@@ -18,9 +18,13 @@ def main(global_config, **settings):
     #    settings.get('authomatic.secret'), callback=groupfinder, hashalg='sha512')
     #authz_policy = ACLAuthorizationPolicy()
     #config = Configurator(root_factory=root_factory, settings=settings)
+    config = Configurator(settings=settings)
     #config.set_authentication_policy(authn_policy)
     #config.set_authorization_policy(authz_policy)
 
+    # beaker session
+    config.include('pyramid_beaker')
+    
     # mailer
     #config.include('pyramid_mailer')
 

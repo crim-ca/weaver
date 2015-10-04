@@ -7,6 +7,7 @@ CHANGES = open(os.path.join(here, 'CHANGES.rst')).read()
 
 requires = [
     'pyramid>=1.5.7',
+    'pyramid_beaker',
     'pymongo',
     'owslib',
     ]
