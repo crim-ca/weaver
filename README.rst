@@ -15,7 +15,6 @@ OWS Proxies:
 * `owsproxy by mapbender <https://github.com/mapbender/owsproxy3>`_  
 * http://www.mapbender.org/OWS_Security_Proxy
 * https://github.com/camptocamp/secureOWS
-* https://pypi.python.org/pypi/papyrus_ogcproxy/
 * https://github.com/elemoine/papyrus_ogcproxy
 * http://proxy4ows.org/
 * http://www.slideshare.net/jachym/proxy4ows
@@ -27,4 +26,6 @@ Other Proxies:
 
 Pyramid:
 
-http://pythonpaste.org/modules/proxy.html
+* https://github.com/elemoine/papyrus
+* https://github.com/elemoine/papyrus_mapproxy
+* http://pythonpaste.org/modules/proxy.html
