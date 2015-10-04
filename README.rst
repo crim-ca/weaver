@@ -10,4 +10,21 @@ pywps-proxy is a prototype implemented in Python with the Pyramid web framework.
 Links
 =====
 
+OWS Proxies:
+
 * `owsproxy by mapbender <https://github.com/mapbender/owsproxy3>`_  
+* http://www.mapbender.org/OWS_Security_Proxy
+* https://github.com/camptocamp/secureOWS
+* https://pypi.python.org/pypi/papyrus_ogcproxy/
+* https://github.com/elemoine/papyrus_ogcproxy
+* http://proxy4ows.org/
+* http://www.slideshare.net/jachym/proxy4ows
+* http://wiki.deegree.org/deegreeWiki/deegree3/SecurityRequirements
+
+Other Proxies:
+
+* http://mapproxy.org/
+
+Pyramid:
+
+http://pythonpaste.org/modules/proxy.html
