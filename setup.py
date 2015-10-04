@@ -8,10 +8,7 @@ CHANGES = open(os.path.join(here, 'CHANGES.rst')).read()
 requires = [
     'pyramid>=1.5.7',
     'pymongo',
-    'pyramid_beaker',
-    'pyramid_mailer',
     'owslib',
-    'pywps', 
     ]
 
 setup(name='pywpsproxy',
