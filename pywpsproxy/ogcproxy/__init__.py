@@ -1,3 +1,5 @@
+# code taken from https://github.com/elemoine/papyrus_ogcproxy
+
 from pyramid.config import Configurator
 
 def add_view(config):
@@ -9,13 +11,13 @@ def add_view(config):
     * ``config``: the ``pyramid.config.Configurator`` object.
     """
     config.add_route('ogcproxy', '/ogcproxy')
-    config.add_view('papyrus_ogcproxy.views:ogcproxy', route_name='ogcproxy')
+    config.add_view('pywpsproxy.ogcproxy.views:ogcproxy', route_name='ogcproxy')
 
 def includeme(config):
     """ The callable making it possible to include papyrus_ogcproxy
     in a Pyramid application.
 
-    Calling ``config.include(papyrus_ogcproxy)`` will result in this
+    Calling ``config.include(pywpsproxy.ogcproxy)`` will result in this
     callable being called.
 
     Arguments:
@@ -24,9 +26,3 @@ def includeme(config):
     """
     add_view(config)
 
-def main(global_config, **settings):
-    """ Return the Pyramid application.
-    """
-    config = Configurator(settings=settings)
-    config.include(includeme)
-    return config.make_wsgi_app()

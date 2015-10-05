@@ -1,3 +1,5 @@
+# code taken from https://github.com/elemoine/papyrus_ogcproxy
+
 from urlparse import urlparse
 from httplib2 import Http
 
