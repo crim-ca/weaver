@@ -131,3 +131,15 @@ class OgcProxy(unittest.TestCase):
         self.assertTrue(isinstance(response, Response))
         self.assertEqual(response.status_int, 200)
         self.assertEqual(response.content_type, 'application/vnd.ogc.wms_xml')
+
+    def test_allowed_content_type_wps(self):
+        from pywpsproxy.ogcproxy.views import ogcproxy
+        from pyramid.testing import DummyRequest
+        url = 'http://localhost:8094/wps?' \
+                  'VERSION=1.0.0&SERVICE=WMS&REQUEST=GetCapabilities'
+        request = DummyRequest(scheme='http', params={'url': url})
+        response = ogcproxy(request)
+        from pyramid.response import Response
+        self.assertTrue(isinstance(response, Response))
+        self.assertEqual(response.status_int, 200)
+        self.assertEqual(response.content_type, 'text/xml')
