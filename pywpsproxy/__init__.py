@@ -6,8 +6,8 @@ def main(global_config, **settings):
     This function returns a Pyramid WSGI application.
     """
     from pyramid.config import Configurator
-    from pyramid.events import subscriber
-    from pyramid.events import NewRequest
+    #from pyramid.events import subscriber
+    #from pyramid.events import NewRequest
     #from pyramid.authentication import AuthTktAuthenticationPolicy
     #from pyramid.authorization import ACLAuthorizationPolicy
     #from phoenix.security import groupfinder, root_factory
@@ -24,7 +24,11 @@ def main(global_config, **settings):
 
     # beaker session
     config.include('pyramid_beaker')
-    
+
+    # ogcproxy
+    from pywpsproxy import ogcproxy
+    config.include(ogcproxy)
+        
     # mailer
     #config.include('pyramid_mailer')
 
@@ -37,16 +41,16 @@ def main(global_config, **settings):
     # MongoDB
     # TODO: maybe move this to models.py?
     #@subscriber(NewRequest)
-    def add_mongodb(event):
-        settings = event.request.registry.settings
-        if settings.get('db') is None:
-            try:
-                from pywpsproxy.models import mongodb
-                settings['db'] = mongodb(event.request.registry)
-            except:
-                logger.exception('Could not connect to mongodb %s.', settings['mongodb.url'])
-        event.request.db = settings.get('db')
-    config.add_subscriber(add_mongodb, NewRequest)
+    ## def add_mongodb(event):
+    ##     settings = event.request.registry.settings
+    ##     if settings.get('db') is None:
+    ##         try:
+    ##             from pywpsproxy.models import mongodb
+    ##             settings['db'] = mongodb(event.request.registry)
+    ##         except:
+    ##             logger.exception('Could not connect to mongodb %s.', settings['mongodb.url'])
+    ##     event.request.db = settings.get('db')
+    #config.add_subscriber(add_mongodb, NewRequest)
     
     config.scan('pywpsproxy')
 
