@@ -3,6 +3,7 @@
 import unittest
 import mock
 from nose import SkipTest
+from nose.plugins.attrib import attr
 
 from pyramid import testing
 
