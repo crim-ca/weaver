@@ -24,6 +24,10 @@ Other Proxies:
 
 * http://mapproxy.org/
 
+Security Filters:
+
+* `FOSS4G Talk <http://www.slideshare.net/JorgeMendesdeJesus/pywps-a-tutorial-for-beginners-and-developers>`_ on using `mod_python <http://www.modpython.org/>`_ with security filter for PyWPS.  
+
 Pyramid:
 
 * https://github.com/elemoine/papyrus
