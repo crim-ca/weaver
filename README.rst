@@ -33,3 +33,9 @@ Pyramid:
 * https://github.com/elemoine/papyrus
 * https://github.com/elemoine/papyrus_mapproxy
 * http://pythonpaste.org/modules/proxy.html
+
+Macaroons Tokens (simple security tokens for distributed systems):
+
+* https://github.com/rescrv/libmacaroons
+* http://hackingdistributed.com/2014/05/16/macaroons-are-better-than-cookies/
+* https://github.com/shirkey/macaroons-kopdar/
