@@ -6,6 +6,13 @@ pywps-proxy is a security proxy for Web Processing Services (WPS). The execution
 
 pywps-proxy is a prototype implemented in Python with the Pyramid web framework.
 
+pywps-proxy comes in two flavours:
+
+* *A security proxy for Web Processing Services implemented in Python*
+* *A security proxy for PyWPS with WSGI application layers*
+
+pywps-proxy is a working title. It's not a *bird* yet. It may become a candidate for the `GeoPython <http://geopython.github.io/>`_ project. 
+
 
 Links
 =====
