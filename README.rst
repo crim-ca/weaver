@@ -46,3 +46,7 @@ Macaroons Tokens (simple security tokens for distributed systems):
 * https://github.com/rescrv/libmacaroons
 * http://hackingdistributed.com/2014/05/16/macaroons-are-better-than-cookies/
 * https://github.com/shirkey/macaroons-kopdar/
+
+JSON Web Token (JWT):
+
+* http://openid.net/specs/draft-jones-oauth-jwt-bearer-03.html
