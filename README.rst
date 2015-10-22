@@ -30,6 +30,7 @@ OWS Proxies:
 Other Proxies:
 
 * http://mapproxy.org/
+* http://www.georchestra.org/ (security proxy for inspire)
 
 Security Filters:
 
