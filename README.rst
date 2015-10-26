@@ -2,6 +2,10 @@
 Welcome to pywps-proxy's documentation!
 =======================================
 
+.. image:: https://travis-ci.org/bird-house/pywps-proxy.svg?branch=master
+   :target: https://travis-ci.org/bird-house/pywps-proxy
+   :alt: Travis Build
+
 .. _introduction:
 
 Introduction
