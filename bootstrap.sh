@@ -30,6 +30,8 @@ install_pkgs() {
     elif [ -f /etc/redhat-release ] ; then
         echo "Install CentOS packages for Birdhouse build ..."
         sudo yum update -y && sudo yum install -y epel-release wget curl gcc-c++ make tar bzip2 unzip
+      	# xlibs used by cairo
+        sudo yum install -y libXrender libXext libX11
         sudo yum install -y vim-common  # anaconda needs xxd
     elif [ `uname -s` = "Darwin" ] ; then
         echo "Install Homebrew packages for Birdhouse build ..."
