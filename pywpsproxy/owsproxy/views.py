@@ -29,6 +29,10 @@ allowed_hosts = (
     "localhost",
     )
 
+ows_registry = {
+    'emu': 'http://localhost:8094/wps'
+    }
+
 class OWSProxy(object):
     def __init__(self, request):
         self.request = request
@@ -42,11 +46,6 @@ class OWSProxy(object):
 
         logger.debug("ows_service = %s", ows_service)
 
-        try:
-            ows_registry = yaml.load(self.request.registry.settings.get('pywpsproxy.ows_registry'))
-            logger.debug("registry = %s", ows_registry)
-        except:
-            logger.exception('ows registry')
         url = ows_registry.get(ows_service)
         logger.debug('url %s', url)
         if url is None:
