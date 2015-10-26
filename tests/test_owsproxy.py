@@ -134,6 +134,7 @@ class OWSProxyTests(unittest.TestCase):
         self.assertEqual(response.content_type, 'text/html')
 
     def test_allowed_content_type_wps(self):
+        raise SkipTest
         from pywpsproxy.owsproxy.views import OWSProxy
         from pyramid.testing import DummyRequest
         request = DummyRequest(scheme='http', params={'VERSION': '1.0.0', 'SERVICE': 'WMS', 'REQUEST': 'GetCapabilities'})
