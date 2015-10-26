@@ -1,6 +1,11 @@
-===========
-pywps-proxy
-===========
+=======================================
+Welcome to pywps-proxy's documentation!
+=======================================
+
+.. _introduction:
+
+Introduction
+============
 
 pywps-proxy is a security proxy for Web Processing Services (WPS). The execution of a WPS process is blocked by the proxy. The proxy service provides access tokens (uuid) which needs to be used to run a WPS process. The access tokens are valid only for a short period of time.
 
@@ -13,6 +18,14 @@ pywps-proxy comes in two flavours:
 
 pywps-proxy is a working title. It's not a *bird* yet. It may become a candidate for the `GeoPython <http://geopython.github.io/>`_ project. 
 
+pywps-proxy is part of the `Birdhouse <http://bird-house.github.io>`_ project.
+
+Contents:
+
+.. toctree::
+   :maxdepth: 2
+
+.. _links:
 
 Links
 =====
@@ -51,3 +64,11 @@ Macaroons Tokens (simple security tokens for distributed systems):
 JSON Web Token (JWT):
 
 * http://openid.net/specs/draft-jones-oauth-jwt-bearer-03.html
+
+
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
