@@ -1,5 +1,3 @@
-import yaml
-
 import urllib
 from urlparse import urlparse
 from httplib2 import Http
