@@ -5,13 +5,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README.rst')).read()
 CHANGES = open(os.path.join(here, 'CHANGES.rst')).read()
 
-requires = [
-    'pyramid>=1.5.7',
-    'pyramid_beaker',
-    'beaker_mongodb',
-    'pymongo',
-    'papyrus_ogcproxy'
-    ]
+reqs = [line.strip() for line in open('requirements/deploy.txt')]
 
 setup(name='pywpsproxy',
       version='0.1.0',
@@ -33,7 +27,7 @@ setup(name='pywpsproxy',
       include_package_data=True,
       zip_safe=False,
       test_suite='pywpsproxy',
-      install_requires=requires,
+      install_requires=reqs,
       entry_points="""\
       [paste.app_factory]
       main = pywpsproxy:main
