@@ -1,4 +1,10 @@
-# code taken from https://github.com/elemoine/papyrus_ogcproxy
+"""
+based on `papyrus_ogcproxy <https://github.com/elemoine/papyrus_ogcproxy>`_
+
+pyramid testing:
+
+* http://docs.pylonsproject.org/projects/pyramid/en/latest/quick_tutorial/routing.html
+"""
 
 import unittest
 import mock
@@ -17,7 +23,7 @@ class IncludeMeTests(unittest.TestCase):
 
     def test(self):
         from pyramid.interfaces import IRoutesMapper
-        from pywpsproxy.ogcproxy import includeme
+        from pywpsproxy.owsproxy import includeme
         views = []
 
         def dummy_add_view(view, route_name=''):
@@ -28,8 +34,8 @@ class IncludeMeTests(unittest.TestCase):
         mapper = self.config.registry.getUtility(IRoutesMapper)
         routes = mapper.get_routes()
         self.assertEqual(len(routes), 1)
-        self.assertEqual(routes[0].name, 'ogcproxy')
-        self.assertEqual(routes[0].path, '/ogcproxy')
+        self.assertEqual(routes[0].name, 'owsproxy')
+        self.assertEqual(routes[0].path, '/owsproxy')
 
 
 class MainTests(unittest.TestCase):
@@ -40,80 +46,80 @@ class MainTests(unittest.TestCase):
         self.assertTrue(isinstance(app, Router))
 
 
-class OgcProxy(unittest.TestCase):
+class OWSProxyTests(unittest.TestCase):
     def setUp(self):
         self.config = testing.setUp()
 
     def tearDown(self):
         testing.tearDown()
-        from pywpsproxy.ogcproxy import views
+        from pywpsproxy.owsproxy import views
         views.allowed_hosts = ()
 
     def test_badrequest_url(self):
-        from pywpsproxy.ogcproxy.views import ogcproxy
+        from pywpsproxy.owsproxy.views import OWSProxy
         from pyramid.testing import DummyRequest
         request = DummyRequest(scheme='http')
-        response = ogcproxy(request)
+        response = OWSProxy(request)
         from pyramid.httpexceptions import HTTPBadRequest
         self.assertTrue(isinstance(response, HTTPBadRequest))
 
     def test_badrequest_netloc(self):
-        from pywpsproxy.ogcproxy.views import ogcproxy
+        from pywpsproxy.owsproxy.views import OWSProxy
         from pyramid.testing import DummyRequest
         request = DummyRequest(scheme='http',
                                params={'url': 'http://'})
-        response = ogcproxy(request)
+        response = OWSProxy(request)
         from pyramid.httpexceptions import HTTPBadRequest
         self.assertTrue(isinstance(response, HTTPBadRequest))
 
     def test_badgateway_url(self):
-        from pywpsproxy.ogcproxy.views import ogcproxy
+        from pywpsproxy.owsproxy.views import OWSProxy
         from pyramid.testing import DummyRequest
         request = DummyRequest(scheme='http',
                                params={'url': 'http://__foo__.__toto__'})
-        response = ogcproxy(request)
+        response = OWSProxy(request)
         from pyramid.httpexceptions import HTTPBadGateway
         self.assertTrue(isinstance(response, HTTPBadGateway))
 
     def test_forbidden_content_type(self):
-        from pywpsproxy.ogcproxy.views import ogcproxy
+        from pywpsproxy.owsproxy.views import OWSProxy
         from pyramid.testing import DummyRequest
         request = DummyRequest(scheme='http',
                                params={'url': 'http://www.google.com'})
-        response = ogcproxy(request)
+        response = OWSProxy(request)
         from pyramid.httpexceptions import HTTPForbidden
         self.assertTrue(isinstance(response, HTTPForbidden))
 
     def test_forbidden_content_type_with_post(self):
-        from pywpsproxy.ogcproxy.views import ogcproxy
+        from pywpsproxy.owsproxy.views import OWSProxy
         from pyramid.testing import DummyRequest
         request = DummyRequest(scheme='http',
                                params={'url': 'http://www.google.com'},
                                post='foo')
-        response = ogcproxy(request)
+        response = OWSProxy(request)
         from pyramid.httpexceptions import HTTPForbidden
         self.assertTrue(isinstance(response, HTTPForbidden))
 
-    @mock.patch('pywpsproxy.ogcproxy.views.Http')
+    @mock.patch('pywpsproxy.owsproxy.views.Http')
     def test_notacceptable_no_content_type(self, MockClass):
         instance = MockClass.return_value
         instance.request.return_value = ({}, 'content')
-        from pywpsproxy.ogcproxy.views import ogcproxy
+        from pywpsproxy.owsproxy.views import OWSProxy
         from pyramid.testing import DummyRequest
         request = DummyRequest(scheme='http',
                                params={'url': 'http://www.google.com'})
-        response = ogcproxy(request)
+        response = OWSProxy(request)
         from pyramid.httpexceptions import HTTPNotAcceptable
         self.assertTrue(isinstance(response, HTTPNotAcceptable))
 
     def test_allowed_host(self):
-        from pywpsproxy.ogcproxy import views
-        from pywpsproxy.ogcproxy.views import ogcproxy
+        from pywpsproxy.owsproxy import views
+        from pywpsproxy.owsproxy.views import OWSProxy
         from pyramid.testing import DummyRequest
         views.allowed_hosts = ('www.google.com')
         request = DummyRequest(scheme='http',
                                params={'url': 'http://www.google.com'})
-        response = ogcproxy(request)
+        response = OWSProxy(request)
         from pyramid.response import Response
         self.assertTrue(isinstance(response, Response))
         self.assertEqual(response.status_int, 200)
@@ -121,24 +127,24 @@ class OgcProxy(unittest.TestCase):
 
     def test_allowed_content_type(self):
         raise SkipTest
-        from pywpsproxy.ogcproxy.views import ogcproxy
+        from pywpsproxy.owsproxy.views import OWSProxy
         from pyramid.testing import DummyRequest
         url = 'http://wms.jpl.nasa.gov/wms.cgi?' \
                   'SERVICE=WMS&REQUEST=GetCapabilities'
         request = DummyRequest(scheme='http', params={'url': url})
-        response = ogcproxy(request)
+        response = OWSProxy(request)
         from pyramid.response import Response
         self.assertTrue(isinstance(response, Response))
         self.assertEqual(response.status_int, 200)
         self.assertEqual(response.content_type, 'application/vnd.ogc.wms_xml')
 
     def test_allowed_content_type_wps(self):
-        from pywpsproxy.ogcproxy.views import ogcproxy
+        from pywpsproxy.owsproxy.views import OWSProxy
         from pyramid.testing import DummyRequest
         url = 'http://localhost:8094/wps?' \
                   'VERSION=1.0.0&SERVICE=WMS&REQUEST=GetCapabilities'
         request = DummyRequest(scheme='http', params={'url': url})
-        response = ogcproxy(request)
+        response = OWSProxy(request)
         from pyramid.response import Response
         self.assertTrue(isinstance(response, Response))
         self.assertEqual(response.status_int, 200)
