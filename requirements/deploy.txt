@@ -2,3 +2,4 @@ pyramid>=1.5.7
 pyramid_beaker
 beaker_mongodb
 pymongo
+httplib2
