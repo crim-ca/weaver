@@ -37,20 +37,6 @@ def main(global_config, **settings):
 
     # routes 
     config.add_route('home', '/')
-
-    # MongoDB
-    # TODO: maybe move this to models.py?
-    #@subscriber(NewRequest)
-    ## def add_mongodb(event):
-    ##     settings = event.request.registry.settings
-    ##     if settings.get('db') is None:
-    ##         try:
-    ##             from pywpsproxy.models import mongodb
-    ##             settings['db'] = mongodb(event.request.registry)
-    ##         except:
-    ##             logger.exception('Could not connect to mongodb %s.', settings['mongodb.url'])
-    ##     event.request.db = settings.get('db')
-    #config.add_subscriber(add_mongodb, NewRequest)
     
     config.scan('pywpsproxy')
 

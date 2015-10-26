@@ -1,12 +1,15 @@
-# code taken from https://github.com/elemoine/papyrus_ogcproxy
+# code based on https://github.com/elemoine/papyrus_ogcproxy
 
 from urlparse import urlparse
 from httplib2 import Http
 
+from pyramid.view import view_config
 from pyramid.httpexceptions import (HTTPForbidden, HTTPBadRequest,
                                     HTTPBadGateway, HTTPNotAcceptable)
 from pyramid.response import Response
 
+import logging
+logger = logging.getLogger(__name__)
 
 allowed_content_types = (
     "application/xml", "text/xml",
@@ -22,12 +25,16 @@ allowed_content_types = (
 
 allowed_hosts = (
     # list allowed hosts here (no port limiting)
+    'localhost',
     )
 
+@view_config(route_name='ogcproxy')
 def ogcproxy(request):
     url = request.params.get("url")
     if url is None:
         return HTTPBadRequest()
+
+    logger.debug("url = %s", url)
 
     # check for full url
     parsed_url = urlparse(url)
@@ -36,11 +43,14 @@ def ogcproxy(request):
 
     # forward request to target (without Host Header)
     http = Http(disable_ssl_certificate_validation=True)
+    logger.debug("headers = %s", dict(request.headers))
+    logger.debug("method = %s", request.method)
+    logger.debug("body = %s", request.body)
     h = dict(request.headers)
     h.pop("Host", h)
     try:
-        resp, content = http.request(url, method=request.method, 
-                                     body=request.body, headers=h)
+        resp, content = http.request(url, method=request.method, body=request.body, headers=h)
+        logger.debug("content = %s", content)
     except:
         return HTTPBadGateway()
 

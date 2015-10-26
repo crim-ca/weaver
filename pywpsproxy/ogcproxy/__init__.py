@@ -11,7 +11,6 @@ def add_view(config):
     * ``config``: the ``pyramid.config.Configurator`` object.
     """
     config.add_route('ogcproxy', '/ogcproxy')
-    config.add_view('pywpsproxy.ogcproxy.views:ogcproxy', route_name='ogcproxy')
 
 def includeme(config):
     """ The callable making it possible to include papyrus_ogcproxy
