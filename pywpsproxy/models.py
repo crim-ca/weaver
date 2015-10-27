@@ -2,6 +2,10 @@ import pymongo
 import uuid
 from datetime import timedelta
 from utils import now, localize_datetime
+from urlparse import urlparse
+
+from pyramid.httpexceptions import (HTTPForbidden, HTTPBadRequest,
+                                    HTTPBadGateway, HTTPNotAcceptable)
 
 import logging
 logger = logging.getLogger(__name__)
@@ -10,6 +14,32 @@ def mongodb(registry):
     settings = registry.settings
     client = pymongo.MongoClient(settings['mongodb.host'], int(settings['mongodb.port']))
     return client[settings['mongodb.db_name']]
+
+
+# ows registry
+
+ows_registry = {
+    'emu': 'http://localhost:8094/wps'
+    }
+
+
+def register_service(url):
+    # check for full url
+    parsed_url = urlparse(url)
+    if not parsed_url.netloc or parsed_url.scheme not in ("http", "https"):
+        return HTTPBadRequest()
+
+def service_url(service_id):
+    logger.debug("service_id = %s", service_id)
+    if service_id is None:
+        return None
+    if not service_id in ows_registry:
+        return None
+    url = ows_registry.get(service_id)
+    logger.debug('url %s', url)
+    return url
+
+# tokens
 
 def create_token(request):
     token = dict(
