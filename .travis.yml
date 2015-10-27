@@ -10,6 +10,6 @@ install:
   - make install
 script:
   - make docs
-  - bin/nosetests tests
+  - make test
 #after_success:
 # - coveralls
