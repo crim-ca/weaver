@@ -15,5 +15,5 @@ def includeme(config):
 
     * ``config``: the ``pyramid.config.Configurator`` object.
     """
-    config.add_route('owsproxy', '/owsproxy/{ows_service}')
+    config.add_route('owsproxy', '/owsproxy/{ows_service}/{token}')
 

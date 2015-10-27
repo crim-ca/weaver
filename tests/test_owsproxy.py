@@ -115,7 +115,8 @@ class OWSProxyTests(unittest.TestCase):
         from pyramid.testing import DummyRequest
         request = DummyRequest(scheme='http',
                                params={'url': 'http://www.google.com'})
-        response = OWSProxy(request)
+        inst = OWSProxy(request)
+        response = inst.owsproxy()
         from pyramid.httpexceptions import HTTPNotAcceptable
         self.assertTrue(isinstance(response, HTTPNotAcceptable))
 
@@ -134,7 +135,10 @@ class OWSProxyTests(unittest.TestCase):
         self.assertEqual(response.content_type, 'text/html')
 
     @attr('online')
-    def test_allowed_content_type_wps(self):
+    @mock.patch('pywpsproxy.owsproxy.views.models')
+    def test_allowed_content_type_wps(self, MockClass):
+        instance = MockClass.return_value
+        instance.is_token_valid.return_value = True
         from pywpsproxy.owsproxy.views import OWSProxy
         from pyramid.testing import DummyRequest
         request = DummyRequest(scheme='http', params={'VERSION': '1.0.0', 'SERVICE': 'WMS', 'REQUEST': 'GetCapabilities'})

@@ -7,6 +7,8 @@ from pyramid.httpexceptions import (HTTPForbidden, HTTPBadRequest,
                                     HTTPBadGateway, HTTPNotAcceptable)
 from pyramid.response import Response
 
+from pywpsproxy import models
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -39,10 +41,17 @@ class OWSProxy(object):
     @view_config(route_name='owsproxy')
     def owsproxy(self):
         ows_service = self.request.matchdict.get('ows_service')
+        logger.debug("ows_service = %s", ows_service)
         if ows_service is None:
             return HTTPBadRequest()
+        
+        if not ows_service in ows_registry:
+            return HTTPBadRequest()
 
-        logger.debug("ows_service = %s", ows_service)
+        token = self.request.matchdict.get('token')
+        logger.debug("token = %s", token)
+        if not models.is_token_valid(self.request, token):
+            return HTTPBadRequest()
 
         url = ows_registry.get(ows_service)
         logger.debug('url %s', url)
