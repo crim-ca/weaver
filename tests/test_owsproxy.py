@@ -120,29 +120,12 @@ class OWSProxyTests(unittest.TestCase):
         from pyramid.httpexceptions import HTTPNotAcceptable
         self.assertTrue(isinstance(response, HTTPNotAcceptable))
 
-    def test_allowed_host(self):
-        raise SkipTest
-        from pywpsproxy.owsproxy import views
-        from pywpsproxy.owsproxy.views import OWSProxy
-        from pyramid.testing import DummyRequest
-        views.allowed_hosts = ('www.google.com')
-        request = DummyRequest(scheme='http',
-                               params={'url': 'http://www.google.com'})
-        response = OWSProxy(request)
-        from pyramid.response import Response
-        self.assertTrue(isinstance(response, Response))
-        self.assertEqual(response.status_int, 200)
-        self.assertEqual(response.content_type, 'text/html')
-
     @attr('online')
-    @mock.patch('pywpsproxy.owsproxy.views.models')
-    def test_allowed_content_type_wps(self, MockClass):
-        instance = MockClass.return_value
-        instance.is_token_valid.return_value = True
+    def test_allowed_content_type_wps(self):
         from pywpsproxy.owsproxy.views import OWSProxy
         from pyramid.testing import DummyRequest
-        request = DummyRequest(scheme='http', params={'VERSION': '1.0.0', 'SERVICE': 'WMS', 'REQUEST': 'GetCapabilities'})
-        request.matchdict['ows_service'] = 'emu'
+        request = DummyRequest(scheme='http', params={'VERSION': '1.0.0', 'SERVICE': 'WPS', 'REQUEST': 'GetCapabilities'})
+        request.matchdict['service_id'] = 'emu'
         inst = OWSProxy(request)
         response = inst.owsproxy()
         from pyramid.response import Response

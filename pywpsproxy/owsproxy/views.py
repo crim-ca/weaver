@@ -73,7 +73,7 @@ class OWSProxy(object):
         if ows_request is None:
             return False
         
-        if ows_request in allowed_requests:
+        if ows_request.lower() in allowed_requests:
             return True
         
         try:
@@ -113,7 +113,7 @@ class OWSProxy(object):
     
     @view_config(route_name='owsproxy')
     @view_config(route_name='owsproxy_secured')
-    def owsproxy_secured(self):
+    def owsproxy(self):
         url = models.service_url(self.request.matchdict.get('service_id'))
         if url is None:
             return HTTPBadRequest()
