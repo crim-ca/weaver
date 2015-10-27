@@ -1,4 +1,5 @@
 import urllib
+from urlparse import urlparse
 from httplib2 import Http
 
 from pyramid.view import view_config
@@ -114,8 +115,16 @@ class OWSProxy(object):
     @view_config(route_name='owsproxy')
     @view_config(route_name='owsproxy_secured')
     def owsproxy(self):
-        url = models.service_url(self.request.matchdict.get('service_id'))
-        if url is None:
+        url = None
+        try:
+            url = models.service_url(self.request, self.request.matchdict.get('service_id'))
+            logger.debug(url)
+        except:
+            return HTTPBadRequest()
+
+        # check for full url
+        parsed_url = urlparse(url)
+        if not parsed_url.netloc or parsed_url.scheme not in ("http", "https"):
             return HTTPBadRequest()
         
         if not self.allow_access():

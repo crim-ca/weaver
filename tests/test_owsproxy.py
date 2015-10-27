@@ -121,7 +121,12 @@ class OWSProxyTests(unittest.TestCase):
         self.assertTrue(isinstance(response, HTTPNotAcceptable))
 
     @attr('online')
-    def test_allowed_content_type_wps(self):
+    @mock.patch('pywpsproxy.owsproxy.views.models')
+    def test_allowed_content_type_wps(self, MockClass):
+        # mocking
+        instance = MockClass.return_value
+        instance.service_url.return_value = 'http://localhost:8094/wps'
+        # real test
         from pywpsproxy.owsproxy.views import OWSProxy
         from pyramid.testing import DummyRequest
         request = DummyRequest(scheme='http', params={'VERSION': '1.0.0', 'SERVICE': 'WPS', 'REQUEST': 'GetCapabilities'})

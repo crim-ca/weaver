@@ -2,12 +2,11 @@ import pymongo
 import uuid
 from datetime import timedelta
 from utils import now, localize_datetime
-from urlparse import urlparse
 
 from pyramid.httpexceptions import (HTTPForbidden, HTTPBadRequest,
                                     HTTPBadGateway, HTTPNotAcceptable)
 
-from exceptions import TokenNotValid
+from exceptions import TokenNotValid, OWSServiceNotFound
 
 import logging
 logger = logging.getLogger(__name__)
@@ -20,26 +19,21 @@ def mongodb(registry):
 
 # ows registry
 
-ows_registry = {
-    'emu': 'http://localhost:8094/wps'
-    }
+def register_service(request, url):
+    service = dict(
+        identifier = str(uuid.uuid1()),
+        url = url)
+    request.db.services.insert_one(service)
+    return request.db.services.find_one({'identifier': service['identifier']})
 
-
-def register_service(url):
-    # check for full url
-    parsed_url = urlparse(url)
-    if not parsed_url.netloc or parsed_url.scheme not in ("http", "https"):
-        return HTTPBadRequest()
-
-def service_url(service_id):
-    logger.debug("service_id = %s", service_id)
-    if service_id is None:
-        return None
-    if not service_id in ows_registry:
-        return None
-    url = ows_registry.get(service_id)
-    logger.debug('url %s', url)
-    return url
+def service_url(request, service_id):
+    service = request.db.services.find_one({'identifier': service_id})
+    if service is None:
+        raise OWSServiceNotFound('service not found')
+    if not 'url' in service:
+        logger.error('service has no url')
+        raise OWSServiceNotFound('service has no url')
+    return service.get('url')
 
 # tokens
 

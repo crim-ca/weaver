@@ -15,5 +15,6 @@ def includeme(config):
 
     * ``config``: the ``pyramid.config.Configurator`` object.
     """
+    config.add_route('register_service', '/admin/register_service')
     config.add_route('create_token', '/admin/create_token')
 
