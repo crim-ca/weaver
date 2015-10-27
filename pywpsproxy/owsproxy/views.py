@@ -64,6 +64,25 @@ class OWSProxy(object):
         logger.debug("request = %s", ows_request)
         return ows_request
 
+    def allow_access(self):
+        ows_service = self.ows_service()
+        if ows_service is None:
+            return False
+
+        ows_request = self.ows_request()
+        if ows_request is None:
+            return False
+        
+        if ows_request in allowed_requests:
+            return True
+        
+        try:
+            tokenid = self.request.matchdict.get('tokenid')
+            models.validate_token(self.request, tokenid)
+        except:
+            return False
+        return True
+    
     def send_request(self, url):
         # TODO: fix way to build url
         logger.debug('params = %s', self.request.params)
@@ -93,39 +112,13 @@ class OWSProxy(object):
         return Response(content, status=resp.status, headers={"Content-Type": ct})
     
     @view_config(route_name='owsproxy')
-    def owsproxy(self):
-        url = models.service_url(self.request.matchdict.get('service_id'))
-        if url is None:
-            return HTTPBadRequest()
-
-        ows_service = self.ows_service()
-        if ows_service is None:
-            return HTTPBadRequest()
-
-        ows_request = self.ows_request()
-        if ows_request is None:
-            return HTTPBadRequest()
-        if not ows_request in allowed_requests:
-            return HTTPForbidden()
-
-        return self.send_request(url)
-
     @view_config(route_name='owsproxy_secured')
     def owsproxy_secured(self):
         url = models.service_url(self.request.matchdict.get('service_id'))
         if url is None:
             return HTTPBadRequest()
         
-        ows_service = self.ows_service()
-        if ows_service is None:
-            return HTTPBadRequest()
-
-        ows_request = self.ows_request()
-        if ows_request is None:
-            return HTTPBadRequest()
-
-        tokenid = self.request.matchdict.get('tokenid')
-        if not models.is_token_valid(self.request, tokenid):
+        if not self.allow_access():
             return HTTPForbidden()
 
         return self.send_request(url)

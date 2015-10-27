@@ -7,6 +7,8 @@ from urlparse import urlparse
 from pyramid.httpexceptions import (HTTPForbidden, HTTPBadRequest,
                                     HTTPBadGateway, HTTPNotAcceptable)
 
+from exceptions import TokenNotValid
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -52,23 +54,20 @@ def create_token(request):
 def get_token(request, identifier):
     return request.db.tokens.find_one({'identifier': identifier})
 
-def is_token_valid(request, identifier):
+def validate_token(request, identifier):
     try:
         token = request.db.tokens.find_one({'identifier': identifier})
         if token is None: # invalid token
-            return False
+            raise TokenNotValid("no token found")
         not_before = localize_datetime(token['creation_time'])
         if not_before > now(): # not before
-            logger.debug('check not before failed')
-            return False
+            return TokenNotValid("token not valid")
         not_after = not_before + timedelta(hours=token['valid_in_hours'])
         if not_after < now(): # not after
-            logger.debug('check not after failed')
-            return False
-    except:
-        logger.exception('failed')
-        return False
-    return True
+            return TokenNotValid("token not valid")
+    except TokenNotValid:
+        logger.warn('accessed with invalid token')
+        raise
 
 def remove_token(request, identifier):
     request.db.tokens.delete_one({'identifier': identifier})
