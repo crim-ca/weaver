@@ -7,11 +7,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 def add_service(request, url):
-    service = dict(
-        identifier = str(uuid.uuid1()),
-        url = url)
-    request.db.services.insert_one(service)
-    return request.db.services.find_one({'identifier': service['identifier']})
+    # TODO: check url ... reduce it to base url
+    # check if service is already registered
+    service = request.db.services.find_one({'url': url})
+    if service is None:
+        service = dict(
+            identifier = str(uuid.uuid1().get_hex()),
+            url = url)
+        request.db.services.insert_one(service)
+        service = request.db.services.find_one({'identifier': service['identifier']})
+    return service
 
 def service_url(request, service_id):
     service = request.db.services.find_one({'identifier': service_id})
@@ -22,6 +27,13 @@ def service_url(request, service_id):
         raise OWSServiceNotFound('service has no url')
     return service.get('url')
 
+
+def clear(request):
+    """
+    removes all services.
+    """
+    request.db.services.drop()
+    
 
 
 

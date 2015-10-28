@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 def create_token(request):
     token = dict(
-        identifier = str(uuid.uuid1()),
+        identifier = str(uuid.uuid1().get_hex()),
         creation_time = now(),
         valid_in_hours = 1)
     request.db.tokens.insert_one(token)
