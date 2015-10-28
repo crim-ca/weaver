@@ -10,4 +10,4 @@ def test_get_random_name():
 def test_get_random_name_retry():
     name = namesgenerator.get_random_name(retry=True)
     assert len(name) > 3
-    assert int(name[-1]) in range(1,11)
+    assert int(name[-1]) >= 0
