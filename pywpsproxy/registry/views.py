@@ -16,12 +16,11 @@ class Registry(object):
         url = self.request.params.get('url')
         identifier = self.request.params.get('identifier')
         if url is None:
-            return HTTPBadRequest()
-        # TODO: check url
+            return HTTPBadRequest("url parameter is required.")
         try:
             service = add_service(self.request, url=url, identifier=identifier)
-        except:
-            return HTTPBadRequest("Could not add service. Service identifier is already used.")
+        except Exception as err:
+            return HTTPBadRequest("Could not add service: %s" % err.message)
         return dict(identifier=service['identifier'], url=service['url'])
 
     @view_config(route_name='clear_services', renderer='json')

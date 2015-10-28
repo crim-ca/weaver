@@ -1,5 +1,4 @@
 import urllib
-from urlparse import urlparse
 from httplib2 import Http
 
 from pyramid.view import view_config
@@ -119,16 +118,9 @@ class OWSProxy(object):
         url = None
         try:
             url = service_url(self.request, self.request.matchdict.get('service_id'))
-            logger.debug(url)
-        except:
-            logger.exception('did not find service url')
-            return HTTPBadRequest()
+        except Exception as err:
+            return HTTPBadRequest("Could not get service url: %s" % (err.message))
 
-        # check for full url
-        parsed_url = urlparse(url)
-        if not parsed_url.netloc or parsed_url.scheme not in ("http", "https"):
-            return HTTPBadRequest()
-        
         if not self.allow_access():
             return HTTPForbidden()
 
