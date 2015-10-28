@@ -18,7 +18,10 @@ class Registry(object):
         if url is None:
             return HTTPBadRequest()
         # TODO: check url
-        service = add_service(self.request, url=url, identifier=identifier)
+        try:
+            service = add_service(self.request, url=url, identifier=identifier)
+        except:
+            return HTTPBadRequest("Could not add service. Service identifier is already used.")
         return dict(identifier=service['identifier'], url=service['url'])
 
     @view_config(route_name='clear_services', renderer='json')
