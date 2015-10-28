@@ -1,7 +1,7 @@
 import pymongo
 
 from pywpsproxy.exceptions import OWSServiceNotFound, OWSServiceException
-from pywpsproxy.utils import namesgenerator
+from pywpsproxy.utils import namesgenerator, baseurl
 
 import logging
 logger = logging.getLogger(__name__)
