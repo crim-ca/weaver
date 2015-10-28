@@ -26,8 +26,9 @@ def main(global_config, **settings):
     config.include('pyramid_beaker')
 
     # owsproxy
-    from pywpsproxy import owsproxy, admin
-    config.include(admin)
+    from pywpsproxy import owsproxy, registry, security
+    config.include(registry)
+    config.include(security)
     config.include(owsproxy)
         
     # mailer
