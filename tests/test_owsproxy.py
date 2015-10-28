@@ -41,7 +41,7 @@ from pyramid import testing
 class MainTests(unittest.TestCase):
     def test(self):
         from pywpsproxy import main
-        app = main({}, a='a')
+        app = main({}, **{'pywpsproxy.secret': 'testsecret'})
         from pyramid.router import Router
         self.assertTrue(isinstance(app, Router))
 

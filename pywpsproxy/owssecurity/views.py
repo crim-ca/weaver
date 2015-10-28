@@ -1,12 +1,12 @@
-from pyramid.view import view_config
-from pyramid.httpexceptions import (HTTPForbidden, HTTPBadRequest,
-                                    HTTPBadGateway, HTTPNotAcceptable)
-from models import create_token
+from pyramid.view import view_config, view_defaults
+
+from .models import create_token
 
 import logging
 logger = logging.getLogger(__name__)
 
-class Admin(object):
+@view_defaults(permission='admin')
+class OWSSecurity(object):
     def __init__(self, request):
         self.request = request
         self.session = self.request.session

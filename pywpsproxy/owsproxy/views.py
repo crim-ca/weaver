@@ -1,7 +1,7 @@
 import urllib
 from httplib2 import Http
 
-from pyramid.view import view_config
+from pyramid.view import view_config, view_defaults
 from pyramid.httpexceptions import (HTTPForbidden, HTTPBadRequest,
                                     HTTPBadGateway, HTTPNotAcceptable)
 from pyramid.response import Response
@@ -32,6 +32,7 @@ allowed_content_types = (
     )
 
 
+@view_defaults(permission='view')
 class OWSProxy(object):
     def __init__(self, request):
         self.request = request
