@@ -6,7 +6,7 @@ from pyramid.httpexceptions import (HTTPForbidden, HTTPBadRequest,
                                     HTTPBadGateway, HTTPNotAcceptable)
 from pyramid.response import Response
 
-from pywpsproxy.security.models import validate_token
+from pywpsproxy.owssecurity.models import validate_token
 from pywpsproxy.registry.models import get_service
 
 import logging
