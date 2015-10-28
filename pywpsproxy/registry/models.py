@@ -6,6 +6,7 @@ from pywpsproxy.utils import namesgenerator
 import logging
 logger = logging.getLogger(__name__)
 
+
 def add_service(request, url, identifier=None):
     # get baseurl
     service_url = baseurl(url)
@@ -23,14 +24,20 @@ def add_service(request, url, identifier=None):
         service = request.db.services.find_one({'identifier': service['identifier']})
     return service
 
+
 def remove_service(request, identifier):
     request.db.services.delete_one({'identifier': identifier})
 
+    
 def list_services(request):
     my_services = []
     for service in request.db.services.find().sort('identifer', pymongo.ASCENDING):
-        my_services.append({'identifier': service['identifier'], 'url': service['url']})
+        my_services.append({
+            'identifier': service['identifier'],
+            'service_url': service['url'],
+            'proxy_url': proxyurl(request, service['identifier'])})
     return my_services
+
 
 def service_url(request, identifier):
     service = request.db.services.find_one({'identifier': identifier})
@@ -46,6 +53,12 @@ def clear(request):
     removes all services.
     """
     request.db.services.drop()
+
+
+def proxyurl(request, identifier):
+    return request.route_url('owsproxy', service_id=identifier)
+
+    
     
 
 

@@ -13,4 +13,4 @@ class Home(object):
     @view_config(route_name='home', renderer='json')
     def view(self):
         services = list_services(self.request)
-        return {'status': 'running', 'services': services}
+        return {'services': services}
