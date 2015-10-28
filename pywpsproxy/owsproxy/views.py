@@ -7,7 +7,7 @@ from pyramid.httpexceptions import (HTTPForbidden, HTTPBadRequest,
 from pyramid.response import Response
 
 from pywpsproxy.security.models import validate_token
-from pywpsproxy.registry.models import service_url
+from pywpsproxy.registry.models import get_service
 
 import logging
 logger = logging.getLogger(__name__)
@@ -26,15 +26,11 @@ allowed_content_types = (
     "application/vnd.ogc.se+xml",           # OGC Service Exception
     "application/vnd.ogc.success+xml",      # OGC Success (SLD Put)
     "application/vnd.ogc.wms_xml",          # WMS Capabilities
-    "application/vnd.ogc.context+xml",      # WMC
     "application/vnd.ogc.gml",              # GML
     "application/vnd.ogc.sld+xml",          # SLD
     "application/vnd.google-earth.kml+xml", # KML
     )
 
-allowed_hosts = (
-    "localhost",
-    )
 
 class OWSProxy(object):
     def __init__(self, request):
@@ -84,10 +80,10 @@ class OWSProxy(object):
             return False
         return True
     
-    def send_request(self, url):
+    def send_request(self, service):
         # TODO: fix way to build url
         logger.debug('params = %s', self.request.params)
-        url = url + '?' + urllib.urlencode(self.request.params)
+        url = service['url'] + '?' + urllib.urlencode(self.request.params)
 
         logger.debug('url %s', url)
 
@@ -104,24 +100,30 @@ class OWSProxy(object):
         if resp.has_key("content-type"):
             ct = resp["content-type"]
             if not ct.split(";")[0] in allowed_content_types:
-                # allow any content type from allowed hosts (any port)
-                if not parsed_url.netloc in allowed_hosts:
-                    return HTTPForbidden()
+                return HTTPForbidden()
         else:
             return HTTPNotAcceptable()
+
+        # replace urls in xml content
+        if 'xml' in ct:
+            content = content.replace(service['url'], service['proxy_url'])
 
         return Response(content, status=resp.status, headers={"Content-Type": ct})
     
     @view_config(route_name='owsproxy')
     @view_config(route_name='owsproxy_secured')
     def owsproxy(self):
-        url = None
+        identifier = self.request.matchdict.get('service_id')
+        if identifier is None:
+            return HTTPBadRequest('Param identifier is required')
+        
+        service = None
         try:
-            url = service_url(self.request, self.request.matchdict.get('service_id'))
+            service = get_service(self.request, identifier)
         except Exception as err:
-            return HTTPBadRequest("Could not get service url: %s" % (err.message))
+            return HTTPBadRequest("Could not find service: %s" % (err.message))
 
         if not self.allow_access():
             return HTTPForbidden()
 
-        return self.send_request(url)
+        return self.send_request(service)

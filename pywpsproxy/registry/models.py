@@ -34,18 +34,20 @@ def list_services(request):
     for service in request.db.services.find().sort('identifer', pymongo.ASCENDING):
         my_services.append({
             'identifier': service['identifier'],
-            'service_url': service['url'],
+            'url': service['url'],
             'proxy_url': proxyurl(request, service['identifier'])})
     return my_services
 
 
-def service_url(request, identifier):
+def get_service(request, identifier):
     service = request.db.services.find_one({'identifier': identifier})
     if service is None:
         raise OWSServiceNotFound('service not found')
     if not 'url' in service:
         raise OWSServiceNotFound('service has no url')
-    return service.get('url')
+    return dict(url=service.get('url'),
+                identifier=identifier,
+                proxy_url=proxyurl(request, service['identifier']))
 
 
 def clear(request):
