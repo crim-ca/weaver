@@ -29,6 +29,15 @@ def add_service(request, url, identifier=None):
         service = request.db.services.find_one({'identifier': service['identifier']})
     return service
 
+def remove_service(request, identifier):
+    request.db.services.delete_one({'identifier': identifier})
+
+def list_services(request):
+    my_services = []
+    for service in request.db.services.find().sort('identifer', pymongo.ASCENDING):
+        my_services.append({'identifier': service['identifier'], 'url': service['url']})
+    return my_services
+
 def service_url(request, identifier):
     service = request.db.services.find_one({'identifier': identifier})
     if service is None:

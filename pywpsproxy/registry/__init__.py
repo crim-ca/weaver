@@ -16,6 +16,8 @@ def includeme(config):
     * ``config``: the ``pyramid.config.Configurator`` object.
     """
     config.add_route('add_service', '/registry/add')
+    config.add_route('remove_service', '/registry/remove')
+    config.add_route('list_services', '/registry/list')
     config.add_route('clear_services', '/registry/clear')
 
 
