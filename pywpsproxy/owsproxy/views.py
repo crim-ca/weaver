@@ -7,7 +7,8 @@ from pyramid.httpexceptions import (HTTPForbidden, HTTPBadRequest,
                                     HTTPBadGateway, HTTPNotAcceptable)
 from pyramid.response import Response
 
-from pywpsproxy import models
+from pywpsproxy.security.models import validate_token
+from pywpsproxy.registry.models import service_url
 
 import logging
 logger = logging.getLogger(__name__)
@@ -79,7 +80,7 @@ class OWSProxy(object):
         
         try:
             tokenid = self.request.matchdict.get('tokenid')
-            models.validate_token(self.request, tokenid)
+            validate_token(self.request, tokenid)
         except:
             return False
         return True
@@ -117,9 +118,10 @@ class OWSProxy(object):
     def owsproxy(self):
         url = None
         try:
-            url = models.service_url(self.request, self.request.matchdict.get('service_id'))
+            url = service_url(self.request, self.request.matchdict.get('service_id'))
             logger.debug(url)
         except:
+            logger.exception('did not find service url')
             return HTTPBadRequest()
 
         # check for full url
