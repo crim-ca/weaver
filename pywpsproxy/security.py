@@ -4,13 +4,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 Admin = 'group.admin'
-Guest = 'group.guest'
 
-def groupfinder(userid, request):
-    if userid == 'admin':
+def groupfinder(username, password, request):
+    if username == 'admin':
         return [Admin]
     else:
-        return [Guest]
+        return []
     return HTTPForbidden()
 
 

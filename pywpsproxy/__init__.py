@@ -1,7 +1,8 @@
 from pyramid.config import Configurator
 #from pyramid.events import subscriber
 from pyramid.events import NewRequest
-from pyramid.authentication import AuthTktAuthenticationPolicy
+#from pyramid.authentication import AuthTktAuthenticationPolicy
+from pyramid.authentication import BasicAuthAuthenticationPolicy
 from pyramid.authorization import ACLAuthorizationPolicy
 
 from .security import groupfinder, root_factory
@@ -28,9 +29,10 @@ def main(global_config, **settings):
     #config.include('pyramid_mailer')
 
     # Security policies
-    authn_policy = AuthTktAuthenticationPolicy(
-        settings['pywpsproxy.secret'], callback=groupfinder,
-        hashalg='sha512')
+    ## authn_policy = AuthTktAuthenticationPolicy(
+    ##     settings['pywpsproxy.secret'], callback=groupfinder,
+    ##     hashalg='sha512')
+    authn_policy = BasicAuthAuthenticationPolicy(check=groupfinder, realm="Birdhouse")
     authz_policy = ACLAuthorizationPolicy()
     config.set_authentication_policy(authn_policy)
     config.set_authorization_policy(authz_policy)
