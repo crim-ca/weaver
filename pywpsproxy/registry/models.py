@@ -6,24 +6,23 @@ from pywpsproxy.exceptions import OWSServiceNotFound
 import logging
 logger = logging.getLogger(__name__)
 
-def add_service(request, url):
+def add_service(request, url, identifier=None):
     # TODO: check url ... reduce it to base url
     # check if service is already registered
     service = request.db.services.find_one({'url': url})
     if service is None:
-        service = dict(
-            identifier = str(uuid.uuid1().get_hex()),
-            url = url)
+        if identifier is None:
+            identifier = uuid.uuid1().get_hex()
+        service = dict(identifier = identifier, url = url)
         request.db.services.insert_one(service)
         service = request.db.services.find_one({'identifier': service['identifier']})
     return service
 
-def service_url(request, service_id):
-    service = request.db.services.find_one({'identifier': service_id})
+def service_url(request, identifier):
+    service = request.db.services.find_one({'identifier': identifier})
     if service is None:
         raise OWSServiceNotFound('service not found')
     if not 'url' in service:
-        logger.error('service has no url')
         raise OWSServiceNotFound('service has no url')
     return service.get('url')
 
