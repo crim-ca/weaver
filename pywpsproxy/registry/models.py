@@ -1,6 +1,4 @@
 import pymongo
-from urlparse import urlparse
-import uuid
 
 from pywpsproxy.exceptions import OWSServiceNotFound, OWSServiceException
 from pywpsproxy.utils import namesgenerator
@@ -9,12 +7,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 def add_service(request, url, identifier=None):
-    # TODO: check url ... reduce it to base url
-    # check for full url
-    parsed_url = urlparse(url)
-    if not parsed_url.netloc or parsed_url.scheme not in ("http", "https"):
-        raise OWSServiceException("bad url.")
-    service_url = "%s://%s%s" % (parsed_url.scheme, parsed_url.netloc, parsed_url.path.strip())
+    # get baseurl
+    service_url = baseurl(url)
     # check if service is already registered
     service = request.db.services.find_one({'url': service_url})
     if service is None:
