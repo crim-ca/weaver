@@ -38,3 +38,10 @@ Macaroons Tokens (simple security tokens for distributed systems):
 JSON Web Token (JWT):
 
 * http://openid.net/specs/draft-jones-oauth-jwt-bearer-03.html
+
+
+Geo XACML (access control XML):
+
+* https://en.wikipedia.org/wiki/XACML
+* https://en.wikipedia.org/wiki/GeoXACML
+

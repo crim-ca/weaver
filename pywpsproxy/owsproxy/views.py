@@ -62,6 +62,9 @@ class OWSProxy(object):
         return ows_request
 
     def allow_access(self):
+        """
+        TODO: provide token both as get and post parameter
+        """
         ows_service = self.ows_service()
         if ows_service is None:
             return False

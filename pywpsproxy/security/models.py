@@ -9,6 +9,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 def create_token(request):
+    """
+    creates a token which is valid for 1 hour.
+
+    TODO: specify valid in hours
+    TODO: maybe specify how often a token can be used
+    """
     token = dict(
         identifier = str(uuid.uuid1().get_hex()),
         creation_time = now(),
