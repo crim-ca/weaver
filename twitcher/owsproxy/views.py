@@ -6,8 +6,8 @@ from pyramid.httpexceptions import (HTTPForbidden, HTTPBadRequest,
                                     HTTPBadGateway, HTTPNotAcceptable)
 from pyramid.response import Response
 
-from pywpsproxy.owssecurity.models import validate_token
-from pywpsproxy.registry.models import get_service
+from twitcher.owssecurity.models import validate_token
+from twitcher.registry.models import get_service
 
 import logging
 logger = logging.getLogger(__name__)

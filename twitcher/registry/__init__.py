@@ -8,7 +8,7 @@ def includeme(config):
     """ The callable makes it possible to include admin
     in a Pyramid application.
 
-    Calling ``config.include(pywpsproxy.registry)`` will result in this
+    Calling ``config.include(twitcher.registry)`` will result in this
     callable being called.
 
     Arguments:

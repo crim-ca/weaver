@@ -1,9 +1,9 @@
 import pymongo
 import uuid
 from datetime import timedelta
-from pywpsproxy.utils import now, localize_datetime
+from twitcher.utils import now, localize_datetime
 
-from pywpsproxy.exceptions import TokenNotValid
+from twitcher.exceptions import TokenNotValid
 
 import logging
 logger = logging.getLogger(__name__)

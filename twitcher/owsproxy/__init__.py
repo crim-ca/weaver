@@ -8,7 +8,7 @@ def includeme(config):
     """ The callable makes it possible to include owsproxy
     in a Pyramid application.
 
-    Calling ``config.include(pywpsproxy.owsproxy)`` will result in this
+    Calling ``config.include(twitcher.owsproxy)`` will result in this
     callable being called.
 
     Arguments:

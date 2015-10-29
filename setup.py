@@ -7,7 +7,7 @@ CHANGES = open(os.path.join(here, 'CHANGES.rst')).read()
 
 reqs = [line.strip() for line in open('requirements/deploy.txt')]
 
-setup(name='pywpsproxy',
+setup(name='twitcher',
       version='0.1.0',
       description='Security Proxy for Web Processing Services (WPS)',
       long_description=README + '\n\n' + CHANGES,
@@ -20,16 +20,16 @@ setup(name='pywpsproxy',
         ],
       author='Birdhouse Developers',
       author_email='',
-      url='https://github.com/bird-house/pywps-proxy.git',
+      url='https://github.com/bird-house/twitcher.git',
       license='Apache License 2.0',
-      keywords='buildout pyramids birdhouse wps pywps esgf security proxy ows ogc',
+      keywords='buildout pyramid birdhouse wps pywps esgf security proxy ows ogc',
       packages=find_packages(),
       include_package_data=True,
       zip_safe=False,
-      test_suite='pywpsproxy',
+      test_suite='twitcher',
       install_requires=reqs,
       entry_points="""\
       [paste.app_factory]
-      main = pywpsproxy:main
+      main = twitcher:main
       """,
       )

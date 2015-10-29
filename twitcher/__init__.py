@@ -20,7 +20,7 @@ def main(global_config, **settings):
     config.include('pyramid_beaker')
 
     # owsproxy
-    from pywpsproxy import owsproxy, registry, owssecurity
+    from twitcher import owsproxy, registry, owssecurity
     config.include(registry)
     config.include(owssecurity)
     config.include(owsproxy)
@@ -30,7 +30,7 @@ def main(global_config, **settings):
 
     # Security policies
     ## authn_policy = AuthTktAuthenticationPolicy(
-    ##     settings['pywpsproxy.secret'], callback=groupfinder,
+    ##     settings['twitcher.secret'], callback=groupfinder,
     ##     hashalg='sha512')
     authn_policy = BasicAuthAuthenticationPolicy(check=groupfinder, realm="Birdhouse")
     authz_policy = ACLAuthorizationPolicy()
@@ -50,14 +50,14 @@ def main(global_config, **settings):
         settings = event.request.registry.settings
         if settings.get('db') is None:
             try:
-                from pywpsproxy.models import mongodb
+                from .models import mongodb
                 settings['db'] = mongodb(event.request.registry)
             except:
                 logger.exception('Could not connect to mongodb')
         event.request.db = settings.get('db')
     config.add_subscriber(add_mongodb, NewRequest)
     
-    config.scan('pywpsproxy')
+    config.scan('twitcher')
 
     return config.make_wsgi_app()
 

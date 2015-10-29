@@ -1,6 +1,6 @@
 from nose.tools import assert_equals, assert_raises
 
-from pywpsproxy import utils
+from twitcher import utils
 
 def test_baseurl():
     assert_equals(utils.baseurl('http://localhost:8094/wps'), 'http://localhost:8094/wps')

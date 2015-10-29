@@ -1,5 +1,5 @@
 #
-# pywps-proxy documentation build configuration file, created by
+# twitcher documentation build configuration file, created by
 # sphinx-quickstart on Fri Oct 23 10:58:16 2015.
 #
 # This file is execfile()d with the current directory set to its
@@ -36,7 +36,7 @@ extensions = [
 ]
 
 autoapi_type = 'python'
-autoapi_dirs = ['../../pywpsproxy']
+autoapi_dirs = ['../../twitcher']
 autoapi_file_pattern = '*.py'
 autoapi_options = ['members', 'undoc-members', 'private-members']
 
@@ -55,7 +55,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'pywps-proxy'
+project = u'twitcher'
 copyright = u'2015, Birdhouse'
 author = u'Birdhouse'
 
@@ -244,7 +244,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-  (master_doc, 'project.tex', u'pywps-proxy Documentation',
+  (master_doc, 'project.tex', u'twitcher Documentation',
    u'Birdhouse', 'manual'),
 ]
 
@@ -274,7 +274,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'project', u'pywps-proxy Documentation',
+    (master_doc, 'project', u'twitcher Documentation',
      [author], 1)
 ]
 
@@ -288,7 +288,7 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  (master_doc, 'project', u'pywps-proxy Documentation',
+  (master_doc, 'project', u'twitcher Documentation',
    author, 'project', 'One line description of project.',
    'Miscellaneous'),
 ]

@@ -1,6 +1,6 @@
 from nose.tools import assert_equals
 
-from pywpsproxy.utils import namesgenerator
+from twitcher.utils import namesgenerator
 
 def test_get_random_name():
     name = namesgenerator.get_random_name()
