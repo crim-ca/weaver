@@ -1,4 +1,4 @@
-from pyramid.view import view_config
+from pyramid.view import view_config, view_defaults
 from pyramid.httpexceptions import (HTTPForbidden, HTTPBadRequest,
                                     HTTPBadGateway, HTTPNotAcceptable)
 
@@ -7,6 +7,7 @@ from models import add_service, remove_service, list_services, clear
 import logging
 logger = logging.getLogger(__name__)
 
+@view_defaults(permission='admin')
 class Registry(object):
     def __init__(self, request):
         self.request = request
