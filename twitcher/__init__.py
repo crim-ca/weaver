@@ -16,6 +16,11 @@ def main(global_config, **settings):
     """
     config = Configurator(settings=settings, root_factory=root_factory)
 
+    # pyramid json-rpc
+    # http://docs.pylonsproject.org/projects/pyramid-rpc/en/latest/jsonrpc.html
+    config.include('pyramid_rpc.jsonrpc')
+    config.add_jsonrpc_endpoint('api', '/api')
+
     # beaker session
     config.include('pyramid_beaker')
 
