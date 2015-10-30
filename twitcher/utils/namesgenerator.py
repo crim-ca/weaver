@@ -85,6 +85,10 @@ right = [
     "chicken",
     "crane",
     "cuckoo",
+    
+    # dodrio: http://bulbapedia.bulbagarden.net/wiki/Dodrio_%28Pok%C3%A9mon%29
+    "dodrio",
+     
     "dove",
     "duck",
     "eagle",
