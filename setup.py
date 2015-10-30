@@ -31,5 +31,7 @@ setup(name='twitcher',
       entry_points="""\
       [paste.app_factory]
       main = twitcher:main
+      [console_scripts]
+      twitcherctl=twitcher.twitcherctl:main
       """,
       )

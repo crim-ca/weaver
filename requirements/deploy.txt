@@ -4,3 +4,4 @@ pyramid_beaker
 beaker_mongodb
 pymongo
 httplib2
+argcomplete
