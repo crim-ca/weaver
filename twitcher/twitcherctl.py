@@ -18,28 +18,39 @@ def _create_https_context(verify=True):
 
 class TwitcherCtl(object):
 
-    def __init__(self, url="https://localhost:38083/api/xmlrpc"):
-        self.url = url
+    def __init__(self):
+        pass
 
         
-    def create_server(self, verify=True):
-        context = _create_https_context(verify=verify)
-        server = xmlrpclib.ServerProxy(self.url, context=context)
+    def create_server(self, hostname="localhost", port=38083, verify_ssl=True):
+        # TODO: build url
+        url = "https://%s:%s/api/xmlrpc" % (hostname, port)
+        context = _create_https_context(verify=verify_ssl)
+        server = xmlrpclib.ServerProxy(url, context=context)
         return server
         
 
     def create_parser(self):
         parser = argparse.ArgumentParser(
             prog="twitcherctl",
-            #usage='''twitcherctl [<options>] <command> [<args>]''',
             description='twitcherctl -- control twitcher proxy service from the cmd line.',
             )
         parser.add_argument("--debug",
                             help="enable debug mode.",
                             action="store_true")
         parser.add_argument("--no-check-certificate",
+                            dest='verify_ssl',
                             help="don't validate the server's certificate.",
-                            action="store_true")
+                            action="store_false")
+        parser.add_argument('--hostname',
+                            default='localhost',
+                            action="store",
+                            )
+        parser.add_argument('--port',
+                            default=38083,
+                            type=type(38083),
+                            action="store",
+                            )
 
         # commands
         subparsers = parser.add_subparsers(
@@ -50,19 +61,18 @@ class TwitcherCtl(object):
             )
 
         # register
-        subparser = subparsers.add_parser('register',
-                    #prog=twitcherctl {0}".format('addService')",
-                    #help="add service"
-                    )
-
+        subparser = subparsers.add_parser('register')
         subparser.add_argument('--url',
                     dest='url',
                     required=True,
                     nargs=1,
                     default='http://localhost:8094/wps',
                     action="store",
-                    help="",
+                    #help="",
                     )
+
+        # list
+        subparser = subparsers.add_parser('list')
 
 
         return parser
@@ -71,8 +81,14 @@ class TwitcherCtl(object):
         if args.debug:
             logger.setLevel(logging.DEBUG)
 
-        server = self.create_server()
-        return None
+        if not args.verify_ssl:
+            logger.warn('disabled certificate verification!')
+            
+        server = self.create_server(hostname=args.hostname, port=args.port, verify_ssl=args.verify_ssl)
+        result = None
+        if args.cmd == 'list':
+            result = server.list()
+        return result
 
 def main():
     logger.setLevel(logging.INFO)
@@ -82,7 +98,7 @@ def main():
     argcomplete.autocomplete(parser)
 
     args = parser.parse_args()
-    ctl.run(args)
+    return ctl.run(args)
 
 if __name__ == '__main__':
     sys.exit(main())
