@@ -26,8 +26,7 @@ def main(global_config, **settings):
     config.include('pyramid_beaker')
 
     # owsproxy
-    from twitcher import owsproxy, registry, owssecurity
-    config.include(registry)
+    from twitcher import owsproxy, owssecurity
     config.include(owssecurity)
     config.include(owsproxy)
         

@@ -7,7 +7,7 @@ from pyramid.response import Response
 import logging
 logger = logging.getLogger(__name__)
 
-from registry.models import list_services
+from registry import list
 
 
 @view_config(route_name='home', renderer='json', permission='view')

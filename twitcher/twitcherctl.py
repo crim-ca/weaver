@@ -31,7 +31,7 @@ class TwitcherCtl(object):
     def create_parser(self):
         parser = argparse.ArgumentParser(
             prog="twitcherctl",
-            usage='''twitcherctl [<options>] <command> [<args>]''',
+            #usage='''twitcherctl [<options>] <command> [<args>]''',
             description='twitcherctl -- control twitcher proxy service from the cmd line.',
             )
         parser.add_argument("--debug",
@@ -40,6 +40,30 @@ class TwitcherCtl(object):
         parser.add_argument("--no-check-certificate",
                             help="don't validate the server's certificate.",
                             action="store_true")
+
+        # commands
+        subparsers = parser.add_subparsers(
+            dest='cmd',
+            title='command',
+            description='List of available commands',
+            #help='Run "birdy <command> -h" to get additional help.'
+            )
+
+        # register
+        subparser = subparsers.add_parser('register',
+                    #prog=twitcherctl {0}".format('addService')",
+                    #help="add service"
+                    )
+
+        subparser.add_argument('--url',
+                    dest='url',
+                    required=True,
+                    nargs=1,
+                    default='http://localhost:8094/wps',
+                    action="store",
+                    help="",
+                    )
+
 
         return parser
 

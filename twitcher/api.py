@@ -1,6 +1,8 @@
 from pyramid.view import view_config, view_defaults
 from pyramid_rpc.xmlrpc import xmlrpc_method
 
+from twitcher import registry
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -12,20 +14,24 @@ class RpcInterface(object):
 
         
     @xmlrpc_method(endpoint='api')
-    def addService(self, url, identifier):
-        return 'add service done'
+    def register(self, url, identifier):
+        registry.register(self.request, url=url, identifier=identifier)
+        return 'register %s done' % url
        
 
     @xmlrpc_method(endpoint='api')
-    def removeService(self, identifier):
+    def unregister(self, identifier):
+        registry.unregister(self.request, identifier=idenfitier)
         return 'remove service %s done' % identifier
 
     
     @xmlrpc_method(endpoint='api')
-    def listServices(self):
-        return 'list services done'
+    def list(self):
+        services = registry.list(self.request)
+        return 'list services %s done' % services
 
     
     @xmlrpc_method(endpoint='api')
-    def clearServices(self):
+    def clear(self):
+        registry.clear(self.request)
         return 'clear services done'

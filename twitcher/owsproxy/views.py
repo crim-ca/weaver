@@ -7,7 +7,7 @@ from pyramid.httpexceptions import (HTTPForbidden, HTTPBadRequest,
 from pyramid.response import Response
 
 from twitcher.owssecurity.models import validate_token
-from twitcher.registry.models import get_service
+from twitcher.registry import get_service
 
 import logging
 logger = logging.getLogger(__name__)
