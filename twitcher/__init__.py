@@ -45,6 +45,9 @@ def main(global_config, **settings):
     # routes 
     config.add_route('home', '/')
 
+    # add tween/middleware
+    config.add_tween('twitcher.middleware.timing_tween_factory')
+
     # MongoDB
     # TODO: maybe move this to models.py?
     #@subscriber(NewRequest)
