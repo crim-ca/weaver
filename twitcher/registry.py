@@ -6,47 +6,47 @@ from twitcher.utils import namesgenerator, baseurl
 import logging
 logger = logging.getLogger(__name__)
 
-def register(request, url, identifier=None):
+def register(request, url, name=None):
     # get baseurl
     service_url = baseurl(url)
     # check if service is already registered
     service = request.db.services.find_one({'url': service_url})
     if service is None:
-        if identifier is None:
-            identifier = namesgenerator.get_random_name()
-            if not request.db.services.find_one({'identifier': identifier}) is None:
-                identifier = namesgenerator.get_random_name(retry=True)
-        service = dict(identifier = identifier, url = service_url)
-        if request.db.services.find_one({'identifier': identifier}):
-            raise OWSServiceException("identifier %s already registered." % (identifier))
+        if name is None:
+            name = namesgenerator.get_random_name()
+            if not request.db.services.find_one({'name': name}) is None:
+                name = namesgenerator.get_random_name(retry=True)
+        service = dict(name=name, url=service_url)
+        if request.db.services.find_one({'name': name}):
+            raise OWSServiceException("service %s already registered." % (name))
         request.db.services.insert_one(service)
-        service = request.db.services.find_one({'identifier': service['identifier']})
+        service = request.db.services.find_one({'name': service['name']})
     return service
 
 
-def unregister(request, identifier):
-    request.db.services.delete_one({'identifier': identifier})
+def unregister(request, name):
+    request.db.services.delete_one({'name': name})
 
     
 def list(request):
     my_services = []
-    for service in request.db.services.find().sort('identifer', pymongo.ASCENDING):
+    for service in request.db.services.find().sort('name', pymongo.ASCENDING):
         my_services.append({
-            'identifier': service['identifier'],
+            'name': service['name'],
             'url': service['url'],
-            'proxy_url': proxyurl(request, service['identifier'])})
+            'proxy_url': proxyurl(request, service['name'])})
     return my_services
 
 
-def get_service(request, identifier):
-    service = request.db.services.find_one({'identifier': identifier})
+def get_service(request, name):
+    service = request.db.services.find_one({'name': name})
     if service is None:
         raise OWSServiceNotFound('service not found')
     if not 'url' in service:
         raise OWSServiceNotFound('service has no url')
     return dict(url=service.get('url'),
-                identifier=identifier,
-                proxy_url=proxyurl(request, service['identifier']))
+                name=name,
+                proxy_url=proxyurl(request, service['name']))
 
 
 def clear(request):
@@ -56,8 +56,8 @@ def clear(request):
     request.db.services.drop()
 
 
-def proxyurl(request, identifier):
-    return request.route_url('owsproxy', service_id=identifier)
+def proxyurl(request, name):
+    return request.route_url('owsproxy', service_id=name)
 
     
     

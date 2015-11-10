@@ -24,7 +24,7 @@ class TwitcherCtl(object):
         
     def create_server(self, hostname="localhost", port=38083, verify_ssl=True):
         # TODO: build url
-        url = "https://%s:%s/api/xmlrpc" % (hostname, port)
+        url = "https://%s:%s" % (hostname, port)
         context = _create_https_context(verify=verify_ssl)
         server = xmlrpclib.ServerProxy(url, context=context)
         return server
@@ -60,6 +60,12 @@ class TwitcherCtl(object):
             #help='Run "birdy <command> -h" to get additional help.'
             )
 
+        # list
+        subparser = subparsers.add_parser('list')
+
+        # clear
+        subparser = subparsers.add_parser('clear')
+
         # register
         subparser = subparsers.add_parser('register')
         subparser.add_argument('--url',
@@ -71,8 +77,15 @@ class TwitcherCtl(object):
                     #help="",
                     )
 
-        # list
-        subparser = subparsers.add_parser('list')
+        # unregister
+        subparser = subparsers.add_parser('unregister')
+        subparser.add_argument('--name',
+                    dest='name',
+                    required=True,
+                    nargs=1,
+                    action="store",
+                    #help="",
+                    )
 
 
         return parser
@@ -88,6 +101,14 @@ class TwitcherCtl(object):
         result = None
         if args.cmd == 'list':
             result = server.list()
+        elif args.cmd == 'register':
+            logger.debug('register %s', args.url[0])
+            result = server.register(args.url[0])
+        elif args.cmd == 'unregister':
+            logger.debug('unregister %s', args.name[0])
+            result = server.unregister(args.name[0])
+        if args.cmd == 'clear':
+            result = server.clear()
         return result
 
 def main():

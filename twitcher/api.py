@@ -6,32 +6,40 @@ from twitcher import registry
 import logging
 logger = logging.getLogger(__name__)
 
-@view_defaults(permission='view')
-class RpcInterface(object):
-    def __init__(self, request):
-        self.request = request
-        self.session = self.request.session
-
-        
-    @xmlrpc_method(endpoint='api')
-    def register(self, url, identifier):
-        registry.register(self.request, url=url, identifier=identifier)
-        return 'register %s done' % url
-       
-
-    @xmlrpc_method(endpoint='api')
-    def unregister(self, identifier):
-        registry.unregister(self.request, identifier=idenfitier)
-        return 'remove service %s done' % identifier
+@xmlrpc_method(endpoint='api')
+def register(request, url):
+    service = registry.register(request, url=url)
+    return service['name']
 
     
-    @xmlrpc_method(endpoint='api')
-    def list(self):
-        services = registry.list(self.request)
-        return 'list services %s done' % services
+@xmlrpc_method(endpoint='api')
+def unregister(request, name):
+    try:
+        registry.unregister(request, name=name)
+    except:
+        logger.exception('unregister failed')
+        return False
+    else:
+        return True
 
     
-    @xmlrpc_method(endpoint='api')
-    def clear(self):
-        registry.clear(self.request)
-        return 'clear services done'
+@xmlrpc_method(endpoint='api')
+def list(request):
+    try:
+        services = registry.list(request)
+        return services
+    except:
+        logger.exception('register failed')
+        return []
+
+    
+@xmlrpc_method(endpoint='api')
+def clear(request):
+    try:
+        registry.clear(request)
+    except:
+        logger.exception('clear failed')
+        return False
+    else:
+        return True
+    

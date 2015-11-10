@@ -20,7 +20,7 @@ def main(global_config, **settings):
     # http://docs.pylonsproject.org/projects/pyramid-rpc/en/latest/xmlrpc.html
     # http://docs.pylonsproject.org/projects/pyramid-rpc/en/latest/jsonrpc.html
     config.include('pyramid_rpc.xmlrpc')
-    config.add_xmlrpc_endpoint('api', '/api/xmlrpc')
+    config.add_xmlrpc_endpoint('api', '/RPC2')
 
     # beaker session
     config.include('pyramid_beaker')
@@ -30,9 +30,6 @@ def main(global_config, **settings):
     config.include(owssecurity)
     config.include(owsproxy)
         
-    # mailer
-    #config.include('pyramid_mailer')
-
     # Security policies
     ## authn_policy = AuthTktAuthenticationPolicy(
     ##     settings['twitcher.secret'], callback=groupfinder,
@@ -62,7 +59,7 @@ def main(global_config, **settings):
         event.request.db = settings.get('db')
     config.add_subscriber(add_mongodb, NewRequest)
     
-    config.scan('twitcher')
+    config.scan()
 
     return config.make_wsgi_app()
 
