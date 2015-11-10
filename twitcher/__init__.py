@@ -47,6 +47,7 @@ def main(global_config, **settings):
 
     # add tween/middleware
     config.add_tween('twitcher.middleware.timing_tween_factory')
+    config.add_tween('twitcher.middleware.dummy_tween_factory')
 
     # MongoDB
     # TODO: maybe move this to models.py?
