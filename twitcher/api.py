@@ -7,15 +7,15 @@ import logging
 logger = logging.getLogger(__name__)
 
 @xmlrpc_method(endpoint='api')
-def register(request, url):
-    service = registry.register(request, url=url)
+def addService(request, url):
+    service = registry.add_service(request, url=url)
     return service['name']
 
     
 @xmlrpc_method(endpoint='api')
-def unregister(request, name):
+def removeService(request, name):
     try:
-        registry.unregister(request, name=name)
+        registry.remove_service(request, name=name)
     except:
         logger.exception('unregister failed')
         return False
@@ -24,9 +24,9 @@ def unregister(request, name):
 
     
 @xmlrpc_method(endpoint='api')
-def list(request):
+def listServices(request):
     try:
-        services = registry.list(request)
+        services = registry.list_services(request)
         return services
     except:
         logger.exception('register failed')
@@ -34,9 +34,9 @@ def list(request):
 
     
 @xmlrpc_method(endpoint='api')
-def clear(request):
+def clearServices(request):
     try:
-        registry.clear(request)
+        registry.clear_service(request)
     except:
         logger.exception('clear failed')
         return False

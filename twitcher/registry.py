@@ -6,7 +6,7 @@ from twitcher.utils import namesgenerator, baseurl
 import logging
 logger = logging.getLogger(__name__)
 
-def register(request, url, name=None):
+def add_service(request, url, name=None):
     # get baseurl
     service_url = baseurl(url)
     # check if service is already registered
@@ -24,11 +24,11 @@ def register(request, url, name=None):
     return service
 
 
-def unregister(request, name):
+def remove_service(request, name):
     request.db.services.delete_one({'name': name})
 
     
-def list(request):
+def list_services(request):
     my_services = []
     for service in request.db.services.find().sort('name', pymongo.ASCENDING):
         my_services.append({
@@ -49,7 +49,7 @@ def get_service(request, name):
                 proxy_url=proxyurl(request, service['name']))
 
 
-def clear(request):
+def clear_services(request):
     """
     removes all services.
     """

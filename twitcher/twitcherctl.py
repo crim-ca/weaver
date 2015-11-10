@@ -67,7 +67,7 @@ class TwitcherCtl(object):
         subparser = subparsers.add_parser('clear')
 
         # register
-        subparser = subparsers.add_parser('register')
+        subparser = subparsers.add_parser('add')
         subparser.add_argument('--url',
                     dest='url',
                     required=True,
@@ -78,7 +78,7 @@ class TwitcherCtl(object):
                     )
 
         # unregister
-        subparser = subparsers.add_parser('unregister')
+        subparser = subparsers.add_parser('remove')
         subparser.add_argument('--name',
                     dest='name',
                     required=True,
@@ -100,15 +100,13 @@ class TwitcherCtl(object):
         server = self.create_server(hostname=args.hostname, port=args.port, verify_ssl=args.verify_ssl)
         result = None
         if args.cmd == 'list':
-            result = server.list()
-        elif args.cmd == 'register':
-            logger.debug('register %s', args.url[0])
-            result = server.register(args.url[0])
-        elif args.cmd == 'unregister':
-            logger.debug('unregister %s', args.name[0])
-            result = server.unregister(args.name[0])
+            result = server.listServices()
+        elif args.cmd == 'add':
+            result = server.addService(args.url[0])
+        elif args.cmd == 'remove':
+            result = server.removeService(args.name[0])
         if args.cmd == 'clear':
-            result = server.clear()
+            result = server.clearServices()
         return result
 
 def main():
