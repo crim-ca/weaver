@@ -45,9 +45,8 @@ def main(global_config, **settings):
     # routes 
     config.add_route('home', '/')
 
-    # add tween
-    config.add_tween('twitcher.tween.timing_tween_factory')
-    config.add_tween('twitcher.tween.dummy_tween_factory')
+    # add tweens
+    config.add_tween('twitcher.tween.TokenSecurityTween')
 
     # MongoDB
     # TODO: maybe move this to models.py?
