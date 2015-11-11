@@ -3,6 +3,7 @@ The owsproxy is based on `papyrus_ogcproxy <https://github.com/elemoine/papyrus_
 """
 
 from pyramid.config import Configurator
+import pyramid.tweens
 from twitcher.tweens import OWS_SECURITY
 
 def includeme(config):
@@ -20,5 +21,5 @@ def includeme(config):
     config.add_route('owsproxy_secured', '/owsproxy/{service_id}/{tokenid}')
 
     # add tweens
-    config.add_tween(OWS_SECURITY)
+    config.add_tween(OWS_SECURITY, under=pyramid.tweens.EXCVIEW)
 

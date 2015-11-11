@@ -48,29 +48,27 @@ def validate_ows_request(request):
 
 def route_path_protected(request):
     try:
-        route_path = request.current_route_path()
         # TODO: configure path which should be secured
-        return 'owsproxy' in route_path
+        logger.debug('route path %s', request.path)
+        return 'owsproxy' in request.path
     except ValueError:
-        return False
+        logger.exception('route path check failed')
+        return True
 
     
 def ows_security_tween_factory(handler, registry):
     """ A :term:`tween` factory which produces a tween which raises an exception
     if access to OWS service is not allowed."""
 
-    # check if tween is enabled
-    #if asbool(registry.settings.get('do_ows_security')):
-    if True:
-        def ows_security_tween(request):
-            if route_path_protected(request):
-                validate_ows_service(request)
-                validate_ows_request(request)
-            response = handler(request)
-            return response
-        return ows_security_tween
-        # if ows security tween is not enabled return original handler
-    return handler
+    def ows_security_tween(request):
+        if route_path_protected(request):
+            logger.debug('checking request ...')
+            validate_ows_service(request)
+            validate_ows_request(request)
+        else:
+            logger.warn('unprotected access')
+        return handler(request)
+    return ows_security_tween
 
 OWS_SECURITY = 'twitcher.tweens.ows_security_tween_factory'
 

@@ -34,7 +34,10 @@ def get_token(request, identifier):
 
 def validate_token(request):
     try:
-        tokenid = request.matchdict.get('tokenid')
+        tokenid = None
+        if not request.matchdict:
+            # TODO: this is not the way to get the tokenid
+            tokenid = request.path_info.split('/')[2]
         token = request.db.tokens.find_one({'identifier': tokenid})
         if token is None: # invalid token
             raise HTTPTokenNotValid("no token found")
@@ -44,8 +47,8 @@ def validate_token(request):
         not_after = not_before + timedelta(hours=token['valid_in_hours'])
         if not_after < now(): # not after
             return HTTPTokenNotValid("token not valid")
-    except HTTPTokenNotValid:
-        logger.warn('accessed with invalid token')
+    except:
+        logger.exception('token validation failed. %s', request)
         raise
 
 

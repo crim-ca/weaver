@@ -60,6 +60,14 @@ class TwitcherCtl(object):
             #help='Run "birdy <command> -h" to get additional help.'
             )
 
+        # token
+        # -----
+        subparser = subparsers.add_parser('createtoken')
+        
+
+        # service registry
+        # ----------------
+        
         # list
         subparser = subparsers.add_parser('list')
 
@@ -87,7 +95,6 @@ class TwitcherCtl(object):
                     #help="",
                     )
 
-
         return parser
 
     def run(self, args):
@@ -105,8 +112,10 @@ class TwitcherCtl(object):
             result = server.addService(args.url[0])
         elif args.cmd == 'remove':
             result = server.removeService(args.name[0])
-        if args.cmd == 'clear':
+        elif args.cmd == 'clear':
             result = server.clearServices()
+        elif args.cmd == 'createtoken':
+            result = server.createToken()
         return result
 
 def main():
