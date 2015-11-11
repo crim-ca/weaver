@@ -72,5 +72,5 @@ def ows_security_tween_factory(handler, registry):
         # if ows security tween is not enabled return original handler
     return handler
 
-OWS_SECURITY = 'twitcher.tween.ows_security_tween_factory'
+OWS_SECURITY = 'twitcher.tweens.ows_security_tween_factory'
 

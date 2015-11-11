@@ -3,7 +3,7 @@ The owsproxy is based on `papyrus_ogcproxy <https://github.com/elemoine/papyrus_
 """
 
 from pyramid.config import Configurator
-from twitcher.tween import OWS_SECURITY
+from twitcher.tweens import OWS_SECURITY
 
 def includeme(config):
     """ The callable makes it possible to include owsproxy
