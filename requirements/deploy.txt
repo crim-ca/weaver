@@ -1,6 +1,8 @@
 pyramid>=1.5.7
 pyramid_rpc
 pyramid_beaker
+paste
+pastedeploy
 beaker_mongodb
 pymongo
 httplib2
