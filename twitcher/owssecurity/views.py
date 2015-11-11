@@ -1,6 +1,6 @@
 from pyramid.view import view_config, view_defaults
 
-from .models import create_token
+from twitcher.tokenstore import create_token
 
 import logging
 logger = logging.getLogger(__name__)

@@ -6,7 +6,7 @@ from pyramid.httpexceptions import (HTTPForbidden, HTTPBadRequest,
                                     HTTPBadGateway, HTTPNotAcceptable)
 from pyramid.response import Response
 
-from twitcher.owssecurity.models import validate_token
+from twitcher.tokenstore import validate_token
 from twitcher.registry import get_service
 
 import logging
