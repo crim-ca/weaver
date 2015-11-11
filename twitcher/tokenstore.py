@@ -3,10 +3,11 @@ import uuid
 from datetime import timedelta
 from twitcher.utils import now, localize_datetime
 
-from twitcher.exceptions import TokenNotValid
+from twitcher.exceptions import HTTPTokenNotValid
 
 import logging
 logger = logging.getLogger(__name__)
+
 
 def create_token(request):
     """
@@ -22,26 +23,32 @@ def create_token(request):
     request.db.tokens.insert_one(token)
     return request.db.tokens.find_one({'identifier':token['identifier']})
 
+
+def remove_token(request, tokenid):
+    request.db.tokens.delete_one({'identifier': tokenid})
+
+    
 def get_token(request, identifier):
     return request.db.tokens.find_one({'identifier': identifier})
 
-def validate_token(request, identifier):
+
+def validate_token(request):
     try:
-        token = request.db.tokens.find_one({'identifier': identifier})
+        tokenid = request.matchdict.get('tokenid')
+        token = request.db.tokens.find_one({'identifier': tokenid})
         if token is None: # invalid token
-            raise TokenNotValid("no token found")
+            raise HTTPTokenNotValid("no token found")
         not_before = localize_datetime(token['creation_time'])
         if not_before > now(): # not before
-            return TokenNotValid("token not valid")
+            return HTTPTokenNotValid("token not valid")
         not_after = not_before + timedelta(hours=token['valid_in_hours'])
         if not_after < now(): # not after
-            return TokenNotValid("token not valid")
-    except TokenNotValid:
+            return HTTPTokenNotValid("token not valid")
+    except HTTPTokenNotValid:
         logger.warn('accessed with invalid token')
         raise
 
-def remove_token(request, identifier):
-    request.db.tokens.delete_one({'identifier': identifier})
+
     
 
 

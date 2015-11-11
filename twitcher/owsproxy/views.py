@@ -6,19 +6,11 @@ from pyramid.httpexceptions import (HTTPForbidden, HTTPBadRequest,
                                     HTTPBadGateway, HTTPNotAcceptable)
 from pyramid.response import Response
 
-from twitcher.tokenstore import validate_token
 from twitcher.registry import get_service
 
 import logging
 logger = logging.getLogger(__name__)
 
-allowed_service_types = (
-    'wps',
-    )
-
-allowed_requests = (
-    'getcapabilities', 'describeprocess',
-    )
 
 allowed_content_types = (
     "application/xml", "text/xml",
@@ -37,53 +29,8 @@ class OWSProxy(object):
     def __init__(self, request):
         self.request = request
         self.session = self.request.session
-        
-    def ows_service(self):
-        ows_service = None
-        if 'service' in self.request.params:
-            ows_service = self.request.params['service']
-        elif 'SERVICE' in self.request.params:
-            ows_service = self.request.params['SERVICE']
 
-        if ows_service is not None:
-            if ows_service.lower() in allowed_service_types:
-                ows_service = ows_service.lower()
-            else:
-                ows_service = None
-        logger.debug("service = %s", ows_service)
-        return ows_service
-
-    def ows_request(self):
-        ows_request = None
-        if 'request' in self.request.params:
-            ows_request = self.request.params['request']
-        elif 'REQUEST' in self.request.params:
-            ows_request = self.request.params['REQUEST']
-        logger.debug("request = %s", ows_request)
-        return ows_request
-
-    def allow_access(self):
-        """
-        TODO: provide token both as get and post parameter
-        """
-        ows_service = self.ows_service()
-        if ows_service is None:
-            return False
-
-        ows_request = self.ows_request()
-        if ows_request is None:
-            return False
-        
-        if ows_request.lower() in allowed_requests:
-            return True
-        
-        try:
-            tokenid = self.request.matchdict.get('tokenid')
-            validate_token(self.request, tokenid)
-        except:
-            return False
-        return True
-    
+          
     def send_request(self, service):
         # TODO: fix way to build url
         logger.debug('params = %s', self.request.params)
@@ -126,8 +73,5 @@ class OWSProxy(object):
             service = get_service(self.request, identifier)
         except Exception as err:
             return HTTPBadRequest("Could not find service: %s" % (err.message))
-
-        if not self.allow_access():
-            return HTTPForbidden()
 
         return self.send_request(service)

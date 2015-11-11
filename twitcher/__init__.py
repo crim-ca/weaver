@@ -5,7 +5,8 @@ from pyramid.events import NewRequest
 from pyramid.authentication import BasicAuthAuthenticationPolicy
 from pyramid.authorization import ACLAuthorizationPolicy
 
-from .security import groupfinder, root_factory
+from twitcher.security import groupfinder, root_factory
+from twitcher import owsproxy
 
 import logging
 logger = logging.getLogger(__name__)
@@ -16,9 +17,8 @@ def main(global_config, **settings):
     """
     config = Configurator(settings=settings, root_factory=root_factory)
 
-    # pyramid json-rpc
+    # pyramid xml-rpc
     # http://docs.pylonsproject.org/projects/pyramid-rpc/en/latest/xmlrpc.html
-    # http://docs.pylonsproject.org/projects/pyramid-rpc/en/latest/jsonrpc.html
     config.include('pyramid_rpc.xmlrpc')
     config.add_xmlrpc_endpoint('api', '/RPC2')
 
@@ -26,8 +26,6 @@ def main(global_config, **settings):
     config.include('pyramid_beaker')
 
     # owsproxy
-    from twitcher import owsproxy, owssecurity
-    config.include(owssecurity)
     config.include(owsproxy)
         
     # Security policies
@@ -44,9 +42,6 @@ def main(global_config, **settings):
 
     # routes 
     config.add_route('home', '/')
-
-    # add tweens
-    config.add_tween('twitcher.tween.TokenSecurityTween')
 
     # MongoDB
     # TODO: maybe move this to models.py?

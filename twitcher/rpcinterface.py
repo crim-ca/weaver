@@ -1,10 +1,19 @@
 from pyramid.view import view_config, view_defaults
 from pyramid_rpc.xmlrpc import xmlrpc_method
 
-from twitcher import registry
+from twitcher import registry, tokenstore
 
 import logging
 logger = logging.getLogger(__name__)
+
+# token management
+
+@xmlrpc_method(endpoint='api')
+def createToken(request):
+    token = tokenstore.create_token(request)
+    return token['identifier']
+
+# service registry
 
 @xmlrpc_method(endpoint='api')
 def addService(request, url):
