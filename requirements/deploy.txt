@@ -5,3 +5,4 @@ beaker_mongodb
 pymongo
 httplib2
 argcomplete
+pywps
