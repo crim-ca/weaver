@@ -100,7 +100,7 @@ class AccessToken(dict):
         """
         Access token is not valid before this time.
         """
-        return localize_datetime(self.creation_time)
+        return self.creation_time
 
     
     def not_after(self):
