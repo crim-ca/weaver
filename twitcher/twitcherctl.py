@@ -62,7 +62,7 @@ class TwitcherCtl(object):
 
         # token
         # -----
-        subparser = subparsers.add_parser('createtoken')
+        subparser = subparsers.add_parser('gentoken')
         
 
         # service registry
@@ -114,8 +114,8 @@ class TwitcherCtl(object):
             result = server.removeService(args.name[0])
         elif args.cmd == 'clear':
             result = server.clearServices()
-        elif args.cmd == 'createtoken':
-            result = server.createToken()
+        elif args.cmd == 'gentoken':
+            result = server.generateToken()
         return result
 
 def main():

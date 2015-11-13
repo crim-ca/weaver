@@ -9,9 +9,10 @@ logger = logging.getLogger(__name__)
 # token management
 
 @xmlrpc_method(endpoint='api')
-def createToken(request):
-    token = tokenstore.create_token(request)
-    return token['identifier']
+def generateToken(request):
+    access_token = tokens.generate_access_token(request)
+    return access_token.access_token
+
 
 # service registry
 

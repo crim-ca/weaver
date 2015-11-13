@@ -1,6 +1,6 @@
 from pyramid.settings import asbool
 
-from twitcher.tokens import validate_token
+from twitcher.tokens import validate_access_token
 from twitcher.exceptions import HTTPServiceNotAllowed
 
 import logging
@@ -42,15 +42,15 @@ def validate_ows_request(request):
         ows_request = request.params['REQUEST']
 
     if not ows_request in allowed_requests:
-        validate_token(request)
+        validate_access_token(request)
     return ows_request
 
 
-def route_path_protected(request):
+def is_route_path_protected(request):
     try:
         # TODO: configure path which should be secured
-        logger.debug('route path %s', request.path)
-        return 'owsproxy' in request.path
+        logger.debug('route path %s', request.path_info)
+        return 'owsproxy' in request.path_info
     except ValueError:
         logger.exception('route path check failed')
         return True
@@ -61,8 +61,7 @@ def ows_security_tween_factory(handler, registry):
     if access to OWS service is not allowed."""
 
     def ows_security_tween(request):
-        if route_path_protected(request):
-            logger.debug('checking request ...')
+        if is_route_path_protected(request):
             validate_ows_service(request)
             validate_ows_request(request)
         else:
