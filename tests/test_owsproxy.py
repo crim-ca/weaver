@@ -41,7 +41,9 @@ from pyramid import testing
 class MainTests(unittest.TestCase):
     def test(self):
         from twitcher import main
-        app = main({}, **{'twitcher.secret': 'testsecret'})
+        # TODO: fix mongodb init
+        app = main({}, **{'twitcher.secret': 'testsecret',
+                          'mongodb.host': 'localhost', 'mongodb.port': '27027', 'mongodb.db_name': 'testdb'})
         from pyramid.router import Router
         self.assertTrue(isinstance(app, Router))
 
