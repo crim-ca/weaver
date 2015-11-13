@@ -1,8 +1,7 @@
-import pymongo
 import uuid
 from datetime import timedelta
-from twitcher.utils import now, localize_datetime
 
+from twitcher.utils import now, localize_datetime
 from twitcher.exceptions import HTTPTokenNotValid
 
 import logging

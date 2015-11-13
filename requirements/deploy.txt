@@ -1,6 +1,7 @@
 pyramid>=1.5.7
 pyramid_rpc
 pyramid_beaker
+webob
 paste
 pastedeploy
 beaker_mongodb
