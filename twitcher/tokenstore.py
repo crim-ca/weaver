@@ -34,10 +34,8 @@ def get_token(request, identifier):
 
 def validate_token(request):
     try:
-        tokenid = None
-        if not request.matchdict:
-            # TODO: this is not the way to get the tokenid
-            tokenid = request.path_info.split('/')[2]
+        # TODO: this is not the way to get the tokenid
+        tokenid = request.path_info.split('/')[3]
         token = request.db.tokens.find_one({'identifier': tokenid})
         if token is None: # invalid token
             raise HTTPTokenNotValid("no token found")

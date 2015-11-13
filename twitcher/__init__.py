@@ -1,12 +1,13 @@
 from pyramid.config import Configurator
 #from pyramid.events import subscriber
-from pyramid.events import NewRequest
+#from pyramid.events import NewRequest
 #from pyramid.authentication import AuthTktAuthenticationPolicy
 from pyramid.authentication import BasicAuthAuthenticationPolicy
 from pyramid.authorization import ACLAuthorizationPolicy
 
 from twitcher.security import groupfinder, root_factory
 from twitcher import owsproxy
+from twitcher.models import mongodb
 
 import logging
 logger = logging.getLogger(__name__)
@@ -43,14 +44,15 @@ def main(global_config, **settings):
     # MongoDB
     # http://docs.pylonsproject.org/projects/pyramid-cookbook/en/latest/database/mongodb.html
     #@subscriber(NewRequest)
-    def add_mongodb(event):
-        settings = event.request.registry.settings
-        try:
-            from twitcher.models import mongodb
-            event.request.registry.db = mongodb(event.request.registry)
-        except:
-            logger.exception('Could not connect to mongodb')
-    config.add_subscriber(add_mongodb, NewRequest)
+    ## def add_mongodb(event):
+    ##     settings = event.request.registry.settings
+    ##     try:
+    ##         event.request.registry.db = mongodb(event.request.registry)
+    ##     except:
+    ##         logger.exception('Could not connect to mongodb')
+    ## config.add_subscriber(add_mongodb, NewRequest)
+    
+    config.registry.db = mongodb(config.registry)
 
     def add_db(request):
         db = config.registry.db
