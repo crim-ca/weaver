@@ -2,17 +2,23 @@ from datetime import datetime
 import pytz
 from urlparse import urlparse
 
+import logging
+logger = logging.getLogger(__name__)
+
 def now():
     return localize_datetime(datetime.utcnow())
 
 def localize_datetime(dt, tz_name='UTC'):
     """Provide a timzeone-aware object for a given datetime and timezone name
     """
-    assert dt.tzinfo == None
-    utc = pytz.timezone('UTC')
-    aware = utc.localize(dt)
-    timezone = pytz.timezone(tz_name)
-    tz_aware_dt = aware.astimezone(timezone)
+    tz_aware_dt = dt
+    if dt.tzinfo is None:
+        utc = pytz.timezone('UTC')
+        aware = utc.localize(dt)
+        timezone = pytz.timezone(tz_name)
+        tz_aware_dt = aware.astimezone(timezone)
+    else:
+        logger.warn('tzinfo already set')
     return tz_aware_dt
 
 def baseurl(url):
