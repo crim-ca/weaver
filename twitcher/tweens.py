@@ -1,6 +1,6 @@
 from pyramid.settings import asbool
 
-from twitcher.tokenstore import validate_token
+from twitcher.tokens import validate_token
 from twitcher.exceptions import HTTPServiceNotAllowed
 
 import logging

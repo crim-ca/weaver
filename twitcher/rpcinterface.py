@@ -1,7 +1,7 @@
 from pyramid.view import view_config, view_defaults
 from pyramid_rpc.xmlrpc import xmlrpc_method
 
-from twitcher import registry, tokenstore
+from twitcher import registry, tokens
 
 import logging
 logger = logging.getLogger(__name__)
