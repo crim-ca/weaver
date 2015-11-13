@@ -22,6 +22,14 @@ Other Proxies:
 Security Filters:
 
 * `FOSS4G Talk <http://www.slideshare.net/JorgeMendesdeJesus/pywps-a-tutorial-for-beginners-and-developers>`_ on using `mod_python <http://www.modpython.org/>`_ with security filter for PyWPS.  
+* WSGI middleware for oauth: https://pypi.python.org/pypi/wsgioauth
+* https://pypi.python.org/pypi/stups-tokens
+* http://docs.services.mozilla.com/token/index.html
+* https://github.com/mozilla-services/tokenserver
+* https://www.mapbox.com/developers/api/
+* https://pypi.python.org/pypi/django-access-tokens
+* https://github.com/jpulgarin/django-tokenapi
+* https://github.com/repoze/repoze.who
 
 Pyramid:
 
@@ -38,6 +46,7 @@ Macaroons Tokens (simple security tokens for distributed systems):
 JSON Web Token (JWT):
 
 * http://openid.net/specs/draft-jones-oauth-jwt-bearer-03.html
+* https://pypi.python.org/pypi/pyramid_jwtauth
 
 
 Geo XACML (access control XML):
