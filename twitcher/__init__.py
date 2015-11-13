@@ -29,9 +29,6 @@ def main(global_config, **settings):
     config.include(owsproxy)
         
     # Security policies
-    ## authn_policy = AuthTktAuthenticationPolicy(
-    ##     settings['twitcher.secret'], callback=groupfinder,
-    ##     hashalg='sha512')
     authn_policy = BasicAuthAuthenticationPolicy(check=groupfinder, realm="Birdhouse")
     authz_policy = ACLAuthorizationPolicy()
     config.set_authentication_policy(authn_policy)
@@ -44,18 +41,24 @@ def main(global_config, **settings):
     config.add_route('home', '/')
 
     # MongoDB
-    # TODO: maybe move this to models.py?
+    # http://docs.pylonsproject.org/projects/pyramid-cookbook/en/latest/database/mongodb.html
     #@subscriber(NewRequest)
     def add_mongodb(event):
         settings = event.request.registry.settings
-        if settings.get('db') is None:
-            try:
-                from .models import mongodb
-                settings['db'] = mongodb(event.request.registry)
-            except:
-                logger.exception('Could not connect to mongodb')
-        event.request.db = settings.get('db')
+        try:
+            from twitcher.models import mongodb
+            event.request.registry.db = mongodb(event.request.registry)
+        except:
+            logger.exception('Could not connect to mongodb')
     config.add_subscriber(add_mongodb, NewRequest)
+
+    def add_db(request):
+        db = config.registry.db
+        #if db_url.username and db_url.password:
+        #    db.authenticate(db_url.username, db_url.password)
+        return db
+
+    config.add_request_method(add_db, 'db', reify=True)
     
     config.scan()
 
