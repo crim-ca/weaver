@@ -38,7 +38,7 @@ class TwitcherCtl(object):
         parser.add_argument("--debug",
                             help="enable debug mode.",
                             action="store_true")
-        parser.add_argument("--no-check-certificate",
+        parser.add_argument("-x", "--no-check-certificate",
                             dest='verify_ssl',
                             help="don't validate the server's certificate.",
                             action="store_false")
