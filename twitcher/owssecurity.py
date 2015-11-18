@@ -1,5 +1,5 @@
 from twitcher.tokens import validate_access_token
-from twitcher.exceptions import HTTPServiceNotAllowed
+from twitcher.httpexceptions import OWSServiceNotAllowed
 
 import logging
 logger = logging.getLogger(__name__)
@@ -23,12 +23,12 @@ def validate_ows_service(request):
         ows_service = request.params['SERVICE']
 
     if ows_service is None:
-        raise HTTPServiceNotAllowed()
+        raise OWSServiceNotAllowed()
 
     if ows_service.lower() in allowed_service_types:
         ows_service = ows_service.lower()
     else:
-        raise HTTPServiceNotAllowed()
+        raise OWSServiceNotAllowed()
     return ows_service
 
 

@@ -2,7 +2,7 @@ import uuid
 from datetime import timedelta
 
 from twitcher.utils import now, localize_datetime
-from twitcher.exceptions import HTTPTokenNotValid
+from twitcher.httpexceptions import OWSTokenNotValid
 
 import logging
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ def validate_access_token(request):
     except:
         # TODO: handle exceptions
         logger.exception('token validation failed!')
-        raise HTTPTokenNotValid()
+        raise OWSTokenNotValid()
 
 def generate_access_token(request):
     storage = TokenStorage(request)
