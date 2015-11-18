@@ -2,7 +2,7 @@ import uuid
 from datetime import timedelta
 
 from twitcher.utils import now, localize_datetime
-from twitcher.httpexceptions import OWSTokenNotValid
+from twitcher.owsexceptions import OWSTokenNotValid
 
 import logging
 logger = logging.getLogger(__name__)

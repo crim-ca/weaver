@@ -1,5 +1,5 @@
 from twitcher.tokens import validate_access_token
-from twitcher.httpexceptions import OWSServiceNotAllowed
+from twitcher.owsexceptions import OWSServiceNotAllowed
 
 import logging
 logger = logging.getLogger(__name__)
