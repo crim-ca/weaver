@@ -25,7 +25,7 @@ def addService(request, url):
 @xmlrpc_method(endpoint='api')
 def removeService(request, name):
     try:
-        registry.remove_service(request, name=name)
+        registry.remove_service(request, service_name=name)
     except:
         logger.exception('unregister failed')
         return False
