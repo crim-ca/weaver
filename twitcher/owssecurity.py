@@ -48,7 +48,7 @@ def is_route_path_protected(request):
     try:
         # TODO: configure path which should be secured
         logger.debug('path %s', request.path)
-        return 'owsproxy' in request.path or 'wps' in request.path
+        return 'ows' in request.path
     except ValueError:
         logger.exception('route path check failed')
         return True

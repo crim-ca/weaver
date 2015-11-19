@@ -17,8 +17,8 @@ def includeme(config):
 
     * ``config``: the ``pyramid.config.Configurator`` object.
     """
-    config.add_route('owsproxy', '/owsproxy/{service_id}')
-    config.add_route('owsproxy_secured', '/owsproxy/{service_id}/{tokenid}')
+    config.add_route('owsproxy', '/ows/proxy/{service_id}')
+    config.add_route('owsproxy_secured', '/ows/proxy/{service_id}/{tokenid}')
 
     # add tweens
     config.add_tween(OWS_SECURITY, under=pyramid.tweens.EXCVIEW)
