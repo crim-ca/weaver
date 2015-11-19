@@ -22,11 +22,12 @@ class TwitcherCtl(object):
         pass
 
         
-    def create_server(self, hostname="localhost", port=38083, verify_ssl=True):
+    def create_server(self, hostname="localhost", port=38083, verify_ssl=True, username=None, password=None):
         # TODO: build url
-        username = 'admin'
-        password = 'admin'
-        url = "https://%s:%s@%s:%s" % (username, password, hostname, port)
+        if username:
+            url = "https://%s:%s@%s:%s" % (username, password, hostname, port)
+        else:
+            url = "https://%s:%s" % (hostname, port)
         context = _create_https_context(verify=verify_ssl)
         server = xmlrpclib.ServerProxy(url, context=context)
         return server
@@ -40,10 +41,12 @@ class TwitcherCtl(object):
         parser.add_argument("--debug",
                             help="enable debug mode.",
                             action="store_true")
-        parser.add_argument("-x", "--no-check-certificate",
-                            dest='verify_ssl',
-                            help="don't validate the server's certificate.",
-                            action="store_false")
+        parser.add_argument("-u", "--username",
+                            action="store",
+                            )
+        parser.add_argument("-p", "--password",
+                            action="store",
+                            )
         parser.add_argument('--hostname',
                             default='localhost',
                             action="store",
@@ -53,6 +56,10 @@ class TwitcherCtl(object):
                             type=type(38083),
                             action="store",
                             )
+        parser.add_argument("-x", "--no-check-certificate",
+                            dest='verify_ssl',
+                            help="don't validate the server's certificate.",
+                            action="store_false")
 
         # commands
         subparsers = parser.add_subparsers(
@@ -106,7 +113,9 @@ class TwitcherCtl(object):
         if not args.verify_ssl:
             logger.warn('disabled certificate verification!')
             
-        server = self.create_server(hostname=args.hostname, port=args.port, verify_ssl=args.verify_ssl)
+        server = self.create_server(
+            hostname=args.hostname, port=args.port, verify_ssl=args.verify_ssl,
+            username=args.username, password=args.password)
         result = None
         if args.cmd == 'list':
             result = server.listServices()
