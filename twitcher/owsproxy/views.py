@@ -64,13 +64,13 @@ class OWSProxy(object):
     @view_config(route_name='owsproxy')
     @view_config(route_name='owsproxy_secured')
     def owsproxy(self):
-        identifier = self.request.matchdict.get('service_id')
-        if identifier is None:
-            return HTTPBadRequest('Param identifier is required')
+        service_name = self.request.matchdict.get('service_name')
+        if service_name is None:
+            return HTTPBadRequest('Param service_name is required')
         
         service = None
         try:
-            service = get_service(self.request, identifier)
+            service = get_service(self.request, service_name)
         except Exception as err:
             return HTTPBadRequest("Could not find service: %s" % (err.message))
 

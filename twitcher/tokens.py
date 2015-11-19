@@ -15,7 +15,7 @@ def validate_access_token(request):
     storage = TokenStorage(request)
     try:
         # TODO: getting token from url needs to be done in a better way
-        token = request.path_info.split('/')[3]
+        token = request.path_info.split('/')[4]
         access_token = storage.get_access_token(token)
         if access_token is None:
             raise Exception('no access token found!')

@@ -57,8 +57,8 @@ def clear_services(request):
     request.db.services.drop()
 
 
-def proxyurl(request, name):
-    return request.route_url('owsproxy', service_id=name)
+def proxyurl(request, service_name):
+    return request.route_url('owsproxy', service_name=service_name)
 
     
     
