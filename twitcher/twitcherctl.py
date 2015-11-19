@@ -1,8 +1,8 @@
-import xmlrpclib
-import ssl
-
+import getpass
 import argcomplete
 import argparse
+import xmlrpclib
+import ssl
 
 import logging
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.WARN)
@@ -112,22 +112,33 @@ class TwitcherCtl(object):
 
         if not args.verify_ssl:
             logger.warn('disabled certificate verification!')
+
+        password = args.password
+        if args.username:
+            #username = raw_input('Username:')
+            password = getpass.getpass(prompt='Password:')
             
         server = self.create_server(
             hostname=args.hostname, port=args.port, verify_ssl=args.verify_ssl,
-            username=args.username, password=args.password)
+            username=args.username, password=password)
         result = None
-        if args.cmd == 'list':
-            result = server.listServices()
-        elif args.cmd == 'add':
-            result = server.addService(args.url[0])
-        elif args.cmd == 'remove':
-            result = server.removeService(args.name[0])
-        elif args.cmd == 'clear':
-            result = server.clearServices()
-        elif args.cmd == 'gentoken':
-            result = server.generateToken()
-        return result
+        try:
+            if args.cmd == 'list':
+                result = server.listServices()
+            elif args.cmd == 'add':
+                result = server.addService(args.url[0])
+            elif args.cmd == 'remove':
+                result = server.removeService(args.name[0])
+            elif args.cmd == 'clear':
+                result = server.clearServices()
+            elif args.cmd == 'gentoken':
+                result = server.generateToken()
+        except xmlrpclib.Fault as e:
+            logger.error("A fault occurred: %s (%d)", e.faultString, e.faultCode)
+        except xmlrpclib.ProtocolError as e:
+            logger.error("A protocol error occurred. URL: %s, HTTP/HTTPS headers: %s, Error code: %d, Error message: %s",  e.url, e.headers, e.errcode, e.errmsg)
+        else:
+            return result
 
 def main():
     logger.setLevel(logging.INFO)
