@@ -24,7 +24,9 @@ class TwitcherCtl(object):
         
     def create_server(self, hostname="localhost", port=38083, verify_ssl=True):
         # TODO: build url
-        url = "https://%s:%s" % (hostname, port)
+        username = 'admin'
+        password = 'admin'
+        url = "https://%s:%s@%s:%s" % (username, password, hostname, port)
         context = _create_https_context(verify=verify_ssl)
         server = xmlrpclib.ServerProxy(url, context=context)
         return server

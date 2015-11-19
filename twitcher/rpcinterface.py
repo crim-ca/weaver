@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 # shortcut for xmlrpc_method
 api_xmlrpc = functools.partial(xmlrpc_method, endpoint="api")
 
-#@view_defaults(permission='admin')
+@view_defaults(permission='admin')
 class RPCInterface(object):
     def __init__(self, request):
         self.request = request
