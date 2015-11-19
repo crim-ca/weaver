@@ -3,7 +3,7 @@ from pyramid.authentication import BasicAuthAuthenticationPolicy
 from pyramid.authorization import ACLAuthorizationPolicy
 
 from twitcher.security import groupfinder, root_factory
-from twitcher import owsproxy
+from twitcher import owsproxy, rpcinterface
 from twitcher.models import mongodb
 
 import logging
@@ -15,15 +15,11 @@ def main(global_config, **settings):
     """
     config = Configurator(settings=settings, root_factory=root_factory)
 
-    # pyramid xml-rpc
-    # http://docs.pylonsproject.org/projects/pyramid-rpc/en/latest/xmlrpc.html
-    config.include('pyramid_rpc.xmlrpc')
-    config.add_xmlrpc_endpoint('api', '/RPC2')
-
     # beaker session
     config.include('pyramid_beaker')
 
-    # owsproxy
+    # include twitcher components
+    config.include(rpcinterface)
     config.include(owsproxy)
         
     # Security policies

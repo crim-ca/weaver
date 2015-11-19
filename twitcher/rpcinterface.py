@@ -59,4 +59,19 @@ def clearServices(request):
         return False
     else:
         return True
-    
+
+def includeme(config):
+    """ The callable makes it possible to include rpcinterface
+    in a Pyramid application.
+
+    Calling ``config.include(twitcher.rpcinterface)`` will result in this
+    callable being called.
+
+    Arguments:
+
+    * ``config``: the ``pyramid.config.Configurator`` object.
+    """
+    # pyramid xml-rpc
+    # http://docs.pylonsproject.org/projects/pyramid-rpc/en/latest/xmlrpc.html
+    config.include('pyramid_rpc.xmlrpc')
+    config.add_xmlrpc_endpoint('api', '/RPC2')
