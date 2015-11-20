@@ -19,7 +19,7 @@ class RPCInterface(object):
 
     # token management
 
-    @api_xmlrpc
+    @api_xmlrpc()
     def generateToken(self):
         access_token = tokens.generate_access_token(self.request)
         return access_token.access_token

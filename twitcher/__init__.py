@@ -4,7 +4,6 @@ from pyramid.tweens import EXCVIEW
 
 from twitcher.config import Configurator
 from twitcher.security import groupfinder, root_factory
-from twitcher.models import mongodb
 from twitcher.middleware import OWSSecurityMiddleware
 from twitcher.tweens import OWS_SECURITY
 
@@ -21,10 +20,11 @@ def main(global_config, **settings):
     config.include('pyramid_beaker')
 
     # include twitcher components
+    config.include('.db')
     config.include('.rpcinterface')
     config.include('.owsproxy')
     config.include('.wps')
-        
+    
     # Security policies
     authn_policy = BasicAuthAuthenticationPolicy(check=groupfinder, realm="Birdhouse")
     authz_policy = ACLAuthorizationPolicy()
@@ -33,19 +33,6 @@ def main(global_config, **settings):
 
     # routes 
     config.add_route('home', '/')
-
-    # MongoDB
-    # http://docs.pylonsproject.org/projects/pyramid-cookbook/en/latest/database/mongodb.html
-    # maybe use event to register mongodb    
-    config.registry.db = mongodb(config.registry)
-
-    def add_db(request):
-        db = config.registry.db
-        #if db_url.username and db_url.password:
-        #    db.authenticate(db_url.username, db_url.password)
-        return db
-
-    config.add_request_method(add_db, 'db', reify=True)
 
     #config.add_wsgi_middleware(OWSSecurityMiddleware)
     config.add_tween(OWS_SECURITY, under=EXCVIEW)
