@@ -1,5 +1,6 @@
 from pyramid.authentication import BasicAuthAuthenticationPolicy
 from pyramid.authorization import ACLAuthorizationPolicy
+from pyramid.tweens import EXCVIEW
 
 from twitcher.config import Configurator
 from twitcher.security import groupfinder, root_factory
@@ -47,7 +48,7 @@ def main(global_config, **settings):
     config.add_request_method(add_db, 'db', reify=True)
 
     #config.add_wsgi_middleware(OWSSecurityMiddleware)
-    config.add_tween(OWS_SECURITY)
+    config.add_tween(OWS_SECURITY, under=EXCVIEW)
     
     config.scan()
 
