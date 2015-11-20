@@ -55,11 +55,11 @@ class OWSProxyTests(unittest.TestCase):
 
     def tearDown(self):
         testing.tearDown()
-        from twitcher.owsproxy import views
-        views.allowed_hosts = ()
+        from twitcher import owsproxy
+        owsproxy.allowed_hosts = ()
 
     def test_badrequest_url(self):
-        from twitcher.owsproxy.views import OWSProxy
+        from twitcher.owsproxy import OWSProxy
         from pyramid.testing import DummyRequest
         request = DummyRequest(scheme='http')
         inst = OWSProxy(request)
@@ -68,7 +68,7 @@ class OWSProxyTests(unittest.TestCase):
         self.assertTrue(isinstance(response, HTTPBadRequest))
 
     def test_badrequest_netloc(self):
-        from twitcher.owsproxy.views import OWSProxy
+        from twitcher.owsproxy import OWSProxy
         from pyramid.testing import DummyRequest
         request = DummyRequest(scheme='http',
                                params={'url': 'http://'})
@@ -79,7 +79,7 @@ class OWSProxyTests(unittest.TestCase):
 
     def test_badgateway_url(self):
         raise SkipTest
-        from twitcher.owsproxy.views import OWSProxy
+        from twitcher.owsproxy import OWSProxy
         from pyramid.testing import DummyRequest
         request = DummyRequest(scheme='http',
                                params={'url': 'http://__foo__.__toto__'})
@@ -90,7 +90,7 @@ class OWSProxyTests(unittest.TestCase):
 
     def test_forbidden_content_type(self):
         raise SkipTest
-        from twitcher.owsproxy.views import OWSProxy
+        from twitcher.owsproxy import OWSProxy
         from pyramid.testing import DummyRequest
         request = DummyRequest(scheme='http',
                                params={'url': 'http://www.google.com'})
@@ -100,7 +100,7 @@ class OWSProxyTests(unittest.TestCase):
 
     def test_forbidden_content_type_with_post(self):
         raise SkipTest
-        from twitcher.owsproxy.views import OWSProxy
+        from twitcher.owsproxy import OWSProxy
         from pyramid.testing import DummyRequest
         request = DummyRequest(scheme='http',
                                params={'url': 'http://www.google.com'},
@@ -109,12 +109,12 @@ class OWSProxyTests(unittest.TestCase):
         from pyramid.httpexceptions import HTTPForbidden
         self.assertTrue(isinstance(response, HTTPForbidden))
 
-    @mock.patch('twitcher.owsproxy.views.Http')
+    @mock.patch('twitcher.owsproxy.Http')
     def test_notacceptable_no_content_type(self, MockClass):
         raise SkipTest
         instance = MockClass.return_value
         instance.request.return_value = ({}, 'content')
-        from twitcher.owsproxy.views import OWSProxy
+        from twitcher.owsproxy import OWSProxy
         from pyramid.testing import DummyRequest
         request = DummyRequest(scheme='http',
                                params={'url': 'http://www.google.com'})
@@ -131,7 +131,7 @@ class OWSProxyTests(unittest.TestCase):
         instance = MockClass.return_value
         instance.get_service.return_value = {'url': 'http://localhost:8094/wps'}
         # real test
-        from twitcher.owsproxy.views import OWSProxy
+        from twitcher.owsproxy import OWSProxy
         from pyramid.testing import DummyRequest
         request = DummyRequest(scheme='http', params={'VERSION': '1.0.0', 'SERVICE': 'WPS', 'REQUEST': 'GetCapabilities'})
         request.matchdict['service_id'] = 'emu'
