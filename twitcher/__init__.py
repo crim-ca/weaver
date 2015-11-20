@@ -1,9 +1,10 @@
-from pyramid.config import Configurator
 from pyramid.authentication import BasicAuthAuthenticationPolicy
 from pyramid.authorization import ACLAuthorizationPolicy
 
+from twitcher.config import Configurator
 from twitcher.security import groupfinder, root_factory
 from twitcher.models import mongodb
+from twitcher.middleware import OWSSecurityMiddleware
 
 import logging
 logger = logging.getLogger(__name__)
@@ -43,6 +44,8 @@ def main(global_config, **settings):
         return db
 
     config.add_request_method(add_db, 'db', reify=True)
+
+    config.add_wsgi_middleware(OWSSecurityMiddleware)
     
     config.scan()
 
