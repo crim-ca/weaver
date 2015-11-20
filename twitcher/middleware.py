@@ -1,6 +1,6 @@
 from webob import Request
 
-from twitcher import owssecurity
+from twitcher.owssecurity import validate
 
 import logging
 logger = logging.getLogger(__name__)
@@ -15,9 +15,5 @@ class OWSSecurityMiddleware(object):
         logger.debug("request = %s", request)
         logger.debug('path_info=%s, path=%s, query=%s', request.path_info, request.path, request.query_string)
         logger.debug("request params = %s", request.params)
-        if owssecurity.is_route_path_protected(request):
-            owssecurity.validate_ows_service(request)
-            owssecurity.validate_ows_request(request)
-        else:
-            logger.warn('unprotected access')
+        validate(request)
         return self.app(environ, start_response)

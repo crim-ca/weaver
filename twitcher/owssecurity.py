@@ -1,5 +1,6 @@
 from twitcher.tokens import validate_access_token
 from twitcher.owsexceptions import OWSServiceNotAllowed
+from twitcher.owsrequest import OWSRequest
 
 import logging
 logger = logging.getLogger(__name__)
@@ -14,43 +15,44 @@ allowed_requests = (
     'getcapabilities', 'describeprocess',
     )
 
-    
-def validate_ows_service(request):
-    ows_service = None
-    if 'service' in request.params:
-        ows_service = request.params['service']
-    elif 'SERVICE' in request.params:
-        ows_service = request.params['SERVICE']
 
-    if ows_service is None:
-        raise OWSServiceNotAllowed()
+def validate(request):
+    validator = OWSSecurity(request)
+    validator.validate()
 
-    if ows_service.lower() in allowed_service_types:
-        ows_service = ows_service.lower()
-    else:
-        raise OWSServiceNotAllowed()
-    return ows_service
+        
+class OWSSecurity(object):
+    def __init__(self, request):
+        self.request = OWSRequest(request)
 
 
-def validate_ows_request(request):
-    ows_request = None
-    if 'request' in request.params:
-        ows_request = request.params['request']
-    elif 'REQUEST' in request.params:
-        ows_request = request.params['REQUEST']
+    def validate(self):
+        if self.is_route_path_protected():
+            self.validate_ows_service()
+            self.validate_ows_request()
+        else:
+            logger.warn('unprotected access')
+                
+    def validate_ows_service(self):
+        if self.request.ows_service is None:
+            raise OWSServiceNotAllowed()
 
-    if not ows_request in allowed_requests:
-        validate_access_token(request)
-    return ows_request
+        if not self.request.ows_service in allowed_service_types:
+            raise OWSServiceNotAllowed()
 
 
-def is_route_path_protected(request):
-    try:
-        # TODO: configure path which should be secured
-        logger.debug('path %s', request.path)
-        return 'ows' in request.path
-    except ValueError:
-        logger.exception('route path check failed')
-        return True
+    def validate_ows_request(self):
+        if not self.request.ows_request in allowed_requests:
+            validate_access_token(self.request.wrapped)
+
+
+    def is_route_path_protected(self):
+        try:
+            # TODO: configure path which should be secured
+            logger.debug('path %s', self.request.wrapped.path)
+            return 'ows' in self.request.wrapped.path
+        except ValueError:
+            logger.exception('route path check failed')
+            return True
 
     
