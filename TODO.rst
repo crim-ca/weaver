@@ -6,6 +6,7 @@ Todo list
 * clean up ows exception handling
 * clean up pywps wrapper module
 * clean up rpc interface
+* clean up basic auth for rpc interface
 * use wsgi middleware
 * pass extra environ to application via middleware/tween
 * add example with ceda oauth
