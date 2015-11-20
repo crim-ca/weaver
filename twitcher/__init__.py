@@ -3,7 +3,6 @@ from pyramid.authentication import BasicAuthAuthenticationPolicy
 from pyramid.authorization import ACLAuthorizationPolicy
 
 from twitcher.security import groupfinder, root_factory
-from twitcher import owsproxy, rpcinterface
 from twitcher.models import mongodb
 
 import logging
@@ -19,8 +18,9 @@ def main(global_config, **settings):
     config.include('pyramid_beaker')
 
     # include twitcher components
-    config.include(rpcinterface)
-    config.include(owsproxy)
+    config.include('.rpcinterface')
+    config.include('.owsproxy')
+    config.include('.wps')
         
     # Security policies
     authn_policy = BasicAuthAuthenticationPolicy(check=groupfinder, realm="Birdhouse")
