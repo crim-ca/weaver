@@ -17,7 +17,7 @@ class PyWPSWrapper(object):
     def pywps(self):
         """
         TODO: add xml response renderer
-        TODO: fix exceptions
+        TODO: fix exceptions ... use OWSException (raise ...)
         """
         self.response.status = "200 OK"
         self.response.content_type = "text/xml"
@@ -31,7 +31,7 @@ class PyWPSWrapper(object):
 
         if not inputQuery:
             err =  NoApplicableCode("No query string found.")
-            return [err.getResponse()]
+            return err
 
         # create the WPS object
         try:
@@ -40,9 +40,9 @@ class PyWPSWrapper(object):
                 pywps.debug(wps.inputs)
                 return wps.performRequest()
         except WPSException,e:
-            return [e]
+            return e
         except Exception, e:
-            return [e]
+            return e
 
 def includeme(config):
     config.add_route('wps', '/ows/wps')
