@@ -1,3 +1,7 @@
+"""
+The owsproxy is based on `papyrus_ogcproxy <https://github.com/elemoine/papyrus_ogcproxy>`_
+"""
+
 import urllib
 from httplib2 import Http
 
@@ -5,7 +9,9 @@ from pyramid.view import view_config, view_defaults
 from pyramid.httpexceptions import (HTTPForbidden, HTTPBadRequest,
                                     HTTPBadGateway, HTTPNotAcceptable)
 from pyramid.response import Response
+import pyramid.tweens
 
+from twitcher.tweens import OWS_SECURITY
 from twitcher.registry import get_service
 
 import logging
@@ -75,3 +81,10 @@ class OWSProxy(object):
             return HTTPBadRequest("Could not find service: %s" % (err.message))
 
         return self.send_request(service)
+
+def includeme(config):
+    config.add_route('owsproxy', '/ows/proxy/{service_name}')
+    config.add_route('owsproxy_secured', '/ows/proxy/{service_name}/{access_token}')
+
+    # add tweens
+    config.add_tween(OWS_SECURITY, under=pyramid.tweens.EXCVIEW)
