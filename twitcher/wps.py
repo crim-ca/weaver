@@ -8,7 +8,7 @@ import pywps
 from pywps.Exceptions import WPSException, NoApplicableCode
 
 @view_defaults(permission='view')
-class WPSWrapper(object):
+class PyWPSWrapper(object):
     def __init__(self, request):
         self.request = request
         self.response = self.request.response
@@ -17,15 +17,17 @@ class WPSWrapper(object):
     def pywps(self):
         """
         TODO: add xml response renderer
+        TODO: fix exceptions
         """
         self.response.status = "200 OK"
         self.response.content_type = "text/xml"
 
+        # TODO: is this the right way for get/post?
         inputQuery = None
         if self.request.method == "GET":
             inputQuery = self.request.query_string
-        elif "wsgi.input" in self.request.environ:
-            inputQuery = self.request.environ['wsgi.input']
+        elif "wsgi.input" in self.request.params:
+            inputQuery = self.request.params['wsgi.input']
 
         if not inputQuery:
             err =  NoApplicableCode("No query string found.")
