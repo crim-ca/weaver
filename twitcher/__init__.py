@@ -5,6 +5,7 @@ from twitcher.config import Configurator
 from twitcher.security import groupfinder, root_factory
 from twitcher.models import mongodb
 from twitcher.middleware import OWSSecurityMiddleware
+from twitcher.tweens import OWS_SECURITY
 
 import logging
 logger = logging.getLogger(__name__)
@@ -45,7 +46,8 @@ def main(global_config, **settings):
 
     config.add_request_method(add_db, 'db', reify=True)
 
-    config.add_wsgi_middleware(OWSSecurityMiddleware)
+    #config.add_wsgi_middleware(OWSSecurityMiddleware)
+    config.add_tween(OWS_SECURITY)
     
     config.scan()
 
