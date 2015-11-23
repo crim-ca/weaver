@@ -20,10 +20,9 @@ def main(global_config, **settings):
     config.include('pyramid_beaker')
 
     # include twitcher components
-    config.include('.db')
-    config.include('.rpcinterface')
-    config.include('.owsproxy')
-    config.include('.wps')
+    config.include('twitcher.rpcinterface')
+    config.include('twitcher.owsproxy')
+    config.include('twitcher.wps')
     
     # Security policies
     authn_policy = BasicAuthAuthenticationPolicy(check=groupfinder, realm="Birdhouse")
@@ -38,7 +37,6 @@ def main(global_config, **settings):
     config.add_wsgi_middleware(
         OWSSecurityMiddleware,
         tokenstore=TokenStorage(mongodb(config.registry)))
-    #config.add_tween(OWS_SECURITY, under=EXCVIEW)
     
     config.scan()
 

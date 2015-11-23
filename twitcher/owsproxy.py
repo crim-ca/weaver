@@ -81,5 +81,8 @@ class OWSProxy(object):
         return self.send_request(service)
 
 def includeme(config):
+    # include mongodb
+    config.include('twitcher.db')
+    
     config.add_route('owsproxy', '/ows/proxy/{service_name}')
     config.add_route('owsproxy_secured', '/ows/proxy/{service_name}/{access_token}')

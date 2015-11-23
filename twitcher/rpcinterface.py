@@ -80,4 +80,5 @@ def includeme(config):
     # pyramid xml-rpc
     # http://docs.pylonsproject.org/projects/pyramid-rpc/en/latest/xmlrpc.html
     config.include('pyramid_rpc.xmlrpc')
+    config.include('twitcher.db')
     config.add_xmlrpc_endpoint('api', '/RPC2')
