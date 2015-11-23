@@ -1,6 +1,6 @@
 from webob import Request
 
-from twitcher.owsexceptions import OWSServiceNotAllowed
+from twitcher.owsexceptions import OWSException, OWSServiceNotAllowed
 from twitcher.owsrequest import OWSRequest
 
 import logging
@@ -27,8 +27,13 @@ class OWSSecurityMiddleware(object):
         self.request = Request(environ)
         self.ows_request = OWSRequest(self.request)
         if self.is_route_path_protected():
-            self.validate_ows_service()
-            self.validate_ows_request()
+            try:
+                self.validate_ows_service()
+                self.validate_ows_request()
+            except OWSException as e:
+                return e(environ, start_response)
+            except Exception,e:
+                return [e]
         else:
             logger.warn('unprotected access')
 
