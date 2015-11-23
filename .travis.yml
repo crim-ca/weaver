@@ -1,7 +1,6 @@
 language: python
 branches:
   only:
-    - develop
     - master
 python:
   - "2.7"
