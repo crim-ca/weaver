@@ -22,7 +22,7 @@ class RPCInterface(object):
     @api_xmlrpc()
     def generateToken(self):
         tokenstore = tokens.TokenStorage(self.request.db)
-        access_token = tokenstore.generate_access_token(self.request)
+        access_token = tokenstore.create_access_token()
         return access_token.access_token
 
 

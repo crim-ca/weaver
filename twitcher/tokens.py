@@ -39,10 +39,13 @@ class TokenStorage(object):
 
     
     def get_access_token(self, token):
+        access_token = None
         if isinstance(token, AccessToken):
-            AccessToken(self.db.find_one(token))
+            access_token = self.db.find_one(token)
         else:
-            access_token = AccessToken(self.db.find_one({'access_token': token}))
+            access_token = self.db.find_one({'access_token': token})
+        if not access_token is None:
+            access_token = AccessToken(access_token)
         return access_token
 
     def validate_access_token(self, request):
