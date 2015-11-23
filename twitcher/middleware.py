@@ -1,19 +1,62 @@
 from webob import Request
 
-from twitcher.owssecurity import validate
+from twitcher.owsexceptions import OWSServiceNotAllowed
+from twitcher.owsrequest import OWSRequest
 
 import logging
 logger = logging.getLogger(__name__)
 
+
+allowed_service_types = (
+    'wps',
+    )
+
+    
+allowed_requests = (
+    'getcapabilities', 'describeprocess',
+    )
+
+
 class OWSSecurityMiddleware(object):
-    def __init__(self, app, **kwargs):
+    def __init__(self, app, tokenstore, **kwargs):
         self.app = app
-        #config = config or {}
+        self.tokenstore = tokenstore
+
 
     def __call__(self, environ, start_response):
-        request = Request(environ)
-        logger.debug("request = %s", request)
-        logger.debug('path_info=%s, path=%s, query=%s', request.path_info, request.path, request.query_string)
-        logger.debug("request params = %s", request.params)
-        validate(request)
+        self.request = Request(environ)
+        self.ows_request = OWSRequest(self.request)
+        if self.is_route_path_protected():
+            self.validate_ows_service()
+            self.validate_ows_request()
+        else:
+            logger.warn('unprotected access')
+
         return self.app(environ, start_response)
+
+    
+    def is_route_path_protected(self):
+        try:
+            # TODO: configure path which should be secured
+            logger.debug('path %s', self.request.path)
+            return 'ows' in self.request.path
+        except ValueError:
+            logger.exception('route path check failed')
+            return True
+
+        
+    def validate_ows_service(self):
+        if self.ows_request.service is None:
+            raise OWSServiceNotAllowed()
+
+        if not self.ows_request.service in allowed_service_types:
+            raise OWSServiceNotAllowed()
+
+
+    def validate_ows_request(self):
+        if not self.ows_request.request in allowed_requests:
+           self.tokenstore.validate_access_token(self.request)
+
+
+    
+

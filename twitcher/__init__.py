@@ -1,11 +1,11 @@
 from pyramid.authentication import BasicAuthAuthenticationPolicy
 from pyramid.authorization import ACLAuthorizationPolicy
-from pyramid.tweens import EXCVIEW
 
 from twitcher.config import Configurator
 from twitcher.security import groupfinder, root_factory
+from twitcher.db import mongodb
+from twitcher.tokens import TokenStorage
 from twitcher.middleware import OWSSecurityMiddleware
-from twitcher.tweens import OWS_SECURITY
 
 import logging
 logger = logging.getLogger(__name__)
@@ -34,8 +34,11 @@ def main(global_config, **settings):
     # routes 
     config.add_route('home', '/')
 
-    #config.add_wsgi_middleware(OWSSecurityMiddleware)
-    config.add_tween(OWS_SECURITY, under=EXCVIEW)
+    # middleware
+    config.add_wsgi_middleware(
+        OWSSecurityMiddleware,
+        tokenstore=TokenStorage(mongodb(config.registry)))
+    #config.add_tween(OWS_SECURITY, under=EXCVIEW)
     
     config.scan()
 

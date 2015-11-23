@@ -11,29 +11,9 @@ logger = logging.getLogger(__name__)
 DEFAULT_VALID_IN_HOURS = 1
 
 
-def validate_access_token(request):
-    storage = TokenStorage(request)
-    try:
-        # TODO: getting token from url needs to be done in a better way
-        token = request.path_info.split('/')[4]
-        access_token = storage.get_access_token(token)
-        if access_token is None:
-            raise Exception('no access token found!')
-        if not access_token.is_valid():
-            raise Exception('token is not valid')
-    except:
-        # TODO: handle exceptions
-        logger.exception('token validation failed!')
-        raise OWSTokenNotValid()
-
-def generate_access_token(request):
-    storage = TokenStorage(request)
-    return storage.create_access_token()
-
-
 class TokenStorage(object):
-    def __init__(self, request):
-        self.db = request.db.tokens
+    def __init__(self, db):
+        self.db = db.tokens
 
         
     def create_access_token(self, valid_in_hours=DEFAULT_VALID_IN_HOURS):
@@ -64,6 +44,20 @@ class TokenStorage(object):
         else:
             access_token = AccessToken(self.db.find_one({'access_token': token}))
         return access_token
+
+    def validate_access_token(self, request):
+        try:
+            # TODO: getting token from url needs to be done in a better way
+            token = request.path_info.split('/')[4]
+            access_token = self.get_access_token(token)
+            if access_token is None:
+                raise Exception('no access token found!')
+            if not access_token.is_valid():
+                raise Exception('token is not valid')
+        except:
+            # TODO: handle exceptions
+            logger.exception('token validation failed!')
+            raise OWSTokenNotValid()
 
 
 class AccessToken(dict):

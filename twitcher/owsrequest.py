@@ -12,7 +12,7 @@ class OWSRequest(object):
         return self._request
 
     @property
-    def ows_service(self):
+    def service(self):
         service = None
         if 'service' in self._request.params:
             service = self._request.params['service']
@@ -25,7 +25,7 @@ class OWSRequest(object):
         return service
 
     @property
-    def ows_request(self):
+    def request(self):
         request = None
         if 'request' in self._request.params:
             request = self._request.params['request']
