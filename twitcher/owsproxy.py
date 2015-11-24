@@ -6,8 +6,7 @@ import urllib
 from httplib2 import Http
 
 from pyramid.view import view_config, view_defaults
-from pyramid.httpexceptions import (HTTPForbidden, HTTPBadRequest,
-                                    HTTPBadGateway, HTTPNotAcceptable)
+from pyramid.httpexceptions import HTTPBadRequest, HTTPBadGateway, HTTPNotAcceptable
 from pyramid.response import Response
 
 from twitcher.registry import get_service
@@ -27,7 +26,6 @@ allowed_content_types = (
     #"application/vnd.google-earth.kml+xml", # KML
     )
 
-
 @view_defaults(permission='view')
 class OWSProxy(object):
     def __init__(self, request):
@@ -39,8 +37,6 @@ class OWSProxy(object):
         # TODO: fix way to build url
         logger.debug('params = %s', self.request.params)
         url = service['url'] + '?' + urllib.urlencode(self.request.params)
-
-        logger.debug('url %s', url)
 
         # forward request to target (without Host Header)
         http = Http(disable_ssl_certificate_validation=True)
@@ -84,5 +80,5 @@ def includeme(config):
     # include mongodb
     config.include('twitcher.db')
     
-    config.add_route('owsproxy', '/ows/proxy/{service_name}')
-    config.add_route('owsproxy_secured', '/ows/proxy/{service_name}/{access_token}')
+    config.add_route('owsproxy', '/ows/{service_name}')
+    config.add_route('owsproxy_secured', '/ows/{service_name}/{access_token}')
