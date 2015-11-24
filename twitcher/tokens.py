@@ -50,11 +50,18 @@ class TokenStorage(object):
 
     def validate_access_token(self, request):
         token = None
+        logger.error('path = %s', request.path)
         if 'access_token' in request.params:
             token = request.params['access_token']   # in params
         elif 'Access-Token' in request.headers:
             token = request.headers['Access-Token']  # in header
-        else:
+        else:  # in path
+            path_elements = [el.strip() for el in request.path.split('/')]
+            path_elements = [el for el in path_elements if len(el) > 0]
+            if len(path_elements) > 1:
+                token = path_elements[-1]   # last path element
+                
+        if token is None:
             raise OWSForbidden() # no access token provided
 
         access_token = self.get_access_token(token)
