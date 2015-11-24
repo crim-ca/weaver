@@ -22,6 +22,7 @@ def main(global_config, **settings):
     config.include('twitcher.wps')
     
     # tweens/middleware
+    # TODO: maybe add tween for exception handling or use unknown_failure view
     config.add_tween(OWS_SECURITY, under=EXCVIEW)
    
     config.scan()

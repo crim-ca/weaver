@@ -1,3 +1,6 @@
+from pyramid.httpexceptions import HTTPUnauthorized
+from pyramid.security import forget
+from pyramid.view import forbidden_view_config
 from pyramid.authentication import BasicAuthAuthenticationPolicy
 from pyramid.authorization import ACLAuthorizationPolicy
 from pyramid.security import (
@@ -29,6 +32,12 @@ class RootFactory(object):
 def root_factory(request):
     return RootFactory(request)
 
+
+@forbidden_view_config()
+def basic_challenge(request):
+    response = HTTPUnauthorized()
+    response.headers.update(forget(request))
+    return response
 
 def includeme(config):
     # Security policies for basic auth
