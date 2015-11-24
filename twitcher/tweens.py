@@ -12,14 +12,15 @@ def ows_security_tween_factory(handler, registry):
     if access to OWS service is not allowed."""
 
     allowed_service_types = ('wps',)
-    allowed_requests = ('getcapabilities', 'describeprocess',)
+    allowed_requests = ('getcapabilities', 'describeprocess')
+    protected_path = '/ows/'
     
     tokenstore = TokenStorage( mongodb(registry) )
     
     def ows_security_tween(request):
         ows_request = OWSRequest(request)
         try:
-            if 'ows' in request.path:
+            if request.path.startswith(protected_path):
                 if ows_request.service is None:
                     raise OWSForbidden() # service parameter is missing
                 if not ows_request.service in allowed_service_types:
@@ -27,9 +28,12 @@ def ows_security_tween_factory(handler, registry):
                 if not ows_request.request in allowed_requests:
                     tokenstore.validate_access_token(request)
             return handler(request)
-        except Exception:
+        except OWSException as err:
             logger.exception("security check failed.")
-            raise
+            return err
+        except Exception as err:
+            logger.exception("unknown error")
+            return OWSForbidden()
         
     return ows_security_tween
 
