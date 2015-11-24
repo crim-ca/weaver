@@ -56,7 +56,7 @@ class TwitcherCtl(object):
                             type=type(38083),
                             action="store",
                             )
-        parser.add_argument("-x", "--no-check-certificate",
+        parser.add_argument("-k", "--insecure", # like curl
                             dest='verify_ssl',
                             help="don't validate the server's certificate.",
                             action="store_false")
