@@ -7,13 +7,14 @@ from pyramid.view import view_config, view_defaults
 import pywps
 from pywps.Exceptions import WPSException, NoApplicableCode
 
-@view_defaults(permission='view')
+@view_defaults(permission='view', renderer='string')
 class PyWPSWrapper(object):
     def __init__(self, request):
         self.request = request
         self.response = self.request.response
 
-    @view_config(route_name='wps', renderer='string')
+    @view_config(route_name='wps')
+    @view_config(route_name='wps_secured')
     def pywps(self):
         """
         TODO: add xml response renderer
@@ -46,6 +47,7 @@ class PyWPSWrapper(object):
 
 def includeme(config):
     config.add_route('wps', '/ows/wps')
+    config.add_route('wps_secured', '/ows/wps/{access_token}')
 
 
 
