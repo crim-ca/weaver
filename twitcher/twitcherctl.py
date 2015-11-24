@@ -78,13 +78,13 @@ class TwitcherCtl(object):
         # ----------------
         
         # list
-        subparser = subparsers.add_parser('list')
+        subparser = subparsers.add_parser('list_services')
 
         # clear
-        subparser = subparsers.add_parser('clear')
+        subparser = subparsers.add_parser('clear_services')
 
         # register
-        subparser = subparsers.add_parser('add')
+        subparser = subparsers.add_parser('add_service')
         subparser.add_argument('--url',
                     dest='url',
                     required=True,
@@ -95,7 +95,7 @@ class TwitcherCtl(object):
                     )
 
         # unregister
-        subparser = subparsers.add_parser('remove')
+        subparser = subparsers.add_parser('remove_service')
         subparser.add_argument('--name',
                     dest='name',
                     required=True,
@@ -123,16 +123,16 @@ class TwitcherCtl(object):
             username=args.username, password=password)
         result = None
         try:
-            if args.cmd == 'list':
-                result = server.listServices()
-            elif args.cmd == 'add':
-                result = server.addService(args.url[0])
-            elif args.cmd == 'remove':
-                result = server.removeService(args.name[0])
-            elif args.cmd == 'clear':
-                result = server.clearServices()
+            if args.cmd == 'list_services':
+                result = server.list_services()
+            elif args.cmd == 'add_service':
+                result = server.add_service(args.url[0])
+            elif args.cmd == 'remove_service':
+                result = server.remove_service(args.name[0])
+            elif args.cmd == 'clear_services':
+                result = server.clear_services()
             elif args.cmd == 'gentoken':
-                result = server.generateToken()
+                result = server.generate_token()
         except xmlrpclib.Fault as e:
             logger.error("A fault occurred: %s (%d)", e.faultString, e.faultCode)
         except xmlrpclib.ProtocolError as e:

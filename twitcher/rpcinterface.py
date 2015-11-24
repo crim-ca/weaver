@@ -21,7 +21,7 @@ class RPCInterface(object):
     # token management
 
     @api_xmlrpc()
-    def generateToken(self):
+    def generate_token(self):
         tokenstore = tokens.TokenStorage(self.request.db)
         access_token = tokenstore.create_access_token()
         return access_token.access_token
@@ -30,13 +30,13 @@ class RPCInterface(object):
     # service registry
 
     @api_xmlrpc()
-    def addService(self, url):
+    def add_service(self, url):
         service = registry.add_service(self.request, url=url)
         return service['name']
 
 
     @api_xmlrpc()
-    def removeService(self, name):
+    def remove_service(self, name):
         try:
             registry.remove_service(self.request, service_name=name)
         except:
@@ -48,7 +48,7 @@ class RPCInterface(object):
 
 
     @api_xmlrpc()
-    def listServices(self):
+    def list_services(self):
         try:
             services = registry.list_services(self.request)
             return services
@@ -58,7 +58,7 @@ class RPCInterface(object):
 
 
     @api_xmlrpc()
-    def clearServices(self):
+    def clear_services(self):
         try:
             registry.clear_service(self.request)
         except:
