@@ -19,6 +19,7 @@ def main(global_config, **settings):
     config.include('pyramid_beaker')
 
     # include twitcher components
+    config.include('twitcher.frontpage')
     config.include('twitcher.rpcinterface')
     config.include('twitcher.owsproxy')
     config.include('twitcher.wps')
@@ -29,13 +30,9 @@ def main(global_config, **settings):
     config.set_authentication_policy(authn_policy)
     config.set_authorization_policy(authz_policy)
 
-    # routes 
-    config.add_route('home', '/')
-
     # tweens/middleware
     config.add_tween(OWS_SECURITY, under=EXCVIEW)
    
-    
     config.scan()
 
     return config.make_wsgi_app()

@@ -10,8 +10,8 @@ logger = logging.getLogger(__name__)
 from registry import list_services
 
 
-@view_config(route_name='home', renderer='json', permission='view')
-def home(request):
+@view_config(route_name='frontpage', renderer='json', permission='view')
+def frontpage(request):
     services = list_services(request)
     return {'services': services}
 
@@ -32,6 +32,10 @@ def unknown_failure(request, exc):
     #response =  Response('Ooops, something went wrong. Check the log files.')
     response.status_int = 500
     return response
+
+
+def includeme(config):
+    config.add_route('frontpage', '/')
 
 
     
