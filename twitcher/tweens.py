@@ -1,4 +1,4 @@
-from twitcher.owsexceptions import OWSException, OWSTokenNotValid
+from twitcher.owsexceptions import OWSException, OWSForbidden
 from twitcher.owsrequest import OWSRequest
 from twitcher.tokens import TokenStorage
 from twitcher.db import mongodb
@@ -21,16 +21,15 @@ def ows_security_tween_factory(handler, registry):
         try:
             if 'ows' in request.path:
                 if ows_request.service is None:
-                    raise OWSServiceNotAllowed()
+                    raise OWSForbidden() # service parameter is missing
                 if not ows_request.service in allowed_service_types:
-                    raise OWSServiceNotAllowed()
+                    raise OWSForbidden() # service not supported
                 if not ows_request.request in allowed_requests:
                     tokenstore.validate_access_token(request)
             return handler(request)
-        except OWSException:
+        except Exception:
+            logger.exception("security check failed.")
             raise
-        except Exception as err:
-            raise OWSTokenNotValid()
         
     return ows_security_tween
 

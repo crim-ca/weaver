@@ -2,7 +2,7 @@ import uuid
 from datetime import timedelta
 
 from twitcher.utils import now, localize_datetime
-from twitcher.owsexceptions import OWSTokenNotValid
+from twitcher.owsexceptions import OWSForbidden
 
 import logging
 logger = logging.getLogger(__name__)
@@ -49,15 +49,19 @@ class TokenStorage(object):
         return access_token
 
     def validate_access_token(self, request):
-        # TODO: getting token from url needs to be done in a better way
-        if not 'access_token' in request.params:
-            raise OWSTokenNotValid('no access token found')
-        token = request.params['access_token']
+        token = None
+        if 'access_token' in request.params:
+            token = request.params['access_token']   # in params
+        elif 'Access-Token' in request.headers:
+            token = request.headers['Access-Token']  # in header
+        else:
+            raise OWSForbidden() # no access token provided
+
         access_token = self.get_access_token(token)
         if access_token is None:
-            raise OWSTokenNotValid('no access token found!')
+            raise OWSForbidden() # no access token in store
         if not access_token.is_valid():
-            raise OWSTokenNotValid()
+            raise OWSForbidden() # access token not valid
 
 
 class AccessToken(dict):

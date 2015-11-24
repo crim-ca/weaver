@@ -64,8 +64,6 @@ class OWSException(Response, Exception):
         self.prepare(environ)
         return Response.__call__(self, environ, start_response)
 
-class OWSTokenNotValid(OWSException):
-    explanation = 'Token is not valid.'
+class OWSForbidden(OWSException):
+    explanation = 'Access to this service is forbidden.'
 
-class OWSServiceNotAllowed(OWSException):
-    explanation = 'OWS service is not allowed.'
