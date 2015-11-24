@@ -8,3 +8,9 @@ def test_baseurl():
     assert_equals(utils.baseurl('https://localhost:8094/wps?service=wps&request=getcapabilities'), 'https://localhost:8094/wps')
     with assert_raises(ValueError) as e:
         utils.baseurl('ftp://localhost:8094/wps')
+
+
+def test_path_elements():
+    assert_equals(utils.path_elements('/ows/proxy/lovely_bird'), ['ows', 'proxy', 'lovely_bird'])
+    assert_equals(utils.path_elements('/ows/proxy/lovely_bird/'), ['ows', 'proxy', 'lovely_bird'])
+    assert_equals(utils.path_elements('/ows/proxy/lovely_bird/ '), ['ows', 'proxy', 'lovely_bird'])

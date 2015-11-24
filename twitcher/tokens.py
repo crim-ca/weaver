@@ -1,7 +1,7 @@
 import uuid
 from datetime import timedelta
 
-from twitcher.utils import now, localize_datetime
+from twitcher.utils import now, localize_datetime, path_elements
 from twitcher.owsexceptions import OWSForbidden
 
 import logging
@@ -56,9 +56,8 @@ class TokenStorage(object):
         elif 'Access-Token' in request.headers:
             token = request.headers['Access-Token']  # in header
         else:  # in path
-            path_elements = [el.strip() for el in request.path.split('/')]
-            path_elements = [el for el in path_elements if len(el) > 0]
-            if len(path_elements) > 1:
+            elements = path_elements(request.path)
+            if len(path_elements) > 1: # there is always /ows/
                 token = path_elements[-1]   # last path element
                 
         if token is None:

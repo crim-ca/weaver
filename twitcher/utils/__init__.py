@@ -30,3 +30,11 @@ def baseurl(url):
         raise ValueError('bad url')
     service_url = "%s://%s%s" % (parsed_url.scheme, parsed_url.netloc, parsed_url.path.strip())
     return service_url
+
+
+def path_elements(path):
+    elements = [el.strip() for el in path.split('/')]
+    elements = [el for el in elements if len(el) > 0]
+    return elements
+
+
