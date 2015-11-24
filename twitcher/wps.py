@@ -7,7 +7,7 @@ from pyramid.view import view_config, view_defaults
 import pywps
 from pywps.Exceptions import WPSException, NoApplicableCode
 
-@view_defaults(permission='view', renderer='string')
+@view_defaults(renderer='string')
 class PyWPSWrapper(object):
     def __init__(self, request):
         self.request = request

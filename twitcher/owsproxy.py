@@ -5,7 +5,7 @@ The owsproxy is based on `papyrus_ogcproxy <https://github.com/elemoine/papyrus_
 import urllib
 from httplib2 import Http
 
-from pyramid.view import view_config, view_defaults
+from pyramid.view import view_config
 from pyramid.httpexceptions import HTTPBadRequest, HTTPBadGateway, HTTPNotAcceptable
 from pyramid.response import Response
 
@@ -26,7 +26,6 @@ allowed_content_types = (
     #"application/vnd.google-earth.kml+xml", # KML
     )
 
-@view_defaults(permission='view')
 class OWSProxy(object):
     def __init__(self, request):
         self.request = request
