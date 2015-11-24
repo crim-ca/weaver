@@ -1,9 +1,6 @@
 import functools
 
-from pyramid.view import view_config, view_defaults
-from pyramid.exceptions import HTTPForbidden
-from pyramid.authentication import BasicAuthAuthenticationPolicy
-from pyramid.authorization import ACLAuthorizationPolicy
+from pyramid.view import view_defaults
 from pyramid_rpc.xmlrpc import xmlrpc_method
 
 from twitcher import registry, tokens
@@ -14,37 +11,6 @@ logger = logging.getLogger(__name__)
 
 # shortcut for xmlrpc_method
 api_xmlrpc = functools.partial(xmlrpc_method, endpoint="api")
-
-# security
-Admin = 'group.admin'
-
-def groupfinder(username, password, request):
-    if username == 'admin':
-        return [Admin]
-    else:
-        return []
-    return HTTPForbidden()
-
-
-# Authentication and Authorization
-
-from pyramid.security import (
-        Allow,
-        Everyone,
-        ALL_PERMISSIONS)
-
-
-class Root():
-    __acl__ = [
-        (Allow, Everyone, 'view'),
-        (Allow, Admin, ALL_PERMISSIONS)
-        ]
-
-    def __init__(self, request):
-        self.request = request
-
-def root_factory(request):
-    return Root(request)
 
 
 @view_defaults(permission='admin')
@@ -112,15 +78,13 @@ def includeme(config):
 
     * ``config``: the ``pyramid.config.Configurator`` object.
     """
+
+    # using basic auth
+    config.include('twitcher.basicauth')
+    
     # pyramid xml-rpc
     # http://docs.pylonsproject.org/projects/pyramid-rpc/en/latest/xmlrpc.html
     config.include('pyramid_rpc.xmlrpc')
     config.include('twitcher.db')
     config.add_xmlrpc_endpoint('api', '/RPC2')
 
-    # Security policies: basic auth
-    authn_policy = BasicAuthAuthenticationPolicy(check=groupfinder, realm="Birdhouse")
-    authz_policy = ACLAuthorizationPolicy()
-    config.set_authentication_policy(authn_policy)
-    config.set_authorization_policy(authz_policy)
-    config.set_root_factory(root_factory)
