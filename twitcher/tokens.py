@@ -49,17 +49,14 @@ class TokenStorage(object):
         return access_token
 
     def validate_access_token(self, request):
-        try:
-            # TODO: getting token from url needs to be done in a better way
-            token = request.path_info.split('/')[4]
-            access_token = self.get_access_token(token)
-            if access_token is None:
-                raise Exception('no access token found!')
-            if not access_token.is_valid():
-                raise Exception('token is not valid')
-        except:
-            # TODO: handle exceptions
-            logger.exception('token validation failed!')
+        # TODO: getting token from url needs to be done in a better way
+        if not 'access_token' in request.params:
+            raise OWSTokenNotValid('no access token found')
+        token = request.params['access_token']
+        access_token = self.get_access_token(token)
+        if access_token is None:
+            raise OWSTokenNotValid('no access token found!')
+        if not access_token.is_valid():
             raise OWSTokenNotValid()
 
 
