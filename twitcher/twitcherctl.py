@@ -3,6 +3,7 @@ import argcomplete
 import argparse
 import xmlrpclib
 import ssl
+from urlparse import urlparse
 
 import logging
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.WARN)
@@ -16,52 +17,39 @@ def _create_https_context(verify=True):
         context.verify_mode = ssl.CERT_NONE
     return context
 
+def _create_server(url, verify_ssl=True, username=None, password=None):
+    if username:
+        # TODO: build url
+        parsed = urlparse(url)
+        url = "%s://%s:%s@%s%s" % (parsed.scheme, username, password, parsed.netloc, parsed.path)
+    context = _create_https_context(verify=verify_ssl)
+    server = xmlrpclib.ServerProxy(url, context=context)
+    return server
+
 class TwitcherCtl(object):
     """
     Command line to interact with the xmlrpc interface of the ``twitcher`` service.
     """
 
-    def __init__(self):
-        pass
-
-        
-    def create_server(self, hostname="localhost", port=38083, verify_ssl=True, username=None, password=None):
-        # TODO: build url
-        if username:
-            url = "https://%s:%s@%s:%s" % (username, password, hostname, port)
-        else:
-            url = "https://%s:%s" % (hostname, port)
-        context = _create_https_context(verify=verify_ssl)
-        server = xmlrpclib.ServerProxy(url, context=context)
-        return server
-        
-
     def create_parser(self):
         parser = argparse.ArgumentParser(
             prog="twitcherctl",
-            description='twitcherctl -- control twitcher proxy service from the cmd line.',
+            description='twitcherctl -- control twitcher service from the cmd line.',
             )
         parser.add_argument("--debug",
-                            help="enable debug mode.",
+                            help="Enable debug mode.",
                             action="store_true")
+        parser.add_argument('-s', '--serverurl',
+                            metavar='URL',
+                            default='https://localhost:38083',
+                            help='URL on which twitcher server is listening (default "https://localhost:38083").')
         parser.add_argument("-u", "--username",
-                            action="store",
-                            )
+                            help="Username to use for authentication with server.")
         parser.add_argument("-p", "--password",
-                            action="store",
-                            )
-        parser.add_argument('--hostname',
-                            default='localhost',
-                            action="store",
-                            )
-        parser.add_argument('--port',
-                            default=38083,
-                            type=type(38083),
-                            action="store",
-                            )
+                            help="Password to use for authentication with server")
         parser.add_argument("-k", "--insecure", # like curl
                             dest='verify_ssl',
-                            help="don't validate the server's certificate.",
+                            help="Don't validate the server's certificate.",
                             action="store_false")
 
         # commands
@@ -114,8 +102,8 @@ class TwitcherCtl(object):
             #username = raw_input('Username:')
             password = getpass.getpass(prompt='Password:')
             
-        server = self.create_server(
-            hostname=args.hostname, port=args.port, verify_ssl=args.verify_ssl,
+        server = _create_server(
+            url=args.serverurl, verify_ssl=args.verify_ssl,
             username=args.username, password=password)
         result = None
         try:
