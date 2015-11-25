@@ -9,7 +9,7 @@ from pyramid.view import view_config
 from pyramid.httpexceptions import HTTPBadRequest, HTTPBadGateway, HTTPNotAcceptable
 from pyramid.response import Response
 
-from twitcher.registry import get_service
+from twitcher.registry import registry_factory
 
 import logging
 logger = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ allowed_content_types = (
 class OWSProxy(object):
     def __init__(self, request):
         self.request = request
-        self.session = self.request.session
+        self.registry = registry_factory(request)
 
           
     def send_request(self, service):
@@ -69,7 +69,7 @@ class OWSProxy(object):
         
         service = None
         try:
-            service = get_service(self.request, service_name)
+            service = self.reqistry.get_service(service_name)
         except Exception as err:
             return HTTPBadRequest("Could not find service: %s" % (err.message))
 

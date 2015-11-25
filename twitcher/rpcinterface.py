@@ -3,7 +3,8 @@ import functools
 from pyramid.view import view_defaults
 from pyramid_rpc.xmlrpc import xmlrpc_method
 
-from twitcher import registry, tokens
+from twitcher.registry import registry_factory
+from twitcher.tokens import TokenStorage
 
 import logging
 logger = logging.getLogger(__name__)
@@ -17,7 +18,8 @@ api_xmlrpc = functools.partial(xmlrpc_method, endpoint="api")
 class RPCInterface(object):
     def __init__(self, request):
         self.request = request
-        self.tokenstore = tokens.TokenStorage(self.request.db)
+        self.tokenstore = TokenStorage(self.request.db)
+        self.registry = registry_factory(self.request)
 
     # token management
 
@@ -51,7 +53,7 @@ class RPCInterface(object):
         """
         Adds an OWS service with the given ``url`` to the registry.
         """
-        service = registry.add_service(self.request, url=url)
+        service = self.registry.add_service(url=url)
         return service['name']
 
 
@@ -61,7 +63,7 @@ class RPCInterface(object):
         Removes OWS service with the given ``name`` from the registry.
         """
         try:
-            registry.remove_service(self.request, service_name=name)
+            self.registry.remove_service(service_name=name)
         except:
             logger.exception('unregister failed')
             return False
@@ -76,7 +78,7 @@ class RPCInterface(object):
         Lists all registred OWS services.
         """
         try:
-            services = registry.list_services(self.request)
+            services = self.registry.list_services()
             return services
         except:
             logger.exception('register failed')
@@ -89,7 +91,7 @@ class RPCInterface(object):
         Removes all services from the registry.
         """
         try:
-            registry.clear_service(self.request)
+            self.registry.clear_service()
         except:
             logger.exception('clear failed')
             return False
