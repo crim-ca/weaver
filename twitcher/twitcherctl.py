@@ -73,31 +73,32 @@ class TwitcherCtl(object):
 
         # token
         # -----
-        subparser = subparsers.add_parser('gentoken', help="generates an access token")
+        subparser = subparsers.add_parser('gentoken', help="Generates an access token.")
+        subparser.add_argument('-e', '--env', nargs='*', default=[], help="Set environment variable (key=value).")
         
-        subparser = subparsers.add_parser('remove_token', help="removes given access token")
+        subparser = subparsers.add_parser('remove_token', help="Removes given access token.")
         subparser.add_argument('token', help="access token")
         
-        subparser = subparsers.add_parser('clear_tokens', help="removes all access tokens")
+        subparser = subparsers.add_parser('clear_tokens', help="Removes all access tokens.")
         
 
         # service registry
         # ----------------
         
         # list
-        subparser = subparsers.add_parser('list_services', help="lists all registered OWS services for OWS proxy")
+        subparser = subparsers.add_parser('list_services', help="Lists all registered OWS services for OWS proxy.")
 
         # clear
-        subparser = subparsers.add_parser('clear_services', help="removes all OWS services from the registry")
+        subparser = subparsers.add_parser('clear_services', help="Removes all OWS services from the registry.")
 
         # register
-        subparser = subparsers.add_parser('add_service', help="adds a OWS service to the registry to be used by the OWS proxy")
-        subparser.add_argument('url', help="service url")
-        subparser.add_argument('--name', help="service name. If not set then a name will be generated.")
+        subparser = subparsers.add_parser('add_service', help="Adds a OWS service to the registry to be used by the OWS proxy.")
+        subparser.add_argument('url', help="Service url.")
+        subparser.add_argument('--name', help="Service name. If not set then a name will be generated.")
 
         # unregister
-        subparser = subparsers.add_parser('remove_service', help="removes OWS service from the registry")
-        subparser.add_argument('name', help="service name")
+        subparser = subparsers.add_parser('remove_service', help="Removes OWS service from the registry.")
+        subparser.add_argument('name', help="Service name.")
 
         return parser
 
@@ -130,7 +131,8 @@ class TwitcherCtl(object):
             elif args.cmd == 'clear_services':
                 result = server.clear_services()
             elif args.cmd == 'gentoken':
-                result = server.generate_token()
+                user_environ = {k:v for k,v in (x.split('=') for x in args.env) }
+                result = server.generate_token(user_environ)
             elif args.cmd == 'remove_token':
                 result = server.remove_token(args.token)
             elif args.cmd == 'clear_tokens':

@@ -58,7 +58,6 @@ class TokenStorage(object):
 
     def validate_access_token(self, request):
         token = None
-        logger.error('path = %s', request.path)
         if 'access_token' in request.params:
             token = request.params['access_token']   # in params
         elif 'Access-Token' in request.headers:

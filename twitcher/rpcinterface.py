@@ -24,11 +24,11 @@ class RPCInterface(object):
     # token management
 
     @api_xmlrpc()
-    def generate_token(self):
+    def generate_token(self, user_environ=None):
         """
-        Generates an access token.
+        Generates an access token. Stores the optional ``user_environ`` dict with the token.
         """
-        access_token = self.tokenstore.create_access_token()
+        access_token = self.tokenstore.create_access_token(user_environ=user_environ)
         return access_token.access_token
 
     

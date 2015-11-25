@@ -19,7 +19,6 @@ def ows_security_tween_factory(handler, registry):
     
     def ows_security_tween(request):
         try:
-            user_environ = None
             ows_request = OWSRequest(request)
             if request.path.startswith(protected_path):
                 if ows_request.service is None:

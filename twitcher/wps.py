@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class PyWPSWrapper(object):
     def __init__(self, request):
         self.request = request
-        self.response = self.request.response
+        self.response = request.response
 
     @view_config(route_name='wps')
     @view_config(route_name='wps_secured')
@@ -25,8 +25,6 @@ class PyWPSWrapper(object):
         """
         self.response.status = "200 OK"
         self.response.content_type = "text/xml"
-
-        logger.debug('request params: %s', self.request.params)
 
         # TODO: is this the right way for get/post?
         inputQuery = None
