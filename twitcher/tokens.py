@@ -16,7 +16,7 @@ class TokenStorage(object):
         self.db = db.tokens
 
         
-    def create_access_token(self, valid_in_hours=DEFAULT_VALID_IN_HOURS):
+    def create_access_token(self, valid_in_hours=DEFAULT_VALID_IN_HOURS, user_environ=None):
         """
         Generates an access token.
 
@@ -26,7 +26,8 @@ class TokenStorage(object):
         access_token = AccessToken(
             access_token = str(uuid.uuid1().get_hex()),
             creation_time = now(),
-            valid_in_hours = valid_in_hours)
+            valid_in_hours = valid_in_hours,
+            user_environ = user_environ)
         self.db.insert_one(access_token)
         return access_token
 
@@ -125,6 +126,11 @@ class AccessToken(dict):
         Checks if token is valid.
         """
         return self.not_before() <= now() and now() <= self.not_after()
+
+
+    @property
+    def user_environ(self):
+        return self.get('user_environ')
 
     
     def __str__(self):

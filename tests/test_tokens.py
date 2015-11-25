@@ -26,3 +26,10 @@ def test_invalid_access_token():
     ok_(token.not_before() == creation_time)
     ok_(token.not_after() > creation_time)
     ok_(token.is_valid() == False)
+
+
+def test_access_token_with_user_environ():
+    creation_time = now()
+    token = AccessToken(access_token='12345', creation_time=creation_time,
+                        user_environ={'oauth_token': 'bfghk'})
+    ok_(token.user_environ == {'oauth_token': 'bfghk'})
