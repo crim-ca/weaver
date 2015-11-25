@@ -48,6 +48,12 @@ JSON Web Token (JWT):
 * http://openid.net/specs/draft-jones-oauth-jwt-bearer-03.html
 * https://pypi.python.org/pypi/pyramid_jwtauth
 
+Simple Web Token (SWT):
+
+* https://lbadri.wordpress.com/2012/07/30/anatomy-of-a-simple-web-token-swt/
+* https://lbadri.wordpress.com/2012/09/13/simple-web-token-swt-as-oauth-2-0-bearer-token-for-asp-net-web-api/
+* https://msdn.microsoft.com/en-us/library/hh454950.aspx
+* https://en.wikipedia.org/wiki/Access_Control_Service
 
 Geo XACML (access control XML):
 
