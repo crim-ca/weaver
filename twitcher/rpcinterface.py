@@ -17,26 +17,49 @@ api_xmlrpc = functools.partial(xmlrpc_method, endpoint="api")
 class RPCInterface(object):
     def __init__(self, request):
         self.request = request
+        self.tokenstore = tokens.TokenStorage(self.request.db)
 
     # token management
 
     @api_xmlrpc()
     def generate_token(self):
-        tokenstore = tokens.TokenStorage(self.request.db)
-        access_token = tokenstore.create_access_token()
+        """
+        Generates an access token.
+        """
+        access_token = self.tokenstore.create_access_token()
         return access_token.access_token
 
+    
+    @api_xmlrpc()
+    def clear_tokens(self):
+        """
+        Removes all tokens.
+        """
+        try:
+            self.tokenstore.clear()
+        except:
+            logger.exception('clear tokens failed')
+            return False
+        else:
+            return True
+            
 
     # service registry
 
     @api_xmlrpc()
     def add_service(self, url):
+        """
+        Adds an OWS service with the given ``url`` to the registry.
+        """
         service = registry.add_service(self.request, url=url)
         return service['name']
 
 
     @api_xmlrpc()
     def remove_service(self, name):
+        """
+        Removes OWS service with the given ``name`` from the registry.
+        """
         try:
             registry.remove_service(self.request, service_name=name)
         except:
@@ -49,6 +72,9 @@ class RPCInterface(object):
 
     @api_xmlrpc()
     def list_services(self):
+        """
+        Lists all registred OWS services.
+        """
         try:
             services = registry.list_services(self.request)
             return services
@@ -59,6 +85,9 @@ class RPCInterface(object):
 
     @api_xmlrpc()
     def clear_services(self):
+        """
+        Removes all services from the registry.
+        """
         try:
             registry.clear_service(self.request)
         except:

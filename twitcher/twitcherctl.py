@@ -17,6 +17,9 @@ def _create_https_context(verify=True):
     return context
 
 class TwitcherCtl(object):
+    """
+    Command line to interact with the xmlrpc interface of the ``twitcher`` service.
+    """
 
     def __init__(self):
         pass
@@ -66,25 +69,32 @@ class TwitcherCtl(object):
             dest='cmd',
             title='command',
             description='List of available commands',
-            #help='Run "birdy <command> -h" to get additional help.'
             )
 
         # token
         # -----
-        subparser = subparsers.add_parser('gentoken')
+        subparser = subparsers.add_parser('gentoken', help="generates an access token")
+        subparser = subparsers.add_parser('remove_token', help="removes given access token")
+        subparser.add_argument('--token',
+                    dest='token',
+                    required=True,
+                    nargs=1,
+                    action="store",
+                    )
+        subparser = subparsers.add_parser('clear_tokens', help="removes all access tokens")
         
 
         # service registry
         # ----------------
         
         # list
-        subparser = subparsers.add_parser('list_services')
+        subparser = subparsers.add_parser('list_services', help="lists all registered OWS services for OWS proxy")
 
         # clear
-        subparser = subparsers.add_parser('clear_services')
+        subparser = subparsers.add_parser('clear_services', help="removes all OWS services from the registry")
 
         # register
-        subparser = subparsers.add_parser('add_service')
+        subparser = subparsers.add_parser('add_service', help="adds a OWS service to the registry to be used by the OWS proxy")
         subparser.add_argument('--url',
                     dest='url',
                     required=True,
@@ -95,7 +105,7 @@ class TwitcherCtl(object):
                     )
 
         # unregister
-        subparser = subparsers.add_parser('remove_service')
+        subparser = subparsers.add_parser('remove_service', help="removes OWS service from the registry")
         subparser.add_argument('--name',
                     dest='name',
                     required=True,
@@ -133,6 +143,10 @@ class TwitcherCtl(object):
                 result = server.clear_services()
             elif args.cmd == 'gentoken':
                 result = server.generate_token()
+            elif args.cmd == 'remove_token':
+                result = server.remove_token(args.token[0])
+            elif args.cmd == 'clear_tokens':
+                result = server.clear_tokens()
         except xmlrpclib.Fault as e:
             logger.error("A fault occurred: %s (%d)", e.faultString, e.faultCode)
         except xmlrpclib.ProtocolError as e:

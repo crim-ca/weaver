@@ -48,6 +48,13 @@ class TokenStorage(object):
             access_token = AccessToken(access_token)
         return access_token
 
+
+    def clear(self):
+        """
+        Removes all tokens from database.
+        """
+        self.db.drop()
+
     def validate_access_token(self, request):
         token = None
         logger.error('path = %s', request.path)
