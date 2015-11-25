@@ -29,7 +29,6 @@ allowed_content_types = (
 class OWSProxy(object):
     def __init__(self, request):
         self.request = request
-        self.registry = registry_factory(request)
 
           
     def send_request(self, service):
@@ -69,7 +68,8 @@ class OWSProxy(object):
         
         service = None
         try:
-            service = self.reqistry.get_service(service_name)
+            registry = registry_factory(request)
+            service = reqistry.get_service(service_name)
         except Exception as err:
             return HTTPBadRequest("Could not find service: %s" % (err.message))
 
