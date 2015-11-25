@@ -18,15 +18,18 @@ def ows_security_tween_factory(handler, registry):
     tokenstore = TokenStorage( mongodb(registry) )
     
     def ows_security_tween(request):
-        ows_request = OWSRequest(request)
         try:
+            user_environ = None
+            ows_request = OWSRequest(request)
             if request.path.startswith(protected_path):
                 if ows_request.service is None:
                     raise OWSForbidden() # service parameter is missing
                 if not ows_request.service in allowed_service_types:
                     raise OWSForbidden() # service not supported
                 if not ows_request.request in allowed_requests:
-                    tokenstore.validate_access_token(request)
+                    access_token = tokenstore.validate_access_token(request)
+                    # update request with user environ from access token
+                    request.environ.update( access_token.user_environ )
             return handler(request)
         except OWSException as err:
             logger.exception("security check failed.")

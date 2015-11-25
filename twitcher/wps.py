@@ -7,6 +7,9 @@ from pyramid.view import view_config, view_defaults
 import pywps
 from pywps.Exceptions import WPSException, NoApplicableCode
 
+import logging
+logger = logging.getLogger(__name__)
+
 @view_defaults(renderer='string')
 class PyWPSWrapper(object):
     def __init__(self, request):
@@ -22,6 +25,8 @@ class PyWPSWrapper(object):
         """
         self.response.status = "200 OK"
         self.response.content_type = "text/xml"
+
+        logger.debug('request params: %s', self.request.params)
 
         # TODO: is this the right way for get/post?
         inputQuery = None

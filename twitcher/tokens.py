@@ -76,6 +76,7 @@ class TokenStorage(object):
             raise OWSForbidden() # no access token in store
         if not access_token.is_valid():
             raise OWSForbidden() # access token not valid
+        return access_token
 
 
 class AccessToken(dict):
@@ -130,7 +131,8 @@ class AccessToken(dict):
 
     @property
     def user_environ(self):
-        return self.get('user_environ')
+        environ = self['user_environ'] or {}
+        return environ
 
     
     def __str__(self):
