@@ -1,4 +1,7 @@
-from twitcher.owsexceptions import OWSException, OWSForbidden
+from twitcher.owsexceptions import (OWSException,
+                                    OWSAccessForbidden,
+                                    OWSMissingParameterValue,
+                                    OWSInvalidParameterValue)
 from twitcher.owsrequest import OWSRequest
 from twitcher.tokens import TokenStorage
 from twitcher.db import mongodb
@@ -31,15 +34,15 @@ def ows_security_tween_factory(handler, registry):
                 token = path_elements[-1]   # last path element
 
         if token is None:
-            raise OWSForbidden() # no access token provided
+            raise OWSAccessForbidden("no access token provided")
         return token
     
     def _validate_token(token):
         access_token = tokenstore.get_access_token(token)
         if access_token is None:
-            raise OWSForbidden() # no access token in store
+            raise OWSAccessForbidden("no access token in store")
         if not access_token.is_valid():
-            raise OWSForbidden() # access token not valid
+            raise OWSAccessForbidden("access token not valid")
         return access_token
     
     def ows_security_tween(request):
@@ -47,9 +50,10 @@ def ows_security_tween_factory(handler, registry):
             ows_request = OWSRequest(request)
             if request.path.startswith(protected_path):
                 if ows_request.service is None:
-                    raise OWSForbidden() # service parameter is missing
+                    raise OWSMissingParameterValue("service parameter is missing", value="SERVICE")
                 if not ows_request.service in allowed_service_types:
-                    raise OWSForbidden() # service not supported
+                    raise OWSInvalidParameterValue(
+                        "service %s not supported" % ows_request.service, value="SERVICE")
                 if not ows_request.request in allowed_requests:
                     token = _get_token(request)
                     access_token = _validate_token(token)
@@ -61,7 +65,7 @@ def ows_security_tween_factory(handler, registry):
             return err
         except Exception as err:
             logger.exception("unknown error")
-            return OWSForbidden()
+            return OWSAccessForbidden(err.message)
         
     return ows_security_tween
 

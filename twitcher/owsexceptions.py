@@ -16,30 +16,36 @@ from pyramid.response import Response
 class OWSException(Response, Exception):
 
     code = 'NoApplicableCode'
+    value = None
+    locator = 'NoApplicableCode'
     explanation = 'Unknown Error'
 
     page_template = Template('''\
 <?xml version="1.0" encoding="utf-8"?>
 <ExceptionReport version="1.0.0" xmlns="http://www.opengis.net/ows/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.opengis.net/ows/1.1 http://schemas.opengis.net/ows/1.1.0/owsExceptionReport.xsd">
-    <Exception exceptionCode="${code}">
-        <ExceptionText>${explanation}</ExceptionText>
+    <Exception exceptionCode="${code}" locator="${locator}">
+        <ExceptionText>${message}</ExceptionText>
     </Exception>
 </ExceptionReport>''')
 
 
-    def __init__(self, **kw):
+    def __init__(self, detail=None, value=None, **kw):
         Response.__init__(self, status='200 OK', **kw)
-        Exception.__init__(self, self.explanation)
+        Exception.__init__(self, detail)
+        self.message = detail or self.explanation
+        if value:
+            self.locator = value
 
     def __str__(self):
-        return self.text
+        return self.message
 
     def prepare(self, environ):
         if not self.body:
             self.content_type = 'text/xml'
             args = {
                 'code': _html_escape(self.code),
-                'explanation': _html_escape(self.explanation or ''),
+                'locator': _html_escape(self.locator),
+                'message': _html_escape(self.message or ''),
                 }
             page = self.page_template.substitute(args)
             page = page.encode(self.charset)
@@ -64,6 +70,22 @@ class OWSException(Response, Exception):
         self.prepare(environ)
         return Response.__call__(self, environ, start_response)
 
-class OWSForbidden(OWSException):
-    explanation = 'Access to this service is forbidden.'
+class OWSAccessForbidden(OWSException):
+    locator = "AccessForbidden"
+    explanation = "Access to this service is forbidden"
 
+    
+class OWSMissingParameterValue(OWSException):
+    """MissingParameterValue WPS Exception"""
+    code = "MissingParameterValue"
+    locator = ""
+    explanation = "Parameter value is missing"
+    
+    
+
+class OWSInvalidParameterValue(OWSException):
+    """InvalidParameterValue WPS Exception"""
+    code = "InvalidParameterValue"
+    locator = ""
+    explanation = "Parameter value is invalid"
+    
