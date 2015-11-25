@@ -1,6 +1,5 @@
 import pymongo
 
-from twitcher.exceptions import OWSServiceNotFound, OWSServiceException
 from twitcher.utils import namesgenerator, baseurl
 
 import logging
@@ -42,7 +41,7 @@ class ServiceRegistry(object):
                     name = namesgenerator.get_random_name(retry=True)
             service = dict(url=service_url, name=service_name, type=service_type)
             if self.db.find_one({'name': service_name}):
-                raise OWSServiceException("service %s already registered." % (service_name))
+                raise ValueError("service %s already registered." % (service_name))
             self.db.insert_one(service)
             service = self.db.find_one({'name': service['name']})
         return service
@@ -75,9 +74,9 @@ class ServiceRegistry(object):
         """
         service = self.db.find_one({'name': service_name})
         if service is None:
-            raise OWSServiceNotFound('service not found')
+            raise ValueError('service not found')
         if not 'url' in service:
-            raise OWSServiceNotFound('service has no url')
+            raise ValueError('service has no url')
         return dict(url=service.get('url'),
                     name=service_name,
                     proxy_url=proxyurl(self.request, service['name']))
