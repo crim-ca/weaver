@@ -99,9 +99,15 @@ class TwitcherCtl(object):
                     dest='url',
                     required=True,
                     nargs=1,
-                    default='http://localhost:8094/wps',
                     action="store",
-                    #help="",
+                    help="service url",
+                    )
+        subparser.add_argument('--name',
+                    dest='name',
+                    required=False,
+                    nargs=1,
+                    action="store",
+                    help="service name. If not set then a name will be generated.",
                     )
 
         # unregister
@@ -136,7 +142,10 @@ class TwitcherCtl(object):
             if args.cmd == 'list_services':
                 result = server.list_services()
             elif args.cmd == 'add_service':
-                result = server.add_service(args.url[0])
+                if args.name:
+                    result = server.add_service(args.url[0], args.name[0])
+                else:
+                    result = server.add_service(args.url[0])
             elif args.cmd == 'remove_service':
                 result = server.remove_service(args.name[0])
             elif args.cmd == 'clear_services':
