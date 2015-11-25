@@ -68,8 +68,8 @@ class OWSProxy(object):
         
         service = None
         try:
-            registry = registry_factory(request)
-            service = reqistry.get_service(service_name)
+            registry = registry_factory(self.request)
+            service = registry.get_service(service_name)
         except Exception as err:
             return HTTPBadRequest("Could not find service: %s" % (err.message))
 
