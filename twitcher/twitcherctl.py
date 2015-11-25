@@ -74,13 +74,10 @@ class TwitcherCtl(object):
         # token
         # -----
         subparser = subparsers.add_parser('gentoken', help="generates an access token")
+        
         subparser = subparsers.add_parser('remove_token', help="removes given access token")
-        subparser.add_argument('--token',
-                    dest='token',
-                    required=True,
-                    nargs=1,
-                    action="store",
-                    )
+        subparser.add_argument('token', help="access token")
+        
         subparser = subparsers.add_parser('clear_tokens', help="removes all access tokens")
         
 
@@ -95,30 +92,12 @@ class TwitcherCtl(object):
 
         # register
         subparser = subparsers.add_parser('add_service', help="adds a OWS service to the registry to be used by the OWS proxy")
-        subparser.add_argument('--url',
-                    dest='url',
-                    required=True,
-                    nargs=1,
-                    action="store",
-                    help="service url",
-                    )
-        subparser.add_argument('--name',
-                    dest='name',
-                    required=False,
-                    nargs=1,
-                    action="store",
-                    help="service name. If not set then a name will be generated.",
-                    )
+        subparser.add_argument('url', help="service url")
+        subparser.add_argument('--name', help="service name. If not set then a name will be generated.")
 
         # unregister
         subparser = subparsers.add_parser('remove_service', help="removes OWS service from the registry")
-        subparser.add_argument('--name',
-                    dest='name',
-                    required=True,
-                    nargs=1,
-                    action="store",
-                    #help="",
-                    )
+        subparser.add_argument('name', help="service name")
 
         return parser
 
@@ -143,17 +122,17 @@ class TwitcherCtl(object):
                 result = server.list_services()
             elif args.cmd == 'add_service':
                 if args.name:
-                    result = server.add_service(args.url[0], args.name[0])
+                    result = server.add_service(args.url, args.name)
                 else:
-                    result = server.add_service(args.url[0])
+                    result = server.add_service(args.url)
             elif args.cmd == 'remove_service':
-                result = server.remove_service(args.name[0])
+                result = server.remove_service(args.name)
             elif args.cmd == 'clear_services':
                 result = server.clear_services()
             elif args.cmd == 'gentoken':
                 result = server.generate_token()
             elif args.cmd == 'remove_token':
-                result = server.remove_token(args.token[0])
+                result = server.remove_token(args.token)
             elif args.cmd == 'clear_tokens':
                 result = server.clear_tokens()
         except xmlrpclib.Fault as e:
