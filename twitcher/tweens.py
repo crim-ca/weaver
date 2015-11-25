@@ -5,11 +5,10 @@ from twitcher.owsexceptions import (OWSException,
 from twitcher.owsrequest import OWSRequest
 from twitcher.tokens import TokenStorage
 from twitcher.db import mongodb
+from twitcher.utils import path_elements
 
 import logging
 logger = logging.getLogger(__name__)
-
-
 
 
 def ows_security_tween_factory(handler, registry):
@@ -30,8 +29,8 @@ def ows_security_tween_factory(handler, registry):
             token = request.headers['Access-Token']  # in header
         else:  # in path
             elements = path_elements(request.path)
-            if len(path_elements) > 1: # there is always /ows/
-                token = path_elements[-1]   # last path element
+            if len(elements) > 1: # there is always /ows/
+                token = elements[-1]   # last path element
 
         if token is None:
             raise OWSAccessForbidden("no access token provided")

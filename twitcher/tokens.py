@@ -1,7 +1,7 @@
 import uuid
 from datetime import timedelta
 
-from twitcher.utils import now, localize_datetime, path_elements
+from twitcher.utils import now, localize_datetime
 
 import logging
 logger = logging.getLogger(__name__)
