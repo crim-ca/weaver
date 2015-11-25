@@ -2,7 +2,6 @@ import uuid
 from datetime import timedelta
 
 from twitcher.utils import now, localize_datetime, path_elements
-from twitcher.owsexceptions import OWSForbidden
 
 import logging
 logger = logging.getLogger(__name__)
@@ -56,28 +55,7 @@ class TokenStorage(object):
         """
         self.db.drop()
 
-    def validate_access_token(self, request):
-        token = None
-        if 'access_token' in request.params:
-            token = request.params['access_token']   # in params
-        elif 'Access-Token' in request.headers:
-            token = request.headers['Access-Token']  # in header
-        else:  # in path
-            elements = path_elements(request.path)
-            if len(path_elements) > 1: # there is always /ows/
-                token = path_elements[-1]   # last path element
-                
-        if token is None:
-            raise OWSForbidden() # no access token provided
-
-        access_token = self.get_access_token(token)
-        if access_token is None:
-            raise OWSForbidden() # no access token in store
-        if not access_token.is_valid():
-            raise OWSForbidden() # access token not valid
-        return access_token
-
-
+    
 class AccessToken(dict):
     """
     Dictionary that contains access token. It always has ``'access_token'`` key.
