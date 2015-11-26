@@ -18,10 +18,11 @@ def _create_https_context(verify=True):
     return context
 
 def _create_server(url, verify_ssl=True, username=None, password=None):
-    if username:
-        # TODO: build url
-        parsed = urlparse(url)
-        url = "%s://%s:%s@%s%s" % (parsed.scheme, username, password, parsed.netloc, parsed.path)
+    username = username or 'nouser'
+    password = password or 'nopass'
+
+    parsed = urlparse(url)
+    url = "%s://%s:%s@%s%s" % (parsed.scheme, username, password, parsed.netloc, parsed.path)
     context = _create_https_context(verify=verify_ssl)
     server = xmlrpclib.ServerProxy(url, context=context)
     return server
