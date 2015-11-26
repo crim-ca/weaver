@@ -49,7 +49,7 @@ class PyWPSWrapper(object):
         except WPSException,e:
             return e
         except Exception, e:
-            return OWSNoApplicablCode(e.message)
+            return OWSNoApplicableCode(e.message)
 
 def includeme(config):
     config.add_route('wps', '/ows/wps')
