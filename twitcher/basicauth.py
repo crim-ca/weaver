@@ -15,10 +15,15 @@ logger = logging.getLogger(__name__)
 Admin = 'group:admin'
 
 def groupfinder(username, password, request):
-    if username == 'admin':
-        return [Admin]
+    logger.error("u=%s, p=%s", request.username, request.password)
+    if request.username and request.password:
+        if username == request.username and password == request.password:
+            return [Admin]
+        else:
+            return []
     else:
-        return []
+        # Warning: no access restrictions!
+        return [Admin]
     
 class RootFactory(object):
     __acl__ = [
@@ -39,6 +44,26 @@ def basic_challenge(request):
     response.headers.update(forget(request))
     return response
 
+def _get_username(request):
+    settings = request.registry.settings
+    if 'twitcher.username' in settings:
+        username = settings['twitcher.username']
+        if username:
+            username = username.strip()
+            if len(username) > 2:
+                return username
+    return None
+
+def _get_password(request):
+    settings = request.registry.settings
+    if 'twitcher.password' in settings:
+        password = settings['twitcher.password']
+        if password:
+            password = password.strip()
+            if len(password) > 2:
+                return password
+    return None
+
 def includeme(config):
     # Security policies for basic auth
     authn_policy = BasicAuthAuthenticationPolicy(check=groupfinder, realm="Birdhouse")
@@ -46,3 +71,5 @@ def includeme(config):
     config.set_authentication_policy(authn_policy)
     config.set_authorization_policy(authz_policy)
     config.set_root_factory(root_factory)
+    config.add_request_method(_get_username, 'username', reify=True)
+    config.add_request_method(_get_password, 'password', reify=True)

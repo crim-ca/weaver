@@ -2,6 +2,8 @@
 extends = buildout.cfg
 
 [settings]
+username =
+password =
 hostname = localhost 
 http-port = 8083
 log-level = DEBUG
