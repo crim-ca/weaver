@@ -14,3 +14,13 @@ def test_path_elements():
     assert_equals(utils.path_elements('/ows/proxy/lovely_bird'), ['ows', 'proxy', 'lovely_bird'])
     assert_equals(utils.path_elements('/ows/proxy/lovely_bird/'), ['ows', 'proxy', 'lovely_bird'])
     assert_equals(utils.path_elements('/ows/proxy/lovely_bird/ '), ['ows', 'proxy', 'lovely_bird'])
+
+
+def test_lxml_strip_ns():
+    import lxml.etree
+    wpsxml = """<wps100:Execute xmlns:wps100="http://www.opengis.net/wps/1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" service="WPS" version="1.0.0" xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/wps/1.0.0/wpsExecute_request.xsd"/>"""
+
+    doc = lxml.etree.fromstring(wpsxml)
+    assert_equals(doc.tag, '{http://www.opengis.net/wps/1.0.0}Execute')
+    utils.lxml_strip_ns(doc)
+    assert_equals(doc.tag, 'Execute')
