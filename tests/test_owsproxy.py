@@ -15,7 +15,7 @@ from pyramid.httpexceptions import HTTPBadRequest
 from pyramid import testing
 from pyramid.testing import DummyRequest
 
-from twitcher.owsproxy import OWSProxy
+from twitcher.owsproxy import owsproxy_view
 
 
 class OWSProxyTests(unittest.TestCase):
@@ -29,15 +29,13 @@ class OWSProxyTests(unittest.TestCase):
 
     def test_badrequest_url(self):
         request = DummyRequest(scheme='http')
-        inst = OWSProxy(request)
-        response = inst.owsproxy()
+        response = owsproxy_view(request)
         self.assertTrue(isinstance(response, HTTPBadRequest))
 
     def test_badrequest_netloc(self):
         request = DummyRequest(scheme='http',
                                params={'url': 'http://'})
-        inst = OWSProxy(request)
-        response = inst.owsproxy()
+        response = owsproxy_view(request)
         self.assertTrue(isinstance(response, HTTPBadRequest))
 
    
