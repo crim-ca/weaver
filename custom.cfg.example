@@ -2,8 +2,12 @@
 extends = buildout.cfg
 
 [settings]
-username =
-password =
 hostname = localhost 
 http-port = 8083
 log-level = DEBUG
+username =
+password =
+ows-security = true
+ows-proxy = true
+rpcinterface = true
+wps = true

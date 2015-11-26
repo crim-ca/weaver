@@ -1,7 +1,4 @@
 from pyramid.config import Configurator
-from pyramid.tweens import EXCVIEW
-
-from twitcher.tweens import OWS_SECURITY
 
 import logging
 logger = logging.getLogger(__name__)
@@ -23,7 +20,7 @@ def main(global_config, **settings):
     
     # tweens/middleware
     # TODO: maybe add tween for exception handling or use unknown_failure view
-    config.add_tween(OWS_SECURITY, under=EXCVIEW)
+    config.include('twitcher.tweens')
    
     config.scan()
 

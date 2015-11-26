@@ -2,6 +2,7 @@ import functools
 
 from pyramid.view import view_defaults
 from pyramid_rpc.xmlrpc import xmlrpc_method
+from pyramid.settings import asbool
 
 from twitcher.registry import registry_factory
 from twitcher.tokens import TokenStorage
@@ -109,13 +110,17 @@ def includeme(config):
 
     * ``config``: the ``pyramid.config.Configurator`` object.
     """
+    settings = config.registry.settings
 
-    # using basic auth
-    config.include('twitcher.basicauth')
+    if asbool(settings.get('twitcher.rpcinferface', True)):
+        logger.info('Add twitcher rpcinterface')
+
+        # using basic auth
+        config.include('twitcher.basicauth')
     
-    # pyramid xml-rpc
-    # http://docs.pylonsproject.org/projects/pyramid-rpc/en/latest/xmlrpc.html
-    config.include('pyramid_rpc.xmlrpc')
-    config.include('twitcher.db')
-    config.add_xmlrpc_endpoint('api', '/RPC2')
+        # pyramid xml-rpc
+        # http://docs.pylonsproject.org/projects/pyramid-rpc/en/latest/xmlrpc.html
+        config.include('pyramid_rpc.xmlrpc')
+        config.include('twitcher.db')
+        config.add_xmlrpc_endpoint('api', '/RPC2')
 

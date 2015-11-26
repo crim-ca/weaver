@@ -1,3 +1,6 @@
+from pyramid.settings import asbool
+from pyramid.tweens import EXCVIEW
+
 from twitcher.owsexceptions import (OWSException,
                                     OWSAccessForbidden,
                                     OWSNoApplicableCode,
@@ -10,6 +13,13 @@ from twitcher.utils import path_elements
 
 import logging
 logger = logging.getLogger(__name__)
+
+def includeme(config):
+    settings = config.registry.settings
+
+    if asbool(settings.get('twitcher.ows_security', True)):
+        logger.info('Add OWS security tween')
+        config.add_tween(OWS_SECURITY, under=EXCVIEW)
 
 
 def ows_security_tween_factory(handler, registry):
