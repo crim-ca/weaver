@@ -18,6 +18,7 @@ def _create_https_context(verify=True):
     return context
 
 def _create_server(url, verify_ssl=True, username=None, password=None):
+    # TODO: disable basicauth when username is not set
     username = username or 'nouser'
     password = password or 'nopass'
 
