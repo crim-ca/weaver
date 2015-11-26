@@ -1,3 +1,8 @@
+"""
+see access token example:
+https://www.mapbox.com/developers/api/
+"""
+
 import uuid
 from datetime import timedelta
 
