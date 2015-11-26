@@ -38,3 +38,13 @@ def path_elements(path):
     return elements
 
 
+def lxml_strip_ns(tree):
+    for node in tree.iter():
+        try:
+            has_namespace = node.tag.startswith('{')
+        except AttributeError:
+            continue  # node.tag is not a string (node is a comment or similar)
+        if has_namespace:
+            node.tag = node.tag.split('}', 1)[1]
+
+

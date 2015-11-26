@@ -3,9 +3,11 @@ pywps wrapper
 """
 
 from pyramid.view import view_config, view_defaults
+from pyramid.httpexceptions import HTTPBadRequest
 
 import pywps
-from pywps.Exceptions import WPSException, NoApplicableCode
+from pywps.Exceptions import WPSException
+from twitcher.owsexceptions import OWSNoApplicableCode
 
 import logging
 logger = logging.getLogger(__name__)
@@ -26,16 +28,16 @@ class PyWPSWrapper(object):
         self.response.status = "200 OK"
         self.response.content_type = "text/xml"
 
-        # TODO: is this the right way for get/post?
         inputQuery = None
         if self.request.method == "GET":
             inputQuery = self.request.query_string
-        elif "wsgi.input" in self.request.params:
-            inputQuery = self.request.params['wsgi.input']
+        elif self.request.method == "POST":
+            inputQuery = self.request.body_file_raw
+        else:
+            return HTTPBadRequest()
 
         if not inputQuery:
-            err =  NoApplicableCode("No query string found.")
-            return err
+            return OWSNoApplicableCode("No query string found.")
 
         # create the WPS object
         try:
@@ -46,7 +48,7 @@ class PyWPSWrapper(object):
         except WPSException,e:
             return e
         except Exception, e:
-            return e
+            return OWSNoApplicablCode(e.message)
 
 def includeme(config):
     config.add_route('wps', '/ows/wps')

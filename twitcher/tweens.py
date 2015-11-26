@@ -1,5 +1,6 @@
 from twitcher.owsexceptions import (OWSException,
                                     OWSAccessForbidden,
+                                    OWSNoApplicableCode,
                                     OWSMissingParameterValue,
                                     OWSInvalidParameterValue)
 from twitcher.owsrequest import OWSRequest
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def ows_security_tween_factory(handler, registry):
-    """A :term:`tween` factory which produces a tween which raises an exception
+    """A tween factory which produces a tween which raises an exception
     if access to OWS service is not allowed."""
 
     allowed_service_types = ('wps',)
@@ -33,21 +34,21 @@ def ows_security_tween_factory(handler, registry):
                 token = elements[-1]   # last path element
 
         if token is None:
-            raise OWSAccessForbidden("no access token provided")
+            raise OWSAccessForbidden("You need to provide an access token to use this service.")
         return token
     
     def _validate_token(token):
         access_token = tokenstore.get_access_token(token)
         if access_token is None:
-            raise OWSAccessForbidden("You need to provide an access token to use this service")
+            raise OWSAccessForbidden("The access token is invalid.")
         if not access_token.is_valid():
-            raise OWSAccessForbidden("The access token is invalid")
+            raise OWSAccessForbidden("The access token is invalid.")
         return access_token
     
     def ows_security_tween(request):
         try:
-            ows_request = OWSRequest(request)
             if request.path.startswith(protected_path):
+                ows_request = OWSRequest(request)
                 if not ows_request.service in allowed_service_types:
                     raise OWSInvalidParameterValue(
                         "service %s not supported" % ows_request.service, value="service")
@@ -62,7 +63,7 @@ def ows_security_tween_factory(handler, registry):
             return err
         except Exception as err:
             logger.exception("unknown error")
-            return OWSAccessForbidden(err.message)
+            return OWSNoApplicableCode(err.message)
         
     return ows_security_tween
 

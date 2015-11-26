@@ -77,14 +77,16 @@ class OWSAccessForbidden(OWSException):
     explanation = "Access to this service is forbidden"
 
     
+class OWSNoApplicableCode(OWSException):
+    pass
+
+
 class OWSMissingParameterValue(OWSException):
     """MissingParameterValue WPS Exception"""
     code = "MissingParameterValue"
     locator = ""
     explanation = "Parameter value is missing"
     
-    
-
 class OWSInvalidParameterValue(OWSException):
     """InvalidParameterValue WPS Exception"""
     code = "InvalidParameterValue"
