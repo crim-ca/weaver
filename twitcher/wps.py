@@ -22,8 +22,9 @@ class PyWPSWrapper(object):
     @view_config(route_name='wps_secured')
     def pywps(self):
         """
-        TODO: add xml response renderer
-        TODO: fix exceptions ... use OWSException (raise ...)
+        * TODO: add xml response renderer
+        * TODO: fix exceptions ... use OWSException (raise ...)
+        * TODO: config of pywps is missing
         """
         self.response.status = "200 OK"
         self.response.content_type = "text/xml"
