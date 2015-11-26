@@ -39,20 +39,18 @@ def ows_security_tween_factory(handler, registry):
     def _validate_token(token):
         access_token = tokenstore.get_access_token(token)
         if access_token is None:
-            raise OWSAccessForbidden("no access token in store")
+            raise OWSAccessForbidden("You need to provide an access token to use this service")
         if not access_token.is_valid():
-            raise OWSAccessForbidden("access token not valid")
+            raise OWSAccessForbidden("The access token is invalid")
         return access_token
     
     def ows_security_tween(request):
         try:
             ows_request = OWSRequest(request)
             if request.path.startswith(protected_path):
-                if ows_request.service is None:
-                    raise OWSMissingParameterValue("service parameter is missing", value="SERVICE")
                 if not ows_request.service in allowed_service_types:
                     raise OWSInvalidParameterValue(
-                        "service %s not supported" % ows_request.service, value="SERVICE")
+                        "service %s not supported" % ows_request.service, value="service")
                 if not ows_request.request in allowed_requests:
                     token = _get_token(request)
                     access_token = _validate_token(token)

@@ -1,5 +1,7 @@
 """
 OWSExceptions are based on pyramid.httpexceptions.
+
+See also: https://github.com/jachym/pywps-4/blob/master/pywps/exceptions.py
 """
 
 
