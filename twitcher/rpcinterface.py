@@ -4,7 +4,7 @@ from pyramid.view import view_defaults
 from pyramid_rpc.xmlrpc import xmlrpc_method
 from pyramid.settings import asbool
 
-from twitcher.registry import registry_factory
+from twitcher.registry import service_registry_factory, update_with_proxy_url
 from twitcher.tokens import tokengenerator_factory
 from twitcher.tokens import tokenstore_factory
 
@@ -23,7 +23,7 @@ class RPCInterface(object):
         registry = self.request.registry
         self.tokengenerator = tokengenerator_factory(registry)
         self.tokenstore = tokenstore_factory(registry)
-        self.registry = registry_factory(self.request)
+        self.registry = service_registry_factory(registry)
 
     # token management
 
@@ -58,7 +58,7 @@ class RPCInterface(object):
         """
         Adds an OWS service with the given ``url`` to the registry.
         """
-        service = self.registry.add_service(url=url, service_name=name)
+        service = self.registry.register_service(url=url, service_name=name)
         return service['name']
 
 
@@ -68,7 +68,7 @@ class RPCInterface(object):
         Removes OWS service with the given ``name`` from the registry.
         """
         try:
-            self.registry.remove_service(service_name=name)
+            self.registry.unregister_service(service_name=name)
         except:
             logger.exception('unregister failed')
             return False
@@ -84,7 +84,7 @@ class RPCInterface(object):
         """
         try:
             services = self.registry.list_services()
-            return services
+            return update_with_proxy_url(self.request, services)
         except:
             logger.exception('register failed')
             return []

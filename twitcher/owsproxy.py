@@ -10,7 +10,7 @@ from pyramid.httpexceptions import HTTPBadRequest, HTTPBadGateway, HTTPNotAccept
 from pyramid.response import Response
 from pyramid.settings import asbool
 
-from twitcher.registry import registry_factory
+from twitcher.registry import service_registry_factory, proxy_url
 
 import logging
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ def _send_request(request, service):
 
     # replace urls in xml content
     if 'xml' in ct:
-        content = content.replace(service['url'], service['proxy_url'])
+        content = content.replace(service['url'], proxy_url(request, service['name']))
 
     return Response(content, status=resp.status, headers={"Content-Type": ct})
 
@@ -64,14 +64,13 @@ def owsproxy_view(request):
     if service_name is None:
         return HTTPBadRequest('Parameter service_name is required.')
 
-    service = None
     try:
-        registry = registry_factory(request)
+        registry = service_registry_factory(request.registry)
         service = registry.get_service(service_name)
     except Exception as err:
         return HTTPBadRequest("Could not find service: %s." % (err.message))
-
-    return _send_request(request, service)
+    else:
+        return _send_request(request, service)
 
 def includeme(config):
     settings = config.registry.settings
