@@ -7,7 +7,7 @@ from twitcher.registry import ServiceRegistry
 
 class ServiceRegistryTestCase(unittest.TestCase):
     def setUp(self):
-        self.service = dict(name="loving_flamingo", url="http://somewhere.over.the/ocean")
+        self.service = dict(name="loving_flamingo", url="http://somewhere.over.the/ocean", type="WPS")
 
     def test_get_service(self):
         collection_mock = mock.Mock(spec=["find_one"])
@@ -18,3 +18,12 @@ class ServiceRegistryTestCase(unittest.TestCase):
 
         collection_mock.find_one.assert_called_with({"name": self.service['name']})
         ok_(isinstance(service, dict))
+
+    def test_register_service_default(self):
+        collection_mock = mock.Mock(spec=["insert_one", "find_one"])
+        collection_mock.find_one.return_value = None
+        
+        store = ServiceRegistry(collection=collection_mock)
+        store.register_service(url=self.service['url'], service_name=self.service['name'])
+
+        collection_mock.insert_one.assert_called_with(self.service)
