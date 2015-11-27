@@ -75,11 +75,11 @@ class TwitcherCtl(object):
         # service registry
         # ----------------
         
-        # list
-        subparser = subparsers.add_parser('list', help="Lists all registered OWS services for OWS proxy.")
+        # status
+        subparser = subparsers.add_parser('status', help="Lists all registered OWS services used by OWS proxy.")
 
-        # clear
-        subparser = subparsers.add_parser('clear', help="Removes all OWS services from the registry.")
+        # purge
+        subparser = subparsers.add_parser('purge', help="Removes all OWS services from the registry.")
 
         # register
         subparser = subparsers.add_parser('register', help="Adds OWS service to the registry to be used by the OWS proxy.")
@@ -110,7 +110,7 @@ class TwitcherCtl(object):
             username=args.username, password=password)
         result = None
         try:
-            if args.cmd == 'list':
+            if args.cmd == 'status':
                 result = server.list_services()
             elif args.cmd == 'register':
                 if args.name:
@@ -119,7 +119,7 @@ class TwitcherCtl(object):
                     result = server.register_service(args.url)
             elif args.cmd == 'unregister':
                 result = server.unregister_service(args.name)
-            elif args.cmd == 'clear':
+            elif args.cmd == 'purge':
                 result = server.clear_services()
             elif args.cmd == 'gentoken':
                 user_environ = {k:v for k,v in (x.split('=') for x in args.env) }
@@ -135,7 +135,7 @@ class TwitcherCtl(object):
         except xmlrpclib.ResponseError as e:
             logger.error("A response error occured. Maybe service needs authentication with username and password? %s", e.message)
         except Exception as e:
-            logger.error("Unknown error occured: %s", e.message)
+            logger.error('Unknown error occured. Maybe you need to use the "--insecure" option to access the service on HTTPS? %s', e.message)
         else:
             return result
 
