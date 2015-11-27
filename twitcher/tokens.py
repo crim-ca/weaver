@@ -1,5 +1,9 @@
 """
-see access token examples:
+Classes to manage access tokens used in the security middleware.
+
+The implementation is based on `python-oauth2 <http://python-oauth2.readthedocs.org/>`_
+
+See access token examples:
 
 * https://www.mapbox.com/developers/api/
 * http://python-oauth2.readthedocs.org/en/latest/store.html
@@ -9,6 +13,8 @@ import uuid
 from datetime import timedelta
 
 from twitcher.utils import now, localize_datetime
+from twitcher.exceptions import AccessTokenNotFound
+from twitcher.db import mongodb
 
 import logging
 logger = logging.getLogger(__name__)
@@ -17,50 +23,109 @@ logger = logging.getLogger(__name__)
 DEFAULT_VALID_IN_HOURS = 1
 
 
-class TokenStore(object):
-    def __init__(self, db):
-        self.db = db.tokens
+def tokenstore_factory(registry):
+    db = mongodb(registry)
+    return MongodbStore(db.tokens)
 
-        
+
+def tokengenerator_factory(registry):
+    return UuidGenerator()
+
+
+class AccessTokenStore(object):
+
+    def save_token(self, access_token):
+        """
+        Stores an access token with additional data.
+        """
+        raise NotImplementedError
+
+          
+    def delete_token(self, token):
+        """
+        Deletes an access token from the store using its token string to identify it.
+        This invalidates both the access token and the token.
+
+        :param token: A string containing the token.
+        :return: None.
+        """
+        raise NotImplementedError
+
+    
+    def fetch_by_token(self, token):
+        """
+        Fetches an access token from the store using its token string to
+        identify it.
+
+        :param token: A string containing the token.
+        :return: An instance of :class:`twitcher.tokens.AccessToken`.
+        """
+        raise NotImplementedError
+
+
+    def clean_tokens(self):
+        """
+        Removes all tokens from database.
+        """
+        raise NotImplementedError
+
+
+
+class MongodbStore(AccessTokenStore):
+    def __init__(self, collection):
+        self.collection = collection
+
+    def save_token(self, access_token):
+        self.collection.insert_one(access_token)
+
+          
+    def delete_token(self, token):
+        self.collection.delete_one({'token': token})
+
+    
+    def fetch_by_token(self, token):
+        token = self.collection.find_one({'token': token})
+        if not token:
+            raise AccessTokenNotFound
+        return AccessToken(token)
+
+
+    def clean_tokens(self):
+        self.collection.drop()
+
+
+class AccessTokenGenerator(object):
+    """
+    Base class for access token generators.
+    """
     def create_access_token(self, valid_in_hours=DEFAULT_VALID_IN_HOURS, user_environ=None):
         """
-        Generates an access token.
+        Creates an access token.
 
         TODO: check valid in hours
         TODO: maybe specify how often a token can be used
         """
         access_token = AccessToken(
-            access_token = str(uuid.uuid1().get_hex()),
+            token = self.generate(),
             creation_time = now(),
             valid_in_hours = valid_in_hours,
             user_environ = user_environ)
-        self.db.insert_one(access_token)
         return access_token
+    
+    def generate(self):
+        raise NotImplementedError
 
     
-    def delete_access_token(self, token):
-        if isinstance(token, AccessToken):
-            self.db.delete_one(token)
-        else:
-            self.db.delete_one({'access_token': token})
-
-    
-    def get_access_token(self, token):
-        access_token = None
-        if isinstance(token, AccessToken):
-            access_token = self.db.find_one(token)
-        else:
-            access_token = self.db.find_one({'access_token': token})
-        if not access_token is None:
-            access_token = AccessToken(access_token)
-        return access_token
-
-
-    def clear(self):
+class UuidGenerator(AccessTokenGenerator):
+    """
+    Generate a token using uuid4.
+    """
+    def generate(self):
         """
-        Removes all tokens from database.
+        :return: A new token
+        :rtype: str
         """
-        self.db.drop()
+        return uuid.uuid4().get_hex()
 
     
 class AccessToken(dict):
@@ -70,16 +135,16 @@ class AccessToken(dict):
     
     def __init__(self, *args, **kwargs):
         super(AccessToken, self).__init__(*args, **kwargs)
-        if 'access_token' not in self:
-            raise TypeError("'access_token' is required")
+        if 'token' not in self:
+            raise TypeError("'token' is required")
         if 'creation_time' not in self:
             raise TypeError("'creation_time' is required")
 
             
     @property
-    def access_token(self):
-        """(:class:`basestring`) Access token."""
-        return self['access_token']
+    def token(self):
+        """Access token."""
+        return self['token']
 
         
     @property
@@ -120,7 +185,7 @@ class AccessToken(dict):
 
     
     def __str__(self):
-        return self.access_token
+        return self.token
 
     
     def __repr__(self):

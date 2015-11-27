@@ -5,7 +5,8 @@ from pyramid_rpc.xmlrpc import xmlrpc_method
 from pyramid.settings import asbool
 
 from twitcher.registry import registry_factory
-from twitcher.tokens import TokenStore
+from twitcher.tokens import tokengenerator_factory
+from twitcher.tokens import tokenstore_factory
 
 import logging
 logger = logging.getLogger(__name__)
@@ -19,7 +20,9 @@ api_xmlrpc = functools.partial(xmlrpc_method, endpoint="api")
 class RPCInterface(object):
     def __init__(self, request):
         self.request = request
-        self.tokenstore = TokenStore(self.request.db)
+        registry = self.request.registry
+        self.tokengenerator = tokengenerator_factory(registry)
+        self.tokenstore = tokenstore_factory(registry)
         self.registry = registry_factory(self.request)
 
     # token management
@@ -29,19 +32,20 @@ class RPCInterface(object):
         """
         Generates an access token. Stores the optional ``user_environ`` dict with the token.
         """
-        access_token = self.tokenstore.create_access_token(user_environ=user_environ)
-        return access_token.access_token
+        access_token = self.tokengenerator.create_access_token(user_environ=user_environ)
+        self.tokenstore.save_token(access_token)
+        return access_token.token
 
     
     @api_xmlrpc()
-    def clear_tokens(self):
+    def clean_tokens(self):
         """
         Removes all tokens.
         """
         try:
-            self.tokenstore.clear()
+            self.tokenstore.clean_tokens()
         except:
-            logger.exception('clear tokens failed')
+            logger.exception('clean tokens failed')
             return False
         else:
             return True
@@ -50,7 +54,7 @@ class RPCInterface(object):
     # service registry
 
     @api_xmlrpc()
-    def add_service(self, url, name=None):
+    def register_service(self, url, name=None):
         """
         Adds an OWS service with the given ``url`` to the registry.
         """
@@ -59,7 +63,7 @@ class RPCInterface(object):
 
 
     @api_xmlrpc()
-    def remove_service(self, name):
+    def unregister_service(self, name):
         """
         Removes OWS service with the given ``name`` from the registry.
         """

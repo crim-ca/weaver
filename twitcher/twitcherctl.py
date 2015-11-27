@@ -66,28 +66,28 @@ class TwitcherCtl(object):
         subparser = subparsers.add_parser('gentoken', help="Generates an access token.")
         subparser.add_argument('-e', '--env', nargs='*', default=[], help="Set environment variable (key=value).")
         
-        subparser = subparsers.add_parser('remove_token', help="Removes given access token.")
+        subparser = subparsers.add_parser('revoke', help="Removes given access token.")
         subparser.add_argument('token', help="access token")
         
-        subparser = subparsers.add_parser('clear_tokens', help="Removes all access tokens.")
+        subparser = subparsers.add_parser('clean', help="Removes all access tokens.")
         
 
         # service registry
         # ----------------
         
         # list
-        subparser = subparsers.add_parser('list_services', help="Lists all registered OWS services for OWS proxy.")
+        subparser = subparsers.add_parser('list', help="Lists all registered OWS services for OWS proxy.")
 
         # clear
-        subparser = subparsers.add_parser('clear_services', help="Removes all OWS services from the registry.")
+        subparser = subparsers.add_parser('clear', help="Removes all OWS services from the registry.")
 
         # register
-        subparser = subparsers.add_parser('add_service', help="Adds a OWS service to the registry to be used by the OWS proxy.")
+        subparser = subparsers.add_parser('register', help="Adds OWS service to the registry to be used by the OWS proxy.")
         subparser.add_argument('url', help="Service url.")
         subparser.add_argument('--name', help="Service name. If not set then a name will be generated.")
 
         # unregister
-        subparser = subparsers.add_parser('remove_service', help="Removes OWS service from the registry.")
+        subparser = subparsers.add_parser('unregister', help="Removes OWS service from the registry.")
         subparser.add_argument('name', help="Service name.")
 
         return parser
@@ -109,24 +109,24 @@ class TwitcherCtl(object):
             username=args.username, password=password)
         result = None
         try:
-            if args.cmd == 'list_services':
+            if args.cmd == 'list':
                 result = server.list_services()
-            elif args.cmd == 'add_service':
+            elif args.cmd == 'register':
                 if args.name:
-                    result = server.add_service(args.url, args.name)
+                    result = server.register_service(args.url, args.name)
                 else:
-                    result = server.add_service(args.url)
-            elif args.cmd == 'remove_service':
-                result = server.remove_service(args.name)
-            elif args.cmd == 'clear_services':
+                    result = server.register_service(args.url)
+            elif args.cmd == 'unregister':
+                result = server.unregister_service(args.name)
+            elif args.cmd == 'clear':
                 result = server.clear_services()
             elif args.cmd == 'gentoken':
                 user_environ = {k:v for k,v in (x.split('=') for x in args.env) }
                 result = server.generate_token(user_environ)
-            elif args.cmd == 'remove_token':
-                result = server.remove_token(args.token)
-            elif args.cmd == 'clear_tokens':
-                result = server.clear_tokens()
+            elif args.cmd == 'revoke':
+                result = server.delete_token(args.token)
+            elif args.cmd == 'clean':
+                result = server.clean_tokens()
         except xmlrpclib.Fault as e:
             logger.error("A fault occurred: %s (%d)", e.faultString, e.faultCode)
         except xmlrpclib.ProtocolError as e:

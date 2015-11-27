@@ -6,9 +6,9 @@ from twitcher.owsexceptions import (OWSException,
                                     OWSNoApplicableCode,
                                     OWSMissingParameterValue,
                                     OWSInvalidParameterValue)
+from twitcher.exceptions import AccessTokenNotFound
 from twitcher.owsrequest import OWSRequest
-from twitcher.tokens import TokenStore
-from twitcher.db import mongodb
+from twitcher.tokens import tokenstore_factory
 from twitcher.utils import path_elements
 
 import logging
@@ -30,7 +30,7 @@ def ows_security_tween_factory(handler, registry):
     allowed_requests = ('getcapabilities', 'describeprocess')
     protected_path = '/ows/'
     
-    tokenstore = TokenStore( mongodb(registry) )
+    tokenstore = tokenstore_factory(registry)
 
     def _get_token(request):
         token = None
@@ -48,12 +48,14 @@ def ows_security_tween_factory(handler, registry):
         return token
     
     def _validate_token(token):
-        access_token = tokenstore.get_access_token(token)
-        if access_token is None:
-            raise OWSAccessForbidden("The access token is invalid.")
-        if not access_token.is_valid():
-            raise OWSAccessForbidden("The access token is invalid.")
-        return access_token
+        try: 
+            access_token = tokenstore.fetch_by_token(token)
+            if not access_token.is_valid():
+                raise OWSAccessForbidden("Access token is invalid.")
+        except AccessTokenNotFound as e:
+            raise OWSAccessForbidden("Access token not found.")
+        else:
+            return access_token
     
     def ows_security_tween(request):
         try:
