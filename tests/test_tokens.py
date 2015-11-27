@@ -1,12 +1,27 @@
 from nose.tools import ok_, assert_raises
 import unittest
+import mock
 
 from datetime import timedelta
 
 from twitcher.utils import now
-from twitcher.tokens import AccessToken, UuidGenerator
+from twitcher.tokens import AccessToken, UuidGenerator, MongodbAccessTokenStore
 
 
+class MongodbAccessTokenStoreTestCase(unittest.TestCase):
+    def setUp(self):
+        creation_time = now()
+        self.access_token = AccessToken(token="abcdef", creation_time=creation_time)
+    
+    def test_save_token(self):
+        collection_mock = mock.Mock(spec=["insert_one"])
+        
+        store = MongodbAccessTokenStore(collection=collection_mock)
+        store.save_token(self.access_token)
+
+        collection_mock.insert_one.assert_called_with(self.access_token)
+
+        
 class UuidGeneratorTestCase(unittest.TestCase):
     def test_generate(self):
         generator = UuidGenerator()
@@ -31,10 +46,10 @@ class AccessTokenTestCase(unittest.TestCase):
     def test_access_token(self):
         creation_time = now()
 
-        token = AccessToken(token='abcdef', creation_time=creation_time)
-        ok_(token.not_before() == creation_time)
-        ok_(token.not_after() > creation_time)
-        ok_(token.is_valid() == True)
+        access_token = AccessToken(token='abcdef', creation_time=creation_time)
+        ok_(access_token.not_before() == creation_time)
+        ok_(access_token.not_after() > creation_time)
+        ok_(access_token.is_valid() == True)
 
     def test_bad_access_token(self):
         with assert_raises(TypeError) as e:
@@ -45,14 +60,14 @@ class AccessTokenTestCase(unittest.TestCase):
     def test_invalid_access_token(self):
         creation_time = now() - timedelta(hours=2)
 
-        token = AccessToken(token='abcdef', creation_time=creation_time)
-        ok_(token.not_before() == creation_time)
-        ok_(token.not_after() > creation_time)
-        ok_(token.is_valid() == False)
+        access_token = AccessToken(token='abcdef', creation_time=creation_time)
+        ok_(access_token.not_before() == creation_time)
+        ok_(access_token.not_after() > creation_time)
+        ok_(access_token.is_valid() == False)
 
 
     def test_access_token_with_user_environ(self):
         creation_time = now()
-        token = AccessToken(token='12345', creation_time=creation_time,
+        access_token = AccessToken(token='12345', creation_time=creation_time,
                             user_environ={'oauth_token': 'bfghk'})
-        ok_(token.user_environ == {'oauth_token': 'bfghk'})
+        ok_(access_token.user_environ == {'oauth_token': 'bfghk'})
