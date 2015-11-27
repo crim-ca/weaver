@@ -1,6 +1,8 @@
 """
-see access token example:
-https://www.mapbox.com/developers/api/
+see access token examples:
+
+* https://www.mapbox.com/developers/api/
+* http://python-oauth2.readthedocs.org/en/latest/store.html
 """
 
 import uuid
