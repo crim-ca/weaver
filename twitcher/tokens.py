@@ -25,7 +25,7 @@ DEFAULT_VALID_IN_HOURS = 1
 
 def tokenstore_factory(registry):
     db = mongodb(registry)
-    return MongodbStore(db.tokens)
+    return MongodbAccessTokenStore(db.tokens)
 
 
 def tokengenerator_factory(registry):
@@ -71,7 +71,7 @@ class AccessTokenStore(object):
 
 
 
-class MongodbStore(AccessTokenStore):
+class MongodbAccessTokenStore(AccessTokenStore):
     def __init__(self, collection):
         self.collection = collection
 
