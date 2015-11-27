@@ -38,20 +38,20 @@ class MongodbAccessTokenStoreTestCase(unittest.TestCase):
 
         
 class UuidGeneratorTestCase(unittest.TestCase):
+    def setUp(self):
+        self.generator = UuidGenerator()
+    
     def test_generate(self):
-        generator = UuidGenerator()
-        token = generator.generate()
+        token = self.generator.generate()
         ok_(len(token) == 32)
 
     def test_create_access_token_default(self):
-        generator = UuidGenerator()
-        access_token = generator.create_access_token()
+        access_token = self.generator.create_access_token()
         ok_(len( access_token.token ) == 32)
         ok_(access_token.valid_in_hours == 1)
 
     def test_create_access_non_default_hours(self):
-        generator = UuidGenerator()
-        access_token = generator.create_access_token(valid_in_hours=2)
+        access_token = self.generator.create_access_token(valid_in_hours=2)
         ok_(len( access_token.token ) == 32)
         ok_(access_token.valid_in_hours == 2)
         
