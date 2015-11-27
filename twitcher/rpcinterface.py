@@ -58,7 +58,7 @@ class RPCInterface(object):
         """
         Adds an OWS service with the given ``url`` to the registry.
         """
-        service = self.registry.register_service(url=url, service_name=name)
+        service = self.registry.register_service(url=url, name=name)
         return service['name']
 
 
@@ -68,7 +68,7 @@ class RPCInterface(object):
         Removes OWS service with the given ``name`` from the registry.
         """
         try:
-            self.registry.unregister_service(service_name=name)
+            self.registry.unregister_service(name=name)
         except:
             logger.exception('unregister failed')
             return False

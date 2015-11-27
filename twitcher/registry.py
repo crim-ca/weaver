@@ -33,7 +33,7 @@ class ServiceRegistry(object):
     def __init__(self, collection):
         self.collection = collection
 
-    def register_service(self, url, service_name=None, service_type='WPS'):
+    def register_service(self, url, name=None, service_type='wps'):
         """
         Adds OWS service with given name to registry database.
         """
@@ -42,23 +42,23 @@ class ServiceRegistry(object):
         # check if service is already registered
         service = self.collection.find_one({'url': service_url})
         if service is None:
-            if service_name is None:
-                service_name = namesgenerator.get_random_name()
-                if not self.collection.find_one({'name': service_name}) is None:
+            if name is None:
+                name = namesgenerator.get_random_name()
+                if not self.collection.find_one({'name': name}) is None:
                     name = namesgenerator.get_random_name(retry=True)
-            service = dict(url=service_url, name=service_name, type=service_type)
-            if self.collection.find_one({'name': service_name}):
-                raise ValueError("service %s already registered." % (service_name))
+            service = dict(url=service_url, name=name, type=service_type)
+            if self.collection.find_one({'name': name}):
+                raise ValueError("service %s already registered." % (name))
             self.collection.insert_one(service)
             service = self.collection.find_one({'name': service['name']})
         return service
 
 
-    def unregister_service(self, service_name):
+    def unregister_service(self, name):
         """
         Removes service from registry database.
         """
-        self.collection.delete_one({'name': service_name})
+        self.collection.delete_one({'name': name})
 
 
     def list_services(self):
@@ -74,17 +74,16 @@ class ServiceRegistry(object):
         return my_services
 
 
-    def get_service(self, service_name):
+    def get_service(self, name):
         """
-        Get service url and proxy_url for given ``service_name`` from registry database.
+        Get service url and proxy_url for given ``name`` from registry database.
         """
-        service = self.collection.find_one({'name': service_name})
+        service = self.collection.find_one({'name': name})
         if service is None:
             raise ValueError('service not found')
         if not 'url' in service:
             raise ValueError('service has no url')
-        return dict(url=service.get('url'),
-                    name=service_name)
+        return dict(url=service.get('url'), name=name)
 
     
     def clear_services(self):
