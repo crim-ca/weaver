@@ -4,7 +4,27 @@ import unittest
 from datetime import timedelta
 
 from twitcher.utils import now
-from twitcher.tokens import AccessToken
+from twitcher.tokens import AccessToken, UuidGenerator
+
+
+class UuidGeneratorTestCase(unittest.TestCase):
+    def test_generate(self):
+        generator = UuidGenerator()
+        token = generator.generate()
+        ok_(len(token) == 32)
+
+    def test_create_access_token_default(self):
+        generator = UuidGenerator()
+        access_token = generator.create_access_token()
+        ok_(len( access_token.token ) == 32)
+        ok_(access_token.valid_in_hours == 1)
+
+    def test_create_access_non_default_hours(self):
+        generator = UuidGenerator()
+        access_token = generator.create_access_token(valid_in_hours=2)
+        ok_(len( access_token.token ) == 32)
+        ok_(access_token.valid_in_hours == 2)
+        
 
 class AccessTokenTestCase(unittest.TestCase):
 
