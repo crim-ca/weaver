@@ -64,12 +64,24 @@ def _get_password(request):
                 return password
     return None
 
+def auth_activated(registry):
+    settings = registry.settings
+    username = settings.get('twitcher.username')
+    if username:
+        if len(username.strip()) > 2:
+            return True
+    return False
+
 def includeme(config):
-    # Security policies for basic auth
-    authn_policy = BasicAuthAuthenticationPolicy(check=groupfinder, realm="Birdhouse")
-    authz_policy = ACLAuthorizationPolicy()
-    config.set_authentication_policy(authn_policy)
-    config.set_authorization_policy(authz_policy)
-    config.set_root_factory(root_factory)
-    config.add_request_method(_get_username, 'username', reify=True)
-    config.add_request_method(_get_password, 'password', reify=True)
+    if auth_activated(config.registry):
+        logger.info("basic authentication is activated.")
+        # Security policies for basic auth
+        authn_policy = BasicAuthAuthenticationPolicy(check=groupfinder, realm="Birdhouse")
+        authz_policy = ACLAuthorizationPolicy()
+        config.set_authentication_policy(authn_policy)
+        config.set_authorization_policy(authz_policy)
+        config.set_root_factory(root_factory)
+        config.add_request_method(_get_username, 'username', reify=True)
+        config.add_request_method(_get_password, 'password', reify=True)
+    else:
+        logger.warn("basic authentication is deactivated.")
