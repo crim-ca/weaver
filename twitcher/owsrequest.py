@@ -57,10 +57,10 @@ class OWSParser(object):
         return self.params
 
     def _get_service(self):
-        raise NotImplemented
+        raise NotImplementedError 
 
     def _get_request_type(self):
-        raise NotImplemented
+        raise NotImplementedError 
     
 class Get(OWSParser):
 
