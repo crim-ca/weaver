@@ -102,7 +102,8 @@ class TwitcherCtl(object):
         password = args.password
         if args.username:
             #username = raw_input('Username:')
-            password = getpass.getpass(prompt='Password:')
+            if not password:
+                password = getpass.getpass(prompt='Password:')
             
         server = _create_server(
             url=args.serverurl, verify_ssl=args.verify_ssl,
@@ -131,6 +132,10 @@ class TwitcherCtl(object):
             logger.error("A fault occurred: %s (%d)", e.faultString, e.faultCode)
         except xmlrpclib.ProtocolError as e:
             logger.error("A protocol error occurred. URL: %s, HTTP/HTTPS headers: %s, Error code: %d, Error message: %s",  e.url, e.headers, e.errcode, e.errmsg)
+        except xmlrpclib.ResponseError as e:
+            logger.error("A response error occured. Maybe service needs authentication with username and password? %s", e.message)
+        except Exception as e:
+            logger.error("Unknown error occured: %s", e.message)
         else:
             return result
 
