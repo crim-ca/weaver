@@ -63,6 +63,7 @@ class TwitcherCtl(object):
 
         # token
         # -----
+        # TODO: add valid hours param to gentoken
         subparser = subparsers.add_parser('gentoken', help="Generates an access token.")
         subparser.add_argument('-e', '--env', nargs='*', default=[], help="Set environment variable (key=value).")
         
