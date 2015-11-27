@@ -7,7 +7,7 @@ from twitcher.owsexceptions import (OWSException,
                                     OWSMissingParameterValue,
                                     OWSInvalidParameterValue)
 from twitcher.owsrequest import OWSRequest
-from twitcher.tokens import TokenStorage
+from twitcher.tokens import TokenStore
 from twitcher.db import mongodb
 from twitcher.utils import path_elements
 
@@ -30,7 +30,7 @@ def ows_security_tween_factory(handler, registry):
     allowed_requests = ('getcapabilities', 'describeprocess')
     protected_path = '/ows/'
     
-    tokenstore = TokenStorage( mongodb(registry) )
+    tokenstore = TokenStore( mongodb(registry) )
 
     def _get_token(request):
         token = None

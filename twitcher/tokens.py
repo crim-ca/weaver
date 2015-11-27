@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_VALID_IN_HOURS = 1
 
 
-class TokenStorage(object):
+class TokenStore(object):
     def __init__(self, db):
         self.db = db.tokens
 

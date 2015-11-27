@@ -5,7 +5,7 @@ from pyramid_rpc.xmlrpc import xmlrpc_method
 from pyramid.settings import asbool
 
 from twitcher.registry import registry_factory
-from twitcher.tokens import TokenStorage
+from twitcher.tokens import TokenStore
 
 import logging
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ api_xmlrpc = functools.partial(xmlrpc_method, endpoint="api")
 class RPCInterface(object):
     def __init__(self, request):
         self.request = request
-        self.tokenstore = TokenStorage(self.request.db)
+        self.tokenstore = TokenStore(self.request.db)
         self.registry = registry_factory(self.request)
 
     # token management
