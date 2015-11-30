@@ -4,13 +4,19 @@ import mock
 
 from pyramid.testing import DummyRequest
 
+from twitcher.utils import now
+from twitcher.tokens import AccessToken
 from twitcher.owssecurity import OWSSecurity
 from twitcher.owsexceptions import OWSAccessForbidden
 
 
 class OWSSecurityTestCase(unittest.TestCase):
     def setUp(self):
+        creation_time = now()
+        self.access_token = AccessToken(token="cdefg", creation_time=creation_time)
+        
         store_mock = mock.Mock(spec=["fetch_by_token"])
+        store_mock.fetch_by_token.return_value = self.access_token
         self.security = OWSSecurity(tokenstore=store_mock)
 
     def test_get_token_by_param(self):
@@ -40,6 +46,20 @@ class OWSSecurityTestCase(unittest.TestCase):
         request = DummyRequest(params=params)
         with assert_raises(OWSAccessForbidden):
             self.security.get_token(request)
+
+
+    def test_validate_token(self):
+        access_token = self.security.validate_token(token="cdefg")
+        ok_(access_token.token == "cdefg")
+
+
+    def test_validate_token_invalid(self):
+        store_mock = mock.Mock(spec=["fetch_by_token"])
+        store_mock.fetch_by_token.return_value = None
+        security = OWSSecurity(tokenstore=store_mock)
+
+        with assert_raises(OWSAccessForbidden):
+            security.validate_token(token="klmnop")
 
 
 
