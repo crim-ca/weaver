@@ -27,44 +27,46 @@ class OWSRequestTestCase(unittest.TestCase):
 
         
     def test_get_describeprocess_request(self):
-        params = dict(request="DescribeProcess", service="wps")
+        params = dict(request="DescribeProcess", service="wps", version="1.0.0")
         request = DummyRequest(params=params)
         ows_req = OWSRequest(request)
         ok_(ows_req.request == 'describeprocess')
         ok_(ows_req.service == 'wps')
+        ok_(ows_req.version == '1.0.0')
 
 
     def test_get_execute_request(self):
-        params = dict(request="execute", service="Wps")
+        params = dict(request="execute", service="Wps", version="1.0.0")
         request = DummyRequest(params=params)
         ows_req = OWSRequest(request)
         ok_(ows_req.request == 'execute')
         ok_(ows_req.service == 'wps')
+        ok_(ows_req.version == '1.0.0')
 
 
     def test_get_false_request(self):
-        params = dict(request="tellmemore", service="Wps")
+        params = dict(request="tellmemore", service="Wps", version="1.0.0")
         request = DummyRequest(params=params)
         with assert_raises(OWSInvalidParameterValue):
             ows_req = OWSRequest(request)
 
             
     def test_get_missing_request(self):
-        params = dict(service="wps")
+        params = dict(service="wps", version="1.0.0")
         request = DummyRequest(params=params)
         with assert_raises(OWSMissingParameterValue):
             ows_req = OWSRequest(request)
 
             
     def test_get_false_service(self):
-        params = dict(request="execute", service="ATM")
+        params = dict(request="execute", service="ATM", version="1.0.0")
         request = DummyRequest(params=params)
         with assert_raises(OWSInvalidParameterValue):
             ows_req = OWSRequest(request)
 
 
     def test_get_missing_service(self):
-        params = dict(request="Execute")
+        params = dict(request="Execute", version="1.0.0")
         request = DummyRequest(params=params)
         with assert_raises(OWSMissingParameterValue):
             ows_req = OWSRequest(request)
@@ -105,6 +107,7 @@ class OWSRequestTestCase(unittest.TestCase):
         ows_req = OWSRequest(request)
         ok_(ows_req.request == 'describeprocess')
         ok_(ows_req.service == 'wps')
+        ok_(ows_req.version == '1.0.0')
         
 
     def test_post_execute_request(self):
@@ -139,6 +142,6 @@ class OWSRequestTestCase(unittest.TestCase):
         ows_req = OWSRequest(request)
         ok_(ows_req.request == 'execute')
         ok_(ows_req.service == 'wps')
-        #ok_(ows_req.version == '1.0.0')
+        ok_(ows_req.version == '1.0.0')
 
         

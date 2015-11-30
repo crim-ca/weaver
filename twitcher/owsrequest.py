@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 allowed_ows_services = ('wps', 'wms', 'wcs', 'wfs')
 allowed_request_types = ('getcapabilities', 'describeprocess', 'execute')
+allowed_versions = ('1.0.0')
 
 class OWSRequest(object):
     """
@@ -35,6 +36,10 @@ class OWSRequest(object):
     @property
     def request(self):
         return self.parser.params['request']
+
+    @property
+    def version(self):
+        return self.parser.params['version']
 
 
 def ows_parser_factory(request):
@@ -54,12 +59,16 @@ class OWSParser(object):
     def parse(self):
         self._get_service()
         self._get_request_type()
+        self._get_version()
         return self.params
 
     def _get_service(self):
         raise NotImplementedError 
 
     def _get_request_type(self):
+        raise NotImplementedError
+
+    def _get_version(self):
         raise NotImplementedError 
     
 class Get(OWSParser):
@@ -88,6 +97,21 @@ class Get(OWSParser):
         else:
             raise OWSMissingParameterValue('Parameter "request" is missing', value="request")
         return self.params["request"]
+
+
+    def _get_version(self):
+        """Find requested version in GET request."""
+        if "version" in self.request.params:
+            value = self.request.params["version"].lower()
+            if value in allowed_versions:
+                self.params["version"] = value
+            else:
+                raise OWSInvalidParameterValue("Version %s is not supported" % value, value="version")
+        elif self._get_request_type() == "getcapabilities":
+            self.params["version"] = None
+        else:
+            raise OWSMissingParameterValue('Parameter "version" is missing', value="version")
+        return self.params["version"]
 
        
 class Post(OWSParser):
@@ -123,4 +147,19 @@ class Post(OWSParser):
         else:
             raise OWSInvalidParameterValue("Request type %s is not supported" % value, value="request")
         return self.params["request"]
+
+
+    def _get_version(self):
+        """Find requested version in POST request."""
+        if "version" in self.document.attrib:
+            value = self.document.attrib["version"].lower()
+            if value in allowed_versions:
+                self.params["version"] = value
+            else:
+                raise OWSInvalidParameterValue("Version %s is not supported" % value, value="version")
+        elif self._get_request_type() == "getcapabilities":
+            self.params["version"] = None
+        else:
+            raise OWSMissingParameterValue('Parameter "version" is missing', value="version")
+        return self.params["version"]
     
