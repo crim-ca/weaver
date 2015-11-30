@@ -50,9 +50,8 @@ class TwitcherCtl(object):
         parser.add_argument("-p", "--password",
                             help="Password to use for authentication with server")
         parser.add_argument("-k", "--insecure", # like curl
-                            dest='verify_ssl',
                             help="Don't validate the server's certificate.",
-                            action="store_false")
+                            action="store_true")
 
         # commands
         subparsers = parser.add_subparsers(
@@ -97,7 +96,7 @@ class TwitcherCtl(object):
         if args.debug:
             logger.setLevel(logging.DEBUG)
 
-        if not args.verify_ssl:
+        if args.insecure:
             logger.warn('disabled certificate verification!')
 
         password = args.password
@@ -105,9 +104,10 @@ class TwitcherCtl(object):
             #username = raw_input('Username:')
             if not password:
                 password = getpass.getpass(prompt='Password:')
-            
+
+        verify_ssl = args.insecure == False
         server = _create_server(
-            url=args.serverurl, verify_ssl=args.verify_ssl,
+            url=args.serverurl, verify_ssl=verify_ssl,
             username=args.username, password=password)
         result = None
         try:
