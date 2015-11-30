@@ -63,8 +63,8 @@ class TwitcherCtl(object):
 
         # token
         # -----
-        # TODO: add valid hours param to gentoken
         subparser = subparsers.add_parser('gentoken', help="Generates an access token.")
+        subparser.add_argument('-H', '--valid-in-hours', type=int, default=1, help="Set how long the token is valid in hours (default: 1 hour).")
         subparser.add_argument('-e', '--env', nargs='*', default=[], help="Set environment variable (key=value).")
         
         subparser = subparsers.add_parser('revoke', help="Removes given access token.")
@@ -124,7 +124,7 @@ class TwitcherCtl(object):
                 result = server.purge()
             elif args.cmd == 'gentoken':
                 user_environ = {k:v for k,v in (x.split('=') for x in args.env) }
-                result = server.gentoken(user_environ)
+                result = server.gentoken(args.valid_in_hours, user_environ)
             elif args.cmd == 'revoke':
                 result = server.revoke(args.token)
             elif args.cmd == 'clean':

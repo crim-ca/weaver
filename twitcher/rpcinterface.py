@@ -28,11 +28,11 @@ class RPCInterface(object):
     # token management
 
     @api_xmlrpc()
-    def gentoken(self, user_environ=None):
+    def gentoken(self, valid_in_hours=1, user_environ=None):
         """
-        Generates an access token. Stores the optional ``user_environ`` dict with the token.
+        Generates an access token which is valid for ``valid_in_hours``. Stores the optional ``user_environ`` dict with the token.
         """
-        access_token = self.tokengenerator.create_access_token(user_environ=user_environ)
+        access_token = self.tokengenerator.create_access_token(valid_in_hours=valid_in_hours, user_environ=user_environ)
         self.tokenstore.save_token(access_token)
         return access_token.token
 
