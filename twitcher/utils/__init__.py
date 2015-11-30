@@ -1,3 +1,4 @@
+import time
 from datetime import datetime
 import pytz
 from urlparse import urlparse
@@ -7,6 +8,14 @@ logger = logging.getLogger(__name__)
 
 def now():
     return localize_datetime(datetime.utcnow())
+
+
+def now_secs():
+    """
+    Return the current time in seconds since the Epoch.
+    """
+    return int(time.time())
+
 
 def localize_datetime(dt, tz_name='UTC'):
     """Provide a timzeone-aware object for a given datetime and timezone name

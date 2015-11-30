@@ -10,17 +10,14 @@ See access token examples:
 """
 
 import uuid
-from datetime import timedelta
+import time
 
-from twitcher.utils import now, localize_datetime
+from twitcher.utils import now_secs
 from twitcher.exceptions import AccessTokenNotFound
 from twitcher.db import mongodb
 
 import logging
 logger = logging.getLogger(__name__)
-
-# defaults
-DEFAULT_VALID_IN_HOURS = 1
 
 
 def tokenstore_factory(registry):
@@ -31,6 +28,9 @@ def tokenstore_factory(registry):
 def tokengenerator_factory(registry):
     return UuidGenerator()
 
+
+def expires_at(hours=1):
+    return now_secs() + hours * 3600 
 
 class AccessTokenStore(object):
 
@@ -98,7 +98,7 @@ class AccessTokenGenerator(object):
     """
     Base class for access token generators.
     """
-    def create_access_token(self, valid_in_hours=DEFAULT_VALID_IN_HOURS, user_environ=None):
+    def create_access_token(self, valid_in_hours=1, user_environ=None):
         """
         Creates an access token.
 
@@ -107,8 +107,7 @@ class AccessTokenGenerator(object):
         """
         access_token = AccessToken(
             token = self.generate(),
-            creation_time = now(),
-            valid_in_hours = valid_in_hours,
+            expires_at = expires_at(hours=valid_in_hours),
             user_environ = user_environ)
         return access_token
     
@@ -130,54 +129,51 @@ class UuidGenerator(AccessTokenGenerator):
     
 class AccessToken(dict):
     """
-    Dictionary that contains access token. It always has ``'access_token'`` key.
+    Dictionary that contains access token. It always has ``'token'`` key.
     """
     
     def __init__(self, *args, **kwargs):
         super(AccessToken, self).__init__(*args, **kwargs)
         if 'token' not in self:
             raise TypeError("'token' is required")
-        if 'creation_time' not in self:
-            raise TypeError("'creation_time' is required")
+
+        self.expires_at = int( self.get("expires_at", 0) )
 
             
     @property
     def token(self):
-        """Access token."""
+        """Access token string."""
         return self['token']
 
-        
+
     @property
-    def creation_time(self):
-        return self['creation_time']
+    def expires_in(self):
+        """
+        Returns the time until the token expires.
+        :return: The remaining time until expiration in seconds or 0 if the
+                 token has expired.
+        """
+        time_left = self.expires_at - now_secs()
+
+        if time_left > 0:
+            return time_left
+        return 0
 
     
-    @property
-    def valid_in_hours(self):
-        return self.get('valid_in_hours', DEFAULT_VALID_IN_HOURS)
+    def is_expired(self):
+        """
+        Determines if the token has expired.
+        :return: `True` if the token has expired. Otherwise `False`.
+        """
+        if self.expires_at is None:
+            return True
+
+        if self.expires_in > 0:
+            return False
+
+        return True
 
     
-    def not_before(self):
-        """
-        Access token is not valid before this time.
-        """
-        return localize_datetime(self.creation_time)
-
-    
-    def not_after(self):
-        """
-        Access token is not valid after this time.
-        """
-        return self.not_before() + timedelta(hours=self.valid_in_hours)
-
-    
-    def is_valid(self):
-        """
-        Checks if token is valid.
-        """
-        return self.not_before() <= now() and now() <= self.not_after()
-
-
     @property
     def user_environ(self):
         environ = self.get('user_environ') or {}

@@ -38,7 +38,7 @@ class OWSSecurity(object):
     def validate_token(self, token):
         try: 
             access_token = self.tokenstore.fetch_by_token(token)
-            if not access_token or not access_token.is_valid():
+            if not access_token or access_token.is_expired():
                 raise OWSAccessForbidden("Access token is invalid.")
         except AccessTokenNotFound as e:
             raise OWSAccessForbidden("Access token not found.")

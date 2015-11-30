@@ -6,16 +6,12 @@ from nose.tools import ok_, assert_raises
 import unittest
 import mock
 
-from datetime import timedelta
-
-from twitcher.utils import now
-from twitcher.tokens import AccessToken, UuidGenerator, MongodbAccessTokenStore
+from twitcher.tokens import AccessToken, UuidGenerator, MongodbAccessTokenStore, expires_at
 
 
 class MongodbAccessTokenStoreTestCase(unittest.TestCase):
     def setUp(self):
-        creation_time = now()
-        self.access_token = AccessToken(token="abcdef", creation_time=creation_time)
+        self.access_token = AccessToken(token="abcdef", expires_at=expires_at(hours=1))
 
     def test_fetch_by_token(self):
         collection_mock = mock.Mock(spec=["find_one"])
@@ -48,41 +44,32 @@ class UuidGeneratorTestCase(unittest.TestCase):
     def test_create_access_token_default(self):
         access_token = self.generator.create_access_token()
         ok_(len( access_token.token ) == 32)
-        ok_(access_token.valid_in_hours == 1)
+        ok_(access_token.expires_in <= 3600)
 
     def test_create_access_non_default_hours(self):
         access_token = self.generator.create_access_token(valid_in_hours=2)
         ok_(len( access_token.token ) == 32)
-        ok_(access_token.valid_in_hours == 2)
+        ok_(access_token.expires_in <= 3600 * 2)
         
 
 class AccessTokenTestCase(unittest.TestCase):
 
     def test_access_token(self):
-        creation_time = now()
+        access_token = AccessToken(token='abcdef', expires_at=expires_at(hours=1))
+        ok_(access_token.expires_in <= 3600)
+        ok_(access_token.is_expired() == False)
 
-        access_token = AccessToken(token='abcdef', creation_time=creation_time)
-        ok_(access_token.not_before() == creation_time)
-        ok_(access_token.not_after() > creation_time)
-        ok_(access_token.is_valid() == True)
-
-    def test_bad_access_token(self):
+    def test_missing_token(self):
         with assert_raises(TypeError) as e:
             AccessToken()
-        with assert_raises(TypeError) as e:
-            AccessToken(token='12345')
 
     def test_invalid_access_token(self):
-        creation_time = now() - timedelta(hours=2)
-
-        access_token = AccessToken(token='abcdef', creation_time=creation_time)
-        ok_(access_token.not_before() == creation_time)
-        ok_(access_token.not_after() > creation_time)
-        ok_(access_token.is_valid() == False)
+        access_token = AccessToken(token='abcdef', expires_at=expires_at(hours=-1))
+        ok_(access_token.expires_in == 0)
+        ok_(access_token.is_expired() == True)
 
 
     def test_access_token_with_user_environ(self):
-        creation_time = now()
-        access_token = AccessToken(token='12345', creation_time=creation_time,
-                            user_environ={'oauth_token': 'bfghk'})
-        ok_(access_token.user_environ == {'oauth_token': 'bfghk'})
+        access_token = AccessToken(token='12345', expires_at=expires_at(hours=1),
+                            user_environ={'data_token': 'bfghk'})
+        ok_(access_token.user_environ == {'data_token': 'bfghk'})

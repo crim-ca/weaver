@@ -4,16 +4,14 @@ import mock
 
 from pyramid.testing import DummyRequest
 
-from twitcher.utils import now
-from twitcher.tokens import AccessToken
+from twitcher.tokens import AccessToken, expires_at
 from twitcher.owssecurity import OWSSecurity
 from twitcher.owsexceptions import OWSAccessForbidden
 
 
 class OWSSecurityTestCase(unittest.TestCase):
     def setUp(self):
-        creation_time = now()
-        self.access_token = AccessToken(token="cdefg", creation_time=creation_time)
+        self.access_token = AccessToken(token="cdefg", expires_at=expires_at(hours=1))
         
         store_mock = mock.Mock(spec=["fetch_by_token"])
         store_mock.fetch_by_token.return_value = self.access_token
