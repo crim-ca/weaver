@@ -1,8 +1,13 @@
 from twitcher.exceptions import AccessTokenNotFound
-from twitcher.owsexceptions import OWSAccessForbidden
+from twitcher.owsexceptions import OWSAccessForbidden, OWSInvalidParameterValue
 from twitcher.utils import path_elements
 from twitcher.tokens import tokenstore_factory
+from twitcher.owsrequest import OWSRequest
 
+
+allowed_service_types = ('wps',)
+allowed_request_types = ('getcapabilities', 'describeprocess')
+protected_path = '/ows/'
 
 def owssecurity_factory(registry):
     return OWSSecurity(tokenstore_factory(registry))
@@ -39,3 +44,17 @@ class OWSSecurity(object):
             raise OWSAccessForbidden("Access token not found.")
         else:
             return access_token
+
+
+    def check_request(self, request):
+        if request.path.startswith(protected_path):
+            ows_request = OWSRequest(request)
+            if not ows_request.service in allowed_service_types:
+                raise OWSInvalidParameterValue(
+                    "service %s not supported" % ows_request.service, value="service")
+            if not ows_request.request in allowed_request_types:
+                token = self.get_token(request)
+                access_token = self.validate_token(token)
+                # update request with user environ from access token
+                request.environ.update( access_token.user_environ )
+        
