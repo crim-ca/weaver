@@ -28,7 +28,7 @@ class RPCInterface(object):
     # token management
 
     @api_xmlrpc()
-    def generate_token(self, user_environ=None):
+    def gentoken(self, user_environ=None):
         """
         Generates an access token. Stores the optional ``user_environ`` dict with the token.
         """
@@ -36,9 +36,16 @@ class RPCInterface(object):
         self.tokenstore.save_token(access_token)
         return access_token.token
 
+    @api_xmlrpc()
+    def revoke(self, token):
+        """
+        Remove token from tokenstore.
+        """
+        self.tokenstore.delete_token(token)
+
     
     @api_xmlrpc()
-    def clean_tokens(self):
+    def clean(self):
         """
         Removes all tokens.
         """
@@ -54,7 +61,7 @@ class RPCInterface(object):
     # service registry
 
     @api_xmlrpc()
-    def register_service(self, url, name=None):
+    def register(self, url, name=None):
         """
         Adds an OWS service with the given ``url`` to the registry.
         """
@@ -63,7 +70,7 @@ class RPCInterface(object):
 
 
     @api_xmlrpc()
-    def unregister_service(self, name):
+    def unregister(self, name):
         """
         Removes OWS service with the given ``name`` from the registry.
         """
@@ -78,7 +85,7 @@ class RPCInterface(object):
 
 
     @api_xmlrpc()
-    def list_services(self):
+    def status(self):
         """
         Lists all registred OWS services.
         """
@@ -91,7 +98,7 @@ class RPCInterface(object):
 
 
     @api_xmlrpc()
-    def clear_services(self):
+    def purge(self):
         """
         Removes all services from the registry.
         """

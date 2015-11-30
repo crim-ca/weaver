@@ -112,23 +112,23 @@ class TwitcherCtl(object):
         result = None
         try:
             if args.cmd == 'status':
-                result = server.list_services()
+                result = server.status()
             elif args.cmd == 'register':
                 if args.name:
-                    result = server.register_service(args.url, args.name)
+                    result = server.register(args.url, args.name)
                 else:
-                    result = server.register_service(args.url)
+                    result = server.register(args.url)
             elif args.cmd == 'unregister':
-                result = server.unregister_service(args.name)
+                result = server.unregister(args.name)
             elif args.cmd == 'purge':
-                result = server.clear_services()
+                result = server.purge()
             elif args.cmd == 'gentoken':
                 user_environ = {k:v for k,v in (x.split('=') for x in args.env) }
-                result = server.generate_token(user_environ)
+                result = server.gentoken(user_environ)
             elif args.cmd == 'revoke':
-                result = server.delete_token(args.token)
+                result = server.revoke(args.token)
             elif args.cmd == 'clean':
-                result = server.clean_tokens()
+                result = server.clean()
         except xmlrpclib.Fault as e:
             logger.error("A fault occurred: %s (%d)", e.faultString, e.faultCode)
         except xmlrpclib.ProtocolError as e:
