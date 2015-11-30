@@ -61,6 +61,20 @@ class OWSSecurityTestCase(unittest.TestCase):
         with assert_raises(OWSAccessForbidden):
             security.validate_token(token="klmnop")
 
+    def test_check_request(self):
+        params = dict(request="Execute", service="WPS", version="1.0.0")
+        request = DummyRequest(params=params, path='/ows/emu')
+        self.security.check_request(request)
+
+    def test_check_request_invalid(self):
+        store_mock = mock.Mock(spec=["fetch_by_token"])
+        store_mock.fetch_by_token.return_value = None
+        security = OWSSecurity(tokenstore=store_mock)
+        
+        params = dict(request="Execute", service="WPS", version="1.0.0", access_token="xyz")
+        request = DummyRequest(params=params, path='/ows/emu')
+        with assert_raises(OWSAccessForbidden):
+            security.check_request(request)
 
 
 

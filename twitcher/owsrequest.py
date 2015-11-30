@@ -103,7 +103,7 @@ class Get(OWSParser):
         """Find requested version in GET request."""
         version = self._get_param(param="version", allowed_values=allowed_versions, optional=True)
         if version is None and self._get_request_type() != "getcapabilities":
-            raise OWSMissingParameterValue('Parameter "version" is missing', value=param)
+            raise OWSMissingParameterValue('Parameter "version" is missing', value="version")
         else:
             return version
         

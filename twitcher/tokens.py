@@ -180,7 +180,7 @@ class AccessToken(dict):
 
     @property
     def user_environ(self):
-        environ = self['user_environ'] or {}
+        environ = self.get('user_environ') or {}
         return environ
 
     
