@@ -9,7 +9,8 @@ from twitcher.owssecurity import OWSSecurity
 
 class OWSSecurityTestCase(unittest.TestCase):
     def setUp(self):
-        self.security = OWSSecurity()
+        store_mock = mock.Mock(spec=["fetch_by_token"])
+        self.security = OWSSecurity(tokenstore=store_mock)
 
     def test_get_token_by_param(self):
         params = dict(request="Execute", service="WPS", access_token="abcdef")

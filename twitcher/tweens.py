@@ -6,9 +6,8 @@ from twitcher.owsexceptions import (OWSException,
                                     OWSNoApplicableCode,
                                     OWSMissingParameterValue,
                                     OWSInvalidParameterValue)
-from twitcher.exceptions import AccessTokenNotFound
 from twitcher.owsrequest import OWSRequest
-from twitcher.tokens import tokenstore_factory
+from twitcher.owssecurity import owssecurity_factory
 from twitcher.utils import path_elements
 
 import logging
@@ -29,34 +28,9 @@ def ows_security_tween_factory(handler, registry):
     allowed_service_types = ('wps',)
     allowed_requests = ('getcapabilities', 'describeprocess')
     protected_path = '/ows/'
-    
-    tokenstore = tokenstore_factory(registry)
 
-    def _get_token(request):
-        token = None
-        if 'access_token' in request.params:
-            token = request.params['access_token']   # in params
-        elif 'Access-Token' in request.headers:
-            token = request.headers['Access-Token']  # in header
-        else:  # in path
-            elements = path_elements(request.path)
-            if len(elements) > 1: # there is always /ows/
-                token = elements[-1]   # last path element
-
-        if token is None:
-            raise OWSAccessForbidden("You need to provide an access token to use this service.")
-        return token
-    
-    def _validate_token(token):
-        try: 
-            access_token = tokenstore.fetch_by_token(token)
-            if not access_token.is_valid():
-                raise OWSAccessForbidden("Access token is invalid.")
-        except AccessTokenNotFound as e:
-            raise OWSAccessForbidden("Access token not found.")
-        else:
-            return access_token
-    
+    security = owssecurity_factory(registry)
+ 
     def ows_security_tween(request):
         try:
             if request.path.startswith(protected_path):
@@ -65,8 +39,8 @@ def ows_security_tween_factory(handler, registry):
                     raise OWSInvalidParameterValue(
                         "service %s not supported" % ows_request.service, value="service")
                 if not ows_request.request in allowed_requests:
-                    token = _get_token(request)
-                    access_token = _validate_token(token)
+                    token = security.get_token(request)
+                    access_token = security.validate_token(token)
                     # update request with user environ from access token
                     request.environ.update( access_token.user_environ )
             return handler(request)
