@@ -73,45 +73,40 @@ class OWSParser(object):
     
 class Get(OWSParser):
 
+    def _get_param(self, param, allowed_values=None, optional=False):
+        """Get parameter in GET request."""
+        if param in self.request.params:
+            value = self.request.params[param].lower()
+            if not allowed_values is None:
+                if value in allowed_values:
+                    self.params[param] = value
+                else:
+                    raise OWSInvalidParameterValue("%s %s is not supported" % (param, value), value=param)
+        elif optional:
+            self.params[param] = None
+        else:
+            raise OWSMissingParameterValue('Parameter "%s" is missing' % param, value=param)            
+        return self.params[param]
+    
+
     def _get_service(self):
         """Check mandatory service name parameter in GET request."""
-        if "service" in self.request.params:
-            value = self.request.params["service"].lower()
-            if value in allowed_ows_services:
-                self.params["service"] = value
-            else:
-                raise OWSInvalidParameterValue("Service %s is not supported" % value, value="service")
-        else:
-            raise OWSMissingParameterValue('Parameter "service" is missing', value="service")
-        return self.params["service"]
+        return self._get_param(param="service", allowed_values=allowed_ows_services)
 
 
     def _get_request_type(self):
         """Find requested request type in GET request."""
-        if "request" in self.request.params:
-            value = self.request.params["request"].lower()
-            if value in allowed_request_types:
-                self.params["request"] = value
-            else:
-                raise OWSInvalidParameterValue("Request type %s is not supported" % value, value="request")
-        else:
-            raise OWSMissingParameterValue('Parameter "request" is missing', value="request")
-        return self.params["request"]
+        return self._get_param(param="request", allowed_values=allowed_request_types)
 
 
     def _get_version(self):
         """Find requested version in GET request."""
-        if "version" in self.request.params:
-            value = self.request.params["version"].lower()
-            if value in allowed_versions:
-                self.params["version"] = value
-            else:
-                raise OWSInvalidParameterValue("Version %s is not supported" % value, value="version")
-        elif self._get_request_type() == "getcapabilities":
-            self.params["version"] = None
+        version = self._get_param(param="version", allowed_values=allowed_versions, optional=True)
+        if version is None and self._get_request_type() != "getcapabilities":
+            raise OWSMissingParameterValue('Parameter "version" is missing', value=param)
         else:
-            raise OWSMissingParameterValue('Parameter "version" is missing', value="version")
-        return self.params["version"]
+            return version
+        
 
        
 class Post(OWSParser):
