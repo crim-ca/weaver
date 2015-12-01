@@ -22,6 +22,7 @@ Other Proxies:
 Security Filters:
 
 * `FOSS4G Talk <http://www.slideshare.net/JorgeMendesdeJesus/pywps-a-tutorial-for-beginners-and-developers>`_ on using `mod_python <http://www.modpython.org/>`_ with security filter for PyWPS.  
+* Geoserver Security: http://docs.geoserver.org/stable/en/user/security/service.html
 * WSGI middleware for oauth: https://pypi.python.org/pypi/wsgioauth
 * https://pypi.python.org/pypi/stups-tokens
 * http://docs.services.mozilla.com/token/index.html
