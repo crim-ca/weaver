@@ -19,7 +19,7 @@ class OWSSecurity(object):
         self.tokenstore = tokenstore
 
     
-    def get_token(self, request):
+    def get_token_param(self, request):
         token = None
         if 'access_token' in request.params:
             token = request.params['access_token']   # in params
@@ -29,32 +29,26 @@ class OWSSecurity(object):
             elements = path_elements(request.path)
             if len(elements) > 1: # there is always /ows/
                 token = elements[-1]   # last path element
-
-        if token is None:
-            raise OWSAccessForbidden("You need to provide an access token to use this service.")
         return token
 
     
-    def validate_token(self, token):
-        try: 
-            access_token = self.tokenstore.fetch_by_token(token)
-            if not access_token or access_token.is_expired():
-                raise OWSAccessForbidden("Access token is invalid.")
-        except AccessTokenNotFound as e:
-            raise OWSAccessForbidden("Access token not found.")
-        else:
-            return access_token
-
-
     def check_request(self, request):
         if request.path.startswith(protected_path):
             ows_request = OWSRequest(request)
             if not ows_request.service in allowed_service_types:
                 raise OWSInvalidParameterValue(
                     "service %s not supported" % ows_request.service, value="service")
-            if not ows_request.request in allowed_request_types:
-                token = self.get_token(request)
-                access_token = self.validate_token(token)
+            try:
+                token = self.get_token_param(request)
+                access_token = self.tokenstore.fetch_by_token(token)
+                if not access_token:
+                    raise AccessTokenNotFound()
+                elif access_token.is_expired():
+                    raise OWSAccessForbidden("Access token is expired.")
                 # update request with user environ from access token
                 request.environ.update( access_token.user_environ )
+            except AccessTokenNotFound:
+                if not ows_request.request in allowed_request_types:
+                    raise OWSAccessForbidden("Access token is required to access this service.")
+                
         
