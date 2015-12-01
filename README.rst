@@ -34,6 +34,7 @@ Contents:
 .. toctree::
    :maxdepth: 1
 
+   tutorial
    appendix
 
 Indices and tables
