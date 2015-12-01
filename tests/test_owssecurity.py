@@ -56,6 +56,25 @@ class OWSSecurityTestCase(unittest.TestCase):
             security.check_request(request)
 
 
+    def test_check_request_allowed_caps(self):
+        store_mock = mock.Mock(spec=["fetch_by_token"])
+        store_mock.fetch_by_token.return_value = None
+        security = OWSSecurity(tokenstore=store_mock)
+        
+        params = dict(request="GetCapabilities", service="WPS", version="1.0.0")
+        request = DummyRequest(params=params, path='/ows/emu')
+        security.check_request(request)
+
+    def test_check_request_allowed_describeprocess(self):
+        store_mock = mock.Mock(spec=["fetch_by_token"])
+        store_mock.fetch_by_token.return_value = None
+        security = OWSSecurity(tokenstore=store_mock)
+        
+        params = dict(request="DescribeProcess", service="WPS", version="1.0.0")
+        request = DummyRequest(params=params, path='/ows/emu')
+        security.check_request(request)
+
+
     
 
 
