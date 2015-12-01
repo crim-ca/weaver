@@ -60,7 +60,7 @@ def pywps_view(request):
 
     # create the WPS object
     try:
-        wps = pywps.Pywps(request.method)
+        wps = pywps.Pywps(request.environ)
         if wps.parseRequest(inputQuery):
             pywps.debug(wps.inputs)
             return wps.performRequest()
