@@ -1,6 +1,7 @@
 """
 pywps wrapper
 """
+import os
 
 from pyramid.httpexceptions import HTTPBadRequest
 from pyramid.settings import asbool
@@ -11,6 +12,8 @@ from twitcher.owsexceptions import OWSNoApplicableCode
 
 import logging
 logger = logging.getLogger(__name__)
+
+wps_environ_keys = ['PYWPS_CFG', 'PYWPS_PROCESSES', 'PYWPS_TEMPLATES']
 
 def pywps_view(request):
     """
@@ -32,6 +35,11 @@ def pywps_view(request):
 
     if not inputQuery:
         return OWSNoApplicableCode("No query string found.")
+
+    # set the environ for wps from request environ
+    for key in wps_environ_keys:
+        if key in request.environ:
+            os.environ[key] = request.environ[key]
 
     # create the WPS object
     try:
