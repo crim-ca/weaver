@@ -35,6 +35,7 @@ Contents:
    :maxdepth: 1
 
    installation
+   configuration
    tutorial
    appendix
 
