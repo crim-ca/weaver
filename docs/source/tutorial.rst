@@ -187,8 +187,8 @@ Use the ``status`` command to see which WPS services are registered with OWSProx
    [{'url': 'http://localhost:8094/wps', 'proxy_url': 'https://localhost:38083/ows/proxy/emu', 'type': 'wps', 'name': 'emu'}]
 
 
-Access a registred service
---------------------------
+Access a registered service
+---------------------------
 
 By default the registered service is available at the URL https://localhost:38083/ows/proxy/{service_name}. Replace the ``service_name`` with the registered name.
 
@@ -239,4 +239,6 @@ In the following example we provide the token as HTTP parameter:
 
     $ curl -k "https://localhost:38083/ows/proxy/emu?service=wps&request=execute&identifier=dummyprocess&version=1.0.0&access_token=def456"
 
+.. warning::
 
+   If you have set enviroment variables with your access token then they will *not* be available in the external service.
