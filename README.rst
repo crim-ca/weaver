@@ -1,6 +1,6 @@
-===================
-Welcome to Twitcher 
-===================
+=================================
+Twitcher: The OWS Security Proxy 
+=================================
 
 .. image:: https://travis-ci.org/bird-house/twitcher.svg?branch=master
    :target: https://travis-ci.org/bird-house/twitcher
@@ -18,22 +18,14 @@ Twitcher is a security proxy for Web Processing Services (WPS). The execution of
 
 Twitcher is a prototype implemented in Python with the Pyramid web framework.
 
-Twitcher comes in two flavours:
-
-* *A security proxy for Web Processing Services implemented in Python*
-* *A security proxy for PyWPS with WSGI application layers*
-
-Twitcher may become a candidate for the `GeoPython <http://geopython.github.io/>`_ project. 
-
-Twitcher is part of the `Birdhouse <http://bird-house.github.io>`_ project.
-
-The documentation is on `ReadTheDocs <http://twitcher.rtfd.org/>`_.
+Twitcher is part of the `Birdhouse <http://bird-house.github.io>`_ project. The documentation is on `ReadTheDocs <http://twitcher.rtfd.org/>`_.
 
 Contents:
 
 .. toctree::
    :maxdepth: 1
 
+   overview
    installation
    configuration
    tutorial

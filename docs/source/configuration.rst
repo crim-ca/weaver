@@ -73,6 +73,7 @@ wps
 By setting a component option to ``false`` you can deactivate it:
 
 .. code-block:: sh
+
    [settings]
    ows-proxy = false
 
