@@ -39,6 +39,11 @@ Run a ``DescribeProcess`` request:
 
     $ curl -k "https://localhost:38083/ows/wps?service=wps&request=describeprocess&identifier=dummyprocess&version=1.0.0"
 
+Use token to run an execute request
+-----------------------------------
+
+By default the WPS service is protected by the ``OWSSecurity`` wsgi middleware. You need to provide an access token to run an execute request.
+
 Run an ``Exceute`` request:
 
 .. code-block:: sh
@@ -84,8 +89,24 @@ There are three ways how you can provide the access token:
    $ curl -k -H Access-Token:abc123 "https://localhost:38083/ows/wps?service=wps&request=execute&identifier=dummyprocess&version=1.0.0"
 
 
-Configure a WPS configuration
------------------------------
+Change the default WPS configuration
+------------------------------------
+
+To change the default WPS configuration edit the ``custom.cfg`` and set the ``wps-cfg`` option:
+
+.. code-block:: sh
+
+   $ vim custom.cfg
+   [settings]
+   wps-cfg = /path/to/my/default/pywps.cfg
+
+
+After you have changed the configuration file you must update the installation and restart the twitcher service:
+
+.. code-block:: sh
+
+   $ make update
+   $ make restart
 
 
 Use tokens to set user environment
@@ -147,6 +168,8 @@ Make sure Twitcher is installed and running:
    $ make restart
    $ make status
 
+Register a WPS service
+----------------------
 
 Register the Emu WPS service at the Twitcher ``OWSProxy``:
 
@@ -164,6 +187,9 @@ Use the ``status`` command to see which WPS services are registered with OWSProx
    [{'url': 'http://localhost:8094/wps', 'proxy_url': 'https://localhost:38083/ows/proxy/emu', 'type': 'wps', 'name': 'emu'}]
 
 
+Access a registred service
+--------------------------
+
 By default the registered service is available at the URL https://localhost:38083/ows/proxy/{service_name}. Replace the ``service_name`` with the registered name.
 
 Run a ``GetCapabilities`` request for the registered Emu WPS service:
@@ -178,6 +204,11 @@ Run a ``DescribeProcess`` request:
 .. code-block:: sh
 
     $ curl -k "https://localhost:38083/ows/proxy/emu?service=wps&request=describeprocess&identifier=dummyprocess&version=1.0.0"
+
+Use tokens to run an execute request
+------------------------------------
+
+By default the WPS service is protected by the ``OWSSecurity`` wsgi middleware. You need to provide an access token to run an execute request.
 
 Run an ``Exceute`` request:
 
