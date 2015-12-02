@@ -17,6 +17,7 @@ Install twitcher as normal user from GitHub sources:
    $ make install
    $ make test
 
+The installation process setups a conda environment named birdhouse. All additional packages and configuration files are going into this conda environment. The location is ``~/.conda/envs/birdhouse``.
 
 Start the twitcher service (supervisor):
 

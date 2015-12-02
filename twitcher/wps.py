@@ -33,7 +33,6 @@ def pywps_view(request):
     """
     * TODO: add xml response renderer
     * TODO: fix exceptions ... use OWSException (raise ...)
-    * TODO: config of pywps is missing
     """
     response = request.response
     response.status = "200 OK"
@@ -60,6 +59,7 @@ def pywps_view(request):
 
     # create the WPS object
     try:
+        # TODO: check that the os.environ is used
         wps = pywps.Pywps(request.environ)
         if wps.parseRequest(inputQuery):
             pywps.debug(wps.inputs)

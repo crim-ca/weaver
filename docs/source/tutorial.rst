@@ -12,17 +12,18 @@ Tutorial
 Using the WPS application included in Twitcher
 ==============================================
 
-Make sure twitcher is started with ``make status``:
+See above on how to install twitcher and make sure it is started with ``make status``:
 
 .. code-block:: sh
 
+    $ cd twitcher
     $ make status
     Supervisor status ...
     mongodb                          RUNNING   pid 6863, uptime 0:00:19
     nginx                            RUNNING   pid 6865, uptime 0:00:19
     twitcher                         RUNNING   pid 6864, uptime 0:00:19
 
-Otherwise start the twitcher with ``make start``.
+If twitcher (or nginx, mongodb) is not running then start it with ``make start``.
 
 By default the twitcher WPS application is available at the URL https://localhost:38083/ows/wps.
 
@@ -32,13 +33,11 @@ Run a ``GetCapabilities`` request:
 
     $ curl -k "https://localhost:38083/ows/wps?service=wps&request=getcapabilities"
 
-
 Run a ``DescribeProcess`` request:
 
 .. code-block:: sh
 
     $ curl -k "https://localhost:38083/ows/wps?service=wps&request=describeprocess&identifier=dummyprocess&version=1.0.0"
-
 
 Run an ``Exceute`` request:
 
@@ -47,7 +46,6 @@ Run an ``Exceute`` request:
     $ curl -k "https://localhost:38083/ows/wps?service=wps&request=execute&identifier=dummyprocess&version=1.0.0"
 
 Now you should get an XML error response with a message that you need to provide an access token:
-
 
 .. code-block:: xml
 
@@ -73,7 +71,6 @@ There are three ways how you can provide the access token:
 
     $ curl -k "https://localhost:38083/ows/wps?service=wps&request=execute&identifier=dummyprocess&version=1.0.0&access_token=abc123"
 
-
 2. as the last part of the HTTP path
 
 .. code-block:: sh
@@ -86,6 +83,40 @@ There are three ways how you can provide the access token:
 
    $ curl -k -H Access-Token:abc123 "https://localhost:38083/ows/wps?service=wps&request=execute&identifier=dummyprocess&version=1.0.0"
 
+
+Configure a WPS configuration
+-----------------------------
+
+
+Use tokens to set user environment
+----------------------------------
+
+When you generate an access token you can also set enviroment variables with the ``-e`` option. Currently only the environment variables used by the WPS component (PyWPS) are possible. These are:
+
+PYWPS_CFG
+   Configuration file location
+PYWPS_PROCESSES
+   Directory, where the processes are stored
+PYWPS_TEMPLATES
+   Templates directory (structure should be similar to file:pywps/Templates)
+
+In the following we set a PyWPS configuration:
+
+.. code-block:: sh
+
+   $ bin/twitcherctl -k gentoken -e PYWPS_CFG=/path/to/my/pywps.cfg
+   321bca
+
+
+When you access the wps with the generated token you will get the capabilites corresponding to the provided PyWPS configuration:
+
+.. code-block:: sh
+
+    $ curl -k "https://localhost:38083/ows/wps?service=wps&request=getcapabilities&access_token=321bca"
+
+.. note::
+
+   Without the access token you will get the default capabilities of the WPS service.
 
 
 Using the OWSProxy with an external WPS application
