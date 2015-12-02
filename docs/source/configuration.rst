@@ -4,6 +4,9 @@
 Configuration
 *************
 
+.. contents::
+    :local:
+    :depth: 2
 
 After you have installed twitcher you can customize the default twitcher configuration by editing the ``custom.cfg`` configuration file:
 
