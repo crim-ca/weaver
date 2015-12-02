@@ -20,7 +20,8 @@ Twitcher is a prototype implemented in Python with the Pyramid web framework.
 
 Twitcher is part of the `Birdhouse <http://bird-house.github.io>`_ project. The documentation is on `ReadTheDocs <http://twitcher.rtfd.org/>`_.
 
-Contents:
+Contents
+--------
 
 .. toctree::
    :maxdepth: 1
