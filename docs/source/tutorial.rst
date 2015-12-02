@@ -9,8 +9,8 @@ Tutorial
     :depth: 2
 
 
-Use the WPS application comming with Twitcher
-=============================================
+Getting started with the WPS application comming with Twitcher
+==============================================================
 
 Make sure twitcher is started with ``make status``:
 
@@ -87,6 +87,43 @@ There are three ways how you can provide the access token:
    $ curl -k -H Access-Token:abc123 "https://localhost:38083/ows/wps?service=wps&request=execute&identifier=dummyprocess&version=1.0.0"
 
 
+
+Using the OWSProxy with an external WPS application
+===================================================
+
+
+The ``OWSProxy`` is a proxy service for OWS services. Currently it only supports WPS.
+
+First you need an external WPS. You can use `Emu WPS service <http://emu.readthedocs.org/en/latest/>`_ from Birdhouse. 
+Get it from GitHub and run the installation:
+
+.. code-block:: sh
+
+    $ git clone https://github.com/bird-house/emu.git
+    $ cd emu
+    $ make install
+    $ make start
+
+The Emu WPS service is available by default at the URL: 
+http://localhost:8094/wps?service=WPS&version=1.0.0&request=GetCapabilities
+
+
+Make sure Twitcher is installed and running:
+
+.. code-block:: sh
+
+   $ cd ../twitcher
+   $ make restart
+   $ make status
+
+
+Register the Emu WPS service at the Twitcher ``OWSProxy``:
+
+.. code-block:: sh
+
+   $ bin/twitcherctl -k register --name emu http://localhost:8094/wps
+
+If you don't provide ...
 
 
 
