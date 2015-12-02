@@ -11,3 +11,4 @@ ows-security = true
 ows-proxy = true
 rpcinterface = true
 wps = true
+wps-cfg =
