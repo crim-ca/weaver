@@ -9,8 +9,8 @@ Tutorial
     :depth: 2
 
 
-Getting started with the WPS application comming with Twitcher
-==============================================================
+Using the WPS application included in Twitcher
+==============================================
 
 Make sure twitcher is started with ``make status``:
 
@@ -140,4 +140,41 @@ Run a ``GetCapabilities`` request for the registered Emu WPS service:
 .. code-block:: sh
 
     $ curl -k "https://localhost:38083/ows/proxy/emu?service=wps&request=getcapabilities"
+
+
+Run a ``DescribeProcess`` request:
+
+.. code-block:: sh
+
+    $ curl -k "https://localhost:38083/ows/proxy/emu?service=wps&request=describeprocess&identifier=dummyprocess&version=1.0.0"
+
+Run an ``Exceute`` request:
+
+.. code-block:: sh
+
+    $ curl -k "https://localhost:38083/ows/wps?service=wps&request=execute&identifier=dummyprocess&version=1.0.0"
+
+Now you should get an XML error response with a message that you need to provide an access token (see section above).
+
+We need to generate an access token with ``twitcherctl``:
+
+.. code-block:: sh
+
+    $ bin/twitcherctl -k gentoken -H 24
+    def456
+
+By default the token has a limited life time of one hour. With the option ``-H`` you can extend the life time in hours (24 hours in this example).
+
+You can provide the access token in three ways (see section above):
+
+* as HTTP parameter,
+* as part of the HTTP header
+* or as part of the url path.
+
+In the following example we provide the token as HTTP parameter:
+
+.. code-block:: sh
+
+    $ curl -k "https://localhost:38083/ows/proxy/emu?service=wps&request=execute&identifier=dummyprocess&version=1.0.0&access_token=def456"
+
 
