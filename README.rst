@@ -29,7 +29,9 @@ Contents
    overview
    installation
    configuration
+   running
    tutorial
+   api
    appendix
 
 Indices and tables

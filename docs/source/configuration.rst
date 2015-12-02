@@ -1,8 +1,8 @@
 .. _configuration:
 
-*************
-Configuration
-*************
+******************
+Configuration File
+******************
 
 .. contents::
     :local:

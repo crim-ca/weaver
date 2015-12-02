@@ -1,8 +1,8 @@
-.. _installation:
+.. _installing:
 
-************
-Installation
-************
+**********
+Installing
+**********
 
 The installation is using the Python distribution system `Anaconda <http://www.continuum.io/>`_ to maintain software dependencies. 
 
