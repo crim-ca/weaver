@@ -19,13 +19,14 @@ The following image gives an overview of the Twitcher components.
 The Aim
 =======
 
-The aim is to have a simple to use security filter for OGC/OWS service (especially for Web Processing Services) which can be integrated in existing processing infrastructures.
+The aim is to have a simple to use security filter for OGC/OWS services (especially for Web Processing Services) which can be integrated in existing processing infrastructures.
 
 The design aims are:
 
 * Existing Web Processing Services and Clients should be able to use this security filter without modifications.
 * Simple: to use, to deploy, to maintain, to understand, ...
-* Token based security.
+* Token based security. 
+* Tokens are only valid for a short period of time.
 * Able to provide additional data (user/process environment) with a security token.
 * Able to be used in a distributed infrastructure.
 * Python .. *ehm* not a requirement ... but more and more used.

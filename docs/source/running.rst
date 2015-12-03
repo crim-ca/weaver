@@ -47,7 +47,7 @@ The ``twitcherctl`` is a command line tool to control the twitcher service. It u
 
    Print usage message and exit
 
--s, --serverurl URL
+-s, --serverurl
 
    URL on which twitcher server is listening (default "https://localhost:38083").
 
@@ -95,6 +95,13 @@ Generate an access token valid for 24 hours (use ``-k`` to avoid validation of H
 .. code-block:: sh
   
    $ bin/twitcherctl -k gentoken -H 24
+
+
+Generate an access token and set the ``PYWPS_CFG`` environment variable used by the PyWPS implementation via the *wsgi environ*:
+
+.. code-block:: sh
+  
+   $ bin/twitcherctl -k gentoken -H 12 -e PYWPS_CFG=/path/to/my/pywps.cfg
 
 
 Register an OWS Service for the OWS Proxy

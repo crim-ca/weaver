@@ -16,7 +16,7 @@ Install twitcher (see: :ref:`installation`) and make sure it is started with ``m
 
 .. code-block:: sh
 
-    $ cd twitcher
+    $ cd twitcher  # cd into the installation folder  
     $ make status
     Supervisor status ...
     mongodb                          RUNNING   pid 6863, uptime 0:00:19
@@ -164,7 +164,7 @@ Make sure Twitcher is installed and running:
 
 .. code-block:: sh
 
-   $ cd ../twitcher
+   $ cd ../twitcher  # cd into the twitcher installation folder
    $ make restart
    $ make status
 
