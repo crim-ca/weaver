@@ -31,4 +31,8 @@ A token is generated via the XML-RPC interface. This interface is supposed to be
 
 The admin interface can add additional data (environment variables) to the access token. This additional data is stored with the token in the token store. The data will be added to the *wsgi environ* of the WPS application when the token is provided by the client request.This data can be used to set a dynamic configuration of the WPS service, e.a. user specific data access credentials which are used by the WPS processes. External WPS/OWS services, which are registered with the OWS proxy, have no access to this additional data. 
 
+The OWS security middleware works currently only with WPS services. It allows by default to use ``GetCapabilities`` and ``DescribeProcess`` requests without a token. The ``Execute`` request (and anything else) can be accessed only with a valid token.
+
+Access tokens have a life time limit. By default only for one hour but the admin can set a longer life time when generating a token.
+
 So, twitcher is meant to be integrated in existing processing infrastructures with OGC/OWS services and portals. You can use twitcher as a standalone service but currently only for development and demo purposes.
