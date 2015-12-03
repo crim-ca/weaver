@@ -12,6 +12,9 @@ Overview
 Twitcher Components
 ===================
 
+.. image:: _images/twitcher-overview.png
+
+
 Twitcher has the following components:
 
 OWS Security
