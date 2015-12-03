@@ -135,10 +135,10 @@ Instead of running twitcher as a service you can also include twitcher component
 Include OWS Security Middleware
 -------------------------------
 
-You the Pyramid ``include`` statement. See the ``twitcher/__init__py`` as an example. [..]
+Use the Pyramid ``include`` statement. See the ``twitcher/__init__py`` as an example. [..]
 
 
 Include OWS Proxy
 -----------------
 
-You the Pyramid ``include`` statement. See the ``twitcher/__init__py`` as an example. [..]
+Use the Pyramid ``include`` statement. See the ``twitcher/__init__py`` as an example. [..]
