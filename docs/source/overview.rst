@@ -16,7 +16,7 @@ The following image gives an overview of the Twitcher components.
 Twitcher consists of the following main parts:
 
 OWS Security
-   A wsgi middleware (actually currently it is a `Pyramid tween <http://docs.pylonsproject.org/projects/pyramid/en/latest/glossary.html#term-tween>`_) which puts a simple token based security layer on top of a wsgi application. The access tokens are stored currently in a MongoDB.
+   A wsgi middleware (actually currently it is a `Pyramid tween <http://docs.pylonsproject.org/projects/pyramid/en/latest/glossary.html#term-tween>`_) which puts a simple token based security layer on top of a wsgi application. The access tokens are stored in a MongoDB.
 OWS Proxy
    A wsgi application which acts as a proxy for registred OWS services. Currently it only supports WPS services.
 WPS

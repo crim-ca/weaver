@@ -12,7 +12,7 @@ Tutorial
 Using the WPS application included in Twitcher
 ==============================================
 
-See above on how to install twitcher and make sure it is started with ``make status``:
+Install twitcher (see: :ref:`installation`) and make sure it is started with ``make status``:
 
 .. code-block:: sh
 

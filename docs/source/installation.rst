@@ -1,12 +1,18 @@
-.. _installing:
+.. _installation:
 
-**********
-Installing
-**********
+************
+Installation
+************
 
 The installation is using the Python distribution system `Anaconda <http://www.continuum.io/>`_ to maintain software dependencies. 
 
+Requirements
+============
+
 The installation works on Linux 64 bit distributions (tested on Ubuntu 14.04) and also on MacOSX (tested on El Capitan).
+
+From GitHub Sources
+===================
 
 Install twitcher as normal user from GitHub sources:
 
@@ -18,6 +24,9 @@ Install twitcher as normal user from GitHub sources:
    $ make test
 
 The installation process setups a conda environment named birdhouse. All additional packages and configuration files are going into this conda environment. The location is ``~/.conda/envs/birdhouse``.
+
+Starting Twitcher Service
+=========================
 
 Start the twitcher service (supervisor):
 
