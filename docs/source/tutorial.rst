@@ -242,3 +242,118 @@ In the following example we provide the token as HTTP parameter:
 .. warning::
 
    If you have set enviroment variables with your access token then they will *not* be available in the external service.
+
+
+Use Birdy WPS command line client to run a Process
+==================================================
+
+
+Install the `birdy <http://birdy.readthedocs.org/en/latest/>`_ WPS command line client:
+
+.. code-block:: sh
+
+   $ conda install -c birdhouse birdhouse-birdy
+
+If ``conda`` is not in your path ... it was installed by the twitcher installer and is by default in ``~/anaconda/bin``.
+
+Generate a new access token:
+
+.. code-block:: sh
+
+   $ cd twitcher # cd into twitcher installation folder
+   $ bin/twitcherctl -k gentoken
+   98765
+
+Check which WPS is registered (or register one as described above):
+
+.. code-block:: sh
+
+   $ bin/twitcherctl -k status
+   [{'url': 'http://localhost:8094/wps', 'proxy_url': 'https://localhost:38083/ows/proxy/emu', 'type': 'wps', 'name': 'emu'}]
+
+
+Set the ``WPS_SERVICE`` environment variable for birdy with the ``proxy_url`` and extended with **access token**:
+
+.. code-block:: sh
+
+   $ export WPS_SERVICE=https://localhost:38083/ows/proxy/emu/98765             
+   
+
+Now, run birdy:
+
+.. code-block:: sh
+
+   $ birdy -h
+
+You get a list of available WPS processes::
+
+    usage: brdy [<options>] <command> [<args>]
+     
+    Emu: WPS processes for testing and demos.
+     
+    optional arguments:
+      -h, --help            show this help message and exit
+      --debug               enable debug mode
+     
+    command:
+      List of available commands (wps processes)
+     
+      {helloworld,ultimatequestionprocess,dummyprocess,wordcount,inout,multiplesources,chomsky,zonal_mean}
+                            Run "birdy <command> -h" to get additional help.
+        helloworld          Hello World: Welcome user and say hello ...
+        ultimatequestionprocess
+                            Answer to Life, the Universe and Everything: Numerical
+                            solution that is the answer to Life, Universe and
+                            Everything. The process is an improvement to Deep
+                            Tought computer (therefore version 2.0) since it no
+                            longer takes 7.5 milion years, but only a few seconds
+                            to give a response, with an update of status every 10
+                            seconds.
+        dummyprocess        Dummy Process: The Dummy process is used for testing
+                            the WPS structure. The process will accept 2 input
+                            numbers and will return the XML result with an add one
+                            and subtract one operation
+        wordcount           Word Counter: Counts words in a given text ...
+        inout               Testing all Data Types: Just testing data types like
+                            date, datetime etc ...
+        multiplesources     Multiple Sources: Process with multiple different
+                            sources ...
+        chomsky             Chomsky text generator: Generates a random chomsky
+                            text ...
+        zonal_mean          Zonal Mean: zonal mean in NetCDF File.
+
+
+Show params of ``helloworld process``:
+
+.. code-block:: sh
+
+   $ birdy helloworld -h
+
+
+You get a list of input/output params as option::
+
+    usage: birdy helloworld [-h] --user [USER]
+                            [--output [{output} [{output} ...]]]
+     
+    optional arguments:
+      -h, --help            show this help message and exit
+      --user [USER]         Your name: Please enter your name
+      --output [{output} [{output} ...]]
+                            Output: output=Welcome message: None (default: all
+                            outputs)
+
+
+Run the ``helloworld`` process:
+
+.. code-block:: sh
+
+   $ birdy helloworld --user pingu
+
+The output ...::
+
+    INFO:Execution status: ProcessAccepted
+    INFO:Execution status: ProcessSucceeded
+    INFO:Output:
+    INFO:output=Hello pingu and welcome to WPS :)
+
+
