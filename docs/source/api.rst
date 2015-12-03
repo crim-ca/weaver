@@ -70,3 +70,11 @@ Remove all Services
     server.purge()
 
 
+List registered Services
+-------------------
+
+.. code-block:: python
+
+    server.status()
+
+

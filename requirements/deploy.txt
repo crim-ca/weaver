@@ -4,7 +4,6 @@ pyramid_beaker
 webob
 paste
 pastedeploy
-beaker_mongodb
 pymongo
 httplib2
 argcomplete
