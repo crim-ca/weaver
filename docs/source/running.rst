@@ -9,13 +9,28 @@ Running Twitcher
     :depth: 2
 
 
-Running program:`twitcherctl`
-=============================
+Running twitcher service
+========================
+
+The twitcher service is controlled by `supervisor <http://supervisord.org/>`_. The twitcher installation comes with a Makefile which provides shortcut commands for supervisor:
+
+.. code-block:: sh
+
+    $ cd twitcher   # cd into twitcher installation directory
+    $ make status   # show running supervisor services (incl. twitcher)
+    $ make start    # start all supervisor services (incl. twitcher)
+    $ make stop    # stop ...
+    $ make restart    # restart ...
 
 
-The program:`twitcherctl` is a command line tool to control the twitcher service. It uses the XML-RPC api of twitcher to generate access tokens and to register OWS services.
 
-program:`twitcherctl` is part of the twitcher installation. When you have installed twitcher from GitHub then start program:`twitcherctl` with:
+Running `twitcherctl`
+=====================
+
+
+The ``twitcherctl`` is a command line tool to control the twitcher service. It uses the XML-RPC api of twitcher to generate access tokens and to register OWS services.
+
+``twitcherctl`` is part of the twitcher installation. When you have installed twitcher from GitHub then start ``twitcherctl`` with:
 
 .. code-block:: sh
 
@@ -23,10 +38,10 @@ program:`twitcherctl` is part of the twitcher installation. When you have instal
    $ bin/twitcherctl -h
 
 
-program:`twitcherctl` Commands and Options
+`twitcherctl` Commands and Options
 ------------------------------------------
 
-program:`twitcherctl` has the following command line options:
+``twitcherctl`` has the following command line options:
 
 -h, --help
 
@@ -44,7 +59,7 @@ program:`twitcherctl` has the following command line options:
 
    Password to use for authentication with server
 
- -k, --insecure        
+-k, --insecure        
 
    Don't validate the server's certificate.
 
@@ -104,7 +119,7 @@ You can use the ``--name`` option to provide a name (used by the OWS proxy). Oth
 Show Status of Twitcher
 -----------------------
 
-Currently the command:`status` command shows only the registered OWS services:
+Currently the ``status`` command shows only the registered OWS services:
 
 .. code-block:: sh
 
@@ -112,3 +127,18 @@ Currently the command:`status` command shows only the registered OWS services:
    [{'url': 'http://localhost:8094/wps', 'proxy_url': 'https://localhost:38083/ows/proxy/tiny_buzzard', 'type': 'wps', 'name': 'tiny_buzzard'}]
    
 
+Use Twitcher components in your Pyramid Application
+===================================================
+
+Instead of running twitcher as a service you can also include twitcher components (OWS Security Middleware, OWS Proxy) in a Pyramid application.
+
+Include OWS Security Middleware
+-------------------------------
+
+You the Pyramid ``include`` statement. See the ``twitcher/__init__py`` as an example. [..]
+
+
+Include OWS Proxy
+-----------------
+
+You the Pyramid ``include`` statement. See the ``twitcher/__init__py`` as an example. [..]
