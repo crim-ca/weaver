@@ -9,9 +9,35 @@ Overview
     :depth: 2
 
 
+The Big Picture
+===============
+
 The following image gives an overview of the Twitcher components.
 
 .. image:: _images/twitcher-overview.png
+
+The Aim
+=======
+
+The aim is to have a simple to use security filter for OGC/OWS service (especially for Web Processing Services) which can be integrated in existing processing infrastructures.
+
+The design aims are:
+
+* Existing Web Processing Services and Clients should be able to use this security filter without modifications.
+* Simple: to use, to deploy, to maintain, to understand, ...
+* Token based security.
+* Able to provide additional data (user/process environment) with a security token.
+* Able to be used in a distributed infrastructure.
+* Python .. *ehm* not a requirement ... but more and more used.
+
+Why Twitcher?
+=============
+
+Unfortunately we haven't found anything that fulfills our requirements. There are some other projects with the same subject and give inspiration but they don't work for us. Please see the link list :ref:`appendix`.
+
+
+Twitcher Components
+===================
 
 Twitcher consists of the following main parts:
 
@@ -24,6 +50,9 @@ WPS
 XML-RPC Interface
    An XML-RPC service which is used to control the token generation and OWS service registration. The interface is accessed using Basic Authentication. It should be used by an administrator and administrative web portals.
 
+
+How to Use
+==========
 
 The OWS security middleware protects OWS services with a simple string based token mechanism.  
 A WPS client needs to provide a string token to access the internal WPS or a registered OWS service. 
