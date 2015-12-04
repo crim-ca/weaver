@@ -19,7 +19,7 @@ To use the XML-RPC interface, connect to twitcher’s HTTPS port with any XML-RP
 .. warning::
 
    When accessing the default HTTPS service you need to deactivate SSL verfication. See ``twitcher/twitcherctl.py`` how this can be done. You may also use the following code::
-
+   
    >> from twitcher import twitcherctl
    >> server = twitcherctl._create_server('https://localhost:38083/RPC2', verify_ssl=False)
 

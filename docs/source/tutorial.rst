@@ -357,3 +357,7 @@ The process output::
     INFO:output=Hello pingu and welcome to WPS :)
 
 
+If you don't provide a token or the token is invalid then you will get an error message::
+
+   owslib.wps.WPSException : {'locator': 'AccessForbidden', 'code': 'NoApplicableCode', 'text': 'Access token is required to access this service.'}
+   WARNING:Error: code=NoApplicableCode, locator=AccessForbidden, text=Access token is required to access this service.

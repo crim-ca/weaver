@@ -4,7 +4,7 @@
 Installation
 ************
 
-The installation is using the Python distribution system `Anaconda <http://www.continuum.io/>`_ to maintain software dependencies. `Buildout <http://www.buildout.org/en/latest/>`_ is used to setup the application with all servcices and configuration files.
+The installation is using the Python distribution system `Anaconda <http://www.continuum.io/>`_ to maintain software dependencies. `Buildout <http://www.buildout.org/en/latest/>`_ is used to setup the application with all services and configuration files.
 
 Requirements
 ============
