@@ -6,7 +6,8 @@ import urllib
 from httplib2 import Http
 
 from pyramid.view import view_config
-from pyramid.httpexceptions import HTTPBadRequest, HTTPBadGateway, HTTPNotAcceptable
+from pyramid.httpexceptions import HTTPBadRequest, HTTPBadGateway, HTTPNotAcceptable, HTTPForbidden
+from twitcher.owsexceptions import OWSNoApplicableCode, OWSAccessForbidden
 from pyramid.response import Response
 from pyramid.settings import asbool
 
@@ -46,7 +47,7 @@ def _send_request(request, service):
     if resp.has_key("content-type"):
         ct = resp["content-type"]
         if not ct.split(";")[0] in allowed_content_types:
-            return HTTPForbidden()
+            return OWSAccessForbidden()
     else:
         return HTTPNotAcceptable()
 
