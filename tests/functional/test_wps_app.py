@@ -11,12 +11,13 @@ import unittest
 from nose.plugins.attrib import attr
 from webtest import TestApp
 import pyramid.testing
-from tests.functional.common import setup_with_db
+from tests.functional.common import setup_with_db, setup_tokenstore
 
 class WpsAppTest(unittest.TestCase):
 
     def setUp(self):
         config = setup_with_db()
+        self.token = setup_tokenstore(config)
         config.include('twitcher.wps')
         config.include('twitcher.tweens')
         self.app= TestApp(config.make_wsgi_app())
@@ -45,4 +46,13 @@ class WpsAppTest(unittest.TestCase):
         assert resp.content_type == 'text/xml'
         print resp.body
         resp.mustcontain('<Exception exceptionCode="NoApplicableCode" locator="AccessForbidden">')
+
+    @attr('online')
+    def test_execute_allowed(self):
+        url = '/ows/wps?service=wps&request=execute&version=1.0.0&identifier=dummyprocess&access_token=%s' % self.token
+        resp = self.app.get(url)
+        assert resp.status_code == 200
+        assert resp.content_type == 'text/xml'
+        print resp.body
+        resp.mustcontain('<wps:ProcessSucceeded>PyWPS Process dummyprocess successfully calculated</wps:ProcessSucceeded>')
 

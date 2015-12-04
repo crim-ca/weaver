@@ -2,7 +2,7 @@ import unittest
 from nose.plugins.attrib import attr
 from webtest import TestApp
 from pyramid import testing
-from tests.functional.common import setup_with_db
+from tests.functional.common import setup_with_db, setup_tokenstore
 
 from twitcher.registry import service_registry_factory
 
@@ -22,7 +22,8 @@ class OWSProxyAppTest(unittest.TestCase):
         registry = service_registry_factory(config.registry)
         registry.clear_services()
         # TODO: testing against ourselfs ... not so good
-        registry.register_service(url="https://localhost:38083/ows/wps", name="twitcher")
+        url = "https://localhost:38083/ows/wps"
+        registry.register_service(url=url, name="twitcher")
 
     @attr('online')
     def test_getcaps(self):
@@ -46,3 +47,4 @@ class OWSProxyAppTest(unittest.TestCase):
         print resp.body
         resp.mustcontain('<Exception exceptionCode="NoApplicableCode" locator="AccessForbidden">')
 
+   
