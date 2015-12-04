@@ -190,7 +190,7 @@ Use the ``status`` command to see which WPS services are registered with OWSProx
 Access a registered service
 ---------------------------
 
-By default the registered service is available at the URL https://localhost:38083/ows/proxy/{service_name}. Replace the ``service_name`` with the registered name.
+By default the registered service is available at the URL ``https://localhost:38083/ows/proxy/{service_name}``. Replace the ``service_name`` with the registered name.
 
 Run a ``GetCapabilities`` request for the registered Emu WPS service:
 
