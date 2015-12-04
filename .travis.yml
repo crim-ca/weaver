@@ -12,6 +12,8 @@ services:
   - mongodb
 install:
   - make install
+before_script:
+  - sleep 15
 script:
   - make docs
   - make testall
