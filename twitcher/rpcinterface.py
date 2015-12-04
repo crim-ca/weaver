@@ -103,7 +103,7 @@ class RPCInterface(object):
         Removes all services from the registry.
         """
         try:
-            self.registry.clear_service()
+            self.registry.clear_services()
         except:
             logger.exception('clear failed')
             return False
