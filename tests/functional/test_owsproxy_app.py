@@ -2,23 +2,23 @@ import unittest
 from nose.plugins.attrib import attr
 from webtest import TestApp
 from pyramid import testing
+from tests.functional.common import setup_with_db
 
 from twitcher.registry import service_registry_factory
 
 class OWSProxyAppTest(unittest.TestCase):
 
     def setUp(self):
-        settings = {'mongodb.host':'127.0.0.1', 'mongodb.port':'27027', 'mongodb.db_name': 'twitcher_test'}
-        config = testing.setUp(settings=settings)
+        config = setup_with_db()
+        self._setup_registry(config)
         config.include('twitcher.owsproxy')
         config.include('twitcher.tweens')
-        self._setup_db(config)
         self.app= TestApp(config.make_wsgi_app())
         
     def tearDown(self):
         testing.tearDown()
 
-    def _setup_db(self, config):
+    def _setup_registry(self, config):
         registry = service_registry_factory(config.registry)
         registry.clear_services()
         # TODO: testing against ourselfs ... not so good
