@@ -6,6 +6,7 @@ README = open(os.path.join(here, 'README.rst')).read()
 CHANGES = open(os.path.join(here, 'CHANGES.rst')).read()
 
 reqs = [line.strip() for line in open('requirements/deploy.txt')]
+test_reqs = [line.strip() for line in open('requirements/tests.txt')]
 
 setup(name='twitcher',
       version='0.1.0',
@@ -28,6 +29,7 @@ setup(name='twitcher',
       zip_safe=False,
       test_suite='twitcher',
       install_requires=reqs,
+      test_require=test_reqs,
       entry_points="""\
       [paste.app_factory]
       main = twitcher:main
