@@ -14,6 +14,6 @@ install:
   - make install
 script:
   - make docs
-  - make test
+  - make testall
 #after_success:
 # - coveralls
