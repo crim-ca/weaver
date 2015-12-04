@@ -4,7 +4,7 @@
 Installation
 ************
 
-The installation is using the Python distribution system `Anaconda <http://www.continuum.io/>`_ to maintain software dependencies. 
+The installation is using the Python distribution system `Anaconda <http://www.continuum.io/>`_ to maintain software dependencies. `Buildout <http://www.buildout.org/en/latest/>`_ is used to setup the application with all servcices and configuration files.
 
 Requirements
 ============
@@ -28,7 +28,9 @@ The installation process setups a conda environment named birdhouse. All additio
 Starting Twitcher Service
 =========================
 
-Start the twitcher service (supervisor):
+Twitcher is run in the `Gunicorn <http://gunicorn.org/>`_ WSGI application server behind the `Nginx <http://nginx.org/>`_ HTTP server. Starting/Stopping the services is controlled by `Supervisor <http://supervisord.org/>`_. This is described in the `Birdhouse documenation <http://birdhouse.readthedocs.org/en/latest/installation.html#nginx-gunicorn-and-supervisor>`_.
+
+Start the twitcher service (using supervisor):
 
 .. code-block:: sh
 

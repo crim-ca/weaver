@@ -28,13 +28,13 @@ The design aims are:
 * Token based security. 
 * Tokens are only valid for a short period of time.
 * Able to provide additional data (user/process environment) with a security token.
-* Able to be used in a distributed infrastructure.
+* Able to be used in a distributed infrastructure (maybe using `Macaroons <https://github.com/rescrv/libmacaroons>`_?).
 * Python .. *ehm* not a requirement ... but more and more used.
 
 Why Twitcher?
 =============
 
-Unfortunately we haven't found anything that fulfills our requirements. There are some other projects with the same subject and give inspiration but they don't work for us. Please see the link list :ref:`appendix`.
+Unfortunately we haven't found anything that fulfills our requirements. There are some other projects with the same subject and give inspiration but they don't work for us. Please see :ref:`appendix`.
 
 
 Twitcher Components

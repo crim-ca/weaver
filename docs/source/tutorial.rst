@@ -70,11 +70,11 @@ First we need to generate an access token with ``twitcherctl``:
 
 There are three ways how you can provide the access token:
 
-1. as ``access_token`` HTTP parameter
+1. as ``access_token`` HTTP query parameter
 
 .. code-block:: sh
 
-    $ curl -k "https://localhost:38083/ows/wps?service=wps&request=execute&identifier=dummyprocess&version=1.0.0&access_token=abc123"
+    $ curl -k "https://localhost:38083/ows/wps?access_token=abc123&service=wps&request=execute&identifier=dummyprocess&version=1.0.0"
 
 2. as the last part of the HTTP path
 
@@ -119,7 +119,7 @@ PYWPS_CFG
 PYWPS_PROCESSES
    Directory, where the processes are stored
 PYWPS_TEMPLATES
-   Templates directory (structure should be similar to file:pywps/Templates)
+   Templates directory (structure should be similar to ``pywps/Templates``)
 
 In the following we set a PyWPS configuration:
 
@@ -349,7 +349,7 @@ Run the ``helloworld`` process:
 
    $ birdy helloworld --user pingu
 
-The output ...::
+The process output::
 
     INFO:Execution status: ProcessAccepted
     INFO:Execution status: ProcessSucceeded

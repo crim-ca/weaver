@@ -132,7 +132,17 @@ Currently the ``status`` command shows only the registered OWS services:
 
    $ bin/twitcherctl -k status
    [{'url': 'http://localhost:8094/wps', 'proxy_url': 'https://localhost:38083/ows/proxy/tiny_buzzard', 'type': 'wps', 'name': 'tiny_buzzard'}]
-   
+
+Using OWSProxy
+==============
+
+See the :ref:`tutorial`.
+
+
+Using WPS Application
+=====================
+
+See the :ref:`tutorial`.   
 
 Use Twitcher components in your Pyramid Application
 ===================================================
