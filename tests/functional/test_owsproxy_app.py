@@ -21,7 +21,22 @@ class OWSProxyAppTest(unittest.TestCase):
     def _setup_db(self, config):
         registry = service_registry_factory(config.registry)
         registry.clear_services()
+        # TODO: testing against ourselfs ... not so good
         registry.register_service(url="https://localhost:38083/ows/wps", name="twitcher")
+
+    @attr('online')
+    def test_getcaps(self):
+        resp = self.app.get('/ows/proxy/twitcher?service=wps&request=getcapabilities')
+        assert resp.status_code == 200
+        assert resp.content_type == 'text/xml'
+        resp.mustcontain('</wps:Capabilities>')
+
+    @attr('online')
+    def test_describeprocess(self):
+        resp = self.app.get('/ows/proxy/twitcher?service=wps&request=describeprocess&version=1.0.0&identifier=dummyprocess')
+        assert resp.status_code == 200
+        assert resp.content_type == 'text/xml'
+        resp.mustcontain('</wps:ProcessDescriptions>')
 
     @attr('online')
     def test_execute_not_allowed(self):
