@@ -1,10 +1,15 @@
 language: python
 branches:
   only:
+    - develop
     - master
 python:
   - "2.7"
+env:
+  - DB=mongodb
 sudo: false 
+services:
+  - mongodb
 install:
   - make install
 script:
