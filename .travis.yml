@@ -3,15 +3,15 @@ branches:
   only:
     - develop
     - master
+os:
+  - linux
+  - osx
 python:
   - "2.7"
-env:
-  - DB=mongodb
 sudo: false 
-services:
-  - mongodb
 install:
   - make install
+  - make start
 before_script:
   - sleep 15
 script:
