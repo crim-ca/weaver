@@ -4,6 +4,10 @@
 Useful Links
 ************
 
+Twitcher alike projects:
+
+* `Climate4Impact OWS token api <https://dev.knmi.nl/projects/impactportal/wiki/API>`_
+
 OWS Proxies:
 
 * `owsproxy by mapbender <https://github.com/mapbender/owsproxy3>`_  
