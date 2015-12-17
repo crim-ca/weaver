@@ -52,6 +52,7 @@ JSON Web Token (JWT):
 
 * http://openid.net/specs/draft-jones-oauth-jwt-bearer-03.html
 * https://pypi.python.org/pypi/pyramid_jwtauth
+* https://pypi.python.org/pypi/pyramid_jwt
 
 Simple Web Token (SWT):
 
