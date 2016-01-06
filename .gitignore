@@ -51,12 +51,10 @@ bootstrap.py
 
 # sphinx
 #docs/Makefile
-#docs/make.bat
+docs/make.bat
+docs/doctrees/
+docs/html/
 docs/build/
-
-
-# ipython
-.ipynb_checkpoints
 
 # External Sources
 #src/external
@@ -64,3 +62,7 @@ docs/build/
 # tests
 *.log
 *.lock
+testdata.json
+
+# IPython
+.ipynb_checkpoints
