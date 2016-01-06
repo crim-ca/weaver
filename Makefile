@@ -1,4 +1,4 @@
-VERSION := 0.2.8
+VERSION := 0.2.14
 RELEASE := master
 
 # Application
@@ -19,8 +19,7 @@ PREFIX := $(CONDA_ENVS_DIR)/$(CONDA_ENV)
 HOSTNAME ?= localhost
 USER ?= www-data
 OUTPUT_PORT ?= 8090
-PHOENIX_PASSWORD ?= ""
-WPS_URL ?= http://malleefowl:8094/wps
+LOG_LEVEL ?= WARN
 
 # choose anaconda installer depending on your OS
 ANACONDA_URL = http://repo.continuum.io/miniconda
@@ -58,6 +57,7 @@ help:
 	@echo "\t version     \t- Prints version number of this Makefile."
 	@echo "\t info        \t- Prints information about your system."
 	@echo "\t install     \t- Installs your application by running 'bin/buildout -c custom.cfg'."
+	@echo "\t update      \t- Updates your application by running 'bin/buildout -o -c custom.cfg' (buildout offline mode)."
 	@echo "\t test        \t- Run tests (but skip long running tests)."
 	@echo "\t testall     \t- Run all tests (including long running tests)."
 	@echo "\t clean       \t- Deletes all files that are created by running buildout."
@@ -100,6 +100,7 @@ backup:
 	@echo "Backup custom config ..." 
 	@-test -f custom.cfg && cp -v --update --backup=numbered --suffix=.bak custom.cfg custom.cfg.bak
 
+.PHONY: .gitignore
 .gitignore:
 	@echo "Setup default .gitignore ..."
 	@curl "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/dot_gitignore" --silent --insecure --output .gitignore 
@@ -147,10 +148,11 @@ conda_config: anaconda
 	@"$(ANACONDA_HOME)/bin/conda" config --set ssl_verify false
 	@"$(ANACONDA_HOME)/bin/conda" config --add channels defaults
 	@"$(ANACONDA_HOME)/bin/conda" config --add channels birdhouse
+	@"$(ANACONDA_HOME)/bin/conda" config --add channels ioos
 
 .PHONY: conda_env
 conda_env: anaconda conda_config
-	@test -d $(PREFIX) || "$(ANACONDA_HOME)/bin/conda" create -m -p $(PREFIX) -c birdhouse --yes python setuptools ipython curl pyopenssl genshi mako
+	@test -d $(PREFIX) || "$(ANACONDA_HOME)/bin/conda" create -m -p $(PREFIX) -c ioos --yes python setuptools curl pyopenssl genshi mako
 
 .PHONY: conda_pinned
 conda_pinned: conda_env
@@ -188,8 +190,12 @@ update:
 .PHONY: update-config
 update-config:
 	@echo "Update application config with buildout ..."
-	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);bin/buildout settings:hostname=$(HOSTNAME) settings:output-port=$(OUTPUT_PORT) settings:phoenix-password=$(PHOENIX_PASSWORD) settings:wps-url=$(WPS_URL) -o"
-	chown -R $(USER) $(PREFIX)/var/.
+	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);bin/buildout settings:hostname=$(HOSTNAME) settings:output-port=$(OUTPUT_PORT) settings:log-level=$(LOG_LEVEL) -o -c custom.cfg"
+
+.PHONY: update-user
+update-user:
+	@echo "Update user permission on var/ ..."
+	chown -R $(USER) $(PREFIX)/var && chown -R $(USER) $(PREFIX)/var/lib/.
 
 .PHONY: build
 build: install
@@ -238,7 +244,7 @@ docs:
 	@echo "open your browser: firefox docs/build/html/index.html"
 
 .PHONY: selfupdate
-selfupdate: bootstrap.sh requirements.sh
+selfupdate: bootstrap.sh requirements.sh .gitignore
 	@curl "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/Makefile" --silent --insecure --output Makefile 
 
 ## Supervisor targets
@@ -261,14 +267,10 @@ restart:
 .PHONY: status
 status:
 	@echo "Supervisor status ..."
-	$(PREFIX)/bin/supervisorctl status
+	$(PREFIX)/bin/supervisorctl -c ${PREFIX}/etc/supervisor/supervisord.conf status
 
 
 ## Docker targets
-
-.dockerignore:
-	@echo "Update .dockerignore ..."
-	@curl "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/master/dot_dockerignore" --silent --insecure --output .dockerignore 
 
 .PHONY: Dockerfile
 Dockerfile: bootstrap
@@ -281,7 +283,7 @@ dockerrmi:
 	docker rmi $(DOCKER_IMAGE)
 
 .PHONY: dockerbuild
-dockerbuild: Dockerfile .dockerignore
+dockerbuild: Dockerfile
 	@echo "Building docker image ..."
 	docker build --rm -t $(DOCKER_IMAGE) .
 
