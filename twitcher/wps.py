@@ -39,6 +39,7 @@ def pywps_view(request):
     response.content_type = "text/xml"
 
     inputQuery = None
+    os.environ["REQUEST_METHOD"] = request.method
     if request.method == "GET":
         inputQuery = request.query_string
     elif request.method == "POST":
@@ -59,12 +60,14 @@ def pywps_view(request):
 
     # create the WPS object
     try:
-        wps = pywps.Pywps(request.environ)
+        wps = pywps.Pywps(os.environ["REQUEST_METHOD"], os.environ.get("PYWPS_CFG"))
         if wps.parseRequest(inputQuery):
             pywps.debug(wps.inputs)
-            return wps.performRequest()
+            wps.performRequest(processes=os.environ.get("PYWPS_PROCESSES"))
+            response_headers = [('Content-type', wps.request.contentType)]
+            return wps.response
     except WPSException,e:
-        return e
+        return str(e)
     except Exception, e:
         return OWSNoApplicableCode(e.message)
 
