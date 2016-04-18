@@ -42,14 +42,16 @@ class ServiceRegistry(object):
         # check if service is already registered
         service = self.collection.find_one({'url': service_url})
         if service is None:
-            if name is None:
+            if name is None or len(name.strip()) < 3:
                 name = namesgenerator.get_random_name()
                 if not self.collection.find_one({'name': name}) is None:
                     name = namesgenerator.get_random_name(retry=True)
-            service = dict(url=service_url, name=name, type=service_type)
+            service = dict(_id=name, url=service_url, name=name, type=service_type)
             if self.collection.find_one({'name': name}):
-                raise ValueError("service %s already registered." % (name))
-            self.collection.insert_one(service)
+                logging.info("update registered service %s." % (name))
+                self.collection.update_one({'name': name}, service)
+            else:
+                self.collection.insert_one(service)
             service = self.collection.find_one({'name': service['name']})
         return service
 
