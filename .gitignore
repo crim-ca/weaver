@@ -66,3 +66,11 @@ testdata.json
 
 # IPython
 .ipynb_checkpoints
+
+# gcc/fortran
+*.o
+*.a
+*.mod
+*.out
+
+
