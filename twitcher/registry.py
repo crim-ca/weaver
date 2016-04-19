@@ -46,7 +46,7 @@ class ServiceRegistry(object):
                 name = namesgenerator.get_random_name()
                 if not self.collection.find_one({'name': name}) is None:
                     name = namesgenerator.get_random_name(retry=True)
-            service = dict(_id=name, url=service_url, name=name, type=service_type)
+            service = dict(url=service_url, name=name, type=service_type)
             if self.collection.find_one({'name': name}):
                 logging.info("update registered service %s." % (name))
                 self.collection.update_one({'name': name}, service)
