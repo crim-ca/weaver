@@ -8,8 +8,8 @@ CHANGES = open(os.path.join(here, 'CHANGES.rst')).read()
 reqs = [line.strip() for line in open('requirements/deploy.txt')]
 test_reqs = [line.strip() for line in open('requirements/tests.txt')]
 
-setup(name='twitcher',
-      version='0.1.0',
+setup(name='birdhouse-twitcher',
+      version='0.1.1',
       description='Security Proxy for Web Processing Services (WPS)',
       long_description=README + '\n\n' + CHANGES,
       classifiers=[
