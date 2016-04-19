@@ -9,9 +9,10 @@ reqs = [line.strip() for line in open('requirements/deploy.txt')]
 test_reqs = [line.strip() for line in open('requirements/tests.txt')]
 
 setup(name='birdhouse-twitcher',
-      version='0.1.1',
+      version='0.1.4',
       description='Security Proxy for Web Processing Services (WPS)',
-      long_description=README + '\n\n' + CHANGES,
+      #long_description=README + '\n\n' + CHANGES,
+      long_description=README,
       classifiers=[
         "Programming Language :: Python",
         "Framework :: Pyramid",
