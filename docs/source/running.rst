@@ -49,7 +49,7 @@ The ``twitcherctl`` is a command line tool to control the twitcher service. It u
 
 -s, --serverurl
 
-   URL on which twitcher server is listening (default "https://localhost:38083").
+   URL on which twitcher server is listening (default "https://localhost:38083/").
 
 -u, --username
 
