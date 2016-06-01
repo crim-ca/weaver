@@ -18,9 +18,9 @@ Twitcher is a security proxy for Web Processing Services (WPS). The execution of
 
 The implementation is not restricted to WPS services. It will be extended to more OWS services like WMS (Web Map Service) and CSW (Catalogue Service for the Web) and might also be used for Thredds catalog services.
 
-Twitcher is a **prototype** implemented in Python with the `Pyramid web framework <http://www.pylonsproject.org/>`_.
+Twitcher is a **prototype** implemented in Python with the `Pyramid`_ web framework.
 
-Twitcher is part of the `Birdhouse <http://bird-house.github.io>`_ project. The documentation is on `ReadTheDocs <http://twitcher.rtfd.org/>`_.
+Twitcher is part of the `Birdhouse`_ project. The documentation is on `ReadTheDocs`_.
 
 Contents
 --------
@@ -36,3 +36,6 @@ Contents
    api
    appendix
 
+.. _Pyramid: http://www.pylonsproject.org
+.. _Birdhouse: http://bird-house.github.io
+.. _ReadTheDocs: http://twitcher.readthedocs.io/en/latest/
