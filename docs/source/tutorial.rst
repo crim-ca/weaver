@@ -146,7 +146,7 @@ Using the OWSProxy with an external WPS application
 
 The ``OWSProxy`` is a proxy service for OWS services. Currently it only supports WPS.
 
-First you need an external WPS. You can use `Emu WPS service <http://emu.readthedocs.org/en/latest/>`_ from Birdhouse. 
+First you need an external WPS. You can use `Emu WPS service <http://emu.readthedocs.io/en/latest/>`_ from Birdhouse. 
 Get it from GitHub and run the installation:
 
 .. code-block:: sh
@@ -248,7 +248,7 @@ Use Birdy WPS command line client to run a Process
 ==================================================
 
 
-Install the `birdy <http://birdy.readthedocs.org/en/latest/>`_ WPS command line client:
+Install the `birdy <http://birdy.readthedocs.io/en/latest/>`_ WPS command line client:
 
 .. code-block:: sh
 

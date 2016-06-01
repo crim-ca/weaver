@@ -4,7 +4,7 @@
 Installation
 ************
 
-The installation is using the Python distribution system `Anaconda <https://www.continuum.io/>`_ to maintain software dependencies. `Buildout <http://www.buildout.org/en/latest/>`_ is used to setup the application with all services and configuration files.
+The installation is using the Python distribution system `Anaconda`_ to maintain software dependencies. `Buildout`_ is used to setup the application with all services and configuration files.
 
 Requirements
 ============
@@ -28,7 +28,7 @@ The installation process setups a conda environment named birdhouse. All additio
 Starting Twitcher Service
 =========================
 
-Twitcher is run in the `Gunicorn <http://gunicorn.org/>`_ WSGI application server behind the `Nginx <http://nginx.org/>`_ HTTP server. Starting/Stopping the services is controlled by `Supervisor <http://supervisord.org/>`_. This is described in the `Birdhouse documenation <http://birdhouse.readthedocs.org/en/latest/installation.html#nginx-gunicorn-and-supervisor>`_.
+Twitcher is run in the `Gunicorn <http://gunicorn.org/>`_ WSGI application server behind the `Nginx <http://nginx.org/>`_ HTTP server. Starting/Stopping the services is controlled by `Supervisor <http://supervisord.org/>`_. This is described in the `Birdhouse documenation <http://birdhouse.readthedocs.io/en/latest/installation.html#nginx-gunicorn-and-supervisor>`_.
 
 Start the twitcher service (using supervisor):
 
@@ -47,4 +47,4 @@ Check the status of the twitcher service:
     twitcher                         RUNNING   pid 6864, uptime 0:00:19
 
 
-You will find more information about the installation in the `Makefile documentation <http://birdhousebuilderbootstrap.readthedocs.org/en/latest/>`_.
+You will find more information about the installation in the `Makefile documentation <http://birdhousebuilderbootstrap.readthedocs.io/en/latest/>`_.
