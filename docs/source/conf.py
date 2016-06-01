@@ -322,6 +322,7 @@ intersphinx_mapping = {'python': ('http://docs.python.org/', None),
 # linkcheck options
 # http://www.sphinx-doc.org/en/stable/config.html?highlight=linkchecker#options-for-the-linkcheck-builder
 linkcheck_ignore = [r'http[s]*://localhost.*/']
+linkcheck_timeout = 5
 
 # Link references always present on RST page.
 rst_epilog = """
