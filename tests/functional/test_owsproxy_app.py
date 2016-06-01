@@ -1,5 +1,6 @@
 import unittest
 from nose.plugins.attrib import attr
+from nose import SkipTest
 from webtest import TestApp
 from pyramid import testing
 from tests.functional.common import setup_with_db, setup_tokenstore
@@ -27,6 +28,7 @@ class OWSProxyAppTest(unittest.TestCase):
 
     @attr('online')
     def test_getcaps(self):
+        raise SkipTest
         resp = self.app.get('/ows/proxy/twitcher?service=wps&request=getcapabilities')
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
@@ -34,6 +36,7 @@ class OWSProxyAppTest(unittest.TestCase):
 
     @attr('online')
     def test_describeprocess(self):
+        raise SkipTest
         resp = self.app.get('/ows/proxy/twitcher?service=wps&request=describeprocess&version=1.0.0&identifier=dummyprocess')
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
@@ -41,6 +44,7 @@ class OWSProxyAppTest(unittest.TestCase):
 
     @attr('online')
     def test_execute_not_allowed(self):
+        raise SkipTest
         resp = self.app.get('/ows/proxy/twitcher?service=wps&request=execute&version=1.0.0&identifier=dummyprocess')
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
