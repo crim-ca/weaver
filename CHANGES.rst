@@ -7,6 +7,8 @@ Changes
 * updated docs.
 * renamed python package to pyramid_twitcher.
 * conda envionment.yml added.
+* using get_sane_name().
+* fixed: don't check token for allowed requests (#14).
 
 0.1.5 (2016-04-22)
 ==================
