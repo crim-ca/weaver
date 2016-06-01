@@ -1,6 +1,12 @@
 Changes
 *******
 
+0.1.6 (2016-06-01)
+==================
+
+* updated docs.
+* renamed python package to pyramid_twitcher.
+* conda envionment.yml added.
 
 0.1.5 (2016-04-22)
 ==================
