@@ -6,6 +6,7 @@ This module is inspired by
 """
 
 import random
+import re
 
 left = ["admiring",
         "adoring",
@@ -150,3 +151,7 @@ def get_random_name(retry=False):
         name = "%s%d" % (name, random.randint(0,100))
     return name
 
+def get_sane_name(name, minlen=3, maxlen=25):
+    if name is None or len(name.strip()) < minlen:
+        return None
+    return re.sub("[^a-z]","_", name.strip().lower()[:maxlen])

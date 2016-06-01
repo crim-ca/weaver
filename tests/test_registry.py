@@ -27,3 +27,12 @@ class ServiceRegistryTestCase(unittest.TestCase):
         store.register_service(url=self.service['url'], name=self.service['name'])
 
         collection_mock.insert_one.assert_called_with(self.service)
+
+    def test_register_service_with_special_name(self):
+        collection_mock = mock.Mock(spec=["insert_one", "find_one"])
+        collection_mock.find_one.return_value = None
+        
+        store = ServiceRegistry(collection=collection_mock)
+        store.register_service(url="http://wonderload", name="A special Name")
+
+        collection_mock.insert_one.assert_called_with({'url': 'http://wonderload', 'type': 'wps', 'name': 'a_special_name'})

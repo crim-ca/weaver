@@ -42,7 +42,8 @@ class ServiceRegistry(object):
         # check if service is already registered
         service = self.collection.find_one({'url': service_url})
         if service is None:
-            if name is None or len(name.strip()) < 3:
+            name = namesgenerator.get_sane_name(name)
+            if name is None:
                 name = namesgenerator.get_random_name()
                 if not self.collection.find_one({'name': name}) is None:
                     name = namesgenerator.get_random_name(retry=True)
