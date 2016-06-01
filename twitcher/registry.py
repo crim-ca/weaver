@@ -79,7 +79,7 @@ class ServiceRegistry(object):
 
     def get_service(self, name):
         """
-        Get service url and proxy_url for given ``name`` from registry database.
+        Get service for given ``name`` from registry database.
         """
         service = self.collection.find_one({'name': name})
         if service is None:
@@ -88,6 +88,15 @@ class ServiceRegistry(object):
             raise ValueError('service has no url')
         return dict(url=service.get('url'), name=name)
 
+
+    def get_service_by_url(self, url):
+        """
+        Get service for given ``url`` from registry database.
+        """
+        service = self.collection.find_one({'url': url})
+        if service is None:
+            raise ValueError('service not found')
+        return dict(name=service.get('name'), url=url)
     
     def clear_services(self):
         """
