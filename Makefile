@@ -1,4 +1,4 @@
-VERSION := 0.2.19
+VERSION := 0.2.20
 RELEASE := master
 
 # Application
@@ -45,7 +45,7 @@ DOCKER_CONTAINER := $(APP_NAME)
 
 # end of configuration
 
-.DEFAULT_GOAL := all
+.DEFAULT_GOAL := help
 
 .PHONY: all
 all: clean install
@@ -56,8 +56,8 @@ all: clean install
 help:
 	@echo "make [target]\n"
 	@echo "targets:\n"
-	@echo "\t all         \t- Does a complete installation. Shortcut for 'make sysinstall clean install.' (Default)"
-	@echo "\t help        \t- Prints this help message."
+	@echo "\t help        \t- Prints this help message. (Default)"
+	@echo "\t all         \t- Does a complete installation. Shortcut for 'make clean install.'"
 	@echo "\t version     \t- Prints version number of this Makefile."
 	@echo "\t info        \t- Prints information about your system."
 	@echo "\t install     \t- Installs your application by running 'bin/buildout -c custom.cfg'."
@@ -65,6 +65,7 @@ help:
 	@echo "\t test        \t- Run tests (but skip long running tests)."
 	@echo "\t testall     \t- Run all tests (including long running tests)."
 	@echo "\t clean       \t- Deletes all files that are created by running buildout."
+	@echo "\t srcclean    \t- Removes all *.pyc files."
 	@echo "\t distclean   \t- Removes *all* files that are not controlled by 'git'.\n\t\t\tWARNING: use it *only* if you know what you do!"
 	@echo "\t sysinstall  \t- Installs system packages from requirements.sh. You can also call 'bash requirements.sh' directly."
 	@echo "\t passwd      \t- Generate password for 'phoenix-password' in custom.cfg."
@@ -207,11 +208,14 @@ build: install
 	@echo "\nPlease use 'make install' instead of 'make build'"
 
 .PHONY: clean
-clean:
+clean: srcclean
 	@echo "Cleaning buildout files ..."
 	@-for i in $(BUILDOUT_FILES); do \
             test -e $$i && rm -v -rf $$i; \
         done
+
+.PHONY: srcclean
+srcclean:
 	@echo "Removing *.pyc files ..."
 	@-find $(APP_ROOT) -type f -name "*.pyc" -print0 | xargs -0r rm
 
