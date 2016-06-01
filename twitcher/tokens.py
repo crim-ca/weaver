@@ -1,12 +1,12 @@
 """
 Classes to manage access tokens used in the security middleware.
 
-The implementation is based on `python-oauth2 <http://python-oauth2.readthedocs.org/>`_
+The implementation is based on `python-oauth2 <http://python-oauth2.readthedocs.io/en/latest/>`_
 
 See access token examples:
 
 * https://www.mapbox.com/developers/api/
-* http://python-oauth2.readthedocs.org/en/latest/store.html
+* http://python-oauth2.readthedocs.io/en/latest/store.html
 """
 
 import uuid
@@ -122,7 +122,6 @@ class UuidGenerator(AccessTokenGenerator):
     def generate(self):
         """
         :return: A new token
-        :rtype: str
         """
         return uuid.uuid4().get_hex()
 

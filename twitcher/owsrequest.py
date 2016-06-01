@@ -1,8 +1,8 @@
 """
 The OWSRequest is based on pywps code:
 
-* https://github.com/geopython/PyWPS/tree/master/pywps/Parser
-* https://github.com/jachym/pywps-4/blob/master/pywps/app/WPSRequest.py
+* https://github.com/geopython/pywps/tree/pywps-3.2/pywps/Parser
+* https://github.com/geopython/pywps/blob/master/pywps/app/WPSRequest.py
 """
 
 import lxml.etree
