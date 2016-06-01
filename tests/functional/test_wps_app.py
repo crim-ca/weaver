@@ -33,8 +33,22 @@ class WpsAppTest(unittest.TestCase):
         resp.mustcontain('</wps:Capabilities>')
 
     @attr('online')
+    def test_getcaps_with_invalid_token(self):
+        resp = self.app.get('/ows/wps?service=wps&request=getcapabilities&access_token=invalid')
+        assert resp.status_code == 200
+        assert resp.content_type == 'text/xml'
+        resp.mustcontain('</wps:Capabilities>')
+
+    @attr('online')
     def test_describeprocess(self):
         resp = self.app.get('/ows/wps?service=wps&request=describeprocess&version=1.0.0&identifier=dummyprocess')
+        assert resp.status_code == 200
+        assert resp.content_type == 'text/xml'
+        resp.mustcontain('</wps:ProcessDescriptions>')
+
+    @attr('online')
+    def test_describeprocess_with_invalid_token(self):
+        resp = self.app.get('/ows/wps?service=wps&request=describeprocess&version=1.0.0&identifier=dummyprocess&access_token=invalid')
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
         resp.mustcontain('</wps:ProcessDescriptions>')
