@@ -11,8 +11,7 @@ test_reqs = [line.strip() for line in open('requirements/tests.txt')]
 setup(name='pyramid_twitcher',
       version='0.1.6',
       description='Security Proxy for OGC Services like WPS.',
-      #long_description=README + '\n\n' + CHANGES,
-      long_description=README,
+      long_description=README + '\n\n' + CHANGES,
       classifiers=[
         "Programming Language :: Python",
         "Framework :: Pyramid",
@@ -30,7 +29,6 @@ setup(name='pyramid_twitcher',
       zip_safe=False,
       test_suite='twitcher',
       install_requires=reqs,
-      test_require=test_reqs,
       entry_points="""\
       [paste.app_factory]
       main = twitcher:main
