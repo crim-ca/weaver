@@ -6,11 +6,6 @@ Twitcher: A simple OWS Security Proxy
    :target: https://travis-ci.org/bird-house/twitcher
    :alt: Travis Build
 
-.. _introduction:
-
-Introduction
-============
-
 Twitcher (the bird-watcher)
   *a birdwatcher mainly interested in catching sight of rare birds.* (`Leo <https://dict.leo.org/ende/index_en.html>`_).
 
@@ -22,11 +17,8 @@ Twitcher is a **prototype** implemented in Python with the `Pyramid`_ web framew
 
 Twitcher is part of the `Birdhouse`_ project. The documentation is on `ReadTheDocs`_.
 
-Contents
---------
-
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    overview
    installation
