@@ -4,7 +4,7 @@ pyramid_beaker
 webob
 paste
 pastedeploy
+requests
 pymongo
-httplib2
 argcomplete
 pywps

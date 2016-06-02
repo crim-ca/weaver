@@ -30,6 +30,7 @@ dependencies:
 - pywps=3.2.5=py27_4
 - readline=6.2=2
 - repoze.lru=0.6=py27_0
+- requests=2.10.0=py27_0
 - setuptools=21.2.1=py27_0
 - six=1.10.0=py27_0
 - sqlite=3.13.0=0
@@ -46,6 +47,5 @@ dependencies:
 - pip:
   - beaker==1.8.0
   - beautifulsoup4==4.3.2
-  - httplib2==0.9.2
   - pyramid-beaker==0.8
   - pyramid-rpc==0.7.2
