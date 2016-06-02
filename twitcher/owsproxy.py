@@ -3,7 +3,7 @@ The owsproxy is based on `papyrus_ogcproxy <https://github.com/elemoine/papyrus_
 """
 
 import urllib
-from httplib2 import Http
+import requests
 
 from pyramid.view import view_config
 from pyramid.httpexceptions import HTTPBadRequest, HTTPBadGateway, HTTPNotAcceptable, HTTPForbidden
@@ -35,27 +35,36 @@ def _send_request(request, service):
     url = service['url'] + '?' + urllib.urlencode(request.params)
 
     # forward request to target (without Host Header)
-    http = Http(disable_ssl_certificate_validation=True)
     h = dict(request.headers)
     h.pop("Host", h)
+    resp = None
     try:
-        resp, content = http.request(url, method=request.method, body=request.body, headers=h)
-    except:
-        return HTTPBadGateway()
+        resp = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h)
+    except Exception, e:
+        return HTTPBadGateway(e.message)
+
+    if resp.ok == False:
+        return HTTPBadGateway(resp.reason)
 
     # check for allowed content types
-    if resp.has_key("content-type"):
-        ct = resp["content-type"]
+    ct = None
+    if "Content-Type" in resp.headers:
+        ct = resp.headers["Content-Type"]
         if not ct.split(";")[0] in allowed_content_types:
             return OWSAccessForbidden()
     else:
         return HTTPNotAcceptable()
 
-    # replace urls in xml content
-    if 'xml' in ct:
-        content = content.replace(service['url'], proxy_url(request, service['name']))
+    content = None
+    try:
+        content = resp.content.decode('utf-8', 'ignore')
+        # replace urls in xml content
+        if ct in ['text/xml', 'application/xml']:
+            content = content.replace(service['url'], proxy_url(request, service['name']))
+    except:
+        return HTTPNotAcceptable("Could not decode content.")
 
-    return Response(content, status=resp.status, headers={"Content-Type": ct})
+    return Response(content, status=resp.status_code, headers={"Content-Type": ct})
 
 def owsproxy_view(request):
     """
