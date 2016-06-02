@@ -19,6 +19,14 @@ def update_with_proxy_url(request, services):
         service['proxy_url'] = proxy_url(request, service['name'])
     return services
 
+def service_name_of_proxy_url(proxy_url):
+    from urlparse import urlparse
+    parsed_url = urlparse(proxy_url)
+    service_name = None
+    if parsed_url.path.startswith("/ows/proxy"):
+        service_name = parsed_url.path.strip('/').split('/')[2]
+    return service_name
+
 
 def service_registry_factory(registry):
     db = mongodb(registry)
