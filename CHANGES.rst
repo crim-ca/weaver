@@ -8,7 +8,9 @@ Changes
 * renamed python package to pyramid_twitcher.
 * conda envionment.yml added.
 * using get_sane_name().
+* replaced httplib2 by requests.
 * fixed: don't check token for allowed requests (#14).
+* fixed: decoding errors of response content (#13).
 
 0.1.5 (2016-04-22)
 ==================
