@@ -9,7 +9,7 @@ reqs = [line.strip() for line in open('requirements/deploy.txt')]
 test_reqs = [line.strip() for line in open('requirements/tests.txt')]
 
 setup(name='pyramid_twitcher',
-      version='0.1.6',
+      version='0.1.7',
       description='Security Proxy for OGC Services like WPS.',
       long_description=README + '\n\n' + CHANGES,
       classifiers=[
