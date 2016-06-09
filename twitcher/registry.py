@@ -58,7 +58,7 @@ class ServiceRegistry(object):
             service = dict(url=service_url, name=name, type=service_type)
             if self.collection.find_one({'name': name}):
                 logging.info("update registered service %s." % (name))
-                self.collection.update_one({'name': name}, service)
+                self.collection.update_one({'name': name}, {'$set': service})
             else:
                 self.collection.insert_one(service)
             service = self.collection.find_one({'name': service['name']})
