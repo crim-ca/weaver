@@ -1,4 +1,3 @@
-from nose.tools import ok_, assert_raises
 import unittest
 import mock
 
@@ -17,7 +16,7 @@ class ServiceRegistryTestCase(unittest.TestCase):
         service = registry.get_service(name=self.service['name'])
 
         collection_mock.find_one.assert_called_with({"name": self.service['name']})
-        ok_(isinstance(service, dict))
+        assert isinstance(service, dict)
 
     def test_register_service_default(self):
         collection_mock = mock.Mock(spec=["insert_one", "find_one"])
