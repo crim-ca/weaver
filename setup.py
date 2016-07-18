@@ -6,7 +6,6 @@ README = open(os.path.join(here, 'README.rst')).read()
 CHANGES = open(os.path.join(here, 'CHANGES.rst')).read()
 
 reqs = [line.strip() for line in open('requirements/deploy.txt')]
-test_reqs = [line.strip() for line in open('requirements/tests.txt')]
 
 setup(name='pyramid_twitcher',
       version='0.2.0',

@@ -1,5 +1,4 @@
 include *.rst *.txt
 graft twitcher 
-graft tests
 graft requirements 
 global-exclude *.pyc *.*~
