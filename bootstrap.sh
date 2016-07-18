@@ -7,8 +7,6 @@ usage() {
     Options:
         -h   - Print this help message.
         -i   - Installs required system packages for Birdhouse build. You *need* 'sudo' priviliges!"
-        -u   - Updates Makefile for Birdhouse build. Python needs to be installed."
-        -b   - Both system packages will be installed (-i) and Makefile will be updated (-u). Default."
 EOT
     exit 1
 }
@@ -30,7 +28,7 @@ install_pkgs() {
     elif [ -f /etc/redhat-release ] ; then
         echo "Install CentOS packages for Birdhouse build ..."
         sudo yum update -y && sudo yum install -y epel-release wget curl gcc-c++ make tar bzip2 unzip
-      	# xlibs used by cairo
+        # xlibs used by cairo
         sudo yum install -y libXrender libXext libX11
         sudo yum install -y vim-common  # anaconda needs xxd
     elif [ `uname -s` = "Darwin" ] ; then
@@ -39,20 +37,11 @@ install_pkgs() {
     fi
 }
 
-fetch_makefile() {
-    echo "Fetching current Makefile for Birdhouse build ..."
-    python -c 'import urllib; print urllib.urlopen("https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/master/Makefile").read()' > Makefile
-}
-
 bootstrap() {
     echo "Bootstrapping ..."
 
     if [ $# -eq 0 ] || [ $1 = '-b' ] || [ $1 = '-i' ]; then
         install_pkgs
-    fi
-
-    if [ $# -eq 0 ] || [ $1 = '-b' ] || [ $1 = '-u' ]; then
-        fetch_makefile
     fi
 
     echo "Bootstrapping done"
@@ -69,7 +58,7 @@ if [ $# -gt 0 ] && [ $1 = '-h' ]; then
     usage
 fi
 
-if [ $# -eq 0 ] || [ $1 = '-b' ] || [ $1 = '-i' ] || [ $1 = '-u' ]; then
+if [ $# -eq 0 ] || [ $1 = '-b' ] || [ $1 = '-i' ]; then
     bootstrap $@
 else
     echo -e "Unknown option: $1.\n"
