@@ -109,7 +109,7 @@ class ServiceRegistry(object):
         Get service for given ``url`` from registry database.
         """
         service = self.collection.find_one({'url': url})
-        if service is None:
+        if not service:
             raise ValueError('service not found')
         return dict(name=service.get('name'), url=url)
 
