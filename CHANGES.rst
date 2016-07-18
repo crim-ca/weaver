@@ -1,6 +1,12 @@
 Changes
 *******
 
+0.2.0 (2016-07-18)
+==================
+
+* updated to new buildout with seperated conda environment.
+* replaced nose by pytest.
+
 0.1.7 (2016-06-09)
 ==================
 
