@@ -20,15 +20,15 @@ Install twitcher as normal user from GitHub sources:
 
    $ git clone https://github.com/bird-house/twitcher.git
    $ cd twitcher
-   $ make install
+   $ make clean install
    $ make test
 
-The installation process setups a conda environment named birdhouse. All additional packages and configuration files are going into this conda environment. The location is ``~/.conda/envs/birdhouse``.
+The installation process setups a conda environment named *twitcher* with all dependent conda (and pip) packages. The installation folder (for configuration files, database etc) is by default ``~/birdhouse``. Configuration options can be overriden in the buildout ``custom.cfg`` file.
 
 Starting Twitcher Service
 =========================
 
-Twitcher is run in the `Gunicorn <http://gunicorn.org/>`_ WSGI application server behind the `Nginx <http://nginx.org/>`_ HTTP server. Starting/Stopping the services is controlled by `Supervisor <http://supervisord.org/>`_. This is described in the `Birdhouse documenation <http://birdhouse.readthedocs.io/en/latest/installation.html#nginx-gunicorn-and-supervisor>`_.
+Twitcher is run as `Gunicorn <http://gunicorn.org/>`_ WSGI application server behind the `Nginx <http://nginx.org/>`_ HTTP server. Starting/Stopping the services is controlled by `Supervisor <http://supervisord.org/>`_. This is described in the `Birdhouse documenation <http://birdhouse.readthedocs.io/en/latest/installation.html#nginx-gunicorn-and-supervisor>`_.
 
 Start the twitcher service (using supervisor):
 
