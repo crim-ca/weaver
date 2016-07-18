@@ -12,7 +12,7 @@ install:
   - make install
   - make start
 before_script:
-  - sleep 15
+  - sleep 5
 script:
 #  - make docs
   - make testall
