@@ -309,19 +309,19 @@ texinfo_documents = [
 # Example configuration for intersphinx: refer to the Python standard library.
 #intersphinx_mapping = {'https://docs.python.org/': None}
 intersphinx_mapping = {'python': ('http://docs.python.org/', None),
-                       'phoenix': ('http://pyramid-phoenix.readthedocs.org/en/latest/', None),
-                       'malleefowl': ('http://malleefowl.readthedocs.org/en/latest/', None),
-                       'twitcher': ('http://twitcher.readthedocs.org/en/latest/', None),
-                       'flyingpigeon': ('http://flyingpigeon.readthedocs.org/en/latest/', None),
-                       'hummingbird': ('http://birdhouse-hummingbird.readthedocs.org/en/latest/', None),
-                       'emu': ('http://emu.readthedocs.org/en/latest/', None),
-                       'birdy': ('http://birdy.readthedocs.org/en/latest/', None),
-                       'bootstrap': ('http://birdhousebuilderbootstrap.readthedocs.org/en/latest/', None),
+                       'phoenix': ('http://pyramid-phoenix.readthedocs.io/en/latest/', None),
+                       'malleefowl': ('http://malleefowl.readthedocs.io/en/latest/', None),
+                       'twitcher': ('http://twitcher.readthedocs.io/en/latest/', None),
+                       'flyingpigeon': ('http://flyingpigeon.readthedocs.io/en/latest/', None),
+                       'hummingbird': ('http://birdhouse-hummingbird.readthedocs.io/en/latest/', None),
+                       'emu': ('http://emu.readthedocs.io/en/latest/', None),
+                       'birdy': ('http://birdy.readthedocs.io/en/latest/', None),
+                       'bootstrap': ('http://birdhousebuilderbootstrap.readthedocs.io/en/latest/', None),
                         }
 
 # linkcheck options
 # http://www.sphinx-doc.org/en/stable/config.html?highlight=linkchecker#options-for-the-linkcheck-builder
-linkcheck_ignore = [r'http[s]*://localhost.*/']
+linkcheck_ignore = [r'http[s]*://localhost.*/', 'https://mouflon.dkrz.de/', 'https://esgf-data.dkrz.de/']
 linkcheck_timeout = 5
 
 # Link references always present on RST page.
@@ -331,5 +331,18 @@ rst_epilog = """
 .. _Read the Docs: https://readthedocs.org
 .. _Anaconda: https://www.continuum.io/
 .. _Buildout: http://www.buildout.org/en/latest/ 
+.. _Birdhouse: http://birdhouse.readthedocs.io/en/latest/
+.. _Phoenix: http://pyramid-phoenix.readthedocs.io/en/latest/
+.. _Malleefowl: http://malleefowl.readthedocs.io/en/latest/
+.. _Twitcher: http://twitcher.readthedocs.io/en/latest/
+.. _Flyingpigeon: http://flyingpigeon.readthedocs.io/en/latest/
+.. _Hummingbird: http://birdhouse-hummingbird.readthedocs.io/en/latest/
+.. _Emu: http://emu.readthedocs.io/en/latest/
+.. _Birdy: http://birdy.readthedocs.io/en/latest/
+.. _Bootstrap: http://birdhousebuilderbootstrap.readthedocs.io/en/latest/
+.. _icclim: http://icclim.readthedocs.io/en/latest/
+.. _PyWPS: http://pywps.org/
+.. _dispel4py: https://github.com/dispel4py/dispel4py
+.. _esgf-pyclient: https://github.com/ESGF/esgf-pyclient
 """
 
