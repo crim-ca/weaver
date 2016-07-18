@@ -49,19 +49,25 @@ class ServiceRegistry(object):
         service_url = baseurl(url)
         # check if service is already registered
         service = self.collection.find_one({'url': service_url})
-        if service is None:
+        if service:
+            update_service = dict(public=public)
+            logging.debug(service)
+            logging.info("update registered service %s." % (service['name']))
+            self.collection.update_one({'url': service['url']}, {'$set': update_service})
+            service = self.collection.find_one({'url': service['url']})
+        else:
             name = namesgenerator.get_sane_name(name)
-            if name is None:
+            if not name:
                 name = namesgenerator.get_random_name()
                 if not self.collection.find_one({'name': name}) is None:
                     name = namesgenerator.get_random_name(retry=True)
-            service = dict(url=service_url, name=name, type=service_type, public=public)
+            update_service = dict(url=service_url, name=name, type=service_type, public=public)
             if self.collection.find_one({'name': name}):
                 logging.info("update registered service %s." % (name))
-                self.collection.update_one({'name': name}, {'$set': service})
+                self.collection.update_one({'name': name}, {'$set': update_service})
             else:
                 self.collection.insert_one(service)
-            service = self.collection.find_one({'name': service['name']})
+            service = self.collection.find_one({'name': update_service['name']})
         return service
 
 
@@ -81,7 +87,8 @@ class ServiceRegistry(object):
             my_services.append({
                 'name': service['name'],
                 'type': service['type'],
-                'url': service['url']})
+                'url': service['url'],
+                'public': service.get('public', False)})
         return my_services
 
 
@@ -94,7 +101,7 @@ class ServiceRegistry(object):
             raise ValueError('service not found')
         if not 'url' in service:
             raise ValueError('service has no url')
-        return dict(url=service.get('url'), name=name)
+        return dict(url=service.get('url'), name=name, public=service.get('public', False))
 
 
     def get_service_by_url(self, url):
@@ -105,6 +112,10 @@ class ServiceRegistry(object):
         if service is None:
             raise ValueError('service not found')
         return dict(name=service.get('name'), url=url)
+
+    def is_public(self, name):
+        service = self.get_service(name)
+        return service.get('public', False)
     
     def clear_services(self):
         """

@@ -2,6 +2,8 @@ from twitcher.exceptions import AccessTokenNotFound
 from twitcher.owsexceptions import OWSAccessForbidden, OWSInvalidParameterValue
 from twitcher.utils import path_elements
 from twitcher.tokens import tokenstore_factory
+from twitcher.registry import service_registry_factory
+from twitcher.registry import service_name_of_proxy_url
 from twitcher.owsrequest import OWSRequest
 
 
@@ -10,13 +12,14 @@ allowed_request_types = ('getcapabilities', 'describeprocess')
 protected_path = '/ows/'
 
 def owssecurity_factory(registry):
-    return OWSSecurity(tokenstore_factory(registry))
+    return OWSSecurity(tokenstore_factory(registry), service_registry_factory(registry))
 
 
 class OWSSecurity(object):
 
-    def __init__(self, tokenstore):
+    def __init__(self, tokenstore, service_registry):
         self.tokenstore = tokenstore
+        self.service_registry = service_registry
 
     
     def get_token_param(self, request):
@@ -30,26 +33,28 @@ class OWSSecurity(object):
             if len(elements) > 1: # there is always /ows/
                 token = elements[-1]   # last path element
         return token
-
-    
+  
     def check_request(self, request):
         if request.path.startswith(protected_path):
             ows_request = OWSRequest(request)
             if not ows_request.service in allowed_service_types:
                 raise OWSInvalidParameterValue(
                     "service %s not supported" % ows_request.service, value="service")
-            if not ows_request.request in allowed_request_types:
-                try:
-                    token = self.get_token_param(request)
-                    access_token = self.tokenstore.fetch_by_token(token)
-                    if not access_token:
-                        raise AccessTokenNotFound()
-                    elif access_token.is_expired():
-                        raise OWSAccessForbidden("Access token is expired.")
-                    # update request with user environ from access token
-                    request.environ.update( access_token.user_environ )
-                except AccessTokenNotFound:
-                    raise OWSAccessForbidden("Access token is required to access this service.")
+
+            service_name = service_name_of_proxy_url(request.path)
+            if not self.service_registry.is_public(service_name):
+                if not ows_request.request in allowed_request_types:
+                    try:
+                        token = self.get_token_param(request)
+                        access_token = self.tokenstore.fetch_by_token(token)
+                        if not access_token:
+                            raise AccessTokenNotFound()
+                        elif access_token.is_expired():
+                            raise OWSAccessForbidden("Access token is expired.")
+                        # update request with user environ from access token
+                        request.environ.update( access_token.user_environ )
+                    except AccessTokenNotFound:
+                        raise OWSAccessForbidden("Access token is required to access this service.")
             
                 
         
