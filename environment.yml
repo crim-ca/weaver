@@ -2,50 +2,30 @@ name: twitcher
 channels:
 - birdhouse
 dependencies:
-- argcomplete=1.0.0=py27_1
-- beautiful-soup=4.3.2=py27_0
-- curl=7.45.0=0
-- funcsigs=1.0.2=py27_0
-- gdal=1.11.2=np19py27_3
-- hdf5=1.8.15.1=2
-- htmltmpl=1.22=py27_1
-- libgdal=1.11.2=2
-- libnetcdf=4.3.3.1=3
-- libxml2=2.9.2=0
-- libxslt=1.1.28=0
-- lxml=3.6.0=py27_0
-- mkl=11.3.3=0
-- mock=2.0.0=py27_0
-- nose=1.3.7=py27_1
-- numpy=1.9.3=py27_3
-- openssl=1.0.2h=0
-- paste=1.7.5.1=py27_0
-- pastedeploy=1.5.2=py27_1
-- pbr=1.8.0=py27_0
-- pip=8.1.1=py27_1
-- pymongo=3.0.3=py27_0
-- pyramid=1.5.7=py27_0
-- python=2.7.11=0
-- python-magic=0.4.6=py27_1
-- pywps=3.2.5=py27_4
-- readline=6.2=2
-- repoze.lru=0.6=py27_0
-- requests=2.10.0=py27_0
-- setuptools=21.2.1=py27_0
-- six=1.10.0=py27_0
-- sqlite=3.13.0=0
-- tk=8.5.18=0
-- translationstring=1.3=py27_0
-- venusian=1.0=py27_0
-- waitress=0.8.9=py27_0
-- webob=1.4.1=py27_0
-- webtest=2.0.18=py27_0
-- wheel=0.29.0=py27_0
-- zlib=1.2.8=3
-- zope.deprecation=4.1.2=py27_0
-- zope.interface=4.1.2=py27_1
+- argcomplete
+- beautiful-soup
+- cryptography
+- curl
+- gdal
+- gunicorn
+- ipython
+- lxml
+- mako
+- mock
+- nginx
+- nose
+- openssl
+- paste
+- pastedeploy
+- pymongo=3
+- pyopenssl
+- pytest
+- pywps
+- pyyaml
+- requests
+- supervisor
+- sphinx
 - pip:
-  - beaker==1.8.0
-  - beautifulsoup4==4.3.2
-  - pyramid-beaker==0.8
-  - pyramid-rpc==0.7.2
+  - beaker
+  - pyramid-beaker
+  - pyramid-rpc
