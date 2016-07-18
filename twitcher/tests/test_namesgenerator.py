@@ -1,5 +1,3 @@
-from nose.tools import assert_equals
-
 from twitcher.utils.namesgenerator import get_random_name
 from twitcher.utils.namesgenerator import get_sane_name 
 

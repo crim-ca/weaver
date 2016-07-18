@@ -1,4 +1,4 @@
-from nose.tools import ok_, assert_raises
+import pytest
 import unittest
 import mock
 
@@ -21,14 +21,14 @@ class OWSSecurityTestCase(unittest.TestCase):
         params = dict(request="Execute", service="WPS", access_token="abcdef")
         request = DummyRequest(params=params)
         token = self.security.get_token_param(request)
-        ok_(token == "abcdef")
+        assert token == "abcdef"
 
 
     def test_get_token_by_path(self):
         params = dict(request="Execute", service="WPS")
         request = DummyRequest(params=params, path="/ows/emu/12345")
         token = self.security.get_token_param(request)
-        ok_(token == "12345")
+        assert token == "12345"
 
 
     def test_get_token_by_header(self):
@@ -36,7 +36,7 @@ class OWSSecurityTestCase(unittest.TestCase):
         headers = {'Access-Token': '54321'}
         request = DummyRequest(params=params, headers=headers)
         token = self.security.get_token_param(request)
-        ok_(token == "54321")
+        assert token == "54321"
 
 
     def test_check_request(self):
@@ -52,7 +52,7 @@ class OWSSecurityTestCase(unittest.TestCase):
         
         params = dict(request="Execute", service="WPS", version="1.0.0", access_token="xyz")
         request = DummyRequest(params=params, path='/ows/emu')
-        with assert_raises(OWSAccessForbidden):
+        with pytest.raises(OWSAccessForbidden) as e_info:
             security.check_request(request)
 
 

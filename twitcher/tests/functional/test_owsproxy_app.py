@@ -1,9 +1,8 @@
+import pytest
 import unittest
-from nose.plugins.attrib import attr
-from nose import SkipTest
 from webtest import TestApp
 from pyramid import testing
-from tests.functional.common import setup_with_db, setup_tokenstore
+from .common import setup_with_db, setup_tokenstore
 
 from twitcher.registry import service_registry_factory
 
@@ -26,25 +25,25 @@ class OWSProxyAppTest(unittest.TestCase):
         url = "https://localhost:38083/ows/wps"
         registry.register_service(url=url, name="twitcher")
 
-    @attr('online')
+    @pytest.mark.skip(reason="no way of currently testing this")
+    @pytest.mark.online
     def test_getcaps(self):
-        raise SkipTest
         resp = self.app.get('/ows/proxy/twitcher?service=wps&request=getcapabilities')
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
         resp.mustcontain('</wps:Capabilities>')
 
-    @attr('online')
+    @pytest.mark.skip(reason="no way of currently testing this")
+    @pytest.mark.online
     def test_describeprocess(self):
-        raise SkipTest
         resp = self.app.get('/ows/proxy/twitcher?service=wps&request=describeprocess&version=1.0.0&identifier=dummyprocess')
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
         resp.mustcontain('</wps:ProcessDescriptions>')
 
-    @attr('online')
+    @pytest.mark.skip(reason="no way of currently testing this")
+    @pytest.mark.online
     def test_execute_not_allowed(self):
-        raise SkipTest
         resp = self.app.get('/ows/proxy/twitcher?service=wps&request=execute&version=1.0.0&identifier=dummyprocess')
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'

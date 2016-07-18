@@ -7,16 +7,13 @@ pyramid testing:
 """
 
 import unittest
-import mock
-from nose import SkipTest
-from nose.plugins.attrib import attr
 
 from pyramid.httpexceptions import HTTPBadRequest
 from pyramid import testing
 from pyramid.testing import DummyRequest
 
+from twitcher import owsproxy
 from twitcher.owsproxy import owsproxy_view
-
 
 class OWSProxyTests(unittest.TestCase):
     def setUp(self):
@@ -24,19 +21,18 @@ class OWSProxyTests(unittest.TestCase):
 
     def tearDown(self):
         testing.tearDown()
-        from twitcher import owsproxy
         owsproxy.allowed_hosts = ()
 
     def test_badrequest_url(self):
         request = DummyRequest(scheme='http')
         response = owsproxy_view(request)
-        self.assertTrue(isinstance(response, HTTPBadRequest))
+        assert isinstance(response, HTTPBadRequest) == True
 
     def test_badrequest_netloc(self):
         request = DummyRequest(scheme='http',
                                params={'url': 'http://'})
         response = owsproxy_view(request)
-        self.assertTrue(isinstance(response, HTTPBadRequest))
+        assert isinstance(response, HTTPBadRequest) == True
 
    
 

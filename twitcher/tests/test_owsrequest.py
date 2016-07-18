@@ -1,4 +1,4 @@
-from nose.tools import ok_, assert_raises
+import pytest
 import unittest
 import mock
 
@@ -22,53 +22,53 @@ class OWSRequestTestCase(unittest.TestCase):
         params = dict(request="GetCapabilities", service="WPS")
         request = DummyRequest(params=params)
         ows_req = OWSRequest(request)
-        ok_(ows_req.request == 'getcapabilities')
-        ok_(ows_req.service == 'wps')
+        assert ows_req.request == 'getcapabilities'
+        assert ows_req.service == 'wps'
 
         
     def test_get_describeprocess_request(self):
         params = dict(request="DescribeProcess", service="wps", version="1.0.0")
         request = DummyRequest(params=params)
         ows_req = OWSRequest(request)
-        ok_(ows_req.request == 'describeprocess')
-        ok_(ows_req.service == 'wps')
-        ok_(ows_req.version == '1.0.0')
+        assert ows_req.request == 'describeprocess'
+        assert ows_req.service == 'wps'
+        assert ows_req.version == '1.0.0'
 
 
     def test_get_execute_request(self):
         params = dict(request="execute", service="Wps", version="1.0.0")
         request = DummyRequest(params=params)
         ows_req = OWSRequest(request)
-        ok_(ows_req.request == 'execute')
-        ok_(ows_req.service == 'wps')
-        ok_(ows_req.version == '1.0.0')
+        assert ows_req.request == 'execute'
+        assert ows_req.service == 'wps'
+        assert ows_req.version == '1.0.0'
 
 
     def test_get_false_request(self):
         params = dict(request="tellmemore", service="Wps", version="1.0.0")
         request = DummyRequest(params=params)
-        with assert_raises(OWSInvalidParameterValue):
+        with pytest.raises(OWSInvalidParameterValue) as e_info:
             ows_req = OWSRequest(request)
 
             
     def test_get_missing_request(self):
         params = dict(service="wps", version="1.0.0")
         request = DummyRequest(params=params)
-        with assert_raises(OWSMissingParameterValue):
+        with pytest.raises(OWSMissingParameterValue) as e_info:
             ows_req = OWSRequest(request)
 
             
     def test_get_false_service(self):
         params = dict(request="execute", service="ATM", version="1.0.0")
         request = DummyRequest(params=params)
-        with assert_raises(OWSInvalidParameterValue):
+        with pytest.raises(OWSInvalidParameterValue) as e_info:
             ows_req = OWSRequest(request)
 
 
     def test_get_missing_service(self):
         params = dict(request="Execute", version="1.0.0")
         request = DummyRequest(params=params)
-        with assert_raises(OWSMissingParameterValue):
+        with pytest.raises(OWSMissingParameterValue) as e_info:
             ows_req = OWSRequest(request)
 
 
@@ -77,15 +77,15 @@ class OWSRequestTestCase(unittest.TestCase):
         request.body = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
         <GetCapabilities service="WPS" acceptVersions="1.0.0" language="en-CA"/>"""
         ows_req = OWSRequest(request)
-        ok_(ows_req.request == 'getcapabilities')
-        ok_(ows_req.service == 'wps')
+        assert ows_req.request == 'getcapabilities'
+        assert ows_req.service == 'wps'
 
 
     def test_post_false_request(self):
         request = DummyRequest(post={})
         request.body = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
         <MyCaps service="WPS" acceptVersions="1.0.0" language="en-CA"/>"""
-        with assert_raises(OWSInvalidParameterValue):
+        with pytest.raises(OWSInvalidParameterValue) as e_info:
             ows_req = OWSRequest(request)
 
 
@@ -93,7 +93,7 @@ class OWSRequestTestCase(unittest.TestCase):
         request = DummyRequest(post={})
         request.body = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
         <GetCapabilities service="ATM" acceptVersions="1.0.0" language="en-CA"/>"""
-        with assert_raises(OWSInvalidParameterValue):
+        with pytest.raises(OWSInvalidParameterValue) as e_info:
             ows_req = OWSRequest(request)
 
         
@@ -105,9 +105,9 @@ class OWSRequestTestCase(unittest.TestCase):
           <ows:Identifier>union</ows:Identifier>
         </DescribeProcess>""" 
         ows_req = OWSRequest(request)
-        ok_(ows_req.request == 'describeprocess')
-        ok_(ows_req.service == 'wps')
-        ok_(ows_req.version == '1.0.0')
+        assert ows_req.request == 'describeprocess'
+        assert ows_req.service == 'wps'
+        assert ows_req.version == '1.0.0'
         
 
     def test_post_execute_request(self):
@@ -140,8 +140,8 @@ class OWSRequestTestCase(unittest.TestCase):
     </wps:ResponseForm>
 </wps:Execute>"""
         ows_req = OWSRequest(request)
-        ok_(ows_req.request == 'execute')
-        ok_(ows_req.service == 'wps')
-        ok_(ows_req.version == '1.0.0')
+        assert ows_req.request == 'execute'
+        assert ows_req.service == 'wps'
+        assert ows_req.version == '1.0.0'
 
         
