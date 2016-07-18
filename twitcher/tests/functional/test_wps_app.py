@@ -1,7 +1,7 @@
 """
 Based on tests from:
 
-* https://github.com/jachym/pywps-4/tree/master/tests
+* https://github.com/geopython/pywps/tree/master/tests
 * https://github.com/mmerickel/pyramid_services/tree/master/pyramid_services/tests
 * http://webtest.pythonpaste.org/en/latest/
 * http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/testing.html

@@ -20,7 +20,7 @@ OWS Proxies:
 
 Other Proxies:
 
-* http://mapproxy.org/
+* https://mapproxy.org/
 
 
 Security Filters:
