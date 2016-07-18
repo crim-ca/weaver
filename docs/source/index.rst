@@ -29,5 +29,4 @@ Twitcher is part of the `Birdhouse`_ project. The documentation is on `ReadTheDo
    appendix
 
 .. _Pyramid: http://www.pylonsproject.org
-.. _Birdhouse: http://bird-house.github.io
 .. _ReadTheDocs: http://twitcher.readthedocs.io/en/latest/
