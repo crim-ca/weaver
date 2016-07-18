@@ -25,6 +25,7 @@ dependencies:
 - requests
 - supervisor
 - sphinx
+- webtest
 - pip:
   - beaker
   - pyramid-beaker
