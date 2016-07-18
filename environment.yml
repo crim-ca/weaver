@@ -2,31 +2,46 @@ name: twitcher
 channels:
 - birdhouse
 dependencies:
+- python=2.7.12 
+- setuptools=23.0.0
+- curl=7.49.0 
+- pyopenssl=0.16.0
+- cryptography=1.4
+- mako=1.0.4
+- pyyaml=3.11
+# tests
+- pytest 
+- pytest-pep8 
+- mock
+- webtest
+- nose
+# ipython
+- ipython
+# sphinx
+- sphinx 
+- sphinx_rtd_theme
+# twitcher
 - argcomplete
 - beautiful-soup
-- cryptography
-- curl
-- gdal
-- gunicorn
-- ipython
-- lxml
-- mako
-- mock
-- nginx
-- nose
-- openssl
+- lxml=3.6.0
 - paste
 - pastedeploy
+- requests=2.10.0
+- webob
+# pywps
+- pywps=3.2.6
+- gdal
+# nginx, supervisor
+- nginx=1.10.1
+- supervisor=3.1.3
+- gunicorn=19.1.0
+- gevent=1.1.1
+# mongodb
 - pymongo=3
-- pyopenssl
-- pytest
-- pywps
-- pyyaml
-- requests
-- supervisor
-- sphinx
-- webtest
+- mongodb=2.4.6
 - pip:
+  - genshi==0.7
   - beaker
   - pyramid-beaker
   - pyramid-rpc
+  - sphinx-autoapi==0.4.0
