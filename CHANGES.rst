@@ -6,6 +6,7 @@ Changes
 
 * updated to new buildout with seperated conda environment.
 * replaced nose by pytest.
+* updated installation docs.
 
 0.1.7 (2016-06-09)
 ==================
