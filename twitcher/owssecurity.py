@@ -42,19 +42,20 @@ class OWSSecurity(object):
                     "service %s not supported" % ows_request.service, value="service")
 
             service_name = service_name_of_proxy_url(request.path)
-            if not self.service_registry.is_public(service_name):
-                if not ows_request.request in allowed_request_types:
-                    try:
-                        token = self.get_token_param(request)
-                        access_token = self.tokenstore.fetch_by_token(token)
-                        if not access_token:
-                            raise AccessTokenNotFound()
-                        elif access_token.is_expired():
-                            raise OWSAccessForbidden("Access token is expired.")
-                        # update request with user environ from access token
-                        request.environ.update( access_token.user_environ )
-                    except AccessTokenNotFound:
-                        raise OWSAccessForbidden("Access token is required to access this service.")
+            if service_name and self.service_registry.is_public(service_name):
+                pass
+            elif not ows_request.request in allowed_request_types:
+                try:
+                    token = self.get_token_param(request)
+                    access_token = self.tokenstore.fetch_by_token(token)
+                    if not access_token:
+                        raise AccessTokenNotFound()
+                    elif access_token.is_expired():
+                        raise OWSAccessForbidden("Access token is expired.")
+                    # update request with user environ from access token
+                    request.environ.update( access_token.user_environ )
+                except AccessTokenNotFound:
+                    raise OWSAccessForbidden("Access token is required to access this service.")
             
                 
         
