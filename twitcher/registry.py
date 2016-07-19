@@ -112,8 +112,12 @@ class ServiceRegistry(object):
         return dict(name=service.get('name'), url=url)
 
     def is_public(self, name):
-        service = self.get_service(name)
-        return service.get('public', False)
+        try:
+            service = self.get_service(name)
+            public = service.get('public', False)
+        except:
+            public = False
+        return public
     
     def clear_services(self):
         """
