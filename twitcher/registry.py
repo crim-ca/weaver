@@ -50,10 +50,9 @@ class ServiceRegistry(object):
         # check if service is already registered
         service = self.collection.find_one({'url': service_url})
         if service:
-            update_service = dict(public=public)
-            logging.debug(service)
+            new_service = dict(public=public)
             logging.info("update registered service %s." % (service['name']))
-            self.collection.update_one({'url': service['url']}, {'$set': update_service})
+            self.collection.update_one({'url': service['url']}, {'$set': new_service})
             service = self.collection.find_one({'url': service['url']})
         else:
             name = namesgenerator.get_sane_name(name)
@@ -61,13 +60,12 @@ class ServiceRegistry(object):
                 name = namesgenerator.get_random_name()
                 if not self.collection.find_one({'name': name}) is None:
                     name = namesgenerator.get_random_name(retry=True)
-            update_service = dict(url=service_url, name=name, type=service_type, public=public)
+            service = dict(url=service_url, name=name, type=service_type, public=public)
             if self.collection.find_one({'name': name}):
                 logging.info("update registered service %s." % (name))
-                self.collection.update_one({'name': name}, {'$set': update_service})
+                self.collection.update_one({'name': name}, {'$set': service})
             else:
                 self.collection.insert_one(service)
-            service = self.collection.find_one({'name': update_service['name']})
         return service
 
 
