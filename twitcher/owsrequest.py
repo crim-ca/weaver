@@ -16,9 +16,12 @@ from twitcher.utils import lxml_strip_ns
 import logging
 logger = logging.getLogger(__name__)
 
-allowed_ows_services = ('wps', 'wms', 'wcs', 'wfs')
-allowed_request_types = ('getcapabilities', 'describeprocess', 'execute')
-allowed_versions = ('1.0.0')
+allowed_service_types = ('wps', 'wms')
+allowed_public_request_types = {'wps': ('getcapabilities', 'describeprocess'),
+                                'wms': ('getcapabilities')}
+allowed_request_types = {'wps': ('getcapabilities', 'describeprocess', 'execute'),
+                         'wms': ('getcapabilities', 'getmap')}
+allowed_versions = {'wps': ('1.0.0',), 'wms': ('1.3.0',)}
 
 class OWSRequest(object):
     """
@@ -91,17 +94,17 @@ class Get(OWSParser):
 
     def _get_service(self):
         """Check mandatory service name parameter in GET request."""
-        return self._get_param(param="service", allowed_values=allowed_ows_services)
+        return self._get_param(param="service", allowed_values=allowed_service_types)
 
 
     def _get_request_type(self):
         """Find requested request type in GET request."""
-        return self._get_param(param="request", allowed_values=allowed_request_types)
+        return self._get_param(param="request", allowed_values=allowed_request_types[self.params['service']])
 
 
     def _get_version(self):
         """Find requested version in GET request."""
-        version = self._get_param(param="version", allowed_values=allowed_versions, optional=True)
+        version = self._get_param(param="version", allowed_values=allowed_versions[self.params['service']], optional=True)
         if version is None and self._get_request_type() != "getcapabilities":
             raise OWSMissingParameterValue('Parameter "version" is missing', value="version")
         else:
@@ -125,7 +128,7 @@ class Post(OWSParser):
         """Check mandatory service name parameter in POST request."""
         if "service" in self.document.attrib:
             value = self.document.attrib["service"].lower()
-            if value in allowed_ows_services:
+            if value in allowed_service_types:
                 self.params["service"] = value
             else:
                 raise OWSInvalidParameterValue("Service %s is not supported" % value, value="service")
@@ -137,7 +140,7 @@ class Post(OWSParser):
     def _get_request_type(self):
         """Find requested request type in POST request."""
         value = self.document.tag.lower()
-        if value in allowed_request_types:
+        if value in allowed_request_types[self.params['service']]:
             self.params["request"] = value
         else:
             raise OWSInvalidParameterValue("Request type %s is not supported" % value, value="request")
@@ -148,7 +151,7 @@ class Post(OWSParser):
         """Find requested version in POST request."""
         if "version" in self.document.attrib:
             value = self.document.attrib["version"].lower()
-            if value in allowed_versions:
+            if value in allowed_versions[self.params['service']]:
                 self.params["version"] = value
             else:
                 raise OWSInvalidParameterValue("Version %s is not supported" % value, value="version")
