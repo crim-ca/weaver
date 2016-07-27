@@ -5,9 +5,8 @@ from twitcher.tokens import tokenstore_factory
 from twitcher.registry import service_registry_factory
 from twitcher.registry import service_name_of_proxy_url
 from twitcher.owsrequest import OWSRequest
+from twitcher.owsrequest import allowed_service_types 
 
-
-allowed_service_types = ('wps',)
 allowed_request_types = ('getcapabilities', 'describeprocess')
 protected_path = '/ows/'
 
