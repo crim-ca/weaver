@@ -15,7 +15,7 @@ CPU_ARCH := $(shell uname -m 2>/dev/null || uname -p 2>/dev/null || echo "unknow
 # Python
 SETUPTOOLS_VERSION := 23.0.0
 BUILDOUT_VERSION := 2.5.2
-CONDA_VERSION := 4.1.6
+CONDA_VERSION := 4.1.9
 
 # Anaconda 
 ANACONDA_HOME ?= $(HOME)/anaconda
@@ -41,7 +41,7 @@ endif
 
 # Buildout files and folders
 DOWNLOAD_CACHE := $(APP_ROOT)/downloads
-BUILDOUT_FILES := build dist parts eggs develop-eggs bin .installed.cfg .mr.developer.cfg *.egg-info bootstrap-buildout.py *.bak.* $(DOWNLOAD_CACHE)
+BUILDOUT_FILES := parts eggs develop-eggs bin .installed.cfg .mr.developer.cfg *.egg-info bootstrap-buildout.py *.bak.* $(DOWNLOAD_CACHE)
 
 # Docker
 DOCKER_IMAGE := birdhouse/$(APP_NAME)
