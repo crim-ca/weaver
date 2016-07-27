@@ -48,7 +48,7 @@ def _send_request(request, service):
 
     # check for allowed content types
     ct = None
-    logger.debug("headers=", resp.headers)
+    #logger.debug("headers=", resp.headers)
     if "Content-Type" in resp.headers:
         ct = resp.headers["Content-Type"]
         if not ct.split(";")[0] in allowed_content_types:
@@ -56,18 +56,24 @@ def _send_request(request, service):
     else:
         #return HTTPNotAcceptable("Could not get content type from response.")
         logger.warn("Could not get content type from response")
-        ct = "application/xml"
 
     content = None
     try:
-        content = resp.content.decode('utf-8', 'ignore')
-        # replace urls in xml content
-        if ct in ['text/xml', 'application/xml']:
-            content = content.replace(service['url'], proxy_url(request, service['name']))
+        if ct:
+            content = resp.content.decode('utf-8', 'ignore')
+            # replace urls in xml content
+            if ct in ['text/xml', 'application/xml']:
+                content = content.replace(service['url'], proxy_url(request, service['name']))
+        else:
+            # raw content
+            content = resp.content
     except:
         return HTTPNotAcceptable("Could not decode content.")
 
-    return Response(content, status=resp.status_code, headers={"Content-Type": ct})
+    headers = {}
+    if ct:
+        headers["Content-Type"] = ct
+    return Response(content, status=resp.status_code, headers=headers)
 
 def owsproxy_view(request):
     """
