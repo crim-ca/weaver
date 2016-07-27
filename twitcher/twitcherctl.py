@@ -85,6 +85,8 @@ class TwitcherCtl(object):
         subparser = subparsers.add_parser('register', help="Adds OWS service to the registry to be used by the OWS proxy.")
         subparser.add_argument('url', help="Service url.")
         subparser.add_argument('--name', help="Service name. If not set then a name will be generated.")
+        subparser.add_argument('--type', default='wps', 
+                               help="Service type (wps, wms). Default: wps.")
         subparser.add_argument('--public', action='store_true',
                                help="If set then service has no access restrictions.")
 
@@ -117,9 +119,9 @@ class TwitcherCtl(object):
                 result = server.status()
             elif args.cmd == 'register':
                 if args.name:
-                    result = server.register(args.url, args.name, args.public)
+                    result = server.register(args.url, args.name, args.type, args.public)
                 else:
-                    result = server.register(args.url, None, args.public)
+                    result = server.register(args.url, None, args.type, args.public)
             elif args.cmd == 'unregister':
                 result = server.unregister(args.name)
             elif args.cmd == 'purge':

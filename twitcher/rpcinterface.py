@@ -61,11 +61,11 @@ class RPCInterface(object):
     # service registry
 
     @api_xmlrpc()
-    def register(self, url, name=None, public=False):
+    def register(self, url, name=None, service_type=None, public=False):
         """
         Adds an OWS service with the given ``url`` to the registry.
         """
-        service = self.registry.register_service(url=url, name=name, public=public)
+        service = self.registry.register_service(url=url, name=name, service_type=service_type, public=public)
         return service['name']
 
 
