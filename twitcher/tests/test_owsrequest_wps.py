@@ -9,7 +9,7 @@ from twitcher.owsrequest import OWSRequest
 from twitcher.owsexceptions import OWSInvalidParameterValue, OWSMissingParameterValue
 
 
-class OWSRequestTestCase(unittest.TestCase):
+class OWSRequestWpsTestCase(unittest.TestCase):
     def setUp(self):
         self.config = testing.setUp()
 
