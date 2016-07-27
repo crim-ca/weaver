@@ -17,8 +17,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 allowed_service_types = ('wps', 'wms')
-allowed_public_request_types = {'wps': ('getcapabilities', 'describeprocess'),
-                                'wms': ('getcapabilities')}
+public_request_types = {'wps': ('getcapabilities', 'describeprocess'),
+                        'wms': ('getcapabilities')}
 allowed_request_types = {'wps': ('getcapabilities', 'describeprocess', 'execute'),
                          'wms': ('getcapabilities', 'getmap', 'getfeatureinfo')}
 allowed_versions = {'wps': ('1.0.0',), 'wms': ('1.1.1', '1.3.0',)}
@@ -43,6 +43,12 @@ class OWSRequest(object):
     @property
     def version(self):
         return self.parser.params['version']
+
+    def service_allowed(self):
+        return self.service in allowed_service_types
+
+    def public_access(self):
+        return self.request in public_request_types[self.service]
 
 
 def ows_parser_factory(request):
