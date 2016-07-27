@@ -86,10 +86,9 @@ class OWSParser(object):
 class Get(OWSParser):
 
     def _request_params(self):
-        #TODO: isn't there a request object available in a python lib?
         new_params = {}
         for param in self.request.params:
-            new_params[param.lower()] = self.request.params[param]
+            new_params[param.lower()] = self.request.params.getone(param)
         return new_params
 
     def _get_param(self, param, allowed_values=None, optional=False):
