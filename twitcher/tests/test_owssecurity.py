@@ -30,7 +30,7 @@ class OWSSecurityTestCase(unittest.TestCase):
 
     def test_get_token_by_path(self):
         params = dict(request="Execute", service="WPS")
-        request = DummyRequest(params=params, path="/ows/emu/12345")
+        request = DummyRequest(params=params, path="/ows/proxy/emu/12345")
         token = self.security.get_token_param(request)
         assert token == "12345"
 
@@ -45,7 +45,7 @@ class OWSSecurityTestCase(unittest.TestCase):
 
     def test_check_request(self):
         params = dict(request="Execute", service="WPS", version="1.0.0",  access_token="cdefg")
-        request = DummyRequest(params=params, path='/ows/emu')
+        request = DummyRequest(params=params, path='/ows/proxy/emu')
         self.security.check_request(request)
 
         
@@ -55,7 +55,7 @@ class OWSSecurityTestCase(unittest.TestCase):
         security = OWSSecurity(tokenstore=store_mock, service_registry=self.registry_mock)
         
         params = dict(request="Execute", service="WPS", version="1.0.0", access_token="xyz")
-        request = DummyRequest(params=params, path='/ows/emu')
+        request = DummyRequest(params=params, path='/ows/proxy/emu')
         with pytest.raises(OWSAccessForbidden) as e_info:
             security.check_request(request)
 
@@ -66,7 +66,7 @@ class OWSSecurityTestCase(unittest.TestCase):
         security = OWSSecurity(tokenstore=store_mock, service_registry=self.registry_mock)
         
         params = dict(request="GetCapabilities", service="WPS", version="1.0.0")
-        request = DummyRequest(params=params, path='/ows/emu')
+        request = DummyRequest(params=params, path='/ows/proxy/emu')
         security.check_request(request)
 
     def test_check_request_allowed_describeprocess(self):
@@ -75,7 +75,7 @@ class OWSSecurityTestCase(unittest.TestCase):
         security = OWSSecurity(tokenstore=store_mock, service_registry=self.registry_mock)
         
         params = dict(request="DescribeProcess", service="WPS", version="1.0.0")
-        request = DummyRequest(params=params, path='/ows/emu')
+        request = DummyRequest(params=params, path='/ows/proxy/emu')
         security.check_request(request)
 
     def test_check_request_public_access(self):
@@ -84,7 +84,7 @@ class OWSSecurityTestCase(unittest.TestCase):
         security = OWSSecurity(tokenstore=self.store_mock, service_registry=registry_mock)
 
         params = dict(request="Execute", service="WPS", version="1.0.0")
-        request = DummyRequest(params=params, path='/ows/emu')
+        request = DummyRequest(params=params, path='/ows/proxy/emu')
         security.check_request(request)
 
 
