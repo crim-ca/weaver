@@ -19,11 +19,23 @@ class OWSRequestWmsTestCase(unittest.TestCase):
 
 
     def test_get_getcaps_request(self):
-        params = dict(request="GetCapabilities", service="WMS")
+        params = dict(request="GetCapabilities", service="WMS", version="1.1.1")
         request = DummyRequest(params=params)
         ows_req = OWSRequest(request)
         assert ows_req.request == 'getcapabilities'
         assert ows_req.service == 'wms'
+        assert ows_req.version == '1.1.1'
+        assert ows_req.public_access
+        assert ows_req.service_allowed
+
+    def test_get_getcaps_request_upcase(self):
+        params = dict(REQUEST="GetCapabilities", SERVICE="WMS", VERSION="1.3.0")
+        request = DummyRequest(params=params)
+        ows_req = OWSRequest(request)
+        assert ows_req.request == 'getcapabilities'
+        assert ows_req.service == 'wms'
+        assert ows_req.version == '1.3.0'
+
 
         
 
