@@ -48,12 +48,15 @@ def _send_request(request, service):
 
     # check for allowed content types
     ct = None
+    logger.debug("headers=", resp.headers)
     if "Content-Type" in resp.headers:
         ct = resp.headers["Content-Type"]
         if not ct.split(";")[0] in allowed_content_types:
-            return OWSAccessForbidden()
+            return OWSAccessForbidden("Content type is not allowed: %s." % (ct))
     else:
-        return HTTPNotAcceptable()
+        #return HTTPNotAcceptable("Could not get content type from response.")
+        logger.warn("Could not get content type from response")
+        ct = "application/xml"
 
     content = None
     try:
