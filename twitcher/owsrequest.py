@@ -20,8 +20,8 @@ allowed_service_types = ('wps', 'wms')
 allowed_public_request_types = {'wps': ('getcapabilities', 'describeprocess'),
                                 'wms': ('getcapabilities')}
 allowed_request_types = {'wps': ('getcapabilities', 'describeprocess', 'execute'),
-                         'wms': ('getcapabilities', 'getmap')}
-allowed_versions = {'wps': ('1.0.0',), 'wms': ('1.3.0',)}
+                         'wms': ('getcapabilities', 'getmap', 'getfeatureinfo')}
+allowed_versions = {'wps': ('1.0.0',), 'wms': ('1.1.1', '1.3.0',)}
 
 class OWSRequest(object):
     """
