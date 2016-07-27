@@ -88,7 +88,8 @@ class Get(OWSParser):
     def _request_params(self):
         new_params = {}
         for param in self.request.params:
-            new_params[param.lower()] = self.request.params.getone(param)
+            #new_params[param.lower()] = self.request.params.getone(param)
+            new_params[param.lower()] = self.request.params[param]
         return new_params
 
     def _get_param(self, param, allowed_values=None, optional=False):
