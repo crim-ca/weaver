@@ -26,6 +26,7 @@ allowed_content_types = (
     #"application/vnd.ogc.gml",              # GML
     #"application/vnd.ogc.sld+xml",          # SLD
     #"application/vnd.google-earth.kml+xml", # KML
+    "image/png",                             # PNG
     )
 
           
@@ -41,10 +42,10 @@ def _send_request(request, service):
     try:
         resp = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h)
     except Exception, e:
-        return HTTPBadGateway(e.message)
+        return HTTPBadGateway("Request failed: %s" % (e.message))
 
     if resp.ok == False:
-        return HTTPBadGateway(resp.reason)
+        return HTTPBadGateway("Response is not ok: %s" % (resp.reason))
 
     # check for allowed content types
     ct = None
@@ -52,7 +53,9 @@ def _send_request(request, service):
     if "Content-Type" in resp.headers:
         ct = resp.headers["Content-Type"]
         if not ct.split(";")[0] in allowed_content_types:
-            return OWSAccessForbidden("Content type is not allowed: %s." % (ct))
+            msg = "Content type is not allowed: %s." % (ct)
+            logger.error(msg)
+            return OWSAccessForbidden(msg)
     else:
         #return HTTPNotAcceptable("Could not get content type from response.")
         logger.warn("Could not get content type from response")
