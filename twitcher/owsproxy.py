@@ -19,14 +19,18 @@ logger = logging.getLogger(__name__)
 
 allowed_content_types = (
     "application/xml", "text/xml",
-    "application/vnd.ogc.se_xml",           # OGC Service Exception
-    "application/vnd.ogc.se+xml",           # OGC Service Exception
+    "application/vnd.ogc.se_xml",            # OGC Service Exception
+    "application/vnd.ogc.se+xml",            # OGC Service Exception
     #"application/vnd.ogc.success+xml",      # OGC Success (SLD Put)
-    "application/vnd.ogc.wms_xml",          # WMS Capabilities
+    "application/vnd.ogc.wms_xml",           # WMS Capabilities
     #"application/vnd.ogc.gml",              # GML
     #"application/vnd.ogc.sld+xml",          # SLD
-    #"application/vnd.google-earth.kml+xml", # KML
+    "application/vnd.google-earth.kml+xml",  # KML
+    "application/vnd.google-earth.kmz",
     "image/png",                             # PNG
+    "image/png;mode=32bit",
+    "image/gif",                             # GIF
+    "image/jpeg",                            # JPEG
     )
 
           
