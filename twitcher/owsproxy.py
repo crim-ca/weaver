@@ -31,6 +31,8 @@ allowed_content_types = (
     "image/png;mode=32bit",
     "image/gif",                             # GIF
     "image/jpeg",                            # JPEG
+    "application/json",                      # JSON
+    "application/json;charset=ISO-8859-1",    
     )
 
           
@@ -66,10 +68,9 @@ def _send_request(request, service):
 
     content = None
     try:
-        if ct:
-            content = resp.content.decode('utf-8', 'ignore')
-            # replace urls in xml content
-            if ct in ['text/xml', 'application/xml']:
+        if ct in ['text/xml', 'application/xml']:
+                # replace urls in xml content
+                content = resp.content.decode('utf-8', 'ignore')
                 content = content.replace(service['url'], proxy_url(request, service['name']))
         else:
             # raw content
