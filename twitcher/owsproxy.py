@@ -18,7 +18,9 @@ logger = logging.getLogger(__name__)
 
 
 allowed_content_types = (
-    "application/xml", "text/xml",
+    "application/xml",                       # XML
+    "text/xml",
+    "text/xml;charset=ISO-8859-1"
     "application/vnd.ogc.se_xml",            # OGC Service Exception
     "application/vnd.ogc.se+xml",            # OGC Service Exception
     #"application/vnd.ogc.success+xml",      # OGC Success (SLD Put)
@@ -68,7 +70,7 @@ def _send_request(request, service):
 
     content = None
     try:
-        if ct in ['text/xml', 'application/xml']:
+        if ct in ['text/xml', 'application/xml', 'text/xml;charset=ISO-8859-1']:
                 # replace urls in xml content
                 content = resp.content.decode('utf-8', 'ignore')
                 content = content.replace(service['url'], proxy_url(request, service['name']))
