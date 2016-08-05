@@ -1,10 +1,11 @@
 Changes
 *******
 
-0.2.1 (2016-07-19)
+0.2.1 (2016-08-05)
 ==================
 
 * register service with public access.
+* WMS services can be registered.
 
 0.2.0 (2016-07-18)
 ==================
