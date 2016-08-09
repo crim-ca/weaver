@@ -8,7 +8,7 @@ CHANGES = open(os.path.join(here, 'CHANGES.rst')).read()
 reqs = [line.strip() for line in open('requirements/deploy.txt')]
 
 setup(name='pyramid_twitcher',
-      version='0.2.1',
+      version='0.2.2',
       description='Security Proxy for OGC Services like WPS.',
       long_description=README + '\n\n' + CHANGES,
       classifiers=[
