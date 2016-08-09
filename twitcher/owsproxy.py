@@ -3,6 +3,7 @@ The owsproxy is based on `papyrus_ogcproxy <https://github.com/elemoine/papyrus_
 """
 
 import urllib
+from urlparse import urlparse
 import requests
 
 from pyramid.httpexceptions import HTTPBadRequest, HTTPBadGateway, HTTPNotAcceptable
@@ -36,15 +37,22 @@ allowed_content_types = (
     "application/json;charset=ISO-8859-1",    
     )
 
-          
-def _send_request(request, service, extra_path=None):
+# TODO: configure allowed hosts
+allowed_hosts = (
+    # list allowed hosts here (no port limiting)
+    # "localhost",
+)
+
+
+def _send_request(request, service, extra_path=None, request_params=None):
     
     # TODO: fix way to build url
     url = service['url']
     if extra_path:
         url += '/' + extra_path
-    url += '?' + urllib.urlencode(request.params)
-    # logger.debug('url = %s', url)
+    if request_params:
+        url += '?' + request_params
+    logger.debug('url = %s', url)
     
     # forward request to target (without Host Header)
     h = dict(request.headers)
@@ -89,7 +97,19 @@ def _send_request(request, service, extra_path=None):
     return Response(content, status=resp.status_code, headers=headers)
 
 
-def owsproxy_view(request):
+def owsproxy_url(request):
+    url = request.params.get("url")
+    if url is None:
+        return HTTPBadRequest()
+
+    # check for full url
+    parsed_url = urlparse(url)
+    if not parsed_url.netloc or parsed_url.scheme not in ("http", "https"):
+        return HTTPBadRequest()
+    return _send_request(request, service=dict(url=url, name='external'))
+
+
+def owsproxy(request):
     """
     TODO: use ows exceptions
     """
@@ -101,7 +121,7 @@ def owsproxy_view(request):
     except Exception as err:
         return HTTPBadRequest("Could not find service: %s." % (err.message))
     else:
-        return _send_request(request, service, extra_path)
+        return _send_request(request, service, extra_path, request_params=urllib.urlencode(request.params))
 
 
 def includeme(config):
@@ -113,10 +133,12 @@ def includeme(config):
         # include mongodb
         config.include('twitcher.db')
 
+        config.add_route('owsproxy_url', '/owsproxy')
         config.add_route('owsproxy', '/ows/proxy/{service_name}')
         # TODO: maybe configure extra path
         # config.add_route('owsproxy_extra', '/ows/proxy/{service_name}/{extra_path:.*}')
         config.add_route('owsproxy_secured', '/ows/proxy/{service_name}/{access_token}')
-        config.add_view(owsproxy_view, route_name='owsproxy')
-        # config.add_view(owsproxy_view, route_name='owsproxy_extra')
-        config.add_view(owsproxy_view, route_name='owsproxy_secured')
+        config.add_view(owsproxy_url, route_name='owsproxy_url')
+        config.add_view(owsproxy, route_name='owsproxy')
+        # config.add_view(owsproxy, route_name='owsproxy_extra')
+        config.add_view(owsproxy, route_name='owsproxy_secured')
