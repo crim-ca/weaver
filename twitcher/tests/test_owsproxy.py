@@ -35,7 +35,3 @@ class OWSProxyTests(unittest.TestCase):
         response = owsproxy_view(request)
         assert isinstance(response, HTTPBadRequest) == True
 
-   
-
-   
-   
