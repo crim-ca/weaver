@@ -7,6 +7,7 @@ from twitcher.owssecurity import owssecurity_factory
 import logging
 logger = logging.getLogger(__name__)
 
+
 def includeme(config):
     settings = config.registry.settings
 

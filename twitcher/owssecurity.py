@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 protected_path = '/ows/'
 
+
 def owssecurity_factory(registry):
     return OWSSecurity(tokenstore_factory(registry), service_registry_factory(registry))
 
@@ -21,7 +22,6 @@ class OWSSecurity(object):
         self.tokenstore = tokenstore
         self.service_registry = service_registry
 
-    
     def get_token_param(self, request):
         token = None
         if 'access_token' in request.params:
@@ -56,6 +56,3 @@ class OWSSecurity(object):
                         request.environ.update( access_token.user_environ )
                     except AccessTokenNotFound:
                         raise OWSAccessForbidden("Access token is required to access this service.")
-            
-                
-        
