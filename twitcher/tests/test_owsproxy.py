@@ -13,7 +13,8 @@ from pyramid import testing
 from pyramid.testing import DummyRequest
 
 from twitcher import owsproxy
-from twitcher.owsproxy import owsproxy_view
+from twitcher.owsproxy import owsproxy as owsproxy_view
+
 
 class OWSProxyTests(unittest.TestCase):
     def setUp(self):
