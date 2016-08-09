@@ -21,10 +21,13 @@ allowed_request_types = {'wps': ('getcapabilities', 'describeprocess', 'execute'
                          'wms': ('getcapabilities',
                                  'getmap',
                                  'getfeatureinfo',
-                                 'getlegendgraphic')}
+                                 'getlegendgraphic',
+                         # ncwms extras,
+                         'getmetadata')}
 public_request_types = {'wps': ('getcapabilities', 'describeprocess'),
-                        'wms': ('getcapabilities')}
+                        'wms': ('getcapabilities', )}
 allowed_versions = {'wps': ('1.0.0',), 'wms': ('1.1.1', '1.3.0',)}
+
 
 class OWSRequest(object):
     """
@@ -61,7 +64,8 @@ def ows_parser_factory(request):
         return Post(request)
     else:
         raise HTTPBadRequest()
-        
+
+
 class OWSParser(object):
 
     def __init__(self, request):
@@ -82,13 +86,14 @@ class OWSParser(object):
 
     def _get_version(self):
         raise NotImplementedError 
-    
+
+
 class Get(OWSParser):
 
     def _request_params(self):
         new_params = {}
         for param in self.request.params:
-            #new_params[param.lower()] = self.request.params.getone(param)
+            # new_params[param.lower()] = self.request.params.getone(param)
             new_params[param.lower()] = self.request.params[param]
         return new_params
 
@@ -107,17 +112,14 @@ class Get(OWSParser):
         else:
             raise OWSMissingParameterValue('Parameter "%s" is missing' % param, value=param)            
         return self.params[param]
-    
 
     def _get_service(self):
         """Check mandatory service name parameter in GET request."""
         return self._get_param(param="service", allowed_values=allowed_service_types)
 
-
     def _get_request_type(self):
         """Find requested request type in GET request."""
         return self._get_param(param="request", allowed_values=allowed_request_types[self.params['service']])
-
 
     def _get_version(self):
         """Find requested version in GET request."""
@@ -128,7 +130,6 @@ class Get(OWSParser):
             return version
         
 
-       
 class Post(OWSParser):
 
     def __init__(self, request):
@@ -140,7 +141,6 @@ class Post(OWSParser):
         except Exception as e:
             raise OWSNoApplicableCode(e.message)
 
-        
     def _get_service(self):
         """Check mandatory service name parameter in POST request."""
         if "service" in self.document.attrib:
@@ -153,7 +153,6 @@ class Post(OWSParser):
             raise OWSMissingParameterValue('Parameter "service" is missing', value="service")
         return self.params["service"]
 
-    
     def _get_request_type(self):
         """Find requested request type in POST request."""
         value = self.document.tag.lower()
@@ -162,7 +161,6 @@ class Post(OWSParser):
         else:
             raise OWSInvalidParameterValue("Request type %s is not supported" % value, value="request")
         return self.params["request"]
-
 
     def _get_version(self):
         """Find requested version in POST request."""
@@ -177,4 +175,4 @@ class Post(OWSParser):
         else:
             raise OWSMissingParameterValue('Parameter "version" is missing', value="version")
         return self.params["version"]
-    
+
