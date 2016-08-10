@@ -13,7 +13,8 @@ from twitcher.owsexceptions import OWSNoApplicableCode
 import logging
 logger = logging.getLogger(__name__)
 
-DEFAULT_KEYS =  ['PYWPS_CFG', 'PYWPS_PROCESSES', 'PYWPS_TEMPLATES']
+DEFAULT_KEYS = ['PYWPS_CFG', 'PYWPS_PROCESSES', 'PYWPS_TEMPLATES']
+
 
 def _wps_environ_keys(request):
     settings = request.registry.settings
@@ -71,11 +72,12 @@ def pywps_view(request):
     except Exception, e:
         return OWSNoApplicableCode(e.message)
 
+
 def includeme(config):
     settings = config.registry.settings
 
     if asbool(settings.get('twitcher.wps', True)):
-        logger.info('Add twitcher wps application')
+        # logger.debug('Add twitcher wps application')
 
         config.add_route('wps', '/ows/wps')
         config.add_route('wps_secured', '/ows/wps/{access_token}')

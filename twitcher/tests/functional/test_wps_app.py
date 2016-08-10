@@ -12,6 +12,7 @@ from webtest import TestApp
 import pyramid.testing
 from .common import setup_with_db, setup_tokenstore
 
+
 class WpsAppTest(unittest.TestCase):
 
     def setUp(self):

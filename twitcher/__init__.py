@@ -3,6 +3,7 @@ from pyramid.config import Configurator
 import logging
 logger = logging.getLogger(__name__)
 
+
 def main(global_config, **settings):
     """
     This function returns a Pyramid WSGI application.
