@@ -36,7 +36,11 @@ class OWSSecurity(object):
   
     def check_request(self, request):
         if request.path.startswith(protected_path):
-            service_name = service_name_of_proxy_url(request.path)
+            # TODO: fix this code
+            try:
+                service_name = service_name_of_proxy_url(request.path)
+            except ValueError:
+                service_name = None
             if service_name and self.service_registry.is_public(service_name):
                 logger.info('public access for service %s', service_name)
             else:
@@ -53,6 +57,6 @@ class OWSSecurity(object):
                         elif access_token.is_expired():
                             raise OWSAccessForbidden("Access token is expired.")
                         # update request with user environ from access token
-                        request.environ.update( access_token.user_environ )
+                        request.environ.update(access_token.user_environ)
                     except AccessTokenNotFound:
                         raise OWSAccessForbidden("Access token is required to access this service.")
