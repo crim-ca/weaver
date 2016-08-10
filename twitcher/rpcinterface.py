@@ -4,7 +4,7 @@ from pyramid.view import view_defaults
 from pyramid_rpc.xmlrpc import xmlrpc_method
 from pyramid.settings import asbool
 
-from twitcher.registry import service_registry_factory, update_with_proxy_url
+from twitcher.registry import service_registry_factory, proxy_url
 from twitcher.tokens import tokengenerator_factory
 from twitcher.tokens import tokenstore_factory
 
@@ -43,7 +43,6 @@ class RPCInterface(object):
         """
         self.tokenstore.delete_token(token)
 
-    
     @api_xmlrpc()
     def clean(self):
         """
@@ -56,7 +55,6 @@ class RPCInterface(object):
             return False
         else:
             return True
-            
 
     # service registry
 
@@ -67,7 +65,6 @@ class RPCInterface(object):
         """
         service = self.registry.register_service(url=url, name=name, service_type=service_type, public=public)
         return service['name']
-
 
     @api_xmlrpc()
     def unregister(self, name):
@@ -82,8 +79,6 @@ class RPCInterface(object):
         else:
             return True
 
-
-
     @api_xmlrpc()
     def status(self):
         """
@@ -91,11 +86,12 @@ class RPCInterface(object):
         """
         try:
             services = self.registry.list_services()
-            return update_with_proxy_url(self.request, services)
+            for service in services:
+                service['proxy_url'] = proxy_url(self.request, service['name'])
+            return services
         except:
             logger.exception('register failed')
             return []
-
 
     @api_xmlrpc()
     def purge(self):
@@ -109,6 +105,7 @@ class RPCInterface(object):
             return False
         else:
             return True
+
 
 def includeme(config):
     """ The callable makes it possible to include rpcinterface
@@ -124,7 +121,7 @@ def includeme(config):
     settings = config.registry.settings
 
     if asbool(settings.get('twitcher.rpcinferface', True)):
-        logger.info('Add twitcher rpcinterface')
+        # logger.debug('Add twitcher rpcinterface')
 
         # using basic auth
         config.include('twitcher.basicauth')
