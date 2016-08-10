@@ -2,6 +2,7 @@ import pymongo
 
 from twitcher.utils import namesgenerator, baseurl
 from twitcher.db import mongodb
+from twitcher.exceptions import RegistrationException
 
 import logging
 logger = logging.getLogger(__name__)
@@ -18,6 +19,7 @@ def update_with_proxy_url(request, services):
     for service in services:
         service['proxy_url'] = proxy_url(request, service['name'])
     return services
+
 
 def service_name_of_proxy_url(proxy_url):
     from urlparse import urlparse
@@ -48,33 +50,25 @@ class ServiceRegistry(object):
         
         service_url = baseurl(url)
         # check if service is already registered
-        service = self.collection.find_one({'url': service_url})
-        if service:
-            new_service = dict(public=public)
-            logging.info("update registered service %s." % (service['name']))
-            self.collection.update_one({'url': service['url']}, {'$set': new_service})
-            service = self.collection.find_one({'url': service['url']})
-        else:
-            name = namesgenerator.get_sane_name(name)
-            if not name:
-                name = namesgenerator.get_random_name()
-                if not self.collection.find_one({'name': name}) is None:
-                    name = namesgenerator.get_random_name(retry=True)
-            service = dict(url=service_url, name=name, type=service_type, public=public)
-            if self.collection.find_one({'name': name}):
-                logging.info("update registered service %s." % (name))
-                self.collection.update_one({'name': name}, {'$set': service})
-            else:
-                self.collection.insert_one(service)
-        return service
+        if self.collection.count({'url': service_url}) > 0:
+            raise RegistrationException("service url already registered.")
 
+        name = namesgenerator.get_sane_name(name)
+        if not name:
+            name = namesgenerator.get_random_name()
+            if self.collection.count({'name': name}) > 0:
+                name = namesgenerator.get_random_name(retry=True)
+        if self.collection.count({'name': name}) > 0:
+            raise Exception("service name already registered.")
+        service = dict(url=service_url, name=name, type=service_type, public=public)
+        self.collection.insert_one(service)
+        return service
 
     def unregister_service(self, name):
         """
         Removes service from registry database.
         """
         self.collection.delete_one({'name': name})
-
 
     def list_services(self):
         """
@@ -89,7 +83,6 @@ class ServiceRegistry(object):
                 'public': service.get('public', False)})
         return my_services
 
-
     def get_service(self, name):
         """
         Get service for given ``name`` from registry database.
@@ -97,10 +90,9 @@ class ServiceRegistry(object):
         service = self.collection.find_one({'name': name})
         if service is None:
             raise ValueError('service not found')
-        if not 'url' in service:
+        if 'url' not in service:
             raise ValueError('service has no url')
         return dict(url=service.get('url'), name=name, public=service.get('public', False))
-
 
     def get_service_by_url(self, url):
         """
