@@ -1,7 +1,9 @@
+import pytest
 import unittest
 import mock
 
 from twitcher.registry import ServiceRegistry
+from twitcher.registry import parse_service_name
 
 
 class ServiceRegistryTestCase(unittest.TestCase):
@@ -46,3 +48,13 @@ class ServiceRegistryTestCase(unittest.TestCase):
         store.register_service(url=self.service_public['url'], name=self.service_public['name'], public=True)
 
         collection_mock.insert_one.assert_called_with(self.service_public)
+
+    def test_parse_service_name(self):
+        assert 'emu' == parse_service_name("/ows/proxy/emu")
+        assert 'emu' == parse_service_name("/ows/proxy/emu/foo/bar")
+        assert 'emu' == parse_service_name("/ows/proxy/emu/")
+        with pytest.raises(ValueError) as e_info:
+            assert 'emu' == parse_service_name("/ows/proxy/")
+        with pytest.raises(ValueError) as e_info:
+            assert 'emu' == parse_service_name("/ows/nowhere/emu")
+
