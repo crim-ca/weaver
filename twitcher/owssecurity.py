@@ -3,7 +3,7 @@ from twitcher.owsexceptions import OWSAccessForbidden, OWSInvalidParameterValue
 from twitcher.utils import path_elements
 from twitcher.tokens import tokenstore_factory
 from twitcher.registry import service_registry_factory
-from twitcher.registry import service_name_of_proxy_url
+from twitcher.registry import parse_service_name
 from twitcher.owsrequest import OWSRequest
 
 import logging
@@ -38,7 +38,7 @@ class OWSSecurity(object):
         if request.path.startswith(protected_path):
             # TODO: fix this code
             try:
-                service_name = service_name_of_proxy_url(request.path)
+                service_name = parse_service_name(request.path)
             except ValueError:
                 service_name = None
             if service_name and self.service_registry.is_public(service_name):
