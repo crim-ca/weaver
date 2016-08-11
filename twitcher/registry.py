@@ -15,12 +15,14 @@ def proxy_url(request, service_name):
     return request.route_url('owsproxy', service_name=service_name)
 
 
-def service_name_of_proxy_url(url):
+def parse_service_name(url):
     from urlparse import urlparse
     parsed_url = urlparse(url)
     service_name = None
     if parsed_url.path.startswith("/ows/proxy"):
-        service_name = parsed_url.path.strip('/').split('/')[2]
+        parts = parsed_url.path.strip('/').split('/')
+        if len(parts) > 2:
+            service_name = parts[2]
     if not service_name:
         raise ValueError('service_name not found')
     return service_name
@@ -99,11 +101,19 @@ class ServiceRegistry(object):
             raise ValueError('service not found')
         return dict(name=service.get('name'), url=url)
 
+    def get_service_name(self, url):
+        try:
+            service_name = parse_service_name(url)
+        except ValueError:
+            service = self.get_service_by_url(url)
+            service_name = service['name']
+        return service_name
+
     def is_public(self, name):
         try:
             service = self.get_service(name)
             public = service.get('public', False)
-        except:
+        except ValueError:
             public = False
         return public
     
