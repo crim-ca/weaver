@@ -4,7 +4,7 @@ from pyramid.view import view_defaults
 from pyramid_rpc.xmlrpc import xmlrpc_method
 from pyramid.settings import asbool
 
-from twitcher.registry import service_registry_factory, proxy_url
+from twitcher.registry import service_registry_factory
 from twitcher.tokens import tokengenerator_factory
 from twitcher.tokens import tokenstore_factory
 
@@ -87,7 +87,7 @@ class RPCInterface(object):
         try:
             services = self.registry.list_services()
             for service in services:
-                service['proxy_url'] = proxy_url(self.request, service['name'])
+                service['proxy_url'] = self.request.route_url(service_name=service['name'])
             return services
         except:
             logger.exception('register failed')

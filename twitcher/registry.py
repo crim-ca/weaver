@@ -8,13 +8,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def proxy_url(request, service_name):
-    """
-    Shortcut method to return route url to service name.
-    """
-    return request.route_url('owsproxy', service_name=service_name)
-
-
 def parse_service_name(url):
     from urlparse import urlparse
     parsed_url = urlparse(url)

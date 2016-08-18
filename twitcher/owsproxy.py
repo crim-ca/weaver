@@ -11,7 +11,7 @@ from twitcher.owsexceptions import OWSAccessForbidden
 from pyramid.response import Response
 from pyramid.settings import asbool
 
-from twitcher.registry import service_registry_factory, proxy_url
+from twitcher.registry import service_registry_factory
 
 import logging
 logger = logging.getLogger(__name__)
@@ -82,9 +82,7 @@ def _send_request(request, service, extra_path=None, request_params=None):
         if ct in ['text/xml', 'application/xml', 'text/xml;charset=ISO-8859-1']:
                 # replace urls in xml content
                 content = resp.content.decode('utf-8', 'ignore')
-                content = content.replace(service['url'], proxy_url(request, service['name']))
-                # TODO: remove default namespace in ncwms2 getcaps
-                # content = content.replace('xmlns="http://www.opengis.net/wms"', '')
+                content = content.replace(service['url'], request.route_url(service_name=service['name']))
         else:
             # raw content
             content = resp.content
