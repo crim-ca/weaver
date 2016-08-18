@@ -87,7 +87,7 @@ class RPCInterface(object):
         try:
             services = self.registry.list_services()
             for service in services:
-                service['proxy_url'] = self.request.route_url(service_name=service['name'])
+                service['proxy_url'] = self.request.route_url('owsproxy', service_name=service['name'])
             return services
         except:
             logger.exception('register failed')

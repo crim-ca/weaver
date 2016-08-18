@@ -82,7 +82,7 @@ def _send_request(request, service, extra_path=None, request_params=None):
         if ct in ['text/xml', 'application/xml', 'text/xml;charset=ISO-8859-1']:
                 # replace urls in xml content
                 content = resp.content.decode('utf-8', 'ignore')
-                content = content.replace(service['url'], request.route_url(service_name=service['name']))
+                content = content.replace(service['url'], request.route_url('owsproxy', service_name=service['name']))
         else:
             # raw content
             content = resp.content
