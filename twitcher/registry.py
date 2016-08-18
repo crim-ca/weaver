@@ -34,7 +34,7 @@ class ServiceRegistry(object):
     def __init__(self, collection):
         self.collection = collection
 
-    def register_service(self, url, name=None, service_type='wps', public=False):
+    def register_service(self, url, name=None, service_type='wps', public=False, overwrite=True):
         """
         Adds OWS service with given name to registry database.
         """
@@ -42,7 +42,10 @@ class ServiceRegistry(object):
         service_url = baseurl(url)
         # check if service is already registered
         if self.collection.count({'url': service_url}) > 0:
-            raise RegistrationException("service url already registered.")
+            if overwrite:
+                self.collection.delete_one({'url': service_url})
+            else:
+                raise RegistrationException("service url already registered.")
 
         name = namesgenerator.get_sane_name(name)
         if not name:
@@ -50,7 +53,10 @@ class ServiceRegistry(object):
             if self.collection.count({'name': name}) > 0:
                 name = namesgenerator.get_random_name(retry=True)
         if self.collection.count({'name': name}) > 0:
-            raise Exception("service name already registered.")
+            if overwrite:
+                self.collection.delete_one({'name': name})
+            else:
+                raise Exception("service name already registered.")
         service = dict(url=service_url, name=name, type=service_type, public=public)
         self.collection.insert_one(service)
         return service
