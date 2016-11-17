@@ -50,6 +50,10 @@ def _send_request(request, service, extra_path=None, request_params=None):
     url = service['url']
     if extra_path:
         url += '/' + extra_path
+    if service.get('c4i', False):
+        if 'C4I-Access-Token' in request.headers:
+            logger.debug('using c4i token')
+            url += '/' + request.headers['C4I-Access-Token']
     if request_params:
         url += '?' + request_params
     logger.debug('url = %s', url)

@@ -28,17 +28,17 @@ def service_registry_factory(registry):
 
 class ServiceRegistry(object):
     """
-    Registry for OWS services. Uses mongodb to store service url and attributes. 
+    Registry for OWS services. Uses mongodb to store service url and attributes.
     """
-    
+
     def __init__(self, collection):
         self.collection = collection
 
-    def register_service(self, url, name=None, service_type='wps', public=False, overwrite=True):
+    def register_service(self, url, name=None, service_type='wps', public=False, c4i=False, overwrite=True):
         """
         Adds OWS service with given name to registry database.
         """
-        
+
         service_url = baseurl(url)
         # check if service is already registered
         if self.collection.count({'url': service_url}) > 0:
@@ -57,7 +57,7 @@ class ServiceRegistry(object):
                 self.collection.delete_one({'name': name})
             else:
                 raise Exception("service name already registered.")
-        service = dict(url=service_url, name=name, type=service_type, public=public)
+        service = dict(url=service_url, name=name, type=service_type, public=public, c4i=c4i)
         self.collection.insert_one(service)
         return service
 
@@ -77,7 +77,8 @@ class ServiceRegistry(object):
                 'name': service['name'],
                 'type': service['type'],
                 'url': service['url'],
-                'public': service.get('public', False)})
+                'public': service.get('public', False),
+                'c4i': service.get('c4i', False)})
         return my_services
 
     def get_service(self, name):
@@ -89,7 +90,8 @@ class ServiceRegistry(object):
             raise ValueError('service not found')
         if 'url' not in service:
             raise ValueError('service has no url')
-        return dict(url=service.get('url'), name=name, public=service.get('public', False))
+        return dict(url=service.get('url'), name=name, public=service.get('public', False),
+                    c4i=service.get('c4i', False))
 
     def get_service_by_url(self, url):
         """
@@ -115,20 +117,9 @@ class ServiceRegistry(object):
         except ValueError:
             public = False
         return public
-    
+
     def clear_services(self):
         """
         Removes all OWS services from registry database.
         """
         self.collection.drop()
-
-
-
-
-    
-    
-
-
-
-
-
