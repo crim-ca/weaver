@@ -22,8 +22,8 @@ allowed_request_types = {'wps': ('getcapabilities', 'describeprocess', 'execute'
                                  'getmap',
                                  'getfeatureinfo',
                                  'getlegendgraphic',
-                         # ncwms extras,
-                         'getmetadata')}
+                                 # ncwms extras,
+                                 'getmetadata')}
 public_request_types = {'wps': ('getcapabilities', 'describeprocess'),
                         'wms': ('getcapabilities', )}
 allowed_versions = {'wps': ('1.0.0',), 'wms': ('1.1.1', '1.3.0',)}
@@ -79,13 +79,13 @@ class OWSParser(object):
         return self.params
 
     def _get_service(self):
-        raise NotImplementedError 
+        raise NotImplementedError
 
     def _get_request_type(self):
         raise NotImplementedError
 
     def _get_version(self):
-        raise NotImplementedError 
+        raise NotImplementedError
 
 
 class Get(OWSParser):
@@ -110,7 +110,7 @@ class Get(OWSParser):
         elif optional:
             self.params[param] = None
         else:
-            raise OWSMissingParameterValue('Parameter "%s" is missing' % param, value=param)            
+            raise OWSMissingParameterValue('Parameter "%s" is missing' % param, value=param)
         return self.params[param]
 
     def _get_service(self):
@@ -123,18 +123,19 @@ class Get(OWSParser):
 
     def _get_version(self):
         """Find requested version in GET request."""
-        version = self._get_param(param="version", allowed_values=allowed_versions[self.params['service']], optional=True)
+        version = self._get_param(param="version", allowed_values=allowed_versions[self.params['service']],
+                                  optional=True)
         if version is None and self._get_request_type() != "getcapabilities":
             raise OWSMissingParameterValue('Parameter "version" is missing', value="version")
         else:
             return version
-        
+
 
 class Post(OWSParser):
 
     def __init__(self, request):
         super(Post, self).__init__(request)
-        
+
         try:
             self.document = lxml.etree.fromstring(self.request.body)
             lxml_strip_ns(self.document)
@@ -175,4 +176,3 @@ class Post(OWSParser):
         else:
             raise OWSMissingParameterValue('Parameter "version" is missing', value="version")
         return self.params["version"]
-

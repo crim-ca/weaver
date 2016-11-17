@@ -34,8 +34,8 @@ allowed_content_types = (
     "image/gif",                             # GIF
     "image/jpeg",                            # JPEG
     "application/json",                      # JSON
-    "application/json;charset=ISO-8859-1",    
-    )
+    "application/json;charset=ISO-8859-1",
+)
 
 # TODO: configure allowed hosts
 allowed_hosts = (
@@ -45,7 +45,7 @@ allowed_hosts = (
 
 
 def _send_request(request, service, extra_path=None, request_params=None):
-    
+
     # TODO: fix way to build url
     url = service['url']
     if extra_path:
@@ -53,7 +53,7 @@ def _send_request(request, service, extra_path=None, request_params=None):
     if request_params:
         url += '?' + request_params
     logger.debug('url = %s', url)
-    
+
     # forward request to target (without Host Header)
     h = dict(request.headers)
     h.pop("Host", h)
@@ -127,7 +127,7 @@ def includeme(config):
 
     if asbool(settings.get('twitcher.ows_proxy', True)):
         logger.info('Add OWS proxy')
-        
+
         # include mongodb
         config.include('twitcher.db')
 

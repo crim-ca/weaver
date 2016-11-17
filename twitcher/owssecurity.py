@@ -30,10 +30,10 @@ class OWSSecurity(object):
             token = request.headers['Access-Token']  # in header
         else:  # in path
             elements = path_elements(request.path)
-            if len(elements) > 1: # there is always /ows/
+            if len(elements) > 1:  # there is always /ows/
                 token = elements[-1]   # last path element
         return token
-  
+
     def check_request(self, request):
         if request.path.startswith(protected_path):
             # TODO: fix this code
