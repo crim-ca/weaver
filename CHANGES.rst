@@ -1,6 +1,13 @@
 Changes
 *******
 
+0.2.3 (2016-11-18)
+==================
+
+* pep8
+* using doc2dict, renamed get_service_by_name()
+* added support for c4i tokens
+
 0.2.2 (2016-08-18)
 ==================
 
