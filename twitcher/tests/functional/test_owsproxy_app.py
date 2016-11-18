@@ -1,6 +1,6 @@
 import pytest
 import unittest
-from webtest import TestApp
+import webtest
 from pyramid import testing
 from .common import setup_with_db, setup_tokenstore
 
@@ -14,7 +14,7 @@ class OWSProxyAppTest(unittest.TestCase):
         self._setup_registry(config)
         config.include('twitcher.owsproxy')
         config.include('twitcher.tweens')
-        self.app = TestApp(config.make_wsgi_app())
+        self.app = webtest.TestApp(config.make_wsgi_app())
 
     def tearDown(self):
         testing.tearDown()

@@ -8,7 +8,7 @@ Based on tests from:
 """
 import pytest
 import unittest
-from webtest import TestApp
+import webtest
 import pyramid.testing
 from .common import setup_with_db, setup_tokenstore
 
@@ -20,7 +20,7 @@ class WpsAppTest(unittest.TestCase):
         self.token = setup_tokenstore(config)
         config.include('twitcher.wps')
         config.include('twitcher.tweens')
-        self.app = TestApp(config.make_wsgi_app())
+        self.app = webtest.TestApp(config.make_wsgi_app())
 
     def tearDown(self):
         pyramid.testing.tearDown()
