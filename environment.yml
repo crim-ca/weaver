@@ -1,18 +1,19 @@
 name: twitcher
 channels:
+- defaults
 - birdhouse
 dependencies:
 - python=2.7.12 
-- setuptools=23.0.0
-- curl=7.49.0 
-- pyopenssl=0.16.0
-- cryptography=1.4
-- mako=1.0.4
-- pyyaml=3.11
+- curl 
+- pyopenssl
+- cryptography
+- mako
+- pyyaml
 # tests
 - pytest 
-- pytest-pep8 
+- flake8
 - mock
+- pbr
 - webtest
 # ipython
 - ipython
@@ -25,7 +26,7 @@ dependencies:
 - lxml=3.6.0
 - paste
 - pastedeploy
-- requests=2.10.0
+- requests
 - webob
 # pywps
 - pywps=3.2.6
@@ -37,7 +38,7 @@ dependencies:
 - gevent=1.1.1
 # mongodb
 - pymongo=3
-- mongodb=2.4.6
+- mongodb=2.6.12
 - pip:
   - genshi==0.7
   - beaker
