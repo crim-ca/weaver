@@ -5,8 +5,11 @@ Changes
 ==================
 
 * pep8
-* using doc2dict, renamed get_service_by_name()
-* added support for c4i tokens
+* using doc2dict, renamed get_service_by_name().
+* added support for c4i tokens.
+* updated deps: pytest, mongodb.
+* updated buildout recipes.
+* fixed functional tests.
 
 0.2.2 (2016-08-18)
 ==================
