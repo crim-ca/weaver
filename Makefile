@@ -1,4 +1,4 @@
-VERSION := 0.3.1
+VERSION := 0.3.6
 RELEASE := master
 
 # Include custom config if it is available
@@ -13,11 +13,10 @@ OS_NAME := $(shell uname -s 2>/dev/null || echo "unknown")
 CPU_ARCH := $(shell uname -m 2>/dev/null || uname -p 2>/dev/null || echo "unknown")
 
 # Python
-SETUPTOOLS_VERSION := 23.0.0
-BUILDOUT_VERSION := 2.5.2
-CONDA_VERSION := 4.1.9
+SETUPTOOLS_VERSION := 27.2.0
+CONDA_VERSION := 4.2.12
 
-# Anaconda 
+# Anaconda
 ANACONDA_HOME ?= $(HOME)/anaconda
 CONDA_ENV ?= $(APP_NAME)
 CONDA_ENVS_DIR ?= $(HOME)/.conda/envs
@@ -26,11 +25,11 @@ CONDA_PINNED := $(APP_ROOT)/requirements/conda_pinned
 
 # Configuration used by update-config
 HOSTNAME ?= localhost
+HTTP_PORT ?= 8094
 OUTPUT_PORT ?= 8090
-LOG_LEVEL ?= WARN
 
 # choose anaconda installer depending on your OS
-ANACONDA_URL = http://repo.continuum.io/miniconda
+ANACONDA_URL = https://repo.continuum.io/miniconda
 ifeq "$(OS_NAME)" "Linux"
 FN := Miniconda2-latest-Linux-x86_64.sh
 else ifeq "$(OS_NAME)" "Darwin"
@@ -105,13 +104,13 @@ info:
 
 .PHONY: backup
 backup:
-	@echo "Backup custom config ..." 
+	@echo "Backup custom config ..."
 	@-test -f custom.cfg && cp -v --update --backup=numbered --suffix=.bak custom.cfg custom.cfg.bak
 
 .PHONY: .gitignore
 .gitignore:
 	@echo "Setup default .gitignore ..."
-	@curl "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/dot_gitignore" --silent --insecure --output .gitignore 
+	@curl "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/dot_gitignore" --silent --insecure --output .gitignore
 
 .PHONY: bootstrap.sh
 bootstrap.sh:
@@ -121,7 +120,7 @@ bootstrap.sh:
 
 requirements.sh:
 	@echo "Setup default requirements.sh ..."
-	@curl "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/requirements.sh" --silent --insecure --output requirements.sh 
+	@curl "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/requirements.sh" --silent --insecure --output requirements.sh
 	@chmod 755 requirements.sh
 
 custom.cfg:
@@ -138,28 +137,30 @@ init: custom.cfg downloads
 
 bootstrap-buildout.py:
 	@echo "Update buildout bootstrap-buildout.py ..."
-	@test -f boostrap-buildout.py || curl https://bootstrap.pypa.io/bootstrap-buildout.py --insecure --silent --output bootstrap-buildout.py 
+	@test -f boostrap-buildout.py || curl https://bootstrap.pypa.io/bootstrap-buildout.py --insecure --silent --output bootstrap-buildout.py
 
 ## Anaconda targets
 
 .PHONY: anaconda
 anaconda:
 	@echo "Installing Anaconda ..."
-	@test -d $(ANACONDA_HOME) || curl $(ANACONDA_URL)/$(FN) --silent --insecure --output "$(DOWNLOAD_CACHE)/$(FN)" 
-	@test -d $(ANACONDA_HOME) || bash "$(DOWNLOAD_CACHE)/$(FN)" -b -p $(ANACONDA_HOME)   
+	@test -d $(ANACONDA_HOME) || curl $(ANACONDA_URL)/$(FN) --silent --insecure --output "$(DOWNLOAD_CACHE)/$(FN)"
+	@test -d $(ANACONDA_HOME) || bash "$(DOWNLOAD_CACHE)/$(FN)" -b -p $(ANACONDA_HOME)
 	@echo "Add '$(ANACONDA_HOME)/bin' to your PATH variable in '.bashrc'."
 
 .PHONY: conda_config
 conda_config: anaconda
 	@echo "Update ~/.condarc"
-	@"$(ANACONDA_HOME)/bin/conda" install -y conda=$(CONDA_VERSION)
+	@-"$(ANACONDA_HOME)/bin/conda" install -y conda=$(CONDA_VERSION)
 	@"$(ANACONDA_HOME)/bin/conda" config --add envs_dirs $(CONDA_ENVS_DIR)
 	@"$(ANACONDA_HOME)/bin/conda" config --set ssl_verify true
-	@"$(ANACONDA_HOME)/bin/conda" config --set update_dependencies true
+	@"$(ANACONDA_HOME)/bin/conda" config --set update_dependencies false
 	@"$(ANACONDA_HOME)/bin/conda" config --set use_pip true
-	@"$(ANACONDA_HOME)/bin/conda" config --set channel_priority false
+	@"$(ANACONDA_HOME)/bin/conda" config --set channel_priority true
 	@"$(ANACONDA_HOME)/bin/conda" config --set auto_update_conda false
 	@"$(ANACONDA_HOME)/bin/conda" config --add channels defaults
+	@"$(ANACONDA_HOME)/bin/conda" config --append channels birdhouse
+	@"$(ANACONDA_HOME)/bin/conda" config --append channels conda-forge
 
 .PHONY: conda_env
 conda_env: anaconda conda_config
@@ -170,7 +171,7 @@ conda_env: anaconda conda_config
 .PHONY: conda_pinned
 conda_pinned: conda_env
 	@echo "Update pinned conda packages ..."
-	@test -d $(CONDA_ENV_PATH) && test -f $(CONDA_PINNED) && cp -f "$(CONDA_PINNED)" "$(CONDA_ENV_PATH)/conda-meta/pinned" 
+	@test -d $(CONDA_ENV_PATH) && test -f $(CONDA_PINNED) && cp -f "$(CONDA_PINNED)" "$(CONDA_ENV_PATH)/conda-meta/pinned"
 
 .PHONY: export
 export:
@@ -204,8 +205,8 @@ update:
 
 .PHONY: update-config
 update-config:
-	@echo "Update application config with buildout (offline mode) and enviroment variables..."
-	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);bin/buildout buildout:anaconda-home=$(ANACONDA_HOME) settings:hostname=$(HOSTNAME) settings:output-port=$(OUTPUT_PORT) settings:log-level=$(LOG_LEVEL) -o -c custom.cfg"
+	@echo "Update application config with buildout (offline mode) and environment variables..."
+	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);bin/buildout buildout:anaconda-home=$(ANACONDA_HOME) settings:hostname=$(HOSTNAME) settings:output-port=$(OUTPUT_PORT) settings:http-port=$(HTTP_PORT) -o -c custom.cfg"
 
 .PHONY: clean
 clean: srcclean envclean
@@ -236,7 +237,7 @@ passwd: custom.cfg
 	@echo "Enter a password with at least 8 characters."
 	@bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); python -c 'from IPython.lib import passwd; pw = passwd(algorithm=\"sha256\"); lines = [\"phoenix-password = \" + pw + \"\\n\" if line.startswith(\"phoenix-password\") else line for line in open(\"custom.cfg\", \"r\")]; file = open(\"custom.cfg\", \"w\"); file.writelines(lines); file.close()'"
 	@echo ""
-	@echo "Run \`make install restart' to activate this password." 
+	@echo "Run \`make install restart' to activate this password."
 
 .PHONY: test
 test:
@@ -248,6 +249,11 @@ testall:
 	@echo "Running all tests (including slow and online tests) ..."
 	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); bin/py.test -v"
 
+.PHONY: pep8
+pep8:
+		@echo "Running pep8 checks ..."
+		bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); flake8"
+
 .PHONY: docs
 docs:
 	@echo "Generating docs with Sphinx ..."
@@ -256,7 +262,7 @@ docs:
 
 .PHONY: selfupdate
 selfupdate: bootstrap.sh requirements.sh .gitignore
-	@curl "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/Makefile" --silent --insecure --output Makefile 
+	@curl "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/Makefile" --silent --insecure --output Makefile
 
 ## Supervisor targets
 
@@ -289,7 +295,7 @@ Dockerfile: bootstrap
 	bin/buildout -c custom.cfg install docker
 
 .PHONY: dockerrmi
-dockerrmi: 
+dockerrmi:
 	@echo "Removing previous docker image ..."
 	docker rmi $(DOCKER_IMAGE)
 
