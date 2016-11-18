@@ -6,6 +6,7 @@ from .common import setup_with_db, setup_tokenstore
 
 from twitcher.registry import service_registry_factory
 
+
 class OWSProxyAppTest(unittest.TestCase):
 
     def setUp(self):
@@ -13,8 +14,8 @@ class OWSProxyAppTest(unittest.TestCase):
         self._setup_registry(config)
         config.include('twitcher.owsproxy')
         config.include('twitcher.tweens')
-        self.app= TestApp(config.make_wsgi_app())
-        
+        self.app = TestApp(config.make_wsgi_app())
+
     def tearDown(self):
         testing.tearDown()
 
@@ -36,7 +37,8 @@ class OWSProxyAppTest(unittest.TestCase):
     @pytest.mark.skip(reason="no way of currently testing this")
     @pytest.mark.online
     def test_describeprocess(self):
-        resp = self.app.get('/ows/proxy/twitcher?service=wps&request=describeprocess&version=1.0.0&identifier=dummyprocess')
+        resp = self.app.get(
+            '/ows/proxy/twitcher?service=wps&request=describeprocess&version=1.0.0&identifier=dummyprocess')
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
         resp.mustcontain('</wps:ProcessDescriptions>')
@@ -49,5 +51,3 @@ class OWSProxyAppTest(unittest.TestCase):
         assert resp.content_type == 'text/xml'
         print resp.body
         resp.mustcontain('<Exception exceptionCode="NoApplicableCode" locator="AccessForbidden">')
-
-   

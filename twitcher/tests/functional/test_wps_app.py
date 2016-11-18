@@ -20,7 +20,7 @@ class WpsAppTest(unittest.TestCase):
         self.token = setup_tokenstore(config)
         config.include('twitcher.wps')
         config.include('twitcher.tweens')
-        self.app= TestApp(config.make_wsgi_app())
+        self.app = TestApp(config.make_wsgi_app())
 
     def tearDown(self):
         pyramid.testing.tearDown()
@@ -48,7 +48,8 @@ class WpsAppTest(unittest.TestCase):
 
     @pytest.mark.online
     def test_describeprocess_with_invalid_token(self):
-        resp = self.app.get('/ows/wps?service=wps&request=describeprocess&version=1.0.0&identifier=dummyprocess&access_token=invalid')
+        resp = self.app.get(
+            '/ows/wps?service=wps&request=describeprocess&version=1.0.0&identifier=dummyprocess&access_token=invalid')
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
         resp.mustcontain('</wps:ProcessDescriptions>')
@@ -68,5 +69,5 @@ class WpsAppTest(unittest.TestCase):
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
         print resp.body
-        resp.mustcontain('<wps:ProcessSucceeded>PyWPS Process dummyprocess successfully calculated</wps:ProcessSucceeded>')
-
+        resp.mustcontain(
+            '<wps:ProcessSucceeded>PyWPS Process dummyprocess successfully calculated</wps:ProcessSucceeded>')
