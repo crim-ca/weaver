@@ -1,2 +1,2 @@
 python <3
-mongodb ==2.4.6
+mongodb ==2.6.12
