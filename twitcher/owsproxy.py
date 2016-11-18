@@ -119,7 +119,7 @@ def owsproxy(request):
         service_name = request.matchdict.get('service_name')
         extra_path = request.matchdict.get('extra_path')
         registry = service_registry_factory(request.registry)
-        service = registry.get_service(service_name)
+        service = registry.get_service_by_name(service_name)
     except Exception as err:
         return HTTPBadRequest("Could not find service: %s." % (err.message))
     else:
