@@ -26,6 +26,17 @@ def service_registry_factory(registry):
     return ServiceRegistry(collection=db.services)
 
 
+def doc2dict(doc):
+    """
+    Converts a mongodb document to a dictionary
+    """
+    return dict(
+        url=doc.get('url'),
+        name=doc.get('name'),
+        public=doc.get('public', False),
+        c4i=doc.get('c4i', False))
+
+
 class ServiceRegistry(object):
     """
     Registry for OWS services. Uses mongodb to store service url and attributes.
@@ -81,7 +92,7 @@ class ServiceRegistry(object):
                 'c4i': service.get('c4i', False)})
         return my_services
 
-    def get_service(self, name):
+    def get_service_by_name(self, name):
         """
         Get service for given ``name`` from registry database.
         """
@@ -90,8 +101,7 @@ class ServiceRegistry(object):
             raise ValueError('service not found')
         if 'url' not in service:
             raise ValueError('service has no url')
-        return dict(url=service.get('url'), name=name, public=service.get('public', False),
-                    c4i=service.get('c4i', False))
+        return doc2dict(service)
 
     def get_service_by_url(self, url):
         """
@@ -100,7 +110,7 @@ class ServiceRegistry(object):
         service = self.collection.find_one({'url': baseurl(url)})
         if not service:
             raise ValueError('service not found')
-        return dict(name=service.get('name'), url=url)
+        return doc2dict(service)
 
     def get_service_name(self, url):
         try:
@@ -112,7 +122,7 @@ class ServiceRegistry(object):
 
     def is_public(self, name):
         try:
-            service = self.get_service(name)
+            service = self.get_service_by_name(name)
             public = service.get('public', False)
         except ValueError:
             public = False

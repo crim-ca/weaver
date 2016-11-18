@@ -13,12 +13,12 @@ class ServiceRegistryTestCase(unittest.TestCase):
         self.service_public = dict(name="open_pingu", url="http://somewhere.in.the/deep_ocean", type="wps",
                                    public=True, c4i=False)
 
-    def test_get_service(self):
+    def test_get_service_by_name(self):
         collection_mock = mock.Mock(spec=["find_one"])
         collection_mock.find_one.return_value = self.service
 
         registry = ServiceRegistry(collection=collection_mock)
-        service = registry.get_service(name=self.service['name'])
+        service = registry.get_service_by_name(name=self.service['name'])
 
         collection_mock.find_one.assert_called_with({"name": self.service['name']})
         assert isinstance(service, dict)
