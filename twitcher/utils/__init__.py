@@ -2,6 +2,7 @@ import time
 from datetime import datetime
 import pytz
 from urlparse import urlparse
+from lxml import etree
 
 import logging
 logger = logging.getLogger(__name__)
@@ -57,3 +58,17 @@ def lxml_strip_ns(tree):
             continue  # node.tag is not a string (node is a comment or similar)
         if has_namespace:
             node.tag = node.tag.split('}', 1)[1]
+
+
+def replace_caps_urls(xml, url):
+    ns = {
+        'ows': 'http://www.opengis.net/ows/1.1',
+        'xlink': 'http://www.w3.org/1999/xlink'}
+    try:
+        doc = etree.fromstring(xml)
+        for element in doc.findall('ows:OperationsMetadata//*[@xlink:href]', namespaces=ns):
+            element.set('{http://www.w3.org/1999/xlink}href', url)
+        xml = etree.tostring(doc)
+    except:
+        logger.exception('Could not replace caps urls.')
+    return xml
