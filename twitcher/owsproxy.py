@@ -8,6 +8,7 @@ import requests
 
 from pyramid.httpexceptions import HTTPBadRequest, HTTPBadGateway, HTTPNotAcceptable
 from twitcher.owsexceptions import OWSAccessForbidden
+from twitcher.utils import replace_caps_urls
 from pyramid.response import Response
 from pyramid.settings import asbool
 
@@ -86,7 +87,9 @@ def _send_request(request, service, extra_path=None, request_params=None):
         if ct in ['text/xml', 'application/xml', 'text/xml;charset=ISO-8859-1']:
                 # replace urls in xml content
                 content = resp.content.decode('utf-8', 'ignore')
-                content = content.replace(service['url'], request.route_url('owsproxy', service_name=service['name']))
+                proxy_url = request.route_url('owsproxy', service_name=service['name'])
+                content = content.replace(service['url'], proxy_url)
+                content = replace_caps_urls(content, proxy_url)
         else:
             # raw content
             content = resp.content
