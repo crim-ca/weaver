@@ -6,6 +6,7 @@ from urlparse import urlparse
 import logging
 logger = logging.getLogger(__name__)
 
+
 def now():
     return localize_datetime(datetime.utcnow())
 
@@ -29,6 +30,7 @@ def localize_datetime(dt, tz_name='UTC'):
     else:
         logger.warn('tzinfo already set')
     return tz_aware_dt
+
 
 def baseurl(url):
     """
@@ -55,5 +57,3 @@ def lxml_strip_ns(tree):
             continue  # node.tag is not a string (node is a comment or similar)
         if has_namespace:
             node.tag = node.tag.split('}', 1)[1]
-
-
