@@ -60,7 +60,7 @@ def lxml_strip_ns(tree):
             node.tag = node.tag.split('}', 1)[1]
 
 
-def replace_caps_urls(xml, url):
+def replace_caps_url(xml, url):
     ns = {
         'ows': 'http://www.opengis.net/ows/1.1',
         'xlink': 'http://www.w3.org/1999/xlink'}
