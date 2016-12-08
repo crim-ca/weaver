@@ -65,6 +65,16 @@ def replace_caps_url(xml, url):
         'ows': 'http://www.opengis.net/ows/1.1',
         'xlink': 'http://www.w3.org/1999/xlink'}
     doc = etree.fromstring(xml)
-    for element in doc.findall('ows:OperationsMetadata//*[@xlink:href]', namespaces=ns):
-        element.set('{http://www.w3.org/1999/xlink}href', url)
+    # wms onlineResource
+    if 'WMT_MS_Capabilities' in doc.tag:
+        for element in doc.findall('.//OnlineResource[@xlink:href]', namespaces=ns):
+            parsed_url = urlparse(element.get('{http://www.w3.org/1999/xlink}href'))
+            new_url = url
+            if parsed_url.query:
+                new_url += '?' + parsed_url.query
+            element.set('{http://www.w3.org/1999/xlink}href', new_url)
+    # wps operations
+    elif 'Capabilities' in doc.tag:
+        for element in doc.findall('ows:OperationsMetadata//*[@xlink:href]', namespaces=ns):
+            element.set('{http://www.w3.org/1999/xlink}href', url)
     return etree.tostring(doc)
