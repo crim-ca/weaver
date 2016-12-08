@@ -1,0 +1,369 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE WMT_MS_Capabilities SYSTEM "http://schemas.opengis.net/wms/1.1.1/capabilities_1_1_1.dtd">
+<WMT_MS_Capabilities
+        version="1.1.1"
+        updateSequence="2016-12-08T13:20:32.466+01:00" >
+    <Service>
+        <Name>OGC:WMS</Name>
+        <Title>Birdhouse ncWMS2 Server</Title>
+        <Abstract>ncWMS2 Web Map Service used in Birdhouse</Abstract>
+        <KeywordList>
+        </KeywordList>
+        <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms"/>
+        <ContactInformation>
+            <ContactPersonPrimary>
+                <ContactPerson>Birdhouse Admin</ContactPerson>
+                <ContactOrganization>Birdhouse</ContactOrganization>
+            </ContactPersonPrimary>
+            <ContactVoiceTelephone></ContactVoiceTelephone>
+            <ContactElectronicMailAddress></ContactElectronicMailAddress>
+        </ContactInformation>
+        <Fees>none</Fees>
+        <AccessConstraints>none</AccessConstraints>
+    </Service>
+    <Capability>
+        <Request>
+            <GetCapabilities>
+                <Format>application/vnd.ogc.wms_xml</Format>
+                <DCPType>
+                    <HTTP>
+                        <Get>
+                            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms"/>
+                        </Get>
+                    </HTTP>
+                </DCPType>
+            </GetCapabilities>
+            <GetMap>
+                <Format>image/png</Format>
+                <Format>image/png;mode=32bit</Format>
+                <Format>image/gif</Format>
+                <Format>image/jpeg</Format>
+                <Format>application/vnd.google-earth.kmz</Format>
+                <DCPType>
+                    <HTTP>
+                        <Get>
+                            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms"/>
+                        </Get>
+                    </HTTP>
+                </DCPType>
+            </GetMap>
+            <GetFeatureInfo>
+                <Format>text/plain</Format>
+                <Format>text/xml</Format>
+                <DCPType>
+                    <HTTP>
+                        <Get>
+                            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms"/>
+                        </Get>
+                    </HTTP>
+                </DCPType>
+            </GetFeatureInfo>
+        </Request>
+        <Exception>
+            <Format>application/vnd.ogc.wms_xml</Format>
+        </Exception>
+        <Layer>
+            <Title>Birdhouse ncWMS2 Server</Title>
+            <SRS>EPSG:4326</SRS>
+            <SRS>CRS:84</SRS>
+            <SRS>EPSG:41001</SRS>
+            <SRS>EPSG:27700</SRS>
+            <SRS>EPSG:3408</SRS>
+            <SRS>EPSG:3409</SRS>
+            <SRS>EPSG:3857</SRS>
+            <SRS>EPSG:5041</SRS>
+            <SRS>EPSG:5042</SRS>
+            <SRS>EPSG:32661</SRS>
+            <SRS>EPSG:32761</SRS>
+            <Layer>
+                <Title>Dynamic service from uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc</Title>
+    <Layer queryable="1">
+        <Name>uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lat</Name>
+        <Title>lat</Title>
+        <LatLonBoundingBox minx="19.579328931910155" maxx="115.8184101373646" miny="-15.478689504229964" maxy="43.69543941681403"/>
+        <BoundingBox SRS="CRS:84" minx="19.579328931910155" maxx="115.8184101373646" miny="-15.478689504229964" maxy="43.69543941681403"/>
+    
+        <Style>
+            <Name>default-scalar/default</Name>
+            <Title>default-scalar/default</Title>
+            <Abstract>default-scalar style, using the default palette.  Available palettes can be found in the response to http://localhost:8080/ncWMS2/wms?request=GetMetadata&amp;item=layerDetails&amp;layerName=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lat</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=default&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lat&amp;STYLES=default-scalar/default"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>default-scalar/x-Rainbow</Name>
+            <Title>default-scalar/x-Rainbow</Title>
+            <Abstract>default-scalar style, using the x-Rainbow palette</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=x-Rainbow&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lat&amp;STYLES=default-scalar/x-Rainbow"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>default-scalar/x-Rainbow-inv</Name>
+            <Title>default-scalar/x-Rainbow-inv</Title>
+            <Abstract>default-scalar style, using the x-Rainbow-inv palette</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=x-Rainbow-inv&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lat&amp;STYLES=default-scalar/x-Rainbow-inv"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>colored_contours/default</Name>
+            <Title>colored_contours/default</Title>
+            <Abstract>colored_contours style, using the default palette.  Available palettes can be found in the response to http://localhost:8080/ncWMS2/wms?request=GetMetadata&amp;item=layerDetails&amp;layerName=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lat</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=default&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lat&amp;STYLES=colored_contours/default"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>colored_contours/x-Rainbow</Name>
+            <Title>colored_contours/x-Rainbow</Title>
+            <Abstract>colored_contours style, using the x-Rainbow palette</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=x-Rainbow&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lat&amp;STYLES=colored_contours/x-Rainbow"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>colored_contours/x-Rainbow-inv</Name>
+            <Title>colored_contours/x-Rainbow-inv</Title>
+            <Abstract>colored_contours style, using the x-Rainbow-inv palette</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=x-Rainbow-inv&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lat&amp;STYLES=colored_contours/x-Rainbow-inv"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>contours</Name>
+            <Title>contours</Title>
+            <Abstract>contours style</Abstract>
+        </Style>
+        <Style>
+            <Name>raster/default</Name>
+            <Title>raster/default</Title>
+            <Abstract>raster style, using the default palette.  Available palettes can be found in the response to http://localhost:8080/ncWMS2/wms?request=GetMetadata&amp;item=layerDetails&amp;layerName=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lat</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=default&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lat&amp;STYLES=raster/default"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>raster/x-Rainbow</Name>
+            <Title>raster/x-Rainbow</Title>
+            <Abstract>raster style, using the x-Rainbow palette</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=x-Rainbow&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lat&amp;STYLES=raster/x-Rainbow"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>raster/x-Rainbow-inv</Name>
+            <Title>raster/x-Rainbow-inv</Title>
+            <Abstract>raster style, using the x-Rainbow-inv palette</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=x-Rainbow-inv&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lat&amp;STYLES=raster/x-Rainbow-inv"/>
+            </LegendURL>
+        </Style>
+</Layer>
+    <Layer queryable="1">
+        <Name>uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lon</Name>
+        <Title>lon</Title>
+        <LatLonBoundingBox minx="19.579328931910155" maxx="115.8184101373646" miny="-15.478689504229964" maxy="43.69543941681403"/>
+        <BoundingBox SRS="CRS:84" minx="19.579328931910155" maxx="115.8184101373646" miny="-15.478689504229964" maxy="43.69543941681403"/>
+    
+        <Style>
+            <Name>default-scalar/default</Name>
+            <Title>default-scalar/default</Title>
+            <Abstract>default-scalar style, using the default palette.  Available palettes can be found in the response to http://localhost:8080/ncWMS2/wms?request=GetMetadata&amp;item=layerDetails&amp;layerName=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lon</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=default&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lon&amp;STYLES=default-scalar/default"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>default-scalar/x-Rainbow</Name>
+            <Title>default-scalar/x-Rainbow</Title>
+            <Abstract>default-scalar style, using the x-Rainbow palette</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=x-Rainbow&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lon&amp;STYLES=default-scalar/x-Rainbow"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>default-scalar/x-Rainbow-inv</Name>
+            <Title>default-scalar/x-Rainbow-inv</Title>
+            <Abstract>default-scalar style, using the x-Rainbow-inv palette</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=x-Rainbow-inv&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lon&amp;STYLES=default-scalar/x-Rainbow-inv"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>colored_contours/default</Name>
+            <Title>colored_contours/default</Title>
+            <Abstract>colored_contours style, using the default palette.  Available palettes can be found in the response to http://localhost:8080/ncWMS2/wms?request=GetMetadata&amp;item=layerDetails&amp;layerName=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lon</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=default&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lon&amp;STYLES=colored_contours/default"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>colored_contours/x-Rainbow</Name>
+            <Title>colored_contours/x-Rainbow</Title>
+            <Abstract>colored_contours style, using the x-Rainbow palette</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=x-Rainbow&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lon&amp;STYLES=colored_contours/x-Rainbow"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>colored_contours/x-Rainbow-inv</Name>
+            <Title>colored_contours/x-Rainbow-inv</Title>
+            <Abstract>colored_contours style, using the x-Rainbow-inv palette</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=x-Rainbow-inv&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lon&amp;STYLES=colored_contours/x-Rainbow-inv"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>contours</Name>
+            <Title>contours</Title>
+            <Abstract>contours style</Abstract>
+        </Style>
+        <Style>
+            <Name>raster/default</Name>
+            <Title>raster/default</Title>
+            <Abstract>raster style, using the default palette.  Available palettes can be found in the response to http://localhost:8080/ncWMS2/wms?request=GetMetadata&amp;item=layerDetails&amp;layerName=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lon</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=default&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lon&amp;STYLES=raster/default"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>raster/x-Rainbow</Name>
+            <Title>raster/x-Rainbow</Title>
+            <Abstract>raster style, using the x-Rainbow palette</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=x-Rainbow&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lon&amp;STYLES=raster/x-Rainbow"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>raster/x-Rainbow-inv</Name>
+            <Title>raster/x-Rainbow-inv</Title>
+            <Abstract>raster style, using the x-Rainbow-inv palette</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=x-Rainbow-inv&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/lon&amp;STYLES=raster/x-Rainbow-inv"/>
+            </LegendURL>
+        </Style>
+</Layer>
+    <Layer queryable="1">
+        <Name>uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/tasmax</Name>
+        <Title>tasmax</Title>
+        <LatLonBoundingBox minx="19.579328931910155" maxx="115.8184101373646" miny="-15.478689504229964" maxy="43.69543941681403"/>
+        <BoundingBox SRS="CRS:84" minx="19.579328931910155" maxx="115.8184101373646" miny="-15.478689504229964" maxy="43.69543941681403"/>
+        <Dimension name="time" units="unknown"/>
+        <Dimension name="elevation" units="$zDomain.verticalCrs.units"/>
+    
+        <Extent name="time" multipleValues="1" current="1" default="2005-12-31T12:00:00.000Z">
+            2001-01-01T12:00:00.000Z/2005-12-31T12:00:00.000Z/P1D
+        </Extent>
+        <Extent name="elevation" default="2.0">
+            2.0        </Extent>
+        <Style>
+            <Name>default-scalar/default</Name>
+            <Title>default-scalar/default</Title>
+            <Abstract>default-scalar style, using the default palette.  Available palettes can be found in the response to http://localhost:8080/ncWMS2/wms?request=GetMetadata&amp;item=layerDetails&amp;layerName=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/tasmax</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=default&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/tasmax&amp;STYLES=default-scalar/default"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>default-scalar/x-Rainbow</Name>
+            <Title>default-scalar/x-Rainbow</Title>
+            <Abstract>default-scalar style, using the x-Rainbow palette</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=x-Rainbow&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/tasmax&amp;STYLES=default-scalar/x-Rainbow"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>default-scalar/x-Rainbow-inv</Name>
+            <Title>default-scalar/x-Rainbow-inv</Title>
+            <Abstract>default-scalar style, using the x-Rainbow-inv palette</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=x-Rainbow-inv&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/tasmax&amp;STYLES=default-scalar/x-Rainbow-inv"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>colored_contours/default</Name>
+            <Title>colored_contours/default</Title>
+            <Abstract>colored_contours style, using the default palette.  Available palettes can be found in the response to http://localhost:8080/ncWMS2/wms?request=GetMetadata&amp;item=layerDetails&amp;layerName=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/tasmax</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=default&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/tasmax&amp;STYLES=colored_contours/default"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>colored_contours/x-Rainbow</Name>
+            <Title>colored_contours/x-Rainbow</Title>
+            <Abstract>colored_contours style, using the x-Rainbow palette</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=x-Rainbow&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/tasmax&amp;STYLES=colored_contours/x-Rainbow"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>colored_contours/x-Rainbow-inv</Name>
+            <Title>colored_contours/x-Rainbow-inv</Title>
+            <Abstract>colored_contours style, using the x-Rainbow-inv palette</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=x-Rainbow-inv&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/tasmax&amp;STYLES=colored_contours/x-Rainbow-inv"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>contours</Name>
+            <Title>contours</Title>
+            <Abstract>contours style</Abstract>
+        </Style>
+        <Style>
+            <Name>raster/default</Name>
+            <Title>raster/default</Title>
+            <Abstract>raster style, using the default palette.  Available palettes can be found in the response to http://localhost:8080/ncWMS2/wms?request=GetMetadata&amp;item=layerDetails&amp;layerName=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/tasmax</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=default&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/tasmax&amp;STYLES=raster/default"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>raster/x-Rainbow</Name>
+            <Title>raster/x-Rainbow</Title>
+            <Abstract>raster style, using the x-Rainbow palette</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=x-Rainbow&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/tasmax&amp;STYLES=raster/x-Rainbow"/>
+            </LegendURL>
+        </Style>
+        <Style>
+            <Name>raster/x-Rainbow-inv</Name>
+            <Title>raster/x-Rainbow-inv</Title>
+            <Abstract>raster style, using the x-Rainbow-inv palette</Abstract>
+            <LegendURL width="110" height="264">
+                <Format>image/png</Format>
+                <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="http://localhost:8080/ncWMS2/wms?REQUEST=GetLegendGraphic&amp;PALETTE=x-Rainbow-inv&amp;LAYERS=uploads/tasmax_WAS-44_MPI-M-MPI-ESM-LR_historical_r1i1p1_MPI-CSC-REMO2009_v1_day_20010101-20051231.nc/tasmax&amp;STYLES=raster/x-Rainbow-inv"/>
+            </LegendURL>
+        </Style>
+</Layer>
+            </Layer>
+        </Layer>
+    </Capability>
+</WMT_MS_Capabilities>
