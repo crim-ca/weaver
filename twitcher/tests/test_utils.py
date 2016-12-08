@@ -1,5 +1,7 @@
 import pytest
+from lxml import etree
 from twitcher import utils
+from .common import WPS_CAPS_EMU_XML
 
 
 def test_baseurl():
@@ -31,3 +33,12 @@ xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/
     assert doc.tag == '{http://www.opengis.net/wps/1.0.0}Execute'
     utils.lxml_strip_ns(doc)
     assert doc.tag == 'Execute'
+
+
+def test_replace_caps_url():
+    doc = etree.parse(WPS_CAPS_EMU_XML)
+    xml = etree.tostring(doc)
+    assert 'http://localhost:8094/wps' in xml
+    xml = utils.replace_caps_url(xml, "https://localhost/ows/proxy/emu")
+    assert 'http://localhost:8094/wps' not in xml
+    assert 'https://localhost/ows/proxy/emu' in xml
