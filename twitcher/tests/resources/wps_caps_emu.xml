@@ -1,0 +1,148 @@
+<!-- PyWPS 4.0.0 -->
+<wps:Capabilities xmlns:gml="http://www.opengis.net/gml" xmlns:ows="http://www.opengis.net/ows/1.1" xmlns:wps="http://www.opengis.net/wps/1.0.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" service="WPS" version="1.0.0" xml:lang="en-US" xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/wps/1.0.0/wpsGetCapabilities_response.xsd" updateSequence="1">
+  <ows:ServiceIdentification>
+    <ows:Title>Emu</ows:Title>
+    <ows:Abstract>WPS processes for testing and demos.</ows:Abstract>
+    <ows:Keywords>
+      <ows:Keyword>PyWPS</ows:Keyword>
+      <ows:Keyword>WPS</ows:Keyword>
+      <ows:Keyword>OGC</ows:Keyword>
+      <ows:Keyword>processing</ows:Keyword>
+      <ows:Keyword>Birdhouse</ows:Keyword>
+      <ows:Keyword>emu</ows:Keyword>
+      <ows:Type codeSpace="ISOTC211/19115">theme</ows:Type>
+    </ows:Keywords>
+    <ows:ServiceType>WPS</ows:ServiceType>
+    <ows:ServiceTypeVersion>1.0.0</ows:ServiceTypeVersion>
+    <ows:Fees>NONE</ows:Fees>
+    <ows:AccessConstraints>NONE</ows:AccessConstraints>
+  </ows:ServiceIdentification>
+  <ows:ServiceProvider>
+    <ows:ProviderName>Birdhouse/Emu</ows:ProviderName>
+    <ows:ProviderSite xlink:href="http://emu.readthedocs.org/en/latest/"/>
+    <ows:ServiceContact>
+      <ows:IndividualName>Lastname, Firstname</ows:IndividualName>
+      <ows:PositionName>Position Title</ows:PositionName>
+      <ows:ContactInfo>
+        <ows:Phone>
+          <ows:Voice>+xx-xxx-xxx-xxxx</ows:Voice>
+        </ows:Phone>
+        <ows:Address>
+          <ows:AdministrativeArea>Administrative Area</ows:AdministrativeArea>
+          <ows:PostalCode>Zip or Postal Code</ows:PostalCode>
+          <ows:ElectronicMailAddress>Email Address</ows:ElectronicMailAddress>
+        </ows:Address>
+        <ows:OnlineResource xlink:href="Contact URL"/>
+        <ows:HoursOfService>0:00-24:00</ows:HoursOfService>
+        <ows:ContactInstructions>During hours of service. Off on weekends.</ows:ContactInstructions>
+      </ows:ContactInfo>
+      <ows:Role>pointOfContact</ows:Role>
+    </ows:ServiceContact>
+  </ows:ServiceProvider>
+  <ows:OperationsMetadata>
+    <ows:Operation name="GetCapabilities">
+      <ows:DCP>
+        <ows:HTTP>
+          <ows:Get xlink:href="http://localhost:8094/wps"/>
+          <ows:Post xlink:href="http://localhost:8094/wps"/>
+        </ows:HTTP>
+      </ows:DCP>
+    </ows:Operation>
+    <ows:Operation name="DescribeProcess">
+      <ows:DCP>
+        <ows:HTTP>
+          <ows:Get xlink:href="http://localhost:8094/wps"/>
+          <ows:Post xlink:href="http://localhost:8094/wps"/>
+        </ows:HTTP>
+      </ows:DCP>
+    </ows:Operation>
+    <ows:Operation name="Execute">
+      <ows:DCP>
+        <ows:HTTP>
+          <ows:Get xlink:href="http://localhost:8094/wps"/>
+          <ows:Post xlink:href="http://localhost:8094/wps"/>
+        </ows:HTTP>
+      </ows:DCP>
+    </ows:Operation>
+  </ows:OperationsMetadata>
+  <wps:ProcessOfferings>
+    <wps:Process wps:processVersion="1.0">
+      <ows:Identifier>binaryoperatorfornumbers</ows:Identifier>
+      <ows:Title>Binary Operator for Numbers</ows:Title>
+      <ows:Abstract>Performs operation on two numbers and returns the answer.                This example process is taken from Climate4Impact.</ows:Abstract>
+      <ows:Metadata xlink:href="http://bird-house.github.io/" xlink:title="Birdhouse" xlink:type="simple"/>
+      <ows:Metadata xlink:href="http://emu.readthedocs.io/en/latest/" xlink:title="User Guide" xlink:type="simple"/>
+      <ows:Metadata xlink:href="https://dev.climate4impact.eu" xlink:title="Climate4Impact" xlink:type="simple"/>
+    </wps:Process>
+    <wps:Process wps:processVersion="1.0">
+      <ows:Identifier>wordcounter</ows:Identifier>
+      <ows:Title>Word Counter</ows:Title>
+      <ows:Abstract>Counts words in a given text.</ows:Abstract>
+    </wps:Process>
+    <wps:Process wps:processVersion="1.0">
+      <ows:Identifier>chomsky</ows:Identifier>
+      <ows:Title>Chomsky text generator</ows:Title>
+      <ows:Abstract>Generates a random chomsky text</ows:Abstract>
+    </wps:Process>
+    <wps:Process wps:processVersion="2.0">
+      <ows:Identifier>ultimate_question</ows:Identifier>
+      <ows:Title>Answer to the ultimate question</ows:Title>
+      <ows:Abstract>This process gives the answer to the ultimate question of "What is the meaning of life?</ows:Abstract>
+      <ows:Metadata xlink:title="Ultimate Question" xlink:type="simple"/>
+      <ows:Metadata xlink:title="What is the meaning of life" xlink:type="simple"/>
+    </wps:Process>
+    <wps:Process wps:processVersion="1.0">
+      <ows:Identifier>nap</ows:Identifier>
+      <ows:Title>Afternoon Nap (supports sync calls only)</ows:Title>
+      <ows:Abstract>This process will have a short nap for a given delay or 1 second if not a valid value.                This procces only supports synchronous WPS requests ...                 so, make sure the nap does not take to long.</ows:Abstract>
+      <ows:Metadata xlink:href="http://bird-house.github.io/" xlink:title="Birdhouse" xlink:type="simple"/>
+      <ows:Metadata xlink:href="http://emu.readthedocs.io/en/latest/" xlink:title="User Guide" xlink:type="simple"/>
+    </wps:Process>
+    <wps:Process wps:processVersion="1.0">
+      <ows:Identifier>sleep</ows:Identifier>
+      <ows:Title>Sleep Process</ows:Title>
+      <ows:Abstract>This process will sleep for a given delay or 10 seconds if not a valid value</ows:Abstract>
+      <ows:Metadata xlink:title="Sleep" xlink:type="simple"/>
+      <ows:Metadata xlink:title="Wait" xlink:type="simple"/>
+      <ows:Metadata xlink:title="Delay" xlink:type="simple"/>
+    </wps:Process>
+    <wps:Process wps:processVersion="0.1">
+      <ows:Identifier>bbox</ows:Identifier>
+      <ows:Title>Bounding box in- and out</ows:Title>
+      <ows:Abstract>Give bounding box, return the same</ows:Abstract>
+      <ows:Metadata xlink:href="http://bird-house.github.io/" xlink:title="Birdhouse" xlink:type="simple"/>
+      <ows:Metadata xlink:href="http://emu.readthedocs.io/en/latest/" xlink:title="User Guide" xlink:type="simple"/>
+    </wps:Process>
+    <wps:Process wps:processVersion="1.0">
+      <ows:Identifier>show_error</ows:Identifier>
+      <ows:Title>Show a WPS Error</ows:Title>
+      <ows:Abstract>This process will fail intentionally with a WPS error message.</ows:Abstract>
+      <ows:Metadata xlink:href="http://bird-house.github.io/" xlink:title="Birdhouse" xlink:type="simple"/>
+      <ows:Metadata xlink:href="http://emu.readthedocs.io/en/latest/" xlink:title="User Guide" xlink:type="simple"/>
+    </wps:Process>
+    <wps:Process wps:processVersion="2.0">
+      <ows:Identifier>dummyprocess</ows:Identifier>
+      <ows:Title>Dummy Process</ows:Title>
+      <ows:Abstract>DummyProcess to check the WPS structure</ows:Abstract>
+    </wps:Process>
+    <wps:Process wps:processVersion="1.4">
+      <ows:Identifier>hello</ows:Identifier>
+      <ows:Title>Say Hello</ows:Title>
+    </wps:Process>
+    <wps:Process wps:processVersion="1.0">
+      <ows:Identifier>inout</ows:Identifier>
+      <ows:Title>In and Out</ows:Title>
+      <ows:Abstract>Testing all WPS input and output parameters.</ows:Abstract>
+      <ows:Metadata xlink:href="http://bird-house.github.io/" xlink:title="Birdhouse" xlink:type="simple"/>
+      <ows:Metadata xlink:href="http://emu.readthedocs.io/en/latest/" xlink:title="User Guide" xlink:type="simple"/>
+    </wps:Process>
+  </wps:ProcessOfferings>
+  <wps:Languages>
+    <wps:Default>
+      <ows:Language>en-US</ows:Language>
+    </wps:Default>
+    <wps:Supported>
+      <ows:Language>en-US</ows:Language>
+    </wps:Supported>
+  </wps:Languages>
+</wps:Capabilities>
