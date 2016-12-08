@@ -1,10 +1,12 @@
 import pytest
 from twitcher import utils
 
+
 def test_baseurl():
     assert utils.baseurl('http://localhost:8094/wps') == 'http://localhost:8094/wps'
     assert utils.baseurl('http://localhost:8094/wps?service=wps&request=getcapabilities') == 'http://localhost:8094/wps'
-    assert utils.baseurl('https://localhost:8094/wps?service=wps&request=getcapabilities') == 'https://localhost:8094/wps'
+    assert utils.baseurl('https://localhost:8094/wps?service=wps&request=getcapabilities') ==\
+        'https://localhost:8094/wps'
     with pytest.raises(ValueError) as e_info:
         utils.baseurl('ftp://localhost:8094/wps')
 
@@ -17,9 +19,15 @@ def test_path_elements():
 
 def test_lxml_strip_ns():
     import lxml.etree
-    wpsxml = """<wps100:Execute xmlns:wps100="http://www.opengis.net/wps/1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" service="WPS" version="1.0.0" xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/wps/1.0.0/wpsExecute_request.xsd"/>"""
+    wpsxml = """
+<wps100:Execute
+xmlns:wps100="http://www.opengis.net/wps/1.0.0"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+service="WPS"
+version="1.0.0"
+xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/wps/1.0.0/wpsExecute_request.xsd"/>"""
 
     doc = lxml.etree.fromstring(wpsxml)
-    assert doc.tag=='{http://www.opengis.net/wps/1.0.0}Execute'
+    assert doc.tag == '{http://www.opengis.net/wps/1.0.0}Execute'
     utils.lxml_strip_ns(doc)
-    assert doc.tag=='Execute'
+    assert doc.tag == 'Execute'
