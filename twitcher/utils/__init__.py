@@ -64,11 +64,7 @@ def replace_caps_url(xml, url):
     ns = {
         'ows': 'http://www.opengis.net/ows/1.1',
         'xlink': 'http://www.w3.org/1999/xlink'}
-    try:
-        doc = etree.fromstring(xml)
-        for element in doc.findall('ows:OperationsMetadata//*[@xlink:href]', namespaces=ns):
-            element.set('{http://www.w3.org/1999/xlink}href', url)
-        xml = etree.tostring(doc)
-    except:
-        logger.exception('Could not replace caps urls.')
-    return xml
+    doc = etree.fromstring(xml)
+    for element in doc.findall('ows:OperationsMetadata//*[@xlink:href]', namespaces=ns):
+        element.set('{http://www.w3.org/1999/xlink}href', url)
+    return etree.tostring(doc)
