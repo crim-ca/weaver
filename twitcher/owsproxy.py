@@ -88,9 +88,7 @@ def _send_request(request, service, extra_path=None, request_params=None):
                 # replace urls in xml content
                 proxy_url = request.route_url('owsproxy', service_name=service['name'])
                 # TODO: where do i need to replace urls?
-                # content = resp.content.decode('utf-8', 'ignore')
-                # content = content.replace(service['url'], proxy_url)
-                content = replace_caps_url(resp.content, proxy_url)
+                content = replace_caps_url(resp.content, proxy_url, service.get('url'))
         else:
             # raw content
             content = resp.content

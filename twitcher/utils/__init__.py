@@ -60,7 +60,7 @@ def lxml_strip_ns(tree):
             node.tag = node.tag.split('}', 1)[1]
 
 
-def replace_caps_url(xml, url):
+def replace_caps_url(xml, url, prev_url=None):
     ns = {
         'ows': 'http://www.opengis.net/ows/1.1',
         'xlink': 'http://www.w3.org/1999/xlink'}
@@ -74,6 +74,7 @@ def replace_caps_url(xml, url):
             if parsed_url.query:
                 new_url += '?' + parsed_url.query
             element.set('{http://www.w3.org/1999/xlink}href', new_url)
+        xml = etree.tostring(doc)
     # wms 1.3.0 onlineResource
     elif 'WMS_Capabilities' in doc.tag:
         logger.debug("replace proxy urls in wms 1.3.0")
@@ -83,8 +84,13 @@ def replace_caps_url(xml, url):
             if parsed_url.query:
                 new_url += '?' + parsed_url.query
             element.set('{http://www.w3.org/1999/xlink}href', new_url)
+        xml = etree.tostring(doc)
     # wps operations
     elif 'Capabilities' in doc.tag:
         for element in doc.findall('ows:OperationsMetadata//*[@xlink:href]', namespaces=ns):
             element.set('{http://www.w3.org/1999/xlink}href', url)
-    return etree.tostring(doc)
+        xml = etree.tostring(doc)
+    elif prev_url:
+        xml = xml.decode('utf-8', 'ignore')
+        xml = xml.replace(prev_url, url)
+    return xml
