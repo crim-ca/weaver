@@ -65,9 +65,19 @@ def replace_caps_url(xml, url):
         'ows': 'http://www.opengis.net/ows/1.1',
         'xlink': 'http://www.w3.org/1999/xlink'}
     doc = etree.fromstring(xml)
-    # wms onlineResource
+    # wms 1.1.1 onlineResource
     if 'WMT_MS_Capabilities' in doc.tag:
+        logger.debug("replace proxy urls in wms 1.1.1")
         for element in doc.findall('.//OnlineResource[@xlink:href]', namespaces=ns):
+            parsed_url = urlparse(element.get('{http://www.w3.org/1999/xlink}href'))
+            new_url = url
+            if parsed_url.query:
+                new_url += '?' + parsed_url.query
+            element.set('{http://www.w3.org/1999/xlink}href', new_url)
+    # wms 1.3.0 onlineResource
+    elif 'WMS_Capabilities' in doc.tag:
+        logger.debug("replace proxy urls in wms 1.3.0")
+        for element in doc.findall('.//{http://www.opengis.net/wms}OnlineResource[@xlink:href]', namespaces=ns):
             parsed_url = urlparse(element.get('{http://www.w3.org/1999/xlink}href'))
             new_url = url
             if parsed_url.query:
