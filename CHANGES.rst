@@ -1,7 +1,7 @@
 Changes
 *******
 
-0.2.4 (2016-12-xx)
+0.2.4 (2016-12-15)
 ==================
 
 * using replace_caps_url in owsproxy.
