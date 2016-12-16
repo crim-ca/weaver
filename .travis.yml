@@ -1,6 +1,7 @@
 language: python
 branches:
   only:
+    - pingudev
     - develop
     - master
 os:
