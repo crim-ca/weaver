@@ -2,6 +2,7 @@ name: twitcher
 channels:
 - defaults
 - birdhouse
+- conda-forge
 dependencies:
 - python=2.7.12 
 - curl 
@@ -27,6 +28,7 @@ dependencies:
 - paste
 - pastedeploy
 - requests
+- requests-oauthlib
 - webob
 # pywps
 - pywps=3.2.6
