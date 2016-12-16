@@ -150,7 +150,9 @@ class TwitcherCtl(object):
         except Exception as e:
             logger.error(
                 'Unknown error occured. \
-                Maybe you need to use the "--insecure" option to access the service on HTTPS? %s',
+                Maybe you need to use the "--insecure" option to access the service on HTTPS? \
+                Is your service running and did you specify the correct service url (port)? \
+                %s',
                 e.message)
         else:
             return result
