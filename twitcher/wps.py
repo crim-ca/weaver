@@ -29,7 +29,7 @@ def _wps_cfg(request):
     settings = request.registry.settings
     return settings.get('twitcher.wps_cfg')
 
-    
+
 def pywps_view(request):
     """
     * TODO: add xml response renderer
@@ -67,7 +67,7 @@ def pywps_view(request):
             wps.performRequest(processes=os.environ.get("PYWPS_PROCESSES"))
             response_headers = [('Content-type', wps.request.contentType)]
             return wps.response
-    except WPSException,e:
+    except WPSException, e:
         return str(e)
     except Exception, e:
         return OWSNoApplicableCode(e.message)
@@ -85,6 +85,3 @@ def includeme(config):
         config.add_view(pywps_view, route_name='wps_secured', renderer='string')
         config.add_request_method(_wps_environ_keys, 'wps_environ_keys', reify=True)
         config.add_request_method(_wps_cfg, 'wps_cfg', reify=True)
-
-
-
