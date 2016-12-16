@@ -47,6 +47,7 @@ HTTP.SSL.CAPATH={esgf_certs_dir}
 class ESGFAccessManager(object):
     def __init__(self, url, esgf_dir=None, dap_config=None):
         self.url = url
+        self.certificate_url = "{}/oauth/certificate/".format(url)
         self.esgf_dir = esgf_dir or ESGF_DIR
         self.esgf_credentials = os.path.join(self.esgf_dir, ESGF_CREDENTIALS)
         self.esgf_certs_dir = os.path.join(self.esgf_dir, ESGF_CERTS_DIR)
@@ -59,7 +60,7 @@ class ESGFAccessManager(object):
         self._write_certificate(cert)
         self._write_dap_config()
 
-    def _get_certificate(self, client_id, access_token):
+    def _get_certificate(self, access_token):
         """
         Generates a new private key and certificate request, submits the request to be
         signed by the SLCS CA and returns the certificate.
@@ -83,13 +84,13 @@ class ESGFAccessManager(object):
 
         # Build the OAuth session object
         token = {'access_token': access_token, 'token_type': 'Bearer'}
-        slcs = OAuth2Session(client_id, token=token)
+        slcs = OAuth2Session(token=token)
         #headers = {}
         #headers['Authorization'] = 'Bearer %s' % access_token
         #post_data = urllib.urlencode({'certificate_request': encoded_cert_req})
 
         response = slcs.post(
-            self.url,
+            self.certificate_url,
             data={'certificate_request': encoded_cert_req},
             verify=False
         )
@@ -101,6 +102,7 @@ class ESGFAccessManager(object):
         if response.status_code == 200:
             content = "{} {}".format(response.text, private_key)
         else:
+            print(response.content)
             msg = "Could not get certificate: {} {}".format(response.status_code, response.reason)
             raise Exception(msg)
         return content
