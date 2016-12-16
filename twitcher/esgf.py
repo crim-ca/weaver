@@ -3,13 +3,14 @@ Module :mod:`twitcher.esgf`
 ==========================
 
 Retrieve an ESGF certificate using a esgf access token and
-prepare a `.dodsrc` file for OpenDAP access to the ESGF data archive.
+prepare a `.dodsrc` file for OpenDAP_ access to the ESGF data archive.
 
 This module uses code from esgf-slcs-client-example_ and esgf-pyclient_.
 
 
 .. _esgf-scls-client-example: https://github.com/cedadev/esgf-slcs-client-example
 .. _esgf-pyclient: https://github.com/ESGF/esgf-pyclient
+.. _OpenDAP: http://docs.opendap.org/index.php/Wiki_Testing/OPeNDAPUserGuideA#The_OPeNDAP_Client_Initialization_File_.28.dodsrc.29  # noqa
 
 """
 
