@@ -14,7 +14,7 @@ CPU_ARCH := $(shell uname -m 2>/dev/null || uname -p 2>/dev/null || echo "unknow
 
 # Python
 SETUPTOOLS_VERSION := 27.2.0
-CONDA_VERSION := 4.2.12
+CONDA_VERSION := 4.2.13
 
 # Anaconda
 ANACONDA_HOME ?= $(HOME)/anaconda
