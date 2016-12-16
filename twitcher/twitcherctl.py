@@ -12,10 +12,11 @@ logger = logging.getLogger(__name__)
 
 def _create_https_context(verify=True):
     context = ssl._create_default_https_context()
-    if verify == False:
+    if verify is False:
         context.check_hostname = False
         context.verify_mode = ssl.CERT_NONE
     return context
+
 
 def _create_server(url, verify_ssl=True, username=None, password=None):
     # TODO: disable basicauth when username is not set
@@ -28,6 +29,7 @@ def _create_server(url, verify_ssl=True, username=None, password=None):
     server = xmlrpclib.ServerProxy(url, context=context)
     return server
 
+
 class TwitcherCtl(object):
     """
     Command line to interact with the xmlrpc interface of the ``twitcher`` service.
@@ -37,7 +39,7 @@ class TwitcherCtl(object):
         parser = argparse.ArgumentParser(
             prog="twitcherctl",
             description='twitcherctl -- control twitcher service from the cmd line.',
-            )
+        )
         parser.add_argument("--debug",
                             help="Enable debug mode.",
                             action="store_true")
@@ -49,7 +51,7 @@ class TwitcherCtl(object):
                             help="Username to use for authentication with server.")
         parser.add_argument("-p", "--password",
                             help="Password to use for authentication with server")
-        parser.add_argument("-k", "--insecure", # like curl
+        parser.add_argument("-k", "--insecure",  # like curl
                             help="Don't validate the server's certificate.",
                             action="store_true")
 
@@ -58,23 +60,24 @@ class TwitcherCtl(object):
             dest='cmd',
             title='command',
             description='List of available commands',
-            )
+        )
 
         # token
         # -----
         subparser = subparsers.add_parser('gentoken', help="Generates an access token.")
-        subparser.add_argument('-H', '--valid-in-hours', type=int, default=1, help="Set how long the token is valid in hours (default: 1 hour).")
-        subparser.add_argument('-e', '--env', nargs='*', default=[], help="Set environment variable (key=value).")
-        
+        subparser.add_argument('-H', '--valid-in-hours', type=int, default=1,
+                               help="Set how long the token is valid in hours (default: 1 hour).")
+        subparser.add_argument('-e', '--env', nargs='*', default=[],
+                               help="Set environment variable (key=value).")
+
         subparser = subparsers.add_parser('revoke', help="Removes given access token.")
         subparser.add_argument('token', help="access token")
-        
+
         subparser = subparsers.add_parser('clean', help="Removes all access tokens.")
-        
 
         # service registry
         # ----------------
-        
+
         # status
         subparser = subparsers.add_parser('status', help="Lists all registered OWS services used by OWS proxy.")
 
@@ -82,10 +85,11 @@ class TwitcherCtl(object):
         subparser = subparsers.add_parser('purge', help="Removes all OWS services from the registry.")
 
         # register
-        subparser = subparsers.add_parser('register', help="Adds OWS service to the registry to be used by the OWS proxy.")
+        subparser = subparsers.add_parser('register',
+                                          help="Adds OWS service to the registry to be used by the OWS proxy.")
         subparser.add_argument('url', help="Service url.")
         subparser.add_argument('--name', help="Service name. If not set then a name will be generated.")
-        subparser.add_argument('--type', default='wps', 
+        subparser.add_argument('--type', default='wps',
                                help="Service type (wps, wms). Default: wps.")
         subparser.add_argument('--public', action='store_true',
                                help="If set then service has no access restrictions.")
@@ -109,7 +113,7 @@ class TwitcherCtl(object):
             if not password:
                 password = getpass.getpass(prompt='Password:')
 
-        verify_ssl = args.insecure == False
+        verify_ssl = args.insecure is False
         server = _create_server(
             url=args.serverurl, verify_ssl=verify_ssl,
             username=args.username, password=password)
@@ -127,7 +131,7 @@ class TwitcherCtl(object):
             elif args.cmd == 'purge':
                 result = server.purge()
             elif args.cmd == 'gentoken':
-                user_environ = {k:v for k,v in (x.split('=') for x in args.env) }
+                user_environ = {k: v for k, v in (x.split('=') for x in args.env)}
                 result = server.gentoken(args.valid_in_hours, user_environ)
             elif args.cmd == 'revoke':
                 result = server.revoke(args.token)
@@ -136,13 +140,21 @@ class TwitcherCtl(object):
         except xmlrpclib.Fault as e:
             logger.error("A fault occurred: %s (%d)", e.faultString, e.faultCode)
         except xmlrpclib.ProtocolError as e:
-            logger.error("A protocol error occurred. URL: %s, HTTP/HTTPS headers: %s, Error code: %d, Error message: %s",  e.url, e.headers, e.errcode, e.errmsg)
+            logger.error(
+                "A protocol error occurred. URL: %s, HTTP/HTTPS headers: %s, Error code: %d, Error message: %s",
+                e.url, e.headers, e.errcode, e.errmsg)
         except xmlrpclib.ResponseError as e:
-            logger.error("A response error occured. Maybe service needs authentication with username and password? %s", e.message)
+            logger.error(
+                "A response error occured. Maybe service needs authentication with username and password? %s",
+                e.message)
         except Exception as e:
-            logger.error('Unknown error occured. Maybe you need to use the "--insecure" option to access the service on HTTPS? %s', e.message)
+            logger.error(
+                'Unknown error occured. \
+                Maybe you need to use the "--insecure" option to access the service on HTTPS? %s',
+                e.message)
         else:
             return result
+
 
 def main():
     logger.setLevel(logging.INFO)
