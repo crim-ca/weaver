@@ -38,7 +38,7 @@ dependencies:
 - gevent=1.1.1
 # mongodb
 - pymongo=3
-- mongodb
+- mongodb=2.6.*|3.3.9
 - pip:
   - genshi==0.7
   - beaker
