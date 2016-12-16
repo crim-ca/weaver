@@ -13,7 +13,7 @@ from twitcher.owsexceptions import OWSNoApplicableCode
 import logging
 logger = logging.getLogger(__name__)
 
-DEFAULT_KEYS = ['PYWPS_CFG', 'PYWPS_PROCESSES', 'PYWPS_TEMPLATES']
+DEFAULT_KEYS = ['PYWPS_CFG', 'PYWPS_PROCESSES', 'PYWPS_TEMPLATES', 'DODS_CONF']
 
 
 def _wps_environ_keys(request):
