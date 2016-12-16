@@ -23,21 +23,19 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-ROOT_PATH = '/tmp/'
-ESGF_DIR = ROOT_PATH
 ESGF_CERTS_DIR = 'certificates'
 ESGF_CREDENTIALS = 'credentials.pem'
-DAP_CONFIG = os.path.join(ROOT_PATH, '.dodsrc')
+DAP_CONFIG = 'dodsrc'
 DAP_CONFIG_MARKER = '<<< Managed by twitcher >>>'
 
 DAP_CONFIG_TEMPL = """\
 {preamble}
 # BEGIN {marker}
 HTTP.VERBOSE={verbose}
-HTTP.COOKIEJAR={esgf_dir}/.dods_cookies
+HTTP.COOKIEJAR={base_dir}/dods_cookies
 HTTP.SSL.VALIDATE=0
-HTTP.SSL.CERTIFICATE={esgf_dir}/credentials.pem
-HTTP.SSL.KEY={esgf_dir}/credentials.pem
+HTTP.SSL.CERTIFICATE={esgf_credentials}
+HTTP.SSL.KEY={esgf_credentials}
 HTTP.SSL.CAPATH={esgf_certs_dir}
 # END {marker}
 {postamble}
@@ -45,13 +43,13 @@ HTTP.SSL.CAPATH={esgf_certs_dir}
 
 
 class ESGFAccessManager(object):
-    def __init__(self, url, esgf_dir=None, dap_config=None):
+    def __init__(self, url, base_dir=None):
         self.url = url
         self.certificate_url = "{}/oauth/certificate/".format(url)
-        self.esgf_dir = esgf_dir or ESGF_DIR
-        self.esgf_credentials = os.path.join(self.esgf_dir, ESGF_CREDENTIALS)
-        self.esgf_certs_dir = os.path.join(self.esgf_dir, ESGF_CERTS_DIR)
-        self.dap_config = dap_config or DAP_CONFIG
+        self.base_dir = base_dir or '.'
+        self.esgf_credentials = os.path.join(self.base_dir, ESGF_CREDENTIALS)
+        self.esgf_certs_dir = os.path.join(self.base_dir, ESGF_CERTS_DIR)
+        self.dap_config = os.path.join(self.base_dir, DAP_CONFIG)
 
         os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
@@ -115,8 +113,9 @@ class ESGFAccessManager(object):
         with open(self.dap_config, 'w') as fh:
             fh.write(DAP_CONFIG_TEMPL.format(verbose=1 if verbose else 0,
                                              validate=1 if validate else 0,
+                                             base_dir=self.base_dir,
                                              esgf_certs_dir=self.esgf_certs_dir,
-                                             esgf_dir=self.esgf_dir,
+                                             esgf_credentials=self.esgf_credentials,
                                              marker=DAP_CONFIG_MARKER,
                                              preamble='',
                                              postamble='',
