@@ -1,4 +1,5 @@
+from .wps_hello import Hello
 
-__all__ = [
-    "wps_helloworld",
-    ]
+processes = [
+    Hello(),
+]
