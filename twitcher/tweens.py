@@ -21,7 +21,7 @@ def ows_security_tween_factory(handler, registry):
     if access to OWS service is not allowed."""
 
     security = owssecurity_factory(registry)
- 
+
     def ows_security_tween(request):
         try:
             security.check_request(request)
@@ -32,7 +32,7 @@ def ows_security_tween_factory(handler, registry):
         except Exception as err:
             logger.exception("unknown error")
             return OWSNoApplicableCode(err.message)
-        
+
     return ows_security_tween
 
 OWS_SECURITY = 'twitcher.tweens.ows_security_tween_factory'

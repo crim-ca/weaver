@@ -18,12 +18,11 @@ def main(global_config, **settings):
     config.include('twitcher.rpcinterface')
     config.include('twitcher.owsproxy')
     config.include('twitcher.wps')
-    
+
     # tweens/middleware
     # TODO: maybe add tween for exception handling or use unknown_failure view
     config.include('twitcher.tweens')
-   
+
     config.scan()
 
     return config.make_wsgi_app()
-
