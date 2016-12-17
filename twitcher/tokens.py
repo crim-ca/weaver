@@ -30,7 +30,8 @@ def tokengenerator_factory(registry):
 
 
 def expires_at(hours=1):
-    return now_secs() + hours * 3600 
+    return now_secs() + hours * 3600
+
 
 class AccessTokenStore(object):
 
@@ -40,7 +41,6 @@ class AccessTokenStore(object):
         """
         raise NotImplementedError
 
-          
     def delete_token(self, token):
         """
         Deletes an access token from the store using its token string to identify it.
@@ -51,7 +51,6 @@ class AccessTokenStore(object):
         """
         raise NotImplementedError
 
-    
     def fetch_by_token(self, token):
         """
         Fetches an access token from the store using its token string to
@@ -62,13 +61,11 @@ class AccessTokenStore(object):
         """
         raise NotImplementedError
 
-
     def clean_tokens(self):
         """
         Removes all tokens from database.
         """
         raise NotImplementedError
-
 
 
 class MongodbAccessTokenStore(AccessTokenStore):
@@ -78,17 +75,14 @@ class MongodbAccessTokenStore(AccessTokenStore):
     def save_token(self, access_token):
         self.collection.insert_one(access_token)
 
-          
     def delete_token(self, token):
         self.collection.delete_one({'token': token})
 
-    
     def fetch_by_token(self, token):
         token = self.collection.find_one({'token': token})
         if not token:
             raise AccessTokenNotFound
         return AccessToken(token)
-
 
     def clean_tokens(self):
         self.collection.drop()
@@ -106,15 +100,15 @@ class AccessTokenGenerator(object):
         TODO: maybe specify how often a token can be used
         """
         access_token = AccessToken(
-            token = self.generate(),
-            expires_at = expires_at(hours=valid_in_hours),
-            user_environ = user_environ)
+            token=self.generate(),
+            expires_at=expires_at(hours=valid_in_hours),
+            user_environ=user_environ)
         return access_token
-    
+
     def generate(self):
         raise NotImplementedError
 
-    
+
 class UuidGenerator(AccessTokenGenerator):
     """
     Generate a token using uuid4.
@@ -125,25 +119,23 @@ class UuidGenerator(AccessTokenGenerator):
         """
         return uuid.uuid4().get_hex()
 
-    
+
 class AccessToken(dict):
     """
     Dictionary that contains access token. It always has ``'token'`` key.
     """
-    
+
     def __init__(self, *args, **kwargs):
         super(AccessToken, self).__init__(*args, **kwargs)
         if 'token' not in self:
             raise TypeError("'token' is required")
 
-        self.expires_at = int( self.get("expires_at", 0) )
+        self.expires_at = int(self.get("expires_at", 0))
 
-            
     @property
     def token(self):
         """Access token string."""
         return self['token']
-
 
     @property
     def expires_in(self):
@@ -158,7 +150,6 @@ class AccessToken(dict):
             return time_left
         return 0
 
-    
     def is_expired(self):
         """
         Determines if the token has expired.
@@ -172,26 +163,15 @@ class AccessToken(dict):
 
         return True
 
-    
     @property
     def user_environ(self):
         environ = self.get('user_environ') or {}
         return environ
 
-    
     def __str__(self):
         return self.token
 
-    
     def __repr__(self):
         cls = type(self)
         repr_ = dict.__repr__(self)
         return '{0}.{1}({2})'.format(cls.__module__, cls.__name__, repr_)
-
-
-
-    
-
-
-
-
