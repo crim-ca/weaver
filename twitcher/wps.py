@@ -15,7 +15,12 @@ from twitcher.owsexceptions import OWSNoApplicableCode
 import logging
 logger = logging.getLogger(__name__)
 
-DEFAULT_KEYS = ['PYWPS_CFG', 'PYWPS_PROCESSES', 'PYWPS_TEMPLATES', 'DODS_CONF']
+DEFAULT_KEYS = ['PYWPS_CFG', 'DODS_CONF']
+
+
+def _wps_cfg(request):
+    settings = request.registry.settings
+    return settings.get('twitcher.wps_cfg')
 
 
 def _wps_environ_keys(request):
@@ -27,37 +32,28 @@ def _wps_environ_keys(request):
     return keys
 
 
-def _wps_cfg(request):
-    settings = request.registry.settings
-    return settings.get('twitcher.wps_cfg')
-
-
-def pywps_view2(request):
+@wsgiapp2
+def pywps_view(environ, start_response):
     """
     * TODO: add xml response renderer
     * TODO: fix exceptions ... use OWSException (raise ...)
     """
-    if request.wps_cfg:
-        os.environ['PYWPS_CFG'] = request.wps_cfg
-
     # set the environ for wps from request environ
-    for key in request.wps_environ_keys:
-        if key in request.environ:
-            os.environ[key] = request.environ[key]
+    # for key in request.wps_environ_keys:
+    #    if key in request.environ:
+    #        os.environ[key] = request.environ[key]
 
-    # create the WPS object
-    service = request.context
-    return Response(service)
+    logger.debug('pywps env: %s', environ.keys())
+
+    # call pywps application
+    service = Service(processes, ['wps.cfg'])
+    return service(environ, start_response)
 
 
 def includeme(config):
     settings = config.registry.settings
 
     if asbool(settings.get('twitcher.wps', True)):
-        # convert pywps app to pyramid view
-        pywps_app = Service(processes, ['wps.cfg'])
-        pywps_view = wsgiapp2(pywps_app)
-
         config.add_route('wps', '/ows/wps')
         config.add_route('wps_secured', '/ows/wps/{access_token}')
         config.add_view(pywps_view, route_name='wps')
