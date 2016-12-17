@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 ESGF_CERTS_DIR = 'certificates'
 ESGF_CREDENTIALS = 'credentials.pem'
-DAP_CONFIG = 'dodsrc'
+DAP_CONFIG = '.dodsrc'
 DAP_CONFIG_MARKER = '<<< Managed by twitcher >>>'
 
 DAP_CONFIG_TEMPL = """\
@@ -84,9 +84,9 @@ class ESGFAccessManager(object):
         # Build the OAuth session object
         token = {'access_token': access_token, 'token_type': 'Bearer'}
         slcs = OAuth2Session(token=token)
-        #headers = {}
-        #headers['Authorization'] = 'Bearer %s' % access_token
-        #post_data = urllib.urlencode({'certificate_request': encoded_cert_req})
+        # headers = {}
+        # headers['Authorization'] = 'Bearer %s' % access_token
+        # post_data = urllib.urlencode({'certificate_request': encoded_cert_req})
 
         response = slcs.post(
             self.certificate_url,
