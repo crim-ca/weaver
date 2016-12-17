@@ -24,14 +24,14 @@ dependencies:
 # twitcher
 - argcomplete
 - beautiful-soup
-- lxml=3.6.0
+- lxml=3.6
 - paste
 - pastedeploy
 - requests
 - requests-oauthlib
 - webob
 # pywps
-- pywps=3.2.6
+- pywps=4
 - gdal
 # nginx, supervisor
 - nginx=1.10.1
