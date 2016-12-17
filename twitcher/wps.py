@@ -1,13 +1,15 @@
 """
-pywps wrapper
+pywps 4.x wrapper
 """
 import os
 
+from pyramid.response import Response
+from pyramid.wsgi import wsgiapp2
 from pyramid.httpexceptions import HTTPBadRequest
 from pyramid.settings import asbool, aslist
 
-import pywps
-from pywps.Exceptions import WPSException
+from pywps.app.Service import Service
+from twitcher.processes import processes
 from twitcher.owsexceptions import OWSNoApplicableCode
 
 import logging
@@ -30,27 +32,11 @@ def _wps_cfg(request):
     return settings.get('twitcher.wps_cfg')
 
 
-def pywps_view(request):
+def pywps_view2(request):
     """
     * TODO: add xml response renderer
     * TODO: fix exceptions ... use OWSException (raise ...)
     """
-    response = request.response
-    response.status = "200 OK"
-    response.content_type = "text/xml"
-
-    inputQuery = None
-    os.environ["REQUEST_METHOD"] = request.method
-    if request.method == "GET":
-        inputQuery = request.query_string
-    elif request.method == "POST":
-        inputQuery = request.body_file_raw
-    else:
-        return HTTPBadRequest()
-
-    if not inputQuery:
-        return OWSNoApplicableCode("No query string found.")
-
     if request.wps_cfg:
         os.environ['PYWPS_CFG'] = request.wps_cfg
 
@@ -60,28 +46,21 @@ def pywps_view(request):
             os.environ[key] = request.environ[key]
 
     # create the WPS object
-    try:
-        wps = pywps.Pywps(os.environ["REQUEST_METHOD"], os.environ.get("PYWPS_CFG"))
-        if wps.parseRequest(inputQuery):
-            pywps.debug(wps.inputs)
-            wps.performRequest(processes=os.environ.get("PYWPS_PROCESSES"))
-            response_headers = [('Content-type', wps.request.contentType)]
-            return wps.response
-    except WPSException, e:
-        return str(e)
-    except Exception, e:
-        return OWSNoApplicableCode(e.message)
+    service = request.context
+    return Response(service)
 
 
 def includeme(config):
     settings = config.registry.settings
 
     if asbool(settings.get('twitcher.wps', True)):
-        # logger.debug('Add twitcher wps application')
+        # convert pywps app to pyramid view
+        pywps_app = Service(processes, ['wps.cfg'])
+        pywps_view = wsgiapp2(pywps_app)
 
         config.add_route('wps', '/ows/wps')
         config.add_route('wps_secured', '/ows/wps/{access_token}')
-        config.add_view(pywps_view, route_name='wps', renderer='string')
-        config.add_view(pywps_view, route_name='wps_secured', renderer='string')
+        config.add_view(pywps_view, route_name='wps')
+        config.add_view(pywps_view, route_name='wps_secured')
         config.add_request_method(_wps_environ_keys, 'wps_environ_keys', reify=True)
         config.add_request_method(_wps_cfg, 'wps_cfg', reify=True)
