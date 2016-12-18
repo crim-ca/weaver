@@ -45,8 +45,8 @@ class TwitcherCtl(object):
                             action="store_true")
         parser.add_argument('-s', '--serverurl',
                             metavar='URL',
-                            default='https://localhost:38083',
-                            help='URL on which twitcher server is listening (default "https://localhost:38083").')
+                            default='https://localhost:5000',
+                            help='URL on which twitcher server is listening (default "https://localhost:5000").')
         parser.add_argument("-u", "--username",
                             help="Username to use for authentication with server.")
         parser.add_argument("-p", "--password",

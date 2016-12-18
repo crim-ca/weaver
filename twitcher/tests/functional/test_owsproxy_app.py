@@ -23,7 +23,7 @@ class OWSProxyAppTest(unittest.TestCase):
         registry = service_registry_factory(config.registry)
         registry.clear_services()
         # TODO: testing against ourselfs ... not so good
-        url = "https://localhost:38083/ows/wps"
+        url = "https://localhost:5000/ows/wps"
         registry.register_service(url=url, name="twitcher")
 
     @pytest.mark.skip(reason="no way of currently testing this")
