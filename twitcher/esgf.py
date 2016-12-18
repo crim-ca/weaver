@@ -15,6 +15,7 @@ This module uses code from esgf-slcs-client-example_ and esgf-pyclient_.
 """
 
 import os
+import tempfile
 from OpenSSL import crypto
 import base64
 import requests
@@ -41,9 +42,11 @@ HTTP.SSL.CAPATH={esgf_certs_dir}
 """
 
 
-def fetch_certificate(url, access_token):
+def fetch_certificate(url, access_token, workdir=None):
     logger.debug("fetch certificate for %s", access_token)
-    mgr = ESGFAccessManager(url, base_dir='/tmp')
+    workdir = workdir or tempfile.gettempdir()
+    tempdir = tempfile.mkdtemp(prefix='twitcher_', dir=workdir)
+    mgr = ESGFAccessManager(url, base_dir=tempdir)
     mgr.logon(access_token)
     return mgr.base_dir
 
