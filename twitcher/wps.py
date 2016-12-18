@@ -15,7 +15,8 @@ from twitcher.owsexceptions import OWSNoApplicableCode
 import logging
 logger = logging.getLogger(__name__)
 
-DEFAULT_KEYS = ['PYWPS_CFG', 'DODS_CONF']
+DEFAULT_KEYS = ['PYWPS_CFG', 'DODS_CONF', 'HOME']
+PYWPS_CFG = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'wps.cfg')
 
 
 def _wps_cfg(request):
@@ -46,7 +47,9 @@ def pywps_view(environ, start_response):
     logger.debug('pywps env: %s', environ.keys())
 
     # call pywps application
-    service = Service(processes, ['wps.cfg'])
+    if 'PYWPS_CFG' not in environ:
+        environ['PYWPS_CFG'] = PYWPS_CFG
+    service = Service(processes, [environ['PYWPS_CFG']])
     return service(environ, start_response)
 
 
