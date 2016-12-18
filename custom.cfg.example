@@ -4,6 +4,7 @@ extends = buildout.cfg
 [settings]
 hostname = localhost 
 http-port = 8083
+https-port = 5000
 log-level = WARN
 username =
 password =
