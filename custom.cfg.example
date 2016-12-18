@@ -12,3 +12,4 @@ ows-proxy = true
 rpcinterface = true
 wps = true
 wps-cfg =
+temp-path =
