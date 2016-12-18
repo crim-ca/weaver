@@ -31,9 +31,17 @@ class RPCInterface(object):
     def gentoken(self, valid_in_hours=1, user_environ=None):
         """
         Generates an access token which is valid for ``valid_in_hours``.
-        Stores the optional ``user_environ`` dict with the token.
+
+        Arguments:
+
+        * ``valid_in_hours``: number of hours the token is valid.
+        * ``user_environ``: environment used with this token (dict object).
+        Possible keys: ``esgf_access_token``, ``esgf_slcs_service_url``.
         """
-        access_token = self.tokengenerator.create_access_token(valid_in_hours=valid_in_hours, user_environ=user_environ)
+        access_token = self.tokengenerator.create_access_token(
+            valid_in_hours=valid_in_hours,
+            user_environ=user_environ,
+        )
         self.tokenstore.save_token(access_token)
         return access_token.token
 
