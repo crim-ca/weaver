@@ -62,6 +62,7 @@ class OWSSecurity(object):
                         if 'esgf_access_token' in request.environ and 'esgf_slcs_service_url' in request.environ:
                             request.environ['HOME'] = fetch_certificate(
                                 url=request.environ['esgf_slcs_service_url'],
-                                access_token=request.environ['esgf_access_token'])
+                                access_token=request.environ['esgf_access_token'],
+                                workdir=request.workdir)
                     except AccessTokenNotFound:
                         raise OWSAccessForbidden("Access token is required to access this service.")
