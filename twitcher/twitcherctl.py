@@ -67,6 +67,10 @@ class TwitcherCtl(object):
         subparser = subparsers.add_parser('gentoken', help="Generates an access token.")
         subparser.add_argument('-H', '--valid-in-hours', type=int, default=1,
                                help="Set how long the token is valid in hours (default: 1 hour).")
+        subparser.add_argument('-S', '--esgf-slcs-service-url', default="https://172.28.128.3",
+                               help="URL of ESGF SLCS service (default: https://172.28.128.3).")
+        subparser.add_argument('-T', '--esgf-access-token',
+                               help="ESGF access token to retrieve a certificate from ESGF SLCS service (optional).")
         subparser.add_argument('-e', '--env', nargs='*', default=[],
                                help="Set environment variable (key=value).")
 
@@ -132,6 +136,9 @@ class TwitcherCtl(object):
                 result = server.purge()
             elif args.cmd == 'gentoken':
                 user_environ = {k: v for k, v in (x.split('=') for x in args.env)}
+                if args.esgf_access_token:
+                    user_environ['esgf_access_token'] = args.esgf_access_token
+                    user_environ['esgf_slcs_service_url'] = args.esgf_slcs_service_url
                 result = server.gentoken(args.valid_in_hours, user_environ)
             elif args.cmd == 'revoke':
                 result = server.revoke(args.token)
