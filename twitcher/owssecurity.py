@@ -5,6 +5,7 @@ from twitcher.tokens import tokenstore_factory
 from twitcher.registry import service_registry_factory
 from twitcher.registry import parse_service_name
 from twitcher.owsrequest import OWSRequest
+from twitcher.esgf import fetch_certificate
 
 import logging
 logger = logging.getLogger(__name__)
@@ -58,5 +59,9 @@ class OWSSecurity(object):
                             raise OWSAccessForbidden("Access token is expired.")
                         # update request with user environ from access token
                         request.environ.update(access_token.user_environ)
+                        if 'esgf_access_token' in request.environ and 'esgf_slcs_service_url' in request.environ:
+                            request.environ['HOME'] = fetch_certificate(
+                                url=request.environ['esgf_slcs_service_url'],
+                                access_token=request.environ['esgf_access_token'])
                     except AccessTokenNotFound:
                         raise OWSAccessForbidden("Access token is required to access this service.")
