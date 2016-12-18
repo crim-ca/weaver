@@ -30,7 +30,6 @@ DAP_CONFIG = '.dodsrc'
 DAP_CONFIG_MARKER = '<<< Managed by twitcher >>>'
 
 DAP_CONFIG_TEMPL = """\
-{preamble}
 # BEGIN {marker}
 HTTP.VERBOSE={verbose}
 HTTP.COOKIEJAR={base_dir}/dods_cookies
@@ -39,14 +38,19 @@ HTTP.SSL.CERTIFICATE={esgf_credentials}
 HTTP.SSL.KEY={esgf_credentials}
 HTTP.SSL.CAPATH={esgf_certs_dir}
 # END {marker}
-{postamble}
 """
 
 
+def fetch_certificate(url, access_token):
+    logger.debug("fetch certificate for %s", access_token)
+    mgr = ESGFAccessManager(url, base_dir='/tmp')
+    mgr.logon(access_token)
+    return mgr.base_dir
+
+
 class ESGFAccessManager(object):
-    def __init__(self, url, base_dir=None):
-        self.url = url
-        self.certificate_url = "{}/oauth/certificate/".format(url)
+    def __init__(self, slcs_service_url, base_dir=None):
+        self.certificate_url = "{}/oauth/certificate/".format(slcs_service_url)
         self.base_dir = base_dir or '.'
         self.esgf_credentials = os.path.join(self.base_dir, ESGF_CREDENTIALS)
         self.esgf_certs_dir = os.path.join(self.base_dir, ESGF_CERTS_DIR)
@@ -101,7 +105,6 @@ class ESGFAccessManager(object):
         if response.status_code == 200:
             content = "{} {}".format(response.text, private_key)
         else:
-            print(response.content)
             msg = "Could not get certificate: {} {}".format(response.status_code, response.reason)
             raise Exception(msg)
         return content
@@ -118,6 +121,4 @@ class ESGFAccessManager(object):
                                              esgf_certs_dir=self.esgf_certs_dir,
                                              esgf_credentials=self.esgf_credentials,
                                              marker=DAP_CONFIG_MARKER,
-                                             preamble='',
-                                             postamble='',
                                              ))
