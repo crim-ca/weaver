@@ -71,6 +71,8 @@ class TwitcherCtl(object):
                                help="URL of ESGF SLCS service (default: https://172.28.128.3).")
         subparser.add_argument('-T', '--esgf-access-token',
                                help="ESGF access token to retrieve a certificate from ESGF SLCS service (optional).")
+        subparser.add_argument('-C', '--esgf-credentials',
+                               help="File path to ESGF credentials.pem used for testing purpose only.")
         subparser.add_argument('-e', '--env', nargs='*', default=[],
                                help="Set environment variable (key=value).")
 
@@ -139,6 +141,8 @@ class TwitcherCtl(object):
                 if args.esgf_access_token:
                     user_environ['esgf_access_token'] = args.esgf_access_token
                     user_environ['esgf_slcs_service_url'] = args.esgf_slcs_service_url
+                if args.esgf_credentials:
+                    user_environ['esgf_credentials'] = args.esgf_credentials
                 result = server.gentoken(args.valid_in_hours, user_environ)
             elif args.cmd == 'revoke':
                 result = server.revoke(args.token)
