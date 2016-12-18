@@ -7,9 +7,10 @@ http-port = 8083
 log-level = WARN
 username =
 password =
+workdir =
 ows-security = true
 ows-proxy = true
 rpcinterface = true
 wps = true
 wps-cfg =
-temp-path =
+

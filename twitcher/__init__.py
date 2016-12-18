@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 def _workdir(request):
     settings = request.registry.settings
-    workdir = settings.get('twitcher.temp_path')
+    workdir = settings.get('twitcher.workdir')
     workdir = workdir or tempfile.gettempdir()
     logger.debug('using workdir %s', workdir)
     return workdir
