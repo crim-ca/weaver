@@ -46,6 +46,7 @@ def fetch_certificate(url, access_token, workdir=None):
     logger.debug("fetch certificate for %s", access_token)
     workdir = workdir or tempfile.gettempdir()
     tempdir = tempfile.mkdtemp(prefix='twitcher_', dir=workdir)
+    logger.debug('created twitcher tempdir %s', tempdir)
     mgr = ESGFAccessManager(url, base_dir=tempdir)
     mgr.logon(access_token)
     return mgr.base_dir
