@@ -109,7 +109,7 @@ class TwitcherCtl(object):
 
         password = args.password
         if args.username:
-            #username = raw_input('Username:')
+            # username = raw_input('Username:')
             if not password:
                 password = getpass.getpass(prompt='Password:')
 
