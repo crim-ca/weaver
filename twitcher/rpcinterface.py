@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 api_xmlrpc = functools.partial(xmlrpc_method, endpoint="api")
 
 
-@view_defaults(permission='admin')
+@view_defaults(permission='view')
 class RPCInterface(object):
     def __init__(self, request):
         self.request = request
@@ -130,7 +130,7 @@ def includeme(config):
     settings = config.registry.settings
 
     if asbool(settings.get('twitcher.rpcinferface', True)):
-        # logger.debug('Add twitcher rpcinterface')
+        logger.debug('Add twitcher rpcinterface')
 
         # using basic auth
         config.include('twitcher.basicauth')
