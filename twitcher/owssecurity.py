@@ -64,7 +64,7 @@ class OWSSecurity(object):
                                 url=request.environ['esgf_slcs_service_url'],
                                 access_token=request.environ['esgf_access_token'],
                                 workdir=request.workdir,
-                                credentials=request.environ['esgf_credentials'])
+                                credentials=request.environ.get('esgf_credentials'))
                             request.headers['HOME'] = home_dir
                     except AccessTokenNotFound:
                         raise OWSAccessForbidden("Access token is required to access this service.")
