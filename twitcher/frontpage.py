@@ -11,8 +11,3 @@ def frontpage(request):
 
 def includeme(config):
     config.add_route('frontpage', '/')
-
-
-    
-
-   
