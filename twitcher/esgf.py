@@ -43,16 +43,16 @@ HTTP.SSL.CAPATH={esgf_certs_dir}
 """
 
 
-def fetch_certificate(url, access_token, workdir=None, credentials=None):
+def fetch_certificate(url, access_token, workdir=None, test_credentials=None):
     logger.debug("fetch certificate for %s", access_token)
     workdir = workdir or tempfile.gettempdir()
     tempdir = tempfile.mkdtemp(prefix='twitcher_', dir=workdir)
     logger.debug('created twitcher tempdir %s', tempdir)
     mgr = ESGFAccessManager(url, base_dir=tempdir)
     mgr.logon(access_token)
-    if credentials:
-        logger.warn('overwriting credentials.pem with %s', credentials)
-        shutil.copy2(credentials, mgr.esgf_credentials)
+    if test_credentials:
+        logger.warn('overwriting credentials.pem with %s', test_credentials)
+        shutil.copy2(test_credentials, mgr.esgf_credentials)
     return mgr.base_dir
 
 

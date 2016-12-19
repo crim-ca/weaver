@@ -1,19 +1,9 @@
-import tempfile
-
 from pyramid.config import Configurator
 
 import logging
 logger = logging.getLogger(__name__)
 
 __version__ = '0.3.0'
-
-
-def _workdir(request):
-    settings = request.registry.settings
-    workdir = settings.get('twitcher.workdir')
-    workdir = workdir or tempfile.gettempdir()
-    logger.debug('using workdir %s', workdir)
-    return workdir
 
 
 def main(global_config, **settings):
@@ -34,9 +24,6 @@ def main(global_config, **settings):
     # tweens/middleware
     # TODO: maybe add tween for exception handling or use unknown_failure view
     config.include('twitcher.tweens')
-
-    # configuraton
-    config.add_request_method(_workdir, 'workdir', reify=True)
 
     config.scan()
 
