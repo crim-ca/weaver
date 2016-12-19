@@ -5,6 +5,8 @@ from pyramid.config import Configurator
 import logging
 logger = logging.getLogger(__name__)
 
+__version__ = '0.4.0'
+
 
 def _workdir(request):
     settings = request.registry.settings
