@@ -1,6 +1,6 @@
 # MongoDB
 # http://docs.pylonsproject.org/projects/pyramid-cookbook/en/latest/database/mongodb.html
-# maybe use event to register mongodb   
+# maybe use event to register mongodb
 
 import pymongo
 
@@ -26,11 +26,3 @@ def includeme(config):
         #     db.authenticate(db_url.username, db_url.password)
         return db
     config.add_request_method(_add_db, 'db', reify=True)
-
-
-    
-
-
-
-
-
