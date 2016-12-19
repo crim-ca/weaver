@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 # shortcut for xmlrpc_method
-api_xmlrpc = functools.partial(xmlrpc_method, endpoint="api")
+# api_xmlrpc = functools.partial(xmlrpc_method, endpoint="api")
 
 
 @view_defaults(permission='view')
@@ -26,8 +26,8 @@ class RPCInterface(object):
         self.registry = service_registry_factory(registry)
 
     # token management
+    # ----------------
 
-    @api_xmlrpc()
     def gentoken(self, valid_in_hours=1, user_environ=None):
         """
         Generates an access token which is valid for ``valid_in_hours``.
@@ -45,14 +45,12 @@ class RPCInterface(object):
         self.tokenstore.save_token(access_token)
         return access_token.token
 
-    @api_xmlrpc()
     def revoke(self, token):
         """
         Remove token from tokenstore.
         """
         self.tokenstore.delete_token(token)
 
-    @api_xmlrpc()
     def clean(self):
         """
         Removes all tokens.
@@ -66,8 +64,8 @@ class RPCInterface(object):
             return True
 
     # service registry
+    # ----------------
 
-    @api_xmlrpc()
     def register(self, url, name=None, service_type=None, public=False):
         """
         Adds an OWS service with the given ``url`` to the registry.
@@ -75,7 +73,6 @@ class RPCInterface(object):
         service = self.registry.register_service(url=url, name=name, service_type=service_type, public=public)
         return service['name']
 
-    @api_xmlrpc()
     def unregister(self, name):
         """
         Removes OWS service with the given ``name`` from the registry.
@@ -88,7 +85,6 @@ class RPCInterface(object):
         else:
             return True
 
-    @api_xmlrpc()
     def status(self):
         """
         Lists all registred OWS services.
@@ -102,7 +98,6 @@ class RPCInterface(object):
             logger.exception('register failed')
             return []
 
-    @api_xmlrpc()
     def purge(self):
         """
         Removes all services from the registry.
@@ -140,3 +135,12 @@ def includeme(config):
         config.include('pyramid_rpc.xmlrpc')
         config.include('twitcher.db')
         config.add_xmlrpc_endpoint('api', '/RPC2')
+
+        # register xmlrpc methods
+        config.add_xmlrpc_method(RPCInterface, attr='gentoken', endpoint='api', method='gentoken')
+        config.add_xmlrpc_method(RPCInterface, attr='revoke', endpoint='api', method='revoke')
+        config.add_xmlrpc_method(RPCInterface, attr='clean', endpoint='api', method='clean')
+        config.add_xmlrpc_method(RPCInterface, attr='register', endpoint='api', method='register')
+        config.add_xmlrpc_method(RPCInterface, attr='unregister', endpoint='api', method='unregister')
+        config.add_xmlrpc_method(RPCInterface, attr='purge', endpoint='api', method='purge')
+        config.add_xmlrpc_method(RPCInterface, attr='status', endpoint='api', method='status')
