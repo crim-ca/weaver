@@ -43,7 +43,9 @@ class RPCInterface(object):
             user_environ=user_environ,
         )
         self.tokenstore.save_token(access_token)
-        return access_token.token
+        return {
+            'access_token': access_token.token,
+            'expires_at': access_token.expires_at}
 
     def revoke(self, token):
         """
@@ -66,11 +68,15 @@ class RPCInterface(object):
     # service registry
     # ----------------
 
-    def register(self, url, name=None, service_type=None, public=False):
+    def register(self, url, name, service_type, public, c4i, overwrite):
         """
         Adds an OWS service with the given ``url`` to the registry.
         """
-        service = self.registry.register_service(url=url, name=name, service_type=service_type, public=public)
+        service = self.registry.register_service(
+            url=url, name=name, service_type=service_type,
+            public=public,
+            c4i=c4i,
+            overwrite=overwrite)
         return service['name']
 
     def unregister(self, name):
@@ -84,6 +90,45 @@ class RPCInterface(object):
             return False
         else:
             return True
+
+    def get_service_name(self, url):
+        """
+        Get service name for given ``url``.
+        """
+        try:
+            name = self.registry.get_service_name(url=url)
+        except:
+            logger.exception('could not get service with url %s', url)
+            return ''
+        else:
+            return name
+
+    def get_service_by_name(self, name):
+        """
+        Get service for given ``name`` from registry database.
+        """
+        try:
+            service = self.registry.get_service_by_name(name=name)
+        except:
+            logger.exception('could not get service with name %s', name)
+            return {}
+        else:
+            return service
+
+    def get_service_by_url(self, url):
+        """
+        Get service for given ``url`` from registry database.
+        """
+        try:
+            service = self.registry.get_service_by_url(url=url)
+        except:
+            logger.exception('could not get service with url %s', url)
+            return {}
+        else:
+            return service
+
+    def is_public(self, name):
+        return self.registry.is_public(name=name)
 
     def status(self):
         """
@@ -142,5 +187,9 @@ def includeme(config):
         config.add_xmlrpc_method(RPCInterface, attr='clean', endpoint='api', method='clean')
         config.add_xmlrpc_method(RPCInterface, attr='register', endpoint='api', method='register')
         config.add_xmlrpc_method(RPCInterface, attr='unregister', endpoint='api', method='unregister')
+        config.add_xmlrpc_method(RPCInterface, attr='is_public', endpoint='api', method='is_public')
+        config.add_xmlrpc_method(RPCInterface, attr='get_service_name', endpoint='api', method='get_service_name')
+        config.add_xmlrpc_method(RPCInterface, attr='get_service_by_name', endpoint='api', method='get_service_by_name')
+        config.add_xmlrpc_method(RPCInterface, attr='get_service_by_url', endpoint='api', method='get_service_by_url')
         config.add_xmlrpc_method(RPCInterface, attr='purge', endpoint='api', method='purge')
         config.add_xmlrpc_method(RPCInterface, attr='status', endpoint='api', method='status')
