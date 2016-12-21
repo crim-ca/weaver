@@ -28,13 +28,14 @@ logger = logging.getLogger(__name__)
 
 ESGF_CERTS_DIR = 'certificates'
 ESGF_CREDENTIALS = 'credentials.pem'
+HTTP_RC = '.httprc'
 DAP_CONFIG = '.dodsrc'
 DAP_CONFIG_MARKER = '<<< Managed by twitcher >>>'
 
 DAP_CONFIG_TEMPL = """\
 # BEGIN {marker}
 HTTP.VERBOSE={verbose}
-HTTP.COOKIEJAR={base_dir}/dods_cookies
+HTTP.COOKIEJAR={base_dir}/.dods_cookies
 HTTP.SSL.VALIDATE=0
 HTTP.SSL.CERTIFICATE={esgf_credentials}
 HTTP.SSL.KEY={esgf_credentials}
@@ -43,10 +44,14 @@ HTTP.SSL.CAPATH={esgf_certs_dir}
 """
 
 
-def fetch_certificate(url, access_token, workdir=None, prefix=None, test_credentials=None):
+def fetch_certificate(request):
+    url = request.environ['esgf_slcs_service_url']
+    access_token = request.environ['esgf_access_token']
     logger.debug("fetch certificate for %s", access_token)
-    workdir = workdir or tempfile.gettempdir()
-    prefix = prefix or 'pywps_process_'
+    test_credentials = request.esgf_test_credentials
+
+    workdir = request.workdir
+    prefix = request.prefix
     tempdir = tempfile.mkdtemp(prefix=prefix, dir=workdir)
     logger.debug('created twitcher tempdir %s', tempdir)
     mgr = ESGFAccessManager(url, base_dir=tempdir)
@@ -64,6 +69,7 @@ class ESGFAccessManager(object):
         self.esgf_credentials = os.path.join(self.base_dir, ESGF_CREDENTIALS)
         self.esgf_certs_dir = os.path.join(self.base_dir, ESGF_CERTS_DIR)
         self.dap_config = os.path.join(self.base_dir, DAP_CONFIG)
+        self.httprc = os.path.join(self.base_dir, HTTP_RC)
 
         os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
@@ -123,11 +129,14 @@ class ESGFAccessManager(object):
             fh.write(certificate)
 
     def _write_dap_config(self, verbose=False, validate=False):
+        content = DAP_CONFIG_TEMPL.format(
+            verbose=1 if verbose else 0,
+            validate=1 if validate else 0,
+            base_dir=self.base_dir,
+            esgf_certs_dir=self.esgf_certs_dir,
+            esgf_credentials=self.esgf_credentials,
+            marker=DAP_CONFIG_MARKER,
+        )
         with open(self.dap_config, 'w') as fh:
-            fh.write(DAP_CONFIG_TEMPL.format(verbose=1 if verbose else 0,
-                                             validate=1 if validate else 0,
-                                             base_dir=self.base_dir,
-                                             esgf_certs_dir=self.esgf_certs_dir,
-                                             esgf_credentials=self.esgf_credentials,
-                                             marker=DAP_CONFIG_MARKER,
-                                             ))
+            fh.write(content)
+        shutil.copy2(self.dap_config, self.httprc)
