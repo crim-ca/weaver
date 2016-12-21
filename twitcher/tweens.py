@@ -17,6 +17,7 @@ def includeme(config):
         logger.info('Add OWS security tween')
         config.add_tween(OWS_SECURITY, under=EXCVIEW)
         config.add_request_method(_workdir, 'workdir', reify=True)
+        config.add_request_method(_prefix, 'prefix', reify=True)
         config.add_request_method(_esgf_test_credentials, 'esgf_test_credentials', reify=True)
 
 
@@ -26,6 +27,13 @@ def _workdir(request):
     workdir = workdir or tempfile.gettempdir()
     logger.debug('using workdir %s', workdir)
     return workdir
+
+
+def _prefix(request):
+    settings = request.registry.settings
+    prefix = settings.get('twitcher.prefix')
+    prefix = prefix or 'pywps_process_'
+    return prefix
 
 
 def _esgf_test_credentials(request):
