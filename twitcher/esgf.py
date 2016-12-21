@@ -43,10 +43,11 @@ HTTP.SSL.CAPATH={esgf_certs_dir}
 """
 
 
-def fetch_certificate(url, access_token, workdir=None, test_credentials=None):
+def fetch_certificate(url, access_token, workdir=None, prefix=None, test_credentials=None):
     logger.debug("fetch certificate for %s", access_token)
     workdir = workdir or tempfile.gettempdir()
-    tempdir = tempfile.mkdtemp(prefix='pywps_process_', dir=workdir)
+    prefix = prefix or 'pywps_process_'
+    tempdir = tempfile.mkdtemp(prefix=prefix, dir=workdir)
     logger.debug('created twitcher tempdir %s', tempdir)
     mgr = ESGFAccessManager(url, base_dir=tempdir)
     mgr.logon(access_token)

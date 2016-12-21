@@ -64,6 +64,7 @@ class OWSSecurity(object):
                                 url=request.environ['esgf_slcs_service_url'],
                                 access_token=request.environ['esgf_access_token'],
                                 workdir=request.workdir,
+                                prefix=request.prefix,
                                 test_credentials=request.esgf_test_credentials)
                             request.headers['X-Request-ID'] = workdir.split('_')[-1]
                             logger.debug('request id: %s', request.headers.get('X-Request-ID'))
