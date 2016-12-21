@@ -31,10 +31,7 @@ dependencies:
 - requests-oauthlib
 - webob
 # pywps
-- pywps=4
-- gdal
-# wps processes
-- netcdf4=1.2.4
+- pywps=4.0.0
 # nginx, supervisor
 - nginx=1.10.1
 - supervisor=3.3.1
