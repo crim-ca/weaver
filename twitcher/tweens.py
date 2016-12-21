@@ -32,7 +32,7 @@ def _workdir(request):
 def _prefix(request):
     settings = request.registry.settings
     prefix = settings.get('twitcher.prefix')
-    prefix = prefix or 'pywps_process_'
+    prefix = prefix or 'twitcher_'
     return prefix
 
 
