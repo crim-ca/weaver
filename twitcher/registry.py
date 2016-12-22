@@ -80,7 +80,7 @@ class ServiceRegistry(object):
 
     def list_services(self):
         """
-        Lists all servcies in registry database.
+        Lists all services in registry database.
         """
         my_services = []
         for service in self.collection.find().sort('name', pymongo.ASCENDING):
