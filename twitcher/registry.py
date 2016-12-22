@@ -1,6 +1,7 @@
 import pymongo
 
-from twitcher.utils import namesgenerator, baseurl
+from twitcher.utils import baseurl
+from twitcher import namesgenerator
 from twitcher.db import mongodb
 from twitcher.exceptions import RegistrationException
 
