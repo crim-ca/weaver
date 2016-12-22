@@ -1,10 +1,6 @@
-pyramid>=1.5.7
+pyramid>=1.7.3
 pyramid_rpc
-pyramid_beaker
 webob
-paste
-pastedeploy
 requests
 pymongo
 argcomplete
-pywps

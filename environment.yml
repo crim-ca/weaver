@@ -4,14 +4,14 @@ channels:
 - birdhouse
 - conda-forge
 dependencies:
-- python=2.7.12 
-- curl 
+- python=2.7.12
+- curl
 - pyopenssl
 - cryptography
 - mako
 - pyyaml
 # tests
-- pytest 
+- pytest
 - flake8
 - mock
 - pbr
@@ -19,11 +19,10 @@ dependencies:
 # ipython
 - ipython
 # sphinx
-- sphinx 
+- sphinx
 - sphinx_rtd_theme
 # twitcher
 - argcomplete
-- beautiful-soup
 - lxml=3.6
 - paste
 - pastedeploy
@@ -42,7 +41,5 @@ dependencies:
 - mongodb=2.6.*|3.3.9
 - pip:
   - genshi==0.7
-  - beaker
-  - pyramid-beaker
   - pyramid-rpc
   - sphinx-autoapi==0.4.0

@@ -12,9 +12,6 @@ def main(global_config, **settings):
 
     config = Configurator(settings=settings)
 
-    # beaker session
-    config.include('pyramid_beaker')
-
     # include twitcher components
     config.include('twitcher.frontpage')
     config.include('twitcher.rpcinterface')
