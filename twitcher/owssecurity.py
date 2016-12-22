@@ -61,6 +61,6 @@ class OWSSecurity(object):
                         request.environ.update(access_token.user_environ)
                         if 'esgf_access_token' in request.environ and 'esgf_slcs_service_url' in request.environ:
                             workdir = fetch_certificate(request)
-                            request.headers['HOME'] = workdir
+                            request.headers['X-Requested-Workdir'] = workdir
                     except AccessTokenNotFound:
                         raise OWSAccessForbidden("Access token is required to access this service.")
