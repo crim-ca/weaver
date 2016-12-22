@@ -41,7 +41,7 @@ class WpsAppTest(unittest.TestCase):
 
     @pytest.mark.online
     def test_describeprocess(self):
-        resp = self.app.get('/ows/wps?service=wps&request=describeprocess&version=1.0.0&identifier=dummyprocess')
+        resp = self.app.get('/ows/wps?service=wps&request=describeprocess&version=1.0.0&identifier=hello')
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
         resp.mustcontain('</wps:ProcessDescriptions>')
@@ -49,14 +49,14 @@ class WpsAppTest(unittest.TestCase):
     @pytest.mark.online
     def test_describeprocess_with_invalid_token(self):
         resp = self.app.get(
-            '/ows/wps?service=wps&request=describeprocess&version=1.0.0&identifier=dummyprocess&access_token=invalid')
+            '/ows/wps?service=wps&request=describeprocess&version=1.0.0&identifier=hello&access_token=invalid')
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
         resp.mustcontain('</wps:ProcessDescriptions>')
 
     @pytest.mark.online
     def test_execute_not_allowed(self):
-        resp = self.app.get('/ows/wps?service=wps&request=execute&version=1.0.0&identifier=dummyprocess')
+        resp = self.app.get('/ows/wps?service=wps&request=execute&version=1.0.0&identifier=hello')
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
         print resp.body
@@ -64,10 +64,11 @@ class WpsAppTest(unittest.TestCase):
 
     @pytest.mark.online
     def test_execute_allowed(self):
-        url = '/ows/wps?service=wps&request=execute&version=1.0.0&identifier=dummyprocess&access_token=%s' % self.token
+        url = "/ows/wps?service=wps&request=execute&version=1.0.0&identifier=hello&datainputs=name=tux"
+        url += "&access_token={}".format(self.token)
         resp = self.app.get(url)
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
         print resp.body
         resp.mustcontain(
-            '<wps:ProcessSucceeded>PyWPS Process dummyprocess successfully calculated</wps:ProcessSucceeded>')
+            '<wps:ProcessSucceeded>PyWPS Process Say Hello finished</wps:ProcessSucceeded>')
