@@ -1,4 +1,6 @@
-from pywps import Process, LiteralInput, LiteralOutput, OGCUNIT, UOM
+import os
+
+from pywps import Process, LiteralInput, LiteralOutput
 
 import logging
 LOGGER = logging.getLogger("PYWPS")
@@ -24,7 +26,7 @@ class Hello(Process):
         )
 
     def _handler(self, request, response):
-        LOGGER.info("run helloworld")
+        response.update_status("saying hello ...", 0)
+        LOGGER.debug("HOME=%s, Current Dir=%s", os.environ.get('HOME'), os.path.abspath(os.curdir))
         response.outputs['output'].data = 'Hello ' + request.inputs['name'][0].data
-        response.outputs['output'].uom = UOM('unity')
         return response
