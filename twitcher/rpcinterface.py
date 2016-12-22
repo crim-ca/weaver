@@ -143,7 +143,7 @@ class RPCInterface(object):
             logger.exception('register failed')
             return []
 
-    def purge(self):
+    def clear_services(self):
         """
         Removes all services from the registry.
         """

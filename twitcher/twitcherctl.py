@@ -1,33 +1,13 @@
 import getpass
 import argcomplete
 import argparse
-import xmlrpclib
-import ssl
 from urlparse import urlparse
+
+from twitcher.client import TwitcherService
 
 import logging
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.WARN)
 logger = logging.getLogger(__name__)
-
-
-def _create_https_context(verify=True):
-    context = ssl._create_default_https_context()
-    if verify is False:
-        context.check_hostname = False
-        context.verify_mode = ssl.CERT_NONE
-    return context
-
-
-def _create_server(url, verify_ssl=True, username=None, password=None):
-    # TODO: disable basicauth when username is not set
-    username = username or 'nouser'
-    password = password or 'nopass'
-
-    parsed = urlparse(url)
-    url = "%s://%s:%s@%s%s" % (parsed.scheme, username, password, parsed.netloc, parsed.path)
-    context = _create_https_context(verify=verify_ssl)
-    server = xmlrpclib.ServerProxy(url, context=context)
-    return server
 
 
 class TwitcherCtl(object):
@@ -118,49 +98,36 @@ class TwitcherCtl(object):
                 password = getpass.getpass(prompt='Password:')
 
         verify_ssl = args.insecure is False
-        server = _create_server(
-            url=args.serverurl, verify_ssl=verify_ssl,
-            username=args.username, password=password)
+        service = TwitcherService(url=args.serverurl,
+                                  username=args.username,
+                                  password=password,
+                                  verify=verify_ssl)
         result = None
         try:
             if args.cmd == 'status':
-                result = server.status()
+                result = service.status()
             elif args.cmd == 'register':
-                if args.name:
-                    result = server.register(args.url, args.name, args.type, args.public)
-                else:
-                    result = server.register(args.url, None, args.type, args.public)
+                result = service.register_service(
+                    url=args.url,
+                    name=args.name,
+                    service_type=args.type,
+                    public=args.public)
             elif args.cmd == 'unregister':
-                result = server.unregister(args.name)
+                result = service.unregister_service(name=args.name)
             elif args.cmd == 'purge':
-                result = server.purge()
+                result = service.clear_services()
             elif args.cmd == 'gentoken':
-                user_environ = {k: v for k, v in (x.split('=') for x in args.env)}
+                environ = {k: v for k, v in (x.split('=') for x in args.env)}
                 if args.esgf_access_token:
-                    user_environ['esgf_access_token'] = args.esgf_access_token
-                    user_environ['esgf_slcs_service_url'] = args.esgf_slcs_service_url
-                result = server.gentoken(args.valid_in_hours, user_environ)
+                    environ['esgf_access_token'] = args.esgf_access_token
+                    environ['esgf_slcs_service_url'] = args.esgf_slcs_service_url
+                result = service.gentoken(valid_in_hours=args.valid_in_hours, environ=environ)
             elif args.cmd == 'revoke':
-                result = server.revoke(args.token)
+                result = service.revoke(args.token)
             elif args.cmd == 'clean':
-                result = server.clean()
-        except xmlrpclib.Fault as e:
-            logger.error("A fault occurred: %s (%d)", e.faultString, e.faultCode)
-        except xmlrpclib.ProtocolError as e:
-            logger.error(
-                "A protocol error occurred. URL: %s, HTTP/HTTPS headers: %s, Error code: %d, Error message: %s",
-                e.url, e.headers, e.errcode, e.errmsg)
-        except xmlrpclib.ResponseError as e:
-            logger.error(
-                "A response error occured. Maybe service needs authentication with username and password? %s",
-                e.message)
+                result = service.clean()
         except Exception as e:
-            logger.error(
-                'Unknown error occured. \
-                Maybe you need to use the "--insecure" option to access the service on HTTPS? \
-                Is your service running and did you specify the correct service url (port)? \
-                %s',
-                e.message)
+            logger.error("Error: %s", e.message)
         else:
             return result
 
