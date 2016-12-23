@@ -47,19 +47,24 @@ HTTP.SSL.CAPATH={esgf_certs_dir}
 def fetch_certificate(request):
     url = request.environ['esgf_slcs_service_url']
     access_token = request.environ['esgf_access_token']
-    logger.debug("fetch certificate for %s", access_token)
+    logger.debug("Fetch certificate for %s", access_token)
     test_credentials = request.esgf_test_credentials
 
     workdir = request.workdir
     prefix = request.prefix
     tempdir = tempfile.mkdtemp(prefix=prefix, dir=workdir)
-    logger.debug('created twitcher tempdir %s', tempdir)
-    mgr = ESGFAccessManager(url, base_dir=tempdir)
-    mgr.logon(access_token)
-    if test_credentials:
-        logger.warn('overwriting credentials.pem with %s', test_credentials)
-        shutil.copy2(test_credentials, mgr.esgf_credentials)
-    return mgr.base_dir
+    logger.debug('Created twitcher tempdir %s', tempdir)
+    try:
+        mgr = ESGFAccessManager(url, base_dir=tempdir)
+        mgr.logon(access_token)
+        if test_credentials and os.path.isfile(test_credentials):
+            logger.warn('Overwriting credentials.pem with %s', test_credentials)
+            shutil.copy2(test_credentials, mgr.esgf_credentials)
+    except IOError:
+        logger.error("Could not copy test credentials.")
+    except:
+        logger.error("Could not fetch certificate.")
+    return tempdir
 
 
 class ESGFAccessManager(object):
