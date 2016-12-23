@@ -1,10 +1,14 @@
 Changes
 *******
 
-0.2.4 (2016-12-15)
+0.2.4 (2016-12-23)
 ==================
 
+* pep8.
 * using replace_caps_url in owsproxy.
+* pinned mongodb=2.6*|3.3.9.
+* replaced service_url by proxy_url.
+* added wms_130 and renamed wms_111.
 
 0.2.3 (2016-11-18)
 ==================

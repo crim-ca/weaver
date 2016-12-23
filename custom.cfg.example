@@ -2,7 +2,7 @@
 extends = buildout.cfg
 
 [settings]
-hostname = localhost 
+hostname = localhost
 http-port = 8083
 https-port = 5000
 log-level = WARN
@@ -14,4 +14,3 @@ ows-proxy = true
 rpcinterface = true
 wps = true
 wps-cfg =
-
