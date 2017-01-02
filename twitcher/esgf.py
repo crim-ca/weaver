@@ -78,12 +78,12 @@ class ESGFAccessManager(object):
 
         os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
-    def logon(self, access_token):
-        cert = self._get_certificate(access_token)
+    def logon(self, access_token, timeout=1):
+        cert = self._get_certificate(access_token, timeout=timeout)
         self._write_certificate(cert)
         self._write_dap_config()
 
-    def _get_certificate(self, access_token):
+    def _get_certificate(self, access_token, timeout=1):
         """
         Generates a new private key and certificate request, submits the request to be
         signed by the SLCS CA and returns the certificate.
@@ -115,7 +115,8 @@ class ESGFAccessManager(object):
         response = slcs.post(
             self.certificate_url,
             data={'certificate_request': encoded_cert_req},
-            verify=False
+            verify=False,
+            timeout=timeout,
         )
 
         # response = requests.post(self.url,
