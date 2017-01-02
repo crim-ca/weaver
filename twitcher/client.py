@@ -3,6 +3,9 @@ import ssl
 from urlparse import urlparse
 from datetime import datetime
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 def _create_https_context(verify=True):
     context = ssl._create_default_https_context()
