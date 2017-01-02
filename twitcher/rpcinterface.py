@@ -77,7 +77,7 @@ class RPCInterface(object):
             public=public,
             c4i=c4i,
             overwrite=overwrite)
-        return service['name']
+        return service
 
     def unregister(self, name):
         """
@@ -191,5 +191,5 @@ def includeme(config):
         config.add_xmlrpc_method(RPCInterface, attr='get_service_name', endpoint='api', method='get_service_name')
         config.add_xmlrpc_method(RPCInterface, attr='get_service_by_name', endpoint='api', method='get_service_by_name')
         config.add_xmlrpc_method(RPCInterface, attr='get_service_by_url', endpoint='api', method='get_service_by_url')
-        config.add_xmlrpc_method(RPCInterface, attr='purge', endpoint='api', method='purge')
+        config.add_xmlrpc_method(RPCInterface, attr='clear_services', endpoint='api', method='clear_services')
         config.add_xmlrpc_method(RPCInterface, attr='status', endpoint='api', method='status')
