@@ -71,7 +71,7 @@ class ServiceRegistry(object):
                 raise Exception("service name already registered.")
         service = dict(url=service_url, name=name, type=service_type, public=public, c4i=c4i)
         self.collection.insert_one(service)
-        return service
+        return self.get_service_by_url(url=service_url)
 
     def unregister_service(self, name):
         """
