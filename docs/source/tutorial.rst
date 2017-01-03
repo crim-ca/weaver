@@ -16,7 +16,7 @@ Install twitcher (see: :ref:`installation`) and make sure it is started with ``m
 
 .. code-block:: sh
 
-    $ cd twitcher  # cd into the installation folder  
+    $ cd twitcher  # cd into the installation folder
     $ make status
     Supervisor status ...
     mongodb                          RUNNING   pid 6863, uptime 0:00:19
@@ -25,19 +25,19 @@ Install twitcher (see: :ref:`installation`) and make sure it is started with ``m
 
 If twitcher (or nginx, mongodb) is not running then start it with ``make start``.
 
-By default the twitcher WPS application is available at the URL https://localhost:38083/ows/wps.
+By default the twitcher WPS application is available at the URL https://localhost:5000/ows/wps.
 
 Run a ``GetCapabilities`` request:
 
 .. code-block:: sh
 
-    $ curl -k "https://localhost:38083/ows/wps?service=wps&request=getcapabilities"
+    $ curl -k "https://localhost:5000/ows/wps?service=wps&request=getcapabilities"
 
 Run a ``DescribeProcess`` request:
 
 .. code-block:: sh
 
-    $ curl -k "https://localhost:38083/ows/wps?service=wps&request=describeprocess&identifier=dummyprocess&version=1.0.0"
+    $ curl -k "https://localhost:5000/ows/wps?service=wps&request=describeprocess&identifier=hello&version=1.0.0"
 
 Use token to run an execute request
 -----------------------------------
@@ -48,7 +48,7 @@ Run an ``Exceute`` request:
 
 .. code-block:: sh
 
-    $ curl -k "https://localhost:38083/ows/wps?service=wps&request=execute&identifier=dummyprocess&version=1.0.0"
+    $ curl -k "https://localhost:5000/ows/wps?service=wps&request=execute&identifier=dummyprocess&version=1.0.0"
 
 Now you should get an XML error response with a message that you need to provide an access token:
 
@@ -74,7 +74,7 @@ There are three ways how you can provide the access token:
 
 .. code-block:: sh
 
-    $ curl -k "https://localhost:38083/ows/wps?access_token=abc123&service=wps&request=execute&identifier=dummyprocess&version=1.0.0"
+    $ curl -k "https://localhost:5000/ows/wps?access_token=abc123&service=wps&request=execute&identifier=dummyprocess&version=1.0.0"
 
 2. as the last part of the HTTP path
 
@@ -146,7 +146,7 @@ Using the OWSProxy with an external WPS application
 
 The ``OWSProxy`` is a proxy service for OWS services. Currently it only supports WPS.
 
-First you need an external WPS. You can use `Emu WPS service <http://emu.readthedocs.io/en/latest/>`_ from Birdhouse. 
+First you need an external WPS. You can use `Emu WPS service <http://emu.readthedocs.io/en/latest/>`_ from Birdhouse.
 Get it from GitHub and run the installation:
 
 .. code-block:: sh
@@ -156,7 +156,7 @@ Get it from GitHub and run the installation:
     $ make install
     $ make start
 
-The Emu WPS service is available by default at the URL: 
+The Emu WPS service is available by default at the URL:
 http://localhost:8094/wps?service=WPS&version=1.0.0&request=GetCapabilities
 
 
@@ -276,8 +276,8 @@ Set the ``WPS_SERVICE`` environment variable for birdy with the ``proxy_url`` an
 
 .. code-block:: sh
 
-   $ export WPS_SERVICE=https://localhost:38083/ows/proxy/emu/98765             
-   
+   $ export WPS_SERVICE=https://localhost:38083/ows/proxy/emu/98765
+
 
 Now, run birdy:
 
@@ -288,16 +288,16 @@ Now, run birdy:
 You get a list of available WPS processes::
 
     usage: brdy [<options>] <command> [<args>]
-     
+
     Emu: WPS processes for testing and demos.
-     
+
     optional arguments:
       -h, --help            show this help message and exit
       --debug               enable debug mode
-     
+
     command:
       List of available commands (wps processes)
-     
+
       {helloworld,ultimatequestionprocess,dummyprocess,wordcount,inout,multiplesources,chomsky,zonal_mean}
                             Run "birdy <command> -h" to get additional help.
         helloworld          Hello World: Welcome user and say hello ...
@@ -334,7 +334,7 @@ You get a list of input/output params as option::
 
     usage: birdy helloworld [-h] --user [USER]
                             [--output [{output} [{output} ...]]]
-     
+
     optional arguments:
       -h, --help            show this help message and exit
       --user [USER]         Your name: Please enter your name
