@@ -48,7 +48,7 @@ Run an ``Exceute`` request:
 
 .. code-block:: sh
 
-    $ curl -k "https://localhost:5000/ows/wps?service=wps&request=execute&identifier=dummyprocess&version=1.0.0"
+    $ curl -k "https://localhost:5000/ows/wps?service=wps&request=execute&identifier=hello&version=1.0.0"
 
 Now you should get an XML error response with a message that you need to provide an access token:
 
@@ -74,19 +74,19 @@ There are three ways how you can provide the access token:
 
 .. code-block:: sh
 
-    $ curl -k "https://localhost:5000/ows/wps?access_token=abc123&service=wps&request=execute&identifier=dummyprocess&version=1.0.0"
+    $ curl -k "https://localhost:5000/ows/wps?access_token=abc123&service=wps&request=execute&identifier=hello&version=1.0.0&datainputs=name=tux"
 
 2. as the last part of the HTTP path
 
 .. code-block:: sh
 
-    $ curl -k "https://localhost:38083/ows/wps/abc123?service=wps&request=execute&identifier=dummyprocess&version=1.0.0"
+    $ curl -k "https://localhost:5000/ows/wps/abc123?service=wps&request=execute&identifier=hello&version=1.0.0&datainputs=name=tux"
 
 3. as ``Access-Token`` header variable
 
 .. code-block:: sh
 
-   $ curl -k -H Access-Token:abc123 "https://localhost:38083/ows/wps?service=wps&request=execute&identifier=dummyprocess&version=1.0.0"
+   $ curl -k -H Access-Token:abc123 "https://localhost:5000/ows/wps?service=wps&request=execute&identifier=dummyprocess&version=1.0.0&datainputs=name=tux"
 
 
 Change the default WPS configuration
@@ -116,10 +116,6 @@ When you generate an access token you can also set enviroment variables with the
 
 PYWPS_CFG
    Configuration file location
-PYWPS_PROCESSES
-   Directory, where the processes are stored
-PYWPS_TEMPLATES
-   Templates directory (structure should be similar to ``pywps/Templates``)
 
 In the following we set a PyWPS configuration:
 
@@ -184,26 +180,27 @@ Use the ``status`` command to see which WPS services are registered with OWSProx
 .. code-block:: sh
 
    $ bin/twitcherctl -k status
-   [{'url': 'http://localhost:8094/wps', 'proxy_url': 'https://localhost:38083/ows/proxy/emu', 'type': 'wps', 'name': 'emu'}]
+   [{'url': 'http://localhost:8094/wps', 'proxy_url': 'https://localhost:5000/ows/proxy/emu', 'type': 'wps', 'name': 'emu'}]
 
 
 Access a registered service
 ---------------------------
 
-By default the registered service is available at the URL ``https://localhost:38083/ows/proxy/{service_name}``. Replace the ``service_name`` with the registered name.
+By default the registered service is available at the URL ``https://localhost:5000/ows/proxy/{service_name}``.
+Replace the ``service_name`` with the registered name.
 
 Run a ``GetCapabilities`` request for the registered Emu WPS service:
 
 .. code-block:: sh
 
-    $ curl -k "https://localhost:38083/ows/proxy/emu?service=wps&request=getcapabilities"
+    $ curl -k "https://localhost:5000/ows/proxy/emu?service=wps&request=getcapabilities"
 
 
 Run a ``DescribeProcess`` request:
 
 .. code-block:: sh
 
-    $ curl -k "https://localhost:38083/ows/proxy/emu?service=wps&request=describeprocess&identifier=dummyprocess&version=1.0.0"
+    $ curl -k "https://localhost:5000/ows/proxy/emu?service=wps&request=describeprocess&identifier=hello&version=1.0.0"
 
 Use tokens to run an execute request
 ------------------------------------
@@ -214,7 +211,7 @@ Run an ``Exceute`` request:
 
 .. code-block:: sh
 
-    $ curl -k "https://localhost:38083/ows/wps?service=wps&request=execute&identifier=dummyprocess&version=1.0.0"
+    $ curl -k "https://localhost:5000/ows/wps?service=wps&request=execute&identifier=hello&version=1.0.0"
 
 Now you should get an XML error response with a message that you need to provide an access token (see section above).
 
@@ -237,7 +234,7 @@ In the following example we provide the token as HTTP parameter:
 
 .. code-block:: sh
 
-    $ curl -k "https://localhost:38083/ows/proxy/emu?service=wps&request=execute&identifier=dummyprocess&version=1.0.0&access_token=def456"
+    $ curl -k "https://localhost:5000/ows/proxy/emu?service=wps&request=execute&identifier=hello&version=1.0.0&datainputs=name=tux&access_token=def456"
 
 .. warning::
 
@@ -269,14 +266,14 @@ Check which WPS is registered (or register one as described above):
 .. code-block:: sh
 
    $ bin/twitcherctl -k status
-   [{'url': 'http://localhost:8094/wps', 'proxy_url': 'https://localhost:38083/ows/proxy/emu', 'type': 'wps', 'name': 'emu'}]
+   [{'url': 'http://localhost:8094/wps', 'proxy_url': 'https://localhost:5000/ows/proxy/emu', 'type': 'wps', 'name': 'emu'}]
 
 
 Set the ``WPS_SERVICE`` environment variable for birdy with the ``proxy_url`` and extended with **access token**:
 
 .. code-block:: sh
 
-   $ export WPS_SERVICE=https://localhost:38083/ows/proxy/emu/98765
+   $ export WPS_SERVICE=https://localhost:5000/ows/proxy/emu/98765
 
 
 Now, run birdy:
