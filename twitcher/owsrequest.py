@@ -102,7 +102,7 @@ class Get(OWSParser):
         request_params = self._request_params()
         if param in request_params:
             value = request_params[param].lower()
-            if not allowed_values is None:
+            if allowed_values is not None:
                 if value in allowed_values:
                     self.params[param] = value
                 else:
