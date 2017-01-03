@@ -4,15 +4,16 @@ from pyramid.view import forbidden_view_config
 from pyramid.authentication import BasicAuthAuthenticationPolicy
 from pyramid.authorization import ACLAuthorizationPolicy
 from pyramid.security import (
-        Allow,
-        Everyone,
-        ALL_PERMISSIONS)
+    Allow,
+    Everyone,
+    ALL_PERMISSIONS)
 
 import logging
 logger = logging.getLogger(__name__)
 
 
 Admin = 'group:admin'
+
 
 def groupfinder(username, password, request):
     logger.error("u=%s, p=%s", request.username, request.password)
@@ -24,15 +25,17 @@ def groupfinder(username, password, request):
     else:
         # Warning: no access restrictions!
         return [Admin]
-    
+
+
 class RootFactory(object):
     __acl__ = [
         (Allow, Everyone, 'view'),
         (Allow, Admin, ALL_PERMISSIONS)
-        ]
+    ]
 
     def __init__(self, request):
         pass
+
 
 def root_factory(request):
     return RootFactory(request)
@@ -44,6 +47,7 @@ def basic_challenge(request):
     response.headers.update(forget(request))
     return response
 
+
 def _get_username(request):
     settings = request.registry.settings
     if 'twitcher.username' in settings:
@@ -53,6 +57,7 @@ def _get_username(request):
             if len(username) > 2:
                 return username
     return None
+
 
 def _get_password(request):
     settings = request.registry.settings
@@ -64,6 +69,7 @@ def _get_password(request):
                 return password
     return None
 
+
 def auth_activated(registry):
     settings = registry.settings
     username = settings.get('twitcher.username')
@@ -72,9 +78,10 @@ def auth_activated(registry):
             return True
     return False
 
+
 def includeme(config):
     if auth_activated(config.registry):
-        logger.info("basic authentication is activated.")
+        logger.debug("basic authentication is activated.")
         # Security policies for basic auth
         authn_policy = BasicAuthAuthenticationPolicy(check=groupfinder, realm="Birdhouse")
         authz_policy = ACLAuthorizationPolicy()
@@ -83,5 +90,3 @@ def includeme(config):
         config.set_root_factory(root_factory)
         config.add_request_method(_get_username, 'username', reify=True)
         config.add_request_method(_get_password, 'password', reify=True)
-    else:
-        logger.warn("basic authentication is deactivated.")
