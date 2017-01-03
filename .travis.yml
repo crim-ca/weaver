@@ -17,5 +17,6 @@ before_script:
 script:
 #  - make docs
   - make testall
+  - make pep8
 #after_success:
 # - coveralls
