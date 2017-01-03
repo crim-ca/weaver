@@ -59,6 +59,8 @@ class AccessTokenTestCase(unittest.TestCase):
         assert access_token.expires_in > 0
         assert access_token.expires_in <= 3600
         assert access_token.is_expired() is False
+        assert access_token.params['access_token'] == 'abcdef'
+        assert 'expires_at' in access_token.params
 
     def test_missing_token(self):
         with pytest.raises(TypeError) as e_info:
