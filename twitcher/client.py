@@ -81,8 +81,7 @@ class TwitcherService(object):
     @xmlrpc_error_handler
     def register_service(self, url, name=None, service_type=None, public=False, c4i=False, overwrite=True):
         service_type = service_type or 'wps'
-        if not name:
-            name = None
+        name = name or ''
         return self.server.register(url, name, service_type, public, c4i, overwrite)
 
     @xmlrpc_error_handler
