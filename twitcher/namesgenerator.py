@@ -86,10 +86,10 @@ right = [
     "chicken",
     "crane",
     "cuckoo",
-    
+
     # dodrio: http://bulbapedia.bulbagarden.net/wiki/Dodrio_%28Pok%C3%A9mon%29
     "dodrio",
-     
+
     "dove",
     "duck",
     "eagle",
@@ -138,7 +138,8 @@ right = [
     "turkey",
     "woodcreeper",
     "woodpecker",
-    ]
+]
+
 
 def get_random_name(retry=False):
     """
@@ -146,12 +147,13 @@ def get_random_name(retry=False):
     formatted as "adjective_surname". For example 'loving_sugarbird'. If retry is non-zero, a random
     integer between 0 and 100 will be added to the end of the name, e.g `loving_sugarbird3`
     """
-    name = "%s_%s" % ( left[random.randint(0, len(left)-1)], right[random.randint(0, len(right)-1)] )
-    if retry == True:
-        name = "%s%d" % (name, random.randint(0,100))
+    name = "%s_%s" % (left[random.randint(0, len(left) - 1)], right[random.randint(0, len(right) - 1)])
+    if retry is True:
+        name = "%s%d" % (name, random.randint(0, 100))
     return name
+
 
 def get_sane_name(name, minlen=3, maxlen=25):
     if name is None or len(name.strip()) < minlen:
         return None
-    return re.sub("[^a-z]","_", name.strip().lower()[:maxlen])
+    return re.sub("[^a-z]", "_", name.strip().lower()[:maxlen])
