@@ -64,17 +64,17 @@ class TwitcherService(object):
     # tokens
 
     @xmlrpc_error_handler
-    def gentoken(self, valid_in_hours=1, environ=None):
+    def generate_token(self, valid_in_hours=1, environ=None):
         environ = environ or {}
-        return self.server.gentoken(valid_in_hours, environ)
+        return self.server.generate_token(valid_in_hours, environ)
 
     @xmlrpc_error_handler
-    def revoke(self, token):
-        return self.server.revoke(token=token)
+    def revoke_token(self, token):
+        return self.server.revoke_token(token)
 
     @xmlrpc_error_handler
-    def clean(self):
-        return self.server.clean()
+    def revoke_all_tokens(self):
+        return self.server.revoke_all_tokens()
 
     # service registry
 
@@ -82,15 +82,15 @@ class TwitcherService(object):
     def register_service(self, url, name=None, service_type=None, public=False, c4i=False, overwrite=True):
         service_type = service_type or 'wps'
         name = name or ''
-        return self.server.register(url, name, service_type, public, c4i, overwrite)
+        return self.server.register_service(url, name, service_type, public, c4i, overwrite)
 
     @xmlrpc_error_handler
     def unregister_service(self, name):
-        return self.server.unregister(name)
+        return self.server.unregister_service(name)
 
     @xmlrpc_error_handler
-    def status(self):
-        return self.server.status()
+    def list_services(self):
+        return self.server.list_services()
 
     @xmlrpc_error_handler
     def clear_services(self):

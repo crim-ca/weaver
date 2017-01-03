@@ -49,7 +49,13 @@ class RPCInterface(object):
         """
         Remove token from tokenstore.
         """
-        self.tokenstore.delete_token(token)
+        try:
+            self.tokenstore.delete_token(token)
+        except:
+            logger.exception('Failed to remove token.')
+            return False
+        else:
+            return True
 
     def revoke_all_tokens(self):
         """
@@ -66,7 +72,7 @@ class RPCInterface(object):
     # service registry
     # ----------------
 
-    def register(self, url, name, service_type, public, c4i, overwrite):
+    def register_service(self, url, name, service_type, public, c4i, overwrite):
         """
         Adds an OWS service with the given ``url`` to the registry.
         """
@@ -77,7 +83,7 @@ class RPCInterface(object):
             overwrite=overwrite)
         return service
 
-    def unregister(self, name):
+    def unregister_service(self, name):
         """
         Removes OWS service with the given ``name`` from the registry.
         """
@@ -128,7 +134,7 @@ class RPCInterface(object):
     def is_public(self, name):
         return self.registry.is_public(name=name)
 
-    def status(self):
+    def list_services(self):
         """
         Lists all registred OWS services.
         """
@@ -180,14 +186,14 @@ def includeme(config):
         config.add_xmlrpc_endpoint('api', '/RPC2')
 
         # register xmlrpc methods
-        config.add_xmlrpc_method(RPCInterface, attr='gentoken', endpoint='api', method='gentoken')
-        config.add_xmlrpc_method(RPCInterface, attr='revoke', endpoint='api', method='revoke')
-        config.add_xmlrpc_method(RPCInterface, attr='clean', endpoint='api', method='clean')
-        config.add_xmlrpc_method(RPCInterface, attr='register', endpoint='api', method='register')
-        config.add_xmlrpc_method(RPCInterface, attr='unregister', endpoint='api', method='unregister')
+        config.add_xmlrpc_method(RPCInterface, attr='generate_token', endpoint='api', method='generate_token')
+        config.add_xmlrpc_method(RPCInterface, attr='revoke_token', endpoint='api', method='revoke_token')
+        config.add_xmlrpc_method(RPCInterface, attr='revoke_all_tokens', endpoint='api', method='revoke_all_tokens')
+        config.add_xmlrpc_method(RPCInterface, attr='register_service', endpoint='api', method='register_service')
+        config.add_xmlrpc_method(RPCInterface, attr='unregister_service', endpoint='api', method='unregister_service')
         config.add_xmlrpc_method(RPCInterface, attr='is_public', endpoint='api', method='is_public')
         config.add_xmlrpc_method(RPCInterface, attr='get_service_name', endpoint='api', method='get_service_name')
         config.add_xmlrpc_method(RPCInterface, attr='get_service_by_name', endpoint='api', method='get_service_by_name')
         config.add_xmlrpc_method(RPCInterface, attr='get_service_by_url', endpoint='api', method='get_service_by_url')
         config.add_xmlrpc_method(RPCInterface, attr='clear_services', endpoint='api', method='clear_services')
-        config.add_xmlrpc_method(RPCInterface, attr='status', endpoint='api', method='status')
+        config.add_xmlrpc_method(RPCInterface, attr='list_services', endpoint='api', method='list_services')

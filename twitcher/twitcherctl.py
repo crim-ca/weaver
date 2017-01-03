@@ -106,7 +106,7 @@ class TwitcherCtl(object):
         result = None
         try:
             if args.cmd == 'status':
-                result = service.status()
+                result = service.list_services()
             elif args.cmd == 'register':
                 result = service.register_service(
                     url=args.url,
@@ -122,11 +122,11 @@ class TwitcherCtl(object):
                 if args.esgf_access_token:
                     environ['esgf_access_token'] = args.esgf_access_token
                     environ['esgf_slcs_service_url'] = args.esgf_slcs_service_url
-                result = service.gentoken(valid_in_hours=args.valid_in_hours, environ=environ)
+                result = service.generate_token(valid_in_hours=args.valid_in_hours, environ=environ)
             elif args.cmd == 'revoke':
-                result = service.revoke(args.token)
+                result = service.revoke_token(token=args.token)
             elif args.cmd == 'clean':
-                result = service.clean()
+                result = service.revoke_all_tokens()
         except Exception as e:
             logger.error("Error: %s", e.message)
         else:
