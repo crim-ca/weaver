@@ -9,7 +9,7 @@ The installation is using the Python distribution system `Anaconda`_ to maintain
 Requirements
 ============
 
-The installation works on Linux 64 bit distributions (tested on Ubuntu 14.04) and also on MacOSX (tested on El Capitan).
+The installation works on Linux 64 bit distributions (tested on Ubuntu 14.04) and also on MacOS (tested on Sierra).
 
 From GitHub Sources
 ===================
@@ -35,7 +35,7 @@ Start the twitcher service (using supervisor):
 .. code-block:: sh
 
    $ make start  # or make restart
-  
+
 Check the status of the twitcher service:
 
 .. code-block:: sh
