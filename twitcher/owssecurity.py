@@ -58,7 +58,7 @@ class OWSSecurity(object):
                         elif access_token.is_expired():
                             raise OWSAccessForbidden("Access token is expired.")
                         # update request with environ from access token
-                        request.environ.update(access_token.user_environ)
+                        request.environ.update(access_token.environ)
                         if 'esgf_access_token' in request.environ and 'esgf_slcs_service_url' in request.environ:
                             workdir = fetch_certificate(request)
                             request.headers['X-Requested-Workdir'] = workdir

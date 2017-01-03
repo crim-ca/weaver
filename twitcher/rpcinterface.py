@@ -28,39 +28,37 @@ class RPCInterface(object):
     # token management
     # ----------------
 
-    def gentoken(self, valid_in_hours=1, user_environ=None):
+    def generate_token(self, valid_in_hours=1, environ=None):
         """
         Generates an access token which is valid for ``valid_in_hours``.
 
         Arguments:
 
         * ``valid_in_hours``: number of hours the token is valid.
-        * ``user_environ``: environment used with this token (dict object).
+        * ``environ``: environment used with this token (dict object).
         Possible keys: ``esgf_access_token``, ``esgf_slcs_service_url``.
         """
         access_token = self.tokengenerator.create_access_token(
             valid_in_hours=valid_in_hours,
-            user_environ=user_environ,
+            environ=environ,
         )
         self.tokenstore.save_token(access_token)
-        return {
-            'access_token': access_token.token,
-            'expires_at': access_token.expires_at}
+        return access_token.params
 
-    def revoke(self, token):
+    def revoke_token(self, token):
         """
         Remove token from tokenstore.
         """
         self.tokenstore.delete_token(token)
 
-    def clean(self):
+    def revoke_all_tokens(self):
         """
-        Removes all tokens.
+        Removes all tokens from tokenstore.
         """
         try:
             self.tokenstore.clean_tokens()
         except:
-            logger.exception('clean tokens failed')
+            logger.exception('Failed to remove tokens.')
             return False
         else:
             return True

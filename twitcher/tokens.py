@@ -92,18 +92,18 @@ class AccessTokenGenerator(object):
     """
     Base class for access token generators.
     """
-    def create_access_token(self, valid_in_hours=1, user_environ=None):
+    def create_access_token(self, valid_in_hours=1, environ=None):
         """
         Creates an access token.
 
         TODO: check valid in hours
         TODO: maybe specify how often a token can be used
         """
-        access_token = AccessToken(
+        token = AccessToken(
             token=self.generate(),
             expires_at=expires_at(hours=valid_in_hours),
-            user_environ=user_environ)
-        return access_token
+            environ=environ)
+        return token
 
     def generate(self):
         raise NotImplementedError
@@ -130,12 +130,14 @@ class AccessToken(dict):
         if 'token' not in self:
             raise TypeError("'token' is required")
 
-        self.expires_at = int(self.get("expires_at", 0))
-
     @property
     def token(self):
         """Access token string."""
         return self['token']
+
+    @property
+    def expires_at(self):
+        return int(self.get("expires_at", 0))
 
     @property
     def expires_in(self):
@@ -164,9 +166,12 @@ class AccessToken(dict):
         return True
 
     @property
-    def user_environ(self):
-        environ = self.get('user_environ') or {}
-        return environ
+    def environ(self):
+        return self.get('environ') or {}
+
+    @property
+    def params(self):
+        return {'access_token': self.token, 'expires_at': self.expires_at}
 
     def __str__(self):
         return self.token

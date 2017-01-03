@@ -55,6 +55,8 @@ class AccessTokenTestCase(unittest.TestCase):
 
     def test_access_token(self):
         access_token = AccessToken(token='abcdef', expires_at=expires_at(hours=1))
+        assert access_token.token == 'abcdef'
+        assert access_token.expires_in > 0
         assert access_token.expires_in <= 3600
         assert access_token.is_expired() is False
 
@@ -67,7 +69,7 @@ class AccessTokenTestCase(unittest.TestCase):
         assert access_token.expires_in == 0
         assert access_token.is_expired() is True
 
-    def test_access_token_with_user_environ(self):
+    def test_access_token_with_environ(self):
         access_token = AccessToken(token='12345', expires_at=expires_at(hours=1),
-                                   user_environ={'data_token': 'bfghk'})
-        assert access_token.user_environ == {'data_token': 'bfghk'}
+                                   environ={'data_token': 'bfghk'})
+        assert access_token.environ == {'data_token': 'bfghk'}
