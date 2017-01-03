@@ -18,12 +18,13 @@ After you have installed twitcher you can customize the default twitcher configu
    extends = buildout.cfg
 
    [settings]
-   hostname = localhost 
+   hostname = localhost
    http-port = 8083
-   https-port = 38083
+   https-port = 5000
    log-level = WARN
-   username = 
-   password = 
+   username =
+   password =
+   workdir =
    ows-security = true
    ows-proxy = true
    rpcinterface = true
@@ -64,7 +65,7 @@ Twitcher has four components which by default are activated:
 ows-security
    The OWS security wsgi middleware
 ows-proxy
-   A proxy wsgi application for OWS services 
+   A proxy wsgi application for OWS services
 rpcinterface
    An XML-RPC interface to control token generation and service registration
 wps
@@ -76,4 +77,3 @@ By setting a component option to ``false`` you can deactivate it:
 
    [settings]
    ows-proxy = false
-
