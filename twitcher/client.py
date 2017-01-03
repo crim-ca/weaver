@@ -46,10 +46,10 @@ def xmlrpc_error_handler(wrapped):
             raise
         except Exception as e:
             logger.error(
-                'Unknown error occured. \
-                Maybe you need to use the "--insecure" option to access the service on HTTPS? \
-                Is your service running and did you specify the correct service url (port)? \
-                %s',
+                " Unknown error occured. "
+                "Maybe you need to use the \"--insecure\" option to access the service on HTTPS? "
+                "Is your service running and did you specify the correct service url (port)? "
+                "%s",
                 e.message)
             raise
         else:
