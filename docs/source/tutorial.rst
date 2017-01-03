@@ -129,7 +129,7 @@ When you access the wps with the generated token you will get the capabilites co
 
 .. code-block:: sh
 
-    $ curl -k "https://localhost:38083/ows/wps?service=wps&request=getcapabilities&access_token=321bca"
+    $ curl -k "https://localhost:5000/ows/wps?service=wps&request=getcapabilities&access_token=321bca"
 
 .. note::
 
