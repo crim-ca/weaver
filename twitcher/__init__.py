@@ -1,7 +1,7 @@
 import logging
 logger = logging.getLogger(__name__)
 
-__version__ = '0.3.0'
+__version__ = '0.3-dev'
 
 
 def main(global_config, **settings):
