@@ -1,6 +1,18 @@
 Changes
 *******
 
+0.3.0 (2017-01-xx)
+==================
+
+* pep8.
+* changed rpc interface.
+* added twitcher.client module.
+* using esgf scls service to get credentials.
+* updated internal pywps to version 4.0.0.
+* using default port 5000.
+* added ipython notebook examples.
+* moved namesgenerator to top-level.
+
 0.2.4 (2016-12-23)
 ==================
 
