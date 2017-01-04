@@ -42,8 +42,10 @@ class TwitcherCtl(object):
             description='List of available commands',
         )
 
-        # token
-        # -----
+        # token managment
+        # ---------------
+
+        # gentoken
         subparser = subparsers.add_parser('gentoken', help="Generates an access token.")
         subparser.add_argument('-H', '--valid-in-hours', type=int, default=1,
                                help="Set how long the token is valid in hours (default: 1 hour).")
@@ -54,10 +56,11 @@ class TwitcherCtl(object):
         subparser.add_argument('-e', '--env', nargs='*', default=[],
                                help="Set environment variable (key=value).")
 
-        subparser = subparsers.add_parser('revoke', help="Removes given access token.")
-        subparser.add_argument('token', help="access token")
-
-        subparser = subparsers.add_parser('clean', help="Removes all access tokens.")
+        # revoke
+        subparser = subparsers.add_parser('revoke', help="Remove given access token.")
+        subparser.add_argument('token', nargs="?", help="access token")
+        subparser.add_argument('-A', '--all', action="store_true",
+                               help="Remove all access tokens.")
 
         # service registry
         # ----------------
@@ -123,12 +126,14 @@ class TwitcherCtl(object):
                     environ['esgf_slcs_service_url'] = args.esgf_slcs_service_url
                 result = service.generate_token(valid_in_hours=args.valid_in_hours, environ=environ)
             elif args.cmd == 'revoke':
-                result = service.revoke_token(token=args.token)
-            elif args.cmd == 'clean':
-                result = service.revoke_all_tokens()
+                if args.all is True:
+                    result = service.revoke_all_tokens()
+                else:
+                    result = service.revoke_token(token=args.token)
         except Exception as e:
             LOGGER.error("Error: %s", e.message)
         else:
+            LOGGER.info("Result: %s", result)
             return result
 
 
