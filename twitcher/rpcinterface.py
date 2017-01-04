@@ -36,6 +36,7 @@ class RPCInterface(object):
 
         * ``valid_in_hours``: number of hours the token is valid.
         * ``environ``: environment used with this token (dict object).
+
         Possible keys: ``esgf_access_token``, ``esgf_slcs_service_url``.
         """
         access_token = self.tokengenerator.create_access_token(

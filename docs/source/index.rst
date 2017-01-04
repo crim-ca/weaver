@@ -1,5 +1,5 @@
 =====================================
-Twitcher: A simple OWS Security Proxy 
+Twitcher: A simple OWS Security Proxy
 =====================================
 
 .. image:: https://travis-ci.org/bird-house/twitcher.svg?branch=master
@@ -28,5 +28,5 @@ Twitcher is part of the `Birdhouse`_ project. The documentation is on `ReadTheDo
    api
    appendix
 
-.. _Pyramid: http://www.pylonsproject.org
+.. _Pyramid: http://pylonsproject.org
 .. _ReadTheDocs: http://twitcher.readthedocs.io/en/latest/

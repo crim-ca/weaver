@@ -10,7 +10,7 @@ Configuration File
 
 After you have installed twitcher you can customize the default twitcher configuration by editing the ``custom.cfg`` configuration file. This configuration file overwrites the default settings in the ``buildout.cfg``:
 
-.. code-block:: ini
+.. code-block:: cfg
 
    $ vim custom.cfg
    $ cat custom.cfg

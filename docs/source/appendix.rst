@@ -10,7 +10,7 @@ Twitcher alike projects:
 
 OWS Proxies:
 
-* `owsproxy by mapbender <https://github.com/mapbender/owsproxy3>`_  
+* `owsproxy by mapbender <https://github.com/mapbender/owsproxy3>`_
 * http://doc.mapbender3.org/en/book/development/proxy.html
 * https://github.com/camptocamp/secureOWS
 * https://github.com/elemoine/papyrus_ogcproxy
@@ -25,7 +25,7 @@ Other Proxies:
 
 Security Filters:
 
-* `FOSS4G Talk <http://www.slideshare.net/JorgeMendesdeJesus/pywps-a-tutorial-for-beginners-and-developers>`_ on using `mod_python <http://modpython.org/>`_ with security filter for PyWPS.  
+* `FOSS4G Talk <http://www.slideshare.net/JorgeMendesdeJesus/pywps-a-tutorial-for-beginners-and-developers>`_ on using `mod_python <http://modpython.org/>`_ with security filter for PyWPS.
 * GeoFence: https://github.com/georchestra/geofence
 * georchestra: http://www.georchestra.org/ (security proxy for inspire)
 * Geoserver Security: http://docs.geoserver.org/stable/en/user/security/service.html
@@ -42,7 +42,7 @@ Pyramid:
 
 * https://github.com/elemoine/papyrus
 * https://github.com/elemoine/papyrus_mapproxy
-* http://pythonpaste.org/modules/proxy.html
+* `http://pythonpaste.org/modules/proxy.html`
 
 Macaroons Tokens (simple security tokens for distributed systems):
 
@@ -67,4 +67,3 @@ Geo XACML (access control XML):
 
 * https://en.wikipedia.org/wiki/XACML
 * https://en.wikipedia.org/wiki/GeoXACML
-

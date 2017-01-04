@@ -7,6 +7,7 @@ See access token examples:
 
 * https://www.mapbox.com/developers/api/
 * http://python-oauth2.readthedocs.io/en/latest/store.html
+
 """
 
 import uuid
