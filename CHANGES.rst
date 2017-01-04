@@ -12,6 +12,7 @@ Changes
 * using default port 5000.
 * added ipython notebook examples.
 * moved namesgenerator to top-level.
+* added _compat module for python 3.x/2.x compatibility.
 
 0.2.4 (2016-12-23)
 ==================
