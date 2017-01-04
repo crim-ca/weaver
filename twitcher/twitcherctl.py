@@ -68,8 +68,8 @@ class TwitcherCtl(object):
         # list
         subparser = subparsers.add_parser('list', help="Lists all registered OWS services used by OWS proxy.")
 
-        # purge
-        subparser = subparsers.add_parser('purge', help="Removes all OWS services from the registry.")
+        # clear
+        subparser = subparsers.add_parser('clear', help="Removes all OWS services from the registry.")
 
         # register
         subparser = subparsers.add_parser('register',
@@ -117,7 +117,7 @@ class TwitcherCtl(object):
                     public=args.public)
             elif args.cmd == 'unregister':
                 result = service.unregister_service(name=args.name)
-            elif args.cmd == 'purge':
+            elif args.cmd == 'clear':
                 result = service.clear_services()
             elif args.cmd == 'gentoken':
                 environ = {k: v for k, v in (x.split('=') for x in args.env)}
