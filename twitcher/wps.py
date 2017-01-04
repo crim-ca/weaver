@@ -8,12 +8,12 @@ from pyramid.wsgi import wsgiapp2
 from pyramid.httpexceptions import HTTPBadRequest
 from pyramid.settings import asbool, aslist
 
-from pywps.app.Service import Service
 from twitcher.processes import processes
 from twitcher.owsexceptions import OWSNoApplicableCode
 
+
 import logging
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 PYWPS_CFG = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'wps.cfg')
 
@@ -29,7 +29,8 @@ def pywps_view(environ, start_response):
     * TODO: add xml response renderer
     * TODO: fix exceptions ... use OWSException (raise ...)
     """
-    logger.debug('pywps env: %s', environ.keys())
+    from pywps.app.Service import Service
+    LOGGER.debug('pywps env: %s', environ.keys())
 
     # call pywps application
     if 'PYWPS_CFG' not in environ:
@@ -42,6 +43,7 @@ def includeme(config):
     settings = config.registry.settings
 
     if asbool(settings.get('twitcher.wps', True)):
+        LOGGER.debug("Enabled Twitcher WPS.")
         config.add_route('wps', '/ows/wps')
         config.add_route('wps_secured', '/ows/wps/{access_token}')
         config.add_view(pywps_view, route_name='wps')
