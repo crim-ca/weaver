@@ -59,25 +59,23 @@ The ``twitcherctl`` is a command line tool to control the twitcher service. It u
 
    Password to use for authentication with server
 
--k, --insecure        
+-k, --insecure
 
    Don't validate the server's certificate.
 
 List of available commands:
 
-gentoken            
+gentoken
     Generates an access token.
-revoke              
+revoke
     Removes given access token.
-clean               
-    Removes all access tokens.
-status              
+list
     Lists all registered OWS services used by OWS proxy.
-purge               
+purge
     Removes all OWS services from the registry.
-register            
+register
    Adds OWS service to the registry to be used by the OWS proxy.
-unregister          
+unregister
    Removes OWS service from the registry.
 
 
@@ -93,14 +91,14 @@ See the available options:
 Generate an access token valid for 24 hours (use ``-k`` to avoid validation of HTTPS server certificate):
 
 .. code-block:: sh
-  
+
    $ bin/twitcherctl -k gentoken -H 24
 
 
 Generate an access token and set the ``PYWPS_CFG`` environment variable used by the PyWPS implementation via the *wsgi environ*:
 
 .. code-block:: sh
-  
+
    $ bin/twitcherctl -k gentoken -H 12 -e PYWPS_CFG=/path/to/my/pywps.cfg
 
 
@@ -130,7 +128,7 @@ Currently the ``status`` command shows only the registered OWS services:
 
 .. code-block:: sh
 
-   $ bin/twitcherctl -k status
+   $ bin/twitcherctl -k list
    [{'url': 'http://localhost:8094/wps', 'proxy_url': 'https://localhost:38083/ows/proxy/tiny_buzzard', 'type': 'wps', 'name': 'tiny_buzzard'}]
 
 Using OWSProxy
@@ -142,7 +140,7 @@ See the :ref:`tutorial`.
 Using WPS Application
 =====================
 
-See the :ref:`tutorial`.   
+See the :ref:`tutorial`.
 
 Use Twitcher components in your Pyramid Application
 ===================================================

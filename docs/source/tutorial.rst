@@ -175,11 +175,11 @@ Register the Emu WPS service at the Twitcher ``OWSProxy``:
 
 If you don't provide a name with ``--name`` option then a nice name will be generated, for example ``sleepy_flamingo``.
 
-Use the ``status`` command to see which WPS services are registered with OWSProxy:
+Use the ``list`` command to see which WPS services are registered with OWSProxy:
 
 .. code-block:: sh
 
-   $ bin/twitcherctl -k status
+   $ bin/twitcherctl -k list
    [{'url': 'http://localhost:8094/wps', 'proxy_url': 'https://localhost:5000/ows/proxy/emu', 'type': 'wps', 'name': 'emu'}]
 
 
@@ -265,7 +265,7 @@ Check which WPS is registered (or register one as described above):
 
 .. code-block:: sh
 
-   $ bin/twitcherctl -k status
+   $ bin/twitcherctl -k list
    [{'url': 'http://localhost:8094/wps', 'proxy_url': 'https://localhost:5000/ows/proxy/emu', 'type': 'wps', 'name': 'emu'}]
 
 
