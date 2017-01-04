@@ -65,8 +65,8 @@ class TwitcherCtl(object):
         # service registry
         # ----------------
 
-        # status
-        subparser = subparsers.add_parser('status', help="Lists all registered OWS services used by OWS proxy.")
+        # list
+        subparser = subparsers.add_parser('list', help="Lists all registered OWS services used by OWS proxy.")
 
         # purge
         subparser = subparsers.add_parser('purge', help="Removes all OWS services from the registry.")
@@ -107,7 +107,7 @@ class TwitcherCtl(object):
                                   verify=verify_ssl)
         result = None
         try:
-            if args.cmd == 'status':
+            if args.cmd == 'list':
                 result = service.list_services()
             elif args.cmd == 'register':
                 result = service.register_service(
