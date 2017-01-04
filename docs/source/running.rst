@@ -71,7 +71,7 @@ revoke
     Removes given access token.
 list
     Lists all registered OWS services used by OWS proxy.
-purge
+clear
     Removes all OWS services from the registry.
 register
    Adds OWS service to the registry to be used by the OWS proxy.
