@@ -1,4 +1,5 @@
-nose
+pytest
 mock
 WebTest
+flake8
 
