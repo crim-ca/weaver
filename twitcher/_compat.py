@@ -1,5 +1,5 @@
 """
-This python 2.x/python 3.x compatibility modules is based on the pywps 4.x code.
+This python 2.x/3.x compatibility modules is based on the pywps 4.x code.
 """
 
 import logging
