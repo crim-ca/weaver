@@ -3,7 +3,6 @@ The owsproxy is based on `papyrus_ogcproxy <https://github.com/elemoine/papyrus_
 """
 
 import urllib
-from urlparse import urlparse
 import requests
 
 from pyramid.httpexceptions import HTTPBadRequest, HTTPBadGateway, HTTPNotAcceptable
@@ -13,9 +12,10 @@ from pyramid.response import Response
 from pyramid.settings import asbool
 
 from twitcher.registry import service_registry_factory
+from twitcher._compat import urlparse
 
 import logging
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 allowed_content_types = (
@@ -53,11 +53,11 @@ def _send_request(request, service, extra_path=None, request_params=None):
         url += '/' + extra_path
     if service.get('c4i', False):
         if 'C4I-Access-Token' in request.headers:
-            logger.debug('using c4i token')
+            LOGGER.debug('using c4i token')
             url += '/' + request.headers['C4I-Access-Token']
     if request_params:
         url += '?' + request_params
-    logger.debug('url = %s', url)
+    LOGGER.debug('url = %s', url)
 
     # forward request to target (without Host Header)
     h = dict(request.headers)
@@ -72,16 +72,16 @@ def _send_request(request, service, extra_path=None, request_params=None):
 
     # check for allowed content types
     ct = None
-    # logger.debug("headers=", resp.headers)
+    # LOGGER.debug("headers=", resp.headers)
     if "Content-Type" in resp.headers:
         ct = resp.headers["Content-Type"]
         if not ct.split(";")[0] in allowed_content_types:
             msg = "Content type is not allowed: %s." % (ct)
-            logger.error(msg)
+            LOGGER.error(msg)
             return OWSAccessForbidden(msg)
     else:
         # return HTTPNotAcceptable("Could not get content type from response.")
-        logger.warn("Could not get content type from response")
+        LOGGER.warn("Could not get content type from response")
 
     try:
         if ct in ['text/xml', 'application/xml', 'text/xml;charset=ISO-8859-1']:
@@ -132,7 +132,7 @@ def includeme(config):
     settings = config.registry.settings
 
     if asbool(settings.get('twitcher.ows_proxy', True)):
-        logger.info('Add OWS proxy')
+        LOGGER.info('Add OWS proxy')
 
         # include mongodb
         config.include('twitcher.db')

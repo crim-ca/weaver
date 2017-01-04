@@ -1,10 +1,11 @@
 import xmlrpclib
 import ssl
-from urlparse import urlparse
 from datetime import datetime
 
+from twitcher._compat import urlparse
+
 import logging
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 def _create_https_context(verify=True):
@@ -32,20 +33,20 @@ def xmlrpc_error_handler(wrapped):
         try:
             result = wrapped(*args, **kwargs)
         except xmlrpclib.Fault as e:
-            logger.error("A fault occurred: %s (%d)", e.faultString, e.faultCode)
+            LOGGER.error("A fault occurred: %s (%d)", e.faultString, e.faultCode)
             raise
         except xmlrpclib.ProtocolError as e:
-            logger.error(
+            LOGGER.error(
                 "A protocol error occurred. URL: %s, HTTP/HTTPS headers: %s, Error code: %d, Error message: %s",
                 e.url, e.headers, e.errcode, e.errmsg)
             raise
         except xmlrpclib.ResponseError as e:
-            logger.error(
+            LOGGER.error(
                 "A response error occured. Maybe service needs authentication with username and password? %s",
                 e.message)
             raise
         except Exception as e:
-            logger.error(
+            LOGGER.error(
                 " Unknown error occured. "
                 "Maybe you need to use the \"--insecure\" option to access the service on HTTPS? "
                 "Is your service running and did you specify the correct service url (port)? "

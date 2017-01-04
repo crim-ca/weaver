@@ -5,12 +5,13 @@ from twitcher import namesgenerator
 from twitcher.db import mongodb
 from twitcher.exceptions import RegistrationException
 
+from twitcher._compat import urlparse
+
 import logging
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 def parse_service_name(url):
-    from urlparse import urlparse
     parsed_url = urlparse(url)
     service_name = None
     if parsed_url.path.startswith("/ows/proxy"):

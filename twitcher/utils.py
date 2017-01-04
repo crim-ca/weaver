@@ -1,8 +1,9 @@
 import time
 from datetime import datetime
 import pytz
-from urlparse import urlparse
 from lxml import etree
+
+from twitcher._compat import urlparse
 
 import logging
 logger = logging.getLogger(__name__)

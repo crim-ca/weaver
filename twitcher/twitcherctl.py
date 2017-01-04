@@ -2,13 +2,12 @@ import sys
 import getpass
 import argcomplete
 import argparse
-from urlparse import urlparse
 
 from twitcher.client import TwitcherService
 
 import logging
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.WARN)
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 class TwitcherCtl(object):
@@ -87,10 +86,10 @@ class TwitcherCtl(object):
 
     def run(self, args):
         if args.debug:
-            logger.setLevel(logging.DEBUG)
+            LOGGER.setLevel(logging.DEBUG)
 
         if args.insecure:
-            logger.warn('disabled certificate verification!')
+            LOGGER.warn('disabled certificate verification!')
 
         password = args.password
         if args.username:
@@ -128,13 +127,13 @@ class TwitcherCtl(object):
             elif args.cmd == 'clean':
                 result = service.revoke_all_tokens()
         except Exception as e:
-            logger.error("Error: %s", e.message)
+            LOGGER.error("Error: %s", e.message)
         else:
             return result
 
 
 def main():
-    logger.setLevel(logging.INFO)
+    LOGGER.setLevel(logging.INFO)
 
     ctl = TwitcherCtl()
     parser = ctl.create_parser()
