@@ -4,12 +4,13 @@ channels:
 - birdhouse
 - conda-forge
 dependencies:
-- python=2.7.12
+- python=2.7
 - curl
 - pyopenssl
 - cryptography
 - mako
 - pyyaml
+- icu=56
 # tests
 - pytest
 - flake8
@@ -23,7 +24,8 @@ dependencies:
 - sphinx_rtd_theme
 # twitcher
 - argcomplete
-- lxml=3.6
+- lxml=3.7
+- libxslt=1.1.29
 - paste
 - pastedeploy
 - requests
@@ -35,7 +37,7 @@ dependencies:
 - nginx=1.10.1
 - supervisor=3.3.1
 - gunicorn=19.1.0
-- gevent=1.1.1
+- gevent=1.2
 # mongodb
 - pymongo=3
 - mongodb=2.6.*|3.3.9
