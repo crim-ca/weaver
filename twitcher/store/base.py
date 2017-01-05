@@ -44,9 +44,9 @@ class AccessTokenStore(object):
         raise NotImplementedError
 
 
-class ServiceRegistryStore(object):
+class ServiceStore(object):
     """
-    Registry storage for OWS services.
+    Storage for OWS services.
     """
 
     def register_service(self, url, name=None, service_type='wps', public=False, c4i=False, overwrite=True):

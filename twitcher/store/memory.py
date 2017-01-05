@@ -36,7 +36,7 @@ class MemoryTokenStore(AccessTokenStore):
     def clean_tokens(self):
         self.access_tokens = {}
 
-from twitcher.store.base import ServiceRegistryStore
+from twitcher.store.base import ServiceStore
 from twitcher.datatype import doc2dict
 from twitcher.exceptions import ServiceRegistrationError
 from twitcher import namesgenerator
@@ -44,7 +44,7 @@ from twitcher.utils import parse_service_name
 from twitcher.utils import baseurl
 
 
-class MemoryRegistryStore(ServiceRegistryStore):
+class MemoryServiceStore(ServiceStore):
     """
     Stores OWS services in memory. Useful for testing purposes.
     """

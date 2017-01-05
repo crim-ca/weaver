@@ -19,17 +19,17 @@ class MemoryTokenStoreTestCase(unittest.TestCase):
         assert self.test_store.fetch_by_token(access_token.token) == access_token
 
 
-from twitcher.store.memory import MemoryRegistryStore
+from twitcher.store.memory import MemoryServiceStore
 
 
-class MemoryRegistryStoreTestCase(unittest.TestCase):
+class MemoryServiceStoreTestCase(unittest.TestCase):
     def setUp(self):
         self.service = {'url': 'http://localhost:8094/wps',
                         'name': 'emu',
                         'c4i': False,
                         'public': False,
                         }
-        self.test_store = MemoryRegistryStore()
+        self.test_store = MemoryServiceStore()
 
     def test_register_service_and_fetch_service(self):
         assert self.test_store.register_service(**self.service)

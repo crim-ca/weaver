@@ -37,7 +37,7 @@ class MongodbTokenStore(AccessTokenStore, MongodbStore):
         self.collection.drop()
 
 
-from twitcher.store.base import ServiceRegistryStore
+from twitcher.store.base import ServiceStore
 from twitcher.datatype import doc2dict
 from twitcher.exceptions import ServiceRegistrationError
 from twitcher import namesgenerator
@@ -45,7 +45,7 @@ from twitcher.utils import parse_service_name
 from twitcher.utils import baseurl
 
 
-class MongodbRegistryStore(ServiceRegistryStore, MongodbStore):
+class MongodbServiceStore(ServiceStore, MongodbStore):
     """
     Registry for OWS services. Uses mongodb to store service url and attributes.
     """

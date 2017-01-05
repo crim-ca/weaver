@@ -33,10 +33,10 @@ class MongodbTokenStoreTestCase(unittest.TestCase):
 
         collection_mock.insert_one.assert_called_with(self.access_token)
 
-from twitcher.store.mongodb import MongodbRegistryStore
+from twitcher.store.mongodb import MongodbServiceStore
 
 
-class MongodbRegistryStoreTestCase(unittest.TestCase):
+class MongodbServiceStoreTestCase(unittest.TestCase):
     def setUp(self):
         self.service = dict(name="loving_flamingo", url="http://somewhere.over.the/ocean", type="wps",
                             public=False, c4i=False)
@@ -47,7 +47,7 @@ class MongodbRegistryStoreTestCase(unittest.TestCase):
         collection_mock = mock.Mock(spec=["find_one"])
         collection_mock.find_one.return_value = self.service
 
-        registry = MongodbRegistryStore(collection=collection_mock)
+        registry = MongodbServiceStore(collection=collection_mock)
         service = registry.get_service_by_name(name=self.service['name'])
 
         collection_mock.find_one.assert_called_with({"name": self.service['name']})
@@ -57,7 +57,7 @@ class MongodbRegistryStoreTestCase(unittest.TestCase):
         collection_mock = mock.Mock(spec=["insert_one", "find_one", "count"])
         collection_mock.count.return_value = 0
 
-        store = MongodbRegistryStore(collection=collection_mock)
+        store = MongodbServiceStore(collection=collection_mock)
         store.register_service(url=self.service['url'], name=self.service['name'])
 
         collection_mock.insert_one.assert_called_with(self.service)
@@ -66,7 +66,7 @@ class MongodbRegistryStoreTestCase(unittest.TestCase):
         collection_mock = mock.Mock(spec=["insert_one", "find_one", "count"])
         collection_mock.count.return_value = 0
 
-        store = MongodbRegistryStore(collection=collection_mock)
+        store = MongodbServiceStore(collection=collection_mock)
         store.register_service(url="http://wonderload", name="A special Name")
 
         collection_mock.insert_one.assert_called_with({
@@ -76,7 +76,7 @@ class MongodbRegistryStoreTestCase(unittest.TestCase):
         collection_mock = mock.Mock(spec=["insert_one", "find_one", "count"])
         collection_mock.count.return_value = 0
 
-        store = MongodbRegistryStore(collection=collection_mock)
+        store = MongodbServiceStore(collection=collection_mock)
         store.register_service(url=self.service_public['url'], name=self.service_public['name'], public=True)
 
         collection_mock.insert_one.assert_called_with(self.service_public)
