@@ -33,7 +33,7 @@ class MemoryTokenStore(AccessTokenStore):
 
         return self.access_tokens[token]
 
-    def clean_tokens(self):
+    def clear_tokens(self):
         self.access_tokens = {}
 
 from twitcher.store.base import ServiceStore

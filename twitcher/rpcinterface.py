@@ -64,7 +64,7 @@ class RPCInterface(object):
         Removes all tokens from tokenstore.
         """
         try:
-            self.tokenstore.clean_tokens()
+            self.tokenstore.clear_tokens()
         except:
             logger.exception('Failed to remove tokens.')
             return False

@@ -33,7 +33,7 @@ class MongodbTokenStore(AccessTokenStore, MongodbStore):
             raise AccessTokenNotFound
         return AccessToken(token)
 
-    def clean_tokens(self):
+    def clear_tokens(self):
         self.collection.drop()
 
 

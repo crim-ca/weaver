@@ -37,7 +37,7 @@ class AccessTokenStore(object):
         """
         raise NotImplementedError
 
-    def clean_tokens(self):
+    def clear_tokens(self):
         """
         Removes all tokens from database.
         """

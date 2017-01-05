@@ -14,7 +14,7 @@ def setup_with_mongodb():
 def setup_mongodb_tokenstore(config):
     store = tokenstore_factory(config.registry)
     generator = tokengenerator_factory(config.registry)
-    store.clean_tokens()
+    store.clear_tokens()
     access_token = generator.create_access_token()
     store.save_token(access_token)
     return access_token.token
