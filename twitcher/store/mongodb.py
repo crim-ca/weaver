@@ -3,7 +3,8 @@ Store adapters to read/write data to from/to mongodb using pymongo.
 """
 
 from twitcher.store import AccessTokenStore
-from twitcher.tokens import AccessToken, AccessTokenNotFound
+from twitcher.datatype import AccessToken
+from twitcher.exceptions import AccessTokenNotFound
 
 
 class MongodbStore(object):

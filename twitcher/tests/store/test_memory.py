@@ -1,6 +1,6 @@
 import unittest
 
-from twitcher.tokens import AccessToken
+from twitcher.datatype import AccessToken
 
 from twitcher.store.memory import MemoryTokenStore
 

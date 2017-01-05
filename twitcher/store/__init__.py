@@ -41,7 +41,7 @@ class AccessTokenStore(object):
         identify it.
 
         :param token: A string containing the token.
-        :return: An instance of :class:`twitcher.tokens.AccessToken`.
+        :return: An instance of :class:`twitcher.datatype.AccessToken`.
         """
         raise NotImplementedError
 

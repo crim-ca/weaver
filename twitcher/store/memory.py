@@ -6,7 +6,7 @@ for testing purposes.
 """
 
 from twitcher.store import AccessTokenStore
-from twitcher.tokens import AccessTokenNotFound
+from twitcher.exceptions import AccessTokenNotFound
 
 
 class MemoryTokenStore(AccessTokenStore):

@@ -1,16 +1,7 @@
 """
-Classes to manage access tokens used in the security middleware.
-
-The implementation is based on `python-oauth2 <http://python-oauth2.readthedocs.io/en/latest/>`_
-
-See access token examples:
-
-* https://www.mapbox.com/developers/api/
-* http://python-oauth2.readthedocs.io/en/latest/store.html
-
+Definitions of types used by tokens.
 """
 
-import uuid
 import time
 
 from twitcher.utils import now_secs
@@ -21,44 +12,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def tokengenerator_factory(registry):
-    return UuidGenerator()
-
-
 def expires_at(hours=1):
     return now_secs() + hours * 3600
-
-
-class AccessTokenGenerator(object):
-    """
-    Base class for access token generators.
-    """
-    def create_access_token(self, valid_in_hours=1, environ=None):
-        """
-        Creates an access token.
-
-        TODO: check valid in hours
-        TODO: maybe specify how often a token can be used
-        """
-        token = AccessToken(
-            token=self.generate(),
-            expires_at=expires_at(hours=valid_in_hours),
-            environ=environ)
-        return token
-
-    def generate(self):
-        raise NotImplementedError
-
-
-class UuidGenerator(AccessTokenGenerator):
-    """
-    Generate a token using uuid4.
-    """
-    def generate(self):
-        """
-        :return: A new token
-        """
-        return uuid.uuid4().get_hex()
 
 
 class AccessToken(dict):

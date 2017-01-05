@@ -5,7 +5,7 @@ from pyramid_rpc.xmlrpc import xmlrpc_method
 from pyramid.settings import asbool
 
 from twitcher.registry import service_registry_factory
-from twitcher.tokens import tokengenerator_factory
+from twitcher.tokengenerator import tokengenerator_factory
 from twitcher.store import tokenstore_factory
 
 import logging

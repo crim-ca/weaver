@@ -1,6 +1,6 @@
 from pyramid import testing
 
-from twitcher.tokens import tokengenerator_factory
+from twitcher.tokengenerator import tokengenerator_factory
 from twitcher.store import tokenstore_factory
 
 
