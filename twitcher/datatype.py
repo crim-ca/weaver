@@ -48,6 +48,10 @@ class Service(dict):
         """Flag if service is by climate4impact."""
         return self.get('c4i', False)
 
+    @property
+    def params(self):
+        return {'url': self.url, 'name': self.name, 'type': self.type, 'public': self.public, 'c4i': self.c4i}
+
     def __str__(self):
         return self.name
 

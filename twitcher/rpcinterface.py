@@ -7,6 +7,7 @@ from pyramid.settings import asbool
 from twitcher.tokengenerator import tokengenerator_factory
 from twitcher.store import tokenstore_factory
 from twitcher.store import servicestore_factory
+from twitcher.datatype import Service
 
 import logging
 logger = logging.getLogger(__name__)
@@ -77,12 +78,9 @@ class RPCInterface(object):
         """
         Adds an OWS service with the given ``url`` to the registry.
         """
-        service = self.registry.register_service(
-            url=url, name=name, service_type=service_type,
-            public=public,
-            c4i=c4i,
-            overwrite=overwrite)
-        return service
+        service = Service(url=url, name=name, type=service_type, public=public, c4i=c4i)
+        service = self.registry.register_service(service, overwrite=overwrite)
+        return service.params
 
     def unregister_service(self, name):
         """
