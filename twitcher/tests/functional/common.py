@@ -2,6 +2,7 @@ from pyramid import testing
 
 from twitcher.tokengenerator import tokengenerator_factory
 from twitcher.store import tokenstore_factory
+from twitcher.store import servicestore_factory
 
 
 def setup_with_mongodb():
@@ -17,3 +18,8 @@ def setup_mongodb_tokenstore(config):
     access_token = generator.create_access_token()
     store.save_token(access_token)
     return access_token.token
+
+
+def setup_mongodb_servicestore(config):
+    store = servicestore_factory(config.registry)
+    store.clear_services()
