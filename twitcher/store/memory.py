@@ -5,7 +5,7 @@ Though not very valuable in a production setup, these store adapters are great
 for testing purposes.
 """
 
-from twitcher.store import AccessTokenStore
+from twitcher.store.base import AccessTokenStore
 from twitcher.exceptions import AccessTokenNotFound
 
 
