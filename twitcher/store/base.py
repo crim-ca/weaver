@@ -87,9 +87,6 @@ class ServiceStore(object):
         """
         raise NotImplementedError
 
-    def get_service_name(self, url):
-        raise NotImplementedError
-
     def is_public(self, name):
         raise NotImplementedError
 

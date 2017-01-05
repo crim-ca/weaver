@@ -8,6 +8,7 @@ from twitcher.tokengenerator import tokengenerator_factory
 from twitcher.store import tokenstore_factory
 from twitcher.store import servicestore_factory
 from twitcher.datatype import Service
+from twitcher.utils import parse_service_name
 
 import logging
 logger = logging.getLogger(__name__)
@@ -99,7 +100,10 @@ class RPCInterface(object):
         Get service name for given ``url``.
         """
         try:
-            name = self.registry.get_service_name(url=url)
+            name = parse_service_name(url)
+        except ValueError:
+            service = self.registry.get_service_by_url(url)
+            name = service['name']
         except:
             logger.exception('could not get service with url %s', url)
             return ''

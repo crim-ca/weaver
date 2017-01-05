@@ -40,7 +40,6 @@ from twitcher.store.base import ServiceStore
 from twitcher.datatype import Service
 from twitcher.exceptions import ServiceRegistrationError
 from twitcher import namesgenerator
-from twitcher.utils import parse_service_name
 from twitcher.utils import baseurl
 
 
@@ -129,14 +128,6 @@ class MemoryServiceStore(ServiceStore):
         if not service:
             raise ValueError('service not found')
         return Service(service)
-
-    def get_service_name(self, url):
-        try:
-            service_name = parse_service_name(url)
-        except ValueError:
-            service = self.get_service_by_url(url)
-            service_name = service['name']
-        return service_name
 
     def is_public(self, name):
         try:
