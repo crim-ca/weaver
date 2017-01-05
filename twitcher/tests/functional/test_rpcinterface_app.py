@@ -34,7 +34,11 @@ class XMLRPCInterfaceAppTest(unittest.TestCase):
         return xmlrpclib.loads(resp.body)[0][0]
 
     @pytest.mark.online
-    def test_generate_token(self):
+    def test_generate_token_and_revoke_it(self):
+        # gentoken
         resp = self._callFUT('generate_token', (1, {}))
         assert 'access_token' in resp
         assert 'expires_at' in resp
+        # revoke
+        resp = self._callFUT('revoke_token', (resp['access_token'],))
+        assert resp is True
