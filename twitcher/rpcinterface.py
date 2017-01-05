@@ -135,7 +135,12 @@ class RPCInterface(object):
             return service
 
     def is_public(self, name):
-        return self.registry.is_public(name=name)
+        try:
+            service = self.service.get_service_by_name(name)
+            public = service.get('public', False)
+        except ValueError:
+            public = False
+        return public
 
     def list_services(self):
         """

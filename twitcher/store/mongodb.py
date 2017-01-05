@@ -113,14 +113,6 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
             raise ValueError('service not found')
         return Service(service)
 
-    def is_public(self, name):
-        try:
-            service = self.get_service_by_name(name)
-            public = service.get('public', False)
-        except ValueError:
-            public = False
-        return public
-
     def clear_services(self):
         """
         Removes all OWS services from registry database.

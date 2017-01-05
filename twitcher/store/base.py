@@ -87,9 +87,6 @@ class ServiceStore(object):
         """
         raise NotImplementedError
 
-    def is_public(self, name):
-        raise NotImplementedError
-
     def clear_services(self):
         """
         Removes all OWS services from registry database.
