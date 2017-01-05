@@ -4,7 +4,7 @@ Definitions of types used by tokens.
 
 import time
 
-from twitcher.utils import expires_at, now_secs
+from twitcher.utils import now_secs
 from twitcher.exceptions import AccessTokenNotFound
 
 
