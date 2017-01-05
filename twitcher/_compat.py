@@ -8,6 +8,7 @@ import sys
 
 LOGGER = logging.getLogger('twitcher')
 PY2 = sys.version_info[0] == 2
+PY3 = not PY2
 
 if PY2:
     LOGGER.debug('Python 2.x')
@@ -17,7 +18,7 @@ if PY2:
     from urlparse import urlparse
     from urlparse import urljoin
     from urllib2 import urlopen
-
+    import xmlrpclib
 else:
     LOGGER.debug('Python 3.x')
     text_type = str
@@ -26,3 +27,4 @@ else:
     from urllib.parse import urlparse
     from urllib.parse import urljoin
     from urllib.request import urlopen
+    import xmlrpc.client as xmlrpclib

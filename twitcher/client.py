@@ -1,8 +1,8 @@
-import xmlrpclib
 import ssl
 from datetime import datetime
 
 from twitcher._compat import urlparse
+from twitcher._compat import xmlrpclib
 
 import logging
 LOGGER = logging.getLogger(__name__)
