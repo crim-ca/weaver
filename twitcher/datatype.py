@@ -12,15 +12,49 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def doc2dict(doc):
+class Service(dict):
     """
-    Converts a mongodb document to a dictionary
+    Dictionary that contains OWS services. It always has ``'url'`` and ``'name'`` key.
     """
-    return dict(
-        url=doc.get('url'),
-        name=doc.get('name'),
-        public=doc.get('public', False),
-        c4i=doc.get('c4i', False))
+    def __init__(self, *args, **kwargs):
+        super(Service, self).__init__(*args, **kwargs)
+        if 'url' not in self:
+            raise TypeError("'url' is required")
+        if 'name' not in self:
+            raise TypeError("'name' is required")
+
+    @property
+    def url(self):
+        """Service URL."""
+        return self['url']
+
+    @property
+    def name(self):
+        """Service name."""
+        return self['name']
+
+    @property
+    def type(self):
+        """Service type."""
+        return self.get('type', 'WPS')
+
+    @property
+    def public(self):
+        """Flag if service has public access."""
+        return self.get('public', False)
+
+    @property
+    def c4i(self):
+        """Flag if service is by climate4impact."""
+        return self.get('c4i', False)
+
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        cls = type(self)
+        repr_ = dict.__repr__(self)
+        return '{0}.{1}({2})'.format(cls.__module__, cls.__name__, repr_)
 
 
 class AccessToken(dict):

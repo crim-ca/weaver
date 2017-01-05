@@ -33,6 +33,7 @@ class MongodbTokenStoreTestCase(unittest.TestCase):
 
         collection_mock.insert_one.assert_called_with(self.access_token)
 
+from twitcher.datatype import Service
 from twitcher.store.mongodb import MongodbServiceStore
 
 
@@ -42,6 +43,7 @@ class MongodbServiceStoreTestCase(unittest.TestCase):
                             public=False, c4i=False)
         self.service_public = dict(name="open_pingu", url="http://somewhere.in.the/deep_ocean", type="wps",
                                    public=True, c4i=False)
+        self.service_special = dict(url="http://wonderload", name="A special Name", type='wps')
 
     def test_get_service_by_name(self):
         collection_mock = mock.Mock(spec=["find_one"])
@@ -56,18 +58,20 @@ class MongodbServiceStoreTestCase(unittest.TestCase):
     def test_register_service_default(self):
         collection_mock = mock.Mock(spec=["insert_one", "find_one", "count"])
         collection_mock.count.return_value = 0
+        collection_mock.find_one.return_value = self.service
 
         store = MongodbServiceStore(collection=collection_mock)
-        store.register_service(url=self.service['url'], name=self.service['name'])
+        store.register_service(Service(self.service))
 
         collection_mock.insert_one.assert_called_with(self.service)
 
     def test_register_service_with_special_name(self):
         collection_mock = mock.Mock(spec=["insert_one", "find_one", "count"])
         collection_mock.count.return_value = 0
+        collection_mock.find_one.return_value = self.service_special
 
         store = MongodbServiceStore(collection=collection_mock)
-        store.register_service(url="http://wonderload", name="A special Name")
+        store.register_service(Service(self.service_special))
 
         collection_mock.insert_one.assert_called_with({
             'url': 'http://wonderload', 'type': 'wps', 'name': 'a_special_name', 'public': False, 'c4i': False})
@@ -75,8 +79,9 @@ class MongodbServiceStoreTestCase(unittest.TestCase):
     def test_register_service_public(self):
         collection_mock = mock.Mock(spec=["insert_one", "find_one", "count"])
         collection_mock.count.return_value = 0
+        collection_mock.find_one.return_value = self.service_public
 
         store = MongodbServiceStore(collection=collection_mock)
-        store.register_service(url=self.service_public['url'], name=self.service_public['name'], public=True)
+        store.register_service(Service(self.service_public))
 
         collection_mock.insert_one.assert_called_with(self.service_public)

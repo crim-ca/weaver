@@ -49,33 +49,41 @@ class ServiceStore(object):
     Storage for OWS services.
     """
 
-    def register_service(self, url, name=None, service_type='wps', public=False, c4i=False, overwrite=True):
+    def register_service(self, service, overwrite=True):
         """
-        Adds OWS service with given name to registry database.
+        Stores an OWS service with given name in database.
+
+        :param service: An instance of :class:`twitcher.datatype.Service`.
         """
         raise NotImplementedError
 
     def unregister_service(self, name):
         """
-        Removes service from registry database.
+        Removes service from database.
         """
         raise NotImplementedError
 
     def list_services(self):
         """
-        Lists all services in registry database.
+        Lists all services in database.
         """
         raise NotImplementedError
 
     def get_service_by_name(self, name):
         """
         Get service for given ``name`` from registry database.
+
+        :param token: A string containing the service name.
+        :return: An instance of :class:`twitcher.datatype.Service`.
         """
         raise NotImplementedError
 
     def get_service_by_url(self, url):
         """
         Get service for given ``url`` from registry database.
+
+        :param token: A string containing the service url.
+        :return: An instance of :class:`twitcher.datatype.Service`.
         """
         raise NotImplementedError
 

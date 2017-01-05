@@ -1,7 +1,6 @@
 import unittest
 
 from twitcher.datatype import AccessToken
-
 from twitcher.store.memory import MemoryTokenStore
 
 
@@ -19,19 +18,23 @@ class MemoryTokenStoreTestCase(unittest.TestCase):
         assert self.test_store.fetch_by_token(access_token.token) == access_token
 
 
+from twitcher.datatype import Service
 from twitcher.store.memory import MemoryServiceStore
 
 
 class MemoryServiceStoreTestCase(unittest.TestCase):
     def setUp(self):
-        self.service = {'url': 'http://localhost:8094/wps',
-                        'name': 'emu',
-                        'c4i': False,
-                        'public': False,
-                        }
+        self.service_data = {'url': 'http://localhost:8094/wps',
+                             'name': 'emu',
+                             'c4i': False,
+                             'public': False,
+                             'type': 'WPS',
+                             }
         self.test_store = MemoryServiceStore()
 
     def test_register_service_and_fetch_service(self):
-        assert self.test_store.register_service(**self.service)
-        assert self.test_store.get_service_by_url(self.service['url']) == self.service
-        assert self.test_store.get_service_by_name(self.service['name']) == self.service
+        service = Service(**self.service_data)
+
+        assert self.test_store.register_service(service)
+        assert self.test_store.get_service_by_url(service.url) == service
+        assert self.test_store.get_service_by_name(service.name) == service

@@ -37,7 +37,7 @@ class MemoryTokenStore(AccessTokenStore):
         self.access_tokens = {}
 
 from twitcher.store.base import ServiceStore
-from twitcher.datatype import doc2dict
+from twitcher.datatype import Service
 from twitcher.exceptions import ServiceRegistrationError
 from twitcher import namesgenerator
 from twitcher.utils import parse_service_name
@@ -66,12 +66,12 @@ class MemoryServiceStore(ServiceStore):
         self.name_index[service['name']] = service
         self.url_index[service['url']] = service
 
-    def register_service(self, url, name=None, service_type='wps', public=False, c4i=False, overwrite=True):
+    def register_service(self, service, overwrite=True):
         """
-        Adds OWS service with given name to registry database.
+        Store an OWS service in database.
         """
 
-        service_url = baseurl(url)
+        service_url = baseurl(service.url)
         # check if service is already registered
         if service_url in self.url_index:
             if overwrite:
@@ -79,7 +79,7 @@ class MemoryServiceStore(ServiceStore):
             else:
                 raise ServiceRegistrationError("service url already registered.")
 
-        name = namesgenerator.get_sane_name(name)
+        name = namesgenerator.get_sane_name(service.name)
         if not name:
             name = namesgenerator.get_random_name()
             if name in self.name_index:
@@ -89,8 +89,12 @@ class MemoryServiceStore(ServiceStore):
                 self._delete(name=name)
             else:
                 raise Exception("service name already registered.")
-        service = dict(url=service_url, name=name, type=service_type, public=public, c4i=c4i)
-        self._insert(service)
+        self._insert(Service(
+            url=service_url,
+            name=name,
+            type=service.type,
+            public=service.public,
+            c4i=service.c4i))
         return self.get_service_by_url(url=service_url)
 
     def unregister_service(self, name):
@@ -105,12 +109,7 @@ class MemoryServiceStore(ServiceStore):
         """
         my_services = []
         for service in self.url_index.itervalues():
-            my_services.append({
-                'name': service['name'],
-                'type': service['type'],
-                'url': service['url'],
-                'public': service.get('public', False),
-                'c4i': service.get('c4i', False)})
+            my_services.append(Service(service))
         return my_services
 
     def get_service_by_name(self, name):
@@ -120,9 +119,7 @@ class MemoryServiceStore(ServiceStore):
         service = self.name_index.get(name)
         if service is None:
             raise ValueError('service not found')
-        if 'url' not in service:
-            raise ValueError('service has no url')
-        return doc2dict(service)
+        return Service(service)
 
     def get_service_by_url(self, url):
         """
@@ -131,7 +128,7 @@ class MemoryServiceStore(ServiceStore):
         service = self.url_index.get(baseurl(url))
         if not service:
             raise ValueError('service not found')
-        return doc2dict(service)
+        return Service(service)
 
     def get_service_name(self, url):
         try:
