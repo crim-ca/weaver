@@ -15,15 +15,10 @@ import time
 
 from twitcher.utils import now_secs
 from twitcher.exceptions import AccessTokenNotFound
-from twitcher.db import mongodb
+
 
 import logging
 logger = logging.getLogger(__name__)
-
-
-def tokenstore_factory(registry):
-    db = mongodb(registry)
-    return MongodbAccessTokenStore(db.tokens)
 
 
 def tokengenerator_factory(registry):
@@ -32,61 +27,6 @@ def tokengenerator_factory(registry):
 
 def expires_at(hours=1):
     return now_secs() + hours * 3600
-
-
-class AccessTokenStore(object):
-
-    def save_token(self, access_token):
-        """
-        Stores an access token with additional data.
-        """
-        raise NotImplementedError
-
-    def delete_token(self, token):
-        """
-        Deletes an access token from the store using its token string to identify it.
-        This invalidates both the access token and the token.
-
-        :param token: A string containing the token.
-        :return: None.
-        """
-        raise NotImplementedError
-
-    def fetch_by_token(self, token):
-        """
-        Fetches an access token from the store using its token string to
-        identify it.
-
-        :param token: A string containing the token.
-        :return: An instance of :class:`twitcher.tokens.AccessToken`.
-        """
-        raise NotImplementedError
-
-    def clean_tokens(self):
-        """
-        Removes all tokens from database.
-        """
-        raise NotImplementedError
-
-
-class MongodbAccessTokenStore(AccessTokenStore):
-    def __init__(self, collection):
-        self.collection = collection
-
-    def save_token(self, access_token):
-        self.collection.insert_one(access_token)
-
-    def delete_token(self, token):
-        self.collection.delete_one({'token': token})
-
-    def fetch_by_token(self, token):
-        token = self.collection.find_one({'token': token})
-        if not token:
-            raise AccessTokenNotFound
-        return AccessToken(token)
-
-    def clean_tokens(self):
-        self.collection.drop()
 
 
 class AccessTokenGenerator(object):

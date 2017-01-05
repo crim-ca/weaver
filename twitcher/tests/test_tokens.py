@@ -6,30 +6,7 @@ import pytest
 import unittest
 import mock
 
-from twitcher.tokens import AccessToken, UuidGenerator, MongodbAccessTokenStore, expires_at
-
-
-class MongodbAccessTokenStoreTestCase(unittest.TestCase):
-    def setUp(self):
-        self.access_token = AccessToken(token="abcdef", expires_at=expires_at(hours=1))
-
-    def test_fetch_by_token(self):
-        collection_mock = mock.Mock(spec=["find_one"])
-        collection_mock.find_one.return_value = self.access_token
-
-        store = MongodbAccessTokenStore(collection=collection_mock)
-        access_token = store.fetch_by_token(token=self.access_token.token)
-
-        collection_mock.find_one.assert_called_with({"token": self.access_token.token})
-        assert isinstance(access_token, AccessToken)
-
-    def test_save_token(self):
-        collection_mock = mock.Mock(spec=["insert_one"])
-
-        store = MongodbAccessTokenStore(collection=collection_mock)
-        store.save_token(self.access_token)
-
-        collection_mock.insert_one.assert_called_with(self.access_token)
+from twitcher.tokens import AccessToken, UuidGenerator, expires_at
 
 
 class UuidGeneratorTestCase(unittest.TestCase):

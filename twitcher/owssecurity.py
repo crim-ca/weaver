@@ -1,7 +1,7 @@
 from twitcher.exceptions import AccessTokenNotFound
 from twitcher.owsexceptions import OWSAccessForbidden, OWSInvalidParameterValue
 from twitcher.utils import path_elements
-from twitcher.tokens import tokenstore_factory
+from twitcher.store import tokenstore_factory
 from twitcher.registry import service_registry_factory
 from twitcher.registry import parse_service_name
 from twitcher.owsrequest import OWSRequest

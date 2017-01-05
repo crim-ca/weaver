@@ -6,7 +6,7 @@ from pyramid.settings import asbool
 
 from twitcher.registry import service_registry_factory
 from twitcher.tokens import tokengenerator_factory
-from twitcher.tokens import tokenstore_factory
+from twitcher.store import tokenstore_factory
 
 import logging
 logger = logging.getLogger(__name__)
