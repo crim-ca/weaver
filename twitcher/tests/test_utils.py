@@ -4,6 +4,16 @@ from twitcher import utils
 from .common import WPS_CAPS_EMU_XML, WMS_CAPS_NCWMS2_111_XML, WMS_CAPS_NCWMS2_130_XML
 
 
+def test_parse_service_name():
+    assert 'emu' == utils.parse_service_name("/ows/proxy/emu")
+    assert 'emu' == utils.parse_service_name("/ows/proxy/emu/foo/bar")
+    assert 'emu' == utils.parse_service_name("/ows/proxy/emu/")
+    with pytest.raises(ValueError) as e_info:
+        assert 'emu' == utils.parse_service_name("/ows/proxy/")
+    with pytest.raises(ValueError) as e_info:
+        assert 'emu' == utils.parse_service_name("/ows/nowhere/emu")
+
+
 def test_baseurl():
     assert utils.baseurl('http://localhost:8094/wps') == 'http://localhost:8094/wps'
     assert utils.baseurl('http://localhost:8094/wps?service=wps&request=getcapabilities') == 'http://localhost:8094/wps'

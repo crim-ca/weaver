@@ -26,3 +26,15 @@ def tokenstore_factory(registry, database=None):
     else:
         store = MemoryTokenStore()
     return store
+
+from twitcher.store.mongodb import MongodbRegistryStore
+
+
+def service_registry_factory(registry):
+    """
+    Creates a registry store with the interface of :class:`twitcher.store.ServiceRegistryStore`.
+
+    :return: An instance of :class:`twitcher.store.ServiceRegistryStore`.
+    """
+    db = _mongodb(registry)
+    return MongodbRegistryStore(collection=db.services)

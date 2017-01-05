@@ -4,7 +4,7 @@ import webtest
 from pyramid import testing
 from .common import setup_with_db, setup_tokenstore
 
-from twitcher.registry import service_registry_factory
+from twitcher.store import service_registry_factory
 
 
 class OWSProxyAppTest(unittest.TestCase):

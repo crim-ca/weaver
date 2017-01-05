@@ -11,5 +11,9 @@ class AccessTokenNotFound(Exception):
     pass
 
 
-class RegistrationException(Exception):
+class ServiceRegistrationError(Exception):
+    """
+    Error indicating that an OWS service could not be registered in the
+    storage backend by an instance of :class:`twitcher.store.ServiceRegistryStore`.
+    """
     pass

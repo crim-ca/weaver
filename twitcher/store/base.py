@@ -42,3 +42,51 @@ class AccessTokenStore(object):
         Removes all tokens from database.
         """
         raise NotImplementedError
+
+
+class ServiceRegistryStore(object):
+    """
+    Registry storage for OWS services.
+    """
+
+    def register_service(self, url, name=None, service_type='wps', public=False, c4i=False, overwrite=True):
+        """
+        Adds OWS service with given name to registry database.
+        """
+        raise NotImplementedError
+
+    def unregister_service(self, name):
+        """
+        Removes service from registry database.
+        """
+        raise NotImplementedError
+
+    def list_services(self):
+        """
+        Lists all services in registry database.
+        """
+        raise NotImplementedError
+
+    def get_service_by_name(self, name):
+        """
+        Get service for given ``name`` from registry database.
+        """
+        raise NotImplementedError
+
+    def get_service_by_url(self, url):
+        """
+        Get service for given ``url`` from registry database.
+        """
+        raise NotImplementedError
+
+    def get_service_name(self, url):
+        raise NotImplementedError
+
+    def is_public(self, name):
+        raise NotImplementedError
+
+    def clear_services(self):
+        """
+        Removes all OWS services from registry database.
+        """
+        raise NotImplementedError

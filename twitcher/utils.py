@@ -9,6 +9,18 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def parse_service_name(url):
+    parsed_url = urlparse(url)
+    service_name = None
+    if parsed_url.path.startswith("/ows/proxy"):
+        parts = parsed_url.path.strip('/').split('/')
+        if len(parts) > 2:
+            service_name = parts[2]
+    if not service_name:
+        raise ValueError('service_name not found')
+    return service_name
+
+
 def now():
     return localize_datetime(datetime.utcnow())
 

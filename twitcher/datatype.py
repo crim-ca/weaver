@@ -12,6 +12,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def doc2dict(doc):
+    """
+    Converts a mongodb document to a dictionary
+    """
+    return dict(
+        url=doc.get('url'),
+        name=doc.get('name'),
+        public=doc.get('public', False),
+        c4i=doc.get('c4i', False))
+
+
 class AccessToken(dict):
     """
     Dictionary that contains access token. It always has ``'token'`` key.

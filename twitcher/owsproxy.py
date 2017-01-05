@@ -5,14 +5,16 @@ The owsproxy is based on `papyrus_ogcproxy <https://github.com/elemoine/papyrus_
 import urllib
 import requests
 
-from pyramid.httpexceptions import HTTPBadRequest, HTTPBadGateway, HTTPNotAcceptable
-from twitcher.owsexceptions import OWSAccessForbidden
-from twitcher.utils import replace_caps_url
 from pyramid.response import Response
 from pyramid.settings import asbool
+from pyramid.httpexceptions import HTTPBadRequest, HTTPBadGateway, HTTPNotAcceptable
 
-from twitcher.registry import service_registry_factory
 from twitcher._compat import urlparse
+
+from twitcher.owsexceptions import OWSAccessForbidden
+from twitcher.utils import replace_caps_url
+from twitcher.store import service_registry_factory
+
 
 import logging
 LOGGER = logging.getLogger(__name__)
