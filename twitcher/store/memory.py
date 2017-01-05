@@ -52,7 +52,7 @@ class MemoryRegistryStore(ServiceRegistryStore):
         self.url_index = {}
         self.name_index = {}
 
-    def _delete(url=None, name=None):
+    def _delete(self, url=None, name=None):
         if url:
             service = self.url_index[url]
             del self.name_index[service['name']]
@@ -62,7 +62,7 @@ class MemoryRegistryStore(ServiceRegistryStore):
             del self.url_index[service['url']]
             del self.name_index[name]
 
-    def _insert(service):
+    def _insert(self, service):
         self.name_index[service['name']] = service
         self.url_index[service['url']] = service
 
@@ -73,7 +73,7 @@ class MemoryRegistryStore(ServiceRegistryStore):
 
         service_url = baseurl(url)
         # check if service is already registered
-        if service_url in self.service_url_index:
+        if service_url in self.url_index:
             if overwrite:
                 self._delete(url=service_url)
             else:
@@ -128,7 +128,7 @@ class MemoryRegistryStore(ServiceRegistryStore):
         """
         Get service for given ``url`` from registry database.
         """
-        service = self.url_index(baseurl(url))
+        service = self.url_index.get(baseurl(url))
         if not service:
             raise ValueError('service not found')
         return doc2dict(service)
