@@ -8,13 +8,25 @@ solution specific to your needs.
 The implementation is based on `python-oauth2 <http://python-oauth2.readthedocs.io/en/latest/>`_.
 """
 
-from twitcher.db import mongodb as _mongodb
 
+def tokenstore_factory(registry, database=None):
+    """
+    Creates a token store with the interface of :class:`twitcher.store.AccessTokenStore`.
+    By default the mongodb implementation will be used.
 
-def tokenstore_factory(registry):
-    from twitcher.store.mongodb import MongodbTokenStore
-    db = _mongodb(registry)
-    return MongodbTokenStore(db.tokens)
+    :param database: A string with the store implementation name: "mongodb" or "memory".
+    :return: An instance of :class:`twitcher.store.AccessTokenStore`.
+    """
+    database = database or 'mongodb'
+    if database == 'mongodb':
+        from twitcher.db import mongodb as _mongodb
+        from twitcher.store.mongodb import MongodbTokenStore
+        db = _mongodb(registry)
+        store = MongodbTokenStore(db.tokens)
+    else:
+        from twitcher.store.memory import MemoryTokenStore
+        store = MemoryTokenStore()
+    return store
 
 
 class AccessTokenStore(object):
