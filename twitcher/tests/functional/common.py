@@ -4,13 +4,13 @@ from twitcher.tokengenerator import tokengenerator_factory
 from twitcher.store import tokenstore_factory
 
 
-def setup_with_db():
+def setup_with_mongodb():
     settings = {'mongodb.host': '127.0.0.1', 'mongodb.port': '27027', 'mongodb.db_name': 'twitcher_test'}
     config = testing.setUp(settings=settings)
     return config
 
 
-def setup_tokenstore(config):
+def setup_mongodb_tokenstore(config):
     store = tokenstore_factory(config.registry)
     generator = tokengenerator_factory(config.registry)
     store.clean_tokens()

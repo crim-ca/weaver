@@ -10,14 +10,14 @@ import pytest
 import unittest
 import webtest
 import pyramid.testing
-from .common import setup_with_db, setup_tokenstore
+from twitcher.tests.functional.common import setup_with_mongodb, setup_mongodb_tokenstore
 
 
 class WpsAppTest(unittest.TestCase):
 
     def setUp(self):
-        config = setup_with_db()
-        self.token = setup_tokenstore(config)
+        config = setup_with_mongodb()
+        self.token = setup_mongodb_tokenstore(config)
         config.include('twitcher.wps')
         config.include('twitcher.tweens')
         self.app = webtest.TestApp(config.make_wsgi_app())
