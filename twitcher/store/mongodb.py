@@ -15,7 +15,7 @@ class MongodbStore(object):
         self.collection = collection
 
 
-class MongodbAccessTokenStore(AccessTokenStore, MongodbStore):
+class MongodbTokenStore(AccessTokenStore, MongodbStore):
     def save_token(self, access_token):
         self.collection.insert_one(access_token)
 

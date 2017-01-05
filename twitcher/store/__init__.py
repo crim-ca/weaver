@@ -12,9 +12,9 @@ from twitcher.db import mongodb as _mongodb
 
 
 def tokenstore_factory(registry):
-    from twitcher.store.mongodb import MongodbAccessTokenStore
+    from twitcher.store.mongodb import MongodbTokenStore
     db = _mongodb(registry)
-    return MongodbAccessTokenStore(db.tokens)
+    return MongodbTokenStore(db.tokens)
 
 
 class AccessTokenStore(object):
