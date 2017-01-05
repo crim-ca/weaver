@@ -31,9 +31,9 @@ from twitcher.store.mongodb import MongodbServiceStore
 from twitcher.store.memory import MemoryServiceStore
 
 
-def service_registry_factory(registry, database=None):
+def servicestore_factory(registry, database=None):
     """
-    Creates a registry store with the interface of :class:`twitcher.store.ServiceStore`.
+    Creates a service store with the interface of :class:`twitcher.store.ServiceStore`.
     By default the mongodb implementation will be used.
 
     :return: An instance of :class:`twitcher.store.ServiceStore`.

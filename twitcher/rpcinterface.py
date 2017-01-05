@@ -6,7 +6,7 @@ from pyramid.settings import asbool
 
 from twitcher.tokengenerator import tokengenerator_factory
 from twitcher.store import tokenstore_factory
-from twitcher.store import service_registry_factory
+from twitcher.store import servicestore_factory
 
 import logging
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ class RPCInterface(object):
         registry = self.request.registry
         self.tokengenerator = tokengenerator_factory(registry)
         self.tokenstore = tokenstore_factory(registry)
-        self.registry = service_registry_factory(registry)
+        self.registry = servicestore_factory(registry)
 
     # token management
     # ----------------

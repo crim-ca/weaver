@@ -2,7 +2,7 @@ from twitcher.exceptions import AccessTokenNotFound
 from twitcher.owsexceptions import OWSAccessForbidden, OWSInvalidParameterValue
 from twitcher.utils import path_elements
 from twitcher.store import tokenstore_factory
-from twitcher.store import service_registry_factory
+from twitcher.store import servicestore_factory
 from twitcher.utils import parse_service_name
 from twitcher.owsrequest import OWSRequest
 from twitcher.esgf import fetch_certificate
@@ -14,7 +14,7 @@ protected_path = '/ows/'
 
 
 def owssecurity_factory(registry):
-    return OWSSecurity(tokenstore_factory(registry), service_registry_factory(registry))
+    return OWSSecurity(tokenstore_factory(registry), servicestore_factory(registry))
 
 
 class OWSSecurity(object):

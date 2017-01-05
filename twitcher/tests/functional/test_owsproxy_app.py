@@ -4,7 +4,7 @@ import webtest
 from pyramid import testing
 from .common import setup_with_db, setup_tokenstore
 
-from twitcher.store import service_registry_factory
+from twitcher.store import servicestore_factory
 
 
 class OWSProxyAppTest(unittest.TestCase):
@@ -20,7 +20,7 @@ class OWSProxyAppTest(unittest.TestCase):
         testing.tearDown()
 
     def _setup_registry(self, config):
-        registry = service_registry_factory(config.registry)
+        registry = servicestore_factory(config.registry)
         registry.clear_services()
         # TODO: testing against ourselfs ... not so good
         url = "https://localhost:5000/ows/wps"
