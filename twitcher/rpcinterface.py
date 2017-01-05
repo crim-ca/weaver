@@ -174,7 +174,7 @@ def includeme(config):
     """
     settings = config.registry.settings
 
-    if asbool(settings.get('twitcher.rpcinferface', True)):
+    if asbool(settings.get('twitcher.rpcinterface', True)):
         logger.debug('Add twitcher rpcinterface')
 
         # using basic auth
