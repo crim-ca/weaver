@@ -21,6 +21,7 @@ class MemoryTokenStore(AccessTokenStore):
 
     def save_token(self, access_token):
         self.access_tokens[access_token.token] = access_token
+        return True
 
     def delete_token(self, token):
         if token in self.access_tokens:
