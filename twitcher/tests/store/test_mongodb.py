@@ -6,7 +6,8 @@ import pytest
 import unittest
 import mock
 
-from twitcher.datatype import AccessToken, expires_at
+from twitcher.datatype import AccessToken
+from twitcher.utils import expires_at
 from twitcher.store.mongodb import MongodbTokenStore
 
 

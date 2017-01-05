@@ -4,16 +4,12 @@ Definitions of types used by tokens.
 
 import time
 
-from twitcher.utils import now_secs
+from twitcher.utils import expires_at, now_secs
 from twitcher.exceptions import AccessTokenNotFound
 
 
 import logging
 logger = logging.getLogger(__name__)
-
-
-def expires_at(hours=1):
-    return now_secs() + hours * 3600
 
 
 class AccessToken(dict):

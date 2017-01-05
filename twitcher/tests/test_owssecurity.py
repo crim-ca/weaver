@@ -4,7 +4,8 @@ import mock
 
 from pyramid.testing import DummyRequest
 
-from twitcher.datatype import AccessToken, expires_at
+from twitcher.datatype import AccessToken
+from twitcher.utils import expires_at
 from twitcher.owssecurity import OWSSecurity
 from twitcher.owsexceptions import OWSAccessForbidden
 

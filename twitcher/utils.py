@@ -20,6 +20,10 @@ def now_secs():
     return int(time.time())
 
 
+def expires_at(hours=1):
+    return now_secs() + hours * 3600
+
+
 def localize_datetime(dt, tz_name='UTC'):
     """Provide a timzeone-aware object for a given datetime and timezone name
     """
