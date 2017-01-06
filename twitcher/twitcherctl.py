@@ -112,9 +112,7 @@ class TwitcherCtl(object):
             elif args.cmd == 'register':
                 result = service.register_service(
                     url=args.url,
-                    name=args.name,
-                    service_type=args.type,
-                    public=args.public)
+                    data={'name': args.name, 'type': args.type, 'public': args.public})
             elif args.cmd == 'unregister':
                 result = service.unregister_service(name=args.name)
             elif args.cmd == 'clear':

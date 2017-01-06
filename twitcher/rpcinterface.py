@@ -30,8 +30,8 @@ class RPCInterface(ITokenManager, IRegistry):
     def revoke_all_tokens(self):
         return self.tokenmgr.revoke_all_tokens()
 
-    def register_service(self, url, name, service_type, public, c4i, overwrite):
-        return self.srvreg.register_service(url, name, service_type, public, c4i, overwrite)
+    def register_service(self, url, data=None, overwrite=True):
+        return self.srvreg.register_service(url, data, overwrite)
 
     def unregister_service(self, name):
         return self.srvreg.unregister_service(name)

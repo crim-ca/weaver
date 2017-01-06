@@ -32,9 +32,11 @@ class ITokenManager(object):
 
 
 class IRegistry(object):
-    def register_service(self, url, name, service_type, public, c4i, overwrite):
+    def register_service(self, url, data, overwrite):
         """
         Adds an OWS service with the given ``url`` to the service store.
+
+        :param data: a dict with additional information like ``name``.
         """
         raise NotImplementedError
 
@@ -121,11 +123,15 @@ class Registry(IRegistry):
     def __init__(self, servicestore):
         self.store = servicestore
 
-    def register_service(self, url, name, service_type, public, c4i, overwrite):
+    def register_service(self, url, data=None, overwrite=True):
         """
         Adds an OWS service with the given ``url`` to the service store.
         """
-        service = Service(url=url, name=name, type=service_type, public=public, c4i=c4i)
+        data = data or {}
+
+        args = dict(data)
+        args['url'] = url
+        service = Service(**args)
         service = self.store.save_service(service, overwrite=overwrite)
         return service.params
 

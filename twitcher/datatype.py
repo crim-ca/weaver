@@ -14,14 +14,14 @@ logger = logging.getLogger(__name__)
 
 class Service(dict):
     """
-    Dictionary that contains OWS services. It always has ``'url'`` and ``'name'`` key.
+    Dictionary that contains OWS services. It always has ``'url'`` key.
     """
     def __init__(self, *args, **kwargs):
         super(Service, self).__init__(*args, **kwargs)
         if 'url' not in self:
             raise TypeError("'url' is required")
-        if 'name' not in self:
-            raise TypeError("'name' is required")
+        #if 'name' not in self:
+        #    raise TypeError("'name' is required")
 
     @property
     def url(self):
@@ -31,7 +31,7 @@ class Service(dict):
     @property
     def name(self):
         """Service name."""
-        return self['name']
+        return self.get('name', 'unknown')
 
     @property
     def type(self):

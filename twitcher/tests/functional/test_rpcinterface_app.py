@@ -31,11 +31,11 @@ class XMLRPCInterfaceAppTest(unittest.TestCase):
             xml = xmlrpclib.dumps(params, methodname=method)
         else:
             xml = xmlrpclib.dumps(params, methodname=method).encode('utf-8')
-        #print xml
+        print xml
         resp = self.app.post('/RPC2', content_type='text/xml', params=xml)
         assert resp.status_int == 200
         assert resp.content_type == 'text/xml'
-        #print resp.body
+        print resp.body
         return xmlrpclib.loads(resp.body)[0][0]
 
     @pytest.mark.online
@@ -57,11 +57,8 @@ class XMLRPCInterfaceAppTest(unittest.TestCase):
                    'type': 'wps', 'public': False, 'c4i': False}
         # register
         resp = self._callFUT('register_service', (
-            'http://localhost/wps',
-            'test_emu',
-            'wps',
-            False,
-            False,
+            service['url'],
+            service,
             False))
         assert resp == service
 

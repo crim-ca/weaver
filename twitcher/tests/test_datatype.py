@@ -7,6 +7,7 @@ import unittest
 import mock
 
 from twitcher.datatype import AccessToken
+from twitcher.datatype import Service
 from twitcher.utils import expires_at
 
 
@@ -34,3 +35,27 @@ class AccessTokenTestCase(unittest.TestCase):
         access_token = AccessToken(token='12345', expires_at=expires_at(hours=1),
                                    environ={'data_token': 'bfghk'})
         assert access_token.environ == {'data_token': 'bfghk'}
+
+
+class ServiceTestCase(unittest.TestCase):
+    def test_service_with_url_only(self):
+        service = Service(url='http://nowhere/wps')
+        assert service.url == 'http://nowhere/wps'
+        assert service.name == 'unknown'
+
+    def test_missing_url(self):
+        with pytest.raises(TypeError) as e_info:
+            Service()
+
+    def test_service_with_name(self):
+        service = Service(url='http://nowhere/wps', name="test_wps")
+        assert service.url == 'http://nowhere/wps'
+        assert service.name == 'test_wps'
+
+    def test_service_params(self):
+        service = Service(url='http://nowhere/wps', name="test_wps")
+        assert service.params == {'c4i': False,
+                                  'name': 'test_wps',
+                                  'public': False,
+                                  'type': 'WPS',
+                                  'url': 'http://nowhere/wps'}

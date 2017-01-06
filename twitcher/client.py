@@ -80,10 +80,9 @@ class TwitcherService(object):
     # service registry
 
     @xmlrpc_error_handler
-    def register_service(self, url, name=None, service_type=None, public=False, c4i=False, overwrite=True):
-        service_type = service_type or 'wps'
-        name = name or ''
-        return self.server.register_service(url, name, service_type, public, c4i, overwrite)
+    def register_service(self, url, data=None, overwrite=True):
+        data = data or {}
+        return self.server.register_service(url, data, overwrite)
 
     @xmlrpc_error_handler
     def unregister_service(self, name):
