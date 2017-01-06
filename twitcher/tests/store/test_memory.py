@@ -32,9 +32,9 @@ class MemoryServiceStoreTestCase(unittest.TestCase):
                              }
         self.test_store = MemoryServiceStore()
 
-    def test_register_service_and_fetch_service(self):
+    def test_save_service_and_fetch_service(self):
         service = Service(**self.service_data)
 
-        assert self.test_store.register_service(service)
+        assert self.test_store.save_service(service)
         assert self.test_store.get_service_by_url(service.url) == service
         assert self.test_store.get_service_by_name(service.name) == service

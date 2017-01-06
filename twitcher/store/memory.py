@@ -65,7 +65,7 @@ class MemoryServiceStore(ServiceStore):
         self.name_index[service['name']] = service
         self.url_index[service['url']] = service
 
-    def register_service(self, service, overwrite=True):
+    def save_service(self, service, overwrite=True):
         """
         Store an OWS service in database.
         """
@@ -96,7 +96,7 @@ class MemoryServiceStore(ServiceStore):
             c4i=service.c4i))
         return self.get_service_by_url(url=service_url)
 
-    def unregister_service(self, name):
+    def delete_service(self, name):
         """
         Removes service from registry database.
         """

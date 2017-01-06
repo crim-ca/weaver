@@ -74,7 +74,7 @@ class ServiceAPI(object):
         Adds an OWS service with the given ``url`` to the servicestore.
         """
         service = Service(url=url, name=name, type=service_type, public=public, c4i=c4i)
-        service = self.servicestore.register_service(service, overwrite=overwrite)
+        service = self.servicestore.save_service(service, overwrite=overwrite)
         return service.params
 
     def unregister_service(self, name):
@@ -82,7 +82,7 @@ class ServiceAPI(object):
         Removes OWS service with the given ``name`` from the servicestore.
         """
         try:
-            self.servicestore.unregister_service(name=name)
+            self.servicestore.delete_service(name=name)
         except:
             logger.exception('unregister failed')
             return False

@@ -49,7 +49,7 @@ class ServiceStore(object):
     Storage for OWS services.
     """
 
-    def register_service(self, service, overwrite=True):
+    def save_service(self, service, overwrite=True):
         """
         Stores an OWS service with given name in database.
 
@@ -57,7 +57,7 @@ class ServiceStore(object):
         """
         raise NotImplementedError
 
-    def unregister_service(self, name):
+    def delete_service(self, name):
         """
         Removes service from database.
         """

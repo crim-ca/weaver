@@ -49,9 +49,9 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
     Registry for OWS services. Uses mongodb to store service url and attributes.
     """
 
-    def register_service(self, service, overwrite=True):
+    def save_service(self, service, overwrite=True):
         """
-        Stores an OWS service in database.
+        Stores an OWS service in mongodb.
         """
 
         service_url = baseurl(service.url)
@@ -80,9 +80,9 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
             c4i=service.c4i))
         return self.get_service_by_url(url=service_url)
 
-    def unregister_service(self, name):
+    def delete_service(self, name):
         """
-        Removes service from registry database.
+        Removes service from mongodb storage.
         """
         self.collection.delete_one({'name': name})
 
