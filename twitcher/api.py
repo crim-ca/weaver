@@ -8,21 +8,20 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def service_api_factory(registry):
-    return ServiceAPI(
+def tokenmanager_factory(registry):
+    return TokenManager(
         tokengenerator=tokengenerator_factory(registry),
-        tokenstore=tokenstore_factory(registry),
-        servicestore=servicestore_factory(registry))
+        tokenstore=tokenstore_factory(registry))
 
 
-class ServiceAPI(object):
-    def __init__(self, tokengenerator, tokenstore, servicestore):
+def registry_factory(registry):
+    return Registry(servicestore=servicestore_factory(registry))
+
+
+class TokenManager(object):
+    def __init__(self, tokengenerator, tokenstore):
         self.tokengenerator = tokengenerator
-        self.tokenstore = tokenstore
-        self.servicestore = servicestore
-
-    # token management
-    # ----------------
+        self.store = tokenstore
 
     def generate_token(self, valid_in_hours=1, environ=None):
         """
@@ -39,7 +38,7 @@ class ServiceAPI(object):
             valid_in_hours=valid_in_hours,
             environ=environ,
         )
-        self.tokenstore.save_token(access_token)
+        self.store.save_token(access_token)
         return access_token.params
 
     def revoke_token(self, token):
@@ -47,7 +46,7 @@ class ServiceAPI(object):
         Remove token from tokenstore.
         """
         try:
-            self.tokenstore.delete_token(token)
+            self.store.delete_token(token)
         except:
             logger.exception('Failed to remove token.')
             return False
@@ -59,30 +58,32 @@ class ServiceAPI(object):
         Removes all tokens from tokenstore.
         """
         try:
-            self.tokenstore.clear_tokens()
+            self.store.clear_tokens()
         except:
             logger.exception('Failed to remove tokens.')
             return False
         else:
             return True
 
-    # service servicestore
-    # ----------------
+
+class Registry(object):
+    def __init__(self, servicestore):
+        self.store = servicestore
 
     def register_service(self, url, name, service_type, public, c4i, overwrite):
         """
-        Adds an OWS service with the given ``url`` to the servicestore.
+        Adds an OWS service with the given ``url`` to the service store.
         """
         service = Service(url=url, name=name, type=service_type, public=public, c4i=c4i)
-        service = self.servicestore.save_service(service, overwrite=overwrite)
+        service = self.store.save_service(service, overwrite=overwrite)
         return service.params
 
     def unregister_service(self, name):
         """
-        Removes OWS service with the given ``name`` from the servicestore.
+        Removes OWS service with the given ``name`` from the service store.
         """
         try:
-            self.servicestore.delete_service(name=name)
+            self.store.delete_service(name=name)
         except:
             logger.exception('unregister failed')
             return False
@@ -91,24 +92,24 @@ class ServiceAPI(object):
 
     def get_service_by_name(self, name):
         """
-        Get service for given ``name`` from servicestore database.
+        Gets service with given ``name`` from service store.
         """
         try:
-            service = self.servicestore.fetch_by_name(name=name)
+            service = self.store.fetch_by_name(name=name)
         except:
-            logger.exception('could not get service with name %s', name)
+            logger.error('Could not get service with name %s', name)
             return {}
         else:
             return service
 
     def get_service_by_url(self, url):
         """
-        Get service for given ``url`` from servicestore database.
+        Gets service with given ``url`` from service store.
         """
         try:
-            service = self.servicestore.fetch_by_url(url=url)
+            service = self.store.fetch_by_url(url=url)
         except:
-            logger.exception('could not get service with url %s', url)
+            logger.error('Could not get service with url %s', url)
             return {}
         else:
             return service
@@ -118,22 +119,22 @@ class ServiceAPI(object):
         Lists all registred OWS services.
         """
         try:
-            services = self.servicestore.list_services()
+            services = self.store.list_services()
             for service in services:
                 service['proxy_url'] = self.request.route_url('owsproxy', service_name=service['name'])
             return services
         except:
-            logger.exception('register failed')
+            logger.error('List services failed.')
             return []
 
     def clear_services(self):
         """
-        Removes all services from the servicestore.
+        Removes all services from the service store.
         """
         try:
-            self.servicestore.clear_services()
+            self.store.clear_services()
         except:
-            logger.exception('clear failed')
+            logger.error('Clear services failed.')
             return False
         else:
             return True
