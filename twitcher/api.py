@@ -1,5 +1,4 @@
 from twitcher.datatype import Service
-from twitcher.utils import parse_service_name
 
 import logging
 logger = logging.getLogger(__name__)

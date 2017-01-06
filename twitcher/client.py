@@ -1,6 +1,8 @@
 import ssl
 from datetime import datetime
 
+from twitcher.utils import parse_service_name
+
 from twitcher._compat import urlparse
 from twitcher._compat import xmlrpclib
 
@@ -114,7 +116,7 @@ class TwitcherService(object):
             service = self.server.get_service_by_url(url)
             name = service['name']
         except:
-            logger.exception('could not get service with url %s', url)
+            LOGGER.exception('could not get service with url %s', url)
             return ''
         else:
             return name
