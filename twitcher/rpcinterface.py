@@ -4,11 +4,7 @@ from pyramid.view import view_defaults
 from pyramid_rpc.xmlrpc import xmlrpc_method
 from pyramid.settings import asbool
 
-from twitcher.tokengenerator import tokengenerator_factory
-from twitcher.store import tokenstore_factory
-from twitcher.store import servicestore_factory
-from twitcher.datatype import Service
-from twitcher.utils import parse_service_name
+from twitcher.api import service_api_factory
 
 import logging
 logger = logging.getLogger(__name__)
@@ -22,150 +18,46 @@ logger = logging.getLogger(__name__)
 class RPCInterface(object):
     def __init__(self, request):
         self.request = request
-        registry = self.request.registry
-        self.tokengenerator = tokengenerator_factory(registry)
-        self.tokenstore = tokenstore_factory(registry)
-        self.registry = servicestore_factory(registry)
+        self.api = service_api_factory(self.request.registry)
 
     # token management
     # ----------------
 
     def generate_token(self, valid_in_hours=1, environ=None):
-        """
-        Generates an access token which is valid for ``valid_in_hours``.
-
-        Arguments:
-
-        * ``valid_in_hours``: number of hours the token is valid.
-        * ``environ``: environment used with this token (dict object).
-
-        Possible keys: ``esgf_access_token``, ``esgf_slcs_service_url``.
-        """
-        access_token = self.tokengenerator.create_access_token(
-            valid_in_hours=valid_in_hours,
-            environ=environ,
-        )
-        self.tokenstore.save_token(access_token)
-        return access_token.params
+        return self.api.generate_token(valid_in_hours, environ)
 
     def revoke_token(self, token):
-        """
-        Remove token from tokenstore.
-        """
-        try:
-            self.tokenstore.delete_token(token)
-        except:
-            logger.exception('Failed to remove token.')
-            return False
-        else:
-            return True
+        return self.api.revoke_token(token)
 
     def revoke_all_tokens(self):
-        """
-        Removes all tokens from tokenstore.
-        """
-        try:
-            self.tokenstore.clear_tokens()
-        except:
-            logger.exception('Failed to remove tokens.')
-            return False
-        else:
-            return True
+        return self.api.revoke_all_tokens()
 
     # service registry
     # ----------------
 
     def register_service(self, url, name, service_type, public, c4i, overwrite):
-        """
-        Adds an OWS service with the given ``url`` to the registry.
-        """
-        service = Service(url=url, name=name, type=service_type, public=public, c4i=c4i)
-        service = self.registry.register_service(service, overwrite=overwrite)
-        return service.params
+        return self.api.register_service(url, name, service_type, public, c4i, overwrite)
 
     def unregister_service(self, name):
-        """
-        Removes OWS service with the given ``name`` from the registry.
-        """
-        try:
-            self.registry.unregister_service(name=name)
-        except:
-            logger.exception('unregister failed')
-            return False
-        else:
-            return True
+        return self.api.unregister_service(name)
 
     def get_service_name(self, url):
-        """
-        Get service name for given ``url``.
-        """
-        try:
-            name = parse_service_name(url)
-        except ValueError:
-            service = self.registry.get_service_by_url(url)
-            name = service['name']
-        except:
-            logger.exception('could not get service with url %s', url)
-            return ''
-        else:
-            return name
+        return self.api.get_service_name(url)
 
     def get_service_by_name(self, name):
-        """
-        Get service for given ``name`` from registry database.
-        """
-        try:
-            service = self.registry.get_service_by_name(name=name)
-        except:
-            logger.exception('could not get service with name %s', name)
-            return {}
-        else:
-            return service
+        return self.api.get_service_name(name)
 
     def get_service_by_url(self, url):
-        """
-        Get service for given ``url`` from registry database.
-        """
-        try:
-            service = self.registry.get_service_by_url(url=url)
-        except:
-            logger.exception('could not get service with url %s', url)
-            return {}
-        else:
-            return service
+        return self.api.get_service_by_url(url)
 
     def is_public(self, name):
-        try:
-            service = self.service.get_service_by_name(name)
-            public = service.get('public', False)
-        except ValueError:
-            public = False
-        return public
+        return self.api.is_public(name)
 
     def list_services(self):
-        """
-        Lists all registred OWS services.
-        """
-        try:
-            services = self.registry.list_services()
-            for service in services:
-                service['proxy_url'] = self.request.route_url('owsproxy', service_name=service['name'])
-            return services
-        except:
-            logger.exception('register failed')
-            return []
+        return self.api.list_services()
 
     def clear_services(self):
-        """
-        Removes all services from the registry.
-        """
-        try:
-            self.registry.clear_services()
-        except:
-            logger.exception('clear failed')
-            return False
-        else:
-            return True
+        return self.api.clear_services()
 
 
 def includeme(config):
