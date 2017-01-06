@@ -39,6 +39,7 @@ class MemoryTokenStore(AccessTokenStore):
 from twitcher.store.base import ServiceStore
 from twitcher.datatype import Service
 from twitcher.exceptions import ServiceRegistrationError
+from twitcher.exceptions import ServiceNotFound
 from twitcher import namesgenerator
 from twitcher.utils import baseurl
 
@@ -101,6 +102,7 @@ class MemoryServiceStore(ServiceStore):
         Removes service from registry database.
         """
         self._delete(name=name)
+        return True
 
     def list_services(self):
         """
@@ -116,8 +118,8 @@ class MemoryServiceStore(ServiceStore):
         Get service for given ``name`` from memory storage.
         """
         service = self.name_index.get(name)
-        if service is None:
-            raise ValueError('service not found')
+        if not service:
+            raise ServiceNotFound
         return Service(service)
 
     def fetch_by_url(self, url):
@@ -126,7 +128,7 @@ class MemoryServiceStore(ServiceStore):
         """
         service = self.url_index.get(baseurl(url))
         if not service:
-            raise ValueError('service not found')
+            raise ServiceNotFound
         return Service(service)
 
     def clear_services(self):
@@ -135,3 +137,4 @@ class MemoryServiceStore(ServiceStore):
         """
         self.url_index = {}
         self.name_index = {}
+        return True

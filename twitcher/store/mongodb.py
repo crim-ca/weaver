@@ -40,6 +40,7 @@ class MongodbTokenStore(AccessTokenStore, MongodbStore):
 from twitcher.store.base import ServiceStore
 from twitcher.datatype import Service
 from twitcher.exceptions import ServiceRegistrationError
+from twitcher.exceptions import ServiceNotFound
 from twitcher import namesgenerator
 from twitcher.utils import baseurl
 
@@ -85,6 +86,7 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
         Removes service from mongodb storage.
         """
         self.collection.delete_one({'name': name})
+        return True
 
     def list_services(self):
         """
@@ -100,8 +102,8 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
         Gets service for given ``name`` from mongodb storage.
         """
         service = self.collection.find_one({'name': name})
-        if service is None:
-            raise ValueError('service not found')
+        if not service:
+            raise ServiceNotFound
         return Service(service)
 
     def fetch_by_url(self, url):
@@ -110,7 +112,7 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
         """
         service = self.collection.find_one({'url': baseurl(url)})
         if not service:
-            raise ValueError('service not found')
+            raise ServiceNotFound
         return Service(service)
 
     def clear_services(self):
@@ -118,3 +120,4 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
         Removes all OWS services from mongodb storage.
         """
         self.collection.drop()
+        return True
