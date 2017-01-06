@@ -171,13 +171,12 @@ class Registry(IRegistry):
         Lists all registred OWS services.
         """
         try:
-            services = self.store.list_services()
-            for service in services:
-                service['proxy_url'] = self.request.route_url('owsproxy', service_name=service['name'])
-            return services
+            services = [service.params for service in self.store.list_services()]
         except:
             logger.error('List services failed.')
             return []
+        else:
+            return services
 
     def clear_services(self):
         """

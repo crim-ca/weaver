@@ -73,6 +73,10 @@ class XMLRPCInterfaceAppTest(unittest.TestCase):
         resp = self._callFUT('get_service_by_url', (service['url'],))
         assert resp == service
 
+        # list
+        resp = self._callFUT('list_services', ())
+        assert resp == [service]
+
         # unregister
         resp = self._callFUT('unregister_service', (service['name'],))
         assert resp is True
