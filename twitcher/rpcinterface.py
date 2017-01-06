@@ -43,10 +43,7 @@ class RPCInterface(ITokenManager, IRegistry):
         return self.srvreg.get_service_by_url(url)
 
     def list_services(self):
-        services = self.srvreg.list_services()
-        #for service in services:
-        #    service['proxy_url'] = self.request.route_url('owsproxy', service_name=service['name'])
-        return services
+        return self.srvreg.list_services()
 
     def clear_services(self):
         return self.srvreg.clear_services()

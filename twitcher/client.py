@@ -112,11 +112,13 @@ class TwitcherService(object):
     def get_service_name(self, url):
         try:
             name = parse_service_name(url)
+            LOGGER.debug('parsed service name: %s', name)
         except ValueError:
             service = self.server.get_service_by_url(url)
             name = service['name']
+            LOGGER.debug('service name from registry: %s', name)
         except:
-            LOGGER.exception('could not get service with url %s', url)
+            LOGGER.error('could not get service with url %s', url)
             return ''
         else:
             return name
