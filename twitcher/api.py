@@ -1,6 +1,3 @@
-from twitcher.tokengenerator import tokengenerator_factory
-from twitcher.store import tokenstore_factory
-from twitcher.store import servicestore_factory
 from twitcher.datatype import Service
 from twitcher.utils import parse_service_name
 
@@ -8,17 +5,72 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def tokenmanager_factory(registry):
-    return TokenManager(
-        tokengenerator=tokengenerator_factory(registry),
-        tokenstore=tokenstore_factory(registry))
+class ITokenManager(object):
+    def generate_token(self, valid_in_hours=1, environ=None):
+        """
+        Generates an access token which is valid for ``valid_in_hours``.
+
+        Arguments:
+
+        * ``valid_in_hours``: number of hours the token is valid.
+        * ``environ``: environment used with this token (dict object).
+
+        Possible keys: ``esgf_access_token``, ``esgf_slcs_service_url``.
+        """
+        raise NotImplementedError
+
+    def revoke_token(self, token):
+        """
+        Remove token from tokenstore.
+        """
+        raise NotImplementedError
+
+    def revoke_all_tokens(self):
+        """
+        Removes all tokens from tokenstore.
+        """
+        raise NotImplementedError
 
 
-def registry_factory(registry):
-    return Registry(servicestore=servicestore_factory(registry))
+class IRegistry(object):
+    def register_service(self, url, name, service_type, public, c4i, overwrite):
+        """
+        Adds an OWS service with the given ``url`` to the service store.
+        """
+        raise NotImplementedError
+
+    def unregister_service(self, name):
+        """
+        Removes OWS service with the given ``name`` from the service store.
+        """
+        raise NotImplementedError
+
+    def get_service_by_name(self, name):
+        """
+        Gets service with given ``name`` from service store.
+        """
+        raise NotImplementedError
+
+    def get_service_by_url(self, url):
+        """
+        Gets service with given ``url`` from service store.
+        """
+        raise NotImplementedError
+
+    def list_services(self):
+        """
+        Lists all registred OWS services.
+        """
+        raise NotImplementedError
+
+    def clear_services(self):
+        """
+        Removes all services from the service store.
+        """
+        raise NotImplementedError
 
 
-class TokenManager(object):
+class TokenManager(ITokenManager):
     def __init__(self, tokengenerator, tokenstore):
         self.tokengenerator = tokengenerator
         self.store = tokenstore
@@ -66,7 +118,7 @@ class TokenManager(object):
             return True
 
 
-class Registry(object):
+class Registry(IRegistry):
     def __init__(self, servicestore):
         self.store = servicestore
 

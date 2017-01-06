@@ -47,6 +47,9 @@ class XMLRPCInterfaceAppTest(unittest.TestCase):
         # revoke
         resp = self._callFUT('revoke_token', (resp['access_token'],))
         assert resp is True
+        # revoke all
+        resp = self._callFUT('revoke_all_tokens', ())
+        assert resp is True
 
     @pytest.mark.online
     def test_register_service_and_unregister_it(self):

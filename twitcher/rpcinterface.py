@@ -2,22 +2,24 @@ from pyramid.view import view_defaults
 from pyramid_rpc.xmlrpc import xmlrpc_method
 from pyramid.settings import asbool
 
-from twitcher.api import tokenmanager_factory
-from twitcher.api import registry_factory
+from twitcher.api import ITokenManager, TokenManager
+from twitcher.api import IRegistry, Registry
+from twitcher.tokengenerator import tokengenerator_factory
+from twitcher.store import tokenstore_factory
+from twitcher.store import servicestore_factory
 
 import logging
 logger = logging.getLogger(__name__)
 
 
 @view_defaults(permission='view')
-class RPCInterface(object):
+class RPCInterface(ITokenManager, IRegistry):
     def __init__(self, request):
         self.request = request
-        self.tokenmgr = tokenmanager_factory(self.request.registry)
-        self.service_registry = registry_factory(self.request.registry)
-
-    # token management
-    # ----------------
+        self.tokenmgr = TokenManager(
+            tokengenerator_factory(request.registry),
+            tokenstore_factory(request.registry))
+        self.srvreg = Registry(servicestore_factory(request.registry))
 
     def generate_token(self, valid_in_hours=1, environ=None):
         return self.tokenmgr.generate_token(valid_in_hours, environ)
@@ -28,26 +30,23 @@ class RPCInterface(object):
     def revoke_all_tokens(self):
         return self.tokenmgr.revoke_all_tokens()
 
-    # service registry
-    # ----------------
-
     def register_service(self, url, name, service_type, public, c4i, overwrite):
-        return self.service_registry.register_service(url, name, service_type, public, c4i, overwrite)
+        return self.srvreg.register_service(url, name, service_type, public, c4i, overwrite)
 
     def unregister_service(self, name):
-        return self.service_registry.unregister_service(name)
+        return self.srvreg.unregister_service(name)
 
     def get_service_by_name(self, name):
-        return self.service_registry.get_service_name(name)
+        return self.srvreg.get_service_by_name(name)
 
     def get_service_by_url(self, url):
-        return self.service_registry.get_service_by_url(url)
+        return self.srvreg.get_service_by_url(url)
 
     def list_services(self):
-        return self.service_registry.list_services()
+        return self.srvreg.list_services()
 
     def clear_services(self):
-        return self.service_registry.clear_services()
+        return self.srvreg.clear_services()
 
 
 def includeme(config):
