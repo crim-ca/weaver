@@ -56,7 +56,7 @@ class WpsAppTest(unittest.TestCase):
 
     @pytest.mark.online
     def test_execute_not_allowed(self):
-        resp = self.app.get('/ows/wps?service=wps&request=execute&version=1.0.0&identifier=hello')
+        resp = self.app.get('/ows/wps?service=wps&request=execute&version=1.0.0&identifier=hello&datainputs=name=tux')
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
         print resp.body
