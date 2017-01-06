@@ -98,15 +98,6 @@ class TwitcherService(object):
         return self.server.clear_services()
 
     @xmlrpc_error_handler
-    def is_public(self, name):
-        try:
-            service = self.server.get_service_by_name(name)
-            public = service.get('public', False)
-        except:
-            public = False
-        return public
-
-    @xmlrpc_error_handler
     def get_service_by_url(self, url):
         return self.server.get_service_by_url(url)
 
