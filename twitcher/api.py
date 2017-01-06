@@ -152,7 +152,7 @@ class Registry(IRegistry):
             logger.error('Could not get service with name %s', name)
             return {}
         else:
-            return service
+            return service.params
 
     def get_service_by_url(self, url):
         """
@@ -164,7 +164,7 @@ class Registry(IRegistry):
             logger.error('Could not get service with url %s', url)
             return {}
         else:
-            return service
+            return service.params
 
     def list_services(self):
         """

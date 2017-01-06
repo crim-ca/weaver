@@ -53,6 +53,8 @@ class XMLRPCInterfaceAppTest(unittest.TestCase):
 
     @pytest.mark.online
     def test_register_service_and_unregister_it(self):
+        service = {'url': 'http://localhost/wps', 'name': 'test_emu',
+                   'type': 'wps', 'public': False, 'c4i': False}
         # register
         resp = self._callFUT('register_service', (
             'http://localhost/wps',
@@ -61,8 +63,20 @@ class XMLRPCInterfaceAppTest(unittest.TestCase):
             False,
             False,
             False))
-        assert resp == {'url': 'http://localhost/wps', 'name': 'test_emu',
-                        'type': 'wps', 'public': False, 'c4i': False}
+        assert resp == service
+
+        # get by name
+        resp = self._callFUT('get_service_by_name', (service['name'],))
+        assert resp == service
+
+        # get by url
+        resp = self._callFUT('get_service_by_url', (service['url'],))
+        assert resp == service
+
         # unregister
-        resp = self._callFUT('unregister_service', ('test_emu',))
+        resp = self._callFUT('unregister_service', (service['name'],))
+        assert resp is True
+
+        # clear
+        resp = self._callFUT('clear_services', ())
         assert resp is True
