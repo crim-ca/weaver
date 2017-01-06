@@ -94,7 +94,7 @@ class MemoryServiceStore(ServiceStore):
             type=service.type,
             public=service.public,
             c4i=service.c4i))
-        return self.get_service_by_url(url=service_url)
+        return self.fetch_by_url(url=service_url)
 
     def delete_service(self, name):
         """
@@ -104,25 +104,25 @@ class MemoryServiceStore(ServiceStore):
 
     def list_services(self):
         """
-        Lists all services in registry database.
+        Lists all services in memory storage.
         """
         my_services = []
         for service in self.url_index.itervalues():
             my_services.append(Service(service))
         return my_services
 
-    def get_service_by_name(self, name):
+    def fetch_by_name(self, name):
         """
-        Get service for given ``name`` from registry database.
+        Get service for given ``name`` from memory storage.
         """
         service = self.name_index.get(name)
         if service is None:
             raise ValueError('service not found')
         return Service(service)
 
-    def get_service_by_url(self, url):
+    def fetch_by_url(self, url):
         """
-        Get service for given ``url`` from registry database.
+        Get service for given ``url`` from memory storage.
         """
         service = self.url_index.get(baseurl(url))
         if not service:
@@ -131,7 +131,7 @@ class MemoryServiceStore(ServiceStore):
 
     def clear_services(self):
         """
-        Removes all OWS services from registry database.
+        Removes all OWS services from memory storage.
         """
         self.url_index = {}
         self.name_index = {}

@@ -96,7 +96,7 @@ class ServiceAPI(object):
         try:
             name = parse_service_name(url)
         except ValueError:
-            service = self.servicestore.get_service_by_url(url)
+            service = self.servicestore.fetch_by_url(url)
             name = service['name']
         except:
             logger.exception('could not get service with url %s', url)
@@ -109,7 +109,7 @@ class ServiceAPI(object):
         Get service for given ``name`` from servicestore database.
         """
         try:
-            service = self.servicestore.get_service_by_name(name=name)
+            service = self.servicestore.fetch_by_name(name=name)
         except:
             logger.exception('could not get service with name %s', name)
             return {}
@@ -121,7 +121,7 @@ class ServiceAPI(object):
         Get service for given ``url`` from servicestore database.
         """
         try:
-            service = self.servicestore.get_service_by_url(url=url)
+            service = self.servicestore.fetch_by_url(url=url)
         except:
             logger.exception('could not get service with url %s', url)
             return {}
@@ -130,7 +130,7 @@ class ServiceAPI(object):
 
     def is_public(self, name):
         try:
-            service = self.service.get_service_by_name(name)
+            service = self.service.fetch_by_name(name)
             public = service.get('public', False)
         except ValueError:
             public = False

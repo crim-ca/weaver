@@ -36,5 +36,5 @@ class MemoryServiceStoreTestCase(unittest.TestCase):
         service = Service(**self.service_data)
 
         assert self.test_store.save_service(service)
-        assert self.test_store.get_service_by_url(service.url) == service
-        assert self.test_store.get_service_by_name(service.name) == service
+        assert self.test_store.fetch_by_url(service.url) == service
+        assert self.test_store.fetch_by_name(service.name) == service

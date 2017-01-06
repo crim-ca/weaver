@@ -45,12 +45,12 @@ class MongodbServiceStoreTestCase(unittest.TestCase):
                                    public=True, c4i=False)
         self.service_special = dict(url="http://wonderload", name="A special Name", type='wps')
 
-    def test_get_service_by_name(self):
+    def test_fetch_by_name(self):
         collection_mock = mock.Mock(spec=["find_one"])
         collection_mock.find_one.return_value = self.service
 
-        registry = MongodbServiceStore(collection=collection_mock)
-        service = registry.get_service_by_name(name=self.service['name'])
+        store = MongodbServiceStore(collection=collection_mock)
+        service = store.fetch_by_name(name=self.service['name'])
 
         collection_mock.find_one.assert_called_with({"name": self.service['name']})
         assert isinstance(service, dict)
