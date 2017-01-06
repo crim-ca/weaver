@@ -89,21 +89,6 @@ class ServiceAPI(object):
         else:
             return True
 
-    def get_service_name(self, url):
-        """
-        Get service name for given ``url``.
-        """
-        try:
-            name = parse_service_name(url)
-        except ValueError:
-            service = self.servicestore.fetch_by_url(url)
-            name = service['name']
-        except:
-            logger.exception('could not get service with url %s', url)
-            return ''
-        else:
-            return name
-
     def get_service_by_name(self, name):
         """
         Get service for given ``name`` from servicestore database.
@@ -127,14 +112,6 @@ class ServiceAPI(object):
             return {}
         else:
             return service
-
-    def is_public(self, name):
-        try:
-            service = self.service.fetch_by_name(name)
-            public = service.get('public', False)
-        except ValueError:
-            public = False
-        return public
 
     def list_services(self):
         """

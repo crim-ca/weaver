@@ -41,17 +41,11 @@ class RPCInterface(object):
     def unregister_service(self, name):
         return self.api.unregister_service(name)
 
-    def get_service_name(self, url):
-        return self.api.get_service_name(url)
-
     def get_service_by_name(self, name):
         return self.api.get_service_name(name)
 
     def get_service_by_url(self, url):
         return self.api.get_service_by_url(url)
-
-    def is_public(self, name):
-        return self.api.is_public(name)
 
     def list_services(self):
         return self.api.list_services()
@@ -91,8 +85,6 @@ def includeme(config):
         config.add_xmlrpc_method(RPCInterface, attr='revoke_all_tokens', endpoint='api', method='revoke_all_tokens')
         config.add_xmlrpc_method(RPCInterface, attr='register_service', endpoint='api', method='register_service')
         config.add_xmlrpc_method(RPCInterface, attr='unregister_service', endpoint='api', method='unregister_service')
-        config.add_xmlrpc_method(RPCInterface, attr='is_public', endpoint='api', method='is_public')
-        config.add_xmlrpc_method(RPCInterface, attr='get_service_name', endpoint='api', method='get_service_name')
         config.add_xmlrpc_method(RPCInterface, attr='get_service_by_name', endpoint='api', method='get_service_by_name')
         config.add_xmlrpc_method(RPCInterface, attr='get_service_by_url', endpoint='api', method='get_service_by_url')
         config.add_xmlrpc_method(RPCInterface, attr='clear_services', endpoint='api', method='clear_services')
