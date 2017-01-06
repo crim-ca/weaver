@@ -1,5 +1,3 @@
-import functools
-
 from pyramid.view import view_defaults
 from pyramid_rpc.xmlrpc import xmlrpc_method
 from pyramid.settings import asbool
@@ -8,10 +6,6 @@ from twitcher.api import service_api_factory
 
 import logging
 logger = logging.getLogger(__name__)
-
-
-# shortcut for xmlrpc_method
-# api_xmlrpc = functools.partial(xmlrpc_method, endpoint="api")
 
 
 @view_defaults(permission='view')
