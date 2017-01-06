@@ -20,8 +20,6 @@ class Service(dict):
         super(Service, self).__init__(*args, **kwargs)
         if 'url' not in self:
             raise TypeError("'url' is required")
-        #if 'name' not in self:
-        #    raise TypeError("'name' is required")
 
     @property
     def url(self):
