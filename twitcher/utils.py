@@ -3,6 +3,8 @@ from datetime import datetime
 import pytz
 from lxml import etree
 
+from twitcher.exceptions import ServiceNotFound
+
 from twitcher._compat import urlparse
 
 import logging
@@ -17,7 +19,7 @@ def parse_service_name(url):
         if len(parts) > 2:
             service_name = parts[2]
     if not service_name:
-        raise ValueError('service_name not found')
+        raise ServiceNotFound
     return service_name
 
 

@@ -1,16 +1,17 @@
 import pytest
 from lxml import etree
 from twitcher import utils
-from .common import WPS_CAPS_EMU_XML, WMS_CAPS_NCWMS2_111_XML, WMS_CAPS_NCWMS2_130_XML
+from twitcher.exceptions import ServiceNotFound
+from twitcher.tests.common import WPS_CAPS_EMU_XML, WMS_CAPS_NCWMS2_111_XML, WMS_CAPS_NCWMS2_130_XML
 
 
 def test_parse_service_name():
     assert 'emu' == utils.parse_service_name("/ows/proxy/emu")
     assert 'emu' == utils.parse_service_name("/ows/proxy/emu/foo/bar")
     assert 'emu' == utils.parse_service_name("/ows/proxy/emu/")
-    with pytest.raises(ValueError) as e_info:
+    with pytest.raises(ServiceNotFound) as e_info:
         assert 'emu' == utils.parse_service_name("/ows/proxy/")
-    with pytest.raises(ValueError) as e_info:
+    with pytest.raises(ServiceNotFound) as e_info:
         assert 'emu' == utils.parse_service_name("/ows/nowhere/emu")
 
 

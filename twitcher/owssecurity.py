@@ -1,4 +1,5 @@
 from twitcher.exceptions import AccessTokenNotFound
+from twitcher.exceptions import ServiceNotFound
 from twitcher.owsexceptions import OWSAccessForbidden, OWSInvalidParameterValue
 from twitcher.utils import path_elements
 from twitcher.store import tokenstore_factory
@@ -44,8 +45,8 @@ class OWSSecurity(object):
                 if service.public is True:
                     logger.info('public access for service %s', service_name)
                     return
-            except ValueError:
-                logger.warn("Service not registered.")
+            except ServiceNotFound:
+                logger.debug("Service not registered.")
             ows_request = OWSRequest(request)
             if not ows_request.service_allowed():
                 raise OWSInvalidParameterValue(
