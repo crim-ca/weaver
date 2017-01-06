@@ -119,9 +119,8 @@ class TwitcherService(object):
             LOGGER.debug('service name from registry: %s', name)
         except:
             LOGGER.error('could not get service with url %s', url)
-            return ''
-        else:
-            return name
+            name = ''
+        return name
 
     @xmlrpc_error_handler
     def get_service_by_url(self, url):
