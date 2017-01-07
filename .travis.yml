@@ -6,6 +6,7 @@ branches:
     - master
 os:
   - linux
+  - osx
 python:
   - "2.7"
 sudo: false 
@@ -20,3 +21,6 @@ script:
   - make pep8
 #after_success:
 # - coveralls
+matrix:
+  allow_failures:
+    - os: osx
