@@ -31,10 +31,10 @@ class AccessTokenTestCase(unittest.TestCase):
         assert access_token.expires_in == 0
         assert access_token.is_expired() is True
 
-    def test_access_token_with_environ(self):
+    def test_access_token_with_data(self):
         access_token = AccessToken(token='12345', expires_at=expires_at(hours=1),
-                                   environ={'data_token': 'bfghk'})
-        assert access_token.environ == {'data_token': 'bfghk'}
+                                   data={'esgf_token': 'bfghk'})
+        assert access_token.data == {'esgf_token': 'bfghk'}
 
 
 class ServiceTestCase(unittest.TestCase):

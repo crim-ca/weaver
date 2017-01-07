@@ -19,7 +19,7 @@ class TokenManagerTest(unittest.TestCase):
 
     def test_generate_token_and_revoke_it(self):
         # gentoken
-        resp = self.tokenmgr.generate_token(1, {})
+        resp = self.tokenmgr.generate_token()
         assert 'access_token' in resp
         assert 'expires_at' in resp
         # revoke
@@ -28,6 +28,15 @@ class TokenManagerTest(unittest.TestCase):
         # revoke all
         resp = self.tokenmgr.revoke_all_tokens()
         assert resp is True
+
+    def test_generate_token_with_data(self):
+        # gentoken
+        resp = self.tokenmgr.generate_token(valid_in_hours=1, data={'esgf_token': 'abcdef'})
+        assert 'access_token' in resp
+        assert 'expires_at' in resp
+        # check data
+        access_token = self.tokenmgr.store.fetch_by_token(resp['access_token'])
+        assert access_token.data == {'esgf_token': 'abcdef'}
 
 
 from twitcher.api import Registry

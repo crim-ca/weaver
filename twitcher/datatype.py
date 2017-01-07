@@ -105,8 +105,8 @@ class AccessToken(dict):
         return True
 
     @property
-    def environ(self):
-        return self.get('environ') or {}
+    def data(self):
+        return self.get('data') or {}
 
     @property
     def params(self):

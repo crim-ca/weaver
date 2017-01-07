@@ -26,7 +26,9 @@ class OWSSecurity(object):
 
     def get_token_param(self, request):
         token = None
-        if 'access_token' in request.params:
+        if 'token' in request.params:
+            token = request.params['token']   # in params
+        elif 'access_token' in request.params:
             token = request.params['access_token']   # in params
         elif 'Access-Token' in request.headers:
             token = request.headers['Access-Token']  # in header
@@ -59,8 +61,8 @@ class OWSSecurity(object):
                         raise AccessTokenNotFound()
                     elif access_token.is_expired():
                         raise OWSAccessForbidden("Access token is expired.")
-                    # update request with environ from access token
-                    request.environ.update(access_token.environ)
+                    # update request with data from access token
+                    request.environ.update(access_token.data)
                     if 'esgf_access_token' in request.environ and 'esgf_slcs_service_url' in request.environ:
                         workdir = fetch_certificate(request)
                         request.headers['X-Requested-Workdir'] = workdir

@@ -5,14 +5,14 @@ logger = logging.getLogger(__name__)
 
 
 class ITokenManager(object):
-    def generate_token(self, valid_in_hours=1, environ=None):
+    def generate_token(self, valid_in_hours=1, data=None):
         """
         Generates an access token which is valid for ``valid_in_hours``.
 
         Arguments:
 
-        * ``valid_in_hours``: number of hours the token is valid.
-        * ``environ``: environment used with this token (dict object).
+        * :param valid_in_hours: an int with number of hours the token is valid.
+        * :param data: a dict with extra data used with this token.
 
         Possible keys: ``esgf_access_token``, ``esgf_slcs_service_url``.
         """
@@ -76,27 +76,21 @@ class TokenManager(ITokenManager):
         self.tokengenerator = tokengenerator
         self.store = tokenstore
 
-    def generate_token(self, valid_in_hours=1, environ=None):
+    def generate_token(self, valid_in_hours=1, data=None):
         """
-        Generates an access token which is valid for ``valid_in_hours``.
-
-        Arguments:
-
-        * ``valid_in_hours``: number of hours the token is valid.
-        * ``environ``: environment used with this token (dict object).
-
-        Possible keys: ``esgf_access_token``, ``esgf_slcs_service_url``.
+        Implementation of :meth:`twitcher.api.ITokenManager.generate_token`.
         """
+        data = data or {}
         access_token = self.tokengenerator.create_access_token(
             valid_in_hours=valid_in_hours,
-            environ=environ,
+            data=data,
         )
         self.store.save_token(access_token)
         return access_token.params
 
     def revoke_token(self, token):
         """
-        Remove token from tokenstore.
+        Implementation of :meth:`twitcher.api.ITokenManager.revoke_token`.
         """
         try:
             self.store.delete_token(token)
@@ -108,7 +102,7 @@ class TokenManager(ITokenManager):
 
     def revoke_all_tokens(self):
         """
-        Removes all tokens from tokenstore.
+        Implementation of :meth:`twitcher.api.ITokenManager.revoke_all_tokens`.
         """
         try:
             self.store.clear_tokens()

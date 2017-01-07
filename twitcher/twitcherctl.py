@@ -118,11 +118,11 @@ class TwitcherCtl(object):
             elif args.cmd == 'clear':
                 result = service.clear_services()
             elif args.cmd == 'gentoken':
-                environ = {k: v for k, v in (x.split('=') for x in args.env)}
+                data = {k: v for k, v in (x.split('=') for x in args.env)}
                 if args.esgf_access_token:
-                    environ['esgf_access_token'] = args.esgf_access_token
-                    environ['esgf_slcs_service_url'] = args.esgf_slcs_service_url
-                result = service.generate_token(valid_in_hours=args.valid_in_hours, environ=environ)
+                    data['esgf_access_token'] = args.esgf_access_token
+                    data['esgf_slcs_service_url'] = args.esgf_slcs_service_url
+                result = service.generate_token(valid_in_hours=args.valid_in_hours, data=data)
             elif args.cmd == 'revoke':
                 if args.all is True:
                     result = service.revoke_all_tokens()
