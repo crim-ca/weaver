@@ -12,7 +12,11 @@ logger = logging.getLogger(__name__)
 
 
 def is_valid_url(url):
-    return True
+    try:
+        parsed_url = urlparse(url)
+        return True if all([parsed_url.scheme, ]) else False
+    except:
+        return False
 
 
 def parse_service_name(url):

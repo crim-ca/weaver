@@ -5,6 +5,13 @@ from twitcher.exceptions import ServiceNotFound
 from twitcher.tests.common import WPS_CAPS_EMU_XML, WMS_CAPS_NCWMS2_111_XML, WMS_CAPS_NCWMS2_130_XML
 
 
+def test_is_url_valid():
+    assert utils.is_valid_url("http://somewhere.org") is True
+    assert utils.is_valid_url("https://somewhere.org/my/path") is True
+    assert utils.is_valid_url("file:///my/path") is True
+    assert utils.is_valid_url("/my/path") is False
+
+
 def test_parse_service_name():
     assert 'emu' == utils.parse_service_name("/ows/proxy/emu")
     assert 'emu' == utils.parse_service_name("/ows/proxy/emu/foo/bar")
