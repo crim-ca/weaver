@@ -1,3 +1,5 @@
+import tempfile
+
 from twitcher.exceptions import AccessTokenNotFound
 from twitcher.exceptions import ServiceNotFound
 from twitcher.owsexceptions import OWSAccessForbidden, OWSInvalidParameterValue
@@ -62,9 +64,10 @@ class OWSSecurity(object):
                     elif access_token.is_expired():
                         raise OWSAccessForbidden("Access token is expired.")
                     # update request with data from access token
-                    request.environ.update(access_token.data)
-                    if 'esgf_access_token' in request.environ and 'esgf_slcs_service_url' in request.environ:
-                        workdir = fetch_certificate(request)
-                        request.headers['X-Requested-Workdir'] = workdir
+                    # request.environ.update(access_token.data)
+                    if "esgf_access_token" in access_token.data or "esgf_credentials" in access_token.data:
+                        workdir = tempfile.mkdtemp(prefix=request.prefix, dir=request.workdir)
+                        if fetch_certificate(workdir=workdir, data=access_token.data):
+                            request.headers['X-Requested-Workdir'] = workdir
                 except AccessTokenNotFound:
                     raise OWSAccessForbidden("Access token is required to access this service.")

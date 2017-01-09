@@ -12,7 +12,6 @@ This module uses code from esgf-slcs-client-example_ and esgf-pyclient_.
 """
 
 import os
-import tempfile
 import shutil
 from OpenSSL import crypto
 import base64
@@ -43,24 +42,18 @@ HTTP.SSL.CAPATH={esgf_certs_dir}
 """
 
 
-def fetch_certificate(request):
-    url = request.environ['esgf_slcs_service_url']
-    access_token = request.environ['esgf_access_token']
-    logger.debug("Fetch certificate for %s", access_token)
-    test_credentials = request.environ.get('esgf_credentials')
-
-    workdir = request.workdir
-    prefix = request.prefix
-    tempdir = tempfile.mkdtemp(prefix=prefix, dir=workdir)
-    logger.debug('Created twitcher tempdir %s', tempdir)
+def fetch_certificate(workdir='.', data={}):
     try:
-        mgr = ESGFAccessManager(url, base_dir=tempdir)
+        url = data.get('esgf_slcs_service_url')
+        access_token = data.get('esgf_access_token')
+        test_credentials = data.get('esgf_credentials')
+        mgr = ESGFAccessManager(url, base_dir=workdir)
         mgr.logon(access_token, test_credentials)
-    except IOError:
-        logger.exception("Could not copy test credentials.")
+        logger.debug('Prepared twitcher workdir %s', workdir)
     except:
         logger.error("Could not fetch certificate.")
-    return tempdir
+        return False
+    return True
 
 
 class ESGFAccessManager(object):
