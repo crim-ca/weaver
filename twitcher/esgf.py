@@ -75,9 +75,7 @@ class ESGFAccessManager(object):
         os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
     def logon(self, access_token, certificate=None, timeout=1):
-        if certificate:
-            self._download_certificate(certificate)
-        else:
+        if not self._download_certificate(certificate):
             self._retrieve_certificate(access_token, timeout=timeout)
         self._write_dap_config()
         return True
