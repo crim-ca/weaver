@@ -45,7 +45,7 @@ def fetch_certificate(request):
     url = request.environ['esgf_slcs_service_url']
     access_token = request.environ['esgf_access_token']
     logger.debug("Fetch certificate for %s", access_token)
-    test_credentials = request.esgf_test_credentials
+    test_credentials = None
 
     workdir = request.workdir
     prefix = request.prefix

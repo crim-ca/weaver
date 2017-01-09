@@ -18,7 +18,6 @@ def includeme(config):
         config.add_tween(OWS_SECURITY, under=EXCVIEW)
         config.add_request_method(_workdir, 'workdir', reify=True)
         config.add_request_method(_prefix, 'prefix', reify=True)
-        config.add_request_method(_esgf_test_credentials, 'esgf_test_credentials', reify=True)
 
 
 def _workdir(request):
@@ -34,16 +33,6 @@ def _prefix(request):
     prefix = settings.get('twitcher.prefix')
     prefix = prefix or 'twitcher_'
     return prefix
-
-
-def _esgf_test_credentials(request):
-    settings = request.registry.settings
-    credentials = settings.get('twitcher.esgf_test_credentials')
-    if credentials:
-        logger.warn('using esgf test credentials %s', credentials)
-    else:
-        credentials = None
-    return credentials
 
 
 def ows_security_tween_factory(handler, registry):
