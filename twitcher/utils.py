@@ -11,6 +11,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def is_valid_url(url):
+    return True
+
+
 def parse_service_name(url):
     parsed_url = urlparse(url)
     service_name = None

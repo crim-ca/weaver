@@ -12,12 +12,14 @@ This module uses code from esgf-slcs-client-example_ and esgf-pyclient_.
 """
 
 import os
-import shutil
 import tempfile
+import shutil
 from OpenSSL import crypto
 import base64
 import requests
 from requests_oauthlib import OAuth2Session
+
+from twitcher.utils import is_valid_url
 
 import logging
 logger = logging.getLogger(__name__)
@@ -45,7 +47,7 @@ def fetch_certificate(request):
     url = request.environ['esgf_slcs_service_url']
     access_token = request.environ['esgf_access_token']
     logger.debug("Fetch certificate for %s", access_token)
-    test_credentials = None
+    test_credentials = request.environ.get('esgf_credentials')
 
     workdir = request.workdir
     prefix = request.prefix
@@ -54,11 +56,14 @@ def fetch_certificate(request):
     try:
         mgr = ESGFAccessManager(url, base_dir=tempdir)
         mgr.logon(access_token)
-        if test_credentials and os.path.isfile(test_credentials):
+        if test_credentials and is_valid_url(test_credentials):
             logger.warn('Overwriting credentials.pem with %s', test_credentials)
-            shutil.copy2(test_credentials, mgr.esgf_credentials)
+            response = requests.get(test_credentials, stream=True)
+            with open(mgr.esgf_credentials, 'wb') as fd:
+                for chunk in response.iter_content(chunk_size=128):
+                    fd.write(chunk)
     except IOError:
-        logger.error("Could not copy test credentials.")
+        logger.exception("Could not copy test credentials.")
     except:
         logger.error("Could not fetch certificate.")
     return tempdir
