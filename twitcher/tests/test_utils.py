@@ -10,6 +10,7 @@ def test_is_url_valid():
     assert utils.is_valid_url("https://somewhere.org/my/path") is True
     assert utils.is_valid_url("file:///my/path") is True
     assert utils.is_valid_url("/my/path") is False
+    assert utils.is_valid_url(None) is False
 
 
 def test_parse_service_name():

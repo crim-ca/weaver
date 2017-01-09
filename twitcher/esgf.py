@@ -55,13 +55,7 @@ def fetch_certificate(request):
     logger.debug('Created twitcher tempdir %s', tempdir)
     try:
         mgr = ESGFAccessManager(url, base_dir=tempdir)
-        mgr.logon(access_token)
-        if test_credentials and is_valid_url(test_credentials):
-            logger.warn('Overwriting credentials.pem with %s', test_credentials)
-            response = requests.get(test_credentials, stream=True)
-            with open(mgr.esgf_credentials, 'wb') as fd:
-                for chunk in response.iter_content(chunk_size=128):
-                    fd.write(chunk)
+        mgr.logon(access_token, test_credentials)
     except IOError:
         logger.exception("Could not copy test credentials.")
     except:
@@ -80,16 +74,28 @@ class ESGFAccessManager(object):
 
         os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
-    def logon(self, access_token, timeout=1):
-        cert = self._get_certificate(access_token, timeout=timeout)
-        self._write_certificate(cert)
+    def logon(self, access_token, certificate=None, timeout=1):
+        if certificate:
+            self._download_certificate(certificate)
+        else:
+            self._retrieve_certificate(access_token, timeout=timeout)
         self._write_dap_config()
 
-    def _get_certificate(self, access_token, timeout=1):
+    def _download_certificate(self, url):
+        if is_valid_url(url):
+            logger.debug('Download cert from %s', url)
+            response = requests.get(url, stream=True)
+            with open(self.esgf_credentials, 'wb') as fd:
+                for chunk in response.iter_content(chunk_size=128):
+                    fd.write(chunk)
+
+    def _retrieve_certificate(self, access_token, timeout=1):
         """
         Generates a new private key and certificate request, submits the request to be
         signed by the SLCS CA and returns the certificate.
         """
+        logger.debug("Retrieve certificate with token %s", access_token)
+
         # Generate a new key pair
         key_pair = crypto.PKey()
         key_pair.generate_key(crypto.TYPE_RSA, 2048)
@@ -127,14 +133,12 @@ class ESGFAccessManager(object):
         #                          verify=False)
         if response.status_code == 200:
             content = "{} {}".format(response.text, private_key)
+            with open(self.esgf_credentials, 'w') as fh:
+                fh.write(content)
         else:
             msg = "Could not get certificate: {} {}".format(response.status_code, response.reason)
             raise Exception(msg)
         return content
-
-    def _write_certificate(self, certificate):
-        with open(self.esgf_credentials, 'w') as fh:
-            fh.write(certificate)
 
     def _write_dap_config(self, verbose=False, validate=False):
         content = DAP_CONFIG_TEMPL.format(
