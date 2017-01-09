@@ -80,6 +80,7 @@ class ESGFAccessManager(object):
         else:
             self._retrieve_certificate(access_token, timeout=timeout)
         self._write_dap_config()
+        return True
 
     def _download_certificate(self, url):
         if is_valid_url(url):
@@ -88,6 +89,9 @@ class ESGFAccessManager(object):
             with open(self.esgf_credentials, 'wb') as fd:
                 for chunk in response.iter_content(chunk_size=128):
                     fd.write(chunk)
+            return True
+        else:
+            return False
 
     def _retrieve_certificate(self, access_token, timeout=1):
         """
@@ -138,7 +142,7 @@ class ESGFAccessManager(object):
         else:
             msg = "Could not get certificate: {} {}".format(response.status_code, response.reason)
             raise Exception(msg)
-        return content
+        return True
 
     def _write_dap_config(self, verbose=False, validate=False):
         content = DAP_CONFIG_TEMPL.format(
