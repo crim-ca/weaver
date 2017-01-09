@@ -14,7 +14,7 @@ class ITokenManager(object):
         * :param valid_in_hours: an int with number of hours the token is valid.
         * :param data: a dict with extra data used with this token.
 
-        Possible keys: ``esgf_access_token``, ``esgf_slcs_service_url``.
+        Possible keys: ``esgf_access_token``, ``esgf_slcs_service_url`` or ``esgf_credentials``.
         """
         raise NotImplementedError
 
