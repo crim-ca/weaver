@@ -119,7 +119,7 @@ class Registry(IRegistry):
 
     def register_service(self, url, data=None, overwrite=True):
         """
-        Adds an OWS service with the given ``url`` to the service store.
+        Implementation of :meth:`twitcher.api.IRegistry.register_service`.
         """
         data = data or {}
 
@@ -131,7 +131,7 @@ class Registry(IRegistry):
 
     def unregister_service(self, name):
         """
-        Removes OWS service with the given ``name`` from the service store.
+        Implementation of :meth:`twitcher.api.IRegistry.unregister_service`.
         """
         try:
             self.store.delete_service(name=name)
@@ -143,7 +143,7 @@ class Registry(IRegistry):
 
     def get_service_by_name(self, name):
         """
-        Gets service with given ``name`` from service store.
+        Implementation of :meth:`twitcher.api.IRegistry.get_service_by_name`.
         """
         try:
             service = self.store.fetch_by_name(name=name)
@@ -155,7 +155,7 @@ class Registry(IRegistry):
 
     def get_service_by_url(self, url):
         """
-        Gets service with given ``url`` from service store.
+        Implementation of :meth:`twitcher.api.IRegistry.get_service_by_url`.
         """
         try:
             service = self.store.fetch_by_url(url=url)
@@ -167,7 +167,7 @@ class Registry(IRegistry):
 
     def list_services(self):
         """
-        Lists all registred OWS services.
+        Implementation of :meth:`twitcher.api.IRegistry.list_services`.
         """
         try:
             services = [service.params for service in self.store.list_services()]
@@ -179,7 +179,7 @@ class Registry(IRegistry):
 
     def clear_services(self):
         """
-        Removes all services from the service store.
+        Implementation of :meth:`twitcher.api.IRegistry.clear_services`.
         """
         try:
             self.store.clear_services()
