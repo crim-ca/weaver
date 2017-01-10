@@ -22,30 +22,57 @@ class RPCInterface(ITokenManager, IRegistry):
         self.srvreg = Registry(servicestore_factory(request.registry))
 
     def generate_token(self, valid_in_hours=1, environ=None):
+        """
+        Implementation of :meth:`twitcher.api.ITokenManager.generate_token`.
+        """
         return self.tokenmgr.generate_token(valid_in_hours, environ)
 
     def revoke_token(self, token):
+        """
+        Implementation of :meth:`twitcher.api.ITokenManager.revoke_token`.
+        """
         return self.tokenmgr.revoke_token(token)
 
     def revoke_all_tokens(self):
+        """
+        Implementation of :meth:`twitcher.api.ITokenManager.revoke_all_tokens`.
+        """
         return self.tokenmgr.revoke_all_tokens()
 
     def register_service(self, url, data=None, overwrite=True):
+        """
+        Implementation of :meth:`twitcher.api.IRegistry.register_service`.
+        """
         return self.srvreg.register_service(url, data, overwrite)
 
     def unregister_service(self, name):
+        """
+        Implementation of :meth:`twitcher.api.IRegistry.unregister_service`.
+        """
         return self.srvreg.unregister_service(name)
 
     def get_service_by_name(self, name):
+        """
+        Implementation of :meth:`twitcher.api.IRegistry.get_service_by_name`.
+        """
         return self.srvreg.get_service_by_name(name)
 
     def get_service_by_url(self, url):
+        """
+        Implementation of :meth:`twitcher.api.IRegistry.get_service_by_url`.
+        """
         return self.srvreg.get_service_by_url(url)
 
     def list_services(self):
+        """
+        Implementation of :meth:`twitcher.api.IRegistry.list_services`.
+        """
         return self.srvreg.list_services()
 
     def clear_services(self):
+        """
+        Implementation of :meth:`twitcher.api.IRegistry.clear_services`.
+        """
         return self.srvreg.clear_services()
 
 
