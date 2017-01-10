@@ -72,6 +72,10 @@ class IRegistry(object):
 
 
 class TokenManager(ITokenManager):
+    """
+    Implementation of :class:`twitcher.api.ITokenManager`.
+    """
+
     def __init__(self, tokengenerator, tokenstore):
         self.tokengenerator = tokengenerator
         self.store = tokenstore
@@ -114,6 +118,9 @@ class TokenManager(ITokenManager):
 
 
 class Registry(IRegistry):
+    """
+    Implementation of :class:`twitcher.api.IRegistry`.
+    """
     def __init__(self, servicestore):
         self.store = servicestore
 
