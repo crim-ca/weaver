@@ -40,6 +40,13 @@ class OWSSecurity(object):
                 token = elements[-1]   # last path element
         return token
 
+    def prepare_headers(self, request, access_token):
+        if "esgf_access_token" in access_token.data or "esgf_credentials" in access_token.data:
+            workdir = tempfile.mkdtemp(prefix=request.prefix, dir=request.workdir)
+            if fetch_certificate(workdir=workdir, data=access_token.data):
+                request.headers['X-Requested-Workdir'] = workdir
+        return request
+
     def check_request(self, request):
         if request.path.startswith(protected_path):
             # TODO: fix this code
@@ -59,15 +66,10 @@ class OWSSecurity(object):
                 try:
                     token = self.get_token_param(request)
                     access_token = self.tokenstore.fetch_by_token(token)
-                    if not access_token:
-                        raise AccessTokenNotFound()
-                    elif access_token.is_expired():
+                    if access_token.is_expired():
                         raise OWSAccessForbidden("Access token is expired.")
                     # update request with data from access token
                     # request.environ.update(access_token.data)
-                    if "esgf_access_token" in access_token.data or "esgf_credentials" in access_token.data:
-                        workdir = tempfile.mkdtemp(prefix=request.prefix, dir=request.workdir)
-                        if fetch_certificate(workdir=workdir, data=access_token.data):
-                            request.headers['X-Requested-Workdir'] = workdir
+                    request = self.prepare_headers(request, access_token)
                 except AccessTokenNotFound:
                     raise OWSAccessForbidden("Access token is required to access this service.")
