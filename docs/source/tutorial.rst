@@ -70,11 +70,11 @@ First we need to generate an access token with ``twitcherctl``:
 
 There are three ways how you can provide the access token:
 
-1. as ``access_token`` HTTP query parameter
+1. as ``token`` HTTP query parameter
 
 .. code-block:: sh
 
-    $ curl -k "https://localhost:5000/ows/wps?access_token=abc123&service=wps&request=execute&identifier=hello&version=1.0.0&datainputs=name=tux"
+    $ curl -k "https://localhost:5000/ows/wps?token=abc123&service=wps&request=execute&identifier=hello&version=1.0.0&datainputs=name=tux"
 
 2. as the last part of the HTTP path
 
@@ -129,7 +129,7 @@ When you access the wps with the generated token you will get the capabilites co
 
 .. code-block:: sh
 
-    $ curl -k "https://localhost:5000/ows/wps?service=wps&request=getcapabilities&access_token=321bca"
+    $ curl -k "https://localhost:5000/ows/wps?service=wps&request=getcapabilities&token=321bca"
 
 .. note::
 
@@ -234,7 +234,7 @@ In the following example we provide the token as HTTP parameter:
 
 .. code-block:: sh
 
-    $ curl -k "https://localhost:5000/ows/proxy/emu?service=wps&request=execute&identifier=hello&version=1.0.0&datainputs=name=tux&access_token=def456"
+    $ curl -k "https://localhost:5000/ows/proxy/emu?service=wps&request=execute&identifier=hello&version=1.0.0&datainputs=name=tux&token=def456"
 
 .. warning::
 
