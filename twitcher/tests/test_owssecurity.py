@@ -9,20 +9,22 @@ from twitcher.datatype import Service
 from twitcher.utils import expires_at
 from twitcher.owssecurity import OWSSecurity
 from twitcher.owsexceptions import OWSAccessForbidden
+from twitcher.store.memory import MemoryTokenStore
 
 
 class OWSSecurityTestCase(unittest.TestCase):
     def setUp(self):
         self.access_token = AccessToken(token="cdefg", expires_at=expires_at(hours=1))
 
-        self.tokenstore_mock = mock.Mock(spec=["fetch_by_token"])
-        self.tokenstore_mock.fetch_by_token.return_value = self.access_token
+        self.tokenstore = MemoryTokenStore()
+        self.tokenstore.save_token(self.access_token)
+        self.empty_tokenstore = MemoryTokenStore()
 
         self.servicestore_mock = mock.Mock(spec=["fetch_by_name"])
         self.servicestore_mock.fetch_by_name.return_value = Service(
             url='http://nowhere/wps', name='test_wps', public=False)
 
-        self.security = OWSSecurity(tokenstore=self.tokenstore_mock, servicestore=self.servicestore_mock)
+        self.security = OWSSecurity(tokenstore=self.tokenstore, servicestore=self.servicestore_mock)
 
     def test_get_token_by_param(self):
         params = dict(request="Execute", service="WPS", access_token="abcdef")
@@ -49,9 +51,7 @@ class OWSSecurityTestCase(unittest.TestCase):
         self.security.check_request(request)
 
     def test_check_request_invalid(self):
-        tokenstore_mock = mock.Mock(spec=["fetch_by_token"])
-        tokenstore_mock.fetch_by_token.return_value = None
-        security = OWSSecurity(tokenstore=tokenstore_mock, servicestore=self.servicestore_mock)
+        security = OWSSecurity(tokenstore=self.empty_tokenstore, servicestore=self.servicestore_mock)
 
         params = dict(request="Execute", service="WPS", version="1.0.0", access_token="xyz")
         request = DummyRequest(params=params, path='/ows/proxy/emu')
@@ -59,18 +59,14 @@ class OWSSecurityTestCase(unittest.TestCase):
             security.check_request(request)
 
     def test_check_request_allowed_caps(self):
-        store_mock = mock.Mock(spec=["fetch_by_token"])
-        store_mock.fetch_by_token.return_value = None
-        security = OWSSecurity(tokenstore=store_mock, servicestore=self.servicestore_mock)
+        security = OWSSecurity(tokenstore=self.empty_tokenstore, servicestore=self.servicestore_mock)
 
         params = dict(request="GetCapabilities", service="WPS", version="1.0.0")
         request = DummyRequest(params=params, path='/ows/proxy/emu')
         security.check_request(request)
 
     def test_check_request_allowed_describeprocess(self):
-        store_mock = mock.Mock(spec=["fetch_by_token"])
-        store_mock.fetch_by_token.return_value = None
-        security = OWSSecurity(tokenstore=store_mock, servicestore=self.servicestore_mock)
+        security = OWSSecurity(tokenstore=self.empty_tokenstore, servicestore=self.servicestore_mock)
 
         params = dict(request="DescribeProcess", service="WPS", version="1.0.0")
         request = DummyRequest(params=params, path='/ows/proxy/emu')
@@ -80,7 +76,7 @@ class OWSSecurityTestCase(unittest.TestCase):
         servicestore_mock = mock.Mock(spec=["fetch_by_name"])
         servicestore_mock.fetch_by_name.return_value = Service(
             url='http://nowhere/wps', name='test_wps', public=True)
-        security = OWSSecurity(tokenstore=self.tokenstore_mock, servicestore=servicestore_mock)
+        security = OWSSecurity(tokenstore=self.tokenstore, servicestore=servicestore_mock)
 
         params = dict(request="Execute", service="WPS", version="1.0.0")
         request = DummyRequest(params=params, path='/ows/proxy/emu')
