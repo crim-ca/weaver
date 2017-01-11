@@ -7,11 +7,10 @@ import requests
 
 from pyramid.response import Response
 from pyramid.settings import asbool
-from pyramid.httpexceptions import HTTPBadRequest, HTTPBadGateway, HTTPNotAcceptable
 
 from twitcher._compat import urlparse
 
-from twitcher.owsexceptions import OWSAccessForbidden
+from twitcher.owsexceptions import OWSAccessForbidden, OWSAccessFailed
 from twitcher.utils import replace_caps_url
 from twitcher.store import servicestore_factory
 
@@ -67,10 +66,13 @@ def _send_request(request, service, extra_path=None, request_params=None):
     try:
         resp = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h)
     except Exception, e:
-        return HTTPBadGateway("Request failed: %s" % (e.message))
+        return OWSAccessFailed("Request failed: {}".format(e.message))
 
     if resp.ok is False:
-        return HTTPBadGateway("Response is not ok: %s" % (resp.reason))
+        if 'ExceptionReport' in resp.content:
+            pass
+        else:
+            return OWSAccessFailed("Response is not ok: {}".format(resp.reason))
 
     # check for allowed content types
     ct = None
@@ -78,11 +80,11 @@ def _send_request(request, service, extra_path=None, request_params=None):
     if "Content-Type" in resp.headers:
         ct = resp.headers["Content-Type"]
         if not ct.split(";")[0] in allowed_content_types:
-            msg = "Content type is not allowed: %s." % (ct)
+            msg = "Content type is not allowed: {}.".format(ct)
             LOGGER.error(msg)
             return OWSAccessForbidden(msg)
     else:
-        # return HTTPNotAcceptable("Could not get content type from response.")
+        # return OWSAccessFailed("Could not get content type from response.")
         LOGGER.warn("Could not get content type from response")
 
     try:
@@ -95,7 +97,7 @@ def _send_request(request, service, extra_path=None, request_params=None):
             # raw content
             content = resp.content
     except:
-        return HTTPNotAcceptable("Could not decode content.")
+        return OWSAccessFailed("Could not decode content.")
 
     headers = {}
     if ct:
@@ -106,12 +108,12 @@ def _send_request(request, service, extra_path=None, request_params=None):
 def owsproxy_url(request):
     url = request.params.get("url")
     if url is None:
-        return HTTPBadRequest()
+        return OWSAccessFailed("URL param is missing.")
 
     # check for full url
     parsed_url = urlparse(url)
     if not parsed_url.netloc or parsed_url.scheme not in ("http", "https"):
-        return HTTPBadRequest()
+        return OWSAccessFailed("Not a valid URL.")
     return _send_request(request, service=dict(url=url, name='external'))
 
 
@@ -125,7 +127,7 @@ def owsproxy(request):
         store = servicestore_factory(request.registry)
         service = store.fetch_by_name(service_name)
     except Exception as err:
-        return HTTPBadRequest("Could not find service: %s." % (err.message))
+        return OWSAccessFailed("Could not find service: {}.".format(err.message))
     else:
         return _send_request(request, service, extra_path, request_params=urllib.urlencode(request.params))
 

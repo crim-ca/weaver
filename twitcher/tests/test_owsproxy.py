@@ -8,10 +8,10 @@ pyramid testing:
 
 import unittest
 
-from pyramid.httpexceptions import HTTPBadRequest
 from pyramid import testing
 from pyramid.testing import DummyRequest
 
+from twitcher.owsexceptions import OWSAccessFailed
 from twitcher import owsproxy
 from twitcher.owsproxy import owsproxy as owsproxy_view
 
@@ -27,10 +27,10 @@ class OWSProxyTests(unittest.TestCase):
     def test_badrequest_url(self):
         request = DummyRequest(scheme='http')
         response = owsproxy_view(request)
-        assert isinstance(response, HTTPBadRequest) is True
+        assert isinstance(response, OWSAccessFailed) is True
 
     def test_badrequest_netloc(self):
         request = DummyRequest(scheme='http',
                                params={'url': 'http://'})
         response = owsproxy_view(request)
-        assert isinstance(response, HTTPBadRequest) is True
+        assert isinstance(response, OWSAccessFailed) is True
