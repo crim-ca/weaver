@@ -23,7 +23,7 @@ def _prefix(request):
 
 
 def includeme(config):
-    settings = config.registry.settings
+    # settings = config.registry.settings
 
     logger.debug("Loading twitcher configuration.")
 
