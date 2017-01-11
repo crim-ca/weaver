@@ -17,6 +17,7 @@ Changes
 * added twitcher.store with mongodb and memory implementation.
 * added twitcher.datatype with AccessToken and Service.
 * using https port only.
+* using OWSExceptions on errors in owsproxy.
 
 0.2.4 (2016-12-23)
 ==================
