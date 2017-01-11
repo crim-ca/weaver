@@ -81,6 +81,11 @@ class OWSAccessForbidden(OWSException):
     explanation = "Access to this service is forbidden"
 
 
+class OWSAccessFailed(OWSException):
+    locator = "NotAcceptable"
+    explanation = "Access to this service failed"
+
+
 class OWSNoApplicableCode(OWSException):
     pass
 
