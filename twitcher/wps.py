@@ -43,7 +43,11 @@ def includeme(config):
     settings = config.registry.settings
 
     if asbool(settings.get('twitcher.wps', True)):
-        LOGGER.debug("Enabled Twitcher WPS.")
+        LOGGER.debug("Twitcher WPS enabled.")
+
+        # include twitcher config
+        config.include('twitcher.config')
+
         config.add_route('wps', '/ows/wps')
         config.add_route('wps_secured', '/ows/wps/{access_token}')
         config.add_view(pywps_view, route_name='wps')

@@ -136,8 +136,10 @@ def includeme(config):
     settings = config.registry.settings
 
     if asbool(settings.get('twitcher.ows_proxy', True)):
-        LOGGER.info('Add OWS proxy')
+        LOGGER.info('Twitcher OWSProxy enabled.')
 
+        # include twitcher config
+        config.include('twitcher.config')
         # include mongodb
         config.include('twitcher.db')
 

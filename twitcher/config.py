@@ -7,13 +7,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def includeme(config):
-    settings = config.registry.settings
-
-    config.add_request_method(_workdir, 'workdir', reify=True)
-    config.add_request_method(_prefix, 'prefix', reify=True)
-
-
 def _workdir(request):
     settings = request.registry.settings
     workdir = settings.get('twitcher.workdir')
@@ -27,3 +20,12 @@ def _prefix(request):
     prefix = settings.get('twitcher.prefix')
     prefix = prefix or 'twitcher_'
     return prefix
+
+
+def includeme(config):
+    settings = config.registry.settings
+
+    logger.debug("Loading twitcher configuration.")
+
+    config.add_request_method(_workdir, 'workdir', reify=True)
+    config.add_request_method(_prefix, 'prefix', reify=True)
