@@ -1,7 +1,7 @@
 Changes
 *******
 
-0.3.0 (2017-01-xx)
+0.3.0 (2017-01-11)
 ==================
 
 * pep8.
@@ -16,6 +16,7 @@ Changes
 * added twitcher.api and cleaned up rpcinterface.
 * added twitcher.store with mongodb and memory implementation.
 * added twitcher.datatype with AccessToken and Service.
+* using https port only.
 
 0.2.4 (2016-12-23)
 ==================
