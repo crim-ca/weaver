@@ -1,5 +1,3 @@
-import tempfile
-
 from pyramid.settings import asbool
 from pyramid.tweens import EXCVIEW
 
@@ -16,23 +14,6 @@ def includeme(config):
     if asbool(settings.get('twitcher.ows_security', True)):
         logger.info('Add OWS security tween')
         config.add_tween(OWS_SECURITY, under=EXCVIEW)
-        config.add_request_method(_workdir, 'workdir', reify=True)
-        config.add_request_method(_prefix, 'prefix', reify=True)
-
-
-def _workdir(request):
-    settings = request.registry.settings
-    workdir = settings.get('twitcher.workdir')
-    workdir = workdir or tempfile.gettempdir()
-    logger.debug('using workdir %s', workdir)
-    return workdir
-
-
-def _prefix(request):
-    settings = request.registry.settings
-    prefix = settings.get('twitcher.prefix')
-    prefix = prefix or 'twitcher_'
-    return prefix
 
 
 def ows_security_tween_factory(handler, registry):

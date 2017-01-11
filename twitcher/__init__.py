@@ -13,6 +13,7 @@ def main(global_config, **settings):
     config = Configurator(settings=settings)
 
     # include twitcher components
+    config.include('twitcher.config')
     config.include('twitcher.frontpage')
     config.include('twitcher.rpcinterface')
     config.include('twitcher.owsproxy')
