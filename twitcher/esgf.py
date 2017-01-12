@@ -72,7 +72,10 @@ class ESGFAccessManager(object):
             self._retrieve_certificate(access_token, timeout=timeout)
         self._write_dap_config()
         # fix permission
-        os.chmod(self.esgf_credentials, 0o400)
+        try:
+            os.chmod(self.esgf_credentials, 0o400)
+        except:
+            logger.warn("Could not update permission of credentials.")
         return True
 
     def _download_certificate(self, url):
