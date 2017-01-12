@@ -71,6 +71,8 @@ class ESGFAccessManager(object):
         if not self._download_certificate(certificate):
             self._retrieve_certificate(access_token, timeout=timeout)
         self._write_dap_config()
+        # fix permission
+        os.chmod(self.esgf_credentials, 0o400)
         return True
 
     def _download_certificate(self, url):
