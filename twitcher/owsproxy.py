@@ -1,5 +1,7 @@
 """
 The owsproxy is based on `papyrus_ogcproxy <https://github.com/elemoine/papyrus_ogcproxy>`_
+
+See also: https://github.com/nive/outpost/blob/master/outpost/proxy.py
 """
 
 import urllib
