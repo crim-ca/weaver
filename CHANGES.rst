@@ -6,6 +6,7 @@ Changes
 
 * pep8.
 * set permission of certfile.
+* added option ows-proxy-delegate.
 
 0.3.0 (2017-01-11)
 ==================
