@@ -133,6 +133,9 @@ def owsproxy(request):
 
 
 def owsproxy_delegate(request):
+    """
+    Delegates owsproxy request to external twitcher service.
+    """
     twitcher_url = request.registry.settings.get('twitcher.url')
     url = twitcher_url + '/ows/proxy'
     if request.matchdict.get('service_name'):
@@ -142,8 +145,8 @@ def owsproxy_delegate(request):
     url += '?' + urllib.urlencode(request.params)
     LOGGER.debug("delegate to owsproxy: %s", url)
     # forward request to target (without Host Header)
-    #h = dict(request.headers)
-    #h.pop("Host", h)
+    # h = dict(request.headers)
+    # h.pop("Host", h)
     resp = requests.request(method=request.method.upper(), url=url, data=request.body,
                             headers=request.headers, verify=False)
     return Response(resp.content, status=resp.status_code, headers=resp.headers)
@@ -153,19 +156,27 @@ def includeme(config):
     settings = config.registry.settings
 
     if asbool(settings.get('twitcher.ows_proxy', True)):
-        LOGGER.info('Twitcher OWSProxy enabled.')
+        LOGGER.debug('Twitcher /ows/proxy enabled.')
 
-        # include twitcher config
-        config.include('twitcher.config')
-        # include mongodb
-        config.include('twitcher.db')
-
-        config.add_route('owsproxy_url', '/owsproxy')
         config.add_route('owsproxy', '/ows/proxy/{service_name}')
         # TODO: maybe configure extra path
         # config.add_route('owsproxy_extra', '/ows/proxy/{service_name}/{extra_path:.*}')
         config.add_route('owsproxy_secured', '/ows/proxy/{service_name}/{access_token}')
-        config.add_view(owsproxy_url, route_name='owsproxy_url')
-        config.add_view(owsproxy, route_name='owsproxy')
-        # config.add_view(owsproxy, route_name='owsproxy_extra')
-        config.add_view(owsproxy, route_name='owsproxy_secured')
+
+        # use delegation mode?
+        if asbool(settings.get('twitcher.ows_proxy_delegate', False)):
+            LOGGER.debug('Twitcher /ows/proxy delegation mode enabled.')
+            config.add_view(owsproxy_delegate, route_name='owsproxy')
+            config.add_view(owsproxy_delegate, route_name='owsproxy_secured')
+        else:
+            # include twitcher config
+            config.include('twitcher.config')
+            # include mongodb
+            config.include('twitcher.db')
+            config.add_view(owsproxy, route_name='owsproxy')
+            config.add_view(owsproxy, route_name='owsproxy_secured')
+        # use /owsproxy?
+        if asbool(settings.get('twitcher.ows_proxy_url', True)):
+            LOGGER.debug('Twitcher /owsproxy enabled.')
+            config.add_route('owsproxy_url', '/owsproxy')
+            config.add_view(owsproxy_url, route_name='owsproxy_url')
