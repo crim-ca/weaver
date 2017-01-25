@@ -132,6 +132,23 @@ def owsproxy(request):
         return _send_request(request, service, extra_path, request_params=urllib.urlencode(request.params))
 
 
+def owsproxy_delegate(request):
+    twitcher_url = request.registry.settings.get('twitcher.url')
+    url = twitcher_url + '/ows/proxy'
+    if request.matchdict.get('service_name'):
+        url += '/' + request.matchdict.get('service_name')
+        if request.matchdict.get('access_token'):
+            url += '/' + request.matchdict.get('service_name')
+    url += '?' + urllib.urlencode(request.params)
+    LOGGER.debug("delegate to owsproxy: %s", url)
+    # forward request to target (without Host Header)
+    #h = dict(request.headers)
+    #h.pop("Host", h)
+    resp = requests.request(method=request.method.upper(), url=url, data=request.body,
+                            headers=request.headers, verify=False)
+    return Response(resp.content, status=resp.status_code, headers=resp.headers)
+
+
 def includeme(config):
     settings = config.registry.settings
 
