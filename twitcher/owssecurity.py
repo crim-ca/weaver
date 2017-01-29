@@ -8,7 +8,7 @@ from twitcher.store import tokenstore_factory
 from twitcher.store import servicestore_factory
 from twitcher.utils import parse_service_name
 from twitcher.owsrequest import OWSRequest
-from twitcher.esgf import fetch_certificate
+from twitcher.esgf import fetch_certificate, ESGF_CREDENTIALS
 
 import logging
 logger = logging.getLogger(__name__)
@@ -45,6 +45,7 @@ class OWSSecurity(object):
             workdir = tempfile.mkdtemp(prefix=request.prefix, dir=request.workdir)
             if fetch_certificate(workdir=workdir, data=access_token.data):
                 request.headers['X-Requested-Workdir'] = workdir
+                request.headers['X-X509-User-Proxy'] = workdir + '/' + ESGF_CREDENTIALS
         return request
 
     def check_request(self, request):
