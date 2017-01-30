@@ -115,22 +115,15 @@ class ESGFAccessManager(object):
 
         # Build the OAuth session object
         token = {'access_token': access_token, 'token_type': 'Bearer'}
-        slcs = OAuth2Session(token=token)
-        # headers = {}
-        # headers['Authorization'] = 'Bearer %s' % access_token
-        # post_data = urllib.urlencode({'certificate_request': encoded_cert_req})
+        client = OAuth2Session(token=token)
 
-        response = slcs.post(
+        response = client.post(
             self.certificate_url,
             data={'certificate_request': encoded_cert_req},
             verify=False,
             timeout=timeout,
         )
 
-        # response = requests.post(self.url,
-        #                          headers=headers,
-        #                          data=post_data,
-        #                          verify=False)
         if response.status_code == 200:
             content = "{} {}".format(response.text, private_key)
             with open(self.esgf_credentials, 'w') as fh:
