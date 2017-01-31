@@ -51,7 +51,7 @@ def fetch_certificate(workdir='.', data={}):
         mgr.logon(access_token, test_credentials)
         logger.debug('Prepared twitcher workdir %s', workdir)
     except:
-        logger.error("Could not fetch certificate.")
+        logger.exception("Could not fetch certificate.")
         return False
     return True
 
@@ -67,9 +67,13 @@ class ESGFAccessManager(object):
 
         os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
-    def logon(self, access_token, certificate=None, timeout=1):
-        if not self._download_certificate(certificate):
+    def logon(self, access_token, cert_url=None, timeout=1):
+        if access_token:
             self._retrieve_certificate(access_token, timeout=timeout)
+        elif cert_url:
+            self._download_certificate(cert_url)
+        else:
+            raise Exception("Need either access_token or cert_url.")
         self._write_dap_config()
         # fix permission
         try:
@@ -89,12 +93,12 @@ class ESGFAccessManager(object):
         else:
             return False
 
-    def _retrieve_certificate(self, access_token, timeout=1):
+    def _retrieve_certificate(self, access_token, timeout=3):
         """
         Generates a new private key and certificate request, submits the request to be
         signed by the SLCS CA and returns the certificate.
         """
-        logger.debug("Retrieve certificate with token %s", access_token)
+        logger.debug("Retrieve certificate with token.")
 
         # Generate a new key pair
         key_pair = crypto.PKey()
@@ -124,7 +128,7 @@ class ESGFAccessManager(object):
             timeout=timeout,
         )
 
-        if response.status_code == 200:
+        if response.ok:
             content = "{} {}".format(response.text, private_key)
             with open(self.esgf_credentials, 'w') as fh:
                 fh.write(content)
