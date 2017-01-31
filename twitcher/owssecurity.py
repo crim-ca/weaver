@@ -46,6 +46,7 @@ class OWSSecurity(object):
             if fetch_certificate(workdir=workdir, data=access_token.data):
                 request.headers['X-Requested-Workdir'] = workdir
                 request.headers['X-X509-User-Proxy'] = workdir + '/' + ESGF_CREDENTIALS
+                logger.debug("Prepared request headers.")
         return request
 
     def check_request(self, request):
