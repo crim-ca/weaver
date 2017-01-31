@@ -132,6 +132,7 @@ class ESGFAccessManager(object):
             content = "{} {}".format(response.text, private_key)
             with open(self.esgf_credentials, 'w') as fh:
                 fh.write(content)
+            logger.debug('Fetched certificate successfully.')
         else:
             msg = "Could not get certificate: {} {}".format(response.status_code, response.reason)
             raise Exception(msg)
