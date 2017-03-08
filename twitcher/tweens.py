@@ -35,4 +35,5 @@ def ows_security_tween_factory(handler, registry):
 
     return ows_security_tween
 
+
 OWS_SECURITY = 'twitcher.tweens.ows_security_tween_factory'

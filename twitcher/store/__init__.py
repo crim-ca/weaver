@@ -27,6 +27,7 @@ def tokenstore_factory(registry, database=None):
         store = MemoryTokenStore()
     return store
 
+
 from twitcher.store.mongodb import MongodbServiceStore
 from twitcher.store.memory import MemoryServiceStore
 

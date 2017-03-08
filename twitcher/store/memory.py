@@ -36,6 +36,7 @@ class MemoryTokenStore(AccessTokenStore):
     def clear_tokens(self):
         self.access_tokens = {}
 
+
 from twitcher.store.base import ServiceStore
 from twitcher.datatype import Service
 from twitcher.exceptions import ServiceRegistrationError
