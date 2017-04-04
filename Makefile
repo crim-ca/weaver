@@ -155,7 +155,6 @@ conda_config: anaconda
 	@-"$(ANACONDA_HOME)/bin/conda" install -y conda=$(CONDA_VERSION) requests
 	@"$(ANACONDA_HOME)/bin/conda" config --add envs_dirs $(CONDA_ENVS_DIR)
 	@"$(ANACONDA_HOME)/bin/conda" config --set ssl_verify true
-	@"$(ANACONDA_HOME)/bin/conda" config --set update_dependencies false
 	@"$(ANACONDA_HOME)/bin/conda" config --set use_pip true
 	@"$(ANACONDA_HOME)/bin/conda" config --set channel_priority true
 	@"$(ANACONDA_HOME)/bin/conda" config --set auto_update_conda false
