@@ -55,10 +55,12 @@ class OWSSecurity(object):
             try:
                 service_name = parse_service_name(request.path)
                 service = self.servicestore.fetch_by_name(service_name)
+                is_public = service.public
                 if service.public is True:
-                    logger.info('public access for service %s', service_name)
+                    logger.warn('public access for service %s', service_name)
             except ServiceNotFound:
-                logger.debug("Service not registered.")
+                is_public = False
+                logger.warn("Service not registered.")
             ows_request = OWSRequest(request)
             if not ows_request.service_allowed():
                 raise OWSInvalidParameterValue(
@@ -68,11 +70,11 @@ class OWSSecurity(object):
                     # try to get access_token ... if no access restrictions then don't complain.
                     token = self.get_token_param(request)
                     access_token = self.tokenstore.fetch_by_token(token)
-                    if access_token.is_expired() and service.public is False:
+                    if access_token.is_expired() and not is_public:
                         raise OWSAccessForbidden("Access token is expired.")
                     # update request with data from access token
                     # request.environ.update(access_token.data)
                     request = self.prepare_headers(request, access_token)
                 except AccessTokenNotFound:
-                    if service.public is False:
+                    if not is_public:
                         raise OWSAccessForbidden("Access token is required to access this service.")
