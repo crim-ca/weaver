@@ -1,6 +1,11 @@
 Changes
 *******
 
+0.3.3 (2017-04-27)
+==================
+
+* fixed fetching of access token when service is public.
+
 0.3.2 (2017-01-31)
 ==================
 
