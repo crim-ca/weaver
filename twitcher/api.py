@@ -1,7 +1,7 @@
 from twitcher.datatype import Service
 
 import logging
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger("TWITCHER")
 
 
 class ITokenManager(object):
@@ -99,7 +99,7 @@ class TokenManager(ITokenManager):
         try:
             self.store.delete_token(token)
         except:
-            logger.exception('Failed to remove token.')
+            LOGGER.exception('Failed to remove token.')
             return False
         else:
             return True
@@ -111,7 +111,7 @@ class TokenManager(ITokenManager):
         try:
             self.store.clear_tokens()
         except:
-            logger.exception('Failed to remove tokens.')
+            LOGGER.exception('Failed to remove tokens.')
             return False
         else:
             return True
@@ -143,7 +143,7 @@ class Registry(IRegistry):
         try:
             self.store.delete_service(name=name)
         except:
-            logger.exception('unregister failed')
+            LOGGER.exception('unregister failed')
             return False
         else:
             return True
@@ -155,7 +155,7 @@ class Registry(IRegistry):
         try:
             service = self.store.fetch_by_name(name=name)
         except:
-            logger.error('Could not get service with name %s', name)
+            LOGGER.error('Could not get service with name %s', name)
             return {}
         else:
             return service.params
@@ -167,7 +167,7 @@ class Registry(IRegistry):
         try:
             service = self.store.fetch_by_url(url=url)
         except:
-            logger.error('Could not get service with url %s', url)
+            LOGGER.error('Could not get service with url %s', url)
             return {}
         else:
             return service.params
@@ -179,7 +179,7 @@ class Registry(IRegistry):
         try:
             services = [service.params for service in self.store.list_services()]
         except:
-            logger.error('List services failed.')
+            LOGGER.error('List services failed.')
             return []
         else:
             return services
@@ -191,7 +191,7 @@ class Registry(IRegistry):
         try:
             self.store.clear_services()
         except:
-            logger.error('Clear services failed.')
+            LOGGER.error('Clear services failed.')
             return False
         else:
             return True
