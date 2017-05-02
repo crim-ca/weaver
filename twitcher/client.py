@@ -5,7 +5,7 @@ from twitcher._compat import urlparse
 from twitcher._compat import xmlrpclib
 
 import logging
-LOGGER = logging.getLogger(__name__)
+LOGGER = logging.getLogger("TWITCHER")
 
 
 def _create_https_context(verify=True):
