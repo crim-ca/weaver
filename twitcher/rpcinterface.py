@@ -9,7 +9,7 @@ from twitcher.store import tokenstore_factory
 from twitcher.store import servicestore_factory
 
 import logging
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger("TWITCHER")
 
 
 @view_defaults(permission='view')
@@ -90,7 +90,7 @@ def includeme(config):
     settings = config.registry.settings
 
     if asbool(settings.get('twitcher.rpcinterface', True)):
-        logger.debug('Twitcher XML-RPC Interface enabled.')
+        LOGGER.debug('Twitcher XML-RPC Interface enabled.')
 
         # include twitcher config
         config.include('twitcher.config')
