@@ -4,14 +4,14 @@ from pyramid.settings import asbool
 
 
 import logging
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger("TWITCHER")
 
 
 def _workdir(request):
     settings = request.registry.settings
     workdir = settings.get('twitcher.workdir')
     workdir = workdir or tempfile.gettempdir()
-    logger.debug('using workdir %s', workdir)
+    LOGGER.debug('using workdir %s', workdir)
     return workdir
 
 
@@ -25,7 +25,7 @@ def _prefix(request):
 def includeme(config):
     # settings = config.registry.settings
 
-    logger.debug("Loading twitcher configuration.")
+    LOGGER.debug("Loading twitcher configuration.")
 
     config.add_request_method(_workdir, 'workdir', reify=True)
     config.add_request_method(_prefix, 'prefix', reify=True)
