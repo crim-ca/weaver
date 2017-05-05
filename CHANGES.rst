@@ -1,6 +1,12 @@
 Changes
 *******
 
+0.3.4 (2017-05-05)
+==================
+
+* updated logging.
+* fixed: creates workdir if it does not exist.
+
 0.3.3 (2017-04-27)
 ==================
 
