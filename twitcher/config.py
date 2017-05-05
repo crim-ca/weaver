@@ -1,3 +1,4 @@
+import os
 import tempfile
 
 from pyramid.settings import asbool
@@ -11,6 +12,8 @@ def _workdir(request):
     settings = request.registry.settings
     workdir = settings.get('twitcher.workdir')
     workdir = workdir or tempfile.gettempdir()
+    if not os.path.exists(workdir):
+        os.makedirs(workdir)
     LOGGER.debug('using workdir %s', workdir)
     return workdir
 
