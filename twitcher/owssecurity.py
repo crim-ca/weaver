@@ -11,7 +11,7 @@ from twitcher.owsrequest import OWSRequest
 from twitcher.esgf import fetch_certificate, ESGF_CREDENTIALS
 
 import logging
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger("TWITCHER")
 
 protected_path = '/ows/'
 
@@ -46,7 +46,7 @@ class OWSSecurity(object):
             if fetch_certificate(workdir=workdir, data=access_token.data):
                 request.headers['X-Requested-Workdir'] = workdir
                 request.headers['X-X509-User-Proxy'] = workdir + '/' + ESGF_CREDENTIALS
-                logger.debug("Prepared request headers.")
+                LOGGER.debug("Prepared request headers.")
         return request
 
     def check_request(self, request):
@@ -57,10 +57,10 @@ class OWSSecurity(object):
                 service = self.servicestore.fetch_by_name(service_name)
                 is_public = service.public
                 if service.public is True:
-                    logger.warn('public access for service %s', service_name)
+                    LOGGER.warn('public access for service %s', service_name)
             except ServiceNotFound:
                 is_public = False
-                logger.warn("Service not registered.")
+                LOGGER.warn("Service not registered.")
             ows_request = OWSRequest(request)
             if not ows_request.service_allowed():
                 raise OWSInvalidParameterValue(
