@@ -1,5 +1,4 @@
 import tempfile
-
 from twitcher.exceptions import AccessTokenNotFound
 from twitcher.exceptions import ServiceNotFound
 from twitcher.owsexceptions import OWSAccessForbidden, OWSInvalidParameterValue
@@ -10,10 +9,18 @@ from twitcher.utils import parse_service_name
 from twitcher.owsrequest import OWSRequest
 from twitcher.esgf import fetch_certificate, ESGF_CREDENTIALS
 
+import sys
+sys.path.insert(0, '/home/deruefx/CrimProjects/PAVICS/Magpie')
+
+
+
+from pyramid.interfaces import IAuthenticationPolicy, IAuthorizationPolicy
+
 import logging
 LOGGER = logging.getLogger("TWITCHER")
 
 protected_path = '/ows/'
+
 
 
 def owssecurity_factory(registry):
@@ -51,6 +58,36 @@ class OWSSecurity(object):
 
     def check_request(self, request):
         if request.path.startswith(protected_path):
+            #request: GET: https://public_host.com:portnumber/ows/proxy/{service_name}/{extra_path}?arg1=fdae&arg2=jfeaf...
+            #request: POST:
+            #ex: https://public.crim.ca:8083/ows/proxy/emu/wps?service=wps&request=getcapabilities
+
+            # Need the service_name
+            # Fetch the service from the DB
+            # Check the type of service
+            # Each service type has an specific object and handle the extrapath {which is actually the real path to append to the host of the service)
+            # ! a request could be GET or POST
+            # Use pywps to parse the request of a wps, it will give you
+
+            # for wms, I just need
+
+            from magpie.services import service_factory
+            from magpie.models import Service
+            service_name = parse_service_name(request.path)
+            service = Service.by_service_name(service_name, db_session=request.db) #fetch from the database
+
+            service_specific = service_factory(service, request) #return a specific type of service, ex: ServiceWPS with all the acl (loaded according to the service_type)
+            #should contain all the acl, this the only thing important
+            permission_requested = service_specific.permission_requested() #parse request (GET/POST) to get the permission requested for that service
+
+            authn_policy = request.registry.queryUtility(IAuthenticationPolicy)
+            authz_policy = request.registry.queryUtility(IAuthorizationPolicy)
+            principals = authn_policy.effective_principals(request)
+            has_permission = authz_policy.permits(service_specific, principals, permission_requested)
+            if not has_permission:
+                raise OWSAccessForbidden("Not authorized to access this resource.")
+
+            '''
             # TODO: fix this code
             try:
                 service_name = parse_service_name(request.path)
@@ -78,3 +115,4 @@ class OWSSecurity(object):
                 except AccessTokenNotFound:
                     if not is_public:
                         raise OWSAccessForbidden("Access token is required to access this service.")
+            '''

@@ -107,6 +107,67 @@ def _send_request(request, service, extra_path=None, request_params=None):
     return Response(content, status=resp.status_code, headers=headers)
 
 
+
+def _send_request_magpie(request, service, extra_path=None, request_params=None):
+
+    # TODO: fix way to build url
+    #url = service['url']
+    url = service.url
+    if extra_path:
+        url += '/' + extra_path
+    #if service.get('c4i', False):
+    #    if 'C4I-Access-Token' in request.headers:
+    #        LOGGER.debug('using c4i token')
+    #        url += '/' + request.headers['C4I-Access-Token']
+    if request_params:
+        url += '?' + request_params
+    LOGGER.debug('url = %s', url)
+
+    # forward request to target (without Host Header)
+    h = dict(request.headers)
+    h.pop("Host", h)
+    try:
+        resp = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h)
+    except Exception, e:
+        return OWSAccessFailed("Request failed: {}".format(e.message))
+
+    if resp.ok is False:
+        if 'ExceptionReport' in resp.content:
+            pass
+        else:
+            return OWSAccessFailed("Response is not ok: {}".format(resp.reason))
+
+    # check for allowed content types
+    ct = None
+    # LOGGER.debug("headers=", resp.headers)
+    if "Content-Type" in resp.headers:
+        ct = resp.headers["Content-Type"]
+        if not ct.split(";")[0] in allowed_content_types:
+            msg = "Content type is not allowed: {}.".format(ct)
+            LOGGER.error(msg)
+            return OWSAccessForbidden(msg)
+    else:
+        # return OWSAccessFailed("Could not get content type from response.")
+        LOGGER.warn("Could not get content type from response")
+
+    try:
+        if ct in ['text/xml', 'application/xml', 'text/xml;charset=ISO-8859-1']:
+                # replace urls in xml content
+                proxy_url = request.route_url('owsproxy', service_name=service.resource_name)
+                # TODO: where do i need to replace urls?
+                content = replace_caps_url(resp.content, proxy_url, service.url)
+        else:
+            # raw content
+            content = resp.content
+    except:
+        return OWSAccessFailed("Could not decode content.")
+
+    headers = {}
+    if ct:
+        headers["Content-Type"] = ct
+    return Response(content, status=resp.status_code, headers=headers)
+
+
 def owsproxy_url(request):
     url = request.params.get("url")
     if url is None:
@@ -154,6 +215,22 @@ def owsproxy_delegate(request):
     return Response(resp.content, status=resp.status_code, headers=resp.headers)
 
 
+def owsproxy_magpie(request):
+    try:
+        service_name = request.matchdict.get('service_name')
+        extra_path = request.matchdict.get('extra_path')
+        #store = servicestore_factory(request.registry)
+        #service = store.fetch_by_name(service_name)
+        from magpie.models import Service
+        service = Service.by_service_name(service_name, db_session=request.db)
+
+
+    except Exception as err:
+        return OWSAccessFailed("Could not find service: {}.".format(err.message))
+    else:
+        return _send_request_magpie(request, service, extra_path, request_params=urllib.urlencode(request.params))
+    pass
+
 def includeme(config):
     settings = config.registry.settings
 
@@ -163,20 +240,25 @@ def includeme(config):
         config.add_route('owsproxy', '/ows/proxy/{service_name}')
         # TODO: maybe configure extra path
         # config.add_route('owsproxy_extra', '/ows/proxy/{service_name}/{extra_path:.*}')
-        config.add_route('owsproxy_secured', '/ows/proxy/{service_name}/{access_token}')
+        #config.add_route('owsproxy_secured', '/ows/proxy/{service_name}/{access_token}')
+
+        config.add_route('owsproxy_magpie', '/ows/proxy/{service_name}/{extra_path:.*}')
 
         # use delegation mode?
         if asbool(settings.get('twitcher.ows_proxy_delegate', False)):
             LOGGER.debug('Twitcher /ows/proxy delegation mode enabled.')
             config.add_view(owsproxy_delegate, route_name='owsproxy')
-            config.add_view(owsproxy_delegate, route_name='owsproxy_secured')
+            #config.add_view(owsproxy_delegate, route_name='owsproxy_secured')
+            config.add_view(owsproxy_magpie, route_name='owsproxy_magpie')
         else:
             # include twitcher config
             config.include('twitcher.config')
             # include mongodb
-            config.include('twitcher.db')
+            #config.include('twitcher.db')
+            config.include('twitcher.postgresdb')
             config.add_view(owsproxy, route_name='owsproxy')
-            config.add_view(owsproxy, route_name='owsproxy_secured')
+            #config.add_view(owsproxy, route_name='owsproxy_secured')
+            config.add_view(owsproxy_magpie, route_name='owsproxy_magpie')
         # use /owsproxy?
         if asbool(settings.get('twitcher.ows_proxy_url', True)):
             LOGGER.debug('Twitcher /owsproxy enabled.')
