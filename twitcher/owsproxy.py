@@ -39,6 +39,8 @@ allowed_content_types = (
     "image/jpeg",                            # JPEG
     "application/json",                      # JSON
     "application/json;charset=ISO-8859-1",
+    "text/html",
+    "application/x-netcdf"
 )
 
 # TODO: configure allowed hosts

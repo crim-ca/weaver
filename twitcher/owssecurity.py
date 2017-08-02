@@ -58,18 +58,6 @@ class OWSSecurity(object):
 
     def check_request(self, request):
         if request.path.startswith(protected_path):
-            #request: GET: https://public_host.com:portnumber/ows/proxy/{service_name}/{extra_path}?arg1=fdae&arg2=jfeaf...
-            #request: POST:
-            #ex: https://public.crim.ca:8083/ows/proxy/emu/wps?service=wps&request=getcapabilities
-
-            # Need the service_name
-            # Fetch the service from the DB
-            # Check the type of service
-            # Each service type has an specific object and handle the extrapath {which is actually the real path to append to the host of the service)
-            # ! a request could be GET or POST
-            # Use pywps to parse the request of a wps, it will give you
-
-            # for wms, I just need
 
             from magpie.services import service_factory
             from magpie.models import Service
