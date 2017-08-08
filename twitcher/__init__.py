@@ -7,8 +7,8 @@ from pyramid.authorization import ACLAuthorizationPolicy
 
 # -- Ziggurat_foundation ----
 
-import sys
-sys.path.insert(0, '/home/deruefx/CrimProjects/PAVICS/Magpie')
+#import sys
+#sys.path.insert(0, '/home/deruefx/CrimProjects/PAVICS/Magpie')
 
 
 __version__ = '0.3.4'

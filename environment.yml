@@ -41,6 +41,12 @@ dependencies:
 # mongodb
 - pymongo=3
 - mongodb=2.6.*|3.3.9
+# magpie
+- openssl
+- libffi
+- libxslt
+- libxml2
+- zlib
 - pip:
   - genshi==0.7
   - pyramid-rpc

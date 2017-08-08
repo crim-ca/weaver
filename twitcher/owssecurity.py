@@ -9,8 +9,8 @@ from twitcher.utils import parse_service_name
 from twitcher.owsrequest import OWSRequest
 from twitcher.esgf import fetch_certificate, ESGF_CREDENTIALS
 
-import sys
-sys.path.insert(0, '/home/deruefx/CrimProjects/PAVICS/Magpie')
+#import sys
+#sys.path.insert(0, '/home/deruefx/CrimProjects/PAVICS/Magpie')
 
 
 
