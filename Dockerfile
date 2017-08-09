@@ -53,10 +53,8 @@ ENV DAEMON_OPTS --nodaemon
 
 WORKDIR /
 RUN git clone https://github.com/ouranosinc/magpie && \
-	.opt/conda/envs/twitcher/bin/pip install -r /opt/birdhouse/src/twitcher/magpie/requirements.txt && \
-	.opt/conda/envs/twitcher/bin/pip install ./magpie/
+	./opt/conda/envs/twitcher/bin/pip install -r magpie/requirements.txt && \
+	./opt/conda/envs/twitcher/bin/pip install ./magpie
 
-
-#CMD ["bash"]
-# Start service ...
+WORKDIR /opt/birdhouse/src/twitcher
 CMD ["make", "update-config", "start"]

@@ -43,10 +43,8 @@ dependencies:
 - mongodb=2.6.*|3.3.9
 # magpie
 - openssl
-- libffi
-- libxslt
-- libxml2
-- zlib
+- lxml=3.7
+- libxslt=1.1.29
 - pip:
   - genshi==0.7
   - pyramid-rpc
