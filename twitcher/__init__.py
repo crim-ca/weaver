@@ -9,7 +9,7 @@ from pyramid.authorization import ACLAuthorizationPolicy
 
 #import sys
 #sys.path.insert(0, '/home/deruefx/CrimProjects/PAVICS/Magpie')
-
+import os
 
 __version__ = '0.3.4'
 
@@ -23,9 +23,14 @@ def main(global_config, **settings):
 
 
     from magpie.models import group_finder
-    #config = Configurator(settings=settings)
+
+    magpie_secret = os.getenv('MAGPIE_SECRET')
+    if magpie_secret is None:
+        logger.debug('Use default secret from twitcher.ini')
+        magpie_secret = settings['twitcher.secret']
+
     authn_policy = AuthTktAuthenticationPolicy(
-        settings['twitcher.secret'],
+        magpie_secret,
         callback=group_finder,
     )
     authz_policy = ACLAuthorizationPolicy()
