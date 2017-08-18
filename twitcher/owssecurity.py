@@ -74,33 +74,3 @@ class OWSSecurity(object):
             has_permission = authz_policy.permits(service_specific, principals, permission_requested)
             if not has_permission:
                 raise OWSAccessForbidden("Not authorized to access this resource.")
-
-            '''
-            # TODO: fix this code
-            try:
-                service_name = parse_service_name(request.path)
-                service = self.servicestore.fetch_by_name(service_name)
-                is_public = service.public
-                if service.public is True:
-                    LOGGER.warn('public access for service %s', service_name)
-            except ServiceNotFound:
-                is_public = False
-                LOGGER.warn("Service not registered.")
-            ows_request = OWSRequest(request)
-            if not ows_request.service_allowed():
-                raise OWSInvalidParameterValue(
-                    "service %s not supported" % ows_request.service, value="service")
-            if not ows_request.public_access():
-                try:
-                    # try to get access_token ... if no access restrictions then don't complain.
-                    token = self.get_token_param(request)
-                    access_token = self.tokenstore.fetch_by_token(token)
-                    if access_token.is_expired() and not is_public:
-                        raise OWSAccessForbidden("Access token is expired.")
-                    # update request with data from access token
-                    # request.environ.update(access_token.data)
-                    request = self.prepare_headers(request, access_token)
-                except AccessTokenNotFound:
-                    if not is_public:
-                        raise OWSAccessForbidden("Access token is required to access this service.")
-            '''

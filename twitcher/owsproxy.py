@@ -15,7 +15,7 @@ from twitcher._compat import urlparse
 from twitcher.owsexceptions import OWSAccessForbidden, OWSAccessFailed
 from twitcher.utils import replace_caps_url
 from twitcher.store import servicestore_factory
-
+from pyramid.httpexceptions import HTTPTemporaryRedirect, HTTPFound
 
 import logging
 LOGGER = logging.getLogger(__name__)
@@ -40,7 +40,9 @@ allowed_content_types = (
     "application/json",                      # JSON
     "application/json;charset=ISO-8859-1",
     "text/html",
-    "application/x-netcdf"
+    "application/x-netcdf",
+    "text/plain",
+    "application/octet-stream"
 )
 
 # TODO: configure allowed hosts
@@ -68,7 +70,8 @@ def _send_request(request, service, extra_path=None, request_params=None):
     h = dict(request.headers)
     h.pop("Host", h)
     try:
-        resp = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h)
+        #resp = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h)
+        return HTTPTemporaryRedirect(location=url)
     except Exception, e:
         return OWSAccessFailed("Request failed: {}".format(e.message))
 
@@ -129,7 +132,8 @@ def _send_request_magpie(request, service, extra_path=None, request_params=None)
     h = dict(request.headers)
     h.pop("Host", h)
     try:
-        resp = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h)
+        #resp = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h)
+        return HTTPTemporaryRedirect(location=url)
     except Exception, e:
         return OWSAccessFailed("Request failed: {}".format(e.message))
 
@@ -230,7 +234,7 @@ def owsproxy_magpie(request):
     except Exception as err:
         return OWSAccessFailed("Could not find service: {}.".format(err.message))
     else:
-        return _send_request_magpie(request, service, extra_path, request_params=urllib.urlencode(request.params))
+        return _send_request_magpie(request, service, extra_path, request_params=request.query_string)
     pass
 
 def includeme(config):
