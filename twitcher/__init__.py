@@ -27,7 +27,7 @@ def main(global_config, **settings):
     magpie_secret = os.getenv('MAGPIE_SECRET')
     if magpie_secret is None:
         logger.debug('Use default secret from twitcher.ini')
-        magpie_secret = settings['twitcher.secret']
+        magpie_secret = settings['magpie.secret']
 
     authn_policy = AuthTktAuthenticationPolicy(
         magpie_secret,
