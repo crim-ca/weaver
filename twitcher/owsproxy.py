@@ -132,8 +132,8 @@ def _send_request_magpie(request, service, extra_path=None, request_params=None)
     h = dict(request.headers)
     h.pop("Host", h)
     try:
-        #resp = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h)
-        return HTTPTemporaryRedirect(location=url)
+        resp = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h)
+        #return HTTPTemporaryRedirect(location=url)
     except Exception, e:
         return OWSAccessFailed("Request failed: {}".format(e.message))
 
