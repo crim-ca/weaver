@@ -68,9 +68,10 @@ class OWSSecurity(object):
             #should contain all the acl, this the only thing important
             permission_requested = service_specific.permission_requested() #parse request (GET/POST) to get the permission requested for that service
 
-            authn_policy = request.registry.queryUtility(IAuthenticationPolicy)
-            authz_policy = request.registry.queryUtility(IAuthorizationPolicy)
-            principals = authn_policy.effective_principals(request)
-            has_permission = authz_policy.permits(service_specific, principals, permission_requested)
-            if not has_permission:
-                raise OWSAccessForbidden("Not authorized to access this resource.")
+            if permission_requested:
+                authn_policy = request.registry.queryUtility(IAuthenticationPolicy)
+                authz_policy = request.registry.queryUtility(IAuthorizationPolicy)
+                principals = authn_policy.effective_principals(request)
+                has_permission = authz_policy.permits(service_specific, principals, permission_requested)
+                if not has_permission:
+                    raise OWSAccessForbidden("Not authorized to access this resource.")
