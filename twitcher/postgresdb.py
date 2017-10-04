@@ -1,39 +1,27 @@
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine
-import os
-
-import logging
-logger = logging.getLogger(__name__)
+from magpie.db import get_session_factory, get_engine, get_tm_session
 
 
-def postgresdb(registry):
-    settings = registry.settings
-    #engine = create_engine('postgresql://postgres:postgres@localhost/ziggudb', echo=True)
-
-    '''
-    database_url = 'postgresql://'\
-                   +settings['postgresdb.user_name'] + \
-                   ':'+settings['postgresdb.password'] + \
-                   '@' + settings['postgresdb.host'] +\
-                   '/' + settings['postgresdb.db_name']
-    '''
-    database_url = 'postgresql://' \
-                   + os.getenv('POSTGRES_USER') + \
-                   ':' + os.getenv('POSTGRES_PASSWORD') + \
-                   '@' + os.getenv('POSTGRES_HOST') + \
-                   '/' + os.getenv('POSTGRES_DB')
-
-    engine = create_engine(database_url, echo=True)
-    db = sessionmaker(bind=engine)()
-    return db
 
 def includeme(config):
-    config.registry.db = postgresdb(config.registry)
+    """
+    Initialize the model for a Pyramid app.
 
-    def _add_db(request):
-        db = request.registry.db
-        # if db_url.username and db_url.password:
-        #     db.authenticate(db_url.username, db_url.password)
-        return db
-    config.add_request_method(_add_db, 'db', reify=True)
+    Activate this setup using ``config.include('pyramid_blogr.models')``.
+
+    """
+    settings = config.get_settings()
+
+    # use pyramid_tm to hook the transaction lifecycle to the request
+    config.include('pyramid_tm')
+
+    session_factory = get_session_factory(get_engine(settings))
+    config.registry['dbsession_factory'] = session_factory
+
+    # make request.dbsession available for use in Pyramid
+    config.add_request_method(
+        # r.tm is the transaction manager used by pyramid_tm
+        lambda r: get_tm_session(session_factory, r.tm),
+        'db',
+        reify=True
+    )
+

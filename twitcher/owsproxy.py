@@ -255,6 +255,7 @@ def includeme(config):
             LOGGER.debug('Twitcher /ows/proxy delegation mode enabled.')
             config.add_view(owsproxy_delegate, route_name='owsproxy')
             #config.add_view(owsproxy_delegate, route_name='owsproxy_secured')
+            config.add_view(owsproxy_magpie, route_name='owsproxy')
             config.add_view(owsproxy_magpie, route_name='owsproxy_magpie')
         else:
             # include twitcher config
@@ -262,7 +263,7 @@ def includeme(config):
             # include mongodb
             #config.include('twitcher.db')
             config.include('twitcher.postgresdb')
-            config.add_view(owsproxy, route_name='owsproxy')
+            config.add_view(owsproxy_magpie, route_name='owsproxy')
             #config.add_view(owsproxy, route_name='owsproxy_secured')
             config.add_view(owsproxy_magpie, route_name='owsproxy_magpie')
         # use /owsproxy?
