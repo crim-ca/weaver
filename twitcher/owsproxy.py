@@ -249,6 +249,7 @@ def includeme(config):
         #config.add_route('owsproxy_secured', '/ows/proxy/{service_name}/{access_token}')
 
         config.add_route('owsproxy_magpie', '/ows/proxy/{service_name}/{extra_path:.*}')
+        config.add_route('owsproxy_extraprefix_magpie', '/{prefix_path}/ows/proxy/{service_name}/{extra_path:.*}')
 
         # use delegation mode?
         if asbool(settings.get('twitcher.ows_proxy_delegate', False)):
@@ -257,6 +258,7 @@ def includeme(config):
             #config.add_view(owsproxy_delegate, route_name='owsproxy_secured')
             config.add_view(owsproxy_magpie, route_name='owsproxy')
             config.add_view(owsproxy_magpie, route_name='owsproxy_magpie')
+            config.add_view(owsproxy_magpie, route_name='owsproxy_extraprefix_magpie')
         else:
             # include twitcher config
             config.include('twitcher.config')
@@ -266,6 +268,8 @@ def includeme(config):
             config.add_view(owsproxy_magpie, route_name='owsproxy')
             #config.add_view(owsproxy, route_name='owsproxy_secured')
             config.add_view(owsproxy_magpie, route_name='owsproxy_magpie')
+            config.add_view(owsproxy_magpie, route_name='owsproxy_extraprefix_magpie')
+
         # use /owsproxy?
         if asbool(settings.get('twitcher.ows_proxy_url', True)):
             LOGGER.debug('Twitcher /owsproxy enabled.')
