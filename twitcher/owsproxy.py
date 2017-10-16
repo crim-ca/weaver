@@ -239,17 +239,18 @@ def owsproxy_magpie(request):
 
 def includeme(config):
     settings = config.registry.settings
-
+    protected_path = settings['twitcher.ows_proxy_protected_path']
+    if not protected_path:
+        protected_path = '/twitcher/ows/proxy'  # default path
     if asbool(settings.get('twitcher.ows_proxy', True)):
         LOGGER.debug('Twitcher /ows/proxy enabled.')
 
-        config.add_route('owsproxy', '/ows/proxy/{service_name}')
+        config.add_route('owsproxy', protected_path+'/{service_name}')
         # TODO: maybe configure extra path
         # config.add_route('owsproxy_extra', '/ows/proxy/{service_name}/{extra_path:.*}')
         #config.add_route('owsproxy_secured', '/ows/proxy/{service_name}/{access_token}')
 
-        config.add_route('owsproxy_magpie', '/ows/proxy/{service_name}/{extra_path:.*}')
-        config.add_route('owsproxy_extraprefix_magpie', '/{prefix_path}/ows/proxy/{service_name}/{extra_path:.*}')
+        config.add_route('owsproxy_magpie', protected_path+'/{service_name}/{extra_path:.*}')
 
         # use delegation mode?
         if asbool(settings.get('twitcher.ows_proxy_delegate', False)):
@@ -258,7 +259,6 @@ def includeme(config):
             #config.add_view(owsproxy_delegate, route_name='owsproxy_secured')
             config.add_view(owsproxy_magpie, route_name='owsproxy')
             config.add_view(owsproxy_magpie, route_name='owsproxy_magpie')
-            config.add_view(owsproxy_magpie, route_name='owsproxy_extraprefix_magpie')
         else:
             # include twitcher config
             config.include('twitcher.config')
@@ -268,7 +268,6 @@ def includeme(config):
             config.add_view(owsproxy_magpie, route_name='owsproxy')
             #config.add_view(owsproxy, route_name='owsproxy_secured')
             config.add_view(owsproxy_magpie, route_name='owsproxy_magpie')
-            config.add_view(owsproxy_magpie, route_name='owsproxy_extraprefix_magpie')
 
         # use /owsproxy?
         if asbool(settings.get('twitcher.ows_proxy_url', True)):

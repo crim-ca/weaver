@@ -19,7 +19,7 @@ from pyramid.interfaces import IAuthenticationPolicy, IAuthorizationPolicy
 import logging
 LOGGER = logging.getLogger("TWITCHER")
 
-protected_path = '/ows/'
+
 
 
 
@@ -57,11 +57,13 @@ class OWSSecurity(object):
         return request
 
     def check_request(self, request):
+        protected_path = request.registry.settings['twitcher.ows_proxy_protected_path']
         if request.path.startswith(protected_path):
 
             from magpie.services import service_factory
             from magpie.models import Service
-            service_name = parse_service_name(request.path)
+
+            service_name = parse_service_name(request.path, protected_path)
             service = Service.by_service_name(service_name, db_session=request.db) #fetch from the database
 
             service_specific = service_factory(service, request) #return a specific type of service, ex: ServiceWPS with all the acl (loaded according to the service_type)
@@ -75,3 +77,4 @@ class OWSSecurity(object):
                 has_permission = authz_policy.permits(service_specific, principals, permission_requested)
                 if not has_permission:
                     raise OWSAccessForbidden("Not authorized to access this resource.")
+
