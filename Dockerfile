@@ -16,6 +16,7 @@ ENV POSTGRES_HOST postgres
 ENV POSTGRES_DB pavics
 ENV POSTGRES_PORT 5432
 ENV MAGPIE_SECRET seekrit
+ENV TWITCHER_PROTECTED_PATH /twitcher/ows/proxy
 
 
 # Set current home
