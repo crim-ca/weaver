@@ -11,7 +11,7 @@ from pyramid.authorization import ACLAuthorizationPolicy
 #sys.path.insert(0, '/home/deruefx/CrimProjects/PAVICS/Magpie')
 import os
 
-__version__ = '0.3.4'
+__version__ = '0.1.0'
 
 
 def main(global_config, **settings):
