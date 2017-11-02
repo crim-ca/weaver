@@ -18,6 +18,7 @@ Makefile.config
 *.egg-info
 *.sqlite
 *.bak
+__pycache__
 
 # Unit test / Coverage reports
 .cache

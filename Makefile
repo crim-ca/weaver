@@ -1,4 +1,4 @@
-VERSION := 0.3.9
+VERSION := 0.3.13
 RELEASE := master
 
 # Include custom config if it is available
@@ -13,9 +13,9 @@ OS_NAME := $(shell uname -s 2>/dev/null || echo "unknown")
 CPU_ARCH := $(shell uname -m 2>/dev/null || uname -p 2>/dev/null || echo "unknown")
 
 # Python
-SETUPTOOLS_VERSION := 27.2.0
+SETUPTOOLS_VERSION := 36.5.0
 CONDA_VERSION := 4.3
-BUILDOUT_VERSION := 2.9.2
+BUILDOUT_VERSION := 2.9.5
 
 # Anaconda
 ANACONDA_HOME ?= $(HOME)/anaconda
@@ -68,12 +68,17 @@ help:
 	@echo "\nTesting targets:"
 	@echo "  test        to run tests (but skip long running tests)."
 	@echo "  testall     to run all tests (including long running tests)."
+	@echo "  pep8        to run pep8 code style checks."
+	@echo "\nSphinx targets:"
+	@echo "  docs        to generate HTML documentation with Sphinx."
+	@echo "  linkcheck   to check all external links in documentation for integrity."
+	@echo "  doc8        to run doc8 documentation style checks."
 	@echo "\nSupporting targets:"
 	@echo "  envclean    to remove the conda enviroment $(CONDA_ENV)."
 	@echo "  srcclean    to remove all *.pyc files."
 	@echo "  distclean   to remove *all* files that are not controlled by 'git'. WARNING: use it *only* if you know what you do!"
 	@echo "  passwd      to generate password for 'phoenix-password' in custom.cfg."
-	@echo "  docs        to generate HTML documentation with Sphinx."
+	@echo "  export      to export the conda environment. Caution! You always need to check it the enviroment.yml is working."
 	@echo "  selfupdate  to update this Makefile."
 	@echo "\nSupervisor targets:"
 	@echo "  start       to start supervisor service."
@@ -171,7 +176,7 @@ conda_env: anaconda conda_config
 .PHONY: conda_pinned
 conda_pinned: conda_env
 	@echo "Update pinned conda packages ..."
-	@test -d $(CONDA_ENV_PATH) && test -f $(CONDA_PINNED) && cp -f "$(CONDA_PINNED)" "$(CONDA_ENV_PATH)/conda-meta/pinned"
+	@-test -d $(CONDA_ENV_PATH) && test -f $(CONDA_PINNED) && cp -f "$(CONDA_PINNED)" "$(CONDA_ENV_PATH)/conda-meta/pinned"
 
 .PHONY: export
 export:
@@ -190,7 +195,7 @@ sysinstall:
 	@echo "\nInstalling system packages for bootstrap ..."
 	@bash bootstrap.sh -i
 	@echo "\nInstalling system packages for your application ..."
-	@test -f requirements.sh || bash requirements.sh
+	@-test -f requirements.sh && bash requirements.sh
 
 .PHONY: install
 install: bootstrap
@@ -251,17 +256,27 @@ testall:
 
 .PHONY: pep8
 pep8:
-		@echo "Running pep8 checks ..."
-		bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); flake8"
+	@echo "Running pep8 code style checks ..."
+	$(CONDA_ENV_PATH)/bin/flake8
 
 .PHONY: docs
 docs:
 	@echo "Generating docs with Sphinx ..."
-	$(MAKE) -C $@ clean linkcheck html
+	$(MAKE) -C $@ clean html
 	@echo "open your browser: firefox docs/build/html/index.html"
 
+.PHONY: linkcheck
+linkcheck:
+	@echo "Run link checker on docs..."
+	$(MAKE) -C docs linkcheck
+
+.PHONY: doc8
+doc8:
+	@echo "Running doc8 doc style checks ..."
+	$(CONDA_ENV_PATH)/bin/doc8 docs/
+
 .PHONY: selfupdate
-selfupdate: bootstrap.sh requirements.sh .gitignore
+selfupdate: bootstrap.sh .gitignore
 	@curl "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/Makefile" --silent --insecure --output Makefile
 
 ## Supervisor targets
