@@ -59,4 +59,5 @@ RUN git clone https://github.com/ouranosinc/magpie && \
 	./opt/conda/envs/twitcher/bin/pip install ./magpie
 
 WORKDIR /opt/birdhouse/src/twitcher
+RUN mkdir -p /opt/birdhouse/var/tmp/nginx/client
 CMD ["make", "update-config", "start"]
