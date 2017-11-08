@@ -8,6 +8,10 @@ from twitcher.store import servicestore_factory
 from twitcher.utils import parse_service_name
 from twitcher.owsrequest import OWSRequest
 from twitcher.esgf import fetch_certificate, ESGF_CREDENTIALS
+from pyramid.httpexceptions import HTTPForbidden, HTTPNotFound
+from magpie.services import service_factory
+from magpie.models import Service
+from magpie import evaluate_call, verify_param
 
 #import sys
 #sys.path.insert(0, '/home/deruefx/CrimProjects/PAVICS/Magpie')
@@ -59,12 +63,11 @@ class OWSSecurity(object):
     def check_request(self, request):
         protected_path = request.registry.settings['twitcher.ows_proxy_protected_path']
         if request.path.startswith(protected_path):
-
-            from magpie.services import service_factory
-            from magpie.models import Service
-
             service_name = parse_service_name(request.path, protected_path)
-            service = Service.by_service_name(service_name, db_session=request.db) #fetch from the database
+            service = evaluate_call(lambda: Service.by_service_name(service_name, db_session=request.db),
+                                    fallback=lambda: request.db.rollback(),
+                                    httpError=HTTPForbidden, msgOnFail="Service query by name refused by db")
+            verify_param(service, notNone=True, httpError=HTTPNotFound, msgOnFail="Service name not found in db")
 
             service_specific = service_factory(service, request) #return a specific type of service, ex: ServiceWPS with all the acl (loaded according to the service_type)
             #should contain all the acl, this the only thing important
