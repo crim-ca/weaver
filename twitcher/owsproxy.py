@@ -169,10 +169,9 @@ def _send_request_magpie(request, service, extra_path=None, request_params=None)
         return OWSAccessFailed("Could not decode content.")
 
     headers = {}
+    headers = resp.headers
     if ct:
         headers["Content-Type"] = ct
-    if "Content-Length" in resp.headers:
-        headers["Content-Length"] = resp.headers["Content-Type"]
     return Response(content, status=resp.status_code, headers=headers)
 
 
