@@ -2,8 +2,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # -- Pyramid ----
-from pyramid.authentication import AuthTktAuthenticationPolicy
-from pyramid.authorization import ACLAuthorizationPolicy
+
 
 # -- Ziggurat_foundation ----
 
@@ -11,7 +10,7 @@ from pyramid.authorization import ACLAuthorizationPolicy
 #sys.path.insert(0, '/home/deruefx/CrimProjects/PAVICS/Magpie')
 import os
 
-__version__ = '0.1.0'
+__version__ = '0.2.3'
 
 
 def main(global_config, **settings):
@@ -19,7 +18,8 @@ def main(global_config, **settings):
     This function returns a Pyramid WSGI application.
     """
     from pyramid.config import Configurator
-
+    from pyramid.authentication import AuthTktAuthenticationPolicy
+    from pyramid.authorization import ACLAuthorizationPolicy
 
 
     from magpie.models import group_finder
