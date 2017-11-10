@@ -6,6 +6,12 @@ See also: https://github.com/nive/outpost/blob/master/outpost/proxy.py
 
 import urllib
 import requests
+import base64
+import hashlib
+import calendar
+import datetime
+
+
 
 from pyramid.response import Response
 from pyramid.settings import asbool
@@ -16,7 +22,7 @@ from twitcher.owsexceptions import OWSAccessForbidden, OWSAccessFailed
 from twitcher.utils import replace_caps_url
 from twitcher.store import servicestore_factory
 from pyramid.httpexceptions import HTTPTemporaryRedirect, HTTPFound
-
+import os
 import logging
 LOGGER = logging.getLogger(__name__)
 
@@ -115,20 +121,31 @@ def _send_request(request, service, extra_path=None, request_params=None):
 
 def _send_request_magpie(request, service, extra_path=None, request_params=None):
 
-    # TODO: fix way to build url
-    #url = service['url']
     url = service.url
     if extra_path:
         url += '/' + extra_path
-    #if service.get('c4i', False):
-    #    if 'C4I-Access-Token' in request.headers:
-    #        LOGGER.debug('using c4i token')
-    #        url += '/' + request.headers['C4I-Access-Token']
+
+    if service.type == 'thredds':
+        if '/fileServer/' in url:
+            secret = os.getenv('PROXY_THREDDS_SECRET', "Rfns8wpTx5")
+
+            future = datetime.datetime.utcnow() + datetime.timedelta(minutes=1)
+            expiry = calendar.timegm(future.timetuple())
+            url_path = urlparse(url).path
+            secure_link = "{expiry}{url} {key}".format(key=secret,
+                                                       url=url_path,
+                                                       expiry=expiry)
+            hash = hashlib.md5(secure_link).digest()
+            encoded_hash = base64.urlsafe_b64encode(hash).rstrip('=')
+
+            url = url + "?filetoken=" + encoded_hash + "&expires=" + str(expiry)
+            return HTTPFound(location=url)
+
     if request_params:
         url += '?' + request_params
     LOGGER.debug('url = %s', url)
 
-    # forward request to target (without Host Header)
+        # forward request to target (without Host Header)
     h = dict(request.headers)
     h.pop("Host", h)
     try:
@@ -146,6 +163,7 @@ def _send_request_magpie(request, service, extra_path=None, request_params=None)
     # check for allowed content types
     ct = None
     # LOGGER.debug("headers=", resp.headers)
+
     if "Content-Type" in resp.headers:
         ct = resp.headers["Content-Type"]
         if not ct.split(";")[0] in allowed_content_types:
@@ -168,10 +186,13 @@ def _send_request_magpie(request, service, extra_path=None, request_params=None)
     except:
         return OWSAccessFailed("Could not decode content.")
 
+
     headers = {}
-    headers = resp.headers
+    content = resp.content
     if ct:
         headers["Content-Type"] = ct
+    if "Content-Length" in resp.headers:
+        headers["Content-Length"] = resp.headers["Content-Length"]
     return Response(content, status=resp.status_code, headers=headers)
 
 
