@@ -127,18 +127,22 @@ def _send_request_magpie(request, service, extra_path=None, request_params=None)
 
     if service.type == 'thredds':
         if '/fileServer/' in url:
+            pr = urlparse(url)
+
             secret = os.getenv('PROXY_THREDDS_SECRET', "Rfns8wpTx5")
+            proxy_thredds = os.getenv('PROXY_THREDDS_HOSTNAME', pr.hostname)
+            upstream = pr.netloc
+            url_path = pr.path
 
             future = datetime.datetime.utcnow() + datetime.timedelta(minutes=1)
             expiry = calendar.timegm(future.timetuple())
-            url_path = urlparse(url).path
-            secure_link = "{expiry}{url} {key}".format(key=secret,
-                                                       url=url_path,
-                                                       expiry=expiry)
+
+            secure_link = "{expiry}{url_path}{upstream} {secret}".format(**locals())
             hash = hashlib.md5(secure_link).digest()
             encoded_hash = base64.urlsafe_b64encode(hash).rstrip('=')
 
-            url = url + "?filetoken=" + encoded_hash + "&expires=" + str(expiry)
+            params = 'filetoken={encoded_hash}&expires={expiry}&upstream={upstream}'.format(**locals())
+            url = 'https://{proxy_thredds}{url_path}?{params}'.format(**locals())
             return HTTPFound(location=url)
 
     if request_params:
