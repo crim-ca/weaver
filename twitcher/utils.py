@@ -15,7 +15,7 @@ def is_valid_url(url):
     try:
         parsed_url = urlparse(url)
         return True if all([parsed_url.scheme, ]) else False
-    except:
+    except Exception:
         return False
 
 

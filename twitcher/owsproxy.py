@@ -98,7 +98,7 @@ def _send_request(request, service, extra_path=None, request_params=None):
         else:
             # raw content
             content = resp.content
-    except:
+    except Exception:
         return OWSAccessFailed("Could not decode content.")
 
     headers = {}
