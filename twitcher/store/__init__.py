@@ -19,7 +19,8 @@ def tokenstore_factory(registry, database=None):
     :param database: A string with the store implementation name: "mongodb" or "memory".
     :return: An instance of :class:`twitcher.store.AccessTokenStore`.
     """
-    database = database or 'mongodb'
+    #database = database or 'mongodb'
+    database = None
     if database == 'mongodb':
         db = _mongodb(registry)
         store = MongodbTokenStore(db.tokens)
@@ -39,7 +40,8 @@ def servicestore_factory(registry, database=None):
 
     :return: An instance of :class:`twitcher.store.ServiceStore`.
     """
-    database = database or 'mongodb'
+    #database = database or 'mongodb'
+    database = None
     if database == 'mongodb':
         db = _mongodb(registry)
         store = MongodbServiceStore(collection=db.services)

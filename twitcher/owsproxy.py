@@ -195,9 +195,17 @@ def _send_request_magpie(request, service, extra_path=None, request_params=None)
     content = resp.content
     if ct:
         headers["Content-Type"] = ct
-    if "Content-Length" in resp.headers:
-        headers["Content-Length"] = resp.headers["Content-Length"]
-    return Response(content, status=resp.status_code, headers=headers)
+
+    headers = dict(resp.headers)
+    if 'Content-Length' in headers.keys():
+        del headers['Content-Length']
+    if 'Content-Encoding' in headers.keys():
+        del headers['Content-Encoding']
+
+    proxy_response = Response(body=content, status=resp.status_code)
+    proxy_response.headers.update(headers)
+
+    return proxy_response
 
 
 def owsproxy_url(request):

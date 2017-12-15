@@ -24,9 +24,6 @@ import logging
 LOGGER = logging.getLogger("TWITCHER")
 
 
-
-
-
 def owssecurity_factory(registry):
     return OWSSecurity(tokenstore_factory(registry), servicestore_factory(registry))
 
