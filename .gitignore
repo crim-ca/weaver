@@ -1,5 +1,7 @@
 # installer
 #Makefile
+env/
+opt/
 
 # Docker
 #Dockerfile
