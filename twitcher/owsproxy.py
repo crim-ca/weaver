@@ -127,10 +127,10 @@ def _send_request_magpie(request, service, extra_path=None, request_params=None)
 
     pr = urlparse(url)
 
-    secret_nginx = os.getenv('TWITCHER_REDIRECT_SECRET', "Rfns8wpTx5")
+    secret = os.getenv('TWITCHER_REDIRECT_SECRET', "Rfns8wpTx5")
     proxy_twitcher_redirect_host = os.getenv('TWITCHER_REDIRECT_HOSTNAME', pr.hostname)
 
-    proxy_twitcher_redirect_path = os.getenv('TWITCHER_REDIRECT_PATH', '/twitcher/redirect')
+    proxy_twitcher_redirect_path = os.getenv('TWITCHER_REDIRECT_PATH', '/twitchernginx/redirect')
 
     upstream = pr.netloc
     url_path = pr.path
