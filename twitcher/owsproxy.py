@@ -125,87 +125,28 @@ def _send_request_magpie(request, service, extra_path=None, request_params=None)
     if extra_path:
         url += '/' + extra_path
 
-    if service.type == 'thredds':
-        if '/fileServer/' in url:
-            pr = urlparse(url)
+    pr = urlparse(url)
 
-            secret = os.getenv('PROXY_THREDDS_SECRET', "Rfns8wpTx5")
-            proxy_thredds = os.getenv('PROXY_THREDDS_HOSTNAME', pr.hostname)
-            upstream = pr.netloc
-            url_path = pr.path
+    secret_nginx = os.getenv('TWITCHER_REDIRECT_SECRET', "Rfns8wpTx5")
+    proxy_twitcher_redirect_host = os.getenv('TWITCHER_REDIRECT_HOSTNAME', pr.hostname)
 
-            future = datetime.datetime.utcnow() + datetime.timedelta(minutes=1)
-            expiry = calendar.timegm(future.timetuple())
+    proxy_twitcher_redirect_path = os.getenv('TWITCHER_REDIRECT_PATH', '/twitcher/redirect')
 
-            secure_link = "{expiry}{url_path}{upstream} {secret}".format(**locals())
-            hash = hashlib.md5(secure_link).digest()
-            encoded_hash = base64.urlsafe_b64encode(hash).rstrip('=')
+    upstream = pr.netloc
+    url_path = pr.path
+    url_path_with_redirect = proxy_twitcher_redirect_path+url_path
 
-            params = 'filetoken={encoded_hash}&expires={expiry}&upstream={upstream}'.format(**locals())
-            url = 'https://{proxy_thredds}{url_path}?{params}'.format(**locals())
-            return HTTPFound(location=url)
+    future = datetime.datetime.utcnow() + datetime.timedelta(minutes=1)
+    expiry = calendar.timegm(future.timetuple())
 
-    if request_params:
-        url += '?' + request_params
-    LOGGER.debug('url = %s', url)
+    secure_link = "{expiry}{url_path_with_redirect}{upstream} {secret}".format(**locals())
+    hash = hashlib.md5(secure_link).digest()
+    encoded_hash = base64.urlsafe_b64encode(hash).rstrip('=')
 
-        # forward request to target (without Host Header)
-    h = dict(request.headers)
-    h.pop("Host", h)
-    try:
-        resp = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h)
-        #return HTTPTemporaryRedirect(location=url)
-    except Exception, e:
-        return OWSAccessFailed("Request failed: {}".format(e.message))
-
-    if resp.ok is False:
-        if 'ExceptionReport' in resp.content:
-            pass
-        else:
-            return OWSAccessFailed("Response is not ok: {}".format(resp.reason))
-
-    # check for allowed content types
-    ct = None
-    # LOGGER.debug("headers=", resp.headers)
-
-    if "Content-Type" in resp.headers:
-        ct = resp.headers["Content-Type"]
-        if not ct.split(";")[0] in allowed_content_types:
-            msg = "Content type is not allowed: {}.".format(ct)
-            LOGGER.error(msg)
-            return OWSAccessForbidden(msg)
-    else:
-        # return OWSAccessFailed("Could not get content type from response.")
-        LOGGER.warn("Could not get content type from response")
-
-    try:
-        if ct in ['text/xml', 'application/xml', 'text/xml;charset=ISO-8859-1']:
-                # replace urls in xml content
-                proxy_url = request.route_url('owsproxy', service_name=service.resource_name)
-                # TODO: where do i need to replace urls?
-                content = replace_caps_url(resp.content, proxy_url, service.url)
-        else:
-            # raw content
-            content = resp.content
-    except:
-        return OWSAccessFailed("Could not decode content.")
-
-
-    headers = {}
-    content = resp.content
-    if ct:
-        headers["Content-Type"] = ct
-
-    headers = dict(resp.headers)
-    if 'Content-Length' in headers.keys():
-        del headers['Content-Length']
-    if 'Content-Encoding' in headers.keys():
-        del headers['Content-Encoding']
-
-    proxy_response = Response(body=content, status=resp.status_code)
-    proxy_response.headers.update(headers)
-
-    return proxy_response
+    params = 'filetoken={encoded_hash}&expires={expiry}&upstream={upstream}&url_path={url_path}'.format(**locals())
+    params += '&' + request_params
+    url = 'https://{proxy_twitcher_redirect_host}{url_path_with_redirect}?{params}'.format(**locals())
+    return HTTPFound(location=url)
 
 
 def owsproxy_url(request):
