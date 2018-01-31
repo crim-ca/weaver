@@ -27,37 +27,6 @@ import logging
 LOGGER = logging.getLogger(__name__)
 
 
-allowed_content_types = (
-    "application/xml",                       # XML
-    "text/xml",
-    "text/xml;charset=ISO-8859-1"
-    "application/vnd.ogc.se_xml",            # OGC Service Exception
-    "application/vnd.ogc.se+xml",            # OGC Service Exception
-    # "application/vnd.ogc.success+xml",      # OGC Success (SLD Put)
-    "application/vnd.ogc.wms_xml",           # WMS Capabilities
-    # "application/vnd.ogc.gml",              # GML
-    # "application/vnd.ogc.sld+xml",          # SLD
-    "application/vnd.google-earth.kml+xml",  # KML
-    "application/vnd.google-earth.kmz",
-    "image/png",                             # PNG
-    "image/png;mode=32bit",
-    "image/gif",                             # GIF
-    "image/jpeg",                            # JPEG
-    "application/json",                      # JSON
-    "application/json;charset=ISO-8859-1",
-    "text/html",
-    "application/x-netcdf",
-    "text/plain",
-    "application/octet-stream"
-)
-
-# TODO: configure allowed hosts
-allowed_hosts = (
-    # list allowed hosts here (no port limiting)
-    # "localhost",
-)
-
-
 def _send_request(request, service, extra_path=None, request_params=None):
 
     # TODO: fix way to build url
@@ -118,94 +87,31 @@ def _send_request(request, service, extra_path=None, request_params=None):
     return Response(content, status=resp.status_code, headers=headers)
 
 
-
 def _send_request_magpie(request, service, extra_path=None, request_params=None):
 
     url = service.url
     if extra_path:
         url += '/' + extra_path
 
-    if service.type == 'thredds':
-        if '/fileServer/' in url:
-            pr = urlparse(url)
-
-            secret = os.getenv('PROXY_THREDDS_SECRET', "Rfns8wpTx5")
-            proxy_thredds = os.getenv('PROXY_THREDDS_HOSTNAME', pr.hostname)
-            upstream = pr.netloc
-            url_path = pr.path
-
-            future = datetime.datetime.utcnow() + datetime.timedelta(minutes=1)
-            expiry = calendar.timegm(future.timetuple())
-
-            secure_link = "{expiry}{url_path}{upstream} {secret}".format(**locals())
-            hash = hashlib.md5(secure_link).digest()
-            encoded_hash = base64.urlsafe_b64encode(hash).rstrip('=')
-
-            params = 'filetoken={encoded_hash}&expires={expiry}&upstream={upstream}'.format(**locals())
-            url = 'https://{proxy_thredds}{url_path}?{params}'.format(**locals())
-            return HTTPFound(location=url)
-
     if request_params:
         url += '?' + request_params
+
     LOGGER.debug('url = %s', url)
 
-        # forward request to target (without Host Header)
+    # forward request to target (without Host Header and by forcing no encoding)
     h = dict(request.headers)
     h.pop("Host", h)
+    h['Accept-Encoding'] = None
+
     try:
-        resp = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h)
-        #return HTTPTemporaryRedirect(location=url)
-    except Exception, e:
+        resp_iter = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h, stream=True)
+    except Exception as e:
         return OWSAccessFailed("Request failed: {}".format(e.message))
 
-    if resp.ok is False:
-        if 'ExceptionReport' in resp.content:
-            pass
-        else:
-            return OWSAccessFailed("Response is not ok: {}".format(resp.reason))
-
-    # check for allowed content types
-    ct = None
-    # LOGGER.debug("headers=", resp.headers)
-
-    if "Content-Type" in resp.headers:
-        ct = resp.headers["Content-Type"]
-        if not ct.split(";")[0] in allowed_content_types:
-            msg = "Content type is not allowed: {}.".format(ct)
-            LOGGER.error(msg)
-            return OWSAccessForbidden(msg)
-    else:
-        # return OWSAccessFailed("Could not get content type from response.")
-        LOGGER.warn("Could not get content type from response")
-
-    try:
-        if ct in ['text/xml', 'application/xml', 'text/xml;charset=ISO-8859-1']:
-                # replace urls in xml content
-                proxy_url = request.route_url('owsproxy', service_name=service.resource_name)
-                # TODO: where do i need to replace urls?
-                content = replace_caps_url(resp.content, proxy_url, service.url)
-        else:
-            # raw content
-            content = resp.content
-    except:
-        return OWSAccessFailed("Could not decode content.")
-
-
-    headers = {}
-    content = resp.content
-    if ct:
-        headers["Content-Type"] = ct
-
-    headers = dict(resp.headers)
-    if 'Content-Length' in headers.keys():
-        del headers['Content-Length']
-    if 'Content-Encoding' in headers.keys():
-        del headers['Content-Encoding']
-
-    proxy_response = Response(body=content, status=resp.status_code)
-    proxy_response.headers.update(headers)
-
-    return proxy_response
+    #Headers meaningful only for a single transport-level connection
+    HopbyHop = ['Connection', 'Keep-Alive', 'Public', 'Proxy-Authenticate', 'Transfer-Encoding', 'Upgrade']
+    return Response(app_iter=resp_iter,
+                    headers={k: v for k, v in resp_iter.headers.iteritems() if k not in HopbyHop})
 
 
 def owsproxy_url(request):
