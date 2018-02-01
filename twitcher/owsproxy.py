@@ -27,6 +27,14 @@ import logging
 LOGGER = logging.getLogger(__name__)
 
 
+# requests.models.Reponse defaults its chunk size to 128 bytes, which is very slow
+class BufferedResponse():
+    def __init__(self, resp):
+        self.resp=resp
+
+    def __iter__(self):
+        return self.resp.iter_content(64*1024)
+
 def _send_request(request, service, extra_path=None, request_params=None):
 
     # TODO: fix way to build url
@@ -110,7 +118,7 @@ def _send_request_magpie(request, service, extra_path=None, request_params=None)
 
     #Headers meaningful only for a single transport-level connection
     HopbyHop = ['Connection', 'Keep-Alive', 'Public', 'Proxy-Authenticate', 'Transfer-Encoding', 'Upgrade']
-    return Response(app_iter=resp_iter,
+    return Response(app_iter=BufferedResponse(resp_iter),
                     headers={k: v for k, v in resp_iter.headers.iteritems() if k not in HopbyHop})
 
 
