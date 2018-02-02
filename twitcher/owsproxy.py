@@ -27,36 +27,13 @@ import logging
 LOGGER = logging.getLogger(__name__)
 
 
-allowed_content_types = (
-    "application/xml",                       # XML
-    "text/xml",
-    "text/xml;charset=ISO-8859-1"
-    "application/vnd.ogc.se_xml",            # OGC Service Exception
-    "application/vnd.ogc.se+xml",            # OGC Service Exception
-    # "application/vnd.ogc.success+xml",      # OGC Success (SLD Put)
-    "application/vnd.ogc.wms_xml",           # WMS Capabilities
-    # "application/vnd.ogc.gml",              # GML
-    # "application/vnd.ogc.sld+xml",          # SLD
-    "application/vnd.google-earth.kml+xml",  # KML
-    "application/vnd.google-earth.kmz",
-    "image/png",                             # PNG
-    "image/png;mode=32bit",
-    "image/gif",                             # GIF
-    "image/jpeg",                            # JPEG
-    "application/json",                      # JSON
-    "application/json;charset=ISO-8859-1",
-    "text/html",
-    "application/x-netcdf",
-    "text/plain",
-    "application/octet-stream"
-)
+# requests.models.Reponse defaults its chunk size to 128 bytes, which is very slow
+class BufferedResponse():
+    def __init__(self, resp):
+        self.resp=resp
 
-# TODO: configure allowed hosts
-allowed_hosts = (
-    # list allowed hosts here (no port limiting)
-    # "localhost",
-)
-
+    def __iter__(self):
+        return self.resp.iter_content(64*1024)
 
 def _send_request(request, service, extra_path=None, request_params=None):
 
@@ -118,35 +95,31 @@ def _send_request(request, service, extra_path=None, request_params=None):
     return Response(content, status=resp.status_code, headers=headers)
 
 
-
 def _send_request_magpie(request, service, extra_path=None, request_params=None):
 
     url = service.url
     if extra_path:
         url += '/' + extra_path
 
-    pr = urlparse(url)
+    if request_params:
+        url += '?' + request_params
 
-    secret = os.getenv('TWITCHER_REDIRECT_SECRET', "Rfns8wpTx5")
-    proxy_twitcher_redirect_host = os.getenv('TWITCHER_REDIRECT_HOSTNAME', pr.hostname)
+    LOGGER.debug('url = %s', url)
 
-    proxy_twitcher_redirect_path = os.getenv('TWITCHER_REDIRECT_PATH', '/twitchernginx/redirect')
+    # forward request to target (without Host Header and by forcing no encoding)
+    h = dict(request.headers)
+    h.pop("Host", h)
+    h['Accept-Encoding'] = None
 
-    upstream = pr.netloc
-    url_path = pr.path
-    url_path_with_redirect = proxy_twitcher_redirect_path+url_path
+    try:
+        resp_iter = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h, stream=True)
+    except Exception as e:
+        return OWSAccessFailed("Request failed: {}".format(e.message))
 
-    future = datetime.datetime.utcnow() + datetime.timedelta(minutes=1)
-    expiry = calendar.timegm(future.timetuple())
-
-    secure_link = "{expiry}{url_path_with_redirect}{upstream} {secret}".format(**locals())
-    hash = hashlib.md5(secure_link).digest()
-    encoded_hash = base64.urlsafe_b64encode(hash).rstrip('=')
-
-    params = 'filetoken={encoded_hash}&expires={expiry}&upstream={upstream}&url_path={url_path}'.format(**locals())
-    params += '&' + request_params
-    url = 'https://{proxy_twitcher_redirect_host}{url_path_with_redirect}?{params}'.format(**locals())
-    return HTTPFound(location=url)
+    #Headers meaningful only for a single transport-level connection
+    HopbyHop = ['Connection', 'Keep-Alive', 'Public', 'Proxy-Authenticate', 'Transfer-Encoding', 'Upgrade']
+    return Response(app_iter=BufferedResponse(resp_iter),
+                    headers={k: v for k, v in resp_iter.headers.iteritems() if k not in HopbyHop})
 
 
 def owsproxy_url(request):
