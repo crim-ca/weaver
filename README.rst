@@ -1,10 +1,23 @@
 =====================================
-Twitcher: A simple OWS Security Proxy 
+Twitcher: A simple OWS Security Proxy
 =====================================
+
+.. image:: https://img.shields.io/badge/docs-latest-brightgreen.svg
+   :target: http://twitcher.readthedocs.io/en/latest/?badge=latest
+   :alt: Documentation Status
 
 .. image:: https://travis-ci.org/bird-house/twitcher.svg?branch=master
    :target: https://travis-ci.org/bird-house/twitcher
    :alt: Travis Build
+
+.. image:: https://img.shields.io/github/license/bird-house/twitcher.svg
+   :target: https://github.com/bird-house/twitcher/blob/master/LICENSE.txt
+   :alt: GitHub license
+
+.. image:: https://badges.gitter.im/bird-house/birdhouse.svg
+   :target: https://gitter.im/bird-house/birdhouse?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
+   :alt: Join the chat at https://gitter.im/bird-house/birdhouse
+
 
 Twitcher (the bird-watcher)
   *a birdwatcher mainly interested in catching sight of rare birds.* (`Leo <https://dict.leo.org/ende/index_en.html>`_).

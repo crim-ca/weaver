@@ -1,15 +1,13 @@
 language: python
-branches:
-  only:
-    - pingudev
-    - develop
-    - master
+# branches:
+#  only:
+#    - master
 os:
   - linux
 #  - osx
 python:
   - "2.7"
-sudo: false 
+sudo: false
 install:
   - make install
   - make start

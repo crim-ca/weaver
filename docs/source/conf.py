@@ -23,7 +23,7 @@ import shlex
 # -- General configuration ------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
-needs_sphinx = '1.3'
+needs_sphinx = '1.6'
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
@@ -33,6 +33,8 @@ extensions = [
     'sphinx.ext.intersphinx',
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',
+    'sphinx.ext.napoleon',
+    'pywps.ext_autodoc',
 ]
 
 autoapi_type = 'python'
@@ -56,7 +58,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'twitcher'
-copyright = u'2015, Birdhouse'
+copyright = u'2018, Birdhouse'
 author = u'Birdhouse'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -117,18 +119,7 @@ todo_include_todos = True
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-#html_theme = 'alabaster'
-
-# on_rtd is whether we are on readthedocs.org, this line of code grabbed from docs.readthedocs.org
-# http://docs.readthedocs.org/en/latest/faq.html?highlight=autodoc#how-do-i-change-behavior-for-read-the-docs
-on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
-
-if on_rtd:
-    html_theme = 'default'
-else:  # only import and set the theme if we're building docs locally
-    import sphinx_rtd_theme
-    html_theme = 'sphinx_rtd_theme'
-    html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+html_theme = 'alabaster'
 
 # otherwise, readthedocs.org uses their theme by default, so no need to specify it
 
@@ -322,8 +313,8 @@ intersphinx_mapping = {'python': ('http://docs.python.org/', None),
 
 # linkcheck options
 # http://www.sphinx-doc.org/en/stable/config.html?highlight=linkchecker#options-for-the-linkcheck-builder
-linkcheck_ignore = [r'http[s]*://localhost.*/', 'https://mouflon.dkrz.de/', 'https://esgf-data.dkrz.de/']
-linkcheck_timeout = 5
+linkcheck_ignore = [r'http[s]*://localhost.*/', 'https://mouflon.dkrz.de/', 'https://esgf-data.dkrz.de/', 'https://indico.egi.eu/']
+linkcheck_timeout = 15
 
 # Link references always present on RST page.
 rst_epilog = """
@@ -331,7 +322,7 @@ rst_epilog = """
 .. _reStructuredText: http://sphinx-doc.org/rest.html
 .. _Read the Docs: https://readthedocs.org
 .. _Anaconda: https://www.continuum.io/
-.. _Buildout: http://www.buildout.org/en/latest/ 
+.. _Buildout: http://www.buildout.org/en/latest/
 .. _Birdhouse: http://birdhouse.readthedocs.io/en/latest/
 .. _Phoenix: http://pyramid-phoenix.readthedocs.io/en/latest/
 .. _Malleefowl: http://malleefowl.readthedocs.io/en/latest/
@@ -346,4 +337,3 @@ rst_epilog = """
 .. _dispel4py: https://github.com/dispel4py/dispel4py
 .. _esgf-pyclient: https://github.com/ESGF/esgf-pyclient
 """
-
