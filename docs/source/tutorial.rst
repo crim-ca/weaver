@@ -86,7 +86,7 @@ There are three ways how you can provide the access token:
 
 .. code-block:: sh
 
-   $ curl -k -H Access-Token:abc123 "https://localhost:5000/ows/wps?service=wps&request=execute&identifier=dummyprocess&version=1.0.0&datainputs=name=tux"
+   $ curl -k -H Access-Token:abc123 "https://localhost:5000/ows/wps?service=wps&request=execute&identifier=hello&version=1.0.0&datainputs=name=tux"
 
 
 Change the default WPS configuration

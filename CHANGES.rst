@@ -1,6 +1,18 @@
 Changes
 *******
 
+0.3.5 (2018-03-01)
+==================
+
+* pep8
+* updated makefile
+* updated buildout recipes
+* fixed nginx dependency
+* updated mongodb 3.4
+* configured csrf in xmlrpc
+* fixed tutorial example
+* added readthedocs, licence and chat badges
+
 0.3.4 (2017-05-05)
 ==================
 
@@ -120,4 +132,3 @@ Bugfixes:
 ==================
 
 Initial Release.
-

@@ -1,6 +1,8 @@
 [buildout]
 extends = buildout.cfg
 
+# versions = noversions
+
 [settings]
 hostname = localhost
 http-port = 8083
@@ -14,3 +16,5 @@ ows-proxy = true
 rpcinterface = true
 wps = true
 wps-cfg =
+
+[noversions]
