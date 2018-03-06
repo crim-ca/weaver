@@ -1,0 +1,10 @@
+# test
+pytest
+mock
+WebTest
+flake8
+# sphinx
+sphinx>=1.3
+sphinx-autoapi
+# internal WPS
+pywps>=4.0.0

@@ -1,7 +1,7 @@
 name: twitcher
 channels:
-- defaults
 - birdhouse
+- defaults
 - conda-forge
 dependencies:
 - python=2.7
@@ -17,11 +17,8 @@ dependencies:
 - mock
 - pbr
 - webtest
-# ipython
-- ipython
 # sphinx
 - sphinx
-- sphinx_rtd_theme
 # twitcher
 - argcomplete
 - lxml=3.7
@@ -35,8 +32,8 @@ dependencies:
 - pywps=4.0.0
 # nginx, supervisor
 - nginx=1.10
-- supervisor=3.3.1
-- gunicorn=19.1.0
+- supervisor=3
+- gunicorn=19
 - gevent=1.2
 # mongodb
 - pymongo=3

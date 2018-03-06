@@ -23,11 +23,12 @@ __pycache__
 # Unit test / Coverage reports
 .cache
 .coverage
+.pytest_cache
 .tox
 nosetests.xml
 unit_tests/testdata.json
 
-# R 
+# R
 *.Rhistory
 
 # Eclipse / PyDev
@@ -82,4 +83,6 @@ testdata.json
 *.mod
 *.out
 
-
+# snappy
+esa-snap_sentinel_unix_6_0.sh
+response.varfile

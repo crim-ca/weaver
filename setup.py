@@ -7,7 +7,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README.rst')).read()
 CHANGES = open(os.path.join(here, 'CHANGES.rst')).read()
 
-reqs = [line.strip() for line in open('requirements/deploy.txt')]
+reqs = [line.strip() for line in open('requirements.txt')]
 
 setup(name='pyramid_twitcher',
       version=version,
