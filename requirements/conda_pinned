@@ -1,3 +1,0 @@
-# http://conda.pydata.org/docs/spec.html#package-match-specifications
-python <3
-mongodb 2.6.*|3.3.9
