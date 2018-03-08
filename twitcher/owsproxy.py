@@ -47,6 +47,13 @@ allowed_hosts = (
     # "localhost",
 )
 
+# requests.models.Reponse defaults its chunk size to 128 bytes, which is very slow
+class BufferedResponse():
+    def __init__(self, resp):
+        self.resp = resp
+
+    def __iter__(self):
+        return self.resp.iter_content(64*1024)
 
 def _send_request(request, service, extra_path=None, request_params=None):
 
@@ -61,46 +68,62 @@ def _send_request(request, service, extra_path=None, request_params=None):
     # forward request to target (without Host Header)
     h = dict(request.headers)
     h.pop("Host", h)
-    try:
-        resp = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h)
-    except Exception, e:
-        return OWSAccessFailed("Request failed: {}".format(e.message))
+    h['Accept-Encoding'] = None
 
-    if resp.ok is False:
-        if 'ExceptionReport' in resp.content:
-            pass
-        else:
-            return OWSAccessFailed("Response is not ok: {}".format(resp.reason))
+    #
+    service_type = service['type']
+    if service_type and (service_type.lower() != 'wps'):
+        try:
+            resp_iter = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h,
+                                         stream=True)
+        except Exception as e:
+            return OWSAccessFailed("Request failed: {}".format(e.message))
 
-    # check for allowed content types
-    ct = None
-    # LOGGER.debug("headers=", resp.headers)
-    if "Content-Type" in resp.headers:
-        ct = resp.headers["Content-Type"]
-        if not ct.split(";")[0] in allowed_content_types:
-            msg = "Content type is not allowed: {}.".format(ct)
-            LOGGER.error(msg)
-            return OWSAccessForbidden(msg)
+        # Headers meaningful only for a single transport-level connection
+        HopbyHop = ['Connection', 'Keep-Alive', 'Public', 'Proxy-Authenticate', 'Transfer-Encoding', 'Upgrade']
+        return Response(app_iter=BufferedResponse(resp_iter),
+                        headers={k: v for k, v in resp_iter.headers.iteritems() if k not in HopbyHop})
     else:
-        # return OWSAccessFailed("Could not get content type from response.")
-        LOGGER.warn("Could not get content type from response")
+        try:
+            resp = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h)
+        except Exception, e:
+            return OWSAccessFailed("Request failed: {}".format(e.message))
 
-    try:
-        if ct in ['text/xml', 'application/xml', 'text/xml;charset=ISO-8859-1']:
+        if resp.ok is False:
+            if 'ExceptionReport' in resp.content:
+                pass
+            else:
+                return OWSAccessFailed("Response is not ok: {}".format(resp.reason))
+
+        # check for allowed content types
+        ct = None
+        # LOGGER.debug("headers=", resp.headers)
+        if "Content-Type" in resp.headers:
+            ct = resp.headers["Content-Type"]
+            if not ct.split(";")[0] in allowed_content_types:
+                msg = "Content type is not allowed: {}.".format(ct)
+                LOGGER.error(msg)
+                return OWSAccessForbidden(msg)
+        else:
+            # return OWSAccessFailed("Could not get content type from response.")
+            LOGGER.warn("Could not get content type from response")
+
+        try:
+            if ct in ['text/xml', 'application/xml', 'text/xml;charset=ISO-8859-1']:
                 # replace urls in xml content
                 proxy_url = request.route_url('owsproxy', service_name=service['name'])
                 # TODO: where do i need to replace urls?
                 content = replace_caps_url(resp.content, proxy_url, service.get('url'))
-        else:
-            # raw content
-            content = resp.content
-    except Exception:
-        return OWSAccessFailed("Could not decode content.")
+            else:
+                # raw content
+                content = resp.content
+        except Exception:
+            return OWSAccessFailed("Could not decode content.")
 
-    headers = {}
-    if ct:
-        headers["Content-Type"] = ct
-    return Response(content, status=resp.status_code, headers=headers)
+        headers = {}
+        if ct:
+            headers["Content-Type"] = ct
+        return Response(content, status=resp.status_code, headers=headers)
 
 
 def owsproxy_url(request):
@@ -108,11 +131,12 @@ def owsproxy_url(request):
     if url is None:
         return OWSAccessFailed("URL param is missing.")
 
+    service_type = request.GET.get('service', 'wps') or request.GET.get('SERVICE', 'wps')
     # check for full url
     parsed_url = urlparse(url)
     if not parsed_url.netloc or parsed_url.scheme not in ("http", "https"):
         return OWSAccessFailed("Not a valid URL.")
-    return _send_request(request, service=dict(url=url, name='external'))
+    return _send_request(request, service=dict(url=url, name='external', service_type=service_type))
 
 
 def owsproxy(request):
@@ -128,7 +152,6 @@ def owsproxy(request):
         return OWSAccessFailed("Could not find service: {}.".format(err.message))
     else:
         return _send_request(request, service, extra_path, request_params=urllib.urlencode(request.params))
-
 
 def owsproxy_delegate(request):
     """
@@ -158,7 +181,7 @@ def includeme(config):
 
         config.add_route('owsproxy', '/ows/proxy/{service_name}')
         # TODO: maybe configure extra path
-        # config.add_route('owsproxy_extra', '/ows/proxy/{service_name}/{extra_path:.*}')
+        config.add_route('owsproxy_extra', '/ows/proxy/{service_name}/{extra_path:.*}')
         config.add_route('owsproxy_secured', '/ows/proxy/{service_name}/{access_token}')
 
         # use delegation mode?
@@ -173,6 +196,7 @@ def includeme(config):
             config.include('twitcher.db')
             config.add_view(owsproxy, route_name='owsproxy')
             config.add_view(owsproxy, route_name='owsproxy_secured')
+            config.add_view(owsproxy, route_name='owsproxy_extra')
         # use /owsproxy?
         if asbool(settings.get('twitcher.ows_proxy_url', True)):
             LOGGER.debug('Twitcher /owsproxy enabled.')
