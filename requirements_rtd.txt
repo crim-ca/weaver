@@ -1,0 +1,3 @@
+# sphinx
+sphinx>=1.3
+sphinx-autoapi
