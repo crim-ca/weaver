@@ -2,7 +2,7 @@ import pytest
 import unittest
 import mock
 
-from pyramid.testing import DummyRequest
+from pyramid.testing import DummyRequest, testConfig
 
 from twitcher.datatype import AccessToken
 from twitcher.datatype import Service

@@ -41,4 +41,4 @@ dependencies:
 - pip:
   - genshi==0.7
   - pyramid-rpc
-  - sphinx-autoapi==0.4.0
+  - sphinx-autoapi

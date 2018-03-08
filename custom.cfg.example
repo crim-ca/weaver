@@ -1,20 +1,10 @@
 [buildout]
 extends = buildout.cfg
 
+## Development options
 # versions = noversions
 
 [settings]
 hostname = localhost
-http-port = 8083
 https-port = 5000
 log-level = WARN
-username =
-password =
-workdir =
-ows-security = true
-ows-proxy = true
-rpcinterface = true
-wps = true
-wps-cfg =
-
-[noversions]
