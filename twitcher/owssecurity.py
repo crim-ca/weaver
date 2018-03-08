@@ -21,6 +21,11 @@ def owssecurity_factory(registry):
     return OWSSecurity(tokenstore_factory(registry), servicestore_factory(registry))
 
 
+def verify_cert(request):
+    if not request.headers.get('X-Ssl-Client-Verify', '') == 'SUCCESS':
+        raise OWSAccessForbidden("A valid X.509 client certificate is needed.")
+
+
 class OWSSecurity(object):
 
     def __init__(self, tokenstore, servicestore):
@@ -54,7 +59,7 @@ class OWSSecurity(object):
         # TODO: public service access handling is confusing.
         try:
             if service.auth == 'cert':
-                self._verify_cert(request)
+                verify_cert(request)
             else:  # token
                 self._verify_access_token(request)
         except OWSAccessForbidden:
@@ -74,11 +79,6 @@ class OWSSecurity(object):
             request = self.prepare_headers(request, access_token)
         except AccessTokenNotFound:
             raise OWSAccessForbidden("Access token is required to access this service.")
-
-    def _verify_cert(self, request):
-        # LOGGER.debug('+++ request headers=%s', request.headers.keys())
-        if not request.headers.get('X-Ssl-Client-Verify', '') == 'SUCCESS':
-            raise OWSAccessForbidden("A valid X.509 client certificate is needed.")
 
     def check_request(self, request):
         if request.path.startswith(protected_path):
