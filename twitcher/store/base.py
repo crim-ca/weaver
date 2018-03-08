@@ -51,7 +51,7 @@ class ServiceStore(object):
 
     def save_service(self, service, overwrite=True):
         """
-        Stores an OWS service with given name in storage.
+        Stores an OWS service in storage.
 
         :param service: An instance of :class:`twitcher.datatype.Service`.
         """

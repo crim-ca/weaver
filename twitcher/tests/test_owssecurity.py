@@ -2,7 +2,7 @@ import pytest
 import unittest
 import mock
 
-from pyramid.testing import DummyRequest
+from pyramid.testing import DummyRequest, testConfig
 
 from twitcher.datatype import AccessToken
 from twitcher.datatype import Service
@@ -47,17 +47,19 @@ class OWSSecurityTestCase(unittest.TestCase):
         assert token == "54321"
 
     def test_check_request(self):
-        params = dict(request="Execute", service="WPS", version="1.0.0", token="cdefg")
-        request = DummyRequest(params=params, path='/ows/proxy/emu')
-        self.security.check_request(request)
+        with testConfig() as config:
+            params = dict(request="Execute", service="WPS", version="1.0.0", token="cdefg")
+            request = DummyRequest(params=params, path='/ows/proxy/emu')
+            self.security.check_request(request)
 
     def test_check_request_invalid(self):
-        security = OWSSecurity(tokenstore=self.empty_tokenstore, servicestore=self.servicestore)
+        with testConfig() as config:
+            security = OWSSecurity(tokenstore=self.empty_tokenstore, servicestore=self.servicestore)
 
-        params = dict(request="Execute", service="WPS", version="1.0.0", token="xyz")
-        request = DummyRequest(params=params, path='/ows/proxy/emu')
-        with pytest.raises(OWSAccessForbidden) as e_info:
-            security.check_request(request)
+            params = dict(request="Execute", service="WPS", version="1.0.0", token="xyz")
+            request = DummyRequest(params=params, path='/ows/proxy/emu')
+            with pytest.raises(OWSAccessForbidden) as e_info:
+                security.check_request(request)
 
     def test_check_request_allowed_caps(self):
         security = OWSSecurity(tokenstore=self.empty_tokenstore, servicestore=self.servicestore)
@@ -74,11 +76,12 @@ class OWSSecurityTestCase(unittest.TestCase):
         security.check_request(request)
 
     def test_check_request_public_access(self):
-        servicestore = MemoryServiceStore()
-        servicestore.save_service(Service(
-            url='http://nowhere/wps', name='test_wps', public=True))
-        security = OWSSecurity(tokenstore=self.tokenstore, servicestore=servicestore)
+        with testConfig() as config:
+            servicestore = MemoryServiceStore()
+            servicestore.save_service(Service(
+                url='http://nowhere/wps', name='test_wps', public=True))
+            security = OWSSecurity(tokenstore=self.tokenstore, servicestore=servicestore)
 
-        params = dict(request="Execute", service="WPS", version="1.0.0", token="cdefg")
-        request = DummyRequest(params=params, path='/ows/proxy/emu')
-        security.check_request(request)
+            params = dict(request="Execute", service="WPS", version="1.0.0", token="cdefg")
+            request = DummyRequest(params=params, path='/ows/proxy/emu')
+            security.check_request(request)

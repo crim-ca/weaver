@@ -1,6 +1,18 @@
 Changes
 *******
 
+current
+=======
+
+* pep8
+* removed unused ``c4i`` option.
+* added ``auth`` option to set authentication method.
+* updated docs for usage of x509 certificates.
+
+New Features:
+
+* Feature #25: using x509 certificates for service authentication.
+
 0.3.5 (2018-03-01)
 ==================
 

@@ -335,5 +335,4 @@ rst_epilog = """
 .. _icclim: http://icclim.readthedocs.io/en/latest/
 .. _PyWPS: http://pywps.org/
 .. _dispel4py: https://github.com/dispel4py/dispel4py
-.. _esgf-pyclient: https://github.com/ESGF/esgf-pyclient
 """

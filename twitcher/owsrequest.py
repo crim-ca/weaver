@@ -44,6 +44,7 @@ class OWSRequest(object):
 
     @property
     def request(self):
+        # TODO: same name for service request and HTTP request is confusing.
         return self.parser.params['request']
 
     @property

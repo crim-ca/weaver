@@ -14,9 +14,9 @@ install:
 before_script:
   - sleep 5
 script:
-#  - make docs
   - make testall
   - make pep8
+  - make docs
 #after_success:
 # - coveralls
 matrix:
