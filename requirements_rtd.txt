@@ -1,3 +1,4 @@
 # sphinx
 sphinx>=1.3
 sphinx-autoapi
+-e git+https://github.com/huard/sphinx-autodoc-pywps.git#egg=sphinx_autodoc_pywps
