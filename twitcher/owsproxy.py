@@ -47,13 +47,15 @@ allowed_hosts = (
     # "localhost",
 )
 
+
 # requests.models.Reponse defaults its chunk size to 128 bytes, which is very slow
 class BufferedResponse():
     def __init__(self, resp):
         self.resp = resp
 
     def __iter__(self):
-        return self.resp.iter_content(64*1024)
+        return self.resp.iter_content(64 * 1024)
+
 
 def _send_request(request, service, extra_path=None, request_params=None):
 
@@ -152,6 +154,7 @@ def owsproxy(request):
         return OWSAccessFailed("Could not find service: {}.".format(err.message))
     else:
         return _send_request(request, service, extra_path, request_params=urllib.urlencode(request.params))
+
 
 def owsproxy_delegate(request):
     """
