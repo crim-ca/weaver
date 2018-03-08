@@ -34,7 +34,8 @@ extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',
     'sphinx.ext.napoleon',
-    'sphinx_autodoc_pywps',
+    # TODO: enable pywps extension
+    # 'sphinx_autodoc_pywps',
 ]
 
 autoapi_type = 'python'
