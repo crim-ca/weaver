@@ -39,6 +39,7 @@ Twitcher is a **prototype** implemented in Python with the `Pyramid`_ web framew
 
 Twitcher is part of the `Birdhouse`_ project. The documentation is on `ReadTheDocs`_.
 
+.. _Birdhouse: http://birdhouse.readthedocs.io/en/latest/
 .. _Pyramid: http://www.pylonsproject.org
 .. _ReadTheDocs: http://twitcher.readthedocs.io/en/latest/
 .. _Magpie: https://github.com/Ouranosinc/Magpie

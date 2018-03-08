@@ -323,7 +323,6 @@ rst_epilog = """
 .. _Read the Docs: https://readthedocs.org
 .. _Anaconda: https://www.continuum.io/
 .. _Buildout: http://www.buildout.org/en/latest/
-.. _Birdhouse: http://birdhouse.readthedocs.io/en/latest/
 .. _Phoenix: http://pyramid-phoenix.readthedocs.io/en/latest/
 .. _Malleefowl: http://malleefowl.readthedocs.io/en/latest/
 .. _Twitcher: http://twitcher.readthedocs.io/en/latest/
