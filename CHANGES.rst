@@ -1,8 +1,8 @@
 Changes
 *******
 
-current
-=======
+0.3.6 (2018-03-08)
+==================
 
 * pep8
 * removed unused ``c4i`` option.
