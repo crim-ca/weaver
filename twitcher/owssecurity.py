@@ -14,10 +14,7 @@ from twitcher.datatype import Service
 
 import logging
 LOGGER = logging.getLogger("TWITCHER")
-
-
-protected_path = '/ows/proxy/'
-
+protected_path = '/ows/proxy'
 
 def owssecurity_factory(registry):
     if registry.settings.get('twitcher.auth', None) == 'magpie':
