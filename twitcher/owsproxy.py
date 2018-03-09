@@ -122,7 +122,7 @@ def owsproxy(request):
     try:
         service_name = request.matchdict.get('service_name')
         extra_path = request.matchdict.get('extra_path')
-        store = servicestore_factory(request.registry)
+        store = servicestore_factory(request.registry, database='postgres', db_session=request.db)
         service = store.fetch_by_name(service_name)
     except Exception as err:
         return OWSAccessFailed("Could not find service: {}.".format(err.message))
@@ -152,13 +152,13 @@ def owsproxy_delegate(request):
 
 def includeme(config):
     settings = config.registry.settings
-
+    auth_method = settings.get('twitcher.auth', None)
     if asbool(settings.get('twitcher.ows_proxy', True)):
         LOGGER.debug('Twitcher /ows/proxy enabled.')
 
         config.add_route('owsproxy', '/ows/proxy/{service_name}')
         # TODO: maybe configure extra path
-        # config.add_route('owsproxy_extra', '/ows/proxy/{service_name}/{extra_path:.*}')
+        config.add_route('owsproxy_extra', '/ows/proxy/{service_name}/{extra_path:.*}')
         config.add_route('owsproxy_secured', '/ows/proxy/{service_name}/{access_token}')
 
         # use delegation mode?
@@ -170,9 +170,14 @@ def includeme(config):
             # include twitcher config
             config.include('twitcher.config')
             # include mongodb
-            config.include('twitcher.db')
+            if auth_method == 'magpie':
+                config.include('twitcher.postgresdb')
+            else:
+                config.include('twitcher.db')
+            # include postgresdb
             config.add_view(owsproxy, route_name='owsproxy')
             config.add_view(owsproxy, route_name='owsproxy_secured')
+            config.add_view(owsproxy, route_name='owsproxy_extra')
         # use /owsproxy?
         if asbool(settings.get('twitcher.ows_proxy_url', True)):
             LOGGER.debug('Twitcher /owsproxy enabled.')

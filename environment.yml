@@ -42,4 +42,3 @@ dependencies:
   - genshi==0.7
   - pyramid-rpc
   - sphinx-autoapi
-  - -e git+https://github.com/huard/sphinx-autodoc-pywps.git#egg=sphinx_autodoc_pywps

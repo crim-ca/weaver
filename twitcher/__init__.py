@@ -8,13 +8,17 @@ def main(global_config, **settings):
     from pyramid.config import Configurator
 
     config = Configurator(settings=settings)
-
+    auth_method = config.get_settings().get('twitcher.auth', None)
     # include twitcher components
     config.include('twitcher.config')
     config.include('twitcher.frontpage')
-    config.include('twitcher.rpcinterface')
     config.include('twitcher.owsproxy')
     config.include('twitcher.wps')
+    if not auth_method:
+        config.include('twitcher.rpcinterface')
+    if auth_method == 'magpie':
+        config.include('twitcher.magpieconfig')
+
 
     # tweens/middleware
     # TODO: maybe add tween for exception handling or use unknown_failure view
