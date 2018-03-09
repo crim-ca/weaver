@@ -1,6 +1,13 @@
 Changes
 *******
 
+current
+=======
+
+New Features:
+
+* Feature #28: use request upstream when not using wps (e.g download file through thredds).
+
 0.3.6 (2018-03-08)
 ==================
 
