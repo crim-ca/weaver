@@ -24,6 +24,8 @@ def parse_service_name(url, protected_path):
     service_name = None
     if parsed_url.path.startswith(protected_path):
         parts_without_protected_path = parsed_url.path[len(protected_path)::].strip('/').split('/')
+        if 'proxy' in parts_without_protected_path:
+            parts_without_protected_path.remove('proxy')
         if len(parts_without_protected_path) > 0:
             service_name = parts_without_protected_path[0]
     if not service_name:
