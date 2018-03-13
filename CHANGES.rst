@@ -1,8 +1,12 @@
 Changes
 *******
 
-current
-=======
+0.3.7 (2018-03-13)
+==================
+
+Fixes:
+
+* fixed exclude filter in MANIFEST.in.
 
 New Features:
 
