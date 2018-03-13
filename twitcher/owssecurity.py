@@ -14,8 +14,6 @@ from twitcher.datatype import Service
 import logging
 LOGGER = logging.getLogger("TWITCHER")
 
-protected_path = '/ows/'
-
 
 def owssecurity_factory(registry):
     return OWSSecurity(tokenstore_factory(registry), servicestore_factory(registry))
@@ -81,10 +79,11 @@ class OWSSecurity(object):
             raise OWSAccessForbidden("Access token is required to access this service.")
 
     def check_request(self, request):
+        protected_path = request.registry.settings.get('twitcher.ows_proxy_protected_path ', '/ows/proxy')
         if request.path.startswith(protected_path):
             # TODO: refactor this code
             try:
-                service_name = parse_service_name(request.path)
+                service_name = parse_service_name(request.path, protected_path)
                 service = self.servicestore.fetch_by_name(service_name)
                 if service.public is True:
                     LOGGER.warn('public access for service %s', service_name)
