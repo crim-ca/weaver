@@ -183,10 +183,10 @@ def includeme(config):
     if asbool(settings.get('twitcher.ows_proxy', True)):
         LOGGER.debug('Twitcher {}/proxy enabled.'.format(protected_path))
 
-        config.add_route('owsproxy', protected_path+'/proxy/{service_name}')
+        config.add_route('owsproxy', protected_path + '/proxy/{service_name}')
         # TODO: maybe configure extra path
-        config.add_route('owsproxy_extra', protected_path+'/proxy/{service_name}/{extra_path:.*}')
-        config.add_route('owsproxy_secured', protected_path+'/proxy/{service_name}/{access_token}')
+        config.add_route('owsproxy_extra', protected_path + '/proxy/{service_name}/{extra_path:.*}')
+        config.add_route('owsproxy_secured', protected_path + '/proxy/{service_name}/{access_token}')
 
         # use delegation mode?
         if asbool(settings.get('twitcher.ows_proxy_delegate', False)):
