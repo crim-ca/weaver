@@ -56,7 +56,7 @@ ENV DAEMON_OPTS --nodaemon
 WORKDIR /
 RUN git clone https://github.com/ouranosinc/magpie && \
     cd magpie && \
-    git checkout tags/0.4.3 && \
+    git checkout tags/0.5.3 && \
     cd .. && \
     ./opt/conda/envs/twitcher/bin/pip install -r magpie/requirements.txt && \
     ./opt/conda/envs/twitcher/bin/pip install ./magpie

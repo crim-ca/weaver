@@ -178,12 +178,12 @@ def owsproxy_magpie(request):
         from magpie.models import Service
         service = Service.by_service_name(service_name, db_session=request.db)
 
-
     except Exception as err:
         return OWSAccessFailed("Could not find service: {}.".format(err.message))
     else:
         return _send_request_magpie(request, service, extra_path, request_params=request.query_string)
     pass
+
 
 def includeme(config):
     settings = config.registry.settings
