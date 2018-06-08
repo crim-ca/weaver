@@ -14,13 +14,14 @@ def test_is_url_valid():
 
 
 def test_parse_service_name():
-    assert 'emu' == utils.parse_service_name("/ows/proxy/emu")
-    assert 'emu' == utils.parse_service_name("/ows/proxy/emu/foo/bar")
-    assert 'emu' == utils.parse_service_name("/ows/proxy/emu/")
+    protected_path = '/ows/proxy'
+    assert 'emu' == utils.parse_service_name("/ows/proxy/emu", protected_path)
+    assert 'emu' == utils.parse_service_name("/ows/proxy/emu/foo/bar", protected_path)
+    assert 'emu' == utils.parse_service_name("/ows/proxy/emu/", protected_path)
     with pytest.raises(ServiceNotFound) as e_info:
-        assert 'emu' == utils.parse_service_name("/ows/proxy/")
+        assert 'emu' == utils.parse_service_name("/ows/proxy/", protected_path)
     with pytest.raises(ServiceNotFound) as e_info:
-        assert 'emu' == utils.parse_service_name("/ows/nowhere/emu")
+        assert 'emu' == utils.parse_service_name("/ows/nowhere/emu", protected_path)
 
 
 def test_baseurl():
