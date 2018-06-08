@@ -29,7 +29,7 @@ COPY . /opt/birdhouse/src/twitcher
 WORKDIR /opt/birdhouse/src/twitcher
 
 # Provide custom.cfg with settings for docker image
-RUN printf "[buildout]\nextends=profiles/docker.cfg" > custom.cfg
+RUN printf "[buildout]\nextends=buildout.cfg profiles/docker.cfg" > custom.cfg
 
 # Install system dependencies
 RUN bash bootstrap.sh -i && bash requirements.sh
