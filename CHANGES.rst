@@ -1,8 +1,19 @@
 Changes
 *******
 
-current
+Current
 =======
+
+New Features:
+
+* Feature #36: make protected path configurable.
+
+0.3.7 (2018-03-13)
+==================
+
+Fixes:
+
+* fixed exclude filter in MANIFEST.in.
 
 New Features:
 

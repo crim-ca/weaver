@@ -161,7 +161,8 @@ def owsproxy_delegate(request):
     Delegates owsproxy request to external twitcher service.
     """
     twitcher_url = request.registry.settings.get('twitcher.url')
-    url = twitcher_url + '/ows/proxy'
+    protected_path = request.registry.settings.get('twitcher.ows_proxy_protected_path', '/ows')
+    url = twitcher_url + protected_path + '/proxy'
     if request.matchdict.get('service_name'):
         url += '/' + request.matchdict.get('service_name')
         if request.matchdict.get('access_token'):
@@ -178,18 +179,18 @@ def owsproxy_delegate(request):
 
 def includeme(config):
     settings = config.registry.settings
-
+    protected_path = settings.get('twitcher.ows_proxy_protected_path', '/ows')
     if asbool(settings.get('twitcher.ows_proxy', True)):
-        LOGGER.debug('Twitcher /ows/proxy enabled.')
+        LOGGER.debug('Twitcher {}/proxy enabled.'.format(protected_path))
 
-        config.add_route('owsproxy', '/ows/proxy/{service_name}')
+        config.add_route('owsproxy', protected_path + '/proxy/{service_name}')
         # TODO: maybe configure extra path
-        config.add_route('owsproxy_extra', '/ows/proxy/{service_name}/{extra_path:.*}')
-        config.add_route('owsproxy_secured', '/ows/proxy/{service_name}/{access_token}')
+        config.add_route('owsproxy_extra', protected_path + '/proxy/{service_name}/{extra_path:.*}')
+        config.add_route('owsproxy_secured', protected_path + '/proxy/{service_name}/{access_token}')
 
         # use delegation mode?
         if asbool(settings.get('twitcher.ows_proxy_delegate', False)):
-            LOGGER.debug('Twitcher /ows/proxy delegation mode enabled.')
+            LOGGER.debug('Twitcher {}/proxy delegation mode enabled.'.format(protected_path))
             config.add_view(owsproxy_delegate, route_name='owsproxy')
             config.add_view(owsproxy_delegate, route_name='owsproxy_secured')
         else:
