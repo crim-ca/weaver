@@ -1,6 +1,6 @@
 from pyramid.settings import asbool
 from pyramid.tweens import EXCVIEW
-
+from pyramid.httpexceptions import *
 from twitcher.owsexceptions import OWSException, OWSNoApplicableCode
 from twitcher.owssecurity import owssecurity_factory
 
@@ -27,6 +27,9 @@ def ows_security_tween_factory(handler, registry):
             security.check_request(request)
             return handler(request)
         except OWSException as err:
+            logger.exception("security check failed.")
+            return err
+        except HTTPException as err:
             logger.exception("security check failed.")
             return err
         except Exception as err:

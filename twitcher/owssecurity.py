@@ -1,5 +1,4 @@
 import tempfile
-
 from twitcher.exceptions import AccessTokenNotFound
 from twitcher.exceptions import ServiceNotFound
 from twitcher.owsexceptions import OWSAccessForbidden, OWSInvalidParameterValue
@@ -9,6 +8,11 @@ from twitcher.store import servicestore_factory
 from twitcher.utils import parse_service_name
 from twitcher.owsrequest import OWSRequest
 from twitcher.esgf import fetch_certificate, ESGF_CREDENTIALS
+from pyramid.httpexceptions import HTTPForbidden, HTTPNotFound
+from pyramid.interfaces import IAuthenticationPolicy, IAuthorizationPolicy
+from magpie.services import service_factory
+from magpie.models import Service
+from magpie.api_except import evaluate_call, verify_param
 from twitcher.datatype import Service
 
 
@@ -34,7 +38,8 @@ class OWSSecurity(object):
         self.tokenstore = tokenstore
         self.servicestore = servicestore
 
-    def get_token_param(self, request):
+    @staticmethod
+    def get_token_param(request):
         token = None
         if 'token' in request.params:
             token = request.params['token']   # in params
@@ -48,7 +53,8 @@ class OWSSecurity(object):
                 token = elements[-1]   # last path element
         return token
 
-    def prepare_headers(self, request, access_token):
+    @staticmethod
+    def prepare_headers(request, access_token):
         if "esgf_access_token" in access_token.data or "esgf_credentials" in access_token.data:
             workdir = tempfile.mkdtemp(prefix=request.prefix, dir=request.workdir)
             if fetch_certificate(workdir=workdir, data=access_token.data):
@@ -83,7 +89,7 @@ class OWSSecurity(object):
             raise OWSAccessForbidden("Access token is required to access this service.")
 
     def check_request(self, request):
-        protected_path = request.registry.settings.get('twitcher.ows_proxy_protected_path ', '/ows')
+        protected_path = request.registry.settings['twitcher.ows_proxy_protected_path']
         if request.path.startswith(protected_path):
             # TODO: refactor this code
             try:

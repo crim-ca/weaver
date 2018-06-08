@@ -6,6 +6,12 @@ See also: https://github.com/nive/outpost/blob/master/outpost/proxy.py
 
 import urllib
 import requests
+import base64
+import hashlib
+import calendar
+import datetime
+
+
 
 from pyramid.response import Response
 from pyramid.settings import asbool
@@ -15,8 +21,8 @@ from twitcher._compat import urlparse
 from twitcher.owsexceptions import OWSAccessForbidden, OWSAccessFailed
 from twitcher.utils import replace_caps_url
 from twitcher.store import servicestore_factory
-
-
+from pyramid.httpexceptions import HTTPTemporaryRedirect, HTTPFound
+import os
 import logging
 LOGGER = logging.getLogger(__name__)
 
@@ -51,10 +57,10 @@ allowed_hosts = (
 # requests.models.Reponse defaults its chunk size to 128 bytes, which is very slow
 class BufferedResponse():
     def __init__(self, resp):
-        self.resp = resp
+        self.resp=resp
 
     def __iter__(self):
-        return self.resp.iter_content(64 * 1024)
+        return self.resp.iter_content(64*1024)
 
 
 def _send_request(request, service, extra_path=None, request_params=None):
@@ -70,6 +76,7 @@ def _send_request(request, service, extra_path=None, request_params=None):
     # forward request to target (without Host Header)
     h = dict(request.headers)
     h.pop("Host", h)
+
     h['Accept-Encoding'] = None
 
     #
@@ -128,6 +135,33 @@ def _send_request(request, service, extra_path=None, request_params=None):
         return Response(content, status=resp.status_code, headers=headers)
 
 
+def _send_request_magpie(request, service, extra_path=None, request_params=None):
+
+    url = service.url
+    if extra_path:
+        url += '/' + extra_path
+
+    if request_params:
+        url += '?' + request_params
+
+    LOGGER.debug('url = %s', url)
+
+    # forward request to target (without Host Header and by forcing no encoding)
+    h = dict(request.headers)
+    h.pop("Host", h)
+    h['Accept-Encoding'] = None
+
+    try:
+        resp_iter = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h, stream=True)
+    except Exception as e:
+        return OWSAccessFailed("Request failed: {}".format(e.message))
+
+    #Headers meaningful only for a single transport-level connection
+    HopbyHop = ['Connection', 'Keep-Alive', 'Public', 'Proxy-Authenticate', 'Transfer-Encoding', 'Upgrade']
+    return Response(app_iter=BufferedResponse(resp_iter),
+                    headers={k: v for k, v in resp_iter.headers.iteritems() if k not in HopbyHop})
+
+
 def owsproxy_url(request):
     url = request.params.get("url")
     if url is None:
@@ -181,6 +215,22 @@ def owsproxy_delegate(request):
     return Response(resp.content, status=resp.status_code, headers=resp.headers)
 
 
+def owsproxy_magpie(request):
+    try:
+        service_name = request.matchdict.get('service_name')
+        extra_path = request.matchdict.get('extra_path')
+        #store = servicestore_factory(request.registry)
+        #service = store.fetch_by_name(service_name)
+        from magpie.models import Service
+        service = Service.by_service_name(service_name, db_session=request.db)
+
+    except Exception as err:
+        return OWSAccessFailed("Could not find service: {}.".format(err.message))
+    else:
+        return _send_request_magpie(request, service, extra_path, request_params=request.query_string)
+    pass
+
+
 def includeme(config):
     settings = config.registry.settings
     protected_path = settings.get('twitcher.ows_proxy_protected_path', '/ows/proxy')
@@ -190,14 +240,19 @@ def includeme(config):
 
         config.add_route('owsproxy', protected_path+'/{service_name}')
         # TODO: maybe configure extra path
-        config.add_route('owsproxy_extra', protected_path+'/{service_name}/{extra_path:.*}')
-        config.add_route('owsproxy_secured', protected_path+'/{service_name}/{access_token}')
+        # config.add_route('owsproxy_extra', '/ows/proxy/{service_name}/{extra_path:.*}')
+        #config.add_route('owsproxy_secured', '/ows/proxy/{service_name}/{access_token}')
+
+        config.add_route('owsproxy_magpie', protected_path+'/{service_name}/{extra_path:.*}')
+
 
         # use delegation mode?
         if asbool(settings.get('twitcher.ows_proxy_delegate', False)):
             LOGGER.debug('Twitcher {}/proxy delegation mode enabled.'.format(protected_path))
             config.add_view(owsproxy_delegate, route_name='owsproxy')
-            config.add_view(owsproxy_delegate, route_name='owsproxy_secured')
+            #config.add_view(owsproxy_delegate, route_name='owsproxy_secured')
+            config.add_view(owsproxy_magpie, route_name='owsproxy')
+            config.add_view(owsproxy_magpie, route_name='owsproxy_magpie')
         else:
             # include twitcher config
             config.include('twitcher.config')
@@ -208,8 +263,10 @@ def includeme(config):
                 config.include('twitcher.db')
             # include postgresdb
             config.add_view(owsproxy, route_name='owsproxy')
-            config.add_view(owsproxy, route_name='owsproxy_secured')
-            config.add_view(owsproxy, route_name='owsproxy_extra')
+            #config.add_view(owsproxy, route_name='owsproxy_secured')
+            #config.add_view(owsproxy, route_name='owsproxy_extra')
+            config.add_view(owsproxy_magpie, route_name='owsproxy_magpie')
+
         # use /owsproxy?
         if asbool(settings.get('twitcher.ows_proxy_url', True)):
             LOGGER.debug('Twitcher /owsproxy enabled.')
