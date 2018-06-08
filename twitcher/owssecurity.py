@@ -11,7 +11,7 @@ from twitcher.esgf import fetch_certificate, ESGF_CREDENTIALS
 from pyramid.httpexceptions import HTTPForbidden, HTTPNotFound
 from magpie.services import service_factory
 from magpie.models import Service
-from magpie import evaluate_call, verify_param
+from magpie.api_except import evaluate_call, verify_param
 
 #import sys
 #sys.path.insert(0, '/home/deruefx/CrimProjects/PAVICS/Magpie')
