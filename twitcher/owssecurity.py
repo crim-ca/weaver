@@ -9,16 +9,10 @@ from twitcher.utils import parse_service_name
 from twitcher.owsrequest import OWSRequest
 from twitcher.esgf import fetch_certificate, ESGF_CREDENTIALS
 from pyramid.httpexceptions import HTTPForbidden, HTTPNotFound
+from pyramid.interfaces import IAuthenticationPolicy, IAuthorizationPolicy
 from magpie.services import service_factory
 from magpie.models import Service
 from magpie.api_except import evaluate_call, verify_param
-
-#import sys
-#sys.path.insert(0, '/home/deruefx/CrimProjects/PAVICS/Magpie')
-
-
-
-from pyramid.interfaces import IAuthenticationPolicy, IAuthorizationPolicy
 
 import logging
 LOGGER = logging.getLogger("TWITCHER")
@@ -34,7 +28,8 @@ class OWSSecurity(object):
         self.tokenstore = tokenstore
         self.servicestore = servicestore
 
-    def get_token_param(self, request):
+    @staticmethod
+    def get_token_param(request):
         token = None
         if 'token' in request.params:
             token = request.params['token']   # in params
@@ -48,7 +43,8 @@ class OWSSecurity(object):
                 token = elements[-1]   # last path element
         return token
 
-    def prepare_headers(self, request, access_token):
+    @staticmethod
+    def prepare_headers(request, access_token):
         if "esgf_access_token" in access_token.data or "esgf_credentials" in access_token.data:
             workdir = tempfile.mkdtemp(prefix=request.prefix, dir=request.workdir)
             if fetch_certificate(workdir=workdir, data=access_token.data):
@@ -57,7 +53,8 @@ class OWSSecurity(object):
                 LOGGER.debug("Prepared request headers.")
         return request
 
-    def check_request(self, request):
+    @staticmethod
+    def check_request(request):
         protected_path = request.registry.settings['twitcher.ows_proxy_protected_path']
         if request.path.startswith(protected_path):
             service_name = parse_service_name(request.path, protected_path)
@@ -66,9 +63,10 @@ class OWSSecurity(object):
                                     httpError=HTTPForbidden, msgOnFail="Service query by name refused by db")
             verify_param(service, notNone=True, httpError=HTTPNotFound, msgOnFail="Service name not found in db")
 
-            service_specific = service_factory(service, request) #return a specific type of service, ex: ServiceWPS with all the acl (loaded according to the service_type)
-            #should contain all the acl, this the only thing important
-            permission_requested = service_specific.permission_requested() #parse request (GET/POST) to get the permission requested for that service
+            # return a specific type of service, ex: ServiceWPS with all the acl (loaded according to the service_type)
+            # parse request (GET/POST) to get the permission requested for that service
+            service_specific = service_factory(service, request)
+            permission_requested = service_specific.permission_requested()
 
             if permission_requested:
                 authn_policy = request.registry.queryUtility(IAuthenticationPolicy)
