@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 #sys.path.insert(0, '/home/deruefx/CrimProjects/PAVICS/Magpie')
 import os
 
-__version__ = '0.3.3'
+__version__ = '0.3.7'
 
 
 def main(global_config, **settings):

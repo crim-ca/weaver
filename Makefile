@@ -1,4 +1,4 @@
-VERSION := 0.3.13
+VERSION := 0.3.15
 RELEASE := master
 
 # Include custom config if it is available
@@ -14,8 +14,8 @@ CPU_ARCH := $(shell uname -m 2>/dev/null || uname -p 2>/dev/null || echo "unknow
 
 # Python
 SETUPTOOLS_VERSION := 36.5.0
-CONDA_VERSION := 4.3
-BUILDOUT_VERSION := 2.9.5
+CONDA_VERSION := 4.4
+BUILDOUT_VERSION := 2.10.0
 
 # Anaconda
 ANACONDA_HOME ?= $(HOME)/anaconda
@@ -43,10 +43,6 @@ endif
 DOWNLOAD_CACHE := $(APP_ROOT)/downloads
 BUILDOUT_FILES := parts eggs develop-eggs bin .installed.cfg .mr.developer.cfg *.egg-info bootstrap-buildout.py *.bak.* $(DOWNLOAD_CACHE)
 
-# Docker
-DOCKER_IMAGE := birdhouse/$(APP_NAME)
-DOCKER_CONTAINER := $(APP_NAME)
-
 # end of configuration
 
 .DEFAULT_GOAL := help
@@ -64,7 +60,6 @@ help:
 	@echo "  sysinstall  to install system packages from requirements.sh. You can also call 'bash requirements.sh' directly."
 	@echo "  update      to update your application by running 'bin/buildout -o -c custom.cfg' (buildout offline mode)."
 	@echo "  clean       to delete all files that are created by running buildout."
-	@echo "  export      to export the conda environment. Caution! You always need to check it the enviroment.yml is working."
 	@echo "\nTesting targets:"
 	@echo "  test        to run tests (but skip long running tests)."
 	@echo "  testall     to run all tests (including long running tests)."
@@ -85,9 +80,6 @@ help:
 	@echo "  stop        to stop supervisor service."
 	@echo "  restart     to restart supervisor service."
 	@echo "  status      to show supervisor status"
-	@echo "\nDocker targets:"
-	@echo "  Dockerfile  to generate a Dockerfile for $(APP_NAME)."
-	@echo "  dockerbuild to build a docker image for $(APP_NAME)."
 
 .PHONY: version
 version:
@@ -104,8 +96,7 @@ info:
 	@echo "  APP_NAME            $(APP_NAME)"
 	@echo "  APP_ROOT            $(APP_ROOT)"
 	@echo "  DOWNLOAD_CACHE      $(DOWNLOAD_CACHE)"
-	@echo "  DOCKER_IMAGE        $(DOCKER_IMAGE)"
-
+	
 ## Helper targets ... ensure that Makefile etc are in place
 
 .PHONY: backup
@@ -123,11 +114,6 @@ bootstrap.sh:
 	@echo "Update bootstrap.sh ..."
 	@curl "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/bootstrap.sh" --silent --insecure --output bootstrap.sh "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/bootstrap.sh"
 	@chmod 755 bootstrap.sh
-
-requirements.sh:
-	@echo "Setup default requirements.sh ..."
-	@curl "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/requirements.sh" --silent --insecure --output requirements.sh
-	@chmod 755 requirements.sh
 
 custom.cfg:
 	@echo "Using custom.cfg for buildout ..."
@@ -300,26 +286,3 @@ restart:
 status:
 	@echo "Supervisor status ..."
 	bin/supervisorctl status
-
-
-## Docker targets
-
-.PHONY: Dockerfile
-Dockerfile: bootstrap
-	@echo "Update Dockerfile ..."
-	bin/buildout -c custom.cfg install docker
-
-.PHONY: dockerrmi
-dockerrmi:
-	@echo "Removing previous docker image ..."
-	docker rmi $(DOCKER_IMAGE)
-
-.PHONY: dockerbuild
-dockerbuild: Dockerfile
-	@echo "Building docker image ..."
-	docker build --rm -t $(DOCKER_IMAGE) .
-
-.PHONY: dockerrun
-dockerrun: dockerbuild
-	@echo "Run docker image ..."
-	docker run -i -t -p 9001:9001 --name=$(DOCKER_CONTAINER) $(DOCKER_IMAGE) /bin/bash

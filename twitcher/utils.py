@@ -15,7 +15,7 @@ def is_valid_url(url):
     try:
         parsed_url = urlparse(url)
         return True if all([parsed_url.scheme, ]) else False
-    except:
+    except Exception:
         return False
 
 
@@ -23,12 +23,11 @@ def parse_service_name(url, protected_path):
     parsed_url = urlparse(url)
     service_name = None
     if parsed_url.path.startswith(protected_path):
-        #parts = parsed_url.path.strip('/').split('/')
         parts_without_protected_path = parsed_url.path[len(protected_path)::].strip('/').split('/')
+        if 'proxy' in parts_without_protected_path:
+            parts_without_protected_path.remove('proxy')
         if len(parts_without_protected_path) > 0:
             service_name = parts_without_protected_path[0]
-        #if len(parts) > 2:
-        #    service_name = parts[2]
     if not service_name:
         raise ServiceNotFound
     return service_name

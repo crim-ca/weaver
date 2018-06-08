@@ -13,6 +13,7 @@ from pyramid.interfaces import IAuthenticationPolicy, IAuthorizationPolicy
 from magpie.services import service_factory
 from magpie.models import Service
 from magpie.api_except import evaluate_call, verify_param
+from twitcher.datatype import Service
 
 import logging
 LOGGER = logging.getLogger("TWITCHER")
@@ -20,6 +21,11 @@ LOGGER = logging.getLogger("TWITCHER")
 
 def owssecurity_factory(registry):
     return OWSSecurity(tokenstore_factory(registry), servicestore_factory(registry))
+
+
+def verify_cert(request):
+    if not request.headers.get('X-Ssl-Client-Verify', '') == 'SUCCESS':
+        raise OWSAccessForbidden("A valid X.509 client certificate is needed.")
 
 
 class OWSSecurity(object):
@@ -53,6 +59,31 @@ class OWSSecurity(object):
                 LOGGER.debug("Prepared request headers.")
         return request
 
+    def verify_access(self, request, service):
+        # TODO: public service access handling is confusing.
+        try:
+            if service.auth == 'cert':
+                verify_cert(request)
+            else:  # token
+                self._verify_access_token(request)
+        except OWSAccessForbidden:
+            if not service.public:
+                raise
+
+    def _verify_access_token(self, request):
+        try:
+            # try to get access_token ... if no access restrictions then don't complain.
+            token = self.get_token_param(request)
+            access_token = self.tokenstore.fetch_by_token(token)
+            if access_token.is_expired():
+                raise OWSAccessForbidden("Access token is expired.")
+            # update request with data from access token
+            # request.environ.update(access_token.data)
+            # TODO: is this realy the way we want to do this?
+            request = self.prepare_headers(request, access_token)
+        except AccessTokenNotFound:
+            raise OWSAccessForbidden("Access token is required to access this service.")
+
     @staticmethod
     def check_request(request):
         protected_path = request.registry.settings['twitcher.ows_proxy_protected_path']
@@ -75,4 +106,3 @@ class OWSSecurity(object):
                 has_permission = authz_policy.permits(service_specific, principals, permission_requested)
                 if not has_permission:
                     raise OWSAccessForbidden("Not authorized to access this resource.")
-

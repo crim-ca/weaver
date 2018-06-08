@@ -1,24 +1,22 @@
 language: python
-branches:
-  only:
-    - pingudev
-    - develop
-    - master
+# branches:
+#  only:
+#    - master
 os:
   - linux
 #  - osx
 python:
   - "2.7"
-sudo: false 
+sudo: false
 install:
   - make install
   - make start
 before_script:
   - sleep 5
 script:
-#  - make docs
   - make testall
   - make pep8
+  - make docs
 #after_success:
 # - coveralls
 matrix:

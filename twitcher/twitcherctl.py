@@ -82,6 +82,8 @@ class TwitcherCtl(object):
                                help="Service type (wps, wms). Default: wps.")
         subparser.add_argument('--public', action='store_true',
                                help="If set then service has no access restrictions.")
+        subparser.add_argument('--auth', default='token',
+                               help="Authentication method (token, cert). Default: token.")
 
         # unregister
         subparser = subparsers.add_parser('unregister', help="Removes OWS service from the registry.")
@@ -114,7 +116,7 @@ class TwitcherCtl(object):
             elif args.cmd == 'register':
                 result = service.register_service(
                     url=args.url,
-                    data={'name': args.name, 'type': args.type, 'public': args.public})
+                    data={'name': args.name, 'type': args.type, 'public': args.public, 'auth': args.auth})
             elif args.cmd == 'unregister':
                 result = service.unregister_service(name=args.name)
             elif args.cmd == 'clear':

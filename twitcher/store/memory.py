@@ -95,7 +95,7 @@ class MemoryServiceStore(ServiceStore):
             name=name,
             type=service.type,
             public=service.public,
-            c4i=service.c4i))
+            auth=service.auth))
         return self.fetch_by_url(url=service_url)
 
     def delete_service(self, name):

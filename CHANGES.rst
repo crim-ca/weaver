@@ -1,6 +1,48 @@
 Changes
 *******
 
+Current
+=======
+
+New Features:
+
+* Feature #36: make protected path configurable.
+
+0.3.7 (2018-03-13)
+==================
+
+Fixes:
+
+* fixed exclude filter in MANIFEST.in.
+
+New Features:
+
+* Feature #28: use request upstream when not using wps (e.g download file through thredds).
+
+0.3.6 (2018-03-08)
+==================
+
+* pep8
+* removed unused ``c4i`` option.
+* added ``auth`` option to set authentication method.
+* updated docs for usage of x509 certificates.
+
+New Features:
+
+* Feature #25: using x509 certificates for service authentication.
+
+0.3.5 (2018-03-01)
+==================
+
+* pep8
+* updated makefile
+* updated buildout recipes
+* fixed nginx dependency
+* updated mongodb 3.4
+* configured csrf in xmlrpc
+* fixed tutorial example
+* added readthedocs, licence and chat badges
+
 0.3.4 (2017-05-05)
 ==================
 
@@ -120,4 +162,3 @@ Bugfixes:
 ==================
 
 Initial Release.
-
