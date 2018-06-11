@@ -15,6 +15,7 @@ def main(global_config, **settings):
     config.include('twitcher.rpcinterface')
     config.include('twitcher.owsproxy')
     config.include('twitcher.wps')
+    config.include('twitcher.wps_restapi')
 
     # tweens/middleware
     # TODO: maybe add tween for exception handling or use unknown_failure view
