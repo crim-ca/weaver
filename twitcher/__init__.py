@@ -1,6 +1,12 @@
 __version__ = '0.3.7'
 
 
+import os
+import sys
+this_dir = os.path.abspath(os.path.dirname(__file__))
+sys.path.insert(0, this_dir)
+
+
 def main(global_config, **settings):
     """
     This function returns a Pyramid WSGI application.

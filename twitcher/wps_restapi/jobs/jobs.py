@@ -16,44 +16,48 @@ def get_processes(request):
 
 
 @view_config(route_name='job', request_method='GET')
+@view_config(route_name='job_full', request_method='GET')
 def describe_process(request):
     """
     Retrieve the status of a job
     """
-    # TODO Validate param somehow (provider_name and process_id are optional)
+    # TODO Validate param somehow
     provider_name = request.matchdict.get('provider_name')
     process_id = request.matchdict.get('process_id')
     job_id = request.matchdict.get('job_id')
 
 
 @view_config(route_name='job', request_method='DELETE')
+@view_config(route_name='job_full', request_method='DELETE')
 def submit_job(request):
     """
     Dismiss a job"
     """
-    # TODO Validate param somehow (provider_name and process_id are optional)
+    # TODO Validate param somehow
     provider_name = request.matchdict.get('provider_name')
     process_id = request.matchdict.get('process_id')
     job_id = request.matchdict.get('job_id')
 
 
 @view_config(route_name='outputs', request_method='GET')
+@view_config(route_name='outputs_full', request_method='GET')
 def describe_process(request):
     """
     Retrieve the result(s) of a job"
     """
-    # TODO Validate param somehow (provider_name and process_id are optional)
+    # TODO Validate param somehow
     provider_name = request.matchdict.get('provider_name')
     process_id = request.matchdict.get('process_id')
     job_id = request.matchdict.get('job_id')
 
 
 @view_config(route_name='output', request_method='GET')
+@view_config(route_name='output_full', request_method='GET')
 def submit_job(request):
     """
     Retrieve the result of a particular job output
     """
-    # TODO Validate param somehow (provider_name and process_id are optional)
+    # TODO Validate param somehow
     provider_name = request.matchdict.get('provider_name')
     process_id = request.matchdict.get('process_id')
     job_id = request.matchdict.get('job_id')

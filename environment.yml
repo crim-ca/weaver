@@ -30,6 +30,7 @@ dependencies:
 - webob
 # pywps
 - pywps=4.0.0
+- owslib=0.14.0
 # nginx, supervisor
 - nginx=1.10
 - supervisor=3
