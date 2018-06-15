@@ -41,20 +41,21 @@ def main(global_config, **settings):
         authentication_policy=authn_policy,
         authorization_policy=authz_policy
     )
-    auth_method = config.get_settings().get('twitcher.auth', None)
 
-    from magpie.models import get_user
-    config.set_request_property(get_user, 'user', reify=True)
 
     # include twitcher components
     config.include('twitcher.config')
     config.include('twitcher.frontpage')
     config.include('twitcher.owsproxy')
     config.include('twitcher.wps')
-    if not auth_method:
-        config.include('twitcher.rpcinterface')
+
+    auth_method = config.get_settings().get('twitcher.ows_security_provider', None)
     if auth_method == 'magpie':
+        from magpie.models import get_user
+        config.set_request_property(get_user, 'user', reify=True)
         config.include('twitcher.magpieconfig')
+    else:
+        config.include('twitcher.rpcinterface')
 
 
     # tweens/middleware

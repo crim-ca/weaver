@@ -21,7 +21,7 @@ LOGGER = logging.getLogger("TWITCHER")
 
 
 def owssecurity_factory(registry):
-    if registry.settings.get('twitcher.auth', None) == 'magpie':
+    if registry.settings.get('twitcher.ows_security_provider', None) == 'magpie':
         return OWSSecurityMagpie()
     else:
         return OWSSecurity(tokenstore_factory(registry), servicestore_factory(registry))
@@ -131,7 +131,7 @@ class OWSSecurityMagpie(object):
         return request
 
     def check_request(self, request):
-        twitcher_protected_path = request.registry.settings.get('twitcher.ows_proxy_protected_path', protected_path)
+        twitcher_protected_path = request.registry.settings.get('twitcher.ows_proxy_protected_path', '/ows')
         if request.path.startswith(twitcher_protected_path):
             service_name = parse_service_name(request.path, twitcher_protected_path)
             service = evaluate_call(lambda: Service.by_service_name(service_name, db_session=request.db),

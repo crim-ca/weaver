@@ -182,7 +182,7 @@ def owsproxy(request):
     try:
         service_name = request.matchdict.get('service_name')
         extra_path = request.matchdict.get('extra_path')
-        auth = request.registry.settings.get('twitcher.auth', None)
+        auth = request.registry.settings.get('twitcher.ows_security_provider', None)
         if auth == 'magpie':
             store = servicestore_factory(request.registry, database='postgres', db_session=request.db)
         else:
@@ -233,8 +233,7 @@ def owsproxy_magpie(request):
 
 def includeme(config):
     settings = config.registry.settings
-    protected_path = settings.get('twitcher.ows_proxy_protected_path', '/ows/proxy')
-    auth_method = settings.get('twitcher.auth', None)
+    protected_path = settings.get('twitcher.ows_proxy_protected_path', '/ows')
     if asbool(settings.get('twitcher.ows_proxy', True)):
         LOGGER.debug('Twitcher {} enabled.'.format(protected_path))
 
@@ -256,12 +255,15 @@ def includeme(config):
         else:
             # include twitcher config
             config.include('twitcher.config')
-            # include mongodb
+
+            auth_method = settings.get('twitcher.ows_security_provider', None)
             if auth_method == 'magpie':
+                # include postgresdb
                 config.include('twitcher.postgresdb')
             else:
+                # include mongodb
                 config.include('twitcher.db')
-            # include postgresdb
+
             config.add_view(owsproxy, route_name='owsproxy')
             #config.add_view(owsproxy, route_name='owsproxy_secured')
             #config.add_view(owsproxy, route_name='owsproxy_extra')
