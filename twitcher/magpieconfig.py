@@ -1,8 +1,8 @@
 from pyramid.authentication import AuthTktAuthenticationPolicy
 from pyramid.authorization import ACLAuthorizationPolicy
 import os
-from magpie.models import group_finder
 from magpie.models import get_user
+from ziggurat_foundations.models import groupfinder
 
 def includeme(config):
 
@@ -11,7 +11,7 @@ def includeme(config):
 
     authn_policy = AuthTktAuthenticationPolicy(
         magpie_secret,
-        callback=group_finder,
+        callback=groupfinder,
     )
     authz_policy = ACLAuthorizationPolicy()
 
