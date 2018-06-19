@@ -86,7 +86,7 @@ There are three ways how you can provide the access token:
 
 .. code-block:: sh
 
-   $ curl -k -H Access-Token:abc123 "https://localhost:5000/ows/wps?service=wps&request=execute&identifier=dummyprocess&version=1.0.0&datainputs=name=tux"
+   $ curl -k -H Access-Token:abc123 "https://localhost:5000/ows/wps?service=wps&request=execute&identifier=hello&version=1.0.0&datainputs=name=tux"
 
 
 Change the default WPS configuration
@@ -211,7 +211,7 @@ Run an ``Exceute`` request:
 
 .. code-block:: sh
 
-    $ curl -k "https://localhost:5000/ows/wps?service=wps&request=execute&identifier=hello&version=1.0.0"
+    $ curl -k "https://localhost:5000/ows/proxy/emu?service=wps&request=execute&identifier=hello&version=1.0.0&datainputs=name=tux"
 
 Now you should get an XML error response with a message that you need to provide an access token (see section above).
 
@@ -239,6 +239,41 @@ In the following example we provide the token as HTTP parameter:
 .. warning::
 
    If you have set enviroment variables with your access token then they will *not* be available in the external service.
+
+
+Use x509 certificates to control client access
+==================================================
+
+Since version 0.3.6 Twitcher is prepared to use x509 certificates for control client access.
+By default it is configured to accept x509 proxy certificates from `ESGF`_.
+
+Register the Emu WPS service at the Twitcher ``OWSProxy`` with ``auth`` option ``cert``:
+
+.. code-block:: sh
+
+   $ bin/twitcherctl -k register --name emu --auth cert http://localhost:8094/wps
+
+The ``GetCapabilities``  and ``DescribeProcess`` requests are not blocked:
+
+.. code-block:: sh
+
+  $ curl -k "https://localhost:5000/ows/proxy/emu?service=wps&request=getcapabilities"
+  $ curl -k "https://localhost:5000/ows/proxy/emu?service=wps&request=describeprocess&identifier=hello&version=1.0.0"
+
+When you run an ``Exceute`` request without a certificate you should get an exception report:
+
+.. code-block:: sh
+
+  $ curl -k "https://localhost:5000/ows/proxy/emu?service=wps&request=execute&identifier=hello&version=1.0.0&datainputs=name=tux"
+
+Now you should get an XML error response with a message that you need to provide a valid X509 certificate.
+
+Get a valid proxy certificate from ESGF, you may use the `esgf-pyclient`_ to run a myproxy logon.
+Let's say your proxy certificate is ``cert.pem``, then run the exceute request again using this certificate:
+
+.. code-block:: sh
+
+  $ curl --cert cert.pem --key cert.pem -k "https://localhost:5000/ows/proxy/emu?service=wps&request=execute&identifier=hello&version=1.0.0&datainputs=name=tux"
 
 
 Use Birdy WPS command line client to run a Process
@@ -358,3 +393,7 @@ If you don't provide a token or the token is invalid then you will get an error 
 
    owslib.wps.WPSException : {'locator': 'AccessForbidden', 'code': 'NoApplicableCode', 'text': 'Access token is required to access this service.'}
    WARNING:Error: code=NoApplicableCode, locator=AccessForbidden, text=Access token is required to access this service.
+
+
+.. _ESGF: https://esgf.llnl.gov/
+.. _esgf-pyclient: https://github.com/ESGF/esgf-pyclient

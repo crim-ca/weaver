@@ -1,0 +1,7 @@
+# test
+pytest
+mock
+WebTest
+flake8
+# internal WPS
+pywps>=4.0.0

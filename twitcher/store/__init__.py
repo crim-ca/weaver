@@ -11,6 +11,7 @@ from twitcher.store.mongodb import MongodbTokenStore
 from twitcher.store.memory import MemoryTokenStore
 
 
+
 def tokenstore_factory(registry, database=None):
     """
     Creates a token store with the interface of :class:`twitcher.store.AccessTokenStore`.
@@ -31,9 +32,9 @@ def tokenstore_factory(registry, database=None):
 
 from twitcher.store.mongodb import MongodbServiceStore
 from twitcher.store.memory import MemoryServiceStore
+from twitcher.store.postgres import PostgresServiceStore
 
-
-def servicestore_factory(registry, database=None):
+def servicestore_factory(registry, database=None, db_session=None):
     """
     Creates a service store with the interface of :class:`twitcher.store.ServiceStore`.
     By default the mongodb implementation will be used.
@@ -45,6 +46,8 @@ def servicestore_factory(registry, database=None):
     if database == 'mongodb':
         db = _mongodb(registry)
         store = MongodbServiceStore(collection=db.services)
+    elif database == 'postgres':
+        store = PostgresServiceStore(db_session=db_session)
     else:
         store = MemoryServiceStore()
     return store

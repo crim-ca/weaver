@@ -12,7 +12,7 @@ import logging
 LOGGER = logging.getLogger("TWITCHER")
 
 
-@view_defaults(permission='view')
+@view_defaults(permission='view', require_csrf=False)
 class RPCInterface(ITokenManager, IRegistry):
     def __init__(self, request):
         self.request = request

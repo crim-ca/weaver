@@ -8,10 +8,6 @@ from twitcher.utils import now_secs
 from twitcher.exceptions import AccessTokenNotFound
 
 
-import logging
-logger = logging.getLogger(__name__)
-
-
 class Service(dict):
     """
     Dictionary that contains OWS services. It always has ``'url'`` key.
@@ -39,16 +35,22 @@ class Service(dict):
     @property
     def public(self):
         """Flag if service has public access."""
+        # TODO: public access can be set via auth parameter.
         return self.get('public', False)
 
     @property
-    def c4i(self):
-        """Flag if service is by climate4impact."""
-        return self.get('c4i', False)
+    def auth(self):
+        """Authentication method: public, token, cert."""
+        return self.get('auth', 'token')
 
     @property
     def params(self):
-        return {'url': self.url, 'name': self.name, 'type': self.type, 'public': self.public, 'c4i': self.c4i}
+        return {
+            'url': self.url,
+            'name': self.name,
+            'type': self.type,
+            'public': self.public,
+            'auth': self.auth}
 
     def __str__(self):
         return self.name

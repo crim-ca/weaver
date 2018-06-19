@@ -98,7 +98,7 @@ class TokenManager(ITokenManager):
         """
         try:
             self.store.delete_token(token)
-        except:
+        except Exception:
             LOGGER.exception('Failed to remove token.')
             return False
         else:
@@ -110,7 +110,7 @@ class TokenManager(ITokenManager):
         """
         try:
             self.store.clear_tokens()
-        except:
+        except Exception:
             LOGGER.exception('Failed to remove tokens.')
             return False
         else:
@@ -142,7 +142,7 @@ class Registry(IRegistry):
         """
         try:
             self.store.delete_service(name=name)
-        except:
+        except Exception:
             LOGGER.exception('unregister failed')
             return False
         else:
@@ -154,7 +154,7 @@ class Registry(IRegistry):
         """
         try:
             service = self.store.fetch_by_name(name=name)
-        except:
+        except Exception:
             LOGGER.error('Could not get service with name %s', name)
             return {}
         else:
@@ -166,7 +166,7 @@ class Registry(IRegistry):
         """
         try:
             service = self.store.fetch_by_url(url=url)
-        except:
+        except Exception:
             LOGGER.error('Could not get service with url %s', url)
             return {}
         else:
@@ -178,7 +178,7 @@ class Registry(IRegistry):
         """
         try:
             services = [service.params for service in self.store.list_services()]
-        except:
+        except Exception:
             LOGGER.error('List services failed.')
             return []
         else:
@@ -190,7 +190,7 @@ class Registry(IRegistry):
         """
         try:
             self.store.clear_services()
-        except:
+        except Exception:
             LOGGER.error('Clear services failed.')
             return False
         else:

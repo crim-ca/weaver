@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 #sys.path.insert(0, '/home/deruefx/CrimProjects/PAVICS/Magpie')
 import os
 
-__version__ = '0.3.3'
+__version__ = '0.3.7'
 
 
 def main(global_config, **settings):
@@ -35,20 +35,28 @@ def main(global_config, **settings):
     )
     authz_policy = ACLAuthorizationPolicy()
 
+
     config = Configurator(
         settings=settings,
         authentication_policy=authn_policy,
         authorization_policy=authz_policy
     )
-    from magpie.models import get_user
-    config.set_request_property(get_user, 'user', reify=True)
+
 
     # include twitcher components
     config.include('twitcher.config')
     config.include('twitcher.frontpage')
-    #config.include('twitcher.rpcinterface')
     config.include('twitcher.owsproxy')
     config.include('twitcher.wps')
+
+    auth_method = config.get_settings().get('twitcher.ows_security_provider', None)
+    if auth_method == 'magpie':
+        from magpie.models import get_user
+        config.set_request_property(get_user, 'user', reify=True)
+        config.include('twitcher.magpieconfig')
+    else:
+        config.include('twitcher.rpcinterface')
+
 
     # tweens/middleware
     # TODO: maybe add tween for exception handling or use unknown_failure view

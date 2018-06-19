@@ -33,6 +33,7 @@ class MongodbTokenStoreTestCase(unittest.TestCase):
 
         collection_mock.insert_one.assert_called_with(self.access_token)
 
+
 from twitcher.datatype import Service
 from twitcher.store.mongodb import MongodbServiceStore
 
@@ -40,10 +41,11 @@ from twitcher.store.mongodb import MongodbServiceStore
 class MongodbServiceStoreTestCase(unittest.TestCase):
     def setUp(self):
         self.service = dict(name="loving_flamingo", url="http://somewhere.over.the/ocean", type="wps",
-                            public=False, c4i=False)
+                            public=False, auth='token')
         self.service_public = dict(name="open_pingu", url="http://somewhere.in.the/deep_ocean", type="wps",
-                                   public=True, c4i=False)
-        self.service_special = dict(url="http://wonderload", name="A special Name", type='wps')
+                                   public=True, auth='token')
+        self.service_special = dict(url="http://wonderload", name="A special Name", type='wps',
+                                    auth='token')
 
     def test_fetch_by_name(self):
         collection_mock = mock.Mock(spec=["find_one"])
@@ -74,7 +76,7 @@ class MongodbServiceStoreTestCase(unittest.TestCase):
         store.save_service(Service(self.service_special))
 
         collection_mock.insert_one.assert_called_with({
-            'url': 'http://wonderload', 'type': 'wps', 'name': 'a_special_name', 'public': False, 'c4i': False})
+            'url': 'http://wonderload', 'type': 'wps', 'name': 'a_special_name', 'public': False, 'auth': 'token'})
 
     def test_save_service_public(self):
         collection_mock = mock.Mock(spec=["insert_one", "find_one", "count"])

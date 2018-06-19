@@ -50,7 +50,7 @@ def fetch_certificate(workdir='.', data={}):
         mgr = ESGFAccessManager(url, base_dir=workdir)
         mgr.logon(access_token, test_credentials)
         logger.debug('Prepared twitcher workdir %s', workdir)
-    except:
+    except Exception:
         logger.exception("Could not fetch certificate.")
         return False
     return True
@@ -78,7 +78,7 @@ class ESGFAccessManager(object):
         # fix permission
         try:
             os.chmod(self.esgf_credentials, 0o400)
-        except:
+        except Exception:
             logger.warn("Could not update permission of credentials.")
         return True
 
