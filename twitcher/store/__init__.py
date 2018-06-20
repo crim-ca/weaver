@@ -41,8 +41,8 @@ def servicestore_factory(registry, database=None, db_session=None):
 
     :return: An instance of :class:`twitcher.store.ServiceStore`.
     """
-    #database = database or 'mongodb'
-    database = None
+    database = database or 'mongodb'
+    #database = None
     if database == 'mongodb':
         db = _mongodb(registry)
         store = MongodbServiceStore(collection=db.services)
