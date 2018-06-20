@@ -89,7 +89,7 @@ class OWSSecurity(object):
             raise OWSAccessForbidden("Access token is required to access this service.")
 
     def check_request(self, request):
-        protected_path = request.registry.settings['twitcher.ows_proxy_protected_path']
+        protected_path = request.registry.settings.get('twitcher.ows_proxy_protected_path', '/ows')
         if request.path.startswith(protected_path):
             # TODO: refactor this code
             try:

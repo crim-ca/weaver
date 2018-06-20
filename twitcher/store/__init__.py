@@ -34,20 +34,34 @@ from twitcher.store.mongodb import MongodbServiceStore
 from twitcher.store.memory import MemoryServiceStore
 from twitcher.store.postgres import PostgresServiceStore
 
-def servicestore_factory(registry, database=None, db_session=None):
+
+def my_import(name):
+    components = name.split('.')
+    mod = __import__(components[0])
+    for comp in components[1:]:
+        mod = getattr(mod, comp)
+    return mod
+
+
+def servicestore_factory(registry, database=None, headers=None, db_session=None):
     """
     Creates a service store with the interface of :class:`twitcher.store.ServiceStore`.
     By default the mongodb implementation will be used.
 
     :return: An instance of :class:`twitcher.store.ServiceStore`.
     """
-    #database = database or 'mongodb'
-    database = None
-    if database == 'mongodb':
-        db = _mongodb(registry)
-        store = MongodbServiceStore(collection=db.services)
-    elif database == 'postgres':
-        store = PostgresServiceStore(db_session=db_session)
+
+    settings = registry.settings
+    if settings.get('twitcher.wps_provider_registry', 'default') != 'default':
+        store_class = my_import(settings.get('twitcher.wps_provider_registry'))
+        store = store_class(headers=headers)
     else:
-        store = MemoryServiceStore()
+        database = database or 'mongodb'
+        if database == 'mongodb':
+            db = _mongodb(registry)
+            store = MongodbServiceStore(collection=db.services)
+        elif database == 'postgres':
+            store = PostgresServiceStore(db_session=db_session)
+        else:
+            store = MemoryServiceStore()
     return store
