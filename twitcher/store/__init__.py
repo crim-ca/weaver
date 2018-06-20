@@ -53,7 +53,7 @@ def servicestore_factory(registry, database=None, headers=None, db_session=None)
     settings = registry.settings
     if settings.get('twitcher.wps_provider_registry', 'default') != 'default':
         store_class = my_import(settings.get('twitcher.wps_provider_registry'))
-        store = store_class(headers=headers)
+        store = store_class(registry=registry, headers=headers)
     else:
         database = database or 'mongodb'
         if database == 'mongodb':
