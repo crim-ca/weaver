@@ -50,7 +50,6 @@ def servicestore_factory(registry, database=None, headers=None, db_session=None)
 
     :return: An instance of :class:`twitcher.store.ServiceStore`.
     """
-
     settings = registry.settings
     if settings.get('twitcher.wps_provider_registry', 'default') != 'default':
         store_class = my_import(settings.get('twitcher.wps_provider_registry'))

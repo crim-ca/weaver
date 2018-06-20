@@ -112,9 +112,9 @@ class OWSSecurity(object):
 try:
     from magpie.services import service_factory
     from magpie.models import Service
-    from magpie import evaluate_call, verify_param
-except ImportError:
-    LOGGER.warning('Can not import magpie')
+    from magpie.api_except import evaluate_call, verify_param
+except ImportError as e:
+    LOGGER.warning('Can not import magpie : {!r}'.format(e))
 
 from pyramid.httpexceptions import HTTPForbidden, HTTPNotFound
 from pyramid.interfaces import IAuthenticationPolicy, IAuthorizationPolicy
