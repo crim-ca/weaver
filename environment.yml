@@ -30,7 +30,7 @@ dependencies:
 - webob
 # pywps
 - pywps=4.0.0
-- owslib=0.14.0
+#- owslib (waiting 0.17.0 which implement wps with custom headers)
 # nginx, supervisor
 - nginx=1.10
 - supervisor=3
@@ -44,3 +44,4 @@ dependencies:
   - pyramid-rpc
   - sphinx-autoapi
   - -e git+https://github.com/huard/sphinx-autodoc-pywps.git#egg=sphinx_autodoc_pywps
+  - https://github.com/geopython/OWSLib/archive/master.zip

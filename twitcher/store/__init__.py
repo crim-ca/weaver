@@ -32,17 +32,31 @@ from twitcher.store.mongodb import MongodbServiceStore
 from twitcher.store.memory import MemoryServiceStore
 
 
-def servicestore_factory(registry, database=None):
+def my_import(name):
+    components = name.split('.')
+    mod = __import__(components[0])
+    for comp in components[1:]:
+        mod = getattr(mod, comp)
+    return mod
+
+
+def servicestore_factory(registry, database=None, headers=None):
     """
     Creates a service store with the interface of :class:`twitcher.store.ServiceStore`.
     By default the mongodb implementation will be used.
 
     :return: An instance of :class:`twitcher.store.ServiceStore`.
     """
-    database = database or 'mongodb'
-    if database == 'mongodb':
-        db = _mongodb(registry)
-        store = MongodbServiceStore(collection=db.services)
+    settings = registry.settings
+
+    if settings.get('twitcher.wps_provider_registry', 'default') != 'default':
+        store_class = my_import(settings.get('twitcher.wps_provider_registry'))
+        store = store_class(headers=headers)
     else:
-        store = MemoryServiceStore()
+        database = database or 'mongodb'
+        if database == 'mongodb':
+            db = _mongodb(registry)
+            store = MongodbServiceStore(collection=db.services)
+        else:
+            store = MemoryServiceStore()
     return store

@@ -9,7 +9,7 @@ def get_processes(request):
     &limit=[number]
     &status=[ProcessAccepted, ProcessStarted, ProcessPaused, ProcessFailed, ProcessSucceeded] 
     &process=[process_name]
-    &provider=[provider_name]
+    &provider=[provider_id]
     &sort=[created, status, process, provider]
     """
     pass
@@ -22,7 +22,7 @@ def describe_process(request):
     Retrieve the status of a job
     """
     # TODO Validate param somehow
-    provider_name = request.matchdict.get('provider_name')
+    provider_id = request.matchdict.get('provider_id')
     process_id = request.matchdict.get('process_id')
     job_id = request.matchdict.get('job_id')
 
@@ -34,7 +34,7 @@ def submit_job(request):
     Dismiss a job"
     """
     # TODO Validate param somehow
-    provider_name = request.matchdict.get('provider_name')
+    provider_id = request.matchdict.get('provider_id')
     process_id = request.matchdict.get('process_id')
     job_id = request.matchdict.get('job_id')
 
@@ -46,7 +46,7 @@ def describe_process(request):
     Retrieve the result(s) of a job"
     """
     # TODO Validate param somehow
-    provider_name = request.matchdict.get('provider_name')
+    provider_id = request.matchdict.get('provider_id')
     process_id = request.matchdict.get('process_id')
     job_id = request.matchdict.get('job_id')
 
@@ -58,7 +58,7 @@ def submit_job(request):
     Retrieve the result of a particular job output
     """
     # TODO Validate param somehow
-    provider_name = request.matchdict.get('provider_name')
+    provider_id = request.matchdict.get('provider_id')
     process_id = request.matchdict.get('process_id')
     job_id = request.matchdict.get('job_id')
     output_id = request.matchdict.get('output_id')

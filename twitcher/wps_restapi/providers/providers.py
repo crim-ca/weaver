@@ -10,20 +10,23 @@ def get_providers(request):
     """
     Lists providers
     """
-    store = servicestore_factory(request.registry)
+    store = servicestore_factory(request.registry, headers=request.headers)
     providers = []
 
     # TODO Filter by permissions (public / private)
     for service in store.list_services():
-        wps = WebProcessingService(url=service.url)
-        providers.append(dict(
-            id=service.name,
-            label=getattr(wps.identification, 'title', ''),
-            description=getattr(wps.identification, 'abstract', ''),
-            url='{base_url}/providers/{provider_name}'.format(
-                base_url=restapi_base_url(request),
-                provider_name=service.name),
-            public=service.public))
+        try:
+            wps = WebProcessingService(url=service.url)
+            providers.append(dict(
+                id=service.name,
+                title=getattr(wps.identification, 'title', ''),
+                abstract=getattr(wps.identification, 'abstract', ''),
+                url='{base_url}/providers/{provider_id}'.format(
+                    base_url=restapi_base_url(request),
+                    provider_id=service.name),
+                public=service.public))
+        except Exception as e:
+            pass
 
     return providers
 
@@ -33,7 +36,7 @@ def add_provider(request):
     """
     Add a provider
     """
-    store = servicestore_factory(request.registry)
+    store = servicestore_factory(request.registry, headers=request.headers)
 
     # TODO Validate that params have at least a url and a name
     new_service = Service(url=request.json.url, name=request.json.id)
@@ -51,12 +54,13 @@ def remove_provider(request):
     """
     Remove a provider
     """
-    store = servicestore_factory(request.registry)
+    store = servicestore_factory(request.registry, headers=request.headers)
 
     # TODO Validate param somehow
-    provider_name = request.matchdict.get('provider_name')
+    provider_id = request.matchdict.get('provider_id')
 
-    store.delete_service(provider_name)
+    # TODO Exception handling in json please
+    store.delete_service(provider_id)
 
     return {}
 
@@ -67,20 +71,20 @@ def get_capabilities(request):
     GetCapabilities of a wps provider
     """
 
-    store = servicestore_factory(request.registry)
+    store = servicestore_factory(request.registry, headers=request.headers)
 
     # TODO Validate param somehow
-    provider_name = request.matchdict.get('provider_name')
+    provider_id = request.matchdict.get('provider_id')
 
-    service = store.fetch_by_name(provider_name)
+    service = store.fetch_by_name(provider_id)
     wps = WebProcessingService(url=service.url)
 
     return dict(
-        id=provider_name,
-        label=wps.identification.title,
-        description=wps.identification.abstract,
-        url='{base_url}/providers/{provider_name}'.format(
+        id=provider_id,
+        title=wps.identification.title,
+        abstract=wps.identification.abstract,
+        url='{base_url}/providers/{provider_id}'.format(
                 base_url=restapi_base_url(request),
-                provider_name=provider_name),
+                provider_id=provider_id),
         type='WPS',
         contact=wps.provider.contact.name)

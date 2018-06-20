@@ -12,3 +12,4 @@ def includeme(config):
         config.include('wps_restapi.providers')
         config.include('wps_restapi.processes')
         config.include('wps_restapi.jobs')
+        config.add_route('wps_restapi', '/api')
