@@ -2,7 +2,7 @@ import os
 import tempfile
 
 from pyramid.settings import asbool
-
+from pyramid.exceptions import ConfigurationError
 
 import logging
 LOGGER = logging.getLogger("TWITCHER")
@@ -29,12 +29,11 @@ def parse_extra_options(option_str):
     """
     Parses the extra options parameter.
 
-    The option_str is a string with ``opt=value`` pairs.
+    The option_str is a string with coma separated ``opt=value`` pairs.
 
     Example::
 
-        tempdir=/path/to/tempdir
-        archive_root=/path/to/archive
+        tempdir=/path/to/tempdir,archive_root=/path/to/archive
 
     :param option_str: A string parameter with the extra options.
     :return: A dict with the parsed extra options.
@@ -45,8 +44,8 @@ def parse_extra_options(option_str):
             extra_options = dict([('=' in opt) and opt.split('=', 1) for opt in extra_options])
         except Exception:
             msg = "Can not parse extra-options: {}".format(option_str)
-            logging.exception(msg)
-            raise zc.buildout.UserError(msg)
+            LOGGER.exception(msg)
+            raise ConfigurationError(msg)
     else:
         extra_options = {}
     return extra_options
