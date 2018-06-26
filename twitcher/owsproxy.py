@@ -156,7 +156,10 @@ def owsproxy(request):
         extra_path = request.matchdict.get('extra_path')
         auth = request.registry.settings.get('twitcher.ows_security_provider', None)
         if auth == 'magpie':
-            store = servicestore_factory(request.registry, database='postgres', db_session=request.db)
+            store = servicestore_factory(request.registry,
+                                         database='postgres',
+                                         db_session=request.db,
+                                         headers=request.headers)
         else:
             store = servicestore_factory(request.registry, database='mongodb')
         service = store.fetch_by_name(service_name)

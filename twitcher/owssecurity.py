@@ -22,6 +22,8 @@ LOGGER = logging.getLogger("TWITCHER")
 
 def owssecurity_factory(registry):
     if registry.settings.get('twitcher.ows_security_provider', None) == 'magpie':
+        # TODO For magpie we cannot store the servicestore object since the constructor need a header with token
+        # taken from the request... maybe we should check for that?!?
         return OWSSecurityMagpie()
     else:
         return OWSSecurity(tokenstore_factory(registry), servicestore_factory(registry))
