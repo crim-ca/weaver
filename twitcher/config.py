@@ -2,7 +2,7 @@ import os
 import tempfile
 
 from pyramid.settings import asbool
-
+from pyramid.exceptions import ConfigurationError
 
 import logging
 LOGGER = logging.getLogger("TWITCHER")
@@ -25,6 +25,32 @@ def _prefix(request):
     return prefix
 
 
+def parse_extra_options(option_str):
+    """
+    Parses the extra options parameter.
+
+    The option_str is a string with coma separated ``opt=value`` pairs.
+
+    Example::
+
+        tempdir=/path/to/tempdir,archive_root=/path/to/archive
+
+    :param option_str: A string parameter with the extra options.
+    :return: A dict with the parsed extra options.
+    """
+    if option_str:
+        try:
+            extra_options = option_str.split(',')
+            extra_options = dict([('=' in opt) and opt.split('=', 1) for opt in extra_options])
+        except Exception:
+            msg = "Can not parse extra-options: {}".format(option_str)
+            LOGGER.exception(msg)
+            raise ConfigurationError(msg)
+    else:
+        extra_options = {}
+    return extra_options
+
+
 def includeme(config):
     # settings = config.registry.settings
 
@@ -32,3 +58,6 @@ def includeme(config):
 
     config.add_request_method(_workdir, 'workdir', reify=True)
     config.add_request_method(_prefix, 'prefix', reify=True)
+
+    settings = config.registry.settings
+    config.add_settings(parse_extra_options(settings.get('twitcher.extra_options', '')))
