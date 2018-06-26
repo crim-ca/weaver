@@ -14,6 +14,7 @@ from twitcher.exceptions import ServiceRegistrationError
 from twitcher.exceptions import ServiceNotFound
 from twitcher import namesgenerator
 from twitcher.utils import baseurl
+from pyramid.exceptions import ConfigurationError
 
 
 class MagpieServiceStore(ServiceStore):
@@ -22,7 +23,11 @@ class MagpieServiceStore(ServiceStore):
     """
     def __init__(self, registry, headers=None):
         self.headers = headers
-        self.magpie_url = registry.settings.get('magpie.url').strip('/')
+        try:
+            self.magpie_url = registry.settings.get('magpie.url').strip('/')
+        except AttributeError:
+            #If magpie.url does not exist, calling strip fct over None will raise this issue
+            raise ConfigurationError('magpie.url config cannot be found')
 
     def save_service(self, service, overwrite=True):
         """
