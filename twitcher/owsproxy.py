@@ -66,7 +66,7 @@ class BufferedResponse():
 def _send_request(request, service, extra_path=None, request_params=None):
 
     # TODO: fix way to build url
-    url = service['url']
+    url = service.url
     if extra_path:
         url += '/' + extra_path
     if request_params:
@@ -79,7 +79,7 @@ def _send_request(request, service, extra_path=None, request_params=None):
     h['Accept-Encoding'] = None
 
     #
-    service_type = service['type']
+    service_type = service.type
     if service_type and (service_type.lower() != 'wps'):
         try:
             resp_iter = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h,
@@ -119,9 +119,9 @@ def _send_request(request, service, extra_path=None, request_params=None):
         try:
             if ct in ['text/xml', 'application/xml', 'text/xml;charset=ISO-8859-1']:
                 # replace urls in xml content
-                proxy_url = request.route_url('owsproxy', service_name=service['name'])
+                proxy_url = request.route_url('owsproxy', service_name=service.name)
                 # TODO: where do i need to replace urls?
-                content = replace_caps_url(resp.content, proxy_url, service.get('url'))
+                content = replace_caps_url(resp.content, proxy_url, service.url)
             else:
                 # raw content
                 content = resp.content
