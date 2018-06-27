@@ -2,17 +2,16 @@ from sqlalchemy import engine_from_config
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm import configure_mappers
 import zope.sqlalchemy
-import os
 
 
 def get_engine(settings, prefix='sqlalchemy.'):
-   database_url = 'postgresql://' \
-                   + os.getenv('POSTGRES_USER') + \
-                   ':' + os.getenv('POSTGRES_PASSWORD') + \
-                   '@' + os.getenv('POSTGRES_HOST') + \
-                   ':' + os.getenv('POSTGRES_PORT') + \
-                   '/' + os.getenv('POSTGRES_DB')
-
+   database_url = 'postgresql://{user}:{pw}@{host}:{port}/{db_name}'.format(
+       user=settings.get('postgresdb.user_name'),
+       pw=settings.get('postgresdb.password'),
+       host=settings.get('postgresdb.host'),
+       port=settings.get('postgresdb.port'),
+       db_name=settings.get('postgresdb.name')
+   )
    settings[prefix+'url'] = database_url
    return engine_from_config(settings, prefix)
 
