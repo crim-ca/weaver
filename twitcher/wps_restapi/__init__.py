@@ -9,7 +9,7 @@ def includeme(config):
 
     if asbool(settings.get('twitcher.wps_restapi', True)):
         logger.info('Adding WPS REST API ...')
-        config.include('wps_restapi.providers')
-        config.include('wps_restapi.processes')
-        config.include('wps_restapi.jobs')
+        config.include('twitcher.wps_restapi.providers')
+        config.include('twitcher.wps_restapi.processes')
+        config.include('twitcher.wps_restapi.jobs')
         config.add_route('wps_restapi', '/api')

@@ -2,14 +2,12 @@
 Factories to create storage backends.
 """
 
-# Interfaces
-from twitcher.store.base import AccessTokenStore
-
 # Factories
 from twitcher.db import mongodb as _mongodb
-from twitcher.store.mongodb import MongodbTokenStore
+# Interfaces
+from twitcher.store.base import AccessTokenStore
 from twitcher.store.memory import MemoryTokenStore
-
+from twitcher.store.mongodb import MongodbTokenStore
 
 def tokenstore_factory(registry, database=None):
     """
@@ -40,23 +38,17 @@ def my_import(name):
     return mod
 
 
-def servicestore_factory(registry, database=None, headers=None):
+def servicestore_defaultfactory(registry, database=None):
     """
     Creates a service store with the interface of :class:`twitcher.store.ServiceStore`.
     By default the mongodb implementation will be used.
 
     :return: An instance of :class:`twitcher.store.ServiceStore`.
     """
-    settings = registry.settings
-
-    if settings.get('twitcher.wps_provider_registry', 'default') != 'default':
-        store_class = my_import(settings.get('twitcher.wps_provider_registry'))
-        store = store_class(headers=headers)
+    database = database or 'mongodb'
+    if database == 'mongodb':
+        db = _mongodb(registry)
+        store = MongodbServiceStore(collection=db.services)
     else:
-        database = database or 'mongodb'
-        if database == 'mongodb':
-            db = _mongodb(registry)
-            store = MongodbServiceStore(collection=db.services)
-        else:
-            store = MemoryServiceStore()
+        store = MemoryServiceStore()
     return store

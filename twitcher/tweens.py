@@ -2,7 +2,7 @@ from pyramid.settings import asbool
 from pyramid.tweens import EXCVIEW
 
 from twitcher.owsexceptions import OWSException, OWSNoApplicableCode
-from twitcher.owssecurity import owssecurity_factory
+from twitcher.adapter import owssecurity_factory
 
 import logging
 logger = logging.getLogger(__name__)

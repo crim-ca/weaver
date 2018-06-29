@@ -6,7 +6,7 @@ from twitcher.api import ITokenManager, TokenManager
 from twitcher.api import IRegistry, Registry
 from twitcher.tokengenerator import tokengenerator_factory
 from twitcher.store import tokenstore_factory
-from twitcher.store import servicestore_factory
+from twitcher.adapter import servicestore_factory
 
 import logging
 LOGGER = logging.getLogger("TWITCHER")

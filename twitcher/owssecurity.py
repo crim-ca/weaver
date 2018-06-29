@@ -5,7 +5,7 @@ from twitcher.exceptions import ServiceNotFound
 from twitcher.owsexceptions import OWSAccessForbidden, OWSInvalidParameterValue
 from twitcher.utils import path_elements
 from twitcher.store import tokenstore_factory
-from twitcher.store import servicestore_factory
+from twitcher.adapter import servicestore_factory
 from twitcher.utils import parse_service_name
 from twitcher.owsrequest import OWSRequest
 from twitcher.esgf import fetch_certificate, ESGF_CREDENTIALS
@@ -15,7 +15,7 @@ import logging
 LOGGER = logging.getLogger("TWITCHER")
 
 
-def owssecurity_factory(registry):
+def owssecurity_defaultfactory(registry):
     return OWSSecurity(tokenstore_factory(registry), servicestore_factory(registry))
 
 

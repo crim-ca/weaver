@@ -1,5 +1,5 @@
 from pyramid.view import view_config
-from twitcher.store import servicestore_factory
+from twitcher.adapter import servicestore_factory
 from owslib.wps import WebProcessingService
 from twitcher.datatype import Service
 from twitcher.wps_restapi.utils import restapi_base_url

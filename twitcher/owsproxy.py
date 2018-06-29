@@ -14,8 +14,8 @@ from twitcher._compat import urlparse
 
 from twitcher.owsexceptions import OWSAccessForbidden, OWSAccessFailed
 from twitcher.utils import replace_caps_url
-from twitcher.store import servicestore_factory
-
+from twitcher.adapter import servicestore_factory
+from twitcher.adapter import adapter_factory
 
 import logging
 LOGGER = logging.getLogger(__name__)
@@ -148,7 +148,8 @@ def owsproxy(request):
     try:
         service_name = request.matchdict.get('service_name')
         extra_path = request.matchdict.get('extra_path')
-        store = servicestore_factory(request.registry)
+        store = servicestore_factory(request.registry,
+                                     headers=request.headers)
         service = store.fetch_by_name(service_name)
     except Exception as err:
         return OWSAccessFailed("Could not find service: {}.".format(err.message))
@@ -179,6 +180,10 @@ def owsproxy_delegate(request):
 
 def includeme(config):
     settings = config.registry.settings
+    adapter_factory(settings).owsproxy_config(settings, config)
+
+
+def owsproxy_defaultconfig(settings, config):
     protected_path = settings.get('twitcher.ows_proxy_protected_path', '/ows')
     if asbool(settings.get('twitcher.ows_proxy', True)):
         LOGGER.debug('Twitcher {}/proxy enabled.'.format(protected_path))

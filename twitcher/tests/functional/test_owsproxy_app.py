@@ -4,7 +4,7 @@ import webtest
 from pyramid import testing
 from .common import setup_with_mongodb
 
-from twitcher.store import servicestore_factory
+from twitcher.adapter import servicestore_factory
 
 
 class OWSProxyAppTest(unittest.TestCase):
