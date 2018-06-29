@@ -12,7 +12,7 @@ class DefaultAdapter(AdapterInterface):
 
     def configurator_factory(self, settings):
         from pyramid.config import Configurator
-        config = Configurator(settings=settings)
+        return Configurator(settings=settings)
 
     def owsproxy_config(self, settings, config):
         from twitcher.owsproxy import owsproxy_defaultconfig
