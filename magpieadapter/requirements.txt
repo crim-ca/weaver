@@ -1,0 +1,7 @@
+pyramid>=1.7.3
+pyramid_rpc
+webob
+requests
+requests_oauthlib
+pymongo
+argcomplete

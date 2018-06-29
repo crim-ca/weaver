@@ -30,7 +30,6 @@ def tokenstore_factory(registry, database=None):
 
 from twitcher.store.mongodb import MongodbServiceStore
 from twitcher.store.memory import MemoryServiceStore
-from twitcher.store.postgres import PostgresServiceStore
 
 
 def my_import(name):

@@ -1,15 +1,3 @@
-import logging
-logger = logging.getLogger(__name__)
-
-# -- Pyramid ----
-
-
-# -- Ziggurat_foundation ----
-
-#import sys
-#sys.path.insert(0, '/home/deruefx/CrimProjects/PAVICS/Magpie')
-import os
-
 __version__ = '0.3.7'
 
 
@@ -21,6 +9,7 @@ def parse_extra_options(option_str):
     Parses the extra options parameter.
 
     The option_str is a string with coma separated ``opt=value`` pairs.
+
     Example::
 
         tempdir=/path/to/tempdir,archive_root=/path/to/archive
@@ -55,18 +44,10 @@ def main(global_config, **settings):
     # include twitcher components
     config.include('twitcher.config')
     config.include('twitcher.frontpage')
+    config.include('twitcher.rpcinterface')
     config.include('twitcher.owsproxy')
     config.include('twitcher.wps')
     config.include('twitcher.wps_restapi')
-
-    auth_method = config.get_settings().get('twitcher.ows_security_provider', None)
-    if auth_method == 'magpie':
-        from magpie.models import get_user
-        config.set_request_property(get_user, 'user', reify=True)
-        config.include('twitcher.magpieconfig')
-    else:
-        config.include('twitcher.rpcinterface')
-
 
     # tweens/middleware
     # TODO: maybe add tween for exception handling or use unknown_failure view

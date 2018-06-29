@@ -194,7 +194,7 @@ def owsproxy_defaultconfig(settings, config):
     if asbool(settings.get('twitcher.ows_proxy', True)):
         LOGGER.debug('Twitcher {} enabled.'.format(protected_path))
 
-        config.add_route('owsproxy', protected_path+'/{service_name}')
+        config.add_route('owsproxy', protected_path + '/{service_name}')
         # TODO: maybe configure extra path
         config.add_route('owsproxy_extra', '/ows/proxy/{service_name}/{extra_path:.*}')
         config.add_route('owsproxy_secured', '/ows/proxy/{service_name}/{access_token}')
@@ -208,13 +208,8 @@ def owsproxy_defaultconfig(settings, config):
             # include twitcher config
             config.include('twitcher.config')
 
-            auth_method = settings.get('twitcher.ows_security_provider', None)
-            if auth_method == 'magpie':
-                # include postgresdb
-                config.include('twitcher.postgresdb')
-            else:
-                # include mongodb
-                config.include('twitcher.db')
+            # include mongodb
+            config.include('twitcher.db')
 
             config.add_view(owsproxy, route_name='owsproxy')
             config.add_view(owsproxy, route_name='owsproxy_secured')
