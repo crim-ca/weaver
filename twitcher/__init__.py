@@ -13,41 +13,44 @@ import os
 __version__ = '0.3.7'
 
 
-import os
-import sys
-this_dir = os.path.abspath(os.path.dirname(__file__))
-sys.path.insert(0, this_dir)
+from pyramid.exceptions import ConfigurationError
+
+
+def parse_extra_options(option_str):
+    """
+    Parses the extra options parameter.
+
+    The option_str is a string with coma separated ``opt=value`` pairs.
+    Example::
+
+        tempdir=/path/to/tempdir,archive_root=/path/to/archive
+
+    :param option_str: A string parameter with the extra options.
+    :return: A dict with the parsed extra options.
+    """
+    if option_str:
+        try:
+            extra_options = option_str.split(',')
+            extra_options = dict([('=' in opt) and opt.split('=', 1) for opt in extra_options])
+        except Exception:
+            msg = "Can not parse extra-options: {}".format(option_str)
+            raise ConfigurationError(msg)
+    else:
+        extra_options = {}
+    return extra_options
 
 
 def main(global_config, **settings):
     """
     This function returns a Pyramid WSGI application.
     """
-    from pyramid.config import Configurator
-    from pyramid.authentication import AuthTktAuthenticationPolicy
-    from pyramid.authorization import ACLAuthorizationPolicy
 
+    # Parse extra_options and add each of them in the settings dict
+    settings.update(parse_extra_options(settings.get('twitcher.extra_options', '')))
 
-    from magpie.models import group_finder
+    from twitcher.adapter import adapter_factory
 
-    magpie_secret = os.getenv('MAGPIE_SECRET')
-    if magpie_secret is None:
-        logger.debug('Use default secret from twitcher.ini')
-        magpie_secret = settings['magpie.secret']
-
-    authn_policy = AuthTktAuthenticationPolicy(
-        magpie_secret,
-        callback=group_finder,
-    )
-    authz_policy = ACLAuthorizationPolicy()
-
-
-    config = Configurator(
-        settings=settings,
-        authentication_policy=authn_policy,
-        authorization_policy=authz_policy
-    )
-
+    config = adapter_factory(settings).configurator_factory(settings)
 
     # include twitcher components
     config.include('twitcher.config')

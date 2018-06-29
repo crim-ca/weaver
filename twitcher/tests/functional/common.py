@@ -2,7 +2,7 @@ from pyramid import testing
 
 from twitcher.tokengenerator import tokengenerator_factory
 from twitcher.store import tokenstore_factory
-from twitcher.store import servicestore_factory
+from twitcher.adapter import servicestore_factory
 
 
 def setup_with_mongodb():
