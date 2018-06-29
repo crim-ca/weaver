@@ -80,10 +80,18 @@ class OWSAccessForbidden(OWSException):
     locator = "AccessForbidden"
     explanation = "Access to this service is forbidden"
 
+    def __init__(self, detail=None, value=None, **kw):
+        OWSException.__init__(self, detail=detail, value=value, **kw)
+        self.status = 401
+
 
 class OWSAccessFailed(OWSException):
     locator = "NotAcceptable"
     explanation = "Access to this service failed"
+
+    def __init__(self, detail=None, value=None, **kw):
+        OWSException.__init__(self, detail=detail, value=value, **kw)
+        self.status = 502
 
 
 class OWSNoApplicableCode(OWSException):
