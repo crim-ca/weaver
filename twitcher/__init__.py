@@ -9,7 +9,6 @@ def parse_extra_options(option_str):
     Parses the extra options parameter.
 
     The option_str is a string with coma separated ``opt=value`` pairs.
-
     Example::
 
         tempdir=/path/to/tempdir,archive_root=/path/to/archive

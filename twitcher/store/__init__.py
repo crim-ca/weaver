@@ -9,7 +9,6 @@ from twitcher.store.base import AccessTokenStore
 from twitcher.store.memory import MemoryTokenStore
 from twitcher.store.mongodb import MongodbTokenStore
 
-
 def tokenstore_factory(registry, database=None):
     """
     Creates a token store with the interface of :class:`twitcher.store.AccessTokenStore`.
@@ -18,8 +17,7 @@ def tokenstore_factory(registry, database=None):
     :param database: A string with the store implementation name: "mongodb" or "memory".
     :return: An instance of :class:`twitcher.store.AccessTokenStore`.
     """
-    #database = database or 'mongodb'
-    database = None
+    database = database or 'mongodb'
     if database == 'mongodb':
         db = _mongodb(registry)
         store = MongodbTokenStore(db.tokens)

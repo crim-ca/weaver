@@ -1,4 +1,5 @@
 import tempfile
+
 from twitcher.exceptions import AccessTokenNotFound
 from twitcher.exceptions import ServiceNotFound
 from twitcher.owsexceptions import OWSAccessForbidden, OWSInvalidParameterValue
@@ -9,7 +10,6 @@ from twitcher.utils import parse_service_name
 from twitcher.owsrequest import OWSRequest
 from twitcher.esgf import fetch_certificate, ESGF_CREDENTIALS
 from twitcher.datatype import Service
-
 
 import logging
 LOGGER = logging.getLogger("TWITCHER")
@@ -30,8 +30,7 @@ class OWSSecurity(object):
         self.tokenstore = tokenstore
         self.servicestore = servicestore
 
-    @staticmethod
-    def get_token_param(request):
+    def get_token_param(self, request):
         token = None
         if 'token' in request.params:
             token = request.params['token']   # in params
@@ -45,8 +44,7 @@ class OWSSecurity(object):
                 token = elements[-1]   # last path element
         return token
 
-    @staticmethod
-    def prepare_headers(request, access_token):
+    def prepare_headers(self, request, access_token):
         if "esgf_access_token" in access_token.data or "esgf_credentials" in access_token.data:
             workdir = tempfile.mkdtemp(prefix=request.prefix, dir=request.workdir)
             if fetch_certificate(workdir=workdir, data=access_token.data):
@@ -99,5 +97,3 @@ class OWSSecurity(object):
                     "service %s not supported" % ows_request.service, value="service")
             if not ows_request.public_access():
                 self.verify_access(request, service)
-
-

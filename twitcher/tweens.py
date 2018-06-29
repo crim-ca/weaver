@@ -1,6 +1,6 @@
 from pyramid.settings import asbool
 from pyramid.tweens import EXCVIEW
-from pyramid.httpexceptions import *
+from pyramid.httpexceptions import HTTPException
 from twitcher.owsexceptions import OWSException, OWSNoApplicableCode
 from twitcher.adapter import owssecurity_factory
 

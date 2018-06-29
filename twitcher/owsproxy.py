@@ -6,12 +6,6 @@ See also: https://github.com/nive/outpost/blob/master/outpost/proxy.py
 
 import urllib
 import requests
-import base64
-import hashlib
-import calendar
-import datetime
-
-
 
 from pyramid.response import Response
 from pyramid.settings import asbool
@@ -57,10 +51,10 @@ allowed_hosts = (
 # requests.models.Reponse defaults its chunk size to 128 bytes, which is very slow
 class BufferedResponse():
     def __init__(self, resp):
-        self.resp=resp
+        self.resp = resp
 
     def __iter__(self):
-        return self.resp.iter_content(64*1024)
+        return self.resp.iter_content(64 * 1024)
 
 
 def _send_request(request, service, extra_path=None, request_params=None):
@@ -192,12 +186,12 @@ def includeme(config):
 def owsproxy_defaultconfig(settings, config):
     protected_path = settings.get('twitcher.ows_proxy_protected_path', '/ows')
     if asbool(settings.get('twitcher.ows_proxy', True)):
-        LOGGER.debug('Twitcher {} enabled.'.format(protected_path))
+        LOGGER.debug('Twitcher {}/proxy enabled.'.format(protected_path))
 
-        config.add_route('owsproxy', protected_path + '/{service_name}')
+        config.add_route('owsproxy', protected_path + '/proxy/{service_name}')
         # TODO: maybe configure extra path
-        config.add_route('owsproxy_extra', '/ows/proxy/{service_name}/{extra_path:.*}')
-        config.add_route('owsproxy_secured', '/ows/proxy/{service_name}/{access_token}')
+        config.add_route('owsproxy_extra', protected_path + '/proxy/{service_name}/{extra_path:.*}')
+        config.add_route('owsproxy_secured', protected_path + '/proxy/{service_name}/{access_token}')
 
         # use delegation mode?
         if asbool(settings.get('twitcher.ows_proxy_delegate', False)):
@@ -207,14 +201,11 @@ def owsproxy_defaultconfig(settings, config):
         else:
             # include twitcher config
             config.include('twitcher.config')
-
             # include mongodb
             config.include('twitcher.db')
-
             config.add_view(owsproxy, route_name='owsproxy')
             config.add_view(owsproxy, route_name='owsproxy_secured')
             config.add_view(owsproxy, route_name='owsproxy_extra')
-
         # use /owsproxy?
         if asbool(settings.get('twitcher.ows_proxy_url', True)):
             LOGGER.debug('Twitcher /owsproxy enabled.')
