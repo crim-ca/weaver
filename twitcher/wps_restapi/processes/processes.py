@@ -5,7 +5,6 @@ from owslib.wps import ComplexData
 from twitcher.wps_restapi.utils import restapi_base_url
 
 
-@view_config(route_name='processes', request_method='GET', renderer='json')
 def get_processes(request):
     """
     Retrieve available processes
@@ -40,7 +39,6 @@ def jsonify(value):
         return value
 
 
-@view_config(route_name='process', request_method='GET', renderer='json')
 def describe_process(request):
     """
     Retrieve a process description
@@ -82,7 +80,6 @@ def describe_process(request):
     )
 
 
-@view_config(route_name='process', request_method='POST')
 def submit_job(request):
     """
     Execute a process. Parameters: ?sync-execute=true|false (false being the default value)
