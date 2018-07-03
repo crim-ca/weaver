@@ -5,7 +5,6 @@ from twitcher.datatype import Service
 from twitcher.wps_restapi.utils import restapi_base_url
 
 
-@view_config(route_name='providers', request_method='GET', renderer='json')
 def get_providers(request):
     """
     Lists providers
@@ -31,7 +30,6 @@ def get_providers(request):
     return providers
 
 
-@view_config(route_name='providers', request_method='POST', renderer='json')
 def add_provider(request):
     """
     Add a provider
@@ -49,7 +47,6 @@ def add_provider(request):
     return {}
 
 
-@view_config(route_name='provider', request_method='DELETE', renderer='json')
 def remove_provider(request):
     """
     Remove a provider
@@ -65,7 +62,6 @@ def remove_provider(request):
     return {}
 
 
-@view_config(route_name='provider', request_method='GET', renderer='json')
 def get_capabilities(request):
     """
     GetCapabilities of a wps provider
