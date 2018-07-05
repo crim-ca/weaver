@@ -153,7 +153,7 @@ def owsproxy(request):
     except Exception as err:
         return OWSAccessFailed("Could not find service: {}.".format(err.message))
     else:
-        return _send_request(request, service, extra_path, request_params=urllib.urlencode(request.params))
+        return _send_request(request, service, extra_path, request_params=request.query_string)
 
 
 def owsproxy_delegate(request):
