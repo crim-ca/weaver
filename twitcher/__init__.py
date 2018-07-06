@@ -1,6 +1,6 @@
 __version__ = '0.3.7'
 
-
+import adapter
 from pyramid.exceptions import ConfigurationError
 
 
