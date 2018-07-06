@@ -55,6 +55,13 @@ ENV DAEMON_OPTS --nodaemon
 
 WORKDIR /
 
+RUN git clone https://github.com/ouranosinc/magpie && \
+    cd magpie && \
+    git checkout magpie_adapter && \
+    cd .. && \
+    ./opt/conda/envs/twitcher/bin/pip install -r magpie/requirements.txt && \
+    ./opt/conda/envs/twitcher/bin/pip install ./magpie
+
 WORKDIR /opt/birdhouse/src/twitcher
 RUN mkdir -p /opt/birdhouse/var/tmp/nginx/client
 CMD ["make", "update-config", "start"]
