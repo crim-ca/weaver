@@ -19,6 +19,7 @@ ENV MAGPIE_URL magpie
 ENV TWITCHER_URL twitcher
 ENV MAGPIE_SECRET to_be_override
 ENV TWITCHER_PROTECTED_PATH /ows/proxy
+ENV TWITCHER_RESTAPI_PATH /
 
 # Set current home
 ENV HOME /root
