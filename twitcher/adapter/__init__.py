@@ -30,13 +30,22 @@ def adapter_factory(settings):
             LOGGER.info('Using adapter: {!r}'.format(adapter_class))
             return adapter_class()
         except Exception as e:
-            LOGGER.warn('Adapter raised an exception while instantiating : {!r}'.format(e))
+            LOGGER.error('Adapter raised an exception while instantiating : {!r}'.format(e))
+            raise
     return DefaultAdapter()
 
 
 def servicestore_factory(registry, database=None, headers=None):
-    return adapter_factory(registry.settings).servicestore_factory(registry, database, headers)
+    try:
+        return adapter_factory(registry.settings).servicestore_factory(registry, database, headers)
+    except Exception as e:
+        LOGGER.error('Adapter raised an exception while getting servicestore_factory : {!r}'.format(e))
+        raise
 
 
 def owssecurity_factory(registry):
-    return adapter_factory(registry.settings).owssecurity_factory(registry)
+    try:
+        return adapter_factory(registry.settings).owssecurity_factory(registry)
+    except Exception as e:
+        LOGGER.error('Adapter raised an exception while getting owssecurity_factory : {!r}'.format(e))
+        raise
