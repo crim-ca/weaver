@@ -27,6 +27,7 @@ def adapter_factory(settings):
     if settings.get('twitcher.adapter', 'default') != 'default':
         try:
             adapter_class = import_adapter(settings.get('twitcher.adapter'))
+            LOGGER.info('Using adapter: {!r}'.format(adapter_class))
             return adapter_class()
         except Exception as e:
             LOGGER.warn('Adapter raised an exception while instantiating : {!r}'.format(e))
