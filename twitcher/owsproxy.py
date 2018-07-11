@@ -22,6 +22,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 allowed_content_types = (
+    "text/html",
     "application/xml",                       # XML
     "text/xml",
     "text/xml;charset=ISO-8859-1"
