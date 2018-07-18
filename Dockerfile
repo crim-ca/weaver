@@ -57,12 +57,17 @@ ENV DAEMON_OPTS --nodaemon
 
 WORKDIR /
 
+# Install magpie for the magpie adapter
 RUN git clone https://github.com/ouranosinc/magpie && \
     cd magpie && \
     git checkout magpie_adapter && \
     cd .. && \
     ./opt/conda/envs/twitcher/bin/pip install -r magpie/requirements.txt && \
     ./opt/conda/envs/twitcher/bin/pip install ./magpie
+
+# Install twitcher to make sure that magpie adapter can import it
+RUN cd /opt/birdhouse/src/twitcher && \
+    ./opt/conda/envs/twitcher/bin/pip install .
 
 WORKDIR /opt/birdhouse/src/twitcher
 RUN mkdir -p /opt/birdhouse/var/tmp/nginx/client
