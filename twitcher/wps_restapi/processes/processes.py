@@ -3,8 +3,17 @@ from twitcher.adapter import servicestore_factory
 from owslib.wps import WebProcessingService
 from owslib.wps import ComplexData
 from twitcher.wps_restapi.utils import restapi_base_url
+from twitcher.wps_restapi.swagger_definitions import (processes,
+                                                      process,
+                                                      GetProcesses,
+                                                      GetProcess,
+                                                      PostProcess,
+                                                      get_processes_response,
+                                                      get_process_description_response,
+                                                      launch_job_response)
 
 
+@processes.get(tags=['processes'], schema=GetProcesses(), response_schemas=get_processes_response)
 def get_processes(request):
     """
     Retrieve available processes
@@ -39,6 +48,7 @@ def jsonify(value):
         return value
 
 
+@process.get(tags=['processes'], schema=GetProcess(), response_schemas=get_process_description_response)
 def describe_process(request):
     """
     Retrieve a process description
@@ -80,6 +90,7 @@ def describe_process(request):
     )
 
 
+@process.post(tags=['processes'], schema=PostProcess(), response_schemas=launch_job_response)
 def submit_job(request):
     """
     Execute a process. Parameters: ?sync-execute=true|false (false being the default value)

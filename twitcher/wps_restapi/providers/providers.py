@@ -3,8 +3,17 @@ from twitcher.adapter import servicestore_factory
 from owslib.wps import WebProcessingService
 from twitcher.datatype import Service
 from twitcher.wps_restapi.utils import restapi_base_url
+from twitcher.wps_restapi.swagger_definitions import (providers,
+                                                      provider,
+                                                      GetProvider,
+                                                      GetProviders,
+                                                      DeleteProvider,
+                                                      PostProvider,
+                                                      get_all_providers_response,
+                                                      post_provider_response)
 
 
+@providers.get(tags=['providers'], schema=GetProviders(), response_schemas=get_all_providers_response)
 def get_providers(request):
     """
     Lists providers
@@ -30,6 +39,7 @@ def get_providers(request):
     return providers
 
 
+@providers.post(tags=['providers'], schema=PostProvider(), response_schemas=post_provider_response)
 def add_provider(request):
     """
     Add a provider
@@ -47,6 +57,7 @@ def add_provider(request):
     return {}
 
 
+@provider.delete(tags=['providers'], schema=DeleteProvider())
 def remove_provider(request):
     """
     Remove a provider
@@ -62,6 +73,7 @@ def remove_provider(request):
     return {}
 
 
+@provider.get(tags=['providers'], schema=GetProvider())
 def get_capabilities(request):
     """
     GetCapabilities of a wps provider
