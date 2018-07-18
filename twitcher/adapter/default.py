@@ -1,5 +1,6 @@
 from twitcher.adapter.base import AdapterInterface
 
+
 class DefaultAdapter(AdapterInterface):
 
     def servicestore_factory(self, registry, database=None, headers=None):

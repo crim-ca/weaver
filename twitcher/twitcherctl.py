@@ -1,3 +1,4 @@
+import os
 import sys
 import getpass
 import argcomplete
@@ -6,7 +7,8 @@ import argparse
 from twitcher.client import TwitcherService
 
 import logging
-logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.WARN)
+LOGGER_LEVEL = os.getenv('TWITCHER_LOGGER_LEVEL', logging.WARN)
+logging.basicConfig(format='%(levelname)s:%(message)s', level=LOGGER_LEVEL)
 LOGGER = logging.getLogger(__name__)
 
 
@@ -142,7 +144,7 @@ class TwitcherCtl(object):
 
 
 def main():
-    LOGGER.setLevel(logging.INFO)
+    LOGGER.setLevel(LOGGER_LEVEL)
 
     ctl = TwitcherCtl()
     parser = ctl.create_parser()
