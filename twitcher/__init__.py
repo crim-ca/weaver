@@ -1,6 +1,13 @@
 __version__ = '0.3.7'
 
-import adapter
+import os
+import sys
+TWITCHER_MODULE_DIR = os.path.abspath(os.path.dirname(__file__))
+TWITCHER_ROOT_DIR = os.path.abspath(os.path.dirname(TWITCHER_MODULE_DIR))
+sys.path.insert(0, TWITCHER_ROOT_DIR)
+sys.path.insert(0, TWITCHER_MODULE_DIR)
+
+from twitcher import adapter
 from pyramid.exceptions import ConfigurationError
 
 
