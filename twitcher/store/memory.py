@@ -67,7 +67,7 @@ class MemoryServiceStore(ServiceStore):
         self.name_index[service['name']] = service
         self.url_index[service['url']] = service
 
-    def save_service(self, service, overwrite=True):
+    def save_service(self, service, overwrite=True, request=None):
         """
         Store an OWS service in database.
         """
@@ -96,16 +96,16 @@ class MemoryServiceStore(ServiceStore):
             type=service.type,
             public=service.public,
             auth=service.auth))
-        return self.fetch_by_url(url=service_url)
+        return self.fetch_by_url(url=service_url, request=request)
 
-    def delete_service(self, name):
+    def delete_service(self, name, request=None):
         """
         Removes service from registry database.
         """
         self._delete(name=name)
         return True
 
-    def list_services(self):
+    def list_services(self, request=None):
         """
         Lists all services in memory storage.
         """
@@ -114,7 +114,7 @@ class MemoryServiceStore(ServiceStore):
             my_services.append(Service(service))
         return my_services
 
-    def fetch_by_name(self, name):
+    def fetch_by_name(self, name, request=None):
         """
         Get service for given ``name`` from memory storage.
         """
@@ -123,7 +123,7 @@ class MemoryServiceStore(ServiceStore):
             raise ServiceNotFound
         return Service(service)
 
-    def fetch_by_url(self, url):
+    def fetch_by_url(self, url, request=None):
         """
         Get service for given ``url`` from memory storage.
         """
@@ -132,7 +132,7 @@ class MemoryServiceStore(ServiceStore):
             raise ServiceNotFound
         return Service(service)
 
-    def clear_services(self):
+    def clear_services(self, request=None):
         """
         Removes all OWS services from memory storage.
         """

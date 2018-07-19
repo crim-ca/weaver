@@ -40,6 +40,10 @@ def main(global_config, **settings):
 
     config = adapter_factory(settings).configurator_factory(settings)
 
+    # celery
+    config.include('pyramid_celery')
+    config.configure_celery(global_config['__file__'])
+
     # include twitcher components
     config.include('twitcher.config')
     config.include('twitcher.frontpage')

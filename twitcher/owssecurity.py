@@ -84,7 +84,9 @@ class OWSSecurity(object):
             # TODO: refactor this code
             try:
                 service_name = parse_service_name(request.path, protected_path)
-                service = self.servicestore.fetch_by_name(service_name)
+                service = self.servicestore.fetch_by_name(service_name,
+                                                          headers=request.headers,
+                                                          cookies=request.cookies)
                 if service.public is True:
                     LOGGER.warn('public access for service %s', service_name)
             except ServiceNotFound:
