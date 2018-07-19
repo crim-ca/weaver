@@ -35,9 +35,9 @@ def adapter_factory(settings):
     return DefaultAdapter()
 
 
-def servicestore_factory(registry, database=None, headers=None):
+def servicestore_factory(registry, database=None):
     try:
-        return adapter_factory(registry.settings).servicestore_factory(registry, database, headers)
+        return adapter_factory(registry.settings).servicestore_factory(registry, database)
     except Exception as e:
         LOGGER.error('Adapter raised an exception while getting servicestore_factory : {!r}'.format(e))
         raise

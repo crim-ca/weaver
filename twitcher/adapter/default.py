@@ -3,7 +3,7 @@ from twitcher.adapter.base import AdapterInterface
 
 class DefaultAdapter(AdapterInterface):
 
-    def servicestore_factory(self, registry, database=None, headers=None):
+    def servicestore_factory(self, registry, database=None):
         from twitcher.store import servicestore_defaultfactory
         return servicestore_defaultfactory(registry, database)
 
