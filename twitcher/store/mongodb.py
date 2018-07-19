@@ -50,7 +50,7 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
     Registry for OWS services. Uses mongodb to store service url and attributes.
     """
 
-    def save_service(self, service, overwrite=True):
+    def save_service(self, service, overwrite=True, request=None):
         """
         Stores an OWS service in mongodb.
         """
@@ -79,16 +79,16 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
             type=service.type,
             public=service.public,
             auth=service.auth))
-        return self.fetch_by_url(url=service_url)
+        return self.fetch_by_url(url=service_url, request=request)
 
-    def delete_service(self, name):
+    def delete_service(self, name, request=None):
         """
         Removes service from mongodb storage.
         """
         self.collection.delete_one({'name': name})
         return True
 
-    def list_services(self):
+    def list_services(self, request=None):
         """
         Lists all services in mongodb storage.
         """
@@ -97,7 +97,7 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
             my_services.append(Service(service))
         return my_services
 
-    def fetch_by_name(self, name):
+    def fetch_by_name(self, name, request=None):
         """
         Gets service for given ``name`` from mongodb storage.
         """
@@ -106,7 +106,7 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
             raise ServiceNotFound
         return Service(service)
 
-    def fetch_by_url(self, url):
+    def fetch_by_url(self, url, request=None):
         """
         Gets service for given ``url`` from mongodb storage.
         """
@@ -115,7 +115,7 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
             raise ServiceNotFound
         return Service(service)
 
-    def clear_services(self):
+    def clear_services(self, request=None):
         """
         Removes all OWS services from mongodb storage.
         """

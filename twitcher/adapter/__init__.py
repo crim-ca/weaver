@@ -27,8 +27,8 @@ def adapter_factory(settings):
     return DefaultAdapter()
 
 
-def servicestore_factory(registry, database=None, headers=None):
-    return adapter_factory(registry.settings).servicestore_factory(registry, database, headers)
+def servicestore_factory(registry, database=None):
+    return adapter_factory(registry.settings).servicestore_factory(registry, database)
 
 def owssecurity_factory(registry):
     return adapter_factory(registry.settings).owssecurity_factory(registry)

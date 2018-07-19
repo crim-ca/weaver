@@ -49,7 +49,7 @@ class ServiceStore(object):
     Storage for OWS services.
     """
 
-    def save_service(self, service, overwrite=True):
+    def save_service(self, service, overwrite=True, request=None):
         """
         Stores an OWS service in storage.
 
@@ -57,19 +57,19 @@ class ServiceStore(object):
         """
         raise NotImplementedError
 
-    def delete_service(self, name):
+    def delete_service(self, name, request=None):
         """
         Removes service from database.
         """
         raise NotImplementedError
 
-    def list_services(self):
+    def list_services(self, request=None):
         """
         Lists all services in database.
         """
         raise NotImplementedError
 
-    def fetch_by_name(self, name):
+    def fetch_by_name(self, name, request=None):
         """
         Get service for given ``name`` from storage.
 
@@ -78,7 +78,7 @@ class ServiceStore(object):
         """
         raise NotImplementedError
 
-    def fetch_by_url(self, url):
+    def fetch_by_url(self, url, request=None):
         """
         Get service for given ``url`` from storage.
 
@@ -87,7 +87,7 @@ class ServiceStore(object):
         """
         raise NotImplementedError
 
-    def clear_services(self):
+    def clear_services(self, request=None):
         """
         Removes all OWS services from storage.
         """

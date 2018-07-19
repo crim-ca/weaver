@@ -8,10 +8,20 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class MongoDB:
+    __db = None
+
+    @classmethod
+    def get(cls, registry):
+        if not cls.__db:
+            settings = registry.settings
+            client = pymongo.MongoClient(settings['mongodb.host'], int(settings['mongodb.port']))
+            cls.__db = client[settings['mongodb.db_name']]
+        return cls.__db
+
+
 def mongodb(registry):
-    settings = registry.settings
-    client = pymongo.MongoClient(settings['mongodb.host'], int(settings['mongodb.port']))
-    db = client[settings['mongodb.db_name']]
+    db = MongoDB.get(registry)
     db.services.create_index("name", unique=True)
     db.services.create_index("url", unique=True)
     return db

@@ -148,9 +148,8 @@ def owsproxy(request):
     try:
         service_name = request.matchdict.get('service_name')
         extra_path = request.matchdict.get('extra_path')
-        store = servicestore_factory(request.registry,
-                                     headers=request.headers)
-        service = store.fetch_by_name(service_name)
+        store = servicestore_factory(request.registry)
+        service = store.fetch_by_name(service_name, request=request)
     except Exception as err:
         return OWSAccessFailed("Could not find service: {}.".format(err.message))
     else:
@@ -201,7 +200,7 @@ def owsproxy_defaultconfig(settings, config):
         else:
             # include twitcher config
             config.include('twitcher.config')
-            # include mongodb
+            # include mongodb for services
             config.include('twitcher.db')
             config.add_view(owsproxy, route_name='owsproxy')
             config.add_view(owsproxy, route_name='owsproxy_secured')
