@@ -4,15 +4,17 @@ OWSExceptions are based on pyramid.httpexceptions.
 See also: https://github.com/geopython/pywps/blob/master/pywps/exceptions.py
 """
 
-
+import json
 from string import Template
 
 from zope.interface import implementer
 
 from webob import html_escape as _html_escape
+from webob.acceptparse import MIMEAccept
 
 from pyramid.interfaces import IExceptionResponse
 from pyramid.response import Response
+from pyramid.compat import text_type
 
 
 @implementer(IExceptionResponse)
@@ -44,16 +46,48 @@ class OWSException(Response, Exception):
     def __str__(self):
         return self.message
 
+    @staticmethod
+    def json_formatter(status, body, title, environ):
+        return {'description': body.strip(),
+                'code': status}
+
     def prepare(self, environ):
         if not self.body:
-            self.content_type = 'text/xml'
+            accept_value = environ.get('HTTP_ACCEPT', '')
+            accept = MIMEAccept(accept_value)
+
+            # Attempt to match text/xml or application/json, if those don't
+            # match, we will fall through to defaulting to text/xml
+            match = accept.best_match(['text/xml', 'application/json'])
+
+            if match == 'application/json':
+                self.content_type = 'application/json'
+
+                # json exception response should not have status 200
+                if self.status_code == 200:
+                    self.status = 500
+
+                class JsonPageTemplate(object):
+                    def __init__(self, excobj):
+                        self.excobj = excobj
+
+                    def substitute(self, code, locator, message):
+                        return json.dumps(self.json_formatter(status=code, body=message))
+
+                page_template = JsonPageTemplate(self)
+
+            else:
+                self.content_type = 'text/xml'
+                page_template = self.page_template
+
             args = {
                 'code': _html_escape(self.code),
                 'locator': _html_escape(self.locator),
                 'message': _html_escape(self.message or ''),
             }
-            page = self.page_template.substitute(args)
-            page = page.encode(self.charset)
+            page = page_template.substitute(**args)
+            if isinstance(page, text_type):
+                page = page.encode(self.charset if self.charset else 'UTF-8')
             self.app_iter = [page]
             self.body = page
 
