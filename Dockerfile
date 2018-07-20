@@ -67,7 +67,7 @@ RUN git clone https://github.com/ouranosinc/magpie && \
 
 # Install twitcher to make sure that magpie adapter can import it
 RUN cd /opt/birdhouse/src/twitcher && \
-    ./opt/conda/envs/twitcher/bin/pip install .
+    /opt/conda/envs/twitcher/bin/pip install .
 
 WORKDIR /opt/birdhouse/src/twitcher
 RUN mkdir -p /opt/birdhouse/var/tmp/nginx/client
