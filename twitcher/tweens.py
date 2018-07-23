@@ -31,6 +31,8 @@ def ows_security_tween_factory(handler, registry):
             return err
         except HTTPException as err:
             logger.exception("security check failed.")
+            # Use the same json formatter than OWSException
+            err._json_formatter = OWSException.json_formatter
             return err
         except Exception as err:
             logger.exception("unknown error")
