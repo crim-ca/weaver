@@ -9,7 +9,8 @@ from colander import (MappingSchema,
                       String,
                       Boolean,
                       Integer,
-                      Mapping)
+                      Mapping,
+                      List)
 
 """
 API endpoints
@@ -28,6 +29,10 @@ outputs_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id
 outputs_short_uri = '/jobs/{job_id}/outputs'
 output_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/outputs/{output_id}'
 output_short_uri = '/jobs/{job_id}/outputs/{output_id}'
+exceptions_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/exceptions'
+exceptions_short_uri = '/jobs/{job_id}/exceptions'
+logs_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/log'
+logs_short_uri = '/jobs/{job_id}/log'
 
 """
 These "services" are wrappers that allow Cornice to generate the api's json
@@ -45,6 +50,10 @@ outputs_full = Service(name='outputs_full', path=outputs_full_uri)
 outputs_short = Service(name='outputs_short', path=outputs_short_uri)
 output_full = Service(name='output_full', path=output_full_uri)
 output_short = Service(name='output_short', path=output_short_uri)
+exceptions_full = Service(name='exceptions_full', path=exceptions_full_uri)
+exceptions_short = Service(name='exceptions_short', path=exceptions_short_uri)
+logs_full = Service(name='logs_full', path=logs_full_uri)
+logs_short = Service(name='logs_short', path=logs_short_uri)
 
 """
 Query parameter definitions
@@ -90,6 +99,26 @@ class ShortOutputEndpoint(MappingSchema):
     output_id = output_id
 
 
+class FullExceptionsEndpoint(MappingSchema):
+    provider_id = provider_id
+    process_id = process_id
+    job_id = job_id
+
+
+class ShortExceptionsEndpoint(MappingSchema):
+    job_id = job_id
+
+
+class FullLogsEndpoint(MappingSchema):
+    provider_id = provider_id
+    process_id = process_id
+    job_id = job_id
+
+
+class ShortLogsEndpoint(MappingSchema):
+    job_id = job_id
+
+
 """
 These classes define schemas for requests that feature a body
 """
@@ -111,13 +140,22 @@ class LaunchJobRequestBody(SequenceSchema):
 
 
 class ProviderSchema(MappingSchema):
-    """WPS provider definition"""
+    """WPS provider shortened definition"""
     url = SchemaNode(String())
     abstract = SchemaNode(String())
     title = SchemaNode(String())
     id = SchemaNode(String())
     public = SchemaNode(Boolean())
+
+
+class ProviderCapabilitiesSchema(MappingSchema):
+    """WPS provider capabilities"""
     contact = SchemaNode(String())
+    title = SchemaNode(String())
+    url = SchemaNode(String())
+    abstract = SchemaNode(String())
+    type = SchemaNode(String())
+    id = SchemaNode(String())
 
 
 class ProcessSchema(MappingSchema):
@@ -199,8 +237,30 @@ class JobOutputsSchema(SequenceSchema):
     output = JobOutputSchema()
 
 
+class ExceptionTextList(SequenceSchema):
+    text = SchemaNode(String())
+
+
+class ExceptionSchema(MappingSchema):
+    Code = SchemaNode(String())
+    Locator = SchemaNode(String())
+    Text = ExceptionTextList()
+
+
+class ExceptionsOutputSchema(SequenceSchema):
+    exceptions = ExceptionSchema()
+
+
+class LogsOutputSchema(MappingSchema):
+    pass
+
+
 class OkGetProvidersSchema(MappingSchema):
     body = ProvidersSchema()
+
+
+class OkGetProviderCapabilitiesSchema(MappingSchema):
+    body = ProviderCapabilitiesSchema()
 
 
 class OkGetProcessesSchema(MappingSchema):
@@ -235,8 +295,19 @@ class OkGetSingleOutputResponse(MappingSchema):
     body = JobOutputSchema()
 
 
+class OkGetExceptionsResponse(MappingSchema):
+    body = ExceptionsOutputSchema()
+
+
+class OkGetLogsResponse(MappingSchema):
+    body = LogsOutputSchema()
+
+
 get_all_providers_response = {
     '200': OkGetProvidersSchema(description='success')
+}
+get_one_provider_response = {
+    '200': OkGetProviderCapabilitiesSchema(description='success')
 }
 get_processes_response = {
     '200': OkGetProcessesSchema(description='success')
@@ -261,6 +332,12 @@ get_single_job_outputs_response = {
 }
 get_single_output_response = {
     '200': OkGetSingleOutputResponse(description='success')
+}
+get_exceptions_response = {
+    '200': OkGetExceptionsResponse(description='success')
+}
+get_logs_response = {
+    '200': OkGetLogsResponse(description='success')
 }
 
 
@@ -334,3 +411,19 @@ class GetSpecificOutputFull(MappingSchema):
 
 class GetSpecificOutputShort(MappingSchema):
     querystring = ShortOutputEndpoint()
+
+
+class GetExceptionsFull(MappingSchema):
+    querystring = FullExceptionsEndpoint()
+
+
+class GetExceptionsShort(MappingSchema):
+    querystring = ShortExceptionsEndpoint()
+
+
+class GetLogsFull(MappingSchema):
+    querystring = FullLogsEndpoint()
+
+
+class GetLogsShort(MappingSchema):
+    querystring = ShortLogsEndpoint()

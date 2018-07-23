@@ -10,7 +10,8 @@ from twitcher.wps_restapi.swagger_definitions import (providers,
                                                       DeleteProvider,
                                                       PostProvider,
                                                       get_all_providers_response,
-                                                      post_provider_response)
+                                                      post_provider_response,
+                                                      get_one_provider_response)
 from twitcher.wps_restapi.utils import restapi_base_url, get_cookie_headers
 import pyramid.httpexceptions as exc
 
@@ -80,7 +81,7 @@ def remove_provider(request):
     return {}
 
 
-@provider.get(tags=['providers'], schema=GetProvider())
+@provider.get(tags=['providers'], schema=GetProvider(), response_schemas=get_one_provider_response)
 def get_capabilities(request):
     """
     GetCapabilities of a wps provider

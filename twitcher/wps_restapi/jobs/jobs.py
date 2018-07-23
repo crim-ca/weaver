@@ -6,6 +6,10 @@ from twitcher.wps_restapi.swagger_definitions import (jobs,
                                                       outputs_short,
                                                       output_full,
                                                       output_short,
+                                                      exceptions_full,
+                                                      exceptions_short,
+                                                      logs_full,
+                                                      logs_short,
                                                       GetJobs,
                                                       GetJobStatusFull,
                                                       GetJobStatusShort,
@@ -15,10 +19,16 @@ from twitcher.wps_restapi.swagger_definitions import (jobs,
                                                       GetJobOutputsShort,
                                                       GetSpecificOutputFull,
                                                       GetSpecificOutputShort,
+                                                      GetExceptionsFull,
+                                                      GetExceptionsShort,
+                                                      GetLogsFull,
+                                                      GetLogsShort,
                                                       get_all_jobs_response,
                                                       get_single_job_status_response,
                                                       get_single_job_outputs_response,
-                                                      get_single_output_response)
+                                                      get_single_output_response,
+                                                      get_exceptions_response,
+                                                      get_logs_response)
 import uuid
 import requests
 from datetime import datetime
@@ -289,6 +299,8 @@ def get_output(request):
     return 404
 
 
+@exceptions_full.get(tags=['jobs'], schema=GetExceptionsFull(), response_schemas=get_exceptions_response)
+@exceptions_short.get(tags=['jobs'], schema=GetExceptionsShort(), response_schemas=get_exceptions_response)
 def get_exceptions(request):
     """
     Retrieve the result(s) of a job"
@@ -301,6 +313,8 @@ def get_exceptions(request):
     return job['exceptions']
 
 
+@logs_full.get(tags=['jobs'], schema=GetLogsFull(), response_schemas=get_logs_response)
+@logs_short.get(tags=['jobs'], schema=GetLogsShort(), response_schemas=get_logs_response)
 def get_log(request):
     """
     Retrieve the result(s) of a job"

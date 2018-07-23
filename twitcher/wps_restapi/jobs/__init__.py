@@ -4,7 +4,11 @@ from twitcher.wps_restapi.swagger_definitions import (jobs_uri,
                                                       outputs_full_uri,
                                                       outputs_short_uri,
                                                       output_full_uri,
-                                                      output_short_uri)
+                                                      output_short_uri,
+                                                      exceptions_full_uri,
+                                                      exceptions_short_uri,
+                                                      logs_full_uri,
+                                                      logs_short_uri)
 from twitcher.wps_restapi.jobs.jobs import (get_jobs,
                                             get_job_status,
                                             cancel_job,
@@ -24,10 +28,10 @@ def includeme(config):
     config.add_route('outputs', outputs_short_uri)
     config.add_route('output_full', output_full_uri)
     config.add_route('output', output_short_uri)
-    config.add_route('exceptions_full', '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/exceptions')
-    config.add_route('exceptions', '/jobs/{job_id}/exceptions')
-    config.add_route('log_full', '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/log')
-    config.add_route('log', '/jobs/{job_id}/log')
+    config.add_route('exceptions_full', exceptions_full_uri)
+    config.add_route('exceptions', exceptions_short_uri)
+    config.add_route('log_full', logs_full_uri)
+    config.add_route('log', logs_short_uri)
 
     config.add_view(get_jobs, route_name='jobs', request_method='GET', renderer='json')
     config.add_view(get_job_status, route_name='job', request_method='GET', renderer='json')
