@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<head>
+    <meta charset="UTF-8">
+    <title>Twitcher's Swagger UI</title>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@3.12.1/swagger-ui.css">
+    <script src="https://unpkg.com/swagger-ui-dist@3.12.1/swagger-ui-standalone-preset.js"></script>
+    <script src="https://unpkg.com/swagger-ui-dist@3.12.1/swagger-ui-bundle.js"></script>
+    <script>
+        addEventListener('DOMContentLoaded', function() {
+            window.ui = SwaggerUIBundle({
+                url: "/__api__",
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                docExpansion: 'none',
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIStandalonePreset
+                ],
+                plugins: [
+                    SwaggerUIBundle.plugins.DownloadUrl
+                ],
+                layout: "StandaloneLayout",
+            });
+        });
+    </script>
+</head>
+<body>
+<div id="swagger-ui"></div>
+</body>
+</html>

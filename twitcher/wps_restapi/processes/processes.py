@@ -5,20 +5,31 @@ from time import sleep
 from datetime import datetime
 from twitcher.adapter import servicestore_factory
 from owslib.wps import WebProcessingService
+from owslib.wps import ComplexData
+from twitcher.wps_restapi.utils import restapi_base_url
+from twitcher.wps_restapi.swagger_definitions import (processes,
+                                                      process,
+                                                      GetProcesses,
+                                                      GetProcess,
+                                                      PostProcess,
+                                                      get_processes_response,
+                                                      get_process_description_response,
+                                                      launch_job_response)
 from owslib.wps import WPSException
 from owslib.wps import ComplexDataInput
 from owslib.wps import ASYNC, SYNC
 from twitcher.wps_restapi.utils import *
-from twitcher.wps_restapi.jobs import add_job, check_status
+from twitcher.wps_restapi.jobs.jobs import add_job, check_status
 from twitcher.db import MongoDB
 from pyramid_celery import celery_app as app
 from lxml import etree
 
-
 from celery.utils.log import get_task_logger
+
 logger = get_task_logger(__name__)
 
 
+@processes.get(tags=['processes'], schema=GetProcesses(), response_schemas=get_processes_response)
 def get_processes(request):
     """
     Retrieve available processes
@@ -44,7 +55,7 @@ def get_processes(request):
     return processes
 
 
-
+@process.get(tags=['processes'], schema=GetProcess(), response_schemas=get_process_description_response)
 def describe_process(request):
     """
     Retrieve a process description
@@ -81,8 +92,8 @@ def describe_process(request):
         id=process_id,
         label=getattr(process, 'title', ''),
         description=getattr(process, 'abstract', ''),
-        inputs = inputs,
-        outputs = outputs
+        inputs=inputs,
+        outputs=outputs
     )
 
 
@@ -133,6 +144,7 @@ def _read_reference(input_value):
     except urllib2.URLError:
         # Don't raise exceptions coming from that.
         return None
+
 
 def _get_json_multiple_inputs(input_value):
     """
@@ -213,8 +225,8 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
 
     try:
         wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), skip_caps=False, verify=False)
-        #execution = wps.execute(identifier, inputs=inputs, output=outputs, async=async, lineage=True)
-        execution = wps.execute(identifier, inputs=inputs, output=outputs, mode= ASYNC if async else SYNC, lineage=True)
+        # execution = wps.execute(identifier, inputs=inputs, output=outputs, async=async, lineage=True)
+        execution = wps.execute(identifier, inputs=inputs, output=outputs, mode=ASYNC if async else SYNC, lineage=True)
         # job['service'] = wps.identification.title
         # job['title'] = getattr(execution.process, "title")
         if not execution.process and execution.errors:
@@ -293,6 +305,7 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
     return job['status']
 
 
+@process.post(tags=['processes'], schema=PostProcess(), response_schemas=launch_job_response)
 def submit_job(request):
     """
     Execute a process. Parameters: ?sync-execute=true|false (false being the default value)
@@ -387,15 +400,15 @@ def submit_job(request):
         inputs=inputs,
         outputs=outputs,
         async=async,
-        #Convert EnvironHeaders to a simple dict (should cherrypick the required headers)
+        # Convert EnvironHeaders to a simple dict (should cherrypick the required headers)
         headers={k: v for k, v in request.headers.iteritems()})
 
     # Should return 201 response
     return {'jobID': result.id,
             'status': "ProcessAccepted",
-            'location' : '{base_url}/providers/{provider_id}/processes/{process_id}/jobs/{job_id}'.format(
+            'location': '{base_url}/providers/{provider_id}/processes/{process_id}/jobs/{job_id}'.format(
                 base_url=restapi_base_url(request),
                 provider_id=provider_id,
                 process_id=process.identifier,
                 job_id=result.id)
-    }
+            }
