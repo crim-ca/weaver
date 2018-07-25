@@ -39,6 +39,9 @@ dependencies:
 # mongodb
 - pymongo=3
 - mongodb=3.4
+- openssl
+- lxml=3.7
+- libxslt=1.1.29
 - celery
 - cornice
 - colander
@@ -48,5 +51,7 @@ dependencies:
   - pyramid-celery
   - sphinx-autoapi
   - -e git+https://github.com/huard/sphinx-autodoc-pywps.git#egg=sphinx_autodoc_pywps
+  - ziggurat_foundations
+  - bcrypt
   - https://github.com/geopython/OWSLib/archive/master.zip
   - cornice_swagger
