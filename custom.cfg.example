@@ -1,5 +1,6 @@
 [buildout]
 extends = buildout.cfg
+parts += adapter_impl
 
 ## Development options
 # versions = noversions
@@ -8,3 +9,15 @@ extends = buildout.cfg
 hostname = localhost
 https-port = 5000
 log-level = WARN
+
+wps-restapi = true
+adapter = package.path.to.AdapterImpl
+restapi-path = /
+
+extra-options = adapter_impl.opt1=value1,adapter_impl.opt2=value2
+
+[adapter_impl]
+recipe = git-recipe
+repository = git://github.com/provider/adapter_impl.git
+ref = master
+as_egg = True
