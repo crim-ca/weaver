@@ -1,34 +1,5 @@
 from pyramid.view import view_config
-from twitcher.wps_restapi.swagger_definitions import (jobs,
-                                                      job_full,
-                                                      job_short,
-                                                      outputs_full,
-                                                      outputs_short,
-                                                      output_full,
-                                                      output_short,
-                                                      exceptions_full,
-                                                      exceptions_short,
-                                                      logs_full,
-                                                      logs_short,
-                                                      GetJobs,
-                                                      GetJobStatusFull,
-                                                      GetJobStatusShort,
-                                                      DismissJobFull,
-                                                      DismissJobShort,
-                                                      GetJobOutputsFull,
-                                                      GetJobOutputsShort,
-                                                      GetSpecificOutputFull,
-                                                      GetSpecificOutputShort,
-                                                      GetExceptionsFull,
-                                                      GetExceptionsShort,
-                                                      GetLogsFull,
-                                                      GetLogsShort,
-                                                      get_all_jobs_response,
-                                                      get_single_job_status_response,
-                                                      get_single_job_outputs_response,
-                                                      get_single_output_response,
-                                                      get_exceptions_response,
-                                                      get_logs_response)
+import twitcher.wps_restapi.swagger_definitions as sd
 import uuid
 import requests
 from datetime import datetime
@@ -160,7 +131,7 @@ def filter_jobs(collection, request, page=0, limit=10, process=None, provider=No
     return items, count
 
 
-@jobs.get(tags=['jobs'], schema=GetJobs(), response_schemas=get_all_jobs_response)
+@sd.jobs_service.get(tags=['jobs'], response_schemas=sd.get_all_jobs_responses)
 def get_jobs(request):
     """
     Retrieve the list of jobs which can be filtered/sorted using :
@@ -214,8 +185,8 @@ def get_job(request):
     return job
 
 
-@job_full.get(tags=['jobs'], schema=GetJobStatusFull(), response_schemas=get_single_job_status_response)
-@job_short.get(tags=['jobs'], schema=GetJobStatusShort(), response_schemas=get_single_job_status_response)
+@sd.job_full_service.get(tags=['jobs'], schema=sd.FullJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
+@sd.job_short_service.get(tags=['jobs'], schema=sd.ShortJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
 def get_job_status(request):
     """
     Retrieve the status of a job
@@ -243,8 +214,8 @@ def get_job_status(request):
     return response
 
 
-@job_full.delete(tags=['jobs'], schema=DismissJobFull())
-@job_short.delete(tags=['jobs'], schema=DismissJobShort())
+@sd.job_full_service.delete(tags=['jobs'], schema=sd.FullJobEndpoint())
+@sd.job_short_service.delete(tags=['jobs'], schema=sd.ShortJobEndpoint())
 def cancel_job(request):
     """
     Dismiss a job.
@@ -260,8 +231,8 @@ def cancel_job(request):
     return 200
 
 
-@outputs_full.get(tags=['jobs'], schema=GetJobOutputsFull(), response_schemas=get_single_job_outputs_response)
-@outputs_short.get(tags=['jobs'], schema=GetJobOutputsShort(), response_schemas=get_single_job_outputs_response)
+@sd.outputs_full_service.get(tags=['jobs'], schema=sd.FullJobEndpoint(), response_schemas=sd.get_single_job_outputs_responses)
+@sd.outputs_short_service.get(tags=['jobs'], schema=sd.ShortJobEndpoint(), response_schemas=sd.get_single_job_outputs_responses)
 def get_outputs(request):
     """
     Retrieve the result(s) of a job
@@ -278,8 +249,8 @@ def get_outputs(request):
     return outputs
 
 
-@output_full.get(tags=['jobs'], schema=GetSpecificOutputFull(), response_schemas=get_single_output_response)
-@output_short.get(tags=['jobs'], schema=GetSpecificOutputShort(), response_schemas=get_single_output_response)
+@sd.output_full_service.get(tags=['jobs'], schema=sd.FullOutputEndpoint(), response_schemas=sd.get_single_output_responses)
+@sd.output_short_service.get(tags=['jobs'], schema=sd.ShortOutputEndpoint(), response_schemas=sd.get_single_output_responses)
 def get_output(request):
     """
     Retrieve the result of a particular job output
@@ -299,8 +270,8 @@ def get_output(request):
     return 404
 
 
-@exceptions_full.get(tags=['jobs'], schema=GetExceptionsFull(), response_schemas=get_exceptions_response)
-@exceptions_short.get(tags=['jobs'], schema=GetExceptionsShort(), response_schemas=get_exceptions_response)
+@sd.exceptions_full_service.get(tags=['jobs'], schema=sd.FullExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
+@sd.exceptions_short_service.get(tags=['jobs'], schema=sd.ShortExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
 def get_exceptions(request):
     """
     Retrieve the result(s) of a job"
@@ -313,8 +284,8 @@ def get_exceptions(request):
     return job['exceptions']
 
 
-@logs_full.get(tags=['jobs'], schema=GetLogsFull(), response_schemas=get_logs_response)
-@logs_short.get(tags=['jobs'], schema=GetLogsShort(), response_schemas=get_logs_response)
+@sd.logs_full_service.get(tags=['jobs'], schema=sd.FullLogsEndpoint(), response_schemas=sd.get_logs_responses)
+@sd.logs_short_service.get(tags=['jobs'], schema=sd.ShortLogsEndpoint(), response_schemas=sd.get_logs_responses)
 def get_log(request):
     """
     Retrieve the result(s) of a job"

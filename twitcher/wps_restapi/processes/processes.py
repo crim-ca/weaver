@@ -1,5 +1,6 @@
 import json
 import urllib2
+import twitcher.wps_restapi.swagger_definitions as sd
 from owslib.wps import is_reference
 from time import sleep
 from datetime import datetime
@@ -7,14 +8,6 @@ from twitcher.adapter import servicestore_factory
 from owslib.wps import WebProcessingService
 from owslib.wps import ComplexData
 from twitcher.wps_restapi.utils import restapi_base_url
-from twitcher.wps_restapi.swagger_definitions import (processes,
-                                                      process,
-                                                      GetProcesses,
-                                                      GetProcess,
-                                                      PostProcess,
-                                                      get_processes_response,
-                                                      get_process_description_response,
-                                                      launch_job_response)
 from owslib.wps import WPSException
 from owslib.wps import ComplexDataInput
 from owslib.wps import ASYNC, SYNC
@@ -29,7 +22,7 @@ from celery.utils.log import get_task_logger
 logger = get_task_logger(__name__)
 
 
-@processes.get(tags=['processes'], schema=GetProcesses(), response_schemas=get_processes_response)
+@sd.processes_service.get(tags=['processes'], schema=sd.ProviderEndpoint(), response_schemas=sd.get_processes_responses)
 def get_processes(request):
     """
     Retrieve available processes
@@ -55,7 +48,7 @@ def get_processes(request):
     return processes
 
 
-@process.get(tags=['processes'], schema=GetProcess(), response_schemas=get_process_description_response)
+@sd.process_service.get(tags=['processes'], schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_description_responses)
 def describe_process(request):
     """
     Retrieve a process description
@@ -305,7 +298,7 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
     return job['status']
 
 
-@process.post(tags=['processes'], schema=PostProcess(), response_schemas=launch_job_response)
+@sd.process_service.post(tags=['processes'], schema=sd.PostProcess(), response_schemas=sd.launch_job_responses)
 def submit_job(request):
     """
     Execute a process. Parameters: ?sync-execute=true|false (false being the default value)
@@ -316,45 +309,16 @@ def submit_job(request):
     "inputs": [
         {
             "id": "sosInputNiederschlag",
-            "value": "http://www.fluggs.de/sos2/sos?service%3DSOS&version%3D2.0.0&request%3DGetObservation&responseformat%3Dhttp://www.opengis.net/om/2.0&observedProperty%3DNiederschlagshoehe&procedure%3DTagessumme&featureOfInterest%3DBever-Talsperre&&namespaces%3Dxmlns%28sams%2Chttp%3A%2F%2Fwww.opengis.net%2FsamplingSpatial%2F2.0%29%2Cxmlns%28om%2Chttp%3A%2F%2Fwww.opengis.net%2Fom%2F2.0%29&temporalFilter%3Dom%3AphenomenonTime%2C2016-01-01T10:00:00.00Z%2F2016-04-30T23:59:00.000Z",
-			"type" : "text/plain"
+            "value": "http://www.fluggs.de/sos2/sos?service%3DSOS&version%3D2.0.0&request%3DGetObservation&responseformat%3Dhttp://www.opengis.net/om/2.0&observedProperty%3DNiederschlagshoehe&procedure%3DTagessumme&featureOfInterest%3DBever-Talsperre&&namespaces%3Dxmlns%28sams%2Chttp%3A%2F%2Fwww.opengis.net%2FsamplingSpatial%2F2.0%29%2Cxmlns%28om%2Chttp%3A%2F%2Fwww.opengis.net%2Fom%2F2.0%29&temporalFilter%3Dom%3AphenomenonTime%2C2016-01-01T10:00:00.00Z%2F2016-04-30T23:59:00.000Z"
         },
         {
             "id": "sosInputFuellstand",
-            "value": "http://www.fluggs.de/sos2/sos?service%3DSOS&version%3D2.0.0&request%3DGetObservation&responseformat%3Dhttp://www.opengis.net/om/2.0&observedProperty%3DSpeicherfuellstand&procedure%3DEinzelwert&featureOfInterest%3DBever-Talsperre_Windenhaus&namespaces%3Dxmlns%28sams%2Chttp%3A%2F%2Fwww.opengis.net%2FsamplingSpatial%2F2.0%29%2Cxmlns%28om%2Chttp%3A%2F%2Fwww.opengis.net%2Fom%2F2.0%29&temporalFilter%3Dom%3AphenomenonTime%2C2016-01-01T10:00:00.00Z%2F2016-04-30T23:59:00.000Z",
-			"type" : "text/plain"
+            "value": "http://www.fluggs.de/sos2/sos?service%3DSOS&version%3D2.0.0&request%3DGetObservation&responseformat%3Dhttp://www.opengis.net/om/2.0&observedProperty%3DSpeicherfuellstand&procedure%3DEinzelwert&featureOfInterest%3DBever-Talsperre_Windenhaus&namespaces%3Dxmlns%28sams%2Chttp%3A%2F%2Fwww.opengis.net%2FsamplingSpatial%2F2.0%29%2Cxmlns%28om%2Chttp%3A%2F%2Fwww.opengis.net%2Fom%2F2.0%29&temporalFilter%3Dom%3AphenomenonTime%2C2016-01-01T10:00:00.00Z%2F2016-04-30T23:59:00.000Z"
         },
         {
             "id": "sosInputTarget",
-            "value": "http://fluggs.wupperverband.de/sos2-tamis/service?service%3DSOS&version%3D2.0.0&request%3DGetObservation&responseformat%3Dhttp://www.opengis.net/om/2.0&observedProperty%3DWasserstand_im_Damm&procedure%3DHandeingabe&featureOfInterest%3DBever-Talsperre_MQA7_Piezometer_Kalkzone&namespaces%3Dxmlns%28sams%2Chttp%3A%2F%2Fwww.opengis.net%2FsamplingSpati-al%2F2.0%29%2Cxmlns%28om%2Chttp%3A%2F%2Fwww.opengis.net%2Fom%2F2.0%29&temporalFilter%3Dom%3AphenomenonTime%2C2016-01-01T00:01:00.00Z%2F2016-04-30T23:59:00.000Z",
-			"type" : "text/plain"
+            "value": "http://fluggs.wupperverband.de/sos2-tamis/service?service%3DSOS&version%3D2.0.0&request%3DGetObservation&responseformat%3Dhttp://www.opengis.net/om/2.0&observedProperty%3DWasserstand_im_Damm&procedure%3DHandeingabe&featureOfInterest%3DBever-Talsperre_MQA7_Piezometer_Kalkzone&namespaces%3Dxmlns%28sams%2Chttp%3A%2F%2Fwww.opengis.net%2FsamplingSpati-al%2F2.0%29%2Cxmlns%28om%2Chttp%3A%2F%2Fwww.opengis.net%2Fom%2F2.0%29&temporalFilter%3Dom%3AphenomenonTime%2C2016-01-01T00:01:00.00Z%2F2016-04-30T23:59:00.000Z"
         }
-    ],
-    "outputs": [
-      {
-              "id": "targetObs_plot",
-              "type": "image/png"
-       },
-      {
-              "id": "model_diagnostics",
-              "type": "image/png"
-       },
-      {
-              "id": "relations",
-              "type": "image/png"
-       },
-      {
-              "id": "model_prediction",
-              "type": "text/csv"
-       },
-      {
-              "id": "metaJson",
-              "type": "application/json"
-       },
-      {
-              "id": "dataJson",
-              "type": "application/json"
-       }
     ]
 }
 

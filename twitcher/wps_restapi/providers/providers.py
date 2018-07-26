@@ -1,19 +1,11 @@
-from pyramid.response import Response
 import pyramid.httpexceptions as exc
+import twitcher.wps_restapi.swagger_definitions as sd
 from owslib.wps import WebProcessingService
+from pyramid.response import Response
+
 
 from twitcher.adapter import servicestore_factory
 from twitcher.datatype import Service
-from twitcher.wps_restapi.utils import restapi_base_url
-from twitcher.wps_restapi.swagger_definitions import (providers,
-                                                      provider,
-                                                      GetProvider,
-                                                      GetProviders,
-                                                      DeleteProvider,
-                                                      PostProvider,
-                                                      get_all_providers_response,
-                                                      post_provider_response,
-                                                      get_one_provider_response)
 from twitcher.exceptions import ServiceNotFound
 from twitcher.wps_restapi.utils import restapi_base_url, get_cookie_headers
 
@@ -21,7 +13,7 @@ import logging
 logger = logging.getLogger('TWITCHER')
 
 
-@providers.get(tags=['providers'], schema=GetProviders(), response_schemas=get_all_providers_response)
+@sd.providers_service.get(tags=['providers'], response_schemas=sd.get_all_providers_responses)
 def get_providers(request):
     """
     Lists providers
@@ -81,7 +73,7 @@ def get_service(request):
     return service, store
 
 
-@providers.post(tags=['providers'], schema=PostProvider(), response_schemas=post_provider_response)
+@sd.providers_service.post(tags=['providers'], schema=sd.PostProvider(), response_schemas=sd.post_provider_responses)
 def add_provider(request):
     """
     Add a provider
@@ -108,7 +100,7 @@ def add_provider(request):
     return get_capabilities(new_service, request)
 
 
-@provider.delete(tags=['providers'], schema=DeleteProvider())
+@sd.provider_service.delete(tags=['providers'], schema=sd.ProviderEndpoint())
 def remove_provider(request):
     """
     Remove a provider
@@ -124,7 +116,7 @@ def remove_provider(request):
     return Response(status=204)
 
 
-@provider.get(tags=['providers'], schema=GetProvider(), response_schemas=get_one_provider_response)
+@sd.provider_service.get(tags=['providers'], schema=sd.ProviderEndpoint(), response_schemas=sd.get_one_provider_responses)
 def get_provider(request):
     """
     GetCapabilities of a wps provider
