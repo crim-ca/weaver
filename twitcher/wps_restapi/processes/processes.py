@@ -11,7 +11,7 @@ from twitcher.wps_restapi.swagger_definitions import (processes,
                                                       process,
                                                       GetProcesses,
                                                       GetProcess,
-                                                      PostProcess,
+                                                      PostProviderProcessRequest,
                                                       get_processes_response,
                                                       get_process_description_response,
                                                       launch_job_response)
@@ -278,7 +278,7 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
                         } for error in execution.errors]
                         for error in execution.errors:
                             save_log(job, error)
-            except:
+            except Exception:
                 num_retries += 1
                 logger.exception("Could not read status xml document for job %s. Trying again ...", self.request.id)
                 sleep(1)
@@ -305,59 +305,62 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
     return job['status']
 
 
-@process.post(tags=['processes'], schema=PostProcess(), response_schemas=launch_job_response)
+#############
+# EXAMPLE
+#############
+#   Parameters: ?sync-execute=true|false (false being the default value)
+#
+#   Content-Type: application/json;
+#
+# {
+#     "inputs": [
+#         {
+#             "id": "sosInputNiederschlag",
+#             "value": "http://www.fluggs.de/sos2/sos?service%3DSOS&version%3D2.0.0&request%3DGetObservation&responseformat%3Dhttp://www.opengis.net/om/2.0&observedProperty%3DNiederschlagshoehe&procedure%3DTagessumme&featureOfInterest%3DBever-Talsperre&&namespaces%3Dxmlns%28sams%2Chttp%3A%2F%2Fwww.opengis.net%2FsamplingSpatial%2F2.0%29%2Cxmlns%28om%2Chttp%3A%2F%2Fwww.opengis.net%2Fom%2F2.0%29&temporalFilter%3Dom%3AphenomenonTime%2C2016-01-01T10:00:00.00Z%2F2016-04-30T23:59:00.000Z",
+# 			"type" : "text/plain"
+#         },
+#         {
+#             "id": "sosInputFuellstand",
+#             "value": "http://www.fluggs.de/sos2/sos?service%3DSOS&version%3D2.0.0&request%3DGetObservation&responseformat%3Dhttp://www.opengis.net/om/2.0&observedProperty%3DSpeicherfuellstand&procedure%3DEinzelwert&featureOfInterest%3DBever-Talsperre_Windenhaus&namespaces%3Dxmlns%28sams%2Chttp%3A%2F%2Fwww.opengis.net%2FsamplingSpatial%2F2.0%29%2Cxmlns%28om%2Chttp%3A%2F%2Fwww.opengis.net%2Fom%2F2.0%29&temporalFilter%3Dom%3AphenomenonTime%2C2016-01-01T10:00:00.00Z%2F2016-04-30T23:59:00.000Z",
+# 			"type" : "text/plain"
+#         },
+#         {
+#             "id": "sosInputTarget",
+#             "value": "http://fluggs.wupperverband.de/sos2-tamis/service?service%3DSOS&version%3D2.0.0&request%3DGetObservation&responseformat%3Dhttp://www.opengis.net/om/2.0&observedProperty%3DWasserstand_im_Damm&procedure%3DHandeingabe&featureOfInterest%3DBever-Talsperre_MQA7_Piezometer_Kalkzone&namespaces%3Dxmlns%28sams%2Chttp%3A%2F%2Fwww.opengis.net%2FsamplingSpati-al%2F2.0%29%2Cxmlns%28om%2Chttp%3A%2F%2Fwww.opengis.net%2Fom%2F2.0%29&temporalFilter%3Dom%3AphenomenonTime%2C2016-01-01T00:01:00.00Z%2F2016-04-30T23:59:00.000Z",
+# 			"type" : "text/plain"
+#         }
+#     ],
+#     "outputs": [
+#       {
+#               "id": "targetObs_plot",
+#               "type": "image/png"
+#        },
+#       {
+#               "id": "model_diagnostics",
+#               "type": "image/png"
+#        },
+#       {
+#               "id": "relations",
+#               "type": "image/png"
+#        },
+#       {
+#               "id": "model_prediction",
+#               "type": "text/csv"
+#        },
+#       {
+#               "id": "metaJson",
+#               "type": "application/json"
+#        },
+#       {
+#               "id": "dataJson",
+#               "type": "application/json"
+#        }
+#     ]
+# }
+@process.post(tags=['processes'], schema=PostProviderProcessRequest(), response_schemas=launch_job_response)
 def submit_job(request):
     """
-    Execute a process. Parameters: ?sync-execute=true|false (false being the default value)
-
-    Content-Type: application/json;
-
-{
-    "inputs": [
-        {
-            "id": "sosInputNiederschlag",
-            "value": "http://www.fluggs.de/sos2/sos?service%3DSOS&version%3D2.0.0&request%3DGetObservation&responseformat%3Dhttp://www.opengis.net/om/2.0&observedProperty%3DNiederschlagshoehe&procedure%3DTagessumme&featureOfInterest%3DBever-Talsperre&&namespaces%3Dxmlns%28sams%2Chttp%3A%2F%2Fwww.opengis.net%2FsamplingSpatial%2F2.0%29%2Cxmlns%28om%2Chttp%3A%2F%2Fwww.opengis.net%2Fom%2F2.0%29&temporalFilter%3Dom%3AphenomenonTime%2C2016-01-01T10:00:00.00Z%2F2016-04-30T23:59:00.000Z",
-			"type" : "text/plain"
-        },
-        {
-            "id": "sosInputFuellstand",
-            "value": "http://www.fluggs.de/sos2/sos?service%3DSOS&version%3D2.0.0&request%3DGetObservation&responseformat%3Dhttp://www.opengis.net/om/2.0&observedProperty%3DSpeicherfuellstand&procedure%3DEinzelwert&featureOfInterest%3DBever-Talsperre_Windenhaus&namespaces%3Dxmlns%28sams%2Chttp%3A%2F%2Fwww.opengis.net%2FsamplingSpatial%2F2.0%29%2Cxmlns%28om%2Chttp%3A%2F%2Fwww.opengis.net%2Fom%2F2.0%29&temporalFilter%3Dom%3AphenomenonTime%2C2016-01-01T10:00:00.00Z%2F2016-04-30T23:59:00.000Z",
-			"type" : "text/plain"
-        },
-        {
-            "id": "sosInputTarget",
-            "value": "http://fluggs.wupperverband.de/sos2-tamis/service?service%3DSOS&version%3D2.0.0&request%3DGetObservation&responseformat%3Dhttp://www.opengis.net/om/2.0&observedProperty%3DWasserstand_im_Damm&procedure%3DHandeingabe&featureOfInterest%3DBever-Talsperre_MQA7_Piezometer_Kalkzone&namespaces%3Dxmlns%28sams%2Chttp%3A%2F%2Fwww.opengis.net%2FsamplingSpati-al%2F2.0%29%2Cxmlns%28om%2Chttp%3A%2F%2Fwww.opengis.net%2Fom%2F2.0%29&temporalFilter%3Dom%3AphenomenonTime%2C2016-01-01T00:01:00.00Z%2F2016-04-30T23:59:00.000Z",
-			"type" : "text/plain"
-        }
-    ],
-    "outputs": [
-      {
-              "id": "targetObs_plot",
-              "type": "image/png"
-       },
-      {
-              "id": "model_diagnostics",
-              "type": "image/png"
-       },
-      {
-              "id": "relations",
-              "type": "image/png"
-       },
-      {
-              "id": "model_prediction",
-              "type": "text/csv"
-       },
-      {
-              "id": "metaJson",
-              "type": "application/json"
-       },
-      {
-              "id": "dataJson",
-              "type": "application/json"
-       }
-    ]
-}
-
+    Execute a process.
     """
 
     store = servicestore_factory(request.registry)
@@ -365,22 +368,22 @@ def submit_job(request):
     # TODO Validate param somehow
     provider_id = request.matchdict.get('provider_id')
     process_id = request.matchdict.get('process_id')
-    async = not request.params.getone('sync-execute') if 'sync-execute' in request.params else True
+    async_execute = not request.params.getone('sync-execute') if 'sync-execute' in request.params else True
 
     service = store.fetch_by_name(provider_id, request=request)
     wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
     process = wps.describeprocess(process_id)
 
     # prepare inputs
-    comp_inpts = []
-    for inpt in process.dataInputs:
-        if 'ComplexData' in inpt.dataType:
-            comp_inpts.append(inpt.identifier)
+    complex_inputs = []
+    for process_input in process.dataInputs:
+        if 'ComplexData' in process_input.dataType:
+            complex_inputs.append(process_input.identifier)
 
     try:
         # need to use ComplexDataInput structure for complex input
-        inputs = [(inpt['id'],
-                   ComplexDataInput(inpt['value']) if inpt['id'] in comp_inpts else inpt['value'])
+        inputs = [(inpt['id'], ComplexDataInput(inpt['value'])
+                  if inpt['id'] in complex_inputs else inpt['value'])
                   for inpt in request.json_body['inputs']]
     except KeyError:
         inputs = []
@@ -399,9 +402,9 @@ def submit_job(request):
         provider=provider_id,
         inputs=inputs,
         outputs=outputs,
-        async=async,
+        async=async_execute,
         # Convert EnvironHeaders to a simple dict (should cherrypick the required headers)
-        headers={k: v for k, v in request.headers.iteritems()})
+        headers={k: v for k, v in request.headers.items()})
 
     # Should return 201 response
     return {'jobID': result.id,

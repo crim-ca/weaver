@@ -3,14 +3,7 @@ This module should contain any and every definitions in use to build the swagger
 so that one can update the swagger without touching any other files after the initial integration
 """
 from cornice import Service
-from colander import (MappingSchema,
-                      SequenceSchema,
-                      SchemaNode,
-                      String,
-                      Boolean,
-                      Integer,
-                      Mapping,
-                      List)
+from colander import *
 
 """
 API endpoints
@@ -133,10 +126,20 @@ class CreateProviderRequestBody(MappingSchema):
 class JobInput(MappingSchema):
     id = SchemaNode(String())
     value = SchemaNode(String())
+    type = SchemaNode(String())
 
 
-class LaunchJobRequestBody(SequenceSchema):
-    input = JobInput()
+class JobOutput(MappingSchema):
+    id = SchemaNode(String())
+    type = SchemaNode(String())
+
+
+class JobInputList(SequenceSchema):
+    item = JobInput()
+
+
+class JobOutputList(SequenceSchema):
+    item = JobOutput()
 
 
 class ProviderSchema(MappingSchema):
@@ -371,10 +374,26 @@ class GetProcess(MappingSchema):
     querystring = ProcessEndpoint()
 
 
-class PostProcess(MappingSchema):
+class PostProviderProcessRequestHeader(MappingSchema):
+    content_type = SchemaNode(String(), example='application/json')
+    content_type.name = 'Content-Type'
+
+
+class PostProviderProcessRequestQuery(MappingSchema):
+    sync_execute = SchemaNode(Boolean(), example='application/json', default=False, missing=drop)
+    sync_execute.name = 'sync-execute'
+
+
+class PostProviderProcessRequestBody(MappingSchema):
+    inputs = JobInputList()
+    outputs = JobOutputList()
+
+
+class PostProviderProcessRequest(MappingSchema):
     """Launching a new process request definition"""
-    querystring = ProcessEndpoint()
-    body = LaunchJobRequestBody()
+    header = PostProviderProcessRequestHeader()
+    querystring = PostProviderProcessRequestQuery()
+    body = PostProviderProcessRequestBody()
 
 
 class GetJobs(MappingSchema):
