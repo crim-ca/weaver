@@ -1,19 +1,15 @@
 import json
-import urllib2
-from owslib.wps import is_reference
+from six.moves.urllib.request import urlopen
+from six.moves.urllib.error import URLError
 from time import sleep
 from datetime import datetime
 from twitcher.adapter import servicestore_factory
-from owslib.wps import WebProcessingService
-from owslib.wps import ComplexData
 from twitcher.wps_restapi.utils import restapi_base_url
 from twitcher.wps_restapi import swagger_definitions as sd
-from owslib.wps import WPSException
-from owslib.wps import ComplexDataInput
-from owslib.wps import ASYNC, SYNC
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import add_job, check_status
 from twitcher.db import MongoDB
+from owslib.wps import WebProcessingService, WPSException, ComplexData, ComplexDataInput, ASYNC, SYNC, is_reference
 from pyramid_celery import celery_app as app
 from lxml import etree
 
@@ -22,7 +18,7 @@ from celery.utils.log import get_task_logger
 logger = get_task_logger(__name__)
 
 
-@processes.get(tags=['processes'], schema=GetProcesses(), response_schemas=get_processes_responses)
+@sd.provider_processes_service.get(tags=[sd.provider_processes_tag], schema=sd.ProviderEndpoint(), response_schemas=sd.get_processes_responses)
 def get_processes(request):
     """
     Retrieve available processes
@@ -48,19 +44,20 @@ def get_processes(request):
     return processes
 
 
-@sd.processes.post(tags=['processes'], response_schemas=sd.post_processes_responses)
+@sd.provider_provider_processes_service.post(tags=[sd.provider_processes_tag], response_schemas=sd.post_processes_responses)
 def add_process(self, url, service_name, identifier, provider, inputs, outputs,
                     async=True, userid=None, caption=None, headers=None):
     registry = app.conf['PYRAMID_REGISTRY']
     db = MongoDB.get(registry)
-    
+
     url = SchemaNode(String())
     abstract = SchemaNode(String())
     id = SchemaNode(String())
     title = SchemaNode(String())
 
 
-@process.get(tags=['processes'], schema=GetProcess(), response_schemas=get_process_description_responses)
+@sd.provider_process_service.get(tags=[sd.provider_processes_tag], schema=sd.ProcessEndpoint(),
+                        response_schemas=sd.get_process_description_responses)
 def describe_process(request):
     """
     Retrieve a process description
@@ -145,8 +142,8 @@ def _read_reference(input_value):
     Read a WPS reference and return the content
     """
     try:
-        return urllib2.urlopen(input_value.reference).read()
-    except urllib2.URLError:
+        return urlopen(input_value.reference).read()
+    except URLError:
         # Don't raise exceptions coming from that.
         return None
 
@@ -213,6 +210,7 @@ def _jsonify_output(output, datatype):
 
 
 @app.task(bind=True)
+@sd.provider_process_service.post()
 def execute_process(self, url, service_name, identifier, provider, inputs, outputs,
                     async=True, userid=None, caption=None, headers=None):
     registry = app.conf['PYRAMID_REGISTRY']
@@ -362,7 +360,8 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
 #        }
 #     ]
 # }
-@process.post(tags=['processes'], schema=PostProviderProcessRequest(), response_schemas=launch_job_responses)
+@sd.provider_process_service.post(tags=[sd.provider_processes_tag], schema=sd.PostProviderProcessRequest(),
+                                  response_schemas=sd.launch_job_responses)
 def submit_job(request):
     """
     Execute a process.

@@ -2,7 +2,7 @@
 FROM birdhouse/bird-base:latest
 MAINTAINER https://github.com/bird-house/twitcher
 
-LABEL Description="twitcher application" Vendor="Birdhouse" Version="0.6"
+LABEL Description="twitcher application" Vendor="Birdhouse" Version="0.3.9"
 
 # Configure hostname and ports for services
 ENV HTTP_PORT 8080
@@ -46,6 +46,7 @@ RUN make clean install && chmod 755 /opt/birdhouse/etc && chmod 755 /opt/birdhou
 # Volume for data, cache, logfiles, ...
 VOLUME /opt/birdhouse/var/lib
 VOLUME /opt/birdhouse/var/log
+
 # Volume for configs
 VOLUME /opt/birdhouse/etc
 
@@ -54,8 +55,6 @@ EXPOSE 9001 $HTTP_PORT $HTTPS_PORT $OUTPUT_PORT
 
 # Start supervisor in foreground
 ENV DAEMON_OPTS --nodaemon
-
-WORKDIR /
 
 # Install magpie for the magpie adapter
 RUN git clone https://github.com/ouranosinc/magpie && \
@@ -69,6 +68,5 @@ RUN git clone https://github.com/ouranosinc/magpie && \
 RUN cd /opt/birdhouse/src/twitcher && \
     /opt/conda/envs/twitcher/bin/pip install .
 
-WORKDIR /opt/birdhouse/src/twitcher
 RUN mkdir -p /opt/birdhouse/var/tmp/nginx/client
 CMD ["make", "update-config", "start"]

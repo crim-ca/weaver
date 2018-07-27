@@ -8,10 +8,11 @@
     <script>
         addEventListener('DOMContentLoaded', function() {
             window.ui = SwaggerUIBundle({
-                url: "/__api__",
+                url: "__api__",
                 dom_id: '#swagger-ui',
                 deepLinking: true,
                 docExpansion: 'none',
+                validatorUrl: false,
                 presets: [
                     SwaggerUIBundle.presets.apis,
                     SwaggerUIStandalonePreset
