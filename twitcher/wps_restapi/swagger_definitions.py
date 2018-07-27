@@ -270,6 +270,10 @@ class OkGetProcessesSchema(MappingSchema):
     body = ProcessesSchema()
 
 
+class OkPostProcessesSchema(MappingSchema):
+    body = ProcessSchema()
+
+
 class OkGetProcessDescription(MappingSchema):
     body = ProcessDescriptionSchema()
 
@@ -306,40 +310,43 @@ class OkGetLogsResponse(MappingSchema):
     body = LogsOutputSchema()
 
 
-get_all_providers_response = {
+get_all_providers_responses = {
     '200': OkGetProvidersSchema(description='success')
 }
-get_one_provider_response = {
+get_one_provider_responses = {
     '200': OkGetProviderCapabilitiesSchema(description='success')
 }
-get_processes_response = {
+get_processes_responses = {
     '200': OkGetProcessesSchema(description='success')
 }
-get_process_description_response = {
+post_processes_responses = {
+    '200': OkPostProcessesSchema(description='success')
+}
+get_process_description_responses = {
     '200': OkGetProcessDescription(description='success')
 }
-post_provider_response = {
+post_provider_responses = {
     '200': OkPostProvider(description='success')
 }
-launch_job_response = {
+launch_job_responses = {
     '200': OkLaunchJobResponse(description='success')
 }
-get_all_jobs_response = {
+get_all_jobs_responses = {
     '200': OkGetAllJobsResponse(description='success')
 }
-get_single_job_status_response = {
+get_single_job_status_responses = {
     '200': OkGetSingleJobStatusResponse(description='success')
 }
-get_single_job_outputs_response = {
+get_single_job_outputs_responses = {
     '200': OkGetSingleJobOutputsResponse(description='success')
 }
-get_single_output_response = {
+get_single_output_responses = {
     '200': OkGetSingleOutputResponse(description='success')
 }
-get_exceptions_response = {
+get_exceptions_responses = {
     '200': OkGetExceptionsResponse(description='success')
 }
-get_logs_response = {
+get_logs_responses = {
     '200': OkGetLogsResponse(description='success')
 }
 

@@ -7,14 +7,7 @@ from twitcher.adapter import servicestore_factory
 from owslib.wps import WebProcessingService
 from owslib.wps import ComplexData
 from twitcher.wps_restapi.utils import restapi_base_url
-from twitcher.wps_restapi.swagger_definitions import (processes,
-                                                      process,
-                                                      GetProcesses,
-                                                      GetProcess,
-                                                      PostProviderProcessRequest,
-                                                      get_processes_response,
-                                                      get_process_description_response,
-                                                      launch_job_response)
+from twitcher.wps_restapi import swagger_definitions as sd
 from owslib.wps import WPSException
 from owslib.wps import ComplexDataInput
 from owslib.wps import ASYNC, SYNC
@@ -29,7 +22,7 @@ from celery.utils.log import get_task_logger
 logger = get_task_logger(__name__)
 
 
-@processes.get(tags=['processes'], schema=GetProcesses(), response_schemas=get_processes_response)
+@processes.get(tags=['processes'], schema=GetProcesses(), response_schemas=get_processes_responses)
 def get_processes(request):
     """
     Retrieve available processes
@@ -55,7 +48,19 @@ def get_processes(request):
     return processes
 
 
-@process.get(tags=['processes'], schema=GetProcess(), response_schemas=get_process_description_response)
+@sd.processes.post(tags=['processes'], response_schemas=sd.post_processes_responses)
+def add_process(self, url, service_name, identifier, provider, inputs, outputs,
+                    async=True, userid=None, caption=None, headers=None):
+    registry = app.conf['PYRAMID_REGISTRY']
+    db = MongoDB.get(registry)
+    
+    url = SchemaNode(String())
+    abstract = SchemaNode(String())
+    id = SchemaNode(String())
+    title = SchemaNode(String())
+
+
+@process.get(tags=['processes'], schema=GetProcess(), response_schemas=get_process_description_responses)
 def describe_process(request):
     """
     Retrieve a process description
@@ -357,7 +362,7 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
 #        }
 #     ]
 # }
-@process.post(tags=['processes'], schema=PostProviderProcessRequest(), response_schemas=launch_job_response)
+@process.post(tags=['processes'], schema=PostProviderProcessRequest(), response_schemas=launch_job_responses)
 def submit_job(request):
     """
     Execute a process.
