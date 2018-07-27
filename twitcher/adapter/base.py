@@ -1,6 +1,3 @@
-
-
-
 class AdapterInterface(object):
     """
     Common interface allowing some functionalities overriding using an adapter
