@@ -74,6 +74,80 @@ job_id = SchemaNode(String(), description='The job id')
 output_id = SchemaNode(String(), description='The output id')
 
 #########################################################
+# Generic schemas
+#########################################################
+
+
+class StringList(SequenceSchema):
+    item = SchemaNode(String())
+
+
+class MetadataObject(MappingSchema):
+    role = SchemaNode(String(), missing=drop)
+    href = SchemaNode(String(), missing=drop)
+
+
+class MetadataList(SequenceSchema):
+    item = MetadataObject()
+
+
+class FormatObject(MappingSchema):
+    mimeType = SchemaNode(String())
+    schema = SchemaNode(String(), missing=drop)
+    encoding = SchemaNode(String(), missing=drop)
+    maximumMegabytes = SchemaNode(Integer(), missing=drop)
+    default = SchemaNode(Boolean(), missing=drop, default=False)
+
+
+class FormatList(SequenceSchema):
+    item = FormatObject()
+
+
+class LiteralDataDomainObject(MappingSchema):
+    pass
+
+
+class BaseTypeBody(MappingSchema):
+    id = SchemaNode(String())
+    title = SchemaNode(String(), missing=drop)
+    abstract = SchemaNode(String(), missing=drop)
+    keywords = StringList(missing=drop)
+    metadata = MetadataList(missing=drop)
+    formats = FormatList()
+    minOccurs = SchemaNode(Integer(), missing=drop)
+    maxOccurs = SchemaNode(Integer(), missing=drop)
+
+
+class LiteralInputTypeBody(BaseTypeBody):
+    LiteralDataDomain = LiteralDataDomainObject(missing=drop)
+
+
+class ComplexInputTypeBody(BaseTypeBody):
+    pass
+
+
+class BoundingBoxInputTypeBody(BaseTypeBody):
+    pass
+
+
+class InputTypeList(SequenceSchema):
+    item = SchemaNode(MappingSchema(default={}),
+                      validator=OneOf([LiteralInputTypeBody, ComplexInputTypeBody, BoundingBoxInputTypeBody]))
+
+
+class OutputTypeBody(BaseTypeBody):
+    pass
+
+
+class OutputTypeList(SequenceSchema):
+    item = SchemaNode(OutputTypeBody())
+
+
+JobControlOptionsEnum = SchemaNode(String(), validator=OneOf(['sync-execute', 'async-execute']), missing=drop)
+OutputTransmissionEnum = SchemaNode(String(), validator=OneOf(['value', 'reference']), missing=drop)
+
+
+#########################################################
 # These classes define each of the endpoints parameters
 #########################################################
 
@@ -283,7 +357,7 @@ class OkGetProviderCapabilitiesSchema(MappingSchema):
     body = ProviderCapabilitiesSchema()
 
 
-class OkGetProcessesSchema(MappingSchema):
+class OkGetProviderProcessesSchema(MappingSchema):
     body = ProcessesSchema()
 
 
@@ -291,7 +365,7 @@ class OkPostProcessesSchema(MappingSchema):
     body = ProcessSchema()
 
 
-class OkGetProcessDescription(MappingSchema):
+class OkGetProviderProcessDescription(MappingSchema):
     body = ProcessDescriptionSchema()
 
 
@@ -334,13 +408,13 @@ get_one_provider_responses = {
     '200': OkGetProviderCapabilitiesSchema(description='success')
 }
 get_processes_responses = {
-    '200': OkGetProcessesSchema(description='success')
+    '200': OkGetProviderProcessesSchema(description='success')
 }
 post_processes_responses = {
     '200': OkPostProcessesSchema(description='success')
 }
 get_process_description_responses = {
-    '200': OkGetProcessDescription(description='success')
+    '200': OkGetProviderProcessDescription(description='success')
 }
 post_provider_responses = {
     '200': OkPostProvider(description='success')
@@ -383,18 +457,64 @@ class PostProvider(MappingSchema):
     header = JsonHeader()
 
 
-#####################
-# Processes schemas
-#####################
+#################################
+# Local Processes schemas
+#################################
 
 
-class GetProcesses(MappingSchema):
-    # reusing the Provider query because both only have provider_id as field in the query string
-    querystring = ProviderEndpoint()
+class ProcessOfferingBody(MappingSchema):
+    id = SchemaNode(String())
+    title = SchemaNode(String(), missing=drop)
+    abstract = SchemaNode(String(), missing=drop)
+    keywords = StringList(missing=drop)
+    metadata = MetadataList(missing=drop)
+    inputs = InputTypeList(missing=drop)
+    outputs = OutputTypeList(missing=drop)
+    version = SchemaNode(String(), missing=drop)
+    jobControlOptions = JobControlOptionsEnum
+    outputTransmission = OutputTransmissionEnum
+    executeEndpoint = SchemaNode(String(), missing=drop)    # URL
 
 
-class GetProcess(MappingSchema):
-    querystring = ProcessEndpoint()
+class PackageBody(MappingSchema):
+    workflow = SchemaNode(String(), description="Workflow file content.")  # TODO: maybe binary?
+
+
+class ExecutionUnitBody(MappingSchema):
+    package = PackageBody(missing=drop)
+    reference = SchemaNode(String(), missing=drop)
+
+
+class ProfileExtensionBody(MappingSchema):
+    pass
+
+
+class DeploymentProfileBody(MappingSchema):
+    name = SchemaNode(String(), description="Name of the deployment profile.")
+    executionUnit = ExecutionUnitBody(missing=drop)
+    profileExtension = ProfileExtensionBody(missing=drop)
+
+
+class PostProcessRequestBody(MappingSchema):
+    processOffering = ProcessOfferingBody()
+    deploymentProfile = DeploymentProfileBody()
+
+
+class PostProcessRequest(MappingSchema):
+    header = JsonHeader()
+    body = PostProcessRequestBody()
+
+
+#################################
+# Provider Processes schemas
+#################################
+
+class GetProviderProcesses(MappingSchema):
+    pass
+
+
+class GetProviderProcess(MappingSchema):
+    pass
 
 
 class PostProviderProcessRequestQuery(MappingSchema):

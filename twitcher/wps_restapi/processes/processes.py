@@ -44,9 +44,9 @@ def get_processes(request):
     return processes
 
 
-@sd.provider_provider_processes_service.post(tags=[sd.provider_processes_tag], response_schemas=sd.post_processes_responses)
-def add_process(self, url, service_name, identifier, provider, inputs, outputs,
-                    async=True, userid=None, caption=None, headers=None):
+@sd.provider_processes_service.post(tags=[sd.provider_processes_tag], schema=sd.PostProcessRequest(),
+                                    response_schemas=sd.post_processes_responses)
+def add_process(request):
     registry = app.conf['PYRAMID_REGISTRY']
     db = MongoDB.get(registry)
 
@@ -57,7 +57,7 @@ def add_process(self, url, service_name, identifier, provider, inputs, outputs,
 
 
 @sd.provider_process_service.get(tags=[sd.provider_processes_tag], schema=sd.ProcessEndpoint(),
-                        response_schemas=sd.get_process_description_responses)
+                                 response_schemas=sd.get_process_description_responses)
 def describe_process(request):
     """
     Retrieve a process description
@@ -210,7 +210,6 @@ def _jsonify_output(output, datatype):
 
 
 @app.task(bind=True)
-@sd.provider_process_service.post()
 def execute_process(self, url, service_name, identifier, provider, inputs, outputs,
                     async=True, userid=None, caption=None, headers=None):
     registry = app.conf['PYRAMID_REGISTRY']
