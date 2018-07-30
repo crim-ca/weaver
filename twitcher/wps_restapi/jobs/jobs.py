@@ -131,14 +131,14 @@ def filter_jobs(collection, request, page=0, limit=10, process=None, provider=No
     return items, count
 
 
-@sd.jobs_service.get(tags=['jobs'], response_schemas=sd.get_all_jobs_responses)
+@sd.jobs_service.get(tags=[sd.provider_jobs_tag], response_schemas=sd.get_all_jobs_responses)
 def get_jobs(request):
     """
     Retrieve the list of jobs which can be filtered/sorted using :
     ?page=[number]
     &limit=[number]
-    &status=[ProcessAccepted, ProcessStarted, ProcessPaused, ProcessFailed, ProcessSucceeded] 
-    &process=[process_name]
+    &status=[ProcessAccepted, ProcessStarted, ProcessPaused, ProcessFailed, ProcessSucceeded]
+    &process=[process.title]
     &provider=[provider_id]
     &sort=[created, status, process, provider]
     """
@@ -185,8 +185,8 @@ def get_job(request):
     return job
 
 
-@sd.job_full_service.get(tags=['jobs'], schema=sd.FullJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
-@sd.job_short_service.get(tags=['jobs'], schema=sd.ShortJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
+@sd.job_full_service.get(tags=[sd.provider_jobs_tag], schema=sd.FullJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
+@sd.job_short_service.get(tags=[sd.provider_jobs_tag], schema=sd.ShortJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
 def get_job_status(request):
     """
     Retrieve the status of a job
@@ -214,8 +214,8 @@ def get_job_status(request):
     return response
 
 
-@sd.job_full_service.delete(tags=['jobs'], schema=sd.FullJobEndpoint())
-@sd.job_short_service.delete(tags=['jobs'], schema=sd.ShortJobEndpoint())
+@sd.job_full_service.delete(tags=[sd.provider_jobs_tag], schema=sd.FullJobEndpoint())
+@sd.job_short_service.delete(tags=[sd.provider_jobs_tag], schema=sd.ShortJobEndpoint())
 def cancel_job(request):
     """
     Dismiss a job.
@@ -231,8 +231,8 @@ def cancel_job(request):
     return 200
 
 
-@sd.outputs_full_service.get(tags=['jobs'], schema=sd.FullJobEndpoint(), response_schemas=sd.get_single_job_outputs_responses)
-@sd.outputs_short_service.get(tags=['jobs'], schema=sd.ShortJobEndpoint(), response_schemas=sd.get_single_job_outputs_responses)
+@sd.outputs_full_service.get(tags=[sd.provider_jobs_tag], schema=sd.FullJobEndpoint(), response_schemas=sd.get_single_job_outputs_responses)
+@sd.outputs_short_service.get(tags=[sd.provider_jobs_tag], schema=sd.ShortJobEndpoint(), response_schemas=sd.get_single_job_outputs_responses)
 def get_outputs(request):
     """
     Retrieve the result(s) of a job
@@ -249,8 +249,8 @@ def get_outputs(request):
     return outputs
 
 
-@sd.output_full_service.get(tags=['jobs'], schema=sd.FullOutputEndpoint(), response_schemas=sd.get_single_output_responses)
-@sd.output_short_service.get(tags=['jobs'], schema=sd.ShortOutputEndpoint(), response_schemas=sd.get_single_output_responses)
+@sd.output_full_service.get(tags=[sd.provider_jobs_tag], schema=sd.FullOutputEndpoint(), response_schemas=sd.get_single_output_responses)
+@sd.output_short_service.get(tags=[sd.provider_jobs_tag], schema=sd.ShortOutputEndpoint(), response_schemas=sd.get_single_output_responses)
 def get_output(request):
     """
     Retrieve the result of a particular job output
@@ -270,8 +270,8 @@ def get_output(request):
     return 404
 
 
-@sd.exceptions_full_service.get(tags=['jobs'], schema=sd.FullExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
-@sd.exceptions_short_service.get(tags=['jobs'], schema=sd.ShortExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
+@sd.exceptions_full_service.get(tags=[sd.provider_jobs_tag], schema=sd.FullExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
+@sd.exceptions_short_service.get(tags=[sd.provider_jobs_tag], schema=sd.ShortExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
 def get_exceptions(request):
     """
     Retrieve the result(s) of a job"
@@ -284,8 +284,8 @@ def get_exceptions(request):
     return job['exceptions']
 
 
-@sd.logs_full_service.get(tags=['jobs'], schema=sd.FullLogsEndpoint(), response_schemas=sd.get_logs_responses)
-@sd.logs_short_service.get(tags=['jobs'], schema=sd.ShortLogsEndpoint(), response_schemas=sd.get_logs_responses)
+@sd.logs_full_service.get(tags=[sd.provider_jobs_tag], schema=sd.FullLogsEndpoint(), response_schemas=sd.get_logs_responses)
+@sd.logs_short_service.get(tags=[sd.provider_jobs_tag], schema=sd.ShortLogsEndpoint(), response_schemas=sd.get_logs_responses)
 def get_log(request):
     """
     Retrieve the result(s) of a job"

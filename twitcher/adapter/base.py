@@ -16,3 +16,6 @@ class AdapterInterface(object):
 
     def owsproxy_config(self, settings, config):
         raise NotImplementedError
+
+    def processstore_factory(self, registry, database=None):
+        raise NotImplementedError

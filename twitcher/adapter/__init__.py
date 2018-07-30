@@ -49,3 +49,11 @@ def owssecurity_factory(registry):
     except Exception as e:
         LOGGER.error('Adapter raised an exception while getting owssecurity_factory : {!r}'.format(e))
         raise
+
+
+def processstore_factory(registry, database=None):
+    try:
+        return adapter_factory(registry.settings).processstore_factory(registry, database)
+    except Exception as e:
+        LOGGER.error('Adapter raised an exception while getting processstore_factory : {!r}'.format(e))
+        raise

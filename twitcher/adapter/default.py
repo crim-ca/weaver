@@ -18,3 +18,7 @@ class DefaultAdapter(AdapterInterface):
     def owsproxy_config(self, settings, config):
         from twitcher.owsproxy import owsproxy_defaultconfig
         owsproxy_defaultconfig(settings, config)
+
+    def processstore_factory(self, registry, database=None):
+        from twitcher.store import processstore_defaultfactory
+        return processstore_defaultfactory(registry, database)

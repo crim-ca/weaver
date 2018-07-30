@@ -5,9 +5,10 @@ Factories to create storage backends.
 # Factories
 from twitcher.db import mongodb as _mongodb
 # Interfaces
-from twitcher.store.base import AccessTokenStore
-from twitcher.store.memory import MemoryTokenStore
-from twitcher.store.mongodb import MongodbTokenStore
+from twitcher.store.base import AccessTokenStore, ProcessStore
+from twitcher.store.memory import MemoryTokenStore, MemoryProcessStore
+from twitcher.store.mongodb import MongodbTokenStore, MongodbProcessStore
+
 
 def tokenstore_factory(registry, database=None):
     """
@@ -51,4 +52,20 @@ def servicestore_defaultfactory(registry, database=None):
         store = MongodbServiceStore(collection=db.services)
     else:
         store = MemoryServiceStore()
+    return store
+
+
+def processstore_defaultfactory(registry, database=None, init_processes=None):
+    """
+    Creates a process store with the interface of :class:`twitcher.store.ProcessStore`.
+    By default the mongodb implementation will be used.
+
+    :return: An instance of :class:`twitcher.store.ProcessStore`.
+    """
+    database = database or 'mongodb'
+    if database == 'mongodb':
+        db = _mongodb(registry)
+        store = MongodbProcessStore(collection=db.processes, init_processes=init_processes)
+    else:
+        store = MemoryProcessStore(init_processes)
     return store

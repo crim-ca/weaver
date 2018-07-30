@@ -59,7 +59,7 @@ ENV DAEMON_OPTS --nodaemon
 # Install magpie for the magpie adapter
 RUN git clone https://github.com/ouranosinc/magpie && \
     cd magpie && \
-    git checkout master && \
+    git checkout adapter-processstore-factory && \
     cd .. && \
     ./opt/conda/envs/twitcher/bin/pip install -r magpie/requirements.txt && \
     ./opt/conda/envs/twitcher/bin/pip install ./magpie

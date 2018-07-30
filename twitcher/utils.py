@@ -2,6 +2,8 @@ import time
 from datetime import datetime
 import pytz
 from lxml import etree
+import types
+import re
 
 from twitcher.exceptions import ServiceNotFound
 
@@ -123,3 +125,14 @@ def replace_caps_url(xml, url, prev_url=None):
         xml = xml.decode('utf-8', 'ignore')
         xml = xml.replace(prev_url, url)
     return xml
+
+
+def islambda(func):
+    return isinstance(func, types.LambdaType) and func.__name__ == (lambda: None).__name__
+
+
+first_cap_re = re.compile('(.)([A-Z][a-z]+)')
+all_cap_re = re.compile('([a-z0-9])([A-Z])')
+def convert_snake_case(name):
+    s1 = first_cap_re.sub(r'\1_\2', name)
+    return all_cap_re.sub(r'\1_\2', s1).lower()

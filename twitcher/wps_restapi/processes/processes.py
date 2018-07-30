@@ -1,14 +1,18 @@
 import json
+from pyramid.httpexceptions import *
 from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import URLError
 from time import sleep
 from datetime import datetime
 from twitcher.adapter import servicestore_factory
+from twitcher.store import servicestore_defaultfactory, processstore_defaultfactory
+from twitcher.utils import convert_snake_case
 from twitcher.wps_restapi.utils import restapi_base_url
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import add_job, check_status
 from twitcher.db import MongoDB
+from twitcher.datatype import Process as ProcessDB
 from owslib.wps import WebProcessingService, WPSException, ComplexData, ComplexDataInput, ASYNC, SYNC, is_reference
 from pyramid_celery import celery_app as app
 from lxml import etree
@@ -18,8 +22,55 @@ from celery.utils.log import get_task_logger
 logger = get_task_logger(__name__)
 
 
-@sd.provider_processes_service.get(tags=[sd.provider_processes_tag], schema=sd.ProviderEndpoint(), response_schemas=sd.get_processes_responses)
+@sd.processes_service.get(tags=[sd.processes_tag], response_schemas=sd.get_processes_responses)
 def get_processes(request):
+    store = processstore_defaultfactory(request.registry)
+    return store.list_processes()
+
+
+@sd.processes_service.post(tags=[sd.processes_tag], schema=sd.PostProcessRequest(),
+                           response_schemas=sd.post_processes_responses)
+def add_process(request):
+    store = servicestore_defaultfactory(request.registry)
+
+    process_offering = request.params.get('processOffering')
+    deployment_profile = request.params.get('deploymentProfile')
+    if not process_offering:
+        raise HTTPNotAcceptable(detail="Missing parameter 'processOffering'")
+    if not deployment_profile:
+        raise HTTPNotAcceptable(detail="Missing parameter 'deploymentProfile'")
+
+    # validate minimum field requirements
+    process_info = process_offering.get('process')
+    if not process_info:
+        raise HTTPNotAcceptable(detail="Missing parameter 'processOffering.process'")
+    if not process_info.get('identifier'):
+        raise HTTPNotAcceptable(detail="Missing parameter 'processOffering.process.identifier'")
+
+    execution_unit = deployment_profile.get('executionUnit')
+    if not execution_unit:
+        raise HTTPNotAcceptable(detail="Missing parameter 'deploymentProfile.executionUnit'")
+    package = execution_unit.get('package')
+    if not package:
+        raise HTTPNotAcceptable(detail="Missing parameter 'deploymentProfile.executionUnit.package'")
+
+    process_info.update({'package': package})
+    store.add_process(ProcessDB(process_info))
+
+
+@sd.process_service.get(tags=[sd.processes_tag], response_schemas=sd.get_process_responses)
+def get_process(request):
+    store = processstore_defaultfactory(request.registry)
+    process_id = request.params.get('identifier')
+    if not process_id:
+        raise HTTPNotAcceptable(detail="Missing parameter 'identifier'")
+    process = store.findOne({'identifier': process_id})
+    return process
+
+
+@sd.provider_processes_service.get(tags=[sd.provider_processes_tag], schema=sd.ProviderEndpoint(),
+                                   response_schemas=sd.get_provider_processes_responses)
+def get_provider_processes(request):
     """
     Retrieve available processes
     """
@@ -44,21 +95,9 @@ def get_processes(request):
     return processes
 
 
-@sd.provider_processes_service.post(tags=[sd.provider_processes_tag], schema=sd.PostProcessRequest(),
-                                    response_schemas=sd.post_processes_responses)
-def add_process(request):
-    registry = app.conf['PYRAMID_REGISTRY']
-    db = MongoDB.get(registry)
-
-    url = SchemaNode(String())
-    abstract = SchemaNode(String())
-    id = SchemaNode(String())
-    title = SchemaNode(String())
-
-
 @sd.provider_process_service.get(tags=[sd.provider_processes_tag], schema=sd.ProcessEndpoint(),
-                                 response_schemas=sd.get_process_description_responses)
-def describe_process(request):
+                                 response_schemas=sd.get_provider_process_description_responses)
+def describe_provider_process(request):
     """
     Retrieve a process description
     """
@@ -361,7 +400,7 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
 # }
 @sd.provider_process_service.post(tags=[sd.provider_processes_tag], schema=sd.PostProviderProcessRequest(),
                                   response_schemas=sd.launch_job_responses)
-def submit_job(request):
+def submit_provider_job(request):
     """
     Execute a process.
     """

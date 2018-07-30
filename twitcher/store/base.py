@@ -82,7 +82,6 @@ class ServiceStore(object):
         """
         Get service for given ``url`` from storage.
 
-        :param token: A string containing the service url.
         :return: An instance of :class:`twitcher.datatype.Service`.
         """
         raise NotImplementedError
@@ -90,5 +89,39 @@ class ServiceStore(object):
     def clear_services(self, request=None):
         """
         Removes all OWS services from storage.
+        """
+        raise NotImplementedError
+
+
+class ProcessStore(object):
+    """
+    Storage for local WPS processes.
+    """
+
+    def save_process(self, process, overwrite=True, request=None):
+        """
+        Stores a WPS process in storage.
+
+        :param process: An instance of :class:`twitcher.datatype.Process`.
+        """
+        raise NotImplementedError
+
+    def delete_process(self, process_id, request=None):
+        """
+        Removes process from database.
+        """
+        raise NotImplementedError
+
+    def list_processes(self, request=None):
+        """
+        Lists all processes in database.
+        """
+        raise NotImplementedError
+
+    def fetch_by_id(self, process_id, request=None):
+        """
+        Get process for given ``name`` from storage.
+
+        :return: An instance of :class:`twitcher.datatype.Process`.
         """
         raise NotImplementedError

@@ -110,7 +110,7 @@ class MemoryServiceStore(ServiceStore):
         Lists all services in memory storage.
         """
         my_services = []
-        for service in self.url_index.itervalues():
+        for service in self.url_index.values():
             my_services.append(Service(service))
         return my_services
 
@@ -139,3 +139,53 @@ class MemoryServiceStore(ServiceStore):
         self.url_index = {}
         self.name_index = {}
         return True
+
+
+from twitcher.store.base import ProcessStore
+
+
+class MemoryProcessStore(ProcessStore):
+    """
+    Stores WPS processes in memory. Useful for testing purposes.
+    """
+
+    def __init__(self, init_processes=None):
+        self.name_index = {}
+        if isinstance(init_processes, list):
+            for process in init_processes:
+                self.save_process(process)
+
+    def save_process(self, process, overwrite=True, request=None):
+        """
+        Stores a WPS process in storage.
+
+        :param process: An instance of :class:`twitcher.datatype.Process`.
+        """
+        sane_name = namesgenerator.get_sane_name(process.title)
+        if not self.name_index.get(sane_name) or overwrite:
+            process.title = sane_name
+            self.name_index[sane_name] = process
+
+    def delete_process(self, name, request=None):
+        """
+        Removes process from database.
+        """
+        sane_name = namesgenerator.get_sane_name(name)
+        if self.name_index.get(sane_name):
+            del self.name_index[sane_name]
+
+    def list_processes(self, request=None):
+        """
+        Lists all processes in database.
+        """
+        return [process.title for process in self.name_index]
+
+    def fetch_by_name(self, name, request=None):
+        """
+        Get process for given ``name`` from storage.
+
+        :return: An instance of :class:`twitcher.datatype.Process`.
+        """
+        sane_name = namesgenerator.get_sane_name(name)
+        process = self.name_index.get(sane_name)
+        return process

@@ -9,6 +9,9 @@ from colander import *
 # API endpoints
 #########################################################
 
+processes_uri = '/processes'
+process_uri = '/processes/{process_id}'
+
 providers_uri = '/providers'
 provider_uri = '/providers/{provider_id}'
 
@@ -36,6 +39,7 @@ logs_short_uri = '/jobs/{job_id}/log'
 #########################################################
 
 provider_processes_tag = 'Provider Processes'
+provider_jobs_tag = 'Jobs'
 providers_tag = 'Providers'
 processes_tag = 'Local Processes'
 
@@ -43,11 +47,14 @@ processes_tag = 'Local Processes'
 # These "services" are wrappers that allow Cornice to generate the api's json
 ###############################################################################
 
+processes_service = Service(name='processes', path=processes_uri)
+process_service = Service(name='process', path=process_uri)
+
 providers_service = Service(name='providers', path=providers_uri)
 provider_service = Service(name='provider', path=provider_uri)
 
-provider_processes_service = Service(name='processes', path=provider_processes_uri)
-provider_process_service = Service(name='process', path=provider_process_uri)
+provider_processes_service = Service(name='provider_processes', path=provider_processes_uri)
+provider_process_service = Service(name='provider_process', path=provider_process_uri)
 
 jobs_service = Service(name='jobs', path=jobs_uri)
 job_full_service = Service(name='job_full', path=job_full_uri)
@@ -131,8 +138,8 @@ class BoundingBoxInputTypeBody(BaseTypeBody):
 
 
 class InputTypeList(SequenceSchema):
-    item = SchemaNode(MappingSchema(default={}),
-                      validator=OneOf([LiteralInputTypeBody, ComplexInputTypeBody, BoundingBoxInputTypeBody]))
+    item = MappingSchema(default={},
+                         validator=OneOf([LiteralInputTypeBody, ComplexInputTypeBody, BoundingBoxInputTypeBody]))
 
 
 class OutputTypeBody(BaseTypeBody):
@@ -140,7 +147,7 @@ class OutputTypeBody(BaseTypeBody):
 
 
 class OutputTypeList(SequenceSchema):
-    item = SchemaNode(OutputTypeBody())
+    item = OutputTypeBody()
 
 
 JobControlOptionsEnum = SchemaNode(String(), validator=OneOf(['sync-execute', 'async-execute']), missing=drop)
@@ -260,6 +267,10 @@ class ProcessSchema(MappingSchema):
     title = SchemaNode(String())
 
 
+class ProcessListSchema(SequenceSchema):
+    item = ProcessSchema(missing=drop)
+
+
 class ProcessOutputDescriptionSchema(MappingSchema):
     """WPS process output definition"""
     dataType = SchemaNode(String())
@@ -361,8 +372,24 @@ class OkGetProviderProcessesSchema(MappingSchema):
     body = ProcessesSchema()
 
 
+class OkGetProcessesBodySchema(MappingSchema):
+    processes = ProcessListSchema()
+
+
+class OkGetProcessesSchema(MappingSchema):
+    body = OkGetProcessesBodySchema()
+
+
 class OkPostProcessesSchema(MappingSchema):
     body = ProcessSchema()
+
+
+class OkGetProcessBodySchema(MappingSchema):
+    process = ProcessSchema()
+
+
+class OkGetProcessSchema(MappingSchema):
+    body = OkGetProcessBodySchema()
 
 
 class OkGetProviderProcessDescription(MappingSchema):
@@ -401,19 +428,25 @@ class OkGetLogsResponse(MappingSchema):
     body = LogsOutputSchema()
 
 
+get_processes_responses = {
+    '200': OkGetProcessesSchema(description='success')
+}
+post_processes_responses = {
+    '200': OkPostProcessesSchema(description='success')
+}
+get_process_responses = {
+    '200': OkGetProcessSchema(description='success')
+}
 get_all_providers_responses = {
     '200': OkGetProvidersSchema(description='success')
 }
 get_one_provider_responses = {
     '200': OkGetProviderCapabilitiesSchema(description='success')
 }
-get_processes_responses = {
+get_provider_processes_responses = {
     '200': OkGetProviderProcessesSchema(description='success')
 }
-post_processes_responses = {
-    '200': OkPostProcessesSchema(description='success')
-}
-get_process_description_responses = {
+get_provider_process_description_responses = {
     '200': OkGetProviderProcessDescription(description='success')
 }
 post_provider_responses = {
@@ -490,7 +523,7 @@ class ProfileExtensionBody(MappingSchema):
 
 
 class DeploymentProfileBody(MappingSchema):
-    name = SchemaNode(String(), description="Name of the deployment profile.")
+    deploymentProfileName = SchemaNode(String(), description="Name of the deployment profile.")
     executionUnit = ExecutionUnitBody(missing=drop)
     profileExtension = ProfileExtensionBody(missing=drop)
 
@@ -532,3 +565,7 @@ class PostProviderProcessRequest(MappingSchema):
     header = JsonHeader()
     querystring = PostProviderProcessRequestQuery()
     body = PostProviderProcessRequestBody()
+
+
+def service_api_route_info(service_api):
+    return {'name': service_api.name, 'pattern': service_api.path}
