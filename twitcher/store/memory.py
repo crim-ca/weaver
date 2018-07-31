@@ -180,12 +180,12 @@ class MemoryProcessStore(ProcessStore):
         """
         return [process.title for process in self.name_index]
 
-    def fetch_by_name(self, name, request=None):
+    def fetch_by_id(self, process_id, request=None):
         """
         Get process for given ``name`` from storage.
 
         :return: An instance of :class:`twitcher.datatype.Process`.
         """
-        sane_name = namesgenerator.get_sane_name(name)
+        sane_name = namesgenerator.get_sane_name(process_id)
         process = self.name_index.get(sane_name)
         return process

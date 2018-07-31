@@ -9,3 +9,4 @@ argcomplete
 celery
 owslib
 lxml
+cwltool

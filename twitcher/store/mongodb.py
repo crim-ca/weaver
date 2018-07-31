@@ -135,11 +135,11 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
     Registry for WPS processes. Uses mongodb to store process.title and attributes.
     """
 
-    def __init__(self, collection, init_processes=None):
+    def __init__(self, collection, default_processes=None):
         super(MongodbProcessStore, self).__init__(collection=collection)
-        if init_processes:
+        if default_processes:
             registered_processes = [process.identifier for process in self.list_processes()]
-            for process in init_processes:
+            for process in default_processes:
                 sane_name = self._get_process_id(process)
                 if sane_name not in registered_processes:
                     self._add_process(process)
@@ -200,7 +200,7 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
             else:
                 raise ProcessRegistrationError("Process `{}` already registered.".format(sane_name))
         self._add_process(process)
-        return self.fetch_by_name(sane_name)
+        return self.fetch_by_id(sane_name)
 
     def delete_process(self, process_id, request=None):
         """

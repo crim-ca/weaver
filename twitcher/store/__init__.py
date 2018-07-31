@@ -8,6 +8,7 @@ from twitcher.db import mongodb as _mongodb
 from twitcher.store.base import AccessTokenStore, ProcessStore
 from twitcher.store.memory import MemoryTokenStore, MemoryProcessStore
 from twitcher.store.mongodb import MongodbTokenStore, MongodbProcessStore
+from twitcher.processes import default_processes
 
 
 def tokenstore_factory(registry, database=None):
@@ -55,7 +56,7 @@ def servicestore_defaultfactory(registry, database=None):
     return store
 
 
-def processstore_defaultfactory(registry, database=None, init_processes=None):
+def processstore_defaultfactory(registry, database=None):
     """
     Creates a process store with the interface of :class:`twitcher.store.ProcessStore`.
     By default the mongodb implementation will be used.
@@ -65,7 +66,7 @@ def processstore_defaultfactory(registry, database=None, init_processes=None):
     database = database or 'mongodb'
     if database == 'mongodb':
         db = _mongodb(registry)
-        store = MongodbProcessStore(collection=db.processes, init_processes=init_processes)
+        store = MongodbProcessStore(collection=db.processes, default_processes=default_processes)
     else:
-        store = MemoryProcessStore(init_processes)
+        store = MemoryProcessStore(default_processes)
     return store

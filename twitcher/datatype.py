@@ -5,7 +5,8 @@ Definitions of types used by tokens.
 import time
 
 from twitcher.utils import now_secs
-from twitcher.exceptions import AccessTokenNotFound
+from twitcher.exceptions import ProcessInstanceError
+from twitcher.processes import process_mapping
 from pywps import Process as ProcessWPS
 
 
@@ -156,56 +157,56 @@ class Process(dict):
 
     @property
     def identifier(self):
-        return self.identifier
+        return self['identifier']
 
     @property
     def title(self):
-        return self.title
+        return self.get('title')
 
     @property
     def abstract(self):
-        return self.abstract
+        return self.get('abstract')
 
     @property
     def keywords(self):
-        return self.keywords
+        return self.get('keywords')
 
     @property
     def metadata(self):
-        return self.metadata
+        return self.get('metadata')
 
     @property
     def version(self):
-        return self.version
+        return self.get('version')
 
     @property
     def inputs(self):
-        return self.inputs
+        return self.get('inputs')
 
     @property
     def outputs(self):
-        return self.outputs
+        return self.get('outputs')
 
     @property
     def jobControlOptions(self):
-        return self.jobControlOptions
+        return self.get('jobControlOptions')
 
     @property
     def outputTransmission(self):
-        return self.outputTransmission
+        return self.get('outputTransmission')
 
     @property
     def executeEndpoint(self):
-        return self.executeEndpoint
+        return self.get('executeEndpoint')
 
     # wps, workflow, etc.
     @property
     def type(self):
-        return self.type
+        return self.get('type')
 
     @property
     def package(self):
-        return self.package
+        return self.get('package')
 
     def __str__(self):
         return "Process <{0}> ({1})".format(self.identifier, self.title)
@@ -245,6 +246,11 @@ class Process(dict):
     @staticmethod
     def from_wps(wps_process):
         assert isinstance(wps_process, ProcessWPS)
-        process = wps_process.json()
+        process = wps_process.json
         process.update({'type': 'wps', 'package': None})
         return Process(process)
+
+    def wps(self):
+        if self.type not in process_mapping:
+            ProcessInstanceError("Unknown process type `{}` mapping".format(self.type))
+        return process_mapping[self.type](**self)

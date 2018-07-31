@@ -7,6 +7,7 @@ from pyramid.response import Response
 from pyramid.wsgi import wsgiapp2
 from pyramid.httpexceptions import HTTPBadRequest
 from pyramid.settings import asbool, aslist
+from pyramid_celery import celery_app as app
 
 from twitcher.processes import default_processes
 from twitcher.store import processstore_defaultfactory
@@ -29,6 +30,7 @@ def _processes(request):
 
 
 @wsgiapp2
+@app.task(bind=True)
 def pywps_view(environ, start_response):
     """
     * TODO: add xml response renderer
@@ -41,7 +43,10 @@ def pywps_view(environ, start_response):
     if 'PYWPS_CFG' not in environ:
         environ['PYWPS_CFG'] = PYWPS_CFG
 
-    service = Service(default_processes, [environ['PYWPS_CFG']])
+    registry = app.conf['PYRAMID_REGISTRY']
+    processstore = processstore_defaultfactory(registry.settings, default_processes)
+    processes_wps = [process.wps() for process in processstore.list_processes()]
+    service = Service(processes_wps, [environ['PYWPS_CFG']])
     return service(environ, start_response)
 
 
@@ -53,7 +58,6 @@ def includeme(config):
 
         # include twitcher config
         config.include('twitcher.config')
-        config.include('twitcher.processes')
 
         config.add_route('wps', '/ows/wps')
         config.add_route('wps_secured', '/ows/wps/{access_token}')

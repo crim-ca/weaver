@@ -1,10 +1,16 @@
 from .wps_hello import Hello
-from twitcher.store import processstore_defaultfactory
+from .wps_workflow import Workflow
 
 default_processes = [
     Hello()
 ]
 
+process_mapping = {
+    'hello': Hello,
+    'workflow': Workflow
+}
+
 
 def includeme(config):
-    config.registry.processes = processstore_defaultfactory(config.registry, init_processes=default_processes)
+    pass
+    #config.registry.processes = processstore_defaultfactory(config.registry, init_processes=default_processes)

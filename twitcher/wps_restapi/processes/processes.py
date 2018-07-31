@@ -24,8 +24,16 @@ logger = get_task_logger(__name__)
 
 @sd.processes_service.get(tags=[sd.processes_tag], response_schemas=sd.get_processes_responses)
 def get_processes(request):
-    store = processstore_defaultfactory(request.registry)
-    return store.list_processes()
+    try:
+        store = processstore_defaultfactory(request.registry)
+        processes = [process.json() for process in store.list_processes()]
+        return {
+            'processes': processes
+        }
+    except HTTPException:
+        raise  # re-throw already handled HTTPException
+    except Exception as ex:
+        raise HTTPInternalServerError(detail=ex.message)
 
 
 @sd.processes_service.post(tags=[sd.processes_tag], schema=sd.PostProcessRequest(),
@@ -54,18 +62,26 @@ def add_process(request):
     if not package:
         raise HTTPNotAcceptable(detail="Missing parameter 'deploymentProfile.executionUnit.package'")
 
-    process_info.update({'package': package})
+    # for debug
+    process_type = request.params.get('process_type', 'workflow')
+
+    process_info.update({'type': process_type, 'package': package})
     store.add_process(ProcessDB(process_info))
 
 
 @sd.process_service.get(tags=[sd.processes_tag], response_schemas=sd.get_process_responses)
 def get_process(request):
-    store = processstore_defaultfactory(request.registry)
-    process_id = request.params.get('identifier')
-    if not process_id:
-        raise HTTPNotAcceptable(detail="Missing parameter 'identifier'")
-    process = store.findOne({'identifier': process_id})
-    return process
+    try:
+        store = processstore_defaultfactory(request.registry)
+        process_id = request.matchdict.get('process_id')
+        if not process_id:
+            raise HTTPNotAcceptable(detail="Missing parameter 'identifier'")
+        process = store.fetch_by_id(process_id)
+        return {'process': process.json()}
+    except HTTPException:
+        raise  # re-throw already handled HTTPException
+    except Exception as ex:
+        raise HTTPInternalServerError(detail=ex.message)
 
 
 @sd.provider_processes_service.get(tags=[sd.provider_processes_tag], schema=sd.ProviderEndpoint(),
