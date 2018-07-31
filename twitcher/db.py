@@ -29,7 +29,7 @@ def mongodb(registry):
     db = MongoDB.get(registry)
     db.services.create_index("name", unique=True)
     db.services.create_index("url", unique=True)
-    db.processes.create_index("id", unique=True)
+    db.processes.create_index("identifier", unique=True)
     return db
 
 

@@ -10,6 +10,28 @@ sys.path.insert(0, TWITCHER_MODULE_DIR)
 from twitcher import adapter
 from pyramid.exceptions import ConfigurationError
 from pyramid.httpexceptions import HTTPServerError
+from pyramid.view import exception_view_config, notfound_view_config, forbidden_view_config
+
+
+@notfound_view_config()
+def notfound_view(request):
+    exception_view(request)
+
+
+@exception_view_config()
+def exception_view(request):
+    content = {u'route_name': str(request.upath_info), u'request_url': str(request.url),
+               u'detail': request.detail or u'undefined', u'method': request.method}
+    if hasattr(request, 'exception'):
+        if hasattr(request.exception, 'json'):
+            if type(request.exception.json) is dict:
+                content.update(request.exception.json)
+        elif isinstance(request.exception, HTTPServerError) and hasattr(request.exception, 'message'):
+            content.update({u'exception': str(request.exception.message)})
+    elif hasattr(request, 'matchdict'):
+        if request.matchdict is not None and request.matchdict != '':
+            content.update(request.matchdict)
+    return content
 
 
 def parse_extra_options(option_str):
@@ -34,21 +56,6 @@ def parse_extra_options(option_str):
     else:
         extra_options = {}
     return extra_options
-
-
-def exception_view(request):
-    content = {u'route_name': str(request.upath_info), u'request_url': str(request.url),
-               u'detail': request.detail or u'undefined', u'method': request.method}
-    if hasattr(request, 'exception'):
-        if hasattr(request.exception, 'json'):
-            if type(request.exception.json) is dict:
-                content.update(request.exception.json)
-        elif isinstance(request.exception, HTTPServerError) and hasattr(request.exception, 'message'):
-            content.update({u'exception': str(request.exception.message)})
-    elif hasattr(request, 'matchdict'):
-        if request.matchdict is not None and request.matchdict != '':
-            content.update(request.matchdict)
-    return content
 
 
 def main(global_config, **settings):
@@ -80,7 +87,7 @@ def main(global_config, **settings):
     # TODO: maybe add tween for exception handling or use unknown_failure view
     config.include('twitcher.tweens')
 
-    config.add_exception_view(exception_view)
+    ##config.add_exception_view(exception_view)
 
     config.scan()
 

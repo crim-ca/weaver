@@ -247,10 +247,15 @@ class Process(dict):
     def from_wps(wps_process):
         assert isinstance(wps_process, ProcessWPS)
         process = wps_process.json
-        process.update({'type': 'wps', 'package': None})
+        process.update({'type': wps_process.identifier, 'package': None})
         return Process(process)
 
     def wps(self):
-        if self.type not in process_mapping:
-            ProcessInstanceError("Unknown process type `{}` mapping".format(self.type))
-        return process_mapping[self.type](**self)
+        process_key = self.type
+        if self.type == 'wps':
+            process_key = self.identifier
+        if process_key not in process_mapping:
+            ProcessInstanceError("Unknown process `{}` in mapping".format(process_key))
+        if process_key == 'workflow':
+            return process_mapping[process_key](**self.params)
+        return process_mapping[process_key]()

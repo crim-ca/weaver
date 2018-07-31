@@ -26,11 +26,11 @@ def _wps_cfg(request):
 
 
 def _processes(request):
-    return processstore_defaultfactory(request.registry, default_processes)
+    return processstore_defaultfactory(request.registry)
 
 
+#@app.task(bind=True)
 @wsgiapp2
-@app.task(bind=True)
 def pywps_view(environ, start_response):
     """
     * TODO: add xml response renderer
@@ -44,7 +44,7 @@ def pywps_view(environ, start_response):
         environ['PYWPS_CFG'] = PYWPS_CFG
 
     registry = app.conf['PYRAMID_REGISTRY']
-    processstore = processstore_defaultfactory(registry.settings, default_processes)
+    processstore = processstore_defaultfactory(registry.settings)
     processes_wps = [process.wps() for process in processstore.list_processes()]
     service = Service(processes_wps, [environ['PYWPS_CFG']])
     return service(environ, start_response)

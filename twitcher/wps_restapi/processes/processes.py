@@ -39,10 +39,10 @@ def get_processes(request):
 @sd.processes_service.post(tags=[sd.processes_tag], schema=sd.PostProcessRequest(),
                            response_schemas=sd.post_processes_responses)
 def add_process(request):
-    store = servicestore_defaultfactory(request.registry)
+    store = processstore_defaultfactory(request.registry)
 
-    process_offering = request.params.get('processOffering')
-    deployment_profile = request.params.get('deploymentProfile')
+    process_offering = request.json.get('processOffering')
+    deployment_profile = request.json.get('deploymentProfile')
     if not process_offering:
         raise HTTPNotAcceptable(detail="Missing parameter 'processOffering'")
     if not deployment_profile:
@@ -63,10 +63,10 @@ def add_process(request):
         raise HTTPNotAcceptable(detail="Missing parameter 'deploymentProfile.executionUnit.package'")
 
     # for debug
-    process_type = request.params.get('process_type', 'workflow')
+    process_type = request.json.get('process_type', 'workflow')
 
     process_info.update({'type': process_type, 'package': package})
-    store.add_process(ProcessDB(process_info))
+    store.save_process(ProcessDB(process_info))
 
 
 @sd.process_service.get(tags=[sd.processes_tag], response_schemas=sd.get_process_responses)

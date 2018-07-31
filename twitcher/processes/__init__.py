@@ -1,6 +1,7 @@
 from .wps_hello import Hello
 from .wps_workflow import Workflow
 
+
 default_processes = [
     Hello()
 ]

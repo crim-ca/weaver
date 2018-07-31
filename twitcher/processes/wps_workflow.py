@@ -4,9 +4,23 @@ import cwltool.factory
 from pywps import Process, LiteralInput, LiteralOutput, ComplexInput, ComplexOutput, Format
 from pywps.app.Common import Metadata
 from six import string_types
+import json
+import yaml
 
 import logging
 LOGGER = logging.getLogger("PYWPS")
+
+
+def load_file(file_path):
+    file_path = os.path.abspath(file_path)
+    if not os.path.isfile(file_path):
+        raise Exception("missing file: {}".format(file_path))
+    file_ext = os.path.splitext(file_path)[1].replace('.', '')
+    if file_ext in ['yaml', 'yml', 'json', 'cwl', 'job']:
+        # yaml properly loads json as well
+        with open(file_path, 'r') as f:
+            return yaml.safe_load(f)
+    raise Exception("unsupported file type: {}".format(file_ext))
 
 
 class Workflow(Process):
@@ -23,14 +37,14 @@ class Workflow(Process):
             cwl_factory = cwltool.factory.Factory()
             self.workflow = cwl_factory.make(self.cwl_file)
         elif isinstance(package, dict):
-            raise NotImplementedError("workflow.dict") # TODO
+            raise NotImplementedError("workflow.dict")  # TODO
         else:
             raise Exception("unkwown parsing of package definition for workflow process")
 
         kw.pop('type')
         kw.pop('inputs')
         kw.pop('outputs')
-        super(Process, self).__init__(
+        super(Workflow, self).__init__(
             self._handler,
             #identifier='workflow',
             #title='Runs a workflow from a CWL definition',
