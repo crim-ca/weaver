@@ -428,6 +428,19 @@ class OkGetProcessSchema(MappingSchema):
     body = OkGetProcessBodySchema()
 
 
+class DeleteProcessRequestSchema(MappingSchema):
+    pass
+
+
+class OkDeleteProcessBodySchema(MappingSchema):
+    deploymentDone = SchemaNode(String(), default='success', example='success')
+    id = SchemaNode(String(), example='workflow')
+
+
+class OkDeleteProcessSchema(MappingSchema):
+    body = OkDeleteProcessBodySchema()
+
+
 class OkGetProviderProcessDescription(MappingSchema):
     body = ProcessDescriptionSchema()
 
@@ -481,6 +494,9 @@ post_processes_responses = {
 }
 get_process_responses = {
     '200': OkGetProcessSchema(description='success')
+}
+delete_process_responses = {
+    '200': OkDeleteProcessSchema(description='success')
 }
 get_all_providers_responses = {
     '200': OkGetProvidersSchema(description='success')

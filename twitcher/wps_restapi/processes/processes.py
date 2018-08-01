@@ -13,6 +13,7 @@ from twitcher.wps_restapi.utils import restapi_base_url
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import add_job, check_status
+from twitcher.exceptions import ProcessNotFound, ProcessInstanceError, ProcessRegistrationError
 from twitcher.db import MongoDB
 from twitcher.datatype import Process as ProcessDB
 from owslib.wps import WebProcessingService, WPSException, ComplexData, ComplexDataInput, is_reference
@@ -75,15 +76,36 @@ def add_process(request):
 
 @sd.process_service.get(tags=[sd.processes_tag], response_schemas=sd.get_process_responses)
 def get_process(request):
+    process_id = request.matchdict.get('process_id')
+    if not process_id:
+        raise HTTPNotAcceptable(detail="Missing parameter 'process_id'")
     try:
         store = processstore_defaultfactory(request.registry)
-        process_id = request.matchdict.get('process_id')
-        if not process_id:
-            raise HTTPNotAcceptable(detail="Missing parameter 'identifier'")
         process = store.fetch_by_id(process_id)
         return {'process': process.json()}
     except HTTPException:
         raise  # re-throw already handled HTTPException
+    except ProcessNotFound:
+        raise HTTPNotFound(detail="The process with id `{}` does not exist.".format(str(process_id)))
+    except Exception as ex:
+        raise HTTPInternalServerError(detail=ex.message)
+
+
+@sd.process_service.delete(tags=[sd.processes_tag],
+                           schema=sd.DeleteProcessRequestSchema, response_schemas=sd.delete_process_responses)
+def delete_process(request):
+    process_id = request.matchdict.get('process_id')
+    if not process_id:
+        raise HTTPNotAcceptable(detail="Missing parameter 'process_id'")
+    try:
+        store = processstore_defaultfactory(request.registry)
+        if store.delete_process(process_id):
+            return HTTPOk(json={'deploymentDone': 'success', 'id': process_id})
+        raise HTTPInternalServerError(detail="Delete process failed.")
+    except HTTPException:
+        raise  # re-throw already handled HTTPException
+    except ProcessNotFound:
+        raise HTTPNotFound(detail="The process with process_id `{}` does not exist.".format(str(process_id)))
     except Exception as ex:
         raise HTTPInternalServerError(detail=ex.message)
 
