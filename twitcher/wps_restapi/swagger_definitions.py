@@ -9,6 +9,10 @@ from colander import *
 # API endpoints
 #########################################################
 
+api_frontpage_uri = '/'
+api_swagger_ui_uri = '/api'
+api_swagger_json_uri = '/api/json'
+
 processes_uri = '/processes'
 process_uri = '/processes/{process_id}'
 
@@ -38,6 +42,7 @@ logs_short_uri = '/jobs/{job_id}/log'
 # API tags
 #########################################################
 
+api_tag = 'API'
 provider_processes_tag = 'Provider Processes'
 provider_jobs_tag = 'Jobs'
 providers_tag = 'Providers'
@@ -46,6 +51,10 @@ processes_tag = 'Local Processes'
 ###############################################################################
 # These "services" are wrappers that allow Cornice to generate the api's json
 ###############################################################################
+
+api_frontpage_service = Service(name='api_frontpage', path=api_frontpage_uri)
+api_swagger_ui_service = Service(name='api_swagger_ui', path=api_swagger_ui_uri)
+api_swagger_json_service = Service(name='api_swagger_json', path=api_swagger_json_uri)
 
 processes_service = Service(name='processes', path=processes_uri)
 process_service = Service(name='process', path=process_uri)
@@ -83,6 +92,16 @@ output_id = SchemaNode(String(), description='The output id')
 #########################################################
 # Generic schemas
 #########################################################
+
+
+class JsonHeader(MappingSchema):
+    content_type = SchemaNode(String(), example='application/json', default='application/json')
+    content_type.name = 'Content-Type'
+
+
+class HtmlHeader(MappingSchema):
+    content_type = SchemaNode(String(), example='text/html', default='text/html')
+    content_type.name = 'Content-Type'
 
 
 class StringList(SequenceSchema):
@@ -360,6 +379,23 @@ class LogsOutputSchema(MappingSchema):
     pass
 
 
+class FrontpageSchema(MappingSchema):
+    message = SchemaNode(String(), default='hello')
+    configuration = SchemaNode(String(), default='default')
+
+
+class OkGetFrontpageSchema(MappingSchema):
+    body = FrontpageSchema()
+
+
+class OkGetSwaggerJSONSchema(MappingSchema):
+    body = MappingSchema(default={}, description="")
+
+
+class OkGetSwaggerUISchema(MappingSchema):
+    header = HtmlHeader()
+
+
 class OkGetProvidersSchema(MappingSchema):
     body = ProvidersSchema()
 
@@ -428,6 +464,15 @@ class OkGetLogsResponse(MappingSchema):
     body = LogsOutputSchema()
 
 
+get_api_frontpage_responses = {
+    '200': OkGetFrontpageSchema(description='success')
+}
+get_api_swagger_json_responses = {
+    '200': OkGetSwaggerJSONSchema(description='success')
+}
+get_api_swagger_ui_responses = {
+    '200': OkGetSwaggerUISchema(description='success')
+}
 get_processes_responses = {
     '200': OkGetProcessesSchema(description='success')
 }
@@ -478,11 +523,6 @@ get_logs_responses = {
 class LaunchJobQuerystring(MappingSchema):
     sync_execute = SchemaNode(Boolean(), example='application/json', default=False, missing=drop)
     sync_execute.name = 'sync-execute'
-
-
-class JsonHeader(MappingSchema):
-    content_type = SchemaNode(String(), example='application/json', default='application/json')
-    content_type.name = 'Content-Type'
 
 
 class PostProvider(MappingSchema):

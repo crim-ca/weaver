@@ -76,7 +76,6 @@ def main(global_config, **settings):
 
     # include twitcher components
     config.include('twitcher.config')
-    config.include('twitcher.frontpage')
     config.include('twitcher.rpcinterface')
     config.include('twitcher.owsproxy')
     config.include('twitcher.wps')

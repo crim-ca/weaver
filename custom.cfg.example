@@ -6,6 +6,7 @@ parts += adapter_impl
 # versions = noversions
 
 [settings]
+configuration = default
 hostname = localhost
 https-port = 5000
 log-level = WARN
