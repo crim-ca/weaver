@@ -11,3 +11,5 @@ owslib
 lxml
 cwltool
 six
+zc.buildout
+
