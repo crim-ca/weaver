@@ -59,14 +59,19 @@ def add_process(request):
     if not execution_unit:
         raise HTTPNotAcceptable(detail="Missing parameter 'deploymentProfile.executionUnit'")
     package = execution_unit.get('package')
-    if not package:
-        raise HTTPNotAcceptable(detail="Missing parameter 'deploymentProfile.executionUnit.package'")
+    reference = execution_unit.get('reference')
+    if not (package or reference):
+        raise HTTPNotAcceptable(
+            detail="Missing one of parameters [package, reference] in 'deploymentProfile.executionUnit'"
+        )
 
     # for debug
     process_type = request.json.get('process_type', 'workflow')
 
-    process_info.update({'type': process_type, 'package': package})
-    store.save_process(ProcessDB(process_info))
+    process_info.update({'type': process_type, 'package': package, 'reference': reference})
+    saved_process = store.save_process(ProcessDB(process_info))
+
+    return {'processSummary': saved_process.summary()}
 
 
 @sd.process_service.get(tags=[sd.processes_tag], response_schemas=sd.get_process_responses)

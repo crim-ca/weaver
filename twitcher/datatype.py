@@ -138,24 +138,6 @@ class Process(dict):
             raise TypeError("'package' is required")
 
     @property
-    def params(self):
-        return {
-            'identifier': self.identifier,
-            'title': self.title,
-            'abstract': self.abstract,
-            'keywords': self.keywords,
-            'metadata': self.metadata,
-            'version': self.version,
-            'inputs': self.inputs,
-            'outputs': self.outputs,
-            'jobControlOptions': self.jobControlOptions,
-            'outputTransmission': self.outputTransmission,
-            'executeEndpoint': self.executeEndpoint,
-            'type': self.type,
-            'package': self.package,    # the deployment specification (json cwl, json wps, etc...)
-        }
-
-    @property
     def identifier(self):
         return self['identifier']
 
@@ -208,6 +190,10 @@ class Process(dict):
     def package(self):
         return self.get('package')
 
+    @property
+    def reference(self):
+        return self.get('reference')
+
     def __str__(self):
         return "Process <{0}> ({1})".format(self.identifier, self.title)
 
@@ -215,6 +201,40 @@ class Process(dict):
         cls = type(self)
         repr_ = dict.__repr__(self)
         return '{0}.{1}({2})'.format(cls.__module__, cls.__name__, repr_)
+
+    @property
+    def params(self):
+        return {
+            'identifier': self.identifier,
+            'title': self.title,
+            'abstract': self.abstract,
+            'keywords': self.keywords,
+            'metadata': self.metadata,
+            'version': self.version,
+            'inputs': self.inputs,
+            'outputs': self.outputs,
+            'jobControlOptions': self.jobControlOptions,
+            'outputTransmission': self.outputTransmission,
+            'executeEndpoint': self.executeEndpoint,
+            'type': self.type,
+            'package': self.package,      # deployment specification (json body)
+            'reference': self.reference,  # deployment specification (cwl file)
+        }
+
+    @property
+    def params_wps(self):
+        """Values applicable to WPS Process __init__
+        """
+        return {
+            'identifier': self.identifier,
+            'title': self.title,
+            'abstract': self.abstract,
+            'keywords': self.keywords,
+            'metadata': self.metadata,
+            'version': self.version,
+            'inputs': self.inputs,
+            'outputs': self.outputs,
+        }
 
     def json(self):
         return {
@@ -247,7 +267,7 @@ class Process(dict):
     def from_wps(wps_process):
         assert isinstance(wps_process, ProcessWPS)
         process = wps_process.json
-        process.update({'type': wps_process.identifier, 'package': None})
+        process.update({'type': wps_process.identifier, 'package': None, 'reference': None})
         return Process(process)
 
     def wps(self):
@@ -257,5 +277,7 @@ class Process(dict):
         if process_key not in process_mapping:
             ProcessInstanceError("Unknown process `{}` in mapping".format(process_key))
         if process_key == 'workflow':
-            return process_mapping[process_key](**self.params)
+            kwargs = self.params_wps
+            kwargs.update({'package': self.package, 'reference': self.reference})
+            return process_mapping[process_key](**kwargs)
         return process_mapping[process_key]()

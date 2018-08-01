@@ -132,7 +132,7 @@ from pywps import Process as ProcessWPS
 
 class MongodbProcessStore(ProcessStore, MongodbStore):
     """
-    Registry for WPS processes. Uses mongodb to store process.title and attributes.
+    Registry for WPS processes. Uses mongodb to store processes and attributes.
     """
 
     def __init__(self, collection, default_processes=None):
