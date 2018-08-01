@@ -10,5 +10,4 @@ celery
 owslib
 lxml
 cwltool
-yaml
 six
