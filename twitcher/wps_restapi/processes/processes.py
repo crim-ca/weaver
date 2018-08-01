@@ -1,5 +1,7 @@
 import json
 from pyramid.httpexceptions import *
+from pyramid_celery import celery_app as app
+from celery.utils.log import get_task_logger
 from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import URLError
 from time import sleep
@@ -13,11 +15,8 @@ from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import add_job, check_status
 from twitcher.db import MongoDB
 from twitcher.datatype import Process as ProcessDB
-from owslib.wps import WebProcessingService, WPSException, ComplexData, ComplexDataInput, ASYNC, SYNC, is_reference
-from pyramid_celery import celery_app as app
+from owslib.wps import WebProcessingService, WPSException, ComplexData, ComplexDataInput, is_reference
 from lxml import etree
-
-from celery.utils.log import get_task_logger
 
 logger = get_task_logger(__name__)
 
@@ -288,7 +287,8 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
     try:
         wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), skip_caps=False, verify=False)
         # execution = wps.execute(identifier, inputs=inputs, output=outputs, async=async, lineage=True)
-        execution = wps.execute(identifier, inputs=inputs, output=outputs, mode=ASYNC if async else SYNC, lineage=True)
+        mode = 'async' if async else 'sync'
+        execution = wps.execute(identifier, inputs=inputs, output=outputs, mode=mode, lineage=True)
         # job['service'] = wps.identification.title
         # job['title'] = getattr(execution.process, "title")
         if not execution.process and execution.errors:
