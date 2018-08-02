@@ -104,8 +104,8 @@ class HtmlHeader(MappingSchema):
     content_type.name = 'Content-Type'
 
 
-class StringList(SequenceSchema):
-    item = SchemaNode(String())
+class KeywordList(SequenceSchema):
+    keyword = SchemaNode(String())
 
 
 class MetadataObject(MappingSchema):
@@ -114,7 +114,7 @@ class MetadataObject(MappingSchema):
 
 
 class MetadataList(SequenceSchema):
-    item = MetadataObject()
+    metadata = MetadataObject()
 
 
 class FormatObject(MappingSchema):
@@ -126,7 +126,7 @@ class FormatObject(MappingSchema):
 
 
 class FormatList(SequenceSchema):
-    item = FormatObject()
+    format = FormatObject()
 
 
 class LiteralDataDomainObject(MappingSchema):
@@ -134,10 +134,10 @@ class LiteralDataDomainObject(MappingSchema):
 
 
 class BaseTypeBody(MappingSchema):
-    id = SchemaNode(String())
+    identifier = SchemaNode(String())
     title = SchemaNode(String(), missing=drop)
     abstract = SchemaNode(String(), missing=drop)
-    keywords = StringList(missing=drop)
+    keywords = KeywordList(missing=drop)
     metadata = MetadataList(missing=drop)
     formats = FormatList()
     minOccurs = SchemaNode(Integer(), missing=drop)
@@ -156,9 +156,14 @@ class BoundingBoxInputTypeBody(BaseTypeBody):
     pass
 
 
+class InputTypeBody(BaseTypeBody):
+    # TODO: figure out how to do OneOf
+    # item = MappingSchema(validator=OneOf([LiteralInputTypeBody, ComplexInputTypeBody, BoundingBoxInputTypeBody]))
+    pass
+
+
 class InputTypeList(SequenceSchema):
-    item = MappingSchema(default={},
-                         validator=OneOf([LiteralInputTypeBody, ComplexInputTypeBody, BoundingBoxInputTypeBody]))
+    input = InputTypeBody()
 
 
 class OutputTypeBody(BaseTypeBody):
@@ -166,7 +171,7 @@ class OutputTypeBody(BaseTypeBody):
 
 
 class OutputTypeList(SequenceSchema):
-    item = OutputTypeBody()
+    output = OutputTypeBody()
 
 
 JobControlOptionsEnum = SchemaNode(String(), validator=OneOf(['sync-execute', 'async-execute']), missing=drop)
@@ -555,7 +560,7 @@ class ProcessBody(MappingSchema):
     identifier = SchemaNode(String())
     title = SchemaNode(String(), missing=drop)
     abstract = SchemaNode(String(), missing=drop)
-    keywords = StringList(missing=drop)
+    keywords = KeywordList(missing=drop)
     metadata = MetadataList(missing=drop)
     inputs = InputTypeList(missing=drop)
     outputs = OutputTypeList(missing=drop)
