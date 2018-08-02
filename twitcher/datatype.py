@@ -143,19 +143,19 @@ class Process(dict):
 
     @property
     def title(self):
-        return self.get('title')
+        return self.get('title', self.identifier)
 
     @property
     def abstract(self):
-        return self.get('abstract')
+        return self.get('abstract', '')
 
     @property
     def keywords(self):
-        return self.get('keywords')
+        return self.get('keywords', [])
 
     @property
     def metadata(self):
-        return self.get('metadata')
+        return self.get('metadata', [])
 
     @property
     def version(self):
@@ -190,10 +190,6 @@ class Process(dict):
     def package(self):
         return self.get('package')
 
-    @property
-    def reference(self):
-        return self.get('reference')
-
     def __str__(self):
         return "Process <{0}> ({1})".format(self.identifier, self.title)
 
@@ -218,7 +214,6 @@ class Process(dict):
             'executeEndpoint': self.executeEndpoint,
             'type': self.type,
             'package': self.package,      # deployment specification (json body)
-            'reference': self.reference,  # deployment specification (cwl file)
         }
 
     @property
@@ -278,6 +273,6 @@ class Process(dict):
             ProcessInstanceError("Unknown process `{}` in mapping".format(process_key))
         if process_key == 'workflow':
             kwargs = self.params_wps
-            kwargs.update({'package': self.package, 'reference': self.reference})
+            kwargs.update({'package': self.package})
             return process_mapping[process_key](**kwargs)
         return process_mapping[process_key]()

@@ -551,8 +551,8 @@ class PostProvider(MappingSchema):
 #################################
 
 
-class ProcessOfferingBody(MappingSchema):
-    id = SchemaNode(String())
+class ProcessBody(MappingSchema):
+    identifier = SchemaNode(String())
     title = SchemaNode(String(), missing=drop)
     abstract = SchemaNode(String(), missing=drop)
     keywords = StringList(missing=drop)
@@ -563,6 +563,10 @@ class ProcessOfferingBody(MappingSchema):
     jobControlOptions = JobControlOptionsEnum
     outputTransmission = OutputTransmissionEnum
     executeEndpoint = SchemaNode(String(), missing=drop)    # URL
+
+
+class ProcessOfferingBody(MappingSchema):
+    process = ProcessBody()
 
 
 class PackageBody(MappingSchema):

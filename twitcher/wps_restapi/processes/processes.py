@@ -16,6 +16,7 @@ from twitcher.wps_restapi.jobs.jobs import add_job, check_status
 from twitcher.exceptions import ProcessNotFound, ProcessInstanceError, ProcessRegistrationError
 from twitcher.db import MongoDB
 from twitcher.datatype import Process as ProcessDB
+from twitcher.processes.wps_workflow import load_workflow_content, load_workflow_file
 from owslib.wps import WebProcessingService, WPSException, ComplexData, ComplexDataInput, is_reference
 from lxml import etree
 
@@ -62,13 +63,21 @@ def add_process(request):
     reference = execution_unit.get('reference')
     if not (package or reference):
         raise HTTPNotAcceptable(
-            detail="Missing one of parameters [package, reference] in 'deploymentProfile.executionUnit'"
-        )
-
+            detail="Missing one of parameters [package,reference] in 'deploymentProfile.executionUnit'.")
+    if package and reference:
+        raise HTTPNotAcceptable(
+            detail="Cannot specify parameters [package,reference] simultaneously in 'deploymentProfile.executionUnit'.")
     # for debug
     process_type = request.json.get('process_type', 'workflow')
 
-    process_info.update({'type': process_type, 'package': package, 'reference': reference})
+    if reference:
+        package = load_workflow_file(reference)
+    try:
+        load_workflow_content(package)
+    except Exception as ex:
+        raise HTTPBadRequest("Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex)))
+
+    process_info.update({'type': process_type, 'package': package})
     saved_process = store.save_process(ProcessDB(process_info))
 
     return {'processSummary': saved_process.summary()}
