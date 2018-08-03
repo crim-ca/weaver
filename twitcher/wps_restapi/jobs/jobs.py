@@ -1,10 +1,11 @@
 from pyramid.view import view_config
+from pyramid.httpexceptions import *
 import twitcher.wps_restapi.swagger_definitions as sd
 import uuid
 import requests
 from datetime import datetime
 from twitcher.db import MongoDB
-from twitcher.wps_restapi.utils import restapi_base_url, get_cookie_headers
+from twitcher.wps_restapi.utils import wps_restapi_base_url, get_cookie_headers
 from twitcher.adapter import servicestore_factory
 from pyramid.security import authenticated_userid
 from pymongo import ASCENDING, DESCENDING
@@ -25,7 +26,7 @@ status_categories = {
 
 def job_url(request, job):
     return '{base_url}/providers/{provider_id}/processes/{process_id}/jobs/{job_id}'.format(
-        base_url=restapi_base_url(request),
+        base_url=wps_restapi_base_url(request.registry.settings),
         provider_id=job['provider_id'],
         process_id=job['process_id'],
         job_id=job['task_id'])
@@ -132,16 +133,10 @@ def filter_jobs(collection, request, page=0, limit=10, process=None,
     return items, count
 
 
-@sd.jobs_service.get(tags=[sd.jobs_tag], response_schemas=sd.get_all_jobs_responses)
+@sd.jobs_service.get(schema=sd.GetJobsRequest(), tags=[sd.jobs_tag], response_schemas=sd.get_all_jobs_responses)
 def get_jobs(request):
     """
-    Retrieve the list of jobs which can be filtered/sorted using :
-    ?page=[number]
-    &limit=[number]
-    &status=[ProcessAccepted, ProcessStarted, ProcessPaused, ProcessFailed, ProcessSucceeded]
-    &process=[process.title]
-    &provider=[provider_id]
-    &sort=[created, status, process, provider]
+    Retrieve the list of jobs which can be filtered/sorted using queries.
     """
 
     page = int(request.params.get('page', '0'))
@@ -157,7 +152,7 @@ def get_jobs(request):
     collection = db.jobs
 
     items, count = filter_jobs(collection, request, page, limit, process, provider, tag, access, status, sort)
-    return {
+    return HTTPOk(json={
         'count': count,
         'page': page,
         'limit': limit,
@@ -166,7 +161,7 @@ def get_jobs(request):
             'status': item['status'],
             'location': job_url(request, item)
         } for item in items]
-    }
+    })
 
 
 def get_job(request):
@@ -192,12 +187,12 @@ def get_job(request):
                           response_schemas=sd.get_single_job_status_responses)
 def get_job_status(request):
     """
-    Retrieve the status of a job
+    Retrieve the status of a job.
     """
     job = get_job(request)
     if not job:
         # TODO Return a not found job response
-        return 404
+        return HTTPNotFound()
 
     response = {
         "jobID": job['task_id'],
@@ -227,7 +222,7 @@ def cancel_job(request):
     job = get_job(request)
     if not job:
         # TODO Return a not found job response
-        return 404
+        return HTTPNotFound()
 
     app.control.revoke(job['task_id'], terminate=True)
 
@@ -240,12 +235,12 @@ def cancel_job(request):
                               response_schemas=sd.get_single_job_outputs_responses)
 def get_outputs(request):
     """
-    Retrieve the result(s) of a job
+    Retrieve the result(s) of a job.
     """
     job = get_job(request)
     if not job:
         # TODO Return a not found job response
-        return 404
+        return HTTPNotFound()
 
     outputs = job['outputs']
     for output in outputs:
@@ -260,12 +255,12 @@ def get_outputs(request):
                              response_schemas=sd.get_single_output_responses)
 def get_output(request):
     """
-    Retrieve the result of a particular job output
+    Retrieve the result of a particular job output.
     """
     job = get_job(request)
     if not job:
         # TODO Return a not found job response
-        return 404
+        return HTTPNotFound()
 
     output_id = request.matchdict.get('output_id')
 
@@ -274,7 +269,7 @@ def get_output(request):
             output['url'] = '{job_url}/outputs/{output_id}'.format(job_url=job_url(request, job),
                                                                    output_id=output['identifier'])
             return output
-    return 404
+    return HTTPNotFound()
 
 
 @sd.exceptions_full_service.get(tags=[sd.jobs_tag], schema=sd.FullExceptionsEndpoint(),
@@ -283,12 +278,12 @@ def get_output(request):
                                  response_schemas=sd.get_exceptions_responses)
 def get_exceptions(request):
     """
-    Retrieve the result(s) of a job"
+    Retrieve the result(s) of a job.
     """
     job = get_job(request)
     if not job:
         # TODO Return a not found job response
-        return 404
+        return HTTPNotFound()
 
     return job['exceptions']
 
@@ -297,11 +292,11 @@ def get_exceptions(request):
 @sd.logs_short_service.get(tags=[sd.jobs_tag], schema=sd.ShortLogsEndpoint(), response_schemas=sd.get_logs_responses)
 def get_log(request):
     """
-    Retrieve the result(s) of a job"
+    Retrieve the result(s) of a job.
     """
     job = get_job(request)
     if not job:
         # TODO Return a not found job response
-        return 404
+        return HTTPNotFound()
 
     return job['log']

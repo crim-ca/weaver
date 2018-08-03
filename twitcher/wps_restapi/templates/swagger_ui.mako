@@ -1,14 +1,15 @@
 <!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
-    <title>Twitcher's Swagger UI</title>
+    <title>${api_title}</title>
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@3.17.5/swagger-ui.css">
     <script src="https://unpkg.com/swagger-ui-dist@3.17.5/swagger-ui-standalone-preset.js"></script>
     <script src="https://unpkg.com/swagger-ui-dist@3.17.5/swagger-ui-bundle.js"></script>
     <script>
         addEventListener('DOMContentLoaded', function() {
             window.ui = SwaggerUIBundle({
-                url: "api/json",
+                url: "${api_swagger_json_path}",
+                urls: [{ url: "${api_swagger_json_path}", name: "latest" }],
                 dom_id: '#swagger-ui',
                 deepLinking: true,
                 docExpansion: 'none',

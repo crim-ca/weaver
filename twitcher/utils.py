@@ -12,6 +12,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def get_any_id(info):  # type: (dict) -> Any
+    """Retrieves a dictionary 'id'-like key using multiple common variations [id, identifier, _id].
+    :param info: dictionary that potentially contains an 'id'-like key.
+    :returns: value of the matched 'id'-like key."""
+    return info.get('id', info.get('identifier', info.get('_id')))
+
+
 def is_valid_url(url):
     try:
         parsed_url = urlparse(url)
@@ -142,7 +149,7 @@ def parse_request_query(request):
     :param request:
     :return: dict of dict where k=v are accessible by d[k][0] == v and q=k=v are accessible by d[q][k] == v, lowercase
     """
-    queries = parse_qs(request.query_string().lower())
+    queries = parse_qs(request.query_string.lower())
     queries_dict = dict()
     for q in queries:
         queries_dict[q] = dict()

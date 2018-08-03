@@ -2,10 +2,32 @@ import os
 import tempfile
 
 from pyramid.settings import asbool
+from pyramid.exceptions import ConfigurationError
 
 
 import logging
 LOGGER = logging.getLogger("TWITCHER")
+
+
+TWITCHER_CONFIGURATION_DEFAULT = 'DEFAULT'
+TWITCHER_CONFIGURATION_ADES = 'ADES'
+TWITCHER_CONFIGURATION_EMS = 'EMS'
+TWITCHER_CONFIGURATIONS = frozenset([
+    TWITCHER_CONFIGURATION_DEFAULT,
+    TWITCHER_CONFIGURATION_ADES,
+    TWITCHER_CONFIGURATION_EMS
+])
+
+
+def get_twitcher_configuration(settings):
+    twitcher_config = settings.get('twitcher.configuration')
+    if not twitcher_config:
+        LOGGER.warn("Setting 'twitcher.configuration' not specified, using '{}'".format(TWITCHER_CONFIGURATION_DEFAULT))
+        twitcher_config = TWITCHER_CONFIGURATION_DEFAULT
+    twitcher_config_up = twitcher_config.upper()
+    if twitcher_config_up not in TWITCHER_CONFIGURATIONS:
+        raise ConfigurationError("Unknown setting 'twitcher.configuration' specified: '{}'".format(twitcher_config))
+    return twitcher_config_up
 
 
 def _workdir(request):

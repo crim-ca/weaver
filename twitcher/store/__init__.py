@@ -66,7 +66,8 @@ def processstore_defaultfactory(registry, database=None):
     database = database or 'mongodb'
     if database == 'mongodb':
         db = _mongodb(registry)
-        store = MongodbProcessStore(collection=db.processes, default_processes=default_processes)
+        store = MongodbProcessStore(collection=db.processes, settings=registry.settings,
+                                    default_processes=default_processes)
     else:
         store = MemoryProcessStore(default_processes)
     return store

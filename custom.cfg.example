@@ -10,10 +10,12 @@ configuration = default
 hostname = localhost
 https-port = 5000
 log-level = WARN
-
+wps = true
+wps-path = /ows/wps
+ows-proxy-protected-path = /ows/proxy
 wps-restapi = true
+wps-restapi-path = /
 adapter = package.path.to.AdapterImpl
-restapi-path = /
 
 extra-options = adapter_impl.opt1=value1,adapter_impl.opt2=value2
 

@@ -7,6 +7,7 @@ from twitcher.store.base import AccessTokenStore
 from twitcher.datatype import AccessToken
 from twitcher.exceptions import AccessTokenNotFound
 from twitcher.utils import islambda
+from twitcher.wps_restapi.utils import wps_restapi_base_url
 
 import logging
 LOGGER = logging.getLogger(__name__)
@@ -135,8 +136,10 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
     Registry for WPS processes. Uses mongodb to store processes and attributes.
     """
 
-    def __init__(self, collection, default_processes=None):
+    def __init__(self, collection, settings, default_processes=None):
         super(MongodbProcessStore, self).__init__(collection=collection)
+        self.default_host = settings.get('twitcher.url')
+        self.default_wps_endpoint = '{host}{wps}'.format(host=self.default_host, wps=settings.get('twitcher.wps_path'))
         if default_processes:
             registered_processes = [process.identifier for process in self.list_processes()]
             for process in default_processes:
@@ -154,6 +157,7 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
 
         new_process['type'] = self._get_process_type(process)
         new_process['identifier'] = self._get_process_id(process)
+        new_process['executeEndpoint'] = self._get_process_urls(process)
         self.collection.insert_one(new_process)
 
     @staticmethod
@@ -182,8 +186,13 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         return self._get_process_field(process, lambda: process.identifier)
 
     def _get_process_type(self, process):
-        return self._get_process_field(process, {ProcessDB: lambda: process.type,
-                                                 ProcessWPS: lambda: 'wps'}).lower()
+        return self._get_process_field(process, {ProcessDB: lambda: process.type, ProcessWPS: lambda: 'wps'}).lower()
+
+    def _get_process_urls(self, process):
+        url = self._get_process_field(process, {ProcessDB: lambda: process.executeEndpoint, ProcessWPS: lambda: None})
+        if not url:
+            url = self.default_wps_endpoint
+        return url
 
     def save_process(self, process, overwrite=True, request=None):
         """

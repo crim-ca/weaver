@@ -87,6 +87,7 @@ class MockRequest(object):
     def __init__(self, url):
         self.url = url
 
+    @property
     def query_string(self):
         return urlparse(self.url).query
 

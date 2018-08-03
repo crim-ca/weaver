@@ -8,9 +8,12 @@ sys.path.insert(0, TWITCHER_ROOT_DIR)
 sys.path.insert(0, TWITCHER_MODULE_DIR)
 
 from twitcher import adapter
+from twitcher.config import get_twitcher_configuration
 from pyramid.exceptions import ConfigurationError
 from pyramid.httpexceptions import HTTPServerError
 from pyramid.view import exception_view_config, notfound_view_config, forbidden_view_config
+import logging
+logger = logging.getLogger('TWITCHER')
 
 
 @notfound_view_config()
@@ -63,6 +66,10 @@ def main(global_config, **settings):
     This function returns a Pyramid WSGI application.
     """
 
+    # validate and fix configuration
+    twitcher_config = get_twitcher_configuration(settings)
+    settings.update({'twitcher.configuration': twitcher_config})
+
     # Parse extra_options and add each of them in the settings dict
     settings.update(parse_extra_options(settings.get('twitcher.extra_options', '')))
 
@@ -73,6 +80,9 @@ def main(global_config, **settings):
     # celery
     config.include('pyramid_celery')
     config.configure_celery(global_config['__file__'])
+
+    # mako used by swagger-ui
+    config.include('pyramid_mako')
 
     # include twitcher components
     config.include('twitcher.config')

@@ -55,6 +55,116 @@ def load_workflow_content(workflow_dict):
     return workflow
 
 
+def _cwl2wps_io(io_info):
+    """Converts input/output parameters from CWL types to WPS types.
+    :param io_info: parsed IO of a CWL file
+    :return: corresponding IO in WPS format
+    """
+    is_input = False
+    is_output = False
+    if 'inputBinding' in io_info:
+        is_input = True
+        io_literal = LiteralInput
+        io_complex = ComplexInput
+        io_bbox = BoundingBoxInput
+    elif 'outputBinding' in io_info:
+        is_output = True
+        io_literal = LiteralOutput
+        io_complex = ComplexOutput
+        io_bbox = BoundingBoxOutput
+    else:
+        raise Exception("Unsupported I/O info definition: `{}`.".format(repr(io_info)))
+
+    io_name = io_info['name']
+    io_type = io_info['type']
+
+    # literal types
+    if io_type in ['string', 'boolean', 'float', 'int', 'long', 'double', 'null', 'Any']:
+        if io_type == 'Any':
+            io_type = 'anyvalue'
+        if io_type == 'null':
+            io_type = 'novalue'
+        if io_type == 'int':
+            io_type = 'integer'
+        if io_type in ['float', 'long', 'double']:
+            io_type = 'float'
+        return io_literal(identifier=io_name,
+                          title=io_info.get('label', io_name),
+                          abstract=io_info.get('doc', ''),
+                          data_type=io_type,
+                          default=io_info.get('default', None),
+                          min_occurs=1, max_occurs=1)
+    # complex types
+    else:
+        kw = {
+            'identifier': io_name,
+            'title': io_info.get('label', io_name),
+            'abstract': io_info.get('doc', ''),
+            'supported_formats': [Format(io_info.get('format', 'text/plain'))]
+        }
+        if is_output:
+            if io_type == 'Directory':
+                kw['as_reference'] = True
+            if io_type == 'File':
+                has_contents = io_info.get('contents') is not None
+                kw['as_reference'] = False if has_contents else True
+        return io_complex(**kw)
+
+
+def _merge_workflow_io(wps_io_list, cwl_io_list):
+    """
+    Update I/O definitions to use for process creation and returned by GetCapabilities, DescribeProcess.
+    If WPS I/O definitions where provided during deployment, update them with CWL-to-WPS converted I/O and
+    preserve their optional WPS fields. Otherwise, provided minimum field requirements from CWL.
+    Adds and removes any deployment WPS I/O definitions that don't match any CWL I/O by id.
+
+    :param wps_io_list: list of WPS I/O passed during process deployment.
+    :param cwl_io_list: list of CWL I/O converted to WPS-like I/O for counter-validation.
+    :returns: list of validated/updated WPS I/O for the process.
+    """
+    if not cwl_io_list:
+        raise Exception("CWL I/O definitions must be provided, empty list if none required.")
+    if not wps_io_list:
+        wps_io_list = list()
+    wps_io_dict = OrderedDict((wps_io.identifier, wps_io) for wps_io in wps_io_list)
+    cwl_io_dict = OrderedDict((cwl_io.identifier, cwl_io) for cwl_io in cwl_io_list)
+    missing_io_list = set(cwl_io_dict) - set(wps_io_dict)
+    updated_io_list = list()
+    for cwl_id in missing_io_list:
+        updated_io_list.append(cwl_io_dict[cwl_id])
+    for wps_io in wps_io_list:
+        wps_id = wps_io.identifier
+        # WPS I/O by id not matching CWL I/O are discarded
+        if wps_id in wps_io_dict:
+            # retrieve any additional fields (metadata, keywords, etc.) passed as input,
+            # but override CWL-converted types and formats
+            if hasattr(wps_io, 'data_type'):
+                wps_io.data_type = cwl_io_dict[wps_id].data_type
+            updated_io_list.append(wps_io)
+    return updated_io_list
+
+
+def merge_workflow_inputs_outputs(wps_inputs_list, cwl_inputs_list, wps_outputs_list, cwl_outputs_list):
+    """Merges I/O definitions to use for process creation and returned by GetCapabilities, DescribeProcess
+    using the WPS specifications (from request POST) and CWL specifications (extracted from file)."""
+    return _merge_workflow_io(wps_inputs_list, cwl_inputs_list), _merge_workflow_io(wps_outputs_list, cwl_outputs_list)
+
+
+def get_workflow_inputs(self):
+    """Generates WPS-like inputs using parsed CWL workflow input definitions."""
+    return [self._cwl2wps_io(i) for i in self.workflow.t.inputs_record_schema['fields']]
+
+
+def get_workflow_outputs(self):
+    """Generates WPS-like outputs using parsed CWL workflow output definitions."""
+    return [self._cwl2wps_io(o) for o in self.workflow.t.outputs_record_schema['fields']]
+
+
+def get_workflow_inputs_outputs(workflow):
+    """Generates WPS-like (inputs,outputs) tuple using parsed CWL workflow output definitions."""
+    return get_workflow_inputs(workflow), get_workflow_outputs(workflow)
+
+
 class Workflow(Process):
     workflow = None
     job_file = None
@@ -71,114 +181,17 @@ class Workflow(Process):
 
         wps_inputs = kw.pop('inputs')
         wps_outputs = kw.pop('outputs')
-        cwl_inputs = self._get_workflow_inputs()
-        cwl_outputs = self._get_workflow_outputs()
+        cwl_inputs = get_workflow_inputs(self.workflow)
+        cwl_outputs = get_workflow_outputs(self.workflow)
 
         super(Workflow, self).__init__(
             self._handler,
-            inputs=self._update_workflow_io(wps_inputs, cwl_inputs),
-            outputs=self._update_workflow_io(wps_outputs, cwl_outputs),
+            inputs=_merge_workflow_io(wps_inputs, cwl_inputs),
+            outputs=_merge_workflow_io(wps_outputs, cwl_outputs),
             store_supported=True,
             status_supported=True,
             **kw
         )
-
-    @staticmethod
-    def _cwl2wps_io(io_info):
-        """Converts input/output parameters from CWL types to WPS types.
-        :param io_info: parsed IO of a CWL file
-        :return: corresponding IO in WPS format
-        """
-        is_input = False
-        is_output = False
-        if 'inputBinding' in io_info:
-            is_input = True
-            io_literal = LiteralInput
-            io_complex = ComplexInput
-            io_bbox = BoundingBoxInput
-        elif 'outputBinding' in io_info:
-            is_output = True
-            io_literal = LiteralOutput
-            io_complex = ComplexOutput
-            io_bbox = BoundingBoxOutput
-        else:
-            raise Exception("Unsupported I/O info definition: `{}`.".format(repr(io_info)))
-
-        io_name = io_info['name']
-        io_type = io_info['type']
-
-        # literal types
-        if io_type in ['string', 'boolean', 'float', 'int', 'long', 'double', 'null', 'Any']:
-            if io_type == 'Any':
-                io_type = 'anyvalue'
-            if io_type == 'null':
-                io_type = 'novalue'
-            if io_type == 'int':
-                io_type = 'integer'
-            if io_type in ['float', 'long', 'double']:
-                io_type = 'float'
-            return io_literal(identifier=io_name,
-                              title=io_info.get('label', io_name),
-                              abstract=io_info.get('doc', ''),
-                              data_type=io_type,
-                              default=io_info.get('default', None),
-                              min_occurs=1, max_occurs=1)
-        # complex types
-        else:
-            kw = {
-                'identifier': io_name,
-                'title': io_info.get('label', io_name),
-                'abstract': io_info.get('doc', ''),
-                'supported_formats': [Format(io_info.get('format', 'text/plain'))]
-            }
-            if is_output:
-                if io_type == 'Directory':
-                    kw['as_reference'] = True
-                if io_type == 'File':
-                    has_contents = io_info.get('contents') is not None
-                    kw['as_reference'] = False if has_contents else True
-            return io_complex(**kw)
-
-    @staticmethod
-    def _update_workflow_io(wps_io_list, cwl_io_list):
-        """
-        Update I/O definitions to use for process creation and returned by GetCapabilities, DescribeProcess.
-        If WPS I/O definitions where provided during deployment, update them with CWL-to-WPS converted I/O and
-        preserve their optional WPS fields. Otherwise, provided minimum field requirements from CWL.
-        Adds and removes any deployment WPS I/O definitions that don't match any CWL I/O by id.
-
-        :param wps_io_list: list of WPS I/O passed during process deployment.
-        :param cwl_io_list: list of CWL I/O converted to WPS-like I/O for counter-validation.
-        :returns: list of validated/updated WPS I/O for the process.
-        """
-        if not cwl_io_list:
-            raise Exception("CWL I/O definitions must be provided, empty list if none required.")
-        if not wps_io_list:
-            wps_io_list = list()
-        wps_io_dict = OrderedDict((wps_io.identifier, wps_io) for wps_io in wps_io_list)
-        cwl_io_dict = OrderedDict((cwl_io.identifier, cwl_io) for cwl_io in cwl_io_list)
-        missing_io_list = set(cwl_io_dict) - set(wps_io_dict)
-        updated_io_list = list()
-        for cwl_id in missing_io_list:
-            updated_io_list.append(cwl_io_dict[cwl_id])
-        for wps_io in wps_io_list:
-            wps_id = wps_io.identifier
-            # WPS I/O by id not matching CWL I/O are discarded
-            if wps_id in wps_io_dict:
-                # retrieve any additional fields (metadata, keywords, etc.) passed as input,
-                # but override CWL-converted types and formats
-                if hasattr(wps_io, 'data_type'):
-                    wps_io.data_type = cwl_io_dict[wps_id].data_type
-                updated_io_list.append(wps_io)
-        return updated_io_list
-
-    def _get_workflow_inputs(self):
-        """Generates WPS-like inputs using parsed CWL workflow input definitions."""
-        return [self._cwl2wps_io(i) for i in self.workflow.t.inputs_record_schema['fields']]
-
-    def _get_workflow_outputs(self):
-        """Generates WPS-like outputs using parsed CWL workflow output definitions."""
-        return [self._cwl2wps_io(o) for o in self.workflow.t.outputs_record_schema['fields']]
 
     def _handler(self, request, response):
         response.update_status("Launching workflow ...", 0)

@@ -57,3 +57,4 @@ dependencies:
   - https://github.com/geopython/OWSLib/archive/master.zip
   - https://github.com/geopython/pywps/archive/master.zip
   - cornice_swagger
+  - cornice

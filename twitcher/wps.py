@@ -44,7 +44,7 @@ def pywps_view(environ, start_response):
         environ['PYWPS_CFG'] = PYWPS_CFG
 
     registry = app.conf['PYRAMID_REGISTRY']
-    processstore = processstore_defaultfactory(registry.settings)
+    processstore = processstore_defaultfactory(registry)
     processes_wps = [process.wps() for process in processstore.list_processes()]
     service = Service(processes_wps, [environ['PYWPS_CFG']])
     return service(environ, start_response)
@@ -59,8 +59,9 @@ def includeme(config):
         # include twitcher config
         config.include('twitcher.config')
 
-        config.add_route('wps', '/ows/wps')
-        config.add_route('wps_secured', '/ows/wps/{access_token}')
+        wps_path = settings.get('twitcher.wps_path', '/ows/wps').rstrip('/').strip()
+        config.add_route('wps', wps_path)
+        config.add_route('wps_secured', wps_path + '/{access_token}')
         config.add_view(pywps_view, route_name='wps')
         config.add_view(pywps_view, route_name='wps_secured')
         config.add_request_method(_wps_cfg, 'wps_cfg', reify=True)

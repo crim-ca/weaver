@@ -1,21 +1,31 @@
 import json
+import requests
+from pyramid.settings import asbool
 from pyramid.httpexceptions import *
 from pyramid_celery import celery_app as app
 from celery.utils.log import get_task_logger
 from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import URLError
+from six import string_types
 from time import sleep
 from datetime import datetime
 from twitcher.adapter import servicestore_factory
+from twitcher.config import TWITCHER_CONFIGURATION_EMS, get_twitcher_configuration
 from twitcher.store import servicestore_defaultfactory, processstore_defaultfactory
-from twitcher.wps_restapi.utils import restapi_base_url, get_wps_output_format
+from twitcher.utils import get_any_id
+from twitcher.wps_restapi.utils import wps_restapi_base_url, get_wps_output_format
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import add_job, check_status
 from twitcher.exceptions import ProcessNotFound, ProcessInstanceError, ProcessRegistrationError
 from twitcher.db import MongoDB
 from twitcher.datatype import Process as ProcessDB
-from twitcher.processes.wps_workflow import load_workflow_content, load_workflow_file
+from twitcher.processes.wps_workflow import (
+    load_workflow_content,
+    load_workflow_file,
+    get_workflow_inputs_outputs,
+    merge_workflow_inputs_outputs,
+)
 from owslib.wps import WebProcessingService, WPSException, ComplexData, ComplexDataInput, is_reference
 from lxml import etree
 
@@ -26,14 +36,29 @@ logger = get_task_logger(__name__)
                           response_schemas=sd.get_processes_responses)
 def get_processes(request):
     """
-    List registered local processes (GetCapabilities).
+    List registered processes (GetCapabilities). Optionally list both local and provider processes.
     """
     try:
+        # get local processes
         store = processstore_defaultfactory(request.registry)
-        processes = [process.json() for process in store.list_processes()]
-        return {
-            'processes': processes
-        }
+        processes = [process.summary() for process in store.list_processes()]
+        response_body = {'processes': processes}
+
+        # if EMS and ?providers=True, also fetch each provider's processes
+        if get_twitcher_configuration(request.registry.settings) == TWITCHER_CONFIGURATION_EMS:
+            queries = parse_request_query(request)
+            if 'providers' in queries and asbool(queries['providers'][0]) is True:
+                providers_response = requests.request('GET', '{host}/providers'.format(host=request.host_url),
+                                                      headers=request.headers, cookies=request.cookies)
+                providers = providers_response.json()
+                response_body.update({'providers': providers})
+                for i, provider in enumerate(providers):
+                    provider_id = get_any_id(provider)
+                    processes = requests.request('GET', '{host}/providers/{provider_id}/processes'
+                                                        .format(host=request.host_url, provider_id=provider_id),
+                                                 headers=request.headers, cookies=request.cookies)
+                    response_body['providers'][i].update({'processes': processes})
+        return HTTPOk(json=response_body)
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except Exception as ex:
@@ -42,7 +67,7 @@ def get_processes(request):
 
 @sd.processes_service.post(tags=[sd.processes_tag], schema=sd.PostProcessRequest(),
                            response_schemas=sd.post_processes_responses)
-def add_process(request):
+def add_local_process(request):
     """
     Register a local process.
     """
@@ -50,53 +75,60 @@ def add_process(request):
 
     process_offering = request.json.get('processOffering')
     deployment_profile = request.json.get('deploymentProfile')
-    if not process_offering:
-        raise HTTPNotAcceptable(detail="Missing parameter 'processOffering'")
-    if not deployment_profile:
-        raise HTTPNotAcceptable(detail="Missing parameter 'deploymentProfile'")
+    if not isinstance(process_offering, dict):
+        raise HTTPUnprocessableEntity(detail="Invalid parameter 'processOffering'")
+    if not isinstance(deployment_profile, dict):
+        raise HTTPUnprocessableEntity(detail="Invalid parameter 'deploymentProfile'")
 
     # validate minimum field requirements
     process_info = process_offering.get('process')
-    if not process_info:
-        raise HTTPNotAcceptable(detail="Missing parameter 'processOffering.process'")
-    if not process_info.get('identifier'):
-        raise HTTPNotAcceptable(detail="Missing parameter 'processOffering.process.identifier'")
+    if not isinstance(process_info, dict):
+        raise HTTPUnprocessableEntity(detail="Invalid parameter 'processOffering.process'")
+    if not isinstance(process_info.get('identifier'), string_types):
+        raise HTTPUnprocessableEntity(detail="Invalid parameter 'processOffering.process.identifier'")
 
-    execution_unit = deployment_profile.get('executionUnit')
-    if not execution_unit:
-        raise HTTPNotAcceptable(detail="Missing parameter 'deploymentProfile.executionUnit'")
-    package = execution_unit.get('package')
-    reference = execution_unit.get('reference')
-    if not (package or reference):
-        raise HTTPNotAcceptable(
-            detail="Missing one of parameters [package,reference] in 'deploymentProfile.executionUnit'.")
-    if package and reference:
-        raise HTTPNotAcceptable(
-            detail="Cannot specify parameters [package,reference] simultaneously in 'deploymentProfile.executionUnit'.")
-    # for debug
-    process_type = request.json.get('process_type', 'workflow')
+    process_type = request.json.get('type', 'workflow')
+    if process_type == 'workflow':
+        execution_unit = deployment_profile.get('executionUnit')
+        if not isinstance(execution_unit, dict):
+            raise HTTPUnprocessableEntity(detail="Invalid parameter 'deploymentProfile.executionUnit'")
+        package = execution_unit.get('package')
+        reference = execution_unit.get('reference')
+        if not (isinstance(package, dict) or isinstance(reference, string_types)):
+            raise HTTPUnprocessableEntity(
+                detail="Invalid parameters amongst one of [package,reference] in 'deploymentProfile.executionUnit'.")
+        if package and reference:
+            raise HTTPUnprocessableEntity(
+                detail="Simultaneous parameters [package,reference] not allowed in 'deploymentProfile.executionUnit'.")
 
-    if reference:
-        package = load_workflow_file(reference)
-    try:
-        load_workflow_content(package)
-    except Exception as ex:
-        raise HTTPBadRequest("Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex)))
+        # retrieve package information and validate them at the same time by loading/updating definitions to store in DB
+        if reference:
+            package = load_workflow_file(reference)
+        try:
+            workflow = load_workflow_content(package)
+            workflow_inputs, workflow_outputs = get_workflow_inputs_outputs(workflow)
+            process_inputs = process_info.get('inputs')
+            process_outputs = process_info.get('outputs')
+            workflow_inputs, workflow_outputs = merge_workflow_inputs_outputs(workflow_inputs, process_inputs,
+                                                                              workflow_outputs, process_outputs)
+            process_info.update({'package': package, 'inputs': workflow_inputs, 'outputs': workflow_outputs})
+        except Exception as ex:
+            raise HTTPBadRequest("Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex)))
 
-    process_info.update({'type': process_type, 'package': package})
+    process_info.update({'type': process_type})
     saved_process = store.save_process(ProcessDB(process_info))
 
     return {'processSummary': saved_process.summary()}
 
 
 @sd.process_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], response_schemas=sd.get_process_responses)
-def get_process(request):
+def get_local_process(request):
     """
     Get a registered local process information (DescribeProcess).
     """
     process_id = request.matchdict.get('process_id')
-    if not process_id:
-        raise HTTPNotAcceptable(detail="Missing parameter 'process_id'")
+    if not isinstance(process_id, string_types):
+        raise HTTPUnprocessableEntity(detail="Invalid parameter 'process_id'")
     try:
         store = processstore_defaultfactory(request.registry)
         process = store.fetch_by_id(process_id)
@@ -111,14 +143,14 @@ def get_process(request):
 
 @sd.process_service.delete(tags=[sd.processes_tag],
                            schema=sd.DeleteProcessRequestSchema, response_schemas=sd.delete_process_responses)
-def delete_process(request):
+def delete_local_process(request):
     process_id = request.matchdict.get('process_id')
-    if not process_id:
-        raise HTTPNotAcceptable(detail="Missing parameter 'process_id'")
+    if not isinstance(process_id, string_types):
+        raise HTTPUnprocessableEntity(detail="Invalid parameter 'process_id'")
     try:
         store = processstore_defaultfactory(request.registry)
         if store.delete_process(process_id):
-            return HTTPOk(json={'deploymentDone': 'success', 'id': process_id})
+            return HTTPOk(json={'deploymentDone': 'success', 'identifier': process_id})
         raise HTTPInternalServerError(detail="Delete process failed.")
     except HTTPException:
         raise  # re-throw already handled HTTPException
@@ -149,7 +181,7 @@ def get_provider_processes(request):
             title=getattr(process, 'title', ''),
             abstract=getattr(process, 'abstract', ''),
             url='{base_url}/providers/{provider_id}/processes/{process_id}'.format(
-                base_url=restapi_base_url(request),
+                base_url=wps_restapi_base_url(request.registry.settings),
                 provider_id=provider_id,
                 process_id=process.identifier))
         processes.append(item)
@@ -488,8 +520,8 @@ def submit_provider_job(request):
 
     try:
         # need to use ComplexDataInput structure for complex input
-        inputs = [(inpt['id'], ComplexDataInput(inpt['value'])
-                  if inpt['id'] in complex_inputs else inpt['value'])
+        inputs = [(get_any_id(inpt), ComplexDataInput(inpt['value'])
+                  if get_any_id(inpt) in complex_inputs else inpt['value'])
                   for inpt in request.json_body['inputs']]
     except KeyError:
         inputs = []
@@ -516,7 +548,7 @@ def submit_provider_job(request):
     return {'jobID': result.id,
             'status': "ProcessAccepted",
             'location': '{base_url}/providers/{provider_id}/processes/{process_id}/jobs/{job_id}'.format(
-                base_url=restapi_base_url(request),
+                base_url=wps_restapi_base_url(request.registry.settings),
                 provider_id=provider_id,
                 process_id=process.identifier,
                 job_id=result.id)

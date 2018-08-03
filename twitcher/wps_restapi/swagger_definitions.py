@@ -2,16 +2,21 @@
 This module should contain any and every definitions in use to build the swagger UI,
 so that one can update the swagger without touching any other files after the initial integration
 """
+from twitcher.config import TWITCHER_CONFIGURATION_EMS
+from twitcher.wps_restapi.utils import wps_restapi_base_path
 from cornice import Service
 from colander import *
 
-#########################################################
+#########################################################################
 # API endpoints
-#########################################################
+# note: all these paths can be prefixed by 'wps-rest-api-path' setting
+#########################################################################
+
+api_title = 'Twitcher REST API'
 
 api_frontpage_uri = '/'
-api_swagger_ui_uri = '/api'
-api_swagger_json_uri = '/api/json'
+api_swagger_ui_uri = '/doc'
+api_swagger_json_uri = '/json'
 
 processes_uri = '/processes'
 process_uri = '/processes/{process_id}'
@@ -269,44 +274,87 @@ class JobOutputList(SequenceSchema):
     item = JobOutput()
 
 
-class ProviderSchema(MappingSchema):
-    """WPS provider shortened definition"""
-    url = SchemaNode(String())
-    abstract = SchemaNode(String())
-    title = SchemaNode(String())
+class ProviderSummarySchema(MappingSchema):
+    """WPS provider summary definition."""
     id = SchemaNode(String())
+    url = SchemaNode(String())
+    title = SchemaNode(String())
+    abstract = SchemaNode(String())
     public = SchemaNode(Boolean())
 
 
 class ProviderCapabilitiesSchema(MappingSchema):
-    """WPS provider capabilities"""
+    """WPS provider capabilities."""
+    id = SchemaNode(String())
+    url = SchemaNode(String())
+    title = SchemaNode(String())
+    abstract = SchemaNode(String())
     contact = SchemaNode(String())
-    title = SchemaNode(String())
-    url = SchemaNode(String())
-    abstract = SchemaNode(String())
     type = SchemaNode(String())
-    id = SchemaNode(String())
 
 
-class ProcessSchema(MappingSchema):
-    """WPS process definition"""
-    url = SchemaNode(String())
-    abstract = SchemaNode(String())
-    id = SchemaNode(String())
+class ProcessSummarySchema(MappingSchema):
+    """WPS process definition."""
+    identifier = SchemaNode(String())
     title = SchemaNode(String())
+    abstract = SchemaNode(String())
+    keywords = KeywordList(missing=drop)
+    metadata = MetadataList(missing=drop)
+    executeEndpoint = SchemaNode(String(), missing=drop)    # URL
 
 
 class ProcessListSchema(SequenceSchema):
-    item = ProcessSchema(missing=drop)
+    process = ProcessSummarySchema(missing=drop)
+
+
+class ProviderSummaryProcessesSchema(ProviderSummarySchema):
+    processes = ProcessListSchema()
+
+
+class ProviderProcessListSchema(SequenceSchema):
+    provider = ProviderSummaryProcessesSchema(missing=drop)
+
+
+class ProcessDetailSchema(MappingSchema):
+    identifier = SchemaNode(String())
+    title = SchemaNode(String(), missing=drop)
+    abstract = SchemaNode(String(), missing=drop)
+    keywords = KeywordList(missing=drop)
+    metadata = MetadataList(missing=drop)
+    inputs = InputTypeList(missing=drop)
+    outputs = OutputTypeList(missing=drop)
+    version = SchemaNode(String(), missing=drop)
+    jobControlOptions = JobControlOptionsEnum
+    outputTransmission = OutputTransmissionEnum
+    executeEndpoint = SchemaNode(String(), missing=drop)    # URL
 
 
 class ProcessOutputDescriptionSchema(MappingSchema):
-    """WPS process output definition"""
+    """WPS process output definition."""
     dataType = SchemaNode(String())
     defaultValue = SchemaNode(Mapping())
     id = SchemaNode(String())
     abstract = SchemaNode(String())
     title = SchemaNode(String())
+
+
+JobStatusEnum = SchemaNode(String(), missing=drop, validator=OneOf([
+    'ProcessAccepted', 'ProcessStarted', 'ProcessPaused', 'ProcessFailed', 'ProcessSucceeded']))
+JobSortEnum = SchemaNode(String(), missing=drop, validator=OneOf([
+    'created', 'status', 'process', 'provider']))
+
+
+class GetJobsQueries(MappingSchema):
+    page = SchemaNode(Integer())
+    limit = SchemaNode(Integer())
+    status = JobStatusEnum
+    process = SchemaNode(String())
+    provider = SchemaNode(String())
+    sort = JobSortEnum
+
+
+class GetJobsRequest(MappingSchema):
+    querystring = GetJobsQueries()
 
 
 class JobStatusSchema(MappingSchema):
@@ -355,11 +403,11 @@ class ProcessDescriptionSchema(MappingSchema):
 
 
 class ProvidersSchema(SequenceSchema):
-    providers_service = ProviderSchema()
+    providers_service = ProviderSummarySchema()
 
 
 class ProcessesSchema(SequenceSchema):
-    provider_processes_service = ProcessSchema()
+    provider_processes_service = ProcessDetailSchema()
 
 
 class JobOutputSchema(MappingSchema):
@@ -418,17 +466,20 @@ class OkGetProviderProcessesSchema(MappingSchema):
     body = ProcessesSchema()
 
 
-class OkGetProcessesBodySchema(MappingSchema):
-    processes = ProcessListSchema()
-
-
 class GetProcessesQuery(MappingSchema):
-    providers = SchemaNode(Boolean(), example=True, default=False, missing=drop,
-                           description="List local processes as well as all sub-processes of all registered providers.")
+    providers = SchemaNode(
+        Boolean(), example=True, default=False, missing=drop,
+        description="List local processes as well as all sub-processes of all registered providers. " +
+                    "Applicable only for Twitcher in {} mode, false otherwise.".format(TWITCHER_CONFIGURATION_EMS))
 
 
 class GetProcessesRequest(MappingSchema):
     querystring = GetProcessesQuery()
+
+
+class OkGetProcessesBodySchema(MappingSchema):
+    processes = ProcessListSchema()
+    providers = ProviderProcessListSchema(missing=drop)
 
 
 class OkGetProcessesSchema(MappingSchema):
@@ -436,11 +487,11 @@ class OkGetProcessesSchema(MappingSchema):
 
 
 class OkPostProcessesSchema(MappingSchema):
-    body = ProcessSchema()
+    body = ProcessDetailSchema()
 
 
 class OkGetProcessBodySchema(MappingSchema):
-    process = ProcessSchema()
+    process = ProcessDetailSchema()
 
 
 class OkGetProcessSchema(MappingSchema):
@@ -465,7 +516,7 @@ class OkGetProviderProcessDescription(MappingSchema):
 
 
 class OkPostProvider(MappingSchema):
-    body = ProviderSchema()
+    body = ProviderSummarySchema()
 
 
 class OkLaunchJobResponse(MappingSchema):
@@ -570,22 +621,8 @@ class PostProvider(MappingSchema):
 #################################
 
 
-class ProcessBody(MappingSchema):
-    identifier = SchemaNode(String())
-    title = SchemaNode(String(), missing=drop)
-    abstract = SchemaNode(String(), missing=drop)
-    keywords = KeywordList(missing=drop)
-    metadata = MetadataList(missing=drop)
-    inputs = InputTypeList(missing=drop)
-    outputs = OutputTypeList(missing=drop)
-    version = SchemaNode(String(), missing=drop)
-    jobControlOptions = JobControlOptionsEnum
-    outputTransmission = OutputTransmissionEnum
-    executeEndpoint = SchemaNode(String(), missing=drop)    # URL
-
-
 class ProcessOfferingBody(MappingSchema):
-    process = ProcessBody()
+    process = ProcessDetailSchema()
 
 
 class PackageBody(MappingSchema):
@@ -640,11 +677,12 @@ class PostProviderProcessJobRequestBody(MappingSchema):
 
 
 class PostProviderProcessJobRequest(MappingSchema):
-    """Launching a new process request definition"""
+    """Launching a new process request definition."""
     header = JsonHeader()
     querystring = PostProviderProcessJobRequestQuery()
     body = PostProviderProcessJobRequestBody()
 
 
-def service_api_route_info(service_api):
-    return {'name': service_api.name, 'pattern': service_api.path}
+def service_api_route_info(service_api, settings):
+    api_base = wps_restapi_base_path(settings)
+    return {'name': service_api.name, 'pattern': '{base}{path}'.format(base=api_base, path=service_api.path)}
