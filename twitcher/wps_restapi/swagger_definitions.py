@@ -23,6 +23,7 @@ provider_processes_uri = '/providers/{provider_id}/processes'
 provider_process_uri = '/providers/{provider_id}/processes/{process_id}'
 
 jobs_uri = '/jobs'
+jobs_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs'
 job_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}'
 job_exceptions_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/exceptions'
 job_short_uri = '/jobs/{job_id}'
@@ -43,10 +44,13 @@ logs_short_uri = '/jobs/{job_id}/log'
 #########################################################
 
 api_tag = 'API'
+jobs_tag = 'Jobs'
 provider_processes_tag = 'Provider Processes'
-provider_jobs_tag = 'Jobs'
 providers_tag = 'Providers'
 processes_tag = 'Local Processes'
+getcapabilities_tag = 'GetCapabilities'
+describeprocess_tag = 'DescribeProcess'
+execute_tag = 'Execute'
 
 ###############################################################################
 # These "services" are wrappers that allow Cornice to generate the api's json
@@ -64,6 +68,7 @@ provider_service = Service(name='provider', path=provider_uri)
 
 provider_processes_service = Service(name='provider_processes', path=provider_processes_uri)
 provider_process_service = Service(name='provider_process', path=provider_process_uri)
+provider_process_jobs_service = Service(name='provider_process_jobs', path=jobs_full_uri)
 
 jobs_service = Service(name='jobs', path=jobs_uri)
 job_full_service = Service(name='job_full', path=job_full_uri)
@@ -417,6 +422,15 @@ class OkGetProcessesBodySchema(MappingSchema):
     processes = ProcessListSchema()
 
 
+class GetProcessesQuery(MappingSchema):
+    providers = SchemaNode(Boolean(), example=True, default=False, missing=drop,
+                           description="List local processes as well as all sub-processes of all registered providers.")
+
+
+class GetProcessesRequest(MappingSchema):
+    querystring = GetProcessesQuery()
+
+
 class OkGetProcessesSchema(MappingSchema):
     body = OkGetProcessesBodySchema()
 
@@ -615,21 +629,21 @@ class GetProviderProcess(MappingSchema):
     pass
 
 
-class PostProviderProcessRequestQuery(MappingSchema):
-    sync_execute = SchemaNode(Boolean(), example='application/json', default=False, missing=drop)
+class PostProviderProcessJobRequestQuery(MappingSchema):
+    sync_execute = SchemaNode(Boolean(), example=True, default=False, missing=drop)
     sync_execute.name = 'sync-execute'
 
 
-class PostProviderProcessRequestBody(MappingSchema):
+class PostProviderProcessJobRequestBody(MappingSchema):
     inputs = JobInputList()
     # outputs = JobOutputList()
 
 
-class PostProviderProcessRequest(MappingSchema):
+class PostProviderProcessJobRequest(MappingSchema):
     """Launching a new process request definition"""
     header = JsonHeader()
-    querystring = PostProviderProcessRequestQuery()
-    body = PostProviderProcessRequestBody()
+    querystring = PostProviderProcessJobRequestQuery()
+    body = PostProviderProcessJobRequestBody()
 
 
 def service_api_route_info(service_api):

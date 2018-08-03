@@ -19,6 +19,7 @@ def includeme(config):
     config.add_route(**sd.service_api_route_info(sd.process_service))
     config.add_route(**sd.service_api_route_info(sd.provider_processes_service))
     config.add_route(**sd.service_api_route_info(sd.provider_process_service))
+    config.add_route(**sd.service_api_route_info(sd.provider_process_jobs_service))
     config.add_view(get_processes, route_name=sd.processes_service.name,
                     request_method='GET', renderer='json')
     config.add_view(add_process, route_name=sd.processes_service.name,
@@ -31,5 +32,5 @@ def includeme(config):
                     request_method='GET', renderer='json')
     config.add_view(describe_provider_process, route_name=sd.provider_process_service.name,
                     request_method='GET', renderer='json')
-    config.add_view(submit_provider_job, route_name=sd.provider_process_service.name,
+    config.add_view(submit_provider_job, route_name=sd.provider_process_jobs_service.name,
                     request_method='POST', renderer='json')

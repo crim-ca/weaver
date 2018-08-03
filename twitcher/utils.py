@@ -6,8 +6,7 @@ import types
 import re
 
 from twitcher.exceptions import ServiceNotFound
-
-from twitcher._compat import urlparse
+from twitcher._compat import urlparse, parse_qs
 
 import logging
 logger = logging.getLogger(__name__)
@@ -136,3 +135,21 @@ all_cap_re = re.compile('([a-z0-9])([A-Z])')
 def convert_snake_case(name):
     s1 = first_cap_re.sub(r'\1_\2', name)
     return all_cap_re.sub(r'\1_\2', s1).lower()
+
+
+def parse_request_query(request):
+    """
+    :param request:
+    :return: dict of dict where k=v are accessible by d[k][0] == v and q=k=v are accessible by d[q][k] == v, lowercase
+    """
+    queries = parse_qs(request.query_string().lower())
+    queries_dict = dict()
+    for q in queries:
+        queries_dict[q] = dict()
+        for i, kv in enumerate(queries[q]):
+            kvs = kv.split('=')
+            if len(kvs) > 1:
+                queries_dict[q][kvs[0]] = kvs[1]
+            else:
+                queries_dict[q][i] = kvs[0]
+    return queries_dict

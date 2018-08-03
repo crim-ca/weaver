@@ -73,10 +73,11 @@ def get_service(request):
     return service, store
 
 
-@sd.providers_service.post(tags=[sd.providers_tag], schema=sd.PostProvider(), response_schemas=sd.post_provider_responses)
+@sd.providers_service.post(tags=[sd.providers_tag], schema=sd.PostProvider(),
+                           response_schemas=sd.post_provider_responses)
 def add_provider(request):
     """
-    Add a provider
+    Add a provider.
     """
     store = servicestore_factory(request.registry)
 
@@ -103,7 +104,7 @@ def add_provider(request):
 @sd.provider_service.delete(tags=[sd.providers_tag], schema=sd.ProviderEndpoint())
 def remove_provider(request):
     """
-    Remove a provider
+    Remove a provider.
     """
     service, store = get_service(request)
 
@@ -116,10 +117,11 @@ def remove_provider(request):
     return Response(status=204)
 
 
-@sd.provider_service.get(tags=[sd.providers_tag], schema=sd.ProviderEndpoint(), response_schemas=sd.get_one_provider_responses)
+@sd.provider_service.get(tags=[sd.providers_tag], schema=sd.ProviderEndpoint(),
+                         response_schemas=sd.get_one_provider_responses)
 def get_provider(request):
     """
-    GetCapabilities of a wps provider
+    Get a provider description.
     """
     service, store = get_service(request)
     return get_capabilities(service, request)

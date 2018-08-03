@@ -8,8 +8,7 @@ from time import sleep
 from datetime import datetime
 from twitcher.adapter import servicestore_factory
 from twitcher.store import servicestore_defaultfactory, processstore_defaultfactory
-from twitcher.utils import convert_snake_case
-from twitcher.wps_restapi.utils import restapi_base_url
+from twitcher.wps_restapi.utils import restapi_base_url, get_wps_output_format
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import add_job, check_status
@@ -23,8 +22,12 @@ from lxml import etree
 logger = get_task_logger(__name__)
 
 
-@sd.processes_service.get(tags=[sd.processes_tag], response_schemas=sd.get_processes_responses)
+@sd.processes_service.get(schema=sd.GetProcessesRequest(), tags=[sd.processes_tag, sd.getcapabilities_tag],
+                          response_schemas=sd.get_processes_responses)
 def get_processes(request):
+    """
+    List registered local processes (GetCapabilities).
+    """
     try:
         store = processstore_defaultfactory(request.registry)
         processes = [process.json() for process in store.list_processes()]
@@ -40,6 +43,9 @@ def get_processes(request):
 @sd.processes_service.post(tags=[sd.processes_tag], schema=sd.PostProcessRequest(),
                            response_schemas=sd.post_processes_responses)
 def add_process(request):
+    """
+    Register a local process.
+    """
     store = processstore_defaultfactory(request.registry)
 
     process_offering = request.json.get('processOffering')
@@ -83,8 +89,11 @@ def add_process(request):
     return {'processSummary': saved_process.summary()}
 
 
-@sd.process_service.get(tags=[sd.processes_tag], response_schemas=sd.get_process_responses)
+@sd.process_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], response_schemas=sd.get_process_responses)
 def get_process(request):
+    """
+    Get a registered local process information (DescribeProcess).
+    """
     process_id = request.matchdict.get('process_id')
     if not process_id:
         raise HTTPNotAcceptable(detail="Missing parameter 'process_id'")
@@ -119,11 +128,12 @@ def delete_process(request):
         raise HTTPInternalServerError(detail=ex.message)
 
 
-@sd.provider_processes_service.get(tags=[sd.provider_processes_tag], schema=sd.ProviderEndpoint(),
+@sd.provider_processes_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.getcapabilities_tag],
+                                   schema=sd.ProviderEndpoint(),
                                    response_schemas=sd.get_provider_processes_responses)
 def get_provider_processes(request):
     """
-    Retrieve available processes
+    Retrieve available processes (GetCapabilities).
     """
     store = servicestore_factory(request.registry)
 
@@ -146,11 +156,12 @@ def get_provider_processes(request):
     return processes
 
 
-@sd.provider_process_service.get(tags=[sd.provider_processes_tag], schema=sd.ProcessEndpoint(),
+@sd.provider_process_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.describeprocess_tag],
+                                 schema=sd.ProcessEndpoint(),
                                  response_schemas=sd.get_provider_process_description_responses)
 def describe_provider_process(request):
     """
-    Retrieve a process description
+    Retrieve a process description (DescribeProcess).
     """
     store = servicestore_factory(request.registry)
 
@@ -450,8 +461,9 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
 #        }
 #     ]
 # }
-@sd.provider_process_service.post(tags=[sd.provider_processes_tag], schema=sd.PostProviderProcessRequest(),
-                                  response_schemas=sd.launch_job_responses)
+@sd.provider_process_jobs_service.post(tags=[sd.provider_processes_tag, sd.providers_tag, sd.execute_tag, sd.jobs_tag],
+                                       schema=sd.PostProviderProcessJobRequest(),
+                                       response_schemas=sd.launch_job_responses)
 def submit_provider_job(request):
     """
     Execute a process.

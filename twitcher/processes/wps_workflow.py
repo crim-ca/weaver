@@ -12,8 +12,7 @@ from pywps import (
     Format,
 )
 from pywps.app.Common import Metadata
-from six import string_types
-from six.moves.urllib.parse import urlparse, parse_qs
+from twitcher.utils import parse_request_query
 from collections import OrderedDict
 import json
 import yaml
@@ -181,25 +180,6 @@ class Workflow(Process):
         """Generates WPS-like outputs using parsed CWL workflow output definitions."""
         return [self._cwl2wps_io(o) for o in self.workflow.t.outputs_record_schema['fields']]
 
-    @staticmethod
-    def _parse_request_query(request):
-        queries = parse_qs(urlparse(request.url).query)
-        queries_lower = dict()
-        for q in queries:
-            ql = q.lower()
-            if ql in queries_lower:
-                queries_lower[ql].extend(queries[q])
-            else:
-                queries_lower.update({ql: list(queries[q])})
-        data_inputs = queries_lower.get('datainputs', {})
-        if isinstance(data_inputs, dict):
-            return data_inputs
-        dict_data_inputs = dict()
-        for di in data_inputs:
-            k, v = di.split('=')
-            dict_data_inputs.update({k: v})
-        return dict_data_inputs
-
     def _handler(self, request, response):
         response.update_status("Launching workflow ...", 0)
         LOGGER.debug("HOME=%s, Current Dir=%s", os.environ.get('HOME'), os.path.abspath(os.curdir))
@@ -209,7 +189,7 @@ class Workflow(Process):
             data_inputs = request.json
         # input parameters from request query from WPS 1.0
         else:
-            data_inputs = self._parse_request_query(request)
+            data_inputs = parse_request_query(request)
         self.workflow(**data_inputs)
 
         #response.outputs['output'].data = 'Workflow: {}'.format(self.cwl_file)
