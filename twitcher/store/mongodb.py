@@ -157,7 +157,7 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
 
         new_process['type'] = self._get_process_type(process)
         new_process['identifier'] = self._get_process_id(process)
-        new_process['executeEndpoint'] = self._get_process_urls(process)
+        new_process['executeEndpoint'] = self._get_process_url(process)
         self.collection.insert_one(new_process)
 
     @staticmethod
@@ -188,7 +188,7 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
     def _get_process_type(self, process):
         return self._get_process_field(process, {ProcessDB: lambda: process.type, ProcessWPS: lambda: 'wps'}).lower()
 
-    def _get_process_urls(self, process):
+    def _get_process_url(self, process):
         url = self._get_process_field(process, {ProcessDB: lambda: process.executeEndpoint, ProcessWPS: lambda: None})
         if not url:
             url = self.default_wps_endpoint

@@ -122,7 +122,7 @@ def _merge_workflow_io(wps_io_list, cwl_io_list):
     :param cwl_io_list: list of CWL I/O converted to WPS-like I/O for counter-validation.
     :returns: list of validated/updated WPS I/O for the process.
     """
-    if not cwl_io_list:
+    if not isinstance(cwl_io_list, list):
         raise Exception("CWL I/O definitions must be provided, empty list if none required.")
     if not wps_io_list:
         wps_io_list = list()
@@ -144,25 +144,38 @@ def _merge_workflow_io(wps_io_list, cwl_io_list):
     return updated_io_list
 
 
-def merge_workflow_inputs_outputs(wps_inputs_list, cwl_inputs_list, wps_outputs_list, cwl_outputs_list):
+def merge_workflow_inputs_outputs(wps_inputs_list, cwl_inputs_list, wps_outputs_list, cwl_outputs_list, as_json=False):
     """Merges I/O definitions to use for process creation and returned by GetCapabilities, DescribeProcess
     using the WPS specifications (from request POST) and CWL specifications (extracted from file)."""
-    return _merge_workflow_io(wps_inputs_list, cwl_inputs_list), _merge_workflow_io(wps_outputs_list, cwl_outputs_list)
+    wps_inputs = _merge_workflow_io(wps_inputs_list, cwl_inputs_list)
+    wps_outputs = _merge_workflow_io(wps_outputs_list, cwl_outputs_list)
+    if as_json:
+        return [i.json for i in wps_inputs], [o.json for o in wps_outputs]
+    return wps_inputs, wps_outputs
 
 
-def get_workflow_inputs(self):
+def _get_workflow_io(workflow, io_attrib, as_json):
+    cwl_workflow_io = getattr(workflow.t, io_attrib)
+    wps_workflow_io = [_cwl2wps_io(o) for o in cwl_workflow_io['fields']]
+    if as_json:
+        return [io.json for io in wps_workflow_io]
+    return wps_workflow_io
+
+
+def get_workflow_inputs(workflow, as_json=False):
     """Generates WPS-like inputs using parsed CWL workflow input definitions."""
-    return [self._cwl2wps_io(i) for i in self.workflow.t.inputs_record_schema['fields']]
+    return _get_workflow_io(workflow, io_attrib='inputs_record_schema', as_json=as_json)
 
 
-def get_workflow_outputs(self):
+def get_workflow_outputs(workflow, as_json=False):
     """Generates WPS-like outputs using parsed CWL workflow output definitions."""
-    return [self._cwl2wps_io(o) for o in self.workflow.t.outputs_record_schema['fields']]
+    return _get_workflow_io(workflow, io_attrib='outputs_record_schema', as_json=as_json)
 
 
-def get_workflow_inputs_outputs(workflow):
+def get_workflow_inputs_outputs(workflow, as_json=False):
     """Generates WPS-like (inputs,outputs) tuple using parsed CWL workflow output definitions."""
-    return get_workflow_inputs(workflow), get_workflow_outputs(workflow)
+    return _get_workflow_io(workflow, io_attrib='inputs_record_schema', as_json=as_json), \
+           _get_workflow_io(workflow, io_attrib='outputs_record_schema', as_json=as_json)
 
 
 class Workflow(Process):

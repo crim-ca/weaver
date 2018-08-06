@@ -107,15 +107,17 @@ def add_local_process(request):
         try:
             workflow = load_workflow_content(package)
             workflow_inputs, workflow_outputs = get_workflow_inputs_outputs(workflow)
-            process_inputs = process_info.get('inputs')
-            process_outputs = process_info.get('outputs')
-            workflow_inputs, workflow_outputs = merge_workflow_inputs_outputs(workflow_inputs, process_inputs,
-                                                                              workflow_outputs, process_outputs)
+            process_inputs = process_info.get('inputs', list())
+            process_outputs = process_info.get('outputs', list())
+            workflow_inputs, workflow_outputs = merge_workflow_inputs_outputs(process_inputs, workflow_inputs,
+                                                                              process_outputs, workflow_outputs,
+                                                                              as_json=True)
             process_info.update({'package': package, 'inputs': workflow_inputs, 'outputs': workflow_outputs})
         except Exception as ex:
             raise HTTPBadRequest("Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex)))
 
-    process_info.update({'type': process_type})
+    # ensure that required 'executeEndpoint' in db is added, will be auto-fixed to localhost if not specified in body
+    process_info.update({'type': process_type, 'executeEndpoint': process_info.get('executeEndpoint')})
     saved_process = store.save_process(ProcessDB(process_info))
 
     return {'processSummary': saved_process.summary()}
