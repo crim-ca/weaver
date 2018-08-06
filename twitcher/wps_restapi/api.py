@@ -9,10 +9,11 @@ from twitcher.wps_restapi.utils import wps_restapi_base_url, wps_restapi_base_pa
 @sd.api_swagger_json_service.get(tags=[sd.api_tag], response_schemas=sd.get_api_swagger_json_responses)
 def api_swagger_json(request, use_docstring_summary=True):
     """Twitcher REST API schema generation in JSON format."""
+
     cornice = CorniceSwagger(get_services())
     # function docstrings are used to create the route's summary in Swagger-UI
     cornice.summary_docstrings = use_docstring_summary
-    return cornice.generate(title=sd.api_title, version=__version__,
+    return cornice.generate(title=sd.API_TITLE, version=__version__,
                             base_path=wps_restapi_base_url(request.registry.settings))
 
 
@@ -20,5 +21,5 @@ def api_swagger_json(request, use_docstring_summary=True):
 def api_swagger_ui(request):
     """Twitcher REST API swagger-ui schema documentation (this page)."""
     json_path = wps_restapi_base_path(request.registry.settings) + sd.api_swagger_json_uri
-    data_mako = {'api_title': sd.api_title, 'api_swagger_json_path': json_path}
+    data_mako = {'api_title': sd.API_TITLE, 'api_swagger_json_path': json_path}
     return render_to_response('templates/swagger_ui.mako', data_mako, request=request)

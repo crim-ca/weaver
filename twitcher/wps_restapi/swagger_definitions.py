@@ -7,12 +7,14 @@ from twitcher.wps_restapi.utils import wps_restapi_base_path
 from cornice import Service
 from colander import *
 
+
+API_TITLE = 'Twitcher REST API'
+
+
 #########################################################################
 # API endpoints
 # note: all these paths can be prefixed by 'wps-rest-api-path' setting
 #########################################################################
-
-api_title = 'Twitcher REST API'
 
 api_frontpage_uri = '/'
 api_swagger_ui_uri = '/doc'
