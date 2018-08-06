@@ -1,31 +1,33 @@
 import json
-import urllib2
-import twitcher.wps_restapi.swagger_definitions as sd
-from owslib.wps import is_reference
+import requests
+from pyramid.settings import asbool
+from pyramid.httpexceptions import *
+from pyramid_celery import celery_app as app
+from celery.utils.log import get_task_logger
+from six.moves.urllib.request import urlopen
+from six.moves.urllib.error import URLError
+from six import string_types
 from time import sleep
 from datetime import datetime
 from twitcher.adapter import servicestore_factory
-from owslib.wps import WebProcessingService
-from owslib.wps import ComplexData
-from twitcher.wps_restapi.utils import restapi_base_url
-from owslib.wps import WPSException
-from owslib.wps import ComplexDataInput
-from owslib.wps import ASYNC, SYNC
+from twitcher.utils import get_any_id
+from twitcher.wps_restapi.utils import wps_restapi_base_url, get_wps_output_format
+from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import add_job, check_status
 from twitcher.db import MongoDB
-from pyramid_celery import celery_app as app
+from owslib.wps import WebProcessingService, WPSException, ComplexData, ComplexDataInput, is_reference
 from lxml import etree
-
-from celery.utils.log import get_task_logger
 
 logger = get_task_logger(__name__)
 
 
-@sd.processes_service.get(tags=['processes'], schema=sd.ProviderEndpoint(), response_schemas=sd.get_processes_responses)
-def get_processes(request):
+@sd.provider_processes_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.getcapabilities_tag],
+                                   schema=sd.ProviderEndpoint(),
+                                   response_schemas=sd.get_provider_processes_responses)
+def get_provider_processes(request):
     """
-    Retrieve available processes
+    Retrieve available processes (GetCapabilities).
     """
     store = servicestore_factory(request.registry)
 
@@ -41,17 +43,19 @@ def get_processes(request):
             title=getattr(process, 'title', ''),
             abstract=getattr(process, 'abstract', ''),
             url='{base_url}/providers/{provider_id}/processes/{process_id}'.format(
-                base_url=restapi_base_url(request),
+                base_url=wps_restapi_base_url(request.registry.settings),
                 provider_id=provider_id,
                 process_id=process.identifier))
         processes.append(item)
     return processes
 
 
-@sd.process_service.get(tags=['processes'], schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_description_responses)
-def describe_process(request):
+@sd.provider_process_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.describeprocess_tag],
+                                 schema=sd.ProcessEndpoint(),
+                                 response_schemas=sd.get_provider_process_description_responses)
+def describe_provider_process(request):
     """
-    Retrieve a process description
+    Retrieve a process description (DescribeProcess).
     """
     store = servicestore_factory(request.registry)
 
@@ -133,8 +137,8 @@ def _read_reference(input_value):
     Read a WPS reference and return the content
     """
     try:
-        return urllib2.urlopen(input_value.reference).read()
-    except urllib2.URLError:
+        return urlopen(input_value.reference).read()
+    except URLError:
         # Don't raise exceptions coming from that.
         return None
 
@@ -219,7 +223,8 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
     try:
         wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), skip_caps=False, verify=False)
         # execution = wps.execute(identifier, inputs=inputs, output=outputs, async=async, lineage=True)
-        execution = wps.execute(identifier, inputs=inputs, output=outputs, mode=ASYNC if async else SYNC, lineage=True)
+        mode = 'async' if async else 'sync'
+        execution = wps.execute(identifier, inputs=inputs, output=outputs, mode=mode, lineage=True)
         # job['service'] = wps.identification.title
         # job['title'] = getattr(execution.process, "title")
         if not execution.process and execution.errors:
@@ -271,7 +276,7 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
                         } for error in execution.errors]
                         for error in execution.errors:
                             save_log(job, error)
-            except:
+            except Exception:
                 num_retries += 1
                 logger.exception("Could not read status xml document for job %s. Trying again ...", self.request.id)
                 sleep(1)
@@ -298,30 +303,64 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
     return job['status']
 
 
-@sd.process_service.post(tags=['processes'], schema=sd.PostProcess(), response_schemas=sd.launch_job_responses)
-def submit_job(request):
+#############
+# EXAMPLE
+#############
+#   Parameters: ?sync-execute=true|false (false being the default value)
+#
+#   Content-Type: application/json;
+#
+# {
+#     "inputs": [
+#         {
+#             "id": "sosInputNiederschlag",
+#             "value": "http://www.fluggs.de/sos2/sos?service%3DSOS&version%3D2.0.0&request%3DGetObservation&responseformat%3Dhttp://www.opengis.net/om/2.0&observedProperty%3DNiederschlagshoehe&procedure%3DTagessumme&featureOfInterest%3DBever-Talsperre&&namespaces%3Dxmlns%28sams%2Chttp%3A%2F%2Fwww.opengis.net%2FsamplingSpatial%2F2.0%29%2Cxmlns%28om%2Chttp%3A%2F%2Fwww.opengis.net%2Fom%2F2.0%29&temporalFilter%3Dom%3AphenomenonTime%2C2016-01-01T10:00:00.00Z%2F2016-04-30T23:59:00.000Z",
+# 			"type" : "text/plain"
+#         },
+#         {
+#             "id": "sosInputFuellstand",
+#             "value": "http://www.fluggs.de/sos2/sos?service%3DSOS&version%3D2.0.0&request%3DGetObservation&responseformat%3Dhttp://www.opengis.net/om/2.0&observedProperty%3DSpeicherfuellstand&procedure%3DEinzelwert&featureOfInterest%3DBever-Talsperre_Windenhaus&namespaces%3Dxmlns%28sams%2Chttp%3A%2F%2Fwww.opengis.net%2FsamplingSpatial%2F2.0%29%2Cxmlns%28om%2Chttp%3A%2F%2Fwww.opengis.net%2Fom%2F2.0%29&temporalFilter%3Dom%3AphenomenonTime%2C2016-01-01T10:00:00.00Z%2F2016-04-30T23:59:00.000Z",
+# 			"type" : "text/plain"
+#         },
+#         {
+#             "id": "sosInputTarget",
+#             "value": "http://fluggs.wupperverband.de/sos2-tamis/service?service%3DSOS&version%3D2.0.0&request%3DGetObservation&responseformat%3Dhttp://www.opengis.net/om/2.0&observedProperty%3DWasserstand_im_Damm&procedure%3DHandeingabe&featureOfInterest%3DBever-Talsperre_MQA7_Piezometer_Kalkzone&namespaces%3Dxmlns%28sams%2Chttp%3A%2F%2Fwww.opengis.net%2FsamplingSpati-al%2F2.0%29%2Cxmlns%28om%2Chttp%3A%2F%2Fwww.opengis.net%2Fom%2F2.0%29&temporalFilter%3Dom%3AphenomenonTime%2C2016-01-01T00:01:00.00Z%2F2016-04-30T23:59:00.000Z",
+# 			"type" : "text/plain"
+#         }
+#     ],
+#     "outputs": [
+#       {
+#               "id": "targetObs_plot",
+#               "type": "image/png"
+#        },
+#       {
+#               "id": "model_diagnostics",
+#               "type": "image/png"
+#        },
+#       {
+#               "id": "relations",
+#               "type": "image/png"
+#        },
+#       {
+#               "id": "model_prediction",
+#               "type": "text/csv"
+#        },
+#       {
+#               "id": "metaJson",
+#               "type": "application/json"
+#        },
+#       {
+#               "id": "dataJson",
+#               "type": "application/json"
+#        }
+#     ]
+# }
+@sd.provider_process_jobs_service.post(tags=[sd.provider_processes_tag, sd.providers_tag, sd.execute_tag, sd.jobs_tag],
+                                       schema=sd.PostProviderProcessJobRequest(),
+                                       response_schemas=sd.launch_job_responses)
+def submit_provider_job(request):
     """
-    Execute a process. Parameters: ?sync-execute=true|false (false being the default value)
-
-    Content-Type: application/json;
-
-{
-    "inputs": [
-        {
-            "id": "sosInputNiederschlag",
-            "value": "http://www.fluggs.de/sos2/sos?service%3DSOS&version%3D2.0.0&request%3DGetObservation&responseformat%3Dhttp://www.opengis.net/om/2.0&observedProperty%3DNiederschlagshoehe&procedure%3DTagessumme&featureOfInterest%3DBever-Talsperre&&namespaces%3Dxmlns%28sams%2Chttp%3A%2F%2Fwww.opengis.net%2FsamplingSpatial%2F2.0%29%2Cxmlns%28om%2Chttp%3A%2F%2Fwww.opengis.net%2Fom%2F2.0%29&temporalFilter%3Dom%3AphenomenonTime%2C2016-01-01T10:00:00.00Z%2F2016-04-30T23:59:00.000Z"
-        },
-        {
-            "id": "sosInputFuellstand",
-            "value": "http://www.fluggs.de/sos2/sos?service%3DSOS&version%3D2.0.0&request%3DGetObservation&responseformat%3Dhttp://www.opengis.net/om/2.0&observedProperty%3DSpeicherfuellstand&procedure%3DEinzelwert&featureOfInterest%3DBever-Talsperre_Windenhaus&namespaces%3Dxmlns%28sams%2Chttp%3A%2F%2Fwww.opengis.net%2FsamplingSpatial%2F2.0%29%2Cxmlns%28om%2Chttp%3A%2F%2Fwww.opengis.net%2Fom%2F2.0%29&temporalFilter%3Dom%3AphenomenonTime%2C2016-01-01T10:00:00.00Z%2F2016-04-30T23:59:00.000Z"
-        },
-        {
-            "id": "sosInputTarget",
-            "value": "http://fluggs.wupperverband.de/sos2-tamis/service?service%3DSOS&version%3D2.0.0&request%3DGetObservation&responseformat%3Dhttp://www.opengis.net/om/2.0&observedProperty%3DWasserstand_im_Damm&procedure%3DHandeingabe&featureOfInterest%3DBever-Talsperre_MQA7_Piezometer_Kalkzone&namespaces%3Dxmlns%28sams%2Chttp%3A%2F%2Fwww.opengis.net%2FsamplingSpati-al%2F2.0%29%2Cxmlns%28om%2Chttp%3A%2F%2Fwww.opengis.net%2Fom%2F2.0%29&temporalFilter%3Dom%3AphenomenonTime%2C2016-01-01T00:01:00.00Z%2F2016-04-30T23:59:00.000Z"
-        }
-    ]
-}
-
+    Execute a process.
     """
 
     store = servicestore_factory(request.registry)
@@ -329,22 +368,22 @@ def submit_job(request):
     # TODO Validate param somehow
     provider_id = request.matchdict.get('provider_id')
     process_id = request.matchdict.get('process_id')
-    async = not request.params.getone('sync-execute') if 'sync-execute' in request.params else True
+    async_execute = not request.params.getone('sync-execute') if 'sync-execute' in request.params else True
 
     service = store.fetch_by_name(provider_id, request=request)
     wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
     process = wps.describeprocess(process_id)
 
     # prepare inputs
-    comp_inpts = []
-    for inpt in process.dataInputs:
-        if 'ComplexData' in inpt.dataType:
-            comp_inpts.append(inpt.identifier)
+    complex_inputs = []
+    for process_input in process.dataInputs:
+        if 'ComplexData' in process_input.dataType:
+            complex_inputs.append(process_input.identifier)
 
     try:
         # need to use ComplexDataInput structure for complex input
-        inputs = [(inpt['id'],
-                   ComplexDataInput(inpt['value']) if inpt['id'] in comp_inpts else inpt['value'])
+        inputs = [(get_any_id(inpt), ComplexDataInput(inpt['value'])
+                  if get_any_id(inpt) in complex_inputs else inpt['value'])
                   for inpt in request.json_body['inputs']]
     except KeyError:
         inputs = []
@@ -363,15 +402,15 @@ def submit_job(request):
         provider=provider_id,
         inputs=inputs,
         outputs=outputs,
-        async=async,
+        async=async_execute,
         # Convert EnvironHeaders to a simple dict (should cherrypick the required headers)
-        headers={k: v for k, v in request.headers.iteritems()})
+        headers={k: v for k, v in request.headers.items()})
 
     # Should return 201 response
     return {'jobID': result.id,
             'status': "ProcessAccepted",
             'location': '{base_url}/providers/{provider_id}/processes/{process_id}/jobs/{job_id}'.format(
-                base_url=restapi_base_url(request),
+                base_url=wps_restapi_base_url(request.registry.settings),
                 provider_id=provider_id,
                 process_id=process.identifier,
                 job_id=result.id)

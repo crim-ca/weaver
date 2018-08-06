@@ -110,7 +110,7 @@ class MemoryServiceStore(ServiceStore):
         Lists all services in memory storage.
         """
         my_services = []
-        for service in self.url_index.itervalues():
+        for service in self.url_index.values():
             my_services.append(Service(service))
         return my_services
 
