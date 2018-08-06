@@ -18,6 +18,7 @@ API_TITLE = 'Twitcher REST API'
 api_frontpage_uri = '/'
 api_swagger_ui_uri = '/doc'
 api_swagger_json_uri = '/json'
+api_versions_uri = '/versions'
 
 providers_uri = '/providers'
 provider_uri = '/providers/{provider_id}'
@@ -61,6 +62,7 @@ execute_tag = 'Execute'
 api_frontpage_service = Service(name='api_frontpage', path=api_frontpage_uri)
 api_swagger_ui_service = Service(name='api_swagger_ui', path=api_swagger_ui_uri)
 api_swagger_json_service = Service(name='api_swagger_json', path=api_swagger_json_uri)
+api_versions_service = Service(name='api_versions', path=api_versions_uri)
 
 providers_service = Service(name='providers', path=providers_uri)
 provider_service = Service(name='provider', path=provider_uri)
@@ -448,6 +450,20 @@ class OkGetSwaggerUISchema(MappingSchema):
     header = HtmlHeader()
 
 
+class VersionsSpecSchema(MappingSchema):
+    wps_restapi = SchemaNode(String(), description="WPS REST API version string.", example='0.1.0')
+    twitcher = SchemaNode(String(), description="Twitcher version string.", example='0.3.0')
+
+
+class VersionsSchema(MappingSchema):
+    version = VersionsSpecSchema()
+
+
+class OkGetVersionsSchema(MappingSchema):
+    header = JsonHeader()
+    body = VersionsSchema()
+
+
 class OkGetProvidersSchema(MappingSchema):
     body = ProvidersSchema()
 
@@ -538,6 +554,9 @@ get_api_swagger_json_responses = {
 }
 get_api_swagger_ui_responses = {
     '200': OkGetSwaggerUISchema(description='success')
+}
+get_api_versions_responses = {
+    '200': OkGetVersionsSchema(description='success')
 }
 get_processes_responses = {
     '200': OkGetProcessesSchema(description='success')

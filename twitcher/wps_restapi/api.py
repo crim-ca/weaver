@@ -1,9 +1,16 @@
-from . import __version__
+from . import __version__ as wps_restapi_version
+from twitcher import __version__ as twitcher_version
 from cornice_swagger import CorniceSwagger
 from cornice.service import get_services
 from pyramid.renderers import render_to_response
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import wps_restapi_base_url, wps_restapi_base_path
+
+
+@sd.api_versions_service.get(tags=[sd.api_tag], response_schemas=sd.get_api_versions_responses)
+def api_versions(request):
+    """Twitcher versions information."""
+    return {'versions': {'wps_restapi': wps_restapi_version, 'twitcher': twitcher_version}}
 
 
 @sd.api_swagger_json_service.get(tags=[sd.api_tag], response_schemas=sd.get_api_swagger_json_responses)
@@ -13,7 +20,7 @@ def api_swagger_json(request, use_docstring_summary=True):
     cornice = CorniceSwagger(get_services())
     # function docstrings are used to create the route's summary in Swagger-UI
     cornice.summary_docstrings = use_docstring_summary
-    return cornice.generate(title=sd.API_TITLE, version=__version__,
+    return cornice.generate(title=sd.API_TITLE, version=wps_restapi_version,
                             base_path=wps_restapi_base_url(request.registry.settings))
 
 
