@@ -4,6 +4,8 @@ This python 2.x/3.x compatibility modules is based on the pywps 4.x code.
 
 import logging
 import sys
+from six.moves.urllib.parse import urlparse, urljoin, parse_qs, parse_qsl
+from six.moves.urllib.request import urlopen
 
 
 LOGGER = logging.getLogger('twitcher')

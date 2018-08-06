@@ -2,6 +2,7 @@
 This module should contain any and every definitions in use to build the swagger UI,
 so that one can update the swagger without touching any other files after the initial integration
 """
+
 from twitcher.config import TWITCHER_CONFIGURATION_EMS
 from twitcher.wps_restapi.utils import wps_restapi_base_path
 from cornice import Service
@@ -19,6 +20,7 @@ API_TITLE = 'Twitcher REST API'
 api_frontpage_uri = '/'
 api_swagger_ui_uri = '/doc'
 api_swagger_json_uri = '/json'
+api_versions_uri = '/versions'
 
 processes_uri = '/processes'
 process_uri = '/processes/{process_id}'
@@ -66,6 +68,7 @@ execute_tag = 'Execute'
 api_frontpage_service = Service(name='api_frontpage', path=api_frontpage_uri)
 api_swagger_ui_service = Service(name='api_swagger_ui', path=api_swagger_ui_uri)
 api_swagger_json_service = Service(name='api_swagger_json', path=api_swagger_json_uri)
+api_versions_service = Service(name='api_versions', path=api_versions_uri)
 
 processes_service = Service(name='processes', path=processes_uri)
 process_service = Service(name='process', path=process_uri)
@@ -456,6 +459,20 @@ class OkGetSwaggerUISchema(MappingSchema):
     header = HtmlHeader()
 
 
+class VersionsSpecSchema(MappingSchema):
+    wps_restapi = SchemaNode(String(), description="WPS REST API version string.", example='0.1.0')
+    twitcher = SchemaNode(String(), description="Twitcher version string.", example='0.3.0')
+
+
+class VersionsSchema(MappingSchema):
+    version = VersionsSpecSchema()
+
+
+class OkGetVersionsSchema(MappingSchema):
+    header = JsonHeader()
+    body = VersionsSchema()
+
+
 class OkGetProvidersSchema(MappingSchema):
     body = ProvidersSchema()
 
@@ -557,6 +574,9 @@ get_api_swagger_json_responses = {
 }
 get_api_swagger_ui_responses = {
     '200': OkGetSwaggerUISchema(description='success')
+}
+get_api_versions_responses = {
+    '200': OkGetVersionsSchema(description='success')
 }
 get_processes_responses = {
     '200': OkGetProcessesSchema(description='success')

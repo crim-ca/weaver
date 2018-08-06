@@ -18,7 +18,7 @@ from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import add_job, check_status
 from twitcher.exceptions import ProcessNotFound, ProcessInstanceError, ProcessRegistrationError
-from twitcher.db import MongoDB
+from twitcher.db import database_factory
 from twitcher.datatype import Process as ProcessDB
 from twitcher.processes.wps_workflow import (
     load_workflow_content,
@@ -348,7 +348,7 @@ def _jsonify_output(output, datatype):
 def execute_process(self, url, service_name, identifier, provider, inputs, outputs,
                     async=True, userid=None, caption=None, headers=None):
     registry = app.conf['PYRAMID_REGISTRY']
-    db = MongoDB.get(registry)
+    db = database_factory(registry)
     job = add_job(
         db,
         userid=userid,

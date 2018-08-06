@@ -1,4 +1,4 @@
-import twitcher.wps_restapi.swagger_definitions as sd
+from twitcher.wps_restapi import swagger_definitions as sd
 from owslib.wps import WebProcessingService
 from pyramid.httpexceptions import *
 from pyramid.response import Response

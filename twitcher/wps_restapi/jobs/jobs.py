@@ -1,21 +1,20 @@
 from pyramid.view import view_config
 from pyramid.httpexceptions import *
-import twitcher.wps_restapi.swagger_definitions as sd
-import uuid
-import requests
+from pyramid.security import authenticated_userid
+from pyramid_celery import celery_app as app
 from datetime import datetime
 from twitcher.db import MongoDB
+from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import wps_restapi_base_url, get_cookie_headers
 from twitcher.adapter import servicestore_factory
-from pyramid.security import authenticated_userid
 from pymongo import ASCENDING, DESCENDING
-from pyramid_celery import celery_app as app
 from owslib.wps import WPSExecution
 from owslib.wps import WebProcessingService
-
 from lxml import etree
-
 from celery.utils.log import get_task_logger
+import uuid
+import requests
+
 logger = get_task_logger(__name__)
 
 status_categories = {
