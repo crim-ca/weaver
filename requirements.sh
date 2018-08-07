@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 if [ -f /etc/debian_version ] ; then
     echo "Installing Debian/Ubuntu packages ..."
     sudo apt-get -y update
