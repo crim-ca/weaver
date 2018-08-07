@@ -97,10 +97,11 @@ def add_provider(request):
         logger.warn('Add provider not supported')
         raise HTTPNotImplemented(detail='Add provider not supported')
 
-    return HTTPOk(json=get_capabilities(new_service, request))
+    return HTTPCreated(json=get_capabilities(new_service, request))
 
 
-@sd.provider_service.delete(tags=[sd.providers_tag], schema=sd.ProviderEndpoint())
+@sd.provider_service.delete(tags=[sd.providers_tag], schema=sd.ProviderEndpoint(),
+                            response_schemas=sd.delete_provider_responses)
 def remove_provider(request):
     """
     Remove a provider.
