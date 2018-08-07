@@ -41,6 +41,7 @@ ENV ANACONDA_HOME /opt/conda
 ENV CONDA_ENVS_DIR /opt/conda/envs
 
 # Run install and fix permissions
+RUN mkdir -p /opt/birdhouse/etc && mkdir -p /opt/birdhouse/var/run
 RUN make clean install && chmod 755 /opt/birdhouse/etc && chmod 755 /opt/birdhouse/var/run
 
 # Volume for data, cache, logfiles, ...
