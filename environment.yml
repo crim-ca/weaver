@@ -46,7 +46,6 @@ dependencies:
 - cornice
 - colander
 - pip:
-  - zc.buildout
   - genshi==0.7
   - pyramid-rpc
   - pyramid-celery
