@@ -10,7 +10,7 @@ from twitcher.utils import get_any_id
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import add_job, check_status
-from twitcher.wps_restapi.status import STATUS_ACCEPTED
+from twitcher.wps_restapi.status import STATUS_ACCEPTED, STATUS_FAILED
 from twitcher.db import MongoDB
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference
 from lxml import etree
@@ -254,7 +254,7 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
                 if execution.isComplete():
                     job['finished'] = datetime.now()
                     if execution.isSucceded():
-                        logger.debug("job succeded")
+                        logger.debug("job succeeded")
                         job['progress'] = 100
 
                         process = wps.describeprocess(job['process_id'])
@@ -289,7 +289,7 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
 
     except (WPSException, Exception) as exc:
         logger.exception("Failed to run Job")
-        job['status'] = "ProcessFailed"
+        job['status'] = STATUS_FAILED
         if isinstance(exc, WPSException):
             job['status_message'] = "Error: [{0}] {1}".format(exc.locator, exc.text)
         else:
@@ -405,6 +405,11 @@ def submit_provider_job(request):
         # Convert EnvironHeaders to a simple dict (should cherrypick the required headers)
         headers={k: v for k, v in request.headers.items()})
 
+    location = '{base_url}/providers/{provider_id}/processes/{process_id}/jobs/{job_id}'.format(
+        base_url=wps_restapi_base_url(request.registry.settings),
+        provider_id=provider_id,
+        process_id=process.identifier,
+        job_id=result.id)
     body_data = {
         'jobID': result.id,
         'status': STATUS_ACCEPTED,
@@ -414,4 +419,6 @@ def submit_provider_job(request):
             process_id=process.identifier,
             job_id=result.id)
     }
-    return HTTPCreated(json=body_data)
+    headers = request.headers
+    headers.update({'Location': location})
+    return HTTPCreated(json=body_data, headers=headers)

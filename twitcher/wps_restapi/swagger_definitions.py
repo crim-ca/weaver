@@ -530,7 +530,12 @@ class CreatedPostProvider(MappingSchema):
     body = ProviderSummarySchema()
 
 
+class CreatedLaunchJobHeader(MappingSchema):
+    Location = SchemaNode(String(), description='Location URL of the created job execution status.')
+
+
 class CreatedLaunchJobResponse(MappingSchema):
+    header = CreatedLaunchJobHeader()
     body = JobStatusSchema()
 
 
