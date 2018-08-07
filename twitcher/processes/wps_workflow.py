@@ -24,6 +24,7 @@ LOGGER = logging.getLogger("PYWPS")
 
 
 WORKFLOW_EXTENSIONS = frozenset(['yaml', 'yml', 'json', 'cwl', 'job'])
+WORKFLOW_LITERAL_TYPES = frozenset(['string', 'boolean', 'float', 'int', 'integer', 'long', 'double', 'null', 'Any'])
 
 
 def check_workflow_file(cwl_file):
@@ -79,12 +80,12 @@ def _cwl2wps_io(io_info):
     io_type = io_info['type']
 
     # literal types
-    if io_type in ['string', 'boolean', 'float', 'int', 'long', 'double', 'null', 'Any']:
+    if io_type in WORKFLOW_LITERAL_TYPES:
         if io_type == 'Any':
             io_type = 'anyvalue'
         if io_type == 'null':
             io_type = 'novalue'
-        if io_type == 'int':
+        if io_type in ['int', 'integer']:
             io_type = 'integer'
         if io_type in ['float', 'long', 'double']:
             io_type = 'float'
@@ -111,6 +112,59 @@ def _cwl2wps_io(io_info):
         return io_complex(**kw)
 
 
+def _dict2wps_io(io_info, input_or_output):
+    """Converts input/output parameters from a JSON dict to WPS types.
+    :param io_info: IO in JSON dict format
+    :param input_or_output: 'input' or 'output' to specified desired WPS type conversion.
+    :return: corresponding IO in WPS format
+    """
+    # remove extra fields added by pywps
+    io_info.pop('workdir', None)
+    io_info.pop('any_value', None)
+    io_info.pop('data_format', None)
+    io_info.pop('data', None)
+    io_info.pop('file', None)
+
+    # convert sub-format objects
+    formats = io_info.pop('supported_formats', None)
+    if formats is not None:
+        io_info['supported_formats'] = [Format(**fmt) for fmt in formats]
+
+    # convert by type
+    io_type = io_info.pop('type', 'complex')    # only ComplexOutput doesn't have 'type'
+    if input_or_output == 'input':
+        if io_type == 'complex':
+            return ComplexInput(**io_info)
+        if io_type == 'bbox':
+            return BoundingBoxInput(**io_info)
+        if io_type == 'literal':
+            return LiteralInput(**io_info)
+    elif input_or_output == 'output':
+        # extra params to remove for outputs
+        io_info.pop('min_occurs', None)
+        io_info.pop('max_occurs', None)
+        if io_type == 'complex':
+            return ComplexOutput(**io_info)
+        if io_type == 'bbox':
+            return BoundingBoxOutput(**io_info)
+        if io_type == 'literal':
+            return LiteralOutput(**io_info)
+    raise Exception("Unknown conversion from dict to WPS type (type={0}, mode={1}).".format(io_type, input_or_output))
+
+
+def _get_field(io_object, field):
+    if isinstance(io_object, dict):
+        return io_object.get(field, None)
+    return getattr(io_object, field, None)
+
+
+def _set_field(io_object, field, value):
+    if isinstance(io_object, dict):
+        io_object[field] = value
+        return
+    setattr(io_object, field, None)
+
+
 def _merge_workflow_io(wps_io_list, cwl_io_list):
     """
     Update I/O definitions to use for process creation and returned by GetCapabilities, DescribeProcess.
@@ -126,20 +180,20 @@ def _merge_workflow_io(wps_io_list, cwl_io_list):
         raise Exception("CWL I/O definitions must be provided, empty list if none required.")
     if not wps_io_list:
         wps_io_list = list()
-    wps_io_dict = OrderedDict((wps_io.identifier, wps_io) for wps_io in wps_io_list)
-    cwl_io_dict = OrderedDict((cwl_io.identifier, cwl_io) for cwl_io in cwl_io_list)
+    wps_io_dict = OrderedDict((_get_field(wps_io, 'identifier'), wps_io) for wps_io in wps_io_list)
+    cwl_io_dict = OrderedDict((_get_field(cwl_io, 'identifier'), cwl_io) for cwl_io in cwl_io_list)
     missing_io_list = set(cwl_io_dict) - set(wps_io_dict)
     updated_io_list = list()
     for cwl_id in missing_io_list:
         updated_io_list.append(cwl_io_dict[cwl_id])
     for wps_io in wps_io_list:
-        wps_id = wps_io.identifier
+        wps_id = _get_field(wps_io, 'identifier')
         # WPS I/O by id not matching CWL I/O are discarded
         if wps_id in wps_io_dict:
             # retrieve any additional fields (metadata, keywords, etc.) passed as input,
             # but override CWL-converted types and formats
-            if hasattr(wps_io, 'data_type'):
-                wps_io.data_type = cwl_io_dict[wps_id].data_type
+            if _get_field(wps_io, 'data_type') is not None:
+                _set_field(wps_io, 'data_type', _get_field(cwl_io_dict[wps_id], 'data_type'))
             updated_io_list.append(wps_io)
     return updated_io_list
 
@@ -196,11 +250,13 @@ class Workflow(Process):
         wps_outputs = kw.pop('outputs')
         cwl_inputs = get_workflow_inputs(self.workflow)
         cwl_outputs = get_workflow_outputs(self.workflow)
+        inputs = [_dict2wps_io(i, 'input') for i in _merge_workflow_io(wps_inputs, cwl_inputs)]
+        outputs = [_dict2wps_io(o, 'output') for o in _merge_workflow_io(wps_outputs, cwl_outputs)]
 
         super(Workflow, self).__init__(
             self._handler,
-            inputs=_merge_workflow_io(wps_inputs, cwl_inputs),
-            outputs=_merge_workflow_io(wps_outputs, cwl_outputs),
+            inputs=inputs,
+            outputs=outputs,
             store_supported=True,
             status_supported=True,
             **kw
