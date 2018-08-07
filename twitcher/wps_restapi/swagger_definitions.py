@@ -5,6 +5,8 @@ so that one can update the swagger without touching any other files after the in
 
 from twitcher.config import TWITCHER_CONFIGURATION_EMS
 from twitcher.wps_restapi.utils import wps_restapi_base_path
+from twitcher.wps_restapi.status import status_values
+from twitcher.wps_restapi.sort import sort_values
 from cornice import Service
 from colander import *
 
@@ -14,7 +16,6 @@ API_TITLE = 'Twitcher REST API'
 
 #########################################################################
 # API endpoints
-# note: all these paths can be prefixed by 'wps-rest-api-path' setting
 #########################################################################
 
 api_frontpage_uri = '/'
@@ -37,10 +38,10 @@ job_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}'
 job_exceptions_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/exceptions'
 job_short_uri = '/jobs/{job_id}'
 
-outputs_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/outputs'
-outputs_short_uri = '/jobs/{job_id}/outputs'
-output_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/outputs/{output_id}'
-output_short_uri = '/jobs/{job_id}/outputs/{output_id}'
+results_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/result'
+results_short_uri = '/jobs/{job_id}/result'
+result_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/result/{result_id}'
+result_short_uri = '/jobs/{job_id}/result/{result_id}'
 
 exceptions_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/exceptions'
 exceptions_short_uri = '/jobs/{job_id}/exceptions'
@@ -60,6 +61,9 @@ processes_tag = 'Local Processes'
 getcapabilities_tag = 'GetCapabilities'
 describeprocess_tag = 'DescribeProcess'
 execute_tag = 'Execute'
+dismiss_tag = 'Dismiss'
+status_tag = 'Status'
+result_tag = 'Result'
 
 ###############################################################################
 # These "services" are wrappers that allow Cornice to generate the api's json
@@ -84,10 +88,10 @@ jobs_service = Service(name='jobs', path=jobs_uri)
 job_full_service = Service(name='job_full', path=job_full_uri)
 job_short_service = Service(name='job_short', path=job_short_uri)
 
-outputs_full_service = Service(name='outputs_full', path=outputs_full_uri)
-outputs_short_service = Service(name='outputs_short', path=outputs_short_uri)
-output_full_service = Service(name='output_full', path=output_full_uri)
-output_short_service = Service(name='output_short', path=output_short_uri)
+results_full_service = Service(name='results_full', path=results_full_uri)
+results_short_service = Service(name='results_short', path=results_short_uri)
+result_full_service = Service(name='result_full', path=result_full_uri)
+result_short_service = Service(name='result_short', path=result_short_uri)
 
 exceptions_full_service = Service(name='exceptions_full', path=exceptions_full_uri)
 exceptions_short_service = Service(name='exceptions_short', path=exceptions_short_uri)
@@ -102,7 +106,7 @@ logs_short_service = Service(name='logs_short', path=logs_short_uri)
 provider_id = SchemaNode(String(), description='The provider id')
 process_id = SchemaNode(String(), description='The process id')
 job_id = SchemaNode(String(), description='The job id')
-output_id = SchemaNode(String(), description='The output id')
+result_id = SchemaNode(String(), description='The result id')
 
 #########################################################
 # Generic schemas
@@ -221,12 +225,12 @@ class FullOutputEndpoint(MappingSchema):
     provider_id = provider_id
     process_id = process_id
     job_id = job_id
-    output_id = output_id
+    result_id = result_id
 
 
 class ShortOutputEndpoint(MappingSchema):
     job_id = job_id
-    output_id = output_id
+    result_id = result_id
 
 
 class FullExceptionsEndpoint(MappingSchema):
@@ -343,10 +347,8 @@ class ProcessOutputDescriptionSchema(MappingSchema):
     title = SchemaNode(String())
 
 
-JobStatusEnum = SchemaNode(String(), missing=drop, validator=OneOf([
-    'ProcessAccepted', 'ProcessStarted', 'ProcessPaused', 'ProcessFailed', 'ProcessSucceeded']))
-JobSortEnum = SchemaNode(String(), missing=drop, validator=OneOf([
-    'created', 'status', 'process', 'provider']))
+JobStatusEnum = SchemaNode(String(), missing=drop, validator=OneOf(status_values))
+JobSortEnum = SchemaNode(String(), missing=drop, validator=OneOf(sort_values))
 
 
 class GetJobsQueries(MappingSchema):
@@ -378,6 +380,12 @@ class GetAllJobsSchema(MappingSchema):
     jobs_service = AllJobsSchema()
     limit = SchemaNode(Integer())
     page = SchemaNode(Integer())
+
+
+class DismissedJobSchema(MappingSchema):
+    status = SchemaNode(String(), example='accepted')
+    message = SchemaNode(String(), example='Job dismissed.')
+    progress = SchemaNode(Integer(), example=0)
 
 
 class SupportedValues(MappingSchema):
@@ -481,6 +489,10 @@ class OkGetProviderCapabilitiesSchema(MappingSchema):
     body = ProviderCapabilitiesSchema()
 
 
+class NoContentDeleteProviderSchema(MappingSchema):
+    body = MappingSchema(default={})
+
+
 class OkGetProviderProcessesSchema(MappingSchema):
     body = ProcessesSchema()
 
@@ -534,16 +546,20 @@ class OkGetProviderProcessDescription(MappingSchema):
     body = ProcessDescriptionSchema()
 
 
-class OkPostProvider(MappingSchema):
+class CreatedPostProvider(MappingSchema):
     body = ProviderSummarySchema()
 
 
-class OkLaunchJobResponse(MappingSchema):
+class CreatedLaunchJobResponse(MappingSchema):
     body = JobStatusSchema()
 
 
 class OkGetAllJobsResponse(MappingSchema):
     body = GetAllJobsSchema()
+
+
+class OkDismissJobResponse(MappingSchema):
+    body = DismissedJobSchema()
 
 
 class OkGetSingleJobStatusResponse(MappingSchema):
@@ -596,6 +612,9 @@ get_all_providers_responses = {
 get_one_provider_responses = {
     '200': OkGetProviderCapabilitiesSchema(description='success')
 }
+delete_provider_responses = {
+    '204': NoContentDeleteProviderSchema(description='success')
+}
 get_provider_processes_responses = {
     '200': OkGetProviderProcessesSchema(description='success')
 }
@@ -603,10 +622,10 @@ get_provider_process_description_responses = {
     '200': OkGetProviderProcessDescription(description='success')
 }
 post_provider_responses = {
-    '200': OkPostProvider(description='success')
+    '201': CreatedPostProvider(description='success')
 }
 launch_job_responses = {
-    '200': OkLaunchJobResponse(description='success')
+    '201': CreatedLaunchJobResponse(description='success')
 }
 get_all_jobs_responses = {
     '200': OkGetAllJobsResponse(description='success')
@@ -614,10 +633,13 @@ get_all_jobs_responses = {
 get_single_job_status_responses = {
     '200': OkGetSingleJobStatusResponse(description='success')
 }
-get_single_job_outputs_responses = {
+delete_job_responses = {
+    '200': OkDismissJobResponse(description='success')
+}
+get_single_job_results_responses = {
     '200': OkGetSingleJobOutputsResponse(description='success')
 }
-get_single_output_responses = {
+get_single_result_responses = {
     '200': OkGetSingleOutputResponse(description='success')
 }
 get_exceptions_responses = {

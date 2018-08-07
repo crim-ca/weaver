@@ -1,22 +1,19 @@
-import json
-import requests
-from pyramid.settings import asbool
 from pyramid.httpexceptions import *
+from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
 from celery.utils.log import get_task_logger
 from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import URLError
-from six import string_types
 from time import sleep
 from datetime import datetime
 from twitcher.adapter import servicestore_factory
 from twitcher.config import TWITCHER_CONFIGURATION_EMS, get_twitcher_configuration
 from twitcher.store import servicestore_defaultfactory, processstore_defaultfactory
 from twitcher.utils import get_any_id
-from twitcher.wps_restapi.utils import wps_restapi_base_url, get_wps_output_format
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import add_job, check_status
+from twitcher.wps_restapi.status import STATUS_ACCEPTED
 from twitcher.exceptions import ProcessNotFound, ProcessInstanceError, ProcessRegistrationError
 from twitcher.db import database_factory
 from twitcher.datatype import Process as ProcessDB
@@ -26,8 +23,10 @@ from twitcher.processes.wps_workflow import (
     get_workflow_inputs_outputs,
     merge_workflow_inputs_outputs,
 )
-from owslib.wps import WebProcessingService, WPSException, ComplexData, ComplexDataInput, is_reference
+from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference
 from lxml import etree
+from six import string_types
+import requests
 
 logger = get_task_logger(__name__)
 
@@ -187,7 +186,7 @@ def get_provider_processes(request):
                 provider_id=provider_id,
                 process_id=process.identifier))
         processes.append(item)
-    return processes
+    return HTTPOk(json=processes)
 
 
 @sd.provider_process_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.describeprocess_tag],
@@ -215,9 +214,10 @@ def describe_provider_process(request):
         maxOccurs=getattr(dataInput, 'maxOccurs', 0),
         dataType=dataInput.dataType,
         defaultValue=jsonify(getattr(dataInput, 'defaultValue', None)),
-        allowedValues=[jsonify(value) for value in getattr(dataInput, 'allowedValues', [])],
-        supportedValues=[jsonify(value) for value in getattr(dataInput, 'supportedValues', [])],
+        allowedValues=[jsonify(dataValue) for dataValue in getattr(dataInput, 'allowedValues', [])],
+        supportedValues=[jsonify(dataValue) for dataValue in getattr(dataInput, 'supportedValues', [])],
     ) for dataInput in getattr(process, 'dataInputs', [])]
+
     outputs = [dict(
         id=getattr(processOutput, 'identifier', ''),
         title=getattr(processOutput, 'title', ''),
@@ -225,13 +225,15 @@ def describe_provider_process(request):
         dataType=processOutput.dataType,
         defaultValue=jsonify(getattr(processOutput, 'defaultValue', None))
     ) for processOutput in getattr(process, 'processOutputs', [])]
-    return dict(
+
+    body_data = dict(
         id=process_id,
         label=getattr(process, 'title', ''),
         description=getattr(process, 'abstract', ''),
         inputs=inputs,
         outputs=outputs
     )
+    return HTTPOk(json=body_data)
 
 
 def wait_secs(run_step=-1):
@@ -306,8 +308,8 @@ def _get_json_multiple_inputs(input_value):
         json_data = json.loads(json_data_str)
 
         if isinstance(json_data, list):
-            for value in json_data:
-                if not is_reference(value):
+            for data_value in json_data:
+                if not is_reference(data_value):
                     return None
             return json_data
     return None
@@ -546,12 +548,13 @@ def submit_provider_job(request):
         # Convert EnvironHeaders to a simple dict (should cherrypick the required headers)
         headers={k: v for k, v in request.headers.items()})
 
-    # Should return 201 response
-    return {'jobID': result.id,
-            'status': "ProcessAccepted",
-            'location': '{base_url}/providers/{provider_id}/processes/{process_id}/jobs/{job_id}'.format(
-                base_url=wps_restapi_base_url(request.registry.settings),
-                provider_id=provider_id,
-                process_id=process.identifier,
-                job_id=result.id)
-            }
+    body_data = {
+        'jobID': result.id,
+        'status': STATUS_ACCEPTED,
+        'location': '{base_url}/providers/{provider_id}/processes/{process_id}/jobs/{job_id}'.format(
+            base_url=wps_restapi_base_url(request.registry.settings),
+            provider_id=provider_id,
+            process_id=process.identifier,
+            job_id=result.id)
+    }
+    return HTTPCreated(json=body_data)
