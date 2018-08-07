@@ -64,7 +64,7 @@ def get_processes(request):
         raise httpError(HTTPInternalServerError, description=ex.message)
 
 
-@sd.processes_service.post(tags=[sd.processes_tag], schema=sd.PostProcessRequest(),
+@sd.processes_service.post(tags=[sd.processes_tag, sd.deploy_tag], schema=sd.PostProcessRequest(),
                            response_schemas=sd.post_processes_responses)
 def add_local_process(request):
     """
@@ -142,7 +142,7 @@ def get_local_process(request):
         raise httpError(HTTPInternalServerError, description=ex.message)
 
 
-@sd.process_service.delete(tags=[sd.processes_tag],
+@sd.process_service.delete(tags=[sd.processes_tag, sd.deploy_tag],
                            schema=sd.DeleteProcessRequestSchema, response_schemas=sd.delete_process_responses)
 def delete_local_process(request):
     """
@@ -552,13 +552,16 @@ def submit_provider_job(request):
         # Convert EnvironHeaders to a simple dict (should cherrypick the required headers)
         headers={k: v for k, v in request.headers.items()})
 
+    location = '{base_url}/providers/{provider_id}/processes/{process_id}/jobs/{job_id}'.format(
+        base_url=wps_restapi_base_url(request.registry.settings),
+        provider_id=provider_id,
+        process_id=process.identifier,
+        job_id=result.id)
     body_data = {
         'jobID': result.id,
         'status': STATUS_ACCEPTED,
-        'location': '{base_url}/providers/{provider_id}/processes/{process_id}/jobs/{job_id}'.format(
-            base_url=wps_restapi_base_url(request.registry.settings),
-            provider_id=provider_id,
-            process_id=process.identifier,
-            job_id=result.id)
+        'location': location
     }
-    return HTTPCreated(json=body_data)
+    headers = request.headers
+    headers.update({'Location': location})
+    return HTTPCreated(json=body_data, headers=headers)

@@ -64,6 +64,7 @@ execute_tag = 'Execute'
 dismiss_tag = 'Dismiss'
 status_tag = 'Status'
 result_tag = 'Result'
+deploy_tag = 'Deploy'
 
 ###############################################################################
 # These "services" are wrappers that allow Cornice to generate the api's json
@@ -550,7 +551,12 @@ class CreatedPostProvider(MappingSchema):
     body = ProviderSummarySchema()
 
 
+class CreatedLaunchJobHeader(MappingSchema):
+    Location = SchemaNode(String(), description='Location URL of the created job execution status.')
+
+
 class CreatedLaunchJobResponse(MappingSchema):
+    header = CreatedLaunchJobHeader()
     body = JobStatusSchema()
 
 

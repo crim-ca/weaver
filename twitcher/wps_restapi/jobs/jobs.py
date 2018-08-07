@@ -2,7 +2,7 @@ from pyramid.httpexceptions import *
 from pyramid.security import authenticated_userid
 from pyramid_celery import celery_app as app
 from datetime import datetime
-from twitcher.db import MongoDB
+from twitcher.db import database_factory
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import wps_restapi_base_url, httpError
 from twitcher.wps_restapi.status import *
@@ -141,7 +141,7 @@ def get_jobs(request):
     status = request.params.get('status', None)
     sort = request.params.get('sort', SORT_CREATED)
 
-    db = MongoDB.get(request.registry)
+    db = database_factory(request.registry)
     collection = db.jobs
 
     items, count = filter_jobs(collection, request, page, limit, process, provider, tag, access, status, sort)
@@ -164,7 +164,7 @@ def get_job(request):
     """
     job_id = request.matchdict.get('job_id')
 
-    db = MongoDB.get(request.registry)
+    db = database_factory(request.registry)
     collection = db.jobs
     job = collection.find_one({'task_id': job_id})
 
