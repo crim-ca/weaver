@@ -114,6 +114,22 @@ class HtmlHeader(MappingSchema):
     content_type.name = 'Content-Type'
 
 
+class XmlHeader(MappingSchema):
+    content_type = SchemaNode(String(), example='application/xml', default='application/xml')
+    content_type.name = 'Content-Type'
+
+
+# TODO: return XML when Accept=application/xml, add header=AcceptHeader() to 'request' MappingSchema (create for GETs)
+# only HTTPExceptions >= 400 properly do it using tweens
+class AcceptHeader(MappingSchema):
+    # 'default' is json since 'return HTTP*(json={})' are used
+    Accept = SchemaNode(String(), missing=drop, default='application/json', validator=OneOf([
+        'application/json',
+        #'application/xml',
+        #'text/html'
+    ]))
+
+
 class KeywordList(SequenceSchema):
     keyword = SchemaNode(String())
 
@@ -186,6 +202,11 @@ class OutputTypeList(SequenceSchema):
 
 JobControlOptionsEnum = SchemaNode(String(), validator=OneOf(['sync-execute', 'async-execute']), missing=drop)
 OutputTransmissionEnum = SchemaNode(String(), validator=OneOf(['value', 'reference']), missing=drop)
+
+
+class LaunchJobQuerystring(MappingSchema):
+    sync_execute = SchemaNode(Boolean(), example='application/json', default=False, missing=drop)
+    sync_execute.name = 'sync-execute'
 
 
 #########################################################
@@ -446,6 +467,94 @@ class FrontpageSchema(MappingSchema):
     configuration = SchemaNode(String(), default='default')
 
 
+class VersionsSpecSchema(MappingSchema):
+    wps_restapi = SchemaNode(String(), description="WPS REST API version string.", example='0.1.0')
+    twitcher = SchemaNode(String(), description="Twitcher version string.", example='0.3.0')
+
+
+class VersionsSchema(MappingSchema):
+    version = VersionsSpecSchema()
+
+
+#################################
+# Local Processes schemas
+#################################
+
+
+class ProcessOfferingBody(MappingSchema):
+    process = ProcessDetailSchema()
+
+
+class PackageBody(MappingSchema):
+    workflow = SchemaNode(String(), description="Workflow file content.")  # TODO: maybe binary?
+
+
+class ExecutionUnitBody(MappingSchema):
+    package = PackageBody(missing=drop)
+    reference = SchemaNode(String(), missing=drop)
+
+
+class ProfileExtensionBody(MappingSchema):
+    # TODO: Complete schema as needed
+    pass
+
+
+class DeploymentProfileBody(MappingSchema):
+    deploymentProfileName = SchemaNode(String(), description="Name of the deployment profile.")
+    executionUnit = ExecutionUnitBody(missing=drop)
+    profileExtension = ProfileExtensionBody(missing=drop)
+
+
+class DeleteProcessRequestSchema(MappingSchema):
+    header = AcceptHeader()
+    body = MappingSchema(default={})
+
+
+class PostProcessRequestBody(MappingSchema):
+    processOffering = ProcessOfferingBody()
+    deploymentProfile = DeploymentProfileBody()
+
+
+class PostProcessRequest(MappingSchema):
+    header = AcceptHeader()
+    body = PostProcessRequestBody()
+
+
+#################################
+# Provider Processes schemas
+#################################
+
+
+class PostProvider(MappingSchema):
+    header = AcceptHeader()
+    body = CreateProviderRequestBody()
+
+
+class GetProviderProcesses(MappingSchema):
+    header = AcceptHeader()
+
+
+class GetProviderProcess(MappingSchema):
+    header = AcceptHeader()
+
+
+class PostProviderProcessJobRequestBody(MappingSchema):
+    inputs = JobInputList()
+    # outputs = JobOutputList()
+
+
+class PostProviderProcessJobRequest(MappingSchema):
+    """Launching a new process request definition."""
+    header = AcceptHeader()
+    querystring = LaunchJobQuerystring()
+    body = PostProviderProcessJobRequestBody()
+
+
+#################################
+# Responses schemas
+#################################
+
+
 class OkGetFrontpageSchema(MappingSchema):
     body = FrontpageSchema()
 
@@ -456,15 +565,6 @@ class OkGetSwaggerJSONSchema(MappingSchema):
 
 class OkGetSwaggerUISchema(MappingSchema):
     header = HtmlHeader()
-
-
-class VersionsSpecSchema(MappingSchema):
-    wps_restapi = SchemaNode(String(), description="WPS REST API version string.", example='0.1.0')
-    twitcher = SchemaNode(String(), description="Twitcher version string.", example='0.3.0')
-
-
-class VersionsSchema(MappingSchema):
-    version = VersionsSpecSchema()
 
 
 class OkGetVersionsSchema(MappingSchema):
@@ -507,10 +607,6 @@ class OkGetProcessBodySchema(MappingSchema):
 
 class OkGetProcessSchema(MappingSchema):
     body = OkGetProcessBodySchema()
-
-
-class DeleteProcessRequestSchema(MappingSchema):
-    pass
 
 
 class OkDeleteProcessBodySchema(MappingSchema):
@@ -634,82 +730,9 @@ get_logs_responses = {
     '200': OkGetLogsResponse(description='success')
 }
 
-
-class LaunchJobQuerystring(MappingSchema):
-    sync_execute = SchemaNode(Boolean(), example='application/json', default=False, missing=drop)
-    sync_execute.name = 'sync-execute'
-
-
-class PostProvider(MappingSchema):
-    body = CreateProviderRequestBody()
-    header = JsonHeader()
-
-
-#################################
-# Local Processes schemas
-#################################
-
-
-class ProcessOfferingBody(MappingSchema):
-    process = ProcessDetailSchema()
-
-
-class PackageBody(MappingSchema):
-    workflow = SchemaNode(String(), description="Workflow file content.")  # TODO: maybe binary?
-
-
-class ExecutionUnitBody(MappingSchema):
-    package = PackageBody(missing=drop)
-    reference = SchemaNode(String(), missing=drop)
-
-
-class ProfileExtensionBody(MappingSchema):
-    pass
-
-
-class DeploymentProfileBody(MappingSchema):
-    deploymentProfileName = SchemaNode(String(), description="Name of the deployment profile.")
-    executionUnit = ExecutionUnitBody(missing=drop)
-    profileExtension = ProfileExtensionBody(missing=drop)
-
-
-class PostProcessRequestBody(MappingSchema):
-    processOffering = ProcessOfferingBody()
-    deploymentProfile = DeploymentProfileBody()
-
-
-class PostProcessRequest(MappingSchema):
-    header = JsonHeader()
-    body = PostProcessRequestBody()
-
-
-#################################
-# Provider Processes schemas
-#################################
-
-class GetProviderProcesses(MappingSchema):
-    pass
-
-
-class GetProviderProcess(MappingSchema):
-    pass
-
-
-class PostProviderProcessJobRequestQuery(MappingSchema):
-    sync_execute = SchemaNode(Boolean(), example=True, default=False, missing=drop)
-    sync_execute.name = 'sync-execute'
-
-
-class PostProviderProcessJobRequestBody(MappingSchema):
-    inputs = JobInputList()
-    # outputs = JobOutputList()
-
-
-class PostProviderProcessJobRequest(MappingSchema):
-    """Launching a new process request definition."""
-    header = JsonHeader()
-    querystring = PostProviderProcessJobRequestQuery()
-    body = PostProviderProcessJobRequestBody()
+#################################################################
+# Utility methods
+#################################################################
 
 
 def service_api_route_info(service_api, settings):

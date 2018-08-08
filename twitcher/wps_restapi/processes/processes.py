@@ -413,11 +413,7 @@ def submit_provider_job(request):
     body_data = {
         'jobID': result.id,
         'status': STATUS_ACCEPTED,
-        'location': '{base_url}/providers/{provider_id}/processes/{process_id}/jobs/{job_id}'.format(
-            base_url=wps_restapi_base_url(request.registry.settings),
-            provider_id=provider_id,
-            process_id=process.identifier,
-            job_id=result.id)
+        'location': location
     }
     headers = request.headers
     headers.update({'Location': location})
