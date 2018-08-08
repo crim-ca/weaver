@@ -61,7 +61,7 @@ def get_processes(request):
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except Exception as ex:
-        raise httpError(HTTPInternalServerError, description=ex.message)
+        raise HTTPInternalServerError(ex.message)
 
 
 @sd.processes_service.post(tags=[sd.processes_tag, sd.deploy_tag], schema=sd.PostProcessRequest(),
@@ -75,22 +75,22 @@ def add_local_process(request):
     process_offering = request.json.get('processOffering')
     deployment_profile = request.json.get('deploymentProfile')
     if not isinstance(process_offering, dict):
-        raise httpError(HTTPUnprocessableEntity, description="Invalid parameter 'processOffering'")
+        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering'")
     if not isinstance(deployment_profile, dict):
-        raise httpError(HTTPUnprocessableEntity, description="Invalid parameter 'deploymentProfile'")
+        raise HTTPUnprocessableEntity("Invalid parameter 'deploymentProfile'")
 
     # validate minimum field requirements
     process_info = process_offering.get('process')
     if not isinstance(process_info, dict):
-        raise httpError(HTTPUnprocessableEntity, description="Invalid parameter 'processOffering.process'")
+        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process'")
     if not isinstance(process_info.get('identifier'), string_types):
-        raise httpError(HTTPUnprocessableEntity, description="Invalid parameter 'processOffering.process.identifier'")
+        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process.identifier'")
 
     process_type = request.json.get('type', 'workflow')
     if process_type == 'workflow':
         execution_unit = deployment_profile.get('executionUnit')
         if not isinstance(execution_unit, dict):
-            raise httpError(HTTPUnprocessableEntity, description="Invalid parameter 'deploymentProfile.executionUnit'")
+            raise HTTPUnprocessableEntity("Invalid parameter 'deploymentProfile.executionUnit'")
         package = execution_unit.get('package')
         reference = execution_unit.get('reference')
         if not (isinstance(package, dict) or isinstance(reference, string_types)):
@@ -129,7 +129,7 @@ def get_local_process(request):
     """
     process_id = request.matchdict.get('process_id')
     if not isinstance(process_id, string_types):
-        raise httpError(HTTPUnprocessableEntity, description="Invalid parameter 'process_id'")
+        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'")
     try:
         store = processstore_defaultfactory(request.registry)
         process = store.fetch_by_id(process_id)
@@ -137,9 +137,9 @@ def get_local_process(request):
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except ProcessNotFound:
-        raise httpError(HTTPNotFound, description="The process with id `{}` does not exist.".format(str(process_id)))
+        raise HTTPNotFound("The process with id `{}` does not exist.".format(str(process_id)))
     except Exception as ex:
-        raise httpError(HTTPInternalServerError, description=ex.message)
+        raise HTTPInternalServerError(ex.message)
 
 
 @sd.process_service.delete(tags=[sd.processes_tag, sd.deploy_tag],
@@ -150,19 +150,19 @@ def delete_local_process(request):
     """
     process_id = request.matchdict.get('process_id')
     if not isinstance(process_id, string_types):
-        raise httpError(HTTPUnprocessableEntity, description="Invalid parameter 'process_id'")
+        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'")
     try:
         store = processstore_defaultfactory(request.registry)
         if store.delete_process(process_id):
             return HTTPOk(json={'deploymentDone': 'success', 'identifier': process_id})
-        raise httpError(HTTPInternalServerError, description="Delete process failed.")
+        raise HTTPInternalServerError("Delete process failed.")
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except ProcessNotFound:
         description = "The process with process_id `{}` does not exist.".format(str(process_id))
-        raise httpError(HTTPNotFound, description=description)
+        raise HTTPNotFound(description)
     except Exception as ex:
-        raise httpError(HTTPInternalServerError, description=ex.message)
+        raise HTTPInternalServerError(ex.message)
 
 
 @sd.provider_processes_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.getcapabilities_tag],

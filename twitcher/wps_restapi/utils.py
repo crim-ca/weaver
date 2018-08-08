@@ -102,23 +102,3 @@ def get_wps_output_format(request, service_url=None):
     # still not found, default to older version
     # for most probable format supported by services
     return OUTPUT_FORMATS[VERSION_100]
-
-
-def httpError(http_error_class, **body):
-    """
-    Builds and raises the default HTTP response with required JSON body contents.
-    Only for raising HTTPError classes (codes >= 400).
-    Example:
-
-        raise httpError(HTTPNotFound, description='message')
-
-    :param http_error_class: one of HTTPException classes
-    :param body: json body additional arguments
-    :return: response of type `httpClass` with built body
-    """
-    if not isinstance(http_error_class, HTTPError):
-        return httpError(HTTPInternalServerError, description='Invalid class to raise HTTP exception.')
-
-    json_body = {'code': http_error_class.code, 'description': 'Unspecified error.'}
-    json_body.update(body)
-    return http_error_class(json=json_body)
