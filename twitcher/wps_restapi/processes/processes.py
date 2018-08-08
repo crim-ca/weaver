@@ -18,81 +18,6 @@ from lxml import etree
 logger = get_task_logger(__name__)
 
 
-@sd.provider_processes_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.getcapabilities_tag],
-                                   schema=sd.ProviderEndpoint(),
-                                   response_schemas=sd.get_provider_processes_responses)
-def get_provider_processes(request):
-    """
-    Retrieve available processes (GetCapabilities).
-    """
-    store = servicestore_factory(request.registry)
-
-    # TODO Validate param somehow
-    provider_id = request.matchdict.get('provider_id')
-
-    service = store.fetch_by_name(provider_id, request=request)
-    wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
-    processes = []
-    for process in wps.processes:
-        item = dict(
-            id=process.identifier,
-            title=getattr(process, 'title', ''),
-            abstract=getattr(process, 'abstract', ''),
-            url='{base_url}/providers/{provider_id}/processes/{process_id}'.format(
-                base_url=wps_restapi_base_url(request.registry.settings),
-                provider_id=provider_id,
-                process_id=process.identifier))
-        processes.append(item)
-    return HTTPOk(json=processes)
-
-
-@sd.provider_process_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.describeprocess_tag],
-                                 schema=sd.ProcessEndpoint(),
-                                 response_schemas=sd.get_provider_process_description_responses)
-def describe_provider_process(request):
-    """
-    Retrieve a process description (DescribeProcess).
-    """
-    store = servicestore_factory(request.registry)
-
-    # TODO Validate param somehow
-    provider_id = request.matchdict.get('provider_id')
-    process_id = request.matchdict.get('process_id')
-
-    service = store.fetch_by_name(provider_id, request=request)
-    wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
-    process = wps.describeprocess(process_id)
-
-    inputs = [dict(
-        id=getattr(dataInput, 'identifier', ''),
-        title=getattr(dataInput, 'title', ''),
-        abstract=getattr(dataInput, 'abstract', ''),
-        minOccurs=getattr(dataInput, 'minOccurs', 0),
-        maxOccurs=getattr(dataInput, 'maxOccurs', 0),
-        dataType=dataInput.dataType,
-        defaultValue=jsonify(getattr(dataInput, 'defaultValue', None)),
-        allowedValues=[jsonify(dataValue) for dataValue in getattr(dataInput, 'allowedValues', [])],
-        supportedValues=[jsonify(dataValue) for dataValue in getattr(dataInput, 'supportedValues', [])],
-    ) for dataInput in getattr(process, 'dataInputs', [])]
-
-    outputs = [dict(
-        id=getattr(processOutput, 'identifier', ''),
-        title=getattr(processOutput, 'title', ''),
-        abstract=getattr(processOutput, 'abstract', ''),
-        dataType=processOutput.dataType,
-        defaultValue=jsonify(getattr(processOutput, 'defaultValue', None))
-    ) for processOutput in getattr(process, 'processOutputs', [])]
-
-    body_data = dict(
-        id=process_id,
-        label=getattr(process, 'title', ''),
-        description=getattr(process, 'abstract', ''),
-        inputs=inputs,
-        outputs=outputs
-    )
-    return HTTPOk(json=body_data)
-
-
 def wait_secs(run_step=-1):
     secs_list = (2, 2, 2, 2, 2, 5, 5, 5, 5, 5, 10, 10, 10, 10, 10, 20, 20, 20, 20, 20, 30)
     if run_step >= len(secs_list):
@@ -355,7 +280,7 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
 #     ]
 # }
 @sd.provider_process_jobs_service.post(tags=[sd.provider_processes_tag, sd.providers_tag, sd.execute_tag, sd.jobs_tag],
-                                       schema=sd.PostProviderProcessJobRequest(),
+                                       renderer='json', schema=sd.PostProviderProcessJobRequest(),
                                        response_schemas=sd.launch_job_responses)
 def submit_provider_job(request):
     """
@@ -418,3 +343,78 @@ def submit_provider_job(request):
     headers = request.headers
     headers.update({'Location': location})
     return HTTPCreated(json=body_data, headers=headers)
+
+
+@sd.provider_processes_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.getcapabilities_tag],
+                                   renderer='json', schema=sd.ProviderEndpoint(),
+                                   response_schemas=sd.get_provider_processes_responses)
+def get_provider_processes(request):
+    """
+    Retrieve available processes (GetCapabilities).
+    """
+    store = servicestore_factory(request.registry)
+
+    # TODO Validate param somehow
+    provider_id = request.matchdict.get('provider_id')
+
+    service = store.fetch_by_name(provider_id, request=request)
+    wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
+    processes = []
+    for process in wps.processes:
+        item = dict(
+            id=process.identifier,
+            title=getattr(process, 'title', ''),
+            abstract=getattr(process, 'abstract', ''),
+            url='{base_url}/providers/{provider_id}/processes/{process_id}'.format(
+                base_url=wps_restapi_base_url(request.registry.settings),
+                provider_id=provider_id,
+                process_id=process.identifier))
+        processes.append(item)
+    return HTTPOk(json=processes)
+
+
+@sd.provider_process_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.describeprocess_tag],
+                                 renderer='json', schema=sd.ProcessEndpoint(),
+                                 response_schemas=sd.get_provider_process_description_responses)
+def describe_provider_process(request):
+    """
+    Retrieve a process description (DescribeProcess).
+    """
+    store = servicestore_factory(request.registry)
+
+    # TODO Validate param somehow
+    provider_id = request.matchdict.get('provider_id')
+    process_id = request.matchdict.get('process_id')
+
+    service = store.fetch_by_name(provider_id, request=request)
+    wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
+    process = wps.describeprocess(process_id)
+
+    inputs = [dict(
+        id=getattr(dataInput, 'identifier', ''),
+        title=getattr(dataInput, 'title', ''),
+        abstract=getattr(dataInput, 'abstract', ''),
+        minOccurs=getattr(dataInput, 'minOccurs', 0),
+        maxOccurs=getattr(dataInput, 'maxOccurs', 0),
+        dataType=dataInput.dataType,
+        defaultValue=jsonify(getattr(dataInput, 'defaultValue', None)),
+        allowedValues=[jsonify(dataValue) for dataValue in getattr(dataInput, 'allowedValues', [])],
+        supportedValues=[jsonify(dataValue) for dataValue in getattr(dataInput, 'supportedValues', [])],
+    ) for dataInput in getattr(process, 'dataInputs', [])]
+
+    outputs = [dict(
+        id=getattr(processOutput, 'identifier', ''),
+        title=getattr(processOutput, 'title', ''),
+        abstract=getattr(processOutput, 'abstract', ''),
+        dataType=processOutput.dataType,
+        defaultValue=jsonify(getattr(processOutput, 'defaultValue', None))
+    ) for processOutput in getattr(process, 'processOutputs', [])]
+
+    body_data = dict(
+        id=process_id,
+        label=getattr(process, 'title', ''),
+        description=getattr(process, 'abstract', ''),
+        inputs=inputs,
+        outputs=outputs
+    )
+    return HTTPOk(json=body_data)

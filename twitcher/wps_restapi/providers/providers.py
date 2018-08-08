@@ -12,7 +12,8 @@ import logging
 logger = logging.getLogger('TWITCHER')
 
 
-@sd.providers_service.get(tags=[sd.providers_tag], response_schemas=sd.get_all_providers_responses)
+@sd.providers_service.get(tags=[sd.providers_tag], renderer='json',
+                          schema=sd.GetProviders(), response_schemas=sd.get_all_providers_responses)
 def get_providers(request):
     """
     Lists registered providers.
@@ -72,8 +73,8 @@ def get_service(request):
     return service, store
 
 
-@sd.providers_service.post(tags=[sd.providers_tag], schema=sd.PostProvider(),
-                           response_schemas=sd.post_provider_responses)
+@sd.providers_service.post(tags=[sd.providers_tag], renderer='json',
+                           schema=sd.PostProvider(), response_schemas=sd.post_provider_responses)
 def add_provider(request):
     """
     Add a provider.
@@ -100,8 +101,8 @@ def add_provider(request):
     return HTTPCreated(json=get_capabilities(new_service, request))
 
 
-@sd.provider_service.delete(tags=[sd.providers_tag], schema=sd.ProviderEndpoint(),
-                            response_schemas=sd.delete_provider_responses)
+@sd.provider_service.delete(tags=[sd.providers_tag], renderer='json',
+                            schema=sd.ProviderEndpoint(), response_schemas=sd.delete_provider_responses)
 def remove_provider(request):
     """
     Remove a provider.
@@ -117,8 +118,8 @@ def remove_provider(request):
     return HTTPNoContent(json={})
 
 
-@sd.provider_service.get(tags=[sd.providers_tag], schema=sd.ProviderEndpoint(),
-                         response_schemas=sd.get_one_provider_responses)
+@sd.provider_service.get(tags=[sd.providers_tag], renderer='json',
+                         schema=sd.ProviderEndpoint(), response_schemas=sd.get_one_provider_responses)
 def get_provider(request):
     """
     Get a provider description.

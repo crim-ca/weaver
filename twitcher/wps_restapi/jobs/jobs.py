@@ -126,7 +126,32 @@ def filter_jobs(collection, request, page=0, limit=10, process=None,
     return items, count
 
 
-@sd.jobs_service.get(schema=sd.GetJobsRequest(), tags=[sd.jobs_tag], response_schemas=sd.get_all_jobs_responses)
+def get_job(request):
+    """
+    :returns: Job information if found.
+    :raises: HTTPNotFound with JSON body details on missing/non-matching job, process, provider IDs.
+    """
+    job_id = request.matchdict.get('job_id')
+
+    db = MongoDB.get(request.registry)
+    collection = db.jobs
+    job = collection.find_one({'task_id': job_id})
+
+    if not job:
+        raise HTTPNotFound('Could not find specified `job_id`.')
+
+    provider_id = request.matchdict.get('provider_id', job['provider_id'])
+    process_id = request.matchdict.get('process_id', job['process_id'])
+
+    if job['provider_id'] != provider_id:
+        raise HTTPNotFound('Could not find specified `provider_id`.')
+    if job['process_id'] != process_id:
+        raise HTTPNotFound('Could not find specified `process_id`.')
+    return job
+
+
+@sd.jobs_service.get(tags=[sd.jobs_tag], renderer='json',
+                     schema=sd.GetJobsRequest(), response_schemas=sd.get_all_jobs_responses)
 def get_jobs(request):
     """
     Retrieve the list of jobs which can be filtered/sorted using queries.
@@ -157,34 +182,10 @@ def get_jobs(request):
     })
 
 
-def get_job(request):
-    """
-    :returns: Job information if found.
-    :raises: HTTPNotFound with JSON body details on missing/non-matching job, process, provider IDs.
-    """
-    job_id = request.matchdict.get('job_id')
-
-    db = MongoDB.get(request.registry)
-    collection = db.jobs
-    job = collection.find_one({'task_id': job_id})
-
-    if not job:
-        raise HTTPNotFound('Could not find specified `job_id`.')
-
-    provider_id = request.matchdict.get('provider_id', job['provider_id'])
-    process_id = request.matchdict.get('process_id', job['process_id'])
-
-    if job['provider_id'] != provider_id:
-        raise HTTPNotFound('Could not find specified `provider_id`.')
-    if job['process_id'] != process_id:
-        raise HTTPNotFound('Could not find specified `process_id`.')
-    return job
-
-
-@sd.job_full_service.get(tags=[sd.jobs_tag, sd.status_tag], schema=sd.FullJobEndpoint(),
-                         response_schemas=sd.get_single_job_status_responses)
-@sd.job_short_service.get(tags=[sd.jobs_tag, sd.status_tag], schema=sd.ShortJobEndpoint(),
-                          response_schemas=sd.get_single_job_status_responses)
+@sd.job_full_service.get(tags=[sd.jobs_tag, sd.status_tag], renderer='json',
+                         schema=sd.FullJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
+@sd.job_short_service.get(tags=[sd.jobs_tag, sd.status_tag], renderer='json',
+                          schema=sd.ShortJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
 def get_job_status(request):
     """
     Retrieve the status of a job.
@@ -208,10 +209,10 @@ def get_job_status(request):
     return HTTPOk(json=response)
 
 
-@sd.job_full_service.delete(tags=[sd.jobs_tag, sd.dismiss_tag], schema=sd.FullJobEndpoint(),
-                            response_schemas=sd.delete_job_responses)
-@sd.job_short_service.delete(tags=[sd.jobs_tag, sd.dismiss_tag], schema=sd.ShortJobEndpoint(),
-                             response_schemas=sd.delete_job_responses)
+@sd.job_full_service.delete(tags=[sd.jobs_tag, sd.dismiss_tag], renderer='json',
+                            schema=sd.FullJobEndpoint(), response_schemas=sd.delete_job_responses)
+@sd.job_short_service.delete(tags=[sd.jobs_tag, sd.dismiss_tag], renderer='json',
+                             schema=sd.ShortJobEndpoint(), response_schemas=sd.delete_job_responses)
 def cancel_job(request):
     """
     Dismiss a job.
@@ -227,10 +228,10 @@ def cancel_job(request):
     })
 
 
-@sd.results_full_service.get(tags=[sd.jobs_tag, sd.result_tag], schema=sd.FullJobEndpoint(),
-                             response_schemas=sd.get_single_job_results_responses)
-@sd.results_short_service.get(tags=[sd.jobs_tag, sd.result_tag], schema=sd.ShortJobEndpoint(),
-                              response_schemas=sd.get_single_job_results_responses)
+@sd.results_full_service.get(tags=[sd.jobs_tag, sd.result_tag], renderer='json',
+                             schema=sd.FullJobEndpoint(), response_schemas=sd.get_single_job_results_responses)
+@sd.results_short_service.get(tags=[sd.jobs_tag, sd.result_tag], renderer='json',
+                              schema=sd.ShortJobEndpoint(), response_schemas=sd.get_single_job_results_responses)
 def get_job_results(request):
     """
     Retrieve the result(s) of a job.
@@ -243,10 +244,10 @@ def get_job_results(request):
     return HTTPOk(json=outputs)
 
 
-@sd.result_full_service.get(tags=[sd.jobs_tag, sd.result_tag], schema=sd.FullOutputEndpoint(),
-                            response_schemas=sd.get_single_result_responses)
-@sd.result_short_service.get(tags=[sd.jobs_tag, sd.result_tag], schema=sd.ShortOutputEndpoint(),
-                             response_schemas=sd.get_single_result_responses)
+@sd.result_full_service.get(tags=[sd.jobs_tag, sd.result_tag], renderer='json',
+                            schema=sd.FullOutputEndpoint(), response_schemas=sd.get_single_result_responses)
+@sd.result_short_service.get(tags=[sd.jobs_tag, sd.result_tag], renderer='json',
+                             schema=sd.ShortOutputEndpoint(), response_schemas=sd.get_single_result_responses)
 def get_job_result(request):
     """
     Retrieve the result of a particular job output.
@@ -262,10 +263,10 @@ def get_job_result(request):
     raise HTTPNotFound('Could not find job output.')
 
 
-@sd.exceptions_full_service.get(tags=[sd.jobs_tag], schema=sd.FullExceptionsEndpoint(),
-                                response_schemas=sd.get_exceptions_responses)
-@sd.exceptions_short_service.get(tags=[sd.jobs_tag], schema=sd.ShortExceptionsEndpoint(),
-                                 response_schemas=sd.get_exceptions_responses)
+@sd.exceptions_full_service.get(tags=[sd.jobs_tag], renderer='json',
+                                schema=sd.FullExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
+@sd.exceptions_short_service.get(tags=[sd.jobs_tag], renderer='json',
+                                 schema=sd.ShortExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
 def get_job_exceptions(request):
     """
     Retrieve the result(s) of a job.
@@ -274,8 +275,10 @@ def get_job_exceptions(request):
     return HTTPOk(json=job['exceptions'])
 
 
-@sd.logs_full_service.get(tags=[sd.jobs_tag], schema=sd.FullLogsEndpoint(), response_schemas=sd.get_logs_responses)
-@sd.logs_short_service.get(tags=[sd.jobs_tag], schema=sd.ShortLogsEndpoint(), response_schemas=sd.get_logs_responses)
+@sd.logs_full_service.get(tags=[sd.jobs_tag], renderer='json',
+                          schema=sd.FullLogsEndpoint(), response_schemas=sd.get_logs_responses)
+@sd.logs_short_service.get(tags=[sd.jobs_tag], renderer='json',
+                           schema=sd.ShortLogsEndpoint(), response_schemas=sd.get_logs_responses)
 def get_job_log(request):
     """
     Retrieve the result(s) of a job.

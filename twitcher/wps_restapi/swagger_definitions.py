@@ -4,7 +4,7 @@ so that one can update the swagger without touching any other files after the in
 """
 from twitcher.wps_restapi.utils import wps_restapi_base_path
 from twitcher.wps_restapi.status import status_values
-from twitcher.wps_restapi.sort import sort_values
+from twitcher.wps_restapi.sort import sort_values, SORT_CREATED
 from cornice import Service
 from colander import *
 
@@ -91,7 +91,7 @@ logs_full_service = Service(name='logs_full', path=logs_full_uri)
 logs_short_service = Service(name='logs_short', path=logs_short_uri)
 
 #########################################################
-# Query parameter definitions
+# Path parameter definitions
 #########################################################
 
 provider_id = SchemaNode(String(), description='The provider id')
@@ -119,8 +119,11 @@ class XmlHeader(MappingSchema):
     content_type.name = 'Content-Type'
 
 
-# TODO: return XML when Accept=application/xml, add header=AcceptHeader() to 'request' MappingSchema (create for GETs)
-# only HTTPExceptions >= 400 properly do it using tweens
+# TODO:
+# return XML when Accept=application/xml, add header=AcceptHeader() to 'request' MappingSchema (create for GETs)
+# only HTTPExceptions >= 400 properly do it using tweens because of the formatter, HTTP 2xx/3xx are always JSON
+# for how to generate doc with content-type specific responses (create the selector in swagger-ui), see:
+#   https://github.com/Cornices/cornice.ext.swagger/blob/master/docs/source/tutorial.rst#extracting-produced-types-from-renderers
 class AcceptHeader(MappingSchema):
     # 'default' is json since 'return HTTP*(json={})' are used
     Accept = SchemaNode(String(), missing=drop, default='application/json', validator=OneOf([
@@ -214,26 +217,43 @@ class LaunchJobQuerystring(MappingSchema):
 #########################################################
 
 
+class FrontpageEndpoint(MappingSchema):
+    header = AcceptHeader()
+
+
+class VersionsEndpoint(MappingSchema):
+    header = AcceptHeader()
+
+
+class SwaggerJsonEndpoint(MappingSchema):
+    header = AcceptHeader()
+
+
 class ProviderEndpoint(MappingSchema):
+    header = AcceptHeader()
     provider_id = provider_id
 
 
 class ProcessEndpoint(MappingSchema):
+    header = AcceptHeader()
     provider_id = provider_id
     process_id = process_id
 
 
 class FullJobEndpoint(MappingSchema):
+    header = AcceptHeader()
     provider_id = provider_id
     process_id = process_id
     job_id = job_id
 
 
 class ShortJobEndpoint(MappingSchema):
+    header = AcceptHeader()
     job_id = job_id
 
 
 class FullOutputEndpoint(MappingSchema):
+    header = AcceptHeader()
     provider_id = provider_id
     process_id = process_id
     job_id = job_id
@@ -241,27 +261,32 @@ class FullOutputEndpoint(MappingSchema):
 
 
 class ShortOutputEndpoint(MappingSchema):
+    header = AcceptHeader()
     job_id = job_id
     result_id = result_id
 
 
 class FullExceptionsEndpoint(MappingSchema):
+    header = AcceptHeader()
     provider_id = provider_id
     process_id = process_id
     job_id = job_id
 
 
 class ShortExceptionsEndpoint(MappingSchema):
+    header = AcceptHeader()
     job_id = job_id
 
 
 class FullLogsEndpoint(MappingSchema):
+    header = AcceptHeader()
     provider_id = provider_id
     process_id = process_id
     job_id = job_id
 
 
 class ShortLogsEndpoint(MappingSchema):
+    header = AcceptHeader()
     job_id = job_id
 
 
@@ -359,20 +384,21 @@ class ProcessOutputDescriptionSchema(MappingSchema):
     title = SchemaNode(String())
 
 
-JobStatusEnum = SchemaNode(String(), missing=drop, validator=OneOf(status_values))
-JobSortEnum = SchemaNode(String(), missing=drop, validator=OneOf(sort_values))
+JobStatusEnum = SchemaNode(String(), missing=drop, default=None, validator=OneOf(status_values))
+JobSortEnum = SchemaNode(String(), missing=drop, default=SORT_CREATED, validator=OneOf(sort_values))
 
 
 class GetJobsQueries(MappingSchema):
-    page = SchemaNode(Integer())
-    limit = SchemaNode(Integer())
+    page = SchemaNode(Integer(), missing=drop, default=0)
+    limit = SchemaNode(Integer(), missing=drop, default=10)
     status = JobStatusEnum
-    process = SchemaNode(String())
-    provider = SchemaNode(String())
+    process = SchemaNode(String(), missing=drop, default=None)
+    provider = SchemaNode(String(), missing=drop, default=None)
     sort = JobSortEnum
 
 
 class GetJobsRequest(MappingSchema):
+    header = AcceptHeader()
     querystring = GetJobsQueries()
 
 
@@ -523,6 +549,10 @@ class PostProcessRequest(MappingSchema):
 #################################
 # Provider Processes schemas
 #################################
+
+
+class GetProviders(MappingSchema):
+    header = AcceptHeader()
 
 
 class PostProvider(MappingSchema):
