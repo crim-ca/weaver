@@ -31,215 +31,6 @@ import requests
 logger = get_task_logger(__name__)
 
 
-@sd.processes_service.get(schema=sd.GetProcessesRequest(), tags=[sd.processes_tag, sd.getcapabilities_tag],
-                          response_schemas=sd.get_processes_responses)
-def get_processes(request):
-    """
-    List registered processes (GetCapabilities). Optionally list both local and provider processes.
-    """
-    try:
-        # get local processes
-        store = processstore_defaultfactory(request.registry)
-        processes = [process.summary() for process in store.list_processes()]
-        response_body = {'processes': processes}
-
-        # if EMS and ?providers=True, also fetch each provider's processes
-        if get_twitcher_configuration(request.registry.settings) == TWITCHER_CONFIGURATION_EMS:
-            queries = parse_request_query(request)
-            if 'providers' in queries and asbool(queries['providers'][0]) is True:
-                providers_response = requests.request('GET', '{host}/providers'.format(host=request.host_url),
-                                                      headers=request.headers, cookies=request.cookies)
-                providers = providers_response.json()
-                response_body.update({'providers': providers})
-                for i, provider in enumerate(providers):
-                    provider_id = get_any_id(provider)
-                    processes = requests.request('GET', '{host}/providers/{provider_id}/processes'
-                                                        .format(host=request.host_url, provider_id=provider_id),
-                                                 headers=request.headers, cookies=request.cookies)
-                    response_body['providers'][i].update({'processes': processes})
-        return HTTPOk(json=response_body)
-    except HTTPException:
-        raise  # re-throw already handled HTTPException
-    except Exception as ex:
-        raise HTTPInternalServerError(ex.message)
-
-
-@sd.processes_service.post(tags=[sd.processes_tag, sd.deploy_tag], schema=sd.PostProcessRequest(),
-                           response_schemas=sd.post_processes_responses)
-def add_local_process(request):
-    """
-    Register a local process.
-    """
-    store = processstore_defaultfactory(request.registry)
-
-    process_offering = request.json.get('processOffering')
-    deployment_profile = request.json.get('deploymentProfile')
-    if not isinstance(process_offering, dict):
-        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering'")
-    if not isinstance(deployment_profile, dict):
-        raise HTTPUnprocessableEntity("Invalid parameter 'deploymentProfile'")
-
-    # validate minimum field requirements
-    process_info = process_offering.get('process')
-    if not isinstance(process_info, dict):
-        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process'")
-    if not isinstance(process_info.get('identifier'), string_types):
-        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process.identifier'")
-
-    process_type = request.json.get('type', 'workflow')
-    if process_type == 'workflow':
-        execution_unit = deployment_profile.get('executionUnit')
-        if not isinstance(execution_unit, dict):
-            raise HTTPUnprocessableEntity("Invalid parameter 'deploymentProfile.executionUnit'")
-        package = execution_unit.get('package')
-        reference = execution_unit.get('reference')
-        if not (isinstance(package, dict) or isinstance(reference, string_types)):
-            raise HTTPUnprocessableEntity(
-                detail="Invalid parameters amongst one of [package,reference] in 'deploymentProfile.executionUnit'.")
-        if package and reference:
-            raise HTTPUnprocessableEntity(
-                detail="Simultaneous parameters [package,reference] not allowed in 'deploymentProfile.executionUnit'.")
-
-        # retrieve package information and validate them at the same time by loading/updating definitions to store in DB
-        if reference:
-            package = load_workflow_file(reference)
-        try:
-            workflow = load_workflow_content(package)
-            workflow_inputs, workflow_outputs = get_workflow_inputs_outputs(workflow)
-            process_inputs = process_info.get('inputs', list())
-            process_outputs = process_info.get('outputs', list())
-            workflow_inputs, workflow_outputs = merge_workflow_inputs_outputs(process_inputs, workflow_inputs,
-                                                                              process_outputs, workflow_outputs,
-                                                                              as_json=True)
-            process_info.update({'package': package, 'inputs': workflow_inputs, 'outputs': workflow_outputs})
-        except Exception as ex:
-            raise HTTPBadRequest("Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex)))
-
-    # ensure that required 'executeEndpoint' in db is added, will be auto-fixed to localhost if not specified in body
-    process_info.update({'type': process_type, 'executeEndpoint': process_info.get('executeEndpoint')})
-    saved_process = store.save_process(ProcessDB(process_info))
-
-    return HTTPOk(json={'processSummary': saved_process.summary()})
-
-
-@sd.process_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], response_schemas=sd.get_process_responses)
-def get_local_process(request):
-    """
-    Get a registered local process information (DescribeProcess).
-    """
-    process_id = request.matchdict.get('process_id')
-    if not isinstance(process_id, string_types):
-        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'")
-    try:
-        store = processstore_defaultfactory(request.registry)
-        process = store.fetch_by_id(process_id)
-        return {'process': process.json()}
-    except HTTPException:
-        raise  # re-throw already handled HTTPException
-    except ProcessNotFound:
-        raise HTTPNotFound("The process with id `{}` does not exist.".format(str(process_id)))
-    except Exception as ex:
-        raise HTTPInternalServerError(ex.message)
-
-
-@sd.process_service.delete(tags=[sd.processes_tag, sd.deploy_tag],
-                           schema=sd.DeleteProcessRequestSchema, response_schemas=sd.delete_process_responses)
-def delete_local_process(request):
-    """
-    Unregister a local process.
-    """
-    process_id = request.matchdict.get('process_id')
-    if not isinstance(process_id, string_types):
-        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'")
-    try:
-        store = processstore_defaultfactory(request.registry)
-        if store.delete_process(process_id):
-            return HTTPOk(json={'deploymentDone': 'success', 'identifier': process_id})
-        raise HTTPInternalServerError("Delete process failed.")
-    except HTTPException:
-        raise  # re-throw already handled HTTPException
-    except ProcessNotFound:
-        description = "The process with process_id `{}` does not exist.".format(str(process_id))
-        raise HTTPNotFound(description)
-    except Exception as ex:
-        raise HTTPInternalServerError(ex.message)
-
-
-@sd.provider_processes_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.getcapabilities_tag],
-                                   schema=sd.ProviderEndpoint(),
-                                   response_schemas=sd.get_provider_processes_responses)
-def get_provider_processes(request):
-    """
-    Retrieve available processes (GetCapabilities).
-    """
-    store = servicestore_factory(request.registry)
-
-    # TODO Validate param somehow
-    provider_id = request.matchdict.get('provider_id')
-
-    service = store.fetch_by_name(provider_id, request=request)
-    wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
-    processes = []
-    for process in wps.processes:
-        item = dict(
-            id=process.identifier,
-            title=getattr(process, 'title', ''),
-            abstract=getattr(process, 'abstract', ''),
-            url='{base_url}/providers/{provider_id}/processes/{process_id}'.format(
-                base_url=wps_restapi_base_url(request.registry.settings),
-                provider_id=provider_id,
-                process_id=process.identifier))
-        processes.append(item)
-    return HTTPOk(json=processes)
-
-
-@sd.provider_process_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.describeprocess_tag],
-                                 schema=sd.ProcessEndpoint(),
-                                 response_schemas=sd.get_provider_process_description_responses)
-def describe_provider_process(request):
-    """
-    Retrieve a process description (DescribeProcess).
-    """
-    store = servicestore_factory(request.registry)
-
-    # TODO Validate param somehow
-    provider_id = request.matchdict.get('provider_id')
-    process_id = request.matchdict.get('process_id')
-
-    service = store.fetch_by_name(provider_id, request=request)
-    wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
-    process = wps.describeprocess(process_id)
-
-    inputs = [dict(
-        id=getattr(dataInput, 'identifier', ''),
-        title=getattr(dataInput, 'title', ''),
-        abstract=getattr(dataInput, 'abstract', ''),
-        minOccurs=getattr(dataInput, 'minOccurs', 0),
-        maxOccurs=getattr(dataInput, 'maxOccurs', 0),
-        dataType=dataInput.dataType,
-        defaultValue=jsonify(getattr(dataInput, 'defaultValue', None)),
-        allowedValues=[jsonify(dataValue) for dataValue in getattr(dataInput, 'allowedValues', [])],
-        supportedValues=[jsonify(dataValue) for dataValue in getattr(dataInput, 'supportedValues', [])],
-    ) for dataInput in getattr(process, 'dataInputs', [])]
-
-    outputs = [dict(
-        id=getattr(processOutput, 'identifier', ''),
-        title=getattr(processOutput, 'title', ''),
-        abstract=getattr(processOutput, 'abstract', ''),
-        dataType=processOutput.dataType,
-        defaultValue=jsonify(getattr(processOutput, 'defaultValue', None))
-    ) for processOutput in getattr(process, 'processOutputs', [])]
-
-    body_data = dict(
-        id=process_id,
-        label=getattr(process, 'title', ''),
-        description=getattr(process, 'abstract', ''),
-        inputs=inputs,
-        outputs=outputs
-    )
-    return HTTPOk(json=body_data)
-
-
 def wait_secs(run_step=-1):
     secs_list = (2, 2, 2, 2, 2, 5, 5, 5, 5, 5, 10, 10, 10, 10, 10, 20, 20, 20, 20, 20, 30)
     if run_step >= len(secs_list):
@@ -449,12 +240,6 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
     return job['status']
 
 
-@sd.process_jobs_service.post(tags=[sd.processes_tag, sd.execute_tag, sd.jobs_tag],
-                              schema=sd.PostProcessJobRequest(),
-                              response_schemas=sd.launch_job_responses)
-def submit_local_job(request):
-
-
 #############
 # EXAMPLE
 #############
@@ -508,7 +293,7 @@ def submit_local_job(request):
 #     ]
 # }
 @sd.provider_process_jobs_service.post(tags=[sd.provider_processes_tag, sd.providers_tag, sd.execute_tag, sd.jobs_tag],
-                                       schema=sd.PostProviderProcessJobRequest(),
+                                       renderer='json', schema=sd.PostProviderProcessJobRequest(),
                                        response_schemas=sd.launch_job_responses)
 def submit_provider_job(request):
     """
@@ -571,3 +356,219 @@ def submit_provider_job(request):
     headers = request.headers
     headers.update({'Location': location})
     return HTTPCreated(json=body_data, headers=headers)
+
+
+@sd.provider_processes_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.getcapabilities_tag],
+                                   renderer='json', schema=sd.ProviderEndpoint(),
+                                   response_schemas=sd.get_provider_processes_responses)
+def get_provider_processes(request):
+    """
+    Retrieve available processes (GetCapabilities).
+    """
+    store = servicestore_factory(request.registry)
+
+    # TODO Validate param somehow
+    provider_id = request.matchdict.get('provider_id')
+
+    service = store.fetch_by_name(provider_id, request=request)
+    wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
+    processes = []
+    for process in wps.processes:
+        item = dict(
+            id=process.identifier,
+            title=getattr(process, 'title', ''),
+            abstract=getattr(process, 'abstract', ''),
+            url='{base_url}/providers/{provider_id}/processes/{process_id}'.format(
+                base_url=wps_restapi_base_url(request.registry.settings),
+                provider_id=provider_id,
+                process_id=process.identifier))
+        processes.append(item)
+    return HTTPOk(json=processes)
+
+
+@sd.provider_process_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.describeprocess_tag],
+                                 renderer='json', schema=sd.ProcessEndpoint(),
+                                 response_schemas=sd.get_provider_process_description_responses)
+def describe_provider_process(request):
+    """
+    Retrieve a process description (DescribeProcess).
+    """
+    store = servicestore_factory(request.registry)
+
+    # TODO Validate param somehow
+    provider_id = request.matchdict.get('provider_id')
+    process_id = request.matchdict.get('process_id')
+
+    service = store.fetch_by_name(provider_id, request=request)
+    wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
+    process = wps.describeprocess(process_id)
+
+    inputs = [dict(
+        id=getattr(dataInput, 'identifier', ''),
+        title=getattr(dataInput, 'title', ''),
+        abstract=getattr(dataInput, 'abstract', ''),
+        minOccurs=getattr(dataInput, 'minOccurs', 0),
+        maxOccurs=getattr(dataInput, 'maxOccurs', 0),
+        dataType=dataInput.dataType,
+        defaultValue=jsonify(getattr(dataInput, 'defaultValue', None)),
+        allowedValues=[jsonify(dataValue) for dataValue in getattr(dataInput, 'allowedValues', [])],
+        supportedValues=[jsonify(dataValue) for dataValue in getattr(dataInput, 'supportedValues', [])],
+    ) for dataInput in getattr(process, 'dataInputs', [])]
+
+    outputs = [dict(
+        id=getattr(processOutput, 'identifier', ''),
+        title=getattr(processOutput, 'title', ''),
+        abstract=getattr(processOutput, 'abstract', ''),
+        dataType=processOutput.dataType,
+        defaultValue=jsonify(getattr(processOutput, 'defaultValue', None))
+    ) for processOutput in getattr(process, 'processOutputs', [])]
+
+    body_data = dict(
+        id=process_id,
+        label=getattr(process, 'title', ''),
+        description=getattr(process, 'abstract', ''),
+        inputs=inputs,
+        outputs=outputs
+    )
+    return HTTPOk(json=body_data)
+
+
+@sd.processes_service.get(schema=sd.GetProcessesRequest(), tags=[sd.processes_tag, sd.getcapabilities_tag],
+                          response_schemas=sd.get_processes_responses)
+def get_processes(request):
+    """
+    List registered processes (GetCapabilities). Optionally list both local and provider processes.
+    """
+    try:
+        # get local processes
+        store = processstore_defaultfactory(request.registry)
+        processes = [process.summary() for process in store.list_processes()]
+        response_body = {'processes': processes}
+
+        # if EMS and ?providers=True, also fetch each provider's processes
+        if get_twitcher_configuration(request.registry.settings) == TWITCHER_CONFIGURATION_EMS:
+            queries = parse_request_query(request)
+            if 'providers' in queries and asbool(queries['providers'][0]) is True:
+                providers_response = requests.request('GET', '{host}/providers'.format(host=request.host_url),
+                                                      headers=request.headers, cookies=request.cookies)
+                providers = providers_response.json()
+                response_body.update({'providers': providers})
+                for i, provider in enumerate(providers):
+                    provider_id = get_any_id(provider)
+                    processes = requests.request('GET', '{host}/providers/{provider_id}/processes'
+                                                        .format(host=request.host_url, provider_id=provider_id),
+                                                 headers=request.headers, cookies=request.cookies)
+                    response_body['providers'][i].update({'processes': processes})
+        return HTTPOk(json=response_body)
+    except HTTPException:
+        raise  # re-throw already handled HTTPException
+    except Exception as ex:
+        raise HTTPInternalServerError(ex.message)
+
+
+@sd.processes_service.post(tags=[sd.processes_tag, sd.deploy_tag], renderer='json',
+                           schema=sd.ProcessesEndpoint(), response_schemas=sd.post_processes_responses)
+def add_local_process(request):
+    """
+    Register a local process.
+    """
+    store = processstore_defaultfactory(request.registry)
+
+    process_offering = request.json.get('processOffering')
+    deployment_profile = request.json.get('deploymentProfile')
+    if not isinstance(process_offering, dict):
+        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering'")
+    if not isinstance(deployment_profile, dict):
+        raise HTTPUnprocessableEntity("Invalid parameter 'deploymentProfile'")
+
+    # validate minimum field requirements
+    process_info = process_offering.get('process')
+    if not isinstance(process_info, dict):
+        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process'")
+    if not isinstance(process_info.get('identifier'), string_types):
+        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process.identifier'")
+
+    process_type = request.json.get('type', 'workflow')
+    if process_type == 'workflow':
+        execution_unit = deployment_profile.get('executionUnit')
+        if not isinstance(execution_unit, dict):
+            raise HTTPUnprocessableEntity("Invalid parameter 'deploymentProfile.executionUnit'")
+        package = execution_unit.get('package')
+        reference = execution_unit.get('reference')
+        if not (isinstance(package, dict) or isinstance(reference, string_types)):
+            raise HTTPUnprocessableEntity(
+                detail="Invalid parameters amongst one of [package,reference] in 'deploymentProfile.executionUnit'.")
+        if package and reference:
+            raise HTTPUnprocessableEntity(
+                detail="Simultaneous parameters [package,reference] not allowed in 'deploymentProfile.executionUnit'.")
+
+        # retrieve package information and validate them at the same time by loading/updating definitions to store in DB
+        if reference:
+            package = load_workflow_file(reference)
+        try:
+            workflow = load_workflow_content(package)
+            workflow_inputs, workflow_outputs = get_workflow_inputs_outputs(workflow)
+            process_inputs = process_info.get('inputs', list())
+            process_outputs = process_info.get('outputs', list())
+            workflow_inputs, workflow_outputs = merge_workflow_inputs_outputs(process_inputs, workflow_inputs,
+                                                                              process_outputs, workflow_outputs,
+                                                                              as_json=True)
+            process_info.update({'package': package, 'inputs': workflow_inputs, 'outputs': workflow_outputs})
+        except Exception as ex:
+            raise HTTPBadRequest("Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex)))
+
+    # ensure that required 'executeEndpoint' in db is added, will be auto-fixed to localhost if not specified in body
+    process_info.update({'type': process_type, 'executeEndpoint': process_info.get('executeEndpoint')})
+    saved_process = store.save_process(ProcessDB(process_info))
+
+    return HTTPOk(json={'processSummary': saved_process.summary()})
+
+
+@sd.process_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer='json',
+                        schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_responses)
+def get_local_process(request):
+    """
+    Get a registered local process information (DescribeProcess).
+    """
+    process_id = request.matchdict.get('process_id')
+    if not isinstance(process_id, string_types):
+        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'")
+    try:
+        store = processstore_defaultfactory(request.registry)
+        process = store.fetch_by_id(process_id)
+        return {'process': process.json()}
+    except HTTPException:
+        raise  # re-throw already handled HTTPException
+    except ProcessNotFound:
+        raise HTTPNotFound("The process with id `{}` does not exist.".format(str(process_id)))
+    except Exception as ex:
+        raise HTTPInternalServerError(ex.message)
+
+
+@sd.process_service.delete(tags=[sd.processes_tag, sd.deploy_tag], renderer='json',
+                           schema=sd.ProcessEndpoint(), response_schemas=sd.delete_process_responses)
+def delete_local_process(request):
+    """
+    Unregister a local process.
+    """
+    process_id = request.matchdict.get('process_id')
+    if not isinstance(process_id, string_types):
+        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'")
+    try:
+        store = processstore_defaultfactory(request.registry)
+        if store.delete_process(process_id):
+            return HTTPOk(json={'deploymentDone': 'success', 'identifier': process_id})
+        raise HTTPInternalServerError("Delete process failed.")
+    except HTTPException:
+        raise  # re-throw already handled HTTPException
+    except ProcessNotFound:
+        description = "The process with process_id `{}` does not exist.".format(str(process_id))
+        raise HTTPNotFound(description)
+    except Exception as ex:
+        raise HTTPInternalServerError(ex.message)
+
+
+@sd.process_jobs_service.post(tags=[sd.processes_tag, sd.execute_tag, sd.jobs_tag], renderer='json',
+                              schema=sd.ProcessJobEndpoint(), response_schemas=sd.launch_job_responses)
+def submit_local_job(request):
+    pass

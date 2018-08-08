@@ -7,13 +7,15 @@ from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import wps_restapi_base_url, wps_restapi_base_path
 
 
-@sd.api_versions_service.get(tags=[sd.api_tag], response_schemas=sd.get_api_versions_responses)
+@sd.api_versions_service.get(tags=[sd.api_tag], renderer='json',
+                             schema=sd.VersionsEndpoint(), response_schemas=sd.get_api_versions_responses)
 def api_versions(request):
     """Twitcher versions information."""
     return {'versions': {'wps_restapi': wps_restapi_version, 'twitcher': twitcher_version}}
 
 
-@sd.api_swagger_json_service.get(tags=[sd.api_tag], response_schemas=sd.get_api_swagger_json_responses)
+@sd.api_swagger_json_service.get(tags=[sd.api_tag], renderer='json',
+                                 schema=sd.SwaggerJsonEndpoint(), response_schemas=sd.get_api_swagger_json_responses)
 def api_swagger_json(request, use_docstring_summary=True):
     """Twitcher REST API schema generation in JSON format."""
 
