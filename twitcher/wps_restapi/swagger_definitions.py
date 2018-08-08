@@ -704,6 +704,15 @@ class PostProcessRequest(MappingSchema):
     body = PostProcessRequestBody()
 
 
+class PostProcessJobBody(MappingSchema):
+    inputs = JobInputList()
+
+
+class PostProcessJobRequest(MappingSchema):
+    header = JsonHeader()
+    body = PostProcessJobBody()
+
+
 #################################
 # Provider Processes schemas
 #################################

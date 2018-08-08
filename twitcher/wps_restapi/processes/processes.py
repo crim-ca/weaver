@@ -449,6 +449,12 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
     return job['status']
 
 
+@sd.process_jobs_service.post(tags=[sd.processes_tag, sd.execute_tag, sd.jobs_tag],
+                              schema=sd.PostProcessJobRequest(),
+                              response_schemas=sd.launch_job_responses)
+def submit_local_job(request):
+
+
 #############
 # EXAMPLE
 #############
