@@ -50,4 +50,4 @@ RUN cd /opt/birdhouse/src/twitcher && \
     /opt/conda/envs/twitcher/bin/pip install .
 
 RUN mkdir -p /opt/birdhouse/var/tmp/nginx/client
-CMD ["make", "update-config", "start"]
+CMD ["make", "online-update-config", "start"]
