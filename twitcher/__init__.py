@@ -15,27 +15,6 @@ import logging
 logger = logging.getLogger('TWITCHER')
 
 
-@notfound_view_config()
-def notfound_view(request):
-    exception_view(request)
-
-
-@exception_view_config()
-def exception_view(request):
-    content = {u'route_name': str(request.upath_info), u'request_url': str(request.url),
-               u'detail': request.detail or u'undefined', u'method': request.method}
-    if hasattr(request, 'exception'):
-        if hasattr(request.exception, 'json'):
-            if type(request.exception.json) is dict:
-                content.update(request.exception.json)
-        elif isinstance(request.exception, HTTPServerError) and hasattr(request.exception, 'message'):
-            content.update({u'exception': str(request.exception.message)})
-    elif hasattr(request, 'matchdict'):
-        if request.matchdict is not None and request.matchdict != '':
-            content.update(request.matchdict)
-    return content
-
-
 def parse_extra_options(option_str):
     """
     Parses the extra options parameter.

@@ -4,7 +4,7 @@ from pyramid_celery import celery_app as app
 from datetime import datetime
 from twitcher.db import MongoDB
 from twitcher.wps_restapi import swagger_definitions as sd
-from twitcher.wps_restapi.utils import wps_restapi_base_url, httpError
+from twitcher.wps_restapi.utils import wps_restapi_base_url
 from twitcher.wps_restapi.status import *
 from twitcher.wps_restapi.sort import *
 from pymongo import ASCENDING, DESCENDING
@@ -169,15 +169,15 @@ def get_job(request):
     job = collection.find_one({'task_id': job_id})
 
     if not job:
-        raise httpError(HTTPNotFound, description='Could not find specified `job_id`.')
+        raise HTTPNotFound('Could not find specified `job_id`.')
 
     provider_id = request.matchdict.get('provider_id', job['provider_id'])
     process_id = request.matchdict.get('process_id', job['process_id'])
 
     if job['provider_id'] != provider_id:
-        raise httpError(HTTPNotFound, description='Could not find specified `provider_id`.')
+        raise HTTPNotFound('Could not find specified `provider_id`.')
     if job['process_id'] != process_id:
-        raise httpError(HTTPNotFound, description='Could not find specified `process_id`.')
+        raise HTTPNotFound('Could not find specified `process_id`.')
     return job
 
 
@@ -259,7 +259,7 @@ def get_job_result(request):
             output['url'] = '{job_url}/outputs/{result_id}'.format(job_url=job_url(request, job),
                                                                    result_id=output['identifier'])
             return HTTPOk(json=output)
-    raise httpError(HTTPNotFound, description='Could not find job output.')
+    raise HTTPNotFound('Could not find job output.')
 
 
 @sd.exceptions_full_service.get(tags=[sd.jobs_tag], schema=sd.FullExceptionsEndpoint(),
