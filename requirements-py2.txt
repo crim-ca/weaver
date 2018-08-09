@@ -1,13 +1,1 @@
-pyramid>=1.7.3
-pyramid_rpc
-pyramid_celery
-pyramid_mako
-webob
-requests
-requests_oauthlib
-pymongo
-argcomplete
-celery
-owslib
-lxml
-six
+flufl.enum
