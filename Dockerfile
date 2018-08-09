@@ -2,7 +2,7 @@
 FROM birdhouse/bird-base:latest
 MAINTAINER https://github.com/bird-house/twitcher
 
-LABEL Description="twitcher application" Vendor="Birdhouse" Version="0.3.9"
+LABEL Description="twitcher application" Vendor="Birdhouse"
 
 # Configure hostname and ports for services
 ENV HTTP_PORT 8080
@@ -70,4 +70,4 @@ RUN cd /opt/birdhouse/src/twitcher && \
     /opt/conda/envs/twitcher/bin/pip install .
 
 RUN mkdir -p /opt/birdhouse/var/tmp/nginx/client
-CMD ["make", "update-config", "start"]
+CMD ["make", "online-update-config", "start"]

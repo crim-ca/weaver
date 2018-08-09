@@ -4,9 +4,16 @@ Changes
 Current
 =======
 
+Fixes:
+
+* Fixes error 400 Contradictory scheme headers
+* Fixes query_string to preserve pywps DataInputs parameters values
+
 New Features:
 
 * Feature #36: make protected path configurable.
+* Feature #24: WPS REST API
+* Cornice-Swagger REST API schemas and routes documentation
 
 0.3.7 (2018-03-13)
 ==================

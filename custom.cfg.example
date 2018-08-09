@@ -20,7 +20,7 @@ adapter = package.path.to.AdapterImpl
 extra-options = adapter_impl.opt1=value1,adapter_impl.opt2=value2
 
 [adapter_impl]
-recipe = git-recipe
-repository = git://github.com/provider/adapter_impl.git
-ref = master
-as_egg = True
+recipe = collective.recipe.cmd
+on_update=true
+on_install=true
+cmds=pip install git+https://github.com/provider/adapter_impl.git#egg=adapter_impl

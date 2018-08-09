@@ -32,14 +32,6 @@ from twitcher.store.mongodb import MongodbServiceStore
 from twitcher.store.memory import MemoryServiceStore
 
 
-def my_import(name):
-    components = name.split('.')
-    mod = __import__(components[0])
-    for comp in components[1:]:
-        mod = getattr(mod, comp)
-    return mod
-
-
 def servicestore_defaultfactory(registry, database=None):
     """
     Creates a service store with the interface of :class:`twitcher.store.ServiceStore`.

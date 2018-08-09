@@ -1,4 +1,5 @@
 import os
+import sys
 from setuptools import setup, find_packages
 
 version = __import__('twitcher').__version__
@@ -7,7 +8,11 @@ here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README.rst')).read()
 CHANGES = open(os.path.join(here, 'CHANGES.rst')).read()
 
+PY2 = sys.version_info[0] == 2
+
 reqs = [line.strip() for line in open('requirements.txt')]
+if PY2:
+    reqs += [line.strip() for line in open('requirements-py2.txt')]
 
 setup(name='pyramid_twitcher',
       version=version,

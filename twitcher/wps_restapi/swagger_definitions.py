@@ -505,9 +505,14 @@ class FrontpageSchema(MappingSchema):
     configuration = SchemaNode(String(), default='default')
 
 
+class AdapterDescriptionSchema(MappingSchema):
+    name = SchemaNode(String(), description="Name of the loaded Twitcher adapter.", missing=drop, example='default')
+    version = SchemaNode(String(), description="Version of the loaded Twitcher adapter.", missing=drop, example='0.3.0')
+
+
 class VersionsSpecSchema(MappingSchema):
-    wps_restapi = SchemaNode(String(), description="WPS REST API version string.", example='0.1.0')
     twitcher = SchemaNode(String(), description="Twitcher version string.", example='0.3.0')
+    adapter = AdapterDescriptionSchema()
 
 
 class VersionsSchema(MappingSchema):

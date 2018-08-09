@@ -199,6 +199,11 @@ update-config:
 	@echo "Update application config with buildout (offline mode) and environment variables..."
 	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);bin/buildout buildout:anaconda-home=$(ANACONDA_HOME) settings:hostname=$(HOSTNAME) settings:output-port=$(OUTPUT_PORT) settings:http-port=$(HTTP_PORT) -o -c custom.cfg"
 
+.PHONY: online-update-config
+online-update-config:
+	@echo "Update application config with buildout (online but non-newest mode) and environment variables..."
+	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);bin/buildout buildout:anaconda-home=$(ANACONDA_HOME) settings:hostname=$(HOSTNAME) settings:output-port=$(OUTPUT_PORT) settings:http-port=$(HTTP_PORT) -N -c custom.cfg"
+
 .PHONY: clean
 clean: srcclean envclean
 	@echo "Cleaning buildout files ..."
