@@ -499,7 +499,6 @@ class AdapterDescriptionSchema(MappingSchema):
 
 
 class VersionsSpecSchema(MappingSchema):
-    wps_restapi = SchemaNode(String(), description="WPS REST API version string.", example='0.1.0')
     twitcher = SchemaNode(String(), description="Twitcher version string.", example='0.3.0')
     adapter = AdapterDescriptionSchema()
 

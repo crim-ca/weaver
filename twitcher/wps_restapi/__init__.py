@@ -1,7 +1,3 @@
-# version of the Twitcher REST API
-# (not to be confused with Twitcher version)
-__version__ = '0.1.1'
-
 from pyramid.settings import asbool
 from twitcher.wps_restapi.frontpage import frontpage
 from twitcher.wps_restapi import swagger_definitions as sd

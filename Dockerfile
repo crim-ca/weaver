@@ -2,7 +2,7 @@
 FROM birdhouse/bird-base:latest
 MAINTAINER https://github.com/bird-house/twitcher
 
-LABEL Description="twitcher application" Vendor="Birdhouse" Version="0.3.7"
+LABEL Description="twitcher application" Vendor="Birdhouse"
 
 # Configure hostname and ports for services
 ENV HTTP_PORT 8080
