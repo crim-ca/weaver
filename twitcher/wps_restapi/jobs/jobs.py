@@ -1,31 +1,25 @@
-from pyramid.view import view_config
-import twitcher.wps_restapi.swagger_definitions as sd
-import uuid
-import requests
+from pyramid.httpexceptions import *
+from pyramid.security import authenticated_userid
+from pyramid_celery import celery_app as app
 from datetime import datetime
 from twitcher.db import MongoDB
-from twitcher.wps_restapi.utils import restapi_base_url, get_cookie_headers
-from twitcher.adapter import servicestore_factory
-from pyramid.security import authenticated_userid
+from twitcher.wps_restapi import swagger_definitions as sd
+from twitcher.wps_restapi.utils import wps_restapi_base_url
+from twitcher.wps_restapi.status import *
+from twitcher.wps_restapi.sort import *
 from pymongo import ASCENDING, DESCENDING
-from pyramid_celery import celery_app as app
 from owslib.wps import WPSExecution
-from owslib.wps import WebProcessingService
-
 from lxml import etree
-
 from celery.utils.log import get_task_logger
-logger = get_task_logger(__name__)
+import uuid
+import requests
 
-status_categories = {
-    'Running': ['ProcessAccepted', 'ProcessPaused', 'ProcessStarted'],
-    'Finished': ['ProcessSucceeded', 'ProcessFailed']
-}
+logger = get_task_logger(__name__)
 
 
 def job_url(request, job):
     return '{base_url}/providers/{provider_id}/processes/{process_id}/jobs/{job_id}'.format(
-        base_url=restapi_base_url(request),
+        base_url=wps_restapi_base_url(request.registry.settings),
         provider_id=job['provider_id'],
         process_id=job['process_id'],
         job_id=job['task_id'])
@@ -59,7 +53,7 @@ def add_job(db, task_id, process_id, provider_id, title=None, abstract=None,
         created=datetime.now(),
         tags=tags,
         caption=caption,
-        status="ProcessAccepted",
+        status=STATUS_ACCEPTED,
         response=None,
         request=None,
     )
@@ -88,13 +82,14 @@ def check_status(url=None, response=None, sleep_secs=2, verify=False):
     execution.checkStatus(response=xml, sleepSecs=sleep_secs)
     if execution.response is None:
         raise Exception("check_status failed!")
-    # TODO: workaround for owslib type change of reponse
+    # TODO: workaround for owslib type change of response
     if not isinstance(execution.response, etree._Element):
         execution.response = etree.fromstring(execution.response)
     return execution
 
 
-def filter_jobs(collection, request, page=0, limit=10, process=None, provider=None, tag=None, access=None, status=None, sort='created'):
+def filter_jobs(collection, request, page=0, limit=10, process=None,
+                provider=None, tag=None, access=None, status=None, sort=SORT_CREATED):
     search_filter = {}
     if access == 'public':
         search_filter['tags'] = 'public'
@@ -120,27 +115,46 @@ def filter_jobs(collection, request, page=0, limit=10, process=None, provider=No
         search_filter['provider_id'] = provider
 
     count = collection.find(search_filter).count()
-    if sort == 'user':
+    if sort == SORT_USER:
         sort = 'userid'
-    elif sort == 'process':
-        sort = 'title'
+    elif sort == SORT_PROCESS:
+        sort = SORT_TITLE
 
-    sort_order = DESCENDING if sort == 'finished' or sort == 'created' else ASCENDING
+    sort_order = DESCENDING if sort == SORT_FINISHED or sort == SORT_CREATED else ASCENDING
     sort_criteria = [(sort, sort_order)]
     items = list(collection.find(search_filter).skip(page * limit).limit(limit).sort(sort_criteria))
     return items, count
 
 
-@sd.jobs_service.get(tags=['jobs'], response_schemas=sd.get_all_jobs_responses)
+def get_job(request):
+    """
+    :returns: Job information if found.
+    :raises: HTTPNotFound with JSON body details on missing/non-matching job, process, provider IDs.
+    """
+    job_id = request.matchdict.get('job_id')
+
+    db = MongoDB.get(request.registry)
+    collection = db.jobs
+    job = collection.find_one({'task_id': job_id})
+
+    if not job:
+        raise HTTPNotFound('Could not find specified `job_id`.')
+
+    provider_id = request.matchdict.get('provider_id', job['provider_id'])
+    process_id = request.matchdict.get('process_id', job['process_id'])
+
+    if job['provider_id'] != provider_id:
+        raise HTTPNotFound('Could not find specified `provider_id`.')
+    if job['process_id'] != process_id:
+        raise HTTPNotFound('Could not find specified `process_id`.')
+    return job
+
+
+@sd.jobs_service.get(tags=[sd.jobs_tag], renderer='json',
+                     schema=sd.GetJobsRequest(), response_schemas=sd.get_all_jobs_responses)
 def get_jobs(request):
     """
-    Retrieve the list of jobs which can be filtered/sorted using :
-    ?page=[number]
-    &limit=[number]
-    &status=[ProcessAccepted, ProcessStarted, ProcessPaused, ProcessFailed, ProcessSucceeded] 
-    &process=[process_name]
-    &provider=[provider_id]
-    &sort=[created, status, process, provider]
+    Retrieve the list of jobs which can be filtered/sorted using queries.
     """
 
     page = int(request.params.get('page', '0'))
@@ -150,13 +164,13 @@ def get_jobs(request):
     tag = request.params.get('tag', None)
     access = request.params.get('access', None)
     status = request.params.get('status', None)
-    sort = request.params.get('sort', 'created')
+    sort = request.params.get('sort', SORT_CREATED)
 
     db = MongoDB.get(request.registry)
     collection = db.jobs
 
     items, count = filter_jobs(collection, request, page, limit, process, provider, tag, access, status, sort)
-    return {
+    return HTTPOk(json={
         'count': count,
         'page': page,
         'limit': limit,
@@ -165,45 +179,26 @@ def get_jobs(request):
             'status': item['status'],
             'location': job_url(request, item)
         } for item in items]
-    }
+    })
 
 
-def get_job(request):
-    # TODO Validate param somehow
-    job_id = request.matchdict.get('job_id')
-
-    db = MongoDB.get(request.registry)
-    collection = db.jobs
-    job = collection.find_one({'task_id': job_id})
-
-    if job:
-        provider_id = request.matchdict.get('provider_id', job['provider_id'])
-        process_id = request.matchdict.get('process_id', job['process_id'])
-
-        if job['provider_id'] != provider_id or job['process_id'] != process_id:
-            return None
-    return job
-
-
-@sd.job_full_service.get(tags=['jobs'], schema=sd.FullJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
-@sd.job_short_service.get(tags=['jobs'], schema=sd.ShortJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
+@sd.job_full_service.get(tags=[sd.jobs_tag, sd.status_tag], renderer='json',
+                         schema=sd.FullJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
+@sd.job_short_service.get(tags=[sd.jobs_tag, sd.status_tag], renderer='json',
+                          schema=sd.ShortJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
 def get_job_status(request):
     """
-    Retrieve the status of a job
+    Retrieve the status of a job.
     """
     job = get_job(request)
-    if not job:
-        # TODO Return a not found job response
-        return 404
-
     response = {
         "jobID": job['task_id'],
         "status": job['status']
     }
-    if job['status'] in status_categories['Running']:
+    if job['status'] in status_categories[STATUS_RUNNING]:
         response["Progress"] = job['progress'] if 'progress' in job else 0
     else:
-        if job['status'] == 'ProcessSucceeded':
+        if job['status'] == STATUS_SUCCEEDED:
             resource = 'outputs'
         else:
             resource = 'exceptions'
@@ -211,88 +206,82 @@ def get_job_status(request):
         response[resource] = '{job_url}/{resource}'.format(job_url=job_url(request, job), resource=resource.lower())
         response['log'] = '{job_url}/log'.format(job_url=job_url(request, job))
 
-    return response
+    return HTTPOk(json=response)
 
 
-@sd.job_full_service.delete(tags=['jobs'], schema=sd.FullJobEndpoint())
-@sd.job_short_service.delete(tags=['jobs'], schema=sd.ShortJobEndpoint())
+@sd.job_full_service.delete(tags=[sd.jobs_tag, sd.dismiss_tag], renderer='json',
+                            schema=sd.FullJobEndpoint(), response_schemas=sd.delete_job_responses)
+@sd.job_short_service.delete(tags=[sd.jobs_tag, sd.dismiss_tag], renderer='json',
+                             schema=sd.ShortJobEndpoint(), response_schemas=sd.delete_job_responses)
 def cancel_job(request):
     """
     Dismiss a job.
     Note: Will only stop tracking this particular process (WPS 1.0 doesn't allow to stop a process)
     """
     job = get_job(request)
-    if not job:
-        # TODO Return a not found job response
-        return 404
-
     app.control.revoke(job['task_id'], terminate=True)
 
-    return 200
+    return HTTPOk(json={
+        'status': job.get('status', 'unknown'),
+        'message': 'Job dismissed.',
+        'progress': job.get('progress', 0),
+    })
 
 
-@sd.outputs_full_service.get(tags=['jobs'], schema=sd.FullJobEndpoint(), response_schemas=sd.get_single_job_outputs_responses)
-@sd.outputs_short_service.get(tags=['jobs'], schema=sd.ShortJobEndpoint(), response_schemas=sd.get_single_job_outputs_responses)
-def get_outputs(request):
+@sd.results_full_service.get(tags=[sd.jobs_tag, sd.result_tag], renderer='json',
+                             schema=sd.FullJobEndpoint(), response_schemas=sd.get_single_job_results_responses)
+@sd.results_short_service.get(tags=[sd.jobs_tag, sd.result_tag], renderer='json',
+                              schema=sd.ShortJobEndpoint(), response_schemas=sd.get_single_job_results_responses)
+def get_job_results(request):
     """
-    Retrieve the result(s) of a job
+    Retrieve the result(s) of a job.
     """
     job = get_job(request)
-    if not job:
-        # TODO Return a not found job response
-        return 404
-
     outputs = job['outputs']
     for output in outputs:
-        output['url'] = '{job_url}/outputs/{output_id}'.format(job_url=job_url(request, job),
-                                                               output_id=output['identifier'])
-    return outputs
+        output['url'] = '{job_url}/outputs/{result_id}'.format(job_url=job_url(request, job),
+                                                               result_id=output['identifier'])
+    return HTTPOk(json=outputs)
 
 
-@sd.output_full_service.get(tags=['jobs'], schema=sd.FullOutputEndpoint(), response_schemas=sd.get_single_output_responses)
-@sd.output_short_service.get(tags=['jobs'], schema=sd.ShortOutputEndpoint(), response_schemas=sd.get_single_output_responses)
-def get_output(request):
+@sd.result_full_service.get(tags=[sd.jobs_tag, sd.result_tag], renderer='json',
+                            schema=sd.FullOutputEndpoint(), response_schemas=sd.get_single_result_responses)
+@sd.result_short_service.get(tags=[sd.jobs_tag, sd.result_tag], renderer='json',
+                             schema=sd.ShortOutputEndpoint(), response_schemas=sd.get_single_result_responses)
+def get_job_result(request):
     """
-    Retrieve the result of a particular job output
+    Retrieve the result of a particular job output.
     """
     job = get_job(request)
-    if not job:
-        # TODO Return a not found job response
-        return 404
-
-    output_id = request.matchdict.get('output_id')
+    result_id = request.matchdict.get('result_id')
 
     for output in job['outputs']:
-        if output['identifier'] == output_id:
-            output['url'] = '{job_url}/outputs/{output_id}'.format(job_url=job_url(request, job),
-                                                                   output_id=output['identifier'])
-            return output
-    return 404
+        if output['identifier'] == result_id:
+            output['url'] = '{job_url}/outputs/{result_id}'.format(job_url=job_url(request, job),
+                                                                   result_id=output['identifier'])
+            return HTTPOk(json=output)
+    raise HTTPNotFound('Could not find job output.')
 
 
-@sd.exceptions_full_service.get(tags=['jobs'], schema=sd.FullExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
-@sd.exceptions_short_service.get(tags=['jobs'], schema=sd.ShortExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
-def get_exceptions(request):
+@sd.exceptions_full_service.get(tags=[sd.jobs_tag], renderer='json',
+                                schema=sd.FullExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
+@sd.exceptions_short_service.get(tags=[sd.jobs_tag], renderer='json',
+                                 schema=sd.ShortExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
+def get_job_exceptions(request):
     """
-    Retrieve the result(s) of a job"
-    """
-    job = get_job(request)
-    if not job:
-        # TODO Return a not found job response
-        return 404
-
-    return job['exceptions']
-
-
-@sd.logs_full_service.get(tags=['jobs'], schema=sd.FullLogsEndpoint(), response_schemas=sd.get_logs_responses)
-@sd.logs_short_service.get(tags=['jobs'], schema=sd.ShortLogsEndpoint(), response_schemas=sd.get_logs_responses)
-def get_log(request):
-    """
-    Retrieve the result(s) of a job"
+    Retrieve the result(s) of a job.
     """
     job = get_job(request)
-    if not job:
-        # TODO Return a not found job response
-        return 404
+    return HTTPOk(json=job['exceptions'])
 
-    return job['log']
+
+@sd.logs_full_service.get(tags=[sd.jobs_tag], renderer='json',
+                          schema=sd.FullLogsEndpoint(), response_schemas=sd.get_logs_responses)
+@sd.logs_short_service.get(tags=[sd.jobs_tag], renderer='json',
+                           schema=sd.ShortLogsEndpoint(), response_schemas=sd.get_logs_responses)
+def get_job_log(request):
+    """
+    Retrieve the result(s) of a job.
+    """
+    job = get_job(request)
+    return HTTPOk(json=job['log'])

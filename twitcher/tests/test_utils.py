@@ -1,6 +1,7 @@
 import pytest
 from lxml import etree
 from twitcher import utils
+from twitcher._compat import urlparse
 from twitcher.exceptions import ServiceNotFound
 from twitcher.tests.common import WPS_CAPS_EMU_XML, WMS_CAPS_NCWMS2_111_XML, WMS_CAPS_NCWMS2_130_XML
 
@@ -80,3 +81,40 @@ def test_replace_caps_url_wms_130():
     xml = utils.replace_caps_url(xml, "https://localhost/ows/proxy/wms")
     # assert 'http://localhost:8080/ncWMS2/wms' not in xml
     assert 'https://localhost/ows/proxy/wms' in xml
+
+
+class MockRequest(object):
+    def __init__(self, url):
+        self.url = url
+
+    @property
+    def query_string(self):
+        return urlparse(self.url).query
+
+
+def test_parse_request_query_basic():
+    req = MockRequest('http://localhost:5000/ows/wps?service=wps&request=GetCapabilities&version=1.0.0')
+    queries = utils.parse_request_query(req)
+    assert 'service' in queries
+    assert isinstance(queries['service'], dict)
+    assert queries['service'][0] == 'wps'
+    assert 'request' in queries
+    assert isinstance(queries['request'], dict)
+    assert queries['request'][0] == 'getcapabilities'
+    assert 'version' in queries
+    assert isinstance(queries['version'], dict)
+    assert queries['version'][0] == '1.0.0'
+
+
+def test_parse_request_query_many_datainputs_multicase():
+    req = MockRequest('http://localhost:5000/ows/wps?service=wps&request=GetCapabilities&version=1.0.0&' +
+                      'datainputs=data1=value1&dataInputs=data2=value2&DataInputs=data3=value3')
+    queries = utils.parse_request_query(req)
+    assert 'datainputs' in queries
+    assert isinstance(queries['datainputs'], dict)
+    assert 'data1' in queries['datainputs']
+    assert 'data2' in queries['datainputs']
+    assert 'data3' in queries['datainputs']
+    assert 'value1' in queries['datainputs'].values()
+    assert 'value2' in queries['datainputs'].values()
+    assert 'value3' in queries['datainputs'].values()

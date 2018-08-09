@@ -1,4 +1,4 @@
-__version__ = '0.3.7'
+__version__ = '0.3.9'
 
 import os
 import sys
@@ -7,9 +7,12 @@ TWITCHER_ROOT_DIR = os.path.abspath(os.path.dirname(TWITCHER_MODULE_DIR))
 sys.path.insert(0, TWITCHER_ROOT_DIR)
 sys.path.insert(0, TWITCHER_MODULE_DIR)
 
-
 from twitcher import adapter
 from pyramid.exceptions import ConfigurationError
+from pyramid.httpexceptions import HTTPServerError
+from pyramid.view import exception_view_config, notfound_view_config, forbidden_view_config
+import logging
+logger = logging.getLogger('TWITCHER')
 
 
 def parse_extra_options(option_str):
@@ -52,9 +55,11 @@ def main(global_config, **settings):
     config.include('pyramid_celery')
     config.configure_celery(global_config['__file__'])
 
+    # mako used by swagger-ui
+    config.include('pyramid_mako')
+
     # include twitcher components
     config.include('twitcher.config')
-    config.include('twitcher.frontpage')
     config.include('twitcher.rpcinterface')
     config.include('twitcher.owsproxy')
     config.include('twitcher.wps')

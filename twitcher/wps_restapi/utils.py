@@ -1,16 +1,24 @@
 from owslib.wps import ComplexData
+from twitcher.utils import parse_request_query
+from distutils.version import LooseVersion
+from pyramid.httpexceptions import HTTPError, HTTPInternalServerError
 
 
-def restapi_base_url(request):
-    twitcher_url = request.registry.settings.get('twitcher.url').rstrip('/')
-    restapi_path = request.registry.settings.get('twitcher.restapi_path', '').rstrip('/')
+def wps_restapi_base_path(settings):
+    restapi_path = settings.get('twitcher.wps_restapi_path', '').rstrip('/').strip()
+    return restapi_path
+
+
+def wps_restapi_base_url(settings):
+    twitcher_url = settings.get('twitcher.url').rstrip('/').strip()
+    restapi_path = wps_restapi_base_path(settings)
     return twitcher_url + restapi_path
 
 
 def get_cookie_headers(headers):
     try:
         return dict(Cookie=headers['Cookie'])
-    except KeyError: #No cookie
+    except KeyError:  # No cookie
         return {}
 
 

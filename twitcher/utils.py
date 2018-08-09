@@ -4,11 +4,17 @@ import pytz
 from lxml import etree
 
 from twitcher.exceptions import ServiceNotFound
-
-from twitcher._compat import urlparse
+from twitcher._compat import urlparse, parse_qs
 
 import logging
 logger = logging.getLogger(__name__)
+
+
+def get_any_id(info):  # type: (dict) -> Any
+    """Retrieves a dictionary 'id'-like key using multiple common variations [id, identifier, _id].
+    :param info: dictionary that potentially contains an 'id'-like key.
+    :returns: value of the matched 'id'-like key."""
+    return info.get('id', info.get('identifier', info.get('_id')))
 
 
 def is_valid_url(url):
@@ -123,3 +129,21 @@ def replace_caps_url(xml, url, prev_url=None):
         xml = xml.decode('utf-8', 'ignore')
         xml = xml.replace(prev_url, url)
     return xml
+
+
+def parse_request_query(request):
+    """
+    :param request:
+    :return: dict of dict where k=v are accessible by d[k][0] == v and q=k=v are accessible by d[q][k] == v, lowercase
+    """
+    queries = parse_qs(request.query_string.lower())
+    queries_dict = dict()
+    for q in queries:
+        queries_dict[q] = dict()
+        for i, kv in enumerate(queries[q]):
+            kvs = kv.split('=')
+            if len(kvs) > 1:
+                queries_dict[q][kvs[0]] = kvs[1]
+            else:
+                queries_dict[q][i] = kvs[0]
+    return queries_dict
