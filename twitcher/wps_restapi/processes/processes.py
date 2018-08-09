@@ -240,75 +240,14 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
     return job['status']
 
 
-#############
-# EXAMPLE
-#############
-#   Parameters: ?sync-execute=true|false (false being the default value)
-#
-#   Content-Type: application/json;
-#
-# {
-#     "inputs": [
-#         {
-#             "id": "sosInputNiederschlag",
-#             "value": "http://www.fluggs.de/sos2/sos?service%3DSOS&version%3D2.0.0&request%3DGetObservation&responseformat%3Dhttp://www.opengis.net/om/2.0&observedProperty%3DNiederschlagshoehe&procedure%3DTagessumme&featureOfInterest%3DBever-Talsperre&&namespaces%3Dxmlns%28sams%2Chttp%3A%2F%2Fwww.opengis.net%2FsamplingSpatial%2F2.0%29%2Cxmlns%28om%2Chttp%3A%2F%2Fwww.opengis.net%2Fom%2F2.0%29&temporalFilter%3Dom%3AphenomenonTime%2C2016-01-01T10:00:00.00Z%2F2016-04-30T23:59:00.000Z",
-# 			"type" : "text/plain"
-#         },
-#         {
-#             "id": "sosInputFuellstand",
-#             "value": "http://www.fluggs.de/sos2/sos?service%3DSOS&version%3D2.0.0&request%3DGetObservation&responseformat%3Dhttp://www.opengis.net/om/2.0&observedProperty%3DSpeicherfuellstand&procedure%3DEinzelwert&featureOfInterest%3DBever-Talsperre_Windenhaus&namespaces%3Dxmlns%28sams%2Chttp%3A%2F%2Fwww.opengis.net%2FsamplingSpatial%2F2.0%29%2Cxmlns%28om%2Chttp%3A%2F%2Fwww.opengis.net%2Fom%2F2.0%29&temporalFilter%3Dom%3AphenomenonTime%2C2016-01-01T10:00:00.00Z%2F2016-04-30T23:59:00.000Z",
-# 			"type" : "text/plain"
-#         },
-#         {
-#             "id": "sosInputTarget",
-#             "value": "http://fluggs.wupperverband.de/sos2-tamis/service?service%3DSOS&version%3D2.0.0&request%3DGetObservation&responseformat%3Dhttp://www.opengis.net/om/2.0&observedProperty%3DWasserstand_im_Damm&procedure%3DHandeingabe&featureOfInterest%3DBever-Talsperre_MQA7_Piezometer_Kalkzone&namespaces%3Dxmlns%28sams%2Chttp%3A%2F%2Fwww.opengis.net%2FsamplingSpati-al%2F2.0%29%2Cxmlns%28om%2Chttp%3A%2F%2Fwww.opengis.net%2Fom%2F2.0%29&temporalFilter%3Dom%3AphenomenonTime%2C2016-01-01T00:01:00.00Z%2F2016-04-30T23:59:00.000Z",
-# 			"type" : "text/plain"
-#         }
-#     ],
-#     "outputs": [
-#       {
-#               "id": "targetObs_plot",
-#               "type": "image/png"
-#        },
-#       {
-#               "id": "model_diagnostics",
-#               "type": "image/png"
-#        },
-#       {
-#               "id": "relations",
-#               "type": "image/png"
-#        },
-#       {
-#               "id": "model_prediction",
-#               "type": "text/csv"
-#        },
-#       {
-#               "id": "metaJson",
-#               "type": "application/json"
-#        },
-#       {
-#               "id": "dataJson",
-#               "type": "application/json"
-#        }
-#     ]
-# }
-@sd.provider_process_jobs_service.post(tags=[sd.provider_processes_tag, sd.providers_tag, sd.execute_tag, sd.jobs_tag],
-                                       renderer='json', schema=sd.PostProviderProcessJobRequest(),
-                                       response_schemas=sd.launch_job_responses)
-def submit_provider_job(request):
-    """
-    Execute a process.
-    """
-
-    store = servicestore_factory(request.registry)
+def submit_job_handler(request, service_url):
 
     # TODO Validate param somehow
-    provider_id = request.matchdict.get('provider_id')
+    provider_id = request.matchdict.get('provider_id')  # None OK if local
     process_id = request.matchdict.get('process_id')
     async_execute = not request.params.getone('sync-execute') if 'sync-execute' in request.params else True
 
-    service = store.fetch_by_name(provider_id, request=request)
-    wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
+    wps = WebProcessingService(url=service_url, headers=get_cookie_headers(request.headers))
     process = wps.describeprocess(process_id)
 
     # prepare inputs
@@ -343,9 +282,11 @@ def submit_provider_job(request):
         # Convert EnvironHeaders to a simple dict (should cherrypick the required headers)
         headers={k: v for k, v in request.headers.items()})
 
-    location = '{base_url}/providers/{provider_id}/processes/{process_id}/jobs/{job_id}'.format(
+    # local/provider process location
+    location_base = '/providers/{provider_id}'.format(provider_id=provider_id) if provider_id else ''
+    location = '{base_url}{location_base}/processes/{process_id}/jobs/{job_id}'.format(
         base_url=wps_restapi_base_url(request.registry.settings),
-        provider_id=provider_id,
+        location_base=location_base,
         process_id=process.identifier,
         job_id=result.id)
     body_data = {
@@ -358,12 +299,25 @@ def submit_provider_job(request):
     return HTTPCreated(json=body_data, headers=headers)
 
 
+@sd.provider_process_jobs_service.post(tags=[sd.provider_processes_tag, sd.providers_tag, sd.execute_tag, sd.jobs_tag],
+                                       renderer='json', schema=sd.PostProviderProcessJobRequest(),
+                                       response_schemas=sd.launch_job_responses)
+def submit_provider_job(request):
+    """
+    Execute a provider process.
+    """
+    store = servicestore_factory(request.registry)
+    provider_id = request.matchdict.get('provider_id')
+    service = store.fetch_by_name(provider_id, request=request)
+    return submit_job_handler(request, service.url)
+
+
 @sd.provider_processes_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.getcapabilities_tag],
                                    renderer='json', schema=sd.ProviderEndpoint(),
                                    response_schemas=sd.get_provider_processes_responses)
 def get_provider_processes(request):
     """
-    Retrieve available processes (GetCapabilities).
+    Retrieve available provider processes (GetCapabilities).
     """
     store = servicestore_factory(request.registry)
 
@@ -571,4 +525,20 @@ def delete_local_process(request):
 @sd.process_jobs_service.post(tags=[sd.processes_tag, sd.execute_tag, sd.jobs_tag], renderer='json',
                               schema=sd.ProcessJobEndpoint(), response_schemas=sd.launch_job_responses)
 def submit_local_job(request):
-    pass
+    """
+    Execute a local process.
+    """
+    process_id = request.matchdict.get('process_id')
+    if not isinstance(process_id, string_types):
+        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'")
+    try:
+        store = processstore_defaultfactory(request.registry)
+        process = store.fetch_by_id(process_id)
+        response = submit_job_handler(request, process.executeEndpoint)
+        return response
+    except HTTPException:
+        raise  # re-throw already handled HTTPException
+    except ProcessNotFound:
+        raise HTTPNotFound("The process with id `{}` does not exist.".format(str(process_id)))
+    except Exception as ex:
+        raise HTTPInternalServerError(ex.message)
