@@ -1,5 +1,6 @@
 from . import __version__ as wps_restapi_version
 from twitcher import __version__ as twitcher_version
+from twitcher.adapter import adapter_factory
 from cornice_swagger import CorniceSwagger
 from cornice.service import get_services
 from pyramid.renderers import render_to_response
@@ -11,7 +12,8 @@ from twitcher.wps_restapi.utils import wps_restapi_base_url, wps_restapi_base_pa
                              schema=sd.VersionsEndpoint(), response_schemas=sd.get_api_versions_responses)
 def api_versions(request):
     """Twitcher versions information."""
-    return {'versions': {'wps_restapi': wps_restapi_version, 'twitcher': twitcher_version}}
+    adapter_info = adapter_factory(request.registry.settings).describe_adapter()
+    return {'versions': {'wps_restapi': wps_restapi_version, 'twitcher': twitcher_version, 'adapter': adapter_info}}
 
 
 @sd.api_swagger_json_service.get(tags=[sd.api_tag], renderer='json',
