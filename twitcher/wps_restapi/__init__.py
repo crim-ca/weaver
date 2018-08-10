@@ -27,6 +27,6 @@ def includeme(config):
                         request_method='GET', renderer='json')
         config.add_view(api_swagger_ui, route_name=sd.api_swagger_ui_service.name,
                         request_method='GET', renderer='templates/swagger_ui.mako')
-        config.registry.celerydb = database_factory(config.registry)
         config.add_view(api_versions, route_name=sd.api_versions_service.name,
                         request_method='GET', renderer='json')
+        config.registry.celerydb = database_factory(config.registry)
