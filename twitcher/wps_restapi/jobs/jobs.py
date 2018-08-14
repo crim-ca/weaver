@@ -157,6 +157,8 @@ def get_filtered_jobs(request, **filter_kwargs):
 
 @sd.jobs_service.get(tags=[sd.jobs_tag], renderer='json',
                      schema=sd.GetJobsRequest(), response_schemas=sd.get_all_jobs_responses)
+@sd.process_jobs_service.get(tags=[sd.processes_tag, sd.jobs_tag], renderer='json',
+                             schema=sd.GetProcessJobsEndpoint(), response_schemas=sd.get_process_jobs_responses)
 def get_jobs(request):
     """
     Retrieve the list of jobs which can be filtered/sorted using queries.
@@ -290,18 +292,3 @@ def get_job_log(request):
     """
     job = get_job(request)
     return HTTPOk(json=job['log'])
-
-
-@sd.process_jobs_service.get(tags=[sd.processes_tag, sd.jobs_tag], renderer='json',
-                             schema=sd.GetProcessJobsEndpoint(), response_schemas=sd.get_process_jobs_responses)
-def list_process_jobs(request):
-    """
-    Retrieve the list of jobs for a local process.
-    """
-    process_id = request.matchdict.get('process_id', None)
-    if not process_id:
-        raise HTTPNotFound("The process with id `{}` does not exist.".format(str(process_id)))
-    items, count = get_filtered_jobs(request, process=process_id)
-    return HTTPOk(json={
-        'jobs': [item['task_id'] for item in items]
-    })

@@ -441,10 +441,6 @@ class JobListSchema(SequenceSchema):
     job = SchemaNode(String(), description='Job ID.')
 
 
-class JobListSchema(SequenceSchema):
-    jobs = SchemaNode(String(), description="Job ID.")
-
-
 class ProcessJobStatusSchema(MappingSchema):
     status = SchemaNode(String(), example=STATUS_ACCEPTED)
     message = SchemaNode(String(), example='Job accepted.')

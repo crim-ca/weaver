@@ -20,7 +20,7 @@ def includeme(config):
     config.add_route(**sd.service_api_route_info(sd.process_jobs_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_job_service, settings))
 
-    config.add_view(j.list_process_jobs, route_name=sd.process_jobs_service.name,
+    config.add_view(j.get_jobs, route_name=sd.process_jobs_service.name,
                     request_method='GET', renderer='json')
     config.add_view(j.get_jobs, route_name=sd.jobs_service.name,
                     request_method='GET', renderer='json')
