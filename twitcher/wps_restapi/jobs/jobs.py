@@ -155,10 +155,12 @@ def get_filtered_jobs(request, **filter_kwargs):
     return filter_jobs(db.jobs, request, **filter_kwargs)
 
 
-@sd.jobs_service.get(tags=[sd.jobs_tag], renderer='json',
-                     schema=sd.GetJobsRequest(), response_schemas=sd.get_all_jobs_responses)
 @sd.process_jobs_service.get(tags=[sd.processes_tag, sd.jobs_tag], renderer='json',
                              schema=sd.GetProcessJobsEndpoint(), response_schemas=sd.get_process_jobs_responses)
+@sd.jobs_full_service.get(tags=[sd.jobs_tag, sd.providers_tag], renderer='json',
+                          schema=sd.GetJobsRequest(), response_schemas=sd.get_all_jobs_responses)
+@sd.jobs_short_service.get(tags=[sd.jobs_tag], renderer='json',
+                           schema=sd.GetJobsRequest(), response_schemas=sd.get_all_jobs_responses)
 def get_jobs(request):
     """
     Retrieve the list of jobs which can be filtered/sorted using queries.
@@ -185,7 +187,7 @@ def get_jobs(request):
     })
 
 
-@sd.job_full_service.get(tags=[sd.jobs_tag, sd.status_tag], renderer='json',
+@sd.job_full_service.get(tags=[sd.jobs_tag, sd.status_tag, sd.providers_tag], renderer='json',
                          schema=sd.FullJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
 @sd.job_short_service.get(tags=[sd.jobs_tag, sd.status_tag], renderer='json',
                           schema=sd.ShortJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
@@ -214,7 +216,7 @@ def get_job_status(request):
     return HTTPOk(json=response)
 
 
-@sd.job_full_service.delete(tags=[sd.jobs_tag, sd.dismiss_tag], renderer='json',
+@sd.job_full_service.delete(tags=[sd.jobs_tag, sd.dismiss_tag, sd.providers_tag], renderer='json',
                             schema=sd.FullJobEndpoint(), response_schemas=sd.delete_job_responses)
 @sd.job_short_service.delete(tags=[sd.jobs_tag, sd.dismiss_tag], renderer='json',
                              schema=sd.ShortJobEndpoint(), response_schemas=sd.delete_job_responses)
@@ -235,7 +237,7 @@ def cancel_job(request):
     })
 
 
-@sd.results_full_service.get(tags=[sd.jobs_tag, sd.result_tag], renderer='json',
+@sd.results_full_service.get(tags=[sd.jobs_tag, sd.result_tag, sd.providers_tag], renderer='json',
                              schema=sd.FullJobEndpoint(), response_schemas=sd.get_single_job_results_responses)
 @sd.results_short_service.get(tags=[sd.jobs_tag, sd.result_tag], renderer='json',
                               schema=sd.ShortJobEndpoint(), response_schemas=sd.get_single_job_results_responses)
@@ -251,7 +253,7 @@ def get_job_results(request):
     return HTTPOk(json=outputs)
 
 
-@sd.result_full_service.get(tags=[sd.jobs_tag, sd.result_tag], renderer='json',
+@sd.result_full_service.get(tags=[sd.jobs_tag, sd.result_tag, sd.providers_tag], renderer='json',
                             schema=sd.FullOutputEndpoint(), response_schemas=sd.get_single_result_responses)
 @sd.result_short_service.get(tags=[sd.jobs_tag, sd.result_tag], renderer='json',
                              schema=sd.ShortOutputEndpoint(), response_schemas=sd.get_single_result_responses)
@@ -270,7 +272,7 @@ def get_job_result(request):
     raise HTTPNotFound('Could not find job output.')
 
 
-@sd.exceptions_full_service.get(tags=[sd.jobs_tag], renderer='json',
+@sd.exceptions_full_service.get(tags=[sd.jobs_tag, sd.providers_tag], renderer='json',
                                 schema=sd.FullExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
 @sd.exceptions_short_service.get(tags=[sd.jobs_tag], renderer='json',
                                  schema=sd.ShortExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
@@ -282,7 +284,7 @@ def get_job_exceptions(request):
     return HTTPOk(json=job['exceptions'])
 
 
-@sd.logs_full_service.get(tags=[sd.jobs_tag], renderer='json',
+@sd.logs_full_service.get(tags=[sd.jobs_tag, sd.providers_tag], renderer='json',
                           schema=sd.FullLogsEndpoint(), response_schemas=sd.get_logs_responses)
 @sd.logs_short_service.get(tags=[sd.jobs_tag], renderer='json',
                            schema=sd.ShortLogsEndpoint(), response_schemas=sd.get_logs_responses)

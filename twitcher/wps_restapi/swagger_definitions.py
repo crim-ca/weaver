@@ -34,7 +34,7 @@ provider_uri = '/providers/{provider_id}'
 provider_processes_uri = '/providers/{provider_id}/processes'
 provider_process_uri = '/providers/{provider_id}/processes/{process_id}'
 
-jobs_uri = '/jobs'
+jobs_short_uri = '/jobs'
 jobs_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs'
 job_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}'
 job_exceptions_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/exceptions'
@@ -89,7 +89,8 @@ provider_processes_service = Service(name='provider_processes', path=provider_pr
 provider_process_service = Service(name='provider_process', path=provider_process_uri)
 provider_process_jobs_service = Service(name='provider_process_jobs', path=jobs_full_uri)
 
-jobs_service = Service(name='jobs', path=jobs_uri)
+jobs_short_service = Service(name='jobs_short', path=jobs_short_uri)
+jobs_full_service = Service(name='jobs_full', path=jobs_full_uri)
 job_full_service = Service(name='job_full', path=job_full_uri)
 job_short_service = Service(name='job_short', path=job_short_uri)
 
