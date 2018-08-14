@@ -17,16 +17,24 @@ def includeme(config):
     config.add_route(**sd.service_api_route_info(sd.exceptions_full_service, settings))
     config.add_route(**sd.service_api_route_info(sd.logs_short_service, settings))
     config.add_route(**sd.service_api_route_info(sd.logs_full_service, settings))
+    config.add_route(**sd.service_api_route_info(sd.process_jobs_service, settings))
+    config.add_route(**sd.service_api_route_info(sd.process_job_service, settings))
 
+    config.add_view(j.list_process_jobs, route_name=sd.process_jobs_service.name,
+                    request_method='GET', renderer='json')
     config.add_view(j.get_jobs, route_name=sd.jobs_service.name,
                     request_method='GET', renderer='json')
     config.add_view(j.get_job_status, route_name=sd.job_short_service.name,
                     request_method='GET', renderer='json')
     config.add_view(j.get_job_status, route_name=sd.job_full_service.name,
                     request_method='GET', renderer='json')
+    config.add_view(j.get_job_status, route_name=sd.process_job_service.name,
+                    request_method='GET', renderer='json')
     config.add_view(j.cancel_job, route_name=sd.job_short_service.name,
                     request_method='DELETE', renderer='json')
     config.add_view(j.cancel_job, route_name=sd.job_full_service.name,
+                    request_method='DELETE', renderer='json')
+    config.add_view(j.cancel_job, route_name=sd.process_job_service.name,
                     request_method='DELETE', renderer='json')
     config.add_view(j.get_job_results, route_name=sd.results_short_service.name,
                     request_method='GET', renderer='json')

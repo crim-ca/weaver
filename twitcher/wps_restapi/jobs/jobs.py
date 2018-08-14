@@ -150,6 +150,11 @@ def get_job(request):
     return job
 
 
+def get_filtered_jobs(request, **filter_kwargs):
+    db = database_factory(request.registry)
+    return filter_jobs(db.jobs, request, **filter_kwargs)
+
+
 @sd.jobs_service.get(tags=[sd.jobs_tag], renderer='json',
                      schema=sd.GetJobsRequest(), response_schemas=sd.get_all_jobs_responses)
 def get_jobs(request):
@@ -159,17 +164,17 @@ def get_jobs(request):
 
     page = int(request.params.get('page', '0'))
     limit = int(request.params.get('limit', '10'))
-    process = request.params.get('process', None)
-    provider = request.params.get('provider', None)
-    tag = request.params.get('tag', None)
-    access = request.params.get('access', None)
-    status = request.params.get('status', None)
-    sort = request.params.get('sort', SORT_CREATED)
-
-    db = database_factory(request.registry)
-    collection = db.jobs
-
-    items, count = filter_jobs(collection, request, page, limit, process, provider, tag, access, status, sort)
+    filters = {
+        'page': page,
+        'limit': limit,
+        'process': request.params.get('process', None),
+        'provider': request.params.get('provider', None),
+        'tag': request.params.get('tag', None),
+        'access': request.params.get('access', None),
+        'status': request.params.get('status', None),
+        'sort': request.params.get('sort', SORT_CREATED),
+    }
+    items, count = get_filtered_jobs(request, **filters)
     return HTTPOk(json={
         'count': count,
         'page': page,
@@ -186,6 +191,8 @@ def get_jobs(request):
                          schema=sd.FullJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
 @sd.job_short_service.get(tags=[sd.jobs_tag, sd.status_tag], renderer='json',
                           schema=sd.ShortJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
+@sd.process_job_service.get(tags=[sd.processes_tag, sd.jobs_tag, sd.status_tag], renderer='json',
+                            schema=sd.GetProcessJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
 def get_job_status(request):
     """
     Retrieve the status of a job.
@@ -213,6 +220,8 @@ def get_job_status(request):
                             schema=sd.FullJobEndpoint(), response_schemas=sd.delete_job_responses)
 @sd.job_short_service.delete(tags=[sd.jobs_tag, sd.dismiss_tag], renderer='json',
                              schema=sd.ShortJobEndpoint(), response_schemas=sd.delete_job_responses)
+@sd.process_job_service.delete(tags=[sd.processes_tag, sd.jobs_tag, sd.dismiss_tag], renderer='json',
+                               schema=sd.DeleteProcessJobEndpoint(), response_schemas=sd.delete_process_job_responses)
 def cancel_job(request):
     """
     Dismiss a job.
@@ -285,3 +294,18 @@ def get_job_log(request):
     """
     job = get_job(request)
     return HTTPOk(json=job['log'])
+
+
+@sd.process_jobs_service.get(tags=[sd.processes_tag, sd.jobs_tag], renderer='json',
+                             schema=sd.GetProcessJobsEndpoint(), response_schemas=sd.get_process_jobs_responses)
+def list_process_jobs(request):
+    """
+    Retrieve the list of jobs for a local process.
+    """
+    process_id = request.matchdict.get('process_id', None)
+    if not process_id:
+        raise HTTPNotFound("The process with id `{}` does not exist.".format(str(process_id)))
+    items, count = get_filtered_jobs(request, process=process_id)
+    return HTTPOk(json={
+        'jobs': [item['task_id'] for item in items]
+    })

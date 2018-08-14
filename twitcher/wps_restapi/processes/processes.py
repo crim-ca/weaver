@@ -12,17 +12,12 @@ from twitcher.store import servicestore_defaultfactory, processstore_defaultfact
 from twitcher.utils import get_any_id
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
-from twitcher.wps_restapi.jobs.jobs import add_job, check_status
+from twitcher.wps_restapi.jobs.jobs import add_job, check_status, get_filtered_jobs, get_job
 from twitcher.wps_restapi.status import STATUS_ACCEPTED, STATUS_FAILED
 from twitcher.exceptions import ProcessNotFound, ProcessInstanceError, ProcessRegistrationError
 from twitcher.db import database_factory
 from twitcher.datatype import Process as ProcessDB
-from twitcher.processes.wps_workflow import (
-    load_workflow_content,
-    load_workflow_file,
-    get_workflow_inputs_outputs,
-    merge_workflow_inputs_outputs,
-)
+from twitcher.processes import wps_workflow as wf
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference
 from lxml import etree
 from six import string_types
@@ -301,7 +296,7 @@ def submit_job_handler(request, service_url):
 
 @sd.provider_process_jobs_service.post(tags=[sd.provider_processes_tag, sd.providers_tag, sd.execute_tag, sd.jobs_tag],
                                        renderer='json', schema=sd.PostProviderProcessJobRequest(),
-                                       response_schemas=sd.launch_job_responses)
+                                       response_schemas=sd.post_process_jobs_responses)
 def submit_provider_job(request):
     """
     Execute a provider process.
@@ -458,15 +453,15 @@ def add_local_process(request):
 
         # retrieve package information and validate them at the same time by loading/updating definitions to store in DB
         if reference:
-            package = load_workflow_file(reference)
+            package = wf.load_workflow_file(reference)
         try:
-            workflow = load_workflow_content(package)
-            workflow_inputs, workflow_outputs = get_workflow_inputs_outputs(workflow)
+            workflow = wf.load_workflow_content(package)
+            workflow_inputs, workflow_outputs = wf.get_workflow_inputs_outputs(workflow)
             process_inputs = process_info.get('inputs', list())
             process_outputs = process_info.get('outputs', list())
-            workflow_inputs, workflow_outputs = merge_workflow_inputs_outputs(process_inputs, workflow_inputs,
-                                                                              process_outputs, workflow_outputs,
-                                                                              as_json=True)
+            workflow_inputs, workflow_outputs = wf.merge_workflow_inputs_outputs(process_inputs, workflow_inputs,
+                                                                                 process_outputs, workflow_outputs,
+                                                                                 as_json=True)
             process_info.update({'package': package, 'inputs': workflow_inputs, 'outputs': workflow_outputs})
         except Exception as ex:
             raise HTTPBadRequest("Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex)))
@@ -523,7 +518,7 @@ def delete_local_process(request):
 
 
 @sd.process_jobs_service.post(tags=[sd.processes_tag, sd.execute_tag, sd.jobs_tag], renderer='json',
-                              schema=sd.ProcessJobEndpoint(), response_schemas=sd.launch_job_responses)
+                              schema=sd.PostProcessJobsEndpoint(), response_schemas=sd.post_process_jobs_responses)
 def submit_local_job(request):
     """
     Execute a local process.

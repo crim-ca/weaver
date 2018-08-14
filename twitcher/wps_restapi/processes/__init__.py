@@ -21,6 +21,8 @@ def includeme(config):
                     request_method='GET', renderer='json')
     config.add_view(p.delete_local_process, route_name=sd.process_service.name,
                     request_method='DELETE', renderer='json')
+    config.add_view(p.submit_local_job, route_name=sd.process_jobs_service.name,
+                    request_method='POST', renderer='json')
     config.add_view(p.get_provider_processes, route_name=sd.provider_processes_service.name,
                     request_method='GET', renderer='json')
     config.add_view(p.describe_provider_process, route_name=sd.provider_process_service.name,

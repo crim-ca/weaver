@@ -5,7 +5,7 @@ so that one can update the swagger without touching any other files after the in
 
 from twitcher.config import TWITCHER_CONFIGURATION_EMS
 from twitcher.wps_restapi.utils import wps_restapi_base_path
-from twitcher.wps_restapi.status import status_values
+from twitcher.wps_restapi.status import status_values, STATUS_ACCEPTED
 from twitcher.wps_restapi.sort import sort_values, SORT_CREATED
 from cornice import Service
 from colander import *
@@ -26,6 +26,7 @@ api_versions_uri = '/versions'
 processes_uri = '/processes'
 process_uri = '/processes/{process_id}'
 process_jobs_uri = '/processes/{process_id}/jobs'
+process_job_uri = '/processes/{process_id}/jobs/{job_id}'
 
 providers_uri = '/providers'
 provider_uri = '/providers/{provider_id}'
@@ -79,6 +80,7 @@ api_versions_service = Service(name='api_versions', path=api_versions_uri)
 processes_service = Service(name='processes', path=processes_uri)
 process_service = Service(name='process', path=process_uri)
 process_jobs_service = Service(name='process_jobs', path=process_jobs_uri)
+process_job_service = Service(name='process_job', path=process_job_uri)
 
 providers_service = Service(name='providers', path=providers_uri)
 provider_service = Service(name='provider', path=provider_uri)
@@ -425,6 +427,16 @@ class AllJobsSchema(SequenceSchema):
     job = JobStatusSchema()
 
 
+class JobListSchema(SequenceSchema):
+    jobs = SchemaNode(String(), description="Job ID.")
+
+
+class ProcessJobStatusSchema(MappingSchema):
+    status = SchemaNode(String(), example=STATUS_ACCEPTED)
+    message = SchemaNode(String(), example='Job accepted.')
+    progress = SchemaNode(Integer(), example=0)
+
+
 class GetAllJobsSchema(MappingSchema):
     count = SchemaNode(Integer())
     jobs_service = AllJobsSchema()
@@ -433,7 +445,7 @@ class GetAllJobsSchema(MappingSchema):
 
 
 class DismissedJobSchema(MappingSchema):
-    status = SchemaNode(String(), example='accepted')
+    status = SchemaNode(String(), example=STATUS_ACCEPTED)
     message = SchemaNode(String(), example='Job dismissed.')
     progress = SchemaNode(Integer(), example=0)
 
@@ -529,7 +541,7 @@ class ProcessOfferingBody(MappingSchema):
 
 
 class PackageBody(MappingSchema):
-    workflow = SchemaNode(String(), description="Workflow file content.")  # TODO: maybe binary?
+    workflow = SchemaNode(String(), description="Workflow file content as JSON.")
 
 
 class ExecutionUnitBody(MappingSchema):
@@ -558,12 +570,24 @@ class ProcessesEndpoint(MappingSchema):
 
 
 class PostProcessJobBody(MappingSchema):
-    inputs = JobInputList()
+    inputs = JobInputList(missing=drop)
 
 
-class ProcessJobEndpoint(MappingSchema):
+class PostProcessJobsEndpoint(MappingSchema):
     header = AcceptHeader()
     body = PostProcessJobBody()
+
+
+class GetProcessJobsEndpoint(MappingSchema):
+    header = AcceptHeader()
+
+
+class GetProcessJobEndpoint(MappingSchema):
+    header = AcceptHeader()
+
+
+class DeleteProcessJobEndpoint(MappingSchema):
+    header = AcceptHeader()
 
 
 #################################
@@ -696,6 +720,20 @@ class CreatedLaunchJobResponse(MappingSchema):
     body = JobStatusSchema()
 
 
+class OkGetAllProcessJobsResponse(MappingSchema):
+    body = JobListSchema()
+
+
+class OkGetProcessJobResponse(MappingSchema):
+    header = JsonHeader()
+    body = ProcessJobStatusSchema()
+
+
+class OkDeleteProcessJobResponse(MappingSchema):
+    header = JsonHeader()
+    body = DismissedJobSchema()
+
+
 class OkGetAllJobsResponse(MappingSchema):
     body = GetAllJobsSchema()
 
@@ -766,8 +804,11 @@ get_provider_process_description_responses = {
 post_provider_responses = {
     '201': CreatedPostProvider(description='success')
 }
-launch_job_responses = {
+post_process_jobs_responses = {
     '201': CreatedLaunchJobResponse(description='success')
+}
+get_process_jobs_responses = {
+    '200': OkGetAllProcessJobsResponse(description='success')
 }
 get_all_jobs_responses = {
     '200': OkGetAllJobsResponse(description='success')
