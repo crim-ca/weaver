@@ -192,12 +192,12 @@ def get_job_status(request):
     """
     job = get_job(request)
     response = {
-        "jobID": job['task_id'],
-        "status": job['status']
+        "status": job['status'],
+        "message": "Job {}.".format(job['status']),
+        "progress": job.get('progress', 0)
     }
-    if job['status'] in status_categories[STATUS_RUNNING]:
-        response["Progress"] = job['progress'] if 'progress' in job else 0
-    else:
+
+    if job['status'] in status_categories[STATUS_FINISHED]:
         if job['status'] == STATUS_SUCCEEDED:
             resource = 'outputs'
         else:
