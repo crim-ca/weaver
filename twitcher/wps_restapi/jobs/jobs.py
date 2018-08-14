@@ -221,7 +221,7 @@ def get_job_status(request):
 @sd.job_short_service.delete(tags=[sd.jobs_tag, sd.dismiss_tag], renderer='json',
                              schema=sd.ShortJobEndpoint(), response_schemas=sd.delete_job_responses)
 @sd.process_job_service.delete(tags=[sd.processes_tag, sd.jobs_tag, sd.dismiss_tag], renderer='json',
-                               schema=sd.DeleteProcessJobEndpoint(), response_schemas=sd.delete_process_job_responses)
+                               schema=sd.DeleteProcessJobEndpoint(), response_schemas=sd.delete_job_responses)
 def cancel_job(request):
     """
     Dismiss a job.
