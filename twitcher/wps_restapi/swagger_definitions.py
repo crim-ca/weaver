@@ -630,10 +630,12 @@ class PostProviderProcessJobRequest(MappingSchema):
 
 
 class OkGetFrontpageSchema(MappingSchema):
+    header = JsonHeader()
     body = FrontpageSchema()
 
 
 class OkGetSwaggerJSONSchema(MappingSchema):
+    header = JsonHeader()
     body = MappingSchema(default={}, description="")
 
 
@@ -647,18 +649,22 @@ class OkGetVersionsSchema(MappingSchema):
 
 
 class OkGetProvidersSchema(MappingSchema):
+    header = JsonHeader()
     body = ProvidersSchema()
 
 
 class OkGetProviderCapabilitiesSchema(MappingSchema):
+    header = JsonHeader()
     body = ProviderCapabilitiesSchema()
 
 
 class NoContentDeleteProviderSchema(MappingSchema):
+    header = JsonHeader()
     body = MappingSchema(default={})
 
 
 class OkGetProviderProcessesSchema(MappingSchema):
+    header = JsonHeader()
     body = ProcessesSchema()
 
 
@@ -679,18 +685,22 @@ class OkGetProcessesBodySchema(MappingSchema):
 
 
 class OkGetProcessesSchema(MappingSchema):
+    header = JsonHeader()
     body = OkGetProcessesBodySchema()
 
 
 class OkPostProcessesSchema(MappingSchema):
+    header = JsonHeader()
     body = ProcessDetailSchema()
 
 
 class OkGetProcessBodySchema(MappingSchema):
+    header = JsonHeader()
     process = ProcessDetailSchema()
 
 
 class OkGetProcessSchema(MappingSchema):
+    header = JsonHeader()
     body = OkGetProcessBodySchema()
 
 
@@ -700,18 +710,21 @@ class OkDeleteProcessBodySchema(MappingSchema):
 
 
 class OkDeleteProcessSchema(MappingSchema):
+    header = JsonHeader()
     body = OkDeleteProcessBodySchema()
 
 
 class OkGetProviderProcessDescription(MappingSchema):
+    header = JsonHeader()
     body = ProcessDescriptionSchema()
 
 
 class CreatedPostProvider(MappingSchema):
+    header = JsonHeader()
     body = ProviderSummarySchema()
 
 
-class CreatedLaunchJobHeader(MappingSchema):
+class CreatedLaunchJobHeader(JsonHeader):
     Location = SchemaNode(String(), description='Location URL of the created job execution status.')
 
 
@@ -735,30 +748,37 @@ class OkDeleteProcessJobResponse(MappingSchema):
 
 
 class OkGetAllJobsResponse(MappingSchema):
+    header = JsonHeader()
     body = GetAllJobsSchema()
 
 
 class OkDismissJobResponse(MappingSchema):
+    header = JsonHeader()
     body = DismissedJobSchema()
 
 
 class OkGetSingleJobStatusResponse(MappingSchema):
+    header = JsonHeader()
     body = JobStatusSchema()
 
 
 class OkGetSingleJobOutputsResponse(MappingSchema):
+    header = JsonHeader()
     body = JobOutputsSchema()
 
 
 class OkGetSingleOutputResponse(MappingSchema):
+    header = JsonHeader()
     body = JobOutputSchema()
 
 
 class OkGetExceptionsResponse(MappingSchema):
+    header = JsonHeader()
     body = ExceptionsOutputSchema()
 
 
 class OkGetLogsResponse(MappingSchema):
+    header = JsonHeader()
     body = LogsOutputSchema()
 
 
