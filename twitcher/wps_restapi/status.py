@@ -1,10 +1,10 @@
-STATUS_ACCEPTED = 'Accepted'
-STATUS_STARTED = 'Started'
-STATUS_PAUSED = 'Paused'
-STATUS_SUCCEEDED = 'Succeeded'
-STATUS_FAILED = 'Failed'
-STATUS_RUNNING = 'Running'
-STATUS_FINISHED = 'Finished'
+STATUS_ACCEPTED = 'accepted'
+STATUS_STARTED = 'started'
+STATUS_PAUSED = 'paused'
+STATUS_SUCCEEDED = 'succeeded'
+STATUS_FAILED = 'failed'
+STATUS_RUNNING = 'running'
+STATUS_FINISHED = 'finished'
 
 status_values = frozenset([
     STATUS_ACCEPTED,

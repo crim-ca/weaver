@@ -398,8 +398,17 @@ class ProcessOutputDescriptionSchema(MappingSchema):
     title = SchemaNode(String())
 
 
-JobStatusEnum = SchemaNode(String(), missing=drop, default=None, validator=OneOf(status_values))
-JobSortEnum = SchemaNode(String(), missing=drop, default=SORT_CREATED, validator=OneOf(sort_values))
+JobStatusEnum = SchemaNode(
+    String(),
+    default=None,
+    validator=OneOf(status_values),
+    example=STATUS_ACCEPTED)
+JobSortEnum = SchemaNode(
+    String(),
+    missing=drop,
+    default=SORT_CREATED,
+    validator=OneOf(sort_values),
+    example=SORT_CREATED)
 
 
 class GetJobsQueries(MappingSchema):
@@ -416,15 +425,26 @@ class GetJobsRequest(MappingSchema):
     querystring = GetJobsQueries()
 
 
-class JobStatusSchema(MappingSchema):
-    Status = SchemaNode(String())
-    Location = SchemaNode(String())
-    Exceptions = SchemaNode(String())
-    JobID = SchemaNode(String())
+class SingleJobStatusSchema(MappingSchema):
+    status = JobStatusEnum
+    message = SchemaNode(String(), example='Job {}.'.format(STATUS_ACCEPTED))
+    progress = SchemaNode(Integer(), example=0)
+    exceptions = SchemaNode(String(), missing=drop,
+                            example='http://twitcher/providers/my-wps/processes/my-process/jobs/my-job/exceptions')
+    outputs = SchemaNode(String(), missing=drop,
+                         example='http://twitcher/providers/my-wps/processes/my-process/jobs/my-job/outputs')
+    logs = SchemaNode(String(), missing=drop,
+                      example='http://twitcher/providers/my-wps/processes/my-process/jobs/my-job/logs')
+
+
+class MultiJobStatusSchema(MappingSchema):
+    status = JobStatusEnum
+    location = SchemaNode(String())
+    jobID = SchemaNode(String())
 
 
 class AllJobsSchema(SequenceSchema):
-    job = JobStatusSchema()
+    job = MultiJobStatusSchema()
 
 
 class JobListSchema(SequenceSchema):
@@ -445,7 +465,7 @@ class GetAllJobsSchema(MappingSchema):
 
 
 class DismissedJobSchema(MappingSchema):
-    status = SchemaNode(String(), example=STATUS_ACCEPTED)
+    status = JobStatusEnum
     message = SchemaNode(String(), example='Job dismissed.')
     progress = SchemaNode(Integer(), example=0)
 
@@ -730,7 +750,7 @@ class CreatedLaunchJobHeader(JsonHeader):
 
 class CreatedLaunchJobResponse(MappingSchema):
     header = CreatedLaunchJobHeader()
-    body = JobStatusSchema()
+    body = SingleJobStatusSchema()
 
 
 class OkGetAllProcessJobsResponse(MappingSchema):
@@ -760,7 +780,7 @@ class OkDismissJobResponse(MappingSchema):
 
 class OkGetSingleJobStatusResponse(MappingSchema):
     header = JsonHeader()
-    body = JobStatusSchema()
+    body = SingleJobStatusSchema()
 
 
 class OkGetSingleJobOutputsResponse(MappingSchema):
