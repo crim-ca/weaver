@@ -437,14 +437,8 @@ class SingleJobStatusSchema(MappingSchema):
                       example='http://twitcher/providers/my-wps/processes/my-process/jobs/my-job/logs')
 
 
-class MultiJobStatusSchema(MappingSchema):
-    status = JobStatusEnum
-    location = SchemaNode(String())
-    jobID = SchemaNode(String())
-
-
-class AllJobsSchema(SequenceSchema):
-    job = MultiJobStatusSchema()
+class JobListSchema(SequenceSchema):
+    job = SchemaNode(String(), description='Job ID.')
 
 
 class JobListSchema(SequenceSchema):
@@ -459,7 +453,7 @@ class ProcessJobStatusSchema(MappingSchema):
 
 class GetAllJobsSchema(MappingSchema):
     count = SchemaNode(Integer())
-    jobs_service = AllJobsSchema()
+    jobs = JobListSchema()
     limit = SchemaNode(Integer())
     page = SchemaNode(Integer())
 
