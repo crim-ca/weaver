@@ -227,6 +227,65 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
     return job['status']
 
 
+def submit_job_handler(request, service_url):
+
+    # TODO Validate param somehow
+    provider_id = request.matchdict.get('provider_id')  # None OK if local
+    process_id = request.matchdict.get('process_id')
+    async_execute = not request.params.getone('sync-execute') if 'sync-execute' in request.params else True
+
+    wps = WebProcessingService(url=service_url, headers=get_cookie_headers(request.headers))
+    process = wps.describeprocess(process_id)
+
+    # prepare inputs
+    complex_inputs = []
+    for process_input in process.dataInputs:
+        if 'ComplexData' in process_input.dataType:
+            complex_inputs.append(process_input.identifier)
+
+    try:
+        # need to use ComplexDataInput structure for complex input
+        inputs = [(get_any_id(inpt), ComplexDataInput(inpt['value'])
+                  if get_any_id(inpt) in complex_inputs else inpt['value'])
+                  for inpt in request.json_body['inputs']]
+    except KeyError:
+        inputs = []
+
+    # prepare outputs
+    outputs = []
+    for output in process.processOutputs:
+        outputs.append(
+            (output.identifier, output.dataType == 'ComplexData'))
+
+    result = execute_process.delay(
+        userid=request.unauthenticated_userid,
+        url=wps.url,
+        service_name=process_id,
+        identifier=process.identifier,
+        provider=provider_id,
+        inputs=inputs,
+        outputs=outputs,
+        async=async_execute,
+        # Convert EnvironHeaders to a simple dict (should cherrypick the required headers)
+        headers={k: v for k, v in request.headers.items()})
+
+    # local/provider process location
+    location_base = '/providers/{provider_id}'.format(provider_id=provider_id) if provider_id else ''
+    location = '{base_url}{location_base}/processes/{process_id}/jobs/{job_id}'.format(
+        base_url=wps_restapi_base_url(request.registry.settings),
+        location_base=location_base,
+        process_id=process.identifier,
+        job_id=result.id)
+    body_data = {
+        'jobID': result.id,
+        'status': STATUS_ACCEPTED,
+        'location': location
+    }
+    headers = request.headers
+    headers.update({'Location': location})
+    return HTTPCreated(json=body_data, headers=headers)
+
+
 #############
 # EXAMPLE
 #############
@@ -281,68 +340,15 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
 # }
 @sd.provider_process_jobs_service.post(tags=[sd.provider_processes_tag, sd.providers_tag, sd.execute_tag, sd.jobs_tag],
                                        renderer='json', schema=sd.PostProviderProcessJobRequest(),
-                                       response_schemas=sd.launch_job_responses)
+                                       response_schemas=sd.post_provider_process_job_responses)
 def submit_provider_job(request):
     """
-    Execute a process.
+    Execute a provider process.
     """
-
     store = servicestore_factory(request.registry)
-
-    # TODO Validate param somehow
     provider_id = request.matchdict.get('provider_id')
-    process_id = request.matchdict.get('process_id')
-    async_execute = not request.params.getone('sync-execute') if 'sync-execute' in request.params else True
-
     service = store.fetch_by_name(provider_id, request=request)
-    wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
-    process = wps.describeprocess(process_id)
-
-    # prepare inputs
-    complex_inputs = []
-    for process_input in process.dataInputs:
-        if 'ComplexData' in process_input.dataType:
-            complex_inputs.append(process_input.identifier)
-
-    try:
-        # need to use ComplexDataInput structure for complex input
-        inputs = [(get_any_id(inpt), ComplexDataInput(inpt['value'])
-                  if get_any_id(inpt) in complex_inputs else inpt['value'])
-                  for inpt in request.json_body['inputs']]
-    except KeyError:
-        inputs = []
-
-    # prepare outputs
-    outputs = []
-    for output in process.processOutputs:
-        outputs.append(
-            (output.identifier, output.dataType == 'ComplexData'))
-
-    result = execute_process.delay(
-        userid=request.unauthenticated_userid,
-        url=wps.url,
-        service_name=process_id,
-        identifier=process.identifier,
-        provider=provider_id,
-        inputs=inputs,
-        outputs=outputs,
-        async=async_execute,
-        # Convert EnvironHeaders to a simple dict (should cherrypick the required headers)
-        headers={k: v for k, v in request.headers.items()})
-
-    location = '{base_url}/providers/{provider_id}/processes/{process_id}/jobs/{job_id}'.format(
-        base_url=wps_restapi_base_url(request.registry.settings),
-        provider_id=provider_id,
-        process_id=process.identifier,
-        job_id=result.id)
-    body_data = {
-        'jobID': result.id,
-        'status': STATUS_ACCEPTED,
-        'location': location
-    }
-    headers = request.headers
-    headers.update({'Location': location})
-    return HTTPCreated(json=body_data, headers=headers)
+    return submit_job_handler(request, service.url)
 
 
 @sd.provider_processes_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.getcapabilities_tag],
