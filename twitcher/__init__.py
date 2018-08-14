@@ -1,4 +1,4 @@
-__version__ = 'pavics-0.3.10'
+__version__ = 'ems-0.3.10'
 
 import os
 import sys
