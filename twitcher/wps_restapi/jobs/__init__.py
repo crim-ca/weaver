@@ -6,7 +6,8 @@ logger = logging.getLogger(__name__)
 
 def includeme(config):
     settings = config.registry.settings
-    config.add_route(**sd.service_api_route_info(sd.jobs_service, settings))
+    config.add_route(**sd.service_api_route_info(sd.jobs_short_service, settings))
+    config.add_route(**sd.service_api_route_info(sd.jobs_full_service, settings))
     config.add_route(**sd.service_api_route_info(sd.job_short_service, settings))
     config.add_route(**sd.service_api_route_info(sd.job_full_service, settings))
     config.add_route(**sd.service_api_route_info(sd.results_short_service, settings))
@@ -18,7 +19,9 @@ def includeme(config):
     config.add_route(**sd.service_api_route_info(sd.logs_short_service, settings))
     config.add_route(**sd.service_api_route_info(sd.logs_full_service, settings))
 
-    config.add_view(j.get_jobs, route_name=sd.jobs_service.name,
+    config.add_view(j.get_jobs, route_name=sd.jobs_short_service.name,
+                    request_method='GET', renderer='json')
+    config.add_view(j.get_jobs, route_name=sd.jobs_full_service.name,
                     request_method='GET', renderer='json')
     config.add_view(j.get_job_status, route_name=sd.job_short_service.name,
                     request_method='GET', renderer='json')
