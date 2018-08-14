@@ -174,11 +174,7 @@ def get_jobs(request):
         'count': count,
         'page': page,
         'limit': limit,
-        'jobs': [{
-            'jobID': item['task_id'],
-            'status': item['status'],
-            'location': job_url(request, item)
-        } for item in items]
+        'jobs': [item['task_id'] for item in items]
     })
 
 
