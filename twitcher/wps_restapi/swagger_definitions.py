@@ -734,6 +734,7 @@ class CreatedLaunchJobResponse(MappingSchema):
 
 
 class OkGetAllProcessJobsResponse(MappingSchema):
+    header = JsonHeader()
     body = JobListSchema()
 
 
