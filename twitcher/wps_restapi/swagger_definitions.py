@@ -851,6 +851,9 @@ post_provider_process_job_responses = {
 get_process_jobs_responses = {
     '200': OkGetAllProcessJobsResponse(description='success')
 }
+post_process_jobs_responses = {
+    '201': CreatedLaunchJobResponse(description='success')
+}
 get_all_jobs_responses = {
     '200': OkGetAllJobsResponse(description='success')
 }
