@@ -804,7 +804,7 @@ get_provider_process_description_responses = {
 post_provider_responses = {
     '201': CreatedPostProvider(description='success')
 }
-post_process_jobs_responses = {
+post_provider_process_job_responses = {
     '201': CreatedLaunchJobResponse(description='success')
 }
 get_process_jobs_responses = {
