@@ -173,12 +173,13 @@ def get_jobs(request):
     filters = {
         'page': page,
         'limit': limit,
-        'process': request.params.get('process', None),
-        'provider': request.params.get('provider', None),
         'tag': request.params.get('tag', None),
         'access': request.params.get('access', None),
         'status': request.params.get('status', None),
         'sort': request.params.get('sort', SORT_CREATED),
+        # provider and process can be specified by query (short route) or by path (full route)
+        'process': request.params.get('process', None) or request.matchdict.get('process_id', None),
+        'provider': request.params.get('provider', None) or request.matchdict.get('process_id', None),
     }
     items, count = get_filtered_jobs(request, **filters)
     return HTTPOk(json={
