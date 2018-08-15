@@ -27,6 +27,8 @@ processes_uri = '/processes'
 process_uri = '/processes/{process_id}'
 process_jobs_uri = '/processes/{process_id}/jobs'
 process_job_uri = '/processes/{process_id}/jobs/{job_id}'
+process_results_service = '/processes/{process_id}/jobs/{job_id}/result'
+process_result_service = '/processes/{process_id}/jobs/{job_id}/result/{result_id}'
 
 providers_uri = '/providers'
 provider_uri = '/providers/{provider_id}'
@@ -264,6 +266,12 @@ class FullJobEndpoint(MappingSchema):
 
 class ShortJobEndpoint(MappingSchema):
     header = AcceptHeader()
+    job_id = job_id
+
+
+class ProcessJobResultsEndpoint(MappingSchema):
+    header = AcceptHeader()
+    process_id = process_id
     job_id = job_id
 
 
@@ -854,7 +862,7 @@ get_single_job_status_responses = {
 delete_job_responses = {
     '200': OkDismissJobResponse(description='success')
 }
-get_single_job_results_responses = {
+get_job_results_responses = {
     '200': OkGetSingleJobOutputsResponse(description='success')
 }
 get_single_result_responses = {

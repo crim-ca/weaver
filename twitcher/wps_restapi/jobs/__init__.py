@@ -43,6 +43,8 @@ def includeme(config):
                     request_method='GET', renderer='json')
     config.add_view(j.get_job_results, route_name=sd.results_full_service.name,
                     request_method='GET', renderer='json')
+    config.add_view(j.get_job_results, route_name=sd.process_results_service.name,
+                    request_method='GET', renderer='json')
     config.add_view(j.get_job_result, route_name=sd.result_short_service.name,
                     request_method='GET', renderer='json')
     config.add_view(j.get_job_result, route_name=sd.result_full_service.name,

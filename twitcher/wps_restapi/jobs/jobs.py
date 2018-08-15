@@ -241,6 +241,8 @@ def cancel_job(request):
                              schema=sd.FullJobEndpoint(), response_schemas=sd.get_single_job_results_responses)
 @sd.results_short_service.get(tags=[sd.jobs_tag, sd.result_tag], renderer='json',
                               schema=sd.ShortJobEndpoint(), response_schemas=sd.get_single_job_results_responses)
+@sd.process_results_service.get(tags=[sd.jobs_tag, sd.result_tag, sd.processes_tag], renderer='json',
+                                schema=sd.ProcessJobResultsEndpoint(), response_schemas=sd.get_single_job_results_responses)
 def get_job_results(request):
     """
     Retrieve the result(s) of a job.
