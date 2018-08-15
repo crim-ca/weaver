@@ -69,8 +69,10 @@ describeprocess_tag = 'DescribeProcess'
 execute_tag = 'Execute'
 dismiss_tag = 'Dismiss'
 status_tag = 'Status'
-result_tag = 'Result'
 deploy_tag = 'Deploy'
+results_tag = 'Results'
+exceptions_tag = 'Exceptions'
+logs_tag = 'Logs'
 
 ###############################################################################
 # These "services" are wrappers that allow Cornice to generate the api's json
