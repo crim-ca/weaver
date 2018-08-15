@@ -43,7 +43,7 @@ def includeme(config):
                     request_method='GET', renderer='json')
     config.add_view(j.get_job_exceptions, route_name=sd.exceptions_full_service.name,
                     request_method='GET', renderer='json')
-    config.add_view(j.get_job_log, route_name=sd.logs_short_service.name,
+    config.add_view(j.get_job_logs, route_name=sd.logs_short_service.name,
                     request_method='GET', renderer='json')
-    config.add_view(j.get_job_log, route_name=sd.logs_full_service.name,
+    config.add_view(j.get_job_logs, route_name=sd.logs_full_service.name,
                     request_method='GET', renderer='json')

@@ -40,14 +40,14 @@ def add_job(db, task_id, process_id, provider_id, title=None, abstract=None,
         tags.append('sync')
     job = dict(
         identifier=uuid.uuid4().get_hex(),
-        task_id=task_id,             # TODO: why not using as identifier?
+        task_id=task_id,                    # TODO: why not using as identifier?
         userid=userid,
         is_workflow=is_workflow,
-        service_name=service_name,        # wps service name (service identifier)
-        service=service or service_name,  # wps service title (url, service_name or service title)
-        process_id=process_id,                  # process identifier
-        provider_id=provider_id,  # process identifier
-        title=title or process_id,              # process title (identifier or title)
+        service_name=service_name,          # wps service name (service identifier)
+        service=service or service_name,    # wps service title (url, service_name or service title)
+        process_id=process_id,              # process identifier
+        provider_id=provider_id,            # process identifier
+        title=title or process_id,          # process title (identifier or title)
         abstract=abstract or "No Summary",
         status_location=status_location,
         created=datetime.now(),
@@ -207,7 +207,7 @@ def get_job_status(request):
             resource = 'exceptions'
 
         response[resource] = '{job_url}/{resource}'.format(job_url=job_url(request, job), resource=resource.lower())
-        response['log'] = '{job_url}/log'.format(job_url=job_url(request, job))
+        response['logs'] = '{job_url}/logs'.format(job_url=job_url(request, job))
 
     return HTTPOk(json=response)
 
@@ -232,12 +232,12 @@ def cancel_job(request):
 
 
 @sd.results_full_service.get(tags=[sd.jobs_tag, sd.result_tag, sd.providers_tag], renderer='json',
-                             schema=sd.FullJobEndpoint(), response_schemas=sd.get_single_job_results_responses)
+                             schema=sd.FullResultsEndpoint(), response_schemas=sd.get_job_results_responses)
 @sd.results_short_service.get(tags=[sd.jobs_tag, sd.result_tag], renderer='json',
-                              schema=sd.ShortJobEndpoint(), response_schemas=sd.get_single_job_results_responses)
+                              schema=sd.ShortResultsEndpoint(), response_schemas=sd.get_job_results_responses)
 def get_job_results(request):
     """
-    Retrieve the result(s) of a job.
+    Retrieve the results of a job.
     """
     job = get_job(request)
     outputs = job['outputs']
@@ -248,12 +248,12 @@ def get_job_results(request):
 
 
 @sd.result_full_service.get(tags=[sd.jobs_tag, sd.result_tag, sd.providers_tag], renderer='json',
-                            schema=sd.FullOutputEndpoint(), response_schemas=sd.get_single_result_responses)
+                            schema=sd.FullResultEndpoint(), response_schemas=sd.get_single_result_responses)
 @sd.result_short_service.get(tags=[sd.jobs_tag, sd.result_tag], renderer='json',
-                             schema=sd.ShortOutputEndpoint(), response_schemas=sd.get_single_result_responses)
+                             schema=sd.ShortResultEndpoint(), response_schemas=sd.get_single_result_responses)
 def get_job_result(request):
     """
-    Retrieve the result of a particular job output.
+    Retrieve a specific result of a particular job output.
     """
     job = get_job(request)
     result_id = request.matchdict.get('result_id')
@@ -272,7 +272,7 @@ def get_job_result(request):
                                  schema=sd.ShortExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
 def get_job_exceptions(request):
     """
-    Retrieve the result(s) of a job.
+    Retrieve the exceptions of a job.
     """
     job = get_job(request)
     return HTTPOk(json=job['exceptions'])
@@ -282,9 +282,9 @@ def get_job_exceptions(request):
                           schema=sd.FullLogsEndpoint(), response_schemas=sd.get_logs_responses)
 @sd.logs_short_service.get(tags=[sd.jobs_tag], renderer='json',
                            schema=sd.ShortLogsEndpoint(), response_schemas=sd.get_logs_responses)
-def get_job_log(request):
+def get_job_logs(request):
     """
-    Retrieve the result(s) of a job.
+    Retrieve the logs of a job.
     """
     job = get_job(request)
-    return HTTPOk(json=job['log'])
+    return HTTPOk(json=job['logs'])

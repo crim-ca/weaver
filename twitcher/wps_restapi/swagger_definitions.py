@@ -33,16 +33,16 @@ job_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}'
 job_exceptions_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/exceptions'
 job_short_uri = '/jobs/{job_id}'
 
-results_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/result'
-results_short_uri = '/jobs/{job_id}/result'
-result_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/result/{result_id}'
-result_short_uri = '/jobs/{job_id}/result/{result_id}'
+results_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/results'
+results_short_uri = '/jobs/{job_id}/results'
+result_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/results/{result_id}'
+result_short_uri = '/jobs/{job_id}/results/{result_id}'
 
 exceptions_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/exceptions'
 exceptions_short_uri = '/jobs/{job_id}/exceptions'
 
-logs_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/log'
-logs_short_uri = '/jobs/{job_id}/log'
+logs_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/logs'
+logs_short_uri = '/jobs/{job_id}/logs'
 
 #########################################################
 # API tags
@@ -253,7 +253,21 @@ class ShortJobEndpoint(MappingSchema):
     job_id = job_id
 
 
-class FullOutputEndpoint(MappingSchema):
+class FullResultsEndpoint(MappingSchema):
+    header = AcceptHeader()
+    provider_id = provider_id
+    process_id = process_id
+    job_id = job_id
+
+
+class ShortResultsEndpoint(MappingSchema):
+    header = AcceptHeader()
+    provider_id = provider_id
+    process_id = process_id
+    job_id = job_id
+
+
+class FullResultEndpoint(MappingSchema):
     header = AcceptHeader()
     provider_id = provider_id
     process_id = process_id
@@ -261,7 +275,7 @@ class FullOutputEndpoint(MappingSchema):
     result_id = result_id
 
 
-class ShortOutputEndpoint(MappingSchema):
+class ShortResultEndpoint(MappingSchema):
     header = AcceptHeader()
     job_id = job_id
     result_id = result_id
@@ -787,7 +801,7 @@ get_single_job_status_responses = {
 delete_job_responses = {
     '200': OkDismissJobResponse(description='success')
 }
-get_single_job_results_responses = {
+get_job_results_responses = {
     '200': OkGetSingleJobOutputsResponse(description='success')
 }
 get_single_result_responses = {
