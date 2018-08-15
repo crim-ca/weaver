@@ -19,7 +19,7 @@ API_TITLE = 'Twitcher REST API'
 #########################################################################
 
 api_frontpage_uri = '/'
-api_swagger_ui_uri = '/doc'
+api_swagger_ui_uri = '/api'
 api_swagger_json_uri = '/json'
 api_versions_uri = '/versions'
 
