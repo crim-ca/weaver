@@ -73,7 +73,6 @@ provider_service = Service(name='provider', path=provider_uri)
 
 provider_processes_service = Service(name='provider_processes', path=provider_processes_uri)
 provider_process_service = Service(name='provider_process', path=provider_process_uri)
-provider_process_jobs_service = Service(name='provider_process_jobs', path=jobs_full_uri)
 
 jobs_short_service = Service(name='jobs_short', path=jobs_short_uri)
 jobs_full_service = Service(name='jobs_full', path=jobs_full_uri)

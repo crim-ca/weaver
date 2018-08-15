@@ -338,9 +338,9 @@ def submit_job_handler(request, service_url):
 #        }
 #     ]
 # }
-@sd.provider_process_jobs_service.post(tags=[sd.provider_processes_tag, sd.providers_tag, sd.execute_tag, sd.jobs_tag],
-                                       renderer='json', schema=sd.PostProviderProcessJobRequest(),
-                                       response_schemas=sd.post_provider_process_job_responses)
+@sd.jobs_full_service.post(tags=[sd.provider_processes_tag, sd.providers_tag, sd.execute_tag, sd.jobs_tag],
+                           renderer='json', schema=sd.PostProviderProcessJobRequest(),
+                           response_schemas=sd.post_provider_process_job_responses)
 def submit_provider_job(request):
     """
     Execute a provider process.
