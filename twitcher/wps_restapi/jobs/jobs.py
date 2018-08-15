@@ -231,9 +231,9 @@ def cancel_job(request):
     })
 
 
-@sd.results_full_service.get(tags=[sd.jobs_tag, sd.result_tag, sd.providers_tag], renderer='json',
+@sd.results_full_service.get(tags=[sd.jobs_tag, sd.results_tag, sd.providers_tag], renderer='json',
                              schema=sd.FullResultsEndpoint(), response_schemas=sd.get_job_results_responses)
-@sd.results_short_service.get(tags=[sd.jobs_tag, sd.result_tag], renderer='json',
+@sd.results_short_service.get(tags=[sd.jobs_tag, sd.results_tag], renderer='json',
                               schema=sd.ShortResultsEndpoint(), response_schemas=sd.get_job_results_responses)
 def get_job_results(request):
     """
@@ -247,9 +247,9 @@ def get_job_results(request):
     return HTTPOk(json=outputs)
 
 
-@sd.result_full_service.get(tags=[sd.jobs_tag, sd.result_tag, sd.providers_tag], renderer='json',
+@sd.result_full_service.get(tags=[sd.jobs_tag, sd.results_tag, sd.providers_tag], renderer='json',
                             schema=sd.FullResultEndpoint(), response_schemas=sd.get_single_result_responses)
-@sd.result_short_service.get(tags=[sd.jobs_tag, sd.result_tag], renderer='json',
+@sd.result_short_service.get(tags=[sd.jobs_tag, sd.results_tag], renderer='json',
                              schema=sd.ShortResultEndpoint(), response_schemas=sd.get_single_result_responses)
 def get_job_result(request):
     """
@@ -266,9 +266,9 @@ def get_job_result(request):
     raise HTTPNotFound('Could not find job output.')
 
 
-@sd.exceptions_full_service.get(tags=[sd.jobs_tag, sd.providers_tag], renderer='json',
+@sd.exceptions_full_service.get(tags=[sd.jobs_tag, sd.exceptions_tag, sd.providers_tag], renderer='json',
                                 schema=sd.FullExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
-@sd.exceptions_short_service.get(tags=[sd.jobs_tag], renderer='json',
+@sd.exceptions_short_service.get(tags=[sd.jobs_tag, sd.exceptions_tag], renderer='json',
                                  schema=sd.ShortExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
 def get_job_exceptions(request):
     """
@@ -278,9 +278,9 @@ def get_job_exceptions(request):
     return HTTPOk(json=job['exceptions'])
 
 
-@sd.logs_full_service.get(tags=[sd.jobs_tag, sd.providers_tag], renderer='json',
+@sd.logs_full_service.get(tags=[sd.jobs_tag, sd.logs_tag, sd.providers_tag], renderer='json',
                           schema=sd.FullLogsEndpoint(), response_schemas=sd.get_logs_responses)
-@sd.logs_short_service.get(tags=[sd.jobs_tag], renderer='json',
+@sd.logs_short_service.get(tags=[sd.jobs_tag, sd.logs_tag], renderer='json',
                            schema=sd.ShortLogsEndpoint(), response_schemas=sd.get_logs_responses)
 def get_job_logs(request):
     """
