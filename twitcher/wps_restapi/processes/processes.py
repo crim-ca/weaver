@@ -41,11 +41,11 @@ def save_log(job, error=None):
             job.get('duration', 0),
             job.get('progress', 0),
             job.get('status_message', 'no message'))
-    if 'log' not in job:
-        job['log'] = []
+    if 'logs' not in job:
+        job['logs'] = []
     # skip same log messages
-    if len(job['log']) == 0 or job['log'][-1] != log_msg:
-        job['log'].append(log_msg)
+    if len(job['logs']) == 0 or job['logs'][-1] != log_msg:
+        job['logs'].append(log_msg)
         if error:
             logger.error(log_msg)
         else:

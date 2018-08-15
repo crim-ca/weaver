@@ -27,8 +27,10 @@ processes_uri = '/processes'
 process_uri = '/processes/{process_id}'
 process_jobs_uri = '/processes/{process_id}/jobs'
 process_job_uri = '/processes/{process_id}/jobs/{job_id}'
-process_results_service = '/processes/{process_id}/jobs/{job_id}/result'
-process_result_service = '/processes/{process_id}/jobs/{job_id}/result/{result_id}'
+process_results_service = '/processes/{process_id}/jobs/{job_id}/results'
+process_result_service = '/processes/{process_id}/jobs/{job_id}/results/{result_id}'
+process_exceptions_service = '/processes/{process_id}/jobs/{job_id}/results/{result_id}/exceptions'
+process_logs_service = '/processes/{process_id}/jobs/{job_id}/results/{result_id}/logs'
 
 providers_uri = '/providers'
 provider_uri = '/providers/{provider_id}'
@@ -42,16 +44,16 @@ job_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}'
 job_exceptions_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/exceptions'
 job_short_uri = '/jobs/{job_id}'
 
-results_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/result'
-results_short_uri = '/jobs/{job_id}/result'
-result_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/result/{result_id}'
-result_short_uri = '/jobs/{job_id}/result/{result_id}'
+results_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/results'
+results_short_uri = '/jobs/{job_id}/results'
+result_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/results/{result_id}'
+result_short_uri = '/jobs/{job_id}/results/{result_id}'
 
 exceptions_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/exceptions'
 exceptions_short_uri = '/jobs/{job_id}/exceptions'
 
-logs_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/log'
-logs_short_uri = '/jobs/{job_id}/log'
+logs_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/logs'
+logs_short_uri = '/jobs/{job_id}/logs'
 
 #########################################################
 # API tags
@@ -269,13 +271,33 @@ class ShortJobEndpoint(MappingSchema):
     job_id = job_id
 
 
-class ProcessJobResultsEndpoint(MappingSchema):
+class ProcessResultsEndpoint(MappingSchema):
     header = AcceptHeader()
     process_id = process_id
     job_id = job_id
 
 
-class FullOutputEndpoint(MappingSchema):
+class FullResultsEndpoint(MappingSchema):
+    header = AcceptHeader()
+    provider_id = provider_id
+    process_id = process_id
+    job_id = job_id
+
+
+class ProcessResultEndpoint(MappingSchema):
+    header = AcceptHeader()
+    process_id = process_id
+    job_id = job_id
+
+
+class ShortResultsEndpoint(MappingSchema):
+    header = AcceptHeader()
+    provider_id = provider_id
+    process_id = process_id
+    job_id = job_id
+
+
+class FullResultEndpoint(MappingSchema):
     header = AcceptHeader()
     provider_id = provider_id
     process_id = process_id
@@ -283,7 +305,7 @@ class FullOutputEndpoint(MappingSchema):
     result_id = result_id
 
 
-class ShortOutputEndpoint(MappingSchema):
+class ShortResultEndpoint(MappingSchema):
     header = AcceptHeader()
     job_id = job_id
     result_id = result_id
@@ -301,6 +323,12 @@ class ShortExceptionsEndpoint(MappingSchema):
     job_id = job_id
 
 
+class ProcessExceptionsEndpoint(MappingSchema):
+    header = AcceptHeader()
+    process_id = process_id
+    job_id = job_id
+
+
 class FullLogsEndpoint(MappingSchema):
     header = AcceptHeader()
     provider_id = provider_id
@@ -310,6 +338,12 @@ class FullLogsEndpoint(MappingSchema):
 
 class ShortLogsEndpoint(MappingSchema):
     header = AcceptHeader()
+    job_id = job_id
+
+
+class ProcessLogsEndpoint(MappingSchema):
+    header = AcceptHeader()
+    process_id = process_id
     job_id = job_id
 
 
