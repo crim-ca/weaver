@@ -179,7 +179,7 @@ def get_jobs(request):
         'sort': request.params.get('sort', SORT_CREATED),
         # provider and process can be specified by query (short route) or by path (full route)
         'process': request.params.get('process', None) or request.matchdict.get('process_id', None),
-        'provider': request.params.get('provider', None) or request.matchdict.get('process_id', None),
+        'provider': request.params.get('provider', None) or request.matchdict.get('provider_id', None),
     }
     items, count = get_filtered_jobs(request, **filters)
     return HTTPOk(json={
