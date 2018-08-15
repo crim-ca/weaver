@@ -27,10 +27,10 @@ processes_uri = '/processes'
 process_uri = '/processes/{process_id}'
 process_jobs_uri = '/processes/{process_id}/jobs'
 process_job_uri = '/processes/{process_id}/jobs/{job_id}'
-process_results_service = '/processes/{process_id}/jobs/{job_id}/results'
-process_result_service = '/processes/{process_id}/jobs/{job_id}/results/{result_id}'
-process_exceptions_service = '/processes/{process_id}/jobs/{job_id}/results/{result_id}/exceptions'
-process_logs_service = '/processes/{process_id}/jobs/{job_id}/results/{result_id}/logs'
+process_results_uri = '/processes/{process_id}/jobs/{job_id}/results'
+process_result_uri = '/processes/{process_id}/jobs/{job_id}/results/{result_id}'
+process_exceptions_uri = '/processes/{process_id}/jobs/{job_id}/results/{result_id}/exceptions'
+process_logs_uri = '/processes/{process_id}/jobs/{job_id}/results/{result_id}/logs'
 
 providers_uri = '/providers'
 provider_uri = '/providers/{provider_id}'
@@ -85,6 +85,10 @@ processes_service = Service(name='processes', path=processes_uri)
 process_service = Service(name='process', path=process_uri)
 process_jobs_service = Service(name='process_jobs', path=process_jobs_uri)
 process_job_service = Service(name='process_job', path=process_job_uri)
+process_results_service = Service(name='process_results', path=process_results_uri)
+process_result_service = Service(name='process_result', path=process_result_uri)
+process_exceptions_service = Service(name='process_exceptions', path=process_exceptions_uri)
+process_logs_service = Service(name='process_logs', path=process_logs_uri)
 
 providers_service = Service(name='providers', path=providers_uri)
 provider_service = Service(name='provider', path=provider_uri)

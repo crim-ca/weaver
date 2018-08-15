@@ -261,8 +261,8 @@ def get_job_results(request):
                             schema=sd.FullResultEndpoint(), response_schemas=sd.get_single_result_responses)
 @sd.result_short_service.get(tags=[sd.jobs_tag, sd.result_tag], renderer='json',
                              schema=sd.ShortResultEndpoint(), response_schemas=sd.get_single_result_responses)
-@sd.process_results_service.get(tags=[sd.jobs_tag, sd.result_tag, sd.processes_tag], renderer='json',
-                                schema=sd.ProcessResultEndpoint(), response_schemas=sd.get_single_result_responses)
+@sd.process_result_service.get(tags=[sd.jobs_tag, sd.result_tag, sd.processes_tag], renderer='json',
+                               schema=sd.ProcessResultEndpoint(), response_schemas=sd.get_single_result_responses)
 def get_job_result(request):
     """
     Retrieve a specific result of a particular job output.
