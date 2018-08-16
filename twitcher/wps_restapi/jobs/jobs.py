@@ -158,7 +158,7 @@ def get_filtered_jobs(request, **filter_kwargs):
 
 
 @sd.process_jobs_service.get(tags=[sd.processes_tag, sd.jobs_tag], renderer='json',
-                             schema=sd.GetProcessJobsEndpoint(), response_schemas=sd.get_process_jobs_responses)
+                             schema=sd.GetProcessJobsEndpoint(), response_schemas=sd.get_all_jobs_responses)
 @sd.jobs_full_service.get(tags=[sd.jobs_tag, sd.providers_tag], renderer='json',
                           schema=sd.GetJobsRequest(), response_schemas=sd.get_all_jobs_responses)
 @sd.jobs_short_service.get(tags=[sd.jobs_tag], renderer='json',

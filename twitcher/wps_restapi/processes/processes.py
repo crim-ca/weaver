@@ -470,7 +470,7 @@ def add_local_process(request):
     process_info.update({'type': process_type, 'executeEndpoint': process_info.get('executeEndpoint')})
     saved_process = store.save_process(ProcessDB(process_info))
 
-    return HTTPOk(json={'processSummary': saved_process.summary()})
+    return HTTPOk(json={'deploymentDone': True, 'processSummary': saved_process.summary()})
 
 
 @sd.process_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer='json',
@@ -506,7 +506,7 @@ def delete_local_process(request):
     try:
         store = processstore_defaultfactory(request.registry)
         if store.delete_process(process_id):
-            return HTTPOk(json={'deploymentDone': 'success', 'identifier': process_id})
+            return HTTPOk(json={'undeploymentDone': True, 'identifier': process_id})
         raise HTTPInternalServerError("Delete process failed.")
     except HTTPException:
         raise  # re-throw already handled HTTPException

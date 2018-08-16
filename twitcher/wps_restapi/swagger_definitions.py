@@ -625,6 +625,7 @@ class PostProcessRequestBody(MappingSchema):
 class ProcessesEndpoint(MappingSchema):
     header = AcceptHeader()
     body = PostProcessRequestBody()
+    process_id = process_id
 
 
 class PostProcessJobBody(MappingSchema):
@@ -747,9 +748,16 @@ class OkGetProcessesSchema(MappingSchema):
     body = OkGetProcessesBodySchema()
 
 
+class OkPostProcessDeployBodySchema(MappingSchema):
+    deploymentDone = SchemaNode(Boolean(), description="Indicates if the process was successfully deployed.",
+                                default=False, example=True)
+    processSummary = ProcessSummarySchema(missing=drop, description="Deployed process summary if successful.")
+    failureReason = SchemaNode(String(), missing=drop, description="Description of deploy failure if applicable.")
+
+
 class OkPostProcessesSchema(MappingSchema):
     header = JsonHeader()
-    body = ProcessDetailSchema()
+    body = OkPostProcessDeployBodySchema()
 
 
 class OkGetProcessBodySchema(MappingSchema):
@@ -762,14 +770,16 @@ class OkGetProcessSchema(MappingSchema):
     body = OkGetProcessBodySchema()
 
 
-class OkDeleteProcessBodySchema(MappingSchema):
-    deploymentDone = SchemaNode(String(), default='success', example='success')
-    id = SchemaNode(String(), example='workflow')
+class OkDeleteProcessUndeployBodySchema(MappingSchema):
+    deploymentDone = SchemaNode(Boolean(), description="Indicates if the process was successfully undeployed.",
+                                default=False, example=True)
+    identifier = SchemaNode(String(), example='workflow')
+    failureReason = SchemaNode(String(), missing=drop, description="Description of undeploy failure if applicable.")
 
 
 class OkDeleteProcessSchema(MappingSchema):
     header = JsonHeader()
-    body = OkDeleteProcessBodySchema()
+    body = OkDeleteProcessUndeployBodySchema()
 
 
 class OkGetProviderProcessDescription(MappingSchema):
@@ -885,9 +895,6 @@ post_provider_responses = {
 }
 post_provider_process_job_responses = {
     '201': CreatedLaunchJobResponse(description='success')
-}
-get_process_jobs_responses = {
-    '200': OkGetAllProcessJobsResponse(description='success')
 }
 post_process_jobs_responses = {
     '201': CreatedLaunchJobResponse(description='success')
