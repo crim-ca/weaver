@@ -7,10 +7,15 @@ class DefaultAdapter(AdapterInterface):
         from twitcher import __version__
         return {"name": "default", "version": str(__version__)}
 
-    def servicestore_factory(self, registry, database=None):
+    def servicestore_factory(self, registry):
         __doc__ = super(DefaultAdapter, self).__doc__
         from twitcher.store import servicestore_defaultfactory
-        return servicestore_defaultfactory(registry, database)
+        return servicestore_defaultfactory(registry)
+
+    def jobstore_factory(self, registry):
+        __doc__ = super(DefaultAdapter, self).__doc__
+        from twitcher.store import jobstore_defaultfactory
+        return jobstore_defaultfactory(registry)
 
     def owssecurity_factory(self, registry):
         __doc__ = super(DefaultAdapter, self).__doc__

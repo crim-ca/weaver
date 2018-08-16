@@ -39,8 +39,7 @@ class MongodbTokenStore(AccessTokenStore, MongodbStore):
 
 from twitcher.store.base import ServiceStore
 from twitcher.datatype import Service
-from twitcher.exceptions import ServiceRegistrationError
-from twitcher.exceptions import ServiceNotFound
+from twitcher.exceptions import ServiceRegistrationError, ServiceNotFound
 from twitcher import namesgenerator
 from twitcher.utils import baseurl
 
@@ -118,6 +117,135 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
     def clear_services(self, request=None):
         """
         Removes all OWS services from mongodb storage.
+        """
+        self.collection.drop()
+        return True
+
+
+from twitcher.store.base import JobStore
+from twitcher.datatype import Job
+from twitcher.exceptions import JobRegistrationError, JobNotFound
+from twitcher.wps_restapi.sort import *
+from twitcher.wps_restapi.status import *
+from pyramid.security import authenticated_userid
+from pymongo import ASCENDING, DESCENDING
+from datetime import datetime
+
+
+class MongodbJobStore(JobStore, MongodbStore):
+    """
+    Registry for OWS service process jobs tracking. Uses mongodb to store job attributes.
+    """
+
+    def save_job(self, task_id, process, service=None, is_workflow=False, user_id=None, async=True):
+        """
+        Stores a job in mongodb.
+        """
+        try:
+            tags = ['dev']
+            if is_workflow:
+                tags.append('workflow')
+            else:
+                tags.append('single')
+            if async:
+                tags.append('async')
+            else:
+                tags.append('sync')
+            new_job = Job({
+                'task_id': task_id,     # TODO: why not using as identifier?
+                'user_id': user_id,
+                'service': service,     # provider identifier (WPS service)
+                'process': process,     # process identifier (WPS request)
+                'status': STATUS_ACCEPTED,
+                'is_workflow': is_workflow,
+                'created': datetime.now(),
+                'tags': tags,
+            })
+            self.collection.insert_one(new_job)
+            job = self.fetch_by_id(job_id=task_id)
+            if job is None:
+                raise JobRegistrationError
+            return job
+        except Exception:
+            raise JobRegistrationError
+
+    def update_job(self, job, attributes):
+        """
+        Updates a job parameters in mongodb storage.
+        :param job: instance of ``twitcher.datatype.Job``.
+        :param attributes: dictionary of field:value to update.
+        """
+        self.collection.update(attributes, job)
+
+    def delete_job(self, job_id, request=None):
+        """
+        Removes job from mongodb storage.
+        """
+        self.collection.delete_one({'task_id': job_id})
+        return True
+
+    def fetch_by_id(self, job_id, request=None):
+        """
+        Gets job for given ``job_id`` from mongodb storage.
+        """
+        job = self.collection.find_one({'task_id': job_id})
+        if not job:
+            raise JobNotFound
+        return Job(job)
+
+    def list_jobs(self, request=None):
+        """
+        Lists all jobs in mongodb storage.
+        """
+        jobs = []
+        for job in self.collection.find().sort('task_id', ASCENDING):
+            jobs.append(Job(job))
+        return jobs
+
+    def find_jobs(self, request, page=0, limit=10, process=None, service=None,
+                  tag=None, access=None, status=None, sort=None):
+        """
+        Finds all jobs in mongodb storage matching search filters.
+        """
+        search_filters = {}
+        if access == 'public':
+            search_filters['tags'] = 'public'
+        elif access == 'private':
+            search_filters['tags'] = {'$ne': 'public'}
+            search_filters['user_id'] = authenticated_userid(request)
+        elif access == 'all' and request.has_permission('admin'):
+            pass
+        else:
+            if tag is not None:
+                search_filters['tags'] = tag
+            search_filters['user_id'] = authenticated_userid(request)
+
+        if status in status_categories.keys():
+            search_filters['status'] = {'$in': status_categories[status]}
+        elif status:
+            search_filters['status'] = status
+
+        if process is not None:
+            search_filters['process'] = process
+
+        if service is not None:
+            search_filters['service'] = service
+
+        if sort is None:
+            sort = SORT_CREATED
+        elif sort == SORT_USER:
+            sort = 'user_id'
+
+        sort_order = DESCENDING if sort == SORT_FINISHED or sort == SORT_CREATED else ASCENDING
+        sort_criteria = [(sort, sort_order)]
+        found = self.collection.find(search_filters)
+        count = found.count()
+        items = list(found.skip(page * limit).limit(limit).sort(sort_criteria))
+        return items, count
+
+    def clear_jobs(self, request=None):
+        """
+        Removes all jobs from mongodb storage.
         """
         self.collection.drop()
         return True

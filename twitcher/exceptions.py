@@ -25,3 +25,19 @@ class ServiceRegistrationError(Exception):
     storage backend by an instance of :class:`twitcher.store.ServiceStore`.
     """
     pass
+
+
+class JobNotFound(Exception):
+    """
+    Error indicating that an job could not be read from the
+    storage backend by an instance of :class:`twitcher.store.JobStore`.
+    """
+    pass
+
+
+class JobRegistrationError(Exception):
+    """
+    Error indicating that an job could not be registered in the
+    storage backend by an instance of :class:`twitcher.store.JobStore`.
+    """
+    pass

@@ -5,17 +5,18 @@ from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import URLError
 from time import sleep
 from datetime import datetime
-from twitcher.adapter import servicestore_factory
+from twitcher.adapter import servicestore_factory, jobstore_factory
+from twitcher.datatype import Job as JobType
+from twitcher.exceptions import JobRegistrationError
 from twitcher.utils import get_any_id
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
-from twitcher.wps_restapi.jobs.jobs import add_job, check_status
+from twitcher.wps_restapi.jobs.jobs import check_status
 from twitcher.wps_restapi.status import STATUS_ACCEPTED, STATUS_FAILED
-from twitcher.db import MongoDB
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference
 from lxml import etree
 
-logger = get_task_logger(__name__)
+task_logger = get_task_logger(__name__)
 
 
 def wait_secs(run_step=-1):
@@ -39,9 +40,9 @@ def save_log(job, error=None):
     if len(job['logs']) == 0 or job['logs'][-1] != log_msg:
         job['logs'].append(log_msg)
         if error:
-            logger.error(log_msg)
+            task_logger.error(log_msg)
         else:
-            logger.info(log_msg)
+            task_logger.info(log_msg)
 
 
 def _get_data(input_value):
@@ -129,37 +130,31 @@ def _jsonify_output(output, datatype):
 
 
 @app.task(bind=True)
-def execute_process(self, url, service_name, identifier, provider, inputs, outputs,
-                    async=True, userid=None, caption=None, headers=None):
+def execute_process(self, url, service, process, inputs, outputs,
+                    is_workflow=False, user_id=None, async=True, headers=None):
     registry = app.conf['PYRAMID_REGISTRY']
-    db = MongoDB.get(registry)
-    job = add_job(
-        db,
-        userid=userid,
-        task_id=self.request.id,
-        service_name=service_name,
-        process_id=identifier,
-        provider_id=provider,
-        is_workflow=False,
-        async=async,
-        caption=caption)
-
+    store = jobstore_factory(registry)
+    task_id = self.request.id
+    job = JobType({'task_id': task_id})  # default in case of error during registration to job store
     try:
+        job = store.save_job(task_id=task_id, process=process, service=service, is_workflow=is_workflow,
+                             user_id=user_id, async=async)
+
         wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), skip_caps=False, verify=False)
-        # execution = wps.execute(identifier, inputs=inputs, output=outputs, async=async, lineage=True)
+        # execution = wps.execute(process, inputs=inputs, output=outputs, async=async, lineage=True)
         mode = 'async' if async else 'sync'
-        execution = wps.execute(identifier, inputs=inputs, output=outputs, mode=mode, lineage=True)
+        execution = wps.execute(process, inputs=inputs, output=outputs, mode=mode, lineage=True)
         # job['service'] = wps.identification.title
         # job['title'] = getattr(execution.process, "title")
         if not execution.process and execution.errors:
             raise execution.errors[0]
 
-        job['abstract'] = getattr(execution.process, "abstract")
+        # job['abstract'] = getattr(execution.process, "abstract")
         job['status_location'] = execution.statusLocation
         job['request'] = execution.request
         job['response'] = etree.tostring(execution.response)
 
-        logger.debug("job init done %s ...", self.request.id)
+        task_logger.debug("job init done %s ...", self.request.id)
 
         num_retries = 0
         run_step = 0
@@ -179,7 +174,7 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
                 if execution.isComplete():
                     job['finished'] = datetime.now()
                     if execution.isSucceded():
-                        logger.debug("job succeeded")
+                        task_logger.debug("job succeeded")
                         job['progress'] = 100
 
                         process = wps.describeprocess(job['process_id'])
@@ -191,7 +186,7 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
                         job['outputs'] = [_jsonify_output(output, output_datatype[output.identifier])
                                           for output in execution.processOutputs]
                     else:
-                        logger.debug("job failed.")
+                        task_logger.debug("job failed.")
                         job['status_message'] = '\n'.join(error.text for error in execution.errors)
                         job['exceptions'] = [{
                             'Code': error.code,
@@ -199,21 +194,23 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
                             'Text': error.text
                         } for error in execution.errors]
                         for error in execution.errors:
-                            save_log(job, error)
+                            error_msg = 'ERROR: {0.text} - code={0.code} - locator={0.locator}'.format(error)
+                            save_log(job, error_msg)
             except Exception:
                 num_retries += 1
-                logger.exception("Could not read status xml document for job %s. Trying again ...", self.request.id)
+                task_logger.exception("Could not read status xml document for job %s. Trying again ...",
+                                      self.request.id)
                 sleep(1)
             else:
-                logger.debug("update job %s ...", self.request.id)
+                task_logger.debug("update job %s ...", self.request.id)
                 num_retries = 0
                 run_step += 1
             finally:
                 save_log(job)
-                db.jobs.update({'identifier': job['identifier']}, job)
+                store.update_job({'identifier': job['identifier']}, job)
 
-    except (WPSException, Exception) as exc:
-        logger.exception("Failed to run Job")
+    except (WPSException, JobRegistrationError, Exception) as exc:
+        task_logger.exception("Failed to run Job")
         job['status'] = STATUS_FAILED
         if isinstance(exc, WPSException):
             job['status_message'] = "Error: [{0}] {1}".format(exc.locator, exc.text)
@@ -222,7 +219,7 @@ def execute_process(self, url, service_name, identifier, provider, inputs, outpu
 
     finally:
         save_log(job)
-        db.jobs.update({'identifier': job['identifier']}, job)
+        store.update_job({'identifier': job['identifier']}, job)
 
     return job['status']
 

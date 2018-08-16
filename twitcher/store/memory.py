@@ -39,8 +39,7 @@ class MemoryTokenStore(AccessTokenStore):
 
 from twitcher.store.base import ServiceStore
 from twitcher.datatype import Service
-from twitcher.exceptions import ServiceRegistrationError
-from twitcher.exceptions import ServiceNotFound
+from twitcher.exceptions import ServiceRegistrationError, ServiceNotFound
 from twitcher import namesgenerator
 from twitcher.utils import baseurl
 
@@ -139,3 +138,58 @@ class MemoryServiceStore(ServiceStore):
         self.url_index = {}
         self.name_index = {}
         return True
+
+
+from twitcher.store.base import JobStore
+from twitcher.datatype import Job
+from twitcher.exceptions import JobRegistrationError, JobNotFound
+
+
+class MemoryJobStore(JobStore):
+    """
+    Stores job tracking in memory. Useful for testing purposes.
+    """
+    def save_job(self, task_id, process, service=None, is_workflow=False, user_id=None, async=True):
+        """
+        Stores a job in memory.
+        """
+        raise NotImplementedError
+
+    def update_job(self, job, attributes):
+        """
+        Updates a job parameters in mongodb storage.
+        :param job: instance of ``twitcher.datatype.Job``.
+        :param attributes: dictionary of field:value to update.
+        """
+        raise NotImplementedError
+
+    def delete_job(self, job_id, request=None):
+        """
+        Removes job from memory.
+        """
+        raise NotImplementedError
+
+    def fetch_by_id(self, job_id, request=None):
+        """
+        Gets job for given ``job_id`` from memory.
+        """
+        raise NotImplementedError
+
+    def list_jobs(self, request=None):
+        """
+        Lists all jobs in memory.
+        """
+        raise NotImplementedError
+
+    def find_jobs(self, request, page=0, limit=10, process=None, service=None,
+                  tag=None, access=None, status=None, sort=None):
+        """
+        Finds all jobs in memory matching search filters.
+        """
+        raise NotImplementedError
+
+    def clear_jobs(self, request=None):
+        """
+        Removes all jobs from memory.
+        """
+        raise NotImplementedError
