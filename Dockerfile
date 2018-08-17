@@ -31,7 +31,7 @@ COPY . /opt/birdhouse/src/twitcher
 WORKDIR /opt/birdhouse/src/twitcher
 
 # Provide custom.cfg with settings for docker image
-RUN printf "[buildout]\nextends=docker_custom.cfg" > custom.cfg
+RUN printf "[buildout]\nextends=buildout.cfg profiles/docker.cfg" > custom.cfg
 
 # Set conda enviroment
 ENV ANACONDA_HOME /opt/conda
