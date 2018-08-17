@@ -57,14 +57,6 @@ EXPOSE 9001 $HTTP_PORT $HTTPS_PORT $OUTPUT_PORT
 # Start supervisor in foreground
 ENV DAEMON_OPTS --nodaemon
 
-# Install magpie for the magpie adapter
-RUN git clone https://github.com/ouranosinc/magpie && \
-    cd magpie && \
-    git checkout adapter-processstore-factory && \
-    cd .. && \
-    ./opt/conda/envs/twitcher/bin/pip install -r magpie/requirements.txt && \
-    ./opt/conda/envs/twitcher/bin/pip install ./magpie
-
 # Install twitcher to make sure that magpie adapter can import it
 RUN cd /opt/birdhouse/src/twitcher && \
     /opt/conda/envs/twitcher/bin/pip install .
