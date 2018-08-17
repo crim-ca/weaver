@@ -33,12 +33,12 @@ WORKDIR /opt/birdhouse/src/twitcher
 # Provide custom.cfg with settings for docker image
 RUN printf "[buildout]\nextends=docker_custom.cfg" > custom.cfg
 
-# Install system dependencies
-RUN bash bootstrap.sh -i && bash requirements.sh
-
 # Set conda enviroment
 ENV ANACONDA_HOME /opt/conda
 ENV CONDA_ENVS_DIR /opt/conda/envs
+
+# Install system dependencies
+RUN make sysinstall
 
 # Run install and fix permissions
 RUN mkdir -p /opt/birdhouse/etc && mkdir -p /opt/birdhouse/var/run
@@ -57,17 +57,8 @@ EXPOSE 9001 $HTTP_PORT $HTTPS_PORT $OUTPUT_PORT
 # Start supervisor in foreground
 ENV DAEMON_OPTS --nodaemon
 
-# Install magpie for the magpie adapter
-RUN git clone https://github.com/ouranosinc/magpie && \
-    cd magpie && \
-    git checkout adapter-processstore-factory && \
-    cd .. && \
-    ./opt/conda/envs/twitcher/bin/pip install -r magpie/requirements.txt && \
-    ./opt/conda/envs/twitcher/bin/pip install ./magpie
-
-# Install twitcher to make sure that magpie adapter can import it
-RUN cd /opt/birdhouse/src/twitcher && \
-    /opt/conda/envs/twitcher/bin/pip install .
+# Install twitcher as a package so that adapater implementation can import it
+RUN make pipinstall
 
 RUN mkdir -p /opt/birdhouse/var/tmp/nginx/client
 CMD ["make", "online-update-config", "start"]
