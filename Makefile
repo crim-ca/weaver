@@ -57,6 +57,7 @@ help:
 	@echo "  version     to print version number of this Makefile."
 	@echo "  info        to print information about $(APP_NAME)."
 	@echo "  install     to install $(APP_NAME) by running 'bin/buildout -c custom.cfg'."
+	@echo "  pipinstall  to install as a package to allow import in another python code.
 	@echo "  sysinstall  to install system packages from requirements.sh. You can also call 'bash requirements.sh' directly."
 	@echo "  update      to update your application by running 'bin/buildout -o -c custom.cfg' (buildout offline mode)."
 	@echo "  clean       to delete all files that are created by running buildout."
@@ -96,7 +97,7 @@ info:
 	@echo "  APP_NAME            $(APP_NAME)"
 	@echo "  APP_ROOT            $(APP_ROOT)"
 	@echo "  DOWNLOAD_CACHE      $(DOWNLOAD_CACHE)"
-	
+
 ## Helper targets ... ensure that Makefile etc are in place
 
 .PHONY: backup
@@ -182,6 +183,12 @@ sysinstall:
 	@bash bootstrap.sh -i
 	@echo "\nInstalling system packages for your application ..."
 	@-test -f requirements.sh && bash requirements.sh
+
+.PHONY: pipinstall
+pipinstall: install
+	@echo "Installing package with pip ..."
+	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);pip install ."
+	@echo "\nInstall with pip complete."
 
 .PHONY: install
 install: bootstrap
