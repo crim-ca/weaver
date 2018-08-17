@@ -22,12 +22,12 @@ WORKDIR /opt/birdhouse/src/twitcher
 # Provide custom.cfg with settings for docker image
 RUN printf "[buildout]\nextends=buildout.cfg profiles/docker.cfg" > custom.cfg
 
-# Install system dependencies
-RUN bash bootstrap.sh -i && bash requirements.sh
-
 # Set conda enviroment
 ENV ANACONDA_HOME /opt/conda
 ENV CONDA_ENVS_DIR /opt/conda/envs
+
+# Install system dependencies
+RUN make sysinstall
 
 # Run install and fix permissions
 RUN make clean install && chmod 755 /opt/birdhouse/etc && chmod 755 /opt/birdhouse/var/run
@@ -46,8 +46,7 @@ EXPOSE 9001 $HTTP_PORT $HTTPS_PORT $OUTPUT_PORT
 ENV DAEMON_OPTS --nodaemon
 
 # Install twitcher as a package so that adapater implementation can import it
-RUN cd /opt/birdhouse/src/twitcher && \
-    /opt/conda/envs/twitcher/bin/pip install .
+RUN make pipinstall
 
 RUN mkdir -p /opt/birdhouse/var/tmp/nginx/client
 CMD ["make", "online-update-config", "start"]
