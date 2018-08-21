@@ -4,4 +4,5 @@ mock
 WebTest
 flake8
 # internal WPS
-pywps>=4.0.0
+##pywps>=4.0.0
+-e git+https://github.com/geopython/pywps#egg=pywps

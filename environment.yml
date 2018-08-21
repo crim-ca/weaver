@@ -29,7 +29,7 @@ dependencies:
 - requests-oauthlib
 - webob
 # pywps
-- pywps=4.0.0
+#- pywps=4.0.0
 #- owslib (waiting 0.17.0 which implement wps with custom headers)
 # nginx, supervisor
 - nginx=1.10
@@ -46,6 +46,7 @@ dependencies:
 - cornice
 - colander
 - pip:
+  - -e git+https://github.com/geopython/pywps#egg=pywps
   - genshi==0.7
   - pyramid-rpc
   - pyramid-celery
