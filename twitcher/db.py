@@ -68,7 +68,7 @@ def get_postgresdb_session_from_settings(settings):
 
 def database_factory(registry):
     settings = registry.settings
-    if settings.get('db_factory') == 'postgres':
+    if settings.get('twitcher.db_factory') == 'postgres':
         return get_postgresdb_session_from_settings(settings)
     return mongodb(registry)
 
