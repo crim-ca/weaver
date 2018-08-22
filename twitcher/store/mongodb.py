@@ -149,7 +149,7 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
 
     def _add_process(self, process):
         if isinstance(process, ProcessWPS):
-            new_process = ProcessDB.from_wps(process)
+            new_process = ProcessDB.from_wps(process, executeEndpoint=self.default_wps_endpoint)
         else:
             new_process = process
         if not isinstance(new_process, ProcessDB):

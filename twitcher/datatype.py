@@ -269,10 +269,11 @@ class Process(dict):
         }
 
     @staticmethod
-    def from_wps(wps_process):
+    def from_wps(wps_process, **extra_params):
         assert isinstance(wps_process, ProcessWPS)
         process = wps_process.json
         process.update({'type': wps_process.identifier, 'package': None, 'reference': None})
+        process.update(**extra_params)
         return Process(process)
 
     def wps(self):
