@@ -5,6 +5,7 @@ pyramid_mako
 webob
 requests
 requests_oauthlib
+requests_file
 pymongo
 argcomplete
 celery
