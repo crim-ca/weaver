@@ -169,13 +169,13 @@ class MongodbJobStore(JobStore, MongodbStore):
         except Exception:
             raise JobRegistrationError
 
-    def update_job(self, job, attributes):
+    def update_job(self, job):
         """
         Updates a job parameters in mongodb storage.
         :param job: instance of ``twitcher.datatype.Job``.
-        :param attributes: dictionary of field:value to update.
         """
-        self.collection.update(attributes, job)
+        test = self.collection.update_one({'task_id', job.task_id}, job.params)
+        return self.fetch_by_id(job.task_id)
 
     def delete_job(self, job_id, request=None):
         """
