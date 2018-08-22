@@ -61,7 +61,7 @@ def servicestore_defaultfactory(registry):
     return store
 
 
-def processstore_defaultfactory(registry, database=None):
+def processstore_defaultfactory(registry):
     """
     Creates a process store with the interface of :class:`twitcher.store.ProcessStore`.
     By default the mongodb implementation will be used.

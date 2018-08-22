@@ -39,5 +39,5 @@ class AdapterInterface(object):
         """
         raise NotImplementedError
 
-    def processstore_factory(self, registry, database=None):
+    def processstore_factory(self, registry):
         raise NotImplementedError

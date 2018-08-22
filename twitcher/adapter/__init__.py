@@ -59,9 +59,9 @@ def owssecurity_factory(registry):
         raise
 
 
-def processstore_factory(registry, database=None):
+def processstore_factory(registry):
     try:
-        return adapter_factory(registry.settings).processstore_factory(registry, database)
+        return adapter_factory(registry.settings).processstore_factory(registry)
     except Exception as e:
         LOGGER.error('Adapter raised an exception while getting processstore_factory : {!r}'.format(e))
         raise
