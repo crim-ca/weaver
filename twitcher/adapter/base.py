@@ -9,9 +9,15 @@ class AdapterInterface(object):
         """
         raise NotImplementedError
 
-    def servicestore_factory(self, registry, database=None):
+    def servicestore_factory(self, registry):
         """
         Returns the 'servicestore' implementation of the adapter.
+        """
+        raise NotImplementedError
+
+    def jobstore_factory(self, registry):
+        """
+        Returns the 'jobstore' implementation of the adapter.
         """
         raise NotImplementedError
 

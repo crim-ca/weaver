@@ -1,17 +1,14 @@
 from pyramid.httpexceptions import *
-from pyramid.security import authenticated_userid
 from pyramid_celery import celery_app as app
-from datetime import datetime
-from twitcher.db import database_factory
+from twitcher.adapter import jobstore_factory
+from twitcher.exceptions import JobNotFound
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import wps_restapi_base_url
 from twitcher.wps_restapi.status import *
 from twitcher.wps_restapi.sort import *
-from pymongo import ASCENDING, DESCENDING
 from owslib.wps import WPSExecution
 from lxml import etree
 from celery.utils.log import get_task_logger
-import uuid
 import requests
 
 logger = get_task_logger(__name__)
@@ -25,42 +22,6 @@ def job_url(request, job):
         base_job_url=base_job_url,
         process_id=job['process_id'],
         job_id=job['task_id'])
-
-
-def add_job(db, task_id, process_id, provider_id, title=None, abstract=None,
-            service_name=None, service=None, status_location=None,
-            is_workflow=False, caption=None, userid=None,
-            async=True):
-    tags = ['dev']
-    if is_workflow:
-        tags.append('workflow')
-    else:
-        tags.append('single')
-    if async:
-        tags.append('async')
-    else:
-        tags.append('sync')
-    job = dict(
-        identifier=uuid.uuid4().get_hex(),
-        task_id=task_id,                    # TODO: why not using as identifier?
-        userid=userid,
-        is_workflow=is_workflow,
-        service_name=service_name,          # wps service name (service identifier)
-        service=service or service_name,    # wps service title (url, service_name or service title)
-        process_id=process_id,              # process identifier
-        provider_id=provider_id,            # process identifier
-        title=title or process_id,          # process title (identifier or title)
-        abstract=abstract or "No Summary",
-        status_location=status_location,
-        created=datetime.now(),
-        tags=tags,
-        caption=caption,
-        status=STATUS_ACCEPTED,
-        response=None,
-        request=None,
-    )
-    db.jobs.insert(job)
-    return job
 
 
 def check_status(url=None, response=None, sleep_secs=2, verify=False):
@@ -90,71 +51,26 @@ def check_status(url=None, response=None, sleep_secs=2, verify=False):
     return execution
 
 
-def filter_jobs(collection, request, page=0, limit=10, process=None,
-                provider=None, tag=None, access=None, status=None, sort=SORT_CREATED):
-    search_filter = {}
-    if access == 'public':
-        search_filter['tags'] = 'public'
-    elif access == 'private':
-        search_filter['tags'] = {'$ne': 'public'}
-        search_filter['userid'] = authenticated_userid(request)
-    elif access == 'all' and request.has_permission('admin'):
-        pass
-    else:
-        if tag is not None:
-            search_filter['tags'] = tag
-        search_filter['userid'] = authenticated_userid(request)
-
-    if status in status_categories.keys():
-        search_filter['status'] = {'$in': status_categories[status]}
-    elif status:
-        search_filter['status'] = status
-
-    if process is not None:
-        search_filter['process_id'] = process
-
-    if provider is not None:
-        search_filter['provider_id'] = provider
-
-    count = collection.find(search_filter).count()
-    if sort == SORT_USER:
-        sort = 'userid'
-    elif sort == SORT_PROCESS:
-        sort = SORT_TITLE
-
-    sort_order = DESCENDING if sort == SORT_FINISHED or sort == SORT_CREATED else ASCENDING
-    sort_criteria = [(sort, sort_order)]
-    items = list(collection.find(search_filter).skip(page * limit).limit(limit).sort(sort_criteria))
-    return items, count
-
-
 def get_job(request):
     """
     :returns: Job information if found.
     :raises: HTTPNotFound with JSON body details on missing/non-matching job, process, provider IDs.
     """
     job_id = request.matchdict.get('job_id')
-
-    db = database_factory(request.registry)
-    collection = db.jobs
-    job = collection.find_one({'task_id': job_id})
-
-    if not job:
-        raise HTTPNotFound('Could not find specified `job_id`.')
+    store = jobstore_factory(request.registry)
+    try:
+        job = store.fetch_by_id(job_id)
+    except JobNotFound:
+        raise HTTPNotFound('Could not find job with specified `job_id`')
 
     provider_id = request.matchdict.get('provider_id', job['provider_id'])
     process_id = request.matchdict.get('process_id', job['process_id'])
 
     if job['provider_id'] != provider_id:
-        raise HTTPNotFound('Could not find specified `provider_id`.')
+        raise HTTPNotFound('Could not find job with specified `provider_id`.')
     if job['process_id'] != process_id:
-        raise HTTPNotFound('Could not find specified `process_id`.')
+        raise HTTPNotFound('Could not find job with specified `process_id`.')
     return job
-
-
-def get_filtered_jobs(request, **filter_kwargs):
-    db = database_factory(request.registry)
-    return filter_jobs(db.jobs, request, **filter_kwargs)
 
 
 @sd.process_jobs_service.get(tags=[sd.processes_tag, sd.jobs_tag], renderer='json',
@@ -181,7 +97,8 @@ def get_jobs(request):
         'process': request.params.get('process', None) or request.matchdict.get('process_id', None),
         'provider': request.params.get('provider', None) or request.matchdict.get('provider_id', None),
     }
-    items, count = get_filtered_jobs(request, **filters)
+    store = jobstore_factory(request.registry)
+    items, count = store.find_jobs(request, **filters)
     return HTTPOk(json={
         'count': count,
         'page': page,

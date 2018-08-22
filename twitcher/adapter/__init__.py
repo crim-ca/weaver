@@ -35,11 +35,19 @@ def adapter_factory(settings):
     return DefaultAdapter()
 
 
-def servicestore_factory(registry, database=None):
+def servicestore_factory(registry):
     try:
-        return adapter_factory(registry.settings).servicestore_factory(registry, database)
+        return adapter_factory(registry.settings).servicestore_factory(registry)
     except Exception as e:
         LOGGER.error('Adapter raised an exception while getting servicestore_factory : {!r}'.format(e))
+        raise
+
+
+def jobstore_factory(registry):
+    try:
+        return adapter_factory(registry.settings).jobstore_factory(registry)
+    except Exception as e:
+        LOGGER.error('Adapter raised an exception while getting jobstore_factory : {!r}'.format(e))
         raise
 
 

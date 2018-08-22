@@ -10,9 +10,16 @@ configuration = default
 hostname = localhost
 https-port = 5000
 log-level = WARN
+
 wps = true
 wps-path = /ows/wps
 ows-proxy-protected-path = /ows/proxy
+
+db-factory = mongodb
+mongodb-host = localhost
+mongodb-port = 27017
+mongodb-dbname = twitcher_db
+
 wps-restapi = true
 wps-restapi-path = /
 adapter = package.path.to.AdapterImpl
