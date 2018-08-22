@@ -160,7 +160,7 @@ def execute_process(self, url, service, process, inputs, outputs,
         job['request'] = execution.request
         job['response'] = etree.tostring(execution.response)
 
-        task_logger.debug("job init done %s ...", self.request.id)
+        task_logger.debug("job init done %s ...", task_id)
 
         num_retries = 0
         run_step = 0
@@ -183,7 +183,7 @@ def execute_process(self, url, service, process, inputs, outputs,
                         task_logger.debug("job succeeded")
                         job['progress'] = 100
 
-                        process = wps.describeprocess(job['process_id'])
+                        process = wps.describeprocess(job.process)
 
                         output_datatype = {
                             getattr(processOutput, 'identifier', ''): processOutput.dataType
@@ -202,18 +202,18 @@ def execute_process(self, url, service, process, inputs, outputs,
                         for error in execution.errors:
                             error_msg = 'ERROR: {0.text} - code={0.code} - locator={0.locator}'.format(error)
                             save_log(job, error_msg)
-            except Exception:
+            except Exception as ex:
                 num_retries += 1
-                task_logger.exception("Could not read status xml document for job %s. Trying again ...",
-                                      self.request.id)
+                task_logger.exception("Job {job} generated exception: {ex}".format(job=task_id, ex=ex.message))
+                task_logger.exception("Could not read status xml document for job {}. Trying again ...".format(task_id))
                 sleep(1)
             else:
-                task_logger.debug("update job %s ...", self.request.id)
+                task_logger.debug("update job {} ...".format(task_id))
                 num_retries = 0
                 run_step += 1
             finally:
                 save_log(job)
-                store.update_job({'identifier': job['identifier']}, job)
+                store.update_job({'identifier': job.identifier}, job)
 
     except (WPSException, JobRegistrationError, Exception) as exc:
         task_logger.exception("Failed to run Job")
@@ -225,12 +225,12 @@ def execute_process(self, url, service, process, inputs, outputs,
 
     finally:
         save_log(job)
-        store.update_job({'identifier': job['identifier']}, job)
+        store.update_job({'identifier': job.identifier}, job)
 
-    return job['status']
+    return job.status
 
 
-def submit_job_handler(request, service_url):
+def submit_job_handler(request, service_url, is_workflow=False):
 
     # TODO Validate param somehow
     provider_id = request.matchdict.get('provider_id')  # None OK if local
@@ -261,13 +261,13 @@ def submit_job_handler(request, service_url):
             (output.identifier, output.dataType == 'ComplexData'))
 
     result = execute_process.delay(
-        userid=request.unauthenticated_userid,
         url=wps.url,
-        service_name=process_id,
-        identifier=process.identifier,
-        provider=provider_id,
+        service=provider_id,
+        process=process.identifier,
         inputs=inputs,
         outputs=outputs,
+        is_workflow=is_workflow,
+        user_id=request.authenticated_userid,
         async=async_execute,
         # Convert EnvironHeaders to a simple dict (should cherrypick the required headers)
         headers={k: v for k, v in request.headers.items()})
@@ -524,8 +524,7 @@ def submit_local_job(request):
     try:
         store = processstore_defaultfactory(request.registry)
         process = store.fetch_by_id(process_id)
-        response = submit_job_handler(request, process.executeEndpoint)
-        return response
+        return submit_job_handler(request, process.executeEndpoint, is_workflow=process.type == 'workflow')
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except ProcessNotFound:

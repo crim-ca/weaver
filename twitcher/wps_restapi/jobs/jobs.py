@@ -63,12 +63,14 @@ def get_job(request):
     except JobNotFound:
         raise HTTPNotFound('Could not find job with specified `job_id`')
 
-    provider_id = request.matchdict.get('provider_id', job['provider_id'])
-    process_id = request.matchdict.get('process_id', job['process_id'])
+    job_process = job.process
+    job_service = job.service
+    provider_id = request.matchdict.get('provider_id', job_service)
+    process_id = request.matchdict.get('process_id', job_process)
 
-    if job['provider_id'] != provider_id:
+    if job_service != provider_id:
         raise HTTPNotFound('Could not find job with specified `provider_id`.')
-    if job['process_id'] != process_id:
+    if job_process != process_id:
         raise HTTPNotFound('Could not find job with specified `process_id`.')
     return job
 
@@ -221,4 +223,4 @@ def get_job_logs(request):
     Retrieve the logs of a job.
     """
     job = get_job(request)
-    return HTTPOk(json=job['logs'])
+    return HTTPOk(json=job.logs)
