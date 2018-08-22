@@ -2,8 +2,10 @@
 Definitions of types used by tokens.
 """
 
+import six
 import time
 import uuid
+from datetime import datetime
 from twitcher.utils import now_secs
 from twitcher.exceptions import ProcessInstanceError
 from twitcher.processes import process_mapping
@@ -73,6 +75,28 @@ class Job(dict):
             raise TypeError("'task_id' is required")
         self['identifier'] = uuid.uuid4().get_hex()
 
+    def save_log(self, errors=None, logger=None):
+        if isinstance(errors, six.string_types):
+            errors = list(errors)
+        if isinstance(errors, list):
+            log_msg = ['ERROR: {0.text} - code={0.code} - locator={0.locator}'.format(error) for error in errors]
+            self.exceptions.extend([{
+                    'Code': error.code,
+                    'Locator': error.locator,
+                    'Text': error.text
+                } for error in errors])
+        else:
+            log_msg = ['{0} {1:3d}%: {2}'.format(self.duration, self.process, self.status_message)]
+        # skip same log messages
+        if len(self.logs) == 0 or self.logs[-1] != log_msg[0]:
+            self.logs.extend(log_msg)
+            if logger:
+                for msg in log_msg:
+                    if errors:
+                        logger.error(msg)
+                    else:
+                        logger.info(msg)
+
     @property
     def task_id(self):
         return self['task_id']
@@ -99,7 +123,7 @@ class Job(dict):
 
     @property
     def status_message(self):
-        return self.get('status_message', '')
+        return self.get('status_message', 'no message')
 
     @property
     def status_location(self):
@@ -111,15 +135,32 @@ class Job(dict):
 
     @property
     def created(self):
-        return self.get('created', None)
+        created = self.get('created', None)
+        if not created:
+            self['created'] = datetime.now()
+        return self.get('created')
 
     @property
     def finished(self):
         return self.get('finished', None)
 
+    def is_finished(self):
+        self['finished'] = datetime.now()
+
     @property
     def duration(self):
-        return self.get('duration', None)
+        final_time = self.finished or datetime.now()
+        duration = final_time - self.created
+        self['duration'] = str(duration).split('.')[0]
+        return self['duration']
+
+    @property
+    def progress(self):
+        return self.get('progress', 0)
+
+    @property
+    def exceptions(self):
+        return self.get('exceptions', list())
 
     @property
     def logs(self):
@@ -152,6 +193,8 @@ class Job(dict):
             'created': self.created,
             'finished': self.finished,
             'duration': self.duration,
+            'progress': self.progress,
+            'exceptions': self.exceptions,
             'logs': self.logs,
             'tags': self.tags,
             'request': self.request,

@@ -5,7 +5,6 @@ from celery.utils.log import get_task_logger
 from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import URLError
 from time import sleep
-from datetime import datetime
 from twitcher.adapter import servicestore_factory, jobstore_factory, processstore_factory
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS
 from twitcher.datatype import Process as ProcessDB, Job as JobDB
@@ -16,7 +15,7 @@ from twitcher.processes import wps_workflow as wf
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import check_status
-from twitcher.wps_restapi.status import STATUS_ACCEPTED, STATUS_FAILED
+from twitcher.wps_restapi import status as job_status
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference
 from lxml import etree
 from six import string_types
@@ -30,25 +29,6 @@ def wait_secs(run_step=-1):
     if run_step >= len(secs_list):
         run_step = -1
     return secs_list[run_step]
-
-
-def save_log(job, error=None):
-    if error:
-        log_msg = 'ERROR: {0.text} - code={0.code} - locator={0.locator}'.format(error)
-    else:
-        log_msg = '{0} {1:3d}%: {2}'.format(
-            job.get('duration', 0),
-            job.get('progress', 0),
-            job.get('status_message', 'no message'))
-    if 'logs' not in job:
-        job['logs'] = []
-    # skip same log messages
-    if len(job['logs']) == 0 or job['logs'][-1] != log_msg:
-        job['logs'].append(log_msg)
-        if error:
-            task_logger.error(log_msg)
-        else:
-            task_logger.info(log_msg)
 
 
 def _get_data(input_value):
@@ -156,9 +136,11 @@ def execute_process(self, url, service, process, inputs, outputs,
             raise execution.errors[0]
 
         # job['abstract'] = getattr(execution.process, "abstract")
+        job['status'] = job_status.STATUS_RUNNING
         job['status_location'] = execution.statusLocation
         job['request'] = execution.request
         job['response'] = etree.tostring(execution.response)
+        store.update_job(job)
 
         task_logger.debug("job init done %s ...", task_id)
 
@@ -170,18 +152,19 @@ def execute_process(self, url, service, process, inputs, outputs,
             try:
                 execution = check_status(url=execution.statusLocation, verify=False,
                                          sleep_secs=wait_secs(run_step))
+
                 job['response'] = etree.tostring(execution.response)
                 job['status'] = execution.getStatus()
                 job['status_message'] = execution.statusMessage
                 job['progress'] = execution.percentCompleted
-                duration = datetime.now() - job.get('created', datetime.now())
-                job['duration'] = str(duration).split('.')[0]
 
                 if execution.isComplete():
-                    job['finished'] = datetime.now()
+                    job.is_finished()
                     if execution.isSucceded():
                         task_logger.debug("job succeeded")
                         job['progress'] = 100
+                        job['status'] = job_status.STATUS_FINISHED
+                        job['status_message'] = execution.statusMessage
 
                         process = wps.describeprocess(job.process)
 
@@ -194,14 +177,7 @@ def execute_process(self, url, service, process, inputs, outputs,
                     else:
                         task_logger.debug("job failed.")
                         job['status_message'] = '\n'.join(error.text for error in execution.errors)
-                        job['exceptions'] = [{
-                            'Code': error.code,
-                            'Locator': error.locator,
-                            'Text': error.text
-                        } for error in execution.errors]
-                        for error in execution.errors:
-                            error_msg = 'ERROR: {0.text} - code={0.code} - locator={0.locator}'.format(error)
-                            save_log(job, error_msg)
+                        job.save_log(errors=execution.errors, logger=task_logger)
             except Exception as ex:
                 num_retries += 1
                 task_logger.exception("Job {job} generated exception: {ex}".format(job=task_id, ex=ex.message))
@@ -212,20 +188,20 @@ def execute_process(self, url, service, process, inputs, outputs,
                 num_retries = 0
                 run_step += 1
             finally:
-                save_log(job)
-                store.update_job({'identifier': job.identifier}, job)
+                job.save_log(logger=task_logger)
+                store.update_job(job)
 
     except (WPSException, JobRegistrationError, Exception) as exc:
         task_logger.exception("Failed to run Job")
-        job['status'] = STATUS_FAILED
+        job['status'] = job_status.STATUS_FAILED
         if isinstance(exc, WPSException):
             job['status_message'] = "Error: [{0}] {1}".format(exc.locator, exc.text)
         else:
             job['status_message'] = "Error: {0}".format(exc.message)
 
     finally:
-        save_log(job)
-        store.update_job({'identifier': job.identifier}, job)
+        job.save_log(logger=task_logger)
+        store.update_job(job)
 
     return job.status
 
@@ -281,7 +257,7 @@ def submit_job_handler(request, service_url, is_workflow=False):
         job_id=result.id)
     body_data = {
         'jobID': result.id,
-        'status': STATUS_ACCEPTED,
+        'status': job_status.STATUS_ACCEPTED,
         'location': location
     }
     headers = request.headers

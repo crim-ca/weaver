@@ -203,11 +203,10 @@ class MemoryJobStore(JobStore):
         """
         raise NotImplementedError
 
-    def update_job(self, job, attributes):
+    def update_job(self, job):
         """
         Updates a job parameters in mongodb storage.
         :param job: instance of ``twitcher.datatype.Job``.
-        :param attributes: dictionary of field:value to update.
         """
         raise NotImplementedError
 
