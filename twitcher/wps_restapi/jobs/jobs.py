@@ -10,6 +10,7 @@ from owslib.wps import WPSExecution
 from lxml import etree
 from celery.utils.log import get_task_logger
 import requests
+from requests_file import FileAdapter
 
 logger = get_task_logger(__name__)
 
@@ -37,7 +38,9 @@ def check_status(url=None, response=None, sleep_secs=2, verify=False):
         xml = response
     elif url:
         logger.debug('using status_location url ...')
-        xml = requests.get(url, verify=verify).content
+        request_session = requests.Session()
+        request_session.mount('file://', FileAdapter())
+        xml = request_session.get(url, verify=verify).content
     else:
         raise Exception("you need to provide a status-location url or response object.")
     if type(xml) is unicode:
