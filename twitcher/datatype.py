@@ -208,54 +208,58 @@ class Job(dict):
             raise ValueError("Value must be in range [0,100] for `{}.progress`".format(type(self)))
         self['progress'] = progress
 
-    @property
-    def results(self):
+    def _get_results(self):
         if self.get('results') is None:
             self['results'] = list()
         return self['results']
 
-    @results.setter
-    def results(self, results):
+    def _set_results(self, results):
         if not isinstance(results, list):
             raise TypeError("Type `list` is required for `{}.results`".format(type(self)))
         self['results'] = results
 
-    @property
-    def exceptions(self):
+    # allows to correctly update list by ref using `job.results.extend()`
+    results = property(_get_results, _set_results)
+
+    def _get_exceptions(self):
         if self.get('exceptions') is None:
             self['exceptions'] = list()
         return self['exceptions']
 
-    @exceptions.setter
-    def exceptions(self, exceptions):
+    def _set_exceptions(self, exceptions):
         if not isinstance(exceptions, list):
             raise TypeError("Type `list` is required for `{}.exceptions`".format(type(self)))
         self['exceptions'] = exceptions
 
-    @property
-    def logs(self):
+    # allows to correctly update list by ref using `job.exceptions.extend()`
+    exceptions = property(_get_exceptions, _set_exceptions)
+
+    def _get_logs(self):
         if self.get('logs') is None:
             self['logs'] = list()
         return self['logs']
 
-    @logs.setter
-    def logs(self, logs):
+    def _set_logs(self, logs):
         if not isinstance(logs, list):
             raise TypeError("Type `list` is required for `{}.logs`".format(type(self)))
         self['logs'] = logs
 
-    @property
-    def tags(self):
+    # allows to correctly update list by ref using `job.logs.extend()`
+    logs = property(_get_logs, _set_logs)
+
+    def _get_tags(self):
         if self.get('tags') is None:
             self['tags'] = list()
         return self['tags']
 
-    @tags.setter
-    def tags(self, tags):
+    def _set_tags(self, tags):
         if not isinstance(tags, list):
             raise TypeError("Type `list` is required for `{}.tags`".format(type(self)))
         self['tags'] = tags
 
+    # allows to correctly update list by ref using `job.tags.extend()`
+    tags = property(_get_tags, _set_tags)
+    
     @property
     def request(self):
         return self.get('request', None)
