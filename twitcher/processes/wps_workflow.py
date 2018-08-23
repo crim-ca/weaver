@@ -101,8 +101,9 @@ def _cwl2wps_io(io_info):
             'identifier': io_name,
             'title': io_info.get('label', io_name),
             'abstract': io_info.get('doc', ''),
-            'supported_formats': [Format(io_info.get('format', 'text/plain'))]
         }
+        if 'format' in io_info:
+            kw['supported_formats'] = [Format(io_info['format'])]
         if is_output:
             if io_type == 'Directory':
                 kw['as_reference'] = True
@@ -210,7 +211,7 @@ def merge_workflow_inputs_outputs(wps_inputs_list, cwl_inputs_list, wps_outputs_
 
 def _get_workflow_io(workflow, io_attrib, as_json):
     cwl_workflow_io = getattr(workflow.t, io_attrib)
-    wps_workflow_io = [_cwl2wps_io(o) for o in cwl_workflow_io['fields']]
+    wps_workflow_io = [_cwl2wps_io(io) for io in cwl_workflow_io['fields']]
     if as_json:
         return [io.json for io in wps_workflow_io]
     return wps_workflow_io
