@@ -107,7 +107,7 @@ def _cwl2wps_io(io_info):
             kw['supported_formats'] = [Format(io_info['format'])]
             kw['mode'] = MODE.SIMPLE
         else:
-            kw['supported_formats'] = None
+            kw['supported_formats'] = list()
             kw['mode'] = MODE.NONE
         if is_output:
             if io_type == 'Directory':
