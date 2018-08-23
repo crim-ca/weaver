@@ -174,7 +174,7 @@ class MongodbJobStore(JobStore, MongodbStore):
         Updates a job parameters in mongodb storage.
         :param job: instance of ``twitcher.datatype.Job``.
         """
-        test = self.collection.update_one({'task_id', job.task_id}, job.params)
+        test = self.collection.update_one({'task_id', job.task_id}, {'$set': job.params})
         return self.fetch_by_id(job.task_id)
 
     def delete_job(self, job_id, request=None):
