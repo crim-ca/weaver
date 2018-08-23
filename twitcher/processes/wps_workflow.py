@@ -11,6 +11,7 @@ from pywps import (
     BoundingBoxOutput,
     Format,
 )
+from pywps.validator.mode import MODE
 from pywps.app.Common import Metadata
 from twitcher.utils import parse_request_query
 from collections import OrderedDict
@@ -104,6 +105,10 @@ def _cwl2wps_io(io_info):
         }
         if 'format' in io_info:
             kw['supported_formats'] = [Format(io_info['format'])]
+            kw['mode'] = MODE.SIMPLE
+        else:
+            kw['supported_formats'] = None
+            kw['mode'] = MODE.NONE
         if is_output:
             if io_type == 'Directory':
                 kw['as_reference'] = True
