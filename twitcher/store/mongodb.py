@@ -242,7 +242,7 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
 
 from twitcher.store.base import JobStore
 from twitcher.datatype import Job
-from twitcher.exceptions import JobRegistrationError, JobNotFound
+from twitcher.exceptions import JobRegistrationError, JobNotFound, JobUpdateError
 from twitcher.wps_restapi.sort import *
 from twitcher.wps_restapi.status import *
 from pyramid.security import authenticated_userid
@@ -282,18 +282,25 @@ class MongodbJobStore(JobStore, MongodbStore):
             self.collection.insert_one(new_job)
             job = self.fetch_by_id(job_id=task_id)
             if job is None:
-                raise JobRegistrationError
+                raise JobRegistrationError("Failed to retrieve registered job.")
             return job
-        except Exception:
-            raise JobRegistrationError
+        except JobRegistrationError:
+            raise
+        except Exception as ex:
+            raise JobRegistrationError("Error occurred during job registration: {}".format(repr(ex)))
 
     def update_job(self, job):
         """
         Updates a job parameters in mongodb storage.
         :param job: instance of ``twitcher.datatype.Job``.
         """
-        test = self.collection.update_one({'task_id': job.task_id}, {'$set': job.params})
-        return self.fetch_by_id(job.task_id)
+        try:
+            result = self.collection.update_one({'task_id': job.task_id}, {'$set': job.params})
+            if result.acknowledged and result.modified_count == 1:
+                return self.fetch_by_id(job.task_id)
+        except Exception as ex:
+            raise JobUpdateError("Error occurred during job update: {}".format(repr(ex)))
+        raise JobUpdateError("Failed to update specified job: {}".format(str(job)))
 
     def delete_job(self, job_id, request=None):
         """
@@ -308,7 +315,7 @@ class MongodbJobStore(JobStore, MongodbStore):
         """
         job = self.collection.find_one({'task_id': job_id})
         if not job:
-            raise JobNotFound
+            raise JobNotFound("Could not find job matching: {}".format(job_id))
         return Job(job)
 
     def list_jobs(self, request=None):
