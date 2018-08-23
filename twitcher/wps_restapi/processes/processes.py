@@ -15,7 +15,7 @@ from twitcher.processes import wps_workflow as wf
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import check_status
-from twitcher.wps_restapi import status as job_status
+from twitcher.wps_restapi import status
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference
 from lxml import etree
 from six import string_types
@@ -115,6 +115,13 @@ def _jsonify_output(output, datatype):
     return json_output
 
 
+def _map_status(wps_execution_status):
+    job_status = wps_execution_status.lower().strip('process')
+    if job_status in status.status_values:
+        return job_status
+    return 'unknown'
+
+
 @app.task(bind=True)
 def execute_process(self, url, service, process, inputs, outputs,
                     is_workflow=False, user_id=None, async=True, headers=None):
@@ -136,7 +143,7 @@ def execute_process(self, url, service, process, inputs, outputs,
             raise execution.errors[0]
 
         # job['abstract'] = getattr(execution.process, "abstract")
-        job.status = job_status.STATUS_RUNNING
+        job.status = status.STATUS_RUNNING
         job.status_location = execution.statusLocation
         job.request = execution.request
         job.response = etree.tostring(execution.response)
@@ -154,7 +161,7 @@ def execute_process(self, url, service, process, inputs, outputs,
                                          sleep_secs=wait_secs(run_step))
 
                 job.response = etree.tostring(execution.response)
-                job.status = execution.getStatus()
+                job.status = _map_status(execution.getStatus())
                 job.status_message = execution.statusMessage
                 job.progress = execution.percentCompleted
 
@@ -163,7 +170,7 @@ def execute_process(self, url, service, process, inputs, outputs,
                     if execution.isSucceded():
                         task_logger.debug("Job succeeded")
                         job.progress = 100
-                        job.status = job_status.STATUS_FINISHED
+                        job.status = status.STATUS_FINISHED
                         job.status_message = execution.statusMessage
 
                         process = wps.describeprocess(job.process)
@@ -194,7 +201,7 @@ def execute_process(self, url, service, process, inputs, outputs,
 
     except (WPSException, Exception) as exc:
         task_logger.exception("Failed to run {}.".format(str(job)))
-        job.status = job_status.STATUS_FAILED
+        job.status = status.STATUS_FAILED
         if isinstance(exc, WPSException):
             job.status_message = "Error: [{0}] {1}".format(exc.locator, exc.text)
         else:
@@ -258,7 +265,7 @@ def submit_job_handler(request, service_url, is_workflow=False):
         job_id=result.id)
     body_data = {
         'jobID': result.id,
-        'status': job_status.STATUS_ACCEPTED,
+        'status': status.STATUS_ACCEPTED,
         'location': location
     }
     headers = request.headers
