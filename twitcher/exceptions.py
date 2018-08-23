@@ -41,3 +41,11 @@ class JobRegistrationError(Exception):
     storage backend by an instance of :class:`twitcher.store.JobStore`.
     """
     pass
+
+
+class JobUpdateError(Exception):
+    """
+    Error indicating that an job could not be updated in the
+    storage backend by an instance of :class:`twitcher.store.JobStore`.
+    """
+    pass

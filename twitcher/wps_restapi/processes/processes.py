@@ -134,7 +134,7 @@ def execute_process(self, url, service, process, inputs, outputs,
         job.status_location = execution.statusLocation
         job.request = execution.request
         job.response = etree.tostring(execution.response)
-        store.update_job(job)
+        job = store.update_job(job)
 
         task_logger.debug("Job init done %s ...", task_id)
 
@@ -184,7 +184,7 @@ def execute_process(self, url, service, process, inputs, outputs,
                 run_step += 1
             finally:
                 job.save_log(logger=task_logger)
-                store.update_job(job)
+                job = store.update_job(job)
 
     except (WPSException, JobRegistrationError, Exception) as exc:
         task_logger.exception("Failed to run {}.".format(str(job)))
@@ -196,7 +196,7 @@ def execute_process(self, url, service, process, inputs, outputs,
 
     finally:
         job.save_log(logger=task_logger)
-        store.update_job(job)
+        job = store.update_job(job)
 
     return job.status
 
