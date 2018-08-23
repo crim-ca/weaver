@@ -85,7 +85,7 @@ class Job(dict):
                     'Text': error.text
                 } for error in errors])
         else:
-            log_msg = ['{0} {1:3d}%: {2}'.format(self.duration, self.process, self.status_message)]
+            log_msg = ['{0} {1:3d}%: {2}'.format(self.duration, self.progress, self.status_message)]
         # skip same log messages
         if len(self.logs) == 0 or self.logs[-1] != log_msg[0]:
             self.logs.extend(log_msg)
