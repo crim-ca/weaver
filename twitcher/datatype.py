@@ -9,6 +9,7 @@ from datetime import datetime
 from twitcher.utils import now_secs
 from twitcher.exceptions import ProcessInstanceError
 from twitcher.processes import process_mapping
+from twitcher.wps_restapi.status import status_values
 from pywps import Process as ProcessWPS
 
 
@@ -140,6 +141,8 @@ class Job(dict):
     def status(self, status):
         if not isinstance(status, six.string_types):
             raise TypeError("Type `str` is required for `{}.status`".format(type(self)))
+        if status not in status_values:
+            raise ValueError("Status `{0}` is not valid for `{1}.status`".format(status, type(self)))
         self['status'] = status
 
     @property
