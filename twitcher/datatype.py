@@ -210,7 +210,9 @@ class Job(dict):
 
     @property
     def results(self):
-        return self.get('results', list())
+        if self.get('results') is None:
+            self['results'] = list()
+        return self['results']
 
     @results.setter
     def results(self, results):
@@ -220,7 +222,9 @@ class Job(dict):
 
     @property
     def exceptions(self):
-        return self.get('exceptions', list())
+        if self.get('exceptions') is None:
+            self['exceptions'] = list()
+        return self['exceptions']
 
     @exceptions.setter
     def exceptions(self, exceptions):
@@ -230,7 +234,9 @@ class Job(dict):
 
     @property
     def logs(self):
-        return self.get('logs', list())
+        if self.get('logs') is None:
+            self['logs'] = list()
+        return self['logs']
 
     @logs.setter
     def logs(self, logs):
@@ -240,7 +246,9 @@ class Job(dict):
 
     @property
     def tags(self):
-        return self.get('tags', list())
+        if self.get('tags') is None:
+            self['tags'] = list()
+        return self['tags']
 
     @tags.setter
     def tags(self, tags):
