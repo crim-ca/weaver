@@ -270,7 +270,7 @@ class MongodbJobStore(JobStore, MongodbStore):
             else:
                 tags.append('sync')
             new_job = Job({
-                'task_id': task_id,     # TODO: why not using as identifier?
+                'task_id': task_id,
                 'user_id': user_id,
                 'service': service,     # provider identifier (WPS service)
                 'process': process,     # process identifier (WPS request)
