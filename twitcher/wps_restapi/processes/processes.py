@@ -186,7 +186,7 @@ def execute_process(self, url, service, process, inputs, outputs,
                 job.save_log(logger=task_logger)
                 job = store.update_job(job)
 
-    except (WPSException, JobRegistrationError, Exception) as exc:
+    except (WPSException, Exception) as exc:
         task_logger.exception("Failed to run {}.".format(str(job)))
         job.status = job_status.STATUS_FAILED
         if isinstance(exc, WPSException):
