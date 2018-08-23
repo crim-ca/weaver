@@ -107,7 +107,9 @@ def _cwl2wps_io(io_info):
             kw['supported_formats'] = [Format(io_info['format'])]
             kw['mode'] = MODE.SIMPLE
         else:
-            kw['supported_formats'] = list()
+            # we need to minimally add 1 format, otherwise empty list is evaluated as None by pywps
+            # when 'supported_formats' is None, the process's json property raises because of it cannot iterate formats
+            kw['supported_formats'] = [Format('text/plain')]
             kw['mode'] = MODE.NONE
         if is_output:
             if io_type == 'Directory':
