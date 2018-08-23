@@ -456,7 +456,7 @@ def get_local_process(request):
     try:
         store = processstore_defaultfactory(request.registry)
         process = store.fetch_by_id(process_id)
-        return {'process': process.json()}
+        return HTTPOk(json={'process': process.json()})
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except ProcessNotFound:
