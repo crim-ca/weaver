@@ -147,10 +147,12 @@ class Job(dict):
 
     @property
     def status_message(self):
-        return self.get('status_message', 'undefined')
+        return self.get('status_message', 'no message')
 
     @status_message.setter
     def status_message(self, message):
+        if message is None:
+            return
         if not isinstance(message, six.string_types):
             raise TypeError("Type `str` is required for `{}.status_message`".format(type(self)))
         self['status_message'] = message
