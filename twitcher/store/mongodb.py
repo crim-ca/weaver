@@ -247,7 +247,7 @@ class MongodbJobStore(JobStore, MongodbStore):
         sort_criteria = [(sort, sort_order)]
         found = self.collection.find(search_filters)
         count = found.count()
-        items = list(found.skip(page * limit).limit(limit).sort(sort_criteria))
+        items = [Job(item) for item in list(found.skip(page * limit).limit(limit).sort(sort_criteria))]
         return items, count
 
     def clear_jobs(self, request=None):
