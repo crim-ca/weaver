@@ -130,13 +130,13 @@ def execute_process(self, url, service, process, inputs, outputs,
             raise execution.errors[0]
 
         # job['abstract'] = getattr(execution.process, "abstract")
-        job['status'] = job_status.STATUS_RUNNING
-        job['status_location'] = execution.statusLocation
-        job['request'] = execution.request
-        job['response'] = etree.tostring(execution.response)
+        job.status = job_status.STATUS_RUNNING
+        job.status_location = execution.statusLocation
+        job.request = execution.request
+        job.response = etree.tostring(execution.response)
         store.update_job(job)
 
-        task_logger.debug("job init done %s ...", self.request.id)
+        task_logger.debug("Job init done %s ...", task_id)
 
         num_retries = 0
         run_step = 0
@@ -147,39 +147,39 @@ def execute_process(self, url, service, process, inputs, outputs,
                 execution = check_status(url=execution.statusLocation, verify=False,
                                          sleep_secs=wait_secs(run_step))
 
-                job['response'] = etree.tostring(execution.response)
-                job['status'] = execution.getStatus()
-                job['status_message'] = execution.statusMessage
-                job['progress'] = execution.percentCompleted
+                job.response = etree.tostring(execution.response)
+                job.status = execution.getStatus()
+                job.status_message = execution.statusMessage
+                job.progress = execution.percentCompleted
 
                 if execution.isComplete():
                     job.is_finished()
                     if execution.isSucceded():
-                        task_logger.debug("job succeeded")
-                        job['progress'] = 100
-                        job['status'] = job_status.STATUS_FINISHED
-                        job['status_message'] = execution.statusMessage
+                        task_logger.debug("Job succeeded")
+                        job.progress = 100
+                        job.status = job_status.STATUS_FINISHED
+                        job.status_message = execution.statusMessage
 
-                        process = wps.describeprocess(job['process_id'])
+                        process = wps.describeprocess(job.process)
 
                         output_datatype = {
                             getattr(processOutput, 'identifier', ''): processOutput.dataType
                             for processOutput in getattr(process, 'processOutputs', [])}
 
-                        job['outputs'] = [_jsonify_output(output, output_datatype[output.identifier])
-                                          for output in execution.processOutputs]
+                        job.results = [_jsonify_output(output, output_datatype[output.identifier])
+                                       for output in execution.processOutputs]
                     else:
-                        task_logger.debug("job failed.")
-                        job['status_message'] = '\n'.join(error.text for error in execution.errors)
+                        task_logger.debug("Job failed.")
+                        job.status_message = '\n'.join(error.text for error in execution.errors)
                         job.save_log(errors=execution.errors, logger=task_logger)
 
-            except Exception as ex:
+            except Exception as exc:
                 num_retries += 1
-                task_logger.exception("Could not read status xml document for job %s. Trying again ...",
-                                      self.request.id)
+                task_logger.debug('Exception raised: {}'.format(repr(exc)))
+                task_logger.exception("Could not read status xml document for job %s. Trying again ...", task_id)
                 sleep(1)
             else:
-                task_logger.debug("update job %s ...", self.request.id)
+                task_logger.debug("Update job %s ...", task_id)
                 num_retries = 0
                 run_step += 1
             finally:
@@ -187,18 +187,18 @@ def execute_process(self, url, service, process, inputs, outputs,
                 store.update_job(job)
 
     except (WPSException, JobRegistrationError, Exception) as exc:
-        task_logger.exception("Failed to run Job")
-        job['status'] = job_status.STATUS_FAILED
+        task_logger.exception("Failed to run {}.".format(str(job)))
+        job.status = job_status.STATUS_FAILED
         if isinstance(exc, WPSException):
-            job['status_message'] = "Error: [{0}] {1}".format(exc.locator, exc.text)
+            job.status_message = "Error: [{0}] {1}".format(exc.locator, exc.text)
         else:
-            job['status_message'] = "Error: {0}".format(exc.message)
+            job.status_message = "Error: {0}".format(exc.message)
 
     finally:
         job.save_log(logger=task_logger)
         store.update_job(job)
 
-    return job['status']
+    return job.status
 
 
 def submit_job_handler(request, service_url):

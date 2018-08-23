@@ -70,8 +70,9 @@ class Job(dict):
     def __init__(self, *args, **kwargs):
         super(Job, self).__init__(*args, **kwargs)
         if 'task_id' not in self:
-            raise TypeError("'task_id' is required")
-        self['identifier'] = uuid.uuid4().get_hex()
+            raise TypeError("Parameter `task_id` is required for `{}` creation.".format(type(self)))
+        if not isinstance(self['task_id'], six.string_types):
+            raise TypeError("Type `str` is required for `{}.task_id`".format(type(self)))
 
     def save_log(self, errors=None, logger=None):
         if isinstance(errors, six.string_types):
@@ -100,36 +101,74 @@ class Job(dict):
         return self['task_id']
 
     @property
-    def identifier(self):
-        return self['identifier']
-
-    @property
     def service(self):
         return self.get('service', None)
+
+    @service.setter
+    def service(self, service):
+        if not isinstance(service, six.string_types):
+            raise TypeError("Type `str` is required for `{}.service`".format(type(self)))
+        self['service'] = service
 
     @property
     def process(self):
         return self.get('process', None)
 
+    @process.setter
+    def process(self, process):
+        if not isinstance(process, six.string_types):
+            raise TypeError("Type `str` is required for `{}.process`".format(type(self)))
+        self['process'] = process
+
     @property
     def user_id(self):
         return self.get('user_id', None)
+
+    @user_id.setter
+    def user_id(self, user_id):
+        if not isinstance(user_id, int):
+            raise TypeError("Type `int` is required for `{}.user_id`".format(type(self)))
+        self['user_id'] = user_id
 
     @property
     def status(self):
         return self.get('status', 'unknown')
 
+    @status.setter
+    def status(self, status):
+        if not isinstance(status, six.string_types):
+            raise TypeError("Type `str` is required for `{}.status`".format(type(self)))
+        self['status'] = status
+
     @property
     def status_message(self):
-        return self.get('status_message', 'no message')
+        return self.get('status_message', 'undefined')
+
+    @status_message.setter
+    def status_message(self, message):
+        if not isinstance(message, six.string_types):
+            raise TypeError("Type `str` is required for `{}.status_message`".format(type(self)))
+        self['status_message'] = message
 
     @property
     def status_location(self):
         return self.get('status_message', None)
 
+    @status_location.setter
+    def status_location(self, location_url):
+        if not isinstance(location_url, six.string_types):
+            raise TypeError("Type `str` is required for `{}.status_location`".format(type(self)))
+        self['status_location'] = location_url
+
     @property
     def is_workflow(self):
         return self.get('is_workflow', False)
+
+    @is_workflow.setter
+    def is_workflow(self, is_workflow):
+        if not isinstance(is_workflow, bool):
+            raise TypeError("Type `bool` is required for `{}.is_workflow`".format(type(self)))
+        self['is_workflow'] = is_workflow
 
     @property
     def created(self):
@@ -156,31 +195,74 @@ class Job(dict):
     def progress(self):
         return self.get('progress', 0)
 
+    @progress.setter
+    def progress(self, progress):
+        if not isinstance(progress, (int, float)):
+            raise TypeError("Number is required for `{}.progress`".format(type(self)))
+        if progress < 0 or progress > 100:
+            raise ValueError("Value must be in range [0,100] for `{}.progress`".format(type(self)))
+        self['progress'] = progress
+
+    @property
+    def results(self):
+        return self.get('results', list())
+
+    @results.setter
+    def results(self, results):
+        if not isinstance(results, list):
+            raise TypeError("Type `list` is required for `{}.results`".format(type(self)))
+        self['results'] = results
+
     @property
     def exceptions(self):
         return self.get('exceptions', list())
+
+    @exceptions.setter
+    def exceptions(self, exceptions):
+        if not isinstance(exceptions, list):
+            raise TypeError("Type `list` is required for `{}.exceptions`".format(type(self)))
+        self['exceptions'] = exceptions
 
     @property
     def logs(self):
         return self.get('logs', list())
 
+    @logs.setter
+    def logs(self, logs):
+        if not isinstance(logs, list):
+            raise TypeError("Type `list` is required for `{}.logs`".format(type(self)))
+        self['logs'] = logs
+
     @property
     def tags(self):
         return self.get('tags', list())
 
+    @tags.setter
+    def tags(self, tags):
+        if not isinstance(tags, list):
+            raise TypeError("Type `list` is required for `{}.tags`".format(type(self)))
+        self['tags'] = tags
+
     @property
     def request(self):
-        return self.get('request', list())
+        return self.get('request', None)
+
+    @request.setter
+    def request(self, request):
+        self['request'] = request
 
     @property
     def response(self):
-        return self.get('response', list())
+        return self.get('response', None)
+
+    @response.setter
+    def response(self, response):
+        self['response'] = response
 
     @property
     def params(self):
         return {
             'task_id': self.task_id,
-            'identifier': self.identifier,
             'service': self.service,
             'process': self.process,
             'user_id': self.user_id,
@@ -192,6 +274,7 @@ class Job(dict):
             'finished': self.finished,
             'duration': self.duration,
             'progress': self.progress,
+            'results': self.results,
             'exceptions': self.exceptions,
             'logs': self.logs,
             'tags': self.tags,
