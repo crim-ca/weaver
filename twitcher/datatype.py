@@ -90,7 +90,7 @@ class Job(dict):
         else:
             log_msg = [(INFO, '{0} {1:3d}%: {2}'.format(self.duration, self.progress, self.status_message))]
         for level, msg in log_msg:
-            fmt_msg = '{0}: {1}'.format(_levelNames[level], msg)
+            fmt_msg = '{0:8} | {1} | {2}'.format(_levelNames[level], datetime.now(), msg)
             if len(self.logs) == 0 or self.logs[-1] != fmt_msg:
                 self.logs.append(fmt_msg)
                 if logger:
