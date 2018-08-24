@@ -15,6 +15,7 @@ from pywps.inout.literaltypes import AnyValue
 from pywps.validator.mode import MODE
 from pywps.app.Common import Metadata
 from twitcher.utils import parse_request_query
+from twitcher.exceptions import WorkflowTypeError, WorkflowRegistrationError, WorkflowExecutionError
 from collections import OrderedDict
 import json
 import yaml
@@ -34,9 +35,9 @@ def check_workflow_file(cwl_file):
     cwl_path = os.path.abspath(cwl_file)
     file_ext = os.path.splitext(cwl_path)[1].replace('.', '')
     if file_ext not in WORKFLOW_EXTENSIONS:
-        raise Exception("Not a valid CWL file type: `{}`.".format(file_ext))
+        raise WorkflowRegistrationError("Not a valid CWL file type: `{}`.".format(file_ext))
     if not os.path.isfile(cwl_path):
-        raise Exception("Cannot find CWL file at: `{}`.".format(cwl_path))
+        raise WorkflowRegistrationError("Cannot find CWL file at: `{}`.".format(cwl_path))
     return cwl_path
 
 
@@ -77,7 +78,7 @@ def _cwl2wps_io(io_info):
         io_complex = ComplexOutput
         io_bbox = BoundingBoxOutput
     else:
-        raise Exception("Unsupported I/O info definition: `{}`.".format(repr(io_info)))
+        raise WorkflowTypeError("Unsupported I/O info definition: `{}`.".format(repr(io_info)))
 
     io_name = io_info['name']
     io_type = io_info['type']
@@ -168,7 +169,8 @@ def _dict2wps_io(io_info, input_or_output):
             return BoundingBoxOutput(**io_info)
         if io_type == 'literal':
             return LiteralOutput(**io_info)
-    raise Exception("Unknown conversion from dict to WPS type (type={0}, mode={1}).".format(io_type, input_or_output))
+    raise WorkflowTypeError("Unknown conversion from dict to WPS type (type={0}, mode={1})."
+                            .format(io_type, input_or_output))
 
 
 def _get_field(io_object, field):
@@ -196,7 +198,7 @@ def _merge_workflow_io(wps_io_list, cwl_io_list):
     :returns: list of validated/updated WPS I/O for the process.
     """
     if not isinstance(cwl_io_list, list):
-        raise Exception("CWL I/O definitions must be provided, empty list if none required.")
+        raise WorkflowTypeError("CWL I/O definitions must be provided, empty list if none required.")
     if not wps_io_list:
         wps_io_list = list()
     wps_io_dict = OrderedDict((_get_field(wps_io, 'identifier'), wps_io) for wps_io in wps_io_list)
@@ -259,11 +261,11 @@ class Workflow(Process):
     def __init__(self, **kw):
         package = kw.pop('package')
         if not package:
-            raise Exception("Missing required package definition for workflow process.")
+            raise WorkflowRegistrationError("Missing required package definition for workflow process.")
         if isinstance(package, dict):
             self.workflow = load_workflow_content(package)
         else:
-            raise TypeError("Unknown parsing of package definition for workflow process.")
+            raise WorkflowTypeError("Unknown parsing of package definition for workflow process.")
 
         wps_inputs = kw.pop('inputs')
         wps_outputs = kw.pop('outputs')
@@ -282,16 +284,35 @@ class Workflow(Process):
         )
 
     def _handler(self, request, response):
-        response.update_status("Launching workflow ...", 0)
+        workflow_name = request.identifier
+        response.update_status("Launching workflow `{}` ...".format(workflow_name), 0)
         LOGGER.debug("HOME=%s, Current Dir=%s", os.environ.get('HOME'), os.path.abspath(os.curdir))
 
-        # input parameters from JSON body for WPS 2.0
-        if request.content_type == 'application/json':
-            data_inputs = request.json
-        # input parameters from request query from WPS 1.0
-        else:
-            data_inputs = parse_request_query(request)
-        self.workflow(**data_inputs)
-
-        #response.outputs['output'].data = 'Workflow: {}'.format(self.cwl_file)
+        try:
+            cwl_input_types = dict([(i['name'], i['type']) for i in self.workflow.t.inputs_record_schema['fields']])
+        except Exception as exc:
+            raise WorkflowExecutionError("Failed retrieving workflow `{0}` input types from package definition: {1}"
+                                         .format(workflow_name, repr(exc)))
+        try:
+            cwl_inputs = dict()
+            for i in request.inputs.values():
+                i = i[0]  # only 1 input per deque since min/max=1
+                if isinstance(i, (LiteralInput, BoundingBoxInput)):
+                    cwl_inputs[i.identifier] = i.data
+                elif isinstance(i, ComplexInput):
+                    cwl_inputs[i.identifier] = {'location': i.data, 'class': cwl_input_types[i.identifier]}
+                else:
+                    raise WorkflowTypeError("Undefined workflow `{0}` input received for execution: {1}"
+                                            .format(workflow_name, type(i)))
+        except Exception as exc:
+            raise WorkflowExecutionError("Failed to load workflow `{0}` inputs: {1}".format(workflow_name, repr(exc)))
+        try:
+            result = self.workflow(**cwl_inputs)
+        except Exception as exc:
+            raise WorkflowExecutionError("Failed workflow `{0}` execution: {1}".format(workflow_name, repr(exc)))
+        try:
+            for output in request.outputs:
+                response.outputs[output].data = result[output]
+        except Exception as exc:
+            raise WorkflowExecutionError("Failed to save workflow `{0}` outputs: {1}".format(workflow_name, repr(exc)))
         return response

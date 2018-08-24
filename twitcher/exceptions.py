@@ -73,3 +73,27 @@ class JobUpdateError(Exception):
     storage backend by an instance of :class:`twitcher.store.JobStore`.
     """
     pass
+
+
+class WorkflowTypeError(Exception):
+    """
+    Error indicating that an instance of :class:`twitcher.processes.wps_workflow.Workflow`
+    could not properly parse input/output type(s) for workflow deployment or execution.
+    """
+    pass
+
+
+class WorkflowRegistrationError(Exception):
+    """
+    Error indicating that an instance of :class:`twitcher.processes.wps_workflow.Workflow`
+    could not properly be registered for workflow deployment because of invalid prerequisite.
+    """
+    pass
+
+
+class WorkflowExecutionError(Exception):
+    """
+    Error indicating that an instance of :class:`twitcher.processes.wps_workflow.Workflow`
+    could not properly execute the workflow using provided inputs and package definition.
+    """
+    pass
