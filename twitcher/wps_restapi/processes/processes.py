@@ -189,11 +189,11 @@ def execute_process(self, url, service, process, inputs, outputs,
             except Exception as exc:
                 num_retries += 1
                 task_logger.debug('Exception raised: {}'.format(repr(exc)))
-                task_logger.exception("Could not read status xml document for {}. Trying again ...".format(str(job)))
+                job.status_message = "Could not read status xml document for {}. Trying again ...".format(str(job))
                 job.save_log(errors=execution.errors, logger=task_logger)
                 sleep(1)
             else:
-                task_logger.debug("Update {} ...".format(str(job)))
+                job.status_message = "Update {} ...".format(str(job))
                 job.save_log(logger=task_logger)
                 num_retries = 0
                 run_step += 1
@@ -201,12 +201,12 @@ def execute_process(self, url, service, process, inputs, outputs,
                 job = store.update_job(job)
 
     except (WPSException, Exception) as exc:
-        task_logger.exception("Failed to run {}.".format(str(job)))
         job.status = status.STATUS_FAILED
+        job.status_message = "Failed to run {}.".format(str(job))
         if isinstance(exc, WPSException):
-            errors = "Error: [{0}] {1}".format(exc.locator, exc.text)
+            errors = "[{0}] {1}".format(exc.locator, exc.text)
         else:
-            errors = "Error: {0}".format(exc.message)
+            errors = "{0}".format(exc.message)
         job.save_log(errors=errors, logger=task_logger)
     finally:
         job.status_message = "Job {}.".format(job.status)
