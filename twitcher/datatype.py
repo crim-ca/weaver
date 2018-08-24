@@ -156,7 +156,7 @@ class Job(dict):
 
     @property
     def status_location(self):
-        return self.get('status_message', None)
+        return self.get('status_location', None)
 
     @status_location.setter
     def status_location(self, location_url):
