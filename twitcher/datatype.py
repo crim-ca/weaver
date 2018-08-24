@@ -92,9 +92,11 @@ class Job(dict):
         else:
             log_msg = [(INFO, '{0} {1:3d}%: {2}'.format(self.duration, self.progress, self.status_message))]
         for level, msg in log_msg:
-            self.logs.append('{0}: {1}'.format(_levelNames[level], msg))
-            if logger:
-                logger.log(level, msg)
+            fmt_msg = '{0}: {1}'.format(_levelNames[level], msg)
+            if len(self.logs) == 0 or self.logs[-1] != fmt_msg:
+                self.logs.append(fmt_msg)
+                if logger:
+                    logger.log(level, msg)
 
     @property
     def task_id(self):
