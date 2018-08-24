@@ -11,6 +11,7 @@ from pywps import (
     BoundingBoxOutput,
     Format,
 )
+from pywps.inout.literaltypes import AnyValue
 from pywps.validator.mode import MODE
 from pywps.app.Common import Metadata
 from twitcher.utils import parse_request_query
@@ -26,6 +27,7 @@ LOGGER = logging.getLogger("PYWPS")
 
 WORKFLOW_EXTENSIONS = frozenset(['yaml', 'yml', 'json', 'cwl', 'job'])
 WORKFLOW_LITERAL_TYPES = frozenset(['string', 'boolean', 'float', 'int', 'integer', 'long', 'double', 'null', 'Any'])
+WORKFLOW_CUSTOM_TYPES = frozenset(['enum'])  # can be anything, but support 'enum' which is more common
 
 
 def check_workflow_file(cwl_file):
@@ -81,7 +83,9 @@ def _cwl2wps_io(io_info):
     io_type = io_info['type']
 
     # literal types
-    if io_type in WORKFLOW_LITERAL_TYPES:
+    if io_type in WORKFLOW_LITERAL_TYPES or io_type in WORKFLOW_CUSTOM_TYPES:
+        io_mode = MODE.NONE
+        io_allow = AnyValue
         if io_type == 'Any':
             io_type = 'anyvalue'
         if io_type == 'null':
@@ -90,12 +94,19 @@ def _cwl2wps_io(io_info):
             io_type = 'integer'
         if io_type in ['float', 'long', 'double']:
             io_type = 'float'
+        if io_type in WORKFLOW_CUSTOM_TYPES:
+            io_type = 'string'
+            io_mode = MODE.SIMPLE
+            io_allow = io_info['symbols']
         return io_literal(identifier=io_name,
                           title=io_info.get('label', io_name),
                           abstract=io_info.get('doc', ''),
                           data_type=io_type,
                           default=io_info.get('default', None),
-                          min_occurs=1, max_occurs=1)
+                          min_occurs=1, max_occurs=1,
+                          # unless extended by custom types, no value validation for literals
+                          mode=io_mode,
+                          allowed_values=io_allow)
     # complex types
     else:
         kw = {
