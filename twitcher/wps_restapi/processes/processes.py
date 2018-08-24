@@ -138,12 +138,12 @@ def execute_process(self, url, service, process, inputs, outputs,
 
         # job['abstract'] = getattr(execution.process, "abstract")
         job.status = status.STATUS_RUNNING
+        job.status_message = execution.statusMessage or "{} initiation done.".format(str(job))
         job.status_location = execution.statusLocation
         job.request = execution.request
         job.response = etree.tostring(execution.response)
+        job.save_log(logger=task_logger)
         job = store.update_job(job)
-
-        task_logger.debug("Job init done %s ...", task_id)
 
         num_retries = 0
         run_step = 0
@@ -158,15 +158,15 @@ def execute_process(self, url, service, process, inputs, outputs,
                 job.status = _map_status(execution.getStatus())
                 job.status_message = execution.statusMessage
                 job.progress = execution.percentCompleted
+                job.save_log(logger=task_logger)
 
                 if execution.isComplete():
                     job.is_finished()
                     if execution.isSucceded():
-                        task_logger.debug("Job succeeded")
                         job.progress = 100
                         job.status = status.STATUS_FINISHED
-                        job.status_message = execution.statusMessage
-
+                        job.status_message = execution.statusMessage or "Job succeeded."
+                        job.save_log(logger=task_logger)
                         process = wps.describeprocess(job.process)
 
                         output_datatype = {
@@ -177,20 +177,21 @@ def execute_process(self, url, service, process, inputs, outputs,
                                        for output in execution.processOutputs]
                     else:
                         task_logger.debug("Job failed.")
-                        job.status_message = '\n'.join(error.text for error in execution.errors)
+                        job.status_message = execution.statusMessage or "Job failed."
                         job.save_log(errors=execution.errors, logger=task_logger)
 
             except Exception as exc:
                 num_retries += 1
                 task_logger.debug('Exception raised: {}'.format(repr(exc)))
-                task_logger.exception("Could not read status xml document for job %s. Trying again ...", task_id)
+                task_logger.exception("Could not read status xml document for {}. Trying again ...".format(str(job)))
+                job.save_log(errors=execution.errors, logger=task_logger)
                 sleep(1)
             else:
-                task_logger.debug("Update job %s ...", task_id)
+                task_logger.debug("Update {} ...".format(str(job)))
+                job.save_log(logger=task_logger)
                 num_retries = 0
                 run_step += 1
             finally:
-                job.save_log(logger=task_logger)
                 job = store.update_job(job)
 
     except (WPSException, Exception) as exc:
@@ -200,7 +201,6 @@ def execute_process(self, url, service, process, inputs, outputs,
             job.status_message = "Error: [{0}] {1}".format(exc.locator, exc.text)
         else:
             job.status_message = "Error: {0}".format(exc.message)
-
     finally:
         job.save_log(logger=task_logger)
         job = store.update_job(job)
