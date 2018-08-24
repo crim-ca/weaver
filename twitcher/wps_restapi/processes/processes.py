@@ -204,10 +204,12 @@ def execute_process(self, url, service, process, inputs, outputs,
         task_logger.exception("Failed to run {}.".format(str(job)))
         job.status = status.STATUS_FAILED
         if isinstance(exc, WPSException):
-            job.status_message = "Error: [{0}] {1}".format(exc.locator, exc.text)
+            errors = "Error: [{0}] {1}".format(exc.locator, exc.text)
         else:
-            job.status_message = "Error: {0}".format(exc.message)
+            errors = "Error: {0}".format(exc.message)
+        job.save_log(errors=errors, logger=task_logger)
     finally:
+        job.status_message = "Job {}.".format(job.status)
         job.save_log(logger=task_logger)
         job = store.update_job(job)
 
