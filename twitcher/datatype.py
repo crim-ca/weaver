@@ -6,6 +6,7 @@ import six
 import time
 import uuid
 from datetime import datetime
+from logging import _levelNames, ERROR, INFO
 from twitcher.utils import now_secs
 from twitcher.exceptions import AccessTokenNotFound
 from twitcher.wps_restapi.status import status_values
@@ -77,25 +78,21 @@ class Job(dict):
 
     def save_log(self, errors=None, logger=None):
         if isinstance(errors, six.string_types):
-            errors = list(errors)
-        if isinstance(errors, list):
-            log_msg = ['ERROR: {0.text} - code={0.code} - locator={0.locator}'.format(error) for error in errors]
+            log_msg = [(ERROR, '{0} {1:3d}%: {2}'.format(self.duration, self.progress, self.status_message))]
+            self.exceptions.append(errors)
+        elif isinstance(errors, list):
+            log_msg = [(ERROR, '{0.text} - code={0.code} - locator={0.locator}'.format(error)) for error in errors]
             self.exceptions.extend([{
                     'Code': error.code,
                     'Locator': error.locator,
                     'Text': error.text
                 } for error in errors])
         else:
-            log_msg = ['{0} {1:3d}%: {2}'.format(self.duration, self.progress, self.status_message)]
-        # skip same log messages
-        if len(self.logs) == 0 or self.logs[-1] != log_msg[0]:
-            self.logs.extend(log_msg)
+            log_msg = [(INFO, '{0} {1:3d}%: {2}'.format(self.duration, self.progress, self.status_message))]
+        for level, msg in log_msg:
+            self.logs.append('{0}: {1}'.format(_levelNames[level], log_msg))
             if logger:
-                for msg in log_msg:
-                    if errors:
-                        logger.error(msg)
-                    else:
-                        logger.info(msg)
+                logger.log(msg, level)
 
     @property
     def task_id(self):
@@ -259,7 +256,7 @@ class Job(dict):
 
     # allows to correctly update list by ref using `job.tags.extend()`
     tags = property(_get_tags, _set_tags)
-    
+
     @property
     def request(self):
         return self.get('request', None)
