@@ -78,7 +78,7 @@ class Job(dict):
 
     def save_log(self, errors=None, logger=None):
         if isinstance(errors, six.string_types):
-            log_msg = [(ERROR, '{0} {1:3d}%: {2}'.format(self.duration, self.progress, self.status_message))]
+            log_msg = [(ERROR, '{0} {1:3d}% {2}'.format(self.duration, self.progress, self.status_message))]
             self.exceptions.append(errors)
         elif isinstance(errors, list):
             log_msg = [(ERROR, '{0.text} - code={0.code} - locator={0.locator}'.format(error)) for error in errors]
@@ -88,9 +88,9 @@ class Job(dict):
                     'Text': error.text
                 } for error in errors])
         else:
-            log_msg = [(INFO, '{0} {1:3d}%: {2}'.format(self.duration, self.progress, self.status_message))]
+            log_msg = [(INFO, '{0} {1:3d}% {2}'.format(self.duration, self.progress, self.status_message))]
         for level, msg in log_msg:
-            fmt_msg = '{0}: {1}'.format(_levelNames[level], msg)
+            fmt_msg = '{0} {1:6} {2}'.format(datetime.now(), _levelNames[level], msg)
             if len(self.logs) == 0 or self.logs[-1] != fmt_msg:
                 self.logs.append(fmt_msg)
                 if logger:
