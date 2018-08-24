@@ -78,19 +78,25 @@ class Job(dict):
         if not isinstance(self['task_id'], six.string_types):
             raise TypeError("Type `str` is required for `{}.task_id`".format(type(self)))
 
+    def _get_log_msg(self, msg=None):
+        if not msg:
+            msg = self.status_message
+        return '{dur} {lvl:3d}% {msg}'.format(dur=self.duration, lvl=self.progress, msg=msg)
+
     def save_log(self, errors=None, logger=None):
         if isinstance(errors, six.string_types):
-            log_msg = [(ERROR, '{0} {1:3d}% {2}'.format(self.duration, self.progress, self.status_message))]
+            log_msg = [(ERROR, self._get_log_msg())]
             self.exceptions.append(errors)
         elif isinstance(errors, list):
-            log_msg = [(ERROR, '{0.text} - code={0.code} - locator={0.locator}'.format(error)) for error in errors]
+            log_msg = [(ERROR, self._get_log_msg('{0.text} - code={0.code} - locator={0.locator}'.format(error)))
+                       for error in errors]
             self.exceptions.extend([{
                     'Code': error.code,
                     'Locator': error.locator,
                     'Text': error.text
                 } for error in errors])
         else:
-            log_msg = [(INFO, '{0} {1:3d}% {2}'.format(self.duration, self.progress, self.status_message))]
+            log_msg = [(INFO, self._get_log_msg())]
         for level, msg in log_msg:
             fmt_msg = '{0} {1:6} {2}'.format(datetime.now(), _levelNames[level], msg)
             if len(self.logs) == 0 or self.logs[-1] != fmt_msg:
