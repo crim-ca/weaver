@@ -173,8 +173,8 @@ def execute_process(self, url, service, process, inputs, outputs,
                         job.status = status.STATUS_FINISHED
                         job.status_message = execution.statusMessage or "Job succeeded."
                         job.save_log(logger=task_logger)
-                        process = wps.describeprocess(job.process)
 
+                        process = wps.describeprocess(job.process)
                         output_datatype = {
                             getattr(processOutput, 'identifier', ''): processOutput.dataType
                             for processOutput in getattr(process, 'processOutputs', [])}

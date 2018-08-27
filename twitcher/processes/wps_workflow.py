@@ -11,6 +11,7 @@ from pywps import (
     BoundingBoxOutput,
     Format,
 )
+from pywps.response.status import WPS_STATUS
 from pywps.inout.literaltypes import AnyValue
 from pywps.validator.mode import MODE
 from pywps.app.Common import Metadata
@@ -29,6 +30,8 @@ LOGGER = logging.getLogger("PYWPS")
 WORKFLOW_EXTENSIONS = frozenset(['yaml', 'yml', 'json', 'cwl', 'job'])
 WORKFLOW_LITERAL_TYPES = frozenset(['string', 'boolean', 'float', 'int', 'integer', 'long', 'double', 'null', 'Any'])
 WORKFLOW_CUSTOM_TYPES = frozenset(['enum'])  # can be anything, but support 'enum' which is more common
+WORKFLOW_FILE_NAME = 'workflow.cwl'
+WORKFLOW_LOG_FILE = 'workflow_log_file'
 
 
 def check_workflow_file(cwl_file):
@@ -51,7 +54,7 @@ def load_workflow_file(file_path):
 def load_workflow_content(workflow_dict):
     # TODO: find how to pass dict directly (?) instead of dump to tmp file
     tmp_dir = tempfile.mkdtemp()
-    tmp_json_cwl = os.path.join(tmp_dir, 'cwl.cwl')
+    tmp_json_cwl = os.path.join(tmp_dir, WORKFLOW_FILE_NAME)
     with open(tmp_json_cwl, 'w') as f:
         json.dump(workflow_dict, f)
     cwl_factory = cwltool.factory.Factory()
@@ -256,7 +259,11 @@ def get_workflow_inputs_outputs(workflow, as_json=False):
 class Workflow(Process):
     workflow = None
     job_file = None
+    log_file = None
+    log_level = logging.INFO
+    logger = None
     tmp_dir = None
+    percent = None
 
     def __init__(self, **kw):
         package = kw.pop('package')
@@ -274,6 +281,10 @@ class Workflow(Process):
         inputs = [_dict2wps_io(i, 'input') for i in _merge_workflow_io(wps_inputs, cwl_inputs)]
         outputs = [_dict2wps_io(o, 'output') for o in _merge_workflow_io(wps_outputs, cwl_outputs)]
 
+        # append a log output
+        #outputs.append(ComplexOutput(WORKFLOW_LOG_FILE, 'Workflow log file',
+        #                             as_reference=True, supported_formats=[Format('text/plain')]))
+
         super(Workflow, self).__init__(
             self._handler,
             inputs=inputs,
@@ -283,36 +294,94 @@ class Workflow(Process):
             **kw
         )
 
+    def setup_logger(self):
+        # file logger for output
+        self.log_file = os.path.abspath(os.path.join(tempfile.mkdtemp(), '{}.log'.format(self.workflow_id)))
+        log_file_handler = logging.FileHandler(self.log_file)
+        log_file_formatter = logging.Formatter('%(asctime)s [%(name)s] %(levelname)s %(message)s')
+        log_file_handler.setFormatter(log_file_formatter)
+
+        # prepare workflow logger
+        self.logger = logging.getLogger('wps_workflow.{}'.format(self.workflow_id))
+        self.logger.addHandler(log_file_handler)
+        self.logger.setLevel(self.log_level)
+
+        # add CWL job and CWL runner logging to current workflow logger
+        job_logger = logging.getLogger('job {}'.format(WORKFLOW_FILE_NAME))
+        job_logger.addHandler(log_file_handler)
+        job_logger.setLevel(self.log_level)
+        cwl_logger = logging.getLogger('cwltool')
+        cwl_logger.addHandler(log_file_handler)
+        cwl_logger.setLevel(self.log_level)
+
+    def update_status(self, message, progress=None, status=WPS_STATUS.STARTED):
+        self.percent = progress or self.percent or 0
+        # pywps overrides 'status' by 'accepted' in 'update_status', so use the '_update_status' to enforce the status
+        # using the protected method also avoids weird overrides of progress % on failure and final 'success' status
+        self.response._update_status(status, message, self.percent)
+        self.log_message(message)
+
+    def log_message(self, message, level=logging.INFO):
+        self.logger.log(level, message, exc_info=level > logging.INFO)
+
+    def exception_message(self, exception_type, exception=None, message='no message'):
+        exception_msg = ' [{}]'.format(repr(exception)) if isinstance(exception, Exception) else ''
+        self.log_message('{0}: {1}{2}'.format(exception_type.__name__, message, exception_msg), logging.ERROR)
+        return exception_type('{0}{1}'.format(message, exception_msg))
+
     def _handler(self, request, response):
-        workflow_name = request.identifier
-        response.update_status("Launching workflow `{}` ...".format(workflow_name), 0)
         LOGGER.debug("HOME=%s, Current Dir=%s", os.environ.get('HOME'), os.path.abspath(os.curdir))
+        self.request = request
+        self.response = response
+        self.workflow_id = self.request.identifier
 
         try:
-            cwl_input_types = dict([(i['name'], i['type']) for i in self.workflow.t.inputs_record_schema['fields']])
-        except Exception as exc:
-            raise WorkflowExecutionError("Failed retrieving workflow `{0}` input types from package definition: {1}"
-                                         .format(workflow_name, repr(exc)))
-        try:
-            cwl_inputs = dict()
-            for i in request.inputs.values():
-                i = i[0]  # only 1 input per deque since min/max=1
-                if isinstance(i, (LiteralInput, BoundingBoxInput)):
-                    cwl_inputs[i.identifier] = i.data
-                elif isinstance(i, ComplexInput):
-                    cwl_inputs[i.identifier] = {'location': i.data, 'class': cwl_input_types[i.identifier]}
-                else:
-                    raise WorkflowTypeError("Undefined workflow `{0}` input received for execution: {1}"
-                                            .format(workflow_name, type(i)))
-        except Exception as exc:
-            raise WorkflowExecutionError("Failed to load workflow `{0}` inputs: {1}".format(workflow_name, repr(exc)))
-        try:
-            result = self.workflow(**cwl_inputs)
-        except Exception as exc:
-            raise WorkflowExecutionError("Failed workflow `{0}` execution: {1}".format(workflow_name, repr(exc)))
-        try:
-            for output in request.outputs:
-                response.outputs[output].data = result[output]
-        except Exception as exc:
-            raise WorkflowExecutionError("Failed to save workflow `{0}` outputs: {1}".format(workflow_name, repr(exc)))
-        return response
+            try:
+                self.setup_logger()
+                #self.response.outputs[WORKFLOW_LOG_FILE].file = self.log_file
+                #self.response.outputs[WORKFLOW_LOG_FILE].as_reference = True
+                self.update_status("Preparing workflow logs done.", 1)
+            except Exception as exc:
+                raise self.exception_message(WorkflowExecutionError, exc, "Failed preparing workflow logging.")
+
+            self.log_message("Workflow: {}".format(request.identifier))
+            self.update_status("Launching workflow ...", 2)
+
+            try:
+                cwl_input_types = dict([(i['name'], i['type']) for i in self.workflow.t.inputs_record_schema['fields']])
+                self.update_status("Parsing workflow inputs done.", 3)
+            except Exception as exc:
+                raise self.exception_message(WorkflowExecutionError, exc, "Failed retrieving workflow input types.")
+            try:
+                cwl_inputs = dict()
+                for i in request.inputs.values():
+                    i = i[0]  # only 1 input per deque since min/max=1
+                    if isinstance(i, (LiteralInput, BoundingBoxInput)):
+                        cwl_inputs[i.identifier] = i.data
+                    elif isinstance(i, ComplexInput):
+                        cwl_inputs[i.identifier] = {'location': i.data, 'class': cwl_input_types[i.identifier]}
+                    else:
+                        raise self.exception_message(WorkflowTypeError, None,
+                                                     "Undefined workflow input for execution: {}.".format(type(i)))
+                self.update_status("Convert workflow inputs done.", 4)
+            except Exception as exc:
+                raise self.exception_message(WorkflowExecutionError, exc, "Failed to load workflow inputs.")
+            try:
+                self.update_status("Running workflow ...", 6)
+                result = self.workflow(**cwl_inputs)
+                self.update_status("Workflow execution done.", 95)
+            except Exception as exc:
+                raise self.exception_message(WorkflowExecutionError, exc, "Failed workflow execution.")
+            try:
+                for output in request.outputs:
+                    self.response.outputs[output].data = result[output]
+                self.update_status("Generate workflow outputs done.", 99)
+            except Exception as exc:
+                raise self.exception_message(WorkflowExecutionError, exc, "Failed to save workflow outputs.")
+        except:
+            # return log file location by status message since outputs are not obtained by WPS failed process
+            error_msg = "Workflow completed with errors. Server logs: {}".format(self.log_file)
+            self.update_status(error_msg, status=WPS_STATUS.FAILED)
+        else:
+            self.update_status("Workflow complete.", 100, status=WPS_STATUS.SUCCEEDED)
+        return self.response
