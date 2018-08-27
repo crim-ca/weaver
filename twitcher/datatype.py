@@ -81,7 +81,7 @@ class Job(dict):
     def _get_log_msg(self, msg=None):
         if not msg:
             msg = self.status_message
-        return '{dur} {lvl:3d}% {msg}'.format(dur=self.duration, lvl=self.progress, msg=msg)
+        return '{dur} {lvl:3d}% {stat:10} {msg}'.format(dur=self.duration, lvl=self.progress, stat=self.status, msg=msg)
 
     def save_log(self, errors=None, logger=None):
         if isinstance(errors, six.string_types):
