@@ -380,7 +380,7 @@ class AccessToken(dict):
 class Process(dict):
     """
     Dictionary that contains a process description for db storage.
-    It always has ``'id'``, ``'identifier'``, ``executeEndpoint`` keys.
+    It always has ``'identifier'`` and ``executeEndpoint`` keys.
     """
 
     def __init__(self, *args, **kwargs):
@@ -388,8 +388,8 @@ class Process(dict):
         # use both 'id' and 'identifier' to support any call (WPS and recurrent 'id')
         if 'id' not in self and 'identifier' not in self:
             raise TypeError("'id' OR 'identifier' is required")
-        if not self.get('id'):
-            self['id'] = self['identifier']
+        if not self.get('identifier'):
+            self['identifier'] = self.pop('id')
         if 'executeEndpoint' not in self:
             raise TypeError("'executeEndpoint' is required")
         if 'package' not in self:
@@ -397,11 +397,11 @@ class Process(dict):
 
     @property
     def id(self):
-        return self['id']
+        return self.identifier
 
     @property
     def identifier(self):
-        return self.id
+        return self['identifier']
 
     @property
     def title(self):
