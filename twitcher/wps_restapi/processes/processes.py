@@ -440,6 +440,7 @@ def add_local_process(request):
             workflow_inputs, workflow_outputs = wf.get_workflow_inputs_outputs(workflow)
             process_inputs = process_info.get('inputs', list())
             process_outputs = process_info.get('outputs', list())
+            wf.update_workflow_metadata(process_info, package)
             workflow_inputs, workflow_outputs = wf.merge_workflow_inputs_outputs(process_inputs, workflow_inputs,
                                                                                  process_outputs, workflow_outputs,
                                                                                  as_json=True)

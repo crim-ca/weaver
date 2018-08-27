@@ -28,7 +28,13 @@ LOGGER = logging.getLogger("PYWPS")
 
 
 WORKFLOW_EXTENSIONS = frozenset(['yaml', 'yml', 'json', 'cwl', 'job'])
-WORKFLOW_LITERAL_TYPES = frozenset(['string', 'boolean', 'float', 'int', 'integer', 'long', 'double', 'null', 'Any'])
+WORKFLOW_BASE_TYPES = frozenset(['string', 'boolean', 'float', 'int', 'integer', 'long', 'double'])
+WORKFLOW_LITERAL_TYPES = frozenset(list(WORKFLOW_BASE_TYPES) + ['null', 'Any'])
+WORKFLOW_COMPLEX_TYPES = frozenset(['File', 'Directory'])
+WORKFLOW_ARRAY_BASE = 'array'
+WORKFLOW_ARRAY_MAX_SIZE = 1024  # pywps doesn't allow None, so use a sufficiently big value for most cases
+WORKFLOW_ARRAY_ITEMS = frozenset(list(WORKFLOW_BASE_TYPES) + list(WORKFLOW_COMPLEX_TYPES))
+WORKFLOW_ARRAY_TYPES = frozenset(['{}[]'.format(item) for item in WORKFLOW_ARRAY_ITEMS])
 WORKFLOW_CUSTOM_TYPES = frozenset(['enum'])  # can be anything, but support 'enum' which is more common
 WORKFLOW_FILE_NAME = 'workflow.cwl'
 WORKFLOW_LOG_FILE = 'workflow_log_file'
@@ -85,6 +91,19 @@ def _cwl2wps_io(io_info):
 
     io_name = io_info['name']
     io_type = io_info['type']
+    io_min_occurs = 1
+    io_max_occurs = 1
+
+    # array type conversion when defined as dict of {'type': 'array', 'items': <type>}
+    if isinstance(io_type, dict) and 'items' in io_type and 'type' in io_type:
+        if not io_type['type'] == WORKFLOW_ARRAY_BASE or io_type['items'] not in WORKFLOW_ARRAY_ITEMS:
+            raise WorkflowTypeError("Unsupported I/O 'array' definition: `{}`.".format(repr(io_info)))
+        io_type = io_type['items']
+        io_max_occurs = WORKFLOW_ARRAY_MAX_SIZE
+    # array type conversion when defined as string '<type>[]'
+    elif io_type in WORKFLOW_ARRAY_TYPES:
+        io_type = io_type[:-2]  # remove []
+        io_max_occurs = WORKFLOW_ARRAY_MAX_SIZE
 
     # literal types
     if io_type in WORKFLOW_LITERAL_TYPES or io_type in WORKFLOW_CUSTOM_TYPES:
@@ -107,7 +126,7 @@ def _cwl2wps_io(io_info):
                           abstract=io_info.get('doc', ''),
                           data_type=io_type,
                           default=io_info.get('default', None),
-                          min_occurs=1, max_occurs=1,
+                          min_occurs=io_min_occurs, max_occurs=io_max_occurs,
                           # unless extended by custom types, no value validation for literals
                           mode=io_mode,
                           allowed_values=io_allow)
@@ -132,6 +151,11 @@ def _cwl2wps_io(io_info):
             if io_type == 'File':
                 has_contents = io_info.get('contents') is not None
                 kw['as_reference'] = False if has_contents else True
+        else:
+            kw.update({
+                'min_occurs': io_min_occurs,
+                'max_occurs': io_max_occurs,
+            })
         return io_complex(**kw)
 
 
@@ -256,6 +280,26 @@ def get_workflow_inputs_outputs(workflow, as_json=False):
            _get_workflow_io(workflow, io_attrib='outputs_record_schema', as_json=as_json)
 
 
+def update_workflow_metadata(wps_workflow_metadata, cwl_workflow_package):
+    """Updates the workflow WPS metadata dictionary from extractable CWL workflow definition."""
+    wps_workflow_metadata['title'] = wps_workflow_metadata.get('title', cwl_workflow_package.get('label', ''))
+    wps_workflow_metadata['abstract'] = wps_workflow_metadata.get('abstract', cwl_workflow_package.get('doc', ''))
+
+    if '$schemas' in cwl_workflow_package and isinstance(cwl_workflow_package['$schemas'], list) \
+    and '$namespaces' in cwl_workflow_package and isinstance(cwl_workflow_package['$namespaces'], dict):
+        metadata = wps_workflow_metadata.get('metadata', list())
+        namespaces_inv = {v: k for k, v in cwl_workflow_package['$namespaces']}
+        for schema in cwl_workflow_package['$schemas']:
+            for namespace_url in namespaces_inv:
+                if schema.startswith(namespace_url):
+                    metadata.append({'title': namespaces_inv[namespace_url], 'href': schema})
+        wps_workflow_metadata['metadata'] = metadata
+
+    if 's:keywords' in cwl_workflow_package and isinstance(cwl_workflow_package['s:keywords'], list):
+        wps_workflow_metadata['keywords'] = list(set(wps_workflow_metadata.get('keywords', list)) |
+                                                 set(cwl_workflow_package.get('s:keywords')))
+
+
 class Workflow(Process):
     workflow = None
     job_file = None
@@ -280,6 +324,7 @@ class Workflow(Process):
         cwl_outputs = get_workflow_outputs(self.workflow)
         inputs = [_dict2wps_io(i, 'input') for i in _merge_workflow_io(wps_inputs, cwl_inputs)]
         outputs = [_dict2wps_io(o, 'output') for o in _merge_workflow_io(wps_outputs, cwl_outputs)]
+        metadata = [Metadata(**meta_kw) for meta_kw in kw.pop('metadata', list())]
 
         # append a log output
         #outputs.append(ComplexOutput(WORKFLOW_LOG_FILE, 'Workflow log file',
@@ -289,6 +334,7 @@ class Workflow(Process):
             self._handler,
             inputs=inputs,
             outputs=outputs,
+            metadata=metadata,
             store_supported=True,
             status_supported=True,
             **kw
@@ -355,11 +401,17 @@ class Workflow(Process):
             try:
                 cwl_inputs = dict()
                 for i in request.inputs.values():
-                    i = i[0]  # only 1 input per deque since min/max=1
+                    # at least 1 input required (min_occur)
+                    input_id = i[0].identifier
+                    input_data = i[0].data
+                    if cwl_input_types[input_id] == WORKFLOW_ARRAY_BASE:
+                        # array allow max_occur > 1
+                        input_data = [j.data for j in i]
                     if isinstance(i, (LiteralInput, BoundingBoxInput)):
-                        cwl_inputs[i.identifier] = i.data
+                        cwl_inputs[input_id] = input_data
                     elif isinstance(i, ComplexInput):
-                        cwl_inputs[i.identifier] = {'location': i.data, 'class': cwl_input_types[i.identifier]}
+                        cwl_inputs[input_id] = [{'location': data, 'class': cwl_input_types[input_id]}
+                                                for data in input_data]
                     else:
                         raise self.exception_message(WorkflowTypeError, None,
                                                      "Undefined workflow input for execution: {}.".format(type(i)))

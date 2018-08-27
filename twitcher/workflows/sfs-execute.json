@@ -1,0 +1,20 @@
+{
+	"inputs": [
+        {
+            "identifier": "file_type",
+            "value": "BEAM-DIMAP"
+        },
+        {
+            "identifier": "source_graph",
+            "value": "workflows/SFS.xml"
+        },
+        {
+            "identifier": "source_product",
+            "value": "workflows/stack_result.dim"
+        },
+        {
+            "identifier": "output_name",
+            "value": "workflows/sfs_result.dim"
+        }
+    ]
+}
