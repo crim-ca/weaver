@@ -3,7 +3,7 @@
     "class": "CommandLineTool",
     "hints": {
         "DockerRequirement": {
-            "dockerPull": "docker-registry.crim.ca/ogc-public/debian8-snap6-gpt:v1"
+            "dockerPull": "docker-registry.crim.ca/ogc-public/snap6-gpt:v1"
         }
     },
     "inputs": {
@@ -17,17 +17,13 @@
         "source_product": {
             "inputBinding": {
                 "position": 2,
-                "prefix": "-SsourceProduct=",
-                "separate": false
+                "prefix": "-Pfiles=",
+                "separate": false,
+                "itemSeparator": ","
             },
             "type": {
                 "type": "array",
-                "items": "File",
-                "inputBinding": {
-                    "prefix": "-C=",
-                    "itemSeparator": ",",
-                    "separate": false
-                }
+                "items": "File"
             }
         },
         "source_graph": {

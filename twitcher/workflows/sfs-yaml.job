@@ -1,8 +1,0 @@
-source_graph:
-  class: File
-  path: SFS.xml
-file_type: BEAM-DIMAP
-source_product:
-  class: File
-  path: Resultat_Stack.dim
-output_name: Resultat_Stack_sfs.dim
