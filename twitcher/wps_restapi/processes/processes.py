@@ -233,10 +233,15 @@ def submit_job_handler(request, service_url, is_workflow=False):
             complex_inputs.append(process_input.identifier)
 
     try:
-        # need to use ComplexDataInput structure for complex input
-        inputs = [(get_any_id(inpt), ComplexDataInput(inpt['value'])
-                  if get_any_id(inpt) in complex_inputs else inpt['value'])
-                  for inpt in request.json_body['inputs']]
+        inputs = list()
+        for process_input in request.json_body['inputs']:
+            input_id = get_any_id(process_input)
+            process_value = process_input['value']
+            # in case of array inputs, must repeat (id,value)
+            input_values = process_value if isinstance(process_value, list) else [process_value]
+            # need to use ComplexDataInput structure for complex input
+            inputs.extend([(input_id, ComplexDataInput(input_value) if input_id in complex_inputs else input_value)
+                           for input_value in input_values])
     except KeyError:
         inputs = []
 

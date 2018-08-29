@@ -69,10 +69,34 @@ def load_workflow_content(workflow_dict):
     return workflow
 
 
+def _is_cwl_array_type(io_info):
+    """Verifies if the specified input/output corresponds to one of various CWL array type definitions.
+
+    :return is_array: bool - specifies if the input/output is of array type
+    :return io_type: str - array element type if ``is_array`` is True, type of ``io_info`` otherwise.
+    :raise WorkflowTypeError: if the array element is not supported.
+    """
+    is_array = False
+    io_type = io_info['type']
+    # array type conversion when defined as dict of {'type': 'array', 'items': '<type>'}
+    if isinstance(io_type, dict) and 'items' in io_type and 'type' in io_type:
+        if not io_type['type'] == WORKFLOW_ARRAY_BASE or io_type['items'] not in WORKFLOW_ARRAY_ITEMS:
+            raise WorkflowTypeError("Unsupported I/O 'array' definition: `{}`.".format(repr(io_info)))
+        io_type = io_type['items']
+        is_array = True
+    # array type conversion when defined as string '<type>[]'
+    elif io_type in WORKFLOW_ARRAY_TYPES:
+        io_type = io_type[:-2]  # remove []
+        if io_type not in WORKFLOW_ARRAY_ITEMS:
+            raise WorkflowTypeError("Unsupported I/O 'array' definition: `{}`.".format(repr(io_info)))
+        is_array = True
+    return is_array, io_type
+
+
 def _cwl2wps_io(io_info):
     """Converts input/output parameters from CWL types to WPS types.
     :param io_info: parsed IO of a CWL file
-    :return: corresponding IO in WPS format
+    :returns: corresponding IO in WPS format
     """
     is_input = False
     is_output = False
@@ -94,15 +118,10 @@ def _cwl2wps_io(io_info):
     io_min_occurs = 1
     io_max_occurs = 1
 
-    # array type conversion when defined as dict of {'type': 'array', 'items': <type>}
-    if isinstance(io_type, dict) and 'items' in io_type and 'type' in io_type:
-        if not io_type['type'] == WORKFLOW_ARRAY_BASE or io_type['items'] not in WORKFLOW_ARRAY_ITEMS:
-            raise WorkflowTypeError("Unsupported I/O 'array' definition: `{}`.".format(repr(io_info)))
-        io_type = io_type['items']
-        io_max_occurs = WORKFLOW_ARRAY_MAX_SIZE
-    # array type conversion when defined as string '<type>[]'
-    elif io_type in WORKFLOW_ARRAY_TYPES:
-        io_type = io_type[:-2]  # remove []
+    # convert array types
+    is_array, array_elem = _is_cwl_array_type(io_info)
+    if is_array:
+        io_type = array_elem
         io_max_occurs = WORKFLOW_ARRAY_MAX_SIZE
 
     # literal types
@@ -394,24 +413,29 @@ class Workflow(Process):
             self.update_status("Launching workflow ...", 2)
 
             try:
-                cwl_input_types = dict([(i['name'], i['type']) for i in self.workflow.t.inputs_record_schema['fields']])
-                self.update_status("Parsing workflow inputs done.", 3)
+                cwl_input_info = dict([(i['name'], i) for i in self.workflow.t.inputs_record_schema['fields']])
+                self.update_status("Retrieve workflow inputs done.", 3)
             except Exception as exc:
                 raise self.exception_message(WorkflowExecutionError, exc, "Failed retrieving workflow input types.")
             try:
                 cwl_inputs = dict()
                 for i in request.inputs.values():
-                    # at least 1 input required (min_occur)
+                    # at least 1 input since obtained from request body
                     input_id = i[0].identifier
                     input_data = i[0].data
-                    if cwl_input_types[input_id] == WORKFLOW_ARRAY_BASE:
+                    input_type = cwl_input_info[input_id]['type']
+                    is_array, elem_type = _is_cwl_array_type(cwl_input_info[input_id])
+                    if is_array:
                         # array allow max_occur > 1
                         input_data = [j.data for j in i]
-                    if isinstance(i, (LiteralInput, BoundingBoxInput)):
+                        input_type = elem_type
+                    if isinstance(i[0], (LiteralInput, BoundingBoxInput)):
                         cwl_inputs[input_id] = input_data
-                    elif isinstance(i, ComplexInput):
-                        cwl_inputs[input_id] = [{'location': data, 'class': cwl_input_types[input_id]}
-                                                for data in input_data]
+                    elif isinstance(i[0], ComplexInput):
+                        if isinstance(input_data, list):
+                            cwl_inputs[input_id] = [{'path': data, 'class': input_type} for data in input_data]
+                        else:
+                            cwl_inputs[input_id] = {'path': input_data, 'class': input_type}
                     else:
                         raise self.exception_message(WorkflowTypeError, None,
                                                      "Undefined workflow input for execution: {}.".format(type(i)))
