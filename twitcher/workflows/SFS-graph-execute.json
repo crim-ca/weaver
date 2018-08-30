@@ -1,0 +1,16 @@
+{
+	"inputs": [
+        {
+            "identifier": "source_product",
+            "value": "workflows/stack_result.tif"
+        },
+        {
+            "identifier": "output_file_type",
+            "value": "GeoTIFF"
+        },
+        {
+            "identifier": "output_name",
+            "value": "workflows/sfs_result.tif"
+        }
+    ]
+}
