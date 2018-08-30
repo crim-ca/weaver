@@ -3,7 +3,7 @@
     "class": "CommandLineTool",
     "hints": {
         "DockerRequirement": {
-            "dockerPull": "ogc/snap6-sfs:v2"
+            "dockerPull": "docker-registry.crim.ca/ogc-public/snap6-sfs:v2"
         }
     },
     "inputs": {
