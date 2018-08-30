@@ -34,10 +34,10 @@ class StatusCodeTestCase(TestCase):
             resp = self.app.get(uri, expect_errors=True)
             self.assertEqual(resp.status_code, 200, 'route {} did not return 200'.format(uri))
 
-    def test_403(self):
+    def test_401(self):
         for uri in forbidden_routes:
             resp = self.app.get(uri, expect_errors=True)
-            self.assertEqual(resp.status_code, 403, 'route {} did not return 403'.format(uri))
+            self.assertEqual(resp.status_code, 401, 'route {} did not return 401'.format(uri))
 
     def test_404(self):
         for uri in not_found_routes:
