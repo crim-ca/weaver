@@ -599,11 +599,11 @@ class ProcessOfferingBody(MappingSchema):
 
 
 class PackageBody(MappingSchema):
-    workflow = SchemaNode(String(), description="Workflow file content as JSON.")
+    pass
 
 
 class ExecutionUnitBody(MappingSchema):
-    package = PackageBody(missing=drop)
+    package = PackageBody(missing=drop, description="CWL file content as JSON.")
     reference = SchemaNode(String(), missing=drop)
 
 

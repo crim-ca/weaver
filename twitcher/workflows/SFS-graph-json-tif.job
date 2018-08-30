@@ -1,0 +1,5 @@
+{
+    "source_product": "stack_result.tif",
+    "output_file_type": "GeoTIFF",
+    "output_name": "sfs_result.tif"
+}
