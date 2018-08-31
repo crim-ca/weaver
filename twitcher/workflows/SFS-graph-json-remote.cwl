@@ -24,7 +24,6 @@
                 "type": "enum",
                 "symbols": [
                     "GeoTIFF",
-                    "BEAM-DIMAP",
                     "NetCDF-CF"
                 ]
             }

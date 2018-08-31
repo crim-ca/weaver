@@ -1,4 +1,5 @@
 import os
+import six
 import cwltool
 import cwltool.factory
 from pywps import (
@@ -32,7 +33,7 @@ WORKFLOW_BASE_TYPES = frozenset(['string', 'boolean', 'float', 'int', 'integer',
 WORKFLOW_LITERAL_TYPES = frozenset(list(WORKFLOW_BASE_TYPES) + ['null', 'Any'])
 WORKFLOW_COMPLEX_TYPES = frozenset(['File', 'Directory'])
 WORKFLOW_ARRAY_BASE = 'array'
-WORKFLOW_ARRAY_MAX_SIZE = 2**16  # pywps doesn't allow None, so use a sufficiently big value for most cases
+WORKFLOW_ARRAY_MAX_SIZE = six.MAXSIZE   # pywps doesn't allow None, so use max size
 WORKFLOW_ARRAY_ITEMS = frozenset(list(WORKFLOW_BASE_TYPES) + list(WORKFLOW_COMPLEX_TYPES))
 WORKFLOW_ARRAY_TYPES = frozenset(['{}[]'.format(item) for item in WORKFLOW_ARRAY_ITEMS])
 WORKFLOW_CUSTOM_TYPES = frozenset(['enum'])  # can be anything, but support 'enum' which is more common
@@ -85,12 +86,48 @@ def _is_cwl_array_type(io_info):
         io_type = io_type['items']
         is_array = True
     # array type conversion when defined as string '<type>[]'
-    elif io_type in WORKFLOW_ARRAY_TYPES:
+    elif isinstance(io_type, six.string_types) and io_type in WORKFLOW_ARRAY_TYPES:
         io_type = io_type[:-2]  # remove []
         if io_type not in WORKFLOW_ARRAY_ITEMS:
             raise WorkflowTypeError("Unsupported I/O 'array' definition: `{}`.".format(repr(io_info)))
         is_array = True
     return is_array, io_type
+
+
+def _is_cwl_enum_type(io_info):
+    """Verifies if the specified input/output corresponds to a CWL enum definition.
+
+    :return is_enum: bool - specifies if the input/output is of enum type
+    :return io_type: str - enum base type if ``is_enum`` is True, type of ``io_info`` otherwise.
+    :return io_allow: list - permitted values of the enum
+    :raise WorkflowTypeError: if the enum doesn't have required parameters to be valid.
+    """
+    io_type = io_info['type']
+    if not isinstance(io_type, dict) or 'type' not in io_type or io_type['type'] not in WORKFLOW_CUSTOM_TYPES:
+        return False, io_type, None
+
+    if 'symbols' not in io_type:
+        raise WorkflowTypeError("Unsupported I/O 'enum' definition: `{}`.".format(repr(io_info)))
+    io_allow = io_type['symbols']
+    if not isinstance(io_allow, list) or len(io_allow) < 1:
+        raise WorkflowTypeError("Invalid I/O 'enum.symbols' definition: `{}`.".format(repr(io_info)))
+
+    # validate matching types in allowed symbols and convert to supported CWL type
+    first_allow = io_allow[0]
+    for e in io_allow:
+        if type(e) is not type(first_allow):
+            raise WorkflowTypeError("Ambiguous types in I/O 'enum.symbols' definition: `{}`.".format(repr(io_info)))
+    if isinstance(first_allow, six.string_types):
+        io_type = 'string'
+    elif isinstance(first_allow, float):
+        io_type = 'float'
+    elif isinstance(first_allow, six.integer_types):
+        io_type = 'int'
+    else:
+        raise WorkflowTypeError("Unsupported I/O 'enum' base type: `{0}`, from definition: `{1}`."
+                                .format(str(type(first_allow)), repr(io_info)))
+
+    return True, io_type, io_allow
 
 
 def _cwl2wps_io(io_info):
@@ -117,6 +154,8 @@ def _cwl2wps_io(io_info):
     io_type = io_info['type']
     io_min_occurs = 1
     io_max_occurs = 1
+    io_allow = AnyValue
+    io_mode = MODE.NONE
 
     # convert array types
     is_array, array_elem = _is_cwl_array_type(io_info)
@@ -124,22 +163,23 @@ def _cwl2wps_io(io_info):
         io_type = array_elem
         io_max_occurs = WORKFLOW_ARRAY_MAX_SIZE
 
+    # convert enum types
+    is_enum, enum_type, enum_allow = _is_cwl_enum_type(io_info)
+    if is_enum:
+        io_type = enum_type
+        io_allow = enum_allow
+        io_mode = MODE.SIMPLE
+
     # literal types
-    if io_type in WORKFLOW_LITERAL_TYPES or io_type in WORKFLOW_CUSTOM_TYPES:
-        io_mode = MODE.NONE
-        io_allow = AnyValue
+    if io_type in WORKFLOW_LITERAL_TYPES or is_enum:
         if io_type == 'Any':
             io_type = 'anyvalue'
         if io_type == 'null':
             io_type = 'novalue'
-        if io_type in ['int', 'integer']:
+        if io_type in ['int', 'integer', 'long']:
             io_type = 'integer'
-        if io_type in ['float', 'long', 'double']:
+        if io_type in ['float', 'double']:
             io_type = 'float'
-        if io_type in WORKFLOW_CUSTOM_TYPES:
-            io_type = 'string'
-            io_mode = MODE.SIMPLE
-            io_allow = io_info['symbols']
         return io_literal(identifier=io_name,
                           title=io_info.get('label', io_name),
                           abstract=io_info.get('doc', ''),
