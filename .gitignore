@@ -90,3 +90,6 @@ testdata.json
 # snappy
 esa-snap_sentinel_unix_6_0.sh
 response.varfile
+
+# process results
+*.tif
