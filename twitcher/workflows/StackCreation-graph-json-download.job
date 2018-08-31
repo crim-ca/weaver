@@ -1,0 +1,18 @@
+{
+   "files": [
+       {
+           "location": "https://crimrd-my.sharepoint.com/:u:/g/personal/byrnsda_crim_ca/Ea5PtzJgBW1Op8AqZPkKQTsBUpAsHplgRo0ZJOwpuqaFFQ?download=1",
+           "class": "File"
+       },
+       {
+           "location": "https://crimrd-my.sharepoint.com/:u:/g/personal/byrnsda_crim_ca/ESh12h2WdNxFsYBiVrYOqRcBRBVaHAWyGB0YVb07eB36ZQ?download=1",
+           "class": "File"
+       },
+       {
+           "location": "https://crimrd-my.sharepoint.com/:u:/g/personal/byrnsda_crim_ca/EZkIe6yR7NVIoUu6A6PDWhABnywBYvRlW-xkYseD5mFlgA?download=1",
+           "class": "File"
+       }
+   ],
+   "output_file_type": "GeoTIFF",
+   "output_name": "stack_result.tif"
+}
