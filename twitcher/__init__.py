@@ -1,4 +1,4 @@
-__version__ = 'ogc-0.3.10'
+__version__ = 'ogc-0.3.11'
 
 import os
 import sys

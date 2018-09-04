@@ -18,7 +18,7 @@ from pywps.inout.literaltypes import AnyValue, AllowedValue
 from pywps.validator.mode import MODE
 from pywps.validator.literalvalidator import validate_anyvalue, validate_allowed_values
 from pywps.app.Common import Metadata
-from twitcher.utils import parse_request_query
+from twitcher.utils import parse_request_query, get_any_id
 from twitcher.exceptions import PackageTypeError, PackageRegistrationError, PackageExecutionError
 from collections import OrderedDict
 import json
@@ -409,7 +409,7 @@ def get_process_from_wps_request(process_offering, reference=None, package=None)
 
 
 class Package(Process):
-    _package = None
+    package = None
     job_file = None
     log_file = None
     log_level = logging.INFO
@@ -543,8 +543,13 @@ class Package(Process):
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed package execution.")
             try:
+                self.update_status("Package execution done.", 96)
                 for output in request.outputs:
-                    self.response.outputs[output].data = result[output]
+                    if 'location' in result[output]:
+                        self.response.outputs[output].as_reference = True
+                        self.response.outputs[output].file = result[output]['location'].replace('file://', '')
+                    else:
+                        self.response.outputs[output].data = result[output]
                 self.update_status("Generate package outputs done.", 99)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed to save package outputs.")
