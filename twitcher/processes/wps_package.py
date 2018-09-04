@@ -2,6 +2,7 @@ import os
 import six
 import cwltool
 import cwltool.factory
+from cwltool.context import RuntimeContext
 from pywps import (
     Process,
     LiteralInput,
@@ -13,61 +14,66 @@ from pywps import (
     Format,
 )
 from pywps.response.status import WPS_STATUS
-from pywps.inout.literaltypes import AnyValue
+from pywps.inout.literaltypes import AnyValue, AllowedValue
 from pywps.validator.mode import MODE
+from pywps.validator.literalvalidator import validate_anyvalue, validate_allowed_values
 from pywps.app.Common import Metadata
 from twitcher.utils import parse_request_query
-from twitcher.exceptions import WorkflowTypeError, WorkflowRegistrationError, WorkflowExecutionError
+from twitcher.exceptions import PackageTypeError, PackageRegistrationError, PackageExecutionError
 from collections import OrderedDict
 import json
 import yaml
 import tempfile
+import mimetypes
 import shutil
 
 import logging
 LOGGER = logging.getLogger("PYWPS")
 
 
-WORKFLOW_EXTENSIONS = frozenset(['yaml', 'yml', 'json', 'cwl', 'job'])
-WORKFLOW_BASE_TYPES = frozenset(['string', 'boolean', 'float', 'int', 'integer', 'long', 'double'])
-WORKFLOW_LITERAL_TYPES = frozenset(list(WORKFLOW_BASE_TYPES) + ['null', 'Any'])
-WORKFLOW_COMPLEX_TYPES = frozenset(['File', 'Directory'])
-WORKFLOW_ARRAY_BASE = 'array'
-WORKFLOW_ARRAY_MAX_SIZE = six.MAXSIZE   # pywps doesn't allow None, so use max size
-WORKFLOW_ARRAY_ITEMS = frozenset(list(WORKFLOW_BASE_TYPES) + list(WORKFLOW_COMPLEX_TYPES))
-WORKFLOW_ARRAY_TYPES = frozenset(['{}[]'.format(item) for item in WORKFLOW_ARRAY_ITEMS])
-WORKFLOW_CUSTOM_TYPES = frozenset(['enum'])  # can be anything, but support 'enum' which is more common
-WORKFLOW_FILE_NAME = 'workflow.cwl'
-WORKFLOW_LOG_FILE = 'workflow_log_file'
+__all__ = ['Package', 'get_process_from_wps_request']
 
 
-def check_workflow_file(cwl_file):
+PACKAGE_EXTENSIONS = frozenset(['yaml', 'yml', 'json', 'cwl', 'job'])
+PACKAGE_BASE_TYPES = frozenset(['string', 'boolean', 'float', 'int', 'integer', 'long', 'double'])
+PACKAGE_LITERAL_TYPES = frozenset(list(PACKAGE_BASE_TYPES) + ['null', 'Any'])
+PACKAGE_COMPLEX_TYPES = frozenset(['File', 'Directory'])
+PACKAGE_ARRAY_BASE = 'array'
+PACKAGE_ARRAY_MAX_SIZE = six.MAXSIZE   # pywps doesn't allow None, so use max size
+PACKAGE_ARRAY_ITEMS = frozenset(list(PACKAGE_BASE_TYPES) + list(PACKAGE_COMPLEX_TYPES))
+PACKAGE_ARRAY_TYPES = frozenset(['{}[]'.format(item) for item in PACKAGE_ARRAY_ITEMS])
+PACKAGE_CUSTOM_TYPES = frozenset(['enum'])  # can be anything, but support 'enum' which is more common
+PACKAGE_FILE_NAME = 'workflow.cwl'
+PACKAGE_LOG_FILE = 'workflow_log_file'
+
+
+def _check_package_file(cwl_file):
     cwl_path = os.path.abspath(cwl_file)
     file_ext = os.path.splitext(cwl_path)[1].replace('.', '')
-    if file_ext not in WORKFLOW_EXTENSIONS:
-        raise WorkflowRegistrationError("Not a valid CWL file type: `{}`.".format(file_ext))
+    if file_ext not in PACKAGE_EXTENSIONS:
+        raise PackageRegistrationError("Not a valid CWL file type: `{}`.".format(file_ext))
     if not os.path.isfile(cwl_path):
-        raise WorkflowRegistrationError("Cannot find CWL file at: `{}`.".format(cwl_path))
+        raise PackageRegistrationError("Cannot find CWL file at: `{}`.".format(cwl_path))
     return cwl_path
 
 
-def load_workflow_file(file_path):
-    file_path = check_workflow_file(file_path)
+def _load_package_file(file_path):
+    file_path = _check_package_file(file_path)
     # yaml properly loads json as well
     with open(file_path, 'r') as f:
         return yaml.safe_load(f)
 
 
-def load_workflow_content(workflow_dict):
+def _load_package_content(package_dict):
     # TODO: find how to pass dict directly (?) instead of dump to tmp file
     tmp_dir = tempfile.mkdtemp()
-    tmp_json_cwl = os.path.join(tmp_dir, WORKFLOW_FILE_NAME)
+    tmp_json_cwl = os.path.join(tmp_dir, PACKAGE_FILE_NAME)
     with open(tmp_json_cwl, 'w') as f:
-        json.dump(workflow_dict, f)
-    cwl_factory = cwltool.factory.Factory()
-    workflow = cwl_factory.make(tmp_json_cwl)
+        json.dump(package_dict, f)
+    cwl_factory = cwltool.factory.Factory(runtime_context=RuntimeContext(kwargs={'no_read_only': True}))
+    package = cwl_factory.make(tmp_json_cwl)
     shutil.rmtree(tmp_dir)
-    return workflow
+    return package
 
 
 def _is_cwl_array_type(io_info):
@@ -75,21 +81,21 @@ def _is_cwl_array_type(io_info):
 
     :return is_array: bool - specifies if the input/output is of array type
     :return io_type: str - array element type if ``is_array`` is True, type of ``io_info`` otherwise.
-    :raise WorkflowTypeError: if the array element is not supported.
+    :raise PackageTypeError: if the array element is not supported.
     """
     is_array = False
     io_type = io_info['type']
     # array type conversion when defined as dict of {'type': 'array', 'items': '<type>'}
     if isinstance(io_type, dict) and 'items' in io_type and 'type' in io_type:
-        if not io_type['type'] == WORKFLOW_ARRAY_BASE or io_type['items'] not in WORKFLOW_ARRAY_ITEMS:
-            raise WorkflowTypeError("Unsupported I/O 'array' definition: `{}`.".format(repr(io_info)))
+        if not io_type['type'] == PACKAGE_ARRAY_BASE or io_type['items'] not in PACKAGE_ARRAY_ITEMS:
+            raise PackageTypeError("Unsupported I/O 'array' definition: `{}`.".format(repr(io_info)))
         io_type = io_type['items']
         is_array = True
     # array type conversion when defined as string '<type>[]'
-    elif isinstance(io_type, six.string_types) and io_type in WORKFLOW_ARRAY_TYPES:
+    elif isinstance(io_type, six.string_types) and io_type in PACKAGE_ARRAY_TYPES:
         io_type = io_type[:-2]  # remove []
-        if io_type not in WORKFLOW_ARRAY_ITEMS:
-            raise WorkflowTypeError("Unsupported I/O 'array' definition: `{}`.".format(repr(io_info)))
+        if io_type not in PACKAGE_ARRAY_ITEMS:
+            raise PackageTypeError("Unsupported I/O 'array' definition: `{}`.".format(repr(io_info)))
         is_array = True
     return is_array, io_type
 
@@ -100,23 +106,23 @@ def _is_cwl_enum_type(io_info):
     :return is_enum: bool - specifies if the input/output is of enum type
     :return io_type: str - enum base type if ``is_enum`` is True, type of ``io_info`` otherwise.
     :return io_allow: list - permitted values of the enum
-    :raise WorkflowTypeError: if the enum doesn't have required parameters to be valid.
+    :raise PackageTypeError: if the enum doesn't have required parameters to be valid.
     """
     io_type = io_info['type']
-    if not isinstance(io_type, dict) or 'type' not in io_type or io_type['type'] not in WORKFLOW_CUSTOM_TYPES:
+    if not isinstance(io_type, dict) or 'type' not in io_type or io_type['type'] not in PACKAGE_CUSTOM_TYPES:
         return False, io_type, None
 
     if 'symbols' not in io_type:
-        raise WorkflowTypeError("Unsupported I/O 'enum' definition: `{}`.".format(repr(io_info)))
+        raise PackageTypeError("Unsupported I/O 'enum' definition: `{}`.".format(repr(io_info)))
     io_allow = io_type['symbols']
     if not isinstance(io_allow, list) or len(io_allow) < 1:
-        raise WorkflowTypeError("Invalid I/O 'enum.symbols' definition: `{}`.".format(repr(io_info)))
+        raise PackageTypeError("Invalid I/O 'enum.symbols' definition: `{}`.".format(repr(io_info)))
 
     # validate matching types in allowed symbols and convert to supported CWL type
     first_allow = io_allow[0]
     for e in io_allow:
         if type(e) is not type(first_allow):
-            raise WorkflowTypeError("Ambiguous types in I/O 'enum.symbols' definition: `{}`.".format(repr(io_info)))
+            raise PackageTypeError("Ambiguous types in I/O 'enum.symbols' definition: `{}`.".format(repr(io_info)))
     if isinstance(first_allow, six.string_types):
         io_type = 'string'
     elif isinstance(first_allow, float):
@@ -124,8 +130,8 @@ def _is_cwl_enum_type(io_info):
     elif isinstance(first_allow, six.integer_types):
         io_type = 'int'
     else:
-        raise WorkflowTypeError("Unsupported I/O 'enum' base type: `{0}`, from definition: `{1}`."
-                                .format(str(type(first_allow)), repr(io_info)))
+        raise PackageTypeError("Unsupported I/O 'enum' base type: `{0}`, from definition: `{1}`."
+                               .format(str(type(first_allow)), repr(io_info)))
 
     return True, io_type, io_allow
 
@@ -148,7 +154,7 @@ def _cwl2wps_io(io_info):
         io_complex = ComplexOutput
         io_bbox = BoundingBoxOutput
     else:
-        raise WorkflowTypeError("Unsupported I/O info definition: `{}`.".format(repr(io_info)))
+        raise PackageTypeError("Unsupported I/O info definition: `{}`.".format(repr(io_info)))
 
     io_name = io_info['name']
     io_type = io_info['type']
@@ -161,17 +167,17 @@ def _cwl2wps_io(io_info):
     is_array, array_elem = _is_cwl_array_type(io_info)
     if is_array:
         io_type = array_elem
-        io_max_occurs = WORKFLOW_ARRAY_MAX_SIZE
+        io_max_occurs = PACKAGE_ARRAY_MAX_SIZE
 
     # convert enum types
     is_enum, enum_type, enum_allow = _is_cwl_enum_type(io_info)
     if is_enum:
         io_type = enum_type
         io_allow = enum_allow
-        io_mode = MODE.SIMPLE
+        io_mode = MODE.SIMPLE   # allowed value validator must be set for input
 
     # literal types
-    if io_type in WORKFLOW_LITERAL_TYPES or is_enum:
+    if io_type in PACKAGE_LITERAL_TYPES or is_enum:
         if io_type == 'Any':
             io_type = 'anyvalue'
         if io_type == 'null':
@@ -231,13 +237,24 @@ def _dict2wps_io(io_info, input_or_output):
     io_info.pop('data', None)
     io_info.pop('file', None)
 
-    # convert sub-format objects
+    # convert allowed value objects
+    values = io_info.pop('allowed_values', None)
+    if values is not None:
+        if isinstance(values, list) and len(values) > 0:
+            io_info['allowed_values'] = list()
+            for allow_value_dict in values:
+                allow_value_dict.pop('type', None)
+                io_info['allowed_values'].append(AllowedValue(**allow_value_dict))
+        else:
+            io_info['allowed_values'] = AnyValue
+
+    # convert supported format objects
     formats = io_info.pop('supported_formats', None)
     if formats is not None:
         io_info['supported_formats'] = [Format(**fmt) for fmt in formats]
 
     # convert by type
-    io_type = io_info.pop('type', 'complex')    # only ComplexOutput doesn't have 'type'
+    io_type = io_info.pop('type', 'complex')    # only ComplexData doesn't have 'type'
     if input_or_output == 'input':
         if io_type == 'complex':
             return ComplexInput(**io_info)
@@ -255,8 +272,8 @@ def _dict2wps_io(io_info, input_or_output):
             return BoundingBoxOutput(**io_info)
         if io_type == 'literal':
             return LiteralOutput(**io_info)
-    raise WorkflowTypeError("Unknown conversion from dict to WPS type (type={0}, mode={1})."
-                            .format(io_type, input_or_output))
+    raise PackageTypeError("Unknown conversion from dict to WPS type (type={0}, mode={1})."
+                           .format(io_type, input_or_output))
 
 
 def _get_field(io_object, field):
@@ -272,7 +289,7 @@ def _set_field(io_object, field, value):
     setattr(io_object, field, None)
 
 
-def _merge_workflow_io(wps_io_list, cwl_io_list):
+def _merge_package_io(wps_io_list, cwl_io_list):
     """
     Update I/O definitions to use for process creation and returned by GetCapabilities, DescribeProcess.
     If WPS I/O definitions where provided during deployment, update them with CWL-to-WPS converted I/O and
@@ -284,7 +301,7 @@ def _merge_workflow_io(wps_io_list, cwl_io_list):
     :returns: list of validated/updated WPS I/O for the process.
     """
     if not isinstance(cwl_io_list, list):
-        raise WorkflowTypeError("CWL I/O definitions must be provided, empty list if none required.")
+        raise PackageTypeError("CWL I/O definitions must be provided, empty list if none required.")
     if not wps_io_list:
         wps_io_list = list()
     wps_io_dict = OrderedDict((_get_field(wps_io, 'identifier'), wps_io) for wps_io in wps_io_list)
@@ -301,66 +318,98 @@ def _merge_workflow_io(wps_io_list, cwl_io_list):
             # but override CWL-converted types and formats
             if _get_field(wps_io, 'data_type') is not None:
                 _set_field(wps_io, 'data_type', _get_field(cwl_io_dict[wps_id], 'data_type'))
+            # update value and format validation already defined parameters during CWL package import
+            allowed_values = _get_field(wps_io, 'allowed_values')
+            if isinstance(allowed_values, list) and len(allowed_values) > 0:
+                _set_field(wps_io, 'allowed_values', _get_field(cwl_io_dict[wps_id], 'allowed_values'))
+            supported_formats = _get_field(wps_io, 'supported_formats')
+            if isinstance(supported_formats, list) and len(supported_formats) > 0:
+                _set_field(wps_io, 'supported_formats', _get_field(cwl_io_dict[wps_id], 'supported_formats'))
             updated_io_list.append(wps_io)
     return updated_io_list
 
 
-def merge_workflow_inputs_outputs(wps_inputs_list, cwl_inputs_list, wps_outputs_list, cwl_outputs_list, as_json=False):
+def _merge_package_inputs_outputs(wps_inputs_list, cwl_inputs_list, wps_outputs_list, cwl_outputs_list, as_json=False):
     """Merges I/O definitions to use for process creation and returned by GetCapabilities, DescribeProcess
     using the WPS specifications (from request POST) and CWL specifications (extracted from file)."""
-    wps_inputs = _merge_workflow_io(wps_inputs_list, cwl_inputs_list)
-    wps_outputs = _merge_workflow_io(wps_outputs_list, cwl_outputs_list)
+    wps_inputs = _merge_package_io(wps_inputs_list, cwl_inputs_list)
+    wps_outputs = _merge_package_io(wps_outputs_list, cwl_outputs_list)
     if as_json:
         return [i.json for i in wps_inputs], [o.json for o in wps_outputs]
     return wps_inputs, wps_outputs
 
 
-def _get_workflow_io(workflow, io_attrib, as_json):
-    cwl_workflow_io = getattr(workflow.t, io_attrib)
-    wps_workflow_io = [_cwl2wps_io(io) for io in cwl_workflow_io['fields']]
+def _get_package_io(package, io_attrib, as_json):
+    cwl_package_io = getattr(package.t, io_attrib)
+    wps_package_io = [_cwl2wps_io(io) for io in cwl_package_io['fields']]
     if as_json:
-        return [io.json for io in wps_workflow_io]
-    return wps_workflow_io
+        return [io.json for io in wps_package_io]
+    return wps_package_io
 
 
-def get_workflow_inputs(workflow, as_json=False):
-    """Generates WPS-like inputs using parsed CWL workflow input definitions."""
-    return _get_workflow_io(workflow, io_attrib='inputs_record_schema', as_json=as_json)
+def _get_package_inputs(package, as_json=False):
+    """Generates WPS-like inputs using parsed CWL package input definitions."""
+    return _get_package_io(package, io_attrib='inputs_record_schema', as_json=as_json)
 
 
-def get_workflow_outputs(workflow, as_json=False):
-    """Generates WPS-like outputs using parsed CWL workflow output definitions."""
-    return _get_workflow_io(workflow, io_attrib='outputs_record_schema', as_json=as_json)
+def _get_package_outputs(package, as_json=False):
+    """Generates WPS-like outputs using parsed CWL package output definitions."""
+    return _get_package_io(package, io_attrib='outputs_record_schema', as_json=as_json)
 
 
-def get_workflow_inputs_outputs(workflow, as_json=False):
-    """Generates WPS-like (inputs,outputs) tuple using parsed CWL workflow output definitions."""
-    return _get_workflow_io(workflow, io_attrib='inputs_record_schema', as_json=as_json), \
-           _get_workflow_io(workflow, io_attrib='outputs_record_schema', as_json=as_json)
+def _get_package_inputs_outputs(package, as_json=False):
+    """Generates WPS-like (inputs,outputs) tuple using parsed CWL package output definitions."""
+    return _get_package_io(package, io_attrib='inputs_record_schema', as_json=as_json), \
+           _get_package_io(package, io_attrib='outputs_record_schema', as_json=as_json)
 
 
-def update_workflow_metadata(wps_workflow_metadata, cwl_workflow_package):
-    """Updates the workflow WPS metadata dictionary from extractable CWL workflow definition."""
-    wps_workflow_metadata['title'] = wps_workflow_metadata.get('title', cwl_workflow_package.get('label', ''))
-    wps_workflow_metadata['abstract'] = wps_workflow_metadata.get('abstract', cwl_workflow_package.get('doc', ''))
+def _update_package_metadata(wps_package_metadata, cwl_package_package):
+    """Updates the package WPS metadata dictionary from extractable CWL package definition."""
+    wps_package_metadata['title'] = wps_package_metadata.get('title', cwl_package_package.get('label', ''))
+    wps_package_metadata['abstract'] = wps_package_metadata.get('abstract', cwl_package_package.get('doc', ''))
 
-    if '$schemas' in cwl_workflow_package and isinstance(cwl_workflow_package['$schemas'], list) \
-    and '$namespaces' in cwl_workflow_package and isinstance(cwl_workflow_package['$namespaces'], dict):
-        metadata = wps_workflow_metadata.get('metadata', list())
-        namespaces_inv = {v: k for k, v in cwl_workflow_package['$namespaces']}
-        for schema in cwl_workflow_package['$schemas']:
+    if '$schemas' in cwl_package_package and isinstance(cwl_package_package['$schemas'], list) \
+    and '$namespaces' in cwl_package_package and isinstance(cwl_package_package['$namespaces'], dict):
+        metadata = wps_package_metadata.get('metadata', list())
+        namespaces_inv = {v: k for k, v in cwl_package_package['$namespaces']}
+        for schema in cwl_package_package['$schemas']:
             for namespace_url in namespaces_inv:
                 if schema.startswith(namespace_url):
                     metadata.append({'title': namespaces_inv[namespace_url], 'href': schema})
-        wps_workflow_metadata['metadata'] = metadata
+        wps_package_metadata['metadata'] = metadata
 
-    if 's:keywords' in cwl_workflow_package and isinstance(cwl_workflow_package['s:keywords'], list):
-        wps_workflow_metadata['keywords'] = list(set(wps_workflow_metadata.get('keywords', list)) |
-                                                 set(cwl_workflow_package.get('s:keywords')))
+    if 's:keywords' in cwl_package_package and isinstance(cwl_package_package['s:keywords'], list):
+        wps_package_metadata['keywords'] = list(set(wps_package_metadata.get('keywords', list)) |
+                                                set(cwl_package_package.get('s:keywords')))
 
 
-class Workflow(Process):
-    workflow = None
+def get_process_from_wps_request(process_offering, reference=None, package=None):
+    if not (isinstance(package, dict) or isinstance(reference, six.string_types)):
+        raise PackageRegistrationError(
+            "Invalid parameters amongst one of [package,reference].")
+    if package and reference:
+        raise PackageRegistrationError(
+            "Simultaneous parameters [package,reference] not allowed.")
+
+    if reference:
+        package = _load_package_file(reference)
+    try:
+        package = _load_package_content(package)
+        package_inputs, package_outputs = _get_package_inputs_outputs(package)
+        process_inputs = process_offering.get('inputs', list())
+        process_outputs = process_offering.get('outputs', list())
+        _update_package_metadata(process_offering, package)
+        package_inputs, package_outputs = _merge_package_inputs_outputs(process_inputs, package_inputs,
+                                                                        process_outputs, package_outputs, as_json=True)
+        process_offering.update({'package': package, 'inputs': package_inputs, 'outputs': package_outputs})
+        return process_offering
+    except Exception as ex:
+        msg = "Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex))
+        raise PackageRegistrationError(msg)
+
+
+class Package(Process):
+    _package = None
     job_file = None
     log_file = None
     log_level = logging.INFO
@@ -369,27 +418,32 @@ class Workflow(Process):
     percent = None
 
     def __init__(self, **kw):
+        """
+        Creates a WPS Process instance to execute a CWL package definition.
+        Process parameters should be loaded from an existing `twitcher.datatype.Process`
+        instance generated using method `get_process_from_wps_request`.
+
+        :param kw: dictionary corresponding to method `twitcher.datatype.Process.params_wps`
+        """
         package = kw.pop('package')
         if not package:
-            raise WorkflowRegistrationError("Missing required package definition for workflow process.")
-        if isinstance(package, dict):
-            self.workflow = load_workflow_content(package)
-        else:
-            raise WorkflowTypeError("Unknown parsing of package definition for workflow process.")
+            raise PackageRegistrationError("Missing required package definition for package process.")
+        if not isinstance(package, dict):
+            raise PackageRegistrationError("Unknown parsing of package definition for package process.")
+        try:
+            self.package = _load_package_content(package)
+        except Exception as ex:
+            raise PackageRegistrationError("Exception occurred on package instantiation: `{}`".format(repr(ex)))
 
-        wps_inputs = kw.pop('inputs')
-        wps_outputs = kw.pop('outputs')
-        cwl_inputs = get_workflow_inputs(self.workflow)
-        cwl_outputs = get_workflow_outputs(self.workflow)
-        inputs = [_dict2wps_io(i, 'input') for i in _merge_workflow_io(wps_inputs, cwl_inputs)]
-        outputs = [_dict2wps_io(o, 'output') for o in _merge_workflow_io(wps_outputs, cwl_outputs)]
+        inputs = [_dict2wps_io(i, 'input') for i in kw.pop('inputs', list())]
+        outputs = [_dict2wps_io(o, 'output') for o in kw.pop('outputs', list())]
         metadata = [Metadata(**meta_kw) for meta_kw in kw.pop('metadata', list())]
 
         # append a log output
-        #outputs.append(ComplexOutput(WORKFLOW_LOG_FILE, 'Workflow log file',
+        #outputs.append(ComplexOutput(PACKAGE_LOG_FILE, 'Package log file',
         #                             as_reference=True, supported_formats=[Format('text/plain')]))
 
-        super(Workflow, self).__init__(
+        super(Package, self).__init__(
             self._handler,
             inputs=inputs,
             outputs=outputs,
@@ -401,18 +455,18 @@ class Workflow(Process):
 
     def setup_logger(self):
         # file logger for output
-        self.log_file = os.path.abspath(os.path.join(tempfile.mkdtemp(), '{}.log'.format(self.workflow_id)))
+        self.log_file = os.path.abspath(os.path.join(tempfile.mkdtemp(), '{}.log'.format(self.package_id)))
         log_file_handler = logging.FileHandler(self.log_file)
         log_file_formatter = logging.Formatter('%(asctime)s [%(name)s] %(levelname)s %(message)s')
         log_file_handler.setFormatter(log_file_formatter)
 
-        # prepare workflow logger
-        self.logger = logging.getLogger('wps_workflow.{}'.format(self.workflow_id))
+        # prepare package logger
+        self.logger = logging.getLogger('wps_package.{}'.format(self.package_id))
         self.logger.addHandler(log_file_handler)
         self.logger.setLevel(self.log_level)
 
-        # add CWL job and CWL runner logging to current workflow logger
-        job_logger = logging.getLogger('job {}'.format(WORKFLOW_FILE_NAME))
+        # add CWL job and CWL runner logging to current package logger
+        job_logger = logging.getLogger('job {}'.format(PACKAGE_FILE_NAME))
         job_logger.addHandler(log_file_handler)
         job_logger.setLevel(self.log_level)
         cwl_logger = logging.getLogger('cwltool')
@@ -438,25 +492,25 @@ class Workflow(Process):
         LOGGER.debug("HOME=%s, Current Dir=%s", os.environ.get('HOME'), os.path.abspath(os.curdir))
         self.request = request
         self.response = response
-        self.workflow_id = self.request.identifier
+        self.package_id = self.request.identifier
 
         try:
             try:
                 self.setup_logger()
-                #self.response.outputs[WORKFLOW_LOG_FILE].file = self.log_file
-                #self.response.outputs[WORKFLOW_LOG_FILE].as_reference = True
-                self.update_status("Preparing workflow logs done.", 1)
+                #self.response.outputs[PACKAGE_LOG_FILE].file = self.log_file
+                #self.response.outputs[PACKAGE_LOG_FILE].as_reference = True
+                self.update_status("Preparing package logs done.", 1)
             except Exception as exc:
-                raise self.exception_message(WorkflowExecutionError, exc, "Failed preparing workflow logging.")
+                raise self.exception_message(PackageExecutionError, exc, "Failed preparing package logging.")
 
-            self.log_message("Workflow: {}".format(request.identifier))
-            self.update_status("Launching workflow ...", 2)
+            self.log_message("Package: {}".format(request.identifier))
+            self.update_status("Launching package ...", 2)
 
             try:
-                cwl_input_info = dict([(i['name'], i) for i in self.workflow.t.inputs_record_schema['fields']])
-                self.update_status("Retrieve workflow inputs done.", 3)
+                cwl_input_info = dict([(i['name'], i) for i in self.package.t.inputs_record_schema['fields']])
+                self.update_status("Retrieve package inputs done.", 3)
             except Exception as exc:
-                raise self.exception_message(WorkflowExecutionError, exc, "Failed retrieving workflow input types.")
+                raise self.exception_message(PackageExecutionError, exc, "Failed retrieving package input types.")
             try:
                 cwl_inputs = dict()
                 for i in request.inputs.values():
@@ -473,31 +527,32 @@ class Workflow(Process):
                         cwl_inputs[input_id] = input_data
                     elif isinstance(i[0], ComplexInput):
                         if isinstance(input_data, list):
-                            cwl_inputs[input_id] = [{'path': data, 'class': input_type} for data in input_data]
+                            cwl_inputs[input_id] = [{'location': data, 'class': input_type} for data in input_data]
                         else:
-                            cwl_inputs[input_id] = {'path': input_data, 'class': input_type}
+                            cwl_inputs[input_id] = {'location': input_data, 'class': input_type}
                     else:
-                        raise self.exception_message(WorkflowTypeError, None,
-                                                     "Undefined workflow input for execution: {}.".format(type(i)))
-                self.update_status("Convert workflow inputs done.", 4)
+                        raise self.exception_message(PackageTypeError, None,
+                                                     "Undefined package input for execution: {}.".format(type(i)))
+                self.update_status("Convert package inputs done.", 4)
             except Exception as exc:
-                raise self.exception_message(WorkflowExecutionError, exc, "Failed to load workflow inputs.")
+                raise self.exception_message(PackageExecutionError, exc, "Failed to load package inputs.")
             try:
-                self.update_status("Running workflow ...", 6)
-                result = self.workflow(**cwl_inputs)
-                self.update_status("Workflow execution done.", 95)
+                self.update_status("Running package ...", 6)
+                result = self.package(**cwl_inputs)
+                self.update_status("Package execution done.", 95)
             except Exception as exc:
-                raise self.exception_message(WorkflowExecutionError, exc, "Failed workflow execution.")
+                raise self.exception_message(PackageExecutionError, exc, "Failed package execution.")
             try:
                 for output in request.outputs:
                     self.response.outputs[output].data = result[output]
-                self.update_status("Generate workflow outputs done.", 99)
+                self.update_status("Generate package outputs done.", 99)
             except Exception as exc:
-                raise self.exception_message(WorkflowExecutionError, exc, "Failed to save workflow outputs.")
+                raise self.exception_message(PackageExecutionError, exc, "Failed to save package outputs.")
         except:
             # return log file location by status message since outputs are not obtained by WPS failed process
-            error_msg = "Workflow completed with errors. Server logs: {}".format(self.log_file)
+            error_msg = "Package completed with errors. Server logs: {}".format(self.log_file)
             self.update_status(error_msg, status=WPS_STATUS.FAILED)
+            raise
         else:
-            self.update_status("Workflow complete.", 100, status=WPS_STATUS.SUCCEEDED)
+            self.update_status("Package complete.", 100, status=WPS_STATUS.SUCCEEDED)
         return self.response

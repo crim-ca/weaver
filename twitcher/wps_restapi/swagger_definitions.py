@@ -423,6 +423,20 @@ class ProviderProcessListSchema(SequenceSchema):
     provider = ProviderSummaryProcessesSchema(missing=drop)
 
 
+class ProcessOfferingSchema(MappingSchema):
+    identifier = SchemaNode(String())
+    title = SchemaNode(String(), missing=drop)
+    abstract = SchemaNode(String(), missing=drop)
+    keywords = KeywordList(missing=drop)
+    metadata = MetadataList(missing=drop)
+    inputs = InputTypeList(missing=drop)
+    outputs = OutputTypeList(missing=drop)
+    version = SchemaNode(String(), missing=drop)
+    jobControlOptions = JobControlOptionsEnum
+    outputTransmission = OutputTransmissionEnum
+    executeEndpoint = SchemaNode(String(), missing=drop)    # URL
+
+
 class ProcessDetailSchema(MappingSchema):
     identifier = SchemaNode(String())
     title = SchemaNode(String(), missing=drop)
@@ -594,8 +608,8 @@ class VersionsSchema(MappingSchema):
 #################################
 
 
-class ProcessOfferingBody(MappingSchema):
-    process = ProcessDetailSchema()
+class ProcessDescriptionBody(MappingSchema):
+    processOffering = ProcessOfferingSchema()
 
 
 class PackageBody(MappingSchema):
@@ -604,7 +618,7 @@ class PackageBody(MappingSchema):
 
 class ExecutionUnitBody(MappingSchema):
     package = PackageBody(missing=drop, description="CWL file content as JSON.")
-    reference = SchemaNode(String(), missing=drop)
+    reference = SchemaNode(String(), missing=drop, description="CWL file or docker image reference.")
 
 
 class ProfileExtensionBody(MappingSchema):
@@ -612,13 +626,14 @@ class ProfileExtensionBody(MappingSchema):
 
 
 class DeploymentProfileBody(MappingSchema):
-    deploymentProfileName = SchemaNode(String(), description="Name of the deployment profile.")
-    executionUnit = ExecutionUnitBody(missing=drop)
-    profileExtension = ProfileExtensionBody(missing=drop)
+    deploymentProfileName = SchemaNode(String(), missing=drop, description="Name of the deployment profile.")
+    executionUnit = ExecutionUnitBody(description="Package/Reference definition.",
+                                      validator=OneOf(['reference', 'package']))
+    profileExtension = ProfileExtensionBody(missing=drop, description="Additional parameters for docker image.")
 
 
 class PostProcessRequestBody(MappingSchema):
-    processOffering = ProcessOfferingBody()
+    processDescription = ProcessDescriptionBody()
     deploymentProfile = DeploymentProfileBody()
 
 

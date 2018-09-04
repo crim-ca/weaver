@@ -8,10 +8,10 @@ from time import sleep
 from twitcher.adapter import servicestore_factory, jobstore_factory, processstore_factory
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS
 from twitcher.datatype import Process as ProcessDB, Job as JobDB
-from twitcher.exceptions import ProcessNotFound, JobRegistrationError
+from twitcher.exceptions import ProcessNotFound, JobRegistrationError, PackageRegistrationError, PackageTypeError
 from twitcher.store import processstore_defaultfactory
 from twitcher.utils import get_any_id
-from twitcher.processes import wps_workflow as wf
+from twitcher.processes import wps_package as package
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import check_status
@@ -423,33 +423,19 @@ def add_local_process(request):
     if not isinstance(process_info.get('identifier'), string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process.identifier'")
 
-    process_type = request.json.get('type', 'workflow')
-    if process_type == 'workflow':
+    process_type = request.json.get('type', 'application')
+    if process_type in ['application', 'workflow']:
         execution_unit = deployment_profile.get('executionUnit')
         if not isinstance(execution_unit, dict):
             raise HTTPUnprocessableEntity("Invalid parameter 'deploymentProfile.executionUnit'")
         package = execution_unit.get('package')
         reference = execution_unit.get('reference')
-        if not (isinstance(package, dict) or isinstance(reference, string_types)):
-            raise HTTPUnprocessableEntity(
-                detail="Invalid parameters amongst one of [package,reference] in 'deploymentProfile.executionUnit'.")
-        if package and reference:
-            raise HTTPUnprocessableEntity(
-                detail="Simultaneous parameters [package,reference] not allowed in 'deploymentProfile.executionUnit'.")
 
-        # retrieve package information and validate them at the same time by loading/updating definitions to store in DB
-        if reference:
-            package = wf.load_workflow_file(reference)
+        # obtain updated process information using WPS process offering and CWL package definition
         try:
-            workflow = wf.load_workflow_content(package)
-            workflow_inputs, workflow_outputs = wf.get_workflow_inputs_outputs(workflow)
-            process_inputs = process_info.get('inputs', list())
-            process_outputs = process_info.get('outputs', list())
-            wf.update_workflow_metadata(process_info, package)
-            workflow_inputs, workflow_outputs = wf.merge_workflow_inputs_outputs(process_inputs, workflow_inputs,
-                                                                                 process_outputs, workflow_outputs,
-                                                                                 as_json=True)
-            process_info.update({'package': package, 'inputs': workflow_inputs, 'outputs': workflow_outputs})
+            process_info = package.get_process_from_wps_request(process_info, reference, package)
+        except (PackageRegistrationError, PackageTypeError) as ex:
+            raise HTTPUnprocessableEntity(detail=ex.message)
         except Exception as ex:
             raise HTTPBadRequest("Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex)))
 

@@ -534,7 +534,7 @@ class Process(dict):
             process_key = self.identifier
         if process_key not in process_mapping:
             ProcessInstanceError("Unknown process `{}` in mapping".format(process_key))
-        if process_key == 'workflow':
+        if process_key in ['application', 'workflow']:
             kwargs = self.params_wps
             kwargs.update({'package': self.package})
             return process_mapping[process_key](**kwargs)
