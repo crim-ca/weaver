@@ -1,0 +1,18 @@
+{
+    "files": [
+        {
+            "location": "/data/images/optic/S2A_MSIL1C_20180610T154901_N0206_R054_T18TXR_20180610T193029.SAFE.zip",
+            "class": "File"
+        },
+        {
+            "location": "/data/images/radar/S1A_IW_GRDH_1SDV_20170413T224356_20170413T224421_016132_01AA52_90ED.SAFE.zip",
+            "class": "File"
+        },
+        {
+            "location": "/data/images/radar/RS2_OK18072_PK188251_DK178156_F22_20090501_110525_HH_HV_SLC.zip",
+            "class": "File"
+        }
+    ],
+    "output_file_type": "GeoTIFF",
+    "output_name": "stack_result.tif"
+}

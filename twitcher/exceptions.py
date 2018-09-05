@@ -75,25 +75,25 @@ class JobUpdateError(Exception):
     pass
 
 
-class WorkflowTypeError(Exception):
+class PackageTypeError(Exception):
     """
-    Error indicating that an instance of :class:`twitcher.processes.wps_workflow.Workflow`
-    could not properly parse input/output type(s) for workflow deployment or execution.
-    """
-    pass
-
-
-class WorkflowRegistrationError(Exception):
-    """
-    Error indicating that an instance of :class:`twitcher.processes.wps_workflow.Workflow`
-    could not properly be registered for workflow deployment because of invalid prerequisite.
+    Error indicating that an instance of :class:`twitcher.processes.wps_package.Package`
+    could not properly parse input/output type(s) for package deployment or execution.
     """
     pass
 
 
-class WorkflowExecutionError(Exception):
+class PackageRegistrationError(Exception):
     """
-    Error indicating that an instance of :class:`twitcher.processes.wps_workflow.Workflow`
-    could not properly execute the workflow using provided inputs and package definition.
+    Error indicating that an instance of :class:`twitcher.processes.wps_package.Package`
+    could not properly be registered for package deployment because of invalid prerequisite.
+    """
+    pass
+
+
+class PackageExecutionError(Exception):
+    """
+    Error indicating that an instance of :class:`twitcher.processes.wps_package.Package`
+    could not properly execute the package using provided inputs and package definition.
     """
     pass

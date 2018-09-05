@@ -24,7 +24,13 @@
                 "position": 2,
                 "prefix": "-f"
             },
-            "type": "string"
+            "type": {
+                "type": "enum",
+                "symbols": [
+                    "GeoTIFF",
+                    "NetCDF-CF"
+                ]
+            }
         },
         "output_name": {
             "inputBinding": {
