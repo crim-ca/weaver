@@ -20,10 +20,10 @@ def api_versions(request):
 def api_swagger_json(request, use_docstring_summary=True):
     """Twitcher REST API schema generation in JSON format."""
 
-    cornice = CorniceSwagger(get_services())
+    swagger = CorniceSwagger(get_services())
     # function docstrings are used to create the route's summary in Swagger-UI
-    cornice.summary_docstrings = use_docstring_summary
-    return cornice.generate(title=sd.API_TITLE, version=twitcher_version,
+    swagger.summary_docstrings = use_docstring_summary
+    return swagger.generate(title=sd.API_TITLE, version=twitcher_version,
                             base_path=wps_restapi_base_url(request.registry.settings))
 
 

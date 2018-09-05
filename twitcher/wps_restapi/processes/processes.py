@@ -275,9 +275,7 @@ def submit_job_handler(request, service_url, is_workflow=False):
         'status': status.STATUS_ACCEPTED,
         'location': location
     }
-    headers = request.headers
-    headers.update({'Location': location})
-    return HTTPCreated(json=body_data, headers=headers)
+    return HTTPCreated(json=body_data)
 
 
 @sd.jobs_full_service.post(tags=[sd.provider_processes_tag, sd.providers_tag, sd.execute_tag, sd.jobs_tag],
@@ -502,7 +500,8 @@ def submit_local_job(request):
     try:
         store = processstore_defaultfactory(request.registry)
         process = store.fetch_by_id(process_id)
-        return submit_job_handler(request, process.executeEndpoint, is_workflow=process.type == 'workflow')
+        resp = submit_job_handler(request, process.executeEndpoint, is_workflow=process.type == 'workflow')
+        return resp
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except ProcessNotFound:
