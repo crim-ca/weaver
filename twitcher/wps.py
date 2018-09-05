@@ -13,16 +13,18 @@ from twitcher.processes import default_processes
 from twitcher.store import processstore_defaultfactory
 from twitcher.owsexceptions import OWSNoApplicableCode
 
+from pywps import configuration as pywps_config
 
 import logging
 LOGGER = logging.getLogger(__name__)
 
-PYWPS_CFG = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'wps.cfg')
+PYWPS_CFG_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'wps.cfg')
+PYWPS_CFG = None
 
 
 def _wps_cfg(request):
     settings = request.registry.settings
-    return settings.get('twitcher.wps_cfg')
+    return settings.get('twitcher.wps_cfg', PYWPS_CFG_PATH)
 
 
 def _processes(request):
@@ -38,15 +40,31 @@ def pywps_view(environ, start_response):
     """
     from pywps.app.Service import Service
     LOGGER.debug('pywps env: %s', environ.keys())
+    global PYWPS_CFG
 
-    # call pywps application
-    if 'PYWPS_CFG' not in environ:
-        environ['PYWPS_CFG'] = PYWPS_CFG
+    try:
+        # get config file
+        if 'PYWPS_CFG' not in environ:
+            environ['PYWPS_CFG'] = PYWPS_CFG_PATH
 
-    registry = app.conf['PYRAMID_REGISTRY']
-    processstore = processstore_defaultfactory(registry)
-    processes_wps = [process.wps() for process in processstore.list_processes()]
-    service = Service(processes_wps, [environ['PYWPS_CFG']])
+        if PYWPS_CFG is None:
+            # get PyWPS config
+            pywps_config.load_configuration(environ['PYWPS_CFG'])
+            PYWPS_CFG = pywps_config
+
+            # ensure the output dir exists if specified
+            out_dir_path = PYWPS_CFG.get_config_value('server', 'outputpath')
+            if not os.path.isdir(out_dir_path):
+                os.makedirs(out_dir_path)
+
+        # call pywps application
+        registry = app.conf['PYRAMID_REGISTRY']
+        processstore = processstore_defaultfactory(registry)
+        processes_wps = [process.wps() for process in processstore.list_processes()]
+        service = Service(processes_wps, [environ['PYWPS_CFG']])
+    except Exception as ex:
+        raise OWSNoApplicableCode("Failed setup of PyWPS Service and/or Processes. Error [{}]".format(ex))
+
     return service(environ, start_response)
 
 

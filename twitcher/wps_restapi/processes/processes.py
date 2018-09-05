@@ -11,7 +11,7 @@ from twitcher.datatype import Process as ProcessDB, Job as JobDB
 from twitcher.exceptions import ProcessNotFound, JobRegistrationError, PackageRegistrationError, PackageTypeError
 from twitcher.store import processstore_defaultfactory
 from twitcher.utils import get_any_id
-from twitcher.processes import wps_package as package
+from twitcher.owsexceptions import OWSNoApplicableCode
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import check_status
@@ -134,15 +134,12 @@ def execute_process(self, url, service, process, inputs, outputs,
                              user_id=user_id, async=async)
 
         wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), skip_caps=False, verify=False)
-        # execution = wps.execute(process, inputs=inputs, output=outputs, async=async, lineage=True)
         mode = 'async' if async else 'sync'
         execution = wps.execute(process, inputs=inputs, output=outputs, mode=mode, lineage=True)
-        # job['service'] = wps.identification.title
-        # job['title'] = getattr(execution.process, "title")
+
         if not execution.process and execution.errors:
             raise execution.errors[0]
 
-        # job['abstract'] = getattr(execution.process, "abstract")
         job.status = status.STATUS_RUNNING
         job.status_message = execution.statusMessage or "{} initiation done.".format(str(job))
         job.status_location = execution.statusLocation
@@ -223,8 +220,11 @@ def submit_job_handler(request, service_url, is_workflow=False):
     process_id = request.matchdict.get('process_id')
     async_execute = not request.params.getone('sync-execute') if 'sync-execute' in request.params else True
 
-    wps = WebProcessingService(url=service_url, headers=get_cookie_headers(request.headers))
-    process = wps.describeprocess(process_id)
+    try:
+        wps = WebProcessingService(url=service_url, headers=get_cookie_headers(request.headers))
+        process = wps.describeprocess(process_id)
+    except Exception as ex:
+        raise OWSNoApplicableCode("Failed to retrieve process description. Error: [{}].".format(str(ex)))
 
     # prepare inputs
     complex_inputs = []
