@@ -19,7 +19,7 @@
     },
     "steps": {
         "stack_creation": {
-            "run": "StackCreation-graph-json-remote-str.cwl",
+            "run": "StackCreation-graph-json-remote.cwl",
             "in": {
                 "files": "input_files",
                 "output_file_type": "output_type",
@@ -30,7 +30,7 @@
             "out": ["output"]
         },
         "sfs": {
-            "run": "SFS-graph-json-remote-str.cwl",
+            "run": "SFS-graph-json-remote.cwl",
             "in": {
                 "source_product": "stack_creation/output",
                 "output_file_type": "output_type",
