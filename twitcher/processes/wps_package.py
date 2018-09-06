@@ -392,10 +392,10 @@ def get_process_from_wps_request(process_offering, reference=None, package=None)
             "Simultaneous parameters [package,reference] not allowed.")
 
     if reference:
-        package = _load_package_file(reference)
+        package_factory = _load_package_file(reference)
     try:
-        package = _load_package_content(package)
-        package_inputs, package_outputs = _get_package_inputs_outputs(package)
+        package_factory = _load_package_content(package)
+        package_inputs, package_outputs = _get_package_inputs_outputs(package_factory)
         process_inputs = process_offering.get('inputs', list())
         process_outputs = process_offering.get('outputs', list())
         _update_package_metadata(process_offering, package)

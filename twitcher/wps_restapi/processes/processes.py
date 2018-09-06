@@ -8,7 +8,13 @@ from time import sleep
 from twitcher.adapter import servicestore_factory, jobstore_factory, processstore_factory
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS
 from twitcher.datatype import Process as ProcessDB, Job as JobDB
-from twitcher.exceptions import ProcessNotFound, JobRegistrationError, PackageRegistrationError, PackageTypeError
+from twitcher.exceptions import (
+    ProcessNotFound,
+    JobRegistrationError,
+    PackageRegistrationError,
+    PackageTypeError,
+    ProcessRegistrationError)
+from twitcher.processes import wps_package
 from twitcher.store import processstore_defaultfactory
 from twitcher.utils import get_any_id
 from twitcher.owsexceptions import OWSNoApplicableCode
@@ -275,9 +281,7 @@ def submit_job_handler(request, service_url, is_workflow=False):
         'status': status.STATUS_ACCEPTED,
         'location': location
     }
-    headers = request.headers
-    headers.update({'Location': location})
-    return HTTPCreated(json=body_data, headers=headers)
+    return HTTPCreated(json=body_data)
 
 
 @sd.jobs_full_service.post(tags=[sd.provider_processes_tag, sd.providers_tag, sd.execute_tag, sd.jobs_tag],
@@ -433,7 +437,7 @@ def add_local_process(request):
 
         # obtain updated process information using WPS process offering and CWL package definition
         try:
-            process_info = package.get_process_from_wps_request(process_info, reference, package)
+            process_info = wps_package.get_process_from_wps_request(process_info, reference, package)
         except (PackageRegistrationError, PackageTypeError) as ex:
             raise HTTPUnprocessableEntity(detail=ex.message)
         except Exception as ex:
@@ -441,7 +445,10 @@ def add_local_process(request):
 
     # ensure that required 'executeEndpoint' in db is added, will be auto-fixed to localhost if not specified in body
     process_info.update({'type': process_type, 'executeEndpoint': process_info.get('executeEndpoint')})
-    saved_process = store.save_process(ProcessDB(process_info))
+    try:
+        saved_process = store.save_process(ProcessDB(process_info), overwrite=False)
+    except ProcessRegistrationError as ex:
+        raise HTTPConflict(detail=ex.message)
 
     return HTTPOk(json={'deploymentDone': True, 'processSummary': saved_process.summary()})
 
@@ -502,7 +509,8 @@ def submit_local_job(request):
     try:
         store = processstore_defaultfactory(request.registry)
         process = store.fetch_by_id(process_id)
-        return submit_job_handler(request, process.executeEndpoint, is_workflow=process.type == 'workflow')
+        resp = submit_job_handler(request, process.executeEndpoint, is_workflow=process.type == 'workflow')
+        return resp
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except ProcessNotFound:

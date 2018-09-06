@@ -193,7 +193,7 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
             url = self.default_wps_endpoint
         return url
 
-    def save_process(self, process, overwrite=True, request=None):
+    def save_process(self, process, overwrite=False, request=None):
         """
         Stores a WPS process in storage.
 
