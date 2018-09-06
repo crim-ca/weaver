@@ -3,7 +3,7 @@
     "class": "CommandLineTool",
     "hints": {
         "DockerRequirement": {
-            "dockerPull": "docker-registry.crim.ca/ogc-public/snap6-sfs:v2"
+            "dockerPull": "docker-registry.crim.ca/ogc-public/snap6-sfs:v2.1"
         }
     },
     "inputs": {
@@ -20,13 +20,7 @@
                 "position": 2,
                 "prefix": "-f"
             },
-            "type": {
-                "type": "enum",
-                "symbols": [
-                    "GeoTIFF",
-                    "NetCDF-CF"
-                ]
-            }
+            "type": "string"
         },
         "output_name": {
             "inputBinding": {

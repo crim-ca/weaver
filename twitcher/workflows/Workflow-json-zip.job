@@ -1,5 +1,5 @@
 {
-    "files": [
+    "input_files": [
         {
             "location": "./data/S2A_MSIL1C_20180610T154901_N0206_R054_T18TXR_20180610T193029.SAFE.zip",
             "class": "File"
@@ -13,6 +13,6 @@
             "class": "File"
         }
     ],
-    "output_file_type": "GeoTIFF",
-    "output_name": "stack_result.tif"
+    "output_type": "GeoTIFF",
+    "output_name": "workflow_sfs_result.tif"
 }
