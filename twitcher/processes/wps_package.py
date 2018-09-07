@@ -18,6 +18,7 @@ from pywps.inout.literaltypes import AnyValue, AllowedValue
 from pywps.validator.mode import MODE
 from pywps.validator.literalvalidator import validate_anyvalue, validate_allowed_values
 from pywps.app.Common import Metadata
+from twitcher.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from twitcher.utils import parse_request_query, get_any_id
 from twitcher.exceptions import PackageTypeError, PackageRegistrationError, PackageExecutionError
 from collections import OrderedDict
@@ -392,7 +393,10 @@ def get_process_from_wps_request(process_offering, reference=None, package=None)
             "Simultaneous parameters [package,reference] not allowed.")
 
     if reference:
-        package_factory = _load_package_file(reference)
+        package = _load_package_file(reference)
+    if 'class' not in package:
+        raise PackageRegistrationError("Cannot obtain process type from package class.")
+    process_type = PROCESS_WORKFLOW if package.get('class').lower() == 'workflow' else PROCESS_APPLICATION
     try:
         package_factory = _load_package_content(package)
         package_inputs, package_outputs = _get_package_inputs_outputs(package_factory)
@@ -401,7 +405,8 @@ def get_process_from_wps_request(process_offering, reference=None, package=None)
         _update_package_metadata(process_offering, package)
         package_inputs, package_outputs = _merge_package_inputs_outputs(process_inputs, package_inputs,
                                                                         process_outputs, package_outputs, as_json=True)
-        process_offering.update({'package': package, 'inputs': package_inputs, 'outputs': package_outputs})
+        process_offering.update({'package': package, 'type': process_type,
+                                 'inputs': package_inputs, 'outputs': package_outputs})
         return process_offering
     except Exception as ex:
         msg = "Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex))

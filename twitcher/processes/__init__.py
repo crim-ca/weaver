@@ -1,5 +1,6 @@
 from .wps_hello import Hello
 from .wps_package import Package
+from .types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 
 
 default_processes = [
@@ -8,8 +9,8 @@ default_processes = [
 
 process_mapping = {
     'hello': Hello,
-    'application': Package,
-    'workflow': Package
+    PROCESS_APPLICATION: Package,
+    PROCESS_WORKFLOW: Package
 }
 
 

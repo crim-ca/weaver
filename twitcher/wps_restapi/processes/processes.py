@@ -427,24 +427,22 @@ def add_local_process(request):
     if not isinstance(process_info.get('identifier'), string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process.identifier'")
 
-    process_type = request.json.get('type', 'application')
-    if process_type in ['application', 'workflow']:
-        execution_unit = deployment_profile.get('executionUnit')
-        if not isinstance(execution_unit, dict):
-            raise HTTPUnprocessableEntity("Invalid parameter 'deploymentProfile.executionUnit'")
-        package = execution_unit.get('package')
-        reference = execution_unit.get('reference')
+    execution_unit = deployment_profile.get('executionUnit')
+    if not isinstance(execution_unit, dict):
+        raise HTTPUnprocessableEntity("Invalid parameter 'deploymentProfile.executionUnit'")
+    package = execution_unit.get('package')
+    reference = execution_unit.get('reference')
 
-        # obtain updated process information using WPS process offering and CWL package definition
-        try:
-            process_info = wps_package.get_process_from_wps_request(process_info, reference, package)
-        except (PackageRegistrationError, PackageTypeError) as ex:
-            raise HTTPUnprocessableEntity(detail=ex.message)
-        except Exception as ex:
-            raise HTTPBadRequest("Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex)))
+    # obtain updated process information using WPS process offering and CWL package definition
+    try:
+        process_info = wps_package.get_process_from_wps_request(process_info, reference, package)
+    except (PackageRegistrationError, PackageTypeError) as ex:
+        raise HTTPUnprocessableEntity(detail=ex.message)
+    except Exception as ex:
+        raise HTTPBadRequest("Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex)))
 
     # ensure that required 'executeEndpoint' in db is added, will be auto-fixed to localhost if not specified in body
-    process_info.update({'type': process_type, 'executeEndpoint': process_info.get('executeEndpoint')})
+    process_info.update({'executeEndpoint': process_info.get('executeEndpoint')})
     try:
         saved_process = store.save_process(ProcessDB(process_info), overwrite=False)
     except ProcessRegistrationError as ex:
