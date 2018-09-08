@@ -326,7 +326,7 @@ def get_provider_processes(request):
 
 
 @sd.provider_process_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.describeprocess_tag],
-                                 renderer='json', schema=sd.ProcessEndpoint(),
+                                 renderer='json', schema=sd.ProviderProcessEndpoint(),
                                  response_schemas=sd.get_provider_process_description_responses)
 def describe_provider_process(request):
     """
@@ -416,26 +416,27 @@ def add_local_process(request):
     process_offering = request.json.get('processOffering')
     deployment_profile = request.json.get('deploymentProfile')
     if not isinstance(process_offering, dict):
-        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering'")
+        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering'.")
     if not isinstance(deployment_profile, dict):
-        raise HTTPUnprocessableEntity("Invalid parameter 'deploymentProfile'")
+        raise HTTPUnprocessableEntity("Invalid parameter 'deploymentProfile'.")
 
     # validate minimum field requirements
     process_info = process_offering.get('process')
     if not isinstance(process_info, dict):
-        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process'")
+        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process'.")
     if not isinstance(process_info.get('identifier'), string_types):
-        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process.identifier'")
+        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process.identifier'.")
 
     execution_unit = deployment_profile.get('executionUnit')
     if not isinstance(execution_unit, dict):
-        raise HTTPUnprocessableEntity("Invalid parameter 'deploymentProfile.executionUnit'")
+        raise HTTPUnprocessableEntity("Invalid parameter 'deploymentProfile.executionUnit'.")
     package = execution_unit.get('package')
     reference = execution_unit.get('reference')
 
     # obtain updated process information using WPS process offering and CWL package definition
     try:
-        process_info = wps_package.get_process_from_wps_request(process_info, reference, package)
+        twitcher_url = request.registry.settings.get('twitcher.url')
+        process_info = wps_package.get_process_from_wps_request(process_info, reference, package, base_url=twitcher_url)
     except (PackageRegistrationError, PackageTypeError) as ex:
         raise HTTPUnprocessableEntity(detail=ex.message)
     except Exception as ex:
@@ -459,11 +460,32 @@ def get_local_process(request):
     """
     process_id = request.matchdict.get('process_id')
     if not isinstance(process_id, string_types):
-        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'")
+        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
         store = processstore_defaultfactory(request.registry)
         process = store.fetch_by_id(process_id)
         return HTTPOk(json={'process': process.json()})
+    except HTTPException:
+        raise  # re-throw already handled HTTPException
+    except ProcessNotFound:
+        raise HTTPNotFound("The process with id `{}` does not exist.".format(str(process_id)))
+    except Exception as ex:
+        raise HTTPInternalServerError(ex.message)
+
+
+@sd.process_package_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer='json',
+                                schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_package_responses)
+def get_local_process_package(request):
+    """
+    Get a registered local process package definition.
+    """
+    process_id = request.matchdict.get('process_id')
+    if not isinstance(process_id, string_types):
+        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
+    try:
+        store = processstore_defaultfactory(request.registry)
+        process = store.fetch_by_id(process_id)
+        return HTTPOk(json=process.package or {})
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except ProcessNotFound:
@@ -480,7 +502,7 @@ def delete_local_process(request):
     """
     process_id = request.matchdict.get('process_id')
     if not isinstance(process_id, string_types):
-        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'")
+        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
         store = processstore_defaultfactory(request.registry)
         if store.delete_process(process_id):
@@ -503,7 +525,7 @@ def submit_local_job(request):
     """
     process_id = request.matchdict.get('process_id')
     if not isinstance(process_id, string_types):
-        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'")
+        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
         store = processstore_defaultfactory(request.registry)
         process = store.fetch_by_id(process_id)

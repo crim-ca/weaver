@@ -97,3 +97,11 @@ class PackageExecutionError(Exception):
     could not properly execute the package using provided inputs and package definition.
     """
     pass
+
+
+class PackageNotFoundError(Exception):
+    """
+    Error indicating that an instance of :class:`twitcher.processes.wps_package.Package`
+    could not properly retrieve the package definition using provided references.
+    """
+    pass

@@ -1,7 +1,7 @@
 {
     "processOffering": {
         "process": {
-            "identifier": "sfs_graph",
+            "identifier": "sfs_graph_enum",
             "title": "Application SFS (predefined Graph.xml) dynamically added by POST /processes"
         }
     },
@@ -30,7 +30,13 @@
                             "position": 2,
                             "prefix": "-f"
                         },
-                        "type": "string"
+                        "type": {
+                            "type": "enum",
+                            "symbols": [
+                                "GeoTIFF",
+                                "NetCDF-CF"
+                            ]
+                        }
                     },
                     "output_name": {
                         "inputBinding": {

@@ -25,6 +25,7 @@ api_versions_uri = '/versions'
 
 processes_uri = '/processes'
 process_uri = '/processes/{process_id}'
+process_package_uri = '/processes/{process_id}/package'
 process_jobs_uri = '/processes/{process_id}/jobs'
 process_job_uri = '/processes/{process_id}/jobs/{job_id}'
 process_results_uri = '/processes/{process_id}/jobs/{job_id}/results'
@@ -85,6 +86,7 @@ api_versions_service = Service(name='api_versions', path=api_versions_uri)
 
 processes_service = Service(name='processes', path=processes_uri)
 process_service = Service(name='process', path=process_uri)
+process_package_service = Service(name='process_package', path=process_package_uri)
 process_jobs_service = Service(name='process_jobs', path=process_jobs_uri)
 process_job_service = Service(name='process_job', path=process_job_uri)
 process_results_service = Service(name='process_results', path=process_results_uri)
@@ -258,9 +260,14 @@ class ProviderEndpoint(MappingSchema):
     provider_id = provider_id
 
 
-class ProcessEndpoint(MappingSchema):
+class ProviderProcessEndpoint(MappingSchema):
     header = AcceptHeader()
     provider_id = provider_id
+    process_id = process_id
+
+
+class ProcessEndpoint(MappingSchema):
+    header = AcceptHeader()
     process_id = process_id
 
 
@@ -776,13 +783,17 @@ class OkPostProcessesSchema(MappingSchema):
 
 
 class OkGetProcessBodySchema(MappingSchema):
-    header = JsonHeader()
     process = ProcessDetailSchema()
 
 
 class OkGetProcessSchema(MappingSchema):
     header = JsonHeader()
     body = OkGetProcessBodySchema()
+
+
+class OkGetProcessPackageSchema(MappingSchema):
+    header = JsonHeader()
+    body = MappingSchema(default={})
 
 
 class OkDeleteProcessUndeployBodySchema(MappingSchema):
@@ -886,6 +897,9 @@ post_processes_responses = {
 }
 get_process_responses = {
     '200': OkGetProcessSchema(description='success')
+}
+get_process_package_responses = {
+    '200': OkGetProcessPackageSchema(description='success')
 }
 delete_process_responses = {
     '200': OkDeleteProcessSchema(description='success')
