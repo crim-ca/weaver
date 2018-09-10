@@ -2,6 +2,7 @@ from pyramid.httpexceptions import *
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
 from celery.utils.log import get_task_logger
+from six.moves.urllib.parse import urlparse
 from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import URLError
 from time import sleep
@@ -227,7 +228,8 @@ def submit_job_handler(request, service_url, is_workflow=False):
     async_execute = not request.params.getone('sync-execute') if 'sync-execute' in request.params else True
 
     try:
-        wps = WebProcessingService(url=service_url, headers=get_cookie_headers(request.headers))
+        verify = False if urlparse(service_url).hostname == 'localhost' else False
+        wps = WebProcessingService(url=service_url, headers=get_cookie_headers(request.headers), verify=verify)
         process = wps.describeprocess(process_id)
     except Exception as ex:
         raise OWSNoApplicableCode("Failed to retrieve process description. Error: [{}].".format(str(ex)))
@@ -435,8 +437,7 @@ def add_local_process(request):
 
     # obtain updated process information using WPS process offering and CWL package definition
     try:
-        twitcher_url = request.registry.settings.get('twitcher.url')
-        process_info = wps_package.get_process_from_wps_request(process_info, reference, package, base_url=twitcher_url)
+        process_info = wps_package.get_process_from_wps_request(process_info, reference, package)
     except (PackageRegistrationError, PackageTypeError) as ex:
         raise HTTPUnprocessableEntity(detail=ex.message)
     except Exception as ex:

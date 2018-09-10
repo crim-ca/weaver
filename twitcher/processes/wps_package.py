@@ -19,6 +19,7 @@ from pywps.validator.mode import MODE
 from pywps.validator.literalvalidator import validate_anyvalue, validate_allowed_values
 from pywps.app.Common import Metadata
 from twitcher.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
+from twitcher.processes.sources import DATA_SOURCE_MAPPING
 from twitcher.utils import parse_request_query, get_any_id
 from twitcher.exceptions import PackageTypeError, PackageRegistrationError, PackageExecutionError, PackageNotFoundError
 from twitcher.wps_restapi.swagger_definitions import process_uri
@@ -73,32 +74,27 @@ class NullType():
 null = NullType()
 
 
-def _get_step_process_location(process_id_or_url, data_source, base_url=None):
+def _get_step_process_location(process_id_or_url, data_source=None):
     """
     Obtains the URL of a WPS process description given the specified information.
 
     :param process_id_or_url: process 'identifier' or literal URL to DescribeProcess WPS-REST location.
-    :param data_source: identifier of the data source to map to a specific ADES.
-    :param base_url: URL to employ to try finding local EMS process package specified by ID.
+    :param data_source: identifier of the data source to map to a specific ADES, or mapping to EMS processes if None.
     :return: URL of EMS or ADES WPS-REST DescribeProcess.
     """
-    if data_source and not base_url:
-        # TODO: mapping to specific ADES using data source
-        # process_id_or_url = MAP[data_source]
-        pass
     # if an URL was specified, return it as is
     if urlparse(process_id_or_url).scheme != "":
         return process_id_or_url
+    data_source_url = DATA_SOURCE_MAPPING[data_source]()
     process_url = process_uri.format(process_id=process_id_or_url)
-    return '{host}{path}'.format(host=base_url, path=process_url)
+    return '{host}{path}'.format(host=data_source_url, path=process_url)
 
 
-def _get_step_process_package(process_id_or_url, base_url=None):
+def _get_step_process_package(process_id_or_url, data_source=None):
     """
     Retrieves the WPS process package content from given process ID or literal URL.
 
     :param process_id_or_url: process 'identifier' or literal URL to DescribeProcess WPS-REST location.
-    :param base_url: URL to employ to try finding local sub-package steps specified by ID.
     :return: tuple of package body as dictionary and package reference name.
     """
 
@@ -114,7 +110,7 @@ def _get_step_process_package(process_id_or_url, base_url=None):
     if not isinstance(process_id_or_url, six.string_types):
         raise _package_not_found_error(str(process_id_or_url))
 
-    process_url = _get_step_process_location(process_id_or_url, data_source=None, base_url=base_url)
+    process_url = _get_step_process_location(process_id_or_url, data_source=data_source)
     package_url = '{}/package'.format(process_url)
     package_name = process_id_or_url.split('/')[-1]
     package_body = _get_package_request_body(package_url, process_id_or_url)
@@ -143,14 +139,14 @@ def _load_package_file(file_path):
 
 
 def _load_package_content(package_dict, package_name=PACKAGE_DEFAULT_FILE_NAME,
-                          base_url=None, only_dump_file=False, tmp_dir=None):
+                          data_source=None, only_dump_file=False, tmp_dir=None):
     """
     Loads the package content to file in a temporary directory.
     Recursively processes sub-packages steps if the parent is of 'workflow' type (CWL class).
 
     :param package_dict: package content representation as a json dictionary.
     :param package_name: name to use to create the package file.
-    :param base_url: URL to employ to try finding local sub-package steps specified by ID.
+    :param data_source: identifier of the data source to map to a specific ADES, or mapping to EMS processes if None.
     :param only_dump_file: specify if the :class:``cwltool.factory.Factory`` should be validated and returned.
     :param tmp_dir: location of the temporary directory to dump files (warning: will be deleted on exit).
     :return:
@@ -158,7 +154,7 @@ def _load_package_content(package_dict, package_name=PACKAGE_DEFAULT_FILE_NAME,
     """
     # TODO: find how to pass dict directly (?) instead of dump to tmp file
     tmp_dir = tmp_dir or tempfile.mkdtemp()
-    tmp_json_cwl = os.path.join(tmp_dir, '{}.cwl'.format(package_name))
+    tmp_json_cwl = os.path.join(tmp_dir, package_name)
 
     # for workflows, retrieve each 'sub-package' file
     package_type = PROCESS_WORKFLOW if package_dict.get('class').lower() == 'workflow' else PROCESS_APPLICATION
@@ -166,11 +162,12 @@ def _load_package_content(package_dict, package_name=PACKAGE_DEFAULT_FILE_NAME,
         workflow_steps = package_dict.get('steps')
         for step in workflow_steps:
             step_package_ref = workflow_steps[step].get('run')
-            package_body, package_name = _get_step_process_package(step_package_ref, base_url)
+            package_body, package_name = _get_step_process_package(step_package_ref, data_source)
 
             # generate sub-package file and update workflow step to point to created sub-package file
-            _load_package_content(package_body, package_name, base_url=base_url, only_dump_file=True, tmp_dir=tmp_dir)
-            package_dict['steps'][step]['run'] = '{}.cwl'.format(package_name)
+            _load_package_content(package_body, package_name, data_source=data_source,
+                                  only_dump_file=True, tmp_dir=tmp_dir)
+            package_dict['steps'][step]['run'] = package_name
 
     with open(tmp_json_cwl, 'w') as f:
         json.dump(package_dict, f)
@@ -340,8 +337,10 @@ def _json2wps_type(type_info, type_category):
         return AllowedValue(value=type_info, allowed_type=ALLOWEDVALUETYPE.VALUE)
     if type_category == 'allowed_values' and isinstance(type_info, list):
         return AllowedValue(minval=min(type_info), maxval=max(type_info), allowed_type=ALLOWEDVALUETYPE.RANGE)
-    if type_category == 'supported_formats' and isinstance(type_info, six.string_types):
+    if type_category == 'supported_formats' and isinstance(type_info, dict):
         return Format(**type_info)
+    if type_category == 'supported_formats' and isinstance(type_info, six.string_types):
+        return Format(type_info)
     if type_category == 'metadata' and isinstance(type_info, dict):
         return Metadata(**type_info)
     if type_category == 'metadata' and isinstance(type_info, six.string_types):
@@ -555,7 +554,7 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
                                                 set(cwl_package_package.get('s:keywords')))
 
 
-def get_process_from_wps_request(process_offering, reference=None, package=None, base_url=None):
+def get_process_from_wps_request(process_offering, reference=None, package=None, data_source=None):
     if not (isinstance(package, dict) or isinstance(reference, six.string_types)):
         raise PackageRegistrationError(
             "Invalid parameters amongst one of [package,reference].")
@@ -568,7 +567,7 @@ def get_process_from_wps_request(process_offering, reference=None, package=None,
     if 'class' not in package:
         raise PackageRegistrationError("Cannot obtain process type from package class.")
     try:
-        package_factory, process_type = _load_package_content(package, base_url=base_url)
+        package_factory, process_type = _load_package_content(package, data_source=data_source)
         package_inputs, package_outputs = _get_package_inputs_outputs(package_factory)
         process_inputs = process_offering.get('inputs', list())
         process_outputs = process_offering.get('outputs', list())
