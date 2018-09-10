@@ -243,25 +243,26 @@ def _is_cwl_enum_type(io_info):
     return True, io_type, io_allow
 
 
-def _cwl2wps_io(io_info):
+def _cwl2wps_io(io_info, io_select):
     """Converts input/output parameters from CWL types to WPS types.
     :param io_info: parsed IO of a CWL file
+    :param io_select: ``WPS_INPUT`` or ``WPS_OUTPUT`` to specify desired WPS type conversion.
     :returns: corresponding IO in WPS format
     """
     is_input = False
     is_output = False
-    if 'inputBinding' in io_info:
+    if io_select == WPS_INPUT:
         is_input = True
         io_literal = LiteralInput
         io_complex = ComplexInput
         io_bbox = BoundingBoxInput
-    elif 'outputBinding' in io_info:
+    elif io_select == WPS_OUTPUT:
         is_output = True
         io_literal = LiteralOutput
         io_complex = ComplexOutput
         io_bbox = BoundingBoxOutput
     else:
-        raise PackageTypeError("Unsupported I/O info definition: `{}`.".format(repr(io_info)))
+        raise PackageTypeError("Unsupported I/O info definition: `{0}` with `{1}`.".format(repr(io_info), io_select))
 
     io_name = io_info['name']
     io_type = io_info['type']
@@ -352,10 +353,10 @@ def _json2wps_type(type_info, type_category):
     return None
 
 
-def _json2wps_io(io_info, input_or_output):
+def _json2wps_io(io_info, io_select):
     """Converts input/output parameters from a JSON dict to WPS types.
     :param io_info: IO in JSON dict format.
-    :param input_or_output: ``WPS_INPUT`` or ``WPS_OUTPUT`` to specified desired WPS type conversion.
+    :param io_select: ``WPS_INPUT`` or ``WPS_OUTPUT`` to specify desired WPS type conversion.
     :return: corresponding IO in WPS format.
     """
     # remove extra fields added by pywps
@@ -393,14 +394,14 @@ def _json2wps_io(io_info, input_or_output):
 
     # convert by type
     io_type = io_info.pop('type', WPS_COMPLEX)    # only ComplexData doesn't have 'type'
-    if input_or_output == WPS_INPUT:
+    if io_select == WPS_INPUT:
         if io_type == WPS_COMPLEX:
             return ComplexInput(**io_info)
         if io_type == WPS_BOUNDINGBOX:
             return BoundingBoxInput(**io_info)
         if io_type == WPS_LITERAL:
             return LiteralInput(**io_info)
-    elif input_or_output == WPS_OUTPUT:
+    elif io_select == WPS_OUTPUT:
         # extra params to remove for outputs
         io_info.pop('min_occurs', None)
         io_info.pop('max_occurs', None)
@@ -410,8 +411,7 @@ def _json2wps_io(io_info, input_or_output):
             return BoundingBoxOutput(**io_info)
         if io_type == WPS_LITERAL:
             return LiteralOutput(**io_info)
-    raise PackageTypeError("Unknown conversion from dict to WPS type (type={0}, mode={1})."
-                           .format(io_type, input_or_output))
+    raise PackageTypeError("Unknown conversion from dict to WPS type (type={0}, mode={1}).".format(io_type, io_select))
 
 
 def _get_field(io_object, field, search_variations=False, pop_found=False):
@@ -441,7 +441,7 @@ def _set_field(io_object, field, value):
         setattr(io_object, field, value)
 
 
-def _merge_package_io(wps_io_list, cwl_io_list, input_or_output):
+def _merge_package_io(wps_io_list, cwl_io_list, io_select):
     """
     Update I/O definitions to use for process creation and returned by GetCapabilities, DescribeProcess.
     If WPS I/O definitions where provided during deployment, update them with CWL-to-WPS converted I/O and
@@ -451,7 +451,7 @@ def _merge_package_io(wps_io_list, cwl_io_list, input_or_output):
 
     :param wps_io_list: list of WPS I/O (as json) passed during process deployment.
     :param cwl_io_list: list of CWL I/O converted to WPS-like I/O for counter-validation.
-    :param input_or_output: ``WPS_INPUT`` or ``WPS_OUTPUT`` to specified desired WPS type conversion.
+    :param io_select: ``WPS_INPUT`` or ``WPS_OUTPUT`` to specify desired WPS type conversion.
     :returns: list of validated/updated WPS I/O for the process.
     """
     if not isinstance(cwl_io_list, list):
@@ -479,7 +479,7 @@ def _merge_package_io(wps_io_list, cwl_io_list, input_or_output):
                             'identifier': _get_field(cwl_io_json, 'identifier'),
                             'title': _get_field(wps_io_json, 'title', search_variations=True) or
                                      _get_field(cwl_io_json, 'title')})
-        wps_io = _json2wps_io(wps_io_json, input_or_output)
+        wps_io = _json2wps_io(wps_io_json, io_select)
         # retrieve any complementing fields (metadata, keywords, etc.) passed as WPS input
         for field_type in WPS_FIELD_MAPPING:
             cwl_field = _get_field(cwl_io, field_type)
@@ -505,9 +505,15 @@ def _merge_package_inputs_outputs(wps_inputs_list, cwl_inputs_list, wps_outputs_
     return wps_inputs, wps_outputs
 
 
-def _get_package_io(package, io_attrib, as_json):
+def _get_package_io(package, io_select, as_json):
+    if io_select == WPS_OUTPUT:
+        io_attrib = 'outputs_record_schema'
+    elif io_select == WPS_INPUT:
+        io_attrib = 'inputs_record_schema'
+    else:
+        raise PackageTypeError("Unknown I/O selection: `{}`.".format(io_select))
     cwl_package_io = getattr(package.t, io_attrib)
-    wps_package_io = [_cwl2wps_io(io) for io in cwl_package_io['fields']]
+    wps_package_io = [_cwl2wps_io(io, io_select) for io in cwl_package_io['fields']]
     if as_json:
         return [io.json for io in wps_package_io]
     return wps_package_io
@@ -515,18 +521,18 @@ def _get_package_io(package, io_attrib, as_json):
 
 def _get_package_inputs(package, as_json=False):
     """Generates WPS-like inputs using parsed CWL package input definitions."""
-    return _get_package_io(package, io_attrib='inputs_record_schema', as_json=as_json)
+    return _get_package_io(package, io_select=WPS_INPUT, as_json=as_json)
 
 
 def _get_package_outputs(package, as_json=False):
     """Generates WPS-like outputs using parsed CWL package output definitions."""
-    return _get_package_io(package, io_attrib='outputs_record_schema', as_json=as_json)
+    return _get_package_io(package, io_select=WPS_OUTPUT, as_json=as_json)
 
 
 def _get_package_inputs_outputs(package, as_json=False):
     """Generates WPS-like (inputs,outputs) tuple using parsed CWL package output definitions."""
-    return _get_package_io(package, io_attrib='inputs_record_schema', as_json=as_json), \
-           _get_package_io(package, io_attrib='outputs_record_schema', as_json=as_json)
+    return _get_package_io(package, io_select=WPS_INPUT, as_json=as_json), \
+           _get_package_io(package, io_select=WPS_OUTPUT, as_json=as_json)
 
 
 def _update_package_metadata(wps_package_metadata, cwl_package_package):
