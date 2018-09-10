@@ -188,7 +188,7 @@ class LiteralDataDomainObject(MappingSchema):
     pass
 
 
-class BaseTypeBody(MappingSchema):
+class BaseInputTypeBody(MappingSchema):
     identifier = SchemaNode(String())
     title = SchemaNode(String(), missing=drop)
     abstract = SchemaNode(String(), missing=drop)
@@ -199,34 +199,59 @@ class BaseTypeBody(MappingSchema):
     maxOccurs = SchemaNode(Integer(), missing=drop)
 
 
-class LiteralInputTypeBody(BaseTypeBody):
+class BaseOutputTypeBody(MappingSchema):
+    identifier = SchemaNode(String())
+    title = SchemaNode(String(), missing=drop)
+    abstract = SchemaNode(String(), missing=drop)
+    keywords = KeywordList(missing=drop)
+    metadata = MetadataList(missing=drop)
+    formats = FormatList()
+    minOccurs = SchemaNode(Integer(), missing=drop)
+    maxOccurs = SchemaNode(Integer(), missing=drop)
+
+
+class LiteralInputTypeBody(BaseInputTypeBody):
     LiteralDataDomain = LiteralDataDomainObject(missing=drop)
 
 
-class ComplexInputTypeBody(BaseTypeBody):
+class ComplexInputTypeBody(BaseInputTypeBody):
     pass
 
 
-class BoundingBoxInputTypeBody(BaseTypeBody):
+class BoundingBoxInputTypeBody(BaseInputTypeBody):
     pass
 
 
-class InputTypeBody(BaseTypeBody):
-    # TODO: figure out how to do OneOf
-    # item = MappingSchema(validator=OneOf([LiteralInputTypeBody, ComplexInputTypeBody, BoundingBoxInputTypeBody]))
+class LiteralOutputTypeBody(BaseOutputTypeBody):
+    LiteralDataDomain = LiteralDataDomainObject(missing=drop)
+
+
+class ComplexOutputTypeBody(BaseOutputTypeBody):
     pass
+
+
+class BoundingBoxOutputTypeBody(BaseOutputTypeBody):
+    pass
+
+
+class InputTypeBody(BaseInputTypeBody):
+    literal = LiteralInputTypeBody()
+    complex = ComplexInputTypeBody()
+    bounding_box = BoundingBoxInputTypeBody()
+
+
+class OutputTypeBody(BaseOutputTypeBody):
+    literal = LiteralOutputTypeBody()
+    complex = ComplexOutputTypeBody()
+    bounding_box = BoundingBoxOutputTypeBody()
 
 
 class InputTypeList(SequenceSchema):
-    input = InputTypeBody()
-
-
-class OutputTypeBody(BaseTypeBody):
-    pass
+    input = InputTypeBody(validator=OneOf(['literal', 'complex', 'bounding_box']))
 
 
 class OutputTypeList(SequenceSchema):
-    output = OutputTypeBody()
+    output = OutputTypeBody(validator=OneOf(['literal', 'complex', 'bounding_box']))
 
 
 JobControlOptionsEnum = SchemaNode(String(), validator=OneOf(['sync-execute', 'async-execute']), missing=drop)
@@ -251,8 +276,12 @@ class VersionsEndpoint(MappingSchema):
     header = AcceptHeader()
 
 
-class SwaggerJsonEndpoint(MappingSchema):
+class SwaggerJSONEndpoint(MappingSchema):
     header = AcceptHeader()
+
+
+class SwaggerUIEndpoint(MappingSchema):
+    pass
 
 
 class ProviderEndpoint(MappingSchema):
@@ -430,20 +459,6 @@ class ProviderProcessListSchema(SequenceSchema):
     provider = ProviderSummaryProcessesSchema(missing=drop)
 
 
-class ProcessOfferingSchema(MappingSchema):
-    identifier = SchemaNode(String())
-    title = SchemaNode(String(), missing=drop)
-    abstract = SchemaNode(String(), missing=drop)
-    keywords = KeywordList(missing=drop)
-    metadata = MetadataList(missing=drop)
-    inputs = InputTypeList(missing=drop)
-    outputs = OutputTypeList(missing=drop)
-    version = SchemaNode(String(), missing=drop)
-    jobControlOptions = JobControlOptionsEnum
-    outputTransmission = OutputTransmissionEnum
-    executeEndpoint = SchemaNode(String(), missing=drop)    # URL
-
-
 class ProcessDetailSchema(MappingSchema):
     identifier = SchemaNode(String())
     title = SchemaNode(String(), missing=drop)
@@ -455,7 +470,7 @@ class ProcessDetailSchema(MappingSchema):
     version = SchemaNode(String(), missing=drop)
     jobControlOptions = JobControlOptionsEnum
     outputTransmission = OutputTransmissionEnum
-    executeEndpoint = SchemaNode(String(), missing=drop)    # URL
+    executeEndpoint = SchemaNode(String(), format='url', missing=drop)
 
 
 class ProcessOutputDescriptionSchema(MappingSchema):
@@ -556,6 +571,10 @@ class ProcessDescriptionSchema(MappingSchema):
     label = SchemaNode(String())
 
 
+class ProcessDescriptionBodySchema(MappingSchema):
+    process = ProcessDescriptionSchema()
+
+
 class ProvidersSchema(SequenceSchema):
     providers_service = ProviderSummarySchema()
 
@@ -601,6 +620,14 @@ class AdapterDescriptionSchema(MappingSchema):
     version = SchemaNode(String(), description="Version of the loaded Twitcher adapter.", missing=drop, example='0.3.0')
 
 
+class SwaggerJSONSpecSchema(MappingSchema):
+    pass
+
+
+class SwaggerUISpecSchema(MappingSchema):
+    pass
+
+
 class VersionsSpecSchema(MappingSchema):
     twitcher = SchemaNode(String(), description="Twitcher version string.", example='0.3.0')
     adapter = AdapterDescriptionSchema()
@@ -615,8 +642,8 @@ class VersionsSchema(MappingSchema):
 #################################
 
 
-class ProcessDescriptionBody(MappingSchema):
-    processOffering = ProcessOfferingSchema()
+class ProcessOfferingBody(MappingSchema):
+    process = ProcessDetailSchema(title='Process')
 
 
 class PackageBody(MappingSchema):
@@ -634,20 +661,20 @@ class ProfileExtensionBody(MappingSchema):
 
 class DeploymentProfileBody(MappingSchema):
     deploymentProfileName = SchemaNode(String(), missing=drop, description="Name of the deployment profile.")
-    executionUnit = ExecutionUnitBody(description="Package/Reference definition.",
+    executionUnit = ExecutionUnitBody(description="Package/Reference definition.", title='ExecutionUnit',
                                       validator=OneOf(['reference', 'package']))
-    profileExtension = ProfileExtensionBody(missing=drop, description="Additional parameters for docker image.")
+    profileExtension = ProfileExtensionBody(missing=drop, title='ProfileExtension',
+                                            description="Additional parameters for docker image.")
 
 
 class PostProcessRequestBody(MappingSchema):
-    processDescription = ProcessDescriptionBody()
-    deploymentProfile = DeploymentProfileBody()
+    processOffering = ProcessOfferingBody(title='ProcessOffering')
+    deploymentProfile = DeploymentProfileBody(title='DeploymentProfile')
 
 
 class ProcessesEndpoint(MappingSchema):
     header = AcceptHeader()
-    body = PostProcessRequestBody()
-    process_id = process_id
+    body = PostProcessRequestBody(title='Deploy')
 
 
 class PostProcessJobBody(MappingSchema):
@@ -655,6 +682,7 @@ class PostProcessJobBody(MappingSchema):
 
 
 class PostProcessJobsEndpoint(MappingSchema):
+    process_id = process_id
     header = AcceptHeader()
     body = PostProcessJobBody()
 
@@ -717,11 +745,12 @@ class OkGetFrontpageSchema(MappingSchema):
 
 class OkGetSwaggerJSONSchema(MappingSchema):
     header = JsonHeader()
-    body = MappingSchema(default={}, description="")
+    body = SwaggerJSONSpecSchema(description="Swagger JSON of Twitcher API.")
 
 
 class OkGetSwaggerUISchema(MappingSchema):
     header = HtmlHeader()
+    body = SwaggerUISpecSchema(description="Swagger UI of Twitcher API.")
 
 
 class OkGetVersionsSchema(MappingSchema):
@@ -761,7 +790,7 @@ class GetProcessesRequest(MappingSchema):
 
 
 class OkGetProcessesBodySchema(MappingSchema):
-    processes = ProcessListSchema()
+    processes = ProcessListSchema(title='ProcessCollection')
     providers = ProviderProcessListSchema(missing=drop)
 
 
@@ -810,7 +839,7 @@ class OkDeleteProcessSchema(MappingSchema):
 
 class OkGetProviderProcessDescription(MappingSchema):
     header = JsonHeader()
-    body = ProcessDescriptionSchema()
+    body = ProcessDescriptionBodySchema()
 
 
 class CreatedPostProvider(MappingSchema):
