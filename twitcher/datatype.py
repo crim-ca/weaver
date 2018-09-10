@@ -2,10 +2,14 @@
 Definitions of types used by tokens.
 """
 
+import six
 import time
 import uuid
+from datetime import datetime
+from logging import _levelNames, ERROR, INFO
 from twitcher.utils import now_secs
 from twitcher.exceptions import AccessTokenNotFound
+from twitcher.wps_restapi.status import status_values
 
 
 class Service(dict):
@@ -68,78 +72,219 @@ class Job(dict):
     def __init__(self, *args, **kwargs):
         super(Job, self).__init__(*args, **kwargs)
         if 'task_id' not in self:
-            raise TypeError("'task_id' is required")
-        self['identifier'] = uuid.uuid4().get_hex()
+            raise TypeError("Parameter `task_id` is required for `{}` creation.".format(type(self)))
+        if not isinstance(self['task_id'], six.string_types):
+            raise TypeError("Type `str` is required for `{}.task_id`".format(type(self)))
+
+    def _get_log_msg(self, msg=None):
+        if not msg:
+            msg = self.status_message
+        return '{dur} {lvl:3d}% {stat:10} {msg}'.format(dur=self.duration, lvl=self.progress, stat=self.status, msg=msg)
+
+    def save_log(self, errors=None, logger=None):
+        if isinstance(errors, six.string_types):
+            log_msg = [(ERROR, self._get_log_msg())]
+            self.exceptions.append(errors)
+        elif isinstance(errors, list):
+            log_msg = [(ERROR, self._get_log_msg('{0.text} - code={0.code} - locator={0.locator}'.format(error)))
+                       for error in errors]
+            self.exceptions.extend([{
+                    'Code': error.code,
+                    'Locator': error.locator,
+                    'Text': error.text
+                } for error in errors])
+        else:
+            log_msg = [(INFO, self._get_log_msg())]
+        for level, msg in log_msg:
+            fmt_msg = '{0} {1:6} {2}'.format(datetime.now(), _levelNames[level], msg)
+            if len(self.logs) == 0 or self.logs[-1] != fmt_msg:
+                self.logs.append(fmt_msg)
+                if logger:
+                    logger.log(level, msg)
 
     @property
     def task_id(self):
         return self['task_id']
 
     @property
-    def identifier(self):
-        return self['identifier']
-
-    @property
     def service(self):
         return self.get('service', None)
+
+    @service.setter
+    def service(self, service):
+        if not isinstance(service, six.string_types):
+            raise TypeError("Type `str` is required for `{}.service`".format(type(self)))
+        self['service'] = service
 
     @property
     def process(self):
         return self.get('process', None)
 
+    @process.setter
+    def process(self, process):
+        if not isinstance(process, six.string_types):
+            raise TypeError("Type `str` is required for `{}.process`".format(type(self)))
+        self['process'] = process
+
     @property
     def user_id(self):
         return self.get('user_id', None)
+
+    @user_id.setter
+    def user_id(self, user_id):
+        if not isinstance(user_id, int):
+            raise TypeError("Type `int` is required for `{}.user_id`".format(type(self)))
+        self['user_id'] = user_id
 
     @property
     def status(self):
         return self.get('status', 'unknown')
 
+    @status.setter
+    def status(self, status):
+        if not isinstance(status, six.string_types):
+            raise TypeError("Type `str` is required for `{}.status`".format(type(self)))
+        if status not in status_values:
+            raise ValueError("Status `{0}` is not valid for `{1}.status`".format(status, type(self)))
+        self['status'] = status
+
     @property
     def status_message(self):
-        return self.get('status_message', '')
+        return self.get('status_message', 'no message')
+
+    @status_message.setter
+    def status_message(self, message):
+        if message is None:
+            return
+        if not isinstance(message, six.string_types):
+            raise TypeError("Type `str` is required for `{}.status_message`".format(type(self)))
+        self['status_message'] = message
 
     @property
     def status_location(self):
-        return self.get('status_message', None)
+        return self.get('status_location', None)
+
+    @status_location.setter
+    def status_location(self, location_url):
+        if not isinstance(location_url, six.string_types):
+            raise TypeError("Type `str` is required for `{}.status_location`".format(type(self)))
+        self['status_location'] = location_url
 
     @property
     def is_workflow(self):
         return self.get('is_workflow', False)
 
+    @is_workflow.setter
+    def is_workflow(self, is_workflow):
+        if not isinstance(is_workflow, bool):
+            raise TypeError("Type `bool` is required for `{}.is_workflow`".format(type(self)))
+        self['is_workflow'] = is_workflow
+
     @property
     def created(self):
-        return self.get('created', None)
+        created = self.get('created', None)
+        if not created:
+            self['created'] = datetime.now()
+        return self.get('created')
 
     @property
     def finished(self):
         return self.get('finished', None)
 
+    def is_finished(self):
+        self['finished'] = datetime.now()
+
     @property
     def duration(self):
-        return self.get('duration', None)
+        final_time = self.finished or datetime.now()
+        duration = final_time - self.created
+        self['duration'] = str(duration).split('.')[0]
+        return self['duration']
 
     @property
-    def logs(self):
-        return self.get('logs', list())
+    def progress(self):
+        return self.get('progress', 0)
 
-    @property
-    def tags(self):
-        return self.get('tags', list())
+    @progress.setter
+    def progress(self, progress):
+        if not isinstance(progress, (int, float)):
+            raise TypeError("Number is required for `{}.progress`".format(type(self)))
+        if progress < 0 or progress > 100:
+            raise ValueError("Value must be in range [0,100] for `{}.progress`".format(type(self)))
+        self['progress'] = progress
+
+    def _get_results(self):
+        if self.get('results') is None:
+            self['results'] = list()
+        return self['results']
+
+    def _set_results(self, results):
+        if not isinstance(results, list):
+            raise TypeError("Type `list` is required for `{}.results`".format(type(self)))
+        self['results'] = results
+
+    # allows to correctly update list by ref using `job.results.extend()`
+    results = property(_get_results, _set_results)
+
+    def _get_exceptions(self):
+        if self.get('exceptions') is None:
+            self['exceptions'] = list()
+        return self['exceptions']
+
+    def _set_exceptions(self, exceptions):
+        if not isinstance(exceptions, list):
+            raise TypeError("Type `list` is required for `{}.exceptions`".format(type(self)))
+        self['exceptions'] = exceptions
+
+    # allows to correctly update list by ref using `job.exceptions.extend()`
+    exceptions = property(_get_exceptions, _set_exceptions)
+
+    def _get_logs(self):
+        if self.get('logs') is None:
+            self['logs'] = list()
+        return self['logs']
+
+    def _set_logs(self, logs):
+        if not isinstance(logs, list):
+            raise TypeError("Type `list` is required for `{}.logs`".format(type(self)))
+        self['logs'] = logs
+
+    # allows to correctly update list by ref using `job.logs.extend()`
+    logs = property(_get_logs, _set_logs)
+
+    def _get_tags(self):
+        if self.get('tags') is None:
+            self['tags'] = list()
+        return self['tags']
+
+    def _set_tags(self, tags):
+        if not isinstance(tags, list):
+            raise TypeError("Type `list` is required for `{}.tags`".format(type(self)))
+        self['tags'] = tags
+
+    # allows to correctly update list by ref using `job.tags.extend()`
+    tags = property(_get_tags, _set_tags)
 
     @property
     def request(self):
-        return self.get('request', list())
+        return self.get('request', None)
+
+    @request.setter
+    def request(self, request):
+        self['request'] = request
 
     @property
     def response(self):
-        return self.get('response', list())
+        return self.get('response', None)
+
+    @response.setter
+    def response(self, response):
+        self['response'] = response
 
     @property
     def params(self):
         return {
             'task_id': self.task_id,
-            'identifier': self.identifier,
             'service': self.service,
             'process': self.process,
             'user_id': self.user_id,
@@ -150,6 +295,9 @@ class Job(dict):
             'created': self.created,
             'finished': self.finished,
             'duration': self.duration,
+            'progress': self.progress,
+            'results': self.results,
+            'exceptions': self.exceptions,
             'logs': self.logs,
             'tags': self.tags,
             'request': self.request,
