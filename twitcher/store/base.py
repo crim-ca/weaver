@@ -73,7 +73,7 @@ class ServiceStore(object):
         """
         Get service for given ``name`` from storage.
 
-        :param token: A string containing the service name.
+        :param name: A string containing the service name.
         :return: An instance of :class:`twitcher.datatype.Service`.
         """
         raise NotImplementedError
@@ -90,5 +90,56 @@ class ServiceStore(object):
     def clear_services(self, request=None):
         """
         Removes all OWS services from storage.
+        """
+        raise NotImplementedError
+
+
+class JobStore(object):
+    """
+    Storage for job tracking.
+    """
+
+    def save_job(self, task_id, process, service=None, is_workflow=False, user_id=None, async=True):
+        """
+        Stores a job in storage.
+        """
+        raise NotImplementedError
+
+    def update_job(self, job, attributes):
+        """
+        Updates a job parameters in mongodb storage.
+        :param job: instance of ``twitcher.datatype.Job``.
+        :param attributes: dictionary of field:value to update.
+        """
+        raise NotImplementedError
+
+    def delete_job(self, name, request=None):
+        """
+        Removes job from database.
+        """
+        raise NotImplementedError
+
+    def fetch_by_id(self, job_id, request=None):
+        """
+        Get job for given ``job_id`` from storage.
+        """
+        raise NotImplementedError
+
+    def list_jobs(self, request=None):
+        """
+        Lists all jobs in database.
+        """
+        raise NotImplementedError
+
+    def find_jobs(self, request, page=0, limit=10, process=None, service=None,
+                  tag=None, access=None, status=None, sort=None):
+        """
+        Finds all jobs in database matching search filters.
+        """
+        raise NotImplementedError
+
+    def clear_jobs(self, request=None):
+        """
+        Removes all jobs from storage.
         """
         raise NotImplementedError

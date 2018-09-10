@@ -10,6 +10,11 @@ hostname = localhost
 https-port = 5000
 log-level = WARN
 
+db-factory = mongodb
+mongodb-host = localhost
+mongodb-port = 27017
+mongodb-dbname = twitcher_db
+
 wps-restapi = true
 adapter = package.path.to.AdapterImpl
 restapi-path = /
