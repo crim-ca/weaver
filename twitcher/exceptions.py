@@ -35,14 +35,6 @@ class ProcessNotFound(Exception):
     pass
 
 
-class JobNotFound(Exception):
-    """
-    Error indicating that an job could not be read from the
-    storage backend by an instance of :class:`twitcher.store.JobStore`.
-    """
-    pass
-
-
 class ProcessRegistrationError(Exception):
     """
     Error indicating that a WPS process could not be registered in the
@@ -55,6 +47,14 @@ class ProcessInstanceError(Exception):
     """
     Error indicating that the process instance passed is not supported with
     storage backend by an instance of :class:`twitcher.store.ProcessStore`.
+    """
+    pass
+
+
+class JobNotFound(Exception):
+    """
+    Error indicating that an job could not be read from the
+    storage backend by an instance of :class:`twitcher.store.JobStore`.
     """
     pass
 
