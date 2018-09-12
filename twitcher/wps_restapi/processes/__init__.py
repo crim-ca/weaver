@@ -1,12 +1,11 @@
 from twitcher.wps_restapi.processes import processes as p
 from twitcher.wps_restapi import swagger_definitions as sd
 import logging
-
-
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("TWITCHER")
 
 
 def includeme(config):
+    logger.info('Adding WPS REST API processes ...')
     settings = config.registry.settings
     config.add_route(**sd.service_api_route_info(sd.processes_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_service, settings))

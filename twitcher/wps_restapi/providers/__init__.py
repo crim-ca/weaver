@@ -5,7 +5,7 @@ logger = logging.getLogger('TWITCHER')
 
 
 def includeme(config):
-    logger.debug('Loading providers config.')
+    logger.info('Adding WPS REST API providers ...')
     settings = config.registry.settings
     config.add_route(**sd.service_api_route_info(sd.providers_service, settings))
     config.add_route(**sd.service_api_route_info(sd.provider_service, settings))

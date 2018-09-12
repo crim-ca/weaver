@@ -1,0 +1,45 @@
+from twitcher.wps_restapi import swagger_definitions as sd
+import logging
+logger = logging.getLogger('TWITCHER')
+
+
+@sd.process_quotes_service.post(tags=[sd.bill_quote_tag, sd.processes_tag], renderer='json',
+                                schema=sd.PostProcessQuoteRequestEndpoint(), response_schemas=sd.post_quotes_responses)
+def request_quote(request):
+    """
+    Request a quotation for a process.
+    """
+    pass
+
+
+@sd.process_quotes_service.get(tags=[sd.bill_quote_tag, sd.processes_tag], renderer='json',
+                               schema=sd.ProcessQuotesEndpoint(), response_schemas=sd.get_quote_list_responses)
+@sd.quotes_service.get(tags=[sd.bill_quote_tag], renderer='json',
+                       schema=sd.QuotesEndpoint(), response_schemas=sd.get_quote_list_responses)
+def get_quote_list(request):
+    """
+    Get list of quotes IDs.
+    """
+    pass
+
+
+@sd.process_quote_service.get(tags=[sd.bill_quote_tag, sd.processes_tag], renderer='json',
+                              schema=sd.ProcessQuoteEndpoint(), response_schemas=sd.get_quote_responses)
+@sd.quote_service.get(tags=[sd.bill_quote_tag], renderer='json',
+                      schema=sd.QuoteEndpoint(), response_schemas=sd.get_quote_responses)
+def get_quote_info(request):
+    """
+    Get quote information.
+    """
+    pass
+
+
+@sd.process_quote_service.post(tags=[sd.bill_quote_tag, sd.execute_tag, sd.processes_tag], renderer='json',
+                               schema=sd.PostProcessQuote(), response_schemas=sd.post_quote_responses)
+@sd.quote_service.post(tags=[sd.bill_quote_tag, sd.execute_tag], renderer='json',
+                       schema=sd.PostQuote(), response_schemas=sd.post_quote_responses)
+def execute_quote(request):
+    """
+    Execute a quoted process.
+    """
+    quote_id = request.matchdict.get('quote_id')
