@@ -54,7 +54,7 @@ PACKAGE_LOG_FILE = 'package_log_file'
 
 # WPS object attribute -> all possible naming variations
 WPS_FIELD_MAPPING = {
-    'identifier': ['Identifier', 'ID', 'id'],
+    'identifier': ['Identifier', 'ID', 'id', 'Id'],
     'title': ['Title'],
     'abstract': ['Abstract'],
     'metadata': ['Metadata', 'MetaData'],
@@ -474,10 +474,11 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
         cwl_io_json = cwl_io.json
         updated_io_list.append(cwl_io)
         # enforce expected CWL->WPS I/O type and append required parameters if missing
+        cwl_identifier = _get_field(cwl_io_json, 'identifier', search_variations=True)
+        cwl_title = _get_field(wps_io_json, 'title', search_variations=True)
         wps_io_json.update({'type': _get_field(cwl_io_json, 'type'),
-                            'identifier': _get_field(cwl_io_json, 'identifier'),
-                            'title': _get_field(wps_io_json, 'title', search_variations=True) or
-                                     _get_field(cwl_io_json, 'title')})
+                            'identifier': cwl_identifier,
+                            'title': cwl_title if cwl_title is not null else cwl_identifier})
         wps_io = _json2wps_io(wps_io_json, io_select)
         # retrieve any complementing fields (metadata, keywords, etc.) passed as WPS input
         for field_type in WPS_FIELD_MAPPING:
