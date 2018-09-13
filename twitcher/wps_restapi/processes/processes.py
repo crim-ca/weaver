@@ -16,6 +16,7 @@ from twitcher.exceptions import (
     PackageTypeError,
     ProcessRegistrationError)
 from twitcher.processes import wps_package
+from twitcher.processes.types import PROCESS_WORKFLOW
 from twitcher.store import processstore_defaultfactory
 from twitcher.utils import get_any_id
 from twitcher.owsexceptions import OWSNoApplicableCode
@@ -413,8 +414,6 @@ def add_local_process(request):
     """
     Register a local process.
     """
-    store = processstore_defaultfactory(request.registry)
-
     process_offering = request.json.get('processOffering')
     deployment_profile = request.json.get('deploymentProfile')
     if not isinstance(process_offering, dict):
@@ -443,9 +442,17 @@ def add_local_process(request):
     except Exception as ex:
         raise HTTPBadRequest("Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex)))
 
+    # validate process type against twitcher configuration
+    process_type = process_info['type']
+    if process_type == PROCESS_WORKFLOW:
+        twitcher_config = get_twitcher_configuration(request.registry.settings)
+        if twitcher_config != TWITCHER_CONFIGURATION_EMS:
+            raise HTTPBadRequest("Invalid `{0}` package deployment on `{1}`.".format(process_type, twitcher_config))
+
     # ensure that required 'executeEndpoint' in db is added, will be auto-fixed to localhost if not specified in body
     process_info.update({'executeEndpoint': process_info.get('executeEndpoint')})
     try:
+        store = processstore_defaultfactory(request.registry)
         saved_process = store.save_process(ProcessDB(process_info), overwrite=False)
     except ProcessRegistrationError as ex:
         raise HTTPConflict(detail=ex.message)

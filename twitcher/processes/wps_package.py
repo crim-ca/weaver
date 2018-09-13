@@ -147,10 +147,10 @@ def _load_package_content(package_dict, package_name=PACKAGE_DEFAULT_FILE_NAME,
     :param package_dict: package content representation as a json dictionary.
     :param package_name: name to use to create the package file.
     :param data_source: identifier of the data source to map to a specific ADES, or mapping to EMS processes if None.
-    :param only_dump_file: specify if the :class:``cwltool.factory.Factory`` should be validated and returned.
+    :param only_dump_file: specify if the :class:`cwltool.factory.Factory` should be validated and returned.
     :param tmp_dir: location of the temporary directory to dump files (warning: will be deleted on exit).
     :return:
-        instance of :class:``cwltool.factory.Factory`` if :param:``only_dump_file`` is ``False``, ``None`` otherwise.
+        instance of :class:`cwltool.factory.Factory` if :param:`only_dump_file` is ``False``, ``None`` otherwise.
     """
     # TODO: find how to pass dict directly (?) instead of dump to tmp file
     tmp_dir = tmp_dir or tempfile.mkdtemp()
@@ -596,10 +596,10 @@ class Package(Process):
     def __init__(self, **kw):
         """
         Creates a WPS Process instance to execute a CWL package definition.
-        Process parameters should be loaded from an existing `twitcher.datatype.Process`
+        Process parameters should be loaded from an existing :class:`twitcher.datatype.Process`
         instance generated using method `get_process_from_wps_request`.
 
-        :param kw: dictionary corresponding to method `twitcher.datatype.Process.params_wps`
+        :param kw: dictionary corresponding to method :class:`twitcher.datatype.Process.params_wps`
         """
         package = kw.pop('package')
         if not package:

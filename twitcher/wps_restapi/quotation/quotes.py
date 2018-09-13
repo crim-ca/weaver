@@ -1,6 +1,7 @@
 from twitcher.wps_restapi import swagger_definitions as sd, sort
-from twitcher.exceptions import QuoteNotFound
-from twitcher.adapter import quotestore_factory
+from twitcher.exceptions import QuoteNotFound, ProcessNotFound
+from twitcher.adapter import quotestore_factory, processstore_factory
+from twitcher.processes.types import *
 from pyramid.httpexceptions import *
 import logging
 logger = logging.getLogger('TWITCHER')
@@ -55,7 +56,7 @@ def get_quote_info(request):
     try:
         quote = store.fetch_by_id(quote_id)
     except QuoteNotFound:
-        raise HTTPNotFound('Could not find quote with specified `quote_id`.')
+        raise HTTPNotFound("Could not find quote with specified `quote_id`.")
     return HTTPOk(json={'quote': quote.json()})
 
 
