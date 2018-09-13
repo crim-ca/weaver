@@ -16,10 +16,9 @@ def api_versions(request):
 
 
 @sd.api_swagger_json_service.get(tags=[sd.api_tag], renderer='json',
-                                 schema=sd.SwaggerJsonEndpoint(), response_schemas=sd.get_api_swagger_json_responses)
+                                 schema=sd.SwaggerJSONEndpoint(), response_schemas=sd.get_api_swagger_json_responses)
 def api_swagger_json(request, use_docstring_summary=True):
     """Twitcher REST API schema generation in JSON format."""
-
     swagger = CorniceSwagger(get_services())
     # function docstrings are used to create the route's summary in Swagger-UI
     swagger.summary_docstrings = use_docstring_summary
@@ -27,7 +26,8 @@ def api_swagger_json(request, use_docstring_summary=True):
                             base_path=wps_restapi_base_url(request.registry.settings))
 
 
-@sd.api_swagger_ui_service.get(tags=[sd.api_tag], response_schemas=sd.get_api_swagger_ui_responses)
+@sd.api_swagger_ui_service.get(tags=[sd.api_tag],
+                               schema=sd.SwaggerUIEndpoint(), response_schemas=sd.get_api_swagger_ui_responses)
 def api_swagger_ui(request):
     """Twitcher REST API swagger-ui schema documentation (this page)."""
     json_path = wps_restapi_base_path(request.registry.settings) + sd.api_swagger_json_uri

@@ -1,7 +1,7 @@
 {
 	"processOffering": {
 		"process": {
-			"identifier": "stack_creation_graph",
+			"identifier": "stack_creation_graph_enum",
 			"title": "Application StackCreation (predefined Graph.xml) dynamically added by POST /processes"
 		}
 	},
@@ -34,7 +34,13 @@
 			                "position": 2,
 			                "prefix": "-f"
 			            },
-				    "type": "string"
+						"type": {
+							"type": "enum",
+							"symbols": [
+								"GeoTIFF",
+								"NetCDF-CF"
+							]
+						}
 			        },
 			        "output_name": {
 			            "inputBinding": {

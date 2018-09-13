@@ -2,6 +2,7 @@ from pyramid.httpexceptions import *
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
 from celery.utils.log import get_task_logger
+from six.moves.urllib.parse import urlparse
 from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import URLError
 from time import sleep
@@ -227,7 +228,8 @@ def submit_job_handler(request, service_url, is_workflow=False):
     async_execute = not request.params.getone('sync-execute') if 'sync-execute' in request.params else True
 
     try:
-        wps = WebProcessingService(url=service_url, headers=get_cookie_headers(request.headers))
+        verify = False if urlparse(service_url).hostname == 'localhost' else False
+        wps = WebProcessingService(url=service_url, headers=get_cookie_headers(request.headers), verify=verify)
         process = wps.describeprocess(process_id)
     except Exception as ex:
         raise OWSNoApplicableCode("Failed to retrieve process description. Error: [{}].".format(str(ex)))
@@ -326,7 +328,7 @@ def get_provider_processes(request):
 
 
 @sd.provider_process_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.describeprocess_tag],
-                                 renderer='json', schema=sd.ProcessEndpoint(),
+                                 renderer='json', schema=sd.ProviderProcessEndpoint(),
                                  response_schemas=sd.get_provider_process_description_responses)
 def describe_provider_process(request):
     """
@@ -416,35 +418,33 @@ def add_local_process(request):
     process_offering = request.json.get('processOffering')
     deployment_profile = request.json.get('deploymentProfile')
     if not isinstance(process_offering, dict):
-        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering'")
+        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering'.")
     if not isinstance(deployment_profile, dict):
-        raise HTTPUnprocessableEntity("Invalid parameter 'deploymentProfile'")
+        raise HTTPUnprocessableEntity("Invalid parameter 'deploymentProfile'.")
 
     # validate minimum field requirements
     process_info = process_offering.get('process')
     if not isinstance(process_info, dict):
-        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process'")
+        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process'.")
     if not isinstance(process_info.get('identifier'), string_types):
-        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process.identifier'")
+        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process.identifier'.")
 
-    process_type = request.json.get('type', 'application')
-    if process_type in ['application', 'workflow']:
-        execution_unit = deployment_profile.get('executionUnit')
-        if not isinstance(execution_unit, dict):
-            raise HTTPUnprocessableEntity("Invalid parameter 'deploymentProfile.executionUnit'")
-        package = execution_unit.get('package')
-        reference = execution_unit.get('reference')
+    execution_unit = deployment_profile.get('executionUnit')
+    if not isinstance(execution_unit, dict):
+        raise HTTPUnprocessableEntity("Invalid parameter 'deploymentProfile.executionUnit'.")
+    package = execution_unit.get('package')
+    reference = execution_unit.get('reference')
 
-        # obtain updated process information using WPS process offering and CWL package definition
-        try:
-            process_info = wps_package.get_process_from_wps_request(process_info, reference, package)
-        except (PackageRegistrationError, PackageTypeError) as ex:
-            raise HTTPUnprocessableEntity(detail=ex.message)
-        except Exception as ex:
-            raise HTTPBadRequest("Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex)))
+    # obtain updated process information using WPS process offering and CWL package definition
+    try:
+        process_info = wps_package.get_process_from_wps_request(process_info, reference, package)
+    except (PackageRegistrationError, PackageTypeError) as ex:
+        raise HTTPUnprocessableEntity(detail=ex.message)
+    except Exception as ex:
+        raise HTTPBadRequest("Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex)))
 
     # ensure that required 'executeEndpoint' in db is added, will be auto-fixed to localhost if not specified in body
-    process_info.update({'type': process_type, 'executeEndpoint': process_info.get('executeEndpoint')})
+    process_info.update({'executeEndpoint': process_info.get('executeEndpoint')})
     try:
         saved_process = store.save_process(ProcessDB(process_info), overwrite=False)
     except ProcessRegistrationError as ex:
@@ -461,11 +461,32 @@ def get_local_process(request):
     """
     process_id = request.matchdict.get('process_id')
     if not isinstance(process_id, string_types):
-        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'")
+        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
         store = processstore_defaultfactory(request.registry)
         process = store.fetch_by_id(process_id)
         return HTTPOk(json={'process': process.json()})
+    except HTTPException:
+        raise  # re-throw already handled HTTPException
+    except ProcessNotFound:
+        raise HTTPNotFound("The process with id `{}` does not exist.".format(str(process_id)))
+    except Exception as ex:
+        raise HTTPInternalServerError(ex.message)
+
+
+@sd.process_package_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer='json',
+                                schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_package_responses)
+def get_local_process_package(request):
+    """
+    Get a registered local process package definition.
+    """
+    process_id = request.matchdict.get('process_id')
+    if not isinstance(process_id, string_types):
+        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
+    try:
+        store = processstore_defaultfactory(request.registry)
+        process = store.fetch_by_id(process_id)
+        return HTTPOk(json=process.package or {})
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except ProcessNotFound:
@@ -482,7 +503,7 @@ def delete_local_process(request):
     """
     process_id = request.matchdict.get('process_id')
     if not isinstance(process_id, string_types):
-        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'")
+        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
         store = processstore_defaultfactory(request.registry)
         if store.delete_process(process_id):
@@ -505,7 +526,7 @@ def submit_local_job(request):
     """
     process_id = request.matchdict.get('process_id')
     if not isinstance(process_id, string_types):
-        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'")
+        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
         store = processstore_defaultfactory(request.registry)
         process = store.fetch_by_id(process_id)

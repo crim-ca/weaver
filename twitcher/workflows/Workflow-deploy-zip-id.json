@@ -1,7 +1,7 @@
 {
 	"processOffering": {
 		"process": {
-			"identifier": "workflow_stacker_sfs",
+			"identifier": "workflow_stacker_sfs_id",
 			"title": "Application StackCreation followed by SFS dynamically added by POST /processes"
 		}
 	},
@@ -29,7 +29,7 @@
 				},
 				"steps": {
 					"stack_creation": {
-						"run": "StackCreation-graph-json-remote.cwl",
+						"run": "stack_creation_graph_str",
 						"in": {
 							"files": "input_files",
 							"output_file_type": "output_type",
@@ -40,7 +40,7 @@
 						"out": ["output"]
 					},
 					"sfs": {
-						"run": "SFS-graph-json-remote.cwl",
+						"run": "sfs_creation_graph_str",
 						"in": {
 							"source_product": "stack_creation/output",
 							"output_file_type": "output_type",

@@ -10,6 +10,7 @@ from logging import _levelNames, ERROR, INFO
 from twitcher.utils import now_secs
 from twitcher.exceptions import ProcessInstanceError
 from twitcher.processes import process_mapping
+from twitcher.processes.types import PACKAGE_PROCESSES, PROCESS_WPS
 from twitcher.wps_restapi.status import status_values
 from pywps import Process as ProcessWPS
 
@@ -98,7 +99,7 @@ class Job(dict):
         else:
             log_msg = [(INFO, self._get_log_msg())]
         for level, msg in log_msg:
-            fmt_msg = '{0} {1:6} {2}'.format(datetime.now(), _levelNames[level], msg)
+            fmt_msg = '{0} {1:6} {2}'.format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), _levelNames[level], msg)
             if len(self.logs) == 0 or self.logs[-1] != fmt_msg:
                 self.logs.append(fmt_msg)
                 if logger:
@@ -530,11 +531,11 @@ class Process(dict):
 
     def wps(self):
         process_key = self.type
-        if self.type == 'wps':
+        if self.type == PROCESS_WPS:
             process_key = self.identifier
         if process_key not in process_mapping:
             ProcessInstanceError("Unknown process `{}` in mapping".format(process_key))
-        if process_key in ['application', 'workflow']:
+        if process_key in PACKAGE_PROCESSES:
             kwargs = self.params_wps
             kwargs.update({'package': self.package})
             return process_mapping[process_key](**kwargs)
