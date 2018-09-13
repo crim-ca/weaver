@@ -41,6 +41,9 @@ unit_tests/testdata.json
 # PyCharm
 *.idea
 
+# Intellij
+*.iml
+
 # Kate
 *.kate-swp
 
