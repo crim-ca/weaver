@@ -514,21 +514,21 @@ class SingleJobStatusSchema(MappingSchema):
     message = SchemaNode(String(), example='Job {}.'.format(STATUS_ACCEPTED))
     progress = SchemaNode(Integer(), example=0)
     exceptions = SchemaNode(String(), missing=drop,
-                            example='http://twitcher/providers/my-wps/processes/my-process/jobs/my-job/exceptions')
+                            example='http://{host}/twitcher/providers/{my-wps-id}/processes/{my-process-id}/jobs/{my-job-id}/exceptions')
     outputs = SchemaNode(String(), missing=drop,
-                         example='http://twitcher/providers/my-wps/processes/my-process/jobs/my-job/outputs')
+                         example='http://{host}/twitcher/providers/{my-wps-id}/processes/{my-process-id}/jobs/{my-job-id}/outputs')
     logs = SchemaNode(String(), missing=drop,
-                      example='http://twitcher/providers/my-wps/processes/my-process/jobs/my-job/logs')
+                      example='http://{host}/twitcher/providers/{my-wps-id}/processes/{my-process-id}/jobs/{my-job-id}/logs')
 
 
 class JobListSchema(SequenceSchema):
     job = SchemaNode(String(), description='Job ID.')
 
 
-class ProcessJobStatusSchema(MappingSchema):
+class CreatedJobStatusSchema(MappingSchema):
     status = SchemaNode(String(), example=STATUS_ACCEPTED)
-    message = SchemaNode(String(), example='Job accepted.')
-    progress = SchemaNode(Integer(), example=0)
+    location = SchemaNode(String(), example='http://{host}/twitcher/processes/{my-process-id}/jobs/{my-job-id}')
+    jobID = SchemaNode(String(), example='a9d14bf4-84e0-449a-bac8-16e598efe807', description="ID of the created job.")
 
 
 class GetAllJobsSchema(MappingSchema):
@@ -853,7 +853,7 @@ class CreatedLaunchJobHeader(JsonHeader):
 
 class CreatedLaunchJobResponse(MappingSchema):
     header = CreatedLaunchJobHeader()
-    body = SingleJobStatusSchema()
+    body = CreatedJobStatusSchema()
 
 
 class OkGetAllProcessJobsResponse(MappingSchema):
@@ -863,7 +863,7 @@ class OkGetAllProcessJobsResponse(MappingSchema):
 
 class OkGetProcessJobResponse(MappingSchema):
     header = JsonHeader()
-    body = ProcessJobStatusSchema()
+    body = SingleJobStatusSchema()
 
 
 class OkDeleteProcessJobResponse(MappingSchema):
