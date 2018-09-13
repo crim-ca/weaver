@@ -5,8 +5,8 @@ so that one can update the swagger without touching any other files after the in
 
 from twitcher.config import TWITCHER_CONFIGURATION_EMS
 from twitcher.wps_restapi.utils import wps_restapi_base_path
-from twitcher.wps_restapi.status import status_values, STATUS_ACCEPTED
-from twitcher.wps_restapi.sort import sort_values, SORT_CREATED
+from twitcher.wps_restapi.status import job_status_values, STATUS_ACCEPTED
+from twitcher.wps_restapi.sort import *
 from cornice import Service
 from colander import *
 
@@ -502,13 +502,13 @@ class ProcessOutputDescriptionSchema(MappingSchema):
 JobStatusEnum = SchemaNode(
     String(),
     default=None,
-    validator=OneOf(status_values),
+    validator=OneOf(job_status_values),
     example=STATUS_ACCEPTED)
 JobSortEnum = SchemaNode(
     String(),
     missing=drop,
     default=SORT_CREATED,
-    validator=OneOf(sort_values),
+    validator=OneOf(job_sort_values),
     example=SORT_CREATED)
 
 
@@ -562,8 +562,9 @@ class DismissedJobSchema(MappingSchema):
 
 
 class QuoteProcessSchema(MappingSchema):
-    process = SchemaNode(String(), description="Corresponding process ID.")
+    id = SchemaNode(String(), description="Quote ID.")
     cost = SchemaNode(Float(), description="Process execution cost.")
+    process = SchemaNode(String(), description="Corresponding process ID.")
 
 
 class QuoteProcessListSchema(SequenceSchema):
@@ -571,6 +572,7 @@ class QuoteProcessListSchema(SequenceSchema):
 
 
 class QuoteSchema(MappingSchema):
+    id = SchemaNode(String(), description="Quote ID.")
     process = SchemaNode(String(), description="Corresponding process ID.")
     steps = QuoteProcessListSchema(description="Child processes and costs.")
     total = SchemaNode(Float(), description="Total of the quote.")
@@ -750,7 +752,7 @@ class BillsEndpoint(MappingSchema):
 
 
 class BillEndpoint(MappingSchema):
-    quote_id = quote_id
+    bill_id = bill_id
     header = AcceptHeader()
 
 
@@ -765,8 +767,24 @@ class ProcessQuoteEndpoint(MappingSchema):
     header = AcceptHeader()
 
 
+QuoteSortEnum = SchemaNode(
+    String(),
+    missing=drop,
+    default=SORT_ID,
+    validator=OneOf(quote_sort_values),
+    example=SORT_PROCESS)
+
+
+class GetQuotesQueries(MappingSchema):
+    page = SchemaNode(Integer(), missing=drop, default=0)
+    limit = SchemaNode(Integer(), missing=drop, default=10)
+    process = SchemaNode(String(), missing=drop, default=None)
+    sort = QuoteSortEnum
+
+
 class QuotesEndpoint(MappingSchema):
     header = AcceptHeader()
+    querystring = GetQuotesQueries()
 
 
 class QuoteEndpoint(MappingSchema):

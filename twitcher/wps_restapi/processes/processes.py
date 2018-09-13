@@ -124,7 +124,7 @@ def _jsonify_output(output, datatype):
 
 def _map_status(wps_execution_status):
     job_status = wps_execution_status.lower().replace('process', '')
-    if job_status in status.status_values:
+    if job_status in status.job_status_values:
         return job_status
     return 'unknown'
 

@@ -51,6 +51,22 @@ def jobstore_factory(registry):
         raise
 
 
+def quotestore_factory(registry):
+    try:
+        return adapter_factory(registry.settings).quotestore_factory(registry)
+    except Exception as e:
+        LOGGER.error('Adapter raised an exception while getting quotestore_factory : {!r}'.format(e))
+        raise
+
+
+def billstore_factory(registry):
+    try:
+        return adapter_factory(registry.settings).billstore_factory(registry)
+    except Exception as e:
+        LOGGER.error('Adapter raised an exception while getting billstore_factory : {!r}'.format(e))
+        raise
+
+
 def owssecurity_factory(registry):
     try:
         return adapter_factory(registry.settings).owssecurity_factory(registry)

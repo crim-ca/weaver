@@ -175,3 +175,63 @@ class JobStore(object):
         Removes all jobs from storage.
         """
         raise NotImplementedError
+
+
+class QuoteStore(object):
+    """
+    Storage for quotes.
+    """
+
+    def save_quote(self, quote):
+        """
+        Stores a quote in storage.
+        """
+        raise NotImplementedError
+
+    def fetch_by_id(self, quote_id):
+        """
+        Get quote for given ``quote_id`` from storage.
+        """
+        raise NotImplementedError
+
+    def list_quotes(self):
+        """
+        Lists all quotes in database.
+        """
+        raise NotImplementedError
+
+    def find_quotes(self, process_id=None, page=0, limit=10, sort=None):
+        """
+        Finds all quotes in database matching search filters.
+        """
+        raise NotImplementedError
+
+
+class BillStore(object):
+    """
+    Storage for bills.
+    """
+
+    def save_bill(self, bill):
+        """
+        Stores a bill in storage.
+        """
+        raise NotImplementedError
+
+    def fetch_by_id(self, bill_id):
+        """
+        Get bill for given ``bill_id`` from storage.
+        """
+        raise NotImplementedError
+
+    def list_bills(self):
+        """
+        Lists all bills in database.
+        """
+        raise NotImplementedError
+
+    def find_bills(self, quote_id=None, page=0, limit=10, sort=None):
+        """
+        Finds all bills in database matching search filters.
+        """
+        raise NotImplementedError

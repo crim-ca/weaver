@@ -1,4 +1,7 @@
-from twitcher.wps_restapi import swagger_definitions as sd
+from twitcher.wps_restapi import swagger_definitions as sd, sort
+from twitcher.exceptions import QuoteNotFound
+from twitcher.adapter import quotestore_factory
+from pyramid.httpexceptions import *
 import logging
 logger = logging.getLogger('TWITCHER')
 
@@ -20,7 +23,23 @@ def get_quote_list(request):
     """
     Get list of quotes IDs.
     """
-    pass
+
+    page = int(request.params.get('page', '0'))
+    limit = int(request.params.get('limit', '10'))
+    filters = {
+        'process_id': request.params.get('process', None) or request.matchdict.get('process_id', None),
+        'page': page,
+        'limit': limit,
+        'sort': request.params.get('sort', sort.SORT_CREATED),
+    }
+    store = quotestore_factory(request.registry)
+    items, count = store.find_quotes(request, **filters)
+    return HTTPOk(json={
+        'count': count,
+        'page': page,
+        'limit': limit,
+        'quotes': [quote.id for quote in items]
+    })
 
 
 @sd.process_quote_service.get(tags=[sd.bill_quote_tag, sd.processes_tag], renderer='json',
@@ -31,7 +50,13 @@ def get_quote_info(request):
     """
     Get quote information.
     """
-    pass
+    quote_id = request.matchdict.get('quote_id')
+    store = quotestore_factory(request.registry)
+    try:
+        quote = store.fetch_by_id(quote_id)
+    except QuoteNotFound:
+        raise HTTPNotFound('Could not find quote with specified `quote_id`.')
+    return HTTPOk(json={'quote': quote.json()})
 
 
 @sd.process_quote_service.post(tags=[sd.bill_quote_tag, sd.execute_tag, sd.processes_tag], renderer='json',

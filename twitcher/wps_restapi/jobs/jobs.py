@@ -126,7 +126,7 @@ def get_job_status(request):
         "progress": job.progress
     }
 
-    if job.status in status.status_categories[status.STATUS_FINISHED]:
+    if job.status in status.job_status_categories[status.STATUS_FINISHED]:
         if job.status == status.STATUS_SUCCEEDED:
             resource = 'results'
         else:

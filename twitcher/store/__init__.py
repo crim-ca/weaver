@@ -5,9 +5,22 @@ Factories to create storage backends.
 # Factories
 from twitcher.db import mongodb as mongodb_factory
 # Interfaces
-from twitcher.store.base import AccessTokenStore, ProcessStore
-from twitcher.store.memory import MemoryTokenStore, MemoryServiceStore, MemoryProcessStore, MemoryJobStore
-from twitcher.store.mongodb import MongodbTokenStore, MongodbServiceStore, MongodbProcessStore, MongodbJobStore
+from twitcher.store.memory import (
+    MemoryTokenStore,
+    MemoryServiceStore,
+    MemoryProcessStore,
+    MemoryJobStore,
+    MemoryQuoteStore,
+    MemoryBillStore,
+)
+from twitcher.store.mongodb import (
+    MongodbTokenStore,
+    MongodbServiceStore,
+    MongodbProcessStore,
+    MongodbJobStore,
+    MongodbQuoteStore,
+    MongodbBillStore,
+)
 from twitcher.processes import default_processes
 
 # TODO: add any other db factory configuration here as needed
@@ -91,4 +104,36 @@ def jobstore_defaultfactory(registry):
         store = MongodbJobStore(collection=db.jobs)
     else:
         store = MemoryJobStore()
+    return store
+
+
+def quotestore_defaultfactory(registry):
+    """
+    Creates a quote store with the interface of :class:`twitcher.store.QuoteStore`.
+
+    :param registry: Application registry defining `twitcher.db_factory`.
+    :return: An instance of :class:`twitcher.store.QuoteStore`.
+    """
+    database = get_db_factory(registry)
+    if database == DB_MONGODB:
+        db = mongodb_factory(registry)
+        store = MongodbQuoteStore(collection=db.quotes)
+    else:
+        store = MemoryQuoteStore()
+    return store
+
+
+def billstore_defaultfactory(registry):
+    """
+    Creates a bill store with the interface of :class:`twitcher.store.BillStore`.
+
+    :param registry: Application registry defining `twitcher.db_factory`.
+    :return: An instance of :class:`twitcher.store.BillStore`.
+    """
+    database = get_db_factory(registry)
+    if database == DB_MONGODB:
+        db = mongodb_factory(registry)
+        store = MongodbBillStore(collection=db.bills)
+    else:
+        store = MemoryBillStore()
     return store

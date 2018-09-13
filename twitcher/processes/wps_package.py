@@ -21,7 +21,7 @@ from pywps.app.Common import Metadata
 from twitcher.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from twitcher.processes.sources import DATA_SOURCE_MAPPING
 from twitcher.utils import parse_request_query, get_any_id
-from twitcher.exceptions import PackageTypeError, PackageRegistrationError, PackageExecutionError, PackageNotFoundError
+from twitcher.exceptions import PackageTypeError, PackageRegistrationError, PackageExecutionError, PackageNotFound
 from twitcher.wps_restapi.swagger_definitions import process_uri
 from pyramid.httpexceptions import HTTPOk
 from collections import OrderedDict
@@ -99,7 +99,7 @@ def _get_step_process_package(process_id_or_url, data_source=None):
     """
 
     def _package_not_found_error(ref):
-        return PackageNotFoundError("Could not find workflow step reference: `{}`".format(ref))
+        return PackageNotFound("Could not find workflow step reference: `{}`".format(ref))
 
     def _get_package_request_body(url_ref, original_ref=None):
         package_resp = requests.get(url_ref, headers={'Accept': 'application/json'}, verify=False)
