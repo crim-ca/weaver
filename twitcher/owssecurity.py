@@ -24,13 +24,13 @@ def verify_cert(request):
         raise OWSAccessForbidden("A valid X.509 client certificate is needed.")
 
 
-class OWSSecurity(object):
+class OWSSecurityInterface(object):
 
-    def __init__(self, tokenstore, servicestore):
-        self.tokenstore = tokenstore
-        self.servicestore = servicestore
+    def check_request(self, request):
+        raise NotImplementedError
 
-    def get_token_param(self, request):
+    @staticmethod
+    def get_token_param(request):
         token = None
         if 'token' in request.params:
             token = request.params['token']   # in params
@@ -44,7 +44,8 @@ class OWSSecurity(object):
                 token = elements[-1]   # last path element
         return token
 
-    def prepare_headers(self, request, access_token):
+    @staticmethod
+    def prepare_headers(request, access_token):
         if "esgf_access_token" in access_token.data or "esgf_credentials" in access_token.data:
             workdir = tempfile.mkdtemp(prefix=request.prefix, dir=request.workdir)
             if fetch_certificate(workdir=workdir, data=access_token.data):
@@ -52,6 +53,14 @@ class OWSSecurity(object):
                 request.headers['X-X509-User-Proxy'] = workdir + '/' + ESGF_CREDENTIALS
                 LOGGER.debug("Prepared request headers.")
         return request
+
+
+class OWSSecurity(OWSSecurityInterface):
+
+    def __init__(self, tokenstore, servicestore):
+        super(OWSSecurity, self).__init__()
+        self.tokenstore = tokenstore
+        self.servicestore = servicestore
 
     def verify_access(self, request, service):
         # TODO: public service access handling is confusing.
