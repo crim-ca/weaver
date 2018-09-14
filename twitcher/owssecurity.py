@@ -58,6 +58,7 @@ class OWSSecurityInterface(object):
 class OWSSecurity(OWSSecurityInterface):
 
     def __init__(self, tokenstore, servicestore):
+        super(OWSSecurity, self).__init__()
         self.tokenstore = tokenstore
         self.servicestore = servicestore
 
