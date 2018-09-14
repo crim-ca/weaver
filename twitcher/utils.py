@@ -12,6 +12,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def get_twitcher_url(settings):
+    return settings.get('twitcher.url').rstrip('/').strip()
+
+
 def get_any_id(info):  # type: (dict) -> Any
     """Retrieves a dictionary 'id'-like key using multiple common variations [id, identifier, _id].
     :param info: dictionary that potentially contains an 'id'-like key.

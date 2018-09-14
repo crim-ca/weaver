@@ -19,7 +19,7 @@ from pywps.validator.mode import MODE
 from pywps.validator.literalvalidator import validate_anyvalue, validate_allowed_values
 from pywps.app.Common import Metadata
 from twitcher.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
-from twitcher.processes.sources import DATA_SOURCE_MAPPING
+from twitcher.processes.sources import retrieve_data_source_url
 from twitcher.utils import parse_request_query, get_any_id
 from twitcher.exceptions import PackageTypeError, PackageRegistrationError, PackageExecutionError, PackageNotFound
 from twitcher.wps_restapi.swagger_definitions import process_uri
@@ -91,7 +91,7 @@ def get_process_location(process_id_or_url, data_source=None):
     # if an URL was specified, return it as is
     if urlparse(process_id_or_url).scheme != "":
         return process_id_or_url
-    data_source_url = DATA_SOURCE_MAPPING.get(data_source)
+    data_source_url = retrieve_data_source_url(data_source)
     process_url = process_uri.format(process_id=process_id_or_url)
     return '{host}{path}'.format(host=data_source_url, path=process_url)
 
@@ -585,7 +585,7 @@ def get_process_from_wps_request(process_offering, reference=None, package=None,
     :param process_offering: WPS REST-API process offering as JSON.
     :param reference: URL to an existing package definition.
     :param package: literal package definition as JSON.
-    :param data_source: where to resolve process IDs (default: localhost if ``None``).
+    :param data_source: where to resolve process IDs (default: EMS if ``None``).
     :return: process information dictionary ready for saving to data store.
     """
     if not (isinstance(package, dict) or isinstance(reference, six.string_types)):

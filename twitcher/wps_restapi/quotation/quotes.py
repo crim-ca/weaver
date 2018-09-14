@@ -6,6 +6,7 @@ from twitcher.adapter import quotestore_factory, processstore_factory
 from twitcher.datatype import Quote
 from twitcher.processes.types import *
 from twitcher.processes.wps_package import get_process_location, get_package_workflow_steps
+from twitcher.utils import get_twitcher_url
 from pyramid.httpexceptions import *
 import logging
 import random
@@ -33,7 +34,7 @@ def request_quote(request):
 
     process_type = process.type
     store = quotestore_factory(request.registry)
-    process_url = get_process_location(process_id)
+    process_url = get_process_location(process_id, data_source=get_twitcher_url(request.registry.settings))
 
     # loop workflow sub-process steps to get individual quotes
     if process_type == PROCESS_WORKFLOW and twitcher_config == TWITCHER_CONFIGURATION_EMS:

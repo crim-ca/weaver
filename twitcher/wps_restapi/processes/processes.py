@@ -229,7 +229,7 @@ def submit_job_handler(request, service_url, is_workflow=False):
     async_execute = not request.params.getone('sync-execute') if 'sync-execute' in request.params else True
 
     try:
-        verify = False if urlparse(service_url).hostname == 'localhost' else False
+        verify = False if urlparse(service_url).hostname == 'localhost' else True
         wps = WebProcessingService(url=service_url, headers=get_cookie_headers(request.headers), verify=verify)
         process = wps.describeprocess(process_id)
     except Exception as ex:
@@ -436,7 +436,8 @@ def add_local_process(request):
 
     # obtain updated process information using WPS process offering and CWL package definition
     try:
-        process_info = wps_package.get_process_from_wps_request(process_info, reference, package)
+        data_source = get_twitcher_url(request.registry.settings)
+        process_info = wps_package.get_process_from_wps_request(process_info, reference, package, data_source)
     except (PackageRegistrationError, PackageTypeError) as ex:
         raise HTTPUnprocessableEntity(detail=ex.message)
     except Exception as ex:
