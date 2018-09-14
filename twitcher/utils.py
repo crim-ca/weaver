@@ -111,7 +111,7 @@ def raise_on_xml_exception(xml_node):
     :param xml_node: instance of :class:`etree.Element`
     :raises: Exception on found ExceptionReport document.
     """
-    if not isinstance(xml_node, etree.Element):
+    if not isinstance(xml_node, etree._Element):
         raise TypeError("Invalid input, expecting XML element node.")
     if 'ExceptionReport' in xml_node.tag:
         node = xml_node
