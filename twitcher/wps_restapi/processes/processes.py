@@ -18,7 +18,7 @@ from twitcher.exceptions import (
 from twitcher.processes import wps_package
 from twitcher.processes.types import PROCESS_WORKFLOW
 from twitcher.store import processstore_defaultfactory
-from twitcher.utils import get_any_id
+from twitcher.utils import get_any_id, raise_on_xml_exception
 from twitcher.owsexceptions import OWSNoApplicableCode
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
@@ -231,9 +231,13 @@ def submit_job_handler(request, service_url, is_workflow=False):
     try:
         verify = False if urlparse(service_url).hostname == 'localhost' else True
         wps = WebProcessingService(url=service_url, headers=get_cookie_headers(request.headers), verify=verify)
+        raise_on_xml_exception(wps._capabilities)
+    except Exception as ex:
+        raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
+    try:
         process = wps.describeprocess(process_id)
     except Exception as ex:
-        raise OWSNoApplicableCode("Failed to retrieve process description. Error: [{}].".format(str(ex)))
+        raise OWSNoApplicableCode("Failed to retrieve WPS process description. Error: [{}].".format(str(ex)))
 
     # prepare inputs
     complex_inputs = []
