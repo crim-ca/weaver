@@ -85,7 +85,7 @@ def get_process_location(process_id_or_url, data_source=None):
     Obtains the URL of a WPS REST DescribeProcess given the specified information.
 
     :param process_id_or_url: process 'identifier' or literal URL to DescribeProcess WPS-REST location.
-    :param data_source: identifier of the data source to map to specific ADES, or map to EMS processes when ``None``.
+    :param data_source: identifier of the data source to map to specific ADES, or map to localhost if ``None``.
     :return: URL of EMS or ADES WPS-REST DescribeProcess.
     """
     # if an URL was specified, return it as is
@@ -99,7 +99,8 @@ def get_process_location(process_id_or_url, data_source=None):
 def get_package_workflow_steps(package_dict_or_url):
     """
     :param package_dict_or_url: process package definition or literal URL to DescribeProcess WPS-REST location.
-    :return: list of workflow steps.
+    :return: list of workflow steps as {'name': <name>, 'reference': <reference>}
+        where `name` is the generic package step name, and `reference` is the id/url of a registered WPS package.
     """
     if isinstance(package_dict_or_url, six.string_types):
         package_dict_or_url = _get_process_package(package_dict_or_url)
@@ -109,7 +110,7 @@ def get_package_workflow_steps(package_dict_or_url):
         workflow_steps = package_dict_or_url.get('steps')
         for step in workflow_steps:
             step_package_ref = workflow_steps[step].get('run')
-            workflow_steps_ids.append(step_package_ref)
+            workflow_steps_ids.append({'name': step, 'reference': step_package_ref})
     return workflow_steps_ids
 
 
@@ -169,7 +170,7 @@ def _load_package_content(package_dict, package_name=PACKAGE_DEFAULT_FILE_NAME,
 
     :param package_dict: package content representation as a json dictionary.
     :param package_name: name to use to create the package file.
-    :param data_source: identifier of the data source to map to specific ADES, or map to EMS processes when ``None``.
+    :param data_source: identifier of the data source to map to specific ADES, or map to localhost if ``None``.
     :param only_dump_file: specify if the :class:`cwltool.factory.Factory` should be validated and returned.
     :param tmp_dir: location of the temporary directory to dump files (warning: will be deleted on exit).
     :return:
@@ -182,13 +183,13 @@ def _load_package_content(package_dict, package_name=PACKAGE_DEFAULT_FILE_NAME,
     # for workflows, retrieve each 'sub-package' file
     package_type = _get_package_type(package_dict)
     workflow_steps = get_package_workflow_steps(package_dict)
-    for step_reference in workflow_steps:
+    for step in workflow_steps:
         # generate sub-package file and update workflow step to point to created sub-package file
-        step_process_url = get_process_location(step_reference, data_source)
+        step_process_url = get_process_location(step['reference'], data_source)
         package_body, package_name = _get_process_package(step_process_url)
         _load_package_content(package_body, package_name, data_source=data_source,
                               only_dump_file=True, tmp_dir=tmp_dir)
-        package_dict['steps'][step_reference]['run'] = package_name
+        package_dict['steps'][step['name']]['run'] = package_name
 
     with open(tmp_json_cwl, 'w') as f:
         json.dump(package_dict, f)
@@ -639,7 +640,7 @@ class Package(Process):
         if not isinstance(package, dict):
             raise PackageRegistrationError("Unknown parsing of package definition for package process.")
         try:
-            self.package, _ = _load_package_content(package)
+            self.package, _ = _load_package_content(package, data_source=None)  # no data source for local package
         except Exception as ex:
             raise PackageRegistrationError("Exception occurred on package instantiation: `{}`".format(repr(ex)))
 

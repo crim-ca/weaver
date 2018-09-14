@@ -39,11 +39,11 @@ def request_quote(request):
     # loop workflow sub-process steps to get individual quotes
     if process_type == PROCESS_WORKFLOW and twitcher_config == TWITCHER_CONFIGURATION_EMS:
         workflow_quotes = list()
-        for process_step in get_package_workflow_steps(process_url):
+        for step in get_package_workflow_steps(process_url):
             # retrieve quote from provider ADES
             # TODO: data source mapping
             from twitcher.processes.sources import CRIM_ADES
-            process_step_url = get_process_location(process_step, data_source=CRIM_ADES)
+            process_step_url = get_process_location(step['reference'], data_source=CRIM_ADES)
             process_quote_url = '{}/quote'.format(process_step_url)
             subreq = request.copy()
             subreq.path_info = process_quote_url
