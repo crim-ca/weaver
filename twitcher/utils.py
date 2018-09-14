@@ -17,6 +17,10 @@ def get_any_id(info):  # type: (dict) -> Any
     return info.get('id', info.get('identifier', info.get('_id')))
 
 
+def get_twitcher_url(settings):
+    return settings.get('twitcher.url').rstrip('/').strip()
+
+
 def is_valid_url(url):
     try:
         parsed_url = urlparse(url)
