@@ -75,7 +75,7 @@ class WpsProcess(object):
         return response.json()['status']
 
     def get_job_results(self, job_id):
-        # don't know the format of the output
+        # TODO: don't know the format of the output
         response = requests.get(self.url + self.process_id + '/jobs/' + job_id + '/results',
                                 headers={'Accept': 'application/json'})
         if response.status_code != 200:

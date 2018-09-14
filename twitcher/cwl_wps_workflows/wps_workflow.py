@@ -1,4 +1,3 @@
-import copy
 import datetime
 import hashlib
 import json
@@ -32,6 +31,7 @@ logging.basicConfig(format='%(levelname)s:%(message)s', level=LOGGER_LEVEL)
 LOGGER = logging.getLogger(__name__)
 DEFAULT_TMP_PREFIX = "tmp"
 
+# TODO: The code started as a copy of the class CommandLineTool, and still has useless code in the context of a WPS workflow
 
 def default_make_tool(toolpath_object,  #type: Dict[Text, Any]
                       loadingContext,  #type: LoadingContext
@@ -383,9 +383,13 @@ class WpsWorkflowJob(JobBase):
                  runtimeContext  # type: RuntimeContext
                 ):  # type: (...) -> None
 
-        if self.wps_process.is_deployed():
-            LOGGER.info(u"Process %s is already deployed on %s.", self.wps_process.process_id, self.wps_process.url)
-        self.wps_process.execute(self.builder.job)
+        if not self.wps_process.is_deployed():
+            LOGGER.info(u"Process %s is not deployed on %s - deploying.", self.wps_process.process_id, self.wps_process.url)
+            self.wps_process.deploy()
+
+        result = self.wps_process.execute(self.builder.job)
+
+        # TODO: Write results to outputs so that the main workflow or the next job grabs it
 
         if self.joborder and runtimeContext.research_obj:
             job_order = self.joborder
