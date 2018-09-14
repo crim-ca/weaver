@@ -561,21 +561,22 @@ class DismissedJobSchema(MappingSchema):
     progress = SchemaNode(Integer(), example=0)
 
 
-class QuoteProcessSchema(MappingSchema):
+class QuoteStepSchema(MappingSchema):
     id = SchemaNode(String(), description="Quote ID.")
     cost = SchemaNode(Float(), description="Process execution cost.")
     process = SchemaNode(String(), description="Corresponding process ID.")
+    location = SchemaNode(String(), description="Corresponding process location.")
 
 
 class QuoteProcessListSchema(SequenceSchema):
-    step = QuoteProcessSchema(description="Quote of a process.")
+    step = QuoteStepSchema(description="Quote of a workflow step process.")
 
 
 class QuoteSchema(MappingSchema):
     id = SchemaNode(String(), description="Quote ID.")
     process = SchemaNode(String(), description="Corresponding process ID.")
     steps = QuoteProcessListSchema(description="Child processes and costs.")
-    total = SchemaNode(Float(), description="Total of the quote.")
+    total = SchemaNode(Float(), description="Total of the quote including step processes.")
 
 
 class QuoteListSchema(SequenceSchema):

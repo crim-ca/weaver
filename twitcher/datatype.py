@@ -564,8 +564,19 @@ class Quote(dict):
         return self['process']
 
     @property
+    def location(self):
+        """WPS Process URL."""
+        return self.get('location', '')
+
+    @property
     def cost(self):
+        """Cost of the current quote"""
         return self.get('cost', 0.0)
+
+    @property
+    def steps(self):
+        """Sub-quote IDs if applicable"""
+        return self.get('steps', [])
 
     @property
     def params(self):
@@ -573,6 +584,8 @@ class Quote(dict):
             'id': self.id,
             'cost': self.cost,
             'process': self.process,
+            'location': self.location,
+            'steps': self.steps,
         }
 
     def json(self):

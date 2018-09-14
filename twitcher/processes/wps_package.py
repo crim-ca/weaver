@@ -37,7 +37,12 @@ import logging
 LOGGER = logging.getLogger("PYWPS")
 
 
-__all__ = ['Package', 'get_process_from_wps_request']
+__all__ = [
+    'Package',
+    'get_process_from_wps_request',
+    'get_process_location',
+    'get_package_workflow_steps',
+]
 
 
 PACKAGE_EXTENSIONS = frozenset(['yaml', 'yml', 'json', 'cwl', 'job'])
@@ -69,56 +74,74 @@ WPS_COMPLEX = 'complex'
 WPS_BOUNDINGBOX = 'bbox'
 WPS_LITERAL = 'literal'
 
+
 class NullType():
     pass
 null = NullType()
 
 
-def _get_step_process_location(process_id_or_url, data_source=None):
+def get_process_location(process_id_or_url, data_source=None):
     """
-    Obtains the URL of a WPS process description given the specified information.
+    Obtains the URL of a WPS REST DescribeProcess given the specified information.
 
     :param process_id_or_url: process 'identifier' or literal URL to DescribeProcess WPS-REST location.
-    :param data_source: identifier of the data source to map to a specific ADES, or mapping to EMS processes if None.
+    :param data_source: identifier of the data source to map to specific ADES, or map to EMS processes when ``None``.
     :return: URL of EMS or ADES WPS-REST DescribeProcess.
     """
     # if an URL was specified, return it as is
     if urlparse(process_id_or_url).scheme != "":
         return process_id_or_url
-    data_source_url = DATA_SOURCE_MAPPING[data_source]()
+    data_source_url = DATA_SOURCE_MAPPING.get(data_source)
     process_url = process_uri.format(process_id=process_id_or_url)
     return '{host}{path}'.format(host=data_source_url, path=process_url)
 
 
-def _get_step_process_package(process_id_or_url, data_source=None):
+def get_package_workflow_steps(package_dict_or_url):
+    """
+    :param package_dict_or_url: process package definition or literal URL to DescribeProcess WPS-REST location.
+    :return: list of workflow steps.
+    """
+    if isinstance(package_dict_or_url, six.string_types):
+        package_dict_or_url = _get_process_package(package_dict_or_url)
+    workflow_steps_ids = list()
+    package_type = _get_package_type(package_dict_or_url)
+    if package_type == PROCESS_WORKFLOW:
+        workflow_steps = package_dict_or_url.get('steps')
+        for step in workflow_steps:
+            step_package_ref = workflow_steps[step].get('run')
+            workflow_steps_ids.append(step_package_ref)
+    return workflow_steps_ids
+
+
+def _get_process_package(process_url):
     """
     Retrieves the WPS process package content from given process ID or literal URL.
 
-    :param process_id_or_url: process 'identifier' or literal URL to DescribeProcess WPS-REST location.
+    :param process_url: process literal URL to DescribeProcess WPS-REST location.
     :return: tuple of package body as dictionary and package reference name.
     """
 
     def _package_not_found_error(ref):
         return PackageNotFound("Could not find workflow step reference: `{}`".format(ref))
 
-    def _get_package_request_body(url_ref, original_ref=None):
-        package_resp = requests.get(url_ref, headers={'Accept': 'application/json'}, verify=False)
-        if package_resp.status_code != HTTPOk.code:
-            raise _package_not_found_error(original_ref or url_ref)
-        return package_resp.json()
+    if not isinstance(process_url, six.string_types):
+        raise _package_not_found_error(str(process_url))
 
-    if not isinstance(process_id_or_url, six.string_types):
-        raise _package_not_found_error(str(process_id_or_url))
-
-    process_url = _get_step_process_location(process_id_or_url, data_source=data_source)
     package_url = '{}/package'.format(process_url)
-    package_name = process_id_or_url.split('/')[-1]
-    package_body = _get_package_request_body(package_url, process_id_or_url)
+    package_name = process_url.split('/')[-1]
+    package_resp = requests.get(package_url, headers={'Accept': 'application/json'}, verify=False)
+    if package_resp.status_code != HTTPOk.code:
+        raise _package_not_found_error(package_url or process_url)
+    package_body = package_resp.json()
 
     if not isinstance(package_body, dict) or not len(package_body):
-        raise _package_not_found_error(str(process_id_or_url))
+        raise _package_not_found_error(str(process_url))
 
     return package_body, package_name
+
+
+def _get_package_type(package_dict):
+    return PROCESS_WORKFLOW if package_dict.get('class').lower() == 'workflow' else PROCESS_APPLICATION
 
 
 def _check_package_file(cwl_file):
@@ -146,28 +169,26 @@ def _load_package_content(package_dict, package_name=PACKAGE_DEFAULT_FILE_NAME,
 
     :param package_dict: package content representation as a json dictionary.
     :param package_name: name to use to create the package file.
-    :param data_source: identifier of the data source to map to a specific ADES, or mapping to EMS processes if None.
+    :param data_source: identifier of the data source to map to specific ADES, or map to EMS processes when ``None``.
     :param only_dump_file: specify if the :class:`cwltool.factory.Factory` should be validated and returned.
     :param tmp_dir: location of the temporary directory to dump files (warning: will be deleted on exit).
     :return:
         instance of :class:`cwltool.factory.Factory` if :param:`only_dump_file` is ``False``, ``None`` otherwise.
     """
-    # TODO: find how to pass dict directly (?) instead of dump to tmp file
+
     tmp_dir = tmp_dir or tempfile.mkdtemp()
     tmp_json_cwl = os.path.join(tmp_dir, package_name)
 
     # for workflows, retrieve each 'sub-package' file
-    package_type = PROCESS_WORKFLOW if package_dict.get('class').lower() == 'workflow' else PROCESS_APPLICATION
-    if package_type == PROCESS_WORKFLOW:
-        workflow_steps = package_dict.get('steps')
-        for step in workflow_steps:
-            step_package_ref = workflow_steps[step].get('run')
-            package_body, package_name = _get_step_process_package(step_package_ref, data_source)
-
-            # generate sub-package file and update workflow step to point to created sub-package file
-            _load_package_content(package_body, package_name, data_source=data_source,
-                                  only_dump_file=True, tmp_dir=tmp_dir)
-            package_dict['steps'][step]['run'] = package_name
+    package_type = _get_package_type(package_dict)
+    workflow_steps = get_package_workflow_steps(package_dict)
+    for step_reference in workflow_steps:
+        # generate sub-package file and update workflow step to point to created sub-package file
+        step_process_url = get_process_location(step_reference, data_source)
+        package_body, package_name = _get_process_package(step_process_url)
+        _load_package_content(package_body, package_name, data_source=data_source,
+                              only_dump_file=True, tmp_dir=tmp_dir)
+        package_dict['steps'][step_reference]['run'] = package_name
 
     with open(tmp_json_cwl, 'w') as f:
         json.dump(package_dict, f)
@@ -556,6 +577,17 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
 
 
 def get_process_from_wps_request(process_offering, reference=None, package=None, data_source=None):
+    """
+    Returns an updated process information dictionary ready for storage using provided WPS ``process_offering``
+    and a package definition passed by ``reference`` or ``package`` JSON content.
+    The returned process information can be used later on to load an instance of :class:`twitcher.wps_package.Package`.
+
+    :param process_offering: WPS REST-API process offering as JSON.
+    :param reference: URL to an existing package definition.
+    :param package: literal package definition as JSON.
+    :param data_source: where to resolve process IDs (default: localhost if ``None``).
+    :return: process information dictionary ready for saving to data store.
+    """
     if not (isinstance(package, dict) or isinstance(reference, six.string_types)):
         raise PackageRegistrationError(
             "Invalid parameters amongst one of [package,reference].")
