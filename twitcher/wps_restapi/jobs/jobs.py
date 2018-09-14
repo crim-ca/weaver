@@ -87,13 +87,13 @@ def get_jobs(request):
     filters = {
         'page': page,
         'limit': limit,
-        'tag': request.params.get('tag', None),
+        'tags': request.params.get('tags', '').split(','),
         'access': request.params.get('access', None),
         'status': request.params.get('status', None),
         'sort': request.params.get('sort', sort.SORT_CREATED),
         # provider and process can be specified by query (short route) or by path (full route)
         'process': request.params.get('process', None) or request.matchdict.get('process_id', None),
-        'provider': request.params.get('provider', None) or request.matchdict.get('provider_id', None),
+        'service': request.params.get('provider', None) or request.matchdict.get('provider_id', None),
     }
     store = jobstore_factory(request.registry)
     items, count = store.find_jobs(request, **filters)
