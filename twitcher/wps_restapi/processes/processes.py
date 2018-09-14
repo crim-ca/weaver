@@ -6,12 +6,13 @@ from six.moves.urllib.error import URLError
 from time import sleep
 from datetime import datetime
 from twitcher.adapter import servicestore_factory
-from twitcher.utils import get_any_id
+from twitcher.utils import get_any_id, raise_on_xml_exception
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import add_job, check_status
 from twitcher.wps_restapi.status import STATUS_ACCEPTED, STATUS_FAILED
 from twitcher.db import MongoDB
+from twitcher.owsexceptions import OWSNoApplicableCode
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference
 from lxml import etree
 
@@ -234,8 +235,15 @@ def submit_job_handler(request, service_url):
     process_id = request.matchdict.get('process_id')
     async_execute = not request.params.getone('sync-execute') if 'sync-execute' in request.params else True
 
-    wps = WebProcessingService(url=service_url, headers=get_cookie_headers(request.headers))
-    process = wps.describeprocess(process_id)
+    try:
+        wps = WebProcessingService(url=service_url, headers=get_cookie_headers(request.headers))
+        raise_on_xml_exception(wps._capabilities)
+    except Exception as ex:
+        raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
+    try:
+        process = wps.describeprocess(process_id)
+    except Exception as ex:
+        raise OWSNoApplicableCode("Failed to retrieve WPS process description. Error: [{}].".format(str(ex)))
 
     # prepare inputs
     complex_inputs = []

@@ -99,6 +99,21 @@ def lxml_strip_ns(tree):
             node.tag = node.tag.split('}', 1)[1]
 
 
+def raise_on_xml_exception(xml_node):
+    """
+    Raises an exception with the description if the XML response document defines an ExceptionReport.
+    :param xml_node: instance of :class:`etree.Element`
+    :raises: Exception on found ExceptionReport document.
+    """
+    if not isinstance(xml_node, etree.Element):
+        raise TypeError("Invalid input, expecting XML element node.")
+    if 'ExceptionReport' in xml_node.tag:
+        node = xml_node
+        while len(node.getchildren()):
+            node = node.getchildren()[0]
+        raise Exception(node.text)
+
+
 def replace_caps_url(xml, url, prev_url=None):
     ns = {
         'ows': 'http://www.opengis.net/ows/1.1',
