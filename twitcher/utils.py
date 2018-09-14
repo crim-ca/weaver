@@ -17,6 +17,10 @@ def get_any_id(info):  # type: (dict) -> Any
     return info.get('id', info.get('identifier', info.get('_id')))
 
 
+def get_twitcher_url(settings):
+    return settings.get('twitcher.url').rstrip('/').strip()
+
+
 def is_valid_url(url):
     try:
         parsed_url = urlparse(url)
@@ -93,6 +97,21 @@ def lxml_strip_ns(tree):
             continue  # node.tag is not a string (node is a comment or similar)
         if has_namespace:
             node.tag = node.tag.split('}', 1)[1]
+
+
+def raise_on_xml_exception(xml_node):
+    """
+    Raises an exception with the description if the XML response document defines an ExceptionReport.
+    :param xml_node: instance of :class:`etree.Element`
+    :raises: Exception on found ExceptionReport document.
+    """
+    if not isinstance(xml_node, etree._Element):
+        raise TypeError("Invalid input, expecting XML element node.")
+    if 'ExceptionReport' in xml_node.tag:
+        node = xml_node
+        while len(node.getchildren()):
+            node = node.getchildren()[0]
+        raise Exception(node.text)
 
 
 def replace_caps_url(xml, url, prev_url=None):

@@ -7,7 +7,8 @@ from time import sleep
 from twitcher.adapter import servicestore_factory, jobstore_factory
 from twitcher.datatype import Job as JobDB
 from twitcher.exceptions import JobRegistrationError
-from twitcher.utils import get_any_id
+from twitcher.owsexceptions import OWSNoApplicableCode
+from twitcher.utils import get_any_id, raise_on_xml_exception
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import check_status
@@ -218,8 +219,15 @@ def submit_job_handler(request, service_url):
     async_execute = not request.params.getone('sync-execute') if 'sync-execute' in request.params else True
     tags = request.params.get('tags', '').split(',')
 
-    wps = WebProcessingService(url=service_url, headers=get_cookie_headers(request.headers))
-    process = wps.describeprocess(process_id)
+    try:
+        wps = WebProcessingService(url=service_url, headers=get_cookie_headers(request.headers))
+        raise_on_xml_exception(wps._capabilities)
+    except Exception as ex:
+        raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
+    try:
+        process = wps.describeprocess(process_id)
+    except Exception as ex:
+        raise OWSNoApplicableCode("Failed to retrieve WPS process description. Error: [{}].".format(str(ex)))
 
     # prepare inputs
     complex_inputs = []
