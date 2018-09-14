@@ -132,14 +132,14 @@ def _map_status(wps_execution_status):
 
 @app.task(bind=True)
 def execute_process(self, url, service, process, inputs, outputs,
-                    is_workflow=False, user_id=None, async=True, headers=None):
+                    is_workflow=False, user_id=None, async=True, custom_tags=[], headers=None):
     registry = app.conf['PYRAMID_REGISTRY']
     store = jobstore_factory(registry)
     task_id = self.request.id
     job = JobDB({'task_id': task_id})  # default in case of error during registration to job store
     try:
         job = store.save_job(task_id=task_id, process=process, service=service, is_workflow=is_workflow,
-                             user_id=user_id, async=async)
+                             user_id=user_id, async=async, custom_tags=custom_tags)
 
         wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), skip_caps=False, verify=False)
         mode = 'async' if async else 'sync'
@@ -227,6 +227,7 @@ def submit_job_handler(request, service_url, is_workflow=False):
     provider_id = request.matchdict.get('provider_id')  # None OK if local
     process_id = request.matchdict.get('process_id')
     async_execute = not request.params.getone('sync-execute') if 'sync-execute' in request.params else True
+    tags = request.params.get('tags', '').split(',')
 
     try:
         verify = False if urlparse(service_url).hostname == 'localhost' else True
@@ -273,6 +274,7 @@ def submit_job_handler(request, service_url, is_workflow=False):
         is_workflow=is_workflow,
         user_id=request.authenticated_userid,
         async=async_execute,
+        custom_tags=tags,
         # Convert EnvironHeaders to a simple dict (should cherrypick the required headers)
         headers={k: v for k, v in request.headers.items()})
 

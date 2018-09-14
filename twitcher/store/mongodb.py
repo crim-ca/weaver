@@ -256,12 +256,13 @@ class MongodbJobStore(JobStore, MongodbStore):
     Registry for OWS service process jobs tracking. Uses mongodb to store job attributes.
     """
 
-    def save_job(self, task_id, process, service=None, is_workflow=False, user_id=None, async=True):
+    def save_job(self, task_id, process, service=None, is_workflow=False, user_id=None, async=True, custom_tags=[]):
         """
         Stores a job in mongodb.
         """
         try:
             tags = ['dev']
+            tags.extend(custom_tags)
             if is_workflow:
                 tags.append('workflow')
             else:
@@ -327,7 +328,7 @@ class MongodbJobStore(JobStore, MongodbStore):
         return jobs
 
     def find_jobs(self, request, page=0, limit=10, process=None, service=None,
-                  tag=None, access=None, status=None, sort=None):
+                  tags=None, access=None, status=None, sort=None):
         """
         Finds all jobs in mongodb storage matching search filters.
         """
@@ -340,8 +341,8 @@ class MongodbJobStore(JobStore, MongodbStore):
         elif access == 'all' and request.has_permission('admin'):
             pass
         else:
-            if tag is not None:
-                search_filters['tags'] = tag
+            if tags is not None:
+                search_filters['tags'] = {'$all': tags}
             search_filters['user_id'] = authenticated_userid(request)
 
         if status in job_status_categories.keys():

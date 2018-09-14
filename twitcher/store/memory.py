@@ -197,7 +197,7 @@ class MemoryJobStore(JobStore):
     """
     Stores job tracking in memory. Useful for testing purposes.
     """
-    def save_job(self, task_id, process, service=None, is_workflow=False, user_id=None, async=True):
+    def save_job(self, task_id, process, service=None, is_workflow=False, user_id=None, async=True, custom_tags=[]):
         """
         Stores a job in memory.
         """
@@ -229,7 +229,7 @@ class MemoryJobStore(JobStore):
         raise NotImplementedError
 
     def find_jobs(self, request, page=0, limit=10, process=None, service=None,
-                  tag=None, access=None, status=None, sort=None):
+                  tags=None, access=None, status=None, sort=None):
         """
         Finds all jobs in memory matching search filters.
         """

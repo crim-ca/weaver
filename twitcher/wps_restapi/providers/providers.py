@@ -23,7 +23,7 @@ def get_providers(request):
 
     for service in store.list_services(request=request):
         try:
-            if service.type.lower() is not 'wps':
+            if service.type.lower() != 'wps':
                 continue
 
             wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))

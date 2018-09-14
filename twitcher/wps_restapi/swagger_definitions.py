@@ -276,8 +276,10 @@ OutputTransmissionEnum = SchemaNode(String(), validator=OneOf(['value', 'referen
 
 
 class LaunchJobQuerystring(MappingSchema):
-    sync_execute = SchemaNode(Boolean(), example='application/json', default=False, missing=drop)
+    sync_execute = SchemaNode(Boolean(), default=False, missing=drop)
     sync_execute.name = 'sync-execute'
+    field_string = SchemaNode(String(), default=None, missing=drop, description='Comma separated tags that can be used to filter jobs later')
+    field_string.name = 'tags'
 
 
 #########################################################
@@ -519,6 +521,7 @@ class GetJobsQueries(MappingSchema):
     process = SchemaNode(String(), missing=drop, default=None)
     provider = SchemaNode(String(), missing=drop, default=None)
     sort = JobSortEnum
+    tags = SchemaNode(String(), missing=drop, default=None, description='Comma-separated values of tags assigned to jobs')
 
 
 class GetJobsRequest(MappingSchema):

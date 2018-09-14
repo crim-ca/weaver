@@ -132,7 +132,7 @@ class JobStore(object):
     Storage for job tracking.
     """
 
-    def save_job(self, task_id, process, service=None, is_workflow=False, user_id=None, async=True):
+    def save_job(self, task_id, process, service=None, is_workflow=False, user_id=None, async=True, custom_tags=[]):
         """
         Stores a job in storage.
         """
@@ -164,7 +164,7 @@ class JobStore(object):
         raise NotImplementedError
 
     def find_jobs(self, request, page=0, limit=10, process=None, service=None,
-                  tag=None, access=None, status=None, sort=None):
+                  tags=None, access=None, status=None, sort=None):
         """
         Finds all jobs in database matching search filters.
         """
