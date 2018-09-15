@@ -551,6 +551,10 @@ class CreatedJobStatusSchema(MappingSchema):
     jobID = SchemaNode(String(), example='a9d14bf4-84e0-449a-bac8-16e598efe807', description="ID of the created job.")
 
 
+class CreatedQuotedJobStatusSchema(CreatedJobStatusSchema):
+    bill = SchemaNode(String(), example='d88fda5c-52cc-440b-9309-f2cd20bcd6a2', description="ID of the created bill.")
+
+
 class GetAllJobsSchema(MappingSchema):
     count = SchemaNode(Integer())
     jobs = JobListSchema()
@@ -964,12 +968,8 @@ class CreatedPostProvider(MappingSchema):
     body = ProviderSummarySchema()
 
 
-class CreatedLaunchJobHeader(JsonHeader):
-    Location = SchemaNode(String(), description='Location URL of the created job execution status.')
-
-
 class CreatedLaunchJobResponse(MappingSchema):
-    header = CreatedLaunchJobHeader()
+    header = JsonHeader()
     body = CreatedJobStatusSchema()
 
 
@@ -1013,7 +1013,9 @@ class OkGetSingleOutputResponse(MappingSchema):
     body = JobOutputSchema()
 
 
-CreatedQuoteExecuteResponse = CreatedLaunchJobResponse
+class CreatedQuoteExecuteResponse(MappingSchema):
+    header = JsonHeader()
+    body = CreatedQuotedJobStatusSchema()
 
 
 class CreatedQuoteRequestResponse(MappingSchema):

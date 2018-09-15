@@ -603,12 +603,14 @@ class Quote(dict):
 class Bill(dict):
     """
     Dictionary that contains bill information.
-    It always has ``'id'`` and ``quote`` key.
+    It always has ``'id'``, ``user``, ``quote`` and ``job`` keys.
     """
     def __init__(self, *args, **kwargs):
         super(Bill, self).__init__(*args, **kwargs)
         if 'quote' not in self:
             raise TypeError("'quote' is required")
+        if 'job' not in self:
+            raise TypeError("'job' is required")
         self['id'] = str(uuid.uuid4())
 
     @property
@@ -617,15 +619,27 @@ class Bill(dict):
         return self['id']
 
     @property
+    def user(self):
+        """User ID"""
+        return self['user']
+
+    @property
     def quote(self):
         """Quote ID."""
         return self['quote']
 
     @property
+    def job(self):
+        """Job ID."""
+        return self['job']
+
+    @property
     def params(self):
         return {
             'id': self.id,
+            'user': self.user,
             'quote': self.quote,
+            'job': self.job,
         }
 
     def json(self):

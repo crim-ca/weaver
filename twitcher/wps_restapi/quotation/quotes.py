@@ -1,15 +1,17 @@
 from twitcher.wps_restapi import swagger_definitions as sd, sort
 from twitcher.wps_restapi.utils import wps_restapi_base_url
+from twitcher.wps_restapi.processes.processes import submit_local_job
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS, TWITCHER_CONFIGURATION_ADES
-from twitcher.exceptions import QuoteNotFound, ProcessNotFound
-from twitcher.adapter import quotestore_factory, processstore_factory
-from twitcher.datatype import Quote
+from twitcher.exceptions import BillNotFound, BillRegistrationError, QuoteNotFound, ProcessNotFound
+from twitcher.adapter import billstore_factory, quotestore_factory, processstore_factory
+from twitcher.datatype import Bill, Quote
 from twitcher.processes.types import *
 from twitcher.processes.wps_package import get_process_location, get_package_workflow_steps
 from twitcher.utils import get_twitcher_url
 from pyramid.httpexceptions import *
 import logging
 import random
+import six
 logger = logging.getLogger('TWITCHER')
 
 
@@ -120,4 +122,12 @@ def execute_quote(request):
     """
     Execute a quoted process.
     """
-    quote_id = request.matchdict.get('quote_id')
+    quote = get_quote_info(request)
+    job_resp = submit_local_job(request)
+    job_json = job_resp.json()
+    job_id = job_json.get('jobID')
+    user_id = request.authenticated_userid
+    store = billstore_factory(request.registry)
+    bill = store.save_bill(Bill(user=user_id, quote=quote.id, job=job_id))
+    job_json.update({"bill": bill.id})
+    return HTTPCreated(json=job_json)

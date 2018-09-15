@@ -542,7 +542,7 @@ def submit_local_job(request):
     if not isinstance(process_id, string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
-        store = processstore_defaultfactory(request.registry)
+        store = processstore_factory(request.registry)
         process = store.fetch_by_id(process_id)
         resp = submit_job_handler(request, process.executeEndpoint, is_workflow=process.type == 'workflow')
         return resp
