@@ -38,7 +38,7 @@ def adapter_factory(settings):
 def get_adapter_store_factory(adapter, store_name, registry):
     try:
         store = getattr(adapter, store_name)
-    except AttributeError:
+    except NotImplementedError:
         LOGGER.warn("Adapter `{0!r}` doesn't implement `{1!r}`, falling back to `DefaultAdapter` implementation."
                     .format(adapter, store_name))
         adapter = DefaultAdapter()
