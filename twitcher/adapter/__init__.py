@@ -35,49 +35,51 @@ def adapter_factory(settings):
     return DefaultAdapter()
 
 
-def servicestore_factory(registry):
+def get_adapter_store_factory(adapter, store_name, registry):
     try:
-        return adapter_factory(registry.settings).servicestore_factory(registry)
+        store = getattr(adapter, store_name)
+    except AttributeError:
+        LOGGER.warn("Adapter `{0!r}` doesn't implement `{1!r}`, falling back to `DefaultAdapter` implementation."
+                    .format(adapter, store_name))
+        adapter = DefaultAdapter()
+        store = getattr(adapter, store_name)
     except Exception as e:
-        LOGGER.error('Adapter raised an exception while getting servicestore_factory : {!r}'.format(e))
+        LOGGER.error("Adapter `{0!r}` raised an exception while getting `{1!r}` : `{2!r}`"
+                     .format(adapter, store_name, e))
         raise
-
-
-def jobstore_factory(registry):
     try:
-        return adapter_factory(registry.settings).jobstore_factory(registry)
+        return store(registry)
     except Exception as e:
-        LOGGER.error('Adapter raised an exception while getting jobstore_factory : {!r}'.format(e))
-        raise
-
-
-def quotestore_factory(registry):
-    try:
-        return adapter_factory(registry.settings).quotestore_factory(registry)
-    except Exception as e:
-        LOGGER.error('Adapter raised an exception while getting quotestore_factory : {!r}'.format(e))
-        raise
-
-
-def billstore_factory(registry):
-    try:
-        return adapter_factory(registry.settings).billstore_factory(registry)
-    except Exception as e:
-        LOGGER.error('Adapter raised an exception while getting billstore_factory : {!r}'.format(e))
-        raise
-
-
-def owssecurity_factory(registry):
-    try:
-        return adapter_factory(registry.settings).owssecurity_factory(registry)
-    except Exception as e:
-        LOGGER.error('Adapter raised an exception while getting owssecurity_factory : {!r}'.format(e))
+        LOGGER.error("Adapter `{0!r}` raised an exception while instantiating `{1!r}` : {2!r}"
+                     .format(adapter, store_name, e))
         raise
 
 
 def processstore_factory(registry):
-    try:
-        return adapter_factory(registry.settings).processstore_factory(registry)
-    except Exception as e:
-        LOGGER.error('Adapter raised an exception while getting processstore_factory : {!r}'.format(e))
-        raise
+    adapter = adapter_factory(registry.settings)
+    return get_adapter_store_factory(adapter, 'processstore_factory', registry)
+
+
+def servicestore_factory(registry):
+    adapter = adapter_factory(registry.settings)
+    return get_adapter_store_factory(adapter, 'servicestore_factory', registry)
+
+
+def jobstore_factory(registry):
+    adapter = adapter_factory(registry.settings)
+    return get_adapter_store_factory(adapter, 'jobstore_factory', registry)
+
+
+def quotestore_factory(registry):
+    adapter = adapter_factory(registry.settings)
+    return get_adapter_store_factory(adapter, 'quotestore_factory', registry)
+
+
+def billstore_factory(registry):
+    adapter = adapter_factory(registry.settings)
+    return get_adapter_store_factory(adapter, 'billstore_factory', registry)
+
+
+def owssecurity_factory(registry):
+    adapter = adapter_factory(registry.settings)
+    return get_adapter_store_factory(adapter, 'owssecurity_factory', registry)
