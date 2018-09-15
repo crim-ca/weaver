@@ -17,6 +17,16 @@ class DefaultAdapter(AdapterInterface):
         from twitcher.store import jobstore_defaultfactory
         return jobstore_defaultfactory(registry)
 
+    def quotestore_factory(self, registry):
+        __doc__ = super(DefaultAdapter, self).__doc__
+        from twitcher.store import quotestore_defaultfactory
+        return quotestore_defaultfactory(registry)
+
+    def billstore_factory(self, registry):
+        __doc__ = super(DefaultAdapter, self).__doc__
+        from twitcher.store import billstore_defaultfactory
+        return billstore_defaultfactory(registry)
+
     def owssecurity_factory(self, registry):
         __doc__ = super(DefaultAdapter, self).__doc__
         from twitcher.owssecurity import owssecurity_defaultfactory
