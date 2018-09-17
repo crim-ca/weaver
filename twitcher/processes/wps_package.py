@@ -195,7 +195,7 @@ def _load_package_content(package_dict, package_name=PACKAGE_DEFAULT_FILE_NAME,
         json.dump(package_dict, f)
     if only_dump_file:
         return
-
+    
     cwl_factory = cwltool.factory.Factory(runtime_context=RuntimeContext(kwargs={'no_read_only': True}))
     package = cwl_factory.make(tmp_json_cwl)
     shutil.rmtree(tmp_dir)
@@ -586,9 +586,20 @@ def get_process_from_wps_request(process_offering, reference=None, package=None,
     :param process_offering: WPS REST-API process offering as JSON.
     :param reference: URL to an existing package definition.
     :param package: literal package definition as JSON.
-    :param data_source: where to resolve process IDs (default: EMS if ``None``).
+    :param data_source: where to resolve process IDs (default: localhost if ``None``).
     :return: process information dictionary ready for saving to data store.
     """
+    def try_or_raise_package_error(call, reason):
+        try:
+            LOGGER.debug("Attempting: `{}`".format(reason))
+            return call()
+        except Exception as exc:
+            LOGGER.exception(exc.message)
+            raise PackageRegistrationError(
+                "Invalid package/reference definition. " +
+                "{0} generated error: `{1}`".format(reason, repr(exc))
+            )
+
     if not (isinstance(package, dict) or isinstance(reference, six.string_types)):
         raise PackageRegistrationError(
             "Invalid parameters amongst one of [package,reference].")
@@ -600,21 +611,34 @@ def get_process_from_wps_request(process_offering, reference=None, package=None,
         package = _load_package_file(reference)
     if 'class' not in package:
         raise PackageRegistrationError("Cannot obtain process type from package class.")
-    try:
-        package_factory, process_type = _load_package_content(package, data_source=data_source)
-        package_inputs, package_outputs = _get_package_inputs_outputs(package_factory)
-        process_inputs = process_offering.get('inputs', list())
-        process_outputs = process_offering.get('outputs', list())
-        _update_package_metadata(process_offering, package)
-        package_inputs, package_outputs = _merge_package_inputs_outputs(process_inputs, package_inputs,
-                                                                        process_outputs, package_outputs, as_json=True)
-        process_offering.update({'package': package, 'type': process_type,
-                                 'inputs': package_inputs, 'outputs': package_outputs})
-        return process_offering
-    except Exception as ex:
-        import sys
-        msg = "Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex))
-        raise PackageRegistrationError(msg)
+
+    LOGGER.debug('Using data source: `{}`'.format(data_source))
+    package_factory, process_type = try_or_raise_package_error(
+        lambda: _load_package_content(package, data_source=data_source),
+        reason="Loading")
+
+    package_inputs, package_outputs = try_or_raise_package_error(
+        call=lambda: _get_package_inputs_outputs(package_factory),
+        reason="Definition of package/process inputs/outputs")
+    process_inputs = process_offering.get('inputs', list())
+    process_outputs = process_offering.get('outputs', list())
+
+    try_or_raise_package_error(
+        lambda: _update_package_metadata(process_offering, package),
+        reason="Metadata update")
+
+    package_inputs, package_outputs = try_or_raise_package_error(
+        lambda: _merge_package_inputs_outputs(process_inputs, package_inputs,
+                                              process_outputs, package_outputs, as_json=True),
+        reason="Merging of inputs/outputs")
+
+    process_offering.update({
+        'package': package,
+        'type': process_type,
+        'inputs': package_inputs,
+        'outputs': package_outputs
+    })
+    return process_offering
 
 
 class Package(Process):
