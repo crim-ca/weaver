@@ -34,7 +34,7 @@ import shutil
 import requests
 
 import logging
-LOGGER = logging.getLogger("PYWPS")
+LOGGER = logging.getLogger("PACKAGE")
 
 
 __all__ = [
@@ -195,7 +195,7 @@ def _load_package_content(package_dict, package_name=PACKAGE_DEFAULT_FILE_NAME,
         json.dump(package_dict, f)
     if only_dump_file:
         return
-    
+
     cwl_factory = cwltool.factory.Factory(runtime_context=RuntimeContext(kwargs={'no_read_only': True}))
     package = cwl_factory.make(tmp_json_cwl)
     shutil.rmtree(tmp_dir)
@@ -302,6 +302,12 @@ def _cwl2wps_io(io_info, io_select):
         io_type = enum_type
         io_allow = enum_allow
         io_mode = MODE.SIMPLE   # allowed value validator must be set for input
+
+    # TODO REMOVE
+    LOGGER.debug('io_type:  `{}`'.format(repr(io_type)))
+    LOGGER.debug('PG_TYPES: `{}`'.format(repr(PACKAGE_LITERAL_TYPES)))
+    LOGGER.debug('is_enum:  `{}`'.format(repr(io_type)))
+    LOGGER.debug('io_info:  `{}`'.format(repr(io_info)))
 
     # literal types
     if io_type in PACKAGE_LITERAL_TYPES or is_enum:
@@ -615,10 +621,10 @@ def get_process_from_wps_request(process_offering, reference=None, package=None,
     LOGGER.debug('Using data source: `{}`'.format(data_source))
     package_factory, process_type = try_or_raise_package_error(
         lambda: _load_package_content(package, data_source=data_source),
-        reason="Loading")
+        reason="Loading package content")
 
     package_inputs, package_outputs = try_or_raise_package_error(
-        call=lambda: _get_package_inputs_outputs(package_factory),
+        lambda: _get_package_inputs_outputs(package_factory),
         reason="Definition of package/process inputs/outputs")
     process_inputs = process_offering.get('inputs', list())
     process_outputs = process_offering.get('outputs', list())
