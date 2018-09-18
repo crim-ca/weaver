@@ -265,9 +265,7 @@ def submit_job_handler(request, service_url):
         'status': status.STATUS_ACCEPTED,
         'location': location
     }
-    headers = request.headers
-    headers.update({'Location': location})
-    return HTTPCreated(json=body_data, headers=headers)
+    return HTTPCreated(json=body_data)
 
 
 #############
