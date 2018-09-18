@@ -13,6 +13,7 @@ from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import check_status
 from twitcher.wps_restapi import status
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference
+from owslib.util import clean_ows_url
 from lxml import etree
 
 task_logger = get_task_logger(__name__)
@@ -117,7 +118,7 @@ def _map_status(wps_execution_status):
 
 
 @app.task(bind=True)
-def execute_process(self, url, service, process, inputs, outputs,
+def execute_process(self, url, service, process, inputs,
                     is_workflow=False, user_id=None, async=True, custom_tags=[], headers=None):
     registry = app.conf['PYRAMID_REGISTRY']
     store = jobstore_factory(registry)
@@ -128,9 +129,31 @@ def execute_process(self, url, service, process, inputs, outputs,
                              user_id=user_id, async=async, custom_tags=custom_tags)
 
         wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), skip_caps=False, verify=False)
+        wps_process = wps.describeprocess(process)
+
+        # prepare inputs
+        complex_inputs = []
+        for process_input in wps_process.dataInputs:
+            if 'ComplexData' in process_input.dataType:
+                complex_inputs.append(process_input.identifier)
+
+        try:
+            # need to use ComplexDataInput structure for complex input
+            wps_inputs = [(get_any_id(inpt), ComplexDataInput(inpt['value'])
+            if get_any_id(inpt) in complex_inputs else inpt['value'])
+                      for inpt in inputs]
+        except KeyError:
+            wps_inputs = []
+
+        # prepare outputs
+        outputs = []
+        for output in wps_process.processOutputs:
+            outputs.append(
+                (output.identifier, output.dataType == 'ComplexData'))
+
         # execution = wps.execute(process, inputs=inputs, output=outputs, async=async, lineage=True)
         mode = 'async' if async else 'sync'
-        execution = wps.execute(process, inputs=inputs, output=outputs, mode=mode, lineage=True)
+        execution = wps.execute(process, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
         # job['service'] = wps.identification.title
         # job['title'] = getattr(execution.process, "title")
         if not execution.process and execution.errors:
@@ -218,35 +241,11 @@ def submit_job_handler(request, service_url):
     async_execute = not request.params.getone('sync-execute') if 'sync-execute' in request.params else True
     tags = request.params.get('tags', '').split(',')
 
-    wps = WebProcessingService(url=service_url, headers=get_cookie_headers(request.headers))
-    process = wps.describeprocess(process_id)
-
-    # prepare inputs
-    complex_inputs = []
-    for process_input in process.dataInputs:
-        if 'ComplexData' in process_input.dataType:
-            complex_inputs.append(process_input.identifier)
-
-    try:
-        # need to use ComplexDataInput structure for complex input
-        inputs = [(get_any_id(inpt), ComplexDataInput(inpt['value'])
-                  if get_any_id(inpt) in complex_inputs else inpt['value'])
-                  for inpt in request.json_body['inputs']]
-    except KeyError:
-        inputs = []
-
-    # prepare outputs
-    outputs = []
-    for output in process.processOutputs:
-        outputs.append(
-            (output.identifier, output.dataType == 'ComplexData'))
-
     result = execute_process.delay(
-        url=wps.url,
+        url=clean_ows_url(service_url),
         service=provider_id,
-        process=process.identifier,
-        inputs=inputs,
-        outputs=outputs,
+        process=process_id,
+        inputs=request.json_body['inputs'],
         user_id=request.unauthenticated_userid,
         async=async_execute,
         custom_tags=tags,
@@ -258,7 +257,7 @@ def submit_job_handler(request, service_url):
     location = '{base_url}{location_base}/processes/{process_id}/jobs/{job_id}'.format(
         base_url=wps_restapi_base_url(request.registry.settings),
         location_base=location_base,
-        process_id=process.identifier,
+        process_id=process_id,
         job_id=result.id)
     body_data = {
         'jobID': result.id,
