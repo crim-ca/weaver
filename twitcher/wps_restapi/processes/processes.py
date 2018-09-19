@@ -139,9 +139,9 @@ def execute_process(self, url, service, process, inputs,
 
         try:
             # need to use ComplexDataInput structure for complex input
-            wps_inputs = [(get_any_id(inpt), ComplexDataInput(inpt['value'])
-            if get_any_id(inpt) in complex_inputs else inpt['value'])
-                      for inpt in inputs]
+            wps_inputs = [(get_any_id(wps_in), ComplexDataInput(wps_in['value'])
+                          if get_any_id(wps_in) in complex_inputs else wps_in['value'])
+                          for wps_in in inputs]
         except KeyError:
             wps_inputs = []
 
