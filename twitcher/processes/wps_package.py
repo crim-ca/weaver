@@ -303,16 +303,17 @@ def _cwl2wps_io(io_info, io_select):
         io_allow = enum_allow
         io_mode = MODE.SIMPLE   # allowed value validator must be set for input
 
-    # TODO REMOVE
-    LOGGER.debug('PACKAGE_TYPES: `{}`'.format(repr(PACKAGE_LITERAL_TYPES)))
-    LOGGER.debug('is_array:      `{}`'.format(repr(is_array)))
-    LOGGER.debug('array_elem:    `{}`'.format(repr(array_elem)))
-    LOGGER.debug('is_enum:       `{}`'.format(repr(is_enum)))
-    LOGGER.debug('enum_type:     `{}`'.format(repr(enum_type)))
-    LOGGER.debug('enum_allow:    `{}`'.format(repr(enum_allow)))
-    LOGGER.debug('io_info:       `{}`'.format(repr(io_info)))
-    LOGGER.debug('io_type:       `{}`'.format(repr(io_type)))
-    LOGGER.debug('type(io_type): `{}`'.format(type(io_type)))
+    # debug info for unhandled types conversion
+    if not isinstance(io_type, six.string_types):
+        LOGGER.debug('is_array:      `{}`'.format(repr(is_array)))
+        LOGGER.debug('array_elem:    `{}`'.format(repr(array_elem)))
+        LOGGER.debug('is_enum:       `{}`'.format(repr(is_enum)))
+        LOGGER.debug('enum_type:     `{}`'.format(repr(enum_type)))
+        LOGGER.debug('enum_allow:    `{}`'.format(repr(enum_allow)))
+        LOGGER.debug('io_info:       `{}`'.format(repr(io_info)))
+        LOGGER.debug('io_type:       `{}`'.format(repr(io_type)))
+        LOGGER.debug('type(io_type): `{}`'.format(type(io_type)))
+        raise TypeError("I/O type has not been properly decoded. Should be a string, got:`{!r}`".format(io_type))
 
     # literal types
     if is_enum or io_type in PACKAGE_LITERAL_TYPES:
