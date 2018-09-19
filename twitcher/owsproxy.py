@@ -13,7 +13,7 @@ from pyramid.settings import asbool
 from twitcher._compat import urlparse
 
 from twitcher.owsexceptions import OWSAccessForbidden, OWSAccessFailed
-from twitcher.utils import replace_caps_url
+from twitcher.utils import replace_caps_url, get_twitcher_url
 from twitcher.adapter import servicestore_factory
 from twitcher.adapter import adapter_factory
 
@@ -160,7 +160,7 @@ def owsproxy_delegate(request):
     """
     Delegates owsproxy request to external twitcher service.
     """
-    twitcher_url = request.registry.settings.get('twitcher.url')
+    twitcher_url = get_twitcher_url(request.registry.settings)
     protected_path = request.registry.settings.get('twitcher.ows_proxy_protected_path', '/ows')
     url = twitcher_url + protected_path + '/proxy'
     if request.matchdict.get('service_name'):

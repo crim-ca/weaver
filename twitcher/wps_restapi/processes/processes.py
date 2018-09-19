@@ -7,7 +7,8 @@ from time import sleep
 from twitcher.adapter import servicestore_factory, jobstore_factory
 from twitcher.datatype import Job as JobDB
 from twitcher.exceptions import JobRegistrationError
-from twitcher.utils import get_any_id
+from twitcher.owsexceptions import OWSNoApplicableCode
+from twitcher.utils import get_any_id, raise_on_xml_exception
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import check_status
