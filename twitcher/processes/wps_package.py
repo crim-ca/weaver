@@ -209,17 +209,23 @@ def _is_cwl_array_type(io_info):
     :return io_type: str - array element type if ``is_array`` is True, type of ``io_info`` otherwise.
     :raise PackageTypeError: if the array element is not supported.
     """
+    LOGGER.debug('CALLED: `_is_cwl_array_type`')
+
     is_array = False
     io_type = io_info['type']
     # array type conversion when defined as dict of {'type': 'array', 'items': '<type>'}
     if isinstance(io_type, dict) and 'items' in io_type and 'type' in io_type:
+        LOGGER.debug('  `_is_cwl_array_type`: 1st if')
         if not io_type['type'] == PACKAGE_ARRAY_BASE or io_type['items'] not in PACKAGE_ARRAY_ITEMS:
             raise PackageTypeError("Unsupported I/O 'array' definition: `{}`.".format(repr(io_info)))
         io_type = io_type['items']
         is_array = True
+        LOGGER.debug('  `io_type`: `{!r}`'.format(io_type))
     # array type conversion when defined as string '<type>[]'
     elif isinstance(io_type, six.string_types) and io_type in PACKAGE_ARRAY_TYPES:
+        LOGGER.debug('  `_is_cwl_array_type`: 2nd if')
         io_type = io_type[:-2]  # remove []
+        LOGGER.debug('  `io_type`: `{!r}`'.format(io_type))
         if io_type not in PACKAGE_ARRAY_ITEMS:
             raise PackageTypeError("Unsupported I/O 'array' definition: `{}`.".format(repr(io_info)))
         is_array = True
@@ -234,8 +240,12 @@ def _is_cwl_enum_type(io_info):
     :return io_allow: list - permitted values of the enum
     :raise PackageTypeError: if the enum doesn't have required parameters to be valid.
     """
+    LOGGER.debug('CALLED: `_is_cwl_enum_type`')
+
     io_type = io_info['type']
     if not isinstance(io_type, dict) or 'type' not in io_type or io_type['type'] not in PACKAGE_CUSTOM_TYPES:
+        LOGGER.debug('  `_is_cwl_enum_type`: 1st if'.format(io_type))
+        LOGGER.debug('  `io_type`: `{!r}`'.format(io_type))
         return False, io_type, None
 
     if 'symbols' not in io_type:
@@ -243,6 +253,9 @@ def _is_cwl_enum_type(io_info):
     io_allow = io_type['symbols']
     if not isinstance(io_allow, list) or len(io_allow) < 1:
         raise PackageTypeError("Invalid I/O 'enum.symbols' definition: `{}`.".format(repr(io_info)))
+
+    LOGGER.debug('  `_is_cwl_enum_type`: passed if'.format(io_type))
+    LOGGER.debug('  `io_type`: `{!r}`'.format(io_type))
 
     # validate matching types in allowed symbols and convert to supported CWL type
     first_allow = io_allow[0]
@@ -258,6 +271,10 @@ def _is_cwl_enum_type(io_info):
     else:
         raise PackageTypeError("Unsupported I/O 'enum' base type: `{0}`, from definition: `{1}`."
                                .format(str(type(first_allow)), repr(io_info)))
+
+    LOGGER.debug('  `_is_cwl_enum_type`: before return'.format(io_type))
+    LOGGER.debug('  `io_type`:  `{!r}`'.format(io_type))
+    LOGGER.debug('  `io_allow`: `{!r}`'.format(io_allow))
 
     return True, io_type, io_allow
 
@@ -290,6 +307,12 @@ def _cwl2wps_io(io_info, io_select):
     io_allow = AnyValue
     io_mode = MODE.NONE
 
+    LOGGER.debug('BEFORE FUNCTIONS')
+    LOGGER.debug('io_name:  `{}`'.format(repr(io_name)))
+    LOGGER.debug('io_type:  `{}`'.format(repr(io_type)))
+    LOGGER.debug('io_allow: `{}`'.format(repr(io_name)))
+    LOGGER.debug('io_mode:  `{}`'.format(repr(io_name)))
+
     # convert array types
     is_array, array_elem = _is_cwl_array_type(io_info)
     if is_array:
@@ -302,6 +325,8 @@ def _cwl2wps_io(io_info, io_select):
         io_type = enum_type
         io_allow = enum_allow
         io_mode = MODE.SIMPLE   # allowed value validator must be set for input
+
+    LOGGER.debug('AFTER FUNCTIONS')
 
     # debug info for unhandled types conversion
     if not isinstance(io_type, six.string_types):
