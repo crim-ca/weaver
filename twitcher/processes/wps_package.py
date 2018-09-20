@@ -213,6 +213,11 @@ def _is_cwl_array_type(io_info):
 
     is_array = False
     io_type = io_info['type']
+    LOGGER.debug("  `_is_cwl_array_type` `io_info`: {!r}".format(io_info))
+    LOGGER.debug("  `_is_cwl_array_type` `io_type`: {!r}".format(io_type))
+    LOGGER.debug("  `_is_cwl_array_type` `isinstance(io_type, dict)`: {!r}".format(isinstance(io_type, dict)))
+    LOGGER.debug("  `_is_cwl_array_type` `'items' in io_type`: {!r}".format('items' in io_type))
+    LOGGER.debug("  `_is_cwl_array_type` `'type' in io_type`: {!r}".format('type' in io_type))
     # array type conversion when defined as dict of {'type': 'array', 'items': '<type>'}
     if isinstance(io_type, dict) and 'items' in io_type and 'type' in io_type:
         LOGGER.debug('  `_is_cwl_array_type`: 1st if')
