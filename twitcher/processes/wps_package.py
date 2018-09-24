@@ -13,6 +13,7 @@ from pywps import (
     BoundingBoxOutput,
     Format,
 )
+from pywps.inout.basic import BasicIO
 from pywps.response.status import WPS_STATUS
 from pywps.inout.literaltypes import AnyValue, AllowedValue, ALLOWEDVALUETYPE
 from pywps.validator.mode import MODE
@@ -395,12 +396,16 @@ def _json2wps_io(io_info, io_select):
     :param io_select: ``WPS_INPUT`` or ``WPS_OUTPUT`` to specify desired WPS type conversion.
     :return: corresponding IO in WPS format.
     """
-    # remove extra fields added by pywps
+    # remove extra fields added by pywps (usually added by type's `json` property)
     io_info.pop('workdir', None)
     io_info.pop('any_value', None)
     io_info.pop('data_format', None)
     io_info.pop('data', None)
     io_info.pop('file', None)
+    io_info.pop('mimetype', None)
+    io_info.pop('encoding', None)
+    io_info.pop('schema', None)
+    io_info.pop('asreference', None)
 
     # convert allowed value objects
     values = _get_field(io_info, 'allowed_values', search_variations=True, pop_found=True)
@@ -448,6 +453,16 @@ def _json2wps_io(io_info, io_select):
         if io_type == WPS_LITERAL:
             return LiteralOutput(**io_info)
     raise PackageTypeError("Unknown conversion from dict to WPS type (type={0}, mode={1}).".format(io_type, io_select))
+
+
+def _wps2json_io(io_wps):
+    if not isinstance(io_wps, BasicIO):
+        raise PackageTypeError("Invalid type, expected `BasicIO`, got: `[{0!r}] {1!r}`".format(type(io_wps), io_wps))
+    # in some cases (Complex I/O), 'as_reference=True' causes 'type' to be overwritten, revert it back
+    wps_json = io_wps.json
+    if 'type' in wps_json and wps_json['type'] == 'reference':
+        wps_json['type'] = WPS_COMPLEX
+    return wps_json
 
 
 def _get_field(io_object, field, search_variations=False, pop_found=False):
@@ -538,7 +553,7 @@ def _merge_package_inputs_outputs(wps_inputs_list, cwl_inputs_list, wps_outputs_
     wps_inputs = _merge_package_io(wps_inputs_list, cwl_inputs_list, WPS_INPUT)
     wps_outputs = _merge_package_io(wps_outputs_list, cwl_outputs_list, WPS_OUTPUT)
     if as_json:
-        return [i.json for i in wps_inputs], [o.json for o in wps_outputs]
+        return [_wps2json_io(i) for i in wps_inputs], [_wps2json_io(o) for o in wps_outputs]
     return wps_inputs, wps_outputs
 
 
@@ -552,7 +567,7 @@ def _get_package_io(package, io_select, as_json):
     cwl_package_io = getattr(package.t, io_attrib)
     wps_package_io = [_cwl2wps_io(io, io_select) for io in cwl_package_io['fields']]
     if as_json:
-        return [io.json for io in wps_package_io]
+        return [_wps2json_io(io) for io in wps_package_io]
     return wps_package_io
 
 
