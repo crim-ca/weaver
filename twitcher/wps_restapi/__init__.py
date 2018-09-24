@@ -16,6 +16,7 @@ def includeme(config):
         config.include('cornice_swagger')
         config.include('twitcher.wps_restapi.providers')
         config.include('twitcher.wps_restapi.processes')
+        config.include('twitcher.wps_restapi.quotation')
         config.include('twitcher.wps_restapi.jobs')
         config.add_route(**sd.service_api_route_info(sd.api_frontpage_service, settings))
         config.add_route(**sd.service_api_route_info(sd.api_swagger_json_service, settings))

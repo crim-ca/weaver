@@ -11,7 +11,7 @@ from twitcher.utils import now_secs
 from twitcher.exceptions import ProcessInstanceError
 from twitcher.processes import process_mapping
 from twitcher.processes.types import PACKAGE_PROCESSES, PROCESS_WPS
-from twitcher.wps_restapi.status import status_values
+from twitcher.wps_restapi.status import job_status_values
 from pywps import Process as ProcessWPS
 
 
@@ -147,7 +147,7 @@ class Job(dict):
     def status(self, status):
         if not isinstance(status, six.string_types):
             raise TypeError("Type `str` is required for `{}.status`".format(type(self)))
-        if status not in status_values:
+        if status not in job_status_values:
             raise ValueError("Status `{0}` is not valid for `{1}.status`".format(status, type(self)))
         self['status'] = status
 
@@ -540,3 +540,115 @@ class Process(dict):
             kwargs.update({'package': self.package})
             return process_mapping[process_key](**kwargs)
         return process_mapping[process_key]()
+
+
+class Quote(dict):
+    """
+    Dictionary that contains quote information.
+    It always has ``'id'`` and ``process`` key.
+    """
+    def __init__(self, *args, **kwargs):
+        super(Quote, self).__init__(*args, **kwargs)
+        if 'process' not in self:
+            raise TypeError("'process' is required")
+        self['id'] = str(uuid.uuid4())
+
+    @property
+    def id(self):
+        """Quote ID."""
+        return self['id']
+
+    @property
+    def process(self):
+        """WPS Process ID."""
+        return self['process']
+
+    @property
+    def location(self):
+        """WPS Process URL."""
+        return self.get('location', '')
+
+    @property
+    def cost(self):
+        """Cost of the current quote"""
+        return self.get('cost', 0.0)
+
+    @property
+    def steps(self):
+        """Sub-quote IDs if applicable"""
+        return self.get('steps', [])
+
+    @property
+    def params(self):
+        return {
+            'id': self.id,
+            'cost': self.cost,
+            'process': self.process,
+            'location': self.location,
+            'steps': self.steps,
+        }
+
+    def json(self):
+        return self.params
+
+    def __str__(self):
+        return "Quote <{0}>".format(self.id)
+
+    def __repr__(self):
+        cls = type(self)
+        repr_ = dict.__repr__(self)
+        return '{0}.{1}({2})'.format(cls.__module__, cls.__name__, repr_)
+
+
+class Bill(dict):
+    """
+    Dictionary that contains bill information.
+    It always has ``'id'``, ``user``, ``quote`` and ``job`` keys.
+    """
+    def __init__(self, *args, **kwargs):
+        super(Bill, self).__init__(*args, **kwargs)
+        if 'quote' not in self:
+            raise TypeError("'quote' is required")
+        if 'job' not in self:
+            raise TypeError("'job' is required")
+        self['id'] = str(uuid.uuid4())
+
+    @property
+    def id(self):
+        """Bill ID."""
+        return self['id']
+
+    @property
+    def user(self):
+        """User ID"""
+        return self['user']
+
+    @property
+    def quote(self):
+        """Quote ID."""
+        return self['quote']
+
+    @property
+    def job(self):
+        """Job ID."""
+        return self['job']
+
+    @property
+    def params(self):
+        return {
+            'id': self.id,
+            'user': self.user,
+            'quote': self.quote,
+            'job': self.job,
+        }
+
+    def json(self):
+        return self.params
+
+    def __str__(self):
+        return "Bill <{0}>".format(self.id)
+
+    def __repr__(self):
+        cls = type(self)
+        repr_ = dict.__repr__(self)
+        return '{0}.{1}({2})'.format(cls.__module__, cls.__name__, repr_)

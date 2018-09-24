@@ -53,7 +53,7 @@ class ProcessInstanceError(Exception):
 
 class JobNotFound(Exception):
     """
-    Error indicating that an job could not be read from the
+    Error indicating that a job could not be read from the
     storage backend by an instance of :class:`twitcher.store.JobStore`.
     """
     pass
@@ -61,7 +61,7 @@ class JobNotFound(Exception):
 
 class JobRegistrationError(Exception):
     """
-    Error indicating that an job could not be registered in the
+    Error indicating that a job could not be registered in the
     storage backend by an instance of :class:`twitcher.store.JobStore`.
     """
     pass
@@ -69,7 +69,7 @@ class JobRegistrationError(Exception):
 
 class JobUpdateError(Exception):
     """
-    Error indicating that an job could not be updated in the
+    Error indicating that a job could not be updated in the
     storage backend by an instance of :class:`twitcher.store.JobStore`.
     """
     pass
@@ -99,9 +99,57 @@ class PackageExecutionError(Exception):
     pass
 
 
-class PackageNotFoundError(Exception):
+class PackageNotFound(Exception):
     """
     Error indicating that an instance of :class:`twitcher.processes.wps_package.Package`
     could not properly retrieve the package definition using provided references.
+    """
+    pass
+
+
+class QuoteNotFound(Exception):
+    """
+    Error indicating that a quote could not be read from the
+    storage backend by an instance of :class:`twitcher.store.QuoteStore`.
+    """
+    pass
+
+
+class QuoteRegistrationError(Exception):
+    """
+    Error indicating that a quote could not be registered in the
+    storage backend by an instance of :class:`twitcher.store.QuoteStore`.
+    """
+    pass
+
+
+class QuoteInstanceError(Exception):
+    """
+    Error indicating that a given object doesn't correspond to an expected
+    instance of :class:`twitcher.datatype.Quote`.
+    """
+    pass
+
+
+class BillNotFound(Exception):
+    """
+    Error indicating that a bill could not be read from the
+    storage backend by an instance of :class:`twitcher.store.BillStore`.
+    """
+    pass
+
+
+class BillRegistrationError(Exception):
+    """
+    Error indicating that a bill could not be registered in the
+    storage backend by an instance of :class:`twitcher.store.BillStore`.
+    """
+    pass
+
+
+class BillInstanceError(Exception):
+    """
+    Error indicating that a given object doesn't correspond to an expected
+    instance of :class:`twitcher.datatype.Bill`.
     """
     pass

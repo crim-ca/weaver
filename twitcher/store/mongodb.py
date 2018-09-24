@@ -8,6 +8,12 @@ from twitcher.datatype import AccessToken
 from twitcher.exceptions import AccessTokenNotFound
 from twitcher.utils import islambda
 from twitcher.wps_restapi.utils import wps_restapi_base_url
+from twitcher.wps_restapi.sort import *
+from twitcher.wps_restapi.status import *
+from pyramid.security import authenticated_userid
+from pymongo import ASCENDING, DESCENDING
+from datetime import datetime
+import six
 
 import logging
 LOGGER = logging.getLogger(__name__)
@@ -243,11 +249,6 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
 from twitcher.store.base import JobStore
 from twitcher.datatype import Job
 from twitcher.exceptions import JobRegistrationError, JobNotFound, JobUpdateError
-from twitcher.wps_restapi.sort import *
-from twitcher.wps_restapi.status import *
-from pyramid.security import authenticated_userid
-from pymongo import ASCENDING, DESCENDING
-from datetime import datetime
 
 
 class MongodbJobStore(JobStore, MongodbStore):
@@ -255,12 +256,13 @@ class MongodbJobStore(JobStore, MongodbStore):
     Registry for OWS service process jobs tracking. Uses mongodb to store job attributes.
     """
 
-    def save_job(self, task_id, process, service=None, is_workflow=False, user_id=None, async=True):
+    def save_job(self, task_id, process, service=None, is_workflow=False, user_id=None, async=True, custom_tags=[]):
         """
         Stores a job in mongodb.
         """
         try:
             tags = ['dev']
+            tags.extend(custom_tags)
             if is_workflow:
                 tags.append('workflow')
             else:
@@ -281,13 +283,11 @@ class MongodbJobStore(JobStore, MongodbStore):
             })
             self.collection.insert_one(new_job)
             job = self.fetch_by_id(job_id=task_id)
-            if job is None:
-                raise JobRegistrationError("Failed to retrieve registered job.")
-            return job
-        except JobRegistrationError:
-            raise
         except Exception as ex:
-            raise JobRegistrationError("Error occurred during job registration: {}".format(repr(ex)))
+            raise JobRegistrationError("Error occurred during job registration: [{}]".format(repr(ex)))
+        if job is None:
+            raise JobRegistrationError("Failed to retrieve registered job.")
+        return job
 
     def update_job(self, job):
         """
@@ -299,8 +299,8 @@ class MongodbJobStore(JobStore, MongodbStore):
             if result.acknowledged and result.modified_count == 1:
                 return self.fetch_by_id(job.task_id)
         except Exception as ex:
-            raise JobUpdateError("Error occurred during job update: {}".format(repr(ex)))
-        raise JobUpdateError("Failed to update specified job: {}".format(str(job)))
+            raise JobUpdateError("Error occurred during job update: [{}]".format(repr(ex)))
+        raise JobUpdateError("Failed to update specified job: `{}`".format(str(job)))
 
     def delete_job(self, job_id, request=None):
         """
@@ -315,7 +315,7 @@ class MongodbJobStore(JobStore, MongodbStore):
         """
         job = self.collection.find_one({'task_id': job_id})
         if not job:
-            raise JobNotFound("Could not find job matching: {}".format(job_id))
+            raise JobNotFound("Could not find job matching: `{}`".format(job_id))
         return Job(job)
 
     def list_jobs(self, request=None):
@@ -328,7 +328,7 @@ class MongodbJobStore(JobStore, MongodbStore):
         return jobs
 
     def find_jobs(self, request, page=0, limit=10, process=None, service=None,
-                  tag=None, access=None, status=None, sort=None):
+                  tags=None, access=None, status=None, sort=None):
         """
         Finds all jobs in mongodb storage matching search filters.
         """
@@ -341,12 +341,12 @@ class MongodbJobStore(JobStore, MongodbStore):
         elif access == 'all' and request.has_permission('admin'):
             pass
         else:
-            if tag is not None:
-                search_filters['tags'] = tag
+            if tags is not None:
+                search_filters['tags'] = {'$all': tags}
             search_filters['user_id'] = authenticated_userid(request)
 
-        if status in status_categories.keys():
-            search_filters['status'] = {'$in': status_categories[status]}
+        if status in job_status_categories.keys():
+            search_filters['status'] = {'$in': job_status_categories[status]}
         elif status:
             search_filters['status'] = status
 
@@ -360,6 +360,8 @@ class MongodbJobStore(JobStore, MongodbStore):
             sort = SORT_CREATED
         elif sort == SORT_USER:
             sort = 'user_id'
+        if sort not in job_sort_values:
+            raise JobNotFound("Invalid sorting method: `{}`".format(repr(sort)))
 
         sort_order = DESCENDING if sort == SORT_FINISHED or sort == SORT_CREATED else ASCENDING
         sort_criteria = [(sort, sort_order)]
@@ -374,3 +376,133 @@ class MongodbJobStore(JobStore, MongodbStore):
         """
         self.collection.drop()
         return True
+
+
+from twitcher.store.base import QuoteStore
+from twitcher.datatype import Quote
+from twitcher.exceptions import QuoteRegistrationError, QuoteNotFound, QuoteInstanceError
+
+
+class MongodbQuoteStore(QuoteStore, MongodbStore):
+    """
+    Registry for quotes. Uses mongodb to store quote attributes.
+    """
+
+    def save_quote(self, quote):
+        """
+        Stores a quote in mongodb.
+        """
+        if not isinstance(quote, Quote):
+            raise QuoteInstanceError("Invalid quote object: `{}`".format(repr(quote)))
+        try:
+            self.collection.insert_one(quote)
+            quote = self.fetch_by_id(quote_id=quote.id)
+        except Exception as ex:
+            raise QuoteRegistrationError("Error occurred during quote registration: [{}]".format(repr(ex)))
+        if quote is None:
+            raise QuoteRegistrationError("Failed to retrieve registered quote.")
+        return quote
+
+    def fetch_by_id(self, quote_id):
+        """
+        Gets quote for given ``quote_id`` from mongodb storage.
+        """
+        quote = self.collection.find_one({'id': quote_id})
+        if not quote:
+            raise QuoteNotFound("Could not find quote matching: `{}`".format(quote_id))
+        return Quote(quote)
+
+    def list_quotes(self):
+        """
+        Lists all quotes in mongodb storage.
+        """
+        quotes = []
+        for quote in self.collection.find().sort('id', ASCENDING):
+            quotes.append(Quote(quote))
+        return quotes
+
+    def find_quotes(self, process_id=None, page=0, limit=10, sort=None):
+        """
+        Finds all quotes in mongodb storage matching search filters.
+        """
+        search_filters = {}
+
+        if isinstance(process_id, six.string_types):
+            search_filters['process'] = process_id
+
+        if sort is None:
+            sort = SORT_ID
+        if sort not in quote_sort_values:
+            raise QuoteNotFound("Invalid sorting method: `{}`".format(repr(sort)))
+
+        sort_order = ASCENDING
+        sort_criteria = [(sort, sort_order)]
+        found = self.collection.find(search_filters)
+        count = found.count()
+        items = [Quote(item) for item in list(found.skip(page * limit).limit(limit).sort(sort_criteria))]
+        return items, count
+
+
+from twitcher.store.base import BillStore
+from twitcher.datatype import Bill
+from twitcher.exceptions import BillRegistrationError, BillNotFound, BillInstanceError
+
+
+class MongodbBillStore(BillStore, MongodbStore):
+    """
+    Registry for bills. Uses mongodb to store bill attributes.
+    """
+
+    def save_bill(self, bill):
+        """
+        Stores a bill in mongodb.
+        """
+        if not isinstance(bill, Bill):
+            raise BillInstanceError("Invalid bill object: `{}`".format(repr(bill)))
+        try:
+            self.collection.insert_one(bill)
+            bill = self.fetch_by_id(bill_id=bill.id)
+        except Exception as ex:
+            raise BillRegistrationError("Error occurred during bill registration: [{}]".format(repr(ex)))
+        if bill is None:
+            raise BillRegistrationError("Failed to retrieve registered bill.")
+        return bill
+
+    def fetch_by_id(self, bill_id):
+        """
+        Gets bill for given ``bill_id`` from mongodb storage.
+        """
+        bill = self.collection.find_one({'id': bill_id})
+        if not bill:
+            raise BillNotFound("Could not find bill matching: `{}`".format(bill_id))
+        return Bill(bill)
+
+    def list_bills(self):
+        """
+        Lists all bills in mongodb storage.
+        """
+        bills = []
+        for bill in self.collection.find().sort('id', ASCENDING):
+            bills.append(Bill(bill))
+        return bills
+
+    def find_bills(self, quote_id=None, page=0, limit=10, sort=None):
+        """
+        Finds all bills in mongodb storage matching search filters.
+        """
+        search_filters = {}
+
+        if isinstance(quote_id, six.string_types):
+            search_filters['quote'] = quote_id
+
+        if sort is None:
+            sort = SORT_ID
+        if sort not in bill_sort_values:
+            raise BillNotFound("Invalid sorting method: `{}`".format(repr(sort)))
+
+        sort_order = ASCENDING
+        sort_criteria = [(sort, sort_order)]
+        found = self.collection.find(search_filters)
+        count = found.count()
+        items = [Bill(item) for item in list(found.skip(page * limit).limit(limit).sort(sort_criteria))]
+        return items, count

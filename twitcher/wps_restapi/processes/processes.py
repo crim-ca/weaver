@@ -16,8 +16,9 @@ from twitcher.exceptions import (
     PackageTypeError,
     ProcessRegistrationError)
 from twitcher.processes import wps_package
+from twitcher.processes.types import PROCESS_WORKFLOW
 from twitcher.store import processstore_defaultfactory
-from twitcher.utils import get_any_id
+from twitcher.utils import get_any_id, raise_on_xml_exception
 from twitcher.owsexceptions import OWSNoApplicableCode
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
@@ -124,21 +125,21 @@ def _jsonify_output(output, datatype):
 
 def _map_status(wps_execution_status):
     job_status = wps_execution_status.lower().replace('process', '')
-    if job_status in status.status_values:
+    if job_status in status.job_status_values:
         return job_status
     return 'unknown'
 
 
 @app.task(bind=True)
 def execute_process(self, url, service, process, inputs, outputs,
-                    is_workflow=False, user_id=None, async=True, headers=None):
+                    is_workflow=False, user_id=None, async=True, custom_tags=[], headers=None):
     registry = app.conf['PYRAMID_REGISTRY']
     store = jobstore_factory(registry)
     task_id = self.request.id
     job = JobDB({'task_id': task_id})  # default in case of error during registration to job store
     try:
         job = store.save_job(task_id=task_id, process=process, service=service, is_workflow=is_workflow,
-                             user_id=user_id, async=async)
+                             user_id=user_id, async=async, custom_tags=custom_tags)
 
         wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), skip_caps=False, verify=False)
         mode = 'async' if async else 'sync'
@@ -226,13 +227,18 @@ def submit_job_handler(request, service_url, is_workflow=False):
     provider_id = request.matchdict.get('provider_id')  # None OK if local
     process_id = request.matchdict.get('process_id')
     async_execute = not request.params.getone('sync-execute') if 'sync-execute' in request.params else True
+    tags = request.params.get('tags', '').split(',')
 
     try:
-        verify = False if urlparse(service_url).hostname == 'localhost' else False
+        verify = False if urlparse(service_url).hostname == 'localhost' else True
         wps = WebProcessingService(url=service_url, headers=get_cookie_headers(request.headers), verify=verify)
+        raise_on_xml_exception(wps._capabilities)
+    except Exception as ex:
+        raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
+    try:
         process = wps.describeprocess(process_id)
     except Exception as ex:
-        raise OWSNoApplicableCode("Failed to retrieve process description. Error: [{}].".format(str(ex)))
+        raise OWSNoApplicableCode("Failed to retrieve WPS process description. Error: [{}].".format(str(ex)))
 
     # prepare inputs
     complex_inputs = []
@@ -268,6 +274,7 @@ def submit_job_handler(request, service_url, is_workflow=False):
         is_workflow=is_workflow,
         user_id=request.authenticated_userid,
         async=async_execute,
+        custom_tags=tags,
         # Convert EnvironHeaders to a simple dict (should cherrypick the required headers)
         headers={k: v for k, v in request.headers.items()})
 
@@ -413,8 +420,6 @@ def add_local_process(request):
     """
     Register a local process.
     """
-    store = processstore_defaultfactory(request.registry)
-
     process_offering = request.json.get('processOffering')
     deployment_profile = request.json.get('deploymentProfile')
     if not isinstance(process_offering, dict):
@@ -437,15 +442,24 @@ def add_local_process(request):
 
     # obtain updated process information using WPS process offering and CWL package definition
     try:
-        process_info = wps_package.get_process_from_wps_request(process_info, reference, package)
+        data_source = get_twitcher_url(request.registry.settings)
+        process_info = wps_package.get_process_from_wps_request(process_info, reference, package, data_source)
     except (PackageRegistrationError, PackageTypeError) as ex:
         raise HTTPUnprocessableEntity(detail=ex.message)
     except Exception as ex:
         raise HTTPBadRequest("Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex)))
 
+    # validate process type against twitcher configuration
+    process_type = process_info['type']
+    if process_type == PROCESS_WORKFLOW:
+        twitcher_config = get_twitcher_configuration(request.registry.settings)
+        if twitcher_config != TWITCHER_CONFIGURATION_EMS:
+            raise HTTPBadRequest("Invalid `{0}` package deployment on `{1}`.".format(process_type, twitcher_config))
+
     # ensure that required 'executeEndpoint' in db is added, will be auto-fixed to localhost if not specified in body
     process_info.update({'executeEndpoint': process_info.get('executeEndpoint')})
     try:
+        store = processstore_defaultfactory(request.registry)
         saved_process = store.save_process(ProcessDB(process_info), overwrite=False)
     except ProcessRegistrationError as ex:
         raise HTTPConflict(detail=ex.message)
@@ -528,7 +542,7 @@ def submit_local_job(request):
     if not isinstance(process_id, string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
-        store = processstore_defaultfactory(request.registry)
+        store = processstore_factory(request.registry)
         process = store.fetch_by_id(process_id)
         resp = submit_job_handler(request, process.executeEndpoint, is_workflow=process.type == 'workflow')
         return resp

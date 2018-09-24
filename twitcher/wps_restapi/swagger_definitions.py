@@ -5,8 +5,8 @@ so that one can update the swagger without touching any other files after the in
 
 from twitcher.config import TWITCHER_CONFIGURATION_EMS
 from twitcher.wps_restapi.utils import wps_restapi_base_path
-from twitcher.wps_restapi.status import status_values, STATUS_ACCEPTED
-from twitcher.wps_restapi.sort import sort_values, SORT_CREATED
+from twitcher.wps_restapi.status import job_status_values, STATUS_ACCEPTED
+from twitcher.wps_restapi.sort import *
 from cornice import Service
 from colander import *
 
@@ -28,6 +28,8 @@ process_uri = '/processes/{process_id}'
 process_package_uri = '/processes/{process_id}/package'
 process_jobs_uri = '/processes/{process_id}/jobs'
 process_job_uri = '/processes/{process_id}/jobs/{job_id}'
+process_quotes_uri = '/processes/{process_id}/quotes'
+process_quote_uri = '/processes/{process_id}/quotes/{quote_id}'
 process_results_uri = '/processes/{process_id}/jobs/{job_id}/results'
 process_result_uri = '/processes/{process_id}/jobs/{job_id}/results/{result_id}'
 process_exceptions_uri = '/processes/{process_id}/jobs/{job_id}/exceptions'
@@ -44,6 +46,11 @@ jobs_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs'
 job_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}'
 job_exceptions_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/exceptions'
 job_short_uri = '/jobs/{job_id}'
+
+quotes_uri = '/quotes'
+quote_uri = '/quotes/{quote_id}'
+bills_uri = '/bills'
+bill_uri = '/bill/{bill_id}'
 
 results_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/results'
 results_short_uri = '/jobs/{job_id}/results'
@@ -62,6 +69,7 @@ logs_short_uri = '/jobs/{job_id}/logs'
 
 api_tag = 'API'
 jobs_tag = 'Jobs'
+bill_quote_tag = 'Billing & Quoting'
 provider_processes_tag = 'Provider Processes'
 providers_tag = 'Providers'
 processes_tag = 'Local Processes'
@@ -89,6 +97,8 @@ process_service = Service(name='process', path=process_uri)
 process_package_service = Service(name='process_package', path=process_package_uri)
 process_jobs_service = Service(name='process_jobs', path=process_jobs_uri)
 process_job_service = Service(name='process_job', path=process_job_uri)
+process_quotes_service = Service(name='process_quotes', path=process_quotes_uri)
+process_quote_service = Service(name='process_quote', path=process_quote_uri)
 process_results_service = Service(name='process_results', path=process_results_uri)
 process_result_service = Service(name='process_result', path=process_result_uri)
 process_exceptions_service = Service(name='process_exceptions', path=process_exceptions_uri)
@@ -104,6 +114,11 @@ jobs_short_service = Service(name='jobs_short', path=jobs_short_uri)
 jobs_full_service = Service(name='jobs_full', path=jobs_full_uri)
 job_full_service = Service(name='job_full', path=job_full_uri)
 job_short_service = Service(name='job_short', path=job_short_uri)
+
+quotes_service = Service(name='quotes', path=quotes_uri)
+quote_service = Service(name='quote', path=quote_uri)
+bills_service = Service(name='bills', path=bills_uri)
+bill_service = Service(name='bill', path=bill_uri)
 
 results_full_service = Service(name='results_full', path=results_full_uri)
 results_short_service = Service(name='results_short', path=results_short_uri)
@@ -123,6 +138,8 @@ logs_short_service = Service(name='logs_short', path=logs_short_uri)
 provider_id = SchemaNode(String(), description='The provider id')
 process_id = SchemaNode(String(), description='The process id')
 job_id = SchemaNode(String(), description='The job id')
+bill_id = SchemaNode(String(), description='The bill id')
+quote_id = SchemaNode(String(), description='The quote id')
 result_id = SchemaNode(String(), description='The result id')
 
 #########################################################
@@ -259,8 +276,10 @@ OutputTransmissionEnum = SchemaNode(String(), validator=OneOf(['value', 'referen
 
 
 class LaunchJobQuerystring(MappingSchema):
-    sync_execute = SchemaNode(Boolean(), example='application/json', default=False, missing=drop)
+    sync_execute = SchemaNode(Boolean(), default=False, missing=drop)
     sync_execute.name = 'sync-execute'
+    field_string = SchemaNode(String(), default=None, missing=drop, description='Comma separated tags that can be used to filter jobs later')
+    field_string.name = 'tags'
 
 
 #########################################################
@@ -485,13 +504,13 @@ class ProcessOutputDescriptionSchema(MappingSchema):
 JobStatusEnum = SchemaNode(
     String(),
     default=None,
-    validator=OneOf(status_values),
+    validator=OneOf(job_status_values),
     example=STATUS_ACCEPTED)
 JobSortEnum = SchemaNode(
     String(),
     missing=drop,
     default=SORT_CREATED,
-    validator=OneOf(sort_values),
+    validator=OneOf(job_sort_values),
     example=SORT_CREATED)
 
 
@@ -502,6 +521,7 @@ class GetJobsQueries(MappingSchema):
     process = SchemaNode(String(), missing=drop, default=None)
     provider = SchemaNode(String(), missing=drop, default=None)
     sort = JobSortEnum
+    tags = SchemaNode(String(), missing=drop, default=None, description='Comma-separated values of tags assigned to jobs')
 
 
 class GetJobsRequest(MappingSchema):
@@ -531,6 +551,10 @@ class CreatedJobStatusSchema(MappingSchema):
     jobID = SchemaNode(String(), example='a9d14bf4-84e0-449a-bac8-16e598efe807', description="ID of the created job.")
 
 
+class CreatedQuotedJobStatusSchema(CreatedJobStatusSchema):
+    bill = SchemaNode(String(), example='d88fda5c-52cc-440b-9309-f2cd20bcd6a2', description="ID of the created bill.")
+
+
 class GetAllJobsSchema(MappingSchema):
     count = SchemaNode(Integer())
     jobs = JobListSchema()
@@ -542,6 +566,38 @@ class DismissedJobSchema(MappingSchema):
     status = JobStatusEnum
     message = SchemaNode(String(), example='Job dismissed.')
     progress = SchemaNode(Integer(), example=0)
+
+
+class QuoteStepSchema(MappingSchema):
+    id = SchemaNode(String(), description="Quote ID.")
+    cost = SchemaNode(Float(), description="Process execution cost.")
+    process = SchemaNode(String(), description="Corresponding process ID.")
+    location = SchemaNode(String(), description="Corresponding process location.")
+
+
+class QuoteProcessListSchema(SequenceSchema):
+    step = QuoteStepSchema(description="Quote of a workflow step process.")
+
+
+class QuoteSchema(MappingSchema):
+    id = SchemaNode(String(), description="Quote ID.")
+    process = SchemaNode(String(), description="Corresponding process ID.")
+    steps = QuoteProcessListSchema(description="Child processes and costs.")
+    total = SchemaNode(Float(), description="Total of the quote including step processes.")
+
+
+class QuoteListSchema(SequenceSchema):
+    quote_id = SchemaNode(String(), description="Quote ID.")
+
+
+class BillSchema(MappingSchema):
+    id = SchemaNode(String(), description="Bill ID.")
+    total = SchemaNode(Float(), description="Total of the bill.")
+    quote = SchemaNode(String(), description="Corresponding quote ID.")
+
+
+class BillListSchema(SequenceSchema):
+    bill_id = SchemaNode(String(), description="Bill ID.")
 
 
 class SupportedValues(MappingSchema):
@@ -699,6 +755,71 @@ class DeleteProcessJobEndpoint(MappingSchema):
     header = AcceptHeader()
 
 
+class BillsEndpoint(MappingSchema):
+    header = AcceptHeader()
+
+
+class BillEndpoint(MappingSchema):
+    bill_id = bill_id
+    header = AcceptHeader()
+
+
+class ProcessQuotesEndpoint(MappingSchema):
+    process_id = process_id
+    header = AcceptHeader()
+
+
+class ProcessQuoteEndpoint(MappingSchema):
+    process_id = process_id
+    quote_id = quote_id
+    header = AcceptHeader()
+
+
+QuoteSortEnum = SchemaNode(
+    String(),
+    missing=drop,
+    default=SORT_ID,
+    validator=OneOf(quote_sort_values),
+    example=SORT_PROCESS)
+
+
+class GetQuotesQueries(MappingSchema):
+    page = SchemaNode(Integer(), missing=drop, default=0)
+    limit = SchemaNode(Integer(), missing=drop, default=10)
+    process = SchemaNode(String(), missing=drop, default=None)
+    sort = QuoteSortEnum
+
+
+class QuotesEndpoint(MappingSchema):
+    header = AcceptHeader()
+    querystring = GetQuotesQueries()
+
+
+class QuoteEndpoint(MappingSchema):
+    quote_id = quote_id
+    header = AcceptHeader()
+
+
+class PostProcessQuote(MappingSchema):
+    process_id = process_id
+    quote_id = quote_id
+    header = AcceptHeader()
+    body = MappingSchema(default={})
+
+
+class PostQuote(MappingSchema):
+    quote_id = quote_id
+    header = AcceptHeader()
+    body = MappingSchema(default={})
+
+
+class PostProcessQuoteRequestEndpoint(MappingSchema):
+    process_id = process_id
+    quote_id = quote_id
+    header = AcceptHeader()
+    body = MappingSchema(default={})
+
+
 #################################
 # Provider Processes schemas
 #################################
@@ -847,12 +968,8 @@ class CreatedPostProvider(MappingSchema):
     body = ProviderSummarySchema()
 
 
-class CreatedLaunchJobHeader(JsonHeader):
-    Location = SchemaNode(String(), description='Location URL of the created job execution status.')
-
-
 class CreatedLaunchJobResponse(MappingSchema):
-    header = CreatedLaunchJobHeader()
+    header = JsonHeader()
     body = CreatedJobStatusSchema()
 
 
@@ -894,6 +1011,36 @@ class OkGetSingleJobOutputsResponse(MappingSchema):
 class OkGetSingleOutputResponse(MappingSchema):
     header = JsonHeader()
     body = JobOutputSchema()
+
+
+class CreatedQuoteExecuteResponse(MappingSchema):
+    header = JsonHeader()
+    body = CreatedQuotedJobStatusSchema()
+
+
+class CreatedQuoteRequestResponse(MappingSchema):
+    header = JsonHeader()
+    body = QuoteSchema()
+
+
+class OkGetQuoteResponse(MappingSchema):
+    header = JsonHeader()
+    body = QuoteSchema()
+
+
+class OkGetQuoteListResponse(MappingSchema):
+    header = JsonHeader()
+    body = QuoteListSchema()
+
+
+class OkGetBillDetailResponse(MappingSchema):
+    header = JsonHeader()
+    body = BillSchema()
+
+
+class OkGetBillListResponse(MappingSchema):
+    header = JsonHeader()
+    body = BillListSchema()
 
 
 class OkGetExceptionsResponse(MappingSchema):
@@ -968,6 +1115,24 @@ delete_job_responses = {
 }
 get_job_results_responses = {
     '200': OkGetSingleJobOutputsResponse(description='success')
+}
+get_quote_list_responses = {
+    '200': OkGetQuoteListResponse(description='success')
+}
+get_quote_responses = {
+    '200': OkGetQuoteResponse(description='success')
+}
+post_quote_responses = {
+    '201': CreatedQuoteExecuteResponse(description='success')
+}
+post_quotes_responses = {
+    '201': CreatedQuoteRequestResponse(description='success')
+}
+get_bill_list_responses = {
+    '200': OkGetBillListResponse(description='success')
+}
+get_bill_responses = {
+    '200': OkGetBillDetailResponse(description='success')
 }
 get_single_result_responses = {
     '200': OkGetSingleOutputResponse(description='success')

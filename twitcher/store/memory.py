@@ -197,7 +197,7 @@ class MemoryJobStore(JobStore):
     """
     Stores job tracking in memory. Useful for testing purposes.
     """
-    def save_job(self, task_id, process, service=None, is_workflow=False, user_id=None, async=True):
+    def save_job(self, task_id, process, service=None, is_workflow=False, user_id=None, async=True, custom_tags=[]):
         """
         Stores a job in memory.
         """
@@ -229,7 +229,7 @@ class MemoryJobStore(JobStore):
         raise NotImplementedError
 
     def find_jobs(self, request, page=0, limit=10, process=None, service=None,
-                  tag=None, access=None, status=None, sort=None):
+                  tags=None, access=None, status=None, sort=None):
         """
         Finds all jobs in memory matching search filters.
         """
@@ -238,5 +238,65 @@ class MemoryJobStore(JobStore):
     def clear_jobs(self, request=None):
         """
         Removes all jobs from memory.
+        """
+        raise NotImplementedError
+
+
+class MemoryQuoteStore(object):
+    """
+    Storage for quotes in memory.
+    """
+
+    def save_quote(self, quote):
+        """
+        Stores a quote in memory.
+        """
+        raise NotImplementedError
+
+    def fetch_by_id(self, quote_id):
+        """
+        Get quote for given ``quote_id`` from memory.
+        """
+        raise NotImplementedError
+
+    def list_quotes(self):
+        """
+        Lists all quotes in memory.
+        """
+        raise NotImplementedError
+
+    def find_quotes(self, process_id=None, page=0, limit=10, sort=None):
+        """
+        Finds all quotes in memory matching search filters.
+        """
+        raise NotImplementedError
+
+
+class MemoryBillStore(object):
+    """
+    Storage for bills in memory.
+    """
+
+    def save_bill(self, bill):
+        """
+        Stores a bill in memory.
+        """
+        raise NotImplementedError
+
+    def fetch_by_id(self, bill_id):
+        """
+        Get bill for given ``bill_id`` from memory.
+        """
+        raise NotImplementedError
+
+    def list_bills(self):
+        """
+        Lists all bills in memory.
+        """
+        raise NotImplementedError
+
+    def find_bills(self, quote_id=None, page=0, limit=10, sort=None):
+        """
+        Finds all bills in memory matching search filters.
         """
         raise NotImplementedError

@@ -1,5 +1,5 @@
 from owslib.wps import ComplexData
-from twitcher.utils import parse_request_query
+from twitcher.utils import parse_request_query, get_twitcher_url
 from distutils.version import LooseVersion
 from pyramid.httpexceptions import HTTPSuccessful, HTTPError, HTTPInternalServerError
 from lxml import etree
@@ -28,7 +28,7 @@ def wps_restapi_base_path(settings):
 
 
 def wps_restapi_base_url(settings):
-    twitcher_url = settings.get('twitcher.url').rstrip('/').strip()
+    twitcher_url = get_twitcher_url(settings)
     restapi_path = wps_restapi_base_path(settings)
     return twitcher_url + restapi_path
 

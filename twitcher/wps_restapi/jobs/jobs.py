@@ -91,7 +91,7 @@ def get_jobs(request):
     filters = {
         'page': page,
         'limit': limit,
-        'tag': request.params.get('tag', None),
+        'tags': request.params.get('tags', '').split(','),
         'access': request.params.get('access', None),
         'status': request.params.get('status', None),
         'sort': request.params.get('sort', sort.SORT_CREATED),
@@ -126,7 +126,7 @@ def get_job_status(request):
         "progress": job.progress
     }
 
-    if job.status in status.status_categories[status.STATUS_FINISHED]:
+    if job.status in status.job_status_categories[status.STATUS_FINISHED]:
         if job.status == status.STATUS_SUCCEEDED:
             resource = 'results'
         else:

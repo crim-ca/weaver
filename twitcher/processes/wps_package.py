@@ -19,12 +19,12 @@ from pywps.validator.mode import MODE
 from pywps.validator.literalvalidator import validate_anyvalue, validate_allowed_values
 from pywps.app.Common import Metadata
 from twitcher.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
-from twitcher.processes.sources import DATA_SOURCE_MAPPING
+from twitcher.processes.sources import retrieve_data_source_url
 from twitcher.utils import parse_request_query, get_any_id
-from twitcher.exceptions import PackageTypeError, PackageRegistrationError, PackageExecutionError, PackageNotFoundError
+from twitcher.exceptions import PackageTypeError, PackageRegistrationError, PackageExecutionError, PackageNotFound
 from twitcher.wps_restapi.swagger_definitions import process_uri
 from pyramid.httpexceptions import HTTPOk
-from collections import OrderedDict
+from collections import OrderedDict, Hashable
 from six.moves.urllib.parse import urlparse
 import json
 import yaml
@@ -34,10 +34,15 @@ import shutil
 import requests
 
 import logging
-LOGGER = logging.getLogger("PYWPS")
+LOGGER = logging.getLogger("PACKAGE")
 
 
-__all__ = ['Package', 'get_process_from_wps_request']
+__all__ = [
+    'Package',
+    'get_process_from_wps_request',
+    'get_process_location',
+    'get_package_workflow_steps',
+]
 
 
 PACKAGE_EXTENSIONS = frozenset(['yaml', 'yml', 'json', 'cwl', 'job'])
@@ -54,7 +59,7 @@ PACKAGE_LOG_FILE = 'package_log_file'
 
 # WPS object attribute -> all possible naming variations
 WPS_FIELD_MAPPING = {
-    'identifier': ['Identifier', 'ID', 'id'],
+    'identifier': ['Identifier', 'ID', 'id', 'Id'],
     'title': ['Title'],
     'abstract': ['Abstract'],
     'metadata': ['Metadata', 'MetaData'],
@@ -69,56 +74,75 @@ WPS_COMPLEX = 'complex'
 WPS_BOUNDINGBOX = 'bbox'
 WPS_LITERAL = 'literal'
 
+
 class NullType():
     pass
 null = NullType()
 
 
-def _get_step_process_location(process_id_or_url, data_source=None):
+def get_process_location(process_id_or_url, data_source=None):
     """
-    Obtains the URL of a WPS process description given the specified information.
+    Obtains the URL of a WPS REST DescribeProcess given the specified information.
 
     :param process_id_or_url: process 'identifier' or literal URL to DescribeProcess WPS-REST location.
-    :param data_source: identifier of the data source to map to a specific ADES, or mapping to EMS processes if None.
+    :param data_source: identifier of the data source to map to specific ADES, or map to localhost if ``None``.
     :return: URL of EMS or ADES WPS-REST DescribeProcess.
     """
     # if an URL was specified, return it as is
     if urlparse(process_id_or_url).scheme != "":
         return process_id_or_url
-    data_source_url = DATA_SOURCE_MAPPING[data_source]()
+    data_source_url = retrieve_data_source_url(data_source)
     process_url = process_uri.format(process_id=process_id_or_url)
     return '{host}{path}'.format(host=data_source_url, path=process_url)
 
 
-def _get_step_process_package(process_id_or_url, data_source=None):
+def get_package_workflow_steps(package_dict_or_url):
+    """
+    :param package_dict_or_url: process package definition or literal URL to DescribeProcess WPS-REST location.
+    :return: list of workflow steps as {'name': <name>, 'reference': <reference>}
+        where `name` is the generic package step name, and `reference` is the id/url of a registered WPS package.
+    """
+    if isinstance(package_dict_or_url, six.string_types):
+        package_dict_or_url = _get_process_package(package_dict_or_url)
+    workflow_steps_ids = list()
+    package_type = _get_package_type(package_dict_or_url)
+    if package_type == PROCESS_WORKFLOW:
+        workflow_steps = package_dict_or_url.get('steps')
+        for step in workflow_steps:
+            step_package_ref = workflow_steps[step].get('run')
+            workflow_steps_ids.append({'name': step, 'reference': step_package_ref})
+    return workflow_steps_ids
+
+
+def _get_process_package(process_url):
     """
     Retrieves the WPS process package content from given process ID or literal URL.
 
-    :param process_id_or_url: process 'identifier' or literal URL to DescribeProcess WPS-REST location.
+    :param process_url: process literal URL to DescribeProcess WPS-REST location.
     :return: tuple of package body as dictionary and package reference name.
     """
 
     def _package_not_found_error(ref):
-        return PackageNotFoundError("Could not find workflow step reference: `{}`".format(ref))
+        return PackageNotFound("Could not find workflow step reference: `{}`".format(ref))
 
-    def _get_package_request_body(url_ref, original_ref=None):
-        package_resp = requests.get(url_ref, headers={'Accept': 'application/json'}, verify=False)
-        if package_resp.status_code != HTTPOk.code:
-            raise _package_not_found_error(original_ref or url_ref)
-        return package_resp.json()
+    if not isinstance(process_url, six.string_types):
+        raise _package_not_found_error(str(process_url))
 
-    if not isinstance(process_id_or_url, six.string_types):
-        raise _package_not_found_error(str(process_id_or_url))
-
-    process_url = _get_step_process_location(process_id_or_url, data_source=data_source)
     package_url = '{}/package'.format(process_url)
-    package_name = process_id_or_url.split('/')[-1]
-    package_body = _get_package_request_body(package_url, process_id_or_url)
+    package_name = process_url.split('/')[-1]
+    package_resp = requests.get(package_url, headers={'Accept': 'application/json'}, verify=False)
+    if package_resp.status_code != HTTPOk.code:
+        raise _package_not_found_error(package_url or process_url)
+    package_body = package_resp.json()
 
     if not isinstance(package_body, dict) or not len(package_body):
-        raise _package_not_found_error(str(process_id_or_url))
+        raise _package_not_found_error(str(process_url))
 
     return package_body, package_name
+
+
+def _get_package_type(package_dict):
+    return PROCESS_WORKFLOW if package_dict.get('class').lower() == 'workflow' else PROCESS_APPLICATION
 
 
 def _check_package_file(cwl_file):
@@ -146,28 +170,26 @@ def _load_package_content(package_dict, package_name=PACKAGE_DEFAULT_FILE_NAME,
 
     :param package_dict: package content representation as a json dictionary.
     :param package_name: name to use to create the package file.
-    :param data_source: identifier of the data source to map to a specific ADES, or mapping to EMS processes if None.
-    :param only_dump_file: specify if the :class:``cwltool.factory.Factory`` should be validated and returned.
+    :param data_source: identifier of the data source to map to specific ADES, or map to localhost if ``None``.
+    :param only_dump_file: specify if the :class:`cwltool.factory.Factory` should be validated and returned.
     :param tmp_dir: location of the temporary directory to dump files (warning: will be deleted on exit).
     :return:
-        instance of :class:``cwltool.factory.Factory`` if :param:``only_dump_file`` is ``False``, ``None`` otherwise.
+        instance of :class:`cwltool.factory.Factory` if :param:`only_dump_file` is ``False``, ``None`` otherwise.
     """
-    # TODO: find how to pass dict directly (?) instead of dump to tmp file
+
     tmp_dir = tmp_dir or tempfile.mkdtemp()
     tmp_json_cwl = os.path.join(tmp_dir, package_name)
 
     # for workflows, retrieve each 'sub-package' file
-    package_type = PROCESS_WORKFLOW if package_dict.get('class').lower() == 'workflow' else PROCESS_APPLICATION
-    if package_type == PROCESS_WORKFLOW:
-        workflow_steps = package_dict.get('steps')
-        for step in workflow_steps:
-            step_package_ref = workflow_steps[step].get('run')
-            package_body, package_name = _get_step_process_package(step_package_ref, data_source)
-
-            # generate sub-package file and update workflow step to point to created sub-package file
-            _load_package_content(package_body, package_name, data_source=data_source,
-                                  only_dump_file=True, tmp_dir=tmp_dir)
-            package_dict['steps'][step]['run'] = package_name
+    package_type = _get_package_type(package_dict)
+    workflow_steps = get_package_workflow_steps(package_dict)
+    for step in workflow_steps:
+        # generate sub-package file and update workflow step to point to created sub-package file
+        step_process_url = get_process_location(step['reference'], data_source)
+        package_body, package_name = _get_process_package(step_process_url)
+        _load_package_content(package_body, package_name, data_source=data_source,
+                              only_dump_file=True, tmp_dir=tmp_dir)
+        package_dict['steps'][step['name']]['run'] = package_name
 
     with open(tmp_json_cwl, 'w') as f:
         json.dump(package_dict, f)
@@ -189,8 +211,11 @@ def _is_cwl_array_type(io_info):
     """
     is_array = False
     io_type = io_info['type']
+
     # array type conversion when defined as dict of {'type': 'array', 'items': '<type>'}
-    if isinstance(io_type, dict) and 'items' in io_type and 'type' in io_type:
+    # validate against Hashable instead of 'dict' since 'OrderedDict'/'CommentedMap' can result in `isinstance()==False`
+    if not isinstance(io_type, six.string_types) and not isinstance(io_type, Hashable) \
+    and 'items' in io_type and 'type' in io_type:
         if not io_type['type'] == PACKAGE_ARRAY_BASE or io_type['items'] not in PACKAGE_ARRAY_ITEMS:
             raise PackageTypeError("Unsupported I/O 'array' definition: `{}`.".format(repr(io_info)))
         io_type = io_type['items']
@@ -281,8 +306,20 @@ def _cwl2wps_io(io_info, io_select):
         io_allow = enum_allow
         io_mode = MODE.SIMPLE   # allowed value validator must be set for input
 
+    # debug info for unhandled types conversion
+    if not isinstance(io_type, six.string_types):
+        LOGGER.debug('is_array:      `{}`'.format(repr(is_array)))
+        LOGGER.debug('array_elem:    `{}`'.format(repr(array_elem)))
+        LOGGER.debug('is_enum:       `{}`'.format(repr(is_enum)))
+        LOGGER.debug('enum_type:     `{}`'.format(repr(enum_type)))
+        LOGGER.debug('enum_allow:    `{}`'.format(repr(enum_allow)))
+        LOGGER.debug('io_info:       `{}`'.format(repr(io_info)))
+        LOGGER.debug('io_type:       `{}`'.format(repr(io_type)))
+        LOGGER.debug('type(io_type): `{}`'.format(type(io_type)))
+        raise TypeError("I/O type has not been properly decoded. Should be a string, got:`{!r}`".format(io_type))
+
     # literal types
-    if io_type in PACKAGE_LITERAL_TYPES or is_enum:
+    if is_enum or io_type in PACKAGE_LITERAL_TYPES:
         if io_type == 'Any':
             io_type = 'anyvalue'
         if io_type == 'null':
@@ -474,10 +511,11 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
         cwl_io_json = cwl_io.json
         updated_io_list.append(cwl_io)
         # enforce expected CWL->WPS I/O type and append required parameters if missing
+        cwl_identifier = _get_field(cwl_io_json, 'identifier', search_variations=True)
+        cwl_title = _get_field(wps_io_json, 'title', search_variations=True)
         wps_io_json.update({'type': _get_field(cwl_io_json, 'type'),
-                            'identifier': _get_field(cwl_io_json, 'identifier'),
-                            'title': _get_field(wps_io_json, 'title', search_variations=True) or
-                                     _get_field(cwl_io_json, 'title')})
+                            'identifier': cwl_identifier,
+                            'title': cwl_title if cwl_title is not null else cwl_identifier})
         wps_io = _json2wps_io(wps_io_json, io_select)
         # retrieve any complementing fields (metadata, keywords, etc.) passed as WPS input
         for field_type in WPS_FIELD_MAPPING:
@@ -555,6 +593,28 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
 
 
 def get_process_from_wps_request(process_offering, reference=None, package=None, data_source=None):
+    """
+    Returns an updated process information dictionary ready for storage using provided WPS ``process_offering``
+    and a package definition passed by ``reference`` or ``package`` JSON content.
+    The returned process information can be used later on to load an instance of :class:`twitcher.wps_package.Package`.
+
+    :param process_offering: WPS REST-API process offering as JSON.
+    :param reference: URL to an existing package definition.
+    :param package: literal package definition as JSON.
+    :param data_source: where to resolve process IDs (default: localhost if ``None``).
+    :return: process information dictionary ready for saving to data store.
+    """
+    def try_or_raise_package_error(call, reason):
+        try:
+            LOGGER.debug("Attempting: `{}`".format(reason))
+            return call()
+        except Exception as exc:
+            LOGGER.exception(exc.message)
+            raise PackageRegistrationError(
+                "Invalid package/reference definition. " +
+                "{0} generated error: `{1}`".format(reason, repr(exc))
+            )
+
     if not (isinstance(package, dict) or isinstance(reference, six.string_types)):
         raise PackageRegistrationError(
             "Invalid parameters amongst one of [package,reference].")
@@ -566,21 +626,34 @@ def get_process_from_wps_request(process_offering, reference=None, package=None,
         package = _load_package_file(reference)
     if 'class' not in package:
         raise PackageRegistrationError("Cannot obtain process type from package class.")
-    try:
-        package_factory, process_type = _load_package_content(package, data_source=data_source)
-        package_inputs, package_outputs = _get_package_inputs_outputs(package_factory)
-        process_inputs = process_offering.get('inputs', list())
-        process_outputs = process_offering.get('outputs', list())
-        _update_package_metadata(process_offering, package)
-        package_inputs, package_outputs = _merge_package_inputs_outputs(process_inputs, package_inputs,
-                                                                        process_outputs, package_outputs, as_json=True)
-        process_offering.update({'package': package, 'type': process_type,
-                                 'inputs': package_inputs, 'outputs': package_outputs})
-        return process_offering
-    except Exception as ex:
-        import sys
-        msg = "Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex))
-        raise PackageRegistrationError(msg)
+
+    LOGGER.debug('Using data source: `{}`'.format(data_source))
+    package_factory, process_type = try_or_raise_package_error(
+        lambda: _load_package_content(package, data_source=data_source),
+        reason="Loading package content")
+
+    package_inputs, package_outputs = try_or_raise_package_error(
+        lambda: _get_package_inputs_outputs(package_factory),
+        reason="Definition of package/process inputs/outputs")
+    process_inputs = process_offering.get('inputs', list())
+    process_outputs = process_offering.get('outputs', list())
+
+    try_or_raise_package_error(
+        lambda: _update_package_metadata(process_offering, package),
+        reason="Metadata update")
+
+    package_inputs, package_outputs = try_or_raise_package_error(
+        lambda: _merge_package_inputs_outputs(process_inputs, package_inputs,
+                                              process_outputs, package_outputs, as_json=True),
+        reason="Merging of inputs/outputs")
+
+    process_offering.update({
+        'package': package,
+        'type': process_type,
+        'inputs': package_inputs,
+        'outputs': package_outputs
+    })
+    return process_offering
 
 
 class Package(Process):
@@ -595,10 +668,10 @@ class Package(Process):
     def __init__(self, **kw):
         """
         Creates a WPS Process instance to execute a CWL package definition.
-        Process parameters should be loaded from an existing `twitcher.datatype.Process`
+        Process parameters should be loaded from an existing :class:`twitcher.datatype.Process`
         instance generated using method `get_process_from_wps_request`.
 
-        :param kw: dictionary corresponding to method `twitcher.datatype.Process.params_wps`
+        :param kw: dictionary corresponding to method :class:`twitcher.datatype.Process.params_wps`
         """
         package = kw.pop('package')
         if not package:
@@ -606,7 +679,7 @@ class Package(Process):
         if not isinstance(package, dict):
             raise PackageRegistrationError("Unknown parsing of package definition for package process.")
         try:
-            self.package, _ = _load_package_content(package)
+            self.package, _ = _load_package_content(package, data_source=None)  # no data source for local package
         except Exception as ex:
             raise PackageRegistrationError("Exception occurred on package instantiation: `{}`".format(repr(ex)))
 

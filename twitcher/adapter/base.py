@@ -21,6 +21,18 @@ class AdapterInterface(object):
         """
         raise NotImplementedError
 
+    def quotestore_factory(self, registry):
+        """
+        Returns the 'quotestore' implementation of the adapter.
+        """
+        raise NotImplementedError
+
+    def billstore_factory(self, registry):
+        """
+        Returns the 'billstore' implementation of the adapter.
+        """
+        raise NotImplementedError
+
     def owssecurity_factory(self, registry):
         """
         Returns the 'owssecurity' implementation of the adapter.

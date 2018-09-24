@@ -7,7 +7,7 @@ STATUS_RUNNING = 'running'
 STATUS_FINISHED = 'finished'
 STATUS_DISMISSED = 'dismissed'
 
-status_values = frozenset([
+job_status_values = frozenset([
     STATUS_ACCEPTED,
     STATUS_STARTED,
     STATUS_PAUSED,
@@ -18,7 +18,7 @@ status_values = frozenset([
     STATUS_DISMISSED,
 ])
 
-status_categories = {
+job_status_categories = {
     # note: only [Succeeded, Failed, Accepted, Running] are OGC compliant
     # http://docs.opengeospatial.org/is/14-065/14-065.html#17
     STATUS_RUNNING: frozenset([STATUS_ACCEPTED, STATUS_PAUSED, STATUS_STARTED]),
