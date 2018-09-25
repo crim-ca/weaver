@@ -201,6 +201,38 @@ class FormatList(SequenceSchema):
     format = FormatObject()
 
 
+class Parameter(MappingSchema):
+    name = SchemaNode(String())
+    value = SchemaNode(String())
+
+
+class ParameterList(SequenceSchema):
+    parameter = Parameter()
+
+
+class AdditionalParameter(MappingSchema):
+    role = SchemaNode(String(), missing=drop)
+    parameters = ParameterList(missing=drop)
+
+
+class AdditionalParameters(SequenceSchema):
+    additionalParameter = AdditionalParameter(title='AdditionalParameter')
+
+
+class Content(MappingSchema):
+    href = SchemaNode(String(), format='url', description="URL to CWL file.", title='href',
+                      example="http://some.host/applications/cwl/multisensor_ndvi.cwl")
+
+
+class Offering(MappingSchema):
+    code = SchemaNode(String(), format='url', missing=drop)
+    content = Content(title='content')
+
+
+class OWSContext(MappingSchema):
+    offering = Offering(title='offering')
+
+
 class LiteralDataDomainObject(MappingSchema):
     pass
 
@@ -214,6 +246,7 @@ class BaseInputTypeBody(MappingSchema):
     formats = FormatList()
     minOccurs = SchemaNode(Integer(), missing=drop)
     maxOccurs = SchemaNode(Integer(), missing=drop)
+    additionalParameters = AdditionalParameters(missing=drop)
 
 
 class BaseOutputTypeBody(MappingSchema):
@@ -225,6 +258,7 @@ class BaseOutputTypeBody(MappingSchema):
     formats = FormatList()
     minOccurs = SchemaNode(Integer(), missing=drop)
     maxOccurs = SchemaNode(Integer(), missing=drop)
+    additionalParameters = AdditionalParameters(missing=drop)
 
 
 class LiteralInputTypeBody(BaseInputTypeBody):
@@ -271,14 +305,17 @@ class OutputTypeList(SequenceSchema):
     output = OutputTypeBody(validator=OneOf(['literal', 'complex', 'bounding_box']))
 
 
-JobControlOptionsEnum = SchemaNode(String(), validator=OneOf(['sync-execute', 'async-execute']), missing=drop)
-OutputTransmissionEnum = SchemaNode(String(), validator=OneOf(['value', 'reference']), missing=drop)
+JobControlOptionsEnum = SchemaNode(String(), title='jobControlOptions', missing=drop,
+                                   validator=OneOf(['sync-execute', 'async-execute']))
+OutputTransmissionEnum = SchemaNode(String(), title='outputTransmission', missing=drop,
+                                    validator=OneOf(['value', 'reference']))
 
 
 class LaunchJobQuerystring(MappingSchema):
     sync_execute = SchemaNode(Boolean(), default=False, missing=drop)
     sync_execute.name = 'sync-execute'
-    field_string = SchemaNode(String(), default=None, missing=drop, description='Comma separated tags that can be used to filter jobs later')
+    field_string = SchemaNode(String(), default=None, missing=drop,
+                              description='Comma separated tags that can be used to filter jobs later')
     field_string.name = 'tags'
 
 
@@ -489,7 +526,9 @@ class ProcessDetailSchema(MappingSchema):
     version = SchemaNode(String(), missing=drop)
     jobControlOptions = JobControlOptionsEnum
     outputTransmission = OutputTransmissionEnum
-    executeEndpoint = SchemaNode(String(), format='url', missing=drop)
+    executeEndpoint = SchemaNode(String(), format='url', missing=drop, title='executeEndpoint')
+    additionalParameters = AdditionalParameters(missing=drop, title='additionalParameters')
+    owsContext = OWSContext(missing=drop, title='owsContext')
 
 
 class ProcessOutputDescriptionSchema(MappingSchema):
@@ -706,26 +745,20 @@ class PackageBody(MappingSchema):
     pass
 
 
-class ExecutionUnitBody(MappingSchema):
+class ExecutionUnit(MappingSchema):
     package = PackageBody(missing=drop, description="CWL file content as JSON.")
     reference = SchemaNode(String(), missing=drop, description="CWL file or docker image reference.")
 
 
-class ProfileExtensionBody(MappingSchema):
-    pass
-
-
 class DeploymentProfileBody(MappingSchema):
-    deploymentProfileName = SchemaNode(String(), missing=drop, description="Name of the deployment profile.")
-    executionUnit = ExecutionUnitBody(description="Package/Reference definition.", title='ExecutionUnit',
-                                      validator=OneOf(['reference', 'package']))
-    profileExtension = ProfileExtensionBody(missing=drop, title='ProfileExtension',
-                                            description="Additional parameters for docker image.")
+    executionUnit = ExecutionUnit(description="Package/Reference definition.", title='ExecutionUnit',
+                                  validator=OneOf(['reference', 'package']))
 
 
 class PostProcessRequestBody(MappingSchema):
     processOffering = ProcessOfferingBody(title='ProcessOffering')
     deploymentProfile = DeploymentProfileBody(title='DeploymentProfile')
+    deploymentProfileName = SchemaNode(String(), missing=drop, description="Name of the deployment profile.")
 
 
 class ProcessesEndpoint(MappingSchema):

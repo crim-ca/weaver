@@ -420,25 +420,39 @@ def add_local_process(request):
     """
     Register a local process.
     """
-    process_offering = request.json.get('processOffering')
-    deployment_profile = request.json.get('deploymentProfile')
+    # validate minimum field requirements
+    body = request.json
+    if 'processOffering' not in body:
+        raise HTTPBadRequest("Missing required parameter 'processOffering'.")
+    process_offering = body.get('processOffering')
     if not isinstance(process_offering, dict):
         raise HTTPUnprocessableEntity("Invalid parameter 'processOffering'.")
-    if not isinstance(deployment_profile, dict):
-        raise HTTPUnprocessableEntity("Invalid parameter 'deploymentProfile'.")
-
-    # validate minimum field requirements
     process_info = process_offering.get('process')
     if not isinstance(process_info, dict):
         raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process'.")
     if not isinstance(process_info.get('identifier'), string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process.identifier'.")
 
-    execution_unit = deployment_profile.get('executionUnit')
-    if not isinstance(execution_unit, dict):
-        raise HTTPUnprocessableEntity("Invalid parameter 'deploymentProfile.executionUnit'.")
-    package = execution_unit.get('package')
-    reference = execution_unit.get('reference')
+    # retrieve CWL package definition, either via owsContext or executionUnit package/reference
+    deployment_profile = body.get('deploymentProfile')
+    ows_context = process_info.get('owsContext')
+    if isinstance(ows_context, dict):
+        offering = ows_context.get('offering')
+        if not isinstance(offering, dict):
+            raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.owsContext.offering'.")
+        content = offering.get('content')
+        if not isinstance(content, dict):
+            raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.owsContext.offering.content'.")
+        package = None
+        reference = content.get('href')
+    elif isinstance(deployment_profile, dict):
+        execution_unit = deployment_profile.get('executionUnit')
+        if not isinstance(execution_unit, dict):
+            raise HTTPUnprocessableEntity("Invalid parameter 'deploymentProfile.executionUnit'.")
+        package = execution_unit.get('package')
+        reference = execution_unit.get('reference')
+    else:
+        raise HTTPBadRequest("Missing one of required parameters [owsContext, deploymentProfile].")
 
     # obtain updated process information using WPS process offering and CWL package definition
     try:
