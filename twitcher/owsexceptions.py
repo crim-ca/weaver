@@ -49,7 +49,7 @@ class OWSException(Response, Exception):
     @staticmethod
     def json_formatter(status, body, title, environ):
         # Remove new line symbol and multiple spaces from body
-        return {'description': ' '.join(body.split()),
+        return {'description': ' '.join(body.replace('\n\n', '. ').split()),
                 'code': status}
 
     def prepare(self, environ):

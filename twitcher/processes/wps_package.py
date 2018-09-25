@@ -27,8 +27,9 @@ from twitcher.wps_restapi.swagger_definitions import process_uri
 from pyramid.httpexceptions import HTTPOk
 from collections import OrderedDict, Hashable
 from six.moves.urllib.parse import urlparse
-import json
+from yaml.scanner import ScannerError
 import yaml
+import json
 import tempfile
 import mimetypes
 import shutil
@@ -146,21 +147,43 @@ def _get_package_type(package_dict):
     return PROCESS_WORKFLOW if package_dict.get('class').lower() == 'workflow' else PROCESS_APPLICATION
 
 
-def _check_package_file(cwl_file):
-    cwl_path = os.path.abspath(cwl_file)
+def _check_package_file(cwl_file_path_or_url):
+    """
+    Validates that the specified CWL file path or URL points to an existing and allowed file format.
+    :param cwl_file_path_or_url: one of allowed file types path on disk, or an URL pointing to one served somewhere.
+    :return: absolute_path, is_url: absolute path or URL, and boolean indicating if it is a remote URL file.
+    :raises: PackageRegistrationError in case of missing file, invalid format or invalid HTTP status code.
+    """
+    is_url = False
+    if urlparse(cwl_file_path_or_url).scheme != "":
+        cwl_path = cwl_file_path_or_url
+        cwl_resp = requests.head(cwl_path)
+        is_url = True
+        if cwl_resp.status_code != HTTPOk.code:
+            raise PackageRegistrationError("Cannot find CWL file at: `{}`.".format(cwl_path))
+    else:
+        cwl_path = os.path.abspath(cwl_file_path_or_url)
+        if not os.path.isfile(cwl_path):
+            raise PackageRegistrationError("Cannot find CWL file at: `{}`.".format(cwl_path))
+
     file_ext = os.path.splitext(cwl_path)[1].replace('.', '')
     if file_ext not in PACKAGE_EXTENSIONS:
         raise PackageRegistrationError("Not a valid CWL file type: `{}`.".format(file_ext))
-    if not os.path.isfile(cwl_path):
-        raise PackageRegistrationError("Cannot find CWL file at: `{}`.".format(cwl_path))
-    return cwl_path
+    return cwl_path, is_url
 
 
 def _load_package_file(file_path):
-    file_path = _check_package_file(file_path)
-    # yaml properly loads json as well
-    with open(file_path, 'r') as f:
-        return yaml.safe_load(f)
+    file_path, is_url = _check_package_file(file_path)
+    # if URL, get the content and validate it by loading, otherwise load file directly
+    # yaml properly loads json as well, error can print out the parsing error location
+    try:
+        if is_url:
+            cwl_resp = requests.get(file_path, headers={'Accept': 'text/plain'})
+            return yaml.safe_load(cwl_resp.content)
+        with open(file_path, 'r') as f:
+            return yaml.safe_load(f)
+    except ScannerError as ex:
+        raise PackageRegistrationError("Package parsing generated an error: [{!s}]".format(ex))
 
 
 def _load_package_content(package_dict, package_name=PACKAGE_DEFAULT_FILE_NAME,
@@ -639,6 +662,8 @@ def get_process_from_wps_request(process_offering, reference=None, package=None,
 
     if reference:
         package = _load_package_file(reference)
+    if not isinstance(package, dict):
+        raise PackageRegistrationError("Cannot decode process package contents.")
     if 'class' not in package:
         raise PackageRegistrationError("Cannot obtain process type from package class.")
 

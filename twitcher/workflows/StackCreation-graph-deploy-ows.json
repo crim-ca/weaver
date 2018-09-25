@@ -1,0 +1,28 @@
+{
+	"processOffering": {
+		"process": {
+			"identifier": "stack_creation_graph_ows",
+			"title": "Application StackCreation dynamically added by POST /processes with owsContext reference.",
+			"inputs": [
+				{
+					"identifier": "output_file_type",
+					"allowed_values": [
+						"GeoTIFF",
+						"NetCDF-CF"
+					]
+				}
+			],
+			"owsContext": {
+				"offering": {
+					"content": {
+						"href": "https://ogc-ems.crim.ca/twitcher/wpsoutputs/stack_creation_graph_ows.cwl"
+					}
+				}
+			}
+		}
+	},
+	"deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+	"executionUnit": {
+		"href": "docker-registry.crim.ca/ogc-public/snap6-stack-creation:v2.1"
+	}
+}
