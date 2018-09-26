@@ -43,9 +43,11 @@ def pywps_view(environ, start_response):
     global PYWPS_CFG
 
     try:
+        registry = app.conf['PYRAMID_REGISTRY']
+
         # get config file
         if 'PYWPS_CFG' not in environ:
-            environ['PYWPS_CFG'] = PYWPS_CFG_PATH
+            environ['PYWPS_CFG'] = os.getenv('PYWPS_CFG') or registry.settings.get('twitcher.wps_cfg', PYWPS_CFG_PATH)
 
         if PYWPS_CFG is None:
             # get PyWPS config
@@ -58,7 +60,6 @@ def pywps_view(environ, start_response):
                 os.makedirs(out_dir_path)
 
         # call pywps application
-        registry = app.conf['PYRAMID_REGISTRY']
         processstore = processstore_defaultfactory(registry)
         processes_wps = [process.wps() for process in processstore.list_processes()]
         service = Service(processes_wps, [environ['PYWPS_CFG']])
