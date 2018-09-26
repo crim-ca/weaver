@@ -74,7 +74,7 @@ help:
 	@echo "  srcclean    to remove all *.pyc files."
 	@echo "  distclean   to remove *all* files that are not controlled by 'git'. WARNING: use it *only* if you know what you do!"
 	@echo "  passwd      to generate password for 'phoenix-password' in custom.cfg."
-	@echo "  export      to export the conda environment. Caution! You always need to check it the enviroment.yml is working."
+	@echo "  envexport   to export the conda environment. Caution! You always need to check it the enviroment.yml is working."
 	@echo "  selfupdate  to update this Makefile."
 	@echo "\nSupervisor targets:"
 	@echo "  start       to start supervisor service."
@@ -165,8 +165,8 @@ conda_pinned: conda_env
 	@echo "Update pinned conda packages ..."
 	@-test -d $(CONDA_ENV_PATH) && test -f $(CONDA_PINNED) && cp -f "$(CONDA_PINNED)" "$(CONDA_ENV_PATH)/conda-meta/pinned"
 
-.PHONY: export
-export:
+.PHONY: envexport
+envexport:
 	@echo "Exporting conda enviroment ..."
 	@test -d $(CONDA_ENV_PATH) && "$(ANACONDA_HOME)/bin/conda" env export -n $(CONDA_ENV) -f environment.yml
 
