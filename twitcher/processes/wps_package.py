@@ -761,6 +761,11 @@ class Package(Process):
         cwl_logger.addHandler(log_file_handler)
         cwl_logger.setLevel(self.log_level)
 
+        # add Twitcher Tweens logger to current package logger
+        twitcher_tweens_logger = logging.getLogger('twitcher.tweens')
+        twitcher_tweens_logger.addHandler(log_file_handler)
+        twitcher_tweens_logger.setLevel(self.log_level)
+
     def update_status(self, message, progress=None, status=WPS_STATUS.STARTED):
         self.percent = progress or self.percent or 0
         # pywps overrides 'status' by 'accepted' in 'update_status', so use the '_update_status' to enforce the status
@@ -801,26 +806,31 @@ class Package(Process):
                 raise self.exception_message(PackageExecutionError, exc, "Failed retrieving package input types.")
             try:
                 cwl_inputs = dict()
-                for i in request.inputs.values():
-                    # at least 1 input since obtained from request body
-                    input_id = i[0].identifier
-                    input_data = i[0].data
+                for input_id in request.inputs:
+                    # skip empty inputs (if that is even possible...)
+                    input_occurs = request.inputs[input_id]
+                    if len(input_occurs) <= 0:
+                        continue
+                    # process single occurrences
+                    input_i = input_occurs[0]
+                    # handle as reference/data
+                    input_data = input_i.url if input_i.as_reference else input_i.data
                     input_type = cwl_input_info[input_id]['type']
                     is_array, elem_type = _is_cwl_array_type(cwl_input_info[input_id])
                     if is_array:
-                        # array allow max_occur > 1
-                        input_data = [j.data for j in i]
+                        # extend array data that allow max_occur > 1
+                        input_data = [i.url if i.as_reference else i.data for i in input_occurs]
                         input_type = elem_type
-                    if isinstance(i[0], (LiteralInput, BoundingBoxInput)):
+                    if isinstance(input_i, (LiteralInput, BoundingBoxInput)):
                         cwl_inputs[input_id] = input_data
-                    elif isinstance(i[0], ComplexInput):
+                    elif isinstance(input_i, ComplexInput):
                         if isinstance(input_data, list):
                             cwl_inputs[input_id] = [{'location': data, 'class': input_type} for data in input_data]
                         else:
                             cwl_inputs[input_id] = {'location': input_data, 'class': input_type}
                     else:
                         raise self.exception_message(PackageTypeError, None,
-                                                     "Undefined package input for execution: {}.".format(type(i)))
+                                                     "Undefined package input for execution: {}.".format(type(input_i)))
                 self.update_status("Convert package inputs done.", 4)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed to load package inputs.")
