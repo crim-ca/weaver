@@ -31,3 +31,7 @@ def includeme(config):
                     request_method='GET', renderer='json')
     config.add_view(p.submit_provider_job, route_name=sd.jobs_full_service.name,
                     request_method='POST', renderer='json')
+    config.add_view(p.get_process_visibility, route_name=sd.process_visibility_service.name,
+                    request_method='GET', renderer='json')
+    config.add_view(p.set_process_visibility, route_name=sd.process_visibility_service.name,
+                    request_method='PUT', renderer='json')

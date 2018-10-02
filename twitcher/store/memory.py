@@ -189,6 +189,27 @@ class MemoryProcessStore(ProcessStore):
         process = self.name_index.get(sane_name)
         return process
 
+    def get_visibility(self, process_id, request=None):
+        """
+        Get visibility of a process.
+
+        :return: One value amongst `twitcher.visibility`.
+        """
+        process = self.fetch_by_id(process_id)
+        return process.visibility
+
+    def set_visibility(self, process_id, visibility, request=None):
+        """
+        Set visibility of a process.
+
+        :param visibility: One value amongst `twitcher.visibility`.
+        :returns: updated process with specified visibility parameter.
+        :raises: TypeError or ValueError in case of invalid parameter.
+        """
+        process = self.fetch_by_id(process_id)
+        process.visibility = visibility
+        return self.save_process(process)
+
 
 from twitcher.store.base import JobStore
 

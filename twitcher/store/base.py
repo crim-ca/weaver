@@ -126,6 +126,24 @@ class ProcessStore(object):
         """
         raise NotImplementedError
 
+    def get_visibility(self, process_id, request=None):
+        """
+        Get visibility of a process.
+
+        :return: One value amongst `twitcher.visibility`.
+        """
+        raise NotImplementedError
+
+    def set_visibility(self, process_id, visibility, request=None):
+        """
+        Set visibility of a process.
+
+        :param visibility: One value amongst `twitcher.visibility`.
+        :returns: updated process with specified visibility parameter.
+        :raises: TypeError or ValueError in case of invalid parameter.
+        """
+        raise NotImplementedError
+
 
 class JobStore(object):
     """

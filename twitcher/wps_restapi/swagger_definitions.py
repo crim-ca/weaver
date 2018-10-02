@@ -5,8 +5,8 @@ so that one can update the swagger without touching any other files after the in
 
 from twitcher.config import TWITCHER_CONFIGURATION_EMS
 from twitcher.wps_restapi.utils import wps_restapi_base_path
-from twitcher.wps_restapi.status import job_status_values, STATUS_ACCEPTED
-from twitcher.wps_restapi.sort import *
+from twitcher.status import job_status_values, STATUS_ACCEPTED
+from twitcher.sort import *
 from cornice import Service
 from colander import *
 
@@ -26,6 +26,7 @@ api_versions_uri = '/versions'
 processes_uri = '/processes'
 process_uri = '/processes/{process_id}'
 process_package_uri = '/processes/{process_id}/package'
+process_visibility_uri = '/processes/{process_id}/visibility'
 process_jobs_uri = '/processes/{process_id}/jobs'
 process_job_uri = '/processes/{process_id}/jobs/{job_id}'
 process_quotes_uri = '/processes/{process_id}/quotes'
@@ -69,6 +70,7 @@ logs_short_uri = '/jobs/{job_id}/logs'
 
 api_tag = 'API'
 jobs_tag = 'Jobs'
+visibility_tag = 'Visibility'
 bill_quote_tag = 'Billing & Quoting'
 provider_processes_tag = 'Provider Processes'
 providers_tag = 'Providers'
@@ -95,6 +97,7 @@ api_versions_service = Service(name='api_versions', path=api_versions_uri)
 processes_service = Service(name='processes', path=processes_uri)
 process_service = Service(name='process', path=process_uri)
 process_package_service = Service(name='process_package', path=process_package_uri)
+process_visibility_service = Service(name='process_visibility', path=process_visibility_uri)
 process_jobs_service = Service(name='process_jobs', path=process_jobs_uri)
 process_job_service = Service(name='process_job', path=process_job_uri)
 process_quotes_service = Service(name='process_quotes', path=process_quotes_uri)
@@ -352,6 +355,16 @@ class ProviderProcessEndpoint(MappingSchema):
 
 
 class ProcessEndpoint(MappingSchema):
+    header = AcceptHeader()
+    process_id = process_id
+
+
+class ProcessPackageEndpoint(MappingSchema):
+    header = AcceptHeader()
+    process_id = process_id
+
+
+class ProcessVisibilityEndpoint(MappingSchema):
     header = AcceptHeader()
     process_id = process_id
 

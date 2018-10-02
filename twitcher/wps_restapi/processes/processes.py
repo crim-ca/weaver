@@ -11,19 +11,18 @@ from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_E
 from twitcher.datatype import Process as ProcessDB, Job as JobDB
 from twitcher.exceptions import (
     ProcessNotFound,
-    JobRegistrationError,
     PackageRegistrationError,
     PackageTypeError,
     ProcessRegistrationError)
 from twitcher.processes import wps_package
 from twitcher.processes.types import PROCESS_WORKFLOW
-from twitcher.store import processstore_defaultfactory
+from twitcher.store import processstore_factory
 from twitcher.utils import get_any_id, raise_on_xml_exception
 from twitcher.owsexceptions import OWSNoApplicableCode
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import check_status
-from twitcher.wps_restapi import status
+from twitcher import visibility, status
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference
 from lxml import etree
 from six import string_types
@@ -389,7 +388,7 @@ def get_processes(request):
     """
     try:
         # get local processes
-        store = processstore_defaultfactory(request.registry)
+        store = processstore_factory(request.registry)
         processes = [process.summary() for process in store.list_processes()]
         response_body = {'processes': processes}
 
@@ -473,7 +472,7 @@ def add_local_process(request):
     # ensure that required 'executeEndpoint' in db is added, will be auto-fixed to localhost if not specified in body
     process_info.update({'executeEndpoint': process_info.get('executeEndpoint')})
     try:
-        store = processstore_defaultfactory(request.registry)
+        store = processstore_factory(request.registry)
         saved_process = store.save_process(ProcessDB(process_info), overwrite=False)
     except ProcessRegistrationError as ex:
         raise HTTPConflict(detail=ex.message)
@@ -491,7 +490,7 @@ def get_local_process(request):
     if not isinstance(process_id, string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
-        store = processstore_defaultfactory(request.registry)
+        store = processstore_factory(request.registry)
         process = store.fetch_by_id(process_id)
         return HTTPOk(json={'process': process.json()})
     except HTTPException:
@@ -502,23 +501,73 @@ def get_local_process(request):
         raise HTTPInternalServerError(ex.message)
 
 
-@sd.process_package_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer='json',
-                                schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_package_responses)
-def get_local_process_package(request):
-    """
-    Get a registered local process package definition.
-    """
+def get_process(request):
     process_id = request.matchdict.get('process_id')
     if not isinstance(process_id, string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
-        store = processstore_defaultfactory(request.registry)
+        store = processstore_factory(request.registry)
         process = store.fetch_by_id(process_id)
-        return HTTPOk(json=process.package or {})
+        return process
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except ProcessNotFound:
         raise HTTPNotFound("The process with id `{}` does not exist.".format(str(process_id)))
+    except Exception as ex:
+        raise HTTPInternalServerError(ex.message)
+
+
+@sd.process_package_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer='json',
+                                schema=sd.ProcessPackageEndpoint(), response_schemas=sd.get_process_package_responses)
+def get_local_process_package(request):
+    """
+    Get a registered local process package definition.
+    """
+    process = get_process(request)
+    return HTTPOk(json=process.package or {})
+
+
+@sd.process_visibility_service.get(tags=[sd.processes_tag, sd.visibility_tag], renderer='json',
+                                   schema=sd.ProcessVisibilityEndpoint(),
+                                   response_schemas=sd.get_process_package_responses)
+def get_process_visibility(request):
+    """
+    Get the visibility of a registered local process.
+    """
+    try:
+        store = processstore_factory(request.registry)
+        process = store.fetch_by_id(process_id)
+        return process
+    except HTTPException:
+        raise  # re-throw already handled HTTPException
+    except ProcessNotFound:
+        raise HTTPNotFound("The process with id `{}` does not exist.".format(str(process_id)))
+    except Exception as ex:
+        raise HTTPInternalServerError(ex.message)
+
+
+@sd.process_visibility_service.put(tags=[sd.processes_tag, sd.visibility_tag], renderer='json',
+                                   schema=sd.ProcessVisibilityEndpoint(),
+                                   response_schemas=sd.get_process_package_responses)
+def set_process_visibility(request):
+    """
+    Set the visibility of a registered local process.
+    """
+    visibility_value = request.json.get('value')
+    if not isinstance(visibility_value, string_types):
+        raise HTTPBadRequest('Value of visibility must be a string.')
+    if visibility_value not in visibility.visibility_values:
+        raise HTTPUnprocessableEntity('Value of visibility must be one of : {!s}'
+                                      .format(list(visibility.visibility_values)))
+
+    process = get_process(request)
+    process['visibility'] = visibility_value
+    try:
+        store = processstore_factory(request.registry)
+        store.save_process(process, overwrite=True)
+        return HTTPOk(json={'visibility': visibility_value})
+    except HTTPException:
+        raise  # re-throw already handled HTTPException
     except Exception as ex:
         raise HTTPInternalServerError(ex.message)
 
@@ -533,7 +582,7 @@ def delete_local_process(request):
     if not isinstance(process_id, string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
-        store = processstore_defaultfactory(request.registry)
+        store = processstore_factory(request.registry)
         if store.delete_process(process_id):
             return HTTPOk(json={'undeploymentDone': True, 'identifier': process_id})
         raise HTTPInternalServerError("Delete process failed.")

@@ -7,9 +7,8 @@ from twitcher.store.base import AccessTokenStore
 from twitcher.datatype import AccessToken
 from twitcher.exceptions import AccessTokenNotFound
 from twitcher.utils import islambda
-from twitcher.wps_restapi.utils import wps_restapi_base_url
-from twitcher.wps_restapi.sort import *
-from twitcher.wps_restapi.status import *
+from twitcher.sort import *
+from twitcher.status import *
 from pyramid.security import authenticated_userid
 from pymongo import ASCENDING, DESCENDING
 from datetime import datetime
@@ -244,6 +243,27 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         if not process:
             raise ProcessNotFound("Process `{}` could not be found.".format(sane_name))
         return ProcessDB(process)
+
+    def get_visibility(self, process_id, request=None):
+        """
+        Get visibility of a process.
+
+        :return: One value amongst `twitcher.visibility`.
+        """
+        process = self.fetch_by_id(process_id)
+        return process.visibility
+
+    def set_visibility(self, process_id, visibility, request=None):
+        """
+        Set visibility of a process.
+
+        :param visibility: One value amongst `twitcher.visibility`.
+        :returns: updated process with specified visibility parameter.
+        :raises: TypeError or ValueError in case of invalid parameter.
+        """
+        process = self.fetch_by_id(process_id)
+        process.visibility = visibility
+        return self.save_process(process)
 
 
 from twitcher.store.base import JobStore
