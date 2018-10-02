@@ -389,7 +389,7 @@ def get_processes(request):
     try:
         # get local processes
         store = processstore_factory(request.registry)
-        processes = [process.summary() for process in store.list_processes()]
+        processes = [process.summary() for process in store.list_processes(request=request)]
         response_body = {'processes': processes}
 
         # if EMS and ?providers=True, also fetch each provider's processes
@@ -473,7 +473,7 @@ def add_local_process(request):
     process_info.update({'executeEndpoint': process_info.get('executeEndpoint')})
     try:
         store = processstore_factory(request.registry)
-        saved_process = store.save_process(ProcessDB(process_info), overwrite=False)
+        saved_process = store.save_process(ProcessDB(process_info), overwrite=False, request=request)
     except ProcessRegistrationError as ex:
         raise HTTPConflict(detail=ex.message)
 
@@ -491,7 +491,7 @@ def get_local_process(request):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
         store = processstore_factory(request.registry)
-        process = store.fetch_by_id(process_id)
+        process = store.fetch_by_id(process_id, request=request)
         return HTTPOk(json={'process': process.json()})
     except HTTPException:
         raise  # re-throw already handled HTTPException
@@ -507,7 +507,7 @@ def get_process(request):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
         store = processstore_factory(request.registry)
-        process = store.fetch_by_id(process_id)
+        process = store.fetch_by_id(process_id, request=request)
         return process
     except HTTPException:
         raise  # re-throw already handled HTTPException
@@ -534,10 +534,14 @@ def get_process_visibility(request):
     """
     Get the visibility of a registered local process.
     """
+    process_id = request.matchdict.get('process_id')
+    if not isinstance(process_id, string_types):
+        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
+
     try:
         store = processstore_factory(request.registry)
-        process = store.fetch_by_id(process_id)
-        return process
+        visibility_value = store.get_visibility(process_id, request=request)
+        return HTTPOk(json={u'visibility': visibility_value})
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except ProcessNotFound:
@@ -564,7 +568,7 @@ def set_process_visibility(request):
     process['visibility'] = visibility_value
     try:
         store = processstore_factory(request.registry)
-        store.save_process(process, overwrite=True)
+        store.save_process(process, overwrite=True, request=request)
         return HTTPOk(json={'visibility': visibility_value})
     except HTTPException:
         raise  # re-throw already handled HTTPException
@@ -583,7 +587,7 @@ def delete_local_process(request):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
         store = processstore_factory(request.registry)
-        if store.delete_process(process_id):
+        if store.delete_process(process_id, request=request):
             return HTTPOk(json={'undeploymentDone': True, 'identifier': process_id})
         raise HTTPInternalServerError("Delete process failed.")
     except HTTPException:
@@ -606,7 +610,7 @@ def submit_local_job(request):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
         store = processstore_factory(request.registry)
-        process = store.fetch_by_id(process_id)
+        process = store.fetch_by_id(process_id, request=request)
         resp = submit_job_handler(request, process.executeEndpoint, is_workflow=process.type == 'workflow')
         return resp
     except HTTPException:
