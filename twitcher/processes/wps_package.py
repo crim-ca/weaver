@@ -112,6 +112,10 @@ def get_package_workflow_steps(package_dict_or_url):
         workflow_steps = package_dict_or_url.get('steps')
         for step in workflow_steps:
             step_package_ref = workflow_steps[step].get('run')
+            # if a local file reference was specified, convert it to process id
+            if urlparse(step_package_ref).scheme == "" and step_package_ref.endswith('.cwl'):
+                step_package_ref = step_package_ref[:-4]
+
             workflow_steps_ids.append({'name': step, 'reference': step_package_ref})
     return workflow_steps_ids
 
