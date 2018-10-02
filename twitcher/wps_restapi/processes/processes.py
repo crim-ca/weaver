@@ -544,8 +544,8 @@ def get_process_visibility(request):
         return HTTPOk(json={u'visibility': visibility_value})
     except HTTPException:
         raise  # re-throw already handled HTTPException
-    except ProcessNotFound:
-        raise HTTPNotFound("The process with id `{}` does not exist.".format(str(process_id)))
+    except ProcessNotFound as ex:
+        raise HTTPNotFound(ex.message)
     except Exception as ex:
         raise HTTPInternalServerError(ex.message)
 
@@ -558,20 +558,23 @@ def set_process_visibility(request):
     Set the visibility of a registered local process.
     """
     visibility_value = request.json.get('value')
-    if not isinstance(visibility_value, string_types):
-        raise HTTPBadRequest('Value of visibility must be a string.')
-    if visibility_value not in visibility.visibility_values:
-        raise HTTPUnprocessableEntity('Value of visibility must be one of : {!s}'
-                                      .format(list(visibility.visibility_values)))
+    process_id = request.matchdict.get('process_id')
+    if not isinstance(process_id, string_types):
+        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
 
-    process = get_process(request)
-    process['visibility'] = visibility_value
     try:
         store = processstore_factory(request.registry)
-        store.save_process(process, overwrite=True, request=request)
-        return HTTPOk(json={'visibility': visibility_value})
+        store.set_visibility(process_id, visibility_value, request=request)
+        return HTTPOk(json={u'visibility': visibility_value})
     except HTTPException:
         raise  # re-throw already handled HTTPException
+    except TypeError:
+        raise HTTPBadRequest('Value of visibility must be a string.')
+    except ValueError:
+        raise HTTPUnprocessableEntity('Value of visibility must be one of : {!s}'
+                                      .format(list(visibility.visibility_values)))
+    except ProcessNotFound as ex:
+        raise HTTPNotFound(ex.message)
     except Exception as ex:
         raise HTTPInternalServerError(ex.message)
 
