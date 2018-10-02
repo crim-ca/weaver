@@ -16,6 +16,9 @@ mongodb-host = localhost
 mongodb-port = 27017
 mongodb-dbname = twitcher_db
 
+ows-security = true
+ows-proxy = true
+ows-proxy-ssl-verify = true
 ows-proxy-protected-path = /ows/proxy
 
 wps = true
