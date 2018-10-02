@@ -10,6 +10,7 @@ def includeme(config):
     config.add_route(**sd.service_api_route_info(sd.processes_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_package_service, settings))
+    config.add_route(**sd.service_api_route_info(sd.process_visibility_service, settings))
     config.add_route(**sd.service_api_route_info(sd.provider_processes_service, settings))
     config.add_route(**sd.service_api_route_info(sd.provider_process_service, settings))
     config.add_route(**sd.service_api_route_info(sd.jobs_full_service, settings))
