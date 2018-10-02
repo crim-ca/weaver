@@ -7,6 +7,7 @@ from twitcher.config import TWITCHER_CONFIGURATION_EMS
 from twitcher.wps_restapi.utils import wps_restapi_base_path
 from twitcher.status import job_status_values, STATUS_ACCEPTED
 from twitcher.sort import *
+from twitcher.visibility import visibility_values, VISIBILITY_PUBLIC
 from cornice import Service
 from colander import *
 
@@ -364,9 +365,19 @@ class ProcessPackageEndpoint(MappingSchema):
     process_id = process_id
 
 
-class ProcessVisibilityEndpoint(MappingSchema):
+class ProcessVisibilityGetEndpoint(MappingSchema):
     header = AcceptHeader()
     process_id = process_id
+
+
+class ProcessVisibilityPutBodySchema(MappingSchema):
+    value = SchemaNode(String(), validator=OneOf(list(visibility_values)), example=VISIBILITY_PUBLIC)
+
+
+class ProcessVisibilityPutEndpoint(MappingSchema):
+    header = AcceptHeader()
+    process_id = process_id
+    body = ProcessVisibilityPutBodySchema()
 
 
 class FullJobEndpoint(MappingSchema):
@@ -992,6 +1003,20 @@ class OkGetProcessPackageSchema(MappingSchema):
     body = MappingSchema(default={})
 
 
+class ProcessVisibilityResponseBodySchema(MappingSchema):
+    visibility = SchemaNode(String(), validator=OneOf(list(visibility_values)), example=VISIBILITY_PUBLIC)
+
+
+class OkGetProcessVisibilitySchema(MappingSchema):
+    header = JsonHeader()
+    body = ProcessVisibilityResponseBodySchema()
+
+
+class OkPutProcessVisibilitySchema(MappingSchema):
+    header = JsonHeader()
+    body = ProcessVisibilityResponseBodySchema()
+
+
 class OkDeleteProcessUndeployBodySchema(MappingSchema):
     deploymentDone = SchemaNode(Boolean(), description="Indicates if the process was successfully undeployed.",
                                 default=False, example=True)
@@ -1122,6 +1147,12 @@ get_process_responses = {
 }
 get_process_package_responses = {
     '200': OkGetProcessPackageSchema(description='success')
+}
+get_process_visibility_responses = {
+    '200': OkGetProcessVisibilitySchema(description='success')
+}
+put_process_visibility_responses = {
+    '200': OkPutProcessVisibilitySchema(description='success')
 }
 delete_process_responses = {
     '200': OkDeleteProcessSchema(description='success')

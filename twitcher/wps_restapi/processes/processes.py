@@ -527,8 +527,8 @@ def get_local_process_package(request):
 
 
 @sd.process_visibility_service.get(tags=[sd.processes_tag, sd.visibility_tag], renderer='json',
-                                   schema=sd.ProcessVisibilityEndpoint(),
-                                   response_schemas=sd.get_process_package_responses)
+                                   schema=sd.ProcessVisibilityGetEndpoint(),
+                                   response_schemas=sd.get_process_visibility_responses)
 def get_process_visibility(request):
     """
     Get the visibility of a registered local process.
@@ -550,8 +550,8 @@ def get_process_visibility(request):
 
 
 @sd.process_visibility_service.put(tags=[sd.processes_tag, sd.visibility_tag], renderer='json',
-                                   schema=sd.ProcessVisibilityEndpoint(),
-                                   response_schemas=sd.get_process_package_responses)
+                                   schema=sd.ProcessVisibilityPutEndpoint(),
+                                   response_schemas=sd.put_process_visibility_responses)
 def set_process_visibility(request):
     """
     Set the visibility of a registered local process.
