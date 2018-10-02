@@ -262,7 +262,7 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         """
         process = self.fetch_by_id(process_id)
         process.visibility = visibility
-        self.save_process(process)
+        self.save_process(process, overwrite=True)
 
 
 from twitcher.store.base import JobStore
