@@ -16,7 +16,6 @@ from twitcher.exceptions import (
     ProcessRegistrationError)
 from twitcher.processes import wps_package
 from twitcher.processes.types import PROCESS_WORKFLOW
-from twitcher.store import processstore_factory
 from twitcher.utils import get_any_id, raise_on_xml_exception
 from twitcher.owsexceptions import OWSNoApplicableCode
 from twitcher.wps_restapi import swagger_definitions as sd
