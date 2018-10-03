@@ -34,7 +34,7 @@ dependencies:
 # nginx, supervisor
 - nginx=1.10
 - supervisor=3
-- gunicorn=19
+- gunicorn=19.8.1
 - gevent=1.2
 # mongodb
 - pymongo=3
