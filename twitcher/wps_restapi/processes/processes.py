@@ -16,7 +16,7 @@ from twitcher.exceptions import (
     PackageTypeError,
     ProcessRegistrationError)
 from twitcher.processes import wps_package
-from twitcher.processes.types import PROCESS_WORKFLOW
+from twitcher.processes.types import PROCESS_WORKFLOW, PROCESS_APPLICATION, PROCESS_WPS
 from twitcher.store import processstore_defaultfactory
 from twitcher.utils import get_any_id, raise_on_xml_exception
 from twitcher.namesgenerator import get_sane_name
@@ -35,11 +35,6 @@ import json
 
 
 task_logger = get_task_logger(__name__)
-
-
-JOB_TYPE_PROXY_PROCESS = 'PROXY_PROCESS'
-JOB_TYPE_LOCAL_PROCESS = 'LOCAL_PROCESS'
-JOB_TYPE_LOCAL_WORKFLOW = 'LOCAL_WORKFLOW'
 
 
 def wait_secs(run_step=-1):
@@ -269,15 +264,15 @@ def execute_process(self, url, service, process, inputs,
     job = JobDB({'task_id': task_id})  # default in case of error during registration to job store
 
     job = store.save_job(task_id=task_id, process=process, service=service,
-                         is_workflow=job_type == JOB_TYPE_LOCAL_WORKFLOW,
+                         is_workflow=job_type == PROCESS_WORKFLOW,
                          user_id=user_id, async=async, custom_tags=custom_tags)
 
-    if job_type == JOB_TYPE_LOCAL_WORKFLOW:
+    if job_type == PROCESS_WORKFLOW:
         execute_workflow(job=job, url=url, process_id=process, inputs=inputs, headers=headers)
-    elif job_type == JOB_TYPE_LOCAL_PROCESS:
+    elif job_type == PROCESS_APPLICATION:
         # TODO
         pass
-    elif job_type == JOB_TYPE_PROXY_PROCESS:
+    elif job_type == PROCESS_WPS:
         execute_wps_process(job=job, url=url, process_id=process, inputs=inputs, async=async, headers=headers)
     else:
         raise OWSNoApplicableCode("Failed to launch job : Invalid job type.")
@@ -329,7 +324,7 @@ def submit_provider_job(request):
     store = servicestore_factory(request.registry)
     provider_id = request.matchdict.get('provider_id')
     service = store.fetch_by_name(provider_id, request=request)
-    return submit_job_handler(request, service.url, job_type=JOB_TYPE_PROXY_PROCESS)
+    return submit_job_handler(request, service.url, job_type=PROCESS_WPS)
 
 
 @sd.provider_processes_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.getcapabilities_tag],
@@ -585,7 +580,7 @@ def submit_local_job(request):
     try:
         store = processstore_factory(request.registry)
         process = store.fetch_by_id(process_id)
-        job_type = JOB_TYPE_LOCAL_WORKFLOW if process.type == 'workflow' else JOB_TYPE_LOCAL_PROCESS
+        job_type = PROCESS_WORKFLOW if process.type == 'workflow' else PROCESS_APPLICATION
         resp = submit_job_handler(request, process.executeEndpoint, job_type=job_type)
         return resp
     except HTTPException:
