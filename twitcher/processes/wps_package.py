@@ -1,4 +1,6 @@
 import os
+from itertools import ifilterfalse
+
 import six
 import cwltool
 import cwltool.factory
@@ -19,6 +21,8 @@ from pywps.inout.literaltypes import AnyValue, AllowedValue, ALLOWEDVALUETYPE
 from pywps.validator.mode import MODE
 from pywps.validator.literalvalidator import validate_anyvalue, validate_allowed_values
 from pywps.app.Common import Metadata
+from typing import Dict, List, Tuple
+
 from twitcher.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from twitcher.processes.sources import retrieve_data_source_url
 from twitcher.utils import parse_request_query, get_any_id
@@ -36,8 +40,8 @@ import shutil
 import requests
 
 import logging
-LOGGER = logging.getLogger("PACKAGE")
 
+LOGGER = logging.getLogger("PACKAGE")
 
 __all__ = [
     'Package',
@@ -46,13 +50,12 @@ __all__ = [
     'get_package_workflow_steps',
 ]
 
-
 PACKAGE_EXTENSIONS = frozenset(['yaml', 'yml', 'json', 'cwl', 'job'])
 PACKAGE_BASE_TYPES = frozenset(['string', 'boolean', 'float', 'int', 'integer', 'long', 'double'])
 PACKAGE_LITERAL_TYPES = frozenset(list(PACKAGE_BASE_TYPES) + ['null', 'Any'])
 PACKAGE_COMPLEX_TYPES = frozenset(['File', 'Directory'])
 PACKAGE_ARRAY_BASE = 'array'
-PACKAGE_ARRAY_MAX_SIZE = six.MAXSIZE   # pywps doesn't allow None, so use max size
+PACKAGE_ARRAY_MAX_SIZE = six.MAXSIZE  # pywps doesn't allow None, so use max size
 PACKAGE_ARRAY_ITEMS = frozenset(list(PACKAGE_BASE_TYPES) + list(PACKAGE_COMPLEX_TYPES))
 PACKAGE_ARRAY_TYPES = frozenset(['{}[]'.format(item) for item in PACKAGE_ARRAY_ITEMS])
 PACKAGE_CUSTOM_TYPES = frozenset(['enum'])  # can be anything, but support 'enum' which is more common
@@ -67,7 +70,11 @@ WPS_FIELD_MAPPING = {
     'metadata': ['Metadata', 'MetaData'],
     'keywords': ['Keywords'],
     'allowed_values': ['AllowedValues', 'allowedValues', 'allowedvalues', 'Allowed_Values', 'Allowedvalues'],
+    'allowed_collections': ['AllowedCollections', 'allowedCollections', 'allowedcollections', 'Allowed_Collections',
+                            'Allowedcollections'],
     'supported_formats': ['SupportedFormats', 'supportedFormats', 'supportedformats', 'Supported_Formats'],
+    'additional_parameters': ['AdditionalParameters', 'additionalParameters', 'additionalparameters',
+                              'Additional_Parameters'],
 }
 
 WPS_INPUT = 'input'
@@ -79,6 +86,8 @@ WPS_LITERAL = 'literal'
 
 class NullType():
     pass
+
+
 null = NullType()
 
 
@@ -239,7 +248,7 @@ def _is_cwl_array_type(io_info):
     # array type conversion when defined as dict of {'type': 'array', 'items': '<type>'}
     # validate against Hashable instead of 'dict' since 'OrderedDict'/'CommentedMap' can result in `isinstance()==False`
     if not isinstance(io_type, six.string_types) and not isinstance(io_type, Hashable) \
-    and 'items' in io_type and 'type' in io_type:
+            and 'items' in io_type and 'type' in io_type:
         if not io_type['type'] == PACKAGE_ARRAY_BASE or io_type['items'] not in PACKAGE_ARRAY_ITEMS:
             raise PackageTypeError("Unsupported I/O 'array' definition: `{}`.".format(repr(io_info)))
         io_type = io_type['items']
@@ -328,7 +337,7 @@ def _cwl2wps_io(io_info, io_select):
     if is_enum:
         io_type = enum_type
         io_allow = enum_allow
-        io_mode = MODE.SIMPLE   # allowed value validator must be set for input
+        io_mode = MODE.SIMPLE  # allowed value validator must be set for input
 
     # debug info for unhandled types conversion
     if not isinstance(io_type, six.string_types):
@@ -457,7 +466,7 @@ def _json2wps_io(io_info, io_select):
             io_info[field] = _json2wps_type(value, field)
 
     # convert by type
-    io_type = io_info.pop('type', WPS_COMPLEX)    # only ComplexData doesn't have 'type'
+    io_type = io_info.pop('type', WPS_COMPLEX)  # only ComplexData doesn't have 'type'
     if io_select == WPS_INPUT:
         if io_type == WPS_COMPLEX:
             return ComplexInput(**io_info)
@@ -616,7 +625,7 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
     wps_package_metadata['abstract'] = wps_package_metadata.get('abstract', cwl_package_package.get('doc', ''))
 
     if '$schemas' in cwl_package_package and isinstance(cwl_package_package['$schemas'], list) \
-    and '$namespaces' in cwl_package_package and isinstance(cwl_package_package['$namespaces'], dict):
+            and '$namespaces' in cwl_package_package and isinstance(cwl_package_package['$namespaces'], dict):
         metadata = wps_package_metadata.get('metadata', list())
         namespaces_inv = {v: k for k, v in cwl_package_package['$namespaces']}
         for schema in cwl_package_package['$schemas']:
@@ -642,6 +651,7 @@ def get_process_from_wps_request(process_offering, reference=None, package=None,
     :param data_source: where to resolve process IDs (default: localhost if ``None``).
     :return: process information dictionary ready for saving to data store.
     """
+
     def try_or_raise_package_error(call, reason):
         try:
             LOGGER.debug("Attempting: `{}`".format(reason))
@@ -696,6 +706,141 @@ def get_process_from_wps_request(process_offering, reference=None, package=None,
     return process_offering
 
 
+def _get_field_default(input_data, field, default=None):
+    if field in WPS_FIELD_MAPPING:
+        for f in WPS_FIELD_MAPPING[field]:
+            if f in input_data:
+                default = input_data[f]
+    else:
+        default = input_data.get(field, default)
+    return default
+
+
+def get_additional_parameters(input_data):
+    # type: (Dict) -> List[Tuple]
+    output = []
+    additional_parameters = _get_field_default(input_data, "additional_parameters", default=[])
+    for additional_param in additional_parameters:
+        for key, value in additional_param.items():
+            if key == "parameters":
+                for param in value:
+                    name = param.get("name", "")
+                    value = param.get("value", "")
+                    if name:
+                        output.append((name, value))
+    return output
+
+
+class EOImageHandler(object):
+    def __init__(self, inputs):
+        # type: (List[Dict]) -> None
+        self.eoimage_inputs = list(filter(self.is_oeimage_input, inputs))
+        self.other_inputs = list(ifilterfalse(self.is_oeimage_input, inputs))
+
+    @staticmethod
+    def is_oeimage_input(input_data):
+        # type: (Dict) -> bool
+        for name, value in get_additional_parameters(input_data):
+            if name.upper() == "EOIMAGE" and value.upper() == "TRUE":
+                return True
+        return False
+
+    @staticmethod
+    def get_allowed_collections(input_data):
+        # type: (Dict) -> List
+        for name, value in get_additional_parameters(input_data):
+            if name.upper() == "ALLOWEDCOLLECTIONS":
+                return value.split(",")
+        return []
+
+    @staticmethod
+    def make_aoi(id_="aoi"):
+        data = {
+            "id": id_,
+            "title": "Area of Interest",
+            "abstract": "Area of Interest (Bounding Box)",
+            "formats": [{"mimeType": "OGC-WKT", "default": True}],
+            "minOccurs": 1,
+            "maxOccurs": 1
+        }
+        return data
+
+    @staticmethod
+    def make_collection(id_, allowed_values):
+        data = {
+            "id": id_,
+            "title": "Collection of the data.",
+            "abstract": "Collection",
+            "formats": [{"mimeType": "text/plain", "default": True}],
+            "minOccurs": 1,
+            "maxOccurs": 1,
+            "LiteralDataDomain": {"dataType": "String",
+                                  "allowedValues": allowed_values},
+            "additionalParameters": [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
+                                      "parameters": [{"name": "CatalogSearchField", "value": "parentIdentifier"}]
+                                      }],
+            "owsContext": {"offering": {"code": "anyCode", "content": {"href": "anyRef"}}}
+        }
+        return data
+
+    @staticmethod
+    def make_toi(id_, start_date=True):
+        date = "startDate" if start_date else "endDate"
+        data = {
+            "id": id_,
+            "title": "Time of Interest",
+            "abstract": "Time of Interest (defined as Start date - End date)",
+            "formats": [{"mimeType": "text/plain", "default": True}],
+            "minOccurs": 1,
+            "maxOccurs": 1,
+            "LiteralDataDomain": {"dataType": "String"},
+            "additionalParameters": [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
+                                      "parameters": [{"name": "CatalogSearchField", "value": date}]}],
+            "owsContext": {"offering": {"code": "anyCode", "content": {"href": "anyRef"}}}
+        }
+        return data
+
+    def to_opensearch(self, unique_aoi, unique_toi):
+        # type: (bool, bool) -> List[Dict]
+        if not self.eoimage_inputs:
+            return self.other_inputs
+
+        eoimage_names = [i['id'] for i in self.eoimage_inputs]
+        allowed_collections = [self.get_allowed_collections(i) for i in self.eoimage_inputs]
+
+        toi = []
+        aoi = []
+        collections = []
+
+        if unique_toi:
+            toi.append(self.make_toi("StartDate", start_date=True))
+            toi.append(self.make_toi("EndDate", start_date=False))
+        else:
+            for name in eoimage_names:
+                toi.append(self.make_toi("StartDate_" + name, start_date=True))
+                toi.append(self.make_toi("EndDate_" + name, start_date=False))
+
+        if unique_aoi:
+            aoi.append(self.make_aoi("aoi"))
+        else:
+            for name in eoimage_names:
+                aoi.append(self.make_aoi("aoi_" + name))
+
+        for name, allowed_col in zip(eoimage_names, allowed_collections):
+            collections.append(self.make_collection("collectionId_" + name, allowed_col))
+
+        return self.other_inputs + toi + aoi + collections
+
+
+def _handle_eoimage_inputs(inputs, additional_parameters):
+    # type: (List[Dict], List[Tuple]) -> List[Dict]
+    unique_toi = any(param == ("UNIQUETOI", "TRUE") for param in additional_parameters)
+    unique_aoi = any(param == ("UNIQUEAOI", "TRUE") for param in additional_parameters)
+    handler = EOImageHandler(inputs=inputs)
+    inputs_converted = handler.to_opensearch(unique_aoi=unique_aoi, unique_toi=unique_toi)
+    return inputs_converted
+
+
 class Package(Process):
     package = None
     job_file = None
@@ -723,12 +868,18 @@ class Package(Process):
         except Exception as ex:
             raise PackageRegistrationError("Exception occurred on package instantiation: `{}`".format(repr(ex)))
 
-        inputs = [_json2wps_io(i, WPS_INPUT) for i in kw.pop('inputs', list())]
+        inputs = kw.pop('inputs', [])
+        additional_parameters = get_additional_parameters(kw)
+
+        # handle EOImage inputs
+        inputs = _handle_eoimage_inputs(inputs=inputs, additional_parameters=additional_parameters)
+
+        inputs = [_json2wps_io(i, WPS_INPUT) for i in inputs]
         outputs = [_json2wps_io(o, WPS_OUTPUT) for o in kw.pop('outputs', list())]
         metadata = [_json2wps_type(meta_kw, 'metadata') for meta_kw in kw.pop('metadata', list())]
 
         # append a log output
-        #outputs.append(ComplexOutput(PACKAGE_LOG_FILE, 'Package log file',
+        # outputs.append(ComplexOutput(PACKAGE_LOG_FILE, 'Package log file',
         #                             as_reference=True, supported_formats=[Format('text/plain')]))
 
         super(Package, self).__init__(
@@ -785,8 +936,8 @@ class Package(Process):
         try:
             try:
                 self.setup_logger()
-                #self.response.outputs[PACKAGE_LOG_FILE].file = self.log_file
-                #self.response.outputs[PACKAGE_LOG_FILE].as_reference = True
+                # self.response.outputs[PACKAGE_LOG_FILE].file = self.log_file
+                # self.response.outputs[PACKAGE_LOG_FILE].as_reference = True
                 self.update_status("Preparing package logs done.", 1)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed preparing package logging.")
