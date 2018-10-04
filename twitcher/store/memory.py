@@ -169,7 +169,7 @@ class MemoryProcessStore(ProcessStore):
         sane_name = namesgenerator.get_sane_name(process.identifier, **self.sane_name_config)
         if not self.name_index.get(sane_name) or overwrite:
             if not process.title:
-                process.title = sane_name
+                process['title'] = sane_name
             self.name_index[sane_name] = process
         return self.fetch_by_id(sane_name)
 
@@ -242,6 +242,8 @@ class MemoryJobStore(JobStore):
     """
     Stores job tracking in memory. Useful for testing purposes.
     """
+    store = None
+
     def __init__(self):
         self.store = {}
 

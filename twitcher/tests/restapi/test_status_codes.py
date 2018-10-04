@@ -1,8 +1,8 @@
+# noinspection PyPackageRequirements
+import pytest
 from unittest import TestCase
 # noinspection PyPackageRequirements
 from webtest import TestApp
-# noinspection PyPackageRequirements
-import pytest
 from twitcher.wps_restapi.swagger_definitions import (
     api_frontpage_uri,
     api_swagger_ui_uri,
@@ -33,25 +33,23 @@ not_found_routes = [
 ]
 
 
-"""
-this routine should verify that the twitcher app returns correct status codes for common cases, such as
-- not found
-- forbidden (possibly with a difference between unauthorized and unauthenticated
-- resource added
-- ok
-"""
-# create a twitcher app using configuration
-# invoke request on app:
-#   not found provider, job and process
-#   private resource
-#   login, then private resource
-#   add job
-#   fetch job and find it
-#   search features
-# receive response and assert that status codes match
-
-
 class StatusCodeTestCase(TestCase):
+    """
+    this routine should verify that the twitcher app returns correct status codes for common cases, such as
+    - not found
+    - forbidden (possibly with a difference between unauthorized and unauthenticated
+    - resource added
+    - ok
+    """
+    # create a twitcher app using configuration
+    # invoke request on app:
+    #   not found provider, job and process
+    #   private resource
+    #   login, then private resource
+    #   add job
+    #   fetch job and find it
+    #   search features
+    # receive response and assert that status codes match
 
     headers = {'accept': 'application/json'}
 
@@ -82,23 +80,21 @@ class StatusCodeTestCase(TestCase):
             self.assertEqual(404, resp.status_code, 'route {} did not return 404'.format(uri))
 
 
-"""
-this routine should make sure that the services store jobs, processes and providers correctly,
-  but directly from the services, and not only by status codes
-foreach of jobs, processes, providers
-  save entity
-  fetch entity and verify information
-"""
-# create a store
-# instantiate wps_restapi with that store
-# test provider
-#   create provider
-#   create process in provider
-#   fetch process data
-#   submit job with dummy data
-#   fetch job and see its existence
-# sda
-
-
 class CRUDTestCase(TestCase):
+    """
+    this routine should make sure that the services store jobs, processes and providers correctly,
+      but directly from the services, and not only by status codes
+    foreach of jobs, processes, providers
+      save entity
+      fetch entity and verify information
+    """
+    # create a store
+    # instantiate wps_restapi with that store
+    # test provider
+    #   create provider
+    #   create process in provider
+    #   fetch process data
+    #   submit job with dummy data
+    #   fetch job and see its existence
+    # sda
     pass
