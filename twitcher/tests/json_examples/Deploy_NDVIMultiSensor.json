@@ -1,0 +1,71 @@
+{
+  "processOffering" : {
+    "process" : {
+      "id" : "multisensor_ndvi",
+      "title" : "Multi Sensor NDVI",
+      "abstract" : "Multi Sensor NDVI",
+      "keywords" : [
+        "NDVI"
+      ],
+      "owsContext" : {
+        "offering" : {
+          "code" : "http://www.opengis.net/eoc/applicationContext/cwl",
+          "content" : {
+            "href" : "http://some.host/applications/cwl/multisensor_ndvi.cwl"
+          }
+        }
+      },
+      "inputs" : [
+        {
+          "id" : "files",
+          "title" : "Image Input files",
+          "formats" : [
+            {
+              "mimeType" : "application/zip",
+              "default" : true
+            }
+          ],
+          "minOccurs" : 1,
+          "maxOccurs" : "unbounded",
+          "additionalParameters" : [
+            {
+              "role" : "http://www.opengis.net/eoc/applicationContext/inputMetadata",
+              "parameters" : [
+                {
+                  "name" : "EOImage",
+                  "value" : "true"
+                }
+              ]
+            }
+          ]
+        }
+
+      ],
+      "outputs" : [
+        {
+          "id" : "output",
+          "title" : "NDVI output file",
+          "formats" : [
+            {
+              "mimeType" : "image/tiff",
+              "default" : true
+            }
+          ]
+        }
+      ],
+      "version" : "1.0.0",
+      "jobControlOptions" : [
+        "async-execute"
+      ],
+      "outputTransmission" : [
+        "reference"
+      ]
+    }
+  },
+  "deploymentProfile" : {
+    "deploymentProfileName" : "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+    "executionUnit" : {
+      "reference" : "images.geomatys.com/ndvims:latest"
+    }
+  }
+}

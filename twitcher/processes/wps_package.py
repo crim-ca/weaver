@@ -754,49 +754,49 @@ class EOImageHandler(object):
         return []
 
     @staticmethod
-    def make_aoi(id_="aoi"):
+    def make_aoi(id_=u"aoi"):
         data = {
-            "id": id_,
-            "title": "Area of Interest",
-            "abstract": "Area of Interest (Bounding Box)",
-            "formats": [{"mimeType": "OGC-WKT", "default": True}],
-            "minOccurs": 1,
-            "maxOccurs": 1
+            u"id": id_,
+            u"title": u"Area of Interest",
+            u"abstract": u"Area of Interest (Bounding Box)",
+            u"formats": [{u"mimeType": u"OGC-WKT", u"default": True}],
+            u"minOccurs": 1,
+            u"maxOccurs": 1
         }
         return data
 
     @staticmethod
-    def make_collection(id_, allowed_values):
+    def make_collection(image_format, allowed_values):
         data = {
-            "id": id_,
-            "title": "Collection of the data.",
-            "abstract": "Collection",
-            "formats": [{"mimeType": "text/plain", "default": True}],
-            "minOccurs": 1,
-            "maxOccurs": 1,
-            "LiteralDataDomain": {"dataType": "String",
-                                  "allowedValues": allowed_values},
-            "additionalParameters": [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                                      "parameters": [{"name": "CatalogSearchField", "value": "parentIdentifier"}]
-                                      }],
-            "owsContext": {"offering": {"code": "anyCode", "content": {"href": "anyRef"}}}
+            u"id": u"collectionId_{}".format(image_format),
+            u"title": u"Collection Identifer for input {}".format(image_format),
+            u"abstract": u"Collection",
+            u"formats": [{u"mimeType": u"text/plain", u"default": True}],
+            u"minOccurs": 1,
+            u"maxOccurs": 1,
+            u"LiteralDataDomain": {u"dataType": u"String",
+                                   u"allowedValues": allowed_values},
+            u"additionalParameters": [{u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
+                                       u"parameters": [{u"name": u"CatalogSearchField", u"value": u"parentIdentifier"}]
+                                       }],
+            u"owsContext": {u"offering": {u"code": u"anyCode", u"content": {u"href": u"anyRef"}}}
         }
         return data
 
     @staticmethod
     def make_toi(id_, start_date=True):
-        date = "startDate" if start_date else "endDate"
+        date = u"StartDate" if start_date else u"EndDate"
         data = {
-            "id": id_,
-            "title": "Time of Interest",
-            "abstract": "Time of Interest (defined as Start date - End date)",
-            "formats": [{"mimeType": "text/plain", "default": True}],
-            "minOccurs": 1,
-            "maxOccurs": 1,
-            "LiteralDataDomain": {"dataType": "String"},
-            "additionalParameters": [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                                      "parameters": [{"name": "CatalogSearchField", "value": date}]}],
-            "owsContext": {"offering": {"code": "anyCode", "content": {"href": "anyRef"}}}
+            u"id": id_,
+            u"title": u"Time of Interest",
+            u"abstract": u"Time of Interest (defined as Start date - End date)",
+            u"formats": [{u"mimeType": u"text/plain", u"default": True}],
+            u"minOccurs": 1,
+            u"maxOccurs": 1,
+            u"LiteralDataDomain": {u"dataType": u"String"},
+            u"additionalParameters": [{u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
+                                       u"parameters": [{u"name": u"CatalogSearchField", u"value": date}]}],
+            u"owsContext": {u"offering": {u"code": u"anyCode", u"content": {u"href": u"anyRef"}}}
         }
         return data
 
@@ -813,21 +813,21 @@ class EOImageHandler(object):
         collections = []
 
         if unique_toi:
-            toi.append(self.make_toi("StartDate", start_date=True))
-            toi.append(self.make_toi("EndDate", start_date=False))
+            toi.append(self.make_toi(u"StartDate", start_date=True))
+            toi.append(self.make_toi(u"EndDate", start_date=False))
         else:
             for name in eoimage_names:
-                toi.append(self.make_toi("StartDate_" + name, start_date=True))
-                toi.append(self.make_toi("EndDate_" + name, start_date=False))
+                toi.append(self.make_toi(u"StartDate_" + name, start_date=True))
+                toi.append(self.make_toi(u"EndDate_" + name, start_date=False))
 
         if unique_aoi:
-            aoi.append(self.make_aoi("aoi"))
+            aoi.append(self.make_aoi(u"aoi"))
         else:
             for name in eoimage_names:
-                aoi.append(self.make_aoi("aoi_" + name))
+                aoi.append(self.make_aoi(u"aoi_" + name))
 
         for name, allowed_col in zip(eoimage_names, allowed_collections):
-            collections.append(self.make_collection("collectionId_" + name, allowed_col))
+            collections.append(self.make_collection(name, allowed_col))
 
         return self.other_inputs + toi + aoi + collections
 

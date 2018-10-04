@@ -1,0 +1,243 @@
+{
+  "processOffering": {
+    "process": {
+      "id": "multisensor_ndvi_stack_generator",
+      "title": "Multi Sensor NDVI Stack Generator",
+      "abstract": "Workflow Multi Sensor NDVI Stack Generator",
+      "keywords": [
+        "NDVI"
+      ],
+      "owsContext": {
+        "offering": {
+          "code": "http://www.opengis.net/eoc/applicationContext/cwl",
+          "content": {
+            "href": "http://some.host/applications/cwl/multisensor_ndvi_stack_generator.cwl"
+          }
+        }
+      },
+      "inputs": [
+        {
+          "id": "collectionId_image-s2",
+          "title": "Collection Identifer for input image-s2",
+          "abstract": "Collection",
+          "formats": [
+            {
+              "mimeType": "text/plain",
+              "default": true
+            }
+          ],
+          "minOccurs": 1,
+          "maxOccurs": 1,
+          "LiteralDataDomain": {
+            "allowedValues": [
+              "s2-collection-1",
+              "s2-collection-2",
+              "s2-sentinel2",
+              "s2-landsat8"
+            ],
+            "dataType": "String"
+          },
+          "additionalParameters": [
+            {
+              "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
+              "parameters": [
+                {
+                  "name": "CatalogSearchField",
+                  "value": "parentIdentifier"
+                }
+              ]
+            }
+          ],
+          "owsContext": {
+            "offering": {
+              "code": "anyCode",
+              "content": {
+                "href": "anyRef"
+              }
+            }
+          }
+        },
+        {
+          "id": "collectionId_image-probav",
+          "title": "Collection Identifer for input image-probav",
+          "abstract": "Collection",
+          "formats": [
+            {
+              "mimeType": "text/plain",
+              "default": true
+            }
+          ],
+          "minOccurs": 1,
+          "maxOccurs": 1,
+          "LiteralDataDomain": {
+            "allowedValues": [
+              "probav-collection-1",
+              "probav-collection-2"
+            ],
+            "dataType": "String"
+          },
+          "additionalParameters": [
+            {
+              "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
+              "parameters": [
+                {
+                  "name": "CatalogSearchField",
+                  "value": "parentIdentifier"
+                }
+              ]
+            }
+          ],
+          "owsContext": {
+            "offering": {
+              "code": "anyCode",
+              "content": {
+                "href": "anyRef"
+              }
+            }
+          }
+        },
+        {
+          "id": "collectionId_image-deimos",
+          "title": "Collection Identifer for input image-deimos",
+          "abstract": "Collection",
+          "formats": [
+            {
+              "mimeType": "text/plain",
+              "default": true
+            }
+          ],
+          "minOccurs": 1,
+          "maxOccurs": 1,
+          "LiteralDataDomain": {
+            "allowedValues": [
+              "deimos-collection-1",
+              "deimos-collection-2"
+            ],
+            "dataType": "String"
+          },
+          "additionalParameters": [
+            {
+              "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
+              "parameters": [
+                {
+                  "name": "CatalogSearchField",
+                  "value": "parentIdentifier"
+                }
+              ]
+            }
+          ],
+          "owsContext": {
+            "offering": {
+              "code": "anyCode",
+              "content": {
+                "href": "anyRef"
+              }
+            }
+          }
+        },
+        {
+          "id": "StartDate",
+          "title": "Time of Interest",
+          "abstract": "Time of Interest (defined as Start date - End date)",
+          "formats": [
+            {
+              "mimeType": "text/plain",
+              "default": true
+            }
+          ],
+          "minOccurs": 1,
+          "maxOccurs": 1,
+          "LiteralDataDomain": {
+            "dataType": "String"
+          },
+          "additionalParameters": [
+            {
+              "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
+              "parameters": [
+                {
+                  "name": "CatalogSearchField",
+                  "value": "StartDate"
+                }
+              ]
+            }
+          ],
+          "owsContext": {
+            "offering": {
+              "code": "anyCode",
+              "content": {
+                "href": "anyRef"
+              }
+            }
+          }
+        },
+        {
+          "id": "EndDate",
+          "title": "Time of Interest",
+          "abstract": "Time of Interest (defined as Start date - End date)",
+          "formats": [
+            {
+              "mimeType": "text/plain",
+              "default": true
+            }
+          ],
+          "minOccurs": 1,
+          "maxOccurs": 1,
+          "LiteralDataDomain": {
+            "dataType": "String"
+          },
+          "additionalParameters": [
+            {
+              "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
+              "parameters": [
+                {
+                  "name": "CatalogSearchField",
+                  "value": "EndDate"
+                }
+              ]
+            }
+          ],
+          "owsContext": {
+            "offering": {
+              "code": "anyCode",
+              "content": {
+                "href": "anyRef"
+              }
+            }
+          }
+        },
+        {
+          "id": "aoi",
+          "title": "Area of Interest",
+          "abstract": "Area of Interest (Bounding Box)",
+          "formats": [
+            {
+              "mimeType": "OGC-WKT",
+              "default": true
+            }
+          ],
+          "minOccurs": 1,
+          "maxOccurs": 1
+        }
+      ],
+      "outputs": [
+        {
+          "id": "output",
+          "title": "GeoTIF Image",
+          "formats": [
+            {
+              "mimeType": "image/tiff",
+              "default": true
+            }
+          ]
+        }
+      ],
+      "version": "1.0.0",
+      "jobControlOptions": [
+        "async-execute"
+      ],
+      "outputTransmission": [
+        "reference"
+      ]
+    }
+  }
+}

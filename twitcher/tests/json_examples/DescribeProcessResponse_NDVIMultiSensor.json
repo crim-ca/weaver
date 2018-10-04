@@ -1,0 +1,109 @@
+{
+  "processOffering" : {
+    "process" : {
+      "id" : "multisensor_ndvi",
+      "title" : "Multi Sensor NDVI",
+      "abstract" : "Workflow Multi Sensor NDVI",
+      "keywords" : [
+        "NDVI"
+      ],
+      "owsContext" : {
+        "offering" : {
+          "code" : "http://www.opengis.net/eoc/applicationContext/cwl",
+          "content" : {
+            "href" : "http://some.host/applications/cwl/multisensor_ndvi.cwl"
+          }
+        }
+      },
+      "inputs" : [
+        {
+          "id" : "collectionId_files",
+          "title" : "Collection Identifer for input files",
+          "formats" : [
+            {
+              "mimeType" : "text/plain",
+              "default" : true
+            }
+          ],
+          "minOccurs" : 1,
+          "maxOccurs" : 1,
+          "LiteralDataDomain" : {
+            "dataType" : "String"
+          }
+        },
+
+        {
+          "id" : "StartDate",
+          "title" : "Time of Interest",
+          "abstract" : "Time of Interest (defined as Start date - End date)",
+          "formats" : [
+            {
+              "mimeType" : "text/plain",
+              "default" : true
+            }
+          ],
+          "minOccurs" : 1,
+          "maxOccurs" : 1,
+          "LiteralDataDomain" : {
+            "dataType" : "String"
+          }
+        },
+        {
+          "id" : "EndDate",
+          "title" : "Time of Interest",
+          "abstract" : "Time of Interest (defined as Start date - End date)",
+          "formats" : [
+            {
+              "mimeType" : "text/plain",
+              "default" : true
+            }
+          ],
+          "minOccurs" : 1,
+          "maxOccurs" : 1,
+          "LiteralDataDomain" : {
+            "dataType" : "String"
+          }
+        },
+        {
+          "id" : "aoi",
+          "title" : "Area of Interest",
+          "abstract" : "Area of Interest (Bounding Box)",
+          "formats" : [
+            {
+              "mimeType" : "OGC-WKT",
+              "default" : true
+            }
+          ],
+          "minOccurs" : 1,
+          "maxOccurs" : 1
+        }
+      ],
+      "outputs" : [
+        {
+          "id" : "output",
+          "title" : "GeoTIF Image",
+          "formats" : [
+            {
+              "mimeType" : "image/tiff",
+              "default" : true
+            }
+          ]
+        }
+      ],
+      "version" : "1.0.0",
+      "jobControlOptions" : [
+        "async-execute"
+      ],
+      "outputTransmission" : [
+        "reference"
+      ]
+    }
+  },
+  "deploymentProfile" : {
+    "deploymentProfileName" : "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+    "executionUnit" : {
+      "reference" : "images.geomatys.com/ndvims:latest"
+    }
+  }
+}
+

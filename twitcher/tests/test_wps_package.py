@@ -1,3 +1,4 @@
+import json
 import pytest
 import unittest
 import os
@@ -32,8 +33,11 @@ class WpsHandleEOITestCase(unittest.TestCase):
     def tearDown(self):
         testing.tearDown()
 
-    def get_workflow_file(self, filename):
-        return open(os.path.join(os.path.dirname(__file__), '..', 'workflows', filename)).read()
+    def get_test_file(self, filename):
+        return os.path.join(os.path.dirname(__file__), 'json_examples', filename)
+
+    def load_json(self, filename):
+        return json.load(open(self.get_test_file(filename)))
 
     def make_request(self, **kw):
         request = DummyRequest(**kw)
@@ -42,302 +46,29 @@ class WpsHandleEOITestCase(unittest.TestCase):
         return request
 
     def test_handle_EOI_unique_aoi_unique_toi(self):
-        inputs = [{"id": "image-s2",
-                   "title": "S2 Input Image",
-                   "formats": [{"mimeType": "application/zip", "default": True}],
-                   "minOccurs": 1,
-                   "maxOccurs": "unbounded",
-                   "additionalParameters":
-                       [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                         "parameters":
-                             [{"name": "EOImage",
-                               "value": "true"},
-                              {"name": "AllowedCollections",
-                               "value": "s2-collection-1,s2-collection-2,s2-sentinel2,s2-landsat8"}]
-                         }]},
-                  {"id": "image-probav",
-                   "title": "ProbaV Input Image",
-                   "formats": [{"mimeType": "application/zip", "default": True}],
-                   "minOccurs": 1,
-                   "maxOccurs": "unbounded",
-                   "additionalParameters":
-                       [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                         "parameters": [{"name": "EOImage", "value": "true"},
-                                        {"name": "AllowedCollections",
-                                         "value": "probav-collection-1,probav-collection-2"}]
-                         }]},
-                  ]
-        expected = [{"id": "aoi",
-                     "title": "Area of Interest",
-                     "abstract": "Area of Interest (Bounding Box)",
-                     "formats": [{"mimeType": "OGC-WKT", "default": True}],
-                     "minOccurs": 1,
-                     "maxOccurs": 1
-                     },
-                    {"id": "StartDate",
-                     "title": "Time of Interest",
-                     "abstract": "Time of Interest (defined as Start date - End date)",
-                     "formats": [{"mimeType": "text/plain", "default": True}],
-                     "minOccurs": 1,
-                     "maxOccurs": 1,
-                     "LiteralDataDomain": {"dataType": "String"},
-                     "additionalParameters":
-                         [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                           "parameters": [{"name": "CatalogSearchField",
-                                           "value": "startDate"}]
-                           }],
-                     "owsContext": {"offering": {"code": "anyCode", "content": {"href": "anyRef"}}}},
-                    {"id": "EndDate",
-                     "title": "Time of Interest",
-                     "abstract": "Time of Interest (defined as Start date - End date)",
-                     "formats": [{"mimeType": "text/plain", "default": True}],
-                     "minOccurs": 1,
-                     "maxOccurs": 1,
-                     "LiteralDataDomain": {"dataType": "String"},
-                     "additionalParameters":
-                         [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                           "parameters": [{"name": "CatalogSearchField", "value": "endDate"}]
-                           }],
-                     "owsContext": {"offering": {"code": "anyCode", "content": {"href": "anyRef"}}}},
-                    {"id": "collectionId_image-s2",
-                     "title": "Collection of the data.",
-                     "abstract": "Collection",
-                     "formats": [{"mimeType": "text/plain", "default": True}],
-                     "minOccurs": 1,
-                     "maxOccurs": 1,
-                     "LiteralDataDomain": {"dataType": "String",
-                                           "allowedValues": ['s2-collection-1', 's2-collection-2', 's2-landsat8',
-                                                             's2-sentinel2']},
-                     "additionalParameters":
-                         [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                           "parameters": [{"name": "CatalogSearchField", "value": "parentIdentifier"}]
-                           }],
-                     "owsContext": {"offering": {"code": "anyCode", "content": {"href": "anyRef"}}}},
-                    {"id": "collectionId_image-probav",
-                     "title": "Collection of the data.",
-                     "abstract": "Collection",
-                     "formats": [{"mimeType": "text/plain", "default": True}],
-                     "minOccurs": 1,
-                     "maxOccurs": 1,
-                     "LiteralDataDomain": {"dataType": "String",
-                                           "allowedValues": ["probav-collection-1", "probav-collection-2"]},
-                     "additionalParameters":
-                         [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                           "parameters": [{"name": "CatalogSearchField", "value": "parentIdentifier"}]
-                           }],
-                     "owsContext": {"offering": {"code": "anyCode", "content": {"href": "anyRef"}}}},
-                    ]
+        inputs = self.load_json("eoimage_inputs_example.json")
+        expected = self.load_json("eoimage_unique_aoi_unique_toi.json")
         output = wps_package.EOImageHandler(inputs).to_opensearch(unique_aoi=True, unique_toi=True)
         assert_json_equals(output, expected)
 
     def test_handle_EOI_unique_aoi_non_unique_toi(self):
-        inputs = [{"id": "image-s2",
-                   "title": "S2 Input Image",
-                   "formats": [{"mimeType": "application/zip", "default": True}],
-                   "minOccurs": 1,
-                   "maxOccurs": "unbounded",
-                   "additionalParameters":
-                       [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                         "parameters":
-                             [{"name": "EOImage",
-                               "value": "true"},
-                              {"name": "AllowedCollections",
-                               "value": "s2-collection-1,s2-collection-2,s2-sentinel2,s2-landsat8"}]
-                         }]},
-                  {"id": "image-probav",
-                   "title": "ProbaV Input Image",
-                   "formats": [{"mimeType": "application/zip", "default": True}],
-                   "minOccurs": 1,
-                   "maxOccurs": "unbounded",
-                   "additionalParameters":
-                       [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                         "parameters": [{"name": "EOImage", "value": "true"},
-                                        {"name": "AllowedCollections",
-                                         "value": "probav-collection-1,probav-collection-2"}]
-                         }]},
-                  ]
-        expected = [{"id": "aoi",
-                     "title": "Area of Interest",
-                     "abstract": "Area of Interest (Bounding Box)",
-                     "formats": [{"mimeType": "OGC-WKT", "default": True}],
-                     "minOccurs": 1,
-                     "maxOccurs": 1
-                     },
-                    {"id": "StartDate_image-s2",
-                     "title": "Time of Interest",
-                     "abstract": "Time of Interest (defined as Start date - End date)",
-                     "formats": [{"mimeType": "text/plain", "default": True}],
-                     "minOccurs": 1,
-                     "maxOccurs": 1,
-                     "LiteralDataDomain": {"dataType": "String"},
-                     "additionalParameters":
-                         [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                           "parameters": [{"name": "CatalogSearchField",
-                                           "value": "startDate"}]
-                           }],
-                     "owsContext": {"offering": {"code": "anyCode", "content": {"href": "anyRef"}}}},
-                    {"id": "EndDate_image-s2",
-                     "title": "Time of Interest",
-                     "abstract": "Time of Interest (defined as Start date - End date)",
-                     "formats": [{"mimeType": "text/plain", "default": True}],
-                     "minOccurs": 1,
-                     "maxOccurs": 1,
-                     "LiteralDataDomain": {"dataType": "String"},
-                     "additionalParameters":
-                         [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                           "parameters": [{"name": "CatalogSearchField", "value": "endDate"}]
-                           }],
-                     "owsContext": {"offering": {"code": "anyCode", "content": {"href": "anyRef"}}}},
-                    {"id": "StartDate_image-probav",
-                     "title": "Time of Interest",
-                     "abstract": "Time of Interest (defined as Start date - End date)",
-                     "formats": [{"mimeType": "text/plain", "default": True}],
-                     "minOccurs": 1,
-                     "maxOccurs": 1,
-                     "LiteralDataDomain": {"dataType": "String"},
-                     "additionalParameters":
-                         [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                           "parameters": [{"name": "CatalogSearchField",
-                                           "value": "startDate"}]
-                           }],
-                     "owsContext": {"offering": {"code": "anyCode", "content": {"href": "anyRef"}}}},
-                    {"id": "EndDate_image-probav",
-                     "title": "Time of Interest",
-                     "abstract": "Time of Interest (defined as Start date - End date)",
-                     "formats": [{"mimeType": "text/plain", "default": True}],
-                     "minOccurs": 1,
-                     "maxOccurs": 1,
-                     "LiteralDataDomain": {"dataType": "String"},
-                     "additionalParameters":
-                         [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                           "parameters": [{"name": "CatalogSearchField", "value": "endDate"}]
-                           }],
-                     "owsContext": {"offering": {"code": "anyCode", "content": {"href": "anyRef"}}}},
-                    {"id": "collectionId_image-s2",
-                     "title": "Collection of the data.",
-                     "abstract": "Collection",
-                     "formats": [{"mimeType": "text/plain", "default": True}],
-                     "minOccurs": 1,
-                     "maxOccurs": 1,
-                     "LiteralDataDomain": {"dataType": "String",
-                                           "allowedValues": ['s2-collection-1', 's2-collection-2', 's2-landsat8',
-                                                             's2-sentinel2']},
-                     "additionalParameters":
-                         [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                           "parameters": [{"name": "CatalogSearchField", "value": "parentIdentifier"}]
-                           }],
-                     "owsContext": {"offering": {"code": "anyCode", "content": {"href": "anyRef"}}}},
-                    {"id": "collectionId_image-probav",
-                     "title": "Collection of the data.",
-                     "abstract": "Collection",
-                     "formats": [{"mimeType": "text/plain", "default": True}],
-                     "minOccurs": 1,
-                     "maxOccurs": 1,
-                     "LiteralDataDomain": {"dataType": "String",
-                                           "allowedValues": ["probav-collection-1", "probav-collection-2"]},
-                     "additionalParameters":
-                         [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                           "parameters": [{"name": "CatalogSearchField", "value": "parentIdentifier"}]
-                           }],
-                     "owsContext": {"offering": {"code": "anyCode", "content": {"href": "anyRef"}}}},
-                    ]
+        inputs = self.load_json("eoimage_inputs_example.json")
+        expected = self.load_json("eoimage_unique_aoi_non_unique_toi.json")
         output = wps_package.EOImageHandler(inputs).to_opensearch(unique_aoi=True, unique_toi=False)
         assert_json_equals(expected, output)
 
     def test_handle_EOI_non_unique_aoi_unique_toi(self):
-        inputs = [{"id": "image-s2",
-                   "title": "S2 Input Image",
-                   "formats": [{"mimeType": "application/zip", "default": True}],
-                   "minOccurs": 1,
-                   "maxOccurs": "unbounded",
-                   "additionalParameters":
-                       [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                         "parameters":
-                             [{"name": "EOImage",
-                               "value": "true"},
-                              {"name": "AllowedCollections",
-                               "value": "s2-collection-1,s2-collection-2,s2-sentinel2,s2-landsat8"}]
-                         }]},
-                  {"id": "image-probav",
-                   "title": "ProbaV Input Image",
-                   "formats": [{"mimeType": "application/zip", "default": True}],
-                   "minOccurs": 1,
-                   "maxOccurs": "unbounded",
-                   "additionalParameters":
-                       [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                         "parameters": [{"name": "EOImage", "value": "true"},
-                                        {"name": "AllowedCollections",
-                                         "value": "probav-collection-1,probav-collection-2"}]
-                         }]},
-                  ]
-        expected = [{"id": "aoi_image-probav",
-                     "title": "Area of Interest",
-                     "abstract": "Area of Interest (Bounding Box)",
-                     "formats": [{"mimeType": "OGC-WKT", "default": True}],
-                     "minOccurs": 1,
-                     "maxOccurs": 1
-                     },
-                    {"id": "aoi_image-s2",
-                     "title": "Area of Interest",
-                     "abstract": "Area of Interest (Bounding Box)",
-                     "formats": [{"mimeType": "OGC-WKT", "default": True}],
-                     "minOccurs": 1,
-                     "maxOccurs": 1
-                     },
-                    {"id": "StartDate",
-                     "title": "Time of Interest",
-                     "abstract": "Time of Interest (defined as Start date - End date)",
-                     "formats": [{"mimeType": "text/plain", "default": True}],
-                     "minOccurs": 1,
-                     "maxOccurs": 1,
-                     "LiteralDataDomain": {"dataType": "String"},
-                     "additionalParameters":
-                         [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                           "parameters": [{"name": "CatalogSearchField",
-                                           "value": "startDate"}]
-                           }],
-                     "owsContext": {"offering": {"code": "anyCode", "content": {"href": "anyRef"}}}},
-                    {"id": "EndDate",
-                     "title": "Time of Interest",
-                     "abstract": "Time of Interest (defined as Start date - End date)",
-                     "formats": [{"mimeType": "text/plain", "default": True}],
-                     "minOccurs": 1,
-                     "maxOccurs": 1,
-                     "LiteralDataDomain": {"dataType": "String"},
-                     "additionalParameters":
-                         [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                           "parameters": [{"name": "CatalogSearchField", "value": "endDate"}]
-                           }],
-                     "owsContext": {"offering": {"code": "anyCode", "content": {"href": "anyRef"}}}},
-                    {"id": "collectionId_image-s2",
-                     "title": "Collection of the data.",
-                     "abstract": "Collection",
-                     "formats": [{"mimeType": "text/plain", "default": True}],
-                     "minOccurs": 1,
-                     "maxOccurs": 1,
-                     "LiteralDataDomain": {"dataType": "String",
-                                           "allowedValues": ['s2-collection-1', 's2-collection-2', 's2-landsat8',
-                                                             's2-sentinel2']},
-                     "additionalParameters":
-                         [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                           "parameters": [{"name": "CatalogSearchField", "value": "parentIdentifier"}]
-                           }],
-                     "owsContext": {"offering": {"code": "anyCode", "content": {"href": "anyRef"}}}},
-                    {"id": "collectionId_image-probav",
-                     "title": "Collection of the data.",
-                     "abstract": "Collection",
-                     "formats": [{"mimeType": "text/plain", "default": True}],
-                     "minOccurs": 1,
-                     "maxOccurs": 1,
-                     "LiteralDataDomain": {"dataType": "String",
-                                           "allowedValues": ["probav-collection-1", "probav-collection-2"]},
-                     "additionalParameters":
-                         [{"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                           "parameters": [{"name": "CatalogSearchField", "value": "parentIdentifier"}]
-                           }],
-                     "owsContext": {"offering": {"code": "anyCode", "content": {"href": "anyRef"}}}},
-                    ]
+        inputs = self.load_json("eoimage_inputs_example.json")
+        expected = self.load_json("eoimage_non_unique_aoi_unique_toi.json")
         output = wps_package.EOImageHandler(inputs).to_opensearch(unique_aoi=False, unique_toi=True)
+        assert_json_equals(expected, output)
+
+    def test_handle_EOI_multisensor_ndvi(self):
+        deploy = self.load_json("DeployProcess_Workflow_MultiSensor_NDVI_Stack_Generator_.json")
+        inputs = deploy["processOffering"]["process"]["inputs"]
+        describe = self.load_json("DescribeProcessResponse_Multisensor_ndivi_stack_generator.json")
+        expected = describe["processOffering"]["process"]["inputs"]
+        output = wps_package.EOImageHandler(inputs).to_opensearch(unique_aoi=True, unique_toi=True)
         assert_json_equals(expected, output)
 
     def test_get_additional_parameters(self):
