@@ -1,4 +1,4 @@
-from os.path import join
+from six.moves.urllib.parse import urljoin
 from cornice_swagger import CorniceSwagger
 from cornice.service import get_services
 from pyramid.renderers import render_to_response
@@ -21,17 +21,18 @@ def api_frontpage(request):
     twitcher_config = settings.get('twitcher.configuration', 'default')
 
     twitcher_api = asbool(settings.get('twitcher.wps_restapi'))
-    twitcher_api_url = join(wps_restapi_base_url(settings), sd.api_swagger_ui_uri) if twitcher_api else None
+    twitcher_api_url = wps_restapi_base_url(settings) if twitcher_api else None
+    twitcher_api_doc = urljoin(twitcher_api_url, sd.api_swagger_ui_uri) if twitcher_api else None
     twitcher_wps = asbool(settings.get('twitcher.wps'))
-    twitcher_wps_url = join(twitcher_url, get_wps_path(settings)) if twitcher_wps else None
+    twitcher_wps_url = urljoin(twitcher_url, get_wps_path(settings)) if twitcher_wps else None
     twitcher_proxy = asbool(settings.get('twitcher.ows_proxy'))
-    twitcher_proxy_url = join(twitcher_url, owsproxy_path(settings)) if twitcher_proxy else None
+    twitcher_proxy_url = urljoin(twitcher_url, owsproxy_path(settings)) if twitcher_proxy else None
 
     return {
         'message': 'Twitcher Information',
         'configuration': twitcher_config,
         'parameters': [
-            {'name': 'api', 'enabled': twitcher_api, 'url': twitcher_api_url},
+            {'name': 'api', 'enabled': twitcher_api, 'url': twitcher_api_url, 'doc': twitcher_api_doc},
             {'name': 'proxy', 'enabled': twitcher_proxy, 'url': twitcher_proxy_url},
             {'name': 'wps', 'enabled': twitcher_wps, 'url': twitcher_wps_url},
         ]
