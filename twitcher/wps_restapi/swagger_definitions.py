@@ -521,9 +521,21 @@ class LogsOutputSchema(MappingSchema):
     pass
 
 
+class FrontpageParameterSchema(MappingSchema):
+    name = SchemaNode(String(), example='api')
+    enabled = SchemaNode(Boolean(), example=True)
+    url = SchemaNode(String(), example='https://localhost:5000')
+    doc = SchemaNode(String(), example='https://localhost:5000/api', missing=drop)
+
+
+class FrontpageParameters(SequenceSchema):
+    param = FrontpageParameterSchema()
+
+
 class FrontpageSchema(MappingSchema):
-    message = SchemaNode(String(), default='hello')
-    configuration = SchemaNode(String(), default='default')
+    message = SchemaNode(String(), default='Twitcher Information', example='Twitcher Information')
+    configuration = SchemaNode(String(), default='default', example='default')
+    parameters = FrontpageParameters()
 
 
 class AdapterDescriptionSchema(MappingSchema):

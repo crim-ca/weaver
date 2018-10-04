@@ -15,10 +15,21 @@ mongodb-host = localhost
 mongodb-port = 27017
 mongodb-dbname = twitcher_db
 
-wps-restapi = true
-adapter = package.path.to.AdapterImpl
-restapi-path = /
+ows-security = true|false
+ows-proxy = true|false
+ows-proxy-delegate = true|false
+ows-proxy-url = true|false
+ows-proxy-ssl-verify = true|false
+ows-proxy-protected-path = /proxy/path/to/use
 
+wps = true|false
+wps-cfg = /path/to/custom/wps.cfg
+wps-path = /path/to/wsp (or value in 'wps-cfg.server.url')
+wps-output = /path/to/custom/wps-outputs
+wps-restapi = true|false
+wps-restapi-path = /base/path/of/rest/api
+
+adapter = package.path.to.AdapterImpl
 extra-options = adapter_impl.opt1=value1,adapter_impl.opt2=value2
 
 [adapter_impl]
