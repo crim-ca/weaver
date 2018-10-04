@@ -27,7 +27,7 @@
             }
           ],
           "minOccurs": 1,
-          "maxOccurs": 1,
+          "maxOccurs": "unbounded",
           "LiteralDataDomain": {
             "allowedValues": [
               "s2-collection-1",
@@ -68,7 +68,7 @@
             }
           ],
           "minOccurs": 1,
-          "maxOccurs": 1,
+          "maxOccurs": "unbounded",
           "LiteralDataDomain": {
             "allowedValues": [
               "probav-collection-1",
@@ -107,7 +107,7 @@
             }
           ],
           "minOccurs": 1,
-          "maxOccurs": 1,
+          "maxOccurs": "unbounded",
           "LiteralDataDomain": {
             "allowedValues": [
               "deimos-collection-1",

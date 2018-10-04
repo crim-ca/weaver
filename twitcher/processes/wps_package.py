@@ -754,14 +754,15 @@ class EOImageHandler(object):
         return []
 
     @staticmethod
-    def make_aoi(id_=u"aoi"):
+    def make_aoi(id_, unbounded):
+        max_occurs = u"unbounded" if unbounded else 1
         data = {
             u"id": id_,
             u"title": u"Area of Interest",
             u"abstract": u"Area of Interest (Bounding Box)",
             u"formats": [{u"mimeType": u"OGC-WKT", u"default": True}],
             u"minOccurs": 1,
-            u"maxOccurs": 1
+            u"maxOccurs": max_occurs
         }
         return data
 
@@ -773,7 +774,7 @@ class EOImageHandler(object):
             u"abstract": u"Collection",
             u"formats": [{u"mimeType": u"text/plain", u"default": True}],
             u"minOccurs": 1,
-            u"maxOccurs": 1,
+            u"maxOccurs": u"unbounded",
             u"LiteralDataDomain": {u"dataType": u"String",
                                    u"allowedValues": allowed_values},
             u"additionalParameters": [{u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
@@ -784,7 +785,8 @@ class EOImageHandler(object):
         return data
 
     @staticmethod
-    def make_toi(id_, start_date=True):
+    def make_toi(id_, unbounded, start_date=True):
+        max_occurs = u"unbounded" if unbounded else 1
         date = u"StartDate" if start_date else u"EndDate"
         data = {
             u"id": id_,
@@ -792,7 +794,7 @@ class EOImageHandler(object):
             u"abstract": u"Time of Interest (defined as Start date - End date)",
             u"formats": [{u"mimeType": u"text/plain", u"default": True}],
             u"minOccurs": 1,
-            u"maxOccurs": 1,
+            u"maxOccurs": max_occurs,
             u"LiteralDataDomain": {u"dataType": u"String"},
             u"additionalParameters": [{u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
                                        u"parameters": [{u"name": u"CatalogSearchField", u"value": date}]}],
@@ -812,19 +814,13 @@ class EOImageHandler(object):
         aoi = []
         collections = []
 
-        if unique_toi:
-            toi.append(self.make_toi(u"StartDate", start_date=True))
-            toi.append(self.make_toi(u"EndDate", start_date=False))
-        else:
-            for name in eoimage_names:
-                toi.append(self.make_toi(u"StartDate_" + name, start_date=True))
-                toi.append(self.make_toi(u"EndDate_" + name, start_date=False))
+        unbounded_toi = not unique_toi
+        toi_id = u"" if unique_toi else u"_{id}"
+        toi.append(self.make_toi(u"StartDate{}".format(toi_id), unbounded_toi, start_date=True))
+        toi.append(self.make_toi(u"EndDate{}".format(toi_id), unbounded_toi, start_date=False))
 
-        if unique_aoi:
-            aoi.append(self.make_aoi(u"aoi"))
-        else:
-            for name in eoimage_names:
-                aoi.append(self.make_aoi(u"aoi_" + name))
+        unbounded_aoi = not unique_aoi
+        aoi.append(self.make_aoi(u"aoi", unbounded=unbounded_aoi))
 
         for name, allowed_col in zip(eoimage_names, allowed_collections):
             collections.append(self.make_collection(name, allowed_col))

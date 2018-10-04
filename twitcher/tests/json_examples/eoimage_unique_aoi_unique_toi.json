@@ -93,7 +93,7 @@
       }
     ],
     "minOccurs": 1,
-    "maxOccurs": 1,
+    "maxOccurs": "unbounded",
     "LiteralDataDomain": {
       "dataType": "String",
       "allowedValues": [
@@ -134,7 +134,7 @@
       }
     ],
     "minOccurs": 1,
-    "maxOccurs": 1,
+    "maxOccurs": "unbounded",
     "LiteralDataDomain": {
       "dataType": "String",
       "allowedValues": [

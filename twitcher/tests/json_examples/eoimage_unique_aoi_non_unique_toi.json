@@ -13,7 +13,7 @@
     "maxOccurs": 1
   },
   {
-    "id": "StartDate_image-s2",
+    "id": "StartDate_{id}",
     "title": "Time of Interest",
     "abstract": "Time of Interest (defined as Start date - End date)",
     "formats": [
@@ -23,7 +23,7 @@
       }
     ],
     "minOccurs": 1,
-    "maxOccurs": 1,
+    "maxOccurs": "unbounded",
     "LiteralDataDomain": {
       "dataType": "String"
     },
@@ -48,7 +48,7 @@
     }
   },
   {
-    "id": "EndDate_image-s2",
+    "id": "EndDate_{id}",
     "title": "Time of Interest",
     "abstract": "Time of Interest (defined as Start date - End date)",
     "formats": [
@@ -58,77 +58,7 @@
       }
     ],
     "minOccurs": 1,
-    "maxOccurs": 1,
-    "LiteralDataDomain": {
-      "dataType": "String"
-    },
-    "additionalParameters": [
-      {
-        "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-        "parameters": [
-          {
-            "name": "CatalogSearchField",
-            "value": "EndDate"
-          }
-        ]
-      }
-    ],
-    "owsContext": {
-      "offering": {
-        "code": "anyCode",
-        "content": {
-          "href": "anyRef"
-        }
-      }
-    }
-  },
-  {
-    "id": "StartDate_image-probav",
-    "title": "Time of Interest",
-    "abstract": "Time of Interest (defined as Start date - End date)",
-    "formats": [
-      {
-        "mimeType": "text/plain",
-        "default": true
-      }
-    ],
-    "minOccurs": 1,
-    "maxOccurs": 1,
-    "LiteralDataDomain": {
-      "dataType": "String"
-    },
-    "additionalParameters": [
-      {
-        "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-        "parameters": [
-          {
-            "name": "CatalogSearchField",
-            "value": "StartDate"
-          }
-        ]
-      }
-    ],
-    "owsContext": {
-      "offering": {
-        "code": "anyCode",
-        "content": {
-          "href": "anyRef"
-        }
-      }
-    }
-  },
-  {
-    "id": "EndDate_image-probav",
-    "title": "Time of Interest",
-    "abstract": "Time of Interest (defined as Start date - End date)",
-    "formats": [
-      {
-        "mimeType": "text/plain",
-        "default": true
-      }
-    ],
-    "minOccurs": 1,
-    "maxOccurs": 1,
+    "maxOccurs": "unbounded",
     "LiteralDataDomain": {
       "dataType": "String"
     },
@@ -163,7 +93,7 @@
       }
     ],
     "minOccurs": 1,
-    "maxOccurs": 1,
+    "maxOccurs": "unbounded",
     "LiteralDataDomain": {
       "dataType": "String",
       "allowedValues": [
@@ -204,7 +134,7 @@
       }
     ],
     "minOccurs": 1,
-    "maxOccurs": 1,
+    "maxOccurs": "unbounded",
     "LiteralDataDomain": {
       "dataType": "String",
       "allowedValues": [

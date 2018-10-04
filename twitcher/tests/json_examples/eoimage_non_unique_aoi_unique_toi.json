@@ -1,6 +1,6 @@
 [
   {
-    "id": "aoi_image-probav",
+    "id": "aoi",
     "title": "Area of Interest",
     "abstract": "Area of Interest (Bounding Box)",
     "formats": [
@@ -10,20 +10,7 @@
       }
     ],
     "minOccurs": 1,
-    "maxOccurs": 1
-  },
-  {
-    "id": "aoi_image-s2",
-    "title": "Area of Interest",
-    "abstract": "Area of Interest (Bounding Box)",
-    "formats": [
-      {
-        "mimeType": "OGC-WKT",
-        "default": true
-      }
-    ],
-    "minOccurs": 1,
-    "maxOccurs": 1
+    "maxOccurs": "unbounded"
   },
   {
     "id": "StartDate",
@@ -106,7 +93,7 @@
       }
     ],
     "minOccurs": 1,
-    "maxOccurs": 1,
+    "maxOccurs": "unbounded",
     "LiteralDataDomain": {
       "dataType": "String",
       "allowedValues": [
@@ -147,7 +134,7 @@
       }
     ],
     "minOccurs": 1,
-    "maxOccurs": 1,
+    "maxOccurs": "unbounded",
     "LiteralDataDomain": {
       "dataType": "String",
       "allowedValues": [
