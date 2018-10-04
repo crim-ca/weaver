@@ -453,6 +453,10 @@ class Process(dict):
     def package(self):
         return self.get('package')
 
+    @property
+    def payload(self):
+        return self.get('payload')
+
     def __str__(self):
         return "Process <{0}> ({1})".format(self.identifier, self.title)
 
@@ -537,7 +541,8 @@ class Process(dict):
             ProcessInstanceError("Unknown process `{}` in mapping".format(process_key))
         if process_key in PACKAGE_PROCESSES:
             kwargs = self.params_wps
-            kwargs.update({'package': self.package})
+            kwargs.update({'package': self.package,
+                           'payload': self.payload})
             return process_mapping[process_key](**kwargs)
         return process_mapping[process_key]()
 
