@@ -2,6 +2,7 @@ import os
 import six
 import cwltool
 import cwltool.factory
+from cwltool.context import LoadingContext
 from cwltool.context import RuntimeContext
 from pywps import (
     Process,
@@ -19,8 +20,10 @@ from pywps.inout.literaltypes import AnyValue, AllowedValue, ALLOWEDVALUETYPE
 from pywps.validator.mode import MODE
 from pywps.validator.literalvalidator import validate_anyvalue, validate_allowed_values
 from pywps.app.Common import Metadata
+from twitcher import namesgenerator
 from twitcher.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from twitcher.processes.sources import retrieve_data_source_url
+from twitcher.processes.wps_workflow import make_tool
 from twitcher.utils import parse_request_query, get_any_id
 from twitcher.exceptions import PackageTypeError, PackageRegistrationError, PackageExecutionError, PackageNotFound
 from twitcher.wps_restapi.swagger_definitions import process_uri
@@ -94,7 +97,8 @@ def get_process_location(process_id_or_url, data_source=None):
     if urlparse(process_id_or_url).scheme != "":
         return process_id_or_url
     data_source_url = retrieve_data_source_url(data_source)
-    process_url = process_uri.format(process_id=process_id_or_url)
+    process_id = namesgenerator.get_sane_name(process_id_or_url)
+    process_url = process_uri.format(process_id=process_id)
     return '{host}{path}'.format(host=data_source_url, path=process_url)
 
 
@@ -224,7 +228,17 @@ def _load_package_content(package_dict, package_name=PACKAGE_DEFAULT_FILE_NAME,
     if only_dump_file:
         return
 
-    cwl_factory = cwltool.factory.Factory(runtime_context=RuntimeContext(kwargs={'no_read_only': True}))
+    #if get_twitcher_configuration(request.registry.settings) == TWITCHER_CONFIGURATION_EMS:
+    if True:
+        # EMS dispatch the execution to the ADES
+        loading_context = LoadingContext()
+        loading_context.construct_tool_object = make_tool
+    else:
+        # ADES execute the cwl locally
+        loading_context = None
+
+    cwl_factory = cwltool.factory.Factory(loading_context=loading_context,
+                                          runtime_context=RuntimeContext(kwargs={'no_read_only': True}))
     package = cwl_factory.make(tmp_json_cwl)
     shutil.rmtree(tmp_dir)
     return package, package_type

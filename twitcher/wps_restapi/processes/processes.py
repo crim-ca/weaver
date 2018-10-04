@@ -16,7 +16,7 @@ from twitcher.exceptions import (
     PackageTypeError,
     ProcessRegistrationError)
 from twitcher.processes import wps_package
-from twitcher.processes.types import PROCESS_WORKFLOW, PROCESS_APPLICATION, PROCESS_WPS
+from twitcher.processes.types import PROCESS_WORKFLOW
 from twitcher.store import processstore_defaultfactory
 from twitcher.utils import get_any_id, raise_on_xml_exception
 from twitcher.namesgenerator import get_sane_name
@@ -25,14 +25,10 @@ from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import check_status
 from twitcher.wps_restapi import status
-from twitcher.wps_restapi.processes.workflows import execute_workflow
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference
-from owslib.util import clean_ows_url
 from lxml import etree
 from six import string_types
 import requests
-import json
-
 
 task_logger = get_task_logger(__name__)
 
@@ -135,51 +131,20 @@ def _map_status(wps_execution_status):
     return 'unknown'
 
 
-def execute_wps_process(job, url, process_id, inputs, async=True, headers=None):
+@app.task(bind=True)
+def execute_process(self, url, service, process, inputs, outputs,
+                    is_workflow=False, user_id=None, async=True, custom_tags=[], headers=None):
+    registry = app.conf['PYRAMID_REGISTRY']
+    store = jobstore_factory(registry)
+    task_id = self.request.id
+    job = JobDB({'task_id': task_id})  # default in case of error during registration to job store
     try:
-        registry = app.conf['PYRAMID_REGISTRY']
-        store = jobstore_factory(registry)
-
-        try:
-            verify = False if urlparse(url).hostname == 'localhost' else True
-            wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), verify=verify)
-            raise_on_xml_exception(wps._capabilities)
-        except Exception as ex:
-            raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
-        try:
-            process = wps.describeprocess(process_id)
-        except Exception as ex:
-            raise OWSNoApplicableCode("Failed to retrieve WPS process description. Error: [{}].".format(str(ex)))
-
-        # prepare inputs
-        complex_inputs = []
-        for process_input in process.dataInputs:
-            if 'ComplexData' in process_input.dataType:
-                complex_inputs.append(process_input.identifier)
-
-        try:
-            wps_inputs = list()
-            for process_input in inputs:
-                input_id = get_any_id(process_input)
-                process_value = process_input['value']
-                # in case of array inputs, must repeat (id,value)
-                input_values = process_value if isinstance(process_value, list) else [process_value]
-                # need to use ComplexDataInput structure for complex input
-                wps_inputs.extend(
-                    [(input_id, ComplexDataInput(input_value) if input_id in complex_inputs else input_value)
-                     for input_value in input_values])
-        except KeyError:
-            wps_inputs = []
-
-        # prepare outputs
-        outputs = []
-        for output in process.processOutputs:
-            outputs.append(
-                (output.identifier, output.dataType == 'ComplexData'))
+        job = store.save_job(task_id=task_id, process=process, service=service, is_workflow=is_workflow,
+                             user_id=user_id, async=async, custom_tags=custom_tags)
 
         wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), skip_caps=False, verify=False)
         mode = 'async' if async else 'sync'
-        execution = wps.execute(process_id, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
+        execution = wps.execute(process, inputs=inputs, output=outputs, mode=mode, lineage=True)
 
         if not execution.process and execution.errors:
             raise execution.errors[0]
@@ -254,45 +219,60 @@ def execute_wps_process(job, url, process_id, inputs, async=True, headers=None):
         job.save_log(logger=task_logger)
         job = store.update_job(job)
 
-
-@app.task(bind=True)
-def execute_process(self, url, service, process, inputs,
-                    job_type, user_id=None, async=True,  custom_tags=[], headers=None):
-    registry = app.conf['PYRAMID_REGISTRY']
-    store = jobstore_factory(registry)
-    task_id = self.request.id
-    job = JobDB({'task_id': task_id})  # default in case of error during registration to job store
-
-    job = store.save_job(task_id=task_id, process=process, service=service,
-                         is_workflow=job_type == PROCESS_WORKFLOW,
-                         user_id=user_id, async=async, custom_tags=custom_tags)
-
-    if job_type == PROCESS_WORKFLOW:
-        execute_workflow(job=job, url=url, process_id=process, inputs=inputs, headers=headers)
-    elif job_type == PROCESS_APPLICATION:
-        # TODO
-        pass
-    elif job_type == PROCESS_WPS:
-        execute_wps_process(job=job, url=url, process_id=process, inputs=inputs, async=async, headers=headers)
-    else:
-        raise OWSNoApplicableCode("Failed to launch job : Invalid job type.")
-
     return job.status
 
 
-def submit_job_handler(request, service_url, job_type):
+def submit_job_handler(request, service_url, is_workflow=False):
+
     # TODO Validate param somehow
     provider_id = request.matchdict.get('provider_id')  # None OK if local
     process_id = request.matchdict.get('process_id')
     async_execute = not request.params.getone('sync-execute') if 'sync-execute' in request.params else True
     tags = request.params.get('tags', '').split(',')
 
+    try:
+        verify = False if urlparse(service_url).hostname == 'localhost' else True
+        wps = WebProcessingService(url=service_url, headers=get_cookie_headers(request.headers), verify=verify)
+        raise_on_xml_exception(wps._capabilities)
+    except Exception as ex:
+        raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
+    try:
+        process = wps.describeprocess(process_id)
+    except Exception as ex:
+        raise OWSNoApplicableCode("Failed to retrieve WPS process description. Error: [{}].".format(str(ex)))
+
+    # prepare inputs
+    complex_inputs = []
+    for process_input in process.dataInputs:
+        if 'ComplexData' in process_input.dataType:
+            complex_inputs.append(process_input.identifier)
+
+    try:
+        inputs = list()
+        for process_input in request.json_body['inputs']:
+            input_id = get_any_id(process_input)
+            process_value = process_input['value']
+            # in case of array inputs, must repeat (id,value)
+            input_values = process_value if isinstance(process_value, list) else [process_value]
+            # need to use ComplexDataInput structure for complex input
+            inputs.extend([(input_id, ComplexDataInput(input_value) if input_id in complex_inputs else input_value)
+                           for input_value in input_values])
+    except KeyError:
+        inputs = []
+
+    # prepare outputs
+    outputs = []
+    for output in process.processOutputs:
+        outputs.append(
+            (output.identifier, output.dataType == 'ComplexData'))
+
     result = execute_process.delay(
-        url=clean_ows_url(service_url),
+        url=wps.url,
         service=provider_id,
-        process=process_id,
-        inputs=request.json_body['inputs'],
-        job_type=job_type,
+        process=process.identifier,
+        inputs=inputs,
+        outputs=outputs,
+        is_workflow=is_workflow,
         user_id=request.authenticated_userid,
         async=async_execute,
         custom_tags=tags,
@@ -304,7 +284,7 @@ def submit_job_handler(request, service_url, job_type):
     location = '{base_url}{location_base}/processes/{process_id}/jobs/{job_id}'.format(
         base_url=wps_restapi_base_url(request.registry.settings),
         location_base=location_base,
-        process_id=process_id,
+        process_id=process.identifier,
         job_id=result.id)
     body_data = {
         'jobID': result.id,
@@ -324,7 +304,7 @@ def submit_provider_job(request):
     store = servicestore_factory(request.registry)
     provider_id = request.matchdict.get('provider_id')
     service = store.fetch_by_name(provider_id, request=request)
-    return submit_job_handler(request, service.url, job_type=PROCESS_WPS)
+    return submit_job_handler(request, service.url)
 
 
 @sd.provider_processes_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.getcapabilities_tag],
@@ -580,8 +560,7 @@ def submit_local_job(request):
     try:
         store = processstore_factory(request.registry)
         process = store.fetch_by_id(process_id)
-        job_type = PROCESS_WORKFLOW if process.type == 'workflow' else PROCESS_APPLICATION
-        resp = submit_job_handler(request, process.executeEndpoint, job_type=job_type)
+        resp = submit_job_handler(request, process.executeEndpoint, is_workflow=process.type == 'workflow')
         return resp
     except HTTPException:
         raise  # re-throw already handled HTTPException
