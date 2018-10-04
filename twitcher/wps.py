@@ -12,7 +12,6 @@ from pywps import configuration as pywps_config
 from six.moves.configparser import SafeConfigParser
 import six
 
-from twitcher.store import processstore_defaultfactory
 from twitcher.owsexceptions import OWSNoApplicableCode
 
 import logging
@@ -20,6 +19,7 @@ LOGGER = logging.getLogger(__name__)
 
 # can be overridden with 'settings.wps-cfg'
 DEFAULT_PYWPS_CFG = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'wps.cfg')
+PYWPS_CFG = None
 
 
 def get_wps_cfg_path(settings):
@@ -40,6 +40,7 @@ def get_wps_path(settings):
 
 
 def _processes(request):
+    from twitcher.store import processstore_defaultfactory
     return processstore_defaultfactory(request.registry)
 
 
@@ -72,6 +73,7 @@ def pywps_view(environ, start_response):
                 os.makedirs(out_dir_path)
 
         # call pywps application
+        from twitcher.store import processstore_defaultfactory
         processstore = processstore_defaultfactory(registry)
         processes_wps = [process.wps() for process in processstore.list_processes()]
         service = Service(processes_wps, [environ['PYWPS_CFG']])
