@@ -128,6 +128,10 @@ def _send_request(request, service, extra_path=None, request_params=None):
         return Response(content, status=resp.status_code, headers=headers)
 
 
+def owsproxy_path(settings):
+    return settings.get('twitcher.ows_proxy_protected_path', '/ows').rstrip('/').strip()
+
+
 def owsproxy_url(request):
     url = request.params.get("url")
     if url is None:
@@ -183,8 +187,8 @@ def includeme(config):
 
 
 def owsproxy_defaultconfig(settings, config):
-    protected_path = settings.get('twitcher.ows_proxy_protected_path', '/ows')
     if asbool(settings.get('twitcher.ows_proxy', True)):
+        protected_path = owsproxy_path(settings)
         LOGGER.debug('Twitcher {}/proxy enabled.'.format(protected_path))
 
         config.add_route('owsproxy', protected_path + '/proxy/{service_name}')
