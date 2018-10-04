@@ -1,4 +1,3 @@
-from six.moves.urllib.parse import urljoin
 from cornice_swagger import CorniceSwagger
 from cornice.service import get_services
 from pyramid.renderers import render_to_response
@@ -22,11 +21,11 @@ def api_frontpage(request):
 
     twitcher_api = asbool(settings.get('twitcher.wps_restapi'))
     twitcher_api_url = wps_restapi_base_url(settings) if twitcher_api else None
-    twitcher_api_doc = urljoin(twitcher_api_url, sd.api_swagger_ui_uri) if twitcher_api else None
+    twitcher_api_doc = twitcher_api_url + sd.api_swagger_ui_uri if twitcher_api else None
     twitcher_wps = asbool(settings.get('twitcher.wps'))
-    twitcher_wps_url = urljoin(twitcher_url, get_wps_path(settings)) if twitcher_wps else None
+    twitcher_wps_url = twitcher_url + get_wps_path(settings) if twitcher_wps else None
     twitcher_proxy = asbool(settings.get('twitcher.ows_proxy'))
-    twitcher_proxy_url = urljoin(twitcher_url, owsproxy_path(settings)) if twitcher_proxy else None
+    twitcher_proxy_url = twitcher_url + owsproxy_path(settings) if twitcher_proxy else None
 
     return {
         'message': 'Twitcher Information',
