@@ -23,6 +23,7 @@ from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import check_status
 from twitcher import visibility, status
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference
+from owslib.util import clean_ows_url
 from lxml import etree
 from six import string_types
 import requests
