@@ -26,6 +26,7 @@ from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import check_status
 from twitcher.wps_restapi import status
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference
+from owslib.util import clean_ows_url
 from lxml import etree
 from six import string_types
 import requests
@@ -132,19 +133,55 @@ def _map_status(wps_execution_status):
 
 
 @app.task(bind=True)
-def execute_process(self, url, service, process, inputs, outputs,
+def execute_process(self, url, service, process_id, inputs,
                     is_workflow=False, user_id=None, async=True, custom_tags=[], headers=None):
     registry = app.conf['PYRAMID_REGISTRY']
     store = jobstore_factory(registry)
     task_id = self.request.id
     job = JobDB({'task_id': task_id})  # default in case of error during registration to job store
     try:
-        job = store.save_job(task_id=task_id, process=process, service=service, is_workflow=is_workflow,
+        job = store.save_job(task_id=task_id, process=process_id, service=service, is_workflow=is_workflow,
                              user_id=user_id, async=async, custom_tags=custom_tags)
 
-        wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), skip_caps=False, verify=False)
+        try:
+            verify = False if urlparse(url).hostname == 'localhost' else True
+            wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), verify=verify)
+            raise_on_xml_exception(wps._capabilities)
+        except Exception as ex:
+            raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
+        try:
+            process = wps.describeprocess(process_id)
+        except Exception as ex:
+            raise OWSNoApplicableCode("Failed to retrieve WPS process description. Error: [{}].".format(str(ex)))
+
+        # prepare inputs
+        complex_inputs = []
+        for process_input in process.dataInputs:
+            if 'ComplexData' in process_input.dataType:
+                complex_inputs.append(process_input.identifier)
+
+        try:
+            wps_inputs = list()
+            for process_input in inputs:
+                input_id = get_any_id(process_input)
+                process_value = get_any_value(process_input)
+                # in case of array inputs, must repeat (id,value)
+                input_values = process_value if isinstance(process_value, list) else [process_value]
+                # need to use ComplexDataInput structure for complex input
+                wps_inputs.extend([(input_id,
+                                    ComplexDataInput(input_value) if input_id in complex_inputs else input_value)
+                                   for input_value in input_values])
+        except KeyError:
+            inputs = []
+
+        # prepare outputs
+        outputs = []
+        for output in process.processOutputs:
+            outputs.append(
+                (output.identifier, output.dataType == 'ComplexData'))
+
         mode = 'async' if async else 'sync'
-        execution = wps.execute(process, inputs=inputs, output=outputs, mode=mode, lineage=True)
+        execution = wps.execute(process_id, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
 
         if not execution.process and execution.errors:
             raise execution.errors[0]
@@ -230,48 +267,11 @@ def submit_job_handler(request, service_url, is_workflow=False):
     async_execute = not request.params.getone('sync-execute') if 'sync-execute' in request.params else True
     tags = request.params.get('tags', '').split(',')
 
-    try:
-        verify = False if urlparse(service_url).hostname == 'localhost' else True
-        wps = WebProcessingService(url=service_url, headers=get_cookie_headers(request.headers), verify=verify)
-        raise_on_xml_exception(wps._capabilities)
-    except Exception as ex:
-        raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
-    try:
-        process = wps.describeprocess(process_id)
-    except Exception as ex:
-        raise OWSNoApplicableCode("Failed to retrieve WPS process description. Error: [{}].".format(str(ex)))
-
-    # prepare inputs
-    complex_inputs = []
-    for process_input in process.dataInputs:
-        if 'ComplexData' in process_input.dataType:
-            complex_inputs.append(process_input.identifier)
-
-    try:
-        inputs = list()
-        for process_input in request.json_body['inputs']:
-            input_id = get_any_id(process_input)
-            process_value = get_any_value(process_input)
-            # in case of array inputs, must repeat (id,value)
-            input_values = process_value if isinstance(process_value, list) else [process_value]
-            # need to use ComplexDataInput structure for complex input
-            inputs.extend([(input_id, ComplexDataInput(input_value) if input_id in complex_inputs else input_value)
-                           for input_value in input_values])
-    except KeyError:
-        inputs = []
-
-    # prepare outputs
-    outputs = []
-    for output in process.processOutputs:
-        outputs.append(
-            (output.identifier, output.dataType == 'ComplexData'))
-
     result = execute_process.delay(
-        url=wps.url,
+        url=clean_ows_url(service_url),
         service=provider_id,
-        process=process.identifier,
-        inputs=inputs,
-        outputs=outputs,
+        process_id=process_id,
+        inputs=request.json_body['inputs'],
         is_workflow=is_workflow,
         user_id=request.authenticated_userid,
         async=async_execute,
@@ -284,7 +284,7 @@ def submit_job_handler(request, service_url, is_workflow=False):
     location = '{base_url}{location_base}/processes/{process_id}/jobs/{job_id}'.format(
         base_url=wps_restapi_base_url(request.registry.settings),
         location_base=location_base,
-        process_id=process.identifier,
+        process_id=process_id,
         job_id=result.id)
     body_data = {
         'jobID': result.id,
