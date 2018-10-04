@@ -18,7 +18,7 @@ from twitcher.exceptions import (
 from twitcher.processes import wps_package
 from twitcher.processes.types import PROCESS_WORKFLOW
 from twitcher.store import processstore_defaultfactory
-from twitcher.utils import get_any_id, raise_on_xml_exception
+from twitcher.utils import get_any_id, get_any_value, raise_on_xml_exception
 from twitcher.namesgenerator import get_sane_name
 from twitcher.owsexceptions import OWSNoApplicableCode
 from twitcher.wps_restapi import swagger_definitions as sd
@@ -251,7 +251,7 @@ def submit_job_handler(request, service_url, is_workflow=False):
         inputs = list()
         for process_input in request.json_body['inputs']:
             input_id = get_any_id(process_input)
-            process_value = process_input['value']
+            process_value = get_any_value(process_input)
             # in case of array inputs, must repeat (id,value)
             input_values = process_value if isinstance(process_value, list) else [process_value]
             # need to use ComplexDataInput structure for complex input
