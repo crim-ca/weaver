@@ -15,6 +15,7 @@ from webob.acceptparse import MIMEAccept
 from pyramid.interfaces import IExceptionResponse
 from pyramid.response import Response
 from pyramid.compat import text_type
+import os
 
 
 @implementer(IExceptionResponse)
