@@ -481,6 +481,7 @@ class Process(dict):
             'executeEndpoint': self.executeEndpoint,
             'type': self.type,
             'package': self.package,      # deployment specification (json body)
+            'payload': self.payload,
         }
 
     @property
