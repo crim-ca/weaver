@@ -4,7 +4,7 @@ Definitions of types used by tokens.
 
 import six
 import uuid
-# noinspection PyProtectedMember
+# noinspection PyPackageRequirements
 from dateutil.parser import parse as dt_parse
 from datetime import datetime, timedelta
 # noinspection PyProtectedMember

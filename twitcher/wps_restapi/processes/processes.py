@@ -31,8 +31,14 @@ from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import check_status
 from twitcher.visibility import VISIBILITY_PUBLIC, visibility_values
-from twitcher.status import STATUS_ACCEPTED, STATUS_STARTED, STATUS_FAILED, STATUS_SUCCEEDED, STATUS_RUNNING
-from twitcher.status import job_status_values
+from twitcher.status import (
+    map_status,
+    STATUS_ACCEPTED,
+    STATUS_STARTED,
+    STATUS_FAILED,
+    STATUS_SUCCEEDED,
+    STATUS_PENDING,
+)
 from twitcher.sync import EXECUTE_AUTO, EXECUTE_ASYNC, EXECUTE_SYNC
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference
 from owslib.util import clean_ows_url

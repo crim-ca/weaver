@@ -309,6 +309,8 @@ OutputTransmissionEnum = SchemaNode(String(), title='outputTransmission', missin
 
 
 class LaunchJobQuerystring(MappingSchema):
+    sync_execute = SchemaNode(Boolean(), default=False, missing=drop)
+    sync_execute.name = 'sync-execute'
     field_string = SchemaNode(String(), default=None, missing=drop,
                               description='Comma separated tags that can be used to filter jobs later')
     field_string.name = 'tags'
