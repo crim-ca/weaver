@@ -12,7 +12,7 @@ from pyramid.settings import asbool
 
 from twitcher._compat import urlparse
 
-from twitcher.owsexceptions import OWSAccessForbidden, OWSAccessFailed
+from twitcher.owsexceptions import OWSAccessForbidden, OWSAccessFailed, OWSException
 from twitcher.utils import replace_caps_url, get_twitcher_url
 from twitcher.adapter import servicestore_factory
 from twitcher.adapter import adapter_factory
@@ -72,23 +72,24 @@ def _send_request(request, service, extra_path=None, request_params=None):
     h.pop("Host", h)
     h['Accept-Encoding'] = None
 
-    #
+    ssl_verify = asbool(request.registry.settings.get('twitcher.ows_proxy_ssl_verify', True))
     service_type = service.type
     if service_type and (service_type.lower() != 'wps'):
         try:
             resp_iter = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h,
-                                         stream=True)
+                                         stream=True, verify=ssl_verify)
         except Exception as e:
             return OWSAccessFailed("Request failed: {}".format(e.message))
 
         # Headers meaningful only for a single transport-level connection
         HopbyHop = ['Connection', 'Keep-Alive', 'Public', 'Proxy-Authenticate', 'Transfer-Encoding', 'Upgrade']
         return Response(app_iter=BufferedResponse(resp_iter),
-                        headers={k: v for k, v in resp_iter.headers.iteritems() if k not in HopbyHop})
+                        headers={k: v for k, v in resp_iter.headers.items() if k not in HopbyHop})
     else:
         try:
-            resp = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h)
-        except Exception, e:
+            resp = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h,
+                                    verify=ssl_verify)
+        except Exception as e:
             return OWSAccessFailed("Request failed: {}".format(e.message))
 
         if resp.ok is False:
@@ -128,6 +129,10 @@ def _send_request(request, service, extra_path=None, request_params=None):
         return Response(content, status=resp.status_code, headers=headers)
 
 
+def owsproxy_path(settings):
+    return settings.get('twitcher.ows_proxy_protected_path', '/ows').rstrip('/').strip()
+
+
 def owsproxy_url(request):
     url = request.params.get("url")
     if url is None:
@@ -150,8 +155,11 @@ def owsproxy(request):
         extra_path = request.matchdict.get('extra_path')
         store = servicestore_factory(request.registry)
         service = store.fetch_by_name(service_name, request=request)
+    except OWSException:
+        # Store impl should raise appropriate exception like not authorized
+        pass
     except Exception as err:
-        return OWSAccessFailed("Could not find service: {}.".format(err.message))
+        return OWSAccessFailed("Could not find service {0} : {1}.".format(service_name, err.message))
     else:
         return _send_request(request, service, extra_path, request_params=request.query_string)
 
@@ -183,8 +191,8 @@ def includeme(config):
 
 
 def owsproxy_defaultconfig(settings, config):
-    protected_path = settings.get('twitcher.ows_proxy_protected_path', '/ows')
     if asbool(settings.get('twitcher.ows_proxy', True)):
+        protected_path = owsproxy_path(settings)
         LOGGER.debug('Twitcher {}/proxy enabled.'.format(protected_path))
 
         config.add_route('owsproxy', protected_path + '/proxy/{service_name}')

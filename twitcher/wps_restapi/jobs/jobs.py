@@ -4,7 +4,7 @@ from twitcher.adapter import jobstore_factory
 from twitcher.exceptions import JobNotFound
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import wps_restapi_base_url
-from twitcher.wps_restapi import status, sort
+from twitcher import sort, status
 from owslib.wps import WPSExecution
 from lxml import etree
 from celery.utils.log import get_task_logger
