@@ -455,6 +455,10 @@ class Process(dict):
         return self.get('package')
 
     @property
+    def payload(self):
+        return self.get('payload')
+
+    @property
     def visibility(self):
         return self.get('visibility', VISIBILITY_PRIVATE)
 
@@ -491,6 +495,7 @@ class Process(dict):
             'executeEndpoint': self.executeEndpoint,
             'type': self.type,
             'package': self.package,      # deployment specification (json body)
+            'payload': self.payload,
             'visibility': self.visibility,
         }
 
@@ -552,7 +557,8 @@ class Process(dict):
             ProcessInstanceError("Unknown process `{}` in mapping".format(process_key))
         if process_key in PACKAGE_PROCESSES:
             kwargs = self.params_wps
-            kwargs.update({'package': self.package})
+            kwargs.update({'package': self.package,
+                           'payload': self.payload})
             return process_mapping[process_key](**kwargs)
         return process_mapping[process_key]()
 
