@@ -132,6 +132,7 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
 from twitcher.store.base import ProcessStore
 from twitcher.exceptions import ProcessNotFound, ProcessRegistrationError, ProcessInstanceError
 from twitcher.datatype import Process as ProcessDB
+from twitcher.visibility import visibility_values
 from pywps import Process as ProcessWPS
 
 
@@ -223,12 +224,24 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         self.collection.delete_one({'identifier': sane_name})
         return True
 
-    def list_processes(self, request=None):
+    def list_processes(self, visibility=None, request=None):
         """
-        Lists all processes in database.
+        Lists all processes in database, optionally filtered by visibility.
+
+        :param visibility: One value amongst `twitcher.visibility`.
         """
         db_processes = []
-        for process in self.collection.find().sort('identifier', pymongo.ASCENDING):
+        search_filters = {}
+        if visibility is None:
+            visibility = visibility_values
+        if isinstance(visibility, six.string_types):
+            visibility = [visibility]
+        for v in visibility:
+            if v not in visibility_values:
+                raise ValueError("Invalid visibility value `{0!s}` is not one of {1!s}"
+                                 .format(v, list(visibility_values)))
+        search_filters['visibility'] = {'$in': visibility}
+        for process in self.collection.find(search_filters).sort('identifier', pymongo.ASCENDING):
             db_processes.append(ProcessDB(process))
         return db_processes
 

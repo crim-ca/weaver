@@ -112,9 +112,11 @@ class ProcessStore(object):
         """
         raise NotImplementedError
 
-    def list_processes(self, request=None):
+    def list_processes(self, visibility=None, request=None):
         """
-        Lists all processes in database.
+        Lists all processes in database, optionally filtered by visibility.
+
+        :param visibility: One value amongst `twitcher.visibility`.
         """
         raise NotImplementedError
 

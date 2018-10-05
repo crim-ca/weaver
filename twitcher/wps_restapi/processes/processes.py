@@ -21,7 +21,8 @@ from twitcher.owsexceptions import OWSNoApplicableCode
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import check_status
-from twitcher import visibility, status
+from twitcher.visibility import VISIBILITY_PUBLIC, visibility_values
+from twitcher.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_FINISHED, STATUS_RUNNING, job_status_values
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference
 from owslib.util import clean_ows_url
 from lxml import etree
@@ -124,14 +125,15 @@ def _jsonify_output(output, datatype):
 
 def _map_status(wps_execution_status):
     job_status = wps_execution_status.lower().replace('process', '')
-    if job_status in status.job_status_values:
+    if job_status in job_status_values:
         return job_status
     return 'unknown'
 
 
 @app.task(bind=True)
 def execute_process(self, url, service, process, inputs, outputs,
-                    is_workflow=False, user_id=None, async=True, custom_tags=[], headers=None):
+                    is_workflow=False, user_id=None, async=True, custom_tags=None, headers=None):
+    custom_tags = list() if custom_tags is None else custom_tags
     registry = app.conf['PYRAMID_REGISTRY']
     store = jobstore_factory(registry)
     task_id = self.request.id
@@ -147,7 +149,7 @@ def execute_process(self, url, service, process, inputs, outputs,
         if not execution.process and execution.errors:
             raise execution.errors[0]
 
-        job.status = status.STATUS_RUNNING
+        job.status = STATUS_RUNNING
         job.status_message = execution.statusMessage or "{} initiation done.".format(str(job))
         job.status_location = execution.statusLocation
         job.request = execution.request
@@ -174,7 +176,7 @@ def execute_process(self, url, service, process, inputs, outputs,
                     job.is_finished()
                     if execution.isSucceded():
                         job.progress = 100
-                        job.status = status.STATUS_FINISHED
+                        job.status = STATUS_FINISHED
                         job.status_message = execution.statusMessage or "Job succeeded."
                         job.save_log(logger=task_logger)
 
@@ -205,7 +207,7 @@ def execute_process(self, url, service, process, inputs, outputs,
                 job = store.update_job(job)
 
     except (WPSException, Exception) as exc:
-        job.status = status.STATUS_FAILED
+        job.status = STATUS_FAILED
         job.status_message = "Failed to run {}.".format(str(job))
         if isinstance(exc, WPSException):
             errors = "[{0}] {1}".format(exc.locator, exc.text)
@@ -220,6 +222,7 @@ def execute_process(self, url, service, process, inputs, outputs,
     return job.status
 
 
+# noinspection PyProtectedMember
 def submit_job_handler(request, service_url, is_workflow=False):
 
     # TODO Validate param somehow
@@ -286,7 +289,7 @@ def submit_job_handler(request, service_url, is_workflow=False):
         job_id=result.id)
     body_data = {
         'jobID': result.id,
-        'status': status.STATUS_ACCEPTED,
+        'status': STATUS_ACCEPTED,
         'location': location
     }
     return HTTPCreated(json=body_data)
@@ -389,7 +392,8 @@ def get_processes(request):
     try:
         # get local processes
         store = processstore_factory(request.registry)
-        processes = [process.summary() for process in store.list_processes(request=request)]
+        processes = [process.summary() for process in
+                     store.list_processes(visibility=VISIBILITY_PUBLIC, request=request)]
         response_body = {'processes': processes}
 
         # if EMS and ?providers=True, also fetch each provider's processes
@@ -572,7 +576,7 @@ def set_process_visibility(request):
         raise HTTPBadRequest('Value of visibility must be a string.')
     except ValueError:
         raise HTTPUnprocessableEntity('Value of visibility must be one of : {!s}'
-                                      .format(list(visibility.visibility_values)))
+                                      .format(list(visibility_values)))
     except ProcessNotFound as ex:
         raise HTTPNotFound(ex.message)
     except Exception as ex:

@@ -13,6 +13,7 @@ from six.moves.configparser import SafeConfigParser
 import six
 
 from twitcher.owsexceptions import OWSNoApplicableCode
+from twitcher.visibility import VISIBILITY_PUBLIC
 
 import logging
 LOGGER = logging.getLogger(__name__)
@@ -75,7 +76,7 @@ def pywps_view(environ, start_response):
         # call pywps application
         from twitcher.store import processstore_defaultfactory
         processstore = processstore_defaultfactory(registry)
-        processes_wps = [process.wps() for process in processstore.list_processes()]
+        processes_wps = [process.wps() for process in processstore.list_processes(visibility=VISIBILITY_PUBLIC)]
         service = Service(processes_wps, [environ['PYWPS_CFG']])
     except Exception as ex:
         raise OWSNoApplicableCode("Failed setup of PyWPS Service and/or Processes. Error [{}]".format(ex))
