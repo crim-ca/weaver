@@ -3,13 +3,10 @@ Definitions of types used by tokens.
 """
 
 import six
-import time
-import uuid
 from datetime import datetime
 from logging import _levelNames, ERROR, INFO
 from twitcher.utils import now_secs
-from twitcher.exceptions import AccessTokenNotFound
-from twitcher.wps_restapi.status import status_values
+from twitcher.status import status_values
 
 
 class Service(dict):

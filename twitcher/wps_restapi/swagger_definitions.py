@@ -3,8 +3,8 @@ This module should contain any and every definitions in use to build the swagger
 so that one can update the swagger without touching any other files after the initial integration
 """
 from twitcher.wps_restapi.utils import wps_restapi_base_path
-from twitcher.wps_restapi.status import status_values, STATUS_ACCEPTED
-from twitcher.wps_restapi.sort import sort_values, SORT_CREATED
+from twitcher.status import status_values, STATUS_ACCEPTED
+from twitcher.sort import sort_values, SORT_CREATED
 from cornice import Service
 from colander import *
 
@@ -212,7 +212,8 @@ OutputTransmissionEnum = SchemaNode(String(), validator=OneOf(['value', 'referen
 class LaunchJobQuerystring(MappingSchema):
     sync_execute = SchemaNode(Boolean(), default=False, missing=drop)
     sync_execute.name = 'sync-execute'
-    field_string = SchemaNode(String(), default=None, missing=drop, description='Comma separated tags that can be used to filter jobs later')
+    field_string = SchemaNode(String(), default=None, missing=drop,
+                              description='Comma separated tags that can be used to filter jobs later')
     field_string.name = 'tags'
 
 
@@ -422,7 +423,8 @@ class GetJobsQueries(MappingSchema):
     process = SchemaNode(String(), missing=drop, default=None)
     provider = SchemaNode(String(), missing=drop, default=None)
     sort = JobSortEnum
-    tags = SchemaNode(String(), missing=drop, default=None, description='Comma-separated values of tags assigned to jobs')
+    tags = SchemaNode(String(), missing=drop, default=None,
+                      description='Comma-separated values of tags assigned to jobs')
 
 
 class GetJobsRequest(MappingSchema):

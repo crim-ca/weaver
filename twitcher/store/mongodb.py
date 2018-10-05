@@ -125,8 +125,8 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
 from twitcher.store.base import JobStore
 from twitcher.datatype import Job
 from twitcher.exceptions import JobRegistrationError, JobNotFound, JobUpdateError
-from twitcher.wps_restapi.sort import *
-from twitcher.wps_restapi.status import *
+from twitcher.sort import *
+from twitcher.status import *
 from pyramid.security import authenticated_userid
 from pymongo import ASCENDING, DESCENDING
 from datetime import datetime
