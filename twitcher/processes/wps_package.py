@@ -713,6 +713,7 @@ class Package(Process):
 
         :param kw: dictionary corresponding to method :class:`twitcher.datatype.Process.params_wps`
         """
+        self.payload = kw.pop("payload")
         package = kw.pop('package')
         if not package:
             raise PackageRegistrationError("Missing required package definition for package process.")
