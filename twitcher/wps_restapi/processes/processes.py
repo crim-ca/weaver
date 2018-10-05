@@ -472,6 +472,7 @@ def add_local_process(request):
 
     # ensure that required 'executeEndpoint' in db is added, will be auto-fixed to localhost if not specified in body
     process_info.update({'executeEndpoint': process_info.get('executeEndpoint')})
+    process_info["payload"] = body
     try:
         store = processstore_defaultfactory(request.registry)
         saved_process = store.save_process(ProcessDB(process_info), overwrite=False)
