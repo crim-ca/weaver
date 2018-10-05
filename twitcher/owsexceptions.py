@@ -43,7 +43,7 @@ class OWSException(Response, Exception):
         if value:
             self.locator = value
 
-    def __str__(self):
+    def __str__(self, skip_body=False):
         return self.message
 
     @staticmethod
@@ -73,7 +73,8 @@ class OWSException(Response, Exception):
                         self.excobj = excobj
 
                     def substitute(self, code, locator, message):
-                        return json.dumps(self.json_formatter(status=code, body=message))
+                        return json.dumps(self.excobj.json_formatter(
+                            status=code, body=message, title=None, environ=environ))
 
                 page_template = JsonPageTemplate(self)
 
