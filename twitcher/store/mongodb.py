@@ -160,9 +160,11 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         if not isinstance(new_process, ProcessDB):
             raise ProcessInstanceError("Unsupported process type `{}`".format(type(process)))
 
+        # apply defaults if not specified
         new_process['type'] = self._get_process_type(process)
         new_process['identifier'] = self._get_process_id(process)
         new_process['executeEndpoint'] = self._get_process_url(process)
+        new_process['visibility'] = new_process.visibility
         self.collection.insert_one(new_process)
 
     @staticmethod

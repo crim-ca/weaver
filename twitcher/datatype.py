@@ -11,7 +11,7 @@ from twitcher.exceptions import ProcessInstanceError
 from twitcher.processes import process_mapping
 from twitcher.processes.types import PACKAGE_PROCESSES, PROCESS_WPS
 from twitcher.status import job_status_values
-from twitcher.visibility import visibility_values
+from twitcher.visibility import visibility_values, VISIBILITY_PRIVATE
 from pywps import Process as ProcessWPS
 
 
@@ -456,7 +456,7 @@ class Process(dict):
 
     @property
     def visibility(self):
-        return self.get('visibility')
+        return self.get('visibility', VISIBILITY_PRIVATE)
 
     @visibility.setter
     def visibility(self, visibility):
