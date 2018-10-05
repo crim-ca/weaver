@@ -240,7 +240,7 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
             if v not in visibility_values:
                 raise ValueError("Invalid visibility value `{0!s}` is not one of {1!s}"
                                  .format(v, list(visibility_values)))
-        search_filters['visibility'] = {'$in': visibility}
+        search_filters['visibility'] = {'$in': list(visibility)}
         for process in self.collection.find(search_filters).sort('identifier', pymongo.ASCENDING):
             db_processes.append(ProcessDB(process))
         return db_processes
