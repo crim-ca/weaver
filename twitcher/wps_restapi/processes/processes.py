@@ -27,6 +27,7 @@ from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_
 from owslib.util import clean_ows_url
 from lxml import etree
 from six import string_types
+from copy import deepcopy
 import requests
 
 task_logger = get_task_logger(__name__)
@@ -438,7 +439,7 @@ def add_local_process(request):
 
     # retrieve CWL package definition, either via owsContext or executionUnit package/reference
     deployment_profile = body.get('deploymentProfile')
-    ows_context = process_info.get('owsContext')
+    ows_context = process_info.pop('owsContext', None)
     if isinstance(ows_context, dict):
         offering = ows_context.get('offering')
         if not isinstance(offering, dict):
@@ -474,8 +475,8 @@ def add_local_process(request):
             raise HTTPBadRequest("Invalid `{0}` package deployment on `{1}`.".format(process_type, twitcher_config))
 
     # ensure that required 'executeEndpoint' in db is added, will be auto-fixed to localhost if not specified in body
-    process_info.update({'executeEndpoint': process_info.get('executeEndpoint')})
-    process_info["payload"] = body
+    # use deepcopy of body payload to avoid circular dependencies when writing to mongodb
+    process_info.update({'executeEndpoint': process_info.get('executeEndpoint'), 'payload': deepcopy(body)})
     try:
         store = processstore_factory(request.registry)
         saved_process = store.save_process(ProcessDB(process_info), overwrite=False, request=request)
