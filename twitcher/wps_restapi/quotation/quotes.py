@@ -9,10 +9,23 @@ from twitcher.processes.types import *
 from twitcher.processes.wps_package import get_process_location, get_package_workflow_steps
 from twitcher.utils import get_twitcher_url
 from pyramid.httpexceptions import *
+from datetime import timedelta
 import logging
 import random
 
 logger = logging.getLogger('TWITCHER')
+
+
+def process_quote_estimator(process):
+    """
+    :param process: instance of :class:`twitcher.datatype.Process` for which to evaluate the quote.
+    :return: dict of {price, currency, estimatedTime} values for the process quote.
+    """
+    # TODO: replace by some fancy ml technique or something?
+    price = random.random(0, 10)
+    currency = 'CAD'
+    estimated_time = timedelta(minutes=random.random(5, 60))
+    return {'price': price, 'currency': currency, 'estimatedTime': estimated_time}
 
 
 @sd.process_quotes_service.post(tags=[sd.bill_quote_tag, sd.processes_tag], renderer='json',
@@ -52,16 +65,16 @@ def request_quote(request):
             resp_json = request.invoke_subrequest(subreq).json()
             quote_json = resp_json['quote']
             quote = store.save_quote(Quote(process=quote_json.pop('process'),
-                                           cost=quote_json.pop('cost'),
+                                           price=quote_json.pop('price'),
                                            location=process_step_url))
             workflow_quotes.append(quote.id)
-        quote = store.save_quote(Quote(process=process.identifier, cost=random.random(0, 10),
-                                       location=process_url, steps=workflow_quotes))
+        quote = store.save_quote(Quote(process=process.identifier, location=process_url, steps=workflow_quotes,
+                                       **process_quote_estimator(process)))
         return HTTPCreated(json={"quote": quote.json()})
 
     # single application quotes (ADES or EMS)
     elif process_type == PROCESS_APPLICATION:
-        quote = store.save_quote(Quote(process=process_id, cost=random.random(0, 10), location=process_url))
+        quote = store.save_quote(Quote(process=process_id, location=process_url), **process_quote_estimator(process))
         quote_json = quote.json()
         quote_json.pop('steps', None)
         return HTTPCreated(json={"quote": quote_json})
@@ -128,6 +141,6 @@ def execute_quote(request):
     job_id = job_json.get('jobID')
     user_id = request.authenticated_userid
     store = billstore_factory(request.registry)
-    bill = store.save_bill(Bill(user=user_id, quote=quote.id, job=job_id))
+    bill = store.save_bill(Bill(user=user_id, quote=quote.id, job=job_id, price=quote.price, currency=quote.currency))
     job_json.update({"bill": bill.id})
     return HTTPCreated(json=job_json)
