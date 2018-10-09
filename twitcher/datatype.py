@@ -501,8 +501,7 @@ class Process(dict):
 
     @property
     def params_wps(self):
-        """Values applicable to WPS Process __init__
-        """
+        """Values applicable to WPS Process __init__"""
         return {
             'identifier': self.identifier,
             'title': self.title,
@@ -512,6 +511,8 @@ class Process(dict):
             'version': self.version,
             'inputs': self.inputs,
             'outputs': self.outputs,
+            'package': self.package,
+            'payload': self.payload,
         }
 
     def json(self):
@@ -556,10 +557,7 @@ class Process(dict):
         if process_key not in process_mapping:
             ProcessInstanceError("Unknown process `{}` in mapping".format(process_key))
         if process_key in PACKAGE_PROCESSES:
-            kwargs = self.params_wps
-            kwargs.update({'package': self.package,
-                           'payload': self.payload})
-            return process_mapping[process_key](**kwargs)
+            return process_mapping[process_key](**self.params_wps)
         return process_mapping[process_key]()
 
 
