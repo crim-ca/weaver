@@ -26,7 +26,8 @@ from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import check_status
 from twitcher.visibility import VISIBILITY_PUBLIC, visibility_values
-from twitcher.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_FINISHED, STATUS_RUNNING, job_status_values
+from twitcher.status import STATUS_ACCEPTED, STATUS_STARTED, STATUS_FAILED, STATUS_SUCCEEDED, STATUS_RUNNING
+from twitcher.status import job_status_values
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference
 from owslib.util import clean_ows_url
 from lxml import etree
@@ -130,6 +131,10 @@ def _jsonify_output(output, datatype):
 
 def _map_status(wps_execution_status):
     job_status = wps_execution_status.lower().replace('process', '')
+    if job_status == 'Exception':  # owslib supported status
+        job_status = STATUS_FAILED
+    if job_status == 'Running':  # OGC official status
+        job_status = STATUS_STARTED
     if job_status in job_status_values:
         return job_status
     return 'unknown'
@@ -223,7 +228,7 @@ def execute_process(self, url, service, process_id, inputs,
                     job.is_finished()
                     if execution.isSucceded():
                         job.progress = 100
-                        job.status = STATUS_FINISHED
+                        job.status = STATUS_SUCCEEDED
                         job.status_message = execution.statusMessage or "Job succeeded."
                         job.save_log(logger=task_logger)
 
@@ -507,6 +512,7 @@ def get_local_process(request):
     """
     Get a registered local process information (DescribeProcess).
     """
+
     process_id = request.matchdict.get('process_id')
     if not isinstance(process_id, string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")

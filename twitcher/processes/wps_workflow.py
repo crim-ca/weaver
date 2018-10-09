@@ -6,6 +6,7 @@ import logging
 import os
 import shutil
 import tempfile
+from six.moves import urllib
 from functools import cmp_to_key, partial
 from typing import (Any, Callable, Dict, Generator, List, Optional, Set, MutableMapping, Union, cast)
 from typing_extensions import Text, Type
@@ -77,6 +78,9 @@ class WpsWorkflow(Process):
         self.prov_obj = loadingContext.prov_obj
         self.get_step_process_definition = get_step_process_definition
 
+        # DockerRequirement is removed because we use our custom job which dispatch the processing to an ADES instead
+        self.requirements = list(filter(lambda req: req['class'] != 'DockerRequirement', self.requirements))
+
     def job(self,
             job_order,         # type: Dict[Text, Text]
             output_callbacks,  # type: Callable[[Any, Any], Any]
@@ -94,9 +98,10 @@ class WpsWorkflow(Process):
         builder.outdir = tempfile.mkdtemp(prefix=getdefault(runtimeContext.tmp_outdir_prefix, DEFAULT_TMP_PREFIX))
         builder.stagedir = builder.outdir
 
-        # FIXME: get_step_process_definition's second param should be determined somehow
+        # job_name is the step name and job_order is the actual step inputs
         wps_workflow_job = WpsWorkflowJob(builder, builder.job, self.requirements,
-                                          self.hints, jobname, self.get_step_process_definition(jobname, None))
+                                          self.hints, jobname, self.get_step_process_definition(jobname, job_order),
+                                          self.tool['outputs'])
         wps_workflow_job.prov_obj = self.prov_obj
         wps_workflow_job.successCodes = self.tool.get("successCodes")
         wps_workflow_job.temporaryFailCodes = self.tool.get("temporaryFailCodes")
@@ -158,7 +163,9 @@ class WpsWorkflow(Process):
             if ret:
                 revmap = partial(command_line_tool.revmap_file, builder, outdir)
                 adjustDirObjs(ret, trim_listing)
-                visit_class(ret, ("File", "Directory"), cast(Callable[[Any], Any], revmap))
+
+                # TODO Attempt to avoid a crash because the revmap fct is not functionnal (intend for a docker usage only?)
+                #visit_class(ret, ("File", "Directory"), cast(Callable[[Any], Any], revmap))
                 visit_class(ret, ("File", "Directory"), command_line_tool.remove_path)
                 normalizeFilesDirs(ret)
                 visit_class(ret, ("File", "Directory"), partial(command_line_tool.check_valid_locations, fs_access))
@@ -238,7 +245,8 @@ class WpsWorkflow(Process):
 
                 for files in r:
                     rfile = files.copy()
-                    revmap(rfile)
+                    # TODO This function raise an exception and seems to be related to docker (which is not used here)
+                    #revmap(rfile)
                     if files["class"] == "Directory":
                         ll = builder.loadListing or (binding and binding.get("loadListing"))
                         if ll and ll != "no_listing":
@@ -319,7 +327,8 @@ class WpsWorkflow(Process):
                     primary["format"] = builder.do_eval(schema["format"], context=primary)
 
             # Ensure files point to local references outside of the run environment
-            adjustFileObjs(r, revmap)
+            # TODO: Again removing revmap....
+            #adjustFileObjs(r, revmap)
 
             if not r and optional:
                 return None
@@ -341,10 +350,25 @@ class WpsWorkflowJob(JobBase):
                  requirements,      # type: List[Dict[Text, Text]]
                  hints,             # type: List[Dict[Text, Text]]
                  name,              # type: Text
-                 wps_process,        # type: WpsProcess
+                 wps_process,       # type: WpsProcess
+                 expected_outputs,  # type: List[Dict[id, type, outputBinding]]
                  ):  # type: (...) -> None
         super(WpsWorkflowJob, self).__init__(builder, joborder, None, requirements, hints, name)
         self.wps_process = wps_process
+        self.expected_outputs = {}
+        for output in expected_outputs:
+            # TODO Should we support something else?
+            if output['type'] == 'File':
+                # TODO Not very robust... Expecting output to look like this
+                # output = {'id': 'file:///tmp/random_path/process_name#output_id,
+                #           'type': 'File',
+                #           'outputBinding': {'glob': output_name }
+                #          }
+                output_id = shortname(output['id'])
+                #d = urllib.parse.urlparse(output['id'])
+                #self.expected_outputs[output_id] = d.path
+                self.expected_outputs[output_id] = output['outputBinding']['glob']
+
 
     def run(self,
             runtimeContext     # type: RuntimeContext
@@ -387,9 +411,7 @@ class WpsWorkflowJob(JobBase):
             LOGGER.info(u"Process %s is not deployed on %s - deploying.", self.wps_process.process_id, self.wps_process.url)
             self.wps_process.deploy()
 
-        result = self.wps_process.execute(self.builder.job)
-
-        # TODO: Write results to outputs so that the main workflow or the next job grabs it
+        self.results = self.wps_process.execute(self.builder.job, self.outdir, self.expected_outputs)
 
         if self.joborder and runtimeContext.research_obj:
             job_order = self.joborder

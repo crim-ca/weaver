@@ -24,12 +24,16 @@ from pywps.app.Common import Metadata
 from twitcher.processes import opensearch
 
 from twitcher import namesgenerator
+from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS
+from twitcher.processes.wps_process import WpsProcess
+from twitcher.processes.wps_workflow import default_make_tool
 from twitcher.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
-from twitcher.processes.sources import retrieve_data_source_url
+from twitcher.processes.sources import retrieve_data_source_url, get_data_source_from_url
 from twitcher.utils import parse_request_query, get_any_id
 from twitcher.exceptions import PackageTypeError, PackageRegistrationError, PackageExecutionError, PackageNotFound
 from twitcher.wps_restapi.swagger_definitions import process_uri
 from pyramid.httpexceptions import HTTPOk
+from pyramid_celery import celery_app as app
 from collections import OrderedDict, Hashable
 from six.moves.urllib.parse import urlparse
 from yaml.scanner import ScannerError
@@ -204,7 +208,8 @@ def _load_package_file(file_path):
 
 
 def _load_package_content(package_dict, package_name=PACKAGE_DEFAULT_FILE_NAME,
-                          data_source=None, only_dump_file=False, tmp_dir=None):
+                          data_source=None, only_dump_file=False, tmp_dir=None,
+                          loading_context=None):
     """
     Loads the package content to file in a temporary directory.
     Recursively processes sub-packages steps if the parent is of 'workflow' type (CWL class).
@@ -215,7 +220,11 @@ def _load_package_content(package_dict, package_name=PACKAGE_DEFAULT_FILE_NAME,
     :param only_dump_file: specify if the :class:`cwltool.factory.Factory` should be validated and returned.
     :param tmp_dir: location of the temporary directory to dump files (warning: will be deleted on exit).
     :return:
-        instance of :class:`cwltool.factory.Factory` if :param:`only_dump_file` is ``False``, ``None`` otherwise.
+        tuple of
+        - instance of :class:`cwltool.factory.Factory`
+        - package type (PROCESS_WORKFLOW or PROCESS_APPLICATION)
+        - dict of each step with their package name that must be run
+        if :param:`only_dump_file` is ``False``, ``None`` otherwise.
     """
 
     tmp_dir = tmp_dir or tempfile.mkdtemp()
@@ -224,6 +233,7 @@ def _load_package_content(package_dict, package_name=PACKAGE_DEFAULT_FILE_NAME,
     # for workflows, retrieve each 'sub-package' file
     package_type = _get_package_type(package_dict)
     workflow_steps = get_package_workflow_steps(package_dict)
+    step_packages = {}
     for step in workflow_steps:
         # generate sub-package file and update workflow step to point to created sub-package file
         step_process_url = get_process_location(step['reference'], data_source)
@@ -231,26 +241,18 @@ def _load_package_content(package_dict, package_name=PACKAGE_DEFAULT_FILE_NAME,
         _load_package_content(package_body, package_name, data_source=data_source,
                               only_dump_file=True, tmp_dir=tmp_dir)
         package_dict['steps'][step['name']]['run'] = package_name
+        step_packages[step['name']] = package_name
 
     with open(tmp_json_cwl, 'w') as f:
         json.dump(package_dict, f)
     if only_dump_file:
         return
 
-    if False:
-        # TODO Entry point to the ADES dispatcher cwl step
-        # EMS dispatch the execution to the ADES (WIP)
-        loading_context = LoadingContext()
-        loading_context.construct_tool_object = make_tool
-    else:
-        # ADES execute the cwl locally
-        loading_context = None
-
     cwl_factory = cwltool.factory.Factory(loading_context=loading_context,
                                           runtime_context=RuntimeContext(kwargs={'no_read_only': True}))
     package = cwl_factory.make(tmp_json_cwl)
     shutil.rmtree(tmp_dir)
-    return package, package_type
+    return package, package_type, step_packages
 
 
 def _is_cwl_array_type(io_info):
@@ -699,7 +701,7 @@ def get_process_from_wps_request(process_offering, reference=None, package=None,
         raise PackageRegistrationError("Cannot obtain process type from package class.")
 
     LOGGER.debug('Using data source: `{}`'.format(data_source))
-    package_factory, process_type = try_or_raise_package_error(
+    package_factory, process_type, _ = try_or_raise_package_error(
         lambda: _load_package_content(package, data_source=data_source),
         reason="Loading package content")
 
@@ -745,15 +747,11 @@ class Package(Process):
         :param kw: dictionary corresponding to method :class:`twitcher.datatype.Process.params_wps`
         """
         self.payload = kw.pop("payload")
-        package = kw.pop('package')
-        if not package:
+        self.package = kw.pop('package')
+        if not self.package:
             raise PackageRegistrationError("Missing required package definition for package process.")
-        if not isinstance(package, dict):
+        if not isinstance(self.package, dict):
             raise PackageRegistrationError("Unknown parsing of package definition for package process.")
-        try:
-            self.package, _ = _load_package_content(package, data_source=None)  # no data source for local package
-        except Exception as ex:
-            raise PackageRegistrationError("Exception occurred on package instantiation: `{}`".format(repr(ex)))
 
         inputs = kw.pop('inputs', [])
 
@@ -836,9 +834,32 @@ class Package(Process):
             self.log_message("Package: {}".format(request.identifier))
             self.update_status("Launching package ...", 2)
 
+            registry = app.conf['PYRAMID_REGISTRY']
+            stub_ades_process = False
+            if get_twitcher_configuration(registry.settings) == TWITCHER_CONFIGURATION_EMS and \
+                self.package_id == 'workflow': # TODO Remove this line
+                # EMS dispatch the execution to the ADES
+                loading_context = LoadingContext()
+                make_tool = lambda toolpath_object, loadingContext: self.make_tool(toolpath_object, loadingContext)
+                loading_context.construct_tool_object = make_tool
+            else:
+                # ADES execute the cwl locally
+                loading_context = None
+                stub_ades_process = True
+
+            try:
+                self.package, _, self.step_packages = _load_package_content(self.package,
+                                                                            package_name=self.package_id,
+                                                                            # no data source for local package
+                                                                            data_source=None,
+                                                                            loading_context=loading_context)
+            except Exception as ex:
+                raise PackageRegistrationError("Exception occurred on package instantiation: `{}`".format(repr(ex)))
+            self.update_status("Loading package content done.", 5)
+
             try:
                 cwl_input_info = dict([(i['name'], i) for i in self.package.t.inputs_record_schema['fields']])
-                self.update_status("Retrieve package inputs done.", 3)
+                self.update_status("Retrieve package inputs done.", 6)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed retrieving package input types.")
             try:
@@ -873,17 +894,28 @@ class Package(Process):
                     else:
                         raise self.exception_message(PackageTypeError, None,
                                                      "Undefined package input for execution: {}.".format(type(input_i)))
-                self.update_status("Convert package inputs done.", 4)
+                self.update_status("Convert package inputs done.", 8)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed to load package inputs.")
+
             try:
-                self.update_status("Running package ...", 6)
-                result = self.package(**cwl_inputs)
+                self.update_status("Running package ...", 10)
+                if stub_ades_process:
+                    result = {}
+                    for output in request.outputs:
+                        result[output] = dict(location='file:///home/byrnsda/ogc/testbed14/application-packages/stacker_output.dim.zip')
+                        #result[output]= dict(location='http://10.30.90.187:8090/wpsoutputs/ogc/stacker_output.dim.zip')
+                else:
+                    result = self.package(**cwl_inputs)
                 self.update_status("Package execution done.", 95)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed package execution.")
             try:
                 self.update_status("Package execution done.", 96)
+
+                # TODO Is it the best place to convert from local file to ems public url?
+                #twitcher_output_url = registry.settings.get('twitcher.output_url','http://10.30.90.187:8090/wpsoutputs/ogc')
+                #twitcher_output_path = registry.settings.get('twitcher.output_path','/home/byrnsda/birdhouse/var/lib/pywps/outputs/ogc')
                 for output in request.outputs:
                     if 'location' in result[output]:
                         self.response.outputs[output].as_reference = True
@@ -901,3 +933,27 @@ class Package(Process):
         else:
             self.update_status("Package complete.", 100, status=WPS_STATUS.SUCCEEDED)
         return self.response
+
+    def make_tool(self, toolpath_object, loadingContext):
+        get_step_process_definition_lambda = \
+            lambda step_id, data_source: self.get_step_process_definition(step_id, data_source)
+        return default_make_tool(toolpath_object, loadingContext, get_step_process_definition_lambda)
+
+    def get_step_process_definition(self, step_id, data_source):
+        # FIXME deploy_body must be obtained somehow
+        deploy_body = {}
+
+        # FIXME get the input being an EOData (deploy_body should contains that!)
+        eodata_input = 'files'
+
+        value = data_source[eodata_input]
+        if isinstance(value, list):
+            # Use the first value to determine the data source
+            value = value[0]
+        eodata_input_url = value['location']
+        return WpsProcess(url=retrieve_data_source_url(get_data_source_from_url(eodata_input_url)),
+                          process_id=self.step_packages[step_id],
+                          deploy_body=deploy_body,
+                          cookies=self.request.http_request.cookies)
+
+
