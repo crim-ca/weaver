@@ -164,6 +164,7 @@ class MemoryProcessStore(ProcessStore):
         if not self.name_index.get(sane_name) or overwrite:
             process.title = sane_name
             self.name_index[sane_name] = process
+        return self.fetch_by_id(sane_name)
 
     def delete_process(self, name, request=None):
         """
