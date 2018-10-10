@@ -1,0 +1,841 @@
+<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom" xmlns:csw="http://www.opengis.net/cat/csw/2.0.2" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:fn="http://www.w3.org/2005/xpath-functions" xmlns:geo="http://a9.com/-/opensearch/extensions/geo/1.0/" xmlns:georss="http://www.georss.org/georss" xmlns:gml="http://www.opengis.net/gml" xmlns:os="http://a9.com/-/spec/opensearch/1.1/" xmlns:rim="urn:oasis:names:tc:ebxml-regrep:xsd:rim:3.0" xmlns:semantic="http://a9.com/-/opensearch/extensions/semantic/1.0/" xmlns:sru="http://a9.com/-/opensearch/extensions/sru/2.0/" xmlns:time="http://a9.com/-/opensearch/extensions/time/1.0/" xmlns:wrs="http://www.opengis.net/cat/wrs/1.0" xmlns:xlink="http://www.w3.org/1999/xlink">
+<author>
+<name>FEDEO Clearinghouse</name>
+<email>eohelp@eo.esa.int</email>
+</author>
+<generator>FEDEO Clearinghouse</generator>
+<id>http://geo.spacebel.be/opensearch/request</id>
+<rights>Copyright 2016-2018, European Space Agency</rights>
+<title>FEDEO Clearinghouse - Search Response</title>
+<updated>2018-08-14T12:37:19Z</updated>
+<link href="http://geo.spacebel.be/opensearch/request?query=envisat&amp;startRecord=1&amp;maximumRecords=10&amp;httpAccept=application/atom%2Bxml&amp;status=116,135" hreflang="en" rel="self" type="application/atom+xml"/>
+<link href="http://geo.spacebel.be/opensearch/FedEO_OSGW_Service.xml" rel="describedby" type="application/xml"/>
+<link href="http://geo.spacebel.be/opensearch/request?query=envisat&amp;maximumRecords=10&amp;httpAccept=application/atom%2Bxml&amp;startRecord=1&amp;status=116,135" rel="first" type="application/atom+xml"/>
+
+<link href="http://geo.spacebel.be/opensearch/request?query=envisat&amp;maximumRecords=10&amp;httpAccept=application/atom%2Bxml&amp;startRecord=11&amp;status=116,135" rel="next" type="application/atom+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request?query=envisat&amp;maximumRecords=10&amp;httpAccept=application/atom%2Bxml&amp;startRecord=251&amp;status=116,135" rel="last" type="application/atom+xml"/>
+<link href="http://geo.spacebel.be/opensearch/description.xml" hreflang="en" rel="search" type="application/opensearchdescription+xml"/>
+<os:totalResults>251</os:totalResults>
+<os:startIndex>1</os:startIndex>
+<os:itemsPerPage>10</os:itemsPerPage>
+<os:Query dc:type="collection" os:count="10" os:searchTerms="envisat" os:startIndex="1" role="request"/>
+<entry>
+<category label="Science Keywords &gt; Earth Science &gt; Spectral/Engineering &gt; Radar &gt; Radar Imagery" term="http://gcmdservices.gsfc.nasa.gov/kms/concept/53f69037-ff05-4b09-a95d-e65ff42da595"/>
+<category label="FedEO" term="FedEO"/>
+<category label="SSARA" term="SSARA"/>
+<id>http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA</id>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA" rel="alternate" title="Atom format" type="application/atom+xml"/>
+<link href="http://geo.spacebel.be/opensearch/description.xml?parentIdentifier=EOP:SSARA" hreflang="en" rel="search" type="application/opensearchdescription+xml"/>
+<link href="http://www.unavco.org/projects/other-projects/ssara/ssara.html" rel="describedby" type="text/html"/>
+<link href="http://obeos.spacebel.be/opensearch/images/unavco.png" rel="icon" type="image/png"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA&amp;recordSchema=iso" rel="alternate" title="ISO 19139 metadata" type="application/vnd.iso.19139+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139-2%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA&amp;recordSchema=iso19139-2" rel="alternate" title="ISO 19139-2 metadata" type="application/vnd.iso.19139-2+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/iso19115%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA&amp;recordSchema=iso19115" rel="alternate" title="ISO MENDS metadata" type="application/iso19115+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19115-3%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA&amp;recordSchema=iso19115-3" rel="alternate" title="ISO 19115-3 metadata" type="application/vnd.iso.19115-3+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/dif10%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA&amp;recordSchema=dif10" rel="alternate" title="DIF-10 metadata" type="application/dif10+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/xml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA&amp;recordSchema=dc" rel="alternate" title="Dublin Core metadata" type="application/xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/rdf%2Bxml&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=EOP:SSARA&amp;recordSchema=iso" rel="alternate" title="RDF/XML format" type="application/rdf+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/ld%2Bjson&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=EOP:SSARA&amp;recordSchema=iso" rel="alternate" title="JSON-LD format" type="application/ld+json"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=text/turtle&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=EOP:SSARA&amp;recordSchema=iso" rel="alternate" title="Turtle format" type="text/turtle"/>
+<summary type="html"><![CDATA[<table xmlns="">
+<tr valign="top">
+<td>
+<b>Title</b>
+</td>
+<td>Seamless SAR Archive (SSARA) Provided Collections </td>
+</tr>
+<tr valign="top">
+<td>
+<b>Description</b>
+</td>
+<td> This collection represents the collections provided by the SSARA - Seamless SAR Archive that are available through the FedEO Opensearch Gateway. SSARA will provide users with simple browser and web service API access tools to view and retrieve SAR data from multiple archives, to place their tasking requests, to order data, and to report results back to data providers; to make a larger pool of data available to scientific data users; and to encourage broader national and international use of SAR data. The new ACCESS-developed tools will help overcome current obstacles including heterogeneous archive access protocols and data/product formats, data provider access policy constraints, and an increasingly broad and diverse selection of SAR data that now includes ESA/ERS/ENVISAT (and upcoming Sentinel mission), CSA/Radarsat, JAXA/ ALOS-PALSAR, DLR/TerraSAR-X satellite data and NASA/UAVSAR aircraft SAR data. The list will continue to expand with NASA/DESDynI further increasing the need to efficiently discover, access, retrieve, distribute, and process huge quantities of new and diverse data. (Information from http://www.unavco.org/projects/other-projects/ssara/ssara.html).	</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Type</b>
+</td>
+<td>Collection</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Date</b>
+</td>
+<td/>
+</tr>
+<tr valign="top">
+<td>
+<b>Media Type</b>
+</td>
+<td>
+<a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA" title="ATOM format">ATOM</a>   |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/sru%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA&amp;recordSchema=server-choice" title="SRU format">SRU</a>
+</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Metadata</b>
+</td>
+<td>
+<a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA&amp;recordSchema=iso" title="ISO format">ISO 19139</a>   |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139-2%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA&amp;recordSchema=iso19139-2" title="ISO format">ISO 19139-2</a> |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/dif10%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA&amp;recordSchema=dif10" title="ISO format">DIF-10</a>
+</td>
+</tr>
+</table>]]></summary>
+<content type="html"> This collection represents the collections provided by the SSARA - Seamless SAR Archive that are available through the FedEO Opensearch Gateway. SSARA will provide users with simple browser and web service API access tools to view and retrieve SAR data from multiple archives, to place their tasking requests, to order data, and to report results back to data providers; to make a larger pool of data available to scientific data users; and to encourage broader national and international use of SAR data. The new ACCESS-developed tools will help overcome current obstacles including heterogeneous archive access protocols and data/product formats, data provider access policy constraints, and an increasingly broad and diverse selection of SAR data that now includes ESA/ERS/ENVISAT (and upcoming Sentinel mission), CSA/Radarsat, JAXA/ ALOS-PALSAR, DLR/TerraSAR-X satellite data and NASA/UAVSAR aircraft SAR data. The list will continue to expand with NASA/DESDynI further increasing the need to efficiently discover, access, retrieve, distribute, and process huge quantities of new and diverse data. (Information from http://www.unavco.org/projects/other-projects/ssara/ssara.html).	</content>
+<title>Seamless SAR Archive (SSARA) Provided Collections </title>
+<updated>2018-08-14T12:36:43Z</updated>
+<dc:identifier>EOP:SSARA</dc:identifier>
+<georss:polygon>-90 -180 -90 180 90 180 90 -180 -90 -180</georss:polygon>
+</entry>
+<entry>
+<category label="Science Keywords &gt; Earth Science &gt; Spectral/Engineering &gt; Radar &gt; Radar Imagery" term="http://gcmdservices.gsfc.nasa.gov/kms/concept/53f69037-ff05-4b09-a95d-e65ff42da595"/>
+<category label="ENVISAT" term="http://gcmdservices.gsfc.nasa.gov/kms/concept/a1498dff-002d-4d67-9091-16822c608221"/>
+<category label="FedEO" term="FedEO"/>
+<category label="SSARA" term="SSARA"/>
+<id>http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA%3AENVISAT</id>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA%3AENVISAT" rel="alternate" title="Atom format" type="application/atom+xml"/>
+<link href="http://geo.spacebel.be/opensearch/description.xml?parentIdentifier=EOP:SSARA&amp;sensorType=RADAR&amp;platform=ENVISAT&amp;startDate=2002-11-13T00:00:00Z&amp;endDate=2012-04-08T00:00:00Z" hreflang="en" rel="search" type="application/opensearchdescription+xml"/>
+<link href="http://www.unavco.org/projects/other-projects/ssara/ssara.html" rel="describedby" type="text/html"/>
+<link href="http://obeos.spacebel.be/opensearch/images/unavco.png" rel="icon" type="image/png"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA%3AENVISAT&amp;recordSchema=iso" rel="alternate" title="ISO 19139 metadata" type="application/vnd.iso.19139+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139-2%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA%3AENVISAT&amp;recordSchema=iso19139-2" rel="alternate" title="ISO 19139-2 metadata" type="application/vnd.iso.19139-2+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/iso19115%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA%3AENVISAT&amp;recordSchema=iso19115" rel="alternate" title="ISO MENDS metadata" type="application/iso19115+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19115-3%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA%3AENVISAT&amp;recordSchema=iso19115-3" rel="alternate" title="ISO 19115-3 metadata" type="application/vnd.iso.19115-3+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/dif10%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA%3AENVISAT&amp;recordSchema=dif10" rel="alternate" title="DIF-10 metadata" type="application/dif10+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/xml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA%3AENVISAT&amp;recordSchema=dc" rel="alternate" title="Dublin Core metadata" type="application/xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/rdf%2Bxml&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=EOP:SSARA:ENVISAT&amp;recordSchema=iso" rel="alternate" title="RDF/XML format" type="application/rdf+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/ld%2Bjson&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=EOP:SSARA:ENVISAT&amp;recordSchema=iso" rel="alternate" title="JSON-LD format" type="application/ld+json"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=text/turtle&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=EOP:SSARA:ENVISAT&amp;recordSchema=iso" rel="alternate" title="Turtle format" type="text/turtle"/>
+<summary type="html"><![CDATA[<table xmlns="">
+<tr valign="top">
+<td>
+<b>Title</b>
+</td>
+<td>Seamless SAR Archive (SSARA) Provided Collections for ENVISAT platform</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Description</b>
+</td>
+<td> This collection represents the ENVISAT collections provided by the SSARA - Seamless SAR Archive that are available through the FedEO Opensearch Gateway. SSARA will provide users with simple browser and web service API access tools to view and retrieve SAR data from multiple archives, to place their tasking requests, to order data, and to report results back to data providers; to make a larger pool of data available to scientific data users; and to encourage broader national and international use of SAR data. The new ACCESS-developed tools will help overcome current obstacles including heterogeneous archive access protocols and data/product formats, data provider access policy constraints, and an increasingly broad and diverse selection of SAR data that now includes ENVISAT SAR data.(Information from http://www.unavco.org/projects/other-projects/ssara/ssara.html).	</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Type</b>
+</td>
+<td>Collection</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Date</b>
+</td>
+<td>2002-11-13T00:00:00Z/2012-04-08T00:00:00Z</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Media Type</b>
+</td>
+<td>
+<a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA%3AENVISAT" title="ATOM format">ATOM</a>   |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/sru%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA%3AENVISAT&amp;recordSchema=server-choice" title="SRU format">SRU</a>
+</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Metadata</b>
+</td>
+<td>
+<a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA%3AENVISAT&amp;recordSchema=iso" title="ISO format">ISO 19139</a>   |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139-2%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA%3AENVISAT&amp;recordSchema=iso19139-2" title="ISO format">ISO 19139-2</a> |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/dif10%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=EOP%3ASSARA%3AENVISAT&amp;recordSchema=dif10" title="ISO format">DIF-10</a>
+</td>
+</tr>
+</table>]]></summary>
+<content type="html"> This collection represents the ENVISAT collections provided by the SSARA - Seamless SAR Archive that are available through the FedEO Opensearch Gateway. SSARA will provide users with simple browser and web service API access tools to view and retrieve SAR data from multiple archives, to place their tasking requests, to order data, and to report results back to data providers; to make a larger pool of data available to scientific data users; and to encourage broader national and international use of SAR data. The new ACCESS-developed tools will help overcome current obstacles including heterogeneous archive access protocols and data/product formats, data provider access policy constraints, and an increasingly broad and diverse selection of SAR data that now includes ENVISAT SAR data.(Information from http://www.unavco.org/projects/other-projects/ssara/ssara.html).	</content>
+<title>Seamless SAR Archive (SSARA) Provided Collections for ENVISAT platform</title>
+<updated>2018-08-14T12:36:43Z</updated>
+<dc:identifier>EOP:SSARA:ENVISAT</dc:identifier>
+<dc:date>2002-11-13T00:00:00Z/2012-04-08T00:00:00Z</dc:date>
+<georss:polygon>-90 -180 -90 180 90 180 90 -180 -90 -180</georss:polygon>
+</entry>
+<entry>
+<category label="EARTH SCIENCE &gt; SPECTRAL/ENGINEERING &gt; RADAR" term="http://gcmdservices.gsfc.nasa.gov/kms/concept/d3b7c3c0-e644-4f01-94da-dfebe854c0d1"/>
+<category label="PF-ERS / Envisat format" term="http://www.opengis.net/eop/2.1/processorVersion"/>
+<category label="Radar Imagery" term="https://earth.esa.int/typologies/radar-imagery"/>
+<category label="782 to 785 km" term="https://earth.esa.int/eop-ext/orbitHeight"/>
+<category label="Near-circular, polar, Sun-synchronous" term="http://www.opengis.net/eop/2.1/orbitType"/>
+<category label="5 km" term="https://earth.esa.int/eop-ext/swathWidth"/>
+<category label="ERS" term="https://earth.esa.int/web/guest/data-access/browse-data-products?p_p_id=datasetlist_WAR_ospportlet&amp;missions=ERS"/>
+<category label="SAR" term="https://earth.esa.int/web/guest/data-access/browse-data-products?p_p_id=datasetlist_WAR_ospportlet&amp;instruments=SAR"/>
+<category label="Natural Disasters &gt; Earthquake/Volcano" term="https://earth.esa.int/web/guest/earth-topics/natural-disasters"/>
+<category label="Solid Earth &gt; Tectonics/Seismic Activity" term="https://earth.esa.int/web/guest/earth-topics/solid-earth"/>
+<category label="ERS-1" term="https://earth.esa.int/web/guest/missions/esa-operational-eo-missions/ers"/>
+<category label="ERS-2" term="https://earth.esa.int/web/guest/missions/esa-operational-eo-missions/ers"/>
+<category label="Earth Online" term="Earth Online"/>
+<category label="ESA OADS" term="ESA OADS"/>
+<id>http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMS_1P</id>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMS_1P" rel="alternate" title="Atom format" type="application/atom+xml"/>
+<link href="http://geo.spacebel.be/opensearch/description.xml?parentIdentifier=SAR_IMS_1P&amp;startDate=1991-01-01T00:00:00Z&amp;endDate=2011-12-31T00:00:00Z" hreflang="en" rel="search" type="application/opensearchdescription+xml"/>
+<link href="https://earth.esa.int/web/guest/-/sar-single-look-complex-image-product-1368" rel="describedby" type="text/html"/>
+<link href="https://earth.esa.int/c/document_library/get_file?folderId=13019&amp;name=DLFE-606.pdf" rel="describedby" title="ERS SAR Envisat Format Product Specification - Product Specifications" type="application/pdf"/>
+<link href="https://earth.esa.int/web/sppa/mission-performance/esa-missions/ers-1/sar/sensor-description" rel="describedby" title="ERS-1 SAR Sensor Performance, Products and Algorithms - Other" type="text/html"/>
+<link href="https://earth.esa.int/web/sppa/mission-performance/esa-missions/ers-2/sar/sensor-description" rel="describedby" title="ERS-2 SAR Sensor Performance, Products and Algorithms - Other" type="text/html"/>
+<link href="https://earth.esa.int/web/guest/software-tools/best-basic-envisat-sar-toolbox" rel="describedby" title="Basic Envisat SAR Toolbox (BEST) - Software Tool" type="text/html"/>
+<link href="https://earth.esa.int/web/nest/home" rel="describedby" title="Next ESA SAR Toolbox (NEST) - Software Tool" type="text/html"/>
+<link href="http://step.esa.int/main/toolboxes/sentinel-1-toolbox/" rel="describedby" title="Sentinel-1 Toolbox / Sentinel Application Platform (SNAP) - Software Tool" type="text/html"/>
+<link href="http://earth.esa.int/fringe03/proceedings/papers/26_miranda.pdf" rel="describedby" title="Review of the impact of the ERS-2 Piloting Modes on the SAR Doppler Stability - Other" type="application/pdf"/>
+<link href="https://earth.esa.int/web/guest/document-library/browse-document-library?selectedTags=ers,sar" rel="describedby" title="More SAR Documents - Product Specifications" type="application/pdf"/>
+<link href="http://obeos.spacebel.be/opensearch/images/esa.png" rel="icon" type="image/png"/>
+<atom:link xmlns:atom="http://www.w3.org/2005/Atom" href="https://eoli.eo.esa.int/ngeo/sec/?sharedUrl=https%3A%2F%2Feoli.eo.esa.int%2Fngeo%2Fsec%2F%23data-services-area%2Fsearch%3FosParameters%3D%257B%2522FEDEO-SAR_IMS_1P-SAR_IMS_1P%2522%253A%2522%2522%252C%2522commonCriteria%2522%253A%2522start%253D2011-12-01T00%253A00%253A00.000Z%2526stop%253D2011-12-31T23%253A59%253A59.999Z%2526bbox%253D-80.86%252C-33.49%252C80.85%252C33.48%2522%257D" rel="license" title="Fast Registration with immediate access" type="text/html"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMS_1P&amp;recordSchema=iso" rel="alternate" title="ISO 19139 metadata" type="application/vnd.iso.19139+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139-2%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMS_1P&amp;recordSchema=iso19139-2" rel="alternate" title="ISO 19139-2 metadata" type="application/vnd.iso.19139-2+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/iso19115%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMS_1P&amp;recordSchema=iso19115" rel="alternate" title="ISO MENDS metadata" type="application/iso19115+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19115-3%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMS_1P&amp;recordSchema=iso19115-3" rel="alternate" title="ISO 19115-3 metadata" type="application/vnd.iso.19115-3+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/dif10%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMS_1P&amp;recordSchema=dif10" rel="alternate" title="DIF-10 metadata" type="application/dif10+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/xml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMS_1P&amp;recordSchema=dc" rel="alternate" title="Dublin Core metadata" type="application/xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/rdf%2Bxml&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=SAR_IMS_1P&amp;recordSchema=iso" rel="alternate" title="RDF/XML format" type="application/rdf+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/ld%2Bjson&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=SAR_IMS_1P&amp;recordSchema=iso" rel="alternate" title="JSON-LD format" type="application/ld+json"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=text/turtle&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=SAR_IMS_1P&amp;recordSchema=iso" rel="alternate" title="Turtle format" type="text/turtle"/>
+<summary type="html"><![CDATA[<table xmlns="">
+<tr valign="top">
+<td>
+<b>Title</b>
+</td>
+<td>ERS-1/2 - SAR Level 1 Single Look Complex Image Product</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Description</b>
+</td>
+<td>The SAR SLC product is a single look complex acquired in Image Mode. It is a digital image, with slant range and phase preserved, generated from raw SAR data using up-to-date auxiliary parameters. The products are intended for use in SAR quality assessment, calibration and interferometric applications. A minimum number of corrections and interpolations are performed on the data. Absolute calibration parameters (when available) are provided in the product annotation. Product characteristics Pixel size 8 m (range - across track) x 4 m (azimuth - along track � varying slightly depending on acquisition Pulse Repetition Frequency) Scene area 100 km (range) x at least 102.5 km (azimuth) Scene size 5000 samples (range) x at least 30000 lines (azimuth) Pixel depth 32 bits signed integer (16 bits I, 16 bits Q) Total product volume ~ 575 MB Projection Slant range Number of looks 1</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Type</b>
+</td>
+<td>Collection</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Date</b>
+</td>
+<td>1991-01-01T00:00:00Z/2011-12-31T00:00:00Z</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Media Type</b>
+</td>
+<td>
+<a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMS_1P" title="ATOM format">ATOM</a>   |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/sru%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMS_1P&amp;recordSchema=server-choice" title="SRU format">SRU</a>
+</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Metadata</b>
+</td>
+<td>
+<a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMS_1P&amp;recordSchema=iso" title="ISO format">ISO 19139</a>   |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139-2%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMS_1P&amp;recordSchema=iso19139-2" title="ISO format">ISO 19139-2</a> |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/dif10%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMS_1P&amp;recordSchema=dif10" title="ISO format">DIF-10</a>
+</td>
+</tr>
+</table>]]></summary>
+<content type="html">The SAR SLC product is a single look complex acquired in Image Mode. It is a digital image, with slant range and phase preserved, generated from raw SAR data using up-to-date auxiliary parameters. The products are intended for use in SAR quality assessment, calibration and interferometric applications. A minimum number of corrections and interpolations are performed on the data. Absolute calibration parameters (when available) are provided in the product annotation. Product characteristics Pixel size 8 m (range - across track) x 4 m (azimuth - along track � varying slightly depending on acquisition Pulse Repetition Frequency) Scene area 100 km (range) x at least 102.5 km (azimuth) Scene size 5000 samples (range) x at least 30000 lines (azimuth) Pixel depth 32 bits signed integer (16 bits I, 16 bits Q) Total product volume ~ 575 MB Projection Slant range Number of looks 1</content>
+<rights type="html">Data is available via EOLI-SA after &lt;a href="https://earth.esa.int/FastRegistration/L1_STND___SAR_OTF-A"&gt;registration&lt;/a&gt; for the (A)SAR On The Fly Service.	For more details see the news article from &lt;a href="https://earth.esa.int/web/guest/missions/esa-operational-eo-missions/ers/news/-/article/esa-sar-data-now-available-via-esa-on-the-fly-service"&gt;11 April 2017&lt;/a&gt;</rights>
+<title>ERS-1/2 - SAR Level 1 Single Look Complex Image Product</title>
+<updated>2018-08-14T12:36:43Z</updated>
+<dc:identifier>SAR_IMS_1P</dc:identifier>
+<dc:date>1991-01-01T00:00:00Z/2011-12-31T00:00:00Z</dc:date>
+<georss:polygon>-82 -180 -82 180 82 180 82 -180 -82 -180</georss:polygon>
+</entry>
+<entry>
+<category label="EARTH SCIENCE &gt; SPECTRAL/ENGINEERING &gt; RADAR" term="http://gcmdservices.gsfc.nasa.gov/kms/concept/d3b7c3c0-e644-4f01-94da-dfebe854c0d1"/>
+<category label="Radar Imagery" term="https://earth.esa.int/typologies/radar-imagery"/>
+<category label="800 km" term="https://earth.esa.int/eop-ext/orbitHeight"/>
+<category label="Sun-synchronous" term="http://www.opengis.net/eop/2.1/orbitType"/>
+<category label="5 - 1150 km" term="https://earth.esa.int/eop-ext/swathWidth"/>
+<category label="ENVISAT" term="https://earth.esa.int/web/guest/data-access/browse-data-products?p_p_id=datasetlist_WAR_ospportlet&amp;missions=ENVISAT"/>
+<category label="ASAR" term="https://earth.esa.int/web/guest/data-access/browse-data-products?p_p_id=datasetlist_WAR_ospportlet&amp;instruments=ASAR"/>
+<category label="Land &gt; Soil, Vegetation" term="https://earth.esa.int/web/guest/earth-topics/land"/>
+<category label="Snow and Ice &gt; Sea Ice, Snow and Ice" term="https://earth.esa.int/web/guest/earth-topics/snow-and-ice"/>
+<category label="Natural Disasters &gt; Oil Slick" term="https://earth.esa.int/web/guest/earth-topics/natural-disasters"/>
+<category label="Ocean and Coast &gt; Ocean Currents and Topography, Ocean Waves, Coastal Geomorphology" term="https://earth.esa.int/web/guest/earth-topics/oceans-and-coasts"/>
+<category label="Water &gt; Water Management" term="https://earth.esa.int/web/guest/earth-topics/water"/>
+<category label="Envisat" term="https://earth.esa.int/web/guest/missions/esa-operational-eo-missions/envisat"/>
+<category label="Earth Online" term="Earth Online"/>
+<category label="ESA OADS" term="ESA OADS"/>
+<id>http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APP_1P</id>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APP_1P" rel="alternate" title="Atom format" type="application/atom+xml"/>
+<link href="http://geo.spacebel.be/opensearch/description.xml?parentIdentifier=ENVISAT.ASA.APP_1P&amp;startDate=2002-11-15T00:00:00Z&amp;endDate=2012-04-08T00:00:00Z" hreflang="en" rel="search" type="application/opensearchdescription+xml"/>
+<link href="https://earth.esa.int/web/guest/-/asar-alternating-polarisation-mode-precision-image-1529" rel="describedby" type="text/html"/>
+<link href="https://earth.esa.int/c/document_library/get_file?folderId=231342&amp;name=DLFE-2136.pdf" rel="describedby" title="ASAR Products Specification - Revision C - Product Specifications" type="application/pdf"/>
+<link href="http://envisat.esa.int/handbooks/asar/CNTR2-6-1-2-3.html" rel="describedby" title="SPECAN Algorithm - Technical Report" type="text/html"/>
+<link href="http://envisat.esa.int/handbooks/asar/CNTR6-2-3.html" rel="describedby" title="ASA_APP_1P File Structure - Product Specifications" type="text/html"/>
+<link href="https://earth.esa.int/c/document_library/get_file?folderId=13019&amp;name=DLFE-615.pdf" rel="describedby" title="Envisat ASAR Science and Applications - Technical Note" type="application/pdf"/>
+<link href="http://envisat.esa.int/handbooks/asar/CNTR2-6.html" rel="describedby" title="ASAR Level 1 Algorithms - Product Specifications" type="text/html"/>
+<link href="http://envisat.esa.int/handbooks/asar/CNTR.html" rel="describedby" title="ASAR Product Handbook - User Manual" type="text/html"/>
+<link href="https://earth.esa.int/web/guest/document-library/browse-document-library?selectedTags=envisat,asar" rel="describedby" title="More ASAR Documents - Product Specifications" type="application/pdf"/>
+<link href="http://obeos.spacebel.be/opensearch/images/esa.png" rel="icon" type="image/png"/>
+<atom:link xmlns:atom="http://www.w3.org/2005/Atom" href="https://eoli.eo.esa.int/ngeo/sec/#data-services-area/search?osParameters=%7B%22FEDEO-ENVISAT.ASA.APP_1P-ENVISAT.ASA.APP_1P%22%3A%22%22%2C%22commonCriteria%22%3A%22start%3D2012-03-09T00%3A00%3A00.000Z%26stop%3D2012-04-08T23%3A59%3A59.999Z%26bbox%3D-80.86%2C-33.49%2C80.85%2C33.48%22%7D" rel="license" title="Fast Registration with immediate access" type="text/html"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APP_1P&amp;recordSchema=iso" rel="alternate" title="ISO 19139 metadata" type="application/vnd.iso.19139+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139-2%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APP_1P&amp;recordSchema=iso19139-2" rel="alternate" title="ISO 19139-2 metadata" type="application/vnd.iso.19139-2+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/iso19115%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APP_1P&amp;recordSchema=iso19115" rel="alternate" title="ISO MENDS metadata" type="application/iso19115+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19115-3%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APP_1P&amp;recordSchema=iso19115-3" rel="alternate" title="ISO 19115-3 metadata" type="application/vnd.iso.19115-3+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/dif10%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APP_1P&amp;recordSchema=dif10" rel="alternate" title="DIF-10 metadata" type="application/dif10+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/xml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APP_1P&amp;recordSchema=dc" rel="alternate" title="Dublin Core metadata" type="application/xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/rdf%2Bxml&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=ENVISAT.ASA.APP_1P&amp;recordSchema=iso" rel="alternate" title="RDF/XML format" type="application/rdf+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/ld%2Bjson&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=ENVISAT.ASA.APP_1P&amp;recordSchema=iso" rel="alternate" title="JSON-LD format" type="application/ld+json"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=text/turtle&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=ENVISAT.ASA.APP_1P&amp;recordSchema=iso" rel="alternate" title="Turtle format" type="text/turtle"/>
+<summary type="html"><![CDATA[<table xmlns="">
+<tr valign="top">
+<td>
+<b>Title</b>
+</td>
+<td>ASAR Alternating Polarisation Mode Precision Image</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Description</b>
+</td>
+<td>This data product is generated from Level 0 data collected when the instrument is in Alternating Polarisation Mode (7 possible swaths). The product contains two CO-registered images corresponding to one of the three polarisation combination submodes (HH and VV, HH and HV, VV and VH). This is a stand-alone multi-look, ground range, narrow swath digital image generated using the SPECAN algorithm and the most up to date auxiliary information available at the time of processing. Engineering corrections and relative calibration (antenna elevation gain, range spreading loss) are applied to compensate for well-understood sources of system variability. Generation of this product uses a technique to allow half the looks of an image to be acquired in horizontal polarisation and the other half in vertical polarisation and processed to 30-m resolution (with the exception of IS1). Absolute calibration parameters are available depending on external calibration activities and are provided in the product annotations. Spatial Resolution: 30 m ground range x 30 m azimuth</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Type</b>
+</td>
+<td>Collection</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Date</b>
+</td>
+<td>2002-11-15T00:00:00Z/2012-04-08T00:00:00Z</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Media Type</b>
+</td>
+<td>
+<a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APP_1P" title="ATOM format">ATOM</a>   |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/sru%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APP_1P&amp;recordSchema=server-choice" title="SRU format">SRU</a>
+</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Metadata</b>
+</td>
+<td>
+<a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APP_1P&amp;recordSchema=iso" title="ISO format">ISO 19139</a>   |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139-2%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APP_1P&amp;recordSchema=iso19139-2" title="ISO format">ISO 19139-2</a> |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/dif10%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APP_1P&amp;recordSchema=dif10" title="ISO format">DIF-10</a>
+</td>
+</tr>
+</table>]]></summary>
+<content type="html">This data product is generated from Level 0 data collected when the instrument is in Alternating Polarisation Mode (7 possible swaths). The product contains two CO-registered images corresponding to one of the three polarisation combination submodes (HH and VV, HH and HV, VV and VH). This is a stand-alone multi-look, ground range, narrow swath digital image generated using the SPECAN algorithm and the most up to date auxiliary information available at the time of processing. Engineering corrections and relative calibration (antenna elevation gain, range spreading loss) are applied to compensate for well-understood sources of system variability. Generation of this product uses a technique to allow half the looks of an image to be acquired in horizontal polarisation and the other half in vertical polarisation and processed to 30-m resolution (with the exception of IS1). Absolute calibration parameters are available depending on external calibration activities and are provided in the product annotations. Spatial Resolution: 30 m ground range x 30 m azimuth</content>
+<rights type="html">Data is available via EOLI-SA upon &lt;a href="https://earth.esa.int/FastRegistration/L1_STND_A_SAR_OTF-A"&gt;registration&lt;/a&gt; for the (A)SAR On The Fly Service.	For information on access and use of the On-The-Fly service please refer to the &lt;a href="https://earth.esa.int/web/guest/data-access/how-to-access-eo-data/asar-on-the-fly-faq"&gt;OTF FAQ page&lt;/a&gt; and news of &lt;a href="https://earth.esa.int/web/guest/missions/esa-operational-eo-missions/envisat/news/-/article/full-envisat-asar-ap-data-archive-available-via-the-esa-on-the-fly-service"&gt;30 August 2016&lt;/a&gt;</rights>
+<title>ASAR Alternating Polarisation Mode Precision Image</title>
+<updated>2018-08-14T12:36:43Z</updated>
+<dc:identifier>ENVISAT.ASA.APP_1P</dc:identifier>
+<dc:date>2002-11-15T00:00:00Z/2012-04-08T00:00:00Z</dc:date>
+<georss:polygon>-90 -180 -90 180 90 180 90 -180 -90 -180</georss:polygon>
+</entry>
+<entry>
+<category label="EARTH SCIENCE &gt; SPECTRAL/ENGINEERING &gt; RADAR" term="http://gcmdservices.gsfc.nasa.gov/kms/concept/d3b7c3c0-e644-4f01-94da-dfebe854c0d1"/>
+<category label="PF-ERS / Envisat format" term="http://www.opengis.net/eop/2.1/processorVersion"/>
+<category label="Radar Imagery" term="https://earth.esa.int/typologies/radar-imagery"/>
+<category label="782 to 785 km" term="https://earth.esa.int/eop-ext/orbitHeight"/>
+<category label="Near-circular, polar, Sun-synchronous" term="http://www.opengis.net/eop/2.1/orbitType"/>
+<category label="5 km" term="https://earth.esa.int/eop-ext/swathWidth"/>
+<category label="ERS" term="https://earth.esa.int/web/guest/data-access/browse-data-products?p_p_id=datasetlist_WAR_ospportlet&amp;missions=ERS"/>
+<category label="SAR" term="https://earth.esa.int/web/guest/data-access/browse-data-products?p_p_id=datasetlist_WAR_ospportlet&amp;instruments=SAR"/>
+<category label="Land &gt; Vegetation, Topography/Mapping" term="https://earth.esa.int/web/guest/earth-topics/land"/>
+<category label="Snow and Ice &gt; Sea Ice" term="https://earth.esa.int/web/guest/earth-topics/snow-and-ice"/>
+<category label="ERS-1" term="https://earth.esa.int/web/guest/missions/esa-operational-eo-missions/ers"/>
+<category label="ERS-2" term="https://earth.esa.int/web/guest/missions/esa-operational-eo-missions/ers"/>
+<category label="Earth Online" term="Earth Online"/>
+<category label="ESA OADS" term="ESA OADS"/>
+<id>http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMP_1P</id>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMP_1P" rel="alternate" title="Atom format" type="application/atom+xml"/>
+<link href="http://geo.spacebel.be/opensearch/description.xml?parentIdentifier=SAR_IMP_1P&amp;startDate=1991-01-01T00:00:00Z&amp;endDate=2011-12-31T00:00:00Z" hreflang="en" rel="search" type="application/opensearchdescription+xml"/>
+<link href="https://earth.esa.int/web/guest/-/sar-precision-image-product-1477" rel="describedby" type="text/html"/>
+<link href="https://earth.esa.int/documents/10174/13019/gen144.pdf" rel="describedby" title="Envisat Format Product Specification - Product Specifications" type="application/pdf"/>
+<link href="https://earth.esa.int/web/sppa/mission-performance/esa-missions/ers-1/sar/sensor-description" rel="describedby" title="ERS-1 SAR Sensor Performance, Products and Algorithms - Other" type="text/html"/>
+<link href="https://earth.esa.int//web/sppa/mission-performance/esa-missions/ers-2/sar/sensor-description" rel="describedby" title="ERS-2 SAR Sensor Performance, Products and Algorithms - Other" type="text/html"/>
+<link href="https://earth.esa.int/web/guest/software-tools/best-basic-envisat-sar-toolbox" rel="describedby" title="Basic Envisat SAR Toolbox (BEST) - Software Tool" type="text/html"/>
+<link href="https://earth.esa.int/web/nest/home" rel="describedby" title="Next ESA SAR Toolbox (NEST) - Software Tool" type="text/html"/>
+<link href="http://step.esa.int/main/toolboxes/sentinel-1-toolbox/" rel="describedby" title="Sentinel-1 Toolbox / Sentinel Application Platform (SNAP) - Software Tool" type="text/html"/>
+<link href="https://earth.esa.int/c/document_library/get_file?folderId=13019&amp;name=DLFE-643.pdf" rel="describedby" title="Derivation of Backscattering Coefficient Sigma 0 in ESA ERS SAR PRI Products - Other" type="application/pdf"/>
+<link href="http://earth.esa.int/fringe03/proceedings/papers/26_miranda.pdf" rel="describedby" title="Review of the impact of the ERS-2 Piloting Modes on the SAR Doppler Stability - Technical Note" type="application/pdf"/>
+<link href="https://earth.esa.int/web/guest/document-library/browse-document-library?selectedTags=ers,sar" rel="describedby" title="More SAR Documents - Product Specifications" type="text/html"/>
+<link href="http://obeos.spacebel.be/opensearch/images/esa.png" rel="icon" type="image/png"/>
+<atom:link xmlns:atom="http://www.w3.org/2005/Atom" href="https://eoli.eo.esa.int/ngeo/sec/#data-services-area/search?osParameters=%7B%22FEDEO-ERS.SAR_IMP_1P-SAR_IMP_1P%22%3A%22%22%2C%22commonCriteria%22%3A%22start%3D2011-12-01T00%3A00%3A00.000Z%26stop%3D2011-12-31T23%3A59%3A59.999Z%26bbox%3D-161.72%2C-66.98%2C161.71%2C66.97%22%7D" rel="license" title="Fast Registration with immediate access" type="text/html"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMP_1P&amp;recordSchema=iso" rel="alternate" title="ISO 19139 metadata" type="application/vnd.iso.19139+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139-2%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMP_1P&amp;recordSchema=iso19139-2" rel="alternate" title="ISO 19139-2 metadata" type="application/vnd.iso.19139-2+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/iso19115%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMP_1P&amp;recordSchema=iso19115" rel="alternate" title="ISO MENDS metadata" type="application/iso19115+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19115-3%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMP_1P&amp;recordSchema=iso19115-3" rel="alternate" title="ISO 19115-3 metadata" type="application/vnd.iso.19115-3+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/dif10%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMP_1P&amp;recordSchema=dif10" rel="alternate" title="DIF-10 metadata" type="application/dif10+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/xml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMP_1P&amp;recordSchema=dc" rel="alternate" title="Dublin Core metadata" type="application/xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/rdf%2Bxml&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=SAR_IMP_1P&amp;recordSchema=iso" rel="alternate" title="RDF/XML format" type="application/rdf+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/ld%2Bjson&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=SAR_IMP_1P&amp;recordSchema=iso" rel="alternate" title="JSON-LD format" type="application/ld+json"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=text/turtle&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=SAR_IMP_1P&amp;recordSchema=iso" rel="alternate" title="Turtle format" type="text/turtle"/>
+<summary type="html"><![CDATA[<table xmlns="">
+<tr valign="top">
+<td>
+<b>Title</b>
+</td>
+<td>ERS-1/2 - SAR Level 1 Precision Image Product</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Description</b>
+</td>
+<td>The SAR Precision product is a multi-look (speckle-reduced), ground range image acquired in Image Mode. This product type is most applicable to users interested in remote sensing applications, but is also suitable for calibration purposes. The products are calibrated and corrected for the SAR antenna pattern and range-spreading loss. Radar backscatter can be derived from the products for geophysical modelling, but no correction is applied for terrain-induced radiometric effects. The images are not geocoded, and terrain distortion (foreshortening and layover) has not been removed. The numbering sequence relates to the satellite position and therefore differs between Ascending and Descending scenes. Product characteristics Pixel size 12.5 m (range - across track) x 12.5 m (azimuth - along track) Scene area 100 km (range) x at least 102.5 km (azimuth) Scene size 8000 pixels range x at least 8200 lines (azimuth) Pixel depth 16 bits unsigned integer Total product volume ~ 125 MB Projection Ground-range Number of looks 3</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Type</b>
+</td>
+<td>Collection</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Date</b>
+</td>
+<td>1991-01-01T00:00:00Z/2011-12-31T00:00:00Z</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Media Type</b>
+</td>
+<td>
+<a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMP_1P" title="ATOM format">ATOM</a>   |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/sru%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMP_1P&amp;recordSchema=server-choice" title="SRU format">SRU</a>
+</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Metadata</b>
+</td>
+<td>
+<a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMP_1P&amp;recordSchema=iso" title="ISO format">ISO 19139</a>   |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139-2%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMP_1P&amp;recordSchema=iso19139-2" title="ISO format">ISO 19139-2</a> |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/dif10%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=SAR_IMP_1P&amp;recordSchema=dif10" title="ISO format">DIF-10</a>
+</td>
+</tr>
+</table>]]></summary>
+<content type="html">The SAR Precision product is a multi-look (speckle-reduced), ground range image acquired in Image Mode. This product type is most applicable to users interested in remote sensing applications, but is also suitable for calibration purposes. The products are calibrated and corrected for the SAR antenna pattern and range-spreading loss. Radar backscatter can be derived from the products for geophysical modelling, but no correction is applied for terrain-induced radiometric effects. The images are not geocoded, and terrain distortion (foreshortening and layover) has not been removed. The numbering sequence relates to the satellite position and therefore differs between Ascending and Descending scenes. Product characteristics Pixel size 12.5 m (range - across track) x 12.5 m (azimuth - along track) Scene area 100 km (range) x at least 102.5 km (azimuth) Scene size 8000 pixels range x at least 8200 lines (azimuth) Pixel depth 16 bits unsigned integer Total product volume ~ 125 MB Projection Ground-range Number of looks 3</content>
+<rights type="html">Data is available via EOLI-SA after &lt;a href="https://earth.esa.int/FastRegistration/L1_STND___SAR_OTF-A"&gt;registration&lt;/a&gt; for the (A)SAR On The Fly Service.	For more details see the news article from &lt;a href="https://earth.esa.int/web/guest/missions/esa-operational-eo-missions/ers/news/-/article/esa-sar-data-now-available-via-esa-on-the-fly-service"&gt;11 April 2017&lt;/a&gt;</rights>
+<title>ERS-1/2 - SAR Level 1 Precision Image Product</title>
+<updated>2018-08-14T12:36:43Z</updated>
+<dc:identifier>SAR_IMP_1P</dc:identifier>
+<dc:date>1991-01-01T00:00:00Z/2011-12-31T00:00:00Z</dc:date>
+<georss:polygon>-82 -180 -82 180 82 180 82 -180 -82 -180</georss:polygon>
+</entry>
+<entry>
+<category label="EARTH SCIENCE &gt; SPECTRAL/ENGINEERING &gt; RADAR" term="http://gcmdservices.gsfc.nasa.gov/kms/concept/d3b7c3c0-e644-4f01-94da-dfebe854c0d1"/>
+<category label="Radar Imagery" term="https://earth.esa.int/typologies/radar-imagery"/>
+<category label="800 km" term="https://earth.esa.int/eop-ext/orbitHeight"/>
+<category label="Sun-synchronous" term="http://www.opengis.net/eop/2.1/orbitType"/>
+<category label="5 - 1150 km" term="https://earth.esa.int/eop-ext/swathWidth"/>
+<category label="ENVISAT" term="https://earth.esa.int/web/guest/data-access/browse-data-products?p_p_id=datasetlist_WAR_ospportlet&amp;missions=ENVISAT"/>
+<category label="ASAR" term="https://earth.esa.int/web/guest/data-access/browse-data-products?p_p_id=datasetlist_WAR_ospportlet&amp;instruments=ASAR"/>
+<category label="Ocean and Coast &gt; Ocean Currents and Topography" term="https://earth.esa.int/web/guest/earth-topics/oceans-and-coasts"/>
+<category label="Envisat" term="https://earth.esa.int/web/guest/missions/esa-operational-eo-missions/envisat"/>
+<category label="Earth Online" term="Earth Online"/>
+<category label="ESA OADS" term="ESA OADS"/>
+<id>http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.WSS_1P</id>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.WSS_1P" rel="alternate" title="Atom format" type="application/atom+xml"/>
+<link href="http://geo.spacebel.be/opensearch/description.xml?parentIdentifier=ENVISAT.ASA.WSS_1P&amp;startDate=2002-10-28T00:00:00Z&amp;endDate=2012-04-08T00:00:00Z" hreflang="en" rel="search" type="application/opensearchdescription+xml"/>
+<link href="https://earth.esa.int/web/guest/-/asar-wide-swath-single-look-complex-4218" rel="describedby" type="text/html"/>
+<link href="https://earth.esa.int/c/document_library/get_file?folderId=231342&amp;name=DLFE-2136.pdf" rel="describedby" title="ASAR Products Specification - Revision C - Product Specifications" type="application/pdf"/>
+<link href="http://envisat.esa.int/handbooks/asar/CNTR6-2-13.html" rel="describedby" title="ASA_WSS_1P File Structure - Product Specifications" type="text/html"/>
+<link href="https://earth.esa.int/c/document_library/get_file?folderId=13019&amp;name=DLFE-615.pdf" rel="describedby" title="Envisat ASAR Science and Applications - Technical Note" type="application/pdf"/>
+<link href="http://envisat.esa.int/handbooks/asar/CNTR2-6.html" rel="describedby" title="ASAR Level 1 Algorithms - Product Specifications" type="text/html"/>
+<link href="http://envisat.esa.int/handbooks/asar/CNTR.html" rel="describedby" title="ASAR Product Handbook - User Manual" type="text/html"/>
+<link href="https://earth.esa.int/web/guest/document-library/browse-document-library?selectedTags=envisat,asar" rel="describedby" title="More ASAR Documents - Product Specifications" type="application/pdf"/>
+<link href="http://obeos.spacebel.be/opensearch/images/esa.png" rel="icon" type="image/png"/>
+<atom:link xmlns:atom="http://www.w3.org/2005/Atom" href="https://eoli.eo.esa.int/ngeo/sec/#data-services-area/search?osParameters=%7B%22FEDEO-ENVISAT.ASA.WSS_1P-ENVISAT.ASA.WSS_1P%22%3A%22%22%2C%22commonCriteria%22%3A%22start%3D2012-03-09T00%3A00%3A00.000Z%26stop%3D2012-04-08T23%3A59%3A59.999Z%26bbox%3D-161.72%2C-66.98%2C161.71%2C66.97%22%7D" rel="license" title="Fast Registration with immediate access" type="text/html"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.WSS_1P&amp;recordSchema=iso" rel="alternate" title="ISO 19139 metadata" type="application/vnd.iso.19139+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139-2%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.WSS_1P&amp;recordSchema=iso19139-2" rel="alternate" title="ISO 19139-2 metadata" type="application/vnd.iso.19139-2+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/iso19115%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.WSS_1P&amp;recordSchema=iso19115" rel="alternate" title="ISO MENDS metadata" type="application/iso19115+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19115-3%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.WSS_1P&amp;recordSchema=iso19115-3" rel="alternate" title="ISO 19115-3 metadata" type="application/vnd.iso.19115-3+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/dif10%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.WSS_1P&amp;recordSchema=dif10" rel="alternate" title="DIF-10 metadata" type="application/dif10+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/xml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.WSS_1P&amp;recordSchema=dc" rel="alternate" title="Dublin Core metadata" type="application/xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/rdf%2Bxml&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=ENVISAT.ASA.WSS_1P&amp;recordSchema=iso" rel="alternate" title="RDF/XML format" type="application/rdf+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/ld%2Bjson&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=ENVISAT.ASA.WSS_1P&amp;recordSchema=iso" rel="alternate" title="JSON-LD format" type="application/ld+json"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=text/turtle&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=ENVISAT.ASA.WSS_1P&amp;recordSchema=iso" rel="alternate" title="Turtle format" type="text/turtle"/>
+<summary type="html"><![CDATA[<table xmlns="">
+<tr valign="top">
+<td>
+<b>Title</b>
+</td>
+<td>ASAR Wide Swath Single Look Complex</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Description</b>
+</td>
+<td>The Level-1B data product offered by ESA from the ASAR Wide-Swath Mode (WSM) is the multi-look detected product (ASA_WSM_1P), intended to support applications that exploit intensity data. In order to support the development of new applications with the ASAR ScanSAR data, a WSM product providing phase information has been developed and implemented in the ESA ASAR processor, the Wide-Swath Single-Look complex product (ASA_WSS_1P). This product is mainly used for INSAR applications based either on wide-swath/wide-swath pairs or wide-swath/image mode pairs, applications of ocean current mapping, large-area ocean wave retrievals, and atmospheric water vapour characterisation. It shall be mentioned that the standard ESA WSS product is based on the prototype WSS processor developed by Polimi/Poliba, which has also been used to generate prototype products for testing the potential and preparing the exploitation of the WSS product (see the first ASAR WSM-WSM interferogram). The ESA ASA_WSS_1P product is available as a standard Envisat ASAR product. The ASA_WSS_1P product format is slightly different from other ASAR products since: there are 5 different MDSs, one per sub-swath a "Doppler Grid" ADS has been included to support ocean current mapping applications there are 5 records in the MPP ADS, one per sub-swath there are 5 records in the SQ ADS, one per sub-swath Other key characteristics of the ASA_WSS_1P product are summarised below: processing is fully phase preserving data in the MDSs is sampled in a common grid both in range and in azimuth standard product is 60 sec long with 80 m az. pixel spacing auxiliary timeline information has been added in the Main Processing Parameters ADS elevation antenna pattern correction is applied by default (although the product is a single-look complex) Spatial Resolution: approximately 8 m slant range x 80 m azimuth</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Type</b>
+</td>
+<td>Collection</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Date</b>
+</td>
+<td>2002-10-28T00:00:00Z/2012-04-08T00:00:00Z</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Media Type</b>
+</td>
+<td>
+<a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.WSS_1P" title="ATOM format">ATOM</a>   |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/sru%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.WSS_1P&amp;recordSchema=server-choice" title="SRU format">SRU</a>
+</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Metadata</b>
+</td>
+<td>
+<a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.WSS_1P&amp;recordSchema=iso" title="ISO format">ISO 19139</a>   |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139-2%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.WSS_1P&amp;recordSchema=iso19139-2" title="ISO format">ISO 19139-2</a> |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/dif10%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.WSS_1P&amp;recordSchema=dif10" title="ISO format">DIF-10</a>
+</td>
+</tr>
+</table>]]></summary>
+<content type="html">The Level-1B data product offered by ESA from the ASAR Wide-Swath Mode (WSM) is the multi-look detected product (ASA_WSM_1P), intended to support applications that exploit intensity data. In order to support the development of new applications with the ASAR ScanSAR data, a WSM product providing phase information has been developed and implemented in the ESA ASAR processor, the Wide-Swath Single-Look complex product (ASA_WSS_1P). This product is mainly used for INSAR applications based either on wide-swath/wide-swath pairs or wide-swath/image mode pairs, applications of ocean current mapping, large-area ocean wave retrievals, and atmospheric water vapour characterisation. It shall be mentioned that the standard ESA WSS product is based on the prototype WSS processor developed by Polimi/Poliba, which has also been used to generate prototype products for testing the potential and preparing the exploitation of the WSS product (see the first ASAR WSM-WSM interferogram). The ESA ASA_WSS_1P product is available as a standard Envisat ASAR product. The ASA_WSS_1P product format is slightly different from other ASAR products since: there are 5 different MDSs, one per sub-swath a "Doppler Grid" ADS has been included to support ocean current mapping applications there are 5 records in the MPP ADS, one per sub-swath there are 5 records in the SQ ADS, one per sub-swath Other key characteristics of the ASA_WSS_1P product are summarised below: processing is fully phase preserving data in the MDSs is sampled in a common grid both in range and in azimuth standard product is 60 sec long with 80 m az. pixel spacing auxiliary timeline information has been added in the Main Processing Parameters ADS elevation antenna pattern correction is applied by default (although the product is a single-look complex) Spatial Resolution: approximately 8 m slant range x 80 m azimuth</content>
+<rights type="html">Data is available via EOLI-SA upon &lt;a href="https://earth.esa.int/FastRegistration/L1_STND_A_SAR_OTF-A"&gt;registration&lt;/a&gt; for the (A)SAR On The Fly Service.	For information on access and use of the On-The-Fly service please refer to the &lt;a href="https://earth.esa.int/web/guest/data-access/how-to-access-eo-data/asar-on-the-fly-faq"&gt;OTF FAQ page&lt;/a&gt; and the news of &lt;a href="https://earth.esa.int/web/guest/missions/esa-operational-eo-missions/envisat/news/-/article/envisat-asar-ws-data-available-via-the-esa-on-the-fly-service"&gt;15 December 2016&lt;/a&gt;</rights>
+<title>ASAR Wide Swath Single Look Complex</title>
+<updated>2018-08-14T12:36:43Z</updated>
+<dc:identifier>ENVISAT.ASA.WSS_1P</dc:identifier>
+<dc:date>2002-10-28T00:00:00Z/2012-04-08T00:00:00Z</dc:date>
+<georss:polygon>-90 -180 -90 180 90 180 90 -180 -90 -180</georss:polygon>
+</entry>
+<entry>
+<category label="EARTH SCIENCE &gt; SPECTRAL/ENGINEERING &gt; RADAR" term="http://gcmdservices.gsfc.nasa.gov/kms/concept/d3b7c3c0-e644-4f01-94da-dfebe854c0d1"/>
+<category label="Radar Imagery" term="https://earth.esa.int/typologies/radar-imagery"/>
+<category label="800 km" term="https://earth.esa.int/eop-ext/orbitHeight"/>
+<category label="Sun-synchronous" term="http://www.opengis.net/eop/2.1/orbitType"/>
+<category label="5 - 1150 km" term="https://earth.esa.int/eop-ext/swathWidth"/>
+<category label="ENVISAT" term="https://earth.esa.int/web/guest/data-access/browse-data-products?p_p_id=datasetlist_WAR_ospportlet&amp;missions=ENVISAT"/>
+<category label="ASAR" term="https://earth.esa.int/web/guest/data-access/browse-data-products?p_p_id=datasetlist_WAR_ospportlet&amp;instruments=ASAR"/>
+<category label="Land &gt; Soil, Vegetation" term="https://earth.esa.int/web/guest/earth-topics/land"/>
+<category label="Snow and Ice &gt; Sea Ice, Snow and Ice" term="https://earth.esa.int/web/guest/earth-topics/snow-and-ice"/>
+<category label="Natural Disasters &gt; Oil Slick" term="https://earth.esa.int/web/guest/earth-topics/natural-disasters"/>
+<category label="Ocean and Coast &gt; Ocean Currents and Topography, Ocean Waves, Coastal Geomorphology" term="https://earth.esa.int/web/guest/earth-topics/oceans-and-coasts"/>
+<category label="Water &gt; Water Management" term="https://earth.esa.int/web/guest/earth-topics/water"/>
+<category label="Envisat" term="https://earth.esa.int/web/guest/missions/esa-operational-eo-missions/envisat"/>
+<category label="Earth Online" term="Earth Online"/>
+<category label="ESA OADS" term="ESA OADS"/>
+<id>http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APS_1P</id>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APS_1P" rel="alternate" title="Atom format" type="application/atom+xml"/>
+<link href="http://geo.spacebel.be/opensearch/description.xml?parentIdentifier=ENVISAT.ASA.APS_1P&amp;startDate=2002-11-15T00:00:00Z&amp;endDate=2012-04-08T00:00:00Z" hreflang="en" rel="search" type="application/opensearchdescription+xml"/>
+<link href="https://earth.esa.int/web/guest/-/asar-alternating-polarisation-mode-single-look-complex-1528" rel="describedby" type="text/html"/>
+<link href="https://earth.esa.int/c/document_library/get_file?folderId=231342&amp;name=DLFE-2136.pdf" rel="describedby" title="ASAR Products Specification - Revision C - Product Specifications" type="application/pdf"/>
+<link href="http://envisat.esa.int/handbooks/asar/CNTR2-6-1-2-3.html" rel="describedby" title="Range Doppler Algorithm - Technical Report" type="text/html"/>
+<link href="http://envisat.esa.int/handbooks/asar/CNTR6-2-4.html" rel="describedby" title="ASA_APS_1P File Structure - Product Specifications" type="text/html"/>
+<link href="https://earth.esa.int/c/document_library/get_file?folderId=13019&amp;name=DLFE-615.pdf" rel="describedby" title="Envisat ASAR Science and Applications - Technical Note" type="application/pdf"/>
+<link href="http://envisat.esa.int/handbooks/asar/CNTR2-6.html" rel="describedby" title="ASAR Level 1 Algorithms - Product Specifications" type="text/html"/>
+<link href="http://envisat.esa.int/handbooks/asar/" rel="describedby" title="ASAR Product Handbook - User Manual" type="text/html"/>
+<link href="https://earth.esa.int/c/document_library/get_file?folderId=24074&amp;name=DLFE-486.pdf" rel="describedby" title="Product Quality Disclaimer - Product Specifications" type="application/pdf"/>
+<link href="https://earth.esa.int/web/guest/document-library/browse-document-library?p_r_p_564233524_tag=envisat,asar" rel="describedby" title="More ASAR Documents - Product Specifications" type="application/pdf"/>
+<link href="http://obeos.spacebel.be/opensearch/images/esa.png" rel="icon" type="image/png"/>
+<atom:link xmlns:atom="http://www.w3.org/2005/Atom" href="https://eoli.eo.esa.int/ngeo/sec/?sharedUrl=https%3A%2F%2Feoli.eo.esa.int%2Fngeo%2Fsec%2F%23data-services-area%2Fsearch%3FosParameters%3D%257B%2522FEDEO-ENVISAT.ASA.APS_1P-ENVISAT.ASA.APS_1P%2522%253A%2522%2522%252C%2522commonCriteria%2522%253A%2522start%253D2012-03-09T00%253A00%253A00.000Z%2526stop%253D2012-04-08T23%253A59%253A59.999Z%2526bbox%253D-80.86%252C-33.49%252C80.85%252C33.48%2522%257D" rel="license" title="Fast Registration with immediate access" type="text/html"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APS_1P&amp;recordSchema=iso" rel="alternate" title="ISO 19139 metadata" type="application/vnd.iso.19139+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139-2%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APS_1P&amp;recordSchema=iso19139-2" rel="alternate" title="ISO 19139-2 metadata" type="application/vnd.iso.19139-2+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/iso19115%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APS_1P&amp;recordSchema=iso19115" rel="alternate" title="ISO MENDS metadata" type="application/iso19115+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19115-3%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APS_1P&amp;recordSchema=iso19115-3" rel="alternate" title="ISO 19115-3 metadata" type="application/vnd.iso.19115-3+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/dif10%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APS_1P&amp;recordSchema=dif10" rel="alternate" title="DIF-10 metadata" type="application/dif10+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/xml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APS_1P&amp;recordSchema=dc" rel="alternate" title="Dublin Core metadata" type="application/xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/rdf%2Bxml&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=ENVISAT.ASA.APS_1P&amp;recordSchema=iso" rel="alternate" title="RDF/XML format" type="application/rdf+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/ld%2Bjson&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=ENVISAT.ASA.APS_1P&amp;recordSchema=iso" rel="alternate" title="JSON-LD format" type="application/ld+json"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=text/turtle&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=ENVISAT.ASA.APS_1P&amp;recordSchema=iso" rel="alternate" title="Turtle format" type="text/turtle"/>
+<summary type="html"><![CDATA[<table xmlns="">
+<tr valign="top">
+<td>
+<b>Title</b>
+</td>
+<td>ASAR Alternating Polarisation Mode Single-Look Complex</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Description</b>
+</td>
+<td>This product is a complex, slant-range, digital image generated from Level 0 data collected when the instrument is in Alternating Polarisation mode. (7 possible swaths). It contains two CO-registered images corresponding to one of the three polarisation combination submodes (HH and VV, HH and HV, VV and VH). In addition, the product uses the Range Doppler algorithm and the most up to date processing parameters available at the time of processing. It can be used to derive higher level products for SAR image quality assessment, calibration, and interferometric applications, if allowed by the instrument acquisition. A minimum number of corrections and interpolations are performed on the data in order to allow the end-user maximum freedom to derive higher level products. Complex output data is retained to avoid loss of information. Absolute calibration parameters are available depending on external calibration activities and are provided in the product annotations. Spatial Resolution: approximately 8m slant range x approximately 4m azimuth</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Type</b>
+</td>
+<td>Collection</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Date</b>
+</td>
+<td>2002-11-15T00:00:00Z/2012-04-08T00:00:00Z</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Media Type</b>
+</td>
+<td>
+<a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APS_1P" title="ATOM format">ATOM</a>   |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/sru%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APS_1P&amp;recordSchema=server-choice" title="SRU format">SRU</a>
+</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Metadata</b>
+</td>
+<td>
+<a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APS_1P&amp;recordSchema=iso" title="ISO format">ISO 19139</a>   |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139-2%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APS_1P&amp;recordSchema=iso19139-2" title="ISO format">ISO 19139-2</a> |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/dif10%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.APS_1P&amp;recordSchema=dif10" title="ISO format">DIF-10</a>
+</td>
+</tr>
+</table>]]></summary>
+<content type="html">This product is a complex, slant-range, digital image generated from Level 0 data collected when the instrument is in Alternating Polarisation mode. (7 possible swaths). It contains two CO-registered images corresponding to one of the three polarisation combination submodes (HH and VV, HH and HV, VV and VH). In addition, the product uses the Range Doppler algorithm and the most up to date processing parameters available at the time of processing. It can be used to derive higher level products for SAR image quality assessment, calibration, and interferometric applications, if allowed by the instrument acquisition. A minimum number of corrections and interpolations are performed on the data in order to allow the end-user maximum freedom to derive higher level products. Complex output data is retained to avoid loss of information. Absolute calibration parameters are available depending on external calibration activities and are provided in the product annotations. Spatial Resolution: approximately 8m slant range x approximately 4m azimuth</content>
+<rights type="html">Data is available via EOLI-SA upon &lt;a href="https://earth.esa.int/FastRegistration/L1_STND_A_SAR_OTF-A"&gt;registration&lt;/a&gt; for the (A)SAR On The Fly Service.	For information on access and use of the On-The-Fly service please refer to the &lt;a href="https://earth.esa.int/web/guest/data-access/how-to-access-eo-data/asar-on-the-fly-faq"&gt;OTF FAQ page&lt;/a&gt; and news of &lt;a href="https://earth.esa.int/web/guest/missions/esa-operational-eo-missions/envisat/news/-/article/full-envisat-asar-ap-data-archive-available-via-the-esa-on-the-fly-service"&gt;30 August 2016&lt;/a&gt;</rights>
+<title>ASAR Alternating Polarisation Mode Single-Look Complex</title>
+<updated>2018-08-14T12:36:43Z</updated>
+<dc:identifier>ENVISAT.ASA.APS_1P</dc:identifier>
+<dc:date>2002-11-15T00:00:00Z/2012-04-08T00:00:00Z</dc:date>
+<georss:polygon>-90 -180 -90 180 90 180 90 -180 -90 -180</georss:polygon>
+</entry>
+<entry>
+<category label="EARTH SCIENCE &gt; SPECTRAL/ENGINEERING &gt; RADAR" term="http://gcmdservices.gsfc.nasa.gov/kms/concept/d3b7c3c0-e644-4f01-94da-dfebe854c0d1"/>
+<category label="Radar Imagery" term="https://earth.esa.int/typologies/radar-imagery"/>
+<category label="800 km" term="https://earth.esa.int/eop-ext/orbitHeight"/>
+<category label="Sun-synchronous" term="http://www.opengis.net/eop/2.1/orbitType"/>
+<category label="5 - 1150 km" term="https://earth.esa.int/eop-ext/swathWidth"/>
+<category label="ENVISAT" term="https://earth.esa.int/web/guest/data-access/browse-data-products?p_p_id=datasetlist_WAR_ospportlet&amp;missions=ENVISAT"/>
+<category label="ASAR" term="https://earth.esa.int/web/guest/data-access/browse-data-products?p_p_id=datasetlist_WAR_ospportlet&amp;instruments=ASAR"/>
+<category label="Land &gt; Topography/Mapping, Soil, Vegetation" term="https://earth.esa.int/web/guest/earth-topics/land"/>
+<category label="Snow and Ice &gt; Sea Ice, Snow and Ice" term="https://earth.esa.int/web/guest/earth-topics/snow-and-ice"/>
+<category label="Natural Disasters &gt; Oil Slick" term="https://earth.esa.int/web/guest/earth-topics/natural-disasters"/>
+<category label="Ocean and Coast &gt; Ocean Currents and Topography, Ocean Waves, Coastal Geomorphology" term="https://earth.esa.int/web/guest/earth-topics/oceans-and-coasts"/>
+<category label="Solid Earth &gt; Tectonics/Seismic Activity" term="https://earth.esa.int/web/guest/earth-topics/solid-earth"/>
+<category label="Water &gt; Water Management" term="https://earth.esa.int/web/guest/earth-topics/water"/>
+<category label="Envisat" term="https://earth.esa.int/web/guest/missions/esa-operational-eo-missions/envisat"/>
+<category label="Earth Online" term="Earth Online"/>
+<category label="ESA OADS" term="ESA OADS"/>
+<id>http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMS_1P</id>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMS_1P" rel="alternate" title="Atom format" type="application/atom+xml"/>
+<link href="http://geo.spacebel.be/opensearch/description.xml?parentIdentifier=ENVISAT.ASA.IMS_1P&amp;startDate=2002-10-18T00:00:00Z&amp;endDate=2012-04-08T00:00:00Z" hreflang="en" rel="search" type="application/opensearchdescription+xml"/>
+<link href="https://earth.esa.int/web/guest/-/asar-image-mode-single-look-complex-1616" rel="describedby" type="text/html"/>
+<link href="https://earth.esa.int/c/document_library/get_file?folderId=231342&amp;name=DLFE-2136.pdf" rel="describedby" title="ASAR Products Specification - Revision C - Product Specifications" type="application/pdf"/>
+<link href="http://envisat.esa.int/handbooks/asar/CNTR.html" rel="describedby" title="ASAR Product Handbook - User Manual" type="text/html"/>
+<link href="http://envisat.esa.int/handbooks/asar/CNTR2-6.html" rel="describedby" title="ASAR Level 1B Algorithms - Technical Note" type="text/html"/>
+<link href="http://envisat.esa.int/handbooks/asar/CNTR6-2-9.html" rel="describedby" title="ASA_IMS_1P File Structure - Product Specifications" type="text/html"/>
+<link href="https://earth.esa.int/web/guest/document-library/browse-document-library?selectedTags=envisat,asar" rel="describedby" title="More ASAR Documents - Product Specifications" type="text/html"/>
+<link href="http://obeos.spacebel.be/opensearch/images/esa.png" rel="icon" type="image/png"/>
+<atom:link xmlns:atom="http://www.w3.org/2005/Atom" href="https://eoli.eo.esa.int/ngeo/sec/?sharedUrl=https%3A%2F%2Feoli.eo.esa.int%2Fngeo%2Fsec%2F%23data-services-area%2Fsearch%3FosParameters%3D%257B%2522FEDEO-ENVISAT.ASA.IMS_1P-ENVISAT.ASA.IMS_1P%2522%253A%2522%2522%252C%2522commonCriteria%2522%253A%2522start%253D2012-03-09T00%253A00%253A00.000Z%2526stop%253D2012-04-08T23%253A59%253A59.999Z%2526bbox%253D-80.86%252C-33.49%252C80.85%252C33.48%2522%257D" rel="license" title="Fast Registration with immediate access" type="text/html"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMS_1P&amp;recordSchema=iso" rel="alternate" title="ISO 19139 metadata" type="application/vnd.iso.19139+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139-2%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMS_1P&amp;recordSchema=iso19139-2" rel="alternate" title="ISO 19139-2 metadata" type="application/vnd.iso.19139-2+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/iso19115%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMS_1P&amp;recordSchema=iso19115" rel="alternate" title="ISO MENDS metadata" type="application/iso19115+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19115-3%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMS_1P&amp;recordSchema=iso19115-3" rel="alternate" title="ISO 19115-3 metadata" type="application/vnd.iso.19115-3+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/dif10%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMS_1P&amp;recordSchema=dif10" rel="alternate" title="DIF-10 metadata" type="application/dif10+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/xml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMS_1P&amp;recordSchema=dc" rel="alternate" title="Dublin Core metadata" type="application/xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/rdf%2Bxml&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=ENVISAT.ASA.IMS_1P&amp;recordSchema=iso" rel="alternate" title="RDF/XML format" type="application/rdf+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/ld%2Bjson&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=ENVISAT.ASA.IMS_1P&amp;recordSchema=iso" rel="alternate" title="JSON-LD format" type="application/ld+json"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=text/turtle&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=ENVISAT.ASA.IMS_1P&amp;recordSchema=iso" rel="alternate" title="Turtle format" type="text/turtle"/>
+<summary type="html"><![CDATA[<table xmlns="">
+<tr valign="top">
+<td>
+<b>Title</b>
+</td>
+<td>ASAR Image Mode Single Look Complex</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Description</b>
+</td>
+<td>This data product represents a single-look, complex, slant-range, digital image generated from Level 0 ASAR data collected when the instrument is in image mode. Seven possible swaths in HH or VV polarisation are available. The product is primarily intended for use in SAR quality assessment and calibration, and can be used to derive higher level products. The spatial coverage is about 100 km along track per 56- 100 km across track, and the radiometric resolution is 1 look in azimuth, 1 look in range. The file size is 741 Mbytes. It is worth highlighting that Azimuth pixel spacing depends on Earth-Satellite relative velocity and actual PRF and slant range pixel spacing is given by ASAR sampling frequency (19.208 Mhz). Auxiliary data include: Orbit state vector, Time correlation parameters, Main Processing parameters ADS, Doppler Centroid ADS, Chirp ADS, Antenna Elevation Pattern ADS, Geolocation Grid ADS, SQ ADS. Spatial Resolution: approximately 8m slant range x approximately 4m azimuth</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Type</b>
+</td>
+<td>Collection</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Date</b>
+</td>
+<td>2002-10-18T00:00:00Z/2012-04-08T00:00:00Z</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Media Type</b>
+</td>
+<td>
+<a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMS_1P" title="ATOM format">ATOM</a>   |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/sru%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMS_1P&amp;recordSchema=server-choice" title="SRU format">SRU</a>
+</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Metadata</b>
+</td>
+<td>
+<a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMS_1P&amp;recordSchema=iso" title="ISO format">ISO 19139</a>   |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139-2%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMS_1P&amp;recordSchema=iso19139-2" title="ISO format">ISO 19139-2</a> |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/dif10%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMS_1P&amp;recordSchema=dif10" title="ISO format">DIF-10</a>
+</td>
+</tr>
+</table>]]></summary>
+<content type="html">This data product represents a single-look, complex, slant-range, digital image generated from Level 0 ASAR data collected when the instrument is in image mode. Seven possible swaths in HH or VV polarisation are available. The product is primarily intended for use in SAR quality assessment and calibration, and can be used to derive higher level products. The spatial coverage is about 100 km along track per 56- 100 km across track, and the radiometric resolution is 1 look in azimuth, 1 look in range. The file size is 741 Mbytes. It is worth highlighting that Azimuth pixel spacing depends on Earth-Satellite relative velocity and actual PRF and slant range pixel spacing is given by ASAR sampling frequency (19.208 Mhz). Auxiliary data include: Orbit state vector, Time correlation parameters, Main Processing parameters ADS, Doppler Centroid ADS, Chirp ADS, Antenna Elevation Pattern ADS, Geolocation Grid ADS, SQ ADS. Spatial Resolution: approximately 8m slant range x approximately 4m azimuth</content>
+<rights type="html">Data is available via EOLI-SA upon &lt;a href="https://earth.esa.int/FastRegistration/L1_STND_A_SAR_OTF-A"&gt;registration&lt;/a&gt; for the (A)SAR On The Fly Service.	For information on access and use of the On-The-Fly service please refer to the &lt;a href="https://earth.esa.int/web/guest/data-access/how-to-access-eo-data/asar-on-the-fly-faq"&gt;OTF FAQ page&lt;/a&gt; and &lt;a href="https://earth.esa.int/web/guest/missions/esa-operational-eo-missions/envisat/news/-/article/new-service-open-to-asar-data-users-esa-s-envisat-asar-image-mode-archive-released-for-on-the-fly-data-download"&gt;news&lt;/a&gt; of 28 July 2016.</rights>
+<title>ASAR Image Mode Single Look Complex</title>
+<updated>2018-08-14T12:36:43Z</updated>
+<dc:identifier>ENVISAT.ASA.IMS_1P</dc:identifier>
+<dc:date>2002-10-18T00:00:00Z/2012-04-08T00:00:00Z</dc:date>
+<georss:polygon>-90 -180 -90 180 90 180 90 -180 -90 -180</georss:polygon>
+</entry>
+<entry>
+<category label="EARTH SCIENCE &gt; SPECTRAL/ENGINEERING &gt; RADAR" term="http://gcmdservices.gsfc.nasa.gov/kms/concept/d3b7c3c0-e644-4f01-94da-dfebe854c0d1"/>
+<category label="Radar Imagery" term="https://earth.esa.int/typologies/radar-imagery"/>
+<category label="800 km" term="https://earth.esa.int/eop-ext/orbitHeight"/>
+<category label="Sun-synchronous" term="http://www.opengis.net/eop/2.1/orbitType"/>
+<category label="5 - 1150 km" term="https://earth.esa.int/eop-ext/swathWidth"/>
+<category label="ENVISAT" term="https://earth.esa.int/web/guest/data-access/browse-data-products?p_p_id=datasetlist_WAR_ospportlet&amp;missions=ENVISAT"/>
+<category label="ASAR" term="https://earth.esa.int/web/guest/data-access/browse-data-products?p_p_id=datasetlist_WAR_ospportlet&amp;instruments=ASAR"/>
+<category label="Land &gt; Soil, Topography/Mapping, Vegetation" term="https://earth.esa.int/web/guest/earth-topics/land"/>
+<category label="Snow and Ice &gt; Sea Ice, Snow and Ice" term="https://earth.esa.int/web/guest/earth-topics/snow-and-ice"/>
+<category label="Natural Disasters &gt; Oil Slick" term="https://earth.esa.int/web/guest/earth-topics/natural-disasters"/>
+<category label="Ocean and Coast &gt; Ocean Currents and Topography, Ocean Waves, Coastal Geomorphology" term="https://earth.esa.int/web/guest/earth-topics/oceans-and-coasts"/>
+<category label="Solid Earth &gt; Tectonics/Seismic Activity" term="https://earth.esa.int/web/guest/earth-topics/solid-earth"/>
+<category label="Water &gt; Water Management" term="https://earth.esa.int/web/guest/earth-topics/water"/>
+<category label="Envisat" term="https://earth.esa.int/web/guest/missions/esa-operational-eo-missions/envisat"/>
+<category label="Earth Online" term="Earth Online"/>
+<category label="ESA OADS" term="ESA OADS"/>
+<id>http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMP_1P</id>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMP_1P" rel="alternate" title="Atom format" type="application/atom+xml"/>
+<link href="http://geo.spacebel.be/opensearch/description.xml?parentIdentifier=ENVISAT.ASA.IMP_1P&amp;startDate=2002-10-18T00:00:00Z&amp;endDate=2012-04-08T00:00:00Z" hreflang="en" rel="search" type="application/opensearchdescription+xml"/>
+<link href="https://earth.esa.int/web/guest/-/asar-image-mode-precision-image-1523" rel="describedby" type="text/html"/>
+<link href="https://earth.esa.int/c/document_library/get_file?folderId=231342&amp;name=DLFE-2136.pdf" rel="describedby" title="ASAR Products Specification - Revision C - Product Specifications" type="application/pdf"/>
+<link href="http://envisat.esa.int/handbooks/asar/CNTR2-6-1-2-3.html" rel="describedby" title="Range Doppler Algorithm - Technical Report" type="text/html"/>
+<link href="http://envisat.esa.int/handbooks/asar/CNTR6-2-8.html" rel="describedby" title="ASA_IMP_1P File Structure - Product Specifications" type="text/html"/>
+<link href="https://earth.esa.int/c/document_library/get_file?folderId=13019&amp;name=DLFE-615.pdf" rel="describedby" title="Envisat ASAR Science and Applications - Technical Note" type="application/pdf"/>
+<link href="http://envisat.esa.int/handbooks/asar/CNTR2-6.html" rel="describedby" title="ASAR Level 1 Algorithms - Product Specifications" type="text/html"/>
+<link href="http://envisat.esa.int/handbooks/asar/CNTR.html" rel="describedby" title="ASAR Product Handbook - User Manual" type="text/html"/>
+<link href="https://earth.esa.int/web/guest/document-library/browse-document-library?selectedTags=envisat,asar" rel="describedby" title="More ASAR Documents - Product Specifications" type="application/pdf"/>
+<link href="http://obeos.spacebel.be/opensearch/images/esa.png" rel="icon" type="image/png"/>
+<atom:link xmlns:atom="http://www.w3.org/2005/Atom" href="https://eoli.eo.esa.int/ngeo/sec/#data-services-area/search?osParameters=%7B%22FEDEO-ENVISAT.ASA.IMP_1P-ENVISAT.ASA.IMP_1P%22%3A%22%22%2C%22commonCriteria%22%3A%22start%3D2012-03-09T00%3A00%3A00.000Z%26stop%3D2012-04-08T23%3A59%3A59.999Z%26bbox%3D-80.86%2C-33.49%2C80.85%2C33.48%22%7D" rel="license" title="Fast Registration with immediate access" type="text/html"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMP_1P&amp;recordSchema=iso" rel="alternate" title="ISO 19139 metadata" type="application/vnd.iso.19139+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139-2%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMP_1P&amp;recordSchema=iso19139-2" rel="alternate" title="ISO 19139-2 metadata" type="application/vnd.iso.19139-2+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/iso19115%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMP_1P&amp;recordSchema=iso19115" rel="alternate" title="ISO MENDS metadata" type="application/iso19115+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19115-3%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMP_1P&amp;recordSchema=iso19115-3" rel="alternate" title="ISO 19115-3 metadata" type="application/vnd.iso.19115-3+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/dif10%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMP_1P&amp;recordSchema=dif10" rel="alternate" title="DIF-10 metadata" type="application/dif10+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/xml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMP_1P&amp;recordSchema=dc" rel="alternate" title="Dublin Core metadata" type="application/xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/rdf%2Bxml&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=ENVISAT.ASA.IMP_1P&amp;recordSchema=iso" rel="alternate" title="RDF/XML format" type="application/rdf+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/ld%2Bjson&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=ENVISAT.ASA.IMP_1P&amp;recordSchema=iso" rel="alternate" title="JSON-LD format" type="application/ld+json"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=text/turtle&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=ENVISAT.ASA.IMP_1P&amp;recordSchema=iso" rel="alternate" title="Turtle format" type="text/turtle"/>
+<summary type="html"><![CDATA[<table xmlns="">
+<tr valign="top">
+<td>
+<b>Title</b>
+</td>
+<td>ASAR Image Mode Precision Image</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Description</b>
+</td>
+<td>This is a multi-look, ground range, digital image generated from Level 0 data collected when the instrument is in Image Mode (7 possible swaths HH or VV polarisation). The product includes slant range to ground range correction. It is for users wishing to perform applications-oriented analysis and applies to multi-temporal imaging and to derive backscattering coefficients. The stand-alone image is generated using the Range/Doppler algorithm. The processing uses up to date (at time of processing) auxiliary parameters corrected for antenna elevation gain, and range spreading loss. Engineering corrections and relative calibration are applied to compensate for well-understood sources of system variability. Absolute calibration parameters, when available (depending on external calibration activities) are provided in the product annotations. This product provides a continuation of the ERS-SAR_PRI product. Spatial Resolution: 30 m ground range x 30 m azimuth</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Type</b>
+</td>
+<td>Collection</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Date</b>
+</td>
+<td>2002-10-18T00:00:00Z/2012-04-08T00:00:00Z</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Media Type</b>
+</td>
+<td>
+<a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMP_1P" title="ATOM format">ATOM</a>   |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/sru%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMP_1P&amp;recordSchema=server-choice" title="SRU format">SRU</a>
+</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Metadata</b>
+</td>
+<td>
+<a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMP_1P&amp;recordSchema=iso" title="ISO format">ISO 19139</a>   |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139-2%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMP_1P&amp;recordSchema=iso19139-2" title="ISO format">ISO 19139-2</a> |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/dif10%2Bxml&amp;parentIdentifier=EOP%3AESA%3AFEDEO%3ACOLLECTIONS&amp;uid=ENVISAT.ASA.IMP_1P&amp;recordSchema=dif10" title="ISO format">DIF-10</a>
+</td>
+</tr>
+</table>]]></summary>
+<content type="html">This is a multi-look, ground range, digital image generated from Level 0 data collected when the instrument is in Image Mode (7 possible swaths HH or VV polarisation). The product includes slant range to ground range correction. It is for users wishing to perform applications-oriented analysis and applies to multi-temporal imaging and to derive backscattering coefficients. The stand-alone image is generated using the Range/Doppler algorithm. The processing uses up to date (at time of processing) auxiliary parameters corrected for antenna elevation gain, and range spreading loss. Engineering corrections and relative calibration are applied to compensate for well-understood sources of system variability. Absolute calibration parameters, when available (depending on external calibration activities) are provided in the product annotations. This product provides a continuation of the ERS-SAR_PRI product. Spatial Resolution: 30 m ground range x 30 m azimuth</content>
+<rights type="html">Data is available via EOLI-SA upon &lt;a href="https://earth.esa.int/FastRegistration/L1_STND_A_SAR_OTF-A"&gt;registration&lt;/a&gt; for the (A)SAR On The Fly Service.	For information on access and use of the On-The-Fly service please refer to the &lt;a href="https://earth.esa.int/web/guest/data-access/how-to-access-eo-data/asar-on-the-fly-faq"&gt;OTF FAQ page&lt;/a&gt; and &lt;a href="https://earth.esa.int/web/guest/missions/esa-operational-eo-missions/envisat/news/-/article/new-service-open-to-asar-data-users-esa-s-envisat-asar-image-mode-archive-released-for-on-the-fly-data-download"&gt;news&lt;/a&gt; of 28 July 2016.</rights>
+<title>ASAR Image Mode Precision Image</title>
+<updated>2018-08-14T12:36:43Z</updated>
+<dc:identifier>ENVISAT.ASA.IMP_1P</dc:identifier>
+<dc:date>2002-10-18T00:00:00Z/2012-04-08T00:00:00Z</dc:date>
+<georss:polygon>-90 -180 -90 180 90 180 90 -180 -90 -180</georss:polygon>
+</entry>
+<entry>
+<category label="Atmospheric conditions" term="Atmospheric conditions"/>
+<category label="Land" term="Land"/>
+<category label="Soil Moisture" term="Soil Moisture"/>
+<category label="SAF Archive &amp; FTP" term="SAF Archive &amp; FTP"/>
+<category label="EUMETCast-Europe" term="EUMETCast-Europe"/>
+<category label="EUMETCast-Satellite" term="EUMETCast-Satellite"/>
+<category label="Metop" term="Metop"/>
+<category label="ASCAT" term="ASCAT"/>
+<id>http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AEUMETSAT&amp;uid=EO%3AEUM%3ADAT%3AMETOP%3ASMOBS2</id>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AEUMETSAT&amp;uid=EO%3AEUM%3ADAT%3AMETOP%3ASMOBS2" rel="alternate" title="Atom format" type="application/atom+xml"/>
+<link href="http://geo.spacebel.be/opensearch/description.xml?parentIdentifier=EOP:EUMETSAT:EO:EUM:DAT:METOP:SMOBS2&amp;startDate=2010-08-30T00:00:00Z" hreflang="en" rel="search" type="application/opensearchdescription+xml"/>
+<link href="http://obeos.spacebel.be/opensearch/images/eumetsat.jpg" rel="icon" type="image/jpeg"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139%2Bxml&amp;parentIdentifier=EOP%3AEUMETSAT&amp;uid=EO%3AEUM%3ADAT%3AMETOP%3ASMOBS2&amp;recordSchema=iso" rel="alternate" title="ISO 19139 metadata" type="application/vnd.iso.19139+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139-2%2Bxml&amp;parentIdentifier=EOP%3AEUMETSAT&amp;uid=EO%3AEUM%3ADAT%3AMETOP%3ASMOBS2&amp;recordSchema=iso19139-2" rel="alternate" title="ISO 19139-2 metadata" type="application/vnd.iso.19139-2+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/iso19115%2Bxml&amp;parentIdentifier=EOP%3AEUMETSAT&amp;uid=EO%3AEUM%3ADAT%3AMETOP%3ASMOBS2&amp;recordSchema=iso19115" rel="alternate" title="ISO MENDS metadata" type="application/iso19115+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19115-3%2Bxml&amp;parentIdentifier=EOP%3AEUMETSAT&amp;uid=EO%3AEUM%3ADAT%3AMETOP%3ASMOBS2&amp;recordSchema=iso19115-3" rel="alternate" title="ISO 19115-3 metadata" type="application/vnd.iso.19115-3+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/dif10%2Bxml&amp;parentIdentifier=EOP%3AEUMETSAT&amp;uid=EO%3AEUM%3ADAT%3AMETOP%3ASMOBS2&amp;recordSchema=dif10" rel="alternate" title="DIF-10 metadata" type="application/dif10+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/xml&amp;parentIdentifier=EOP%3AEUMETSAT&amp;uid=EO%3AEUM%3ADAT%3AMETOP%3ASMOBS2&amp;recordSchema=dc" rel="alternate" title="Dublin Core metadata" type="application/xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/rdf%2Bxml&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=EO:EUM:DAT:METOP:SMOBS2&amp;recordSchema=iso" rel="alternate" title="RDF/XML format" type="application/rdf+xml"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/ld%2Bjson&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=EO:EUM:DAT:METOP:SMOBS2&amp;recordSchema=iso" rel="alternate" title="JSON-LD format" type="application/ld+json"/>
+<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=text/turtle&amp;parentIdentifier=EOP:ESA:FEDEO:COLLECTIONS&amp;uid=EO:EUM:DAT:METOP:SMOBS2&amp;recordSchema=iso" rel="alternate" title="Turtle format" type="text/turtle"/>
+<summary type="html"><![CDATA[<table xmlns="">
+<tr valign="top">
+<td>
+<b>Title</b>
+</td>
+<td>Small-scale surface soil moisture by radar scatterometer [1 km, ASCAT/SAR]</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Description</b>
+</td>
+<td>Derived from the CAF Global ASCAT SM product limited to the H-SAF area. Maps of the soil moisture content in the surface layer (0-2 cm) generated from the Metop scatterometer (ASCAT) processed shortly after each satellite orbit completion. It is generated by disaggregating the large-scale product (25 km resolution), to 0.5-km sampling with downscaling parameters derived from ENVISAT ASAR (C-band).</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Type</b>
+</td>
+<td>Collection</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Date</b>
+</td>
+<td>2010-08-30T00:00:00Z/</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Media Type</b>
+</td>
+<td>
+<a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=EOP%3AEUMETSAT&amp;uid=EO%3AEUM%3ADAT%3AMETOP%3ASMOBS2" title="ATOM format">ATOM</a>   |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/sru%2Bxml&amp;parentIdentifier=EOP%3AEUMETSAT&amp;uid=EO%3AEUM%3ADAT%3AMETOP%3ASMOBS2&amp;recordSchema=server-choice" title="SRU format">SRU</a>
+</td>
+</tr>
+<tr valign="top">
+<td>
+<b>Metadata</b>
+</td>
+<td>
+<a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139%2Bxml&amp;parentIdentifier=EOP%3AEUMETSAT&amp;uid=EO%3AEUM%3ADAT%3AMETOP%3ASMOBS2&amp;recordSchema=iso" title="ISO format">ISO 19139</a>   |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/vnd.iso.19139-2%2Bxml&amp;parentIdentifier=EOP%3AEUMETSAT&amp;uid=EO%3AEUM%3ADAT%3AMETOP%3ASMOBS2&amp;recordSchema=iso19139-2" title="ISO format">ISO 19139-2</a> |   <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/dif10%2Bxml&amp;parentIdentifier=EOP%3AEUMETSAT&amp;uid=EO%3AEUM%3ADAT%3AMETOP%3ASMOBS2&amp;recordSchema=dif10" title="ISO format">DIF-10</a>
+</td>
+</tr>
+</table>]]></summary>
+<content type="html">Derived from the CAF Global ASCAT SM product limited to the H-SAF area. Maps of the soil moisture content in the surface layer (0-2 cm) generated from the Metop scatterometer (ASCAT) processed shortly after each satellite orbit completion. It is generated by disaggregating the large-scale product (25 km resolution), to 0.5-km sampling with downscaling parameters derived from ENVISAT ASAR (C-band).</content>
+<rights type="html">- geossDataCore geossNoMonetaryCharge geossuserRegistration geossAttribution</rights>
+<title>Small-scale surface soil moisture by radar scatterometer [1 km, ASCAT/SAR]</title>
+<updated>2018-08-14T12:36:43Z</updated>
+<dc:identifier>EO:EUM:DAT:METOP:SMOBS2</dc:identifier>
+<dc:date>2010-08-30T00:00:00Z/</dc:date>
+<georss:polygon>25 25 25 45 75 45 75 25 25 25</georss:polygon>
+</entry>
+</feed>
