@@ -24,6 +24,13 @@ def get_any_id(info):  # type: (dict) -> Any
     return info.get('id', info.get('identifier', info.get('_id')))
 
 
+def get_any_value(info):  # type: (dict) -> Any
+    """Retrieves a dictionary 'value'-like key using multiple common variations [value, reference].
+    :param info: dictionary that potentially contains an 'value'-like key.
+    :returns: value of the matched 'id'-like key."""
+    return info.get('value', info.get('reference'))
+
+
 def is_valid_url(url):
     try:
         parsed_url = urlparse(url)
