@@ -228,6 +228,7 @@ def _load_package_content(package_dict, package_name=PACKAGE_DEFAULT_FILE_NAME,
         return
 
     if False:
+        # TODO Entry point to the ADES dispatcher cwl step
         # EMS dispatch the execution to the ADES (WIP)
         loading_context = LoadingContext()
         loading_context.construct_tool_object = make_tool
