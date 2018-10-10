@@ -1,5 +1,5 @@
-from twitcher.wps_restapi import swagger_definitions as sd, sort
-from twitcher.adapter import quotestore_factory, billstore_factory
+from twitcher.wps_restapi import swagger_definitions as sd
+from twitcher.adapter import billstore_factory
 from twitcher.exceptions import BillNotFound
 from pyramid.httpexceptions import *
 import logging

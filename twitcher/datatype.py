@@ -3,7 +3,6 @@ Definitions of types used by tokens.
 """
 
 import six
-import time
 import uuid
 from datetime import datetime
 from logging import _levelNames, ERROR, INFO
@@ -11,7 +10,8 @@ from twitcher.utils import now_secs
 from twitcher.exceptions import ProcessInstanceError
 from twitcher.processes import process_mapping
 from twitcher.processes.types import PACKAGE_PROCESSES, PROCESS_WPS
-from twitcher.wps_restapi.status import job_status_values
+from twitcher.status import job_status_values
+from twitcher.visibility import visibility_values, VISIBILITY_PRIVATE
 from pywps import Process as ProcessWPS
 
 
@@ -148,7 +148,8 @@ class Job(dict):
         if not isinstance(status, six.string_types):
             raise TypeError("Type `str` is required for `{}.status`".format(type(self)))
         if status not in job_status_values:
-            raise ValueError("Status `{0}` is not valid for `{1}.status`".format(status, type(self)))
+            raise ValueError("Status `{0}` is not valid for `{1}.status`, must be one of {2!s}`"
+                             .format(status, type(self), list(job_status_values)))
         self['status'] = status
 
     @property
@@ -453,6 +454,23 @@ class Process(dict):
     def package(self):
         return self.get('package')
 
+    @property
+    def payload(self):
+        return self.get('payload')
+
+    @property
+    def visibility(self):
+        return self.get('visibility', VISIBILITY_PRIVATE)
+
+    @visibility.setter
+    def visibility(self, visibility):
+        if not isinstance(visibility, six.string_types):
+            raise TypeError("Type `str` is required for `{}.visibility`".format(type(self)))
+        if visibility not in visibility_values:
+            raise ValueError("Status `{0}` is not valid for `{1}.visibility, must be one of {2!s}`"
+                             .format(visibility, type(self), list(visibility_values)))
+        self['visibility'] = visibility
+
     def __str__(self):
         return "Process <{0}> ({1})".format(self.identifier, self.title)
 
@@ -477,12 +495,13 @@ class Process(dict):
             'executeEndpoint': self.executeEndpoint,
             'type': self.type,
             'package': self.package,      # deployment specification (json body)
+            'payload': self.payload,
+            'visibility': self.visibility,
         }
 
     @property
     def params_wps(self):
-        """Values applicable to WPS Process __init__
-        """
+        """Values applicable to WPS Process __init__"""
         return {
             'identifier': self.identifier,
             'title': self.title,
@@ -492,6 +511,8 @@ class Process(dict):
             'version': self.version,
             'inputs': self.inputs,
             'outputs': self.outputs,
+            'package': self.package,
+            'payload': self.payload,
         }
 
     def json(self):
@@ -536,9 +557,7 @@ class Process(dict):
         if process_key not in process_mapping:
             ProcessInstanceError("Unknown process `{}` in mapping".format(process_key))
         if process_key in PACKAGE_PROCESSES:
-            kwargs = self.params_wps
-            kwargs.update({'package': self.package})
-            return process_mapping[process_key](**kwargs)
+            return process_mapping[process_key](**self.params_wps)
         return process_mapping[process_key]()
 
 

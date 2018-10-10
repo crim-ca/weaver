@@ -112,9 +112,11 @@ class ProcessStore(object):
         """
         raise NotImplementedError
 
-    def list_processes(self, request=None):
+    def list_processes(self, visibility=None, request=None):
         """
-        Lists all processes in database.
+        Lists all processes in database, optionally filtered by visibility.
+
+        :param visibility: One value amongst `twitcher.visibility`.
         """
         raise NotImplementedError
 
@@ -123,6 +125,23 @@ class ProcessStore(object):
         Get process for given ``name`` from storage.
 
         :return: An instance of :class:`twitcher.datatype.Process`.
+        """
+        raise NotImplementedError
+
+    def get_visibility(self, process_id, request=None):
+        """
+        Get visibility of a process.
+
+        :return: One value amongst `twitcher.visibility`.
+        """
+        raise NotImplementedError
+
+    def set_visibility(self, process_id, visibility, request=None):
+        """
+        Set visibility of a process.
+
+        :param visibility: One value amongst `twitcher.visibility`.
+        :raises: TypeError or ValueError in case of invalid parameter.
         """
         raise NotImplementedError
 

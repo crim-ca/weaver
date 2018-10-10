@@ -1,6 +1,7 @@
+import os
 import time
-from datetime import datetime
 import pytz
+from datetime import datetime
 from lxml import etree
 import types
 import re
@@ -9,7 +10,7 @@ from twitcher.exceptions import ServiceNotFound
 from twitcher._compat import urlparse, parse_qs
 
 import logging
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 def get_twitcher_url(settings):
@@ -81,7 +82,7 @@ def localize_datetime(dt, tz_name='UTC'):
         timezone = pytz.timezone(tz_name)
         tz_aware_dt = aware.astimezone(timezone)
     else:
-        logger.warn('tzinfo already set')
+        LOGGER.warn('tzinfo already set')
     return tz_aware_dt
 
 
@@ -134,7 +135,7 @@ def replace_caps_url(xml, url, prev_url=None):
     doc = etree.fromstring(xml)
     # wms 1.1.1 onlineResource
     if 'WMT_MS_Capabilities' in doc.tag:
-        logger.debug("replace proxy urls in wms 1.1.1")
+        LOGGER.debug("replace proxy urls in wms 1.1.1")
         for element in doc.findall('.//OnlineResource[@xlink:href]', namespaces=ns):
             parsed_url = urlparse(element.get('{http://www.w3.org/1999/xlink}href'))
             new_url = url
@@ -144,7 +145,7 @@ def replace_caps_url(xml, url, prev_url=None):
         xml = etree.tostring(doc)
     # wms 1.3.0 onlineResource
     elif 'WMS_Capabilities' in doc.tag:
-        logger.debug("replace proxy urls in wms 1.3.0")
+        LOGGER.debug("replace proxy urls in wms 1.3.0")
         for element in doc.findall('.//{http://www.opengis.net/wms}OnlineResource[@xlink:href]', namespaces=ns):
             parsed_url = urlparse(element.get('{http://www.w3.org/1999/xlink}href'))
             new_url = url

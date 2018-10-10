@@ -1,8 +1,8 @@
-from twitcher.wps_restapi import swagger_definitions as sd, sort
-from twitcher.wps_restapi.utils import wps_restapi_base_url
+from twitcher.wps_restapi import swagger_definitions as sd
+from twitcher import sort
 from twitcher.wps_restapi.processes.processes import submit_local_job
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS, TWITCHER_CONFIGURATION_ADES
-from twitcher.exceptions import BillNotFound, BillRegistrationError, QuoteNotFound, ProcessNotFound
+from twitcher.exceptions import QuoteNotFound, ProcessNotFound
 from twitcher.adapter import billstore_factory, quotestore_factory, processstore_factory
 from twitcher.datatype import Bill, Quote
 from twitcher.processes.types import *
@@ -11,7 +11,7 @@ from twitcher.utils import get_twitcher_url
 from pyramid.httpexceptions import *
 import logging
 import random
-import six
+
 logger = logging.getLogger('TWITCHER')
 
 

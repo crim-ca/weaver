@@ -5,8 +5,9 @@ so that one can update the swagger without touching any other files after the in
 
 from twitcher.config import TWITCHER_CONFIGURATION_EMS
 from twitcher.wps_restapi.utils import wps_restapi_base_path
-from twitcher.wps_restapi.status import job_status_values, STATUS_ACCEPTED
-from twitcher.wps_restapi.sort import *
+from twitcher.status import job_status_values, STATUS_ACCEPTED
+from twitcher.sort import *
+from twitcher.visibility import visibility_values, VISIBILITY_PUBLIC
 from cornice import Service
 from colander import *
 
@@ -26,6 +27,7 @@ api_versions_uri = '/versions'
 processes_uri = '/processes'
 process_uri = '/processes/{process_id}'
 process_package_uri = '/processes/{process_id}/package'
+process_visibility_uri = '/processes/{process_id}/visibility'
 process_jobs_uri = '/processes/{process_id}/jobs'
 process_job_uri = '/processes/{process_id}/jobs/{job_id}'
 process_quotes_uri = '/processes/{process_id}/quotes'
@@ -69,6 +71,7 @@ logs_short_uri = '/jobs/{job_id}/logs'
 
 api_tag = 'API'
 jobs_tag = 'Jobs'
+visibility_tag = 'Visibility'
 bill_quote_tag = 'Billing & Quoting'
 provider_processes_tag = 'Provider Processes'
 providers_tag = 'Providers'
@@ -95,6 +98,7 @@ api_versions_service = Service(name='api_versions', path=api_versions_uri)
 processes_service = Service(name='processes', path=processes_uri)
 process_service = Service(name='process', path=process_uri)
 process_package_service = Service(name='process_package', path=process_package_uri)
+process_visibility_service = Service(name='process_visibility', path=process_visibility_uri)
 process_jobs_service = Service(name='process_jobs', path=process_jobs_uri)
 process_job_service = Service(name='process_job', path=process_job_uri)
 process_quotes_service = Service(name='process_quotes', path=process_quotes_uri)
@@ -354,6 +358,26 @@ class ProviderProcessEndpoint(MappingSchema):
 class ProcessEndpoint(MappingSchema):
     header = AcceptHeader()
     process_id = process_id
+
+
+class ProcessPackageEndpoint(MappingSchema):
+    header = AcceptHeader()
+    process_id = process_id
+
+
+class ProcessVisibilityGetEndpoint(MappingSchema):
+    header = AcceptHeader()
+    process_id = process_id
+
+
+class ProcessVisibilityPutBodySchema(MappingSchema):
+    value = SchemaNode(String(), validator=OneOf(list(visibility_values)), example=VISIBILITY_PUBLIC)
+
+
+class ProcessVisibilityPutEndpoint(MappingSchema):
+    header = AcceptHeader()
+    process_id = process_id
+    body = ProcessVisibilityPutBodySchema()
 
 
 class FullJobEndpoint(MappingSchema):
@@ -705,9 +729,21 @@ class LogsOutputSchema(MappingSchema):
     pass
 
 
+class FrontpageParameterSchema(MappingSchema):
+    name = SchemaNode(String(), example='api')
+    enabled = SchemaNode(Boolean(), example=True)
+    url = SchemaNode(String(), example='https://localhost:5000')
+    doc = SchemaNode(String(), example='https://localhost:5000/api', missing=drop)
+
+
+class FrontpageParameters(SequenceSchema):
+    param = FrontpageParameterSchema()
+
+
 class FrontpageSchema(MappingSchema):
-    message = SchemaNode(String(), default='hello')
-    configuration = SchemaNode(String(), default='default')
+    message = SchemaNode(String(), default='Twitcher Information', example='Twitcher Information')
+    configuration = SchemaNode(String(), default='default', example='default')
+    parameters = FrontpageParameters()
 
 
 class AdapterDescriptionSchema(MappingSchema):
@@ -979,6 +1015,20 @@ class OkGetProcessPackageSchema(MappingSchema):
     body = MappingSchema(default={})
 
 
+class ProcessVisibilityResponseBodySchema(MappingSchema):
+    visibility = SchemaNode(String(), validator=OneOf(list(visibility_values)), example=VISIBILITY_PUBLIC)
+
+
+class OkGetProcessVisibilitySchema(MappingSchema):
+    header = JsonHeader()
+    body = ProcessVisibilityResponseBodySchema()
+
+
+class OkPutProcessVisibilitySchema(MappingSchema):
+    header = JsonHeader()
+    body = ProcessVisibilityResponseBodySchema()
+
+
 class OkDeleteProcessUndeployBodySchema(MappingSchema):
     deploymentDone = SchemaNode(Boolean(), description="Indicates if the process was successfully undeployed.",
                                 default=False, example=True)
@@ -1109,6 +1159,12 @@ get_process_responses = {
 }
 get_process_package_responses = {
     '200': OkGetProcessPackageSchema(description='success')
+}
+get_process_visibility_responses = {
+    '200': OkGetProcessVisibilitySchema(description='success')
+}
+put_process_visibility_responses = {
+    '200': OkPutProcessVisibilitySchema(description='success')
 }
 delete_process_responses = {
     '200': OkDeleteProcessSchema(description='success')

@@ -5,6 +5,7 @@ Though not very valuable in a production setup, these store adapters are great
 for testing purposes.
 """
 
+import six
 from twitcher.store.base import AccessTokenStore
 from twitcher.exceptions import AccessTokenNotFound
 
@@ -141,6 +142,7 @@ class MemoryServiceStore(ServiceStore):
 
 
 from twitcher.store.base import ProcessStore
+from twitcher.visibility import visibility_values
 
 
 class MemoryProcessStore(ProcessStore):
@@ -160,24 +162,36 @@ class MemoryProcessStore(ProcessStore):
 
         :param process: An instance of :class:`twitcher.datatype.Process`.
         """
-        sane_name = namesgenerator.get_sane_name(process.title)
+        sane_name = namesgenerator.get_sane_name(process.identifier)
         if not self.name_index.get(sane_name) or overwrite:
-            process.title = sane_name
+            if not process.title:
+                process.title = sane_name
             self.name_index[sane_name] = process
 
-    def delete_process(self, name, request=None):
+    def delete_process(self, process_id, request=None):
         """
         Removes process from database.
         """
-        sane_name = namesgenerator.get_sane_name(name)
+        sane_name = namesgenerator.get_sane_name(process_id)
         if self.name_index.get(sane_name):
             del self.name_index[sane_name]
 
-    def list_processes(self, request=None):
+    def list_processes(self, visibility=None, request=None):
         """
-        Lists all processes in database.
+        Lists all processes in database, optionally filtered by visibility.
+
+        :param visibility: One value amongst `twitcher.visibility`.
         """
-        return [process.title for process in self.name_index]
+        if visibility is None:
+            visibility = list(visibility_values)
+        if isinstance(visibility, six.string_types):
+            visibility = [visibility]
+        for v in visibility:
+            if v not in visibility_values:
+                raise ValueError("Invalid visibility value `{0!s}` is not one of {1!s}"
+                                 .format(v, list(visibility_values)))
+        return [process.identifier for process in self.name_index
+                if process.visibility in visibility]
 
     def fetch_by_id(self, process_id, request=None):
         """
@@ -188,6 +202,26 @@ class MemoryProcessStore(ProcessStore):
         sane_name = namesgenerator.get_sane_name(process_id)
         process = self.name_index.get(sane_name)
         return process
+
+    def get_visibility(self, process_id, request=None):
+        """
+        Get visibility of a process.
+
+        :return: One value amongst `twitcher.visibility`.
+        """
+        process = self.fetch_by_id(process_id)
+        return process.visibility
+
+    def set_visibility(self, process_id, visibility, request=None):
+        """
+        Set visibility of a process.
+
+        :param visibility: One value amongst `twitcher.visibility`.
+        :raises: TypeError or ValueError in case of invalid parameter.
+        """
+        process = self.fetch_by_id(process_id)
+        process.visibility = visibility
+        self.save_process(process)
 
 
 from twitcher.store.base import JobStore
