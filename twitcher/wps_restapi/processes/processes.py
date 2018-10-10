@@ -139,6 +139,7 @@ def execute_process(self, url, service, process_id, inputs,
                     is_workflow=False, user_id=None, async=True, custom_tags=None, headers=None):
     custom_tags = list() if custom_tags is None else custom_tags
     registry = app.conf['PYRAMID_REGISTRY']
+    ssl_verify = asbool(registry.settings.get('twitcher.ows_proxy_ssl_verify', True))
     store = jobstore_factory(registry)
     task_id = self.request.id
     job = JobDB({'task_id': task_id})  # default in case of error during registration to job store
@@ -147,8 +148,7 @@ def execute_process(self, url, service, process_id, inputs,
                              user_id=user_id, async=async, custom_tags=custom_tags)
 
         try:
-            verify = False if urlparse(url).hostname == 'localhost' else True
-            wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), verify=verify)
+            wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), verify=ssl_verify)
             raise_on_xml_exception(wps._capabilities)
         except Exception as ex:
             raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
@@ -203,7 +203,7 @@ def execute_process(self, url, service, process_id, inputs,
             if num_retries >= 5:
                 raise Exception("Could not read status document after 5 retries. Giving up.")
             try:
-                execution = check_status(url=execution.statusLocation, verify=False,
+                execution = check_status(url=execution.statusLocation, verify=ssl_verify,
                                          sleep_secs=wait_secs(run_step))
 
                 job.response = etree.tostring(execution.response)

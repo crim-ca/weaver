@@ -227,7 +227,6 @@ def _load_package_content(package_dict, package_name=PACKAGE_DEFAULT_FILE_NAME,
     if only_dump_file:
         return
 
-    #if get_twitcher_configuration(request.registry.settings) == TWITCHER_CONFIGURATION_EMS:
     if False:
         # EMS dispatch the execution to the ADES (WIP)
         loading_context = LoadingContext()
