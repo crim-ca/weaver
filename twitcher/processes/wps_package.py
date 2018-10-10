@@ -23,7 +23,6 @@ from pywps.app.Common import Metadata
 from twitcher import namesgenerator
 from twitcher.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from twitcher.processes.sources import retrieve_data_source_url
-from twitcher.processes.wps_workflow import make_tool
 from twitcher.utils import parse_request_query, get_any_id
 from twitcher.exceptions import PackageTypeError, PackageRegistrationError, PackageExecutionError, PackageNotFound
 from twitcher.wps_restapi.swagger_definitions import process_uri
@@ -229,8 +228,8 @@ def _load_package_content(package_dict, package_name=PACKAGE_DEFAULT_FILE_NAME,
         return
 
     #if get_twitcher_configuration(request.registry.settings) == TWITCHER_CONFIGURATION_EMS:
-    if True:
-        # EMS dispatch the execution to the ADES
+    if False:
+        # EMS dispatch the execution to the ADES (WIP)
         loading_context = LoadingContext()
         loading_context.construct_tool_object = make_tool
     else:
