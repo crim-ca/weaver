@@ -493,7 +493,12 @@ def get_local_process(request):
     try:
         store = processstore_defaultfactory(request.registry)
         process = store.fetch_by_id(process_id)
-        return HTTPOk(json={'process': process.json()})
+        process_json = process.json()
+
+        additional_parameters = wps_package.get_additional_parameters(process["payload"]["processOffering"]["process"])
+        process_json["inputs"] = wps_package.handle_eoimage_inputs(process_json["inputs"], additional_parameters)
+
+        return HTTPOk(json={'process': process_json})
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except ProcessNotFound:
@@ -556,7 +561,7 @@ def submit_local_job(request):
     if not isinstance(process_id, string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
-        store = processstore_factory(request.registry)
+        store = processstore_defaultfactory(request.registry)
         process = store.fetch_by_id(process_id)
         resp = submit_job_handler(request, process.executeEndpoint, is_workflow=process.type == 'workflow')
         return resp
