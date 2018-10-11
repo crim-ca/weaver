@@ -207,12 +207,14 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         :param overwrite: Overwrite the matching process instance by name if conflicting.
         :param request: <unused>
         """
-        sane_name = self._get_process_id(process)
+        process_id = self._get_process_id(process)
+        sane_name = namesgenerator.get_sane_name(process_id)
         if self.collection.count({'identifier': sane_name}) > 0:
             if overwrite:
                 self.collection.delete_one({'identifier': sane_name})
             else:
                 raise ProcessRegistrationError("Process `{}` already registered.".format(sane_name))
+        process["identifier"] = sane_name
         self._add_process(process)
         return self.fetch_by_id(sane_name)
 
@@ -221,8 +223,7 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         Removes process from database.
         """
         sane_name = namesgenerator.get_sane_name(process_id)
-        self.collection.delete_one({'identifier': sane_name})
-        return True
+        return bool(self.collection.delete_one({'identifier': sane_name}).deleted_count)
 
     def list_processes(self, request=None):
         """
