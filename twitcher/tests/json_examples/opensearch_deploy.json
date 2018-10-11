@@ -7,11 +7,11 @@
       "keywords": [
         "NDVI"
       ],
-      "owsContext" : {
-        "offering" : {
-          "code" : "http://www.opengis.net/eoc/applicationContext/cwl",
-          "content" : {
-            "href" : "https://file.cwl"
+      "owsContext": {
+        "offering": {
+          "code": "http://www.opengis.net/eoc/applicationContext/cwl",
+          "content": {
+            "href": "https://raw.githubusercontent.com/crim-ca/testbed14/master/application-packages/StackCreation-graph-json-remote.cwl"
           }
         }
       },

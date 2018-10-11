@@ -9,9 +9,22 @@ from pyramid import testing
 from pyramid.testing import DummyRequest
 
 import twitcher
-from twitcher.processes import wps_package
+
+from twitcher.datatype import Process
+from twitcher.processes import wps_package, Package
 from twitcher.store import DB_MEMORY, MemoryProcessStore
 from twitcher.wps_restapi.processes import processes
+
+
+def add_pywps_path():
+    import sys
+    here = os.path.dirname(__file__)
+    while not here.endswith("testbed14-twitcher"):
+        here = os.path.dirname(here)
+    sys.path.append(os.path.join(here, "src", "pywps"))
+
+
+from pywps.app.Service import Service
 
 
 def assert_json_equals(json1, json2):
@@ -29,12 +42,12 @@ def assert_json_equals(json1, json2):
         assert line1 == line2
 
 
-def get_test_file(filename):
-    return os.path.join(os.path.dirname(__file__), 'json_examples', filename)
+def get_test_file(*args):
+    return os.path.join(os.path.dirname(__file__), *args)
 
 
 def load_json_test_file(filename):
-    return json.load(open(get_test_file(filename)))
+    return json.load(open(get_test_file("json_examples", filename)))
 
 
 def make_request(**kw):
@@ -78,22 +91,53 @@ def opensearch_payload():
     return load_json_test_file("opensearch_deploy.json")
 
 
+@pytest.fixture
+def opensearch_process():
+    opensearch_process = Process(load_json_test_file("opensearch_package.json"))
+    payload = load_json_test_file("opensearch_deploy.json")
+    opensearch_process["payload"] = payload
+    return opensearch_process
+
+
+@pytest.fixture
+def store_with_opensearch_process(memory_store, opensearch_process):
+    memory_store.save_process(opensearch_process)
+    return memory_store
+
+
 def test_deploy_opensearch():
     pass
 
 
-def test_describe_process_opensearch(memory_store, dummy_payload):
-    with mock.patch("twitcher.store.processstore_defaultfactory") as store_factory:
-        store_factory.return_value = memory_store
-        request = make_request(json=dummy_payload, method='POST')
-        response = processes.add_local_process(request)
-        print(response.json())
-        # request = make_request(json=dummy_payload, method='POST')
-        # processes.get_local_process(request)
+@mock.patch("twitcher.wps_restapi.processes.processes.processstore_defaultfactory")
+def test_describe_process_opensearch(default_factory, memory_store, opensearch_process):
+    memory_store.save_process(opensearch_process)
+    default_factory.return_value = memory_store
+
+    payload = load_json_test_file("opensearch_deploy.json")
+
+    request = make_request(method='GET')
+    request.matchdict["process_id"] = "multi_sensor_ndvi_stack_g"
+
+    original_inputs = payload["processOffering"]["process"]["inputs"]
+    transformed_inputs = processes.get_local_process(request).json["process"]["inputs"]
+
+    expected_inputs = wps_package.EOImageHandler(inputs=original_inputs).to_opensearch(
+        unique_aoi=True, unique_toi=True)
+
+    assert_json_equals(transformed_inputs, expected_inputs)
 
 
-def test_execute_opensearch():
-    pass
+@mock.patch("twitcher.wps_restapi.processes.processes.processstore_defaultfactory")
+def test_execute_opensearch(default_factory, memory_store, opensearch_process):
+    # opensearch_process.executeEndpoint = "localhost"
+    memory_store.save_process(opensearch_process)
+    default_factory.return_value = memory_store
+
+    request = make_request(method='POST')
+    request.matchdict["process_id"] = "multi_sensor_ndvi_stack_g"
+
+    response = processes.submit_local_job(request)
 
 
 @mock.patch("twitcher.wps_restapi.processes.processes.wps_package.get_process_from_wps_request")

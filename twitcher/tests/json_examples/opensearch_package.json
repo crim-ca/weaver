@@ -103,7 +103,7 @@
   "owsContext": {
     "offering": {
       "content": {
-        "href": "https://file.cwl"
+        "href": "https://raw.githubusercontent.com/crim-ca/testbed14/master/application-packages/StackCreation-graph-json-remote.cwl"
       },
       "code": "http://www.opengis.net/eoc/applicationContext/cwl"
     }
