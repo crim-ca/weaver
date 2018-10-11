@@ -57,7 +57,7 @@ PACKAGE_BASE_TYPES = frozenset(['string', 'boolean', 'float', 'int', 'integer', 
 PACKAGE_LITERAL_TYPES = frozenset(list(PACKAGE_BASE_TYPES) + ['null', 'Any'])
 PACKAGE_COMPLEX_TYPES = frozenset(['File', 'Directory'])
 PACKAGE_ARRAY_BASE = 'array'
-PACKAGE_ARRAY_MAX_SIZE = six.MAXSIZE   # pywps doesn't allow None, so use max size
+PACKAGE_ARRAY_MAX_SIZE = six.MAXSIZE  # pywps doesn't allow None, so use max size
 PACKAGE_ARRAY_ITEMS = frozenset(list(PACKAGE_BASE_TYPES) + list(PACKAGE_COMPLEX_TYPES))
 PACKAGE_ARRAY_TYPES = frozenset(['{}[]'.format(item) for item in PACKAGE_ARRAY_ITEMS])
 PACKAGE_CUSTOM_TYPES = frozenset(['enum'])  # can be anything, but support 'enum' which is more common
@@ -88,6 +88,8 @@ WPS_LITERAL = 'literal'
 
 class NullType():
     pass
+
+
 null = NullType()
 
 
@@ -263,7 +265,7 @@ def _is_cwl_array_type(io_info):
     # array type conversion when defined as dict of {'type': 'array', 'items': '<type>'}
     # validate against Hashable instead of 'dict' since 'OrderedDict'/'CommentedMap' can result in `isinstance()==False`
     if not isinstance(io_type, six.string_types) and not isinstance(io_type, Hashable) \
-    and 'items' in io_type and 'type' in io_type:
+            and 'items' in io_type and 'type' in io_type:
         if not io_type['type'] == PACKAGE_ARRAY_BASE or io_type['items'] not in PACKAGE_ARRAY_ITEMS:
             raise PackageTypeError("Unsupported I/O 'array' definition: `{}`.".format(repr(io_info)))
         io_type = io_type['items']
@@ -352,7 +354,7 @@ def _cwl2wps_io(io_info, io_select):
     if is_enum:
         io_type = enum_type
         io_allow = enum_allow
-        io_mode = MODE.SIMPLE   # allowed value validator must be set for input
+        io_mode = MODE.SIMPLE  # allowed value validator must be set for input
 
     # debug info for unhandled types conversion
     if not isinstance(io_type, six.string_types):
@@ -481,7 +483,7 @@ def _json2wps_io(io_info, io_select):
             io_info[field] = _json2wps_type(value, field)
 
     # convert by type
-    io_type = io_info.pop('type', WPS_COMPLEX)    # only ComplexData doesn't have 'type'
+    io_type = io_info.pop('type', WPS_COMPLEX)  # only ComplexData doesn't have 'type'
     if io_select == WPS_INPUT:
         if io_type == WPS_COMPLEX:
             return ComplexInput(**io_info)
@@ -640,7 +642,7 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
     wps_package_metadata['abstract'] = wps_package_metadata.get('abstract', cwl_package_package.get('doc', ''))
 
     if '$schemas' in cwl_package_package and isinstance(cwl_package_package['$schemas'], list) \
-    and '$namespaces' in cwl_package_package and isinstance(cwl_package_package['$namespaces'], dict):
+            and '$namespaces' in cwl_package_package and isinstance(cwl_package_package['$namespaces'], dict):
         metadata = wps_package_metadata.get('metadata', list())
         namespaces_inv = {v: k for k, v in cwl_package_package['$namespaces']}
         for schema in cwl_package_package['$schemas']:
@@ -666,6 +668,7 @@ def get_process_from_wps_request(process_offering, reference=None, package=None,
     :param data_source: where to resolve process IDs (default: localhost if ``None``).
     :return: process information dictionary ready for saving to data store.
     """
+
     def try_or_raise_package_error(call, reason):
         try:
             LOGGER.debug("Attempting: `{}`".format(reason))
@@ -891,7 +894,7 @@ class Package(Process):
         metadata = [_json2wps_type(meta_kw, 'metadata') for meta_kw in kw.pop('metadata', list())]
 
         # append a log output
-        #outputs.append(ComplexOutput(PACKAGE_LOG_FILE, 'Package log file',
+        # outputs.append(ComplexOutput(PACKAGE_LOG_FILE, 'Package log file',
         #                             as_reference=True, supported_formats=[Format('text/plain')]))
 
         super(Package, self).__init__(
@@ -953,8 +956,8 @@ class Package(Process):
         try:
             try:
                 self.setup_logger()
-                #self.response.outputs[PACKAGE_LOG_FILE].file = self.log_file
-                #self.response.outputs[PACKAGE_LOG_FILE].as_reference = True
+                # self.response.outputs[PACKAGE_LOG_FILE].file = self.log_file
+                # self.response.outputs[PACKAGE_LOG_FILE].as_reference = True
                 self.update_status("Preparing package logs done.", 1)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed preparing package logging.")
