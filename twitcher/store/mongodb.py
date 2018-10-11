@@ -7,9 +7,8 @@ from twitcher.store.base import AccessTokenStore
 from twitcher.datatype import AccessToken
 from twitcher.exceptions import AccessTokenNotFound
 from twitcher.utils import islambda
-from twitcher.wps_restapi.utils import wps_restapi_base_url
-from twitcher.wps_restapi.sort import *
-from twitcher.wps_restapi.status import *
+from twitcher.sort import *
+from twitcher.status import *
 from pyramid.security import authenticated_userid
 from pymongo import ASCENDING, DESCENDING
 from datetime import datetime
@@ -133,6 +132,7 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
 from twitcher.store.base import ProcessStore
 from twitcher.exceptions import ProcessNotFound, ProcessRegistrationError, ProcessInstanceError
 from twitcher.datatype import Process as ProcessDB
+from twitcher.visibility import visibility_values
 from pywps import Process as ProcessWPS
 
 
@@ -160,9 +160,11 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         if not isinstance(new_process, ProcessDB):
             raise ProcessInstanceError("Unsupported process type `{}`".format(type(process)))
 
+        # apply defaults if not specified
         new_process['type'] = self._get_process_type(process)
         new_process['identifier'] = self._get_process_id(process)
         new_process['executeEndpoint'] = self._get_process_url(process)
+        new_process['visibility'] = new_process.visibility
         self.collection.insert_one(new_process)
 
     @staticmethod
@@ -225,12 +227,24 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         sane_name = namesgenerator.get_sane_name(process_id)
         return bool(self.collection.delete_one({'identifier': sane_name}).deleted_count)
 
-    def list_processes(self, request=None):
+    def list_processes(self, visibility=None, request=None):
         """
-        Lists all processes in database.
+        Lists all processes in database, optionally filtered by visibility.
+
+        :param visibility: One value amongst `twitcher.visibility`.
         """
         db_processes = []
-        for process in self.collection.find().sort('identifier', pymongo.ASCENDING):
+        search_filters = {}
+        if visibility is None:
+            visibility = visibility_values
+        if isinstance(visibility, six.string_types):
+            visibility = [visibility]
+        for v in visibility:
+            if v not in visibility_values:
+                raise ValueError("Invalid visibility value `{0!s}` is not one of {1!s}"
+                                 .format(v, list(visibility_values)))
+        search_filters['visibility'] = {'$in': list(visibility)}
+        for process in self.collection.find(search_filters).sort('identifier', pymongo.ASCENDING):
             db_processes.append(ProcessDB(process))
         return db_processes
 
@@ -245,6 +259,26 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         if not process:
             raise ProcessNotFound("Process `{}` could not be found.".format(sane_name))
         return ProcessDB(process)
+
+    def get_visibility(self, process_id, request=None):
+        """
+        Get visibility of a process.
+
+        :return: One value amongst `twitcher.visibility`.
+        """
+        process = self.fetch_by_id(process_id)
+        return process.visibility
+
+    def set_visibility(self, process_id, visibility, request=None):
+        """
+        Set visibility of a process.
+
+        :param visibility: One value amongst `twitcher.visibility`.
+        :raises: TypeError or ValueError in case of invalid parameter.
+        """
+        process = self.fetch_by_id(process_id)
+        process.visibility = visibility
+        self.save_process(process, overwrite=True)
 
 
 from twitcher.store.base import JobStore

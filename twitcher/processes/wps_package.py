@@ -4,6 +4,7 @@ from itertools import ifilterfalse
 import six
 import cwltool
 import cwltool.factory
+from cwltool.context import LoadingContext
 from cwltool.context import RuntimeContext
 from pywps import (
     Process,
@@ -23,6 +24,7 @@ from pywps.validator.literalvalidator import validate_anyvalue, validate_allowed
 from pywps.app.Common import Metadata
 from typing import Dict, List, Tuple
 
+from twitcher import namesgenerator
 from twitcher.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from twitcher.processes.sources import retrieve_data_source_url
 from twitcher.utils import parse_request_query, get_any_id
@@ -55,7 +57,7 @@ PACKAGE_BASE_TYPES = frozenset(['string', 'boolean', 'float', 'int', 'integer', 
 PACKAGE_LITERAL_TYPES = frozenset(list(PACKAGE_BASE_TYPES) + ['null', 'Any'])
 PACKAGE_COMPLEX_TYPES = frozenset(['File', 'Directory'])
 PACKAGE_ARRAY_BASE = 'array'
-PACKAGE_ARRAY_MAX_SIZE = six.MAXSIZE  # pywps doesn't allow None, so use max size
+PACKAGE_ARRAY_MAX_SIZE = six.MAXSIZE   # pywps doesn't allow None, so use max size
 PACKAGE_ARRAY_ITEMS = frozenset(list(PACKAGE_BASE_TYPES) + list(PACKAGE_COMPLEX_TYPES))
 PACKAGE_ARRAY_TYPES = frozenset(['{}[]'.format(item) for item in PACKAGE_ARRAY_ITEMS])
 PACKAGE_CUSTOM_TYPES = frozenset(['enum'])  # can be anything, but support 'enum' which is more common
@@ -86,8 +88,6 @@ WPS_LITERAL = 'literal'
 
 class NullType():
     pass
-
-
 null = NullType()
 
 
@@ -103,7 +103,8 @@ def get_process_location(process_id_or_url, data_source=None):
     if urlparse(process_id_or_url).scheme != "":
         return process_id_or_url
     data_source_url = retrieve_data_source_url(data_source)
-    process_url = process_uri.format(process_id=process_id_or_url)
+    process_id = namesgenerator.get_sane_name(process_id_or_url)
+    process_url = process_uri.format(process_id=process_id)
     return '{host}{path}'.format(host=data_source_url, path=process_url)
 
 
@@ -121,6 +122,10 @@ def get_package_workflow_steps(package_dict_or_url):
         workflow_steps = package_dict_or_url.get('steps')
         for step in workflow_steps:
             step_package_ref = workflow_steps[step].get('run')
+            # if a local file reference was specified, convert it to process id
+            if urlparse(step_package_ref).scheme == "" and step_package_ref.endswith('.cwl'):
+                step_package_ref = step_package_ref[:-4]
+
             workflow_steps_ids.append({'name': step, 'reference': step_package_ref})
     return workflow_steps_ids
 
@@ -229,7 +234,17 @@ def _load_package_content(package_dict, package_name=PACKAGE_DEFAULT_FILE_NAME,
     if only_dump_file:
         return
 
-    cwl_factory = cwltool.factory.Factory(runtime_context=RuntimeContext(kwargs={'no_read_only': True}))
+    if False:
+        # TODO Entry point to the ADES dispatcher cwl step
+        # EMS dispatch the execution to the ADES (WIP)
+        loading_context = LoadingContext()
+        loading_context.construct_tool_object = make_tool
+    else:
+        # ADES execute the cwl locally
+        loading_context = None
+
+    cwl_factory = cwltool.factory.Factory(loading_context=loading_context,
+                                          runtime_context=RuntimeContext(kwargs={'no_read_only': True}))
     package = cwl_factory.make(tmp_json_cwl)
     shutil.rmtree(tmp_dir)
     return package, package_type
@@ -248,7 +263,7 @@ def _is_cwl_array_type(io_info):
     # array type conversion when defined as dict of {'type': 'array', 'items': '<type>'}
     # validate against Hashable instead of 'dict' since 'OrderedDict'/'CommentedMap' can result in `isinstance()==False`
     if not isinstance(io_type, six.string_types) and not isinstance(io_type, Hashable) \
-            and 'items' in io_type and 'type' in io_type:
+    and 'items' in io_type and 'type' in io_type:
         if not io_type['type'] == PACKAGE_ARRAY_BASE or io_type['items'] not in PACKAGE_ARRAY_ITEMS:
             raise PackageTypeError("Unsupported I/O 'array' definition: `{}`.".format(repr(io_info)))
         io_type = io_type['items']
@@ -337,7 +352,7 @@ def _cwl2wps_io(io_info, io_select):
     if is_enum:
         io_type = enum_type
         io_allow = enum_allow
-        io_mode = MODE.SIMPLE  # allowed value validator must be set for input
+        io_mode = MODE.SIMPLE   # allowed value validator must be set for input
 
     # debug info for unhandled types conversion
     if not isinstance(io_type, six.string_types):
@@ -466,7 +481,7 @@ def _json2wps_io(io_info, io_select):
             io_info[field] = _json2wps_type(value, field)
 
     # convert by type
-    io_type = io_info.pop('type', WPS_COMPLEX)  # only ComplexData doesn't have 'type'
+    io_type = io_info.pop('type', WPS_COMPLEX)    # only ComplexData doesn't have 'type'
     if io_select == WPS_INPUT:
         if io_type == WPS_COMPLEX:
             return ComplexInput(**io_info)
@@ -625,7 +640,7 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
     wps_package_metadata['abstract'] = wps_package_metadata.get('abstract', cwl_package_package.get('doc', ''))
 
     if '$schemas' in cwl_package_package and isinstance(cwl_package_package['$schemas'], list) \
-            and '$namespaces' in cwl_package_package and isinstance(cwl_package_package['$namespaces'], dict):
+    and '$namespaces' in cwl_package_package and isinstance(cwl_package_package['$namespaces'], dict):
         metadata = wps_package_metadata.get('metadata', list())
         namespaces_inv = {v: k for k, v in cwl_package_package['$namespaces']}
         for schema in cwl_package_package['$schemas']:
@@ -651,7 +666,6 @@ def get_process_from_wps_request(process_offering, reference=None, package=None,
     :param data_source: where to resolve process IDs (default: localhost if ``None``).
     :return: process information dictionary ready for saving to data store.
     """
-
     def try_or_raise_package_error(call, reason):
         try:
             LOGGER.debug("Attempting: `{}`".format(reason))
@@ -855,6 +869,7 @@ class Package(Process):
 
         :param kw: dictionary corresponding to method :class:`twitcher.datatype.Process.params_wps`
         """
+        self.payload = kw.pop("payload")
         package = kw.pop('package')
         if not package:
             raise PackageRegistrationError("Missing required package definition for package process.")
@@ -876,7 +891,7 @@ class Package(Process):
         metadata = [_json2wps_type(meta_kw, 'metadata') for meta_kw in kw.pop('metadata', list())]
 
         # append a log output
-        # outputs.append(ComplexOutput(PACKAGE_LOG_FILE, 'Package log file',
+        #outputs.append(ComplexOutput(PACKAGE_LOG_FILE, 'Package log file',
         #                             as_reference=True, supported_formats=[Format('text/plain')]))
 
         super(Package, self).__init__(
@@ -909,6 +924,11 @@ class Package(Process):
         cwl_logger.addHandler(log_file_handler)
         cwl_logger.setLevel(self.log_level)
 
+        # add Twitcher Tweens logger to current package logger
+        twitcher_tweens_logger = logging.getLogger('twitcher.tweens')
+        twitcher_tweens_logger.addHandler(log_file_handler)
+        twitcher_tweens_logger.setLevel(self.log_level)
+
     def update_status(self, message, progress=None, status=WPS_STATUS.STARTED):
         self.percent = progress or self.percent or 0
         # pywps overrides 'status' by 'accepted' in 'update_status', so use the '_update_status' to enforce the status
@@ -933,8 +953,8 @@ class Package(Process):
         try:
             try:
                 self.setup_logger()
-                # self.response.outputs[PACKAGE_LOG_FILE].file = self.log_file
-                # self.response.outputs[PACKAGE_LOG_FILE].as_reference = True
+                #self.response.outputs[PACKAGE_LOG_FILE].file = self.log_file
+                #self.response.outputs[PACKAGE_LOG_FILE].as_reference = True
                 self.update_status("Preparing package logs done.", 1)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed preparing package logging.")
@@ -949,26 +969,31 @@ class Package(Process):
                 raise self.exception_message(PackageExecutionError, exc, "Failed retrieving package input types.")
             try:
                 cwl_inputs = dict()
-                for i in request.inputs.values():
-                    # at least 1 input since obtained from request body
-                    input_id = i[0].identifier
-                    input_data = i[0].data
+                for input_id in request.inputs:
+                    # skip empty inputs (if that is even possible...)
+                    input_occurs = request.inputs[input_id]
+                    if len(input_occurs) <= 0:
+                        continue
+                    # process single occurrences
+                    input_i = input_occurs[0]
+                    # handle as reference/data
+                    input_data = input_i.url if input_i.as_reference else input_i.data
                     input_type = cwl_input_info[input_id]['type']
                     is_array, elem_type = _is_cwl_array_type(cwl_input_info[input_id])
                     if is_array:
-                        # array allow max_occur > 1
-                        input_data = [j.data for j in i]
+                        # extend array data that allow max_occur > 1
+                        input_data = [i.url if i.as_reference else i.data for i in input_occurs]
                         input_type = elem_type
-                    if isinstance(i[0], (LiteralInput, BoundingBoxInput)):
+                    if isinstance(input_i, (LiteralInput, BoundingBoxInput)):
                         cwl_inputs[input_id] = input_data
-                    elif isinstance(i[0], ComplexInput):
+                    elif isinstance(input_i, ComplexInput):
                         if isinstance(input_data, list):
                             cwl_inputs[input_id] = [{'location': data, 'class': input_type} for data in input_data]
                         else:
                             cwl_inputs[input_id] = {'location': input_data, 'class': input_type}
                     else:
                         raise self.exception_message(PackageTypeError, None,
-                                                     "Undefined package input for execution: {}.".format(type(i)))
+                                                     "Undefined package input for execution: {}.".format(type(input_i)))
                 self.update_status("Convert package inputs done.", 4)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed to load package inputs.")
