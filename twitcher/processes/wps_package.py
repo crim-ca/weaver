@@ -828,10 +828,11 @@ class EOImageHandler(object):
         return self.other_inputs + toi + aoi + collections
 
 
-def _handle_eoimage_inputs(inputs, additional_parameters):
+def handle_eoimage_inputs(inputs, additional_parameters):
     # type: (List[Dict], List[Tuple]) -> List[Dict]
-    unique_toi = any(param == ("UNIQUETOI", "TRUE") for param in additional_parameters)
-    unique_aoi = any(param == ("UNIQUEAOI", "TRUE") for param in additional_parameters)
+    additional_parameters_upper = [[s.upper() for s in p] for p in additional_parameters]
+    unique_toi = ["UNIQUETOI", "TRUE"] in additional_parameters_upper
+    unique_aoi = ["UNIQUEAOI", "TRUE"] in additional_parameters_upper
     handler = EOImageHandler(inputs=inputs)
     inputs_converted = handler.to_opensearch(unique_aoi=unique_aoi, unique_toi=unique_toi)
     return inputs_converted
@@ -868,7 +869,7 @@ class Package(Process):
         additional_parameters = get_additional_parameters(kw)
 
         # handle EOImage inputs
-        inputs = _handle_eoimage_inputs(inputs=inputs, additional_parameters=additional_parameters)
+        inputs = handle_eoimage_inputs(inputs=inputs, additional_parameters=additional_parameters)
 
         inputs = [_json2wps_io(i, WPS_INPUT) for i in inputs]
         outputs = [_json2wps_io(o, WPS_OUTPUT) for o in kw.pop('outputs', list())]
