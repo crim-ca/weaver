@@ -17,7 +17,7 @@
       },
       "inputs": [
         {
-          "id": "collectionId_image-s2",
+          "id": "image-s2",
           "title": "Collection Identifer for input image-s2",
           "abstract": "Collection",
           "formats": [
@@ -58,7 +58,7 @@
           }
         },
         {
-          "id": "collectionId_image-probav",
+          "id": "image-probav",
           "title": "Collection Identifer for input image-probav",
           "abstract": "Collection",
           "formats": [
@@ -97,7 +97,7 @@
           }
         },
         {
-          "id": "collectionId_image-deimos",
+          "id": "image-deimos",
           "title": "Collection Identifer for input image-deimos",
           "abstract": "Collection",
           "formats": [
@@ -136,7 +136,7 @@
           }
         },
         {
-          "id": "StartDate",
+          "id": "startDate",
           "title": "Time of Interest",
           "abstract": "Time of Interest (defined as Start date - End date)",
           "formats": [
@@ -156,7 +156,7 @@
               "parameters": [
                 {
                   "name": "CatalogSearchField",
-                  "value": "StartDate"
+                  "value": "startDate"
                 }
               ]
             }
@@ -171,7 +171,7 @@
           }
         },
         {
-          "id": "EndDate",
+          "id": "endDate",
           "title": "Time of Interest",
           "abstract": "Time of Interest (defined as Start date - End date)",
           "formats": [
@@ -191,7 +191,7 @@
               "parameters": [
                 {
                   "name": "CatalogSearchField",
-                  "value": "EndDate"
+                  "value": "endDate"
                 }
               ]
             }

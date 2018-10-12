@@ -1,20 +1,11 @@
 {
   "processOffering": {
     "process": {
-      "identifier": "multisensor_ndvi_stack_generator",
-      "title": "Multi Sensor NDVI Stack Generator",
-      "abstract": "Workflow Multi Sensor NDVI Stack Generator",
-      "keywords": [
-        "NDVI"
-      ],
-      "owsContext": {
-        "offering": {
-          "code": "http://www.opengis.net/eoc/applicationContext/cwl",
-          "content": {
-            "href": "https://raw.githubusercontent.com/crim-ca/testbed14/master/application-packages/StackCreation-graph-json-remote.cwl"
-          }
-        }
-      },
+      "visibility": "public",
+      "identifier": "StackCreation-graph-json-remote",
+      "title": "Stacker",
+      "abstract": "",
+      "keywords": [],
       "additionalParameters": [
         {
           "role": "http://www.opengis.net/eoc/applicationContext",
@@ -32,8 +23,8 @@
       ],
       "inputs": [
         {
-          "id": "image-s2",
-          "title": "S2 Input Image",
+          "identifier": "files",
+          "title": "Input Image",
           "formats": [
             {
               "mimeType": "application/zip",
@@ -41,7 +32,7 @@
             }
           ],
           "minOccurs": 1,
-          "maxOccurs": "unbounded",
+          "maxOccurs": 1,
           "additionalParameters": [
             {
               "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
@@ -49,74 +40,34 @@
                 {
                   "name": "EOImage",
                   "value": "true"
-                },
-                {
-                  "name": "AllowedCollections",
-                  "value": "s2-collection-1,s2-collection-2,s2-sentinel2,s2-landsat8"
                 }
               ]
             }
           ]
         },
         {
-          "id": "image-probav",
-          "title": "ProbaV Input Image",
-          "formats": [
-            {
-              "mimeType": "application/zip",
-              "default": true
-            }
-          ],
+          "identifier": "output_file_type",
+          "title": "Type of Stacked Image",
           "minOccurs": 1,
-          "maxOccurs": "unbounded",
-          "additionalParameters": [
-            {
-              "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-              "parameters": [
-                {
-                  "name": "EOImage",
-                  "value": "true"
-                },
-                {
-                  "name": "AllowedCollections",
-                  "value": "probav-collection-1,probav-collection-2"
-                }
-              ]
-            }
-          ]
+          "maxOccurs": 1,
+          "LiteralDataDomain": {
+            "dataType": "String"
+          }
         },
         {
-          "id": "image-deimos",
-          "title": "Deimos Input Image",
-          "formats": [
-            {
-              "mimeType": "application/zip",
-              "default": true
-            }
-          ],
+          "identifier": "output_name",
+          "title": "Name of the Produced Image",
           "minOccurs": 1,
-          "maxOccurs": "unbounded",
-          "additionalParameters": [
-            {
-              "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
-              "parameters": [
-                {
-                  "name": "EOImage",
-                  "value": "true"
-                },
-                {
-                  "name": "AllowedCollections",
-                  "value": "deimos-collection-1,deimos-collection-2"
-                }
-              ]
-            }
-          ]
+          "maxOccurs": 1,
+          "LiteralDataDomain": {
+            "dataType": "String"
+          }
         }
       ],
       "outputs": [
         {
           "id": "output",
-          "title": "NDVI output file",
+          "title": "Stacked Image",
           "formats": [
             {
               "mimeType": "application/octet-stream",
@@ -134,10 +85,10 @@
       ]
     }
   },
-  "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow",
-  "executionUnit": [
-    {
-      "reference": "http://some.host/applications/cwl/multisensor_ndvi_stack_generator.cwl"
+  "deploymentProfile": {
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow",
+    "executionUnit": {
+      "reference": "opensearch_deploy.cwl"
     }
-  ]
+  }
 }

@@ -76,7 +76,7 @@
           }
         },
         {
-          "id": "StartDate",
+          "id": "startDate",
           "title": "Time of Interest",
           "abstract": "Time of Interest (defined as Start date - End date)",
           "formats": [
@@ -92,7 +92,7 @@
           }
         },
         {
-          "id": "EndDate",
+          "id": "endDate",
           "title": "Time of Interest",
           "abstract": "Time of Interest (defined as Start date - End date)",
           "formats": [
