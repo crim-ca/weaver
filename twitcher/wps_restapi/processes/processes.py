@@ -441,7 +441,9 @@ def add_local_process(request):
     """
     # validate minimum field requirements
     body = request.json
+
     # use deepcopy of body payload to avoid circular dependencies when writing to mongodb
+    # and before parsing it because the body is altered by some pop operations
     payload = deepcopy(body)
     if 'processOffering' not in body:
         raise HTTPBadRequest("Missing required parameter 'processOffering'.")
