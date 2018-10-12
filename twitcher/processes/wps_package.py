@@ -30,7 +30,8 @@ from twitcher.processes.wps_workflow import default_make_tool
 from twitcher.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from twitcher.processes.sources import retrieve_data_source_url, get_data_source_from_url
 from twitcher.utils import parse_request_query, get_any_id
-from twitcher.exceptions import PackageTypeError, PackageRegistrationError, PackageExecutionError, PackageNotFound
+from twitcher.exceptions import PackageTypeError, PackageRegistrationError, PackageExecutionError, \
+    PackageNotFound, PayloadNotFound
 from twitcher.wps_restapi.swagger_definitions import process_uri
 from pyramid.httpexceptions import HTTPOk
 from pyramid_celery import celery_app as app
@@ -162,6 +163,32 @@ def _get_process_package(process_url):
         raise _package_not_found_error(str(process_url))
 
     return package_body, package_name
+
+
+def _get_process_payload(process_url):
+    """
+    Retrieves the WPS process payload content from given process ID or literal URL.
+
+    :param process_url: process literal URL to DescribeProcess WPS-REST location.
+    :return: payload body as dictionary.
+    """
+
+    def _payload_not_found_error(ref):
+        return PayloadNotFound("Could not find workflow step reference: `{}`".format(ref))
+
+    if not isinstance(process_url, six.string_types):
+        raise _payload_not_found_error(str(process_url))
+
+    payload_url = '{}/payload'.format(process_url)
+    payload_resp = requests.get(payload_url, headers={'Accept': 'application/json'}, verify=False)
+    if payload_resp.status_code != HTTPOk.code:
+        raise _payload_not_found_error(payload_url or process_url)
+    payload_body = payload_resp.json()
+
+    if not isinstance(payload_body, dict) or not len(payload_body):
+        raise _payload_not_found_error(str(process_url))
+
+    return payload_body
 
 
 def _get_package_type(package_dict):

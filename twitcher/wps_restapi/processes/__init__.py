@@ -10,6 +10,7 @@ def includeme(config):
     config.add_route(**sd.service_api_route_info(sd.processes_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_package_service, settings))
+    config.add_route(**sd.service_api_route_info(sd.process_payload_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_visibility_service, settings))
     config.add_route(**sd.service_api_route_info(sd.provider_processes_service, settings))
     config.add_route(**sd.service_api_route_info(sd.provider_process_service, settings))
@@ -23,6 +24,8 @@ def includeme(config):
     config.add_view(p.delete_local_process, route_name=sd.process_service.name,
                     request_method='DELETE', renderer='json')
     config.add_view(p.get_local_process_package, route_name=sd.process_package_service.name,
+                    request_method='GET', renderer='json')
+    config.add_view(p.get_local_process_payload, route_name=sd.process_payload_service.name,
                     request_method='GET', renderer='json')
     config.add_view(p.submit_local_job, route_name=sd.process_jobs_service.name,
                     request_method='POST', renderer='json')

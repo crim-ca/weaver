@@ -560,6 +560,16 @@ def get_local_process_package(request):
     return HTTPOk(json=process.package or {})
 
 
+@sd.process_payload_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer='json',
+                                schema=sd.ProcessPayloadEndpoint(), response_schemas=sd.get_process_payload_responses)
+def get_local_process_payload(request):
+    """
+    Get a registered local process payload definition.
+    """
+    process = get_process(request)
+    return HTTPOk(json=process.payload or {})
+
+
 @sd.process_visibility_service.get(tags=[sd.processes_tag, sd.visibility_tag], renderer='json',
                                    schema=sd.ProcessVisibilityGetEndpoint(),
                                    response_schemas=sd.get_process_visibility_responses)

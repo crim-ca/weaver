@@ -27,6 +27,7 @@ api_versions_uri = '/versions'
 processes_uri = '/processes'
 process_uri = '/processes/{process_id}'
 process_package_uri = '/processes/{process_id}/package'
+process_payload_uri = '/processes/{process_id}/payload'
 process_visibility_uri = '/processes/{process_id}/visibility'
 process_jobs_uri = '/processes/{process_id}/jobs'
 process_job_uri = '/processes/{process_id}/jobs/{job_id}'
@@ -98,6 +99,7 @@ api_versions_service = Service(name='api_versions', path=api_versions_uri)
 processes_service = Service(name='processes', path=processes_uri)
 process_service = Service(name='process', path=process_uri)
 process_package_service = Service(name='process_package', path=process_package_uri)
+process_payload_service = Service(name='process_payload', path=process_payload_uri)
 process_visibility_service = Service(name='process_visibility', path=process_visibility_uri)
 process_jobs_service = Service(name='process_jobs', path=process_jobs_uri)
 process_job_service = Service(name='process_job', path=process_job_uri)
@@ -361,6 +363,11 @@ class ProcessEndpoint(MappingSchema):
 
 
 class ProcessPackageEndpoint(MappingSchema):
+    header = AcceptHeader()
+    process_id = process_id
+
+
+class ProcessPayloadEndpoint(MappingSchema):
     header = AcceptHeader()
     process_id = process_id
 
@@ -1015,6 +1022,11 @@ class OkGetProcessPackageSchema(MappingSchema):
     body = MappingSchema(default={})
 
 
+class OkGetProcessPayloadSchema(MappingSchema):
+    header = JsonHeader()
+    body = MappingSchema(default={})
+
+
 class ProcessVisibilityResponseBodySchema(MappingSchema):
     visibility = SchemaNode(String(), validator=OneOf(list(visibility_values)), example=VISIBILITY_PUBLIC)
 
@@ -1159,6 +1171,9 @@ get_process_responses = {
 }
 get_process_package_responses = {
     '200': OkGetProcessPackageSchema(description='success')
+}
+get_process_payload_responses = {
+    '200': OkGetProcessPayloadSchema(description='success')
 }
 get_process_visibility_responses = {
     '200': OkGetProcessVisibilitySchema(description='success')
