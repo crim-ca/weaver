@@ -176,6 +176,10 @@ def execute_process(self, url, service, process_id, inputs,
                 process_value = get_any_value(process_input)
                 # in case of array inputs, must repeat (id,value)
                 input_values = process_value if isinstance(process_value, list) else [process_value]
+
+                # we need to support file:// scheme but PyWPS doesn't like them so remove the scheme file://
+                input_values = [val[7:] if val.startswith('file://') else val for val in input_values]
+
                 # need to use ComplexDataInput structure for complex input
                 wps_inputs.extend([(input_id,
                                     ComplexDataInput(input_value) if input_id in complex_inputs else input_value)
@@ -251,7 +255,7 @@ def execute_process(self, url, service, process_id, inputs,
                 job.save_log(errors=execution.errors, logger=task_logger)
                 sleep(1)
             else:
-                job.status_message = "Update {} ...".format(str(job))
+                #job.status_message = "Update {} ...".format(str(job))
                 job.save_log(logger=task_logger)
                 num_retries = 0
                 run_step += 1

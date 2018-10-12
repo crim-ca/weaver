@@ -26,9 +26,9 @@ from cwltool.stdfsaccess import StdFsAccess
 from cwltool.utils import (aslist, json_dumps, onWindows, bytes2str_in_dicts)
 from cwltool.context import (LoadingContext, RuntimeContext, getdefault)
 from cwltool.workflow import Workflow
+from pyramid_celery import celery_app as app
 
-LOGGER_LEVEL = os.getenv('TWITCHER_LOGGER_LEVEL', logging.INFO)
-logging.basicConfig(format='%(levelname)s:%(message)s', level=LOGGER_LEVEL)
+# TODO The logger log twice ?
 LOGGER = logging.getLogger(__name__)
 DEFAULT_TMP_PREFIX = "tmp"
 
@@ -80,6 +80,7 @@ class WpsWorkflow(Process):
 
         # DockerRequirement is removed because we use our custom job which dispatch the processing to an ADES instead
         self.requirements = list(filter(lambda req: req['class'] != 'DockerRequirement', self.requirements))
+        self.hints = list(filter(lambda req: req['class'] != 'DockerRequirement', self.hints))
 
     def job(self,
             job_order,         # type: Dict[Text, Text]
@@ -94,9 +95,15 @@ class WpsWorkflow(Process):
 
         jobname = uniquename(runtimeContext.name or shortname(self.tool.get("id", "job")))
 
+
+        registry = app.conf['PYRAMID_REGISTRY']
+        twitcher_output_path = registry.settings.get('twitcher.wps_output_path')
+
+        runtimeContext.outdir = tempfile.mkdtemp(
+            prefix=getdefault(runtimeContext.tmp_outdir_prefix, DEFAULT_TMP_PREFIX),
+            dir=twitcher_output_path)
+
         builder = self._init_job(job_order, runtimeContext)
-        builder.outdir = tempfile.mkdtemp(prefix=getdefault(runtimeContext.tmp_outdir_prefix, DEFAULT_TMP_PREFIX))
-        builder.stagedir = builder.outdir
 
         # job_name is the step name and job_order is the actual step inputs
         wps_workflow_job = WpsWorkflowJob(builder, builder.job, self.requirements,
@@ -165,7 +172,7 @@ class WpsWorkflow(Process):
                 adjustDirObjs(ret, trim_listing)
 
                 # TODO Attempt to avoid a crash because the revmap fct is not functionnal (intend for a docker usage only?)
-                #visit_class(ret, ("File", "Directory"), cast(Callable[[Any], Any], revmap))
+                # visit_class(ret, ("File", "Directory"), cast(Callable[[Any], Any], revmap))
                 visit_class(ret, ("File", "Directory"), command_line_tool.remove_path)
                 normalizeFilesDirs(ret)
                 visit_class(ret, ("File", "Directory"), partial(command_line_tool.check_valid_locations, fs_access))
@@ -359,14 +366,12 @@ class WpsWorkflowJob(JobBase):
         for output in expected_outputs:
             # TODO Should we support something else?
             if output['type'] == 'File':
-                # TODO Not very robust... Expecting output to look like this
+                # Expecting output to look like this
                 # output = {'id': 'file:///tmp/random_path/process_name#output_id,
                 #           'type': 'File',
                 #           'outputBinding': {'glob': output_name }
                 #          }
                 output_id = shortname(output['id'])
-                #d = urllib.parse.urlparse(output['id'])
-                #self.expected_outputs[output_id] = d.path
                 self.expected_outputs[output_id] = output['outputBinding']['glob']
 
 
