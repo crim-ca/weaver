@@ -1,5 +1,4 @@
 import os
-from itertools import ifilterfalse
 
 import six
 import cwltool
@@ -22,7 +21,7 @@ from pywps.inout.literaltypes import AnyValue, AllowedValue, ALLOWEDVALUETYPE
 from pywps.validator.mode import MODE
 from pywps.validator.literalvalidator import validate_anyvalue, validate_allowed_values
 from pywps.app.Common import Metadata
-from typing import Dict, List, Tuple
+from twitcher.processes import opensearch
 
 from twitcher import namesgenerator
 from twitcher.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
@@ -84,6 +83,8 @@ WPS_OUTPUT = 'output'
 WPS_COMPLEX = 'complex'
 WPS_BOUNDINGBOX = 'bbox'
 WPS_LITERAL = 'literal'
+
+EOIMAGE = "eoimage"
 
 
 class NullType():
@@ -486,6 +487,9 @@ def _json2wps_io(io_info, io_select):
     io_type = io_info.pop('type', WPS_COMPLEX)  # only ComplexData doesn't have 'type'
     if io_select == WPS_INPUT:
         if io_type == WPS_COMPLEX:
+            io_info.pop('data_type', None)
+            if 'supported_formats' not in io_info:
+                io_info['supported_formats'] = [Format(mime_type="text/plain")]
             return ComplexInput(**io_info)
         if io_type == WPS_BOUNDINGBOX:
             return BoundingBoxInput(**io_info)
@@ -723,138 +727,6 @@ def get_process_from_wps_request(process_offering, reference=None, package=None,
     return process_offering
 
 
-def _get_field_default(input_data, field, default=None):
-    if field in WPS_FIELD_MAPPING:
-        for f in WPS_FIELD_MAPPING[field]:
-            if f in input_data:
-                default = input_data[f]
-    else:
-        default = input_data.get(field, default)
-    return default
-
-
-def get_additional_parameters(input_data):
-    # type: (Dict) -> List[Tuple]
-    output = []
-    additional_parameters = _get_field_default(input_data, "additional_parameters", default=[])
-    for additional_param in additional_parameters:
-        for key, value in additional_param.items():
-            if key == "parameters":
-                for param in value:
-                    name = param.get("name", "")
-                    value = param.get("value", "")
-                    if name:
-                        output.append((name, value))
-    return output
-
-
-class EOImageHandler(object):
-    def __init__(self, inputs):
-        # type: (List[Dict]) -> None
-        self.eoimage_inputs = list(filter(self.is_oeimage_input, inputs))
-        self.other_inputs = list(ifilterfalse(self.is_oeimage_input, inputs))
-
-    @staticmethod
-    def is_oeimage_input(input_data):
-        # type: (Dict) -> bool
-        for name, value in get_additional_parameters(input_data):
-            if name.upper() == "EOIMAGE" and value.upper() == "TRUE":
-                return True
-        return False
-
-    @staticmethod
-    def get_allowed_collections(input_data):
-        # type: (Dict) -> List
-        for name, value in get_additional_parameters(input_data):
-            if name.upper() == "ALLOWEDCOLLECTIONS":
-                return value.split(",")
-        return []
-
-    @staticmethod
-    def make_aoi(id_, unbounded):
-        max_occurs = u"unbounded" if unbounded else 1
-        data = {
-            u"id": id_,
-            u"title": u"Area of Interest",
-            u"abstract": u"Area of Interest (Bounding Box)",
-            u"formats": [{u"mimeType": u"OGC-WKT", u"default": True}],
-            u"minOccurs": 1,
-            u"maxOccurs": max_occurs
-        }
-        return data
-
-    @staticmethod
-    def make_collection(image_format, allowed_values):
-        data = {
-            u"id": u"collectionId_{}".format(image_format),
-            u"title": u"Collection Identifer for input {}".format(image_format),
-            u"abstract": u"Collection",
-            u"formats": [{u"mimeType": u"text/plain", u"default": True}],
-            u"minOccurs": 1,
-            u"maxOccurs": u"unbounded",
-            u"LiteralDataDomain": {u"dataType": u"String",
-                                   u"allowedValues": allowed_values},
-            u"additionalParameters": [{u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                                       u"parameters": [{u"name": u"CatalogSearchField", u"value": u"parentIdentifier"}]
-                                       }],
-            u"owsContext": {u"offering": {u"code": u"anyCode", u"content": {u"href": u"anyRef"}}}
-        }
-        return data
-
-    @staticmethod
-    def make_toi(id_, unbounded, start_date=True):
-        max_occurs = u"unbounded" if unbounded else 1
-        date = u"StartDate" if start_date else u"EndDate"
-        data = {
-            u"id": id_,
-            u"title": u"Time of Interest",
-            u"abstract": u"Time of Interest (defined as Start date - End date)",
-            u"formats": [{u"mimeType": u"text/plain", u"default": True}],
-            u"minOccurs": 1,
-            u"maxOccurs": max_occurs,
-            u"LiteralDataDomain": {u"dataType": u"String"},
-            u"additionalParameters": [{u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                                       u"parameters": [{u"name": u"CatalogSearchField", u"value": date}]}],
-            u"owsContext": {u"offering": {u"code": u"anyCode", u"content": {u"href": u"anyRef"}}}
-        }
-        return data
-
-    def to_opensearch(self, unique_aoi, unique_toi):
-        # type: (bool, bool) -> List[Dict]
-        if not self.eoimage_inputs:
-            return self.other_inputs
-
-        eoimage_names = [i['id'] for i in self.eoimage_inputs]
-        allowed_collections = [self.get_allowed_collections(i) for i in self.eoimage_inputs]
-
-        toi = []
-        aoi = []
-        collections = []
-
-        unbounded_toi = not unique_toi
-        toi_id = u"" if unique_toi else u"_{id}"
-        toi.append(self.make_toi(u"StartDate{}".format(toi_id), unbounded_toi, start_date=True))
-        toi.append(self.make_toi(u"EndDate{}".format(toi_id), unbounded_toi, start_date=False))
-
-        unbounded_aoi = not unique_aoi
-        aoi.append(self.make_aoi(u"aoi", unbounded=unbounded_aoi))
-
-        for name, allowed_col in zip(eoimage_names, allowed_collections):
-            collections.append(self.make_collection(name, allowed_col))
-
-        return self.other_inputs + toi + aoi + collections
-
-
-def handle_eoimage_inputs(inputs, additional_parameters):
-    # type: (List[Dict], List[Tuple]) -> List[Dict]
-    additional_parameters_upper = [[s.upper() for s in p] for p in additional_parameters]
-    unique_toi = ["UNIQUETOI", "TRUE"] in additional_parameters_upper
-    unique_aoi = ["UNIQUEAOI", "TRUE"] in additional_parameters_upper
-    handler = EOImageHandler(inputs=inputs)
-    inputs_converted = handler.to_opensearch(unique_aoi=unique_aoi, unique_toi=unique_toi)
-    return inputs_converted
-
-
 class Package(Process):
     package = None
     job_file = None
@@ -884,10 +756,9 @@ class Package(Process):
             raise PackageRegistrationError("Exception occurred on package instantiation: `{}`".format(repr(ex)))
 
         inputs = kw.pop('inputs', [])
-        additional_parameters = get_additional_parameters(kw)
 
         # handle EOImage inputs
-        inputs = handle_eoimage_inputs(inputs=inputs, additional_parameters=additional_parameters)
+        inputs = opensearch.replace_inputs_eoimage_files_to_query(inputs=inputs, payload=self.payload, wps_inputs=True)
 
         inputs = [_json2wps_io(i, WPS_INPUT) for i in inputs]
         outputs = [_json2wps_io(o, WPS_OUTPUT) for o in kw.pop('outputs', list())]
@@ -971,6 +842,11 @@ class Package(Process):
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed retrieving package input types.")
             try:
+                # identify EOimages from payload
+                eoimage_ids = opensearch.get_eoimages_ids_from_payload(self.payload)
+                # if applicable, query EOImages
+                request.inputs = opensearch.query_eo_images_from_wps_inputs(request.inputs, eoimage_ids)
+
                 cwl_inputs = dict()
                 for input_id in request.inputs:
                     # skip empty inputs (if that is even possible...)
