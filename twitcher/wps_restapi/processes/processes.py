@@ -252,7 +252,8 @@ def execute_process(self, url, service, process_id, inputs,
         if isinstance(exc, WPSException):
             errors = "[{0}] {1}".format(exc.locator, exc.text)
         else:
-            errors = "{0}".format(exc.message)
+            exception_class = "{}.{}".format(exc.__module__, exc.__class__.__name__)
+            errors = "{0}: {1}".format(exception_class, exc.message)
         job.save_log(errors=errors, logger=task_logger)
     finally:
         job.status_message = "Job {}.".format(job.status)
