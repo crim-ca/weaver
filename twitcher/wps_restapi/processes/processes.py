@@ -201,7 +201,7 @@ def execute_process(self, url, service, process_id, inputs,
         if not execution.process and execution.errors:
             raise execution.errors[0]
 
-        job.status = STATUS_RUNNING
+        job.status = STATUS_STARTED
         job.status_message = execution.statusMessage or "{} initiation done.".format(str(job))
         job.status_location = execution.statusLocation
         job.request = execution.request
