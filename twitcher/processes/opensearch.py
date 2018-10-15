@@ -323,7 +323,7 @@ class EOImageDescribeProcessHandler(object):
 
 
 def get_eoimages_inputs_from_payload(payload):
-    inputs = payload["processOffering"]["process"]["inputs"]
+    inputs = payload["processOffering"]["process"].get("inputs", {})
     return list(filter(EOImageDescribeProcessHandler.is_oeimage_input, inputs))
 
 
