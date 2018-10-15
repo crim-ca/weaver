@@ -59,7 +59,7 @@ def request_quote(request):
             # TODO: data source mapping
             from twitcher.processes.sources import CRIM_ADES
             process_step_url = get_process_location(step['reference'], data_source=CRIM_ADES)
-            process_quote_url = '{}/quote'.format(process_step_url)
+            process_quote_url = '{}/quotations'.format(process_step_url)
             subreq = request.copy()
             subreq.path_info = process_quote_url
             resp_json = request.invoke_subrequest(subreq).json()
