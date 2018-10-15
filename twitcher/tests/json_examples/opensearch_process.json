@@ -1,0 +1,260 @@
+{
+  "abstract": "",
+  "additionalParameters": [
+    {
+      "parameters": [
+        {
+          "name": "UniqueAOI",
+          "value": "true"
+        },
+        {
+          "name": "UniqueTOI",
+          "value": "true"
+        }
+      ],
+      "role": "http://www.opengis.net/eoc/applicationContext"
+    }
+  ],
+  "executeEndpoint": null,
+  "identifier": "stackcreation_graph_json_",
+  "inputs": [
+    {
+      "abstract": "",
+      "asreference": false,
+      "data_format": {
+        "encoding": "",
+        "extension": "",
+        "mime_type": "text/plain",
+        "schema": ""
+      },
+      "file": null,
+      "identifier": "files",
+      "keywords": [],
+      "max_occurs": 9223372036854775807,
+      "mimetype": "text/plain",
+      "min_occurs": 1,
+      "mode": 0,
+      "supported_formats": [
+        {
+          "encoding": "",
+          "extension": "",
+          "mime_type": "text/plain",
+          "schema": ""
+        }
+      ],
+      "title": "files",
+      "type": "complex",
+      "workdir": null
+    },
+    {
+      "abstract": "",
+      "allowed_values": [],
+      "any_value": true,
+      "data": null,
+      "data_type": "string",
+      "identifier": "output_file_type",
+      "keywords": [],
+      "max_occurs": 1,
+      "min_occurs": 1,
+      "mode": 0,
+      "title": "",
+      "type": "literal",
+      "workdir": null
+    },
+    {
+      "abstract": "",
+      "allowed_values": [],
+      "any_value": true,
+      "data": null,
+      "data_type": "string",
+      "identifier": "output_name",
+      "keywords": [],
+      "max_occurs": 1,
+      "min_occurs": 1,
+      "mode": 0,
+      "title": "",
+      "type": "literal",
+      "workdir": null
+    }
+  ],
+  "jobControlOptions": [
+    "async-execute"
+  ],
+  "keywords": [],
+  "outputTransmission": [
+    "reference"
+  ],
+  "outputs": [
+    {
+      "abstract": "",
+      "asreference": true,
+      "data_format": {
+        "encoding": "",
+        "extension": "",
+        "mime_type": "text/plain",
+        "schema": ""
+      },
+      "file": null,
+      "identifier": "output",
+      "keywords": [],
+      "max_occurs": 1,
+      "mimetype": "text/plain",
+      "min_occurs": 1,
+      "mode": 0,
+      "supported_formats": [
+        {
+          "encoding": "",
+          "extension": "",
+          "mime_type": "text/plain",
+          "schema": ""
+        }
+      ],
+      "title": "output",
+      "type": "complex",
+      "workdir": null
+    }
+  ],
+  "package": {
+    "class": "CommandLineTool",
+    "cwlVersion": "v1.0",
+    "inputs": {
+      "files": {
+        "inputBinding": {
+          "itemSeparator": ",",
+          "position": 1,
+          "prefix": "-Pfiles=",
+          "separate": false
+        },
+        "type": {
+          "items": "File",
+          "type": "array"
+        }
+      },
+      "output_file_type": {
+        "inputBinding": {
+          "position": 2,
+          "prefix": "-f"
+        },
+        "type": "string"
+      },
+      "output_name": {
+        "inputBinding": {
+          "position": 3,
+          "prefix": "-t"
+        },
+        "type": "string"
+      }
+    },
+    "outputs": {
+      "output": {
+        "outputBinding": {
+          "glob": "$(inputs.output_name)"
+        },
+        "type": "File"
+      }
+    },
+    "requirements": {
+      "DockerRequirement": {
+        "dockerPull": "docker-registry.crim.ca/ogc-public/snap6-stack-creation:v2.1"
+      }
+    }
+  },
+  "payload": {
+    "deploymentProfile": {
+      "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow",
+      "executionUnit": {
+        "reference": "/mnt/c/projects/testbed14-twitcher/twitcher/tests/json_examples/opensearch_deploy.cwl"
+      }
+    },
+    "processOffering": {
+      "process": {
+        "abstract": "",
+        "additionalParameters": [
+          {
+            "parameters": [
+              {
+                "name": "UniqueAOI",
+                "value": "true"
+              },
+              {
+                "name": "UniqueTOI",
+                "value": "true"
+              }
+            ],
+            "role": "http://www.opengis.net/eoc/applicationContext"
+          }
+        ],
+        "identifier": "StackCreation-graph-json-remote",
+        "inputs": [
+          {
+            "additionalParameters": [
+              {
+                "parameters": [
+                  {
+                    "name": "EOImage",
+                    "value": "true"
+                  }
+                ],
+                "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata"
+              }
+            ],
+            "formats": [
+              {
+                "default": true,
+                "mimeType": "application/zip"
+              }
+            ],
+            "identifier": "files",
+            "maxOccurs": 1,
+            "minOccurs": 1,
+            "title": "Input Image"
+          },
+          {
+            "LiteralDataDomain": {
+              "dataType": "String"
+            },
+            "identifier": "output_file_type",
+            "maxOccurs": 1,
+            "minOccurs": 1,
+            "title": "Type of Stacked Image"
+          },
+          {
+            "LiteralDataDomain": {
+              "dataType": "String"
+            },
+            "identifier": "output_name",
+            "maxOccurs": 1,
+            "minOccurs": 1,
+            "title": "Name of the Produced Image"
+          }
+        ],
+        "jobControlOptions": [
+          "async-execute"
+        ],
+        "keywords": [],
+        "outputTransmission": [
+          "reference"
+        ],
+        "outputs": [
+          {
+            "formats": [
+              {
+                "default": true,
+                "mimeType": "application/octet-stream"
+              }
+            ],
+            "id": "output",
+            "title": "Stacked Image"
+          }
+        ],
+        "title": "Stacker",
+        "version": "1.0.0",
+        "visibility": "public"
+      }
+    }
+  },
+  "title": "Stacker",
+  "type": "application",
+  "version": "1.0.0",
+  "visibility": "public"
+}

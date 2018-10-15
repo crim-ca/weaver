@@ -6,6 +6,7 @@ from six.moves.urllib.parse import urlparse
 from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import URLError
 from time import sleep
+
 from twitcher.adapter import servicestore_factory, jobstore_factory, processstore_factory
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS
 from twitcher.datatype import Process as ProcessDB, Job as JobDB
@@ -14,7 +15,7 @@ from twitcher.exceptions import (
     PackageRegistrationError,
     PackageTypeError,
     ProcessRegistrationError)
-from twitcher.processes import wps_package
+from twitcher.processes import wps_package, opensearch
 from twitcher.processes.types import PROCESS_WORKFLOW
 from twitcher.store import processstore_defaultfactory
 from twitcher.utils import get_any_id, get_any_value, raise_on_xml_exception
@@ -175,7 +176,13 @@ def execute_process(self, url, service, process_id, inputs,
                                     ComplexDataInput(input_value) if input_id in complex_inputs else input_value)
                                    for input_value in input_values])
         except KeyError:
-            inputs = []
+            wps_inputs = []
+
+        # identify EOimages from payload
+        payload = processstore_factory(registry).fetch_by_id(process_id).payload
+        eoimage_ids = opensearch.get_eoimages_ids_from_payload(payload)
+        # if applicable, query EOImages
+        wps_inputs = opensearch.query_eo_images_from_inputs(wps_inputs, eoimage_ids)
 
         # prepare outputs
         outputs = []
@@ -252,7 +259,8 @@ def execute_process(self, url, service, process_id, inputs,
         if isinstance(exc, WPSException):
             errors = "[{0}] {1}".format(exc.locator, exc.text)
         else:
-            errors = "{0}".format(exc.message)
+            exception_class = "{}.{}".format(exc.__module__, exc.__class__.__name__)
+            errors = "{0}: {1}".format(exception_class, exc.message)
         job.save_log(errors=errors, logger=task_logger)
     finally:
         job.status_message = "Job {}.".format(job.status)
@@ -428,6 +436,8 @@ def add_local_process(request):
     """
     # validate minimum field requirements
     body = request.json
+    # use deepcopy of body payload to avoid circular dependencies when writing to mongodb
+    payload = deepcopy(body)
     if 'processOffering' not in body:
         raise HTTPBadRequest("Missing required parameter 'processOffering'.")
     process_offering = body.get('processOffering')
@@ -464,6 +474,9 @@ def add_local_process(request):
     # obtain updated process information using WPS process offering and CWL package definition
     try:
         data_source = get_twitcher_url(request.registry.settings)
+        if "inputs" in process_info:
+            convert = opensearch.EOImageDescribeProcessHandler.convert_to_wps_input
+            process_info["inputs"] = [convert(i) for i in process_info["inputs"]]
         process_info = wps_package.get_process_from_wps_request(process_info, reference, package, data_source)
     except (PackageRegistrationError, PackageTypeError) as ex:
         raise HTTPUnprocessableEntity(detail=ex.message)
@@ -478,8 +491,7 @@ def add_local_process(request):
             raise HTTPBadRequest("Invalid `{0}` package deployment on `{1}`.".format(process_type, twitcher_config))
 
     # ensure that required 'executeEndpoint' in db is added, will be auto-fixed to localhost if not specified in body
-    # use deepcopy of body payload to avoid circular dependencies when writing to mongodb
-    process_info.update({'executeEndpoint': process_info.get('executeEndpoint'), 'payload': deepcopy(body)})
+    process_info.update({'executeEndpoint': process_info.get('executeEndpoint'), 'payload': payload})
     try:
         store = processstore_factory(request.registry)
         saved_process = store.save_process(ProcessDB(process_info), overwrite=False, request=request)
@@ -501,7 +513,13 @@ def get_local_process(request):
     try:
         store = processstore_factory(request.registry)
         process = store.fetch_by_id(process_id, request=request)
-        return HTTPOk(json={'process': process.json()})
+        process_json = process.json()
+
+        process_json["inputs"] = opensearch.replace_inputs_eoimage_files_to_query(process_json["inputs"],
+                                                                                  process["payload"],
+                                                                                  wps_inputs=True)
+
+        return HTTPOk(json={'process': process_json})
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except ProcessNotFound:

@@ -1,0 +1,99 @@
+{
+  "processDescription" : {
+    "process" : {
+      "id" : "Stacker",
+      "title" : "Stacker",
+      "abstract" : "",
+      "keywords" : [],
+      "owsContext" : {
+        "offering" : {
+          "code" : "http://www.opengis.net/eoc/applicationContext/cwl",
+          "content" : {
+            "href" : "https://raw.githubusercontent.com/crim-ca/testbed14/master/application-packages/StackCreation-graph-json-remote.cwl"
+          }
+        }
+      },
+      "inputs" : [
+        {
+          "id" : "files",
+          "title" : "Input Image",
+          "formats" : [
+            {
+              "mimeType" : "application/zip",
+              "default" : true
+            }
+          ],
+          "minOccurs" : 1,
+          "maxOccurs" : "unbounded",
+          "additionalParameters" : [
+            {
+              "role" : "http://www.opengis.net/eoc/applicationContext/inputMetadata",
+              "parameters" : [
+                {
+                  "name" : "EOImage",
+                  "value" : "true"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id" : "output_file_type",
+          "title" : "Type of Stacked Image",
+          "formats" : [
+            {
+              "mimeType" : "text/plain",
+              "default" : true
+            }
+          ],
+          "minOccurs" : 1,
+          "maxOccurs" : 1,
+          "LiteralDataDomain" : {
+            "dataType" : "String"
+          }
+        },
+        {
+          "id" : "output_name",
+          "title" : "Name of the Produced Image",
+          "formats" : [
+            {
+              "mimeType" : "text/plain",
+              "default" : true
+            }
+          ],
+          "minOccurs" : 1,
+          "maxOccurs" : 1,
+          "LiteralDataDomain" : {
+            "dataType" : "String"
+          }
+        }          
+      ],
+      "outputs" : [
+        {
+          "id" : "output",
+          "title" : "Stacked Image",
+          "formats" : [
+            {
+              "mimeType" : "application/octet-stream",
+              "default" : true
+            }
+          ]
+        }
+      ],
+      "version" : "1.0.0",
+      "jobControlOptions" : [
+        "async-execute"
+      ],
+      "outputTransmission" : [
+        "reference"
+      ]
+    }
+  },
+  "immediateDeployment": "false",
+  
+  "executionUnit" : [ 
+    { 
+        "href" : "docker-registry.crim.ca/ogc-public/snap6-stack-creation:v2.1"
+    }],
+  "deploymentProfileName" : "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+}

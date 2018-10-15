@@ -397,6 +397,12 @@ class Process(dict):
         if 'package' not in self:
             raise TypeError("'package' is required")
 
+    def __setattr__(self, item, value):
+        if item in self:
+            self[item] = value
+        else:
+            raise AttributeError("Can't set attribute")
+
     @property
     def id(self):
         return self.identifier

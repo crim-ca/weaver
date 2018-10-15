@@ -1,0 +1,94 @@
+{
+  "processOffering": {
+    "process": {
+      "visibility": "public",
+      "identifier": "StackCreation-graph-json-remote",
+      "title": "Stacker",
+      "abstract": "",
+      "keywords": [],
+      "additionalParameters": [
+        {
+          "role": "http://www.opengis.net/eoc/applicationContext",
+          "parameters": [
+            {
+              "name": "UniqueAOI",
+              "value": "true"
+            },
+            {
+              "name": "UniqueTOI",
+              "value": "true"
+            }
+          ]
+        }
+      ],
+      "inputs": [
+        {
+          "identifier": "files",
+          "title": "Input Image",
+          "formats": [
+            {
+              "mimeType": "application/zip",
+              "default": true
+            }
+          ],
+          "minOccurs": 1,
+          "maxOccurs": 1,
+          "additionalParameters": [
+            {
+              "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
+              "parameters": [
+                {
+                  "name": "EOImage",
+                  "value": "true"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "identifier": "output_file_type",
+          "title": "Type of Stacked Image",
+          "minOccurs": 1,
+          "maxOccurs": 1,
+          "LiteralDataDomain": {
+            "dataType": "String"
+          }
+        },
+        {
+          "identifier": "output_name",
+          "title": "Name of the Produced Image",
+          "minOccurs": 1,
+          "maxOccurs": 1,
+          "LiteralDataDomain": {
+            "dataType": "String"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "id": "output",
+          "title": "Stacked Image",
+          "formats": [
+            {
+              "mimeType": "application/octet-stream",
+              "default": true
+            }
+          ]
+        }
+      ],
+      "version": "1.0.0",
+      "jobControlOptions": [
+        "async-execute"
+      ],
+      "outputTransmission": [
+        "reference"
+      ]
+    }
+  },
+  "deploymentProfile": {
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow",
+    "executionUnit": {
+      "reference": "opensearch_deploy.cwl"
+    }
+  }
+}

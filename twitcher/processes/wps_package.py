@@ -1,4 +1,5 @@
 import os
+
 import six
 import cwltool
 import cwltool.factory
@@ -20,6 +21,8 @@ from pywps.inout.literaltypes import AnyValue, AllowedValue, ALLOWEDVALUETYPE
 from pywps.validator.mode import MODE
 from pywps.validator.literalvalidator import validate_anyvalue, validate_allowed_values
 from pywps.app.Common import Metadata
+from twitcher.processes import opensearch
+
 from twitcher import namesgenerator
 from twitcher.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from twitcher.processes.sources import retrieve_data_source_url
@@ -38,8 +41,8 @@ import shutil
 import requests
 
 import logging
-LOGGER = logging.getLogger("PACKAGE")
 
+LOGGER = logging.getLogger("PACKAGE")
 
 __all__ = [
     'Package',
@@ -48,13 +51,12 @@ __all__ = [
     'get_package_workflow_steps',
 ]
 
-
 PACKAGE_EXTENSIONS = frozenset(['yaml', 'yml', 'json', 'cwl', 'job'])
 PACKAGE_BASE_TYPES = frozenset(['string', 'boolean', 'float', 'int', 'integer', 'long', 'double'])
 PACKAGE_LITERAL_TYPES = frozenset(list(PACKAGE_BASE_TYPES) + ['null', 'Any'])
 PACKAGE_COMPLEX_TYPES = frozenset(['File', 'Directory'])
 PACKAGE_ARRAY_BASE = 'array'
-PACKAGE_ARRAY_MAX_SIZE = six.MAXSIZE   # pywps doesn't allow None, so use max size
+PACKAGE_ARRAY_MAX_SIZE = six.MAXSIZE  # pywps doesn't allow None, so use max size
 PACKAGE_ARRAY_ITEMS = frozenset(list(PACKAGE_BASE_TYPES) + list(PACKAGE_COMPLEX_TYPES))
 PACKAGE_ARRAY_TYPES = frozenset(['{}[]'.format(item) for item in PACKAGE_ARRAY_ITEMS])
 PACKAGE_CUSTOM_TYPES = frozenset(['enum'])  # can be anything, but support 'enum' which is more common
@@ -69,7 +71,11 @@ WPS_FIELD_MAPPING = {
     'metadata': ['Metadata', 'MetaData'],
     'keywords': ['Keywords'],
     'allowed_values': ['AllowedValues', 'allowedValues', 'allowedvalues', 'Allowed_Values', 'Allowedvalues'],
+    'allowed_collections': ['AllowedCollections', 'allowedCollections', 'allowedcollections', 'Allowed_Collections',
+                            'Allowedcollections'],
     'supported_formats': ['SupportedFormats', 'supportedFormats', 'supportedformats', 'Supported_Formats'],
+    'additional_parameters': ['AdditionalParameters', 'additionalParameters', 'additionalparameters',
+                              'Additional_Parameters'],
 }
 
 WPS_INPUT = 'input'
@@ -78,9 +84,13 @@ WPS_COMPLEX = 'complex'
 WPS_BOUNDINGBOX = 'bbox'
 WPS_LITERAL = 'literal'
 
+EOIMAGE = "eoimage"
+
 
 class NullType():
     pass
+
+
 null = NullType()
 
 
@@ -256,7 +266,7 @@ def _is_cwl_array_type(io_info):
     # array type conversion when defined as dict of {'type': 'array', 'items': '<type>'}
     # validate against Hashable instead of 'dict' since 'OrderedDict'/'CommentedMap' can result in `isinstance()==False`
     if not isinstance(io_type, six.string_types) and not isinstance(io_type, Hashable) \
-    and 'items' in io_type and 'type' in io_type:
+            and 'items' in io_type and 'type' in io_type:
         if not io_type['type'] == PACKAGE_ARRAY_BASE or io_type['items'] not in PACKAGE_ARRAY_ITEMS:
             raise PackageTypeError("Unsupported I/O 'array' definition: `{}`.".format(repr(io_info)))
         io_type = io_type['items']
@@ -345,7 +355,7 @@ def _cwl2wps_io(io_info, io_select):
     if is_enum:
         io_type = enum_type
         io_allow = enum_allow
-        io_mode = MODE.SIMPLE   # allowed value validator must be set for input
+        io_mode = MODE.SIMPLE  # allowed value validator must be set for input
 
     # debug info for unhandled types conversion
     if not isinstance(io_type, six.string_types):
@@ -474,9 +484,12 @@ def _json2wps_io(io_info, io_select):
             io_info[field] = _json2wps_type(value, field)
 
     # convert by type
-    io_type = io_info.pop('type', WPS_COMPLEX)    # only ComplexData doesn't have 'type'
+    io_type = io_info.pop('type', WPS_COMPLEX)  # only ComplexData doesn't have 'type'
     if io_select == WPS_INPUT:
         if io_type == WPS_COMPLEX:
+            io_info.pop('data_type', None)
+            if 'supported_formats' not in io_info:
+                io_info['supported_formats'] = [Format(mime_type="text/plain")]
             return ComplexInput(**io_info)
         if io_type == WPS_BOUNDINGBOX:
             return BoundingBoxInput(**io_info)
@@ -633,7 +646,7 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
     wps_package_metadata['abstract'] = wps_package_metadata.get('abstract', cwl_package_package.get('doc', ''))
 
     if '$schemas' in cwl_package_package and isinstance(cwl_package_package['$schemas'], list) \
-    and '$namespaces' in cwl_package_package and isinstance(cwl_package_package['$namespaces'], dict):
+            and '$namespaces' in cwl_package_package and isinstance(cwl_package_package['$namespaces'], dict):
         metadata = wps_package_metadata.get('metadata', list())
         namespaces_inv = {v: k for k, v in cwl_package_package['$namespaces']}
         for schema in cwl_package_package['$schemas']:
@@ -659,6 +672,7 @@ def get_process_from_wps_request(process_offering, reference=None, package=None,
     :param data_source: where to resolve process IDs (default: localhost if ``None``).
     :return: process information dictionary ready for saving to data store.
     """
+
     def try_or_raise_package_error(call, reason):
         try:
             LOGGER.debug("Attempting: `{}`".format(reason))
@@ -741,12 +755,17 @@ class Package(Process):
         except Exception as ex:
             raise PackageRegistrationError("Exception occurred on package instantiation: `{}`".format(repr(ex)))
 
-        inputs = [_json2wps_io(i, WPS_INPUT) for i in kw.pop('inputs', list())]
+        inputs = kw.pop('inputs', [])
+
+        # handle EOImage inputs
+        inputs = opensearch.replace_inputs_eoimage_files_to_query(inputs=inputs, payload=self.payload, wps_inputs=True)
+
+        inputs = [_json2wps_io(i, WPS_INPUT) for i in inputs]
         outputs = [_json2wps_io(o, WPS_OUTPUT) for o in kw.pop('outputs', list())]
         metadata = [_json2wps_type(meta_kw, 'metadata') for meta_kw in kw.pop('metadata', list())]
 
         # append a log output
-        #outputs.append(ComplexOutput(PACKAGE_LOG_FILE, 'Package log file',
+        # outputs.append(ComplexOutput(PACKAGE_LOG_FILE, 'Package log file',
         #                             as_reference=True, supported_formats=[Format('text/plain')]))
 
         super(Package, self).__init__(
@@ -808,8 +827,8 @@ class Package(Process):
         try:
             try:
                 self.setup_logger()
-                #self.response.outputs[PACKAGE_LOG_FILE].file = self.log_file
-                #self.response.outputs[PACKAGE_LOG_FILE].as_reference = True
+                # self.response.outputs[PACKAGE_LOG_FILE].file = self.log_file
+                # self.response.outputs[PACKAGE_LOG_FILE].as_reference = True
                 self.update_status("Preparing package logs done.", 1)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed preparing package logging.")
@@ -823,6 +842,11 @@ class Package(Process):
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed retrieving package input types.")
             try:
+                # identify EOimages from payload
+                eoimage_ids = opensearch.get_eoimages_ids_from_payload(self.payload)
+                # if applicable, query EOImages
+                request.inputs = opensearch.query_eo_images_from_wps_inputs(request.inputs, eoimage_ids)
+
                 cwl_inputs = dict()
                 for input_id in request.inputs:
                     # skip empty inputs (if that is even possible...)

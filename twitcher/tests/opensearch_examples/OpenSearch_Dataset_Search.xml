@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:alt11="http://www.opengis.net/alt/2.1" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:eo="http://a9.com/-/opensearch/extensions/eo/1.0/" xmlns:eop11="http://www.opengis.net/eop/2.1" xmlns:gco="http://www.isotc211.org/2005/gco" xmlns:geo="http://a9.com/-/opensearch/extensions/geo/1.0/" xmlns:georss="http://www.georss.org/georss" xmlns:georss11="http://www.georss.org/georss/11" xmlns:gmd="http://www.isotc211.org/2005/gmd" xmlns:gmi="http://www.isotc211.org/2005/gmi" xmlns:gml="http://www.opengis.net/gml" xmlns:gml32="http://www.opengis.net/gml/3.2" xmlns:media="http://search.yahoo.com/mrss/" xmlns:opt11="http://www.opengis.net/opt/2.1" xmlns:os="http://a9.com/-/spec/opensearch/1.1/" xmlns:sar11="http://www.opengis.net/sar/2.1" xmlns:semantic="http://a9.com/-/opensearch/extensions/semantic/1.0/" xmlns:sru="http://a9.com/-/opensearch/extensions/sru/2.0/" xmlns:time="http://a9.com/-/opensearch/extensions/time/1.0/">
+	<author>
+		<name>FEDEO Clearinghouse</name>
+		<email>eohelp@eo.esa.int</email>
+	</author>
+	<generator>FEDEO Clearinghouse</generator>
+	<id>http://geo.spacebel.be/opensearch/request</id>
+	<rights>Copyright 2016-2018, European Space Agency</rights>
+	<title>FEDEO Clearinghouse - Search Response</title>
+	<updated>2018-08-14T13:09:28Z</updated>
+	<link href="http://geo.spacebel.be/opensearch/request?parentIdentifier=LANDSAT.ETM.GTC&amp;startDate=2000-01-01T00:00:00Z&amp;endDate=2000-01-31T00:00:00Z&amp;cloudCover=10%5D&amp;httpAccept=application/atom%2Bxml" hreflang="en" rel="self" type="application/atom+xml"/>
+	<link href="http://geo.spacebel.be/opensearch/request?parentIdentifier=LANDSAT.ETM.GTC&amp;startDate=2000-01-01T00:00:00Z&amp;endDate=2000-01-31T00:00:00Z&amp;cloudCover=10%5D&amp;httpAccept=application/metalink%2Bxml" rel="alternate" type="application/metalink+xml"/>
+	<link href="http://geo.spacebel.be/opensearch/request?parentIdentifier=LANDSAT.ETM.GTC&amp;startDate=2000-01-01T00:00:00Z&amp;endDate=2000-01-31T00:00:00Z&amp;cloudCover=10%5D&amp;httpAccept=application/metalink4%2Bxml" rel="alternate" type="application/metalink4+xml"/>
+	<link href="http://geo.spacebel.be/opensearch/FedEO_OSGW_Service.xml" rel="describedby" type="application/xml"/>
+	<link href="http://geo.spacebel.be/opensearch/request?parentIdentifier=LANDSAT.ETM.GTC&amp;startDate=2000-01-01T00:00:00Z&amp;endDate=2000-01-31T00:00:00Z&amp;cloudCover=10%5D&amp;httpAccept=application/atom%2Bxml&amp;startRecord=1" rel="first" type="application/atom+xml"/>
+	<link href="http://geo.spacebel.be/opensearch/request?parentIdentifier=LANDSAT.ETM.GTC&amp;startDate=2000-01-01T00:00:00Z&amp;endDate=2000-01-31T00:00:00Z&amp;cloudCover=10%5D&amp;httpAccept=application/atom%2Bxml&amp;startRecord=11" rel="next" type="application/atom+xml"/>
+	<link href="http://geo.spacebel.be/opensearch/request?parentIdentifier=LANDSAT.ETM.GTC&amp;startDate=2000-01-01T00:00:00Z&amp;endDate=2000-01-31T00:00:00Z&amp;cloudCover=10%5D&amp;httpAccept=application/atom%2Bxml&amp;startRecord=1321" rel="last" type="application/atom+xml"/>
+	<link href="http://geo.spacebel.be/opensearch/description.xml?parentIdentifier=LANDSAT.ETM.GTC" rel="search" type="application/opensearchdescription+xml"/>
+	<os:totalResults>1329</os:totalResults>
+	<os:startIndex>1</os:startIndex>
+	<os:itemsPerPage>10</os:itemsPerPage>
+	<os:Query eo:cloudCover="10]" eo:parentIdentifier="LANDSAT.ETM.GTC" role="request" time:end="2000-01-31T00:00:00Z" time:start="2000-01-01T00:00:00Z"/>
+	<entry>
+		<id>http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=LANDSAT.ETM.GTC&amp;uid=LS07_RMPS_ETM_GTC_1P_20000123T111514_20000123T111543_004119_0205_0038_EBB6</id>
+		<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=LANDSAT.ETM.GTC&amp;uid=LS07_RMPS_ETM_GTC_1P_20000123T111514_20000123T111543_004119_0205_0038_EBB6" rel="alternate" title="Atom format" type="application/atom+xml"/>
+		<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;uid=LANDSAT.ETM.GTC&amp;recordSchema=iso" rel="up" title="Up" type="application/atom+xml"/>
+		<link href="http://landsat-ds.eo.esa.int/products/LANDSAT_ETM/2000/01/23/LS07_RMPS_ETM_GTC_1P_20000123T111514_20000123T111543_004119_0205_0038_EBB6.ZIP" rel="enclosure" title="Download" type="application/x-binary"/>
+		<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/gml%2Bxml&amp;parentIdentifier=LANDSAT.ETM.GTC&amp;uid=LS07_RMPS_ETM_GTC_1P_20000123T111514_20000123T111543_004119_0205_0038_EBB6&amp;recordSchema=om10" rel="alternate" title="O&amp;M metadata" type="application/gml+xml;profile=http://www.opengis.net/spec/EOMPOM/1.0"/>
+		<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/gml%2Bxml&amp;parentIdentifier=LANDSAT.ETM.GTC&amp;uid=LS07_RMPS_ETM_GTC_1P_20000123T111514_20000123T111543_004119_0205_0038_EBB6&amp;recordSchema=om" rel="alternate" title="O&amp;M 1.1 metadata" type="application/gml+xml;profile=http://www.opengis.net/spec/EOMPOM/1.1"/>
+		<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/rdf%2Bxml&amp;parentIdentifier=LANDSAT.ETM.GTC&amp;uid=LS07_RMPS_ETM_GTC_1P_20000123T111514_20000123T111543_004119_0205_0038_EBB6" rel="alternate" title="RDF/XML format" type="application/rdf+xml"/>
+		<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/ld%2Bjson&amp;parentIdentifier=LANDSAT.ETM.GTC&amp;uid=LS07_RMPS_ETM_GTC_1P_20000123T111514_20000123T111543_004119_0205_0038_EBB6" rel="alternate" title="JSON-LD format" type="application/ld+json"/>
+		<link href="http://geo.spacebel.be/opensearch/request/?httpAccept=text/turtle&amp;parentIdentifier=LANDSAT.ETM.GTC&amp;uid=LS07_RMPS_ETM_GTC_1P_20000123T111514_20000123T111543_004119_0205_0038_EBB6" rel="alternate" title="Turtle format" type="text/turtle"/>
+		<link href="http://landsat-ds.eo.esa.int/metadata/LANDSAT_ETM/2000/01/23/LS07_RMPS_ETM_GTC_1P_20000123T111514_20000123T111543_004119_0205_0038_EBB6.BP.PNG" rel="icon" title="Quicklook" type="image/png"/>
+		<owc:offering code="http://www.opengis.net/spec/owc-atom/1.0/req/wps">
+			<owc:operation method="GET" code="Execute" type="application/xml" href="http://wps-domain/WPS/endpoint"/>
+		</owc:offering>
+		<summary type="html"><![CDATA[<table xmlns="" xmlns:eop="http://www.opengis.net/eop/2.1" xmlns:om="http://www.opengis.net/om/2.0"><tr><td valign="top"><table><tr valign="top"><td><b>Platform Short Name</b></td><td>Landsat</td></tr><tr valign="top"><td><b>Platform Serial Identifier</b></td><td>7</td></tr><tr valign="top"><td><b>Instrument Short Name</b></td><td>ETM</td></tr><tr valign="top"><td><b>Sensor Type</b></td><td>OPTICAL</td></tr><tr valign="top"><td><b>Sensor Operational Mode</b></td><td>IM</td></tr><tr valign="top"><td><b>Orbit Number</b></td><td>4119</td></tr><tr valign="top"><td><b>Orbit Direction</b></td><td>DESCENDING</td></tr><tr valign="top"><td><b>Start Date</b></td><td>2000-01-23T11:15:14Z</td></tr><tr valign="top"><td><b>End Date</b></td><td>2000-01-23T11:15:43Z</td></tr><tr><td><b>Media Type</b></td><td><a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/atom%2Bxml&amp;parentIdentifier=LANDSAT.ETM.GTC&amp;uid=LS07_RMPS_ETM_GTC_1P_20000123T111514_20000123T111543_004119_0205_0038_EBB6" title="Atom format">ATOM</a>									| <a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/sru%2Bxml&amp;parentIdentifier=LANDSAT.ETM.GTC&amp;uid=LS07_RMPS_ETM_GTC_1P_20000123T111514_20000123T111543_004119_0205_0038_EBB6&amp;recordSchema=om" title="SRU format">SRU</a></td></tr><tr><td><b>Metadata</b></td><td><a href="http://geo.spacebel.be/opensearch/request/?httpAccept=application/gml%2Bxml&amp;parentIdentifier=LANDSAT.ETM.GTC&amp;uid=LS07_RMPS_ETM_GTC_1P_20000123T111514_20000123T111543_004119_0205_0038_EBB6&amp;recordSchema=om" title="O&amp;M metadata">O&amp;M</a></td></tr></table></td></tr></table>]]></summary>
+		<title>LS07_RMPS_ETM_GTC_1P_20000123T111514_20000123T111543_004119_0205_0038_EBB6</title>
+		<updated>2018-08-14T13:08:52Z</updated>
+		<dc:identifier>LS07_RMPS_ETM_GTC_1P_20000123T111514_20000123T111543_004119_0205_0038_EBB6</dc:identifier>
+		<dc:date>2000-01-23T11:15:14Z/2000-01-23T11:15:43Z</dc:date>
+		<georss:polygon>32.6874 -13.6372 32.6411 -11.3324 30.7894 -11.4047 30.8325 -13.6641 32.6874 -13.6372</georss:polygon>
+		<georss:box>30.7894 -13.6641 32.6874 -11.3324</georss:box>
+		<media:group>
+			<media:content medium="image" type="image/png" url="http://landsat-ds.eo.esa.int/metadata/LANDSAT_ETM/2000/01/23/LS07_RMPS_ETM_GTC_1P_20000123T111514_20000123T111543_004119_0205_0038_EBB6.BP.PNG">
+				<media:category scheme="http://www.opengis.net/spec/EOMPOM/1.1">QUICKLOOK</media:category>
+			</media:content>
+		</media:group>
+	</entry>
+</feed>

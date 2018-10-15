@@ -1,0 +1,710 @@
+<?xml version="1.0" encoding="UTF-8"?><OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:eo="http://a9.com/-/opensearch/extensions/eo/1.0/" xmlns:geo="http://a9.com/-/opensearch/extensions/geo/1.0/" xmlns:param="http://a9.com/-/spec/opensearch/extensions/parameters/1.0/" xmlns:semantic="http://a9.com/-/opensearch/extensions/semantic/1.0/" xmlns:sru="http://a9.com/-/opensearch/extensions/sru/2.0/" xmlns:time="http://a9.com/-/opensearch/extensions/time/1.0/" xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
+<ShortName>FEDEO</ShortName>
+<Description>Provides interoperable access, following ISO/OGC interface guidelines, to Earth Observation metadata.</Description>
+<Tags>FEDEO, ESA, Earth Observation, Digital Repository, HMA, HMA-S, HMA-SE, CEOS-OS-BP-V1.1/L1.</Tags>
+<Url rel="self" template="http://geo.spacebel.be/opensearch/description.xml?parentIdentifier=EOP:SSARA" type="application/opensearchdescription+xml"/>
+
+<Url indexOffset="1" pageOffset="1" rel="results" template="http://geo.spacebel.be/opensearch/request?httpAccept=text%2Fhtml&amp;parentIdentifier=EOP:SSARA&amp;query={searchTerms?}&amp;startDate={time:start?}&amp;endDate={time:end?}&amp;geometry={geo:geometry?}&amp;platform={eo:platform?}&amp;orbitNumber={eo:orbitNumber?}&amp;frame={eo:frame?}&amp;sensorMode={eo:sensorMode?}&amp;swathIdentifier={eo:swathIdentifier?}&amp;orbitDirection={eo:orbitDirection?}&amp;antennaLookDirection={eo:antennaLookDirection?}&amp;polarisationChannels={eo:polarisationChannels?}&amp;processingLevel={eo:processingLevel?}&amp;maximumRecords={count?}&amp;uid={geo:uid?}&amp;name={geo:name?}&amp;lat={geo:lat?}&amp;lon={geo:lon?}&amp;radius={geo:radius?}&amp;bbox={geo:box?}&amp;startRecord={startIndex?}&amp;strict=true" type="text/html">	
+		
+		<param:Parameter maxInclusive="50" minInclusive="0" name="maximumRecords" pattern="[0-9]+" value="{count}"/>
+		<param:Parameter minInclusive="1" name="startRecord" pattern="[0-9]+" value="{startIndex}"/>
+		<param:Parameter minInclusive="1" name="startPage" pattern="[0-9]+" value="{startPage}"/>
+		<param:Parameter name="startDate" pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[\+\-][0-9]{2}:[0-9]{2})$" title="Start date of the time interval to be compared with the data acquisition time." value="{time:start}"/>
+		<param:Parameter name="endDate" pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[\+\-][0-9]{2}:[0-9]{2})$" title="End date of the time interval to be compared with the data acquisition time." value="{time:end}"/>
+		<param:Parameter maxInclusive="90" minInclusive="-90" name="lat" value="{geo:lat}"/>
+		<param:Parameter maxInclusive="180" minInclusive="-180" name="lon" value="{geo:lon}"/>
+		<param:Parameter name="frame" pattern="(\[|\])[0-9]+,[0-9]+(\[|\])|(\[|\])?[0-9]+|[0-9]+(\[|\])?|\{[0-9]+,[0-9]+\}" value="{eo:frame}"/>
+		<param:Parameter name="orbitNumber" pattern="(\[|\])[0-9]+,[0-9]+(\[|\])|(\[|\])?[0-9]+|[0-9]+(\[|\])?|\{[0-9]+,[0-9]+\}" value="{eo:orbitNumber}"/>
+		
+		<param:Parameter name="recordSchema" value="{sru:recordSchema}">
+			<param:Option label="O&amp;M" value="om"/>		
+			<param:Option label="O&amp;M Version 1.1" value="om11"/>		
+		</param:Parameter>
+
+	       
+
+		
+		<param:Parameter name="platform" title="Search by name of the satellite or platform." value="{eo:platform}">
+		    <param:Option label="AIRSAR" value="AIRSAR"/>		
+			<param:Option label="ALOS" value="ALOS"/>	
+            <param:Option label="ALOS_2" value="ALOS_2"/>		
+			<param:Option label="ENVISAT" value="ENVISAT"/>		
+			<param:Option label="ERS-1" value="ERS-1"/>		
+			<param:Option label="ERS-2" value="ERS-2"/>		
+			<param:Option label="JERS-1" value="JERS-1"/>										
+			<param:Option label="RADARSAT-1" value="RADARSAT-1"/>	
+		    <param:Option label="SENTINEL-1" value="SENTINEL-1"/>
+            <param:Option label="SENTINEL-1A" value="SENTINEL-1A"/>
+			<param:Option label="UAVSAR" value="UAVSAR"/>			
+			
+		</param:Parameter>
+		
+		<param:Parameter name="orbitDirection" value="{eo:orbitDirection}">
+			<param:Option label="ASCENDING" value="A"/>					
+			<param:Option label="DESCENDING" value="D"/>					
+		</param:Parameter>
+		
+		<param:Parameter name="processingLevel" value="{eo:processingLevel}">
+			<param:Option label="L0" value="L0"/>		
+			<param:Option label="L1" value="L1"/>					
+			<param:Option label="SLC" value="SLC"/>					
+		</param:Parameter>
+		
+		<param:Parameter name="polarisationChannels" value="{eo:polarisationChannels}">
+			<param:Option label="HH" value="HH"/>		
+			<param:Option label="HV" value="HV"/>		
+			<param:Option label="VH" value="VH"/>		
+			<param:Option label="VV" value="VV"/>		
+			<param:Option label="HH,VV" value="HH,VV"/>		
+			<param:Option label="HH,VH" value="HH,VH"/>		
+			<param:Option label="HH,HV" value="HH,HV"/>		
+			<param:Option label="VH,VV" value="VH,VV"/>		
+			<param:Option label="VH,HV" value="VH,HV"/>		
+			<param:Option label="VV,HV" value="VV,HV"/>		
+			<param:Option label="VV,VH" value="VV,VH"/>		
+			<param:Option label="HV,VH" value="HV,VH"/>		
+			<param:Option label="UNDEFINED" value="UNDEFINED"/>
+		</param:Parameter>
+		
+		<param:Parameter name="antennaLookDirection" value="{eo:antennaLookDirection}">
+			<param:Option label="LEFT" value="L"/>		
+			<param:Option label="RIGHT" value="R"/>		
+		</param:Parameter>
+		
+	<param:Parameter name="query" title="Textual search in the title, abstract of keyword section of the collection.  Surround with double quotes for exact match." value="{searchTerms}"/>
+</Url>
+<Url indexOffset="1" pageOffset="1" rel="results" template="http://geo.spacebel.be/opensearch/request?httpAccept=application%2Fmetalink%2Bxml&amp;parentIdentifier=EOP:SSARA&amp;query={searchTerms?}&amp;startDate={time:start?}&amp;endDate={time:end?}&amp;geometry={geo:geometry?}&amp;platform={eo:platform?}&amp;orbitNumber={eo:orbitNumber?}&amp;frame={eo:frame?}&amp;sensorMode={eo:sensorMode?}&amp;swathIdentifier={eo:swathIdentifier?}&amp;orbitDirection={eo:orbitDirection?}&amp;antennaLookDirection={eo:antennaLookDirection?}&amp;polarisationChannels={eo:polarisationChannels?}&amp;processingLevel={eo:processingLevel?}&amp;maximumRecords={count?}&amp;uid={geo:uid?}&amp;name={geo:name?}&amp;lat={geo:lat?}&amp;lon={geo:lon?}&amp;radius={geo:radius?}&amp;bbox={geo:box?}&amp;startRecord={startIndex?}&amp;strict=true" type="application/metalink+xml">	
+		
+		<param:Parameter maxInclusive="50" minInclusive="0" name="maximumRecords" pattern="[0-9]+" value="{count}"/>
+		<param:Parameter minInclusive="1" name="startRecord" pattern="[0-9]+" value="{startIndex}"/>
+		<param:Parameter minInclusive="1" name="startPage" pattern="[0-9]+" value="{startPage}"/>
+		<param:Parameter name="startDate" pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[\+\-][0-9]{2}:[0-9]{2})$" title="Start date of the time interval to be compared with the data acquisition time." value="{time:start}"/>
+		<param:Parameter name="endDate" pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[\+\-][0-9]{2}:[0-9]{2})$" title="End date of the time interval to be compared with the data acquisition time." value="{time:end}"/>
+		<param:Parameter maxInclusive="90" minInclusive="-90" name="lat" value="{geo:lat}"/>
+		<param:Parameter maxInclusive="180" minInclusive="-180" name="lon" value="{geo:lon}"/>
+		<param:Parameter name="frame" pattern="(\[|\])[0-9]+,[0-9]+(\[|\])|(\[|\])?[0-9]+|[0-9]+(\[|\])?|\{[0-9]+,[0-9]+\}" value="{eo:frame}"/>
+		<param:Parameter name="orbitNumber" pattern="(\[|\])[0-9]+,[0-9]+(\[|\])|(\[|\])?[0-9]+|[0-9]+(\[|\])?|\{[0-9]+,[0-9]+\}" value="{eo:orbitNumber}"/>
+		
+		<param:Parameter name="recordSchema" value="{sru:recordSchema}">
+			<param:Option label="O&amp;M" value="om"/>		
+			<param:Option label="O&amp;M Version 1.1" value="om11"/>		
+		</param:Parameter>
+
+	       
+
+		
+		<param:Parameter name="platform" title="Search by name of the satellite or platform." value="{eo:platform}">
+		    <param:Option label="AIRSAR" value="AIRSAR"/>		
+			<param:Option label="ALOS" value="ALOS"/>	
+            <param:Option label="ALOS_2" value="ALOS_2"/>		
+			<param:Option label="ENVISAT" value="ENVISAT"/>		
+			<param:Option label="ERS-1" value="ERS-1"/>		
+			<param:Option label="ERS-2" value="ERS-2"/>		
+			<param:Option label="JERS-1" value="JERS-1"/>										
+			<param:Option label="RADARSAT-1" value="RADARSAT-1"/>	
+		    <param:Option label="SENTINEL-1" value="SENTINEL-1"/>
+            <param:Option label="SENTINEL-1A" value="SENTINEL-1A"/>
+			<param:Option label="UAVSAR" value="UAVSAR"/>			
+			
+		</param:Parameter>
+		
+		<param:Parameter name="orbitDirection" value="{eo:orbitDirection}">
+			<param:Option label="ASCENDING" value="A"/>					
+			<param:Option label="DESCENDING" value="D"/>					
+		</param:Parameter>
+		
+		<param:Parameter name="processingLevel" value="{eo:processingLevel}">
+			<param:Option label="L0" value="L0"/>		
+			<param:Option label="L1" value="L1"/>					
+			<param:Option label="SLC" value="SLC"/>					
+		</param:Parameter>
+		
+		<param:Parameter name="polarisationChannels" value="{eo:polarisationChannels}">
+			<param:Option label="HH" value="HH"/>		
+			<param:Option label="HV" value="HV"/>		
+			<param:Option label="VH" value="VH"/>		
+			<param:Option label="VV" value="VV"/>		
+			<param:Option label="HH,VV" value="HH,VV"/>		
+			<param:Option label="HH,VH" value="HH,VH"/>		
+			<param:Option label="HH,HV" value="HH,HV"/>		
+			<param:Option label="VH,VV" value="VH,VV"/>		
+			<param:Option label="VH,HV" value="VH,HV"/>		
+			<param:Option label="VV,HV" value="VV,HV"/>		
+			<param:Option label="VV,VH" value="VV,VH"/>		
+			<param:Option label="HV,VH" value="HV,VH"/>		
+			<param:Option label="UNDEFINED" value="UNDEFINED"/>
+		</param:Parameter>
+		
+		<param:Parameter name="antennaLookDirection" value="{eo:antennaLookDirection}">
+			<param:Option label="LEFT" value="L"/>		
+			<param:Option label="RIGHT" value="R"/>		
+		</param:Parameter>
+		
+	<param:Parameter name="query" title="Textual search in the title, abstract of keyword section of the collection.  Surround with double quotes for exact match." value="{searchTerms}"/>
+</Url>
+<Url indexOffset="1" pageOffset="1" rel="results" template="http://geo.spacebel.be/opensearch/request?httpAccept=application%2Fmetalink4%2Bxml&amp;parentIdentifier=EOP:SSARA&amp;query={searchTerms?}&amp;startDate={time:start?}&amp;endDate={time:end?}&amp;geometry={geo:geometry?}&amp;platform={eo:platform?}&amp;orbitNumber={eo:orbitNumber?}&amp;frame={eo:frame?}&amp;sensorMode={eo:sensorMode?}&amp;swathIdentifier={eo:swathIdentifier?}&amp;orbitDirection={eo:orbitDirection?}&amp;antennaLookDirection={eo:antennaLookDirection?}&amp;polarisationChannels={eo:polarisationChannels?}&amp;processingLevel={eo:processingLevel?}&amp;maximumRecords={count?}&amp;uid={geo:uid?}&amp;name={geo:name?}&amp;lat={geo:lat?}&amp;lon={geo:lon?}&amp;radius={geo:radius?}&amp;bbox={geo:box?}&amp;startRecord={startIndex?}&amp;strict=true" type="application/metalink4+xml">	
+		
+		<param:Parameter maxInclusive="50" minInclusive="0" name="maximumRecords" pattern="[0-9]+" value="{count}"/>
+		<param:Parameter minInclusive="1" name="startRecord" pattern="[0-9]+" value="{startIndex}"/>
+		<param:Parameter minInclusive="1" name="startPage" pattern="[0-9]+" value="{startPage}"/>
+		<param:Parameter name="startDate" pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[\+\-][0-9]{2}:[0-9]{2})$" title="Start date of the time interval to be compared with the data acquisition time." value="{time:start}"/>
+		<param:Parameter name="endDate" pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[\+\-][0-9]{2}:[0-9]{2})$" title="End date of the time interval to be compared with the data acquisition time." value="{time:end}"/>
+		<param:Parameter maxInclusive="90" minInclusive="-90" name="lat" value="{geo:lat}"/>
+		<param:Parameter maxInclusive="180" minInclusive="-180" name="lon" value="{geo:lon}"/>
+		<param:Parameter name="frame" pattern="(\[|\])[0-9]+,[0-9]+(\[|\])|(\[|\])?[0-9]+|[0-9]+(\[|\])?|\{[0-9]+,[0-9]+\}" value="{eo:frame}"/>
+		<param:Parameter name="orbitNumber" pattern="(\[|\])[0-9]+,[0-9]+(\[|\])|(\[|\])?[0-9]+|[0-9]+(\[|\])?|\{[0-9]+,[0-9]+\}" value="{eo:orbitNumber}"/>
+		
+		<param:Parameter name="recordSchema" value="{sru:recordSchema}">
+			<param:Option label="O&amp;M" value="om"/>		
+			<param:Option label="O&amp;M Version 1.1" value="om11"/>		
+		</param:Parameter>
+
+	       
+
+		
+		<param:Parameter name="platform" title="Search by name of the satellite or platform." value="{eo:platform}">
+		    <param:Option label="AIRSAR" value="AIRSAR"/>		
+			<param:Option label="ALOS" value="ALOS"/>	
+            <param:Option label="ALOS_2" value="ALOS_2"/>		
+			<param:Option label="ENVISAT" value="ENVISAT"/>		
+			<param:Option label="ERS-1" value="ERS-1"/>		
+			<param:Option label="ERS-2" value="ERS-2"/>		
+			<param:Option label="JERS-1" value="JERS-1"/>										
+			<param:Option label="RADARSAT-1" value="RADARSAT-1"/>	
+		    <param:Option label="SENTINEL-1" value="SENTINEL-1"/>
+            <param:Option label="SENTINEL-1A" value="SENTINEL-1A"/>
+			<param:Option label="UAVSAR" value="UAVSAR"/>			
+			
+		</param:Parameter>
+		
+		<param:Parameter name="orbitDirection" value="{eo:orbitDirection}">
+			<param:Option label="ASCENDING" value="A"/>					
+			<param:Option label="DESCENDING" value="D"/>					
+		</param:Parameter>
+		
+		<param:Parameter name="processingLevel" value="{eo:processingLevel}">
+			<param:Option label="L0" value="L0"/>		
+			<param:Option label="L1" value="L1"/>					
+			<param:Option label="SLC" value="SLC"/>					
+		</param:Parameter>
+		
+		<param:Parameter name="polarisationChannels" value="{eo:polarisationChannels}">
+			<param:Option label="HH" value="HH"/>		
+			<param:Option label="HV" value="HV"/>		
+			<param:Option label="VH" value="VH"/>		
+			<param:Option label="VV" value="VV"/>		
+			<param:Option label="HH,VV" value="HH,VV"/>		
+			<param:Option label="HH,VH" value="HH,VH"/>		
+			<param:Option label="HH,HV" value="HH,HV"/>		
+			<param:Option label="VH,VV" value="VH,VV"/>		
+			<param:Option label="VH,HV" value="VH,HV"/>		
+			<param:Option label="VV,HV" value="VV,HV"/>		
+			<param:Option label="VV,VH" value="VV,VH"/>		
+			<param:Option label="HV,VH" value="HV,VH"/>		
+			<param:Option label="UNDEFINED" value="UNDEFINED"/>
+		</param:Parameter>
+		
+		<param:Parameter name="antennaLookDirection" value="{eo:antennaLookDirection}">
+			<param:Option label="LEFT" value="L"/>		
+			<param:Option label="RIGHT" value="R"/>		
+		</param:Parameter>
+		
+	<param:Parameter name="query" title="Textual search in the title, abstract of keyword section of the collection.  Surround with double quotes for exact match." value="{searchTerms}"/>
+</Url>
+<Url indexOffset="1" pageOffset="1" rel="results" template="http://geo.spacebel.be/opensearch/request?httpAccept=application%2Frdf%2Bxml&amp;parentIdentifier=EOP:SSARA&amp;query={searchTerms?}&amp;startDate={time:start?}&amp;endDate={time:end?}&amp;geometry={geo:geometry?}&amp;platform={eo:platform?}&amp;orbitNumber={eo:orbitNumber?}&amp;frame={eo:frame?}&amp;sensorMode={eo:sensorMode?}&amp;swathIdentifier={eo:swathIdentifier?}&amp;orbitDirection={eo:orbitDirection?}&amp;antennaLookDirection={eo:antennaLookDirection?}&amp;polarisationChannels={eo:polarisationChannels?}&amp;processingLevel={eo:processingLevel?}&amp;maximumRecords={count?}&amp;uid={geo:uid?}&amp;name={geo:name?}&amp;lat={geo:lat?}&amp;lon={geo:lon?}&amp;radius={geo:radius?}&amp;bbox={geo:box?}&amp;startRecord={startIndex?}&amp;strict=true" type="application/rdf+xml">	
+		
+		<param:Parameter maxInclusive="50" minInclusive="0" name="maximumRecords" pattern="[0-9]+" value="{count}"/>
+		<param:Parameter minInclusive="1" name="startRecord" pattern="[0-9]+" value="{startIndex}"/>
+		<param:Parameter minInclusive="1" name="startPage" pattern="[0-9]+" value="{startPage}"/>
+		<param:Parameter name="startDate" pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[\+\-][0-9]{2}:[0-9]{2})$" title="Start date of the time interval to be compared with the data acquisition time." value="{time:start}"/>
+		<param:Parameter name="endDate" pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[\+\-][0-9]{2}:[0-9]{2})$" title="End date of the time interval to be compared with the data acquisition time." value="{time:end}"/>
+		<param:Parameter maxInclusive="90" minInclusive="-90" name="lat" value="{geo:lat}"/>
+		<param:Parameter maxInclusive="180" minInclusive="-180" name="lon" value="{geo:lon}"/>
+		<param:Parameter name="frame" pattern="(\[|\])[0-9]+,[0-9]+(\[|\])|(\[|\])?[0-9]+|[0-9]+(\[|\])?|\{[0-9]+,[0-9]+\}" value="{eo:frame}"/>
+		<param:Parameter name="orbitNumber" pattern="(\[|\])[0-9]+,[0-9]+(\[|\])|(\[|\])?[0-9]+|[0-9]+(\[|\])?|\{[0-9]+,[0-9]+\}" value="{eo:orbitNumber}"/>
+		
+		<param:Parameter name="recordSchema" value="{sru:recordSchema}">
+			<param:Option label="O&amp;M" value="om"/>		
+			<param:Option label="O&amp;M Version 1.1" value="om11"/>		
+		</param:Parameter>
+
+	       
+
+		
+		<param:Parameter name="platform" title="Search by name of the satellite or platform." value="{eo:platform}">
+		    <param:Option label="AIRSAR" value="AIRSAR"/>		
+			<param:Option label="ALOS" value="ALOS"/>	
+            <param:Option label="ALOS_2" value="ALOS_2"/>		
+			<param:Option label="ENVISAT" value="ENVISAT"/>		
+			<param:Option label="ERS-1" value="ERS-1"/>		
+			<param:Option label="ERS-2" value="ERS-2"/>		
+			<param:Option label="JERS-1" value="JERS-1"/>										
+			<param:Option label="RADARSAT-1" value="RADARSAT-1"/>	
+		    <param:Option label="SENTINEL-1" value="SENTINEL-1"/>
+            <param:Option label="SENTINEL-1A" value="SENTINEL-1A"/>
+			<param:Option label="UAVSAR" value="UAVSAR"/>			
+			
+		</param:Parameter>
+		
+		<param:Parameter name="orbitDirection" value="{eo:orbitDirection}">
+			<param:Option label="ASCENDING" value="A"/>					
+			<param:Option label="DESCENDING" value="D"/>					
+		</param:Parameter>
+		
+		<param:Parameter name="processingLevel" value="{eo:processingLevel}">
+			<param:Option label="L0" value="L0"/>		
+			<param:Option label="L1" value="L1"/>					
+			<param:Option label="SLC" value="SLC"/>					
+		</param:Parameter>
+		
+		<param:Parameter name="polarisationChannels" value="{eo:polarisationChannels}">
+			<param:Option label="HH" value="HH"/>		
+			<param:Option label="HV" value="HV"/>		
+			<param:Option label="VH" value="VH"/>		
+			<param:Option label="VV" value="VV"/>		
+			<param:Option label="HH,VV" value="HH,VV"/>		
+			<param:Option label="HH,VH" value="HH,VH"/>		
+			<param:Option label="HH,HV" value="HH,HV"/>		
+			<param:Option label="VH,VV" value="VH,VV"/>		
+			<param:Option label="VH,HV" value="VH,HV"/>		
+			<param:Option label="VV,HV" value="VV,HV"/>		
+			<param:Option label="VV,VH" value="VV,VH"/>		
+			<param:Option label="HV,VH" value="HV,VH"/>		
+			<param:Option label="UNDEFINED" value="UNDEFINED"/>
+		</param:Parameter>
+		
+		<param:Parameter name="antennaLookDirection" value="{eo:antennaLookDirection}">
+			<param:Option label="LEFT" value="L"/>		
+			<param:Option label="RIGHT" value="R"/>		
+		</param:Parameter>
+		
+	<param:Parameter name="query" title="Textual search in the title, abstract of keyword section of the collection.  Surround with double quotes for exact match." value="{searchTerms}"/>
+</Url>
+<Url indexOffset="1" pageOffset="1" rel="results" template="http://geo.spacebel.be/opensearch/request?httpAccept=application%2Fld%2Bjson&amp;parentIdentifier=EOP:SSARA&amp;query={searchTerms?}&amp;startDate={time:start?}&amp;endDate={time:end?}&amp;geometry={geo:geometry?}&amp;platform={eo:platform?}&amp;orbitNumber={eo:orbitNumber?}&amp;frame={eo:frame?}&amp;sensorMode={eo:sensorMode?}&amp;swathIdentifier={eo:swathIdentifier?}&amp;orbitDirection={eo:orbitDirection?}&amp;antennaLookDirection={eo:antennaLookDirection?}&amp;polarisationChannels={eo:polarisationChannels?}&amp;processingLevel={eo:processingLevel?}&amp;maximumRecords={count?}&amp;uid={geo:uid?}&amp;name={geo:name?}&amp;lat={geo:lat?}&amp;lon={geo:lon?}&amp;radius={geo:radius?}&amp;bbox={geo:box?}&amp;startRecord={startIndex?}&amp;strict=true" type="application/ld+json">	
+		
+		<param:Parameter maxInclusive="50" minInclusive="0" name="maximumRecords" pattern="[0-9]+" value="{count}"/>
+		<param:Parameter minInclusive="1" name="startRecord" pattern="[0-9]+" value="{startIndex}"/>
+		<param:Parameter minInclusive="1" name="startPage" pattern="[0-9]+" value="{startPage}"/>
+		<param:Parameter name="startDate" pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[\+\-][0-9]{2}:[0-9]{2})$" title="Start date of the time interval to be compared with the data acquisition time." value="{time:start}"/>
+		<param:Parameter name="endDate" pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[\+\-][0-9]{2}:[0-9]{2})$" title="End date of the time interval to be compared with the data acquisition time." value="{time:end}"/>
+		<param:Parameter maxInclusive="90" minInclusive="-90" name="lat" value="{geo:lat}"/>
+		<param:Parameter maxInclusive="180" minInclusive="-180" name="lon" value="{geo:lon}"/>
+		<param:Parameter name="frame" pattern="(\[|\])[0-9]+,[0-9]+(\[|\])|(\[|\])?[0-9]+|[0-9]+(\[|\])?|\{[0-9]+,[0-9]+\}" value="{eo:frame}"/>
+		<param:Parameter name="orbitNumber" pattern="(\[|\])[0-9]+,[0-9]+(\[|\])|(\[|\])?[0-9]+|[0-9]+(\[|\])?|\{[0-9]+,[0-9]+\}" value="{eo:orbitNumber}"/>
+		
+		<param:Parameter name="recordSchema" value="{sru:recordSchema}">
+			<param:Option label="O&amp;M" value="om"/>		
+			<param:Option label="O&amp;M Version 1.1" value="om11"/>		
+		</param:Parameter>
+
+	       
+
+		
+		<param:Parameter name="platform" title="Search by name of the satellite or platform." value="{eo:platform}">
+		    <param:Option label="AIRSAR" value="AIRSAR"/>		
+			<param:Option label="ALOS" value="ALOS"/>	
+            <param:Option label="ALOS_2" value="ALOS_2"/>		
+			<param:Option label="ENVISAT" value="ENVISAT"/>		
+			<param:Option label="ERS-1" value="ERS-1"/>		
+			<param:Option label="ERS-2" value="ERS-2"/>		
+			<param:Option label="JERS-1" value="JERS-1"/>										
+			<param:Option label="RADARSAT-1" value="RADARSAT-1"/>	
+		    <param:Option label="SENTINEL-1" value="SENTINEL-1"/>
+            <param:Option label="SENTINEL-1A" value="SENTINEL-1A"/>
+			<param:Option label="UAVSAR" value="UAVSAR"/>			
+			
+		</param:Parameter>
+		
+		<param:Parameter name="orbitDirection" value="{eo:orbitDirection}">
+			<param:Option label="ASCENDING" value="A"/>					
+			<param:Option label="DESCENDING" value="D"/>					
+		</param:Parameter>
+		
+		<param:Parameter name="processingLevel" value="{eo:processingLevel}">
+			<param:Option label="L0" value="L0"/>		
+			<param:Option label="L1" value="L1"/>					
+			<param:Option label="SLC" value="SLC"/>					
+		</param:Parameter>
+		
+		<param:Parameter name="polarisationChannels" value="{eo:polarisationChannels}">
+			<param:Option label="HH" value="HH"/>		
+			<param:Option label="HV" value="HV"/>		
+			<param:Option label="VH" value="VH"/>		
+			<param:Option label="VV" value="VV"/>		
+			<param:Option label="HH,VV" value="HH,VV"/>		
+			<param:Option label="HH,VH" value="HH,VH"/>		
+			<param:Option label="HH,HV" value="HH,HV"/>		
+			<param:Option label="VH,VV" value="VH,VV"/>		
+			<param:Option label="VH,HV" value="VH,HV"/>		
+			<param:Option label="VV,HV" value="VV,HV"/>		
+			<param:Option label="VV,VH" value="VV,VH"/>		
+			<param:Option label="HV,VH" value="HV,VH"/>		
+			<param:Option label="UNDEFINED" value="UNDEFINED"/>
+		</param:Parameter>
+		
+		<param:Parameter name="antennaLookDirection" value="{eo:antennaLookDirection}">
+			<param:Option label="LEFT" value="L"/>		
+			<param:Option label="RIGHT" value="R"/>		
+		</param:Parameter>
+		
+	<param:Parameter name="query" title="Textual search in the title, abstract of keyword section of the collection.  Surround with double quotes for exact match." value="{searchTerms}"/>
+</Url>
+<Url indexOffset="1" pageOffset="1" rel="results" template="http://geo.spacebel.be/opensearch/request?httpAccept=text%2Fturtle&amp;parentIdentifier=EOP:SSARA&amp;query={searchTerms?}&amp;startDate={time:start?}&amp;endDate={time:end?}&amp;geometry={geo:geometry?}&amp;platform={eo:platform?}&amp;orbitNumber={eo:orbitNumber?}&amp;frame={eo:frame?}&amp;sensorMode={eo:sensorMode?}&amp;swathIdentifier={eo:swathIdentifier?}&amp;orbitDirection={eo:orbitDirection?}&amp;antennaLookDirection={eo:antennaLookDirection?}&amp;polarisationChannels={eo:polarisationChannels?}&amp;processingLevel={eo:processingLevel?}&amp;maximumRecords={count?}&amp;uid={geo:uid?}&amp;name={geo:name?}&amp;lat={geo:lat?}&amp;lon={geo:lon?}&amp;radius={geo:radius?}&amp;bbox={geo:box?}&amp;startRecord={startIndex?}&amp;strict=true" type="text/turtle">	
+		
+		<param:Parameter maxInclusive="50" minInclusive="0" name="maximumRecords" pattern="[0-9]+" value="{count}"/>
+		<param:Parameter minInclusive="1" name="startRecord" pattern="[0-9]+" value="{startIndex}"/>
+		<param:Parameter minInclusive="1" name="startPage" pattern="[0-9]+" value="{startPage}"/>
+		<param:Parameter name="startDate" pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[\+\-][0-9]{2}:[0-9]{2})$" title="Start date of the time interval to be compared with the data acquisition time." value="{time:start}"/>
+		<param:Parameter name="endDate" pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[\+\-][0-9]{2}:[0-9]{2})$" title="End date of the time interval to be compared with the data acquisition time." value="{time:end}"/>
+		<param:Parameter maxInclusive="90" minInclusive="-90" name="lat" value="{geo:lat}"/>
+		<param:Parameter maxInclusive="180" minInclusive="-180" name="lon" value="{geo:lon}"/>
+		<param:Parameter name="frame" pattern="(\[|\])[0-9]+,[0-9]+(\[|\])|(\[|\])?[0-9]+|[0-9]+(\[|\])?|\{[0-9]+,[0-9]+\}" value="{eo:frame}"/>
+		<param:Parameter name="orbitNumber" pattern="(\[|\])[0-9]+,[0-9]+(\[|\])|(\[|\])?[0-9]+|[0-9]+(\[|\])?|\{[0-9]+,[0-9]+\}" value="{eo:orbitNumber}"/>
+		
+		<param:Parameter name="recordSchema" value="{sru:recordSchema}">
+			<param:Option label="O&amp;M" value="om"/>		
+			<param:Option label="O&amp;M Version 1.1" value="om11"/>		
+		</param:Parameter>
+
+	       
+
+		
+		<param:Parameter name="platform" title="Search by name of the satellite or platform." value="{eo:platform}">
+		    <param:Option label="AIRSAR" value="AIRSAR"/>		
+			<param:Option label="ALOS" value="ALOS"/>	
+            <param:Option label="ALOS_2" value="ALOS_2"/>		
+			<param:Option label="ENVISAT" value="ENVISAT"/>		
+			<param:Option label="ERS-1" value="ERS-1"/>		
+			<param:Option label="ERS-2" value="ERS-2"/>		
+			<param:Option label="JERS-1" value="JERS-1"/>										
+			<param:Option label="RADARSAT-1" value="RADARSAT-1"/>	
+		    <param:Option label="SENTINEL-1" value="SENTINEL-1"/>
+            <param:Option label="SENTINEL-1A" value="SENTINEL-1A"/>
+			<param:Option label="UAVSAR" value="UAVSAR"/>			
+			
+		</param:Parameter>
+		
+		<param:Parameter name="orbitDirection" value="{eo:orbitDirection}">
+			<param:Option label="ASCENDING" value="A"/>					
+			<param:Option label="DESCENDING" value="D"/>					
+		</param:Parameter>
+		
+		<param:Parameter name="processingLevel" value="{eo:processingLevel}">
+			<param:Option label="L0" value="L0"/>		
+			<param:Option label="L1" value="L1"/>					
+			<param:Option label="SLC" value="SLC"/>					
+		</param:Parameter>
+		
+		<param:Parameter name="polarisationChannels" value="{eo:polarisationChannels}">
+			<param:Option label="HH" value="HH"/>		
+			<param:Option label="HV" value="HV"/>		
+			<param:Option label="VH" value="VH"/>		
+			<param:Option label="VV" value="VV"/>		
+			<param:Option label="HH,VV" value="HH,VV"/>		
+			<param:Option label="HH,VH" value="HH,VH"/>		
+			<param:Option label="HH,HV" value="HH,HV"/>		
+			<param:Option label="VH,VV" value="VH,VV"/>		
+			<param:Option label="VH,HV" value="VH,HV"/>		
+			<param:Option label="VV,HV" value="VV,HV"/>		
+			<param:Option label="VV,VH" value="VV,VH"/>		
+			<param:Option label="HV,VH" value="HV,VH"/>		
+			<param:Option label="UNDEFINED" value="UNDEFINED"/>
+		</param:Parameter>
+		
+		<param:Parameter name="antennaLookDirection" value="{eo:antennaLookDirection}">
+			<param:Option label="LEFT" value="L"/>		
+			<param:Option label="RIGHT" value="R"/>		
+		</param:Parameter>
+		
+	<param:Parameter name="query" title="Textual search in the title, abstract of keyword section of the collection.  Surround with double quotes for exact match." value="{searchTerms}"/>
+</Url>
+<Url indexOffset="1" pageOffset="1" rel="results" template="http://geo.spacebel.be/opensearch/request?httpAccept=application%2Fgeo%2Bjson&amp;parentIdentifier=EOP:SSARA&amp;query={searchTerms?}&amp;startDate={time:start?}&amp;endDate={time:end?}&amp;geometry={geo:geometry?}&amp;platform={eo:platform?}&amp;orbitNumber={eo:orbitNumber?}&amp;frame={eo:frame?}&amp;sensorMode={eo:sensorMode?}&amp;swathIdentifier={eo:swathIdentifier?}&amp;orbitDirection={eo:orbitDirection?}&amp;antennaLookDirection={eo:antennaLookDirection?}&amp;polarisationChannels={eo:polarisationChannels?}&amp;processingLevel={eo:processingLevel?}&amp;maximumRecords={count?}&amp;uid={geo:uid?}&amp;name={geo:name?}&amp;lat={geo:lat?}&amp;lon={geo:lon?}&amp;radius={geo:radius?}&amp;bbox={geo:box?}&amp;startRecord={startIndex?}&amp;strict=true" type="application/geo+json">	
+		
+		<param:Parameter maxInclusive="50" minInclusive="0" name="maximumRecords" pattern="[0-9]+" value="{count}"/>
+		<param:Parameter minInclusive="1" name="startRecord" pattern="[0-9]+" value="{startIndex}"/>
+		<param:Parameter minInclusive="1" name="startPage" pattern="[0-9]+" value="{startPage}"/>
+		<param:Parameter name="startDate" pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[\+\-][0-9]{2}:[0-9]{2})$" title="Start date of the time interval to be compared with the data acquisition time." value="{time:start}"/>
+		<param:Parameter name="endDate" pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[\+\-][0-9]{2}:[0-9]{2})$" title="End date of the time interval to be compared with the data acquisition time." value="{time:end}"/>
+		<param:Parameter maxInclusive="90" minInclusive="-90" name="lat" value="{geo:lat}"/>
+		<param:Parameter maxInclusive="180" minInclusive="-180" name="lon" value="{geo:lon}"/>
+		<param:Parameter name="frame" pattern="(\[|\])[0-9]+,[0-9]+(\[|\])|(\[|\])?[0-9]+|[0-9]+(\[|\])?|\{[0-9]+,[0-9]+\}" value="{eo:frame}"/>
+		<param:Parameter name="orbitNumber" pattern="(\[|\])[0-9]+,[0-9]+(\[|\])|(\[|\])?[0-9]+|[0-9]+(\[|\])?|\{[0-9]+,[0-9]+\}" value="{eo:orbitNumber}"/>
+		
+		<param:Parameter name="recordSchema" value="{sru:recordSchema}">
+			<param:Option label="O&amp;M" value="om"/>		
+			<param:Option label="O&amp;M Version 1.1" value="om11"/>		
+		</param:Parameter>
+
+	       
+
+		
+		<param:Parameter name="platform" title="Search by name of the satellite or platform." value="{eo:platform}">
+		    <param:Option label="AIRSAR" value="AIRSAR"/>		
+			<param:Option label="ALOS" value="ALOS"/>	
+            <param:Option label="ALOS_2" value="ALOS_2"/>		
+			<param:Option label="ENVISAT" value="ENVISAT"/>		
+			<param:Option label="ERS-1" value="ERS-1"/>		
+			<param:Option label="ERS-2" value="ERS-2"/>		
+			<param:Option label="JERS-1" value="JERS-1"/>										
+			<param:Option label="RADARSAT-1" value="RADARSAT-1"/>	
+		    <param:Option label="SENTINEL-1" value="SENTINEL-1"/>
+            <param:Option label="SENTINEL-1A" value="SENTINEL-1A"/>
+			<param:Option label="UAVSAR" value="UAVSAR"/>			
+			
+		</param:Parameter>
+		
+		<param:Parameter name="orbitDirection" value="{eo:orbitDirection}">
+			<param:Option label="ASCENDING" value="A"/>					
+			<param:Option label="DESCENDING" value="D"/>					
+		</param:Parameter>
+		
+		<param:Parameter name="processingLevel" value="{eo:processingLevel}">
+			<param:Option label="L0" value="L0"/>		
+			<param:Option label="L1" value="L1"/>					
+			<param:Option label="SLC" value="SLC"/>					
+		</param:Parameter>
+		
+		<param:Parameter name="polarisationChannels" value="{eo:polarisationChannels}">
+			<param:Option label="HH" value="HH"/>		
+			<param:Option label="HV" value="HV"/>		
+			<param:Option label="VH" value="VH"/>		
+			<param:Option label="VV" value="VV"/>		
+			<param:Option label="HH,VV" value="HH,VV"/>		
+			<param:Option label="HH,VH" value="HH,VH"/>		
+			<param:Option label="HH,HV" value="HH,HV"/>		
+			<param:Option label="VH,VV" value="VH,VV"/>		
+			<param:Option label="VH,HV" value="VH,HV"/>		
+			<param:Option label="VV,HV" value="VV,HV"/>		
+			<param:Option label="VV,VH" value="VV,VH"/>		
+			<param:Option label="HV,VH" value="HV,VH"/>		
+			<param:Option label="UNDEFINED" value="UNDEFINED"/>
+		</param:Parameter>
+		
+		<param:Parameter name="antennaLookDirection" value="{eo:antennaLookDirection}">
+			<param:Option label="LEFT" value="L"/>		
+			<param:Option label="RIGHT" value="R"/>		
+		</param:Parameter>
+		
+	<param:Parameter name="query" title="Textual search in the title, abstract of keyword section of the collection.  Surround with double quotes for exact match." value="{searchTerms}"/>
+</Url>
+<Url indexOffset="1" pageOffset="1" rel="results" template="http://geo.spacebel.be/opensearch/request?httpAccept=application%2Frdf%2Bxml%3Bprofile%3Dhttps%3A%2F%2Fjoinup.ec.europa.eu%2Fnode%2F154143%2F&amp;parentIdentifier=EOP:SSARA&amp;query={searchTerms?}&amp;startDate={time:start?}&amp;endDate={time:end?}&amp;geometry={geo:geometry?}&amp;platform={eo:platform?}&amp;orbitNumber={eo:orbitNumber?}&amp;frame={eo:frame?}&amp;sensorMode={eo:sensorMode?}&amp;swathIdentifier={eo:swathIdentifier?}&amp;orbitDirection={eo:orbitDirection?}&amp;antennaLookDirection={eo:antennaLookDirection?}&amp;polarisationChannels={eo:polarisationChannels?}&amp;processingLevel={eo:processingLevel?}&amp;maximumRecords={count?}&amp;uid={geo:uid?}&amp;name={geo:name?}&amp;lat={geo:lat?}&amp;lon={geo:lon?}&amp;radius={geo:radius?}&amp;bbox={geo:box?}&amp;startRecord={startIndex?}&amp;strict=true" type="application/rdf+xml;profile=https://joinup.ec.europa.eu/node/154143/">	
+		
+		<param:Parameter maxInclusive="50" minInclusive="0" name="maximumRecords" pattern="[0-9]+" value="{count}"/>
+		<param:Parameter minInclusive="1" name="startRecord" pattern="[0-9]+" value="{startIndex}"/>
+		<param:Parameter minInclusive="1" name="startPage" pattern="[0-9]+" value="{startPage}"/>
+		<param:Parameter name="startDate" pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[\+\-][0-9]{2}:[0-9]{2})$" title="Start date of the time interval to be compared with the data acquisition time." value="{time:start}"/>
+		<param:Parameter name="endDate" pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[\+\-][0-9]{2}:[0-9]{2})$" title="End date of the time interval to be compared with the data acquisition time." value="{time:end}"/>
+		<param:Parameter maxInclusive="90" minInclusive="-90" name="lat" value="{geo:lat}"/>
+		<param:Parameter maxInclusive="180" minInclusive="-180" name="lon" value="{geo:lon}"/>
+		<param:Parameter name="frame" pattern="(\[|\])[0-9]+,[0-9]+(\[|\])|(\[|\])?[0-9]+|[0-9]+(\[|\])?|\{[0-9]+,[0-9]+\}" value="{eo:frame}"/>
+		<param:Parameter name="orbitNumber" pattern="(\[|\])[0-9]+,[0-9]+(\[|\])|(\[|\])?[0-9]+|[0-9]+(\[|\])?|\{[0-9]+,[0-9]+\}" value="{eo:orbitNumber}"/>
+		
+		<param:Parameter name="recordSchema" value="{sru:recordSchema}">
+			<param:Option label="O&amp;M" value="om"/>		
+			<param:Option label="O&amp;M Version 1.1" value="om11"/>		
+		</param:Parameter>
+
+	       
+
+		
+		<param:Parameter name="platform" title="Search by name of the satellite or platform." value="{eo:platform}">
+		    <param:Option label="AIRSAR" value="AIRSAR"/>		
+			<param:Option label="ALOS" value="ALOS"/>	
+            <param:Option label="ALOS_2" value="ALOS_2"/>		
+			<param:Option label="ENVISAT" value="ENVISAT"/>		
+			<param:Option label="ERS-1" value="ERS-1"/>		
+			<param:Option label="ERS-2" value="ERS-2"/>		
+			<param:Option label="JERS-1" value="JERS-1"/>										
+			<param:Option label="RADARSAT-1" value="RADARSAT-1"/>	
+		    <param:Option label="SENTINEL-1" value="SENTINEL-1"/>
+            <param:Option label="SENTINEL-1A" value="SENTINEL-1A"/>
+			<param:Option label="UAVSAR" value="UAVSAR"/>			
+			
+		</param:Parameter>
+		
+		<param:Parameter name="orbitDirection" value="{eo:orbitDirection}">
+			<param:Option label="ASCENDING" value="A"/>					
+			<param:Option label="DESCENDING" value="D"/>					
+		</param:Parameter>
+		
+		<param:Parameter name="processingLevel" value="{eo:processingLevel}">
+			<param:Option label="L0" value="L0"/>		
+			<param:Option label="L1" value="L1"/>					
+			<param:Option label="SLC" value="SLC"/>					
+		</param:Parameter>
+		
+		<param:Parameter name="polarisationChannels" value="{eo:polarisationChannels}">
+			<param:Option label="HH" value="HH"/>		
+			<param:Option label="HV" value="HV"/>		
+			<param:Option label="VH" value="VH"/>		
+			<param:Option label="VV" value="VV"/>		
+			<param:Option label="HH,VV" value="HH,VV"/>		
+			<param:Option label="HH,VH" value="HH,VH"/>		
+			<param:Option label="HH,HV" value="HH,HV"/>		
+			<param:Option label="VH,VV" value="VH,VV"/>		
+			<param:Option label="VH,HV" value="VH,HV"/>		
+			<param:Option label="VV,HV" value="VV,HV"/>		
+			<param:Option label="VV,VH" value="VV,VH"/>		
+			<param:Option label="HV,VH" value="HV,VH"/>		
+			<param:Option label="UNDEFINED" value="UNDEFINED"/>
+		</param:Parameter>
+		
+		<param:Parameter name="antennaLookDirection" value="{eo:antennaLookDirection}">
+			<param:Option label="LEFT" value="L"/>		
+			<param:Option label="RIGHT" value="R"/>		
+		</param:Parameter>
+		
+	<param:Parameter name="query" title="Textual search in the title, abstract of keyword section of the collection.  Surround with double quotes for exact match." value="{searchTerms}"/>
+</Url>
+<Url indexOffset="1" pageOffset="1" rel="results" template="http://geo.spacebel.be/opensearch/request?httpAccept=text%2Fturtle%3Bprofile%3Dhttps%3A%2F%2Fjoinup.ec.europa.eu%2Fnode%2F154143%2F&amp;parentIdentifier=EOP:SSARA&amp;query={searchTerms?}&amp;startDate={time:start?}&amp;endDate={time:end?}&amp;geometry={geo:geometry?}&amp;platform={eo:platform?}&amp;orbitNumber={eo:orbitNumber?}&amp;frame={eo:frame?}&amp;sensorMode={eo:sensorMode?}&amp;swathIdentifier={eo:swathIdentifier?}&amp;orbitDirection={eo:orbitDirection?}&amp;antennaLookDirection={eo:antennaLookDirection?}&amp;polarisationChannels={eo:polarisationChannels?}&amp;processingLevel={eo:processingLevel?}&amp;maximumRecords={count?}&amp;uid={geo:uid?}&amp;name={geo:name?}&amp;lat={geo:lat?}&amp;lon={geo:lon?}&amp;radius={geo:radius?}&amp;bbox={geo:box?}&amp;startRecord={startIndex?}&amp;strict=true" type="text/turtle;profile=https://joinup.ec.europa.eu/node/154143/">	
+		
+		<param:Parameter maxInclusive="50" minInclusive="0" name="maximumRecords" pattern="[0-9]+" value="{count}"/>
+		<param:Parameter minInclusive="1" name="startRecord" pattern="[0-9]+" value="{startIndex}"/>
+		<param:Parameter minInclusive="1" name="startPage" pattern="[0-9]+" value="{startPage}"/>
+		<param:Parameter name="startDate" pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[\+\-][0-9]{2}:[0-9]{2})$" title="Start date of the time interval to be compared with the data acquisition time." value="{time:start}"/>
+		<param:Parameter name="endDate" pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[\+\-][0-9]{2}:[0-9]{2})$" title="End date of the time interval to be compared with the data acquisition time." value="{time:end}"/>
+		<param:Parameter maxInclusive="90" minInclusive="-90" name="lat" value="{geo:lat}"/>
+		<param:Parameter maxInclusive="180" minInclusive="-180" name="lon" value="{geo:lon}"/>
+		<param:Parameter name="frame" pattern="(\[|\])[0-9]+,[0-9]+(\[|\])|(\[|\])?[0-9]+|[0-9]+(\[|\])?|\{[0-9]+,[0-9]+\}" value="{eo:frame}"/>
+		<param:Parameter name="orbitNumber" pattern="(\[|\])[0-9]+,[0-9]+(\[|\])|(\[|\])?[0-9]+|[0-9]+(\[|\])?|\{[0-9]+,[0-9]+\}" value="{eo:orbitNumber}"/>
+		
+		<param:Parameter name="recordSchema" value="{sru:recordSchema}">
+			<param:Option label="O&amp;M" value="om"/>		
+			<param:Option label="O&amp;M Version 1.1" value="om11"/>		
+		</param:Parameter>
+
+	       
+
+		
+		<param:Parameter name="platform" title="Search by name of the satellite or platform." value="{eo:platform}">
+		    <param:Option label="AIRSAR" value="AIRSAR"/>		
+			<param:Option label="ALOS" value="ALOS"/>	
+            <param:Option label="ALOS_2" value="ALOS_2"/>		
+			<param:Option label="ENVISAT" value="ENVISAT"/>		
+			<param:Option label="ERS-1" value="ERS-1"/>		
+			<param:Option label="ERS-2" value="ERS-2"/>		
+			<param:Option label="JERS-1" value="JERS-1"/>										
+			<param:Option label="RADARSAT-1" value="RADARSAT-1"/>	
+		    <param:Option label="SENTINEL-1" value="SENTINEL-1"/>
+            <param:Option label="SENTINEL-1A" value="SENTINEL-1A"/>
+			<param:Option label="UAVSAR" value="UAVSAR"/>			
+			
+		</param:Parameter>
+		
+		<param:Parameter name="orbitDirection" value="{eo:orbitDirection}">
+			<param:Option label="ASCENDING" value="A"/>					
+			<param:Option label="DESCENDING" value="D"/>					
+		</param:Parameter>
+		
+		<param:Parameter name="processingLevel" value="{eo:processingLevel}">
+			<param:Option label="L0" value="L0"/>		
+			<param:Option label="L1" value="L1"/>					
+			<param:Option label="SLC" value="SLC"/>					
+		</param:Parameter>
+		
+		<param:Parameter name="polarisationChannels" value="{eo:polarisationChannels}">
+			<param:Option label="HH" value="HH"/>		
+			<param:Option label="HV" value="HV"/>		
+			<param:Option label="VH" value="VH"/>		
+			<param:Option label="VV" value="VV"/>		
+			<param:Option label="HH,VV" value="HH,VV"/>		
+			<param:Option label="HH,VH" value="HH,VH"/>		
+			<param:Option label="HH,HV" value="HH,HV"/>		
+			<param:Option label="VH,VV" value="VH,VV"/>		
+			<param:Option label="VH,HV" value="VH,HV"/>		
+			<param:Option label="VV,HV" value="VV,HV"/>		
+			<param:Option label="VV,VH" value="VV,VH"/>		
+			<param:Option label="HV,VH" value="HV,VH"/>		
+			<param:Option label="UNDEFINED" value="UNDEFINED"/>
+		</param:Parameter>
+		
+		<param:Parameter name="antennaLookDirection" value="{eo:antennaLookDirection}">
+			<param:Option label="LEFT" value="L"/>		
+			<param:Option label="RIGHT" value="R"/>		
+		</param:Parameter>
+		
+	<param:Parameter name="query" title="Textual search in the title, abstract of keyword section of the collection.  Surround with double quotes for exact match." value="{searchTerms}"/>
+</Url>
+<Url indexOffset="1" pageOffset="1" rel="results" template="http://geo.spacebel.be/opensearch/request?httpAccept=application%2Fatom%2Bxml&amp;parentIdentifier=EOP:SSARA&amp;query={searchTerms?}&amp;startDate={time:start?}&amp;endDate={time:end?}&amp;geometry={geo:geometry?}&amp;platform={eo:platform?}&amp;orbitNumber={eo:orbitNumber?}&amp;frame={eo:frame?}&amp;sensorMode={eo:sensorMode?}&amp;swathIdentifier={eo:swathIdentifier?}&amp;orbitDirection={eo:orbitDirection?}&amp;antennaLookDirection={eo:antennaLookDirection?}&amp;polarisationChannels={eo:polarisationChannels?}&amp;processingLevel={eo:processingLevel?}&amp;maximumRecords={count?}&amp;uid={geo:uid?}&amp;name={geo:name?}&amp;lat={geo:lat?}&amp;lon={geo:lon?}&amp;radius={geo:radius?}&amp;recordSchema={sru:recordSchema?}&amp;bbox={geo:box?}&amp;startRecord={startIndex?}&amp;strict=true" type="application/atom+xml">	
+		
+		<param:Parameter maxInclusive="50" minInclusive="0" name="maximumRecords" pattern="[0-9]+" value="{count}"/>
+		<param:Parameter minInclusive="1" name="startRecord" pattern="[0-9]+" value="{startIndex}"/>
+		<param:Parameter minInclusive="1" name="startPage" pattern="[0-9]+" value="{startPage}"/>
+		<param:Parameter name="startDate" pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[\+\-][0-9]{2}:[0-9]{2})$" title="Start date of the time interval to be compared with the data acquisition time." value="{time:start}"/>
+		<param:Parameter name="endDate" pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[\+\-][0-9]{2}:[0-9]{2})$" title="End date of the time interval to be compared with the data acquisition time." value="{time:end}"/>
+		<param:Parameter maxInclusive="90" minInclusive="-90" name="lat" value="{geo:lat}"/>
+		<param:Parameter maxInclusive="180" minInclusive="-180" name="lon" value="{geo:lon}"/>
+		<param:Parameter name="frame" pattern="(\[|\])[0-9]+,[0-9]+(\[|\])|(\[|\])?[0-9]+|[0-9]+(\[|\])?|\{[0-9]+,[0-9]+\}" value="{eo:frame}"/>
+		<param:Parameter name="orbitNumber" pattern="(\[|\])[0-9]+,[0-9]+(\[|\])|(\[|\])?[0-9]+|[0-9]+(\[|\])?|\{[0-9]+,[0-9]+\}" value="{eo:orbitNumber}"/>
+		
+		<param:Parameter name="recordSchema" value="{sru:recordSchema}">
+			<param:Option label="O&amp;M" value="om"/>		
+			<param:Option label="O&amp;M Version 1.1" value="om11"/>		
+		</param:Parameter>
+
+	       
+
+		
+		<param:Parameter name="platform" title="Search by name of the satellite or platform." value="{eo:platform}">
+		    <param:Option label="AIRSAR" value="AIRSAR"/>		
+			<param:Option label="ALOS" value="ALOS"/>	
+            <param:Option label="ALOS_2" value="ALOS_2"/>		
+			<param:Option label="ENVISAT" value="ENVISAT"/>		
+			<param:Option label="ERS-1" value="ERS-1"/>		
+			<param:Option label="ERS-2" value="ERS-2"/>		
+			<param:Option label="JERS-1" value="JERS-1"/>										
+			<param:Option label="RADARSAT-1" value="RADARSAT-1"/>	
+		    <param:Option label="SENTINEL-1" value="SENTINEL-1"/>
+            <param:Option label="SENTINEL-1A" value="SENTINEL-1A"/>
+			<param:Option label="UAVSAR" value="UAVSAR"/>			
+			
+		</param:Parameter>
+		
+		<param:Parameter name="orbitDirection" value="{eo:orbitDirection}">
+			<param:Option label="ASCENDING" value="A"/>					
+			<param:Option label="DESCENDING" value="D"/>					
+		</param:Parameter>
+		
+		<param:Parameter name="processingLevel" value="{eo:processingLevel}">
+			<param:Option label="L0" value="L0"/>		
+			<param:Option label="L1" value="L1"/>					
+			<param:Option label="SLC" value="SLC"/>					
+		</param:Parameter>
+		
+		<param:Parameter name="polarisationChannels" value="{eo:polarisationChannels}">
+			<param:Option label="HH" value="HH"/>		
+			<param:Option label="HV" value="HV"/>		
+			<param:Option label="VH" value="VH"/>		
+			<param:Option label="VV" value="VV"/>		
+			<param:Option label="HH,VV" value="HH,VV"/>		
+			<param:Option label="HH,VH" value="HH,VH"/>		
+			<param:Option label="HH,HV" value="HH,HV"/>		
+			<param:Option label="VH,VV" value="VH,VV"/>		
+			<param:Option label="VH,HV" value="VH,HV"/>		
+			<param:Option label="VV,HV" value="VV,HV"/>		
+			<param:Option label="VV,VH" value="VV,VH"/>		
+			<param:Option label="HV,VH" value="HV,VH"/>		
+			<param:Option label="UNDEFINED" value="UNDEFINED"/>
+		</param:Parameter>
+		
+		<param:Parameter name="antennaLookDirection" value="{eo:antennaLookDirection}">
+			<param:Option label="LEFT" value="L"/>		
+			<param:Option label="RIGHT" value="R"/>		
+		</param:Parameter>
+		
+	<param:Parameter name="query" title="Textual search in the title, abstract of keyword section of the collection.  Surround with double quotes for exact match." value="{searchTerms}"/>
+</Url>
+<Url indexOffset="1" pageOffset="1" rel="results" template="http://geo.spacebel.be/opensearch/request?httpAccept=application%2Fsru%2Bxml&amp;parentIdentifier=EOP:SSARA&amp;query={searchTerms?}&amp;startDate={time:start?}&amp;endDate={time:end?}&amp;geometry={geo:geometry?}&amp;platform={eo:platform?}&amp;orbitNumber={eo:orbitNumber?}&amp;frame={eo:frame?}&amp;sensorMode={eo:sensorMode?}&amp;swathIdentifier={eo:swathIdentifier?}&amp;orbitDirection={eo:orbitDirection?}&amp;antennaLookDirection={eo:antennaLookDirection?}&amp;polarisationChannels={eo:polarisationChannels?}&amp;processingLevel={eo:processingLevel?}&amp;maximumRecords={count?}&amp;uid={geo:uid?}&amp;name={geo:name?}&amp;lat={geo:lat?}&amp;lon={geo:lon?}&amp;radius={geo:radius?}&amp;recordSchema={sru:recordSchema?}&amp;bbox={geo:box?}&amp;startRecord={startIndex?}&amp;strict=true" type="application/sru+xml">
+<param:Parameter name="query" title="Textual search in the title, abstract of keyword section of the collection.  Surround with double quotes for exact match." value="{searchTerms}"/>
+</Url>
+<LongName>Earth Observation Catalogue</LongName>
+<Image height="64" type="image/png" width="64">http://geo.spacebel.be/opensearch/images/esa_favicon.ico</Image>
+<Image height="16" type="image/vnd.microsoft.icon" width="16">http://geo.spacebel.be/opensearch/images/esa_favicon.ico</Image>
+<Developer>Spacebel s.a.</Developer>
+<Attribution>Copyright 2017-2018, European Space Agency.</Attribution>
+<SyndicationRight>open</SyndicationRight>
+<AdultContent>false</AdultContent>
+<Language>en-us</Language>
+<OutputEncoding>UTF-8</OutputEncoding>
+<InputEncoding>UTF-8</InputEncoding>
+</OpenSearchDescription>

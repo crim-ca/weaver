@@ -7,7 +7,7 @@ for testing purposes.
 
 import six
 from twitcher.store.base import AccessTokenStore
-from twitcher.exceptions import AccessTokenNotFound
+from twitcher.exceptions import AccessTokenNotFound, ProcessNotFound
 
 
 class MemoryTokenStore(AccessTokenStore):
@@ -167,6 +167,7 @@ class MemoryProcessStore(ProcessStore):
             if not process.title:
                 process.title = sane_name
             self.name_index[sane_name] = process
+        return self.fetch_by_id(sane_name)
 
     def delete_process(self, process_id, request=None):
         """
@@ -201,6 +202,8 @@ class MemoryProcessStore(ProcessStore):
         """
         sane_name = namesgenerator.get_sane_name(process_id)
         process = self.name_index.get(sane_name)
+        if not process:
+            raise ProcessNotFound("Process `{}` could not be found.".format(sane_name))
         return process
 
     def get_visibility(self, process_id, request=None):
