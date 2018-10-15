@@ -597,7 +597,8 @@ class Quote(dict):
             self['expire'] = dtparse(self.get('expire')).isoformat()
         except ValueError:
             raise ValueError("Field `Quote.expire` must be an ISO-8601 datetime string.")
-        self['id'] = str(uuid.uuid4())
+        if 'id' not in self:
+            self['id'] = str(uuid.uuid4())
 
     @property
     def id(self):
@@ -733,7 +734,8 @@ class Bill(dict):
             self['created'] = dtparse(self.get('created')).isoformat()
         except ValueError:
             raise ValueError("Field `Bill.created` must be an ISO-8601 datetime string.")
-        self['id'] = str(uuid.uuid4())
+        if 'id' not in self:
+            self['id'] = str(uuid.uuid4())
 
     @property
     def id(self):
