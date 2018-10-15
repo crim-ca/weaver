@@ -21,9 +21,11 @@ quote_sort_values = frozenset([
     SORT_ID,
     SORT_PROCESS,
     SORT_PRICE,
+    SORT_CREATED,
 ])
 
 bill_sort_values = frozenset([
     SORT_ID,
     SORT_QUOTE,
+    SORT_CREATED,
 ])

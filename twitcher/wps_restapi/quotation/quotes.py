@@ -9,7 +9,9 @@ from twitcher.processes.types import *
 from twitcher.processes.wps_package import get_process_location, get_package_workflow_steps
 from twitcher.utils import get_twitcher_url
 from pyramid.httpexceptions import *
+from pyramid.security import authenticated_userid
 from datetime import timedelta
+from duration import to_iso8601
 import logging
 import random
 
@@ -22,9 +24,9 @@ def process_quote_estimator(process):
     :return: dict of {price, currency, estimatedTime} values for the process quote.
     """
     # TODO: replace by some fancy ml technique or something?
-    price = random.random(0, 10)
+    price = random.uniform(0, 10)
     currency = 'CAD'
-    estimated_time = timedelta(minutes=random.random(5, 60))
+    estimated_time = to_iso8601(timedelta(minutes=random.uniform(5, 60)))
     return {'price': price, 'currency': currency, 'estimatedTime': estimated_time}
 
 
@@ -43,17 +45,20 @@ def request_quote(request):
     process_id = request.matchdict.get('process_id')
     process_store = processstore_factory(request.registry)
     try:
-        process = process_store.fetch_by_id(process_id)
+        process = process_store.fetch_by_id(process_id, request=request)
     except ProcessNotFound:
         raise HTTPNotFound("Could not find process with specified `process_id`.")
 
     process_type = process.type
     store = quotestore_factory(request.registry)
     process_url = get_process_location(process_id, data_source=get_twitcher_url(request.registry.settings))
+    process_quote_info = process_quote_estimator(process)
+    user_id = str(authenticated_userid(request))
 
     # loop workflow sub-process steps to get individual quotes
     if process_type == PROCESS_WORKFLOW and twitcher_config == TWITCHER_CONFIGURATION_EMS:
         workflow_quotes = list()
+
         for step in get_package_workflow_steps(process_url):
             # retrieve quote from provider ADES
             # TODO: data source mapping
@@ -66,15 +71,20 @@ def request_quote(request):
             quote_json = resp_json['quote']
             quote = store.save_quote(Quote(process=quote_json.pop('process'),
                                            price=quote_json.pop('price'),
-                                           location=process_step_url))
+                                           currency=process_quote_info.get('currency'),
+                                           location=process_step_url,
+                                           user=user_id))
             workflow_quotes.append(quote.id)
-        quote = store.save_quote(Quote(process=process.identifier, location=process_url, steps=workflow_quotes,
-                                       **process_quote_estimator(process)))
+        quote = store.save_quote(Quote(process=process.identifier,
+                                       location=process_url,
+                                       steps=workflow_quotes,
+                                       user=user_id,
+                                       **process_quote_info))
         return HTTPCreated(json={"quote": quote.json()})
 
     # single application quotes (ADES or EMS)
     elif process_type == PROCESS_APPLICATION:
-        quote = store.save_quote(Quote(process=process_id, location=process_url), **process_quote_estimator(process))
+        quote = store.save_quote(Quote(process=process_id, location=process_url, user=user_id, **process_quote_info))
         quote_json = quote.json()
         quote_json.pop('steps', None)
         return HTTPCreated(json={"quote": quote_json})
@@ -101,7 +111,7 @@ def get_quote_list(request):
         'sort': request.params.get('sort', sort.SORT_CREATED),
     }
     store = quotestore_factory(request.registry)
-    items, count = store.find_quotes(request, **filters)
+    items, count = store.find_quotes(**filters)
     return HTTPOk(json={
         'count': count,
         'page': page,

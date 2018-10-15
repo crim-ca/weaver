@@ -586,17 +586,17 @@ class Quote(dict):
         elif not isinstance(self.get('currency'), six.string_types) or len(self.get('currency')) != 3:
             raise ValueError("Field `Quote.currency` must be an ISO-4217 currency string code.")
         if 'created' not in self:
-            self['created'] = datetime.now()
+            self['created'] = str(datetime.now())
         try:
             self['created'] = dtparse(self.get('created')).isoformat()
         except ValueError:
-            raise ValueError("Field `Bill.created` must be an ISO-8601 datetime string.")
+            raise ValueError("Field `Quote.created` must be an ISO-8601 datetime string.")
         if 'expire' not in self:
-            self['expire'] = datetime.now() + timedelta(days=1)
+            self['expire'] = str(datetime.now() + timedelta(days=1))
         try:
             self['expire'] = dtparse(self.get('expire')).isoformat()
         except ValueError:
-            raise ValueError("Field `Bill.expire` must be an ISO-8601 datetime string.")
+            raise ValueError("Field `Quote.expire` must be an ISO-8601 datetime string.")
         self['id'] = str(uuid.uuid4())
 
     @property
@@ -728,7 +728,7 @@ class Bill(dict):
         elif not isinstance(self.get('currency'), six.string_types) or len(self.get('currency')) != 3:
             raise ValueError("Field `Bill.currency` must be an ISO-4217 currency string code.")
         if 'created' not in self:
-            raise TypeError("Field `Bill.created` is required")
+            self['created'] = str(datetime.now())
         try:
             self['created'] = dtparse(self.get('created')).isoformat()
         except ValueError:

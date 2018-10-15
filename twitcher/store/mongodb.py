@@ -467,7 +467,7 @@ class MongodbQuoteStore(QuoteStore, MongodbStore):
         if sort is None:
             sort = SORT_ID
         if sort not in quote_sort_values:
-            raise QuoteNotFound("Invalid sorting method: `{}`".format(repr(sort)))
+            raise QuoteNotFound("Invalid sorting method: `{!s}`".format(sort))
 
         sort_order = ASCENDING
         sort_criteria = [(sort, sort_order)]
