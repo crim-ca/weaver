@@ -337,7 +337,7 @@ def replace_inputs_eoimage_files_to_query(inputs, payload, wps_inputs=False):
 
     # add "additionalParameters" property from the payload
     process = payload["processOffering"]["process"]
-    payload_inputs = {i["identifier"]: i for i in process["inputs"]}
+    payload_inputs = {i["identifier"]: i for i in process.get("inputs", {})}
     for i in inputs:
         try:
             i["additionalParameters"] = payload_inputs[i["identifier"]]["additionalParameters"]
