@@ -924,7 +924,7 @@ class PostProcessQuoteRequestEndpoint(MappingSchema):
     process_id = process_id
     quote_id = quote_id
     header = AcceptHeader()
-    body = MappingSchema(default={})
+    body = QuoteProcessParametersSchema()
 
 
 #################################

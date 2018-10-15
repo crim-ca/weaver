@@ -49,11 +49,20 @@ def request_quote(request):
     except ProcessNotFound:
         raise HTTPNotFound("Could not find process with specified `process_id`.")
 
-    process_type = process.type
     store = quotestore_factory(request.registry)
     process_url = get_process_location(process_id, data_source=get_twitcher_url(request.registry.settings))
+    process_type = process.type
+    process_params = dict()
+    for param in ['inputs', 'outputs', 'mode', 'response']:
+        if param in request.json:
+            process_params[param] = request.json.pop(param)
     process_quote_info = process_quote_estimator(process)
-    user_id = str(authenticated_userid(request))
+    process_quote_info.update({
+        'process': process_id,
+        'processParameters': process_params,
+        'location': process_url,
+        'user': str(authenticated_userid(request))
+    })
 
     # loop workflow sub-process steps to get individual quotes
     if process_type == PROCESS_WORKFLOW and twitcher_config == TWITCHER_CONFIGURATION_EMS:
@@ -69,22 +78,16 @@ def request_quote(request):
             subreq.path_info = process_quote_url
             resp_json = request.invoke_subrequest(subreq).json()
             quote_json = resp_json['quote']
-            quote = store.save_quote(Quote(process=quote_json.pop('process'),
-                                           price=quote_json.pop('price'),
-                                           currency=process_quote_info.get('currency'),
-                                           location=process_step_url,
-                                           user=user_id))
+            quote = store.save_quote(Quote(**quote_json))
             workflow_quotes.append(quote.id)
-        quote = store.save_quote(Quote(process=process.identifier,
-                                       location=process_url,
-                                       steps=workflow_quotes,
-                                       user=user_id,
-                                       **process_quote_info))
+
+        process_quote_info.update({'steps': workflow_quotes})
+        quote = store.save_quote(Quote(**process_quote_info))
         return HTTPCreated(json={"quote": quote.json()})
 
     # single application quotes (ADES or EMS)
     elif process_type == PROCESS_APPLICATION:
-        quote = store.save_quote(Quote(process=process_id, location=process_url, user=user_id, **process_quote_info))
+        quote = store.save_quote(Quote(**process_quote_info))
         quote_json = quote.json()
         quote_json.pop('steps', None)
         return HTTPCreated(json={"quote": quote_json})
@@ -145,12 +148,17 @@ def execute_quote(request):
     """
     Execute a quoted process.
     """
-    quote = get_quote_info(request)
+    quote_info = get_quote_info(request).json['quote']
+    quote_bill_info = {
+        'quote': quote_info.get('id'),
+        'price': quote_info.get('price'),
+        'currency': quote_info.get('currency')
+    }
     job_resp = submit_local_job(request)
-    job_json = job_resp.json()
+    job_json = job_resp.json
     job_id = job_json.get('jobID')
-    user_id = request.authenticated_userid
+    user_id = str(authenticated_userid(request))
     store = billstore_factory(request.registry)
-    bill = store.save_bill(Bill(user=user_id, quote=quote.id, job=job_id, price=quote.price, currency=quote.currency))
+    bill = store.save_bill(Bill(user=user_id, job=job_id, **quote_bill_info))
     job_json.update({"bill": bill.id})
     return HTTPCreated(json=job_json)
