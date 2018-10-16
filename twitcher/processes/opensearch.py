@@ -12,6 +12,8 @@ import shapely.wkt
 from typing import Iterable, Dict, Tuple, List, Deque
 import logging
 
+from twitcher.processes.wps_process import OPENSEARCH_LOCAL_FILE_SCHEME
+
 LOGGER = logging.getLogger("PACKAGE")
 
 
@@ -47,7 +49,7 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_ids, osdd_url):
 
                 for link in os.query_datasets(params):
                     new_input = deepcopy(queue[0])
-                    new_input.data = "opensearch_" + link
+                    new_input.data = replace_with_opensearch_scheme(link)
                     eoimages_queue.append(new_input)
 
         # todo: we take the first one for now, change to handle non unique aoi and toi
@@ -87,8 +89,14 @@ def query_eo_images_from_inputs(inputs, eoimage_ids, osdd_url):
             os = OpenSearchQuery(collection_identifier=value, osdd_url=osdd_url)
 
             for link in os.query_datasets(params):
-                inputs.append((id_, "opensearch_" + link))
+                link = replace_with_opensearch_scheme(link)
+                inputs.append((id_, link))
     return inputs
+
+
+def replace_with_opensearch_scheme(link):
+    link_without_scheme = link[link.find(":"):]
+    return "{}{}".format(OPENSEARCH_LOCAL_FILE_SCHEME, link_without_scheme)
 
 
 def load_wkt(wkt):

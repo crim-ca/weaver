@@ -947,9 +947,9 @@ class Package(Process):
             try:
                 self.update_status("Running package ...", PACKAGE_PROGRESS_RUN_CWL)
 
-                # TODO Inputs starting with file:// will be interpreted as ems local files
-                #      If OpenSearch obtain file:// references that must be passed to the ADES use an uri starting
-                #      with OPENSEARCH_LOCAL_FILE_SCHEME://
+                # Inputs starting with file:// will be interpreted as ems local files
+                # If OpenSearch obtain file:// references that must be passed to the ADES use an uri starting
+                # with OPENSEARCH_LOCAL_FILE_SCHEME://
                 result = self.package_inst(**cwl_inputs)
                 self.update_status("Package execution done.", PACKAGE_PROGRESS_CWL_DONE)
             except Exception as exc:
