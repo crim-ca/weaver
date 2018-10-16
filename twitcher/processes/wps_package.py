@@ -911,7 +911,8 @@ class Package(Process):
                 # identify EOimages from payload
                 eoimage_ids = opensearch.get_eoimages_ids_from_payload(self.payload)
                 # if applicable, query EOImages
-                request.inputs = opensearch.query_eo_images_from_wps_inputs(request.inputs, eoimage_ids)
+                osdd_url = registry.settings['twitcher.opensearch_url']
+                request.inputs = opensearch.query_eo_images_from_wps_inputs(request.inputs, eoimage_ids, osdd_url)
 
                 cwl_inputs = dict()
                 for input_id in request.inputs:

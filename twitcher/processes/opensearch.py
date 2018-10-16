@@ -15,8 +15,8 @@ import logging
 LOGGER = logging.getLogger("PACKAGE")
 
 
-def query_eo_images_from_wps_inputs(wps_inputs, eoimage_ids):
-    # type: (Dict[str, Deque], Iterable) -> Dict[str, Deque]
+def query_eo_images_from_wps_inputs(wps_inputs, eoimage_ids, osdd_url):
+    # type: (Dict[str, Deque], Iterable, str) -> Dict[str, Deque]
     """Query OpenSearch using parameters in inputs and return file links.
 
     eoimage_ids is used to identify if a certain input is an eoimage.
@@ -43,7 +43,7 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_ids):
                     "endDate": pop_first_input("endDate")[0].data,
                     "bbox": bbox_str,
                 }
-                os = OpenSearchQuery(osdd_url=queue[0].data)
+                os = OpenSearchQuery(collection_identifier=queue[0].data, osdd_url=osdd_url)
 
                 for link in os.query_datasets(params):
                     new_input = deepcopy(queue[0])
@@ -56,8 +56,8 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_ids):
     return new_inputs
 
 
-def query_eo_images_from_inputs(inputs, eoimage_ids):
-    # type: (List[Tuple[str, str]], Iterable) -> List[Tuple[str, str]]
+def query_eo_images_from_inputs(inputs, eoimage_ids, osdd_url):
+    # type: (List[Tuple[str, str]], Iterable, str) -> List[Tuple[str, str]]
     """Query OpenSearch using parameters in inputs and return file links.
 
     eoimage_ids is used to identify if a certain input is an eoimage.
@@ -84,7 +84,7 @@ def query_eo_images_from_inputs(inputs, eoimage_ids):
                 "endDate": pop_first_input("endDate"),
                 "bbox": bbox_str,
             }
-            os = OpenSearchQuery(osdd_url=value)
+            os = OpenSearchQuery(collection_identifier=value, osdd_url=osdd_url)
 
             for link in os.query_datasets(params):
                 inputs.append((id_, "opensearch_" + link))
@@ -98,22 +98,25 @@ def load_wkt(wkt):
 
 
 class OpenSearchQuery(object):
-    def __init__(self, osdd_url, osdd_base=None):
+    def __init__(self,
+                 collection_identifier,  # type: str
+                 osdd_url,  # type: str
+                 catalog_search_field="parentIdentifier"  # type: str
+                 ):
         """
-        :param osdd_url: url or collection id for the OpenSearch Description Document
-        :param osdd_base: base url, defaults to "http://geo.spacebel.be/opensearch/description.xml"  # todo: change
+        :param collection_identifier: Collection ID to query
+        :param osdd_url: Global OSDD url for opensearch queries.
+        :param catalog_search_field: Name of the field for the collection identifier.
         """
-        try:
-            osdd_base, query = osdd_url.split("?", 1)
-        except ValueError:
-            # maybe the collection ID was passed?
-            if osdd_base is None:
-                osdd_base = "http://geo.spacebel.be/opensearch/description.xml"
-            query = "parentIdentifier=%s" % osdd_url
-        self.osdd_url = osdd_base
-        self.params = dict(urlparse.parse_qsl(query))
-
-        self.params["httpAccept"] = "application/geo+json"
+        self.collection_identifier = collection_identifier
+        self.osdd_url = osdd_url
+        self.params = {
+            catalog_search_field: collection_identifier,
+            "httpAccept": "application/geo+json",
+        }
+        # validate inputs
+        if any(c in "/?" for c in collection_identifier):
+            raise ValueError("Invalid collection identifier: {}".format(collection_identifier))
 
     def get_template_url(self):
         r = requests.get(self.osdd_url, params=self.params)

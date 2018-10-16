@@ -21,6 +21,8 @@ from twitcher.processes import opensearch
 from twitcher.store import DB_MEMORY, MemoryProcessStore
 from twitcher.wps_restapi.processes import processes
 
+OSDD_URL = "http://dummy.com"
+
 
 def assert_json_equals(json1, json2):
     def ordered_json(obj):
@@ -139,7 +141,7 @@ def test_transform_execute_parameters(opensearch_process):
     opensearch.OpenSearchQuery.query_datasets = mock.MagicMock()
     opensearch.OpenSearchQuery.query_datasets.return_value = mocked_query
 
-    transformed = opensearch.query_eo_images_from_inputs(inputs, eoimage_ids)
+    transformed = opensearch.query_eo_images_from_inputs(inputs, eoimage_ids, OSDD_URL)
 
     assert transformed == expected
 
@@ -177,7 +179,7 @@ def test_transform_execute_parameters_wps(opensearch_process):
     opensearch.OpenSearchQuery.query_datasets = mock.MagicMock()
     opensearch.OpenSearchQuery.query_datasets.return_value = mocked_query
 
-    transformed = opensearch.query_eo_images_from_wps_inputs(inputs, eoimage_ids)
+    transformed = opensearch.query_eo_images_from_wps_inputs(inputs, eoimage_ids, OSDD_URL)
 
     def compare(items):
         return sorted([(k, [v.data for v in values]) for k, values in items.items()])
