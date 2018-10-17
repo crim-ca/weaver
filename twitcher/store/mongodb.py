@@ -225,6 +225,9 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         Removes process from database.
         """
         sane_name = namesgenerator.get_sane_name(process_id)
+        process = self.collection.find_one({'identifier': sane_name})
+        if not process:
+            raise ProcessNotFound("Process `{}` could not be found.".format(sane_name))
         return bool(self.collection.delete_one({'identifier': sane_name}).deleted_count)
 
     def list_processes(self, visibility=None, request=None):
