@@ -988,13 +988,13 @@ class Package(Process):
                          in our case input are expected to be File object
         """
 
-        # TODO get the input being an EOData
-        eodata_inputs = ['files', 'source_product']
+        step_process_url = get_process_location(self.step_packages[step_id])
+        step_payload = _get_process_payload(step_process_url)
 
         try:
             # Presume that all EOImage given as input can be resolved to the same ADES
             # So if we got multiple inputs or multiple values for an input, we take the first one as reference
-            eodata_inputs = filter(lambda input: input in joborder, eodata_inputs)
+            eodata_inputs = opensearch.get_eoimages_ids_from_payload(step_payload)
             value = joborder[eodata_inputs[0]]
 
             if isinstance(value, list):
