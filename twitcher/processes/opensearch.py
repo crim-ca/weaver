@@ -211,11 +211,11 @@ def get_additional_parameters(input_data):
 class EOImageDescribeProcessHandler(object):
     def __init__(self, inputs):
         # type: (List[Dict]) -> None
-        self.eoimage_inputs = list(filter(self.is_oeimage_input, inputs))
-        self.other_inputs = list(ifilterfalse(self.is_oeimage_input, inputs))
+        self.eoimage_inputs = list(filter(self.is_eoimage_input, inputs))
+        self.other_inputs = list(ifilterfalse(self.is_eoimage_input, inputs))
 
     @staticmethod
-    def is_oeimage_input(input_data):
+    def is_eoimage_input(input_data):
         # type: (Dict) -> bool
         for name, value in get_additional_parameters(input_data):
             # TODO EOImage value is now a list: Tests should be updated accordingly
@@ -338,7 +338,7 @@ class EOImageDescribeProcessHandler(object):
 
 def get_eoimages_inputs_from_payload(payload):
     inputs = payload["processDescription"]["process"].get("inputs", {})
-    return list(filter(EOImageDescribeProcessHandler.is_oeimage_input, inputs))
+    return list(filter(EOImageDescribeProcessHandler.is_eoimage_input, inputs))
 
 
 def get_eoimages_ids_from_payload(payload):
