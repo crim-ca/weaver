@@ -449,20 +449,21 @@ def add_local_process(request):
     # use deepcopy of body payload to avoid circular dependencies when writing to mongodb
     # and before parsing it because the body is altered by some pop operations
     payload = deepcopy(body)
-    if 'processOffering' not in body:
-        raise HTTPBadRequest("Missing required parameter 'processOffering'.")
-    process_offering = body.get('processOffering')
-    if not isinstance(process_offering, dict):
-        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering'.")
-    process_info = process_offering.get('process')
+
+    if 'processDescription' not in body:
+        raise HTTPBadRequest("Missing required parameter 'processDescription'.")
+    process_description = body.get('processDescription')
+    if not isinstance(process_description, dict):
+        raise HTTPUnprocessableEntity("Invalid parameter 'processDescription'.")
+    process_info = process_description.get('process')
     if not isinstance(process_info, dict):
         raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process'.")
-    if not isinstance(process_info.get('identifier'), string_types):
+    if not isinstance(get_any_id(process_info), string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process.identifier'.")
-    process_info['identifier'] = get_sane_name(process_info.get('identifier'))
+    process_info['identifier'] = get_sane_name(get_any_id(process_info))
 
     # retrieve CWL package definition, either via owsContext or executionUnit package/reference
-    deployment_profile = body.get('deploymentProfile')
+    deployment_profile = body.get('deploymentProfileName')
     ows_context = process_info.pop('owsContext', None)
     if isinstance(ows_context, dict):
         offering = ows_context.get('offering')
@@ -473,12 +474,15 @@ def add_local_process(request):
             raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.owsContext.offering.content'.")
         package = None
         reference = content.get('href')
-    elif isinstance(deployment_profile, dict):
-        execution_unit = deployment_profile.get('executionUnit')
-        if not isinstance(execution_unit, dict):
-            raise HTTPUnprocessableEntity("Invalid parameter 'deploymentProfile.executionUnit'.")
-        package = execution_unit.get('package')
-        reference = execution_unit.get('reference')
+    elif deployment_profile.endswith('workflow'):
+        execution_units = body.get('executionUnit')
+        if not isinstance(execution_units, list):
+            raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
+        for execution_unit in execution_units:
+            if not isinstance(execution_unit, dict):
+                raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
+            package = execution_unit.get('unit')
+            reference = execution_unit.get('href')
     else:
         raise HTTPBadRequest("Missing one of required parameters [owsContext, deploymentProfile].")
 

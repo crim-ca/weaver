@@ -523,6 +523,8 @@ def _json2wps_io(io_info, io_select):
             io_info.pop('data_type', None)
             if 'supported_formats' not in io_info:
                 io_info['supported_formats'] = [Format(mime_type="text/plain")]
+            if ('max_occurs', 'unbounded') in io_info.items():
+                io_info['max_occurs'] = PACKAGE_ARRAY_MAX_SIZE
             return ComplexInput(**io_info)
         if io_type == WPS_BOUNDINGBOX:
             return BoundingBoxInput(**io_info)

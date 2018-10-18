@@ -205,7 +205,8 @@ class EOImageDescribeProcessHandler(object):
     def is_oeimage_input(input_data):
         # type: (Dict) -> bool
         for name, value in get_additional_parameters(input_data):
-            if name.upper() == "EOIMAGE" and value.upper() == "TRUE":
+            # TODO EOImage value is now a list: Tests should be updated accordingly
+            if name.upper() == "EOIMAGE" and value[0].upper() == "TRUE":
                 return True
         return False
 
