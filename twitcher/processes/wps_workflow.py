@@ -32,7 +32,7 @@ from pyramid_celery import celery_app as app
 LOGGER = logging.getLogger(__name__)
 DEFAULT_TMP_PREFIX = "tmp"
 
-# TODO: The code started as a copy of the class CommandLineTool, and still has useless code in the context of a WPS workflow
+# TODO: The code started as a copy of the class cwltool/command_line_tool.py, and still has useless code in the context of a WPS workflow
 
 def default_make_tool(toolpath_object,  #type: Dict[Text, Any]
                       loadingContext,  #type: LoadingContext
@@ -95,10 +95,10 @@ class WpsWorkflow(Process):
 
         jobname = uniquename(runtimeContext.name or shortname(self.tool.get("id", "job")))
 
-
         registry = app.conf['PYRAMID_REGISTRY']
         twitcher_output_path = registry.settings.get('twitcher.wps_output_path')
 
+        # outdir must be served by the EMS because downstream step will need access to upstream steps output
         runtimeContext.outdir = tempfile.mkdtemp(
             prefix=getdefault(runtimeContext.tmp_outdir_prefix, DEFAULT_TMP_PREFIX),
             dir=twitcher_output_path)
@@ -114,7 +114,11 @@ class WpsWorkflow(Process):
         wps_workflow_job.temporaryFailCodes = self.tool.get("temporaryFailCodes")
         wps_workflow_job.permanentFailCodes = self.tool.get("permanentFailCodes")
 
-        builder.requirements = wps_workflow_job.requirements
+        # TODO Taken from command_line_tool.py maybe this could let us use the revmap if required at all
+        # reffiles = copy.deepcopy(builder.files)
+        # builder.pathmapper = self.make_path_mapper(
+        #     reffiles, builder.stagedir, runtimeContext, True)
+        # builder.requirements = wps_workflow_job.requirements
 
         wps_workflow_job.outdir = builder.outdir
         wps_workflow_job.tmpdir = builder.tmpdir
