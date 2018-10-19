@@ -993,7 +993,7 @@ class Package(Process):
         try:
             # Presume that all EOImage given as input can be resolved to the same ADES
             # So if we got multiple inputs or multiple values for an input, we take the first one as reference
-            eodata_inputs = filter(lambda input: input in data_source, eodata_inputs)
+            eodata_inputs = filter(lambda input: input in joborder, eodata_inputs)
             value = joborder[eodata_inputs[0]]
 
             if isinstance(value, list):

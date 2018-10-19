@@ -82,14 +82,15 @@ class WpsProcess(object):
 
 
         execute_body = dict(inputs=execute_body_inputs)
-        response = requests.post(self.url + process_jobs_uri.format(process_id=self.process_id),
+        request_url = self.url + process_jobs_uri.format(process_id=self.process_id)
+        response = requests.post(request_url,
                                  json=execute_body,
                                  headers=self.headers,
                                  cookies=self.cookies,
                                  verify=self.verify)
         response.raise_for_status()
         if response.status_code != 201:
-            response.raise_for_status()
+            raise Exception('Was expecting a 201 status code from the execute request : {0}'.format(request_url))
         job_id = response.json()['jobID']
         job_status = response.json()
 
@@ -100,7 +101,6 @@ class WpsProcess(object):
 
         if job_status['status'] != status.STATUS_SUCCEEDED:
             LOGGER.exception("Monitoring job {job} : [{status}] {message}".format(job=job_id, **job_status))
-            # TODO Error doesn't raise properly we only got  "Process failed, please check server error log"
             raise Exception(job_status)
 
         results = self.get_job_results(job_id)
