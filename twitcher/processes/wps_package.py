@@ -871,21 +871,16 @@ class Package(Process):
             self.update_status("Launching package ...", 2)
 
             registry = app.conf['PYRAMID_REGISTRY']
-
-            # TODO Remove ades stub
-            stub_ades_process = False
             if get_twitcher_configuration(registry.settings) == TWITCHER_CONFIGURATION_EMS:
                 # EMS dispatch the execution to the ADES
                 loading_context = LoadingContext()
                 make_tool = lambda toolpath_object, loadingContext: self.make_tool(toolpath_object, loadingContext)
                 loading_context.construct_tool_object = make_tool
-                runtime_context = RuntimeContext(kwargs={'no_read_only': True, 'rm_tmpdir': False})
             else:
                 # ADES execute the cwl locally
                 loading_context = None
-                runtime_context = RuntimeContext(kwargs={'no_read_only': True})
-                stub_ades_process = True
 
+            runtime_context = RuntimeContext(kwargs={'no_read_only': True, 'outdir': self.workdir})
             try:
                 self.package_inst, _, self.step_packages = _load_package_content(self.package,
                                                                                  package_name=self.package_id,
@@ -942,16 +937,11 @@ class Package(Process):
 
             try:
                 self.update_status("Running package ...", WORKFLOW_PROGRESS_START)
-                if stub_ades_process:
-                    result = {}
-                    for output in request.outputs:
-                        result[output] = dict(location='file:///home/byrnsda/ogc/testbed14/application-packages/stacker_output.dim.zip')
-                        #result[output]= dict(location='http://10.30.90.187:8090/wpsoutputs/ogc/stacker_output.dim.zip')
-                else:
-                    # TODO Inputs starting with file:// will be interpreted as ems local files
-                    #      If OpenSearch obtain file:// references that must be passed to the ADES use an uri starting
-                    #      with OPENSEARCH_LOCAL_FILE_SCHEME://
-                    result = self.package_inst(**cwl_inputs)
+
+                # TODO Inputs starting with file:// will be interpreted as ems local files
+                #      If OpenSearch obtain file:// references that must be passed to the ADES use an uri starting
+                #      with OPENSEARCH_LOCAL_FILE_SCHEME://
+                result = self.package_inst(**cwl_inputs)
                 self.update_status("Package execution done.", WORKFLOW_PROGRESS_END)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed package execution.")
@@ -998,11 +988,9 @@ class Package(Process):
             data_source = get_data_source_from_url(eodata_input_url)
 
             # Presume that steps are launched sequentially and have the same progress weight
-            progress_estimate = float(len(self.step_launched)) / len(self.step_packages)
+            progress_estimate = float(len(self.step_launched)) / max(1, len(self.step_packages))
             progress_estimate *= (WORKFLOW_PROGRESS_END - WORKFLOW_PROGRESS_START) # Map progress on workflow range
             progress_estimate += WORKFLOW_PROGRESS_START # Add the workflow start offset
-
-            self.update_status("Launching step {0} on {1}.".format(step_id, data_source), progress_estimate)
 
             url = retrieve_data_source_url(data_source)
         except (IndexError, KeyError) as exc:
@@ -1010,10 +998,21 @@ class Package(Process):
 
         self.step_launched.append(step_id)
 
-        step_process_url = get_process_location(self.step_packages[step_id])
-        step_payload = _get_process_payload(step_process_url)
+        if step_id == self.package_id:
+            # A step is the package itself only for non-workflow package being executed on the EMS
+            # and needing ADES dispatching
+            step_payload = self.payload
+            process_id = self.package_id
+            self.update_status("Launching {0} on {1}.".format(self.package_id, data_source), progress_estimate)
+        else:
+            # TODO Find a way to retreive the ADES job id and append it in the EMS workflow job
+            # Here we got a step part of a workflow (self is the workflow package)
+            step_process_url = get_process_location(self.step_packages[step_id])
+            step_payload = _get_process_payload(step_process_url)
+            process_id = self.step_packages[step_id]
+            self.update_status("Launching step {0} on {1}.".format(step_id, data_source), progress_estimate)
         return WpsProcess(url=url,
-                          process_id=self.step_packages[step_id],
+                          process_id=process_id,
                           deploy_body=step_payload,
                           cookies=self.request.http_request.cookies)
 

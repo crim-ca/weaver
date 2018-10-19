@@ -96,3 +96,4 @@ response.varfile
 
 # process results
 *.tif
+*.zip
