@@ -26,7 +26,8 @@ from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import check_status
 from twitcher.visibility import VISIBILITY_PUBLIC, visibility_values
-from twitcher.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_FINISHED, STATUS_RUNNING, job_status_values
+from twitcher.status import STATUS_ACCEPTED, STATUS_STARTED, STATUS_FAILED, STATUS_SUCCEEDED, STATUS_RUNNING
+from twitcher.status import job_status_values
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference
 from owslib.util import clean_ows_url
 from lxml import etree
@@ -130,6 +131,8 @@ def _jsonify_output(output, datatype):
 
 def _map_status(wps_execution_status):
     job_status = wps_execution_status.lower().replace('process', '')
+    if job_status == 'running':  # OGC official status but not supported by PyWPS. See twitcher/status.py
+        job_status = STATUS_STARTED # This is the status used by PyWPS
     if job_status in job_status_values:
         return job_status
     return 'unknown'
@@ -171,6 +174,10 @@ def execute_process(self, url, service, process_id, inputs,
                 process_value = get_any_value(process_input)
                 # in case of array inputs, must repeat (id,value)
                 input_values = process_value if isinstance(process_value, list) else [process_value]
+
+                # we need to support file:// scheme but PyWPS doesn't like them so remove the scheme file://
+                input_values = [val[7:] if val.startswith('file://') else val for val in input_values]
+
                 # need to use ComplexDataInput structure for complex input
                 wps_inputs.extend([(input_id,
                                     ComplexDataInput(input_value) if input_id in complex_inputs else input_value)
@@ -179,6 +186,7 @@ def execute_process(self, url, service, process_id, inputs,
             wps_inputs = []
 
         # identify EOimages from payload
+        # TODO payload may be missing (process hello)
         payload = processstore_factory(registry).fetch_by_id(process_id).payload
         eoimage_ids = opensearch.get_eoimages_ids_from_payload(payload)
         # if applicable, query EOImages
@@ -196,7 +204,7 @@ def execute_process(self, url, service, process_id, inputs,
         if not execution.process and execution.errors:
             raise execution.errors[0]
 
-        job.status = STATUS_RUNNING
+        job.status = STATUS_STARTED
         job.status_message = execution.statusMessage or "{} initiation done.".format(str(job))
         job.status_location = execution.statusLocation
         job.request = execution.request
@@ -223,7 +231,7 @@ def execute_process(self, url, service, process_id, inputs,
                     job.is_finished()
                     if execution.isSucceded():
                         job.progress = 100
-                        job.status = STATUS_FINISHED
+                        job.status = STATUS_SUCCEEDED
                         job.status_message = execution.statusMessage or "Job succeeded."
                         job.save_log(logger=task_logger)
 
@@ -246,7 +254,7 @@ def execute_process(self, url, service, process_id, inputs,
                 job.save_log(errors=execution.errors, logger=task_logger)
                 sleep(1)
             else:
-                job.status_message = "Update {} ...".format(str(job))
+                #job.status_message = "Update {} ...".format(str(job))
                 job.save_log(logger=task_logger)
                 num_retries = 0
                 run_step += 1
@@ -436,38 +444,44 @@ def add_local_process(request):
     """
     # validate minimum field requirements
     body = request.json
+
     # use deepcopy of body payload to avoid circular dependencies when writing to mongodb
+    # and before parsing it because the body is altered by some pop operations
     payload = deepcopy(body)
-    if 'processOffering' not in body:
-        raise HTTPBadRequest("Missing required parameter 'processOffering'.")
-    process_offering = body.get('processOffering')
-    if not isinstance(process_offering, dict):
-        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering'.")
-    process_info = process_offering.get('process')
+
+    if 'processDescription' not in body:
+        raise HTTPBadRequest("Missing required parameter 'processDescription'.")
+    process_description = body.get('processDescription')
+    if not isinstance(process_description, dict):
+        raise HTTPUnprocessableEntity("Invalid parameter 'processDescription'.")
+    process_info = process_description.get('process')
     if not isinstance(process_info, dict):
-        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process'.")
-    if not isinstance(process_info.get('identifier'), string_types):
-        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process.identifier'.")
-    process_info['identifier'] = get_sane_name(process_info.get('identifier'))
+        raise HTTPUnprocessableEntity("Invalid parameter 'processDescription.process'.")
+    if not isinstance(get_any_id(process_info), string_types):
+        raise HTTPUnprocessableEntity("Invalid parameter 'processDescription.process.identifier'.")
+    process_info['identifier'] = get_sane_name(get_any_id(process_info))
 
     # retrieve CWL package definition, either via owsContext or executionUnit package/reference
-    deployment_profile = body.get('deploymentProfile')
+    deployment_profile = body.get('deploymentProfileName')
     ows_context = process_info.pop('owsContext', None)
     if isinstance(ows_context, dict):
         offering = ows_context.get('offering')
         if not isinstance(offering, dict):
-            raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.owsContext.offering'.")
+            raise HTTPUnprocessableEntity("Invalid parameter 'processDescription.process.owsContext.offering'.")
         content = offering.get('content')
         if not isinstance(content, dict):
-            raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.owsContext.offering.content'.")
+            raise HTTPUnprocessableEntity("Invalid parameter 'processDescription.process.owsContext.offering.content'.")
         package = None
         reference = content.get('href')
-    elif isinstance(deployment_profile, dict):
-        execution_unit = deployment_profile.get('executionUnit')
-        if not isinstance(execution_unit, dict):
-            raise HTTPUnprocessableEntity("Invalid parameter 'deploymentProfile.executionUnit'.")
-        package = execution_unit.get('package')
-        reference = execution_unit.get('reference')
+    elif deployment_profile.endswith('workflow'):
+        execution_units = body.get('executionUnit')
+        if not isinstance(execution_units, list):
+            raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
+        for execution_unit in execution_units:
+            if not isinstance(execution_unit, dict):
+                raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
+            package = execution_unit.get('unit')
+            reference = execution_unit.get('href')
     else:
         raise HTTPBadRequest("Missing one of required parameters [owsContext, deploymentProfile].")
 
@@ -507,6 +521,7 @@ def get_local_process(request):
     """
     Get a registered local process information (DescribeProcess).
     """
+
     process_id = request.matchdict.get('process_id')
     if not isinstance(process_id, string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
@@ -515,10 +530,13 @@ def get_local_process(request):
         process = store.fetch_by_id(process_id, request=request)
         process_json = process.json()
 
-        process_json["inputs"] = opensearch.replace_inputs_eoimage_files_to_query(process_json["inputs"],
-                                                                                  process["payload"],
-                                                                                  wps_inputs=True)
-
+        try:
+            process_json["inputs"] = opensearch.replace_inputs_eoimage_files_to_query(process_json["inputs"],
+                                                                                      process["payload"],
+                                                                                      wps_inputs=True)
+        # Process may not have a payload... in this case no eoimage inputs anyway
+        except KeyError:
+            pass
         return HTTPOk(json={'process': process_json})
     except HTTPException:
         raise  # re-throw already handled HTTPException
@@ -552,6 +570,16 @@ def get_local_process_package(request):
     """
     process = get_process(request)
     return HTTPOk(json=process.package or {})
+
+
+@sd.process_payload_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer='json',
+                                schema=sd.ProcessPayloadEndpoint(), response_schemas=sd.get_process_payload_responses)
+def get_local_process_payload(request):
+    """
+    Get a registered local process payload definition.
+    """
+    process = get_process(request)
+    return HTTPOk(json=process.payload or {})
 
 
 @sd.process_visibility_service.get(tags=[sd.processes_tag, sd.visibility_tag], renderer='json',

@@ -1,6 +1,8 @@
 from collections import deque
 from copy import deepcopy
 from itertools import ifilterfalse
+from twitcher.utils import get_any_id
+from pyramid.settings import asbool
 
 import lxml.etree
 import requests
@@ -189,9 +191,9 @@ def get_additional_parameters(input_data):
             if key == "parameters":
                 for param in value:
                     name = param.get("name", "")
-                    value = param.get("value", "")
+                    values = param.get("values", [])
                     if name:
-                        output.append((name, value))
+                        output.append((name, values))
     return output
 
 
@@ -205,7 +207,8 @@ class EOImageDescribeProcessHandler(object):
     def is_oeimage_input(input_data):
         # type: (Dict) -> bool
         for name, value in get_additional_parameters(input_data):
-            if name.upper() == "EOIMAGE" and value.upper() == "TRUE":
+            # TODO EOImage value is now a list: Tests should be updated accordingly
+            if name.upper() == "EOIMAGE" and value and asbool(value[0]):
                 return True
         return False
 
@@ -271,7 +274,7 @@ class EOImageDescribeProcessHandler(object):
         if not self.eoimage_inputs:
             return self.other_inputs
 
-        eoimage_names = [i.get('id', i.get('identifier')) for i in self.eoimage_inputs]
+        eoimage_names = [get_any_id(i) for i in self.eoimage_inputs]
         allowed_collections = [self.get_allowed_collections(i) for i in self.eoimage_inputs]
 
         toi = []
@@ -323,12 +326,12 @@ class EOImageDescribeProcessHandler(object):
 
 
 def get_eoimages_inputs_from_payload(payload):
-    inputs = payload["processOffering"]["process"].get("inputs", {})
+    inputs = payload["processDescription"]["process"].get("inputs", {})
     return list(filter(EOImageDescribeProcessHandler.is_oeimage_input, inputs))
 
 
 def get_eoimages_ids_from_payload(payload):
-    return [i["identifier"] for i in get_eoimages_inputs_from_payload(payload)]
+    return [get_any_id(i) for i in get_eoimages_inputs_from_payload(payload)]
 
 
 def replace_inputs_eoimage_files_to_query(inputs, payload, wps_inputs=False):
@@ -336,11 +339,11 @@ def replace_inputs_eoimage_files_to_query(inputs, payload, wps_inputs=False):
     """Replace EOImage inputs (additionalParameter -> EOImage -> true) with OpenSearch query parameters"""
 
     # add "additionalParameters" property from the payload
-    process = payload["processOffering"]["process"]
-    payload_inputs = {i["identifier"]: i for i in process.get("inputs", {})}
+    process = payload["processDescription"]["process"]
+    payload_inputs = {get_any_id(i): i for i in process.get("inputs", {})}
     for i in inputs:
         try:
-            i["additionalParameters"] = payload_inputs[i["identifier"]]["additionalParameters"]
+            i["additionalParameters"] = payload_inputs[get_any_id(i)]["additionalParameters"]
         except:
             pass
 

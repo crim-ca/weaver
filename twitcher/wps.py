@@ -73,6 +73,10 @@ def pywps_view(environ, start_response):
             if not os.path.isdir(out_dir_path):
                 os.makedirs(out_dir_path)
 
+            output_url = PYWPS_CFG.get_config_value('server', 'outputurl')
+            registry.settings['twitcher.wps_output_url'] = output_url
+            registry.settings['twitcher.wps_output_path'] = out_dir_path
+
         # call pywps application
         from twitcher.store import processstore_defaultfactory
         processstore = processstore_defaultfactory(registry)

@@ -41,6 +41,9 @@ unit_tests/testdata.json
 # PyCharm
 *.idea
 
+# Intellij
+*.iml
+
 # Kate
 *.kate-swp
 
@@ -93,3 +96,4 @@ response.varfile
 
 # process results
 *.tif
+*.zip

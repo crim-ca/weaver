@@ -107,6 +107,14 @@ class PackageNotFound(Exception):
     pass
 
 
+class PayloadNotFound(Exception):
+    """
+    Error indicating that an instance of :class:`twitcher.processes.wps_package.Package`
+    could not properly retrieve the package deploy payload using provided references.
+    """
+    pass
+
+
 class QuoteNotFound(Exception):
     """
     Error indicating that a quote could not be read from the
