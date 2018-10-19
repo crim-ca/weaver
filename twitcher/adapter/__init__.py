@@ -38,19 +38,16 @@ def adapter_factory(settings):
 def get_adapter_store_factory(adapter, store_name, registry):
     try:
         store = getattr(adapter, store_name)
+        return store(registry)
     except NotImplementedError:
+        if isinstance(adapter, DefaultAdapter):
+            LOGGER.exception("DefaultAdapter doesn't implement `{1!r}`, no way to recover.".format(adapter, store_name))
+            raise
         LOGGER.warn("Adapter `{0!r}` doesn't implement `{1!r}`, falling back to `DefaultAdapter` implementation."
                     .format(adapter, store_name))
-        adapter = DefaultAdapter()
-        store = getattr(adapter, store_name)
+        return get_adapter_store_factory(DefaultAdapter(), store_name, registry)
     except Exception as e:
-        LOGGER.error("Adapter `{0!r}` raised an exception while getting `{1!r}` : `{2!r}`"
-                     .format(adapter, store_name, e))
-        raise
-    try:
-        return store(registry)
-    except Exception as e:
-        LOGGER.error("Adapter `{0!r}` raised an exception while instantiating `{1!r}` : {2!r}"
+        LOGGER.error("Adapter `{0!r}` raised an exception while instantiating `{1!r}` : `{2!r}`"
                      .format(adapter, store_name, e))
         raise
 

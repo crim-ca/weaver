@@ -5,7 +5,7 @@ SORT_PROCESS = 'process'
 SORT_SERVICE = 'service'
 SORT_USER = 'user'
 SORT_QUOTE = 'quote'
-SORT_COST = 'cost'
+SORT_PRICE = 'price'
 SORT_ID = 'id'
 
 job_sort_values = frozenset([
@@ -20,10 +20,12 @@ job_sort_values = frozenset([
 quote_sort_values = frozenset([
     SORT_ID,
     SORT_PROCESS,
-    SORT_COST,
+    SORT_PRICE,
+    SORT_CREATED,
 ])
 
 bill_sort_values = frozenset([
     SORT_ID,
     SORT_QUOTE,
+    SORT_CREATED,
 ])

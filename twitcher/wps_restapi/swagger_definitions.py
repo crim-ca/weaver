@@ -6,7 +6,8 @@ so that one can update the swagger without touching any other files after the in
 from twitcher.config import TWITCHER_CONFIGURATION_EMS
 from twitcher.wps_restapi.utils import wps_restapi_base_path
 from twitcher.status import job_status_values, STATUS_ACCEPTED
-from twitcher.sort import *
+from twitcher.sort import job_sort_values, quote_sort_values, SORT_CREATED, SORT_ID, SORT_PROCESS
+from twitcher.sync import execute_sync_options, EXECUTE_AUTO
 from twitcher.visibility import visibility_values, VISIBILITY_PUBLIC
 from cornice import Service
 from colander import *
@@ -31,8 +32,8 @@ process_payload_uri = '/processes/{process_id}/payload'
 process_visibility_uri = '/processes/{process_id}/visibility'
 process_jobs_uri = '/processes/{process_id}/jobs'
 process_job_uri = '/processes/{process_id}/jobs/{job_id}'
-process_quotes_uri = '/processes/{process_id}/quotes'
-process_quote_uri = '/processes/{process_id}/quotes/{quote_id}'
+process_quotes_uri = '/processes/{process_id}/quotations'
+process_quote_uri = '/processes/{process_id}/quotations/{quote_id}'
 process_results_uri = '/processes/{process_id}/jobs/{job_id}/results'
 process_result_uri = '/processes/{process_id}/jobs/{job_id}/results/{result_id}'
 process_exceptions_uri = '/processes/{process_id}/jobs/{job_id}/exceptions'
@@ -50,8 +51,8 @@ job_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}'
 job_exceptions_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/exceptions'
 job_short_uri = '/jobs/{job_id}'
 
-quotes_uri = '/quotes'
-quote_uri = '/quotes/{quote_id}'
+quotes_uri = '/quotations'
+quote_uri = '/quotations/{quote_id}'
 bills_uri = '/bills'
 bill_uri = '/bill/{bill_id}'
 
@@ -168,17 +169,11 @@ class XmlHeader(MappingSchema):
     content_type.name = 'Content-Type'
 
 
-# TODO:
-# return XML when Accept=application/xml, add header=AcceptHeader() to 'request' MappingSchema (create for GETs)
-# only HTTPExceptions >= 400 properly do it using tweens because of the formatter, HTTP 2xx/3xx are always JSON
-# for how to generate doc with content-type specific responses (create the selector in swagger-ui), see:
-#   https://github.com/Cornices/cornice.ext.swagger/blob/master/docs/source/tutorial.rst#extracting-produced-types-from-renderers
 class AcceptHeader(MappingSchema):
-    # 'default' is json since 'return HTTP*(json={})' are used
     Accept = SchemaNode(String(), missing=drop, default='application/json', validator=OneOf([
         'application/json',
-        #'application/xml',
-        #'text/html'
+        'application/xml',
+        'text/html'
     ]))
 
 
@@ -312,7 +307,7 @@ class OutputTypeList(SequenceSchema):
 
 
 JobControlOptionsEnum = SchemaNode(String(), title='jobControlOptions', missing=drop,
-                                   validator=OneOf(['sync-execute', 'async-execute']))
+                                   validator=OneOf(execute_sync_options), default=EXECUTE_AUTO)
 OutputTransmissionEnum = SchemaNode(String(), title='outputTransmission', missing=drop,
                                     validator=OneOf(['value', 'reference']))
 
@@ -591,7 +586,8 @@ class GetJobsQueries(MappingSchema):
     process = SchemaNode(String(), missing=drop, default=None)
     provider = SchemaNode(String(), missing=drop, default=None)
     sort = JobSortEnum
-    tags = SchemaNode(String(), missing=drop, default=None, description='Comma-separated values of tags assigned to jobs')
+    tags = SchemaNode(String(), missing=drop, default=None,
+                      description='Comma-separated values of tags assigned to jobs')
 
 
 class GetJobsRequest(MappingSchema):
@@ -603,12 +599,18 @@ class SingleJobStatusSchema(MappingSchema):
     status = JobStatusEnum
     message = SchemaNode(String(), example='Job {}.'.format(STATUS_ACCEPTED))
     progress = SchemaNode(Integer(), example=0)
-    exceptions = SchemaNode(String(), missing=drop,
-                            example='http://{host}/twitcher/providers/{my-wps-id}/processes/{my-process-id}/jobs/{my-job-id}/exceptions')
-    outputs = SchemaNode(String(), missing=drop,
-                         example='http://{host}/twitcher/providers/{my-wps-id}/processes/{my-process-id}/jobs/{my-job-id}/outputs')
-    logs = SchemaNode(String(), missing=drop,
-                      example='http://{host}/twitcher/providers/{my-wps-id}/processes/{my-process-id}/jobs/{my-job-id}/logs')
+    exceptions = SchemaNode(
+        String(),
+        missing=drop,
+        example='http://{host}/twitcher/providers/{my-wps-id}/processes/{my-process-id}/jobs/{my-job-id}/exceptions')
+    outputs = SchemaNode(
+        String(),
+        missing=drop,
+        example='http://{host}/twitcher/providers/{my-wps-id}/processes/{my-process-id}/jobs/{my-job-id}/outputs')
+    logs = SchemaNode(
+        String(),
+        missing=drop,
+        example='http://{host}/twitcher/providers/{my-wps-id}/processes/{my-process-id}/jobs/{my-job-id}/logs')
 
 
 class JobListSchema(SequenceSchema):
@@ -638,11 +640,28 @@ class DismissedJobSchema(MappingSchema):
     progress = SchemaNode(Integer(), example=0)
 
 
+class QuoteProcessParametersSchema(MappingSchema):
+    inputs = InputTypeList(missing=drop)
+    outputs = OutputTypeList(missing=drop)
+    mode = JobControlOptionsEnum
+    response = SchemaNode(String(), validator=OneOf(['raw', 'document']), missing=drop)
+
+
 class QuoteStepSchema(MappingSchema):
     id = SchemaNode(String(), description="Quote ID.")
-    cost = SchemaNode(Float(), description="Process execution cost.")
+    price = SchemaNode(Float(), description="Process execution price.")
+    currency = SchemaNode(String(), description="Currency code in ISO-4217 format.")
+    user = SchemaNode(String(), description="User id that requested the quote.")
     process = SchemaNode(String(), description="Corresponding process ID.")
-    location = SchemaNode(String(), description="Corresponding process location.")
+    location = SchemaNode(String(), description="Corresponding process location.", missing=drop)
+    title = SchemaNode(String(), description="Name of the quotation.", missing=drop)
+    description = SchemaNode(String(), description="Description of the quotation.", missing=drop)
+    details = SchemaNode(String(), description="Details of the quotation.", missing=drop)
+    created = SchemaNode(String(), description="Creation date and time of the quote in ISO-8601 format.")
+    expire = SchemaNode(String(), description="Expiration date and time of the quote in ISO-8601 format.")
+    estimatedTime = SchemaNode(String(), description="Estimated duration of the process execution.", missing=drop)
+    processParameters = QuoteProcessParametersSchema()
+    alternativeQuotations = MappingSchema(missing=drop)
 
 
 class QuoteProcessListSchema(SequenceSchema):
@@ -652,7 +671,7 @@ class QuoteProcessListSchema(SequenceSchema):
 class QuoteSchema(MappingSchema):
     id = SchemaNode(String(), description="Quote ID.")
     process = SchemaNode(String(), description="Corresponding process ID.")
-    steps = QuoteProcessListSchema(description="Child processes and costs.")
+    steps = QuoteProcessListSchema(description="Child processes and prices.")
     total = SchemaNode(Float(), description="Total of the quote including step processes.")
 
 
@@ -662,8 +681,11 @@ class QuoteListSchema(SequenceSchema):
 
 class BillSchema(MappingSchema):
     id = SchemaNode(String(), description="Bill ID.")
-    total = SchemaNode(Float(), description="Total of the bill.")
+    price = SchemaNode(Float(), description="Price associated to the bill.")
+    currency = SchemaNode(String(), description="Currency code in ISO-4217 format.")
+    created = SchemaNode(String(), description="Creation date and time of the bill in ISO-8601 format.")
     quote = SchemaNode(String(), description="Corresponding quote ID.")
+    user = SchemaNode(String(), description="User id that requested the quote.")
 
 
 class BillListSchema(SequenceSchema):
@@ -710,12 +732,28 @@ class ProcessesSchema(SequenceSchema):
 
 
 class JobOutputSchema(MappingSchema):
-    ID = SchemaNode(String())
-    value = SchemaNode(String())
+    id = SchemaNode(String(), description="Job output id corresponding to process description outputs.")
+    data = SchemaNode(String(), missing=drop)
+    href = SchemaNode(String(), format='url', missing=drop)
+    mimeType = SchemaNode(String(), missing=drop)
+    schema = SchemaNode(String(), missing=drop)
+    encoding = SchemaNode(String(), missing=drop)
 
 
 class JobOutputsSchema(SequenceSchema):
     output = JobOutputSchema()
+
+
+class JobLinkSchema(MappingSchema):
+    href = SchemaNode(String(), format='url')
+    rel = SchemaNode(String(), missing=drop, description="Relationship type of the link to the job.", example="bill")
+    type = SchemaNode(String(), missing=drop, description="Content-Type of the link's response.")
+    lang = SchemaNode(String(), missing=drop)
+    title = SchemaNode(String(), missing=drop)
+
+
+class JobLinksSchema(SequenceSchema):
+    link = JobLinkSchema()
 
 
 class ExceptionTextList(SequenceSchema):
@@ -895,7 +933,7 @@ class PostProcessQuoteRequestEndpoint(MappingSchema):
     process_id = process_id
     quote_id = quote_id
     header = AcceptHeader()
-    body = MappingSchema(default={})
+    body = QuoteProcessParametersSchema()
 
 
 #################################
@@ -935,6 +973,16 @@ class PostProviderProcessJobRequest(MappingSchema):
 #################################
 # Responses schemas
 #################################
+
+
+class ErrorJsonResponseBodySchema(MappingSchema):
+    code = SchemaNode(String(), example="NoApplicableCode")
+    description = SchemaNode(String(), example="Not authorized to access this resource.")
+
+
+class UnauthorizedJsonResponseSchema(MappingSchema):
+    header = JsonHeader()
+    body = ErrorJsonResponseBodySchema()
 
 
 class OkGetFrontpageSchema(MappingSchema):
@@ -1100,9 +1148,14 @@ class OkGetSingleJobStatusResponse(MappingSchema):
     body = SingleJobStatusSchema()
 
 
+class OkGetSingleJobOutputsBodySchema(MappingSchema):
+    outputs = JobOutputsSchema()
+    links = JobLinksSchema()
+
+
 class OkGetSingleJobOutputsResponse(MappingSchema):
     header = JsonHeader()
-    body = JobOutputsSchema()
+    body = OkGetSingleJobOutputsBodySchema()
 
 
 class OkGetSingleOutputResponse(MappingSchema):
@@ -1151,103 +1204,135 @@ class OkGetLogsResponse(MappingSchema):
 
 
 get_api_frontpage_responses = {
-    '200': OkGetFrontpageSchema(description='success')
+    '200': OkGetFrontpageSchema(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_api_swagger_json_responses = {
-    '200': OkGetSwaggerJSONSchema(description='success')
+    '200': OkGetSwaggerJSONSchema(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_api_swagger_ui_responses = {
-    '200': OkGetSwaggerUISchema(description='success')
+    '200': OkGetSwaggerUISchema(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_api_versions_responses = {
-    '200': OkGetVersionsSchema(description='success')
+    '200': OkGetVersionsSchema(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_processes_responses = {
-    '200': OkGetProcessesSchema(description='success')
+    '200': OkGetProcessesSchema(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 post_processes_responses = {
-    '200': OkPostProcessesSchema(description='success')
+    '200': OkPostProcessesSchema(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_process_responses = {
-    '200': OkGetProcessSchema(description='success')
+    '200': OkGetProcessSchema(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_process_package_responses = {
-    '200': OkGetProcessPackageSchema(description='success')
+    '200': OkGetProcessPackageSchema(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_process_payload_responses = {
     '200': OkGetProcessPayloadSchema(description='success')
 }
 get_process_visibility_responses = {
-    '200': OkGetProcessVisibilitySchema(description='success')
+    '200': OkGetProcessVisibilitySchema(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 put_process_visibility_responses = {
-    '200': OkPutProcessVisibilitySchema(description='success')
+    '200': OkPutProcessVisibilitySchema(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 delete_process_responses = {
-    '200': OkDeleteProcessSchema(description='success')
+    '200': OkDeleteProcessSchema(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_all_providers_responses = {
-    '200': OkGetProvidersSchema(description='success')
+    '200': OkGetProvidersSchema(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_one_provider_responses = {
-    '200': OkGetProviderCapabilitiesSchema(description='success')
+    '200': OkGetProviderCapabilitiesSchema(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 delete_provider_responses = {
-    '204': NoContentDeleteProviderSchema(description='success')
+    '204': NoContentDeleteProviderSchema(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_provider_processes_responses = {
-    '200': OkGetProviderProcessesSchema(description='success')
+    '200': OkGetProviderProcessesSchema(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_provider_process_description_responses = {
-    '200': OkGetProviderProcessDescription(description='success')
+    '200': OkGetProviderProcessDescription(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 post_provider_responses = {
-    '201': CreatedPostProvider(description='success')
+    '201': CreatedPostProvider(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 post_provider_process_job_responses = {
-    '201': CreatedLaunchJobResponse(description='success')
+    '201': CreatedLaunchJobResponse(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 post_process_jobs_responses = {
-    '201': CreatedLaunchJobResponse(description='success')
+    '201': CreatedLaunchJobResponse(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_all_jobs_responses = {
-    '200': OkGetAllJobsResponse(description='success')
+    '200': OkGetAllJobsResponse(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_single_job_status_responses = {
-    '200': OkGetSingleJobStatusResponse(description='success')
+    '200': OkGetSingleJobStatusResponse(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 delete_job_responses = {
-    '200': OkDismissJobResponse(description='success')
+    '200': OkDismissJobResponse(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_job_results_responses = {
-    '200': OkGetSingleJobOutputsResponse(description='success')
+    '200': OkGetSingleJobOutputsResponse(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_quote_list_responses = {
-    '200': OkGetQuoteListResponse(description='success')
+    '200': OkGetQuoteListResponse(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_quote_responses = {
-    '200': OkGetQuoteResponse(description='success')
+    '200': OkGetQuoteResponse(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 post_quote_responses = {
-    '201': CreatedQuoteExecuteResponse(description='success')
+    '201': CreatedQuoteExecuteResponse(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 post_quotes_responses = {
-    '201': CreatedQuoteRequestResponse(description='success')
+    '201': CreatedQuoteRequestResponse(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_bill_list_responses = {
-    '200': OkGetBillListResponse(description='success')
+    '200': OkGetBillListResponse(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_bill_responses = {
-    '200': OkGetBillDetailResponse(description='success')
+    '200': OkGetBillDetailResponse(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_single_result_responses = {
-    '200': OkGetSingleOutputResponse(description='success')
+    '200': OkGetSingleOutputResponse(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_exceptions_responses = {
-    '200': OkGetExceptionsResponse(description='success')
+    '200': OkGetExceptionsResponse(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_logs_responses = {
-    '200': OkGetLogsResponse(description='success')
+    '200': OkGetLogsResponse(description='success'),
+    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 
 

@@ -4,7 +4,8 @@ Definitions of types used by tokens.
 
 import six
 import uuid
-from datetime import datetime
+from dateutil.parser import parse as dtparse
+from datetime import datetime, timedelta
 from logging import _levelNames, ERROR, INFO
 from twitcher.utils import now_secs
 from twitcher.exceptions import ProcessInstanceError
@@ -575,8 +576,35 @@ class Quote(dict):
     def __init__(self, *args, **kwargs):
         super(Quote, self).__init__(*args, **kwargs)
         if 'process' not in self:
-            raise TypeError("'process' is required")
-        self['id'] = str(uuid.uuid4())
+            raise TypeError("Field `Quote.process` is required")
+        elif not isinstance(self.get('process'), six.string_types):
+            raise ValueError("Field `Quote.process` must be a string.")
+        if 'user' not in self:
+            raise TypeError("Field `Quote.user` is required")
+        elif not isinstance(self.get('user'), six.string_types):
+            raise ValueError("Field `Quote.user` must be a string.")
+        if 'price' not in self:
+            raise TypeError("Field `Quote.price` is required")
+        elif not isinstance(self.get('price'), float):
+            raise ValueError("Field `Quote.price` must be a float number.")
+        if 'currency' not in self:
+            raise TypeError("Field `Quote.currency` is required")
+        elif not isinstance(self.get('currency'), six.string_types) or len(self.get('currency')) != 3:
+            raise ValueError("Field `Quote.currency` must be an ISO-4217 currency string code.")
+        if 'created' not in self:
+            self['created'] = str(datetime.now())
+        try:
+            self['created'] = dtparse(self.get('created')).isoformat()
+        except ValueError:
+            raise ValueError("Field `Quote.created` must be an ISO-8601 datetime string.")
+        if 'expire' not in self:
+            self['expire'] = str(datetime.now() + timedelta(days=1))
+        try:
+            self['expire'] = dtparse(self.get('expire')).isoformat()
+        except ValueError:
+            raise ValueError("Field `Quote.expire` must be an ISO-8601 datetime string.")
+        if 'id' not in self:
+            self['id'] = str(uuid.uuid4())
 
     @property
     def id(self):
@@ -584,9 +612,39 @@ class Quote(dict):
         return self['id']
 
     @property
+    def title(self):
+        """Quote title."""
+        return self.get('title')
+
+    @property
+    def description(self):
+        """Quote description."""
+        return self.get('description')
+
+    @property
+    def details(self):
+        """Quote details."""
+        return self.get('details')
+
+    @property
+    def user(self):
+        """User ID requesting the quote"""
+        return self['user']
+
+    @property
     def process(self):
         """WPS Process ID."""
         return self['process']
+
+    @property
+    def estimatedTime(self):
+        """Process estimated time."""
+        return self.get('estimatedTime')
+
+    @property
+    def processParameters(self):
+        """Process execution parameters for quote."""
+        return self.get('processParameters')
 
     @property
     def location(self):
@@ -594,9 +652,24 @@ class Quote(dict):
         return self.get('location', '')
 
     @property
-    def cost(self):
-        """Cost of the current quote"""
-        return self.get('cost', 0.0)
+    def price(self):
+        """Price of the current quote"""
+        return self.get('price', 0.0)
+
+    @property
+    def currency(self):
+        """Currency of the quote price"""
+        return self.get('currency')
+
+    @property
+    def expire(self):
+        """Quote expiration datetime."""
+        return self.get('expire')
+
+    @property
+    def created(self):
+        """Quote creation datetime."""
+        return self.get('created')
 
     @property
     def steps(self):
@@ -607,10 +680,19 @@ class Quote(dict):
     def params(self):
         return {
             'id': self.id,
-            'cost': self.cost,
+            'price': self.price,
+            'currency': self.currency,
+            'user': self.user,
             'process': self.process,
             'location': self.location,
             'steps': self.steps,
+            'title': self.title,
+            'description': self.description,
+            'details': self.details,
+            'created': self.created,
+            'expire': self.expire,
+            'estimatedTime': self.estimatedTime,
+            'processParameters': self.processParameters,
         }
 
     def json(self):
@@ -633,10 +715,33 @@ class Bill(dict):
     def __init__(self, *args, **kwargs):
         super(Bill, self).__init__(*args, **kwargs)
         if 'quote' not in self:
-            raise TypeError("'quote' is required")
+            raise TypeError("Field `Bill.quote` is required")
+        elif not isinstance(self.get('quote'), six.string_types):
+            raise ValueError("Field `Bill.quote` must be a string.")
         if 'job' not in self:
-            raise TypeError("'job' is required")
-        self['id'] = str(uuid.uuid4())
+            raise TypeError("Field `Bill.job` is required")
+        elif not isinstance(self.get('job'), six.string_types):
+            raise ValueError("Field `Bill.job` must be a string.")
+        if 'user' not in self:
+            raise TypeError("Field `Bill.user` is required")
+        elif not isinstance(self.get('user'), six.string_types):
+            raise ValueError("Field `Bill.user` must be a string.")
+        if 'price' not in self:
+            raise TypeError("Field `Bill.price` is required")
+        elif not isinstance(self.get('price'), float):
+            raise ValueError("Field `Bill.price` must be a float number.")
+        if 'currency' not in self:
+            raise TypeError("Field `Bill.currency` is required")
+        elif not isinstance(self.get('currency'), six.string_types) or len(self.get('currency')) != 3:
+            raise ValueError("Field `Bill.currency` must be an ISO-4217 currency string code.")
+        if 'created' not in self:
+            self['created'] = str(datetime.now())
+        try:
+            self['created'] = dtparse(self.get('created')).isoformat()
+        except ValueError:
+            raise ValueError("Field `Bill.created` must be an ISO-8601 datetime string.")
+        if 'id' not in self:
+            self['id'] = str(uuid.uuid4())
 
     @property
     def id(self):
@@ -659,12 +764,42 @@ class Bill(dict):
         return self['job']
 
     @property
+    def price(self):
+        """Price of the current quote"""
+        return self.get('price', 0.0)
+
+    @property
+    def currency(self):
+        """Currency of the quote price"""
+        return self.get('currency')
+
+    @property
+    def created(self):
+        """Quote creation datetime."""
+        return self.get('created')
+
+    @property
+    def title(self):
+        """Quote title."""
+        return self.get('title')
+
+    @property
+    def description(self):
+        """Quote description."""
+        return self.get('description')
+
+    @property
     def params(self):
         return {
             'id': self.id,
             'user': self.user,
             'quote': self.quote,
             'job': self.job,
+            'price': self.price,
+            'currency': self.currency,
+            'created': self.created,
+            'title': self.title,
+            'description': self.description,
         }
 
     def json(self):
