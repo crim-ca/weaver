@@ -3,6 +3,7 @@ from cornice.service import get_services
 from pyramid.renderers import render_to_response
 from pyramid.settings import asbool
 from twitcher import __version__ as twitcher_version
+from twitcher.config import get_twitcher_configuration
 from twitcher.utils import get_twitcher_url
 from twitcher.wps import get_wps_path
 from twitcher.adapter import adapter_factory
@@ -17,7 +18,7 @@ def api_frontpage(request):
     """Frontpage of Twitcher."""
     settings = request.registry.settings
     twitcher_url = get_twitcher_url(settings)
-    twitcher_config = settings.get('twitcher.configuration', 'default')
+    twitcher_config = get_twitcher_configuration(settings)
 
     twitcher_api = asbool(settings.get('twitcher.wps_restapi'))
     twitcher_api_url = wps_restapi_base_url(settings) if twitcher_api else None

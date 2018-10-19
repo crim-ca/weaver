@@ -68,7 +68,7 @@ def expires_at(hours=1):
 
 
 def localize_datetime(dt, tz_name='UTC'):
-    """Provide a timzeone-aware object for a given datetime and timezone name
+    """Provide a timezone-aware object for a given datetime and timezone name
     """
     tz_aware_dt = dt
     if dt.tzinfo is None:
