@@ -359,7 +359,7 @@ def replace_inputs_eoimage_files_to_query(inputs, payload, wps_inputs=False):
 
     additional_parameters = get_additional_parameters(process)
 
-    additional_parameters_upper = [[s.upper() for s in p] for p in additional_parameters]
+    additional_parameters_upper = [[p[0].upper(), ",".join([c.upper() for c in p[1]])] for p in additional_parameters]
     unique_toi = ["UNIQUETOI", "TRUE"] in additional_parameters_upper
     unique_aoi = ["UNIQUEAOI", "TRUE"] in additional_parameters_upper
     handler = EOImageDescribeProcessHandler(inputs=inputs)
