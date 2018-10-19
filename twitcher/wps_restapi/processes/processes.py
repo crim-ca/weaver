@@ -131,7 +131,7 @@ def _jsonify_output(output, datatype):
 
 def _map_status(wps_execution_status):
     job_status = wps_execution_status.lower().replace('process', '')
-    if job_status == 'running':  # OGC official status but not supported by PyWPS. See twitcher/status.py
+    if job_status == STATUS_RUNNING:  # OGC official status but not supported by PyWPS. See twitcher/status.py
         job_status = STATUS_STARTED # This is the status used by PyWPS
     if job_status in job_status_values:
         return job_status
@@ -483,7 +483,7 @@ def add_local_process(request):
             package = execution_unit.get('unit')
             reference = execution_unit.get('href')
     else:
-        raise HTTPBadRequest("Missing one of required parameters [owsContext, deploymentProfile].")
+        raise HTTPBadRequest("Missing one of required parameters [owsContext, deploymentProfileName being a workflow].")
 
     # obtain updated process information using WPS process offering and CWL package definition
     try:
