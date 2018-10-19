@@ -36,13 +36,13 @@ DEFAULT_TMP_PREFIX = "tmp"
 
 def default_make_tool(toolpath_object,  #type: Dict[Text, Any]
                       loadingContext,  #type: LoadingContext
-                      get_step_process_definition,  #type: (Any, Any) -> WpsProcess
+                      get_job_process_definition,  #type: (Any, Any) -> WpsProcess
                       ):   #type: (...) -> Process
     if not isinstance(toolpath_object, MutableMapping):
         raise WorkflowException(u"Not a dict: '%s'" % toolpath_object)
     if "class" in toolpath_object:
         if toolpath_object["class"] == "CommandLineTool":
-            return WpsWorkflow(toolpath_object, loadingContext, get_step_process_definition)
+            return WpsWorkflow(toolpath_object, loadingContext, get_job_process_definition)
         if toolpath_object["class"] == "ExpressionTool":
             return command_line_tool.ExpressionTool(toolpath_object, loadingContext)
         if toolpath_object["class"] == "Workflow":
@@ -72,11 +72,11 @@ class CallbackJob(object):
 
 
 class WpsWorkflow(Process):
-    def __init__(self, toolpath_object, loadingContext, get_step_process_definition):
+    def __init__(self, toolpath_object, loadingContext, get_job_process_definition):
         # type: (Dict[Text, Any], LoadingContext) -> None
         super(WpsWorkflow, self).__init__(toolpath_object, loadingContext)
         self.prov_obj = loadingContext.prov_obj
-        self.get_step_process_definition = get_step_process_definition
+        self.get_job_process_definition = get_job_process_definition
 
         # DockerRequirement is removed because we use our custom job which dispatch the processing to an ADES instead
         self.requirements = list(filter(lambda req: req['class'] != 'DockerRequirement', self.requirements))
@@ -107,7 +107,7 @@ class WpsWorkflow(Process):
 
         # job_name is the step name and job_order is the actual step inputs
         wps_workflow_job = WpsWorkflowJob(builder, builder.job, self.requirements,
-                                          self.hints, jobname, self.get_step_process_definition(jobname, job_order),
+                                          self.hints, jobname, self.get_job_process_definition(jobname, job_order),
                                           self.tool['outputs'])
         wps_workflow_job.prov_obj = self.prov_obj
         wps_workflow_job.successCodes = self.tool.get("successCodes")

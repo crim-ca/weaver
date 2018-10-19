@@ -69,8 +69,15 @@ PACKAGE_CUSTOM_TYPES = frozenset(['enum'])  # can be anything, but support 'enum
 PACKAGE_DEFAULT_FILE_NAME = 'package'
 PACKAGE_LOG_FILE = 'package_log_file'
 
-WORKFLOW_PROGRESS_START = 10
-WORKFLOW_PROGRESS_END = 95
+PACKAGE_PROGRESS_PREP_LOG = 1
+PACKAGE_PROGRESS_LAUNCHING = 2
+PACKAGE_PROGRESS_LOADING = 5
+PACKAGE_PROGRESS_GET_INPT = 6
+PACKAGE_PROGRESS_CONV_INPT = 8
+PACKAGE_PROGRESS_RUN_CWL = 10
+PACKAGE_PROGRESS_CWL_DONE = 95
+PACKAGE_PROGRESS_PREP_OUT = 98
+PACKAGE_PROGRESS_DONE = 100
 
 # WPS object attribute -> all possible naming variations
 WPS_FIELD_MAPPING = {
@@ -160,7 +167,7 @@ def _get_process_package(process_url):
     package_name = process_url.split('/')[-1]
     package_resp = requests.get(package_url, headers={'Accept': 'application/json'}, verify=False)
     if package_resp.status_code != HTTPOk.code:
-        raise _package_not_found_error(package_url or process_url)
+        raise _package_not_found_error(package_url)
     package_body = package_resp.json()
 
     if not isinstance(package_body, dict) or not len(package_body):
@@ -186,7 +193,7 @@ def _get_process_payload(process_url):
     payload_url = '{}/payload'.format(process_url)
     payload_resp = requests.get(payload_url, headers={'Accept': 'application/json'}, verify=False)
     if payload_resp.status_code != HTTPOk.code:
-        raise _payload_not_found_error(payload_url or process_url)
+        raise _payload_not_found_error(payload_url)
     payload_body = payload_resp.json()
 
     if not isinstance(payload_body, dict) or not len(payload_body):
@@ -250,6 +257,8 @@ def _load_package_content(package_dict, package_name=PACKAGE_DEFAULT_FILE_NAME,
     :param data_source: identifier of the data source to map to specific ADES, or map to localhost if ``None``.
     :param only_dump_file: specify if the :class:`cwltool.factory.Factory` should be validated and returned.
     :param tmp_dir: location of the temporary directory to dump files (warning: will be deleted on exit).
+    :param loading_context: LoadingContext - cwltool context use to make the cwl package
+    :param runtime_context: RuntimeContext - cwltool context use to make the cwl package
     :return:
         tuple of
         - instance of :class:`cwltool.factory.Factory`
@@ -863,19 +872,18 @@ class Package(Process):
                 self.setup_logger()
                 # self.response.outputs[PACKAGE_LOG_FILE].file = self.log_file
                 # self.response.outputs[PACKAGE_LOG_FILE].as_reference = True
-                self.update_status("Preparing package logs done.", 1)
+                self.update_status("Preparing package logs done.", PACKAGE_PROGRESS_PREP_LOG)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed preparing package logging.")
 
             self.log_message("Package: {}".format(request.identifier))
-            self.update_status("Launching package ...", 2)
+            self.update_status("Launching package ...", PACKAGE_PROGRESS_LAUNCHING)
 
             registry = app.conf['PYRAMID_REGISTRY']
             if get_twitcher_configuration(registry.settings) == TWITCHER_CONFIGURATION_EMS:
                 # EMS dispatch the execution to the ADES
                 loading_context = LoadingContext()
-                make_tool = lambda toolpath_object, loadingContext: self.make_tool(toolpath_object, loadingContext)
-                loading_context.construct_tool_object = make_tool
+                loading_context.construct_tool_object = self.make_tool
             else:
                 # ADES execute the cwl locally
                 loading_context = None
@@ -892,11 +900,11 @@ class Package(Process):
 
             except Exception as ex:
                 raise PackageRegistrationError("Exception occurred on package instantiation: `{}`".format(repr(ex)))
-            self.update_status("Loading package content done.", 5)
+            self.update_status("Loading package content done.", PACKAGE_PROGRESS_LOADING)
 
             try:
                 cwl_input_info = dict([(i['name'], i) for i in self.package_inst.t.inputs_record_schema['fields']])
-                self.update_status("Retrieve package inputs done.", 6)
+                self.update_status("Retrieve package inputs done.", PACKAGE_PROGRESS_GET_INPT)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed retrieving package input types.")
             try:
@@ -931,30 +939,28 @@ class Package(Process):
                     else:
                         raise self.exception_message(PackageTypeError, None,
                                                      "Undefined package input for execution: {}.".format(type(input_i)))
-                self.update_status("Convert package inputs done.", 8)
+                self.update_status("Convert package inputs done.", PACKAGE_PROGRESS_CONV_INPT)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed to load package inputs.")
 
             try:
-                self.update_status("Running package ...", WORKFLOW_PROGRESS_START)
+                self.update_status("Running package ...", PACKAGE_PROGRESS_RUN_CWL)
 
                 # TODO Inputs starting with file:// will be interpreted as ems local files
                 #      If OpenSearch obtain file:// references that must be passed to the ADES use an uri starting
                 #      with OPENSEARCH_LOCAL_FILE_SCHEME://
                 result = self.package_inst(**cwl_inputs)
-                self.update_status("Package execution done.", WORKFLOW_PROGRESS_END)
+                self.update_status("Package execution done.", PACKAGE_PROGRESS_CWL_DONE)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed package execution.")
             try:
-                self.update_status("Package execution done.", 96)
-
                 for output in request.outputs:
                     if 'location' in result[output]:
                         self.response.outputs[output].as_reference = True
                         self.response.outputs[output].file = result[output]['location'].replace('file://', '')
                     else:
                         self.response.outputs[output].data = result[output]
-                self.update_status("Generate package outputs done.", 99)
+                self.update_status("Generate package outputs done.", PACKAGE_PROGRESS_PREP_OUT)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed to save package outputs.")
         except:
@@ -963,15 +969,24 @@ class Package(Process):
             self.update_status(error_msg, status=WPS_STATUS.FAILED)
             raise
         else:
-            self.update_status("Package complete.", 100, status=WPS_STATUS.SUCCEEDED)
+            self.update_status("Package complete.", PACKAGE_PROGRESS_DONE, status=WPS_STATUS.SUCCEEDED)
         return self.response
 
     def make_tool(self, toolpath_object, loadingContext):
-        get_step_process_definition_lambda = \
-            lambda step_id, data_source: self.get_step_process_definition(step_id, data_source)
-        return default_make_tool(toolpath_object, loadingContext, get_step_process_definition_lambda)
+        return default_make_tool(toolpath_object, loadingContext, self.get_job_process_definition)
 
-    def get_step_process_definition(self, step_id, data_source):
+    def get_job_process_definition(self, jobname, joborder):
+        """
+        This function is called before running an ADES job (either from a workflow step or a simple EMS dispatch).
+        It must return a WpsProcess instance configured with the proper package, ADES target and cookies.
+
+        :param jobname: The workflow step or the package id that must be launch on an ADES :class:`string`
+        :param joborder: The params for the job :class:`dict {input_name: input_value }`
+                         input_value is one of `input_object` or `array [input_object]`
+                         input_object is one of `string` or `dict {class: File, location: string}`
+                         in our case input are expected to be File object
+        """
+
         # TODO get the input being an EOData
         eodata_inputs = ['files', 'source_product']
 
@@ -979,7 +994,7 @@ class Package(Process):
             # Presume that all EOImage given as input can be resolved to the same ADES
             # So if we got multiple inputs or multiple values for an input, we take the first one as reference
             eodata_inputs = filter(lambda input: input in data_source, eodata_inputs)
-            value = data_source[eodata_inputs[0]]
+            value = joborder[eodata_inputs[0]]
 
             if isinstance(value, list):
                 # Use the first value to determine the data source
@@ -989,16 +1004,16 @@ class Package(Process):
 
             # Presume that steps are launched sequentially and have the same progress weight
             progress_estimate = float(len(self.step_launched)) / max(1, len(self.step_packages))
-            progress_estimate *= (WORKFLOW_PROGRESS_END - WORKFLOW_PROGRESS_START) # Map progress on workflow range
-            progress_estimate += WORKFLOW_PROGRESS_START # Add the workflow start offset
+            progress_estimate *= (PACKAGE_PROGRESS_CWL_DONE - PACKAGE_PROGRESS_RUN_CWL) # Map progress on workflow range
+            progress_estimate += PACKAGE_PROGRESS_RUN_CWL # Add the workflow start offset
 
             url = retrieve_data_source_url(data_source)
         except (IndexError, KeyError) as exc:
             raise self.exception_message(PackageExecutionError, exc, "Failed to save package outputs.")
 
-        self.step_launched.append(step_id)
+        self.step_launched.append(jobname)
 
-        if step_id == self.package_id:
+        if jobname == self.package_id:
             # A step is the package itself only for non-workflow package being executed on the EMS
             # and needing ADES dispatching
             step_payload = self.payload
@@ -1007,10 +1022,10 @@ class Package(Process):
         else:
             # TODO Find a way to retreive the ADES job id and append it in the EMS workflow job
             # Here we got a step part of a workflow (self is the workflow package)
-            step_process_url = get_process_location(self.step_packages[step_id])
+            step_process_url = get_process_location(self.step_packages[jobname])
             step_payload = _get_process_payload(step_process_url)
-            process_id = self.step_packages[step_id]
-            self.update_status("Launching step {0} on {1}.".format(step_id, data_source), progress_estimate)
+            process_id = self.step_packages[jobname]
+            self.update_status("Launching step {0} on {1}.".format(jobname, data_source), progress_estimate)
         return WpsProcess(url=url,
                           process_id=process_id,
                           deploy_body=step_payload,

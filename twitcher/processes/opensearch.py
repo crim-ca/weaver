@@ -2,6 +2,7 @@ from collections import deque
 from copy import deepcopy
 from itertools import ifilterfalse
 from twitcher.utils import get_any_id
+from pyramid.settings import asbool
 
 import lxml.etree
 import requests
@@ -207,7 +208,7 @@ class EOImageDescribeProcessHandler(object):
         # type: (Dict) -> bool
         for name, value in get_additional_parameters(input_data):
             # TODO EOImage value is now a list: Tests should be updated accordingly
-            if name.upper() == "EOIMAGE" and value and value[0].upper() == "TRUE":
+            if name.upper() == "EOIMAGE" and value and asbool(value[0]):
                 return True
         return False
 

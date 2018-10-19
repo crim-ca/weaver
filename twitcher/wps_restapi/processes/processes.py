@@ -131,10 +131,8 @@ def _jsonify_output(output, datatype):
 
 def _map_status(wps_execution_status):
     job_status = wps_execution_status.lower().replace('process', '')
-    if job_status == 'Exception':  # owslib supported status
-        job_status = STATUS_FAILED
-    if job_status == 'Running':  # OGC official status
-        job_status = STATUS_STARTED
+    if job_status == 'running':  # OGC official status but not supported by PyWPS. See twitcher/status.py
+        job_status = STATUS_STARTED # This is the status used by PyWPS
     if job_status in job_status_values:
         return job_status
     return 'unknown'
