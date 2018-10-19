@@ -799,6 +799,8 @@ class DeploymentProfileBody(MappingSchema):
 
 
 class PostProcessRequestBody(MappingSchema):
+    # TODO ProcessOffering has been replaced by ProcessDefinition...
+    # Swagger should be updated based on https://github.com/opengeospatial/D009-ADES_and_EMS_Results_and_Best_Practices_Engineering_Report/blob/master/code/ades_wpst.json
     processOffering = ProcessOfferingBody(title='ProcessOffering')
     deploymentProfile = DeploymentProfileBody(title='DeploymentProfile')
     deploymentProfileName = SchemaNode(String(), missing=drop, description="Name of the deployment profile.")

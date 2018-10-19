@@ -490,6 +490,9 @@ def _json2wps_io(io_info, io_select):
     io_info.pop('schema', None)
     io_info.pop('asreference', None)
 
+    # remove additionalParameters add for the OGC purpose
+    io_info.pop('additionalParameters', None)
+
     # convert allowed value objects
     values = _get_field(io_info, 'allowed_values', search_variations=True, pop_found=True)
     if values is not null:

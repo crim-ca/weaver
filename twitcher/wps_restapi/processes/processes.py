@@ -188,6 +188,7 @@ def execute_process(self, url, service, process_id, inputs,
             wps_inputs = []
 
         # identify EOimages from payload
+        # TODO payload may be missing (process hello)
         payload = processstore_factory(registry).fetch_by_id(process_id).payload
         eoimage_ids = opensearch.get_eoimages_ids_from_payload(payload)
         # if applicable, query EOImages
@@ -457,9 +458,9 @@ def add_local_process(request):
         raise HTTPUnprocessableEntity("Invalid parameter 'processDescription'.")
     process_info = process_description.get('process')
     if not isinstance(process_info, dict):
-        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process'.")
+        raise HTTPUnprocessableEntity("Invalid parameter 'processDescription.process'.")
     if not isinstance(get_any_id(process_info), string_types):
-        raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.process.identifier'.")
+        raise HTTPUnprocessableEntity("Invalid parameter 'processDescription.process.identifier'.")
     process_info['identifier'] = get_sane_name(get_any_id(process_info))
 
     # retrieve CWL package definition, either via owsContext or executionUnit package/reference
@@ -468,10 +469,10 @@ def add_local_process(request):
     if isinstance(ows_context, dict):
         offering = ows_context.get('offering')
         if not isinstance(offering, dict):
-            raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.owsContext.offering'.")
+            raise HTTPUnprocessableEntity("Invalid parameter 'processDescription.process.owsContext.offering'.")
         content = offering.get('content')
         if not isinstance(content, dict):
-            raise HTTPUnprocessableEntity("Invalid parameter 'processOffering.owsContext.offering.content'.")
+            raise HTTPUnprocessableEntity("Invalid parameter 'processDescription.process.owsContext.offering.content'.")
         package = None
         reference = content.get('href')
     elif deployment_profile.endswith('workflow'):
@@ -531,10 +532,13 @@ def get_local_process(request):
         process = store.fetch_by_id(process_id, request=request)
         process_json = process.json()
 
-        process_json["inputs"] = opensearch.replace_inputs_eoimage_files_to_query(process_json["inputs"],
-                                                                                  process["payload"],
-                                                                                  wps_inputs=True)
-
+        try:
+            process_json["inputs"] = opensearch.replace_inputs_eoimage_files_to_query(process_json["inputs"],
+                                                                                      process["payload"],
+                                                                                      wps_inputs=True)
+        # Process may not have a payload... in this case no eoimage inputs anyway
+        except KeyError:
+            pass
         return HTTPOk(json={'process': process_json})
     except HTTPException:
         raise  # re-throw already handled HTTPException
