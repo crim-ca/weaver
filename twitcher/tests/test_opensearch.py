@@ -27,11 +27,11 @@ OSDD_URL = "http://dummy.com"
 def assert_json_equals(json1, json2):
     def ordered_json(obj):
         if isinstance(obj, dict):
-            return sorted((k, ordered_json(v)) for k, v in obj.items())
+            return sorted((unicode(k), ordered_json(v)) for k, v in obj.items())
         elif isinstance(obj, list):
             return sorted(ordered_json(x) for x in obj)
         else:
-            return obj
+            return unicode(obj)
 
     json1_lines = pformat(ordered_json(json1)).split("\n")
     json2_lines = pformat(ordered_json(json2)).split("\n")
@@ -73,7 +73,7 @@ def memory_store():
 
 @pytest.fixture
 def dummy_payload():
-    return {"processOffering": {"process": {
+    return {"processDescription": {"process": {
         "identifier": "workflow_stacker_sfs_id",
         "title": "Application StackCreation followed by SFS dynamically added by POST /processes",
         "owsContext": {
@@ -87,7 +87,7 @@ def dummy_payload():
 def opensearch_payload():
     js = load_json_test_file("opensearch_deploy.json")
     cwl = get_test_file("json_examples", "opensearch_deploy.cwl")
-    js["deploymentProfile"]["executionUnit"]["reference"] = cwl
+    js["executionUnit"][0]["href"] = cwl
     return js
 
 
@@ -125,7 +125,7 @@ def test_transform_execute_parameters(opensearch_process):
     inputs = [('startDate', '2018-01-30T00:00:00.000Z'),
               ('endDate', '2018-01-31T23:59:59.999Z'),
               ('aoi', 'POLYGON ((100.4 15.3, 104.6 15.3, 104.6 19.3, 100.4 19.3, 100.4 15.3))'),
-              ('files', 'http://geo.spacebel.be/opensearch/description.xml?parentIdentifier=EOP:IPT:Sentinel2'),
+              ('files', 'EOP:IPT:Sentinel2'),
               ('output_file_type', 'GEOTIFF'),
               ('output_name', 'stack_result.tif')]
 
@@ -204,7 +204,7 @@ def test_deploy_opensearch(processstore_factory, opensearch_payload):
     # given
     initial_payload = deepcopy(opensearch_payload)
     request = make_request(json=opensearch_payload, method='POST')
-    process_id = opensearch_payload["processOffering"]["process"]["identifier"]
+    process_id = opensearch_payload["processDescription"]["process"]["identifier"]
 
     store = MemoryProcessStore()
     processstore_factory.return_value = store
@@ -245,20 +245,10 @@ def test_handle_EOI_non_unique_aoi_unique_toi():
     assert_json_equals(expected, output)
 
 
-def test_handle_EOI_multisensor_ndvi():
-    deploy = load_json_test_file("DeployProcess_Workflow_MultiSensor_NDVI_Stack_Generator_.json")
-    inputs = deploy["processOffering"]["process"]["inputs"]
-    describe = load_json_test_file("DescribeProcessResponse_Multisensor_ndivi_stack_generator.json")
-    expected = describe["processOffering"]["process"]["inputs"]
-    output = twitcher.processes.opensearch.EOImageDescribeProcessHandler(inputs).to_opensearch(unique_aoi=True,
-                                                                                               unique_toi=True)
-    assert_json_equals(expected, output)
-
-
 def test_get_additional_parameters():
     data = {"additionalParameters": [{"role": "http://www.opengis.net/eoc/applicationContext",
-                                      "parameters": [{"name": "UniqueAOI", "value": "true"},
-                                                     {"name": "UniqueTOI", "value": "true"}]}]}
+                                      "parameters": [{"name": "UniqueAOI", "values": ["true"]},
+                                                     {"name": "UniqueTOI", "values": ["true"]}]}]}
     params = twitcher.processes.opensearch.get_additional_parameters(data)
-    assert ("UniqueAOI", "true") in params
-    assert ("UniqueTOI", "true") in params
+    assert ("UniqueAOI", ["true"]) in params
+    assert ("UniqueTOI", ["true"]) in params

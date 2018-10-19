@@ -1,5 +1,5 @@
 {
-  "processOffering": {
+  "processDescription": {
     "process": {
       "visibility": "public",
       "identifier": "StackCreation-graph-json-remote",
@@ -12,11 +12,11 @@
           "parameters": [
             {
               "name": "UniqueAOI",
-              "value": "true"
+              "values": ["true"]
             },
             {
               "name": "UniqueTOI",
-              "value": "true"
+              "values": ["true"]
             }
           ]
         }
@@ -39,7 +39,7 @@
               "parameters": [
                 {
                   "name": "EOImage",
-                  "value": "true"
+                  "values": ["true"]
                 }
               ]
             }
@@ -85,10 +85,10 @@
       ]
     }
   },
-  "deploymentProfile": {
-    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow",
-    "executionUnit": {
-      "reference": "opensearch_deploy.cwl"
-    }
-  }
+  "executionUnit": [
+      {
+          "href": "docker-registry.crim.ca/ogc-public/snap6-stack-creation:v2.4"
+      }
+  ],
+  "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow"
 }

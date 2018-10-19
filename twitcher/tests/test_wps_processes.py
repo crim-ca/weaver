@@ -18,7 +18,7 @@ def make_request(**kw):
 @mock.patch("twitcher.wps_restapi.processes.processes.wps_package.get_process_from_wps_request")
 def test_deploy(mock_get_process):
     # given
-    dummy_payload = {"processOffering": {
+    dummy_payload = {"processDescription": {
         "process": {
             "identifier": "workflow_stacker_sfs_id",
             "title": "Application StackCreation followed by SFS dynamically added by POST /processes",
@@ -28,7 +28,7 @@ def test_deploy(mock_get_process):
             }
         }}}
     dummy_process_offering = {"package": "", "type": "", "inputs": "", "outputs": ""}
-    dummy_process_offering.update(dummy_payload["processOffering"]["process"])
+    dummy_process_offering.update(dummy_payload["processDescription"]["process"])
     mock_get_process.return_value = dummy_process_offering
     request = make_request(json=dummy_payload, method='POST')
     with mock.patch("twitcher.wps_restapi.processes.processes.ProcessDB") as process_class:
