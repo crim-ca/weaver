@@ -88,8 +88,9 @@ class WpsProcess(object):
             job_status = self.get_job_status(job_id)
             LOGGER.debug("Monitoring job {job} : [{status}] {progress} - {message}".format(job=job_id, **job_status))
 
-        if job_status == status.STATUS_FAILED:
+        if job_status['status'] == status.STATUS_FAILED:
             LOGGER.exception("Monitoring job {job} : [{status}] {message}".format(job=job_id, **job_status))
+            # TODO Error doesn't raise properly we only got  "Process failed, please check server error log"
             raise Exception(job_status)
 
         results = self.get_job_results(job_id)
