@@ -33,6 +33,8 @@ wps-restapi-path = /base/path/of/rest/api
 adapter = package.path.to.AdapterImpl
 extra-options = adapter_impl.opt1=value1,adapter_impl.opt2=value2
 
+data_sources = {"crim":{"netloc":"ogc-ades.crim.ca","ades":"https://ogc-ades.crim.ca/twitcher"},"localhost":{"netloc":"localhost","ades":"https://localhost:5001","default":"true"}}
+
 [adapter_impl]
 recipe = collective.recipe.cmd
 on_update=true

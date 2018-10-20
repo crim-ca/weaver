@@ -71,8 +71,7 @@ def request_quote(request):
         for step in get_package_workflow_steps(process_url):
             # retrieve quote from provider ADES
             # TODO: data source mapping
-            from twitcher.processes.sources import CRIM_ADES
-            process_step_url = get_process_location(step['reference'], data_source=CRIM_ADES)
+            process_step_url = get_process_location(step['reference'])
             process_quote_url = '{}/quotations'.format(process_step_url)
             subreq = request.copy()
             subreq.path_info = process_quote_url
