@@ -5,13 +5,13 @@
       "parameters": [
         {
           "name": "UniqueAOI",
-          "value": [
+          "values": [
             "true"
           ]
         },
         {
           "name": "UniqueTOI",
-          "value": [
+          "values": [
             "true"
           ]
         }
