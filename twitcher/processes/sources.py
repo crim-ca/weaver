@@ -1,7 +1,9 @@
+import os
 import json
 from urlparse import urlparse
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
+from twitcher import TWITCHER_ROOT_DIR
 
 # Data source cache
 DATA_SOURCES = {}
@@ -14,11 +16,15 @@ def fetch_data_sources():
     global DATA_SOURCES
 
     registry = app.conf['PYRAMID_REGISTRY']
-    data_source = registry.settings.get('twitcher.data_sources', '{}')
-    try:
-        DATA_SOURCES = json.loads(data_source)
-    except Exception:
-        pass
+    data_source_cfg = registry.settings.get('twitcher.data_sources', None)
+    if data_source_cfg:
+        if not os.path.isabs(data_source_cfg):
+            try:
+                data_source_cfg = os.path.normpath(os.path.join(TWITCHER_ROOT_DIR, data_source_cfg))
+                with open(data_source_cfg) as f:
+                    DATA_SOURCES = json.load(f)
+            except Exception:
+                pass
     return DATA_SOURCES
 
 

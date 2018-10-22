@@ -1,0 +1,11 @@
+{
+    "crim": {
+        "netloc":"ogc-ades.crim.ca",
+        "ades":"https://ogc-ades.crim.ca/twitcher"
+    },
+    "localhost": {
+        "netloc":"localhost",
+        "ades":"https://localhost:5001",
+        "default":"true"
+    }
+}
