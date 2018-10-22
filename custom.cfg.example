@@ -33,6 +33,7 @@ wps-restapi-path = /base/path/of/rest/api
 adapter = package.path.to.AdapterImpl
 extra-options = adapter_impl.opt1=value1,adapter_impl.opt2=value2
 
+# See twitcher.processes.sources.py for schema
 data_sources = ./data_sources.cfg.example
 
 [adapter_impl]

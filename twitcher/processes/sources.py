@@ -6,6 +6,37 @@ from pyramid_celery import celery_app as app
 from twitcher import TWITCHER_ROOT_DIR
 
 # Data source cache
+"""
+Schema
+
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Data Sources",
+  "type": "object",
+  "patternProperties": {
+    ".*": {
+      "type": "object",
+      "required": [ "netloc", "ades" ],
+      "additionalProperties": false,
+      "properties": {
+        "netloc": {
+          "type": "string",
+          "description": "Net location of a data source url use to match this data source."
+        },
+        "ades": {
+          "type": "string",
+          "description": "ADES endpoint where the processing of this data source can occur."
+        },
+        "default": {
+          "type": "string",
+          "description": "True indicate that if no data source match this one should be used (Use the first default)."
+        }
+      }
+    }
+  }
+}
+"""
+
 DATA_SOURCES = {}
 
 
