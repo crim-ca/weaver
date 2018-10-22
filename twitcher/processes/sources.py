@@ -41,21 +41,21 @@ DATA_SOURCES = {}
 
 
 def fetch_data_sources():
+    global DATA_SOURCES
+
     if DATA_SOURCES:
         return DATA_SOURCES
-
-    global DATA_SOURCES
 
     registry = app.conf['PYRAMID_REGISTRY']
     data_source_cfg = registry.settings.get('twitcher.data_sources', None)
     if data_source_cfg:
         if not os.path.isabs(data_source_cfg):
-            try:
-                data_source_cfg = os.path.normpath(os.path.join(TWITCHER_ROOT_DIR, data_source_cfg))
-                with open(data_source_cfg) as f:
-                    DATA_SOURCES = json.load(f)
-            except Exception:
-                pass
+            data_source_cfg = os.path.normpath(os.path.join(TWITCHER_ROOT_DIR, data_source_cfg))
+        try:
+            with open(data_source_cfg) as f:
+                DATA_SOURCES = json.load(f)
+        except Exception:
+            pass
     return DATA_SOURCES
 
 
