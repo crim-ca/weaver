@@ -187,10 +187,9 @@ def execute_process(self, url, service, process_id, inputs,
             wps_inputs = []
 
         # prepare outputs
-        outputs = []
-        for output in process.processOutputs:
-            outputs.append(
-                (output.identifier, output.dataType == 'ComplexData'))
+        outputs = [
+            (o.identifier, o.dataType == 'ComplexData') for o in process.processOutputs
+        ]
 
         mode = EXECUTE_ASYNC if async else EXECUTE_SYNC
         execution = wps.execute(process_id, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
