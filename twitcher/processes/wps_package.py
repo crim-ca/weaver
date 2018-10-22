@@ -988,8 +988,17 @@ class Package(Process):
                          in our case input are expected to be File object
         """
 
-        step_process_url = get_process_location(self.step_packages[step_id])
-        step_payload = _get_process_payload(step_process_url)
+        if jobname == self.package_id:
+            # A step is the package itself only for non-workflow package being executed on the EMS
+            # and needing ADES dispatching
+            step_payload = self.payload
+            process_id = self.package_id
+        else:
+            # TODO Find a way to retreive the ADES job id and append it in the EMS workflow job
+            # Here we got a step part of a workflow (self is the workflow package)
+            step_process_url = get_process_location(self.step_packages[jobname])
+            step_payload = _get_process_payload(step_process_url)
+            process_id = self.step_packages[jobname]
 
         try:
             # Presume that all EOImage given as input can be resolved to the same ADES
@@ -1015,18 +1024,10 @@ class Package(Process):
         self.step_launched.append(jobname)
 
         if jobname == self.package_id:
-            # A step is the package itself only for non-workflow package being executed on the EMS
-            # and needing ADES dispatching
-            step_payload = self.payload
-            process_id = self.package_id
             self.update_status("Launching {0} on {1}.".format(self.package_id, data_source), progress_estimate)
         else:
-            # TODO Find a way to retreive the ADES job id and append it in the EMS workflow job
-            # Here we got a step part of a workflow (self is the workflow package)
-            step_process_url = get_process_location(self.step_packages[jobname])
-            step_payload = _get_process_payload(step_process_url)
-            process_id = self.step_packages[jobname]
             self.update_status("Launching step {0} on {1}.".format(jobname, data_source), progress_estimate)
+
         return WpsProcess(url=url,
                           process_id=process_id,
                           deploy_body=step_payload,
