@@ -8,6 +8,7 @@ opt/
 
 # custom configs
 custom.cfg
+data_sources.cfg
 Makefile.config
 
 # Python / Extensions etc.

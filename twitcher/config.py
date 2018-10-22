@@ -4,7 +4,6 @@ import tempfile
 from pyramid.settings import asbool
 from pyramid.exceptions import ConfigurationError
 
-
 import logging
 LOGGER = logging.getLogger("TWITCHER")
 

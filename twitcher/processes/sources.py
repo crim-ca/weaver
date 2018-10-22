@@ -1,59 +1,86 @@
+import os
+import json
 from urlparse import urlparse
+from pyramid.settings import asbool
+from pyramid_celery import celery_app as app
+from twitcher import TWITCHER_ROOT_DIR
 
-CRIM_ADES = 'crim-ades'
-CRIM_EMS = 'crim-ems'
-LOCALHOST = 'localhost'
-LOCALHOST_ADES = 'localhost-ades'
+# Data source cache
+"""
+Schema
 
-KNOWN_DATA_SOURCES = frozenset([
-    CRIM_ADES,
-    CRIM_EMS,
-    LOCALHOST_ADES
-])
-
-CRIM_ADES_NETLOC = 'crim-ades.crim.ca'
-CRIM_EMS_NETLOC = 'crim-ems.crim.ca'
-LOCALHOST_NETLOC = 'localhost'
-LOCALHOST_ADES_NETLOC = '10.30.90.187'
-
-KNOWN_DATA_NETLOC = frozenset([
-    CRIM_ADES_NETLOC,
-    CRIM_EMS_NETLOC,
-    LOCALHOST_NETLOC,
-    LOCALHOST_ADES_NETLOC
-])
-
-# TODO: register data sources mapping to url in database
-DATA_SOURCE_MAPPING = {
-    LOCALHOST: 'https://localhost:5000',
-    LOCALHOST_ADES: 'https://10.30.90.187:5001',
-    CRIM_ADES: 'https://ogc-ems.crim.ca/twitcher',
-    CRIM_EMS: 'https://ogc-ades.crim.ca/twitcher',
-    # TODO: other sources here
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Data Sources",
+  "type": "object",
+  "patternProperties": {
+    ".*": {
+      "type": "object",
+      "required": [ "netloc", "ades" ],
+      "additionalProperties": false,
+      "properties": {
+        "netloc": {
+          "type": "string",
+          "description": "Net location of a data source url use to match this data source."
+        },
+        "ades": {
+          "type": "string",
+          "description": "ADES endpoint where the processing of this data source can occur."
+        },
+        "default": {
+          "type": "string",
+          "description": "True indicate that if no data source match this one should be used (Use the first default)."
+        }
+      }
+    }
+  }
 }
+"""
 
-DATA_NETLOC_MAPPING = {
-    LOCALHOST_NETLOC: LOCALHOST,
-    LOCALHOST_ADES_NETLOC: LOCALHOST_ADES,
-    CRIM_EMS_NETLOC: CRIM_EMS,
-    CRIM_ADES_NETLOC: CRIM_ADES,
-    # TODO: other sources here
-}
+DATA_SOURCES = {}
+
+
+def fetch_data_sources():
+    global DATA_SOURCES
+
+    if DATA_SOURCES:
+        return DATA_SOURCES
+
+    registry = app.conf['PYRAMID_REGISTRY']
+    data_source_cfg = registry.settings.get('twitcher.data_sources', None)
+    if data_source_cfg:
+        if not os.path.isabs(data_source_cfg):
+            data_source_cfg = os.path.normpath(os.path.join(TWITCHER_ROOT_DIR, data_source_cfg))
+        try:
+            with open(data_source_cfg) as f:
+                DATA_SOURCES = json.load(f)
+        except Exception:
+            pass
+    return DATA_SOURCES
+
+
+def get_default_data_source(data_sources):
+    # Check for a data source with the default property
+    for src, val in data_sources.items():
+        if asbool(val.get('default', False)):
+            return src
+
+    # Use the first one if no default have been set
+    return next(iter(data_sources))
 
 
 def retrieve_data_source_url(data_source):
-    if data_source in KNOWN_DATA_SOURCES:
-        return DATA_SOURCE_MAPPING[data_source]
-    if data_source is not None:
-        return data_source
-    return DATA_SOURCE_MAPPING[LOCALHOST]
+    data_sources = fetch_data_sources()
+    return data_sources[data_source if data_source in data_sources else get_default_data_source(data_sources)]['ades']
 
 
 def get_data_source_from_url(data_url):
+    data_sources = fetch_data_sources()
     try:
-        o = urlparse(data_url)
-        if o.netloc in KNOWN_DATA_NETLOC:
-            return DATA_NETLOC_MAPPING[o.netloc]
+        netloc = urlparse(data_url).netloc
+        for src, val in data_sources.items():
+            if val['netloc'] == netloc:
+                return src
     except Exception as exc:
         pass
-    return LOCALHOST_ADES
+    return get_default_data_source(data_sources)
