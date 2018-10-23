@@ -1,0 +1,2671 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "OGC Testbed 14 EOC - Transactional Web Processing Service 2.0 with Billing and Quotation - REST/JSON Extension API",
+    "version": "0.2",
+    "description": "This is the Transactional Web Processing Service 2.0 with Billing and Quotation REST/JSON Extension API developped in the frame of the OGC Testbed 14 EOC. This work is based on the WPS REST binding (https://github.com/opengeospatial/wps-rest-binding) by Benjamin Proß with updates from Patrick Jacques (Spacebel), Jerome Gasperi (Geomatys), Christophe Noël (Spacebel) and Panagiotis (Peter) A. Vretanos (CubeWerx).",
+    "contact": {
+      "name": "Open Geospatial Consortium",
+      "email": "standards@opengeospatial.org",
+      "url": "http://www.opengeospatial.org"
+    },
+    "license": {
+      "name": "CC-BY 4.0 license",
+      "url": "https://creativecommons.org/licenses/by/4.0/"
+    }
+  },
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "landing page of this API",
+        "description": "The landing page provides links to the API definition, the Conformance statements and the metadata about the processes offered by this API",
+        "operationId": "getLandingPage",
+        "tags": [
+          "LandingPage"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/f"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "undefined",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/landingPage"
+                }
+              },
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "undefined",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              },
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/processes": {
+      "get": {
+        "summary": "Retrieve available processes",
+        "operationId": "getProcesses",
+        "tags": [
+          "Processes"
+        ],
+        "responses": {
+          "200": {
+            "description": "Information about the available processes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/processCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Deploy a process.",
+        "operationId": "deployProcess",
+        "tags": [
+          "Deploy"
+        ],
+        "requestBody": {
+          "description": "Mandatory deploy request JSON",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/deploy"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Process deployed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/deploymentResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/processes/{id}": {
+      "get": {
+        "summary": "Retrieve a process description",
+        "operationId": "getProcessDescription",
+        "tags": [
+          "ProcessDescription"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "description": "The id of a process",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A process description.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/processOffering"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The process with id {id} does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Undeploy a process",
+        "operationId": "undeployProcess",
+        "tags": [
+          "Undeploy"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "description": "The id of a process",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Process undeployed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/undeploymentResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/processes/{id}/jobs": {
+      "get": {
+        "summary": "Retrieve the list of jobs for a process.",
+        "operationId": "getJobList",
+        "tags": [
+          "JobList"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "description": "The id of a process.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of jobs for this process.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/jobCollection"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The process with id {id} does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Execute a process.",
+        "operationId": "execute",
+        "tags": [
+          "Execute"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "description": "The id of a process.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Mandatory execute request JSON",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/execute"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Started execution. Created job.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "URL to check the status of the execution/job."
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The process with id {id} does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/processes/{id}/jobs/{jobID}": {
+      "get": {
+        "summary": "Retrieve the status of a job",
+        "operationId": "getStatus",
+        "tags": [
+          "Status"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "description": "The id of a process",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "jobID",
+            "description": "The id of a job",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The status of a job.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/statusInfo"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The process with id {id} or the job with id {jobID} does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Dismiss a job",
+        "operationId": "dismiss",
+        "tags": [
+          "Dismiss"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "description": "The id of a process",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "jobID",
+            "description": "The id of a job",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The status of a job.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/statusInfo"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The process with id {id} or the job with id {jobID} does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/processes/{id}/jobs/{jobID}/result": {
+      "get": {
+        "summary": "Retrieve the result(s) of a job",
+        "operationId": "getResult",
+        "tags": [
+          "Result"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "description": "The id of a process",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "jobID",
+            "description": "The id of a job",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The result of a job.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/result"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The process with id {id} or the job with id {jobID} does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An exception happened during the execution of the job.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/processes/{id}/quotations": {
+      "get": {
+        "summary": "Retrieve the list of quotation ids for a given process.",
+        "operationId": "getQuotationList",
+        "tags": [
+          "QuotationList"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "description": "The id of a process.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of quotation ids for this process.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/quotationList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The process with id {id} does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Request a quotation for a given process.",
+        "operationId": "quote",
+        "tags": [
+          "Quote"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "description": "The id of a process.",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Mandatory execute request JSON",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/execute"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result of the quotation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/quotation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The process with id {id} does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/processes/{id}/quotations/{quotationID}": {
+      "get": {
+        "summary": "Retrieve quotation information",
+        "operationId": "getQuotation",
+        "tags": [
+          "Quotation"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "description": "The id of a process",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "quotationID",
+            "description": "The id of a quotation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quotation information.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/quotation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The process with id {id} or the quotation with id {quotationID} does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Execute a quoted process",
+        "operationId": "executeQuotation",
+        "tags": [
+          "Execute (as per Quotation)"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "description": "The id of a process",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "quotationID",
+            "description": "The id of a quotation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Started execution. Created job.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "URL to check the status of the execution/job."
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The process with id {id} or the quotation with id {quotationID} does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "The quotation with id {quotationID} expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/processes/{id}/visibility": {
+      "get": {
+        "summary": "Retrieve the visibility status for a process.",
+        "operationId": "getVisibility",
+        "tags": [
+          "Visibility"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "description": "The id of a process.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The visibility status (public or private) for this process.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/visibility"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The process with id {id} does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Change the visibility status for a process.",
+        "operationId": "changeVisibility",
+        "tags": [
+          "ChangeVisibility"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "description": "The id of a process.",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "New visibility parameters as JSON",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/visibility"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Process visibility status updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/visibility"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The process with id {id} does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/quotations": {
+      "get": {
+        "summary": "Retrieve the list of all quotation ids.",
+        "operationId": "getQuotationList",
+        "tags": [
+          "QuotationList"
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of quotation ids for all server processes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/quotationList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/quotations/{quotationID}": {
+      "get": {
+        "summary": "Retrieve quotation information",
+        "operationId": "getQuotation",
+        "tags": [
+          "Quotation"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotationID",
+            "description": "The id of a quotation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quotation information.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/quotation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The quotation with id {quotationID} does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Execute a quoted process",
+        "operationId": "executeQuotation",
+        "tags": [
+          "Execute (as per Quotation)"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quotationID",
+            "description": "The id of a quotation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Started execution. Created job.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "URL to check the status of the execution/job."
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The quotation with id {quotationID} does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "The quotation with id {quotationID} expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bills": {
+      "get": {
+        "summary": "Retrieve the list of all bills ids.",
+        "operationId": "getBillList",
+        "tags": [
+          "BillList"
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of bills ids.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/billList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bills/{billID}": {
+      "get": {
+        "summary": "Retrieve bill information",
+        "operationId": "getBill",
+        "tags": [
+          "Bill"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "billID",
+            "description": "The id of a bill",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bill information.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bill"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The bill with id {billID} does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conformance": {
+      "get": {
+        "summary": "information about standards that this API conforms to",
+        "description": "list all requirements classes specified in a standard (e.g., WPS REST/JSON Binding Core) that the server conforms to",
+        "operationId": "getRequirementsClasses",
+        "tags": [
+          "Capabilities"
+        ],
+        "responses": {
+          "200": {
+            "description": "the URIs of all requirements classes supported by the server",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/req-classes"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An error occured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/exceptionReportType"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "parameters": {
+      "lang": {
+        "name": "lang",
+        "in": "query",
+        "description": "undefined",
+        "required": false,
+        "allowEmptyValue": true,
+        "schema": {
+          "type": "string"
+        },
+        "style": "form",
+        "explode": true
+      },
+      "f": {
+        "name": "f",
+        "in": "query",
+        "description": "undefined",
+        "required": false,
+        "allowEmptyValue": true,
+        "schema": {
+          "type": "string",
+          "enum": [
+            "html",
+            "text/html",
+            "xml",
+            "text/xml",
+            "json",
+            "application/json"
+          ]
+        },
+        "style": "form",
+        "explode": true
+      }
+    },
+    "schemas": {
+      "landingPage": {
+        "type": "object",
+        "required": [
+          "links"
+        ],
+        "properties": {
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/jsonLink"
+            }
+          }
+        }
+      },
+      "jsonLink": {
+        "type": "object",
+        "required": [
+          "href"
+        ],
+        "properties": {
+          "href": {
+            "type": "string",
+            "format": "uri"
+          },
+          "rel": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "hreflang": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "exceptionReportType": {
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      },
+      "req-classes": {
+        "type": "object",
+        "required": [
+          "conformsTo"
+        ],
+        "properties": {
+          "conformsTo": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "processCollection": {
+        "type": "object",
+        "required": [
+          "processes"
+        ],
+        "properties": {
+          "processes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/processSummary"
+            }
+          }
+        }
+      },
+      "processSummary": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/descriptionType"
+          },
+          {
+            "type": "object",
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "version": {
+                "type": "string"
+              },
+              "jobControlOptions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/jobControlOptions"
+                }
+              },
+              "outputTransmission": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/transmissionMode"
+                }
+              },
+              "processDescriptionURL": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "deploy": {
+        "type": "object",
+        "required": [
+          "executionUnit"
+        ],
+        "properties": {
+          "immediateDeployment": {
+            "type": "boolean",
+            "default": "true"
+          },
+          "processDescription": {
+            "$ref": "#/components/schemas/processDescriptionChoiceType"
+          },
+          "executionUnit": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/executionUnit"
+            }
+          },
+          "deploymentProfileName": {
+            "type": "string"
+          }
+        }
+      },
+      "executionUnit": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/reference"
+          },
+          {
+            "$ref": "#/components/schemas/unitType"
+          }
+        ]
+      },
+      "unitType": {
+        "type": "object",
+        "required": [
+          "unit"
+        ],
+        "properties": {
+          "unit": {
+            "type": "object"
+          }
+        }
+      },
+      "deploymentResult": {
+        "type": "object",
+        "properties": {
+          "processSummary": {
+            "$ref": "#/components/schemas/processSummary"
+          }
+        }
+      },
+      "undeploymentResult": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "processDescriptionChoiceType": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/reference"
+          },
+          {
+            "$ref": "#/components/schemas/processOffering"
+          }
+        ]
+      },
+      "reference": {
+        "type": "object",
+        "required": [
+          "href"
+        ],
+        "properties": {
+          "href": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "encoding": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "bodyReference": {
+             "type": "string",
+             "format": "uri"
+          }
+        }
+      },
+      "dataEncodingAttributes": {
+        "type": "object",
+        "properties": {
+          "mimeType": {
+            "type": "string"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "encoding": {
+            "type": "string"
+          }
+        }
+      },
+      "processOffering": {
+        "type": "object",
+        "required": [
+          "process"
+        ],
+        "properties": {
+          "process": {
+            "$ref": "#/components/schemas/process"
+          },
+          "processVersion": {
+            "type": "string"
+          },
+          "jobControlOptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/jobControlOptions"
+            }
+          },
+          "outputTransmission": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/transmissionMode"
+            }
+          }
+        }
+      },
+      "process": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/descriptionType"
+          },
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "title"
+            ],
+            "properties": {
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/inputType"
+                }
+              },
+              "outputs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/outputDescription"
+                }
+              },
+              "executeEndpoint": {
+                "type": "string",
+                "format": "url"
+              }
+            }
+          }
+        ]
+      },
+      "inputType": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/inputTypeChoice"
+          },
+          {
+            "$ref": "#/components/schemas/dataDescriptionType"
+          }
+        ]
+      },
+      "inputTypeChoice": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/literalInputType"
+          },
+          {
+            "$ref": "#/components/schemas/complexInputType"
+          },
+          {
+            "$ref": "#/components/schemas/boundingBoxInputType"
+          }
+        ]
+      },
+      "jobControlOptions": {
+        "type": "string",
+        "enum": [
+          "sync-execute",
+          "async-execute"
+        ]
+      },
+      "transmissionMode": {
+        "type": "string",
+        "enum": [
+          "value",
+          "reference"
+        ]
+      },
+      "outputDescription": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/dataDescriptionType"
+          }
+        ]
+      },
+      "literalInputType": {
+        "type": "object",
+        "properties": {
+          "literalDataDomains": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/literalDataDomainType"
+            }
+          }
+        }
+      },
+      "literalDataDomainType": {
+        "allOf": [
+          {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/allowedValues"
+              },
+              {
+                "$ref": "#/components/schemas/allowedRanges"
+              },
+              {
+                "$ref": "#/components/schemas/anyValue"
+              },
+              {
+                "$ref": "#/components/schemas/valuesReference"
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "defaultValue": {
+                "type": "string"
+              },
+              "dataType": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "reference": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              },
+              "uom": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "reference": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "allowedValues": {
+        "required": [
+          "allowedValues"
+        ],
+        "type": "object",
+        "properties": {
+          "allowedValues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "allowedRanges": {
+        "type": "object",
+        "required": [
+          "allowedRanges"
+        ],
+        "properties": {
+          "allowedRanges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/range"
+            }
+          }
+        }
+      },
+      "anyValue": {
+        "type": "object",
+        "properties": {
+          "anyValue": {
+            "type": "boolean"
+          }
+        }
+      },
+      "valuesReference": {
+        "type": "object",
+        "required": [
+          "valuesReferences"
+        ],
+        "properties": {
+          "valueReference": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      },
+      "range": {
+        "type": "object",
+        "properties": {
+          "minimumValue": {
+            "type": "string"
+          },
+          "maximumValue": {
+            "type": "string"
+          },
+          "spacing": {
+            "type": "string"
+          },
+          "rangeClosure": {
+            "type": "string",
+            "enum": [
+              "closed",
+              "open",
+              "open-closed",
+              "closed-open"
+            ]
+          }
+        }
+      },
+      "complexInputType": {
+        "type": "object"
+      },
+      "boundingBoxInputType": {
+        "type": "object",
+        "required": [
+          "supportedCRS"
+        ],
+        "properties": {
+          "supportedCRS": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/supportedCrs"
+            }
+          }
+        }
+      },
+      "formatDescription": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/format"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "maximumMegabytes": {
+                "type": "integer"
+              },
+              "default": {
+                "type": "boolean",
+                "default": false
+              }
+            }
+          }
+        ]
+      },
+      "format": {
+        "type": "object",
+        "required": [
+          "mimeType"
+        ],
+        "properties": {
+          "mimeType": {
+            "type": "string"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "encoding": {
+            "type": "string"
+          }
+        }
+      },
+      "supportedCrs": {
+        "type": "object",
+        "required": [
+          "crs"
+        ],
+        "properties": {
+          "crs": {
+            "type": "string",
+            "format": "uri"
+          },
+          "default": {
+            "type": "boolean"
+          }
+        }
+      },
+      "dataDescriptionType": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/descriptionType"
+          },
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "formats"
+            ],
+            "properties": {
+              "minOccurs": {
+                "type": "string"
+              },
+              "maxOccurs": {
+                "type": "string"
+              },
+              "formats": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/formatDescription"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "descriptionType": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "abstract": {
+            "type": "string"
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "owsContext": {
+            "type": "object",
+            "properties": {
+              "offering": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "object",
+                    "properties": {
+                      "href": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "metadata": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/metadata"
+            }
+          },
+          "additionalParameters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/additionalParameters"
+            }
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/jsonLink"
+            }
+          }
+        }
+      },
+      "metadata": {
+        "allOf": [
+          {
+            "type": "object",
+            "properties": {
+              "role": {
+                "type": "string",
+                "format": "uri"
+              },
+              
+              "value": {
+                "type": "string"
+              }
+            
+            }
+          },
+          {
+            "$ref": "#/components/schemas/jsonLink"
+          }
+        ]
+      },
+      "additionalParameters": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/additionalParameter"
+            }
+          }
+        }
+      },
+      "additionalParameter": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "jobCollection": {
+        "type": "object",
+        "properties": {
+          "jobs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "quotationList": {
+        "type": "object",
+        "properties": {
+          "quotations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "billList": {
+        "type": "object",
+        "properties": {
+          "bills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "quotation": {
+        "type": "object",
+        "required": [
+          "id",
+          "processId",
+          "price",
+          "currency",
+          "expire",
+          "created",
+          "userId",
+          "processParameters"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The id of the quotation"
+          },
+          "title": {
+            "type": "string",
+            "description": "A name of the quotation"
+          },
+          "description": {
+            "type": "string",
+            "description": "A description of what the quotation is related"
+          },
+          "processId": {
+            "type": "string",
+            "description": "The id of the parent process"
+          },
+          "price": {
+            "type": "number",
+            "format": "double"
+          },
+          "currency": {
+            "type": "string",
+            "description": "Currency code in ISO 4217 format"
+          },
+          "expire": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time (ISO 8601 format) when the quotation will expire"
+          },
+          "created": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time (ISO 8601 format) when the quotation was created"
+          },
+          "userId": {
+            "type": "string",
+            "description": "User id that requested this quotation"
+          },
+          "details": {
+            "type": "string"
+          },
+          "estimatedTime": {
+            "type": "string",
+            "description": "The estimated duration for the process to be performed (in ISO 8601 duration format)"
+          },
+          "processParameters": {
+            "$ref": "#/components/schemas/execute"
+          },
+          "alternativeQuotations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/alternateQuotation"
+            }
+          }
+        }
+      },
+      "alternateQuotation": {
+        "type": "object",
+        "required": [
+          "id",
+          "price",
+          "currency",
+          "expire",
+          "created"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The id of the quotation"
+          },
+          "title": {
+            "type": "string",
+            "description": "The name of the quotation"
+          },
+          "description": {
+            "type": "string",
+            "description": "The description of what the quotation is related to"
+          },
+          "price": {
+            "type": "number",
+            "format": "double"
+          },
+          "currency": {
+            "type": "string",
+            "description": "Currency code in ISO 4217 format"
+          },
+          "expire": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time (ISO 8601 format) when the quotation will expire"
+          },
+          "created": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time (ISO 8601 format) when the quotation was created"
+          },
+          "details": {
+            "type": "string"
+          },
+          "estimatedTime": {
+            "type": "string",
+            "description": "The estimated duration for the process to be performed (in ISO 8601 duration format)"
+          }
+        }
+      },
+      "bill": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "price",
+          "currency",
+          "created",
+          "userId"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The id of the bill"
+          },
+          "title": {
+            "type": "string",
+            "description": "The name of the bill"
+          },
+          "description": {
+            "type": "string",
+            "description": "A description of what is charged"
+          },
+          "price": {
+            "type": "number",
+            "format": "double"
+          },
+          "currency": {
+            "type": "string",
+            "description": "Currency code in ISO 4217 format"
+          },
+          "created": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time (ISO 8601 format) when the bill was created"
+          },
+          "userId": {
+            "type": "string",
+            "description": "User id that is charged for this bill"
+          },
+          "quotationId": {
+            "type": "string",
+            "description": "Reference to the quotation id corresponding to this bill"
+          }
+        }
+      },
+      "execute": {
+        "type": "object",
+        "required": [
+          "outputs",
+          "mode",
+          "response"
+        ],
+        "properties": {
+          "inputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/input"
+            }
+          },
+          "outputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/output"
+            }
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "sync",
+              "async",
+              "auto"
+            ]
+          },
+          "response": {
+            "type": "string",
+            "enum": [
+              "raw",
+              "document"
+            ]
+          }
+        }
+      },
+      "input": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/inputDataType"
+          },
+          {
+            "$ref": "#/components/schemas/valueType"
+          }
+        ]
+      },
+      "valueType": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/inlineValue"
+          },
+          {
+            "$ref": "#/components/schemas/reference"
+          }
+        ]
+      },
+      "inlineValue": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/dataEncodingAttributes"
+          },
+          {
+            "type": "object",
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "output": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/outputDataType"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "transmissionMode": {
+                "$ref": "#/components/schemas/transmissionMode"
+              }
+            }
+          }
+        ]
+      },
+      "inputDataType": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "outputDataType": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "format": {
+            "$ref": "#/components/schemas/format"
+          }
+        }
+      },
+
+      "statusInfo": {
+        "type": "object",
+        "required": [
+          "jobID","status"
+        ],
+        "properties": {
+          "jobID": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "running",
+              "succeeded",
+              "failed"
+            ]
+          },
+          "expirationDate": {
+             "type": "dateTime"
+          },
+          "estimatedCompletion": {
+             "type": "dateTime"
+          },
+          "nextPoll": {
+             "type": "dateTime"
+          },
+          "percentCompleted": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          }
+        }
+      },
+      "result": {
+        "type": "object",
+        "required": [
+          "outputs"
+        ],
+        "properties": {
+          "outputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/outputInfo"
+            }
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/jsonLink"
+            }
+          }
+        }
+      },
+      "outputInfo": {
+        "allOf": [
+          {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/outputValue"
+              },
+              {
+                "$ref": "#/components/schemas/reference"
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "outputValue": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": ["data"],
+            "properties": {
+              "data": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/dataEncodingAttributes"
+          }
+        ]
+      },
+      "visibility": {
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "value": {
+            "type": "string",
+            "enum": [
+              "public",
+              "private"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Capabilities",
+      "description": "Essential characteristics of this API including information about the data."
+    },
+    {
+      "name": "Processes",
+      "description": "Access to processes."
+    }
+  ],
+  "servers": [
+    {
+      "description": "SwaggerHub API Auto Mocking",
+      "url": "https://virtserver.swaggerhub.com/geoprocessing/WPS/0.1"
+    }
+  ]
+}
