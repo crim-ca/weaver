@@ -63,42 +63,6 @@ def query_eo_images_from_wps_inputs(wps_inputs,
     return new_inputs
 
 
-def query_eo_images_from_inputs(inputs, eoimage_ids, osdd_url):
-    # type: (List[Tuple[str, str]], Iterable, str) -> List[Tuple[str, str]]
-    """Query OpenSearch using parameters in inputs and return file links.
-
-    eoimage_ids is used to identify if a certain input is an eoimage.
-    # todo: handle non unique aoi and toi
-    """
-
-    inputs = deepcopy(inputs)
-
-    def pop_first_input(id_to_pop):
-        for i in inputs:
-            if i[0] == id_to_pop:
-                inputs.remove(i)
-                return i[1]
-
-    for i in inputs[:]:
-        id_, value = i
-        if id_ in eoimage_ids:
-            inputs.remove(i)
-
-            bbox_str = load_wkt(pop_first_input("aoi"))
-
-            params = {
-                "startDate": pop_first_input("startDate"),
-                "endDate": pop_first_input("endDate"),
-                "bbox": bbox_str,
-            }
-            os = OpenSearchQuery(collection_identifier=value, osdd_url=osdd_url)
-
-            for link in os.query_datasets(params):
-                link = replace_with_opensearch_scheme(link)
-                inputs.append((id_, link))
-    return inputs
-
-
 def replace_with_opensearch_scheme(link):
     link_without_scheme = link[link.find(":"):]
     return "{}{}".format(OPENSEARCH_LOCAL_FILE_SCHEME, link_without_scheme)
