@@ -64,8 +64,12 @@ def query_eo_images_from_wps_inputs(wps_inputs,
 
 
 def replace_with_opensearch_scheme(link):
-    link_without_scheme = link[link.find(":"):]
-    return "{}{}".format(OPENSEARCH_LOCAL_FILE_SCHEME, link_without_scheme)
+    scheme = urlparse.urlparse(link).scheme
+    if scheme == "file":
+        link_without_scheme = link[link.find(":"):]
+        return "{}{}".format(OPENSEARCH_LOCAL_FILE_SCHEME, link_without_scheme)
+    else:
+        return link
 
 
 def load_wkt(wkt):
