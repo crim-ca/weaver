@@ -28,6 +28,7 @@ from twitcher.wps_restapi.jobs.jobs import check_status
 from twitcher.visibility import VISIBILITY_PUBLIC, visibility_values
 from twitcher.status import STATUS_ACCEPTED, STATUS_STARTED, STATUS_FAILED, STATUS_SUCCEEDED, STATUS_RUNNING
 from twitcher.status import job_status_values
+from twitcher.sync import EXECUTE_AUTO, EXECUTE_ASYNC, EXECUTE_SYNC
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference
 from owslib.util import clean_ows_url
 from lxml import etree
@@ -198,7 +199,7 @@ def execute_process(self, url, service, process_id, inputs,
             outputs.append(
                 (output.identifier, output.dataType == 'ComplexData'))
 
-        mode = 'async' if async else 'sync'
+        mode = EXECUTE_ASYNC if async else EXECUTE_SYNC
         execution = wps.execute(process_id, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
 
         if not execution.process and execution.errors:
@@ -284,8 +285,29 @@ def submit_job_handler(request, service_url, is_workflow=False):
     # TODO Validate param somehow
     provider_id = request.matchdict.get('provider_id')  # None OK if local
     process_id = request.matchdict.get('process_id')
-    async_execute = not request.params.getone('sync-execute') if 'sync-execute' in request.params else True
     tags = request.params.get('tags', '').split(',')
+
+    reqbody = request.json_body
+    test = [k in reqbody for k in ('inputs', 'outputs', 'mode', 'response')]
+    if not all(k in request.json_body for k in ('inputs', 'outputs', 'mode', 'response')):
+        raise HTTPBadRequest("Missing one of required parameters [inputs, outputs, mode, response].")
+
+    if request.json_body['mode'] not in [EXECUTE_ASYNC, EXECUTE_AUTO]:
+        raise HTTPNotImplemented(detail='{0} mode not supported.'.format(request.json_body['mode']))
+    async_execute = request.json_body['mode'] != EXECUTE_SYNC
+
+    if request.json_body['response'] != 'document':
+        raise HTTPNotImplemented(detail='{0} response not supported.'.format(request.json_body['response']))
+
+    for input in request.json_body['inputs']:
+        if not all(k in input for k in ('id', 'href')):
+            raise HTTPBadRequest("Missing one of required output parameters [id, href].")
+
+    for output in request.json_body['outputs']:
+        if not all(k in output for k in ('id', 'transmissionMode')):
+            raise HTTPBadRequest("Missing one of required output parameters [id, transmissionMode].")
+        if output['transmissionMode'] != 'reference':
+            raise HTTPNotImplemented(detail='{0} transmissionMode not supported.'.format(output['transmissionMode']))
 
     result = execute_process.delay(
         url=clean_ows_url(service_url),
@@ -311,7 +333,7 @@ def submit_job_handler(request, service_url, is_workflow=False):
         'status': STATUS_ACCEPTED,
         'location': location
     }
-    return HTTPCreated(json=body_data)
+    return HTTPCreated(location=location, json=body_data)
 
 
 @sd.jobs_full_service.post(tags=[sd.provider_processes_tag, sd.providers_tag, sd.execute_tag, sd.jobs_tag],

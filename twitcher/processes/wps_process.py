@@ -59,16 +59,17 @@ class WpsProcess(object):
         LOGGER.debug("Execute process WPS request for {0}".format(self.process_id))
 
         execute_body_inputs = []
-        execute_req_inpt_id = 'identifier'
-        execute_req_inpt_val = 'value'
+        execute_req_id = 'id'
+        execute_req_inpt_val = 'href'
+        execute_req_out_trans_mode = 'transmissionMode'
         for workflow_input_key, workflow_input_value in workflow_inputs.items():
             json_input = dict(identifier=workflow_input_key)
             if isinstance(workflow_input_value, list):
                 for workflow_input_value_item in workflow_input_value:
-                    execute_body_inputs.append({execute_req_inpt_id: workflow_input_key,
+                    execute_body_inputs.append({execute_req_id: workflow_input_key,
                                                 execute_req_inpt_val: workflow_input_value_item['location']})
             else:
-                execute_body_inputs.append({execute_req_inpt_id: workflow_input_key,
+                execute_body_inputs.append({execute_req_id: workflow_input_key,
                                             execute_req_inpt_val: workflow_input_value['location']})
         for input in execute_body_inputs:
             if input[execute_req_inpt_val].startswith('{0}://'.format(OPENSEARCH_LOCAL_FILE_SCHEME)):
@@ -77,11 +78,16 @@ class WpsProcess(object):
             elif input[execute_req_inpt_val].startswith('file://'):
                 input[execute_req_inpt_val] = self.host_file(input[execute_req_inpt_val])
                 LOGGER.debug("Hosting intermediate input {0} : {1}".format(
-                    input[execute_req_inpt_id],
+                    input[execute_req_id],
                     input[execute_req_inpt_val]))
 
+        execute_body_outputs = [{execute_req_id: output,
+                                 execute_req_out_trans_mode: 'reference'} for output in expected_outputs]
 
-        execute_body = dict(inputs=execute_body_inputs)
+        execute_body = dict(mode='async',
+                            response='document',
+                            inputs=execute_body_inputs,
+                            outputs=execute_body_outputs)
         request_url = self.url + process_jobs_uri.format(process_id=self.process_id)
         response = requests.post(request_url,
                                  json=execute_body,
@@ -91,19 +97,30 @@ class WpsProcess(object):
         response.raise_for_status()
         if response.status_code != 201:
             raise Exception('Was expecting a 201 status code from the execute request : {0}'.format(request_url))
-        job_id = response.json()['jobID']
-        job_status = response.json()
+        job_status_uri = response.headers['Location']
+        job_status = self.get_job_status(job_status_uri)
 
-        while job_status['status'] not in job_status_categories[status.STATUS_FINISHED]:
+        while job_status['status'].lower() not in job_status_categories[status.STATUS_FINISHED]:
             sleep(5)
-            job_status = self.get_job_status(job_id)
-            LOGGER.debug("Monitoring job {job} : [{status}] {progress} - {message}".format(job=job_id, **job_status))
+            job_status = self.get_job_status(job_status_uri)
+
+            LOGGER.debug("Monitoring job {jobID} : [{status}] {percentCompleted}  {message}".format(
+                jobID=job_status['jobID'],
+                status=job_status['status'],
+                percentCompleted=job_status.get('percentCompleted', ''),
+                message=job_status.get('message', '')
+            ))
 
         if job_status['status'] != status.STATUS_SUCCEEDED:
-            LOGGER.exception("Monitoring job {job} : [{status}] {message}".format(job=job_id, **job_status))
+            LOGGER.debug("Monitoring job {jobID} : [{status}] {percentCompleted}  {message}".format(
+                jobID=job_status['jobID'],
+                status=job_status['status'],
+                percentCompleted=job_status.get('percentCompleted', ''),
+                message=job_status.get('message', '')
+            ))
             raise Exception(job_status)
 
-        results = self.get_job_results(job_id)
+        results = self.get_job_results(job_status['jobID'])
 
         for result in results:
             if get_any_id(result) in expected_outputs:
@@ -119,8 +136,9 @@ class WpsProcess(object):
                 with open(dst_fn, mode='wb') as dst_fh:
                     dst_fh.write(r.content)
 
-    def get_job_status(self, job_id):
-        response = requests.get(self.url + process_job_uri.format(process_id=self.process_id, job_id=job_id),
+
+    def get_job_status(self, job_status_uri):
+        response = requests.get(job_status_uri,
                                 headers=self.headers,
                                 cookies=self.cookies,
                                 verify=self.verify)

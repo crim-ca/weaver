@@ -121,9 +121,10 @@ def get_job_status(request):
     """
     job = get_job(request)
     response = {
-        "status": job.status,
-        "message": job.status_message,
-        "progress": job.progress
+        'jobID': job.task_id,
+        'status': job.status,
+        'message': job.status_message,
+        'percentCompleted': job.progress,
     }
 
     if job.status in status.job_status_categories[status.STATUS_FINISHED]:
@@ -157,9 +158,10 @@ def cancel_job(request):
     store.update_job(job)
 
     return HTTPOk(json={
+        'jobID': job.task_id,
         'status': job.status,
         'message': job.status_message,
-        'progress': job.process,
+        'percentCompleted': job.progress,
     })
 
 
