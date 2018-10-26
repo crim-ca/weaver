@@ -20,10 +20,18 @@ from twitcher.processes.wps_process import OPENSEARCH_LOCAL_FILE_SCHEME
 LOGGER = logging.getLogger("PACKAGE")
 
 
-def query_eo_images_from_wps_inputs(
-    wps_inputs, eoimage_ids, osdd_url, accept_schemes=("http", "https")
-):
-    # type: (Dict[str, Deque], Iterable, str, Tuple) -> Dict[str, Deque]
+def alter_payload_after_query(payload):
+    """When redeploying the package on ADES, strip out any EOImage parameter"""
+    new_payload = deepcopy(payload)
+
+    for input_ in new_payload["processDescription"]["process"]["inputs"]:
+        if EOImageDescribeProcessHandler.is_eoimage_input(input_):
+            del input_["additionalParameters"]
+    return new_payload
+
+
+def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
+    # type: (Dict[str, Deque], Dict[str, Dict]) -> Dict[str, Deque]
     """Query OpenSearch using parameters in inputs and return file links.
 
     eoimage_ids is used to identify if a certain input is an eoimage.
