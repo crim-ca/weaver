@@ -594,8 +594,9 @@ class GetJobsRequest(MappingSchema):
 
 class SingleJobStatusSchema(MappingSchema):
     status = JobStatusEnum
+    jobID = SchemaNode(String(), example='a9d14bf4-84e0-449a-bac8-16e598efe807', description="ID of the job.")
     message = SchemaNode(String(), example='Job {}.'.format(STATUS_ACCEPTED))
-    progress = SchemaNode(Integer(), example=0)
+    percentCompleted = SchemaNode(Integer(), example=0)
     exceptions = SchemaNode(
         String(),
         missing=drop,
@@ -633,8 +634,9 @@ class GetAllJobsSchema(MappingSchema):
 
 class DismissedJobSchema(MappingSchema):
     status = JobStatusEnum
+    jobID = SchemaNode(String(), example='a9d14bf4-84e0-449a-bac8-16e598efe807', description="ID of the job.")
     message = SchemaNode(String(), example='Job dismissed.')
-    progress = SchemaNode(Integer(), example=0)
+    percentCompleted = SchemaNode(Integer(), example=0)
 
 
 class QuoteProcessParametersSchema(MappingSchema):
