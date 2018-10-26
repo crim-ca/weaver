@@ -18,16 +18,20 @@ from twitcher.processes.wps_process import OPENSEARCH_LOCAL_FILE_SCHEME
 LOGGER = logging.getLogger("PACKAGE")
 
 
-def query_eo_images_from_wps_inputs(wps_inputs,
-                                    eoimage_ids,
-                                    osdd_url,
-                                    accept_schemes=("http", "https")
-                                    ):
+def query_eo_images_from_wps_inputs(
+    wps_inputs, eoimage_ids, osdd_url, accept_schemes=("http", "https")
+):
     # type: (Dict[str, Deque], Iterable, str, Tuple) -> Dict[str, Deque]
     """Query OpenSearch using parameters in inputs and return file links.
 
     eoimage_ids is used to identify if a certain input is an eoimage.
-    # todo: handle non unique aoi and toi
+    todo: handle non unique aoi and toi
+
+    Args:
+        wps_inputs: inputs containing info to query
+        eoimage_ids: strings representing the name of fields that are EOImages
+        osdd_url: base OSDD url to query
+        accept_schemes: return result only for these schemes
     """
 
     new_inputs = deepcopy(wps_inputs)
@@ -50,7 +54,9 @@ def query_eo_images_from_wps_inputs(wps_inputs,
                     "endDate": pop_first_input("endDate")[0].data,
                     "bbox": bbox_str,
                 }
-                os = OpenSearchQuery(collection_identifier=queue[0].data, osdd_url=osdd_url)
+                os = OpenSearchQuery(
+                    collection_identifier=queue[0].data, osdd_url=osdd_url
+                )
 
                 for link in os.query_datasets(params, accept_schemes):
                     new_input = deepcopy(queue[0])
@@ -64,15 +70,23 @@ def query_eo_images_from_wps_inputs(wps_inputs,
 
 
 def replace_with_opensearch_scheme(link):
+    """
+    Args:
+        link: url to replace scheme
+    """
     scheme = urlparse.urlparse(link).scheme
     if scheme == "file":
-        link_without_scheme = link[link.find(":"):]
+        link_without_scheme = link[link.find(":") :]
         return "{}{}".format(OPENSEARCH_LOCAL_FILE_SCHEME, link_without_scheme)
     else:
         return link
 
 
 def load_wkt(wkt):
+    """
+    Args:
+        wkt (string): to get the bounding box of
+    """
     bounds = shapely.wkt.loads(wkt).bounds
     bbox_str = ",".join(map(str, bounds))
     return bbox_str
@@ -81,15 +95,18 @@ def load_wkt(wkt):
 class OpenSearchQuery(object):
     MAX_QUERY_RESULTS = 10  # usually the default at the OpenSearch server too
 
-    def __init__(self,
-                 collection_identifier,  # type: str
-                 osdd_url,  # type: str
-                 catalog_search_field="parentIdentifier"  # type: str
-                 ):
+    def __init__(
+        self,
+        collection_identifier,  # type: str
+        osdd_url,  # type: str
+        catalog_search_field="parentIdentifier",  # type: str
+    ):
         """
-        :param collection_identifier: Collection ID to query
-        :param osdd_url: Global OSDD url for opensearch queries.
-        :param catalog_search_field: Name of the field for the collection identifier.
+        Args:
+            collection_identifier: Collection ID to query
+            osdd_url: Global OSDD url for opensearch queries.
+            catalog_search_field: Name of the field for the collection
+                identifier.
         """
         self.collection_identifier = collection_identifier
         self.osdd_url = osdd_url
@@ -99,18 +116,26 @@ class OpenSearchQuery(object):
         }
         # validate inputs
         if any(c in "/?" for c in collection_identifier):
-            raise ValueError("Invalid collection identifier: {}".format(collection_identifier))
+            raise ValueError(
+                "Invalid collection identifier: {}".format(collection_identifier)
+            )
 
     def get_template_url(self):
         r = requests.get(self.osdd_url, params=self.params)
         r.raise_for_status()
 
         et = lxml.etree.fromstring(r.content)
-        url = et.xpath("//*[local-name() = 'Url'][@rel='results']")[0]  # type: lxml.etree._Element
+        xpath = "//*[local-name() = 'Url'][@rel='results']"
+        url = et.xpath(xpath)[0]  # type: lxml.etree._Element
         return url.attrib["template"]
 
     def _prepare_query_url(self, template_url, params):
         # type: (str, Dict) -> Tuple[str, Dict]
+        """
+        Args:
+            template_url: url containing query parameters
+            params: parameters to insert in formated url
+        """
         base_url, query = template_url.split("?", 1)
 
         query_params = {}
@@ -126,7 +151,9 @@ class OpenSearchQuery(object):
         for key, value in params.items():
             if key not in allowed_names:
                 # todo: raise twitcher-specific exception
-                raise ValueError("{key} is not an allowed query parameter".format(key=key))
+                raise ValueError(
+                    "{key} is not an allowed query parameter".format(key=key)
+                )
             query_params[key] = value
 
         query_params["maximumRecords"] = self.MAX_QUERY_RESULTS
@@ -134,7 +161,12 @@ class OpenSearchQuery(object):
         return base_url, query_params
 
     def requests_get_retry(self, *args, **kwargs):
-        """Retry a requests.get call"""
+        """Retry a requests.get call
+
+        Args:
+            *args: passed to requests.get
+            **kwargs: passed to requests.get
+        """
         retries_in_secs = [1, 5]
         for wait in retries_in_secs:
             response = requests.get(*args, **kwargs)
@@ -145,6 +177,11 @@ class OpenSearchQuery(object):
         return response
 
     def _query_features_paginated(self, params):
+        # type: (Dict) -> Iterable[Dict, str]
+        """
+        Args:
+            params: query parameters
+        """
         start_index = 1
         template_url = self.get_template_url()
         base_url, query_params = self._prepare_query_url(template_url, params)
@@ -167,6 +204,11 @@ class OpenSearchQuery(object):
 
     def query_datasets(self, params, accept_schemes):
         # type: (Dict, Tuple) -> Iterable
+        """
+        Args:
+            params: query parameters
+            accept_schemes: only return links of this scheme
+        """
         if params is None:
             params = {}
 
@@ -188,6 +230,10 @@ class OpenSearchQuery(object):
 
 def get_additional_parameters(input_data):
     # type: (Dict) -> List[Tuple[str, str]]
+    """
+    Args:
+        input_data: Dict containing or not the "additionalParameters" key
+    """
     output = []
     additional_parameters = input_data.get("additionalParameters", [])
     for additional_param in additional_parameters:
@@ -204,12 +250,20 @@ def get_additional_parameters(input_data):
 class EOImageDescribeProcessHandler(object):
     def __init__(self, inputs):
         # type: (List[Dict]) -> None
+        """
+        Args:
+            inputs:
+        """
         self.eoimage_inputs = list(filter(self.is_eoimage_input, inputs))
         self.other_inputs = list(ifilterfalse(self.is_eoimage_input, inputs))
 
     @staticmethod
     def is_eoimage_input(input_data):
         # type: (Dict) -> bool
+        """
+        Args:
+            input_data:
+        """
         for name, value in get_additional_parameters(input_data):
             if name.upper() == "EOIMAGE" and value and asbool(value[0]):
                 return True
@@ -218,6 +272,10 @@ class EOImageDescribeProcessHandler(object):
     @staticmethod
     def get_allowed_collections(input_data):
         # type: (Dict) -> List
+        """
+        Args:
+            input_data:
+        """
         for name, value in get_additional_parameters(input_data):
             if name.upper() == "ALLOWEDCOLLECTIONS":
                 return value.split(",")
@@ -225,6 +283,11 @@ class EOImageDescribeProcessHandler(object):
 
     @staticmethod
     def make_aoi(id_, unbounded):
+        """
+        Args:
+            id_:
+            unbounded:
+        """
         max_occurs = u"unbounded" if unbounded else 1
         data = {
             u"id": id_,
@@ -232,12 +295,17 @@ class EOImageDescribeProcessHandler(object):
             u"abstract": u"Area of Interest (Bounding Box)",
             u"formats": [{u"mimeType": u"OGC-WKT", u"default": True}],
             u"minOccurs": 1,
-            u"maxOccurs": max_occurs
+            u"maxOccurs": max_occurs,
         }
         return data
 
     @staticmethod
     def make_collection(image_format, allowed_values):
+        """
+        Args:
+            image_format:
+            allowed_values:
+        """
         data = {
             u"id": u"{}".format(image_format),
             u"title": u"Collection Identifer for input {}".format(image_format),
@@ -245,17 +313,32 @@ class EOImageDescribeProcessHandler(object):
             u"formats": [{u"mimeType": u"text/plain", u"default": True}],
             u"minOccurs": 1,
             u"maxOccurs": u"unbounded",
-            u"LiteralDataDomain": {u"dataType": u"String",
-                                   u"allowedValues": allowed_values},
-            u"additionalParameters": [{u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                                       u"parameters": [{u"name": u"CatalogSearchField", u"value": u"parentIdentifier"}]
-                                       }],
-            u"owsContext": {u"offering": {u"code": u"anyCode", u"content": {u"href": u"anyRef"}}}
+            u"LiteralDataDomain": {
+                u"dataType": u"String",
+                u"allowedValues": allowed_values,
+            },
+            u"additionalParameters": [
+                {
+                    u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
+                    u"parameters": [
+                        {u"name": u"CatalogSearchField", u"value": u"parentIdentifier"}
+                    ],
+                }
+            ],
+            u"owsContext": {
+                u"offering": {u"code": u"anyCode", u"content": {u"href": u"anyRef"}}
+            },
         }
         return data
 
     @staticmethod
     def make_toi(id_, unbounded, start_date=True):
+        """
+        Args:
+            id_:
+            unbounded:
+            start_date:
+        """
         max_occurs = u"unbounded" if unbounded else 1
         date = u"startDate" if start_date else u"endDate"
         data = {
@@ -266,19 +349,33 @@ class EOImageDescribeProcessHandler(object):
             u"minOccurs": 1,
             u"maxOccurs": max_occurs,
             u"LiteralDataDomain": {u"dataType": u"String"},
-            u"additionalParameters": [{u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                                       u"parameters": [{u"name": u"CatalogSearchField", u"value": date}]}],
-            u"owsContext": {u"offering": {u"code": u"anyCode", u"content": {u"href": u"anyRef"}}}
+            u"additionalParameters": [
+                {
+                    u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
+                    u"parameters": [{u"name": u"CatalogSearchField", u"value": date}],
+                }
+            ],
+            u"owsContext": {
+                u"offering": {u"code": u"anyCode", u"content": {u"href": u"anyRef"}}
+            },
         }
         return data
 
     def to_opensearch(self, unique_aoi, unique_toi, wps_inputs=False):
         # type: (bool, bool, bool) -> List[Dict]
+        """
+        Args:
+            unique_aoi:
+            unique_toi:
+            wps_inputs:
+        """
         if not self.eoimage_inputs:
             return self.other_inputs
 
         eoimage_names = [get_any_id(i) for i in self.eoimage_inputs]
-        allowed_collections = [self.get_allowed_collections(i) for i in self.eoimage_inputs]
+        allowed_collections = [
+            self.get_allowed_collections(i) for i in self.eoimage_inputs
+        ]
 
         toi = []
         aoi = []
@@ -286,8 +383,12 @@ class EOImageDescribeProcessHandler(object):
 
         unbounded_toi = not unique_toi
         toi_id = u"" if unique_toi else u"_{id}"
-        toi.append(self.make_toi(u"startDate{}".format(toi_id), unbounded_toi, start_date=True))
-        toi.append(self.make_toi(u"endDate{}".format(toi_id), unbounded_toi, start_date=False))
+        toi.append(
+            self.make_toi(u"startDate{}".format(toi_id), unbounded_toi, start_date=True)
+        )
+        toi.append(
+            self.make_toi(u"endDate{}".format(toi_id), unbounded_toi, start_date=False)
+        )
 
         unbounded_aoi = not unique_aoi
         aoi.append(self.make_aoi(u"aoi", unbounded=unbounded_aoi))
@@ -302,6 +403,10 @@ class EOImageDescribeProcessHandler(object):
 
     @staticmethod
     def convert_to_wps_input(input_):
+        """
+        Args:
+            input_:
+        """
         replace = {
             u"id": u"identifier",
             u"minOccurs": u"min_occurs",
@@ -313,10 +418,7 @@ class EOImageDescribeProcessHandler(object):
             u"additionalParameters",
             u"owsContext",
         ]
-        add = {
-            u"type": u"literal",
-            u"data_type": u"string",
-        }
+        add = {u"type": u"literal", u"data_type": u"string"}
         for k, v in replace.items():
             if k in input_:
                 input_[v] = input_.pop(k)
@@ -329,24 +431,40 @@ class EOImageDescribeProcessHandler(object):
 
 
 def get_eoimages_inputs_from_payload(payload):
+    """
+    Args:
+        payload:
+    """
     inputs = payload["processDescription"]["process"].get("inputs", {})
     return list(filter(EOImageDescribeProcessHandler.is_eoimage_input, inputs))
 
 
 def get_eoimages_ids_from_payload(payload):
+    """
+    Args:
+        payload:
+    """
     return [get_any_id(i) for i in get_eoimages_inputs_from_payload(payload)]
 
 
 def replace_inputs_eoimage_files_to_query(inputs, payload, wps_inputs=False):
     # type: (List[Dict], Dict, bool) -> List[Dict]
-    """Replace EOImage inputs (additionalParameter -> EOImage -> true) with OpenSearch query parameters"""
+    """Replace EOImage inputs (additionalParameter -> EOImage -> true) with
+    OpenSearch query parameters
+
+    Args:
+        inputs:
+        payload:
+        wps_inputs:
+    """
 
     # add "additionalParameters" property from the payload
     process = payload["processDescription"]["process"]
     payload_inputs = {get_any_id(i): i for i in process.get("inputs", {})}
     for i in inputs:
         try:
-            i["additionalParameters"] = payload_inputs[get_any_id(i)]["additionalParameters"]
+            ap = payload_inputs[get_any_id(i)]["additionalParameters"]
+            i["additionalParameters"] = ap
         except:
             pass
 
@@ -354,10 +472,14 @@ def replace_inputs_eoimage_files_to_query(inputs, payload, wps_inputs=False):
 
     unique_toi, unique_aoi = True, True  # by default
     if additional_parameters:
-        additional_parameters_upper = [[p[0].upper(), ",".join([c.upper() for c in p[1]])] for p in
-                                       additional_parameters]
+        additional_parameters_upper = [
+            [p[0].upper(), ",".join([c.upper() for c in p[1]])]
+            for p in additional_parameters
+        ]
         unique_toi = ["UNIQUETOI", "TRUE"] in additional_parameters_upper
         unique_aoi = ["UNIQUEAOI", "TRUE"] in additional_parameters_upper
     handler = EOImageDescribeProcessHandler(inputs=inputs)
-    inputs_converted = handler.to_opensearch(unique_aoi=unique_aoi, unique_toi=unique_toi, wps_inputs=wps_inputs)
+    inputs_converted = handler.to_opensearch(
+        unique_aoi=unique_aoi, unique_toi=unique_toi, wps_inputs=wps_inputs
+    )
     return inputs_converted
