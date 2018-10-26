@@ -56,6 +56,8 @@ def fetch_data_sources():
                 DATA_SOURCES = json.load(f)
         except Exception:
             pass
+    if not DATA_SOURCES:
+        raise ValueError("No data source found in setting 'twitcher.data_sources'")
     return DATA_SOURCES
 
 
