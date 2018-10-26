@@ -75,6 +75,8 @@ def load_wkt(wkt):
 
 
 class OpenSearchQuery(object):
+    MAX_QUERY_RESULTS = 10  # usually the default at the OpenSearch server too
+
     def __init__(self,
                  collection_identifier,  # type: str
                  osdd_url,  # type: str
@@ -123,25 +125,41 @@ class OpenSearchQuery(object):
                 raise ValueError("{key} is not an allowed query parameter".format(key=key))
             query_params[key] = value
 
+        query_params["maximumRecords"] = self.MAX_QUERY_RESULTS
+
         return base_url, query_params
 
+    def requests_get_retry(self, *args, **kwargs):
+        """Retry a requests.get call"""
+        retries_in_secs = [1, 5]
+        for wait in retries_in_secs:
+            response = requests.get(*args, **kwargs)
+            if response.status_code == 200:
+                return response
+            else:
+                time.sleep(wait)
+        return response
+
     def _query_features_paginated(self, params):
-        start_page = 1
+        start_index = 1
         template_url = self.get_template_url()
         base_url, query_params = self._prepare_query_url(template_url, params)
         while True:
-            query_params["startPage"] = start_page
-            response = requests.get(base_url, params=query_params)
-            response.raise_for_status()
-            json_body = response.json()
-            for feature in json_body["features"]:
-                yield feature, response.url
-            total_results = json_body["totalResults"]
-            items_per_page = json_body["itemsPerPage"]
-            start_index = json_body["startIndex"]
-            if start_index + items_per_page >= total_results:
+            query_params["startRecord"] = start_index
+            response = self.requests_get_retry(base_url, params=query_params)
+            if not response.status_code == 200:
                 break
-            start_page += 1
+            json_body = response.json()
+            features = json_body.get("features", [])
+            for feature in features:
+                yield feature, response.url
+            n_received_features = len(features)
+            total_results = json_body["totalResults"]
+            if not n_received_features:
+                break
+            if start_index + n_received_features > total_results:
+                break
+            start_index += n_received_features
 
     def query_datasets(self, params, accept_schemes):
         # type: (Dict, Tuple) -> Iterable
@@ -332,7 +350,8 @@ def replace_inputs_eoimage_files_to_query(inputs, payload, wps_inputs=False):
 
     unique_toi, unique_aoi = True, True  # by default
     if additional_parameters:
-        additional_parameters_upper = [[p[0].upper(), ",".join([c.upper() for c in p[1]])] for p in additional_parameters]
+        additional_parameters_upper = [[p[0].upper(), ",".join([c.upper() for c in p[1]])] for p in
+                                       additional_parameters]
         unique_toi = ["UNIQUETOI", "TRUE"] in additional_parameters_upper
         unique_aoi = ["UNIQUEAOI", "TRUE"] in additional_parameters_upper
     handler = EOImageDescribeProcessHandler(inputs=inputs)
