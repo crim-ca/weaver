@@ -18,7 +18,7 @@ from pyramid.settings import asbool
 # TODO The logger log twice ?
 LOGGER = logging.getLogger(__name__)
 
-OPENSEARCH_LOCAL_FILE_SCHEME = 'opensearch_file'
+OPENSEARCH_LOCAL_FILE_SCHEME = 'opensearchfile'  # must be a valid url scheme parsable by urlparse
 
 class WpsProcess(object):
     def __init__(self, url, process_id, deploy_body, cookies):
