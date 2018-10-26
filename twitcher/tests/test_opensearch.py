@@ -176,7 +176,7 @@ def test_transform_execute_parameters_wps(opensearch_process):
     )
 
     payload = opensearch_process.payload
-    eoimage_ids = opensearch.get_eoimages_ids_from_payload(payload)
+    eoimage_ids = opensearch.get_eo_images_ids_from_payload(payload)
     opensearch.OpenSearchQuery.query_datasets = mock.MagicMock()
     opensearch.OpenSearchQuery.query_datasets.return_value = mocked_query
 
@@ -321,20 +321,41 @@ def test_query():
     inputs["startDate"][0].data = u"2018-01-30T00:00:00.000Z"
     inputs["aoi"][0].data = u"POLYGON ((100 15, 104 15, 104 19, 100 19, 100 15))"
 
-    data = opensearch.query_eo_images_from_wps_inputs(
-        inputs, eoimage_ids, osdd_url, accept_schemes=("file", "https")
-    )
+    eo_image_source_info = {"files": {
+        "collection_id": "EOP:IPT:Sentinel2",
+        "accept_schemes": [
+            "http",
+            "https"
+        ],
+        "rootdir": "/eodata/Sentinel-2",
+        "ades": "http://localhost:5001",
+        "osdd_url": "http://geo.spacebel.be/opensearch/description.xml"
+    }}
+
+    data = opensearch.query_eo_images_from_wps_inputs(inputs, eo_image_source_info)
 
     assert len(data["files"]) == 15
+    for f in data["files"]:
+        print f.data
 
     inputs["files"][0].data = "EOP:VITO:PROBAV_P_V001"
     inputs["endDate"][0].data = u"2018-01-31T23:59:59.999Z"
     inputs["startDate"][0].data = u"2018-01-30T00:00:00.000Z"
     inputs["aoi"][0].data = u"POLYGON ((100 15, 104 15, 104 19, 100 19, 100 15))"
     #
-    data = opensearch.query_eo_images_from_wps_inputs(
-        inputs, eoimage_ids, osdd_url, accept_schemes=("file", "https")
-    )
+
+    eo_image_source_info = {"probav": {
+        "collection_id": "EOP:VITO:PROBAV_P_V001",
+        "accept_schemes": [
+            "http",
+            "https"
+        ],
+        "rootdir": "",
+        "ades": "http://localhost:5001",
+        "osdd_url": "http://geo.spacebel.be/opensearch/description.xml"
+    }}
+
+    data = opensearch.query_eo_images_from_wps_inputs(inputs, eo_image_source_info)
 
     assert len(data["files"]) == 3
 

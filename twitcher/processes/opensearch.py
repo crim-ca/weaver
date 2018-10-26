@@ -2,7 +2,9 @@ import time
 from collections import deque
 from copy import deepcopy
 from itertools import ifilterfalse
-from twitcher.utils import get_any_id
+
+from twitcher.processes.sources import fetch_data_sources
+from twitcher.utils import get_any_id, get_any_value
 from pyramid.settings import asbool
 
 import lxml.etree
@@ -29,21 +31,20 @@ def query_eo_images_from_wps_inputs(
 
     Args:
         wps_inputs: inputs containing info to query
-        eoimage_ids: strings representing the name of fields that are EOImages
-        osdd_url: base OSDD url to query
-        accept_schemes: return result only for these schemes
+        eoimage_source_info: data source info of eoimages
     """
-
     new_inputs = deepcopy(wps_inputs)
 
     def pop_first_input(id_to_pop):
         return new_inputs.pop(id_to_pop)
 
-    eoimages_inputs = [input_id for input_id in wps_inputs if input_id in eoimage_ids]
+    eoimages_inputs = [
+        input_id for input_id in wps_inputs if input_id in eoimage_source_info
+    ]
     if eoimages_inputs:
         eoimages_queue = deque()
         for input_id, queue in wps_inputs.items():
-            if input_id in eoimage_ids:
+            if input_id in eoimage_source_info:
                 new_inputs.pop(input_id)
 
                 wkt = pop_first_input("aoi")[0].data
@@ -54,11 +55,12 @@ def query_eo_images_from_wps_inputs(
                     "endDate": pop_first_input("endDate")[0].data,
                     "bbox": bbox_str,
                 }
+                osdd_url = eoimage_source_info[input_id]["osdd_url"]
+                accept_schemes = eoimage_source_info[input_id]["accept_schemes"]
                 os = OpenSearchQuery(
                     collection_identifier=queue[0].data, osdd_url=osdd_url
                 )
-
-                for link in os.query_datasets(params, accept_schemes):
+                for link in os.query_datasets(params, accept_schemes=accept_schemes):
                     new_input = deepcopy(queue[0])
                     new_input.data = replace_with_opensearch_scheme(link)
                     eoimages_queue.append(new_input)
@@ -265,7 +267,7 @@ class EOImageDescribeProcessHandler(object):
             input_data:
         """
         for name, value in get_additional_parameters(input_data):
-            if name.upper() == "EOIMAGE" and value and asbool(value[0]):
+            if name.upper() == "EOIMAGE" and value and len(value) and asbool(value[0]):
                 return True
         return False
 
@@ -430,7 +432,7 @@ class EOImageDescribeProcessHandler(object):
         return input_
 
 
-def get_eoimages_inputs_from_payload(payload):
+def get_eo_images_inputs_from_payload(payload):
     """
     Args:
         payload:
@@ -439,12 +441,35 @@ def get_eoimages_inputs_from_payload(payload):
     return list(filter(EOImageDescribeProcessHandler.is_eoimage_input, inputs))
 
 
-def get_eoimages_ids_from_payload(payload):
+def get_eo_images_data_sources(payload):
+    # type: (Dict) -> Dict[str, Dict]
+    inputs = get_eo_images_inputs_from_payload(payload)
+    id_with_collection = {get_any_id(i): get_any_value(i) for i in inputs}
+    return {k: get_data_source(id_) for k, id_ in id_with_collection.items()}
+
+
+def get_data_source(collection_id):
+    data_sources = fetch_data_sources()
+    for source_data in data_sources.values():
+        try:
+            if source_data["collection_id"] == collection_id:
+                return source_data
+        except KeyError:
+            pass
+    # specific collection id not found, try to return the default one
+    try:
+        return data_sources["opensearchdefault"]
+    except KeyError:
+        message = "No osdd url found in data sources for collection id:" + collection_id
+        raise ValueError(message)
+
+
+def get_eo_images_ids_from_payload(payload):
     """
     Args:
         payload:
     """
-    return [get_any_id(i) for i in get_eoimages_inputs_from_payload(payload)]
+    return [get_any_id(i) for i in get_eo_images_inputs_from_payload(payload)]
 
 
 def replace_inputs_eoimage_files_to_query(inputs, payload, wps_inputs=False):

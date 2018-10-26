@@ -909,10 +909,9 @@ class Package(Process):
                 raise self.exception_message(PackageExecutionError, exc, "Failed retrieving package input types.")
             try:
                 # identify EOimages from payload
-                eoimage_ids = opensearch.get_eoimages_ids_from_payload(self.payload)
-                # if applicable, query EOImages
-                osdd_url = registry.settings['twitcher.opensearch_url']
-                request.inputs = opensearch.query_eo_images_from_wps_inputs(request.inputs, eoimage_ids, osdd_url)
+                eoimage_data_sources = opensearch.get_eo_images_data_sources(self.payload)
+                if eoimage_data_sources:
+                    request.inputs = opensearch.query_eo_images_from_wps_inputs(request.inputs, eoimage_data_sources)
 
                 cwl_inputs = dict()
                 for input_id in request.inputs:
@@ -1003,14 +1002,19 @@ class Package(Process):
         try:
             # Presume that all EOImage given as input can be resolved to the same ADES
             # So if we got multiple inputs or multiple values for an input, we take the first one as reference
-            eodata_inputs = opensearch.get_eoimages_ids_from_payload(step_payload)
-            value = joborder[eodata_inputs[0]]
+            eodata_inputs = opensearch.get_eo_images_ids_from_payload(step_payload)
 
-            if isinstance(value, list):
-                # Use the first value to determine the data source
-                value = value[0]
-            eodata_input_url = value['location']
-            data_source = get_data_source_from_url(eodata_input_url)
+            data_url = ""  # TODO: If there is no EOImage, get a useful data url. For now, it should be the default ades
+            if eodata_inputs:
+                step_payload = opensearch.alter_payload_after_query(step_payload)
+                value = joborder[eodata_inputs[0]]
+
+                if isinstance(value, list):
+                    # Use the first value to determine the data source
+                    value = value[0]
+
+                data_url = value['location']
+            data_source = get_data_source_from_url(data_url)
 
             # Presume that steps are launched sequentially and have the same progress weight
             progress_estimate = float(len(self.step_launched)) / max(1, len(self.step_packages))
