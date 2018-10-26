@@ -40,6 +40,26 @@ def get_wps_path(settings):
     return wps_path.rstrip('/').strip()
 
 
+def load_pywps_cfg(registry, config_file=None):
+    global PYWPS_CFG
+
+    if PYWPS_CFG is None:
+        # get PyWPS config
+        pywps_config.load_configuration(config_file or get_wps_cfg_path(registry.settings))
+        PYWPS_CFG = pywps_config
+
+    if 'twitcher.wps_output_path' not in registry.settings:
+        # ensure the output dir exists if specified
+        out_dir_path = PYWPS_CFG.get_config_value('server', 'outputpath')
+        if not os.path.isdir(out_dir_path):
+            os.makedirs(out_dir_path)
+        registry.settings['twitcher.wps_output_path'] = out_dir_path
+
+    if 'twitcher.wps_output_url' not in registry.settings:
+        output_url = PYWPS_CFG.get_config_value('server', 'outputurl')
+        registry.settings['twitcher.wps_output_url'] = output_url
+
+
 def _processes(request):
     from twitcher.store import processstore_defaultfactory
     return processstore_defaultfactory(request.registry)
@@ -54,7 +74,6 @@ def pywps_view(environ, start_response):
     """
     from pywps.app.Service import Service
     LOGGER.debug('pywps env: %s', environ.keys())
-    global PYWPS_CFG
 
     try:
         registry = app.conf['PYRAMID_REGISTRY']
@@ -62,20 +81,7 @@ def pywps_view(environ, start_response):
         # get config file
         if 'PYWPS_CFG' not in environ:
             environ['PYWPS_CFG'] = os.getenv('PYWPS_CFG') or get_wps_cfg_path(registry.settings)
-
-        if PYWPS_CFG is None:
-            # get PyWPS config
-            pywps_config.load_configuration(environ['PYWPS_CFG'])
-            PYWPS_CFG = pywps_config
-
-            # ensure the output dir exists if specified
-            out_dir_path = PYWPS_CFG.get_config_value('server', 'outputpath')
-            if not os.path.isdir(out_dir_path):
-                os.makedirs(out_dir_path)
-
-            output_url = PYWPS_CFG.get_config_value('server', 'outputurl')
-            registry.settings['twitcher.wps_output_url'] = output_url
-            registry.settings['twitcher.wps_output_path'] = out_dir_path
+        load_pywps_cfg(registry, config_file=environ['PYWPS_CFG'])
 
         # call pywps application
         from twitcher.store import processstore_defaultfactory
