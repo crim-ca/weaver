@@ -1,3 +1,4 @@
+import time
 from collections import deque
 from copy import deepcopy
 from itertools import ifilterfalse
@@ -17,8 +18,12 @@ from twitcher.processes.wps_process import OPENSEARCH_LOCAL_FILE_SCHEME
 LOGGER = logging.getLogger("PACKAGE")
 
 
-def query_eo_images_from_wps_inputs(wps_inputs, eoimage_ids, osdd_url):
-    # type: (Dict[str, Deque], Iterable, str) -> Dict[str, Deque]
+def query_eo_images_from_wps_inputs(wps_inputs,
+                                    eoimage_ids,
+                                    osdd_url,
+                                    accept_schemes=("http", "https")
+                                    ):
+    # type: (Dict[str, Deque], Iterable, str, Tuple) -> Dict[str, Deque]
     """Query OpenSearch using parameters in inputs and return file links.
 
     eoimage_ids is used to identify if a certain input is an eoimage.
@@ -47,7 +52,7 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_ids, osdd_url):
                 }
                 os = OpenSearchQuery(collection_identifier=queue[0].data, osdd_url=osdd_url)
 
-                for link in os.query_datasets(params):
+                for link in os.query_datasets(params, accept_schemes):
                     new_input = deepcopy(queue[0])
                     new_input.data = replace_with_opensearch_scheme(link)
                     eoimages_queue.append(new_input)
@@ -174,8 +179,8 @@ class OpenSearchQuery(object):
                 break
             start_page += 1
 
-    def query_datasets(self, params=None):
-        # type: (Dict) -> Iterable
+    def query_datasets(self, params, accept_schemes):
+        # type: (Dict, Tuple) -> Iterable
         if params is None:
             params = {}
 
@@ -186,11 +191,13 @@ class OpenSearchQuery(object):
                 LOGGER.exception("Badly formatted json at: {}".format(url))
                 raise
 
-            file_link = [link for link in data_links if urlparse.urlparse(link).scheme == "file"]
-            if not file_link:
-                LOGGER.debug("No file:// download link for a feature at: {}".format(url))
-            file_link = file_link[0]
-            yield file_link
+            for link in data_links:
+                scheme = urlparse.urlparse(link).scheme
+                if scheme in accept_schemes:
+                    yield link
+                    continue
+                else:
+                    LOGGER.debug("No accepted scheme for feature at: {}".format(url))
 
 
 def get_additional_parameters(input_data):
