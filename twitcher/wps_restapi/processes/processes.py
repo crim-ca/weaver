@@ -28,6 +28,7 @@ from twitcher.wps_restapi.jobs.jobs import check_status
 from twitcher.visibility import VISIBILITY_PUBLIC, visibility_values
 from twitcher.status import STATUS_ACCEPTED, STATUS_STARTED, STATUS_FAILED, STATUS_SUCCEEDED, STATUS_RUNNING
 from twitcher.status import job_status_values
+from twitcher.sync import EXECUTE_AUTO, EXECUTE_ASYNC, EXECUTE_SYNC
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference
 from owslib.util import clean_ows_url
 from lxml import etree
@@ -198,7 +199,7 @@ def execute_process(self, url, service, process_id, inputs,
             outputs.append(
                 (output.identifier, output.dataType == 'ComplexData'))
 
-        mode = 'async' if async else 'sync'
+        mode = EXECUTE_ASYNC if async else EXECUTE_SYNC
         execution = wps.execute(process_id, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
 
         if not execution.process and execution.errors:
@@ -291,9 +292,9 @@ def submit_job_handler(request, service_url, is_workflow=False):
     if not all(k in request.json_body for k in ('inputs', 'outputs', 'mode', 'response')):
         raise HTTPBadRequest("Missing one of required parameters [inputs, outputs, mode, response].")
 
-    if request.json_body['mode'] not in ['async', 'auto']:
+    if request.json_body['mode'] not in [EXECUTE_ASYNC, EXECUTE_AUTO]:
         raise HTTPNotImplemented(detail='{0} mode not supported.'.format(request.json_body['mode']))
-    async_execute = request.json_body['mode'] != 'sync'
+    async_execute = request.json_body['mode'] != EXECUTE_SYNC
 
     if request.json_body['response'] != 'document':
         raise HTTPNotImplemented(detail='{0} response not supported.'.format(request.json_body['response']))
