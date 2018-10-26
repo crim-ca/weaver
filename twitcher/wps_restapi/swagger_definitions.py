@@ -313,8 +313,6 @@ OutputTransmissionEnum = SchemaNode(String(), title='outputTransmission', missin
 
 
 class LaunchJobQuerystring(MappingSchema):
-    sync_execute = SchemaNode(Boolean(), default=False, missing=drop)
-    sync_execute.name = 'sync-execute'
     field_string = SchemaNode(String(), default=None, missing=drop,
                               description='Comma separated tags that can be used to filter jobs later')
     field_string.name = 'tags'
@@ -483,13 +481,12 @@ class CreateProviderRequestBody(MappingSchema):
 
 class JobInput(MappingSchema):
     id = SchemaNode(String())
-    value = SchemaNode(String())
-    type = SchemaNode(String())
+    href = SchemaNode(String())
 
 
 class JobOutput(MappingSchema):
     id = SchemaNode(String())
-    type = SchemaNode(String())
+    transmissionMode = SchemaNode(String())
 
 
 class JobInputList(SequenceSchema):
@@ -851,6 +848,9 @@ class ProcessesEndpoint(MappingSchema):
 
 class PostProcessJobBody(MappingSchema):
     inputs = JobInputList(missing=drop)
+    outputs = JobOutputList()
+    mode = SchemaNode(String())
+    response = SchemaNode(String())
 
 
 class PostProcessJobsEndpoint(MappingSchema):
@@ -960,7 +960,9 @@ class GetProviderProcess(MappingSchema):
 
 class PostProviderProcessJobRequestBody(MappingSchema):
     inputs = JobInputList()
-    # outputs = JobOutputList()
+    outputs = JobOutputList()
+    mode = SchemaNode(String())
+    response = SchemaNode(String())
 
 
 class PostProviderProcessJobRequest(MappingSchema):

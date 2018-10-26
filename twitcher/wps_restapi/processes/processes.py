@@ -284,8 +284,29 @@ def submit_job_handler(request, service_url, is_workflow=False):
     # TODO Validate param somehow
     provider_id = request.matchdict.get('provider_id')  # None OK if local
     process_id = request.matchdict.get('process_id')
-    async_execute = not request.params.getone('sync-execute') if 'sync-execute' in request.params else True
     tags = request.params.get('tags', '').split(',')
+
+    reqbody = request.json_body
+    test = [k in reqbody for k in ('inputs', 'outputs', 'mode', 'response')]
+    if not all(k in request.json_body for k in ('inputs', 'outputs', 'mode', 'response')):
+        raise HTTPBadRequest("Missing one of required parameters [inputs, outputs, mode, response].")
+
+    if request.json_body['mode'] not in ['async', 'auto']:
+        raise HTTPNotImplemented(detail='{0} mode not supported.'.format(request.json_body['mode']))
+    async_execute = request.json_body['mode'] != 'sync'
+
+    if request.json_body['response'] != 'document':
+        raise HTTPNotImplemented(detail='{0} response not supported.'.format(request.json_body['response']))
+
+    for input in request.json_body['inputs']:
+        if not all(k in input for k in ('id', 'href')):
+            raise HTTPBadRequest("Missing one of required output parameters [id, href].")
+
+    for output in request.json_body['outputs']:
+        if not all(k in output for k in ('id', 'transmissionMode')):
+            raise HTTPBadRequest("Missing one of required output parameters [id, transmissionMode].")
+        if output['transmissionMode'] != 'reference':
+            raise HTTPNotImplemented(detail='{0} transmissionMode not supported.'.format(output['transmissionMode']))
 
     result = execute_process.delay(
         url=clean_ows_url(service_url),
