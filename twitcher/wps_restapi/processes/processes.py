@@ -333,7 +333,7 @@ def submit_job_handler(request, service_url, is_workflow=False):
         'status': STATUS_ACCEPTED,
         'location': location
     }
-    return HTTPCreated(json=body_data)
+    return HTTPCreated(location=location, json=body_data)
 
 
 @sd.jobs_full_service.post(tags=[sd.provider_processes_tag, sd.providers_tag, sd.execute_tag, sd.jobs_tag],
