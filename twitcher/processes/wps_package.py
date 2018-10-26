@@ -930,13 +930,13 @@ class Package(Process):
                         # extend array data that allow max_occur > 1
                         input_data = [i.url if i.as_reference else i.data for i in input_occurs]
                         input_type = elem_type
-                    if isinstance(input_i, (LiteralInput, BoundingBoxInput)):
-                        cwl_inputs[input_id] = input_data
-                    elif isinstance(input_i, ComplexInput):
+                    if isinstance(input_i, ComplexInput) or elem_type == "File":
                         if isinstance(input_data, list):
                             cwl_inputs[input_id] = [{'location': data, 'class': input_type} for data in input_data]
                         else:
                             cwl_inputs[input_id] = {'location': input_data, 'class': input_type}
+                    elif isinstance(input_i, (LiteralInput, BoundingBoxInput)):
+                        cwl_inputs[input_id] = input_data
                     else:
                         raise self.exception_message(PackageTypeError, None,
                                                      "Undefined package input for execution: {}.".format(type(input_i)))
