@@ -8,6 +8,7 @@ import unittest
 import os
 from pprint import pformat
 
+import urlparse
 from mock import mock
 from pyramid import testing
 from pyramid.testing import DummyRequest
@@ -21,7 +22,13 @@ from twitcher.processes import opensearch
 from twitcher.store import DB_MEMORY, MemoryProcessStore
 from twitcher.wps_restapi.processes import processes
 
-OSDD_URL = "http://dummy.com"
+OSDD_URL = "http://geo.spacebel.be/opensearch/description.xml"
+
+COLLECTION_IDS = {
+    "sentinel2": "EOP:IPT:Sentinel2",
+    "probav": "EOP:VITO:PROBAV_P_V001",
+    "deimos": "DE2_PS3_L1C",
+}
 
 
 def assert_json_equals(json1, json2):
@@ -119,31 +126,6 @@ def test_describe_process_opensearch(processstore_factory, memory_store, opensea
                                                                        wps_inputs=True)
 
     assert_json_equals(transformed_inputs, expected_inputs)
-
-
-def test_transform_execute_parameters(opensearch_process):
-    inputs = [('startDate', '2018-01-30T00:00:00.000Z'),
-              ('endDate', '2018-01-31T23:59:59.999Z'),
-              ('aoi', 'POLYGON ((100.4 15.3, 104.6 15.3, 104.6 19.3, 100.4 19.3, 100.4 15.3))'),
-              ('files', 'EOP:IPT:Sentinel2'),
-              ('output_file_type', 'GEOTIFF'),
-              ('output_name', 'stack_result.tif')]
-
-    mocked_query = ['file:///something.SAFE']
-    mocked_files = [('files', 'opensearch_' + m) for m in mocked_query]
-
-    expected = [('output_file_type', 'GEOTIFF'),
-                ('output_name', 'stack_result.tif'),
-                ] + mocked_files
-
-    payload = opensearch_process.payload
-    eoimage_ids = opensearch.get_eoimages_ids_from_payload(payload)
-    opensearch.OpenSearchQuery.query_datasets = mock.MagicMock()
-    opensearch.OpenSearchQuery.query_datasets.return_value = mocked_query
-
-    transformed = opensearch.query_eo_images_from_inputs(inputs, eoimage_ids, OSDD_URL)
-
-    assert transformed == expected
 
 
 def test_transform_execute_parameters_wps(opensearch_process):
@@ -252,3 +234,70 @@ def test_get_additional_parameters():
     params = twitcher.processes.opensearch.get_additional_parameters(data)
     assert ("UniqueAOI", ["true"]) in params
     assert ("UniqueTOI", ["true"]) in params
+
+
+@pytest.mark.online
+def test_get_template_urls():
+    all_fields = set()
+    for name, collection_id in COLLECTION_IDS.items():
+        o = opensearch.OpenSearchQuery(collection_id, osdd_url=OSDD_URL)
+        template = o.get_template_url()
+        params = urlparse.parse_qsl(urlparse.urlparse(template).query)
+        param_names = list(sorted(p[0] for p in params))
+        if all_fields:
+            all_fields = all_fields.intersection(param_names)
+        else:
+            all_fields.update(param_names)
+
+    fields_in_all_queries = list(sorted(all_fields))
+    expected = ['bbox', 'endDate', 'geometry', 'httpAccept', 'lat', 'lon', 'maximumRecords', 'name', 'parentIdentifier',
+                'radius', 'startDate', 'startRecord', 'uid']
+    assert fields_in_all_queries == expected
+
+
+@pytest.mark.online
+def test_query():
+    eoimage_ids = ["files"]
+    osdd_url = 'http://geo.spacebel.be/opensearch/description.xml'
+    inputs = {
+        "aoi": deque([LiteralInput("aoi", "Area", data_type='string')]),
+        "startDate": deque([LiteralInput("startDate", "Area", data_type='string')]),
+        "endDate": deque([LiteralInput("endDate", "Area", data_type='string')]),
+        "files": deque([LiteralInput("files", "Collection id to query", data_type='string')]),
+    }
+
+    inputs["files"][0].data = "EOP:IPT:Sentinel2"
+    inputs["endDate"][0].data = u'2018-01-31T23:59:59.999Z'
+    inputs["startDate"][0].data =u'2018-01-30T00:00:00.000Z'
+    inputs["aoi"][0].data = u'POLYGON ((100.4 15.3, 104.6 15.3, 104.6 19.3, 100.4 19.3, 100.4 15.3))'
+
+    data = opensearch.query_eo_images_from_wps_inputs(inputs,
+                                                      eoimage_ids,
+                                                      osdd_url,
+                                                      accept_schemes=("file", "https"))
+
+    assert len(data["files"]) == 8
+
+    inputs["files"][0].data = "EOP:VITO:PROBAV_P_V001"
+    inputs["endDate"][0].data = u'2018-01-31T23:59:59.999Z'
+    inputs["startDate"][0].data =u'2018-01-30T00:00:00.000Z'
+    inputs["aoi"][0].data = u'POLYGON ((100.4 15.3, 104.6 15.3, 104.6 19.3, 100.4 19.3, 100.4 15.3))'
+    #
+    data = opensearch.query_eo_images_from_wps_inputs(inputs,
+                                                      eoimage_ids,
+                                                      osdd_url,
+                                                      accept_schemes=("file", "https"))
+
+    assert len(data["files"]) == 4
+
+    # Not implemented
+    # inputs["files"][0].data = "DE2_PS3_L1C"
+    # inputs["startDate"][0].data = u'2008-01-01T00:00:00Z'
+    # inputs["endDate"][0].data = u'2009-01-01T00:00:00Z'
+    # inputs["aoi"][0].data = u'MULTIPOINT ((-117 32), (-115 34))'
+    # "http://geo.spacebel.be/opensearch/request?parentIdentifier=DE2_PS3_L1C&bbox=-117%2C32.7%2C-115%2C33.45&startDate=2008-01-01T00:00:00Z&endDate=2009-01-01T00:00:00Z"
+
+    # data = opensearch.query_eo_images_from_wps_inputs(inputs, eoimage_ids, osdd_url,
+    #                                                   accept_schemes=("file", "https"))
+
+    # assert len(data["files"]) == 8
