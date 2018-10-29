@@ -60,8 +60,6 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
         eoimages_queue = deque()
         for input_id, queue in wps_inputs.items():
             if input_id in eoimage_source_info:
-                new_inputs.pop(input_id)
-
                 wkt = pop_first_input("aoi")[0].data
                 bbox_str = load_wkt(wkt)
 
@@ -79,9 +77,8 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
                     new_input = deepcopy(queue[0])
                     new_input.data = replace_with_opensearch_scheme(link)
                     eoimages_queue.append(new_input)
+                new_inputs[input_id] = eoimages_queue
 
-        eoimage_input_name = eoimages_inputs[0]
-        new_inputs[eoimage_input_name] = eoimages_queue
     return new_inputs
 
 
