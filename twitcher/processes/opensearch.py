@@ -45,27 +45,41 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
     """
     new_inputs = deepcopy(wps_inputs)
 
-    def pop_first_input(id_to_pop):
+    def pop_first_data(ids_to_pop):
+        # type: (Iterable[str]) -> str
         """
 
-        :param id_to_pop: 
+        :param ids_to_pop: list of elements to pop. Only the first will be popped
 
         """
-        return new_inputs.pop(id_to_pop)
+        for id_ in ids_to_pop:
+            try:
+                return new_inputs.pop(id_)[0].data
+            except KeyError:
+                pass
+        else:
+            raise ValueError("Missing input identifier: {}".format(" or ".join(aoi_ids)))
 
     eoimages_inputs = [
         input_id for input_id in wps_inputs if input_id in eoimage_source_info
     ]
     if eoimages_inputs:
-        eoimages_queue = deque()
         for input_id, queue in wps_inputs.items():
+            eoimages_queue = deque()
             if input_id in eoimage_source_info:
-                wkt = pop_first_input("aoi")[0].data
+                aoi_ids = _make_specific_identifier("aoi", input_id), "aoi"
+                startdate_ids = _make_specific_identifier("startDate", input_id), "startDate"
+                enddate_ids = _make_specific_identifier("endDate", input_id), "endDate"
+
+                wkt = pop_first_data(aoi_ids)
+                startdate = pop_first_data(startdate_ids)
+                enddate = pop_first_data(enddate_ids)
+
                 bbox_str = load_wkt(wkt)
 
                 params = {
-                    "startDate": pop_first_input("startDate")[0].data,
-                    "endDate": pop_first_input("endDate")[0].data,
+                    "startDate": startdate,
+                    "endDate": enddate,
                     "bbox": bbox_str,
                 }
                 osdd_url = eoimage_source_info[input_id]["osdd_url"]
@@ -301,10 +315,11 @@ class EOImageDescribeProcessHandler(object):
 
     @staticmethod
     def make_collection(image_format, allowed_values):
+        description = u"Collection Identifer for input {}".format(image_format)
         data = {
             u"id": u"{}".format(image_format),
-            u"title": u"Collection Identifer for input {}".format(image_format),
-            u"abstract": u"Collection",
+            u"title": description,
+            u"abstract": description,
             u"formats": [{u"mimeType": u"text/plain", u"default": True}],
             u"minOccurs": 1,
             u"maxOccurs": u"unbounded",
@@ -381,14 +396,14 @@ class EOImageDescribeProcessHandler(object):
             toi.append(self.make_toi(u"endDate", start_date=False))
         else:
             for name in eoimage_names:
-                toi.append(self.make_toi(u"startDate_{}".format(name), start_date=True))
-                toi.append(self.make_toi(u"endDate_{}".format(name), start_date=False))
+                toi.append(self.make_toi(_make_specific_identifier(u"startDate", name), start_date=True))
+                toi.append(self.make_toi(_make_specific_identifier(u"endDate", name), start_date=False))
 
         if unique_aoi:
             aoi.append(self.make_aoi(u"aoi"))
         else:
             for name in eoimage_names:
-                aoi.append(self.make_aoi(u"aoi_{}".format(name)))
+                aoi.append(self.make_aoi(_make_specific_identifier(u"aoi", name)))
 
         for name, allowed_col in zip(eoimage_names, allowed_collections):
             collections.append(self.make_collection(name, allowed_col))
@@ -516,3 +531,12 @@ def replace_inputs_eoimage_files_to_query(inputs, payload, wps_inputs=False):
         unique_aoi=unique_aoi, unique_toi=unique_toi, to_wps_inputs=wps_inputs
     )
     return inputs_converted
+
+
+def _make_specific_identifier(param_name, identifier):
+    """
+    Only adds an underscore between the parameters
+    :param param_name:
+    :param identifier:
+    """
+    return "{}_{}".format(param_name, identifier)
