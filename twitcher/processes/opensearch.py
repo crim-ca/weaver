@@ -38,8 +38,7 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
     # type: (Dict[str, Deque], Dict[str, Dict]) -> Dict[str, Deque]
     """Query OpenSearch using parameters in inputs and return file links.
 
-    eoimage_ids is used to identify if a certain input is an eoimage. todo:
-    handle non unique aoi and toi
+    eoimage_ids is used to identify if a certain input is an eoimage.
 
     :param wps_inputs: inputs containing info to query
     :param eoimage_source_info: data source info of eoimages
@@ -81,7 +80,6 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
                     new_input.data = replace_with_opensearch_scheme(link)
                     eoimages_queue.append(new_input)
 
-        # todo: we take the first one for now, change to handle non unique aoi and toi
         eoimage_input_name = eoimages_inputs[0]
         new_inputs[eoimage_input_name] = eoimages_queue
     return new_inputs
@@ -172,7 +170,6 @@ class OpenSearchQuery(object):
 
         for key, value in params.items():
             if key not in allowed_names:
-                # todo: raise twitcher-specific exception
                 raise ValueError(
                     "{key} is not an allowed query parameter".format(key=key)
                 )
@@ -294,20 +291,14 @@ class EOImageDescribeProcessHandler(object):
         return []
 
     @staticmethod
-    def make_aoi(id_, unbounded):
-        """
-        Args:
-            id_:
-            unbounded:
-        """
-        max_occurs = u"unbounded" if unbounded else 1
+    def make_aoi(id_):
         data = {
             u"id": id_,
             u"title": u"Area of Interest",
             u"abstract": u"Area of Interest (Bounding Box)",
             u"formats": [{u"mimeType": u"OGC-WKT", u"default": True}],
             u"minOccurs": 1,
-            u"maxOccurs": max_occurs,
+            u"maxOccurs": 1,
         }
         return data
 
@@ -339,14 +330,13 @@ class EOImageDescribeProcessHandler(object):
         return data
 
     @staticmethod
-    def make_toi(id_, unbounded, start_date=True):
+    def make_toi(id_, start_date=True):
         """
 
         :param id_:
         :param start_date:  (Default value = True)
 
         """
-        max_occurs = u"unbounded" if unbounded else 1
         date = u"startDate" if start_date else u"endDate"
         data = {
             u"id": id_,
@@ -354,7 +344,7 @@ class EOImageDescribeProcessHandler(object):
             u"abstract": u"Time of Interest (defined as Start date - End date)",
             u"formats": [{u"mimeType": u"text/plain", u"default": True}],
             u"minOccurs": 1,
-            u"maxOccurs": max_occurs,
+            u"maxOccurs": 1,
             u"LiteralDataDomain": {u"dataType": u"String"},
             u"additionalParameters": [
                 {
@@ -389,17 +379,19 @@ class EOImageDescribeProcessHandler(object):
         aoi = []
         collections = []
 
-        unbounded_toi = not unique_toi
-        toi_id = u"" if unique_toi else u"_{id}"
-        toi.append(
-            self.make_toi(u"startDate{}".format(toi_id), unbounded_toi, start_date=True)
-        )
-        toi.append(
-            self.make_toi(u"endDate{}".format(toi_id), unbounded_toi, start_date=False)
-        )
+        if unique_toi:
+            toi.append(self.make_toi(u"startDate", start_date=True))
+            toi.append(self.make_toi(u"endDate", start_date=False))
+        else:
+            for name in eoimage_names:
+                toi.append(self.make_toi(u"startDate_{}".format(name), start_date=True))
+                toi.append(self.make_toi(u"endDate_{}".format(name), start_date=False))
 
-        unbounded_aoi = not unique_aoi
-        aoi.append(self.make_aoi(u"aoi", unbounded=unbounded_aoi))
+        if unique_aoi:
+            aoi.append(self.make_aoi(u"aoi"))
+        else:
+            for name in eoimage_names:
+                aoi.append(self.make_aoi(u"aoi_{}".format(name)))
 
         for name, allowed_col in zip(eoimage_names, allowed_collections):
             collections.append(self.make_collection(name, allowed_col))
