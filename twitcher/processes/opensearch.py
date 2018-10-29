@@ -21,7 +21,11 @@ LOGGER = logging.getLogger("PACKAGE")
 
 
 def alter_payload_after_query(payload):
-    """When redeploying the package on ADES, strip out any EOImage parameter"""
+    """When redeploying the package on ADES, strip out any EOImage parameter
+
+    :param payload: 
+
+    """
     new_payload = deepcopy(payload)
 
     for input_ in new_payload["processDescription"]["process"]["inputs"]:
@@ -34,16 +38,20 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
     # type: (Dict[str, Deque], Dict[str, Dict]) -> Dict[str, Deque]
     """Query OpenSearch using parameters in inputs and return file links.
 
-    eoimage_ids is used to identify if a certain input is an eoimage.
-    todo: handle non unique aoi and toi
+    eoimage_ids is used to identify if a certain input is an eoimage. todo:
+    handle non unique aoi and toi
 
-    Args:
-        wps_inputs: inputs containing info to query
-        eoimage_source_info: data source info of eoimages
+    :param wps_inputs: inputs containing info to query
+    :param eoimage_source_info: data source info of eoimages
     """
     new_inputs = deepcopy(wps_inputs)
 
     def pop_first_input(id_to_pop):
+        """
+
+        :param id_to_pop: 
+
+        """
         return new_inputs.pop(id_to_pop)
 
     eoimages_inputs = [
@@ -81,8 +89,9 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
 
 def replace_with_opensearch_scheme(link):
     """
-    Args:
-        link: url to replace scheme
+
+    :param link: url to replace scheme
+
     """
     scheme = urlparse.urlparse(link).scheme
     if scheme == "file":
@@ -94,8 +103,10 @@ def replace_with_opensearch_scheme(link):
 
 def load_wkt(wkt):
     """
-    Args:
-        wkt (string): to get the bounding box of
+
+    :param wkt: to get the bounding box of
+    :type wkt: string
+
     """
     bounds = shapely.wkt.loads(wkt).bounds
     bbox_str = ",".join(map(str, bounds))
@@ -112,10 +123,9 @@ class OpenSearchQuery(object):
         catalog_search_field="parentIdentifier",  # type: str
     ):
         """
-        Args:
-            collection_identifier: Collection ID to query
-            osdd_url: Global OSDD url for opensearch queries.
-            catalog_search_field: Name of the field for the collection
+        :param collection_identifier: Collection ID to query
+        :param osdd_url: Global OSDD url for opensearch queries.
+        :param catalog_search_field: Name of the field for the collection
                 identifier.
         """
         self.collection_identifier = collection_identifier
@@ -131,6 +141,7 @@ class OpenSearchQuery(object):
             )
 
     def get_template_url(self):
+        """ """
         r = requests.get(self.osdd_url, params=self.params)
         r.raise_for_status()
 
@@ -142,9 +153,10 @@ class OpenSearchQuery(object):
     def _prepare_query_url(self, template_url, params):
         # type: (str, Dict) -> Tuple[str, Dict]
         """
-        Args:
-            template_url: url containing query parameters
-            params: parameters to insert in formated url
+
+        :param template_url: url containing query parameters
+        :param params: parameters to insert in formated url
+
         """
         base_url, query = template_url.split("?", 1)
 
@@ -173,9 +185,9 @@ class OpenSearchQuery(object):
     def requests_get_retry(self, *args, **kwargs):
         """Retry a requests.get call
 
-        Args:
-            *args: passed to requests.get
-            **kwargs: passed to requests.get
+        :param *args: passed to requests.get
+        :param **kwargs: passed to requests.get
+
         """
         retries_in_secs = [1, 5]
         for wait in retries_in_secs:
@@ -189,8 +201,9 @@ class OpenSearchQuery(object):
     def _query_features_paginated(self, params):
         # type: (Dict) -> Iterable[Dict, str]
         """
-        Args:
-            params: query parameters
+
+        :param params: query parameters
+
         """
         start_index = 1
         template_url = self.get_template_url()
@@ -215,9 +228,10 @@ class OpenSearchQuery(object):
     def query_datasets(self, params, accept_schemes):
         # type: (Dict, Tuple) -> Iterable
         """
-        Args:
-            params: query parameters
-            accept_schemes: only return links of this scheme
+
+        :param params: query parameters
+        :param accept_schemes: only return links of this scheme
+
         """
         if params is None:
             params = {}
@@ -241,8 +255,8 @@ class OpenSearchQuery(object):
 def get_additional_parameters(input_data):
     # type: (Dict) -> List[Tuple[str, str]]
     """
-    Args:
-        input_data: Dict containing or not the "additionalParameters" key
+
+    :param input_data: Dict containing or not the "additionalParameters" key
     """
     output = []
     additional_parameters = input_data.get("additionalParameters", [])
@@ -260,20 +274,12 @@ def get_additional_parameters(input_data):
 class EOImageDescribeProcessHandler(object):
     def __init__(self, inputs):
         # type: (List[Dict]) -> None
-        """
-        Args:
-            inputs:
-        """
         self.eoimage_inputs = list(filter(self.is_eoimage_input, inputs))
         self.other_inputs = list(ifilterfalse(self.is_eoimage_input, inputs))
 
     @staticmethod
     def is_eoimage_input(input_data):
         # type: (Dict) -> bool
-        """
-        Args:
-            input_data:
-        """
         for name, value in get_additional_parameters(input_data):
             if name.upper() == "EOIMAGE" and value and len(value) and asbool(value[0]):
                 return True
@@ -282,10 +288,6 @@ class EOImageDescribeProcessHandler(object):
     @staticmethod
     def get_allowed_collections(input_data):
         # type: (Dict) -> List
-        """
-        Args:
-            input_data:
-        """
         for name, value in get_additional_parameters(input_data):
             if name.upper() == "ALLOWEDCOLLECTIONS":
                 return value.split(",")
@@ -311,11 +313,6 @@ class EOImageDescribeProcessHandler(object):
 
     @staticmethod
     def make_collection(image_format, allowed_values):
-        """
-        Args:
-            image_format:
-            allowed_values:
-        """
         data = {
             u"id": u"{}".format(image_format),
             u"title": u"Collection Identifer for input {}".format(image_format),
@@ -344,10 +341,10 @@ class EOImageDescribeProcessHandler(object):
     @staticmethod
     def make_toi(id_, unbounded, start_date=True):
         """
-        Args:
-            id_:
-            unbounded:
-            start_date:
+
+        :param id_:
+        :param start_date:  (Default value = True)
+
         """
         max_occurs = u"unbounded" if unbounded else 1
         date = u"startDate" if start_date else u"endDate"
@@ -371,13 +368,14 @@ class EOImageDescribeProcessHandler(object):
         }
         return data
 
-    def to_opensearch(self, unique_aoi, unique_toi, wps_inputs=False):
+    def to_opensearch(self, unique_aoi, unique_toi, to_wps_inputs=False):
         # type: (bool, bool, bool) -> List[Dict]
         """
-        Args:
-            unique_aoi:
-            unique_toi:
-            wps_inputs:
+
+        :param unique_aoi:
+        :param unique_toi:
+        :param to_wps_inputs:  (Default value = False)
+
         """
         if not self.eoimage_inputs:
             return self.other_inputs
@@ -407,15 +405,16 @@ class EOImageDescribeProcessHandler(object):
             collections.append(self.make_collection(name, allowed_col))
 
         new_inputs = toi + aoi + collections
-        if wps_inputs:
+        if to_wps_inputs:
             new_inputs = [self.convert_to_wps_input(i) for i in new_inputs]
         return new_inputs + self.other_inputs
 
     @staticmethod
     def convert_to_wps_input(input_):
         """
-        Args:
-            input_:
+
+        :param input_:
+
         """
         replace = {
             u"id": u"identifier",
@@ -442,8 +441,9 @@ class EOImageDescribeProcessHandler(object):
 
 def get_eo_images_inputs_from_payload(payload):
     """
-    Args:
-        payload:
+
+    :param payload: 
+
     """
     inputs = payload["processDescription"]["process"].get("inputs", {})
     return list(filter(EOImageDescribeProcessHandler.is_eoimage_input, inputs))
@@ -451,12 +451,22 @@ def get_eo_images_inputs_from_payload(payload):
 
 def get_eo_images_data_sources(payload):
     # type: (Dict) -> Dict[str, Dict]
+    """
+
+    :param payload:
+
+    """
     inputs = get_eo_images_inputs_from_payload(payload)
     id_with_collection = {get_any_id(i): get_any_value(i) for i in inputs}
     return {k: get_data_source(id_) for k, id_ in id_with_collection.items()}
 
 
 def get_data_source(collection_id):
+    """
+
+    :param collection_id: 
+
+    """
     data_sources = fetch_data_sources()
     for source_data in data_sources.values():
         try:
@@ -474,21 +484,22 @@ def get_data_source(collection_id):
 
 def get_eo_images_ids_from_payload(payload):
     """
-    Args:
-        payload:
+
+    :param payload: 
+
     """
     return [get_any_id(i) for i in get_eo_images_inputs_from_payload(payload)]
 
 
 def replace_inputs_eoimage_files_to_query(inputs, payload, wps_inputs=False):
     # type: (List[Dict], Dict, bool) -> List[Dict]
-    """Replace EOImage inputs (additionalParameter -> EOImage -> true) with
+    """
+    Replace EOImage inputs (additionalParameter -> EOImage -> true) with
     OpenSearch query parameters
 
-    Args:
-        inputs:
-        payload:
-        wps_inputs:
+    :param inputs:
+    :param payload:
+    :param wps_inputs:
     """
 
     # add "additionalParameters" property from the payload
@@ -513,6 +524,6 @@ def replace_inputs_eoimage_files_to_query(inputs, payload, wps_inputs=False):
         unique_aoi = ["UNIQUEAOI", "TRUE"] in additional_parameters_upper
     handler = EOImageDescribeProcessHandler(inputs=inputs)
     inputs_converted = handler.to_opensearch(
-        unique_aoi=unique_aoi, unique_toi=unique_toi, wps_inputs=wps_inputs
+        unique_aoi=unique_aoi, unique_toi=unique_toi, to_wps_inputs=wps_inputs
     )
     return inputs_converted
