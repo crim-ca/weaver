@@ -28,7 +28,6 @@ from cwltool.context import (LoadingContext, RuntimeContext, getdefault)
 from cwltool.workflow import Workflow
 from pyramid_celery import celery_app as app
 
-# TODO The logger log twice ?
 LOGGER = logging.getLogger(__name__)
 DEFAULT_TMP_PREFIX = "tmp"
 

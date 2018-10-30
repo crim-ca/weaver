@@ -7,7 +7,7 @@ import uuid
 from dateutil.parser import parse as dtparse
 from datetime import datetime, timedelta
 from logging import _levelNames, ERROR, INFO
-from twitcher.utils import now_secs
+from twitcher.utils import now_secs, get_job_log_msg, get_log_fmt, get_log_datefmt
 from twitcher.exceptions import ProcessInstanceError
 from twitcher.processes import process_mapping
 from twitcher.processes.types import PACKAGE_PROCESSES, PROCESS_WPS
@@ -83,9 +83,9 @@ class Job(dict):
     def _get_log_msg(self, msg=None):
         if not msg:
             msg = self.status_message
-        return '{dur} {lvl:3d}% {stat:10} {msg}'.format(dur=self.duration, lvl=self.progress, stat=self.status, msg=msg)
+        return get_job_log_msg(duration=self.duration, progress=self.progress, status=self.status, msg=msg)
 
-    def save_log(self, errors=None, logger=None):
+    def save_log(self, errors=None, logger=None, module=None):
         if isinstance(errors, six.string_types):
             log_msg = [(ERROR, self._get_log_msg())]
             self.exceptions.append(errors)
@@ -100,7 +100,10 @@ class Job(dict):
         else:
             log_msg = [(INFO, self._get_log_msg())]
         for level, msg in log_msg:
-            fmt_msg = '{0} {1:6} {2}'.format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), _levelNames[level], msg)
+            fmt_msg = get_log_fmt() % dict(asctime=datetime.now().strftime(get_log_datefmt()),
+                                           levelname=_levelNames[level],
+                                           name='datatype.job',
+                                           message=msg)
             if len(self.logs) == 0 or self.logs[-1] != fmt_msg:
                 self.logs.append(fmt_msg)
                 if logger:

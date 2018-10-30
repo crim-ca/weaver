@@ -16,7 +16,7 @@ from pywps import (
     Format,
 )
 from pywps.inout.basic import BasicIO
-from pywps.response.status import WPS_STATUS
+from pywps.response.status import WPS_STATUS, _WPS_STATUS
 from pywps.inout.literaltypes import AnyValue, AllowedValue, ALLOWEDVALUETYPE
 from pywps.validator.mode import MODE
 from pywps.validator.literalvalidator import validate_anyvalue, validate_allowed_values
@@ -34,6 +34,7 @@ from twitcher.utils import parse_request_query, get_any_id
 from twitcher.exceptions import PackageTypeError, PackageRegistrationError, PackageExecutionError, \
     PackageNotFound, PayloadNotFound
 from twitcher.wps_restapi.swagger_definitions import process_uri
+from twitcher.utils import get_job_log_msg, get_log_fmt, get_log_datefmt
 from pyramid.httpexceptions import HTTPOk
 from pyramid_celery import celery_app as app
 from collections import OrderedDict, Hashable
@@ -823,9 +824,9 @@ class Package(Process):
 
     def setup_logger(self):
         # file logger for output
-        self.log_file = os.path.abspath(os.path.join(tempfile.mkdtemp(), '{}.log'.format(self.package_id)))
+        self.log_file = self.status_location + '.log'
         log_file_handler = logging.FileHandler(self.log_file)
-        log_file_formatter = logging.Formatter('%(asctime)s [%(name)s] %(levelname)s %(message)s')
+        log_file_formatter = logging.Formatter(fmt=get_log_fmt(), datefmt=get_log_datefmt())
         log_file_handler.setFormatter(log_file_formatter)
 
         # prepare package logger
@@ -851,14 +852,19 @@ class Package(Process):
         # pywps overrides 'status' by 'accepted' in 'update_status', so use the '_update_status' to enforce the status
         # using the protected method also avoids weird overrides of progress % on failure and final 'success' status
         self.response._update_status(status, message, self.percent)
-        self.log_message(message)
+        self.log_message(status=status,
+                         message=message,
+                         progress=progress)
 
-    def log_message(self, message, level=logging.INFO):
+    def log_message(self, status, message, progress=None, level=logging.INFO):
+        message = get_job_log_msg(status=_WPS_STATUS._fields[status].lower(), msg=message, progress=progress)
         self.logger.log(level, message, exc_info=level > logging.INFO)
 
     def exception_message(self, exception_type, exception=None, message='no message'):
         exception_msg = ' [{}]'.format(repr(exception)) if isinstance(exception, Exception) else ''
-        self.log_message('{0}: {1}{2}'.format(exception_type.__name__, message, exception_msg), logging.ERROR)
+        self.log_message(status=WPS_STATUS.FAILED,
+                         message='{0}: {1}{2}'.format(exception_type.__name__, message, exception_msg),
+                         level=logging.ERROR)
         return exception_type('{0}{1}'.format(message, exception_msg))
 
     def _handler(self, request, response):
@@ -876,7 +882,6 @@ class Package(Process):
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed preparing package logging.")
 
-            self.log_message("Package: {}".format(request.identifier))
             self.update_status("Launching package ...", PACKAGE_PROGRESS_LAUNCHING)
 
             registry = app.conf['PYRAMID_REGISTRY']
@@ -992,12 +997,13 @@ class Package(Process):
             # and needing ADES dispatching
             step_payload = self.payload
             process_id = self.package_id
+            jobtype = 'package'
         else:
-            # TODO Find a way to retreive the ADES job id and append it in the EMS workflow job
             # Here we got a step part of a workflow (self is the workflow package)
             step_process_url = get_process_location(self.step_packages[jobname])
             step_payload = _get_process_payload(step_process_url)
             process_id = self.step_packages[jobname]
+            jobtype = 'step'
 
         try:
             # Presume that all EOImage given as input can be resolved to the same ADES
@@ -1016,25 +1022,36 @@ class Package(Process):
                 data_url = value['location']
             data_source = get_data_source_from_url(data_url)
 
-            # Presume that steps are launched sequentially and have the same progress weight
-            progress_estimate = float(len(self.step_launched)) / max(1, len(self.step_packages))
-            progress_estimate *= (PACKAGE_PROGRESS_CWL_DONE - PACKAGE_PROGRESS_RUN_CWL) # Map progress on workflow range
-            progress_estimate += PACKAGE_PROGRESS_RUN_CWL # Add the workflow start offset
+            map_progress = lambda progress, range_min, range_max: range_min + (progress * (range_max - range_min)) / 100
+
+            # Progress made with steps presumes that they are done sequentially and have the same progress weight
+            map_step_progress = lambda step_done, steps_nb: map_progress(100 * step_done / steps_nb,
+                                                                         PACKAGE_PROGRESS_RUN_CWL,
+                                                                         PACKAGE_PROGRESS_CWL_DONE)
+
+            start_step_progress = map_step_progress(len(self.step_launched), max(1, len(self.step_packages)))
+            end_step_progress = map_step_progress(len(self.step_launched) + 1, max(1, len(self.step_packages)))
+
+            step_update_status = lambda message, progress: self.update_status(
+                "{0} [{1}] - {2}".format(data_source, jobname, message),
+                map_progress(progress, start_step_progress, end_step_progress))
 
             url = retrieve_data_source_url(data_source)
+
+            self.update_status("Launching {type} {name} on {src}.".format(
+                type=jobtype,
+                name=jobname,
+                src=data_source), start_step_progress)
+
         except (IndexError, KeyError) as exc:
             raise self.exception_message(PackageExecutionError, exc, "Failed to save package outputs.")
 
         self.step_launched.append(jobname)
 
-        if jobname == self.package_id:
-            self.update_status("Launching {0} on {1}.".format(self.package_id, data_source), progress_estimate)
-        else:
-            self.update_status("Launching step {0} on {1}.".format(jobname, data_source), progress_estimate)
-
         return WpsProcess(url=url,
                           process_id=process_id,
                           deploy_body=step_payload,
-                          cookies=self.request.http_request.cookies)
+                          cookies=self.request.http_request.cookies,
+                          update_status=step_update_status)
 
 

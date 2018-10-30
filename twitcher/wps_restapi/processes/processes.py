@@ -1,3 +1,4 @@
+import os
 from pyramid.httpexceptions import *
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
@@ -7,6 +8,7 @@ from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import URLError
 from time import sleep
 
+from twitcher.wps import load_pywps_cfg
 from twitcher.adapter import servicestore_factory, jobstore_factory, processstore_factory
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS
 from twitcher.datatype import Process as ProcessDB, Job as JobDB
@@ -139,11 +141,32 @@ def _map_status(wps_execution_status):
     return 'unknown'
 
 
+def retrieve_package_job_log(execution, job):
+    # If the process is a twitcher package this status xml should be available in the process output dir
+    status_xml_fn = execution.statusLocation.split('/')[-1]
+    try:
+        registry = app.conf['PYRAMID_REGISTRY']
+        output_path = registry.settings['twitcher.wps_output_path']
+
+        # twitcher package log every status update into this file (we no longer rely on the http monitoring)
+        log_fn = os.path.join(output_path, '{0}.log'.format(status_xml_fn))
+        with open(log_fn, 'r') as log_file:
+            # Keep the first log entry which is the real start time and replace the following ones with the file content
+            job.logs = job.logs[:1]
+            for line in log_file:
+                job.logs.append(line.rstrip('\n'))
+        os.remove(log_fn)
+    except (KeyError, IOError):
+        pass
+
+
 @app.task(bind=True)
 def execute_process(self, url, service, process_id, inputs,
                     is_workflow=False, user_id=None, async=True, custom_tags=None, headers=None):
     custom_tags = list() if custom_tags is None else custom_tags
     registry = app.conf['PYRAMID_REGISTRY']
+    load_pywps_cfg(registry)
+
     ssl_verify = asbool(registry.settings.get('twitcher.ows_proxy_ssl_verify', True))
     store = jobstore_factory(registry)
     task_id = self.request.id
@@ -226,6 +249,7 @@ def execute_process(self, url, service, process_id, inputs,
                         job.progress = 100
                         job.status = STATUS_SUCCEEDED
                         job.status_message = execution.statusMessage or "Job succeeded."
+                        retrieve_package_job_log(execution, job)
                         job.save_log(logger=task_logger)
 
                         process = wps.describeprocess(job.process)
@@ -238,7 +262,9 @@ def execute_process(self, url, service, process_id, inputs,
                     else:
                         task_logger.debug("Job failed.")
                         job.status_message = execution.statusMessage or "Job failed."
+                        retrieve_package_job_log(execution, job)
                         job.save_log(errors=execution.errors, logger=task_logger)
+
 
             except Exception as exc:
                 num_retries += 1
@@ -248,7 +274,7 @@ def execute_process(self, url, service, process_id, inputs,
                 sleep(1)
             else:
                 #job.status_message = "Update {} ...".format(str(job))
-                job.save_log(logger=task_logger)
+                #job.save_log(logger=task_logger)
                 num_retries = 0
                 run_step += 1
             finally:
@@ -266,6 +292,8 @@ def execute_process(self, url, service, process_id, inputs,
     finally:
         job.status_message = "Job {}.".format(job.status)
         job.save_log(logger=task_logger)
+
+
         job = store.update_job(job)
 
     return job.status

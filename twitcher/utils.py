@@ -24,10 +24,17 @@ def get_any_id(info):  # type: (dict) -> Any
 
 
 def get_any_value(info):  # type: (dict) -> Any
-    """Retrieves a dictionary 'value'-like key using multiple common variations [value, reference].
-    :param info: dictionary that potentially contains an 'value'-like key.
+    """Retrieves a dictionary 'value'-like key using multiple common variations [href, value, reference].
+    :param info: dictionary that potentially contains a 'value'-like key.
     :returns: value of the matched 'id'-like key."""
     return info.get('href', info.get('value', info.get('reference', info.get('data'))))
+
+
+def get_any_message(info):  # type: (dict) -> Any
+    """Retrieves a dictionary 'value'-like key using multiple common variations [message].
+    :param info: dictionary that potentially contains a 'message'-like key.
+    :returns: value of the matched 'message'-like key or an empty string if not found. """
+    return info.get('message', '')
 
 
 def is_valid_url(url):
@@ -186,3 +193,15 @@ def parse_request_query(request):
             else:
                 queries_dict[q][i] = kvs[0]
     return queries_dict
+
+
+def get_log_fmt():
+    return '%(asctime)s %(levelname)s [%(name)s]  %(message)s'
+
+
+def get_log_datefmt():
+    return '%Y-%m-%d %H:%M:%S'
+
+
+def get_job_log_msg(status, msg, progress=0, duration=None):
+    return '{dur} {lvl:3d}% {stat:10} {msg}'.format(dur=duration or '', lvl=int(progress or 0), stat=status, msg=msg)
