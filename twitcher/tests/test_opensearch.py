@@ -1,7 +1,6 @@
 import json
 from collections import deque
 from copy import deepcopy
-from itertools import chain
 
 import pytest
 import unittest
@@ -27,7 +26,7 @@ OSDD_URL = "http://geo.spacebel.be/opensearch/description.xml"
 COLLECTION_IDS = {
     "sentinel2": "EOP:IPT:Sentinel2",
     "probav": "EOP:VITO:PROBAV_P_V001",
-    "deimos": "DE2_PS3_L1C",
+    # "deimos": "DE2_PS3_L1C",
 }
 
 
@@ -165,7 +164,7 @@ def test_transform_execute_parameters_wps(opensearch_process):
     )
 
     mocked_query = ["file:///something.SAFE"]
-    files_inputs = [make_input("files", "opensearch_" + m) for m in mocked_query]
+    files_inputs = [make_input("files", "opensearch" + m) for m in mocked_query]
 
     expected = dict(
         [
@@ -175,14 +174,11 @@ def test_transform_execute_parameters_wps(opensearch_process):
         ]
     )
 
-    payload = opensearch_process.payload
-    eoimage_ids = opensearch.get_eo_images_ids_from_payload(payload)
-    opensearch.OpenSearchQuery.query_datasets = mock.MagicMock()
-    opensearch.OpenSearchQuery.query_datasets.return_value = mocked_query
-
-    transformed = opensearch.query_eo_images_from_wps_inputs(
-        inputs, eoimage_ids, OSDD_URL
-    )
+    with mock.patch.object(opensearch.OpenSearchQuery, "query_datasets", return_value=mocked_query):
+        eo_image_source_info = make_eo_image_source_info("files", "EOP:IPT:Sentinel2")
+        transformed = opensearch.query_eo_images_from_wps_inputs(
+            inputs, eo_image_source_info
+        )
 
     def compare(items):
         return sorted([(k, [v.data for v in values]) for k, values in items.items()])
@@ -300,73 +296,147 @@ def test_get_template_urls():
         "startRecord",
         "uid",
     ]
-    assert fields_in_all_queries == expected
+    assert not set(expected) - set(fields_in_all_queries)
 
 
-@pytest.mark.online
-def test_query():
-    eoimage_ids = ["files"]
-    osdd_url = "http://geo.spacebel.be/opensearch/description.xml"
-    inputs = {
+def inputs_unique_aoi_toi(files_id):
+    return {
         "aoi": deque([LiteralInput("aoi", "Area", data_type="string")]),
         "startDate": deque([LiteralInput("startDate", "Area", data_type="string")]),
         "endDate": deque([LiteralInput("endDate", "Area", data_type="string")]),
-        "files": deque(
-            [LiteralInput("files", "Collection id to query", data_type="string")]
+        files_id: deque(
+            [LiteralInput(files_id, "Collection id to query", data_type="string")]
         ),
     }
 
-    inputs["files"][0].data = "EOP:IPT:Sentinel2"
-    inputs["endDate"][0].data = u"2018-01-31T23:59:59.999Z"
-    inputs["startDate"][0].data = u"2018-01-30T00:00:00.000Z"
-    inputs["aoi"][0].data = u"POLYGON ((100 15, 104 15, 104 19, 100 19, 100 15))"
 
-    eo_image_source_info = {"files": {
-        "collection_id": "EOP:IPT:Sentinel2",
-        "accept_schemes": [
-            "http",
-            "https"
-        ],
-        "rootdir": "/eodata/Sentinel-2",
-        "ades": "http://localhost:5001",
-        "osdd_url": "http://geo.spacebel.be/opensearch/description.xml"
-    }}
+def inputs_non_unique_aoi_toi(files_id):
+    def make_specific(name):
+        return opensearch._make_specific_identifier(name, files_id)
+
+    end_date, start_date, aoi = map(make_specific, ["endDate", "startDate", "aoi"])
+    return {
+        aoi: deque([LiteralInput(aoi, "Area", data_type="string")]),
+        start_date: deque([LiteralInput(start_date, "Area", data_type="string")]),
+        end_date: deque([LiteralInput(end_date, "Area", data_type="string")]),
+        files_id: deque(
+            [LiteralInput(files_id, "Collection id to query", data_type="string")]
+        ),
+    }
+
+
+def query_param_names(unique_aoi_toi, identifier):
+    end_date, start_date, aoi = "endDate", "startDate", "aoi"
+    if not unique_aoi_toi:
+        end_date = opensearch._make_specific_identifier(end_date, identifier)
+        start_date = opensearch._make_specific_identifier(start_date, identifier)
+        aoi = opensearch._make_specific_identifier(aoi, identifier)
+    return end_date, start_date, aoi
+
+
+def sentinel2_inputs(unique_aoi_toi=True):
+    sentinel_id = "image-sentinel2"
+    end_date, start_date, aoi = query_param_names(unique_aoi_toi, sentinel_id)
+    if unique_aoi_toi:
+        inputs = inputs_unique_aoi_toi(sentinel_id)
+    else:
+        inputs = inputs_non_unique_aoi_toi(sentinel_id)
+
+    inputs[sentinel_id][0].data = "EOP:IPT:Sentinel2"
+    inputs[end_date][0].data = u"2018-01-31T23:59:59.999Z"
+    inputs[start_date][0].data = u"2018-01-30T00:00:00.000Z"
+    inputs[aoi][0].data = u"POLYGON ((100 15, 104 15, 104 19, 100 19, 100 15))"
+
+    eo_image_source_info = make_eo_image_source_info(sentinel_id, "EOP:IPT:Sentinel2")
+    return inputs, eo_image_source_info
+
+
+def probav_inputs(unique_aoi_toi=True):
+    probav_id = "image-probav"
+    end_date, start_date, aoi = query_param_names(unique_aoi_toi, probav_id)
+    if unique_aoi_toi:
+        inputs = inputs_unique_aoi_toi(probav_id)
+    else:
+        inputs = inputs_non_unique_aoi_toi(probav_id)
+
+    inputs[probav_id][0].data = "EOP:VITO:PROBAV_P_V001"
+    inputs[end_date][0].data = u"2018-01-31T23:59:59.999Z"
+    inputs[start_date][0].data = u"2018-01-30T00:00:00.000Z"
+    inputs[aoi][0].data = u"POLYGON ((100 15, 104 15, 104 19, 100 19, 100 15))"
+
+    eo_image_source_info = make_eo_image_source_info(
+        probav_id, "EOP:VITO:PROBAV_P_V001"
+    )
+
+    return inputs, eo_image_source_info
+
+
+def make_eo_image_source_info(name, collection_id):
+    return {
+        name: {
+            "collection_id": collection_id,
+            "accept_schemes": ["http", "https"],
+            "rootdir": "",
+            "ades": "http://localhost:5001",
+            "osdd_url": "http://geo.spacebel.be/opensearch/description.xml",
+        }
+    }
+
+
+def deimos_inputs(unique_aoi_toi=True):
+    deimos_id = "image-deimos"
+    end_date, start_date, aoi = query_param_names(unique_aoi_toi, deimos_id)
+    inputs = inputs_unique_aoi_toi(deimos_id)
+
+    inputs[deimos_id][0].data = "DE2_PS3_L1C"
+    inputs[start_date][0].data = u"2008-01-01T00:00:00Z"
+    inputs[end_date][0].data = u"2009-01-01T00:00:00Z"
+    inputs[aoi][0].data = u"MULTIPOINT ((-117 32), (-115 34))"
+
+    eo_image_source_info = make_eo_image_source_info(deimos_id, "DE2_PS3_L1C")
+    return inputs, eo_image_source_info
+
+
+@pytest.mark.online
+def test_query_sentinel2():
+    inputs, eo_image_source_info = sentinel2_inputs()
 
     data = opensearch.query_eo_images_from_wps_inputs(inputs, eo_image_source_info)
 
-    assert len(data["files"]) == 15
-    for f in data["files"]:
-        print f.data
+    assert 15 == len(data["image-sentinel2"])
 
-    inputs["files"][0].data = "EOP:VITO:PROBAV_P_V001"
-    inputs["endDate"][0].data = u"2018-01-31T23:59:59.999Z"
-    inputs["startDate"][0].data = u"2018-01-30T00:00:00.000Z"
-    inputs["aoi"][0].data = u"POLYGON ((100 15, 104 15, 104 19, 100 19, 100 15))"
-    #
 
-    eo_image_source_info = {"probav": {
-        "collection_id": "EOP:VITO:PROBAV_P_V001",
-        "accept_schemes": [
-            "http",
-            "https"
-        ],
-        "rootdir": "",
-        "ades": "http://localhost:5001",
-        "osdd_url": "http://geo.spacebel.be/opensearch/description.xml"
-    }}
+@pytest.mark.online
+def test_query_probav():
+    inputs, eo_image_source_info = probav_inputs()
 
     data = opensearch.query_eo_images_from_wps_inputs(inputs, eo_image_source_info)
 
-    assert len(data["files"]) == 3
+    assert 3 == len(data["image-probav"])
 
-    # Not implemented
-    # inputs["files"][0].data = "DE2_PS3_L1C"
-    # inputs["startDate"][0].data = u'2008-01-01T00:00:00Z'
-    # inputs["endDate"][0].data = u'2009-01-01T00:00:00Z'
-    # inputs["aoi"][0].data = u'MULTIPOINT ((-117 32), (-115 34))'
-    # "http://geo.spacebel.be/opensearch/request?parentIdentifier=DE2_PS3_L1C&bbox=-117%2C32.7%2C-115%2C33.45&startDate=2008-01-01T00:00:00Z&endDate=2009-01-01T00:00:00Z"
 
-    # data = opensearch.query_eo_images_from_wps_inputs(inputs, eoimage_ids, osdd_url,
-    #                                                   accept_schemes=("file", "https"))
+@pytest.mark.skip(reason="The server is not implemented yet.")
+@pytest.mark.online
+def test_query_deimos():
+    inputs, eo_image_source_info = deimos_inputs()
 
-    # assert len(data["files"]) == 8
+    data = opensearch.query_eo_images_from_wps_inputs(inputs, eo_image_source_info)
+
+    assert 999 == len(data["image-deimos"])
+
+
+@pytest.mark.online
+def test_query_non_unique():
+    inputs_s2, eo_image_source_info_s2 = sentinel2_inputs(unique_aoi_toi=False)
+    inputs_probav, eo_image_source_info_probav = probav_inputs(unique_aoi_toi=False)
+
+    inputs = inputs_s2
+    inputs.update(inputs_probav)
+
+    eo_image_source_info = eo_image_source_info_s2
+    eo_image_source_info.update(eo_image_source_info_probav)
+
+    data = opensearch.query_eo_images_from_wps_inputs(inputs, eo_image_source_info)
+
+    assert len(data["image-sentinel2"]) == 15
+    assert len(data["image-probav"]) == 3

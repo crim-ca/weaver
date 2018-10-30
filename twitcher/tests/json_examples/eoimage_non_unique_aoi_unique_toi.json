@@ -1,6 +1,6 @@
 [
   {
-    "id": "aoi",
+    "id": "aoi_image-probav",
     "title": "Area of Interest",
     "abstract": "Area of Interest (Bounding Box)",
     "formats": [
@@ -10,7 +10,20 @@
       }
     ],
     "minOccurs": 1,
-    "maxOccurs": "unbounded"
+    "maxOccurs": 1
+  },
+  {
+    "id": "aoi_image-s2",
+    "title": "Area of Interest",
+    "abstract": "Area of Interest (Bounding Box)",
+    "formats": [
+      {
+        "mimeType": "OGC-WKT",
+        "default": true
+      }
+    ],
+    "minOccurs": 1,
+    "maxOccurs": 1
   },
   {
     "id": "startDate",
@@ -85,7 +98,7 @@
   {
     "id": "image-s2",
     "title": "Collection Identifer for input image-s2",
-    "abstract": "Collection",
+    "abstract": "Collection Identifer for input image-s2",
     "formats": [
       {
         "mimeType": "text/plain",
@@ -126,7 +139,7 @@
   {
     "id": "image-probav",
     "title": "Collection Identifer for input image-probav",
-    "abstract": "Collection",
+    "abstract": "Collection Identifer for input image-probav",
     "formats": [
       {
         "mimeType": "text/plain",
