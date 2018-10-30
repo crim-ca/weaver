@@ -40,7 +40,11 @@ class WpsProcess(object):
                                 headers=self.headers,
                                 cookies=self.cookies,
                                 verify=self.verify)
+
         if response.status_code == 200:
+            # TODO Remove patch for Geomatys ADES (Missing process return a 200 InvalidParameterValue error !)
+            if response.content.lower().find('InvalidParameterValue') >= 0:
+                return None
             return response.json()
         elif response.status_code == 404:
             return None
@@ -100,7 +104,7 @@ class WpsProcess(object):
         job_status_uri = response.headers['Location']
         job_status = self.get_job_status(job_status_uri)
 
-        while job_status['status'].lower() not in job_status_categories[status.STATUS_FINISHED]:
+        while job_status['status'] not in job_status_categories[status.STATUS_FINISHED]:
             sleep(5)
             job_status = self.get_job_status(job_status_uri)
 
@@ -125,12 +129,13 @@ class WpsProcess(object):
         for result in results:
             if get_any_id(result) in expected_outputs:
                 # This is where cwl expect the output file to be written
+                # TODO We will probably need to handle multiple output value...
                 dst_fn = '/'.join([out_dir.rstrip('/'), expected_outputs[get_any_id(result)]])
 
                 # TODO Should we handle other type than File reference?
                 r = requests.get(get_any_value(result), allow_redirects=True)
                 LOGGER.debug('Fetching result output from {0} to cwl output destination : {1}'.format(
-                    result['reference'],
+                    get_any_value(result),
                     dst_fn
                 ))
                 with open(dst_fn, mode='wb') as dst_fh:
@@ -143,7 +148,18 @@ class WpsProcess(object):
                                 cookies=self.cookies,
                                 verify=self.verify)
         response.raise_for_status()
-        return response.json()
+        status = response.json()
+
+        # TODO Remove patch for Geomatys not conforming to the status schema
+        # (jobID is missing, status are upper cases and succeeded process are indicated as successful)
+        job_id = job_status_uri.split('/')[-1]
+        if 'jobID' not in status:
+            status['jobID'] = job_id
+        status['status'] = status['status'].lower()
+        if status['status'] == 'successful':
+            status['status'] = 'succeeded'
+
+        return status
 
     def get_job_results(self, job_id):
         response = requests.get(self.url + process_results_uri.format(process_id=self.process_id, job_id=job_id),
@@ -151,7 +167,7 @@ class WpsProcess(object):
                                 cookies=self.cookies,
                                 verify=self.verify)
         response.raise_for_status()
-        return response.json()
+        return response.json().get('outputs', {})
 
     def host_file(self, fn):
         registry = app.conf['PYRAMID_REGISTRY']

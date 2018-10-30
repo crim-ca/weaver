@@ -34,8 +34,7 @@ process_jobs_uri = '/processes/{process_id}/jobs'
 process_job_uri = '/processes/{process_id}/jobs/{job_id}'
 process_quotes_uri = '/processes/{process_id}/quotations'
 process_quote_uri = '/processes/{process_id}/quotations/{quote_id}'
-process_results_uri = '/processes/{process_id}/jobs/{job_id}/results'
-process_result_uri = '/processes/{process_id}/jobs/{job_id}/results/{result_id}'
+process_results_uri = '/processes/{process_id}/jobs/{job_id}/result'
 process_exceptions_uri = '/processes/{process_id}/jobs/{job_id}/exceptions'
 process_logs_uri = '/processes/{process_id}/jobs/{job_id}/logs'
 
@@ -56,10 +55,10 @@ quote_uri = '/quotations/{quote_id}'
 bills_uri = '/bills'
 bill_uri = '/bill/{bill_id}'
 
-results_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/results'
-results_short_uri = '/jobs/{job_id}/results'
-result_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/results/{result_id}'
-result_short_uri = '/jobs/{job_id}/results/{result_id}'
+results_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/result'
+results_short_uri = '/jobs/{job_id}/result'
+result_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/result/{result_id}'
+result_short_uri = '/jobs/{job_id}/result/{result_id}'
 
 exceptions_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/exceptions'
 exceptions_short_uri = '/jobs/{job_id}/exceptions'
@@ -107,7 +106,6 @@ process_job_service = Service(name='process_job', path=process_job_uri)
 process_quotes_service = Service(name='process_quotes', path=process_quotes_uri)
 process_quote_service = Service(name='process_quote', path=process_quote_uri)
 process_results_service = Service(name='process_results', path=process_results_uri)
-process_result_service = Service(name='process_result', path=process_result_uri)
 process_exceptions_service = Service(name='process_exceptions', path=process_exceptions_uri)
 process_logs_service = Service(name='process_logs', path=process_logs_uri)
 
@@ -129,8 +127,6 @@ bill_service = Service(name='bill', path=bill_uri)
 
 results_full_service = Service(name='results_full', path=results_full_uri)
 results_short_service = Service(name='results_short', path=results_short_uri)
-result_full_service = Service(name='result_full', path=result_full_uri)
-result_short_service = Service(name='result_short', path=result_short_uri)
 
 exceptions_full_service = Service(name='exceptions_full', path=exceptions_full_uri)
 exceptions_short_service = Service(name='exceptions_short', path=exceptions_short_uri)
@@ -405,31 +401,11 @@ class FullResultsEndpoint(MappingSchema):
     job_id = job_id
 
 
-class ProcessResultEndpoint(MappingSchema):
-    header = AcceptHeader()
-    process_id = process_id
-    job_id = job_id
-
-
 class ShortResultsEndpoint(MappingSchema):
     header = AcceptHeader()
     provider_id = provider_id
     process_id = process_id
     job_id = job_id
-
-
-class FullResultEndpoint(MappingSchema):
-    header = AcceptHeader()
-    provider_id = provider_id
-    process_id = process_id
-    job_id = job_id
-    result_id = result_id
-
-
-class ShortResultEndpoint(MappingSchema):
-    header = AcceptHeader()
-    job_id = job_id
-    result_id = result_id
 
 
 class FullExceptionsEndpoint(MappingSchema):

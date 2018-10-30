@@ -13,8 +13,6 @@ def includeme(config):
     config.add_route(**sd.service_api_route_info(sd.job_full_service, settings))
     config.add_route(**sd.service_api_route_info(sd.results_short_service, settings))
     config.add_route(**sd.service_api_route_info(sd.results_full_service, settings))
-    config.add_route(**sd.service_api_route_info(sd.result_short_service, settings))
-    config.add_route(**sd.service_api_route_info(sd.result_full_service, settings))
     config.add_route(**sd.service_api_route_info(sd.exceptions_short_service, settings))
     config.add_route(**sd.service_api_route_info(sd.exceptions_full_service, settings))
     config.add_route(**sd.service_api_route_info(sd.logs_short_service, settings))
@@ -22,7 +20,6 @@ def includeme(config):
     config.add_route(**sd.service_api_route_info(sd.process_jobs_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_job_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_results_service, settings))
-    config.add_route(**sd.service_api_route_info(sd.process_result_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_exceptions_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_logs_service, settings))
 
@@ -49,12 +46,6 @@ def includeme(config):
     config.add_view(j.get_job_results, route_name=sd.results_full_service.name,
                     request_method='GET', renderer='json')
     config.add_view(j.get_job_results, route_name=sd.process_results_service.name,
-                    request_method='GET', renderer='json')
-    config.add_view(j.get_job_result, route_name=sd.result_short_service.name,
-                    request_method='GET', renderer='json')
-    config.add_view(j.get_job_result, route_name=sd.result_full_service.name,
-                    request_method='GET', renderer='json')
-    config.add_view(j.get_job_result, route_name=sd.process_result_service.name,
                     request_method='GET', renderer='json')
     config.add_view(j.get_job_exceptions, route_name=sd.exceptions_short_service.name,
                     request_method='GET', renderer='json')

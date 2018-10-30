@@ -129,7 +129,7 @@ def get_job_status(request):
 
     if job.status in status.job_status_categories[status.STATUS_FINISHED]:
         if job.status == status.STATUS_SUCCEEDED:
-            resource = 'results'
+            resource = 'result'
         else:
             resource = 'exceptions'
 
@@ -176,32 +176,9 @@ def get_job_results(request):
     Retrieve the results of a job.
     """
     job = get_job(request)
-    results = job.results
-    for result in results:
-        result['url'] = '{job_url}/results/{result_id}'.format(job_url=job_url(request, job),
-                                                               result_id=result['identifier'])
+    results = dict(outputs=[dict(id=result['identifier'],
+                                 href=result['reference']) for result in job.results])
     return HTTPOk(json=results)
-
-
-@sd.result_full_service.get(tags=[sd.jobs_tag, sd.results_tag, sd.providers_tag], renderer='json',
-                            schema=sd.FullResultEndpoint(), response_schemas=sd.get_single_result_responses)
-@sd.result_short_service.get(tags=[sd.jobs_tag, sd.results_tag], renderer='json',
-                             schema=sd.ShortResultEndpoint(), response_schemas=sd.get_single_result_responses)
-@sd.process_result_service.get(tags=[sd.jobs_tag, sd.results_tag, sd.processes_tag], renderer='json',
-                               schema=sd.ProcessResultEndpoint(), response_schemas=sd.get_single_result_responses)
-def get_job_result(request):
-    """
-    Retrieve a specific result of a particular job output.
-    """
-    job = get_job(request)
-    result_id = request.matchdict.get('result_id')
-
-    for result in job.results:
-        if result['identifier'] == result_id:
-            result['url'] = '{job_url}/results/{result_id}'.format(job_url=job_url(request, job),
-                                                                   result_id=result['identifier'])
-            return HTTPOk(json=result)
-    raise HTTPNotFound('Could not find job result.')
 
 
 @sd.exceptions_full_service.get(tags=[sd.jobs_tag, sd.exceptions_tag, sd.providers_tag], renderer='json',
