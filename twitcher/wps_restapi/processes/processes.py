@@ -186,18 +186,10 @@ def execute_process(self, url, service, process_id, inputs,
         except KeyError:
             wps_inputs = []
 
-        # identify EOimages from payload
-        # TODO payload may be missing (process hello)
-        payload = processstore_factory(registry).fetch_by_id(process_id).payload
-        eoimage_ids = opensearch.get_eoimages_ids_from_payload(payload)
-        # if applicable, query EOImages
-        wps_inputs = opensearch.query_eo_images_from_inputs(wps_inputs, eoimage_ids)
-
         # prepare outputs
-        outputs = []
-        for output in process.processOutputs:
-            outputs.append(
-                (output.identifier, output.dataType == 'ComplexData'))
+        outputs = [
+            (o.identifier, o.dataType == 'ComplexData') for o in process.processOutputs
+        ]
 
         mode = EXECUTE_ASYNC if async else EXECUTE_SYNC
         execution = wps.execute(process_id, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
@@ -268,7 +260,7 @@ def execute_process(self, url, service, process_id, inputs,
         if isinstance(exc, WPSException):
             errors = "[{0}] {1}".format(exc.locator, exc.text)
         else:
-            exception_class = "{}.{}".format(exc.__module__, exc.__class__.__name__)
+            exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
             errors = "{0}: {1}".format(exception_class, exc.message)
         job.save_log(errors=errors, logger=task_logger)
     finally:

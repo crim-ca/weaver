@@ -5,11 +5,15 @@
       "parameters": [
         {
           "name": "UniqueAOI",
-          "value": "true"
+          "values": [
+            "true"
+          ]
         },
         {
           "name": "UniqueTOI",
-          "value": "true"
+          "values": [
+            "true"
+          ]
         }
       ],
       "role": "http://www.opengis.net/eoc/applicationContext"
@@ -160,13 +164,13 @@
     }
   },
   "payload": {
-    "deploymentProfile": {
-      "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow",
-      "executionUnit": {
-        "reference": "/mnt/c/projects/testbed14-twitcher/twitcher/tests/json_examples/opensearch_deploy.cwl"
-      }
-    },
-    "processOffering": {
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow",
+    "executionUnit": [
+        {
+            "href": "docker-registry.crim.ca/ogc-public/snap6-stack-creation:v2.4"
+        }
+    ],
+    "processDescription": {
       "process": {
         "abstract": "",
         "additionalParameters": [
@@ -174,11 +178,11 @@
             "parameters": [
               {
                 "name": "UniqueAOI",
-                "value": "true"
+                "values": ["true"]
               },
               {
                 "name": "UniqueTOI",
-                "value": "true"
+                "values": ["true"]
               }
             ],
             "role": "http://www.opengis.net/eoc/applicationContext"
@@ -192,7 +196,7 @@
                 "parameters": [
                   {
                     "name": "EOImage",
-                    "value": "true"
+                    "values": ["true"]
                   }
                 ],
                 "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata"

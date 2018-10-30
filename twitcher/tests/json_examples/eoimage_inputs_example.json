@@ -16,11 +16,11 @@
         "parameters": [
           {
             "name": "EOImage",
-            "value": "true"
+            "values": ["true"]
           },
           {
             "name": "AllowedCollections",
-            "value": "s2-collection-1,s2-collection-2,s2-sentinel2,s2-landsat8"
+            "values": "s2-collection-1,s2-collection-2,s2-sentinel2,s2-landsat8"
           }
         ]
       }
@@ -43,11 +43,11 @@
         "parameters": [
           {
             "name": "EOImage",
-            "value": "true"
+            "values": ["true"]
           },
           {
             "name": "AllowedCollections",
-            "value": "probav-collection-1,probav-collection-2"
+            "values": "probav-collection-1,probav-collection-2"
           }
         ]
       }

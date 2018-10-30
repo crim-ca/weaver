@@ -6,6 +6,8 @@ from pyramid_celery import celery_app as app
 from twitcher import TWITCHER_ROOT_DIR
 
 # Data source cache
+from twitcher.processes.wps_process import OPENSEARCH_LOCAL_FILE_SCHEME
+
 """
 Schema
 
@@ -56,6 +58,8 @@ def fetch_data_sources():
                 DATA_SOURCES = json.load(f)
         except Exception:
             pass
+    if not DATA_SOURCES:
+        raise ValueError("No data source found in setting 'twitcher.data_sources'")
     return DATA_SOURCES
 
 
@@ -77,10 +81,18 @@ def retrieve_data_source_url(data_source):
 def get_data_source_from_url(data_url):
     data_sources = fetch_data_sources()
     try:
-        netloc = urlparse(data_url).netloc
-        for src, val in data_sources.items():
-            if val['netloc'] == netloc:
-                return src
+        parsed = urlparse(data_url)
+        netloc, path, scheme = parsed.netloc, parsed.path, parsed.scheme
+        if netloc:
+            for src, val in data_sources.items():
+                if val['netloc'] == netloc:
+                    return src
+        elif scheme == OPENSEARCH_LOCAL_FILE_SCHEME:
+            # for file links, try to find if any rootdir matches in the file path
+            for src, val in data_sources.items():
+                if path.startswith(val['rootdir']):
+                    return src
+
     except Exception as exc:
         pass
     return get_default_data_source(data_sources)

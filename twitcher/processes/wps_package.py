@@ -909,9 +909,9 @@ class Package(Process):
                 raise self.exception_message(PackageExecutionError, exc, "Failed retrieving package input types.")
             try:
                 # identify EOimages from payload
-                eoimage_ids = opensearch.get_eoimages_ids_from_payload(self.payload)
-                # if applicable, query EOImages
-                request.inputs = opensearch.query_eo_images_from_wps_inputs(request.inputs, eoimage_ids)
+                eoimage_data_sources = opensearch.get_eo_images_data_sources(self.payload)
+                if eoimage_data_sources:
+                    request.inputs = opensearch.query_eo_images_from_wps_inputs(request.inputs, eoimage_data_sources)
 
                 cwl_inputs = dict()
                 for input_id in request.inputs:
@@ -929,13 +929,13 @@ class Package(Process):
                         # extend array data that allow max_occur > 1
                         input_data = [i.url if i.as_reference else i.data for i in input_occurs]
                         input_type = elem_type
-                    if isinstance(input_i, (LiteralInput, BoundingBoxInput)):
-                        cwl_inputs[input_id] = input_data
-                    elif isinstance(input_i, ComplexInput):
+                    if isinstance(input_i, ComplexInput) or elem_type == "File":
                         if isinstance(input_data, list):
                             cwl_inputs[input_id] = [{'location': data, 'class': input_type} for data in input_data]
                         else:
                             cwl_inputs[input_id] = {'location': input_data, 'class': input_type}
+                    elif isinstance(input_i, (LiteralInput, BoundingBoxInput)):
+                        cwl_inputs[input_id] = input_data
                     else:
                         raise self.exception_message(PackageTypeError, None,
                                                      "Undefined package input for execution: {}.".format(type(input_i)))
@@ -946,9 +946,9 @@ class Package(Process):
             try:
                 self.update_status("Running package ...", PACKAGE_PROGRESS_RUN_CWL)
 
-                # TODO Inputs starting with file:// will be interpreted as ems local files
-                #      If OpenSearch obtain file:// references that must be passed to the ADES use an uri starting
-                #      with OPENSEARCH_LOCAL_FILE_SCHEME://
+                # Inputs starting with file:// will be interpreted as ems local files
+                # If OpenSearch obtain file:// references that must be passed to the ADES use an uri starting
+                # with OPENSEARCH_LOCAL_FILE_SCHEME://
                 result = self.package_inst(**cwl_inputs)
                 self.update_status("Package execution done.", PACKAGE_PROGRESS_CWL_DONE)
             except Exception as exc:
@@ -987,20 +987,34 @@ class Package(Process):
                          in our case input are expected to be File object
         """
 
-        # TODO get the input being an EOData
-        eodata_inputs = ['files', 'source_product']
+        if jobname == self.package_id:
+            # A step is the package itself only for non-workflow package being executed on the EMS
+            # and needing ADES dispatching
+            step_payload = self.payload
+            process_id = self.package_id
+        else:
+            # TODO Find a way to retreive the ADES job id and append it in the EMS workflow job
+            # Here we got a step part of a workflow (self is the workflow package)
+            step_process_url = get_process_location(self.step_packages[jobname])
+            step_payload = _get_process_payload(step_process_url)
+            process_id = self.step_packages[jobname]
 
         try:
             # Presume that all EOImage given as input can be resolved to the same ADES
             # So if we got multiple inputs or multiple values for an input, we take the first one as reference
-            eodata_inputs = filter(lambda input: input in joborder, eodata_inputs)
-            value = joborder[eodata_inputs[0]]
+            eodata_inputs = opensearch.get_eo_images_ids_from_payload(step_payload)
 
-            if isinstance(value, list):
-                # Use the first value to determine the data source
-                value = value[0]
-            eodata_input_url = value['location']
-            data_source = get_data_source_from_url(eodata_input_url)
+            data_url = ""  # data_source will be set to the default ADES if no EOImages
+            if eodata_inputs:
+                step_payload = opensearch.alter_payload_after_query(step_payload)
+                value = joborder[eodata_inputs[0]]
+
+                if isinstance(value, list):
+                    # Use the first value to determine the data source
+                    value = value[0]
+
+                data_url = value['location']
+            data_source = get_data_source_from_url(data_url)
 
             # Presume that steps are launched sequentially and have the same progress weight
             progress_estimate = float(len(self.step_launched)) / max(1, len(self.step_packages))
@@ -1014,18 +1028,10 @@ class Package(Process):
         self.step_launched.append(jobname)
 
         if jobname == self.package_id:
-            # A step is the package itself only for non-workflow package being executed on the EMS
-            # and needing ADES dispatching
-            step_payload = self.payload
-            process_id = self.package_id
             self.update_status("Launching {0} on {1}.".format(self.package_id, data_source), progress_estimate)
         else:
-            # TODO Find a way to retreive the ADES job id and append it in the EMS workflow job
-            # Here we got a step part of a workflow (self is the workflow package)
-            step_process_url = get_process_location(self.step_packages[jobname])
-            step_payload = _get_process_payload(step_process_url)
-            process_id = self.step_packages[jobname]
             self.update_status("Launching step {0} on {1}.".format(jobname, data_source), progress_estimate)
+
         return WpsProcess(url=url,
                           process_id=process_id,
                           deploy_body=step_payload,
