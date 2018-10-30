@@ -1004,7 +1004,7 @@ class Package(Process):
             # So if we got multiple inputs or multiple values for an input, we take the first one as reference
             eodata_inputs = opensearch.get_eo_images_ids_from_payload(step_payload)
 
-            data_url = ""  # TODO: If there is no EOImage, get a useful data url. For now, it should be the default ades
+            data_url = ""  # data_source will be set to the default ADES if no EOImages
             if eodata_inputs:
                 step_payload = opensearch.alter_payload_after_query(step_payload)
                 value = joborder[eodata_inputs[0]]
