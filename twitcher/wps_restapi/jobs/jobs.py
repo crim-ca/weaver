@@ -1,4 +1,5 @@
 from pyramid.httpexceptions import *
+from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
 from twitcher.adapter import jobstore_factory
 from twitcher.exceptions import JobNotFound
@@ -20,6 +21,23 @@ def job_url(request, job):
         provider_id=job.service,
         process_id=job.process,
         job_id=job.task_id)
+
+
+def job_format_json(request, job):
+    job_json = {
+        "status": job.status,
+        "message": job.status_message,
+        "progress": job.progress
+    }
+    if job.status in status.status_categories[status.STATUS_FINISHED]:
+        if job.status == status.STATUS_SUCCEEDED:
+            resource = 'results'
+        else:
+            resource = 'exceptions'
+
+        job_json[resource] = '{job_url}/{resource}'.format(job_url=job_url(request, job), resource=resource.lower())
+        job_json['logs'] = '{job_url}/logs'.format(job_url=job_url(request, job))
+    return job_json
 
 
 def check_status(url=None, response=None, sleep_secs=2, verify=False):
@@ -82,6 +100,7 @@ def get_jobs(request):
     Retrieve the list of jobs which can be filtered/sorted using queries.
     """
 
+    detail = asbool(request.params.get('detail', False))
     page = int(request.params.get('page', '0'))
     limit = int(request.params.get('limit', '10'))
     filters = {
@@ -101,7 +120,7 @@ def get_jobs(request):
         'count': count,
         'page': page,
         'limit': limit,
-        'jobs': [job.task_id for job in items]
+        'jobs': [job.task_id if detail else job_format_json(request, job) for job in items]
     })
 
 
@@ -114,21 +133,7 @@ def get_job_status(request):
     Retrieve the status of a job.
     """
     job = get_job(request)
-    response = {
-        "status": job.status,
-        "message": job.status_message,
-        "progress": job.progress
-    }
-
-    if job.status in status.status_categories[status.STATUS_FINISHED]:
-        if job.status == status.STATUS_SUCCEEDED:
-            resource = 'results'
-        else:
-            resource = 'exceptions'
-
-        response[resource] = '{job_url}/{resource}'.format(job_url=job_url(request, job), resource=resource.lower())
-        response['logs'] = '{job_url}/logs'.format(job_url=job_url(request, job))
-
+    response = job_format_json(request, job)
     return HTTPOk(json=response)
 
 

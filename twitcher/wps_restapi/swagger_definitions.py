@@ -417,6 +417,7 @@ JobSortEnum = SchemaNode(
 
 
 class GetJobsQueries(MappingSchema):
+    detail = SchemaNode(Boolean(), description="Provide job details instead of IDs.", default=False, example=True)
     page = SchemaNode(Integer(), missing=drop, default=0)
     limit = SchemaNode(Integer(), missing=drop, default=10)
     status = JobStatusEnum
