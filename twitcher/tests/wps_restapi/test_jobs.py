@@ -8,14 +8,16 @@ from twitcher.status import status_values, STATUS_SUCCEEDED, STATUS_FAILED
 
 
 class WpsRestApiJobsTest(unittest.TestCase):
-
+    @classmethod
     def setUpClass(cls):
         cls.config = setup_with_mongodb()
         cls.config.include('twitcher.wps')
+        cls.config.include('twitcher.wps_restapi')
         cls.config.include('twitcher.tweens')
         cls.json_headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
         cls.app = webtest.TestApp(cls.config.make_wsgi_app())
 
+    @classmethod
     def tearDownClass(cls):
         pyramid.testing.tearDown()
 
@@ -23,17 +25,16 @@ class WpsRestApiJobsTest(unittest.TestCase):
         # rebuild clean db on each test
         self.jobstore = setup_mongodb_jobstore(self.config)
 
-    @classmethod
-    def setup_jobs(cls):
-        j1 = cls.jobstore.save_job('0123-4567-8910-1112', 'process-1', service=None,
-                                   is_workflow=False, user_id=None, async=True)
+    def setup_jobs(self):
+        j1 = self.jobstore.save_job('0123-4567-8910-1112', 'process-1', service=None,
+                                    is_workflow=False, user_id=None, async=True)
         j1.status = STATUS_SUCCEEDED
 
-        cls.jobstore.update_job(j1)
-        j2 = cls.jobstore.save_job('9998-9796-9594-9392', 'process-2', service='service-A',
-                                   is_workflow=True, user_id=1, async=False)
+        self.jobstore.update_job(j1)
+        j2 = self.jobstore.save_job('9998-9796-9594-9392', 'process-2', service='service-A',
+                                    is_workflow=True, user_id=1, async=False)
         j2.status = STATUS_FAILED
-        cls.jobstore.update_job(j2)
+        self.jobstore.update_job(j2)
 
     @staticmethod
     def check_job_format(job):
@@ -49,7 +50,6 @@ class WpsRestApiJobsTest(unittest.TestCase):
         elif job['status'] == STATUS_FAILED:
             assert 'exceptions' in job and isinstance(job['exceptions'], six.string_types)
 
-    @pytest.mark.online
     def test_get_jobs(self):
         self.setup_jobs()
         resp = self.app.get('/jobs', headers=self.json_headers)
@@ -62,7 +62,6 @@ class WpsRestApiJobsTest(unittest.TestCase):
         for job_id in resp.json['jobs']:
             assert isinstance(job_id, six.string_types)
 
-    @pytest.mark.online
     def test_get_jobs_detail(self):
         self.setup_jobs()
         resp = self.app.get('/jobs?detail=true', headers=self.json_headers)

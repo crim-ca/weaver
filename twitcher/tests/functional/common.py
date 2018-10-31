@@ -23,8 +23,10 @@ def setup_mongodb_tokenstore(config):
 def setup_mongodb_servicestore(config):
     store = servicestore_factory(config.registry)
     store.clear_services()
+    return store
 
 
 def setup_mongodb_jobstore(config):
     store = jobstore_factory(config.registry)
     store.clear_jobs()
+    return store
