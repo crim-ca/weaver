@@ -56,10 +56,11 @@ def fetch_data_sources():
         try:
             with open(data_source_cfg) as f:
                 DATA_SOURCES = json.load(f)
-        except Exception:
-            pass
+        except Exception as exc:
+            raise ValueError("Data sources file {0} cannot be loaded properly : {1}".format(data_source_cfg,
+                                                                                            exc.message))
     if not DATA_SOURCES:
-        raise ValueError("No data source found in setting 'twitcher.data_sources'")
+        raise ValueError("No data sources found in setting 'twitcher.data_sources'")
     return DATA_SOURCES
 
 
