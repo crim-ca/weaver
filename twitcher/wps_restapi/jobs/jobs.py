@@ -25,19 +25,21 @@ def job_url(request, job):
 
 def job_format_json(request, job):
     job_json = {
+        "id": job.task_id,
         "status": job.status,
         "message": job.status_message,
         "progress": job.progress
     }
-    if job.status in status.status_categories[status.STATUS_FINISHED]:
-        # back compatibility: check also finished jobs that should have succeeded status
+    # back compatibility: check also finished jobs that should have succeeded status
+    job_finished = list(status.status_categories[status.STATUS_FINISHED]) + list([status.STATUS_FINISHED])
+    if job.status in job_finished:
         if job.status in [status.STATUS_SUCCEEDED, status.STATUS_FINISHED]:
             resource = 'results'
         else:
             resource = 'exceptions'
 
         job_json[resource] = '{job_url}/{resource}'.format(job_url=job_url(request, job), resource=resource.lower())
-        job_json['logs'] = '{job_url}/logs'.format(job_url=job_url(request, job))
+    job_json['logs'] = '{job_url}/logs'.format(job_url=job_url(request, job))
     return job_json
 
 
