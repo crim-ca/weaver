@@ -154,6 +154,9 @@ def get_random_name(retry=False):
 
 
 def get_sane_name(name, minlen=3, maxlen=25):
-    if name is None or len(name.strip()) < minlen:
-        return None
-    return re.sub("[^a-z]", "_", name.strip().lower()[:maxlen])
+    if name is None \
+       or len(name.strip()) < minlen \
+       or len(name.strip()) > maxlen \
+       or not re.match("^[a-zA-Z_]+$", name):
+        raise Exception('Invalid process name : {0}'.format(name))
+    return name
