@@ -1,3 +1,4 @@
+# noinspection PyPackageRequirements
 import pytest
 from lxml import etree
 from twitcher import utils
@@ -19,9 +20,9 @@ def test_parse_service_name():
     assert 'emu' == utils.parse_service_name("/ows/proxy/emu", protected_path)
     assert 'emu' == utils.parse_service_name("/ows/proxy/emu/foo/bar", protected_path)
     assert 'emu' == utils.parse_service_name("/ows/proxy/emu/", protected_path)
-    with pytest.raises(ServiceNotFound) as e_info:
+    with pytest.raises(ServiceNotFound):
         assert 'emu' == utils.parse_service_name("/ows/proxy/", protected_path)
-    with pytest.raises(ServiceNotFound) as e_info:
+    with pytest.raises(ServiceNotFound):
         assert 'emu' == utils.parse_service_name("/ows/nowhere/emu", protected_path)
 
 
@@ -30,7 +31,7 @@ def test_baseurl():
     assert utils.baseurl('http://localhost:8094/wps?service=wps&request=getcapabilities') == 'http://localhost:8094/wps'
     assert utils.baseurl('https://localhost:8094/wps?service=wps&request=getcapabilities') ==\
         'https://localhost:8094/wps'
-    with pytest.raises(ValueError) as e_info:
+    with pytest.raises(ValueError):
         utils.baseurl('ftp://localhost:8094/wps')
 
 

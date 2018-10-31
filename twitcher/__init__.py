@@ -2,9 +2,6 @@ __version__ = 'ogc-0.3.20'
 
 import os
 import sys
-from twitcher import adapter
-from pyramid.exceptions import ConfigurationError
-import logging
 
 TWITCHER_MODULE_DIR = os.path.abspath(os.path.dirname(__file__))
 TWITCHER_ROOT_DIR = os.path.abspath(os.path.dirname(TWITCHER_MODULE_DIR))
@@ -14,7 +11,6 @@ sys.path.insert(0, TWITCHER_MODULE_DIR)
 from twitcher import adapter
 from twitcher.config import get_twitcher_configuration
 from pyramid.exceptions import ConfigurationError
-from pyramid.httpexceptions import HTTPServerError
 from pyramid.view import exception_view_config, notfound_view_config, forbidden_view_config
 import logging
 logger = logging.getLogger('TWITCHER')
@@ -57,31 +53,30 @@ def main(global_config, **settings):
     settings.update(parse_extra_options(settings.get('twitcher.extra_options', '')))
 
     from twitcher.adapter import adapter_factory
-
-    config = adapter_factory(settings).configurator_factory(settings)
+    local_config = adapter_factory(settings).configurator_factory(settings)
 
     # celery
     if global_config.get('__file__') is not None:
-        config.include('pyramid_celery')
-        config.configure_celery(global_config['__file__'])
+        local_config.include('pyramid_celery')
+        local_config.configure_celery(global_config['__file__'])
 
     # mako used by swagger-ui
-    config.include('pyramid_mako')
+    local_config.include('pyramid_mako')
 
     # include twitcher components
-    config.include('twitcher.config')
-    config.include('twitcher.rpcinterface')
-    config.include('twitcher.owsproxy')
-    config.include('twitcher.wps')
-    config.include('twitcher.wps_restapi')
-    config.include('twitcher.processes')
+    local_config.include('twitcher.config')
+    local_config.include('twitcher.rpcinterface')
+    local_config.include('twitcher.owsproxy')
+    local_config.include('twitcher.wps')
+    local_config.include('twitcher.wps_restapi')
+    local_config.include('twitcher.processes')
 
     # tweens/middleware
     # TODO: maybe add tween for exception handling or use unknown_failure view
-    config.include('twitcher.tweens')
+    local_config.include('twitcher.tweens')
 
     ##config.add_exception_view(exception_view)
 
-    config.scan()
+    local_config.scan()
 
-    return config.make_wsgi_app()
+    return local_config.make_wsgi_app()

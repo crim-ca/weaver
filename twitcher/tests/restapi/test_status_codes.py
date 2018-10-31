@@ -16,7 +16,6 @@ from twitcher import main
 from twitcher.config import TWITCHER_CONFIGURATION_DEFAULT
 from twitcher.tests.utils import get_test_twitcher_app
 
-
 public_routes = [
     api_frontpage_uri,
     api_swagger_ui_uri,
@@ -24,8 +23,8 @@ public_routes = [
     api_versions_uri,
 ]
 forbidden_routes = [
-    jobs_short_uri,     # should always be visible
-    jobs_full_uri,      # could be 401
+    jobs_short_uri,  # should always be visible
+    jobs_full_uri,  # could be 401
 ]
 not_found_routes = [
     '/jobs/not-found',
