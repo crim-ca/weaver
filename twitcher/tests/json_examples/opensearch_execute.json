@@ -1,34 +1,28 @@
 {
+  "mode": "async",
+  "response": "document",
   "inputs": [
     {
       "id": "startDate",
-      "value": "2018-01-30T00:00:00.000Z"
+      "data": "2018-01-30T00:00:00.000Z"
     },
     {
       "id": "endDate",
-      "value": "2018-01-31T23:59:59.999Z"
+      "data": "2018-01-31T23:59:59.999Z"
     },
     {
       "id": "aoi",
-      "value": "POLYGON ((100.4 15.3, 104.6 15.3, 104.6 19.3, 100.4 19.3, 100.4 15.3))"
+      "data": "POLYGON((100.4 15.3,104.6 15.3,104.6 19.3,100.4 19.3,100.4 15.3))"
     },
     {
       "id": "files",
-      "value": "http://geo.spacebel.be/opensearch/description.xml?parentIdentifier=EOP:IPT:Sentinel2"
-    },
-    {
-      "id": "output_file_type",
-      "value": "GEOTIFF"
-    },
-    {
-      "id": "output_name",
-      "value": "stack_result.tif"
+      "data": "EOP:IPT:Sentinel2"
     }
   ],
   "outputs": [
     {
       "id": "output",
-      "transmissionMode": "REFERENCE"
+      "transmissionMode": "reference"
     }
   ]
 }
