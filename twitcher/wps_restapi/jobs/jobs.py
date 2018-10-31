@@ -120,7 +120,7 @@ def get_jobs(request):
         'count': count,
         'page': page,
         'limit': limit,
-        'jobs': [job.task_id if detail else job_format_json(request, job) for job in items]
+        'jobs': [job_format_json(request, job) if detail else job.task_id for job in items]
     })
 
 
