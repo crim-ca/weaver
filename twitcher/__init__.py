@@ -2,16 +2,15 @@ __version__ = 'pavics-0.3.17'
 
 import os
 import sys
+from twitcher import adapter
+from pyramid.exceptions import ConfigurationError
+import logging
+
 TWITCHER_MODULE_DIR = os.path.abspath(os.path.dirname(__file__))
 TWITCHER_ROOT_DIR = os.path.abspath(os.path.dirname(TWITCHER_MODULE_DIR))
 sys.path.insert(0, TWITCHER_ROOT_DIR)
 sys.path.insert(0, TWITCHER_MODULE_DIR)
 
-from twitcher import adapter
-from pyramid.exceptions import ConfigurationError
-from pyramid.httpexceptions import HTTPServerError
-from pyramid.view import exception_view_config, notfound_view_config, forbidden_view_config
-import logging
 logger = logging.getLogger('TWITCHER')
 
 
@@ -52,8 +51,9 @@ def main(global_config, **settings):
     config = adapter_factory(settings).configurator_factory(settings)
 
     # celery
-    config.include('pyramid_celery')
-    config.configure_celery(global_config['__file__'])
+    if global_config.get('__file__') is not None:
+        config.include('pyramid_celery')
+        config.configure_celery(global_config['__file__'])
 
     # mako used by swagger-ui
     config.include('pyramid_mako')

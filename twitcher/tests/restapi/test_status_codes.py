@@ -74,16 +74,39 @@ def get_test_store_type_from_env():
     return twitcher_store_type
 
 
+"""
+this routine should verify that the twitcher app returns correct status codes for common cases, such as
+- not found
+- forbidden (possibly with a difference between unauthorized and unauthentificated
+- resource added
+- ok
+"""
+# create a twitcher app using configuration
+# invoke request on app:
+#   not found provider, job and process
+#   private resource
+#   login, then private resource
+#   add job
+#   fetch job and find it
+#   search features
+# receive response and assert that status codes match
+
+
 class StatusCodeTestCase(TestCase):
 
     headers = {'accept': 'application/json'}
 
-    def setUp(self):
+    def setUp_old(self):
         self.app = get_test_twitcher_app()
+
+    def setUp(self):
+        config = testing.setUp()
+        app = main({})
+        self.testapp = TestApp(app)
 
     def test_200(self):
         for uri in public_routes:
-            resp = self.app.get(uri, expect_errors=True, headers=self.headers)
+            resp = self.testapp.get(uri, expect_errors=True, headers=self.headers)
             self.assertEqual(200, resp.status_code, 'route {} did not return 200'.format(uri))
 
     """
@@ -95,5 +118,27 @@ class StatusCodeTestCase(TestCase):
 
     def test_404(self):
         for uri in not_found_routes:
-            resp = self.app.get(uri, expect_errors=True, headers=self.headers)
+            resp = self.testapp.get(uri, expect_errors=True, headers=self.headers)
             self.assertEqual(404, resp.status_code, 'route {} did not return 404'.format(uri))
+
+
+"""
+this routine should make sure that the services store jobs, processes and providers correctly,
+  but directly from the services, and not only by status codes
+foreach of jobs, processes, providers
+  save entity
+  fetch entity and verify informations
+"""
+# create a store
+# instantiate wps_restapi with that store
+# test provider
+#   create provider
+#   create process in provider
+#   fetch process data
+#   submit job with dummy data
+#   fetch job and see its existence
+# sda
+
+
+class CRUDTestCase(TestCase):
+    pass
