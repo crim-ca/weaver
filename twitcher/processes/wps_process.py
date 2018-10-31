@@ -56,6 +56,9 @@ class WpsProcess(object):
             return response.json()
         elif response.status_code == 404:
             return None
+        # TODO Remove patch for Spacebel ADES (Missing process return a 500 error)
+        elif response.status_code == 500:
+            return None
         response.raise_for_status()
 
     def deploy(self):
