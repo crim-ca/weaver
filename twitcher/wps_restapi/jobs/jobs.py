@@ -30,7 +30,8 @@ def job_format_json(request, job):
         "progress": job.progress
     }
     if job.status in status.status_categories[status.STATUS_FINISHED]:
-        if job.status == status.STATUS_SUCCEEDED:
+        # back compatibility: check also finished jobs that should have succeeded status
+        if job.status in [status.STATUS_SUCCEEDED, status.STATUS_FINISHED]:
             resource = 'results'
         else:
             resource = 'exceptions'
