@@ -473,6 +473,7 @@ def get_processes(request):
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except Exception as ex:
+        LOGGER.exception(ex.message, exc_info=True)
         raise HTTPInternalServerError(ex.message)
 
 
