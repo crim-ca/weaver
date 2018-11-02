@@ -1,22 +1,20 @@
-import time
 from collections import deque
 from copy import deepcopy
 from itertools import ifilterfalse
+from pyramid.httpexceptions import HTTPGatewayTimeout, HTTPOk
+from pyramid.settings import asbool
+from six.moves.urllib.parse import urlparse, parse_qsl
 from typing import Iterable, Dict, Tuple, List, Deque
-import logging
-
-import lxml.etree
-import requests
-import urlparse
-import shapely.wkt
-
 from twitcher.processes.sources import fetch_data_sources
 from twitcher.processes.constants import WPS_LITERAL
 from twitcher.utils import get_any_id
-from pyramid.settings import asbool
 from twitcher.processes.wps_process import OPENSEARCH_LOCAL_FILE_SCHEME
 from twitcher.processes.constants import START_DATE, END_DATE, AOI, COLLECTION
-
+import lxml.etree
+import requests
+import shapely.wkt
+import logging
+import time
 
 LOGGER = logging.getLogger("PACKAGE")
 
@@ -24,7 +22,7 @@ LOGGER = logging.getLogger("PACKAGE")
 def alter_payload_after_query(payload):
     """When redeploying the package on ADES, strip out any EOImage parameter
 
-    :param payload: 
+    :param payload:
 
     """
     new_payload = deepcopy(payload)
@@ -104,9 +102,9 @@ def replace_with_opensearch_scheme(link):
     :param link: url to replace scheme
 
     """
-    scheme = urlparse.urlparse(link).scheme
+    scheme = urlparse(link).scheme
     if scheme == "file":
-        link_without_scheme = link[link.find(":") :]
+        link_without_scheme = link[link.find(":"):]
         return "{}{}".format(OPENSEARCH_LOCAL_FILE_SCHEME, link_without_scheme)
     else:
         return link
@@ -129,9 +127,9 @@ class OpenSearchQuery(object):
 
     def __init__(
         self,
-        collection_identifier,  # type: str
-        osdd_url,  # type: str
-        catalog_search_field="parentIdentifier",  # type: str
+        collection_identifier,                      # type: str
+        osdd_url,                                   # type: str
+        catalog_search_field="parentIdentifier",    # type: str
     ):
         """
         :param collection_identifier: Collection ID to query
@@ -158,6 +156,7 @@ class OpenSearchQuery(object):
 
         et = lxml.etree.fromstring(r.content)
         xpath = "//*[local-name() = 'Url'][@rel='results']"
+        # noinspection PyProtectedMember
         url = et.xpath(xpath)[0]  # type: lxml.etree._Element
         return url.attrib["template"]
 
@@ -172,7 +171,7 @@ class OpenSearchQuery(object):
         base_url, query = template_url.split("?", 1)
 
         query_params = {}
-        template_parameters = urlparse.parse_qsl(query)
+        template_parameters = parse_qsl(query)
 
         allowed_names = set([p[0] for p in template_parameters])
         for key, value in template_parameters:
@@ -192,17 +191,18 @@ class OpenSearchQuery(object):
 
         return base_url, query_params
 
+    # noinspection PyMethodMayBeStatic
     def requests_get_retry(self, *args, **kwargs):
         """Retry a requests.get call
 
-        :param *args: passed to requests.get
-        :param **kwargs: passed to requests.get
-
+        :param args: passed to requests.get
+        :param kwargs: passed to requests.get
         """
-        retries_in_secs = [1, 5]
+        response = HTTPGatewayTimeout(detail="Request ran out of retries.")
+        retries_in_secs = range(1, 6)   # 1 to 5 secs
         for wait in retries_in_secs:
             response = requests.get(*args, **kwargs)
-            if response.status_code == 200:
+            if response.status_code == HTTPOk.code:
                 return response
             else:
                 time.sleep(wait)
@@ -211,9 +211,7 @@ class OpenSearchQuery(object):
     def _query_features_paginated(self, params):
         # type: (Dict) -> Iterable[Dict, str]
         """
-
         :param params: query parameters
-
         """
         start_index = 1
         template_url = self.get_template_url()
@@ -254,7 +252,7 @@ class OpenSearchQuery(object):
                 raise
 
             for link in data_links:
-                scheme = urlparse.urlparse(link).scheme
+                scheme = urlparse(link).scheme
                 if scheme in accept_schemes:
                     yield link
                     continue
@@ -436,7 +434,7 @@ class EOImageDescribeProcessHandler(object):
 def get_eo_images_inputs_from_payload(payload):
     """
 
-    :param payload: 
+    :param payload:
 
     """
     inputs = payload["processDescription"]["process"].get("inputs", {})
@@ -491,7 +489,7 @@ def modified_collection_identifiers(eo_image_identifiers):
 def get_data_source(collection_id):
     """
 
-    :param collection_id: 
+    :param collection_id:
 
     """
     data_sources = fetch_data_sources()
@@ -512,7 +510,7 @@ def get_data_source(collection_id):
 def get_eo_images_ids_from_payload(payload):
     """
 
-    :param payload: 
+    :param payload:
 
     """
     return [get_any_id(i) for i in get_eo_images_inputs_from_payload(payload)]
@@ -535,7 +533,8 @@ def replace_inputs_describe_process(inputs, payload):
         try:
             ap = payload_inputs[get_any_id(i)]["additionalParameters"]
             i["additionalParameters"] = ap
-        except:
+        # noinspection PyBroadException
+        except Exception:
             pass
 
     additional_parameters = get_additional_parameters(process)

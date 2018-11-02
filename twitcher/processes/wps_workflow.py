@@ -31,12 +31,12 @@ from pyramid_celery import celery_app as app
 LOGGER = logging.getLogger(__name__)
 DEFAULT_TMP_PREFIX = "tmp"
 
-# TODO: The code started as a copy of the class cwltool/command_line_tool.py, and still has useless code in the context of a WPS workflow
 
-def default_make_tool(toolpath_object,  #type: Dict[Text, Any]
-                      loadingContext,  #type: LoadingContext
-                      get_job_process_definition,  #type: (Any, Any) -> WpsProcess
-                      ):   #type: (...) -> Process
+# TODO: The code started as a copy of the class cwltool/command_line_tool.py, and still has useless code in the context of a WPS workflow
+def default_make_tool(toolpath_object,              # type: Dict[Text, Any]
+                      loadingContext,               # type: LoadingContext
+                      get_job_process_definition,   # type: (Any, Any)
+                      ):                            # type: (...) -> Process
     if not isinstance(toolpath_object, MutableMapping):
         raise WorkflowException(u"Not a dict: '%s'" % toolpath_object)
     if "class" in toolpath_object:
