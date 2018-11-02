@@ -914,7 +914,7 @@ class Package(Process):
                 raise self.exception_message(PackageExecutionError, exc, "Failed retrieving package input types.")
             try:
                 # identify EOimages from payload
-                eoimage_data_sources = opensearch.get_eo_images_data_sources(self.payload)
+                eoimage_data_sources = opensearch.get_eo_images_data_sources(self.payload, request.inputs)
                 if eoimage_data_sources:
                     request.inputs = opensearch.query_eo_images_from_wps_inputs(request.inputs, eoimage_data_sources)
 
