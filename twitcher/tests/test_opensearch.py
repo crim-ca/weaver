@@ -19,6 +19,7 @@ from twitcher import namesgenerator
 from twitcher.datatype import Process
 from twitcher.processes import opensearch
 from twitcher.store import DB_MEMORY, MemoryProcessStore
+from twitcher.utils import get_any_id
 from twitcher.wps_restapi.processes import processes
 
 OSDD_URL = "http://geo.spacebel.be/opensearch/description.xml"
@@ -100,8 +101,6 @@ def dummy_payload():
 @pytest.fixture
 def opensearch_payload():
     js = load_json_test_file("opensearch_deploy.json")
-    cwl = get_test_file("json_examples", "opensearch_deploy.cwl")
-    js["executionUnit"][0]["href"] = cwl
     return js
 
 
@@ -206,7 +205,7 @@ def test_deploy_opensearch(processstore_factory, opensearch_payload):
     # given
     initial_payload = deepcopy(opensearch_payload)
     request = make_request(json=opensearch_payload, method="POST")
-    process_id = opensearch_payload["processDescription"]["process"]["identifier"]
+    process_id = get_any_id(opensearch_payload["processDescription"]["process"])
 
     store = MemoryProcessStore()
     processstore_factory.return_value = store

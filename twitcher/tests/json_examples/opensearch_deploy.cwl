@@ -1,45 +1,22 @@
 {
     "cwlVersion": "v1.0",
     "class": "CommandLineTool",
-    "requirements": {
-        "DockerRequirement": {
-            "dockerPull": "docker-registry.crim.ca/ogc-public/snap6-stack-creation:v2.1"
-        }
-    },
+    "stdout": "output.txt",
+    "baseCommand": "echo",
     "inputs": {
-        "files": {
-            "inputBinding": {
-                "position": 1,
-                "prefix": "-Pfiles=",
-                "separate": false,
-                "itemSeparator": ","
-            },
-            "type": {
-                "type": "array",
-                "items": "File"
-            }
+      "files": {
+        "inputBinding": {
+          "position": 1
         },
-        "output_file_type": {
-            "inputBinding": {
-                "position": 2,
-                "prefix": "-f"
-            },
-            "type": "string"
-        },
-        "output_name": {
-            "inputBinding": {
-                "position": 3,
-                "prefix": "-t"
-            },
-            "type": "string"
+        "type": {
+          "type": "array",
+          "items": "File"
         }
+      }
     },
     "outputs": {
-        "output": {
-            "outputBinding": {
-                "glob": "$(inputs.output_name)"
-            },
-            "type": "File"
-        }
+      "output": {
+        "type": "File"
+      }
     }
 }
