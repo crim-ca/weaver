@@ -157,6 +157,6 @@ def get_sane_name(name, minlen=3, maxlen=25):
     if name is None \
        or len(name.strip()) < minlen \
        or len(name.strip()) > maxlen \
-       or not re.match("^[a-zA-Z_]+$", name):
+       or not re.match("^[a-zA-Z0-9_]+$", name):
         raise Exception('Invalid process name : {0}'.format(name))
     return name

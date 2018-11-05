@@ -2,8 +2,8 @@
   "processDescription": {
     "process": {
       "visibility": "public",
-      "identifier": "StackCreation-graph-json-remote",
-      "title": "Stacker",
+      "id": "opensearch",
+      "title": "opensearch",
       "abstract": "",
       "keywords": [],
       "additionalParameters": [
@@ -12,18 +12,22 @@
           "parameters": [
             {
               "name": "UniqueAOI",
-              "values": ["true"]
+              "values": [
+                "true"
+              ]
             },
             {
               "name": "UniqueTOI",
-              "values": ["true"]
+              "values": [
+                "true"
+              ]
             }
           ]
         }
       ],
       "inputs": [
         {
-          "identifier": "files",
+          "id": "files",
           "title": "Input Image",
           "formats": [
             {
@@ -32,63 +36,68 @@
             }
           ],
           "minOccurs": 1,
-          "maxOccurs": 1,
+          "maxOccurs": "unbounded",
           "additionalParameters": [
             {
               "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
               "parameters": [
                 {
                   "name": "EOImage",
-                  "values": ["true"]
+                  "values": [
+                    "true"
+                  ]
                 }
               ]
             }
           ]
-        },
-        {
-          "identifier": "output_file_type",
-          "title": "Type of Stacked Image",
-          "minOccurs": 1,
-          "maxOccurs": 1,
-          "LiteralDataDomain": {
-            "dataType": "String"
-          }
-        },
-        {
-          "identifier": "output_name",
-          "title": "Name of the Produced Image",
-          "minOccurs": 1,
-          "maxOccurs": 1,
-          "LiteralDataDomain": {
-            "dataType": "String"
-          }
         }
       ],
       "outputs": [
         {
           "id": "output",
-          "title": "Stacked Image",
+          "title": "result image",
           "formats": [
             {
-              "mimeType": "application/octet-stream",
+              "mimeType": "application/zip",
               "default": true
             }
           ]
         }
-      ],
-      "version": "1.0.0",
-      "jobControlOptions": [
-        "async-execute"
-      ],
-      "outputTransmission": [
-        "reference"
       ]
-    }
+    },
+    "processVersion": "1.0.0",
+    "jobControlOptions": [
+      "async-execute"
+    ],
+    "outputTransmission": [
+      "reference"
+    ]
   },
   "executionUnit": [
-      {
-          "href": "docker-registry.crim.ca/ogc-public/snap6-stack-creation:v2.4"
+    {
+      "unit": {
+        "cwlVersion": "v1.0",
+        "class": "CommandLineTool",
+        "stdout": "output.txt",
+        "baseCommand": "echo",
+        "inputs": {
+          "files": {
+            "inputBinding": {
+              "position": 1
+            },
+            "type": {
+              "type": "array",
+              "items": "File"
+            }
+          }
+        },
+        "outputs": {
+          "output": {
+            "type": "File"
+          }
+        }
       }
+    }
   ],
   "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow"
 }

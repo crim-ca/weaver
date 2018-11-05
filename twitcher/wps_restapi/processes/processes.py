@@ -135,7 +135,7 @@ def _jsonify_output(output, datatype):
 def _map_status(wps_execution_status):
     job_status = wps_execution_status.lower().replace('process', '')
     if job_status == STATUS_RUNNING:  # OGC official status but not supported by PyWPS. See twitcher/status.py
-        job_status = STATUS_STARTED # This is the status used by PyWPS
+        job_status = STATUS_STARTED  # This is the status used by PyWPS
     if job_status in job_status_values:
         return job_status
     return 'unknown'
@@ -273,8 +273,8 @@ def execute_process(self, url, service, process_id, inputs,
                 job.save_log(errors=execution.errors, logger=task_logger)
                 sleep(1)
             else:
-                #job.status_message = "Update {} ...".format(str(job))
-                #job.save_log(logger=task_logger)
+                # job.status_message = "Update {} ...".format(str(job))
+                # job.save_log(logger=task_logger)
                 num_retries = 0
                 run_step += 1
             finally:
@@ -293,7 +293,6 @@ def execute_process(self, url, service, process_id, inputs,
         job.status_message = "Job {}.".format(job.status)
         job.save_log(logger=task_logger)
 
-
         job = store.update_job(job)
 
     return job.status
@@ -301,7 +300,6 @@ def execute_process(self, url, service, process_id, inputs,
 
 # noinspection PyProtectedMember
 def submit_job_handler(request, service_url, is_workflow=False):
-
     # TODO Validate param somehow
     provider_id = request.matchdict.get('provider_id')  # None OK if local
     process_id = request.matchdict.get('process_id')
@@ -320,7 +318,7 @@ def submit_job_handler(request, service_url, is_workflow=False):
         raise HTTPNotImplemented(detail='{0} response not supported.'.format(request.json_body['response']))
 
     for input in request.json_body['inputs']:
-        if not all(k in input for k in ('id', 'href')):
+        if not ('id' in input and any(k in input for k in ('data', 'href'))):
             raise HTTPBadRequest("Missing one of required output parameters [id, href].")
 
     for output in request.json_body['outputs']:
@@ -468,7 +466,7 @@ def get_processes(request):
                 for i, provider in enumerate(providers):
                     provider_id = get_any_id(provider)
                     processes = requests.request('GET', '{host}/providers/{provider_id}/processes'
-                                                        .format(host=request.host_url, provider_id=provider_id),
+                                                 .format(host=request.host_url, provider_id=provider_id),
                                                  headers=request.headers, cookies=request.cookies)
                     response_body['providers'][i].update({'processes': processes})
         return HTTPOk(json=response_body)

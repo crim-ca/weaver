@@ -453,16 +453,17 @@ def get_eo_images_inputs_from_payload(payload):
     return list(filter(EOImageDescribeProcessHandler.is_eoimage_input, inputs))
 
 
-def get_eo_images_data_sources(payload):
-    # type: (Dict) -> Dict[str, Dict]
+def get_eo_images_data_sources(payload, wps_inputs):
+    # type: (Dict, Dict[deque]) -> Dict[str, Dict]
     """
 
-    :param payload:
+    :param payload: Deploy payload
+    :param wps_inputs: Execute inputs
 
     """
     inputs = get_eo_images_inputs_from_payload(payload)
-    id_with_collection = {get_any_id(i): get_any_value(i) for i in inputs}
-    return {k: get_data_source(id_) for k, id_ in id_with_collection.items()}
+    eo_image_identifiers = [get_any_id(i) for i in inputs]
+    return {i: get_data_source(wps_inputs[i][0].data) for i in eo_image_identifiers}
 
 
 def get_data_source(collection_id):
