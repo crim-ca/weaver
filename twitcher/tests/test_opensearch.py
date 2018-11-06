@@ -237,7 +237,7 @@ def test_handle_EOI_unique_aoi_non_unique_toi():
     output = twitcher.processes.opensearch.EOImageDescribeProcessHandler(
         inputs
     ).to_opensearch(unique_aoi=True, unique_toi=False)
-    assert_json_equals(expected, output)
+    assert_json_equals(output, expected)
 
 
 def test_handle_EOI_non_unique_aoi_unique_toi():
@@ -246,7 +246,7 @@ def test_handle_EOI_non_unique_aoi_unique_toi():
     output = twitcher.processes.opensearch.EOImageDescribeProcessHandler(
         inputs
     ).to_opensearch(unique_aoi=False, unique_toi=True)
-    assert_json_equals(expected, output)
+    assert_json_equals(output, expected)
 
 
 def test_get_additional_parameters():

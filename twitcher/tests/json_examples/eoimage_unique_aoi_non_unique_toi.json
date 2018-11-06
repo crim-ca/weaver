@@ -24,9 +24,6 @@
     ],
     "minOccurs": 1,
     "maxOccurs": 1,
-    "LiteralDataDomain": {
-      "dataType": "String"
-    },
     "additionalParameters": [
       {
         "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
@@ -51,9 +48,6 @@
     ],
     "minOccurs": 1,
     "maxOccurs": 1,
-    "LiteralDataDomain": {
-      "dataType": "String"
-    },
     "additionalParameters": [
       {
         "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
@@ -78,9 +72,6 @@
     ],
     "minOccurs": 1,
     "maxOccurs": 1,
-    "LiteralDataDomain": {
-      "dataType": "String"
-    },
     "additionalParameters": [
       {
         "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
@@ -105,9 +96,6 @@
     ],
     "minOccurs": 1,
     "maxOccurs": 1,
-    "LiteralDataDomain": {
-      "dataType": "String"
-    },
     "additionalParameters": [
       {
         "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
@@ -132,15 +120,6 @@
     ],
     "minOccurs": 1,
     "maxOccurs": "unbounded",
-    "LiteralDataDomain": {
-      "dataType": "String",
-      "allowedValues": [
-        "s2-collection-1",
-        "s2-collection-2",
-        "s2-landsat8",
-        "s2-sentinel2"
-      ]
-    },
     "additionalParameters": [
       {
         "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
@@ -165,13 +144,6 @@
     ],
     "minOccurs": 1,
     "maxOccurs": "unbounded",
-    "LiteralDataDomain": {
-      "dataType": "String",
-      "allowedValues": [
-        "probav-collection-1",
-        "probav-collection-2"
-      ]
-    },
     "additionalParameters": [
       {
         "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
