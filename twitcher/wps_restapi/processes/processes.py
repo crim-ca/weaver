@@ -601,8 +601,8 @@ def add_local_process(request):
     # ensure that required 'executeEndpoint' in db is added, will be auto-fixed to localhost if not specified in body
     process_info.update({'executeEndpoint': process_info.get('executeEndpoint'), 'payload': payload})
 
-    process_info['jobControlOptions'] = process_description['jobControlOptions']
-    process_info['outputTransmission'] = process_description['outputTransmission']
+    process_info['jobControlOptions'] = process_description.get('jobControlOptions', [])
+    process_info['outputTransmission'] = process_description.get('outputTransmission', [])
     process_info['owsContext'] = ows_context
     try:
         store = processstore_factory(request.registry)
