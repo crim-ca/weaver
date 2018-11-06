@@ -528,9 +528,6 @@ def add_local_process(request):
     # obtain updated process information using WPS process offering and CWL package definition
     try:
         data_source = get_twitcher_url(request.registry.settings)
-        if "inputs" in process_info:
-            convert = opensearch.EOImageDescribeProcessHandler.convert_to_wps_input
-            process_info["inputs"] = [convert(i) for i in process_info["inputs"]]
         process_info = wps_package.get_process_from_wps_request(process_info, reference, package, data_source)
     except (PackageRegistrationError, PackageTypeError) as ex:
         raise HTTPUnprocessableEntity(detail=ex.message)
@@ -576,8 +573,7 @@ def get_local_process(request):
 
         try:
             process_json["inputs"] = opensearch.replace_inputs_eoimage_files_to_query(process_json["inputs"],
-                                                                                      process["payload"],
-                                                                                      wps_inputs=True)
+                                                                                      process["payload"])
         # Process may not have a payload... in this case no eoimage inputs anyway
         except KeyError:
             pass

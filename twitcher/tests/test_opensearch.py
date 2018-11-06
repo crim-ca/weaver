@@ -132,7 +132,7 @@ def test_describe_process_opensearch(
 
     original_inputs = opensearch_process.json()["inputs"]
     expected_inputs = opensearch.replace_inputs_eoimage_files_to_query(
-        original_inputs, opensearch_process.payload, wps_inputs=True
+        original_inputs, opensearch_process.payload
     )
 
     assert_json_equals(transformed_inputs, expected_inputs)

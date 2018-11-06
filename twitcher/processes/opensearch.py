@@ -363,13 +363,12 @@ class EOImageDescribeProcessHandler(object):
         }
         return data
 
-    def to_opensearch(self, unique_aoi, unique_toi, to_wps_inputs=False):
-        # type: (bool, bool, bool) -> List[Dict]
+    def to_opensearch(self, unique_aoi, unique_toi):
+        # type: (bool, bool) -> List[Dict]
         """
 
         :param unique_aoi:
         :param unique_toi:
-        :param to_wps_inputs:  (Default value = False)
 
         """
         if not self.eoimage_inputs:
@@ -411,38 +410,7 @@ class EOImageDescribeProcessHandler(object):
             collections.append(self.make_collection(name, allowed_col))
 
         new_inputs = toi + aoi + collections
-        if to_wps_inputs:
-            new_inputs = [self.convert_to_wps_input(i) for i in new_inputs]
         return new_inputs + self.other_inputs
-
-    @staticmethod
-    def convert_to_wps_input(input_):
-        """
-
-        :param input_:
-
-        """
-        replace = {
-            u"id": u"identifier",
-            u"minOccurs": u"min_occurs",
-            u"maxOccurs": u"max_occurs",
-        }
-        remove = [
-            u"formats",
-            u"LiteralDataDomain",
-            u"additionalParameters",
-            u"owsContext",
-        ]
-        add = {u"type": u"literal", u"data_type": u"string"}
-        for k, v in replace.items():
-            if k in input_:
-                input_[v] = input_.pop(k)
-        for r in remove:
-            input_.pop(r, None)
-        for k, v in add.items():
-            input_[k] = v
-
-        return input_
 
 
 def get_eo_images_inputs_from_payload(payload):
@@ -528,15 +496,14 @@ def get_eo_images_ids_from_payload(payload):
     return [get_any_id(i) for i in get_eo_images_inputs_from_payload(payload)]
 
 
-def replace_inputs_eoimage_files_to_query(inputs, payload, wps_inputs=False):
-    # type: (List[Dict], Dict, bool) -> List[Dict]
+def replace_inputs_eoimage_files_to_query(inputs, payload):
+    # type: (List[Dict], Dict) -> List[Dict]
     """
     Replace EOImage inputs (additionalParameter -> EOImage -> true) with
     OpenSearch query parameters
 
     :param inputs:
     :param payload:
-    :param wps_inputs:
     """
 
     # add "additionalParameters" property from the payload
@@ -561,7 +528,7 @@ def replace_inputs_eoimage_files_to_query(inputs, payload, wps_inputs=False):
         unique_aoi = ["UNIQUEAOI", "TRUE"] in additional_parameters_upper
     handler = EOImageDescribeProcessHandler(inputs=inputs)
     inputs_converted = handler.to_opensearch(
-        unique_aoi=unique_aoi, unique_toi=unique_toi, to_wps_inputs=wps_inputs
+        unique_aoi=unique_aoi, unique_toi=unique_toi
     )
     return inputs_converted
 
