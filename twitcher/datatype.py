@@ -455,6 +455,10 @@ class Process(dict):
     def executeEndpoint(self):
         return self.get('executeEndpoint')
 
+    @property
+    def owsContext(self):
+        return self.get('owsContext')
+
     # wps, workflow, etc.
     @property
     def type(self):
@@ -538,6 +542,7 @@ class Process(dict):
             'jobControlOptions': self.jobControlOptions,
             'outputTransmission': self.outputTransmission,
             'executeEndpoint': self.executeEndpoint,
+            'owsContext': self.owsContext,
         }
 
     def summary(self):

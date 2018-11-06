@@ -549,6 +549,7 @@ def add_local_process(request):
 
     process_info['jobControlOptions'] = process_description['jobControlOptions']
     process_info['outputTransmission'] = process_description['outputTransmission']
+    process_info['owsContext'] = ows_context
     try:
         store = processstore_factory(request.registry)
         saved_process = store.save_process(ProcessDB(process_info), overwrite=False, request=request)
