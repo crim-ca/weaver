@@ -411,10 +411,9 @@ class EOImageDescribeProcessHandler(object):
             for name in eoimage_names:
                 aoi.append(self.make_aoi(_make_specific_identifier(u"aoi", name)))
 
-        unique_eoimage = len(eoimage_names) == 1
+        eoimage_names = modified_collection_identifiers(eoimage_names)
         for name, allowed_col in zip(eoimage_names, allowed_collections):
-            identifier = "collection" if unique_eoimage else name + "_collection"
-            collections.append(self.make_collection(identifier, allowed_col))
+            collections.append(self.make_collection(name, allowed_col))
 
         new_inputs = toi + aoi + collections
         if to_wps_inputs:
@@ -461,6 +460,27 @@ def get_eo_images_inputs_from_payload(payload):
     return list(filter(EOImageDescribeProcessHandler.is_eoimage_input, inputs))
 
 
+def get_original_collection_id(payload, wps_inputs):
+    # type: (Dict[deque]) -> Dict[deque]
+    """
+    When we deploy a Process that contains OpenSearch parameters, the collection identifier if modified.
+    This function changes the id in the execute request to the one in the deploy description.
+    :param payload:
+    :param wps_inputs:
+    :return:
+    """
+    new_inputs = deepcopy(wps_inputs)
+    inputs = get_eo_images_inputs_from_payload(payload)
+    original_ids = [get_any_id(i) for i in inputs]
+
+    correspondance = dict(zip(modified_collection_identifiers(original_ids), original_ids))
+    for execute_id, deploy_id in correspondance.items():
+        if execute_id not in new_inputs:
+            raise ValueError("Missing required input parameter: {}".format(execute_id))
+        new_inputs[deploy_id] = new_inputs.pop(execute_id)
+    return new_inputs
+
+
 def get_eo_images_data_sources(payload, wps_inputs):
     # type: (Dict, Dict[deque]) -> Dict[str, Dict]
     """
@@ -472,6 +492,15 @@ def get_eo_images_data_sources(payload, wps_inputs):
     inputs = get_eo_images_inputs_from_payload(payload)
     eo_image_identifiers = [get_any_id(i) for i in inputs]
     return {i: get_data_source(wps_inputs[i][0].data) for i in eo_image_identifiers}
+
+
+def modified_collection_identifiers(eo_image_identifiers):
+    unique_eoimage = len(eo_image_identifiers) == 1
+    new_identifiers = []
+    for identifier in eo_image_identifiers:
+        new = "collection" if unique_eoimage else identifier + "_collection"
+        new_identifiers.append(new)
+    return new_identifiers
 
 
 def get_data_source(collection_id):
