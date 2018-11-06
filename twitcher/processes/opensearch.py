@@ -58,7 +58,9 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
             except KeyError:
                 pass
         else:
-            raise ValueError("Missing input identifier: {}".format(" or ".join(aoi_ids)))
+            raise ValueError(
+                "Missing input identifier: {}".format(" or ".join(aoi_ids))
+            )
 
     eoimages_inputs = [
         input_id for input_id in wps_inputs if input_id in eoimage_source_info
@@ -80,11 +82,7 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
 
                 bbox_str = load_wkt(wkt)
 
-                params = {
-                    "startDate": startdate,
-                    "endDate": enddate,
-                    "bbox": bbox_str,
-                }
+                params = {"startDate": startdate, "endDate": enddate, "bbox": bbox_str}
                 osdd_url = eoimage_source_info[input_id]["osdd_url"]
                 accept_schemes = eoimage_source_info[input_id]["accept_schemes"]
                 os = OpenSearchQuery(
