@@ -525,9 +525,6 @@ class ProcessDetailSchema(MappingSchema):
     metadata = MetadataList(missing=drop)
     inputs = InputTypeList(missing=drop)
     outputs = OutputTypeList(missing=drop)
-    version = SchemaNode(String(), missing=drop)
-    jobControlOptions = JobControlOptionsEnum
-    outputTransmission = OutputTransmissionEnum
     executeEndpoint = SchemaNode(String(), format='url', missing=drop, title='executeEndpoint')
     additionalParameters = AdditionalParameters(missing=drop, title='additionalParameters')
     owsContext = OWSContext(missing=drop, title='owsContext')
@@ -1043,6 +1040,9 @@ class OkPostProcessesSchema(MappingSchema):
 
 class OkGetProcessBodySchema(MappingSchema):
     process = ProcessDetailSchema()
+    processVersion = SchemaNode(String())
+    jobControlOptions = JobControlOptionsEnum
+    outputTransmission = OutputTransmissionEnum
 
 
 class OkGetProcessSchema(MappingSchema):

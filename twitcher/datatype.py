@@ -536,11 +536,8 @@ class Process(dict):
             'abstract': self.abstract,
             'keywords': self.keywords,
             'metadata': self.metadata,
-            'version': self.version,
             'inputs': self.inputs,
             'outputs': self.outputs,
-            'jobControlOptions': self.jobControlOptions,
-            'outputTransmission': self.outputTransmission,
             'executeEndpoint': self.executeEndpoint,
             'owsContext': self.owsContext,
         }

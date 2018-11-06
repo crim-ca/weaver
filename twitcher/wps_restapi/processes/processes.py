@@ -581,7 +581,13 @@ def get_local_process(request):
         # Process may not have a payload... in this case no eoimage inputs anyway
         except KeyError:
             pass
-        return HTTPOk(json={'process': process_json})
+        json_ = {
+            'process': process_json,
+            'processVersion': process.version,
+            'jobControlOptions': process.jobControlOptions,
+            'outputTransmission': process.outputTransmission,
+        }
+        return HTTPOk(json=json_)
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except ProcessNotFound:
