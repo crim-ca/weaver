@@ -502,7 +502,7 @@ class ProcessSummarySchema(MappingSchema):
     version = SchemaNode(String())
     jobControlOptions = SchemaNode(String())
     processDescriptionURL = SchemaNode(String(), missing=drop)    # URL
-    outputTransmission = SchemaNode(missing=drop)    # URL
+    outputTransmission = SchemaNode(String(), missing=drop)    # URL
 
 
 class ProcessListSchema(SequenceSchema):
