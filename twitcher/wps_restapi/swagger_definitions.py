@@ -499,7 +499,7 @@ class ProcessSummarySchema(MappingSchema):
     abstract = SchemaNode(String())
     keywords = KeywordList(missing=drop)
     metadata = MetadataList(missing=drop)
-    executeEndpoint = SchemaNode(String(), missing=drop)    # URL
+    processDescriptionURL = SchemaNode(String(), missing=drop)    # URL
 
 
 class ProcessListSchema(SequenceSchema):

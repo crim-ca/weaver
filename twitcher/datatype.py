@@ -549,7 +549,7 @@ class Process(dict):
             'metadata': self.metadata,
             'version': self.version,
             'jobControlOptions': self.jobControlOptions,
-            'executeEndpoint': self.executeEndpoint,
+            'processDescriptionURL': "/".join([self.executeEndpoint, "processes", self.identifier]),
         }
 
     @staticmethod
