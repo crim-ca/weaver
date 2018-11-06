@@ -235,7 +235,7 @@ class LiteralDataDomainObject(MappingSchema):
 
 
 class BaseInputTypeBody(MappingSchema):
-    identifier = SchemaNode(String())
+    id = SchemaNode(String())
     title = SchemaNode(String(), missing=drop)
     abstract = SchemaNode(String(), missing=drop)
     keywords = KeywordList(missing=drop)
@@ -247,7 +247,7 @@ class BaseInputTypeBody(MappingSchema):
 
 
 class BaseOutputTypeBody(MappingSchema):
-    identifier = SchemaNode(String())
+    id = SchemaNode(String())
     title = SchemaNode(String(), missing=drop)
     abstract = SchemaNode(String(), missing=drop)
     keywords = KeywordList(missing=drop)
