@@ -20,7 +20,7 @@ def test_deploy(mock_get_process):
     # given
     dummy_payload = {"processDescription": {
         "process": {
-            "identifier": "workflow_stacker_sfs_id",
+            "id": "workflow_stacker_sfs_id",
             "title": "Application StackCreation followed by SFS dynamically added by POST /processes",
             "owsContext": {
                 "offering": {"code": "http://www.opengis.net/eoc/applicationContext/cwl",
@@ -32,6 +32,9 @@ def test_deploy(mock_get_process):
     mock_get_process.return_value = dummy_process_offering
     request = make_request(json=dummy_payload, method='POST')
     with mock.patch("twitcher.wps_restapi.processes.processes.ProcessDB") as process_class:
+        mock_process = mock.MagicMock()
+        mock_process.identifier = "something"
+        process_class.return_value = mock_process
         # when
         response = processes.add_local_process(request)
 
