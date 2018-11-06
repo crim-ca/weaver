@@ -500,6 +500,7 @@ class ProcessSummarySchema(MappingSchema):
     keywords = KeywordList(missing=drop)
     metadata = MetadataList(missing=drop)
     processDescriptionURL = SchemaNode(String(), missing=drop)    # URL
+    outputTransmission = SchemaNode(missing=drop)    # URL
 
 
 class ProcessListSchema(SequenceSchema):

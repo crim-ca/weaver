@@ -550,6 +550,7 @@ class Process(dict):
             'version': self.version,
             'jobControlOptions': self.jobControlOptions,
             'processDescriptionURL': "/".join([self.executeEndpoint, "processes", self.identifier]),
+            'outputTransmission': self.outputTransmission,
         }
 
     @staticmethod
