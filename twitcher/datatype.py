@@ -546,6 +546,7 @@ class Process(dict):
         }
 
     def summary(self):
+        url = "/".join([self.executeEndpoint, 'processes', self.identifier])
         return {
             'id': self.identifier,
             'title': self.title,
@@ -554,7 +555,7 @@ class Process(dict):
             'metadata': self.metadata,
             'version': self.version,
             'jobControlOptions': self.jobControlOptions,
-            'processDescriptionURL': "/".join([self.executeEndpoint, 'processes', self.identifier]),
+            'processDescriptionURL': url,
             'outputTransmission': self.outputTransmission,
         }
 
