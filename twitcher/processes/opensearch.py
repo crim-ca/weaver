@@ -315,7 +315,7 @@ class EOImageDescribeProcessHandler(object):
 
     @staticmethod
     def make_collection(image_format, allowed_values):
-        description = u"Collection Identifer for input {}".format(image_format)
+        description = u"Collection of the data."
         data = {
             u"id": u"{}".format(image_format),
             u"title": description,

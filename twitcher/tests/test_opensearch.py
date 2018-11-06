@@ -304,7 +304,7 @@ def inputs_unique_aoi_toi(files_id):
         "startDate": deque([LiteralInput("startDate", "Area", data_type="string")]),
         "endDate": deque([LiteralInput("endDate", "Area", data_type="string")]),
         files_id: deque(
-            [LiteralInput(files_id, "Collection id to query", data_type="string")]
+            [LiteralInput(files_id, "Collection of the data.", data_type="string")]
         ),
     }
 
@@ -319,7 +319,7 @@ def inputs_non_unique_aoi_toi(files_id):
         start_date: deque([LiteralInput(start_date, "Area", data_type="string")]),
         end_date: deque([LiteralInput(end_date, "Area", data_type="string")]),
         files_id: deque(
-            [LiteralInput(files_id, "Collection id to query", data_type="string")]
+            [LiteralInput(files_id, "Collection of the data.", data_type="string")]
         ),
     }
 
