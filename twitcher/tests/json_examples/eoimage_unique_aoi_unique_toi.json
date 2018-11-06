@@ -37,15 +37,7 @@
           }
         ]
       }
-    ],
-    "owsContext": {
-      "offering": {
-        "code": "anyCode",
-        "content": {
-          "href": "anyRef"
-        }
-      }
-    }
+    ]
   },
   {
     "id": "EndDate",
@@ -72,15 +64,7 @@
           }
         ]
       }
-    ],
-    "owsContext": {
-      "offering": {
-        "code": "anyCode",
-        "content": {
-          "href": "anyRef"
-        }
-      }
-    }
+    ]
   },
   {
     "id": "image-s2_collection",
@@ -113,15 +97,7 @@
           }
         ]
       }
-    ],
-    "owsContext": {
-      "offering": {
-        "code": "anyCode",
-        "content": {
-          "href": "anyRef"
-        }
-      }
-    }
+    ]
   },
   {
     "id": "image-probav_collection",
@@ -152,14 +128,6 @@
           }
         ]
       }
-    ],
-    "owsContext": {
-      "offering": {
-        "code": "anyCode",
-        "content": {
-          "href": "anyRef"
-        }
-      }
-    }
+    ]
   }
 ]

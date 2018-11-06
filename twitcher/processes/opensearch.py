@@ -336,9 +336,6 @@ class EOImageDescribeProcessHandler(object):
                     ],
                 }
             ],
-            u"owsContext": {
-                u"offering": {u"code": u"anyCode", u"content": {u"href": u"anyRef"}}
-            },
         }
         return data
 
@@ -368,9 +365,6 @@ class EOImageDescribeProcessHandler(object):
                     ],
                 }
             ],
-            u"owsContext": {
-                u"offering": {u"code": u"anyCode", u"content": {u"href": u"anyRef"}}
-            },
         }
         return data
 
