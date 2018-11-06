@@ -501,8 +501,8 @@ class ProcessSummarySchema(MappingSchema):
     metadata = MetadataList(missing=drop)
     version = SchemaNode(String())
     jobControlOptions = SchemaNode(String())
-    processDescriptionURL = SchemaNode(String(), missing=drop)    # URL
-    outputTransmission = SchemaNode(String(), missing=drop)    # URL
+    processDescriptionURL = SchemaNode(String())    # URL
+    outputTransmission = SchemaNode(String())
 
 
 class ProcessListSchema(SequenceSchema):
