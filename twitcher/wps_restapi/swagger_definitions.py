@@ -500,9 +500,9 @@ class ProcessSummarySchema(MappingSchema):
     keywords = KeywordList(missing=drop)
     metadata = MetadataList(missing=drop)
     version = SchemaNode(String())
-    jobControlOptions = SchemaNode(String())
+    jobControlOptions = JobControlOptionsEnum
     processDescriptionURL = SchemaNode(String())    # URL
-    outputTransmission = SchemaNode(String())
+    outputTransmission = OutputTransmissionEnum
 
 
 class ProcessListSchema(SequenceSchema):
