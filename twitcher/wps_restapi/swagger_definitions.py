@@ -518,7 +518,7 @@ class ProviderProcessListSchema(SequenceSchema):
 
 
 class ProcessDetailSchema(MappingSchema):
-    identifier = SchemaNode(String())
+    id = SchemaNode(String())
     title = SchemaNode(String(), missing=drop)
     abstract = SchemaNode(String(), missing=drop)
     keywords = KeywordList(missing=drop)
