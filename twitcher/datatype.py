@@ -549,7 +549,7 @@ class Process(dict):
             'metadata': self.metadata,
             'version': self.version,
             'jobControlOptions': self.jobControlOptions,
-            'processDescriptionURL': "/".join([self.executeEndpoint, "processes", self.identifier]),
+            'processDescriptionURL': "/".join([self.executeEndpoint, 'processes', self.identifier]),
             'outputTransmission': self.outputTransmission,
         }
 
