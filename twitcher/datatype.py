@@ -543,7 +543,9 @@ class Process(dict):
         }
 
     def summary(self):
-        url = "/".join([self.executeEndpoint, 'processes', self.identifier])
+        url = ""
+        if self.executeEndpoint:
+            url = "/".join([self.executeEndpoint, 'processes', self.identifier])
         return {
             'id': self.identifier,
             'title': self.title,
