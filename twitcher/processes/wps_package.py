@@ -648,14 +648,12 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
     return updated_io_list
 
 
-def _merge_package_inputs_outputs(wps_inputs_list, cwl_inputs_list, wps_outputs_list, cwl_outputs_list, as_json=False):
+def _merge_package_inputs_outputs(wps_inputs_list, cwl_inputs_list, wps_outputs_list, cwl_outputs_list):
     """Merges I/O definitions to use for process creation and returned by GetCapabilities, DescribeProcess
     using the WPS specifications (from request POST) and CWL specifications (extracted from file)."""
     wps_inputs = _merge_package_io(wps_inputs_list, cwl_inputs_list, WPS_INPUT)
     wps_outputs = _merge_package_io(wps_outputs_list, cwl_outputs_list, WPS_OUTPUT)
-    if as_json:
-        return [_wps2json_io(i) for i in wps_inputs], [_wps2json_io(o) for o in wps_outputs]
-    return wps_inputs, wps_outputs
+    return [_wps2json_io(i) for i in wps_inputs], [_wps2json_io(o) for o in wps_outputs]
 
 
 def _get_package_io(package, io_select, as_json):
@@ -763,7 +761,7 @@ def get_process_from_wps_request(process_offering, reference=None, package=None,
 
     package_inputs, package_outputs = try_or_raise_package_error(
         lambda: _merge_package_inputs_outputs(process_inputs, package_inputs,
-                                              process_outputs, package_outputs, as_json=True),
+                                              process_outputs, package_outputs),
         reason="Merging of inputs/outputs")
 
     process_offering.update({
