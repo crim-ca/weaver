@@ -26,7 +26,7 @@
     "maxOccurs": 1
   },
   {
-    "id": "startDate",
+    "id": "StartDate",
     "title": "Time of Interest",
     "abstract": "Time of Interest (defined as Start date - End date)",
     "formats": [
@@ -61,7 +61,7 @@
     }
   },
   {
-    "id": "endDate",
+    "id": "EndDate",
     "title": "Time of Interest",
     "abstract": "Time of Interest (defined as Start date - End date)",
     "formats": [

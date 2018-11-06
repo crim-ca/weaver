@@ -3,11 +3,11 @@
   "response": "document",
   "inputs": [
     {
-      "id": "startDate",
+      "id": "StartDate",
       "data": "2018-01-30T00:00:00.000Z"
     },
     {
-      "id": "endDate",
+      "id": "EndDate",
       "data": "2018-01-31T23:59:59.999Z"
     },
     {

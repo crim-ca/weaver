@@ -68,8 +68,11 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
             eoimages_queue = deque()
             if input_id in eoimage_source_info:
                 aoi_ids = _make_specific_identifier("aoi", input_id), "aoi"
-                startdate_ids = _make_specific_identifier("startDate", input_id), "startDate"
-                enddate_ids = _make_specific_identifier("endDate", input_id), "endDate"
+                startdate_ids = (
+                    _make_specific_identifier("StartDate", input_id),
+                    "StartDate",
+                )
+                enddate_ids = _make_specific_identifier("EndDate", input_id), "EndDate"
 
                 wkt = pop_first_data(aoi_ids)
                 startdate = pop_first_data(startdate_ids)
@@ -349,7 +352,8 @@ class EOImageDescribeProcessHandler(object):
         :param start_date:  (Default value = True)
 
         """
-        date = u"startDate" if start_date else u"endDate"
+        date = u"StartDate" if start_date else u"EndDate"
+        search_field = "{}{}".format(date[0].lower(), date[1:])
         data = {
             u"id": id_,
             u"title": u"Time of Interest",
@@ -361,7 +365,9 @@ class EOImageDescribeProcessHandler(object):
             u"additionalParameters": [
                 {
                     u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                    u"parameters": [{u"name": u"CatalogSearchField", u"value": date}],
+                    u"parameters": [
+                        {u"name": u"CatalogSearchField", u"value": search_field}
+                    ],
                 }
             ],
             u"owsContext": {
@@ -392,12 +398,20 @@ class EOImageDescribeProcessHandler(object):
         collections = []
 
         if unique_toi:
-            toi.append(self.make_toi(u"startDate", start_date=True))
-            toi.append(self.make_toi(u"endDate", start_date=False))
+            toi.append(self.make_toi(u"StartDate", start_date=True))
+            toi.append(self.make_toi(u"EndDate", start_date=False))
         else:
             for name in eoimage_names:
-                toi.append(self.make_toi(_make_specific_identifier(u"startDate", name), start_date=True))
-                toi.append(self.make_toi(_make_specific_identifier(u"endDate", name), start_date=False))
+                toi.append(
+                    self.make_toi(
+                        _make_specific_identifier(u"StartDate", name), start_date=True
+                    )
+                )
+                toi.append(
+                    self.make_toi(
+                        _make_specific_identifier(u"EndDate", name), start_date=False
+                    )
+                )
 
         if unique_aoi:
             aoi.append(self.make_aoi(u"aoi"))

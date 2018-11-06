@@ -13,7 +13,7 @@
     "maxOccurs": 1
   },
   {
-    "id": "startDate_image-s2",
+    "id": "StartDate_image-s2",
     "title": "Time of Interest",
     "abstract": "Time of Interest (defined as Start date - End date)",
     "formats": [
@@ -48,7 +48,7 @@
     }
   },
   {
-    "id": "startDate_image-probav",
+    "id": "StartDate_image-probav",
     "title": "Time of Interest",
     "abstract": "Time of Interest (defined as Start date - End date)",
     "formats": [
@@ -83,7 +83,7 @@
     }
   },
   {
-    "id": "endDate_image-probav",
+    "id": "EndDate_image-probav",
     "title": "Time of Interest",
     "abstract": "Time of Interest (defined as Start date - End date)",
     "formats": [
@@ -118,7 +118,7 @@
     }
   },
   {
-    "id": "endDate_image-s2",
+    "id": "EndDate_image-s2",
     "title": "Time of Interest",
     "abstract": "Time of Interest (defined as Start date - End date)",
     "formats": [

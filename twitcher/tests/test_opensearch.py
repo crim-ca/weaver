@@ -150,8 +150,8 @@ def test_transform_execute_parameters_wps(opensearch_process):
 
     inputs = dict(
         [
-            make_deque("startDate", "2018-01-30T00:00:00.000Z"),
-            make_deque("endDate", "2018-01-31T23:59:59.999Z"),
+            make_deque("StartDate", "2018-01-30T00:00:00.000Z"),
+            make_deque("EndDate", "2018-01-31T23:59:59.999Z"),
             make_deque(
                 "aoi",
                 "POLYGON ((100.4 15.3, 104.6 15.3, 104.6 19.3, 100.4 19.3, 100.4 15.3))",
@@ -301,8 +301,8 @@ def test_get_template_urls():
 def inputs_unique_aoi_toi(files_id):
     return {
         "aoi": deque([LiteralInput("aoi", "Area", data_type="string")]),
-        "startDate": deque([LiteralInput("startDate", "Area", data_type="string")]),
-        "endDate": deque([LiteralInput("endDate", "Area", data_type="string")]),
+        "StartDate": deque([LiteralInput("StartDate", "Start Date", data_type="string")]),
+        "EndDate": deque([LiteralInput("EndDate", "End Date", data_type="string")]),
         files_id: deque(
             [LiteralInput(files_id, "Collection of the data.", data_type="string")]
         ),
@@ -313,7 +313,7 @@ def inputs_non_unique_aoi_toi(files_id):
     def make_specific(name):
         return opensearch._make_specific_identifier(name, files_id)
 
-    end_date, start_date, aoi = map(make_specific, ["endDate", "startDate", "aoi"])
+    end_date, start_date, aoi = map(make_specific, ["EndDate", "StartDate", "aoi"])
     return {
         aoi: deque([LiteralInput(aoi, "Area", data_type="string")]),
         start_date: deque([LiteralInput(start_date, "Area", data_type="string")]),
@@ -325,7 +325,7 @@ def inputs_non_unique_aoi_toi(files_id):
 
 
 def query_param_names(unique_aoi_toi, identifier):
-    end_date, start_date, aoi = "endDate", "startDate", "aoi"
+    end_date, start_date, aoi = "EndDate", "StartDate", "aoi"
     if not unique_aoi_toi:
         end_date = opensearch._make_specific_identifier(end_date, identifier)
         start_date = opensearch._make_specific_identifier(start_date, identifier)
