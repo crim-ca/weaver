@@ -15,7 +15,7 @@
       "data": "POLYGON((100.4 15.3,104.6 15.3,104.6 19.3,100.4 19.3,100.4 15.3))"
     },
     {
-      "id": "files",
+      "id": "collection",
       "data": "EOP:IPT:Sentinel2"
     }
   ],

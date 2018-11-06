@@ -317,10 +317,10 @@ class EOImageDescribeProcessHandler(object):
         return data
 
     @staticmethod
-    def make_collection(image_format, allowed_values):
+    def make_collection(identifier, allowed_values):
         description = u"Collection of the data."
         data = {
-            u"id": u"{}".format(image_format),
+            u"id": u"{}".format(identifier),
             u"title": description,
             u"abstract": description,
             u"formats": [{u"mimeType": u"text/plain", u"default": True}],
@@ -419,8 +419,10 @@ class EOImageDescribeProcessHandler(object):
             for name in eoimage_names:
                 aoi.append(self.make_aoi(_make_specific_identifier(u"aoi", name)))
 
+        unique_eoimage = len(eoimage_names) == 1
         for name, allowed_col in zip(eoimage_names, allowed_collections):
-            collections.append(self.make_collection(name, allowed_col))
+            identifier = "collection" if unique_eoimage else name + "_collection"
+            collections.append(self.make_collection(identifier, allowed_col))
 
         new_inputs = toi + aoi + collections
         if to_wps_inputs:

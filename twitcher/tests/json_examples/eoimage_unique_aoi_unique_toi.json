@@ -83,9 +83,9 @@
     }
   },
   {
-    "id": "image-s2",
-    "title": "Collection Identifer for input image-s2",
-    "abstract": "Collection Identifer for input image-s2",
+    "id": "image-s2_collection",
+    "title": "Collection of the data.",
+    "abstract": "Collection of the data.",
     "formats": [
       {
         "mimeType": "text/plain",
@@ -124,9 +124,9 @@
     }
   },
   {
-    "id": "image-probav",
-    "title": "Collection Identifer for input image-probav",
-    "abstract": "Collection Identifer for input image-probav",
+    "id": "image-probav_collection",
+    "title": "Collection of the data.",
+    "abstract": "Collection of the data.",
     "formats": [
       {
         "mimeType": "text/plain",
