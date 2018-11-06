@@ -494,7 +494,7 @@ class ProviderCapabilitiesSchema(MappingSchema):
 
 class ProcessSummarySchema(MappingSchema):
     """WPS process definition."""
-    identifier = SchemaNode(String())
+    id = SchemaNode(String())
     title = SchemaNode(String())
     abstract = SchemaNode(String())
     keywords = KeywordList(missing=drop)

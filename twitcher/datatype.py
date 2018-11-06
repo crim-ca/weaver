@@ -542,7 +542,7 @@ class Process(dict):
 
     def summary(self):
         return {
-            'identifier': self.identifier,
+            'id': self.identifier,
             'title': self.title,
             'abstract': self.abstract,
             'keywords': self.keywords,
