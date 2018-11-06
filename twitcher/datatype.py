@@ -530,6 +530,9 @@ class Process(dict):
         }
 
     def json(self):
+        url = ""
+        if self.executeEndpoint:
+            url = "/".join([self.executeEndpoint, 'processes', self.identifier, "jobs"])
         return {
             'id': self.identifier,
             'title': self.title,
@@ -538,7 +541,7 @@ class Process(dict):
             'metadata': self.metadata,
             'inputs': self.inputs,
             'outputs': self.outputs,
-            'executeEndpoint': self.executeEndpoint,
+            'executeEndpoint': url,
             'owsContext': self.owsContext,
         }
 
