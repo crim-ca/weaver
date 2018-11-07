@@ -17,7 +17,9 @@
         "parameters": [
           {
             "name": "CatalogSearchField",
-            "values": ["bbox"]
+            "values": [
+              "bbox"
+            ]
           }
         ]
       }
@@ -48,7 +50,9 @@
         "parameters": [
           {
             "name": "CatalogSearchField",
-            "values": ["startDate"]
+            "values": [
+              "startDate"
+            ]
           }
         ]
       }
@@ -79,7 +83,9 @@
         "parameters": [
           {
             "name": "CatalogSearchField",
-            "values": ["endDate"]
+            "values": [
+              "endDate"
+            ]
           }
         ]
       }
@@ -110,7 +116,9 @@
         "parameters": [
           {
             "name": "CatalogSearchField",
-            "values": ["parentIdentifier"]
+            "values": [
+              "parentIdentifier"
+            ]
           }
         ]
       }
@@ -141,7 +149,9 @@
         "parameters": [
           {
             "name": "CatalogSearchField",
-            "values": ["parentIdentifier"]
+            "values": [
+              "parentIdentifier"
+            ]
           }
         ]
       }

@@ -152,7 +152,9 @@ def test_transform_execute_parameters_wps(opensearch_process):
         ]
     )
 
-    with mock.patch.object(opensearch.OpenSearchQuery, "query_datasets", return_value=mocked_query):
+    with mock.patch.object(
+        opensearch.OpenSearchQuery, "query_datasets", return_value=mocked_query
+    ):
         eo_image_source_info = make_eo_image_source_info("files", "EOP:IPT:Sentinel2")
         transformed = opensearch.query_eo_images_from_wps_inputs(
             inputs, eo_image_source_info
@@ -280,7 +282,9 @@ def test_get_template_urls():
 def inputs_unique_aoi_toi(files_id):
     return {
         "aoi": deque([LiteralInput("aoi", "Area", data_type="string")]),
-        "StartDate": deque([LiteralInput("StartDate", "Start Date", data_type="string")]),
+        "StartDate": deque(
+            [LiteralInput("StartDate", "Start Date", data_type="string")]
+        ),
         "EndDate": deque([LiteralInput("EndDate", "End Date", data_type="string")]),
         files_id: deque(
             [LiteralInput(files_id, "Collection of the data.", data_type="string")]

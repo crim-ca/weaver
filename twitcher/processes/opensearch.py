@@ -333,16 +333,15 @@ class EOImageDescribeProcessHandler(object):
             u"formats": [{u"mimeType": u"text/plain", u"default": True}],
             u"minOccurs": u"1",
             u"maxOccurs": u"unbounded",
-            u"LiteralDataDomain": {
-                u"dataType": {
-                    u"name": u"String"
-                }
-            },
+            u"LiteralDataDomain": {u"dataType": {u"name": u"String"}},
             u"additionalParameters": [
                 {
                     u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
                     u"parameters": [
-                        {u"name": u"CatalogSearchField", u"values": [u"parentIdentifier"]}
+                        {
+                            u"name": u"CatalogSearchField",
+                            u"values": [u"parentIdentifier"],
+                        }
                     ],
                 }
             ],
@@ -366,11 +365,7 @@ class EOImageDescribeProcessHandler(object):
             u"formats": [{u"mimeType": u"text/plain", u"default": True}],
             u"minOccurs": u"1",
             u"maxOccurs": u"1",
-            u"LiteralDataDomain": {
-                u"dataType": {
-                    u"name": u"String"
-                }
-            },
+            u"LiteralDataDomain": {u"dataType": {u"name": u"String"}},
             u"additionalParameters": [
                 {
                     u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
@@ -433,7 +428,7 @@ class EOImageDescribeProcessHandler(object):
         # inputs must have the WPS input type
         for i in new_inputs:
             i["type"] = WPS_LITERAL
-            i["data_type"] = 'string'
+            i["data_type"] = "string"
 
         return new_inputs + self.other_inputs
 
@@ -461,7 +456,9 @@ def get_original_collection_id(payload, wps_inputs):
     inputs = get_eo_images_inputs_from_payload(payload)
     original_ids = [get_any_id(i) for i in inputs]
 
-    correspondance = dict(zip(modified_collection_identifiers(original_ids), original_ids))
+    correspondance = dict(
+        zip(modified_collection_identifiers(original_ids), original_ids)
+    )
     for execute_id, deploy_id in correspondance.items():
         if execute_id not in new_inputs:
             raise ValueError("Missing required input parameter: {}".format(execute_id))
