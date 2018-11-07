@@ -312,6 +312,14 @@ class EOImageDescribeProcessHandler(object):
             u"formats": [{u"mimeType": u"OGC-WKT", u"default": True}],
             u"minOccurs": 1,
             u"maxOccurs": 1,
+            u"additionalParameters": [
+                {
+                    u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
+                    u"parameters": [
+                        {u"name": u"CatalogSearchField", u"value": u"bbox"}
+                    ],
+                }
+            ],
         }
         return data
 

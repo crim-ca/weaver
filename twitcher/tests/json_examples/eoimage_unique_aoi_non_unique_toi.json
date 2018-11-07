@@ -10,7 +10,20 @@
       }
     ],
     "minOccurs": 1,
-    "maxOccurs": 1
+    "maxOccurs": 1,
+    "additionalParameters": [
+      {
+        "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
+        "parameters": [
+          {
+            "name": "CatalogSearchField",
+            "value": "bbox"
+          }
+        ]
+      }
+    ],
+    "type": "literal",
+    "data_type": "string"
   },
   {
     "id": "StartDate_image-s2",
@@ -34,7 +47,9 @@
           }
         ]
       }
-    ]
+    ],
+    "type": "literal",
+    "data_type": "string"
   },
   {
     "id": "StartDate_image-probav",
@@ -58,7 +73,9 @@
           }
         ]
       }
-    ]
+    ],
+    "type": "literal",
+    "data_type": "string"
   },
   {
     "id": "EndDate_image-probav",
@@ -82,7 +99,9 @@
           }
         ]
       }
-    ]
+    ],
+    "type": "literal",
+    "data_type": "string"
   },
   {
     "id": "EndDate_image-s2",
@@ -106,7 +125,9 @@
           }
         ]
       }
-    ]
+    ],
+    "type": "literal",
+    "data_type": "string"
   },
   {
     "id": "image-s2_collection",
@@ -130,7 +151,9 @@
           }
         ]
       }
-    ]
+    ],
+    "type": "literal",
+    "data_type": "string"
   },
   {
     "id": "image-probav_collection",
@@ -154,6 +177,8 @@
           }
         ]
       }
-    ]
+    ],
+    "type": "literal",
+    "data_type": "string"
   }
 ]
