@@ -117,28 +117,6 @@ def memory_store_with_opensearch_process(memory_store, opensearch_process):
     return memory_store
 
 
-@mock.patch("twitcher.wps_restapi.processes.processes.processstore_factory")
-def test_describe_process_opensearch(
-    processstore_factory, memory_store, opensearch_process
-):
-    memory_store.save_process(opensearch_process)
-    processstore_factory.return_value = memory_store
-
-    request = make_request(method="GET")
-    request.matchdict["process_id"] = namesgenerator.get_sane_name(
-        opensearch_process.id
-    )
-
-    transformed_inputs = processes.get_local_process(request).json["process"]["inputs"]
-
-    original_inputs = opensearch_process.json()["inputs"]
-    expected_inputs = opensearch.replace_inputs_describe_process(
-        original_inputs, opensearch_process.payload
-    )
-
-    assert_json_equals(transformed_inputs, expected_inputs)
-
-
 def test_transform_execute_parameters_wps(opensearch_process):
     def make_input(id_, value):
         input_ = LiteralInput(id_, "", data_type="string")
