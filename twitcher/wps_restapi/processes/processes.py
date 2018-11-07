@@ -547,11 +547,13 @@ def add_local_process(request):
         if twitcher_config != TWITCHER_CONFIGURATION_EMS:
             raise HTTPBadRequest("Invalid `{0}` package deployment on `{1}`.".format(process_type, twitcher_config))
 
-    wps_path = settings.get('twitcher.wps_path').strip("/")
-    description_url = "/".join([twitcher_url, wps_path, 'processes', process_info['identifier']])
+    restapi_url = wps_restapi_base_url(settings)
+    description_url = "/".join([restapi_url, 'processes', process_info['identifier']])
+    execute_endpoint = "/".join([description_url, "jobs"])
 
     # ensure that required 'executeWPSEndpoint' in db is added, will be auto-fixed to localhost if not specified in body
     process_info['executeWPSEndpoint'] = process_description.get('executeWPSEndpoint')
+    process_info['executeEndpoint'] = execute_endpoint
     process_info['payload'] = payload
     process_info['jobControlOptions'] = process_description.get('jobControlOptions', [])
     process_info['outputTransmission'] = process_description.get('outputTransmission', [])

@@ -487,6 +487,10 @@ class Process(DescriptionType):
         return self.get('executeWPSEndpoint')
 
     @property
+    def executeEndpoint(self):
+        return self.get('executeEndpoint')
+
+    @property
     def owsContext(self):
         return self.get('owsContext')
 
@@ -561,15 +565,11 @@ class Process(DescriptionType):
         }
 
     def json(self):
-        url = ""
-        if self.executeWPSEndpoint:
-            url = "/".join([self.executeWPSEndpoint, 'processes', self.id, "jobs"])
-
         description = self.description()
 
         description["inputs"] = [i.data_description() for i in self.inputs]
         description["outputs"] = [o.data_description() for o in self.outputs]
-        description["executeWPSEndpoint"] = url
+        description["executeEndpoint"] = self.executeEndpoint
 
         return description
 
