@@ -25,6 +25,7 @@ from twitcher.processes import opensearch
 
 from twitcher import namesgenerator
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS
+from twitcher.processes.wps_constants import WPS_INPUT, WPS_OUTPUT, WPS_COMPLEX, WPS_BOUNDINGBOX, WPS_LITERAL
 from twitcher.processes.wps_process import WpsProcess
 from twitcher.processes.wps_process import OPENSEARCH_LOCAL_FILE_SCHEME
 from twitcher.processes.wps_workflow import default_make_tool
@@ -94,12 +95,6 @@ WPS_FIELD_MAPPING = {
     'additional_parameters': ['AdditionalParameters', 'additionalParameters', 'additionalparameters',
                               'Additional_Parameters'],
 }
-
-WPS_INPUT = 'input'
-WPS_OUTPUT = 'output'
-WPS_COMPLEX = 'complex'
-WPS_BOUNDINGBOX = 'bbox'
-WPS_LITERAL = 'literal'
 
 EOIMAGE = "eoimage"
 

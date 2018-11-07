@@ -4,7 +4,8 @@ from copy import deepcopy
 from itertools import ifilterfalse
 
 from twitcher.processes.sources import fetch_data_sources
-from twitcher.utils import get_any_id, get_any_value
+from twitcher.processes.wps_constants import WPS_LITERAL
+from twitcher.utils import get_any_id
 from pyramid.settings import asbool
 
 import lxml.etree
@@ -410,6 +411,12 @@ class EOImageDescribeProcessHandler(object):
             collections.append(self.make_collection(name, allowed_col))
 
         new_inputs = toi + aoi + collections
+
+        # inputs must have the WPS input type
+        for i in new_inputs:
+            i["type"] = WPS_LITERAL
+            i["data_type"] = 'string'
+
         return new_inputs + self.other_inputs
 
 
