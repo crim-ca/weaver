@@ -11,11 +11,10 @@ import urlparse
 from mock import mock
 from pyramid import testing
 from pyramid.testing import DummyRequest
+from pywps.inout.inputs import LiteralInput
 
 import twitcher
-from pywps.inout.inputs import LiteralInput
-from twitcher import namesgenerator
-
+from twitcher.processes.constants import START_DATE, END_DATE, AOI
 from twitcher.datatype import Process
 from twitcher.processes import opensearch
 from twitcher.store import DB_MEMORY, MemoryProcessStore
@@ -129,10 +128,10 @@ def test_transform_execute_parameters_wps(opensearch_process):
 
     inputs = dict(
         [
-            make_deque("StartDate", "2018-01-30T00:00:00.000Z"),
-            make_deque("EndDate", "2018-01-31T23:59:59.999Z"),
+            make_deque(START_DATE, "2018-01-30T00:00:00.000Z"),
+            make_deque(END_DATE, "2018-01-31T23:59:59.999Z"),
             make_deque(
-                "aoi",
+                AOI,
                 "POLYGON ((100.4 15.3, 104.6 15.3, 104.6 19.3, 100.4 19.3, 100.4 15.3))",
             ),
             make_deque("files", "EOP:IPT:Sentinel2"),
@@ -281,11 +280,11 @@ def test_get_template_urls():
 
 def inputs_unique_aoi_toi(files_id):
     return {
-        "aoi": deque([LiteralInput("aoi", "Area", data_type="string")]),
-        "StartDate": deque(
-            [LiteralInput("StartDate", "Start Date", data_type="string")]
+        AOI: deque([LiteralInput(AOI, "Area", data_type="string")]),
+        START_DATE: deque(
+            [LiteralInput(START_DATE, "Start Date", data_type="string")]
         ),
-        "EndDate": deque([LiteralInput("EndDate", "End Date", data_type="string")]),
+        END_DATE: deque([LiteralInput(END_DATE, "End Date", data_type="string")]),
         files_id: deque(
             [LiteralInput(files_id, "Collection of the data.", data_type="string")]
         ),
@@ -296,7 +295,7 @@ def inputs_non_unique_aoi_toi(files_id):
     def make_specific(name):
         return opensearch._make_specific_identifier(name, files_id)
 
-    end_date, start_date, aoi = map(make_specific, ["EndDate", "StartDate", "aoi"])
+    end_date, start_date, aoi = map(make_specific, [END_DATE, START_DATE, AOI])
     return {
         aoi: deque([LiteralInput(aoi, "Area", data_type="string")]),
         start_date: deque([LiteralInput(start_date, "Area", data_type="string")]),
@@ -308,7 +307,7 @@ def inputs_non_unique_aoi_toi(files_id):
 
 
 def query_param_names(unique_aoi_toi, identifier):
-    end_date, start_date, aoi = "EndDate", "StartDate", "aoi"
+    end_date, start_date, aoi = END_DATE, START_DATE, AOI
     if not unique_aoi_toi:
         end_date = opensearch._make_specific_identifier(end_date, identifier)
         start_date = opensearch._make_specific_identifier(start_date, identifier)

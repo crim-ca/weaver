@@ -4,7 +4,7 @@ from copy import deepcopy
 from itertools import ifilterfalse
 
 from twitcher.processes.sources import fetch_data_sources
-from twitcher.processes.wps_constants import WPS_LITERAL
+from twitcher.processes.constants import WPS_LITERAL
 from twitcher.utils import get_any_id
 from pyramid.settings import asbool
 
@@ -17,6 +17,8 @@ from typing import Iterable, Dict, Tuple, List, Deque
 import logging
 
 from twitcher.processes.wps_process import OPENSEARCH_LOCAL_FILE_SCHEME
+from twitcher.processes.constants import START_DATE, END_DATE, AOI, COLLECTION
+
 
 LOGGER = logging.getLogger("PACKAGE")
 
@@ -70,12 +72,12 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
         for input_id, queue in wps_inputs.items():
             eoimages_queue = deque()
             if input_id in eoimage_source_info:
-                aoi_ids = _make_specific_identifier("aoi", input_id), "aoi"
+                aoi_ids = _make_specific_identifier(AOI, input_id), AOI
                 startdate_ids = (
-                    _make_specific_identifier("StartDate", input_id),
-                    "StartDate",
+                    _make_specific_identifier(START_DATE, input_id),
+                    START_DATE,
                 )
-                enddate_ids = _make_specific_identifier("EndDate", input_id), "EndDate"
+                enddate_ids = _make_specific_identifier(END_DATE, input_id), END_DATE
 
                 wkt = pop_first_data(aoi_ids)
                 startdate = pop_first_data(startdate_ids)
@@ -356,7 +358,7 @@ class EOImageDescribeProcessHandler(object):
         :param start_date:  (Default value = True)
 
         """
-        date = u"StartDate" if start_date else u"EndDate"
+        date = START_DATE if start_date else END_DATE
         search_field = "{}{}".format(date[0].lower(), date[1:])
         data = {
             u"id": id_,
@@ -398,26 +400,26 @@ class EOImageDescribeProcessHandler(object):
         collections = []
 
         if unique_toi:
-            toi.append(self.make_toi(u"StartDate", start_date=True))
-            toi.append(self.make_toi(u"EndDate", start_date=False))
+            toi.append(self.make_toi(START_DATE, start_date=True))
+            toi.append(self.make_toi(END_DATE, start_date=False))
         else:
             for name in eoimage_names:
                 toi.append(
                     self.make_toi(
-                        _make_specific_identifier(u"StartDate", name), start_date=True
+                        _make_specific_identifier(START_DATE, name), start_date=True
                     )
                 )
                 toi.append(
                     self.make_toi(
-                        _make_specific_identifier(u"EndDate", name), start_date=False
+                        _make_specific_identifier(END_DATE, name), start_date=False
                     )
                 )
 
         if unique_aoi:
-            aoi.append(self.make_aoi(u"aoi"))
+            aoi.append(self.make_aoi(AOI))
         else:
             for name in eoimage_names:
-                aoi.append(self.make_aoi(_make_specific_identifier(u"aoi", name)))
+                aoi.append(self.make_aoi(_make_specific_identifier(AOI, name)))
 
         eoimage_names = modified_collection_identifiers(eoimage_names)
         for name, allowed_col in zip(eoimage_names, allowed_collections):
@@ -483,7 +485,7 @@ def modified_collection_identifiers(eo_image_identifiers):
     unique_eoimage = len(eo_image_identifiers) == 1
     new_identifiers = []
     for identifier in eo_image_identifiers:
-        new = "collection" if unique_eoimage else identifier + "_collection"
+        new = COLLECTION if unique_eoimage else identifier + "_" + COLLECTION
         new_identifiers.append(new)
     return new_identifiers
 
