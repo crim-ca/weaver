@@ -624,10 +624,10 @@ class DataDescriptionType(DescriptionType):
 
     def __init__(self, *args, **kwargs):
         super(DataDescriptionType, self).__init__(*args, **kwargs)
-        # if 'formats' not in self:
-        #     raise TypeError("'formats' is required")
-        # if 'type' not in self:
-        #     raise TypeError("'type' is required")
+        if 'formats' not in self:
+            raise TypeError("'formats' is required")
+        if 'type' not in self:
+            raise TypeError("'type' is required")
 
     @property
     def type(self):
