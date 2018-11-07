@@ -1,13 +1,12 @@
 import json
 from collections import deque
 from copy import deepcopy
-
-import pytest
 import unittest
 import os
 from pprint import pformat
-
 import urlparse
+
+import pytest
 from mock import mock
 from pyramid import testing
 from pyramid.testing import DummyRequest

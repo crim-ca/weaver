@@ -2,20 +2,18 @@ import time
 from collections import deque
 from copy import deepcopy
 from itertools import ifilterfalse
-
-from twitcher.processes.sources import fetch_data_sources
-from twitcher.processes.constants import WPS_LITERAL
-from twitcher.utils import get_any_id
-from pyramid.settings import asbool
+from typing import Iterable, Dict, Tuple, List, Deque
+import logging
 
 import lxml.etree
 import requests
 import urlparse
 import shapely.wkt
 
-from typing import Iterable, Dict, Tuple, List, Deque
-import logging
-
+from twitcher.processes.sources import fetch_data_sources
+from twitcher.processes.constants import WPS_LITERAL
+from twitcher.utils import get_any_id
+from pyramid.settings import asbool
 from twitcher.processes.wps_process import OPENSEARCH_LOCAL_FILE_SCHEME
 from twitcher.processes.constants import START_DATE, END_DATE, AOI, COLLECTION
 
