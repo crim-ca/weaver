@@ -550,8 +550,8 @@ def add_local_process(request):
     wps_path = settings.get('twitcher.wps_path').strip("/")
     description_url = "/".join([twitcher_url, wps_path, 'processes', process_info['identifier']])
 
-    # ensure that required 'executeEndpoint' in db is added, will be auto-fixed to localhost if not specified in body
-    process_info['executeEndpoint'] = process_description.get('executeEndpoint')
+    # ensure that required 'executeWPSEndpoint' in db is added, will be auto-fixed to localhost if not specified in body
+    process_info['executeWPSEndpoint'] = process_description.get('executeWPSEndpoint')
     process_info['payload'] = payload
     process_info['jobControlOptions'] = process_description.get('jobControlOptions', [])
     process_info['outputTransmission'] = process_description.get('outputTransmission', [])
@@ -722,7 +722,7 @@ def submit_local_job(request):
     try:
         store = processstore_factory(request.registry)
         process = store.fetch_by_id(process_id, request=request)
-        resp = submit_job_handler(request, process.executeEndpoint, is_workflow=process.type == 'workflow')
+        resp = submit_job_handler(request, process.executeWPSEndpoint, is_workflow=process.type == 'workflow')
         return resp
     except HTTPException:
         raise  # re-throw already handled HTTPException

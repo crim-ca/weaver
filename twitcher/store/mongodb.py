@@ -154,7 +154,7 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
 
     def _add_process(self, process):
         if isinstance(process, ProcessWPS):
-            new_process = ProcessDB.from_wps(process, executeEndpoint=self.default_wps_endpoint)
+            new_process = ProcessDB.from_wps(process, executeWPSEndpoint=self.default_wps_endpoint)
         else:
             new_process = process
         if not isinstance(new_process, ProcessDB):
@@ -163,7 +163,7 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         # apply defaults if not specified
         new_process['type'] = self._get_process_type(process)
         new_process['identifier'] = self._get_process_id(process)
-        new_process['executeEndpoint'] = self._get_process_url(process)
+        new_process['executeWPSEndpoint'] = self._get_process_url(process)
         new_process['visibility'] = new_process.visibility
         self.collection.insert_one(new_process)
 
@@ -196,7 +196,7 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         return self._get_process_field(process, {ProcessDB: lambda: process.type, ProcessWPS: lambda: 'wps'}).lower()
 
     def _get_process_url(self, process):
-        url = self._get_process_field(process, {ProcessDB: lambda: process.executeEndpoint, ProcessWPS: lambda: None})
+        url = self._get_process_field(process, {ProcessDB: lambda: process.executeWPSEndpoint, ProcessWPS: lambda: None})
         if not url:
             url = self.default_wps_endpoint
         return url

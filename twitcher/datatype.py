@@ -422,13 +422,13 @@ class DescriptionType(dict):
 class Process(DescriptionType):
     """
     Dictionary that contains a process description for db storage.
-    It always has ``'identifier'`` and ``executeEndpoint`` keys.
+    It always has ``'identifier'`` and ``executeWPSEndpoint`` keys.
     """
 
     def __init__(self, *args, **kwargs):
         super(Process, self).__init__(*args, **kwargs)
-        if 'executeEndpoint' not in self:
-            raise TypeError("'executeEndpoint' is required")
+        if 'executeWPSEndpoint' not in self:
+            raise TypeError("'executeWPSEndpoint' is required")
         if 'package' not in self:
             raise TypeError("'package' is required")
         if 'inputs' in self:
@@ -483,8 +483,8 @@ class Process(DescriptionType):
         return self.get('processDescriptionURL')
 
     @property
-    def executeEndpoint(self):
-        return self.get('executeEndpoint')
+    def executeWPSEndpoint(self):
+        return self.get('executeWPSEndpoint')
 
     @property
     def owsContext(self):
@@ -537,7 +537,7 @@ class Process(DescriptionType):
             'outputs': self.outputs,
             'jobControlOptions': self.jobControlOptions,
             'outputTransmission': self.outputTransmission,
-            'executeEndpoint': self.executeEndpoint,
+            'executeWPSEndpoint': self.executeWPSEndpoint,
             'type': self.type,
             'package': self.package,      # deployment specification (json body)
             'payload': self.payload,
@@ -562,14 +562,14 @@ class Process(DescriptionType):
 
     def json(self):
         url = ""
-        if self.executeEndpoint:
-            url = "/".join([self.executeEndpoint, 'processes', self.id, "jobs"])
+        if self.executeWPSEndpoint:
+            url = "/".join([self.executeWPSEndpoint, 'processes', self.id, "jobs"])
 
         description = self.description()
 
         description["inputs"] = [i.data_description() for i in self.inputs]
         description["outputs"] = [o.data_description() for o in self.outputs]
-        description["executeEndpoint"] = url
+        description["executeWPSEndpoint"] = url
 
         return description
 
@@ -619,7 +619,7 @@ class Process(DescriptionType):
 class DataDescriptionType(DescriptionType):
     """
     Dictionary that contains a process description for db storage.
-    It always has ``'identifier'`` and ``executeEndpoint`` keys.
+    It always has ``'identifier'`` and ``executeWPSEndpoint`` keys.
     """
 
     def __init__(self, *args, **kwargs):
