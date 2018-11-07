@@ -578,10 +578,12 @@ def add_local_process(request):
     else:
         raise HTTPBadRequest("Missing one of required parameters [owsContext, deploymentProfileName being a workflow].")
 
+    settings = request.registry.settings
+    twitcher_url = get_twitcher_url(settings)
+
     # obtain updated process information using WPS process offering and CWL package definition
     try:
-        data_source = get_twitcher_url(request.registry.settings)
-        process_info = wps_package.get_process_from_wps_request(process_info, reference, package, data_source)
+        process_info = wps_package.get_process_from_wps_request(process_info, reference, package, twitcher_url)
     except (PackageRegistrationError, PackageTypeError) as ex:
         raise HTTPUnprocessableEntity(detail=ex.message)
     except Exception as ex:
@@ -594,16 +596,21 @@ def add_local_process(request):
     # validate process type against twitcher configuration
     process_type = process_info['type']
     if process_type == PROCESS_WORKFLOW:
-        twitcher_config = get_twitcher_configuration(request.registry.settings)
+        twitcher_config = get_twitcher_configuration(settings)
         if twitcher_config != TWITCHER_CONFIGURATION_EMS:
             raise HTTPBadRequest("Invalid `{0}` package deployment on `{1}`.".format(process_type, twitcher_config))
 
-    # ensure that required 'executeEndpoint' in db is added, will be auto-fixed to localhost if not specified in body
-    process_info.update({'executeEndpoint': process_info.get('executeEndpoint'), 'payload': payload})
+    wps_path = settings.get('twitcher.wps_path').strip("/")
+    description_url = "/".join([twitcher_url, wps_path, 'processes', process_info['identifier']])
 
+    # ensure that required 'executeEndpoint' in db is added, will be auto-fixed to localhost if not specified in body
+    process_info['executeEndpoint'] = process_description.get('executeEndpoint')
+    process_info['payload'] = payload
     process_info['jobControlOptions'] = process_description.get('jobControlOptions', [])
     process_info['outputTransmission'] = process_description.get('outputTransmission', [])
     process_info['owsContext'] = ows_context
+    process_info['processDescriptionURL'] = description_url
+
     try:
         store = processstore_factory(request.registry)
         saved_process = store.save_process(ProcessDB(process_info), overwrite=False, request=request)

@@ -452,6 +452,10 @@ class Process(dict):
         return self.get('outputTransmission')
 
     @property
+    def processDescriptionURL(self):
+        return self.get('processDescriptionURL')
+
+    @property
     def executeEndpoint(self):
         return self.get('executeEndpoint')
 
@@ -546,9 +550,6 @@ class Process(dict):
         }
 
     def summary(self):
-        url = ""
-        if self.executeEndpoint:
-            url = "/".join([self.executeEndpoint, 'processes', self.identifier])
         return {
             'id': self.identifier,
             'title': self.title,
@@ -557,7 +558,7 @@ class Process(dict):
             'metadata': self.metadata,
             'version': self.version,
             'jobControlOptions': self.jobControlOptions,
-            'processDescriptionURL': url,
+            'processDescriptionURL': self.processDescriptionURL,
             'outputTransmission': self.outputTransmission,
         }
 
