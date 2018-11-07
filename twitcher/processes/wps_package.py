@@ -795,7 +795,7 @@ class Package(Process):
         inputs = kw.pop('inputs', [])
 
         # handle EOImage inputs
-        inputs = opensearch.replace_inputs_eoimage_files_to_query(inputs=inputs, payload=self.payload)
+        inputs = opensearch.replace_inputs_describe_process(inputs=inputs, payload=self.payload)
 
         inputs = [_json2wps_io(i, WPS_INPUT) for i in inputs]
         outputs = [_json2wps_io(o, WPS_OUTPUT) for o in kw.pop('outputs', list())]

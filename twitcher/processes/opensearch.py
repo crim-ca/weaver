@@ -503,7 +503,7 @@ def get_eo_images_ids_from_payload(payload):
     return [get_any_id(i) for i in get_eo_images_inputs_from_payload(payload)]
 
 
-def replace_inputs_eoimage_files_to_query(inputs, payload):
+def replace_inputs_describe_process(inputs, payload):
     # type: (List[Dict], Dict) -> List[Dict]
     """
     Replace EOImage inputs (additionalParameter -> EOImage -> true) with

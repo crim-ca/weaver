@@ -131,7 +131,7 @@ def test_describe_process_opensearch(
     transformed_inputs = processes.get_local_process(request).json["process"]["inputs"]
 
     original_inputs = opensearch_process.json()["inputs"]
-    expected_inputs = opensearch.replace_inputs_eoimage_files_to_query(
+    expected_inputs = opensearch.replace_inputs_describe_process(
         original_inputs, opensearch_process.payload
     )
 
