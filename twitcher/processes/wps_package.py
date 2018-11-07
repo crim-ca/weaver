@@ -27,7 +27,6 @@ from twitcher import namesgenerator
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS
 from twitcher.processes.wps_constants import WPS_INPUT, WPS_OUTPUT, WPS_COMPLEX, WPS_BOUNDINGBOX, WPS_LITERAL
 from twitcher.processes.wps_process import WpsProcess
-from twitcher.processes.wps_process import OPENSEARCH_LOCAL_FILE_SCHEME
 from twitcher.processes.wps_workflow import default_make_tool
 from twitcher.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from twitcher.processes.sources import retrieve_data_source_url, get_data_source_from_url
@@ -508,9 +507,19 @@ def _json2wps_io(io_info, io_select):
         else:
             io_info['allowed_values'] = AnyValue
 
+    # rename some inputs
+    io_info["supported_formats"] = io_info.pop("formats")
+    default_wps_min_max_occurs = 1
+    io_info["min_occurs"] = io_info.pop("minOccurs", default_wps_min_max_occurs)
+    io_info["max_occurs"] = io_info.pop("maxOccurs", default_wps_min_max_occurs)
+
     # convert supported format objects
     formats = _get_field(io_info, 'supported_formats', search_variations=True, pop_found=True)
     if formats is not null:
+        for format in formats:
+            format["mime_type"] = format.pop("mimeType")
+            format.pop("maximumMegabytes", None)
+            format.pop("default", None)
         io_info['supported_formats'] = [_json2wps_type(fmt, 'supported_formats') for fmt in formats]
 
     # convert metadata objects
@@ -535,8 +544,10 @@ def _json2wps_io(io_info, io_select):
                 io_info['max_occurs'] = PACKAGE_ARRAY_MAX_SIZE
             return ComplexInput(**io_info)
         if io_type == WPS_BOUNDINGBOX:
+            io_info.pop('supported_formats', None)
             return BoundingBoxInput(**io_info)
         if io_type == WPS_LITERAL:
+            io_info.pop('supported_formats', None)
             return LiteralInput(**io_info)
     elif io_select == WPS_OUTPUT:
         # extra params to remove for outputs
