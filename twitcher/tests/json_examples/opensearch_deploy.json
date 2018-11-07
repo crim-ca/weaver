@@ -5,7 +5,16 @@
       "id": "opensearch",
       "title": "opensearch",
       "abstract": "",
+      "version": "1.0",
       "keywords": [],
+      "owsContext": {
+        "offering": {
+          "code": "http://www.opengis.net/eoc/applicationContext/cwl",
+          "content": {
+            "href": "https://raw.githubusercontent.com/crim-ca/testbed14/master/application-packages/Stacker/Stacker.cwl"
+          }
+        }
+      },
       "additionalParameters": [
         {
           "role": "http://www.opengis.net/eoc/applicationContext",
@@ -93,6 +102,9 @@
         },
         "outputs": {
           "output": {
+            "outputBinding": {
+              "glob": "output.txt"
+            },
             "type": "File"
           }
         }

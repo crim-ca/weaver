@@ -59,6 +59,7 @@ def make_request(**kw):
     if request.registry.settings is None:
         request.registry.settings = {}
     request.registry.settings["twitcher.url"] = "localhost"
+    request.registry.settings["twitcher.wps_path"] = "/ows/wps"
     request.registry.settings["twitcher.db_factory"] = DB_MEMORY
     return request
 
