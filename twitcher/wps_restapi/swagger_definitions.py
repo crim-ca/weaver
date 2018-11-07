@@ -501,7 +501,7 @@ class ProcessSummarySchema(MappingSchema):
     metadata = MetadataList(missing=drop)
     version = SchemaNode(String())
     jobControlOptions = JobControlOptionsEnum
-    processDescriptionURL = SchemaNode(String())    # URL
+    processDescriptionURL = SchemaNode(String(), format='url', missing=drop, title='processDescriptionURL')
     outputTransmission = OutputTransmissionEnum
 
 
