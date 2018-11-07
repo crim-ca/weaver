@@ -7,6 +7,8 @@ import uuid
 from dateutil.parser import parse as dtparse
 from datetime import datetime, timedelta
 from logging import _levelNames, ERROR, INFO
+
+from twitcher.processes.wps_package import PACKAGE_ARRAY_MAX_SIZE
 from twitcher.utils import now_secs, get_job_log_msg, get_log_fmt, get_log_datefmt
 from twitcher.exceptions import ProcessInstanceError
 from twitcher.processes import process_mapping
@@ -383,7 +385,41 @@ class AccessToken(dict):
         return '{0}.{1}({2})'.format(cls.__module__, cls.__name__, repr_)
 
 
-class Process(dict):
+class DescriptionType(dict):
+    """
+    Base class for the descriptionType schema
+    """
+    def __init__(self, *args, **kwargs):
+        super(DescriptionType, self).__init__(*args, **kwargs)
+        # use both 'id' and 'identifier' to support any call (WPS and recurrent 'id')
+        if 'id' not in self and 'identifier' not in self:
+            raise TypeError("'id' OR 'identifier' is required")
+        if 'id' not in self:
+            self['id'] = self.pop('identifier')
+
+    @property
+    def id(self):
+        return self['id']
+
+    @property
+    def identifier(self):
+        return self.id
+
+    def description(self):
+        properties = [
+            "id",
+            "title",
+            "abstract",
+            "keywords",
+            "owsContext",
+            "metadata",
+            "additionalParameters",
+            "links",
+        ]
+        return {p: self[p] for p in properties if p in self}
+
+
+class Process(DescriptionType):
     """
     Dictionary that contains a process description for db storage.
     It always has ``'identifier'`` and ``executeEndpoint`` keys.
@@ -391,29 +427,20 @@ class Process(dict):
 
     def __init__(self, *args, **kwargs):
         super(Process, self).__init__(*args, **kwargs)
-        # use both 'id' and 'identifier' to support any call (WPS and recurrent 'id')
-        if 'id' not in self and 'identifier' not in self:
-            raise TypeError("'id' OR 'identifier' is required")
-        if not self.get('identifier'):
-            self['identifier'] = self.pop('id')
         if 'executeEndpoint' not in self:
             raise TypeError("'executeEndpoint' is required")
         if 'package' not in self:
             raise TypeError("'package' is required")
+        if 'inputs' in self:
+            self['inputs'] = [Input(i) for i in self['inputs']]
+        if 'outputs' in self:
+            self['outputs'] = [Output(o) for o in self['outputs']]
 
     def __setattr__(self, item, value):
         if item in self:
             self[item] = value
         else:
             raise AttributeError("Can't set attribute")
-
-    @property
-    def id(self):
-        return self.identifier
-
-    @property
-    def identifier(self):
-        return self['identifier']
 
     @property
     def title(self):
@@ -536,31 +563,39 @@ class Process(dict):
     def json(self):
         url = ""
         if self.executeEndpoint:
-            url = "/".join([self.executeEndpoint, 'processes', self.identifier, "jobs"])
-        return {
-            'id': self.identifier,
-            'title': self.title,
-            'abstract': self.abstract,
-            'keywords': self.keywords,
-            'metadata': self.metadata,
-            'inputs': self.inputs,
-            'outputs': self.outputs,
-            'executeEndpoint': url,
-            'owsContext': self.owsContext,
-        }
+            url = "/".join([self.executeEndpoint, 'processes', self.id, "jobs"])
+
+        description = self.description()
+
+        description["inputs"] = [i.data_description() for i in self.inputs]
+        description["outputs"] = [o.data_description() for o in self.outputs]
+        description["executeEndpoint"] = url
+
+        return description
+
+    def process_offering(self):
+        offering = {'process': self.json()}
+
+        if self.version:
+            offering['processVersion'] = self.version
+
+        properties = [
+            "jobControlOptions",
+            "outputTransmission",
+        ]
+        offering.update({p: self[p] for p in properties if p in self})
+        return offering
 
     def summary(self):
-        return {
-            'id': self.identifier,
-            'title': self.title,
-            'abstract': self.abstract,
-            'keywords': self.keywords,
-            'metadata': self.metadata,
-            'version': self.version,
-            'jobControlOptions': self.jobControlOptions,
-            'processDescriptionURL': self.processDescriptionURL,
-            'outputTransmission': self.outputTransmission,
-        }
+        description = self.description()
+        properties = [
+            "version",
+            "jobControlOptions",
+            "processDescriptionURL",
+            "outputTransmission",
+        ]
+        description.update({p: self[p] for p in properties if p in self})
+        return description
 
     @staticmethod
     def from_wps(wps_process, **extra_params):
@@ -579,6 +614,85 @@ class Process(dict):
         if process_key in PACKAGE_PROCESSES:
             return process_mapping[process_key](**self.params_wps)
         return process_mapping[process_key]()
+
+
+class DataDescriptionType(DescriptionType):
+    """
+    Dictionary that contains a process description for db storage.
+    It always has ``'identifier'`` and ``executeEndpoint`` keys.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(DataDescriptionType, self).__init__(*args, **kwargs)
+        # if 'formats' not in self:
+        #     raise TypeError("'formats' is required")
+        # if 'type' not in self:
+        #     raise TypeError("'type' is required")
+
+    @property
+    def type(self):
+        """The WPS IO type of this object (LiteralType,
+        ComplexType, BoundingBox, etc."""
+        return self.get("type")
+
+    def data_description(self):
+        description = self.description()
+        properties = [
+            "minOccurs",
+            "maxOccurs",
+            "formats",
+        ]
+        description.update({p: self[p] for p in properties if p in self})
+        return description
+
+    @classmethod
+    def from_wps_names(cls, io_data):
+        """
+        Transform input and output from owslib format to the RestAPI compliant schema
+        :param io_data: input or output as json
+        :return:
+            """
+        replace = {
+            u"identifier": u"id",
+            u"supported_formats": u"formats",
+            u"mime_type": u"mimeType",
+            u"min_occurs": u"minOccurs",
+            u"max_occurs": u"maxOccurs",
+        }
+        remove = []
+        add = {}
+        replace_values = {
+            PACKAGE_ARRAY_MAX_SIZE: "unbounded",
+        }
+
+        for k, v in replace.items():
+            if k in io_data:
+                io_data[v] = io_data.pop(k)
+        for r in remove:
+            io_data.pop(r, None)
+        for k, v in add.items():
+            io_data[k] = v
+
+        for key, value in io_data.items():
+            for old_value, new_value in replace_values.items():
+                if value == old_value:
+                    io_data[key] = new_value
+            # also replace if the type of the value is a list of dicts
+            if isinstance(value, list):
+                for nested_item in value:
+                    if isinstance(nested_item, dict):
+                        for k, v in replace.items():
+                            if k in nested_item:
+                                nested_item[v] = nested_item.pop(k)
+        return cls(**io_data)
+
+
+class Input(DataDescriptionType):
+    pass
+
+
+class Output(DataDescriptionType):
+    pass
 
 
 class Quote(dict):

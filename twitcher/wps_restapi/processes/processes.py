@@ -8,11 +8,10 @@ from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import URLError
 from time import sleep
 
-from twitcher.processes.wps_package import PACKAGE_ARRAY_MAX_SIZE
 from twitcher.wps import load_pywps_cfg
 from twitcher.adapter import servicestore_factory, jobstore_factory, processstore_factory
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS
-from twitcher.datatype import Process as ProcessDB, Job as JobDB
+from twitcher.datatype import Process as ProcessDB, Job as JobDB, Input, Output
 from twitcher.exceptions import (
     ProcessNotFound,
     PackageRegistrationError,
@@ -159,58 +158,6 @@ def retrieve_package_job_log(execution, job):
         os.remove(log_fn)
     except (KeyError, IOError):
         pass
-
-
-def convert_io_from_wps(io_data):
-    """
-    Transform inputs and outputs from owslib format to the RestAPI compliant schema
-    :param io_data: inputs or outputs as json
-    :return:
-    """
-    io_data = deepcopy(io_data)
-    replace = {
-        u"identifier": u"id",
-        u"supported_formats": u"formats",
-        u"mime_type": u"mimeType",
-        u"min_occurs": u"minOccurs",
-        u"max_occurs": u"maxOccurs",
-    }
-    remove = [
-        u"mimetype",
-        u"workdir",
-        u"asreference",
-        u"mode",
-        u"file",
-        u"type",
-        u"data_format",
-    ]
-    add = {}
-    replace_values = {
-        PACKAGE_ARRAY_MAX_SIZE: "unbounded",
-    }
-
-    for io in io_data:
-        for k, v in replace.items():
-            if k in io:
-                io[v] = io.pop(k)
-        for r in remove:
-            io.pop(r, None)
-        for k, v in add.items():
-            io[k] = v
-
-        for key, value in io.items():
-            for old_value, new_value in replace_values.items():
-                if value == old_value:
-                    io[key] = new_value
-            # also replace if the type of the value is a list of dicts
-            if isinstance(value, list):
-                for nested_item in value:
-                    if isinstance(nested_item, dict):
-                        for k, v in replace.items():
-                            if k in nested_item:
-                                nested_item[v] = nested_item.pop(k)
-
-    return io_data
 
 
 @app.task(bind=True)
@@ -590,8 +537,8 @@ def add_local_process(request):
         raise HTTPBadRequest("Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex)))
 
     # convert inputs and outputs to be compliant with schema
-    process_info['inputs'] = convert_io_from_wps(process_info['inputs'])
-    process_info['outputs'] = convert_io_from_wps(process_info['outputs'])
+    process_info['inputs'] = [Input.from_wps_names(i) for i in process_info['inputs']]
+    process_info['outputs'] = [Output.from_wps_names(i) for i in process_info['outputs']]
 
     # validate process type against twitcher configuration
     process_type = process_info['type']
@@ -633,21 +580,17 @@ def get_local_process(request):
     try:
         store = processstore_factory(request.registry)
         process = store.fetch_by_id(process_id, request=request)
-        process_json = process.json()
+        offering = process.process_offering()
 
         try:
-            process_json["inputs"] = opensearch.replace_inputs_eoimage_files_to_query(process_json["inputs"],
-                                                                                      process["payload"])
-        # Process may not have a payload... in this case no eoimage inputs anyway
+            inputs, payload = offering["process"]["inputs"], process["payload"]
+            new_inputs = opensearch.replace_inputs_describe_process(inputs, payload)
+            new_inputs = [Input(i).data_description() for i in new_inputs]
+            offering["process"]["inputs"] = new_inputs
         except KeyError:
+            # Process may not have a payload... in this case no eoimage inputs anyway
             pass
-        json_ = {
-            'process': process_json,
-            'processVersion': process.version,
-            'jobControlOptions': process.jobControlOptions,
-            'outputTransmission': process.outputTransmission,
-        }
-        return HTTPOk(json=json_)
+        return HTTPOk(json=offering)
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except ProcessNotFound:
