@@ -9,8 +9,8 @@
         "default": true
       }
     ],
-    "minOccurs": 1,
-    "maxOccurs": 1,
+    "minOccurs": "1",
+    "maxOccurs": "1",
     "additionalParameters": [
       {
         "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
@@ -35,8 +35,8 @@
         "default": true
       }
     ],
-    "minOccurs": 1,
-    "maxOccurs": 1,
+    "minOccurs": "1",
+    "maxOccurs": "1",
     "additionalParameters": [
       {
         "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
@@ -61,8 +61,8 @@
         "default": true
       }
     ],
-    "minOccurs": 1,
-    "maxOccurs": 1,
+    "minOccurs": "1",
+    "maxOccurs": "1",
     "additionalParameters": [
       {
         "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
@@ -87,8 +87,8 @@
         "default": true
       }
     ],
-    "minOccurs": 1,
-    "maxOccurs": 1,
+    "minOccurs": "1",
+    "maxOccurs": "1",
     "additionalParameters": [
       {
         "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
@@ -113,8 +113,8 @@
         "default": true
       }
     ],
-    "minOccurs": 1,
-    "maxOccurs": 1,
+    "minOccurs": "1",
+    "maxOccurs": "1",
     "additionalParameters": [
       {
         "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
@@ -139,7 +139,7 @@
         "default": true
       }
     ],
-    "minOccurs": 1,
+    "minOccurs": "1",
     "maxOccurs": "unbounded",
     "additionalParameters": [
       {
@@ -165,7 +165,7 @@
         "default": true
       }
     ],
-    "minOccurs": 1,
+    "minOccurs": "1",
     "maxOccurs": "unbounded",
     "additionalParameters": [
       {

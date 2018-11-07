@@ -310,8 +310,8 @@ class EOImageDescribeProcessHandler(object):
             u"title": u"Area of Interest",
             u"abstract": u"Area of Interest (Bounding Box)",
             u"formats": [{u"mimeType": u"OGC-WKT", u"default": True}],
-            u"minOccurs": 1,
-            u"maxOccurs": 1,
+            u"minOccurs": u"1",
+            u"maxOccurs": u"1",
             u"additionalParameters": [
                 {
                     u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
@@ -331,7 +331,7 @@ class EOImageDescribeProcessHandler(object):
             u"title": description,
             u"abstract": description,
             u"formats": [{u"mimeType": u"text/plain", u"default": True}],
-            u"minOccurs": 1,
+            u"minOccurs": u"1",
             u"maxOccurs": u"unbounded",
             u"additionalParameters": [
                 {
@@ -359,8 +359,8 @@ class EOImageDescribeProcessHandler(object):
             u"title": u"Time of Interest",
             u"abstract": u"Time of Interest (defined as Start date - End date)",
             u"formats": [{u"mimeType": u"text/plain", u"default": True}],
-            u"minOccurs": 1,
-            u"maxOccurs": 1,
+            u"minOccurs": u"1",
+            u"maxOccurs": u"1",
             u"additionalParameters": [
                 {
                     u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
