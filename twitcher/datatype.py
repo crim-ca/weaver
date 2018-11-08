@@ -625,7 +625,10 @@ class DataDescriptionType(DescriptionType):
     def __init__(self, *args, **kwargs):
         super(DataDescriptionType, self).__init__(*args, **kwargs)
         if 'formats' not in self:
-            raise TypeError("'formats' is required")
+            #raise TypeError("'formats' is required")
+            # TODO: Temporary patch to avoid error with static wps process like hello
+            self['formats'] = [{"mimeType": "text/plain",
+                                "default": True}]
         if 'type' not in self:
             raise TypeError("'type' is required")
 
