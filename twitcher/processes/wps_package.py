@@ -95,8 +95,6 @@ WPS_FIELD_MAPPING = {
                               'Additional_Parameters'],
 }
 
-EOIMAGE = "eoimage"
-
 
 class NullType():
     pass
