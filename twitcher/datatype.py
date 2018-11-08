@@ -585,7 +585,19 @@ class Process(DescriptionType):
 
 
 class Input(DataDescriptionType):
-    pass
+    def inputTypeChoice(self):
+        properties = [
+            "literalDataDomains",  # literalInputType
+            "supportedCRS"  # boundingBoxInputType
+            # complexInputType not defined
+        ]
+        input_type_choice = {p: self[p] for p in properties if p in self}
+        return input_type_choice
+
+    def inputType(self):
+        input_type = self.inputTypeChoice()
+        input_type.update(self.data_description())
+        return input_type
 
 
 class Output(DataDescriptionType):
