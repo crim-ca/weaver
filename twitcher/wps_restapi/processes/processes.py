@@ -587,7 +587,7 @@ def get_local_process(request):
         try:
             inputs, payload = offering["process"]["inputs"], process["payload"]
             new_inputs = opensearch.replace_inputs_describe_process(inputs, payload)
-            new_inputs = [Input(i).data_description() for i in new_inputs]
+            new_inputs = [Input(i).inputType() for i in new_inputs]
             offering["process"]["inputs"] = new_inputs
         except KeyError:
             # Process may not have a payload... in this case no eoimage inputs anyway
