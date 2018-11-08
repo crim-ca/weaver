@@ -19,7 +19,6 @@ from pywps.inout.basic import BasicIO
 from pywps.response.status import WPS_STATUS, _WPS_STATUS
 from pywps.inout.literaltypes import AnyValue, AllowedValue, ALLOWEDVALUETYPE
 from pywps.validator.mode import MODE
-from pywps.validator.literalvalidator import validate_anyvalue, validate_allowed_values
 from pywps.app.Common import Metadata
 from twitcher.processes import opensearch
 
@@ -30,7 +29,6 @@ from twitcher.processes.wps_process import WpsProcess
 from twitcher.processes.wps_workflow import default_make_tool
 from twitcher.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from twitcher.processes.sources import retrieve_data_source_url, get_data_source_from_url
-from twitcher.utils import parse_request_query, get_any_id
 from twitcher.exceptions import PackageTypeError, PackageRegistrationError, PackageExecutionError, \
     PackageNotFound, PayloadNotFound
 from twitcher.wps_restapi.swagger_definitions import process_uri
@@ -43,7 +41,6 @@ from yaml.scanner import ScannerError
 import yaml
 import json
 import tempfile
-import mimetypes
 import shutil
 import requests
 
