@@ -22,6 +22,7 @@ class Service(dict):
     """
     Dictionary that contains OWS services. It always has ``'url'`` key.
     """
+
     def __init__(self, *args, **kwargs):
         super(Service, self).__init__(*args, **kwargs)
         if 'url' not in self:
@@ -75,6 +76,7 @@ class Job(dict):
     """
     Dictionary that contains OWS service jobs. It always has ``'task_id'`` and ``identifier`` keys.
     """
+
     def __init__(self, *args, **kwargs):
         super(Job, self).__init__(*args, **kwargs)
         if 'task_id' not in self:
@@ -95,10 +97,10 @@ class Job(dict):
             log_msg = [(ERROR, self._get_log_msg('{0.text} - code={0.code} - locator={0.locator}'.format(error)))
                        for error in errors]
             self.exceptions.extend([{
-                    'Code': error.code,
-                    'Locator': error.locator,
-                    'Text': error.text
-                } for error in errors])
+                'Code': error.code,
+                'Locator': error.locator,
+                'Text': error.text
+            } for error in errors])
         else:
             log_msg = [(INFO, self._get_log_msg())]
         for level, msg in log_msg:
@@ -509,7 +511,7 @@ class Process(DescriptionType):
             'outputTransmission': self.outputTransmission,
             'executeWPSEndpoint': self.executeWPSEndpoint,
             'type': self.type,
-            'package': self.package,      # deployment specification (json body)
+            'package': self.package,  # deployment specification (json body)
             'payload': self.payload,
             'visibility': self.visibility,
         }
@@ -595,6 +597,7 @@ class Quote(dict):
     Dictionary that contains quote information.
     It always has ``'id'`` and ``process`` key.
     """
+
     def __init__(self, *args, **kwargs):
         super(Quote, self).__init__(*args, **kwargs)
         if 'process' not in self:
@@ -734,6 +737,7 @@ class Bill(dict):
     Dictionary that contains bill information.
     It always has ``'id'``, ``user``, ``quote`` and ``job`` keys.
     """
+
     def __init__(self, *args, **kwargs):
         super(Bill, self).__init__(*args, **kwargs)
         if 'quote' not in self:

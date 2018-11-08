@@ -5,6 +5,7 @@ class DescriptionType(dict):
     """
     Base class for the descriptionType schema
     """
+
     def __init__(self, *args, **kwargs):
         super(DescriptionType, self).__init__(*args, **kwargs)
         # use both 'id' and 'identifier' to support any call (WPS and recurrent 'id')
@@ -44,7 +45,7 @@ class DataDescriptionType(DescriptionType):
     def __init__(self, *args, **kwargs):
         super(DataDescriptionType, self).__init__(*args, **kwargs)
         if 'formats' not in self:
-            #raise TypeError("'formats' is required")
+            # raise TypeError("'formats' is required")
             # TODO: Temporary patch to avoid error with static wps process like hello
             self['formats'] = [{"mimeType": "text/plain",
                                 "default": True}]
@@ -69,8 +70,8 @@ class DataDescriptionType(DescriptionType):
 
     def inputTypeChoice(self):
         properties = [
-            "literalDataDomains", # literalInputType
-            "supportedCRS" # boundingBoxInputType
+            "literalDataDomains",  # literalInputType
+            "supportedCRS"  # boundingBoxInputType
             # complexInputType not defined
         ]
         input_type_choice = {p: self[p] for p in properties if p in self}
