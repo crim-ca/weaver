@@ -1,21 +1,19 @@
 import json
 from collections import deque
 from copy import deepcopy
-
-import pytest
 import unittest
 import os
 from pprint import pformat
-
 import urlparse
+
+import pytest
 from mock import mock
 from pyramid import testing
 from pyramid.testing import DummyRequest
+from pywps.inout.inputs import LiteralInput
 
 import twitcher
-from pywps.inout.inputs import LiteralInput
-from twitcher import namesgenerator
-
+from twitcher.processes.constants import START_DATE, END_DATE, AOI
 from twitcher.datatype import Process
 from twitcher.processes import opensearch
 from twitcher.store import DB_MEMORY, MemoryProcessStore
@@ -59,6 +57,7 @@ def make_request(**kw):
     if request.registry.settings is None:
         request.registry.settings = {}
     request.registry.settings["twitcher.url"] = "localhost"
+    request.registry.settings["twitcher.wps_path"] = "/ows/wps"
     request.registry.settings["twitcher.db_factory"] = DB_MEMORY
     return request
 
@@ -116,28 +115,6 @@ def memory_store_with_opensearch_process(memory_store, opensearch_process):
     return memory_store
 
 
-@mock.patch("twitcher.wps_restapi.processes.processes.processstore_factory")
-def test_describe_process_opensearch(
-    processstore_factory, memory_store, opensearch_process
-):
-    memory_store.save_process(opensearch_process)
-    processstore_factory.return_value = memory_store
-
-    request = make_request(method="GET")
-    request.matchdict["process_id"] = namesgenerator.get_sane_name(
-        opensearch_process.id
-    )
-
-    transformed_inputs = processes.get_local_process(request).json["process"]["inputs"]
-
-    original_inputs = opensearch_process.json()["inputs"]
-    expected_inputs = opensearch.replace_inputs_eoimage_files_to_query(
-        original_inputs, opensearch_process.payload, wps_inputs=True
-    )
-
-    assert_json_equals(transformed_inputs, expected_inputs)
-
-
 def test_transform_execute_parameters_wps(opensearch_process):
     def make_input(id_, value):
         input_ = LiteralInput(id_, "", data_type="string")
@@ -150,10 +127,10 @@ def test_transform_execute_parameters_wps(opensearch_process):
 
     inputs = dict(
         [
-            make_deque("startDate", "2018-01-30T00:00:00.000Z"),
-            make_deque("endDate", "2018-01-31T23:59:59.999Z"),
+            make_deque(START_DATE, "2018-01-30T00:00:00.000Z"),
+            make_deque(END_DATE, "2018-01-31T23:59:59.999Z"),
             make_deque(
-                "aoi",
+                AOI,
                 "POLYGON ((100.4 15.3, 104.6 15.3, 104.6 19.3, 100.4 19.3, 100.4 15.3))",
             ),
             make_deque("files", "EOP:IPT:Sentinel2"),
@@ -173,7 +150,9 @@ def test_transform_execute_parameters_wps(opensearch_process):
         ]
     )
 
-    with mock.patch.object(opensearch.OpenSearchQuery, "query_datasets", return_value=mocked_query):
+    with mock.patch.object(
+        opensearch.OpenSearchQuery, "query_datasets", return_value=mocked_query
+    ):
         eo_image_source_info = make_eo_image_source_info("files", "EOP:IPT:Sentinel2")
         transformed = opensearch.query_eo_images_from_wps_inputs(
             inputs, eo_image_source_info
@@ -237,7 +216,7 @@ def test_handle_EOI_unique_aoi_non_unique_toi():
     output = twitcher.processes.opensearch.EOImageDescribeProcessHandler(
         inputs
     ).to_opensearch(unique_aoi=True, unique_toi=False)
-    assert_json_equals(expected, output)
+    assert_json_equals(output, expected)
 
 
 def test_handle_EOI_non_unique_aoi_unique_toi():
@@ -246,7 +225,7 @@ def test_handle_EOI_non_unique_aoi_unique_toi():
     output = twitcher.processes.opensearch.EOImageDescribeProcessHandler(
         inputs
     ).to_opensearch(unique_aoi=False, unique_toi=True)
-    assert_json_equals(expected, output)
+    assert_json_equals(output, expected)
 
 
 def test_get_additional_parameters():
@@ -300,11 +279,13 @@ def test_get_template_urls():
 
 def inputs_unique_aoi_toi(files_id):
     return {
-        "aoi": deque([LiteralInput("aoi", "Area", data_type="string")]),
-        "startDate": deque([LiteralInput("startDate", "Area", data_type="string")]),
-        "endDate": deque([LiteralInput("endDate", "Area", data_type="string")]),
+        AOI: deque([LiteralInput(AOI, "Area", data_type="string")]),
+        START_DATE: deque(
+            [LiteralInput(START_DATE, "Start Date", data_type="string")]
+        ),
+        END_DATE: deque([LiteralInput(END_DATE, "End Date", data_type="string")]),
         files_id: deque(
-            [LiteralInput(files_id, "Collection id to query", data_type="string")]
+            [LiteralInput(files_id, "Collection of the data.", data_type="string")]
         ),
     }
 
@@ -313,19 +294,19 @@ def inputs_non_unique_aoi_toi(files_id):
     def make_specific(name):
         return opensearch._make_specific_identifier(name, files_id)
 
-    end_date, start_date, aoi = map(make_specific, ["endDate", "startDate", "aoi"])
+    end_date, start_date, aoi = map(make_specific, [END_DATE, START_DATE, AOI])
     return {
         aoi: deque([LiteralInput(aoi, "Area", data_type="string")]),
         start_date: deque([LiteralInput(start_date, "Area", data_type="string")]),
         end_date: deque([LiteralInput(end_date, "Area", data_type="string")]),
         files_id: deque(
-            [LiteralInput(files_id, "Collection id to query", data_type="string")]
+            [LiteralInput(files_id, "Collection of the data.", data_type="string")]
         ),
     }
 
 
 def query_param_names(unique_aoi_toi, identifier):
-    end_date, start_date, aoi = "endDate", "startDate", "aoi"
+    end_date, start_date, aoi = END_DATE, START_DATE, AOI
     if not unique_aoi_toi:
         end_date = opensearch._make_specific_identifier(end_date, identifier)
         start_date = opensearch._make_specific_identifier(start_date, identifier)

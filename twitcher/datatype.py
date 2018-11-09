@@ -7,6 +7,8 @@ import uuid
 from dateutil.parser import parse as dtparse
 from datetime import datetime, timedelta
 from logging import _levelNames, ERROR, INFO
+
+from twitcher.datatype_schemas import DataDescriptionType, DescriptionType
 from twitcher.utils import now_secs, get_job_log_msg, get_log_fmt, get_log_datefmt
 from twitcher.exceptions import ProcessInstanceError
 from twitcher.processes import process_mapping
@@ -20,6 +22,7 @@ class Service(dict):
     """
     Dictionary that contains OWS services. It always has ``'url'`` key.
     """
+
     def __init__(self, *args, **kwargs):
         super(Service, self).__init__(*args, **kwargs)
         if 'url' not in self:
@@ -73,6 +76,7 @@ class Job(dict):
     """
     Dictionary that contains OWS service jobs. It always has ``'task_id'`` and ``identifier`` keys.
     """
+
     def __init__(self, *args, **kwargs):
         super(Job, self).__init__(*args, **kwargs)
         if 'task_id' not in self:
@@ -93,10 +97,10 @@ class Job(dict):
             log_msg = [(ERROR, self._get_log_msg('{0.text} - code={0.code} - locator={0.locator}'.format(error)))
                        for error in errors]
             self.exceptions.extend([{
-                    'Code': error.code,
-                    'Locator': error.locator,
-                    'Text': error.text
-                } for error in errors])
+                'Code': error.code,
+                'Locator': error.locator,
+                'Text': error.text
+            } for error in errors])
         else:
             log_msg = [(INFO, self._get_log_msg())]
         for level, msg in log_msg:
@@ -383,37 +387,28 @@ class AccessToken(dict):
         return '{0}.{1}({2})'.format(cls.__module__, cls.__name__, repr_)
 
 
-class Process(dict):
+class Process(DescriptionType):
     """
     Dictionary that contains a process description for db storage.
-    It always has ``'identifier'`` and ``executeEndpoint`` keys.
+    It always has ``'identifier'`` and ``executeWPSEndpoint`` keys.
     """
 
     def __init__(self, *args, **kwargs):
         super(Process, self).__init__(*args, **kwargs)
-        # use both 'id' and 'identifier' to support any call (WPS and recurrent 'id')
-        if 'id' not in self and 'identifier' not in self:
-            raise TypeError("'id' OR 'identifier' is required")
-        if not self.get('identifier'):
-            self['identifier'] = self.pop('id')
-        if 'executeEndpoint' not in self:
-            raise TypeError("'executeEndpoint' is required")
+        if 'executeWPSEndpoint' not in self:
+            raise TypeError("'executeWPSEndpoint' is required")
         if 'package' not in self:
             raise TypeError("'package' is required")
+        if 'inputs' in self:
+            self['inputs'] = [Input(i) for i in self['inputs']]
+        if 'outputs' in self:
+            self['outputs'] = [Output(o) for o in self['outputs']]
 
     def __setattr__(self, item, value):
         if item in self:
             self[item] = value
         else:
             raise AttributeError("Can't set attribute")
-
-    @property
-    def id(self):
-        return self.identifier
-
-    @property
-    def identifier(self):
-        return self['identifier']
 
     @property
     def title(self):
@@ -452,8 +447,20 @@ class Process(dict):
         return self.get('outputTransmission')
 
     @property
+    def processDescriptionURL(self):
+        return self.get('processDescriptionURL')
+
+    @property
+    def executeWPSEndpoint(self):
+        return self.get('executeWPSEndpoint')
+
+    @property
     def executeEndpoint(self):
         return self.get('executeEndpoint')
+
+    @property
+    def owsContext(self):
+        return self.get('owsContext')
 
     # wps, workflow, etc.
     @property
@@ -502,9 +509,9 @@ class Process(dict):
             'outputs': self.outputs,
             'jobControlOptions': self.jobControlOptions,
             'outputTransmission': self.outputTransmission,
-            'executeEndpoint': self.executeEndpoint,
+            'executeWPSEndpoint': self.executeWPSEndpoint,
             'type': self.type,
-            'package': self.package,      # deployment specification (json body)
+            'package': self.package,  # deployment specification (json body)
             'payload': self.payload,
             'visibility': self.visibility,
         }
@@ -526,31 +533,37 @@ class Process(dict):
         }
 
     def json(self):
-        return {
-            'identifier': self.identifier,
-            'title': self.title,
-            'abstract': self.abstract,
-            'keywords': self.keywords,
-            'metadata': self.metadata,
-            'version': self.version,
-            'inputs': self.inputs,
-            'outputs': self.outputs,
-            'jobControlOptions': self.jobControlOptions,
-            'outputTransmission': self.outputTransmission,
-            'executeEndpoint': self.executeEndpoint,
-        }
+        description = self.description()
+
+        description["inputs"] = [i.data_description() for i in self.inputs]
+        description["outputs"] = [o.data_description() for o in self.outputs]
+        description["executeEndpoint"] = self.executeEndpoint
+
+        return description
+
+    def process_offering(self):
+        offering = {'process': self.json()}
+
+        if self.version:
+            offering['processVersion'] = self.version
+
+        properties = [
+            "jobControlOptions",
+            "outputTransmission",
+        ]
+        offering.update({p: self[p] for p in properties if p in self})
+        return offering
 
     def summary(self):
-        return {
-            'identifier': self.identifier,
-            'title': self.title,
-            'abstract': self.abstract,
-            'keywords': self.keywords,
-            'metadata': self.metadata,
-            'version': self.version,
-            'jobControlOptions': self.jobControlOptions,
-            'executeEndpoint': self.executeEndpoint,
-        }
+        description = self.description()
+        properties = [
+            "version",
+            "jobControlOptions",
+            "processDescriptionURL",
+            "outputTransmission",
+        ]
+        description.update({p: self[p] for p in properties if p in self})
+        return description
 
     @staticmethod
     def from_wps(wps_process, **extra_params):
@@ -571,11 +584,32 @@ class Process(dict):
         return process_mapping[process_key]()
 
 
+class Input(DataDescriptionType):
+    def inputTypeChoice(self):
+        properties = [
+            "literalDataDomains",  # literalInputType
+            "supportedCRS"  # boundingBoxInputType
+            # complexInputType not defined
+        ]
+        input_type_choice = {p: self[p] for p in properties if p in self}
+        return input_type_choice
+
+    def inputType(self):
+        input_type = self.inputTypeChoice()
+        input_type.update(self.data_description())
+        return input_type
+
+
+class Output(DataDescriptionType):
+    pass
+
+
 class Quote(dict):
     """
     Dictionary that contains quote information.
     It always has ``'id'`` and ``process`` key.
     """
+
     def __init__(self, *args, **kwargs):
         super(Quote, self).__init__(*args, **kwargs)
         if 'process' not in self:
@@ -715,6 +749,7 @@ class Bill(dict):
     Dictionary that contains bill information.
     It always has ``'id'``, ``user``, ``quote`` and ``job`` keys.
     """
+
     def __init__(self, *args, **kwargs):
         super(Bill, self).__init__(*args, **kwargs)
         if 'quote' not in self:

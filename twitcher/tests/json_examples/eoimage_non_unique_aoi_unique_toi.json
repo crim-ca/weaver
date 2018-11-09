@@ -9,8 +9,23 @@
         "default": true
       }
     ],
-    "minOccurs": 1,
-    "maxOccurs": 1
+    "minOccurs": "1",
+    "maxOccurs": "1",
+    "additionalParameters": [
+      {
+        "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
+        "parameters": [
+          {
+            "name": "CatalogSearchField",
+            "values": [
+              "bbox"
+            ]
+          }
+        ]
+      }
+    ],
+    "type": "literal",
+    "data_type": "string"
   },
   {
     "id": "aoi_image-s2",
@@ -22,11 +37,26 @@
         "default": true
       }
     ],
-    "minOccurs": 1,
-    "maxOccurs": 1
+    "minOccurs": "1",
+    "maxOccurs": "1",
+    "additionalParameters": [
+      {
+        "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
+        "parameters": [
+          {
+            "name": "CatalogSearchField",
+            "values": [
+              "bbox"
+            ]
+          }
+        ]
+      }
+    ],
+    "type": "literal",
+    "data_type": "string"
   },
   {
-    "id": "startDate",
+    "id": "StartDate",
     "title": "Time of Interest",
     "abstract": "Time of Interest (defined as Start date - End date)",
     "formats": [
@@ -35,10 +65,12 @@
         "default": true
       }
     ],
-    "minOccurs": 1,
-    "maxOccurs": 1,
+    "minOccurs": "1",
+    "maxOccurs": "1",
     "LiteralDataDomain": {
-      "dataType": "String"
+      "dataType": {
+        "name": "String"
+      }
     },
     "additionalParameters": [
       {
@@ -46,22 +78,18 @@
         "parameters": [
           {
             "name": "CatalogSearchField",
-            "value": "startDate"
+            "values": [
+              "startDate"
+            ]
           }
         ]
       }
     ],
-    "owsContext": {
-      "offering": {
-        "code": "anyCode",
-        "content": {
-          "href": "anyRef"
-        }
-      }
-    }
+    "type": "literal",
+    "data_type": "string"
   },
   {
-    "id": "endDate",
+    "id": "EndDate",
     "title": "Time of Interest",
     "abstract": "Time of Interest (defined as Start date - End date)",
     "formats": [
@@ -70,10 +98,12 @@
         "default": true
       }
     ],
-    "minOccurs": 1,
-    "maxOccurs": 1,
+    "minOccurs": "1",
+    "maxOccurs": "1",
     "LiteralDataDomain": {
-      "dataType": "String"
+      "dataType": {
+        "name": "String"
+      }
     },
     "additionalParameters": [
       {
@@ -81,40 +111,32 @@
         "parameters": [
           {
             "name": "CatalogSearchField",
-            "value": "endDate"
+            "values": [
+              "endDate"
+            ]
           }
         ]
       }
     ],
-    "owsContext": {
-      "offering": {
-        "code": "anyCode",
-        "content": {
-          "href": "anyRef"
-        }
-      }
-    }
+    "type": "literal",
+    "data_type": "string"
   },
   {
-    "id": "image-s2",
-    "title": "Collection Identifer for input image-s2",
-    "abstract": "Collection Identifer for input image-s2",
+    "id": "image-s2_collection",
+    "title": "Collection of the data.",
+    "abstract": "Collection of the data.",
     "formats": [
       {
         "mimeType": "text/plain",
         "default": true
       }
     ],
-    "minOccurs": 1,
+    "minOccurs": "1",
     "maxOccurs": "unbounded",
     "LiteralDataDomain": {
-      "dataType": "String",
-      "allowedValues": [
-        "s2-collection-1",
-        "s2-collection-2",
-        "s2-landsat8",
-        "s2-sentinel2"
-      ]
+      "dataType": {
+        "name": "String"
+      }
     },
     "additionalParameters": [
       {
@@ -122,38 +144,32 @@
         "parameters": [
           {
             "name": "CatalogSearchField",
-            "value": "parentIdentifier"
+            "values": [
+              "parentIdentifier"
+            ]
           }
         ]
       }
     ],
-    "owsContext": {
-      "offering": {
-        "code": "anyCode",
-        "content": {
-          "href": "anyRef"
-        }
-      }
-    }
+    "type": "literal",
+    "data_type": "string"
   },
   {
-    "id": "image-probav",
-    "title": "Collection Identifer for input image-probav",
-    "abstract": "Collection Identifer for input image-probav",
+    "id": "image-probav_collection",
+    "title": "Collection of the data.",
+    "abstract": "Collection of the data.",
     "formats": [
       {
         "mimeType": "text/plain",
         "default": true
       }
     ],
-    "minOccurs": 1,
+    "minOccurs": "1",
     "maxOccurs": "unbounded",
     "LiteralDataDomain": {
-      "dataType": "String",
-      "allowedValues": [
-        "probav-collection-1",
-        "probav-collection-2"
-      ]
+      "dataType": {
+        "name": "String"
+      }
     },
     "additionalParameters": [
       {
@@ -161,18 +177,14 @@
         "parameters": [
           {
             "name": "CatalogSearchField",
-            "value": "parentIdentifier"
+            "values": [
+              "parentIdentifier"
+            ]
           }
         ]
       }
     ],
-    "owsContext": {
-      "offering": {
-        "code": "anyCode",
-        "content": {
-          "href": "anyRef"
-        }
-      }
-    }
+    "type": "literal",
+    "data_type": "string"
   }
 ]

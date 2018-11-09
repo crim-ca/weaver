@@ -19,18 +19,16 @@ from pywps.inout.basic import BasicIO
 from pywps.response.status import WPS_STATUS, _WPS_STATUS
 from pywps.inout.literaltypes import AnyValue, AllowedValue, ALLOWEDVALUETYPE
 from pywps.validator.mode import MODE
-from pywps.validator.literalvalidator import validate_anyvalue, validate_allowed_values
 from pywps.app.Common import Metadata
 from twitcher.processes import opensearch
 
 from twitcher import namesgenerator
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS
+from twitcher.processes.constants import WPS_INPUT, WPS_OUTPUT, WPS_COMPLEX, WPS_BOUNDINGBOX, WPS_LITERAL
 from twitcher.processes.wps_process import WpsProcess
-from twitcher.processes.wps_process import OPENSEARCH_LOCAL_FILE_SCHEME
 from twitcher.processes.wps_workflow import default_make_tool
 from twitcher.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from twitcher.processes.sources import retrieve_data_source_url, get_data_source_from_url
-from twitcher.utils import parse_request_query, get_any_id
 from twitcher.exceptions import PackageTypeError, PackageRegistrationError, PackageExecutionError, \
     PackageNotFound, PayloadNotFound
 from twitcher.wps_restapi.swagger_definitions import process_uri
@@ -43,7 +41,6 @@ from yaml.scanner import ScannerError
 import yaml
 import json
 import tempfile
-import mimetypes
 import shutil
 import requests
 
@@ -94,14 +91,6 @@ WPS_FIELD_MAPPING = {
     'additional_parameters': ['AdditionalParameters', 'additionalParameters', 'additionalparameters',
                               'Additional_Parameters'],
 }
-
-WPS_INPUT = 'input'
-WPS_OUTPUT = 'output'
-WPS_COMPLEX = 'complex'
-WPS_BOUNDINGBOX = 'bbox'
-WPS_LITERAL = 'literal'
-
-EOIMAGE = "eoimage"
 
 
 class NullType():
@@ -513,9 +502,19 @@ def _json2wps_io(io_info, io_select):
         else:
             io_info['allowed_values'] = AnyValue
 
+    # rename some inputs
+    io_info["supported_formats"] = io_info.pop("formats")
+    default_wps_min_max_occurs = 1
+    io_info["min_occurs"] = io_info.pop("minOccurs", default_wps_min_max_occurs)
+    io_info["max_occurs"] = io_info.pop("maxOccurs", default_wps_min_max_occurs)
+
     # convert supported format objects
     formats = _get_field(io_info, 'supported_formats', search_variations=True, pop_found=True)
     if formats is not null:
+        for format in formats:
+            format["mime_type"] = format.pop("mimeType")
+            format.pop("maximumMegabytes", None)
+            format.pop("default", None)
         io_info['supported_formats'] = [_json2wps_type(fmt, 'supported_formats') for fmt in formats]
 
     # convert metadata objects
@@ -540,8 +539,12 @@ def _json2wps_io(io_info, io_select):
                 io_info['max_occurs'] = PACKAGE_ARRAY_MAX_SIZE
             return ComplexInput(**io_info)
         if io_type == WPS_BOUNDINGBOX:
+            io_info.pop('supported_formats', None)
+            io_info.pop('supportedCRS', None)
             return BoundingBoxInput(**io_info)
         if io_type == WPS_LITERAL:
+            io_info.pop('supported_formats', None)
+            io_info.pop('literalDataDomains', None)
             return LiteralInput(**io_info)
     elif io_select == WPS_OUTPUT:
         # extra params to remove for outputs
@@ -648,14 +651,12 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
     return updated_io_list
 
 
-def _merge_package_inputs_outputs(wps_inputs_list, cwl_inputs_list, wps_outputs_list, cwl_outputs_list, as_json=False):
+def _merge_package_inputs_outputs(wps_inputs_list, cwl_inputs_list, wps_outputs_list, cwl_outputs_list):
     """Merges I/O definitions to use for process creation and returned by GetCapabilities, DescribeProcess
     using the WPS specifications (from request POST) and CWL specifications (extracted from file)."""
     wps_inputs = _merge_package_io(wps_inputs_list, cwl_inputs_list, WPS_INPUT)
     wps_outputs = _merge_package_io(wps_outputs_list, cwl_outputs_list, WPS_OUTPUT)
-    if as_json:
-        return [_wps2json_io(i) for i in wps_inputs], [_wps2json_io(o) for o in wps_outputs]
-    return wps_inputs, wps_outputs
+    return [_wps2json_io(i) for i in wps_inputs], [_wps2json_io(o) for o in wps_outputs]
 
 
 def _get_package_io(package, io_select, as_json):
@@ -763,7 +764,7 @@ def get_process_from_wps_request(process_offering, reference=None, package=None,
 
     package_inputs, package_outputs = try_or_raise_package_error(
         lambda: _merge_package_inputs_outputs(process_inputs, package_inputs,
-                                              process_outputs, package_outputs, as_json=True),
+                                              process_outputs, package_outputs),
         reason="Merging of inputs/outputs")
 
     process_offering.update({
@@ -802,7 +803,7 @@ class Package(Process):
         inputs = kw.pop('inputs', [])
 
         # handle EOImage inputs
-        inputs = opensearch.replace_inputs_eoimage_files_to_query(inputs=inputs, payload=self.payload, wps_inputs=True)
+        inputs = opensearch.replace_inputs_describe_process(inputs=inputs, payload=self.payload)
 
         inputs = [_json2wps_io(i, WPS_INPUT) for i in inputs]
         outputs = [_json2wps_io(o, WPS_OUTPUT) for o in kw.pop('outputs', list())]
@@ -914,6 +915,7 @@ class Package(Process):
                 raise self.exception_message(PackageExecutionError, exc, "Failed retrieving package input types.")
             try:
                 # identify EOimages from payload
+                request.inputs = opensearch.get_original_collection_id(self.payload, request.inputs)
                 eoimage_data_sources = opensearch.get_eo_images_data_sources(self.payload, request.inputs)
                 if eoimage_data_sources:
                     request.inputs = opensearch.query_eo_images_from_wps_inputs(request.inputs, eoimage_data_sources)

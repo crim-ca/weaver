@@ -11,7 +11,7 @@ from time import sleep
 from twitcher.wps import load_pywps_cfg
 from twitcher.adapter import servicestore_factory, jobstore_factory, processstore_factory
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS
-from twitcher.datatype import Process as ProcessDB, Job as JobDB
+from twitcher.datatype import Process as ProcessDB, Job as JobDB, Input, Output
 from twitcher.exceptions import (
     ProcessNotFound,
     PackageRegistrationError,
@@ -525,27 +525,41 @@ def add_local_process(request):
     else:
         raise HTTPBadRequest("Missing one of required parameters [owsContext, deploymentProfileName being a workflow].")
 
+    settings = request.registry.settings
+    twitcher_url = get_twitcher_url(settings)
+
     # obtain updated process information using WPS process offering and CWL package definition
     try:
-        data_source = get_twitcher_url(request.registry.settings)
-        if "inputs" in process_info:
-            convert = opensearch.EOImageDescribeProcessHandler.convert_to_wps_input
-            process_info["inputs"] = [convert(i) for i in process_info["inputs"]]
-        process_info = wps_package.get_process_from_wps_request(process_info, reference, package, data_source)
+        process_info = wps_package.get_process_from_wps_request(process_info, reference, package, twitcher_url)
     except (PackageRegistrationError, PackageTypeError) as ex:
         raise HTTPUnprocessableEntity(detail=ex.message)
     except Exception as ex:
         raise HTTPBadRequest("Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex)))
 
+    # convert inputs and outputs to be compliant with schema
+    process_info['inputs'] = [Input.from_wps_names(i) for i in process_info['inputs']]
+    process_info['outputs'] = [Output.from_wps_names(i) for i in process_info['outputs']]
+
     # validate process type against twitcher configuration
     process_type = process_info['type']
     if process_type == PROCESS_WORKFLOW:
-        twitcher_config = get_twitcher_configuration(request.registry.settings)
+        twitcher_config = get_twitcher_configuration(settings)
         if twitcher_config != TWITCHER_CONFIGURATION_EMS:
             raise HTTPBadRequest("Invalid `{0}` package deployment on `{1}`.".format(process_type, twitcher_config))
 
-    # ensure that required 'executeEndpoint' in db is added, will be auto-fixed to localhost if not specified in body
-    process_info.update({'executeEndpoint': process_info.get('executeEndpoint'), 'payload': payload})
+    restapi_url = wps_restapi_base_url(settings)
+    description_url = "/".join([restapi_url, 'processes', process_info['identifier']])
+    execute_endpoint = "/".join([description_url, "jobs"])
+
+    # ensure that required 'executeWPSEndpoint' in db is added, will be auto-fixed to localhost if not specified in body
+    process_info['executeWPSEndpoint'] = process_description.get('executeWPSEndpoint')
+    process_info['executeEndpoint'] = execute_endpoint
+    process_info['payload'] = payload
+    process_info['jobControlOptions'] = process_description.get('jobControlOptions', [])
+    process_info['outputTransmission'] = process_description.get('outputTransmission', [])
+    process_info['owsContext'] = ows_context
+    process_info['processDescriptionURL'] = description_url
+
     try:
         store = processstore_factory(request.registry)
         saved_process = store.save_process(ProcessDB(process_info), overwrite=False, request=request)
@@ -568,16 +582,17 @@ def get_local_process(request):
     try:
         store = processstore_factory(request.registry)
         process = store.fetch_by_id(process_id, request=request)
-        process_json = process.json()
+        offering = process.process_offering()
 
         try:
-            process_json["inputs"] = opensearch.replace_inputs_eoimage_files_to_query(process_json["inputs"],
-                                                                                      process["payload"],
-                                                                                      wps_inputs=True)
-        # Process may not have a payload... in this case no eoimage inputs anyway
+            inputs, payload = process.inputs, process["payload"]
+            new_inputs = opensearch.replace_inputs_describe_process(inputs, payload)
+            new_inputs = [Input(i).inputType() for i in new_inputs]
+            offering["process"]["inputs"] = new_inputs
         except KeyError:
+            # Process may not have a payload... in this case no eoimage inputs anyway
             pass
-        return HTTPOk(json={'process': process_json})
+        return HTTPOk(json=offering)
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except ProcessNotFound:
@@ -709,7 +724,7 @@ def submit_local_job(request):
     try:
         store = processstore_factory(request.registry)
         process = store.fetch_by_id(process_id, request=request)
-        resp = submit_job_handler(request, process.executeEndpoint, is_workflow=process.type == 'workflow')
+        resp = submit_job_handler(request, process.executeWPSEndpoint, is_workflow=process.type == 'workflow')
         return resp
     except HTTPException:
         raise  # re-throw already handled HTTPException

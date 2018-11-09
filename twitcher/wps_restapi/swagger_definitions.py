@@ -235,7 +235,7 @@ class LiteralDataDomainObject(MappingSchema):
 
 
 class BaseInputTypeBody(MappingSchema):
-    identifier = SchemaNode(String())
+    id = SchemaNode(String())
     title = SchemaNode(String(), missing=drop)
     abstract = SchemaNode(String(), missing=drop)
     keywords = KeywordList(missing=drop)
@@ -247,7 +247,7 @@ class BaseInputTypeBody(MappingSchema):
 
 
 class BaseOutputTypeBody(MappingSchema):
-    identifier = SchemaNode(String())
+    id = SchemaNode(String())
     title = SchemaNode(String(), missing=drop)
     abstract = SchemaNode(String(), missing=drop)
     keywords = KeywordList(missing=drop)
@@ -494,12 +494,15 @@ class ProviderCapabilitiesSchema(MappingSchema):
 
 class ProcessSummarySchema(MappingSchema):
     """WPS process definition."""
-    identifier = SchemaNode(String())
+    id = SchemaNode(String())
     title = SchemaNode(String())
     abstract = SchemaNode(String())
     keywords = KeywordList(missing=drop)
     metadata = MetadataList(missing=drop)
-    executeEndpoint = SchemaNode(String(), missing=drop)    # URL
+    version = SchemaNode(String())
+    jobControlOptions = JobControlOptionsEnum
+    processDescriptionURL = SchemaNode(String(), format='url', missing=drop, title='processDescriptionURL')
+    outputTransmission = OutputTransmissionEnum
 
 
 class ProcessListSchema(SequenceSchema):
@@ -515,16 +518,13 @@ class ProviderProcessListSchema(SequenceSchema):
 
 
 class ProcessDetailSchema(MappingSchema):
-    identifier = SchemaNode(String())
+    id = SchemaNode(String())
     title = SchemaNode(String(), missing=drop)
     abstract = SchemaNode(String(), missing=drop)
     keywords = KeywordList(missing=drop)
     metadata = MetadataList(missing=drop)
     inputs = InputTypeList(missing=drop)
     outputs = OutputTypeList(missing=drop)
-    version = SchemaNode(String(), missing=drop)
-    jobControlOptions = JobControlOptionsEnum
-    outputTransmission = OutputTransmissionEnum
     executeEndpoint = SchemaNode(String(), format='url', missing=drop, title='executeEndpoint')
     additionalParameters = AdditionalParameters(missing=drop, title='additionalParameters')
     owsContext = OWSContext(missing=drop, title='owsContext')
@@ -1040,6 +1040,9 @@ class OkPostProcessesSchema(MappingSchema):
 
 class OkGetProcessBodySchema(MappingSchema):
     process = ProcessDetailSchema()
+    processVersion = SchemaNode(String())
+    jobControlOptions = JobControlOptionsEnum
+    outputTransmission = OutputTransmissionEnum
 
 
 class OkGetProcessSchema(MappingSchema):

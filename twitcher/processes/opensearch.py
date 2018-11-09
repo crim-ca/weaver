@@ -2,20 +2,21 @@ import time
 from collections import deque
 from copy import deepcopy
 from itertools import ifilterfalse
-
-from twitcher.processes.sources import fetch_data_sources
-from twitcher.utils import get_any_id, get_any_value
-from pyramid.settings import asbool
+from typing import Iterable, Dict, Tuple, List, Deque
+import logging
 
 import lxml.etree
 import requests
 import urlparse
 import shapely.wkt
 
-from typing import Iterable, Dict, Tuple, List, Deque
-import logging
-
+from twitcher.processes.sources import fetch_data_sources
+from twitcher.processes.constants import WPS_LITERAL
+from twitcher.utils import get_any_id
+from pyramid.settings import asbool
 from twitcher.processes.wps_process import OPENSEARCH_LOCAL_FILE_SCHEME
+from twitcher.processes.constants import START_DATE, END_DATE, AOI, COLLECTION
+
 
 LOGGER = logging.getLogger("PACKAGE")
 
@@ -58,7 +59,9 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
             except KeyError:
                 pass
         else:
-            raise ValueError("Missing input identifier: {}".format(" or ".join(aoi_ids)))
+            raise ValueError(
+                "Missing input identifier: {}".format(" or ".join(aoi_ids))
+            )
 
     eoimages_inputs = [
         input_id for input_id in wps_inputs if input_id in eoimage_source_info
@@ -67,9 +70,12 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
         for input_id, queue in wps_inputs.items():
             eoimages_queue = deque()
             if input_id in eoimage_source_info:
-                aoi_ids = _make_specific_identifier("aoi", input_id), "aoi"
-                startdate_ids = _make_specific_identifier("startDate", input_id), "startDate"
-                enddate_ids = _make_specific_identifier("endDate", input_id), "endDate"
+                aoi_ids = _make_specific_identifier(AOI, input_id), AOI
+                startdate_ids = (
+                    _make_specific_identifier(START_DATE, input_id),
+                    START_DATE,
+                )
+                enddate_ids = _make_specific_identifier(END_DATE, input_id), END_DATE
 
                 wkt = pop_first_data(aoi_ids)
                 startdate = pop_first_data(startdate_ids)
@@ -77,11 +83,7 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
 
                 bbox_str = load_wkt(wkt)
 
-                params = {
-                    "startDate": startdate,
-                    "endDate": enddate,
-                    "bbox": bbox_str,
-                }
+                params = {"startDate": startdate, "endDate": enddate, "bbox": bbox_str}
                 osdd_url = eoimage_source_info[input_id]["osdd_url"]
                 accept_schemes = eoimage_source_info[input_id]["accept_schemes"]
                 os = OpenSearchQuery(
@@ -308,36 +310,41 @@ class EOImageDescribeProcessHandler(object):
             u"title": u"Area of Interest",
             u"abstract": u"Area of Interest (Bounding Box)",
             u"formats": [{u"mimeType": u"OGC-WKT", u"default": True}],
-            u"minOccurs": 1,
-            u"maxOccurs": 1,
-        }
-        return data
-
-    @staticmethod
-    def make_collection(image_format, allowed_values):
-        description = u"Collection Identifer for input {}".format(image_format)
-        data = {
-            u"id": u"{}".format(image_format),
-            u"title": description,
-            u"abstract": description,
-            u"formats": [{u"mimeType": u"text/plain", u"default": True}],
-            u"minOccurs": 1,
-            u"maxOccurs": u"unbounded",
-            u"LiteralDataDomain": {
-                u"dataType": u"String",
-                u"allowedValues": allowed_values,
-            },
+            u"minOccurs": u"1",
+            u"maxOccurs": u"1",
             u"additionalParameters": [
                 {
                     u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
                     u"parameters": [
-                        {u"name": u"CatalogSearchField", u"value": u"parentIdentifier"}
+                        {u"name": u"CatalogSearchField", u"values": [u"bbox"]}
                     ],
                 }
             ],
-            u"owsContext": {
-                u"offering": {u"code": u"anyCode", u"content": {u"href": u"anyRef"}}
-            },
+        }
+        return data
+
+    @staticmethod
+    def make_collection(identifier, allowed_values):
+        description = u"Collection of the data."
+        data = {
+            u"id": u"{}".format(identifier),
+            u"title": description,
+            u"abstract": description,
+            u"formats": [{u"mimeType": u"text/plain", u"default": True}],
+            u"minOccurs": u"1",
+            u"maxOccurs": u"unbounded",
+            u"literalDataDomains": {u"dataType": {u"name": u"String"}},
+            u"additionalParameters": [
+                {
+                    u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
+                    u"parameters": [
+                        {
+                            u"name": u"CatalogSearchField",
+                            u"values": [u"parentIdentifier"],
+                        }
+                    ],
+                }
+            ],
         }
         return data
 
@@ -349,34 +356,33 @@ class EOImageDescribeProcessHandler(object):
         :param start_date:  (Default value = True)
 
         """
-        date = u"startDate" if start_date else u"endDate"
+        date = START_DATE if start_date else END_DATE
+        search_field = "{}{}".format(date[0].lower(), date[1:])
         data = {
             u"id": id_,
             u"title": u"Time of Interest",
             u"abstract": u"Time of Interest (defined as Start date - End date)",
             u"formats": [{u"mimeType": u"text/plain", u"default": True}],
-            u"minOccurs": 1,
-            u"maxOccurs": 1,
-            u"LiteralDataDomain": {u"dataType": u"String"},
+            u"minOccurs": u"1",
+            u"maxOccurs": u"1",
+            u"literalDataDomains": {u"dataType": {u"name": u"String"}},
             u"additionalParameters": [
                 {
                     u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
-                    u"parameters": [{u"name": u"CatalogSearchField", u"value": date}],
+                    u"parameters": [
+                        {u"name": u"CatalogSearchField", u"values": [search_field]}
+                    ],
                 }
             ],
-            u"owsContext": {
-                u"offering": {u"code": u"anyCode", u"content": {u"href": u"anyRef"}}
-            },
         }
         return data
 
-    def to_opensearch(self, unique_aoi, unique_toi, to_wps_inputs=False):
-        # type: (bool, bool, bool) -> List[Dict]
+    def to_opensearch(self, unique_aoi, unique_toi):
+        # type: (bool, bool) -> List[Dict]
         """
 
         :param unique_aoi:
         :param unique_toi:
-        :param to_wps_inputs:  (Default value = False)
 
         """
         if not self.eoimage_inputs:
@@ -392,55 +398,39 @@ class EOImageDescribeProcessHandler(object):
         collections = []
 
         if unique_toi:
-            toi.append(self.make_toi(u"startDate", start_date=True))
-            toi.append(self.make_toi(u"endDate", start_date=False))
+            toi.append(self.make_toi(START_DATE, start_date=True))
+            toi.append(self.make_toi(END_DATE, start_date=False))
         else:
             for name in eoimage_names:
-                toi.append(self.make_toi(_make_specific_identifier(u"startDate", name), start_date=True))
-                toi.append(self.make_toi(_make_specific_identifier(u"endDate", name), start_date=False))
+                toi.append(
+                    self.make_toi(
+                        _make_specific_identifier(START_DATE, name), start_date=True
+                    )
+                )
+                toi.append(
+                    self.make_toi(
+                        _make_specific_identifier(END_DATE, name), start_date=False
+                    )
+                )
 
         if unique_aoi:
-            aoi.append(self.make_aoi(u"aoi"))
+            aoi.append(self.make_aoi(AOI))
         else:
             for name in eoimage_names:
-                aoi.append(self.make_aoi(_make_specific_identifier(u"aoi", name)))
+                aoi.append(self.make_aoi(_make_specific_identifier(AOI, name)))
 
+        eoimage_names = modified_collection_identifiers(eoimage_names)
         for name, allowed_col in zip(eoimage_names, allowed_collections):
             collections.append(self.make_collection(name, allowed_col))
 
         new_inputs = toi + aoi + collections
-        if to_wps_inputs:
-            new_inputs = [self.convert_to_wps_input(i) for i in new_inputs]
+
+        # inputs must have the WPS input type
+        for i in new_inputs:
+            i["type"] = WPS_LITERAL
+            i["data_type"] = "string"
+
         return new_inputs + self.other_inputs
-
-    @staticmethod
-    def convert_to_wps_input(input_):
-        """
-
-        :param input_:
-
-        """
-        replace = {
-            u"id": u"identifier",
-            u"minOccurs": u"min_occurs",
-            u"maxOccurs": u"max_occurs",
-        }
-        remove = [
-            u"formats",
-            u"LiteralDataDomain",
-            u"additionalParameters",
-            u"owsContext",
-        ]
-        add = {u"type": u"literal", u"data_type": u"string"}
-        for k, v in replace.items():
-            if k in input_:
-                input_[v] = input_.pop(k)
-        for r in remove:
-            input_.pop(r, None)
-        for k, v in add.items():
-            input_[k] = v
-
-        return input_
 
 
 def get_eo_images_inputs_from_payload(payload):
@@ -451,6 +441,29 @@ def get_eo_images_inputs_from_payload(payload):
     """
     inputs = payload["processDescription"]["process"].get("inputs", {})
     return list(filter(EOImageDescribeProcessHandler.is_eoimage_input, inputs))
+
+
+def get_original_collection_id(payload, wps_inputs):
+    # type: (Dict[deque]) -> Dict[deque]
+    """
+    When we deploy a Process that contains OpenSearch parameters, the collection identifier if modified.
+    This function changes the id in the execute request to the one in the deploy description.
+    :param payload:
+    :param wps_inputs:
+    :return:
+    """
+    new_inputs = deepcopy(wps_inputs)
+    inputs = get_eo_images_inputs_from_payload(payload)
+    original_ids = [get_any_id(i) for i in inputs]
+
+    correspondance = dict(
+        zip(modified_collection_identifiers(original_ids), original_ids)
+    )
+    for execute_id, deploy_id in correspondance.items():
+        if execute_id not in new_inputs:
+            raise ValueError("Missing required input parameter: {}".format(execute_id))
+        new_inputs[deploy_id] = new_inputs.pop(execute_id)
+    return new_inputs
 
 
 def get_eo_images_data_sources(payload, wps_inputs):
@@ -464,6 +477,15 @@ def get_eo_images_data_sources(payload, wps_inputs):
     inputs = get_eo_images_inputs_from_payload(payload)
     eo_image_identifiers = [get_any_id(i) for i in inputs]
     return {i: get_data_source(wps_inputs[i][0].data) for i in eo_image_identifiers}
+
+
+def modified_collection_identifiers(eo_image_identifiers):
+    unique_eoimage = len(eo_image_identifiers) == 1
+    new_identifiers = []
+    for identifier in eo_image_identifiers:
+        new = COLLECTION if unique_eoimage else identifier + "_" + COLLECTION
+        new_identifiers.append(new)
+    return new_identifiers
 
 
 def get_data_source(collection_id):
@@ -496,15 +518,14 @@ def get_eo_images_ids_from_payload(payload):
     return [get_any_id(i) for i in get_eo_images_inputs_from_payload(payload)]
 
 
-def replace_inputs_eoimage_files_to_query(inputs, payload, wps_inputs=False):
-    # type: (List[Dict], Dict, bool) -> List[Dict]
+def replace_inputs_describe_process(inputs, payload):
+    # type: (List[Dict], Dict) -> List[Dict]
     """
     Replace EOImage inputs (additionalParameter -> EOImage -> true) with
     OpenSearch query parameters
 
     :param inputs:
     :param payload:
-    :param wps_inputs:
     """
 
     # add "additionalParameters" property from the payload
@@ -529,7 +550,7 @@ def replace_inputs_eoimage_files_to_query(inputs, payload, wps_inputs=False):
         unique_aoi = ["UNIQUEAOI", "TRUE"] in additional_parameters_upper
     handler = EOImageDescribeProcessHandler(inputs=inputs)
     inputs_converted = handler.to_opensearch(
-        unique_aoi=unique_aoi, unique_toi=unique_toi, to_wps_inputs=wps_inputs
+        unique_aoi=unique_aoi, unique_toi=unique_toi
     )
     return inputs_converted
 
