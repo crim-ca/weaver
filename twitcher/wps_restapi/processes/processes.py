@@ -585,7 +585,7 @@ def get_local_process(request):
         offering = process.process_offering()
 
         try:
-            inputs, payload = offering["process"]["inputs"], process["payload"]
+            inputs, payload = process.inputs, process["payload"]
             new_inputs = opensearch.replace_inputs_describe_process(inputs, payload)
             new_inputs = [Input(i).inputType() for i in new_inputs]
             offering["process"]["inputs"] = new_inputs
