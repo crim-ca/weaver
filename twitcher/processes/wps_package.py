@@ -540,9 +540,11 @@ def _json2wps_io(io_info, io_select):
             return ComplexInput(**io_info)
         if io_type == WPS_BOUNDINGBOX:
             io_info.pop('supported_formats', None)
+            io_info.pop('supportedCRS', None)
             return BoundingBoxInput(**io_info)
         if io_type == WPS_LITERAL:
             io_info.pop('supported_formats', None)
+            io_info.pop('literalDataDomains', None)
             return LiteralInput(**io_info)
     elif io_select == WPS_OUTPUT:
         # extra params to remove for outputs
