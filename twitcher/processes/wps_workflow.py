@@ -15,7 +15,8 @@ from six.moves import urllib
 
 from cwltool.process import stageFiles
 from cwltool import command_line_tool
-from cwltool.command_line_tool import OutputPorts, CreateProvProfile
+from cwltool.command_line_tool import OutputPorts
+from cwltool.provenance import CreateProvProfile
 from cwltool.builder import (CONTENT_LIMIT, Builder, substitute)
 from cwltool.errors import WorkflowException
 from cwltool.job import JobBase, relink_initialworkdir
