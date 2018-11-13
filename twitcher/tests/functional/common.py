@@ -2,7 +2,7 @@ from pyramid import testing
 
 from twitcher.tokengenerator import tokengenerator_factory
 from twitcher.store import tokenstore_factory
-from twitcher.adapter import servicestore_factory
+from twitcher.adapter import servicestore_factory, jobstore_factory
 
 
 def setup_with_mongodb():
@@ -23,3 +23,10 @@ def setup_mongodb_tokenstore(config):
 def setup_mongodb_servicestore(config):
     store = servicestore_factory(config.registry)
     store.clear_services()
+    return store
+
+
+def setup_mongodb_jobstore(config):
+    store = jobstore_factory(config.registry)
+    store.clear_jobs()
+    return store

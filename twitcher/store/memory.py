@@ -235,55 +235,71 @@ class MemoryProcessStore(ProcessStore):
 
 
 from twitcher.store.base import JobStore
+from twitcher.exceptions import JobNotFound
 
 
 class MemoryJobStore(JobStore):
     """
     Stores job tracking in memory. Useful for testing purposes.
     """
+    def __init__(self):
+        self.store = {}
+
     def save_job(self, task_id, process, service=None, is_workflow=False, user_id=None, async=True, custom_tags=None):
         """
         Stores a job in memory.
         """
-        raise NotImplementedError
+        job = {
+            'task_id': task_id,
+            'process': process,
+            'service': service,
+            'is_workflow': is_workflow,
+            'user_id': user_id,
+            'async': async,
+            'custom_tags': custom_tags,
+        }
+        self.store[task_id] = job
 
     def update_job(self, job):
         """
         Updates a job parameters in mongodb storage.
         :param job: instance of ``twitcher.datatype.Job``.
         """
-        raise NotImplementedError
+        self.store[job.task_id] = job
 
     def delete_job(self, job_id, request=None):
         """
         Removes job from memory.
         """
-        raise NotImplementedError
+        del self.store[job_id]
 
     def fetch_by_id(self, job_id, request=None):
         """
         Gets job for given ``job_id`` from memory.
         """
-        raise NotImplementedError
+        job = self.store.get(job_id)
+        if job is None:
+            raise JobNotFound
+        return job
 
     def list_jobs(self, request=None):
         """
         Lists all jobs in memory.
         """
-        raise NotImplementedError
+        return self.store
 
     def find_jobs(self, request, page=0, limit=10, process=None, service=None,
                   tags=None, access=None, status=None, sort=None):
         """
         Finds all jobs in memory matching search filters.
         """
-        raise NotImplementedError
+        return {}, 0
 
     def clear_jobs(self, request=None):
         """
         Removes all jobs from memory.
         """
-        raise NotImplementedError
+        self.__init__()
 
 
 class MemoryQuoteStore(object):

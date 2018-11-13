@@ -6,6 +6,7 @@ import six
 import uuid
 from dateutil.parser import parse as dtparse
 from datetime import datetime, timedelta
+# noinspection PyProtectedMember
 from logging import _levelNames, ERROR, INFO
 
 from twitcher.datatype_schemas import DataDescriptionType, DescriptionType
@@ -89,6 +90,7 @@ class Job(dict):
             msg = self.status_message
         return get_job_log_msg(duration=self.duration, progress=self.progress, status=self.status, msg=msg)
 
+    # noinspection PyUnusedLocal
     def save_log(self, errors=None, logger=None, module=None):
         if isinstance(errors, six.string_types):
             log_msg = [(ERROR, self._get_log_msg())]

@@ -2,6 +2,10 @@ __version__ = 'ogc-0.3.20'
 
 import os
 import sys
+from twitcher import adapter
+from pyramid.exceptions import ConfigurationError
+import logging
+
 TWITCHER_MODULE_DIR = os.path.abspath(os.path.dirname(__file__))
 TWITCHER_ROOT_DIR = os.path.abspath(os.path.dirname(TWITCHER_MODULE_DIR))
 sys.path.insert(0, TWITCHER_ROOT_DIR)
@@ -57,8 +61,9 @@ def main(global_config, **settings):
     config = adapter_factory(settings).configurator_factory(settings)
 
     # celery
-    config.include('pyramid_celery')
-    config.configure_celery(global_config['__file__'])
+    if global_config.get('__file__') is not None:
+        config.include('pyramid_celery')
+        config.configure_celery(global_config['__file__'])
 
     # mako used by swagger-ui
     config.include('pyramid_mako')

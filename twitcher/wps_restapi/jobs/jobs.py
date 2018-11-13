@@ -1,10 +1,11 @@
 from pyramid.httpexceptions import *
+from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
 from twitcher.adapter import jobstore_factory
 from twitcher.exceptions import JobNotFound
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import wps_restapi_base_url
-from twitcher import sort, status
+from twitcher import status, sort
 from owslib.wps import WPSExecution
 from lxml import etree
 from celery.utils.log import get_task_logger
@@ -22,6 +23,26 @@ def job_url(request, job):
         base_job_url=base_job_url,
         process_id=job.process,
         job_id=job.task_id)
+
+
+def job_format_json(request, job):
+    job_json = {
+        "id": job.task_id,
+        "status": job.status,
+        "message": job.status_message,
+        "progress": job.progress
+    }
+    # back compatibility: check also finished jobs that should have succeeded status
+    job_finished = list(status.status_categories[status.STATUS_FINISHED]) + list([status.STATUS_FINISHED])
+    if job.status in job_finished:
+        if job.status in [status.STATUS_SUCCEEDED, status.STATUS_FINISHED]:
+            resource = 'results'
+        else:
+            resource = 'exceptions'
+
+        job_json[resource] = '{job_url}/{resource}'.format(job_url=job_url(request, job), resource=resource.lower())
+    job_json['logs'] = '{job_url}/logs'.format(job_url=job_url(request, job))
+    return job_json
 
 
 def check_status(url=None, response=None, sleep_secs=2, verify=False):
@@ -48,6 +69,7 @@ def check_status(url=None, response=None, sleep_secs=2, verify=False):
     if execution.response is None:
         raise Exception("check_status failed!")
     # TODO: workaround for owslib type change of response
+    # noinspection PyProtectedMember
     if not isinstance(execution.response, etree._Element):
         execution.response = etree.fromstring(execution.response)
     return execution
@@ -86,6 +108,7 @@ def get_jobs(request):
     Retrieve the list of jobs which can be filtered/sorted using queries.
     """
 
+    detail = asbool(request.params.get('detail', False))
     page = int(request.params.get('page', '0'))
     limit = int(request.params.get('limit', '10'))
     filters = {
@@ -105,7 +128,7 @@ def get_jobs(request):
         'count': count,
         'page': page,
         'limit': limit,
-        'jobs': [job.task_id for job in items]
+        'jobs': [job_format_json(request, job) if detail else job.task_id for job in items]
     })
 
 

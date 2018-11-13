@@ -1,3 +1,4 @@
+dateutil
 pyramid>=1.7.3
 pyramid_rpc
 pyramid_celery
