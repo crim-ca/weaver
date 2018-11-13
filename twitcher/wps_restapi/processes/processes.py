@@ -565,6 +565,9 @@ def add_local_process(request):
         saved_process = store.save_process(ProcessDB(process_info), overwrite=False, request=request)
     except ProcessRegistrationError as ex:
         raise HTTPConflict(detail=ex.message)
+    except ValueError as ex:
+        # raised on invalid process name
+        raise HTTPBadRequest(detail=ex.message)
 
     return HTTPOk(json={'deploymentDone': True, 'processSummary': saved_process.summary()})
 

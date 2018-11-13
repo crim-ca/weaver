@@ -52,6 +52,7 @@ class MemoryServiceStore(ServiceStore):
     def __init__(self):
         self.url_index = {}
         self.name_index = {}
+        self.sane_name_config = {'assert_invalid': False, 'replace_invalid': True}
 
     def _delete(self, url=None, name=None):
         if url:
@@ -80,7 +81,7 @@ class MemoryServiceStore(ServiceStore):
             else:
                 raise ServiceRegistrationError("service url already registered.")
 
-        name = namesgenerator.get_sane_name(service.name)
+        name = namesgenerator.get_sane_name(service.name, **self.sane_name_config)
         if not name:
             name = namesgenerator.get_random_name()
             if name in self.name_index:
@@ -152,6 +153,7 @@ class MemoryProcessStore(ProcessStore):
 
     def __init__(self, init_processes=None):
         self.name_index = {}
+        self.sane_name_config = {'assert_invalid': False, 'replace_invalid': True}
         if isinstance(init_processes, list):
             for process in init_processes:
                 self.save_process(process)
@@ -161,8 +163,10 @@ class MemoryProcessStore(ProcessStore):
         Stores a WPS process in storage.
 
         :param process: An instance of :class:`twitcher.datatype.Process`.
+        :param overwrite: Overwrite the process by name if existing.
+        :param request:
         """
-        sane_name = namesgenerator.get_sane_name(process.identifier)
+        sane_name = namesgenerator.get_sane_name(process.identifier, **self.sane_name_config)
         if not self.name_index.get(sane_name) or overwrite:
             if not process.title:
                 process.title = sane_name
@@ -173,7 +177,7 @@ class MemoryProcessStore(ProcessStore):
         """
         Removes process from database.
         """
-        sane_name = namesgenerator.get_sane_name(process_id)
+        sane_name = namesgenerator.get_sane_name(process_id, **self.sane_name_config)
         if self.name_index.get(sane_name):
             del self.name_index[sane_name]
 
@@ -182,6 +186,7 @@ class MemoryProcessStore(ProcessStore):
         Lists all processes in database, optionally filtered by visibility.
 
         :param visibility: One value amongst `twitcher.visibility`.
+        :param request:
         """
         if visibility is None:
             visibility = list(visibility_values)
@@ -200,7 +205,7 @@ class MemoryProcessStore(ProcessStore):
 
         :return: An instance of :class:`twitcher.datatype.Process`.
         """
-        sane_name = namesgenerator.get_sane_name(process_id)
+        sane_name = namesgenerator.get_sane_name(process_id, **self.sane_name_config)
         process = self.name_index.get(sane_name)
         if not process:
             raise ProcessNotFound("Process `{}` could not be found.".format(sane_name))
@@ -220,6 +225,8 @@ class MemoryProcessStore(ProcessStore):
         Set visibility of a process.
 
         :param visibility: One value amongst `twitcher.visibility`.
+        :param process_id:
+        :param request:
         :raises: TypeError or ValueError in case of invalid parameter.
         """
         process = self.fetch_by_id(process_id)
@@ -234,7 +241,7 @@ class MemoryJobStore(JobStore):
     """
     Stores job tracking in memory. Useful for testing purposes.
     """
-    def save_job(self, task_id, process, service=None, is_workflow=False, user_id=None, async=True, custom_tags=[]):
+    def save_job(self, task_id, process, service=None, is_workflow=False, user_id=None, async=True, custom_tags=None):
         """
         Stores a job in memory.
         """
