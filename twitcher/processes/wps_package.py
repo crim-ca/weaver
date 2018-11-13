@@ -30,14 +30,17 @@ from twitcher.processes.wps_process import WpsProcess
 from twitcher.processes.wps_workflow import default_make_tool
 from twitcher.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from twitcher.processes.sources import retrieve_data_source_url, get_data_source_from_url
-from twitcher.exceptions import PackageTypeError, PackageRegistrationError, PackageExecutionError, \
+from twitcher.exceptions import (
+    PackageTypeError, PackageRegistrationError, PackageExecutionError,
     PackageNotFound, PayloadNotFound
+)
 from twitcher.wps_restapi.swagger_definitions import process_uri
 from twitcher.utils import get_job_log_msg, get_log_fmt, get_log_datefmt
 from pyramid.httpexceptions import HTTPOk
 from pyramid_celery import celery_app as app
 from collections import OrderedDict, Hashable
 from six.moves.urllib.parse import urlparse
+from typing import Dict, Union, Any
 from yaml.scanner import ScannerError
 import yaml
 import json
@@ -94,7 +97,8 @@ WPS_FIELD_MAPPING = {
 }
 
 
-class NullType():
+# noinspection PyClassHasNoInit
+class NullType:
     pass
 
 
@@ -571,6 +575,8 @@ def _wps2json_io(io_wps):
 
 
 def _get_field(io_object, field, search_variations=False, pop_found=False):
+    # type: (Union[BasicIO, Dict[str, Any]], str, bool, bool) -> Any
+    """Gets a field by name from various I/O object types."""
     if isinstance(io_object, dict):
         value = io_object.get(field, null)
         if value is not null:
@@ -590,6 +596,8 @@ def _get_field(io_object, field, search_variations=False, pop_found=False):
 
 
 def _set_field(io_object, field, value):
+    # type: (Union[BasicIO, Dict[str, Any]], str, Any) -> None
+    """Sets a field by name into various I/O object types."""
     if not isinstance(value, NullType):
         if isinstance(io_object, dict):
             io_object[field] = value
@@ -971,7 +979,8 @@ class Package(Process):
                 self.update_status("Generate package outputs done.", PACKAGE_PROGRESS_PREP_OUT)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed to save package outputs.")
-        except:
+        # noinspection PyBroadException
+        except Exception:
             # return log file location by status message since outputs are not obtained by WPS failed process
             error_msg = "Package completed with errors. Server logs: {}".format(self.log_file)
             self.update_status(error_msg, status=WPS_STATUS.FAILED)
@@ -1056,5 +1065,3 @@ class Package(Process):
                           deploy_body=step_payload,
                           cookies=self.request.http_request.cookies,
                           update_status=step_update_status)
-
-
