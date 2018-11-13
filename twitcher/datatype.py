@@ -4,7 +4,8 @@ Definitions of types used by tokens.
 
 import six
 import uuid
-from dateutil.parser import parse as dtparse
+# noinspection PyProtectedMember
+from dateutil.parser import parse as dt_parse
 from datetime import datetime, timedelta
 # noinspection PyProtectedMember
 from logging import _levelNames, ERROR, INFO
@@ -633,13 +634,13 @@ class Quote(dict):
         if 'created' not in self:
             self['created'] = str(datetime.now())
         try:
-            self['created'] = dtparse(self.get('created')).isoformat()
+            self['created'] = dt_parse(self.get('created')).isoformat()
         except ValueError:
             raise ValueError("Field `Quote.created` must be an ISO-8601 datetime string.")
         if 'expire' not in self:
             self['expire'] = str(datetime.now() + timedelta(days=1))
         try:
-            self['expire'] = dtparse(self.get('expire')).isoformat()
+            self['expire'] = dt_parse(self.get('expire')).isoformat()
         except ValueError:
             raise ValueError("Field `Quote.expire` must be an ISO-8601 datetime string.")
         if 'id' not in self:
@@ -777,7 +778,7 @@ class Bill(dict):
         if 'created' not in self:
             self['created'] = str(datetime.now())
         try:
-            self['created'] = dtparse(self.get('created')).isoformat()
+            self['created'] = dt_parse(self.get('created')).isoformat()
         except ValueError:
             raise ValueError("Field `Bill.created` must be an ISO-8601 datetime string.")
         if 'id' not in self:
