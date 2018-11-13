@@ -4,7 +4,7 @@ import webtest
 import pyramid.testing
 import six
 from twitcher.tests.functional.common import setup_with_mongodb, setup_mongodb_jobstore
-from twitcher.status import status_values, STATUS_SUCCEEDED, STATUS_FAILED
+from twitcher.status import job_status_values, STATUS_SUCCEEDED, STATUS_FAILED
 
 
 class WpsRestApiJobsTest(unittest.TestCase):
@@ -44,7 +44,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert 'message' in job and isinstance(job['message'], six.string_types)
         assert 'percentCompleted' in job and isinstance(job['percentCompleted'], int)
         assert 'logs' in job and isinstance(job['logs'], six.string_types)
-        assert job['status'] in status_values
+        assert job['status'] in job_status_values
         if job['status'] == STATUS_SUCCEEDED:
             assert 'result' in job and isinstance(job['result'], six.string_types)
         elif job['status'] == STATUS_FAILED:
