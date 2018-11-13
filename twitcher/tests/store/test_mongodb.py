@@ -1,5 +1,5 @@
 """
-Based on unitests in https://github.com/wndhydrnt/python-oauth2/tree/master/oauth2/test
+Based on unittests in https://github.com/wndhydrnt/python-oauth2/tree/master/oauth2/test
 """
 
 import pytest

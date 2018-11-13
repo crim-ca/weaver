@@ -7,7 +7,7 @@ solution specific to your needs.
 
 The implementation is based on `python-oauth2 <http://python-oauth2.readthedocs.io/en/latest/>`_.
 """
-from requests import Request
+from pyramid.request import Request
 from typing import Text, Optional, List
 from twitcher.datatype import Job, Service, Process, Quote, Bill, AccessToken
 
@@ -15,7 +15,7 @@ from twitcher.datatype import Job, Service, Process, Quote, Bill, AccessToken
 class AccessTokenStore(object):
 
     def save_token(self, access_token):
-        # type: (Text) -> None
+        # type: (AccessToken) -> None
         """
         Stores an access token with additional data.
         """
