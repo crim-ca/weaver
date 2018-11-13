@@ -7,7 +7,7 @@ solution specific to your needs.
 
 The implementation is based on `python-oauth2 <http://python-oauth2.readthedocs.io/en/latest/>`_.
 """
-from pyramid.request import Request
+from requests import Request
 from typing import Text, Optional, List
 from twitcher.datatype import Job, Service, Process, Quote, Bill, AccessToken
 

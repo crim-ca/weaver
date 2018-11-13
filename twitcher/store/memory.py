@@ -258,7 +258,7 @@ class MemoryJobStore(JobStore):
             'is_workflow': is_workflow,
             'user_id': user_id,
             'async': async,
-            'custom_tags': custom_tags,
+            'custom_tags': [] if not custom_tags else custom_tags,
         }
         self.store[task_id] = job
 
