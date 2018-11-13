@@ -87,7 +87,7 @@ class WpsProcess(object):
         if response.status_code == HTTPForbidden.code:
             return None
         elif response.status_code == HTTPOk.status_code:
-            return response.json()['visibility'] == VISIBILITY_PUBLIC
+            return response.json()['value'] == VISIBILITY_PUBLIC
         response.raise_for_status()
 
     def set_visibility(self, visibility):
@@ -96,7 +96,7 @@ class WpsProcess(object):
         auth_headers = deepcopy(self.headers)
         auth_headers.update(self.get_admin_auth_header())
         response = requests.put(self.url + process_visibility_uri,
-                                json={'visibility': visibility},
+                                json={'value': visibility},
                                 headers=auth_headers,
                                 cookies=self.cookies,
                                 verify=self.verify)

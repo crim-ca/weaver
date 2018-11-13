@@ -163,8 +163,7 @@ class WpsWorkflow(Process):
                 with fs_access.open(custom_output, "r") as f:
                     ret = json.load(f)
                 if debug:
-                    LOGGER.debug(u"Raw output from %s: %s", custom_output,
-                                  json_dumps(ret, indent=4))
+                    LOGGER.debug(u"Raw output from %s: %s", custom_output, json_dumps(ret, indent=4))
             else:
                 for i, port in enumerate(ports):
                     def makeWorkflowException(msg):

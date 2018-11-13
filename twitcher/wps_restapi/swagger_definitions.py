@@ -1061,7 +1061,7 @@ class OkGetProcessPayloadSchema(MappingSchema):
 
 
 class ProcessVisibilityResponseBodySchema(MappingSchema):
-    visibility = SchemaNode(String(), validator=OneOf(list(visibility_values)), example=VISIBILITY_PUBLIC)
+    value = SchemaNode(String(), validator=OneOf(list(visibility_values)), example=VISIBILITY_PUBLIC)
 
 
 class OkGetProcessVisibilitySchema(MappingSchema):

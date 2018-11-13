@@ -647,11 +647,10 @@ def get_process_visibility(request):
     process_id = request.matchdict.get('process_id')
     if not isinstance(process_id, string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
-
     try:
         store = processstore_factory(request.registry)
         visibility_value = store.get_visibility(process_id, request=request)
-        return HTTPOk(json={u'visibility': visibility_value})
+        return HTTPOk(json={u'value': visibility_value})
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except ProcessNotFound as ex:
@@ -675,7 +674,7 @@ def set_process_visibility(request):
     try:
         store = processstore_factory(request.registry)
         store.set_visibility(process_id, visibility_value, request=request)
-        return HTTPOk(json={u'visibility': visibility_value})
+        return HTTPOk(json={u'value': visibility_value})
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except TypeError:
