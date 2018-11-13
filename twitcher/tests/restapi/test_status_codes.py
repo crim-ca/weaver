@@ -1,10 +1,19 @@
 from unittest import TestCase
+# noinspection PyPackageRequirements
 from webtest import TestApp
-from twitcher.wps_restapi.swagger_definitions import api_frontpage_uri, api_swagger_ui_uri, api_swagger_json_uri, \
-    api_versions_uri, providers_uri, jobs_short_uri, jobs_full_uri
+from twitcher.wps_restapi.swagger_definitions import (
+    api_frontpage_uri,
+    api_swagger_ui_uri,
+    api_swagger_json_uri,
+    api_versions_uri,
+    providers_uri,
+    jobs_short_uri,
+    jobs_full_uri,
+)
 from six.moves import configparser
 from pyramid import testing
 from twitcher import main
+from twitcher.config import TWITCHER_CONFIGURATION_DEFAULT
 from twitcher.adapter import servicestore_factory
 from twitcher.datatype import Service
 import os
@@ -23,8 +32,8 @@ public_routes = [
     api_versions_uri,
 ]
 forbidden_routes = [
-    jobs_short_uri, # should always be visible
-    jobs_full_uri, # could be 401
+    jobs_short_uri,     # should always be visible
+    jobs_full_uri,      # could be 401
 ]
 not_found_routes = [
     '/jobs/not-found',
@@ -101,7 +110,9 @@ class StatusCodeTestCase(TestCase):
 
     def setUp(self):
         config = testing.setUp()
-        app = main({})
+        config.registry.settings['twitcher.configuration'] = TWITCHER_CONFIGURATION_DEFAULT
+        config.registry.settings['twitcher.url'] = 'https://localhost'
+        app = main({}, **config.registry.settings)
         self.testapp = TestApp(app)
 
     def test_200(self):
