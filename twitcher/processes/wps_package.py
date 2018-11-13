@@ -40,9 +40,9 @@ from pyramid.httpexceptions import HTTPOk
 from pyramid_celery import celery_app as app
 from collections import OrderedDict, Hashable
 from six.moves.urllib.parse import urlparse
-from typing import Dict, Union, Any
+from typing import Dict, Tuple, Union, Any, Optional, Text
+from yaml import safe_load
 from yaml.scanner import ScannerError
-import yaml
 import json
 import tempfile
 import shutil
@@ -233,16 +233,21 @@ def _load_package_file(file_path):
     try:
         if is_url:
             cwl_resp = requests.get(file_path, headers={'Accept': 'text/plain'})
-            return yaml.safe_load(cwl_resp.content)
+            return safe_load(cwl_resp.content)
         with open(file_path, 'r') as f:
-            return yaml.safe_load(f)
+            return safe_load(f)
     except ScannerError as ex:
         raise PackageRegistrationError("Package parsing generated an error: [{!s}]".format(ex))
 
 
-def _load_package_content(package_dict, package_name=PACKAGE_DEFAULT_FILE_NAME,
-                          data_source=None, only_dump_file=False, tmp_dir=None,
-                          loading_context=None, runtime_context=None):
+def _load_package_content(package_dict,                             # type: Dict
+                          package_name=PACKAGE_DEFAULT_FILE_NAME,   # type: Optional[Text]
+                          data_source=None,                         # type: Optional[Text]
+                          only_dump_file=False,                     # type: Optional[bool]
+                          tmp_dir=None,                             # type: Optional[Text]
+                          loading_context=None,                     # type: Optional[LoadingContext]
+                          runtime_context=None,                     # type: Optional[RuntimeContext]
+                          ):  # type: (...) -> Union[Tuple[cwltool.factory.Factory, Text, Dict], None]
     """
     Loads the package content to file in a temporary directory.
     Recursively processes sub-packages steps if the parent is of 'workflow' type (CWL class).
@@ -252,8 +257,8 @@ def _load_package_content(package_dict, package_name=PACKAGE_DEFAULT_FILE_NAME,
     :param data_source: identifier of the data source to map to specific ADES, or map to localhost if ``None``.
     :param only_dump_file: specify if the :class:`cwltool.factory.Factory` should be validated and returned.
     :param tmp_dir: location of the temporary directory to dump files (warning: will be deleted on exit).
-    :param loading_context: LoadingContext - cwltool context use to make the cwl package
-    :param runtime_context: RuntimeContext - cwltool context use to make the cwl package
+    :param loading_context: cwltool context use to make the cwl package
+    :param runtime_context: cwltool context use to make the cwl package
     :return:
         tuple of
         - instance of :class:`cwltool.factory.Factory`
@@ -353,7 +358,11 @@ def _is_cwl_enum_type(io_info):
     return True, io_type, io_allow
 
 
-def _cwl2wps_io(io_info, io_select):
+# noinspection PyUnusedLocal
+def _cwl2wps_io(io_info,    # type: Dict[Text, Any]
+                io_select   # type: Text
+                ):
+    # type:(...) -> Union[LiteralInput, LiteralOutput, BoundingBoxInput, BoundingBoxOutput, ComplexInput, ComplexOutput]
     """Converts input/output parameters from CWL types to WPS types.
     :param io_info: parsed IO of a CWL file
     :param io_select: ``WPS_INPUT`` or ``WPS_OUTPUT`` to specify desired WPS type conversion.
@@ -516,10 +525,10 @@ def _json2wps_io(io_info, io_select):
     # convert supported format objects
     formats = _get_field(io_info, 'supported_formats', search_variations=True, pop_found=True)
     if formats is not null:
-        for format in formats:
-            format["mime_type"] = format.pop("mimeType")
-            format.pop("maximumMegabytes", None)
-            format.pop("default", None)
+        for fmt in formats:
+            fmt["mime_type"] = fmt.pop("mimeType")
+            fmt.pop("maximumMegabytes", None)
+            fmt.pop("default", None)
         io_info['supported_formats'] = [_json2wps_type(fmt, 'supported_formats') for fmt in formats]
 
     # convert metadata objects
@@ -568,6 +577,7 @@ def _wps2json_io(io_wps):
     if not isinstance(io_wps, BasicIO):
         raise PackageTypeError("Invalid type, expected `BasicIO`, got: `[{0!r}] {1!r}`".format(type(io_wps), io_wps))
     # in some cases (Complex I/O), 'as_reference=True' causes 'type' to be overwritten, revert it back
+    # noinspection PyUnresolvedReferences
     wps_json = io_wps.json
     if 'type' in wps_json and wps_json['type'] == 'reference':
         wps_json['type'] = WPS_COMPLEX
@@ -654,6 +664,7 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
                 continue
             if type(cwl_field) != type(wps_field) or (cwl_field is not None and wps_field is None):
                 continue
+            # noinspection PyTypeChecker
             if hasattr(cwl_field, '__iter__') and len(cwl_field):
                 continue
             _set_field(updated_io_list[-1], field_type, wps_field)
@@ -694,8 +705,8 @@ def _get_package_outputs(package, as_json=False):
 
 def _get_package_inputs_outputs(package, as_json=False):
     """Generates WPS-like (inputs,outputs) tuple using parsed CWL package output definitions."""
-    return _get_package_io(package, io_select=WPS_INPUT, as_json=as_json), \
-           _get_package_io(package, io_select=WPS_OUTPUT, as_json=as_json)
+    return (_get_package_io(package, io_select=WPS_INPUT, as_json=as_json),
+            _get_package_io(package, io_select=WPS_OUTPUT, as_json=as_json))
 
 
 def _update_package_metadata(wps_package_metadata, cwl_package_package):
@@ -719,6 +730,7 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
 
 
 def get_process_from_wps_request(process_offering, reference=None, package=None, data_source=None):
+    # type: (Dict, Optional[Text], Optional[Text], Optional[Text]) -> Dict
     """
     Returns an updated process information dictionary ready for storage using provided WPS ``process_offering``
     and a package definition passed by ``reference`` or ``package`` JSON content.
@@ -860,13 +872,20 @@ class Package(Process):
     def update_status(self, message, progress=None, status=WPS_STATUS.STARTED):
         self.percent = progress or self.percent or 0
         # pywps overrides 'status' by 'accepted' in 'update_status', so use the '_update_status' to enforce the status
-        # using the protected method also avoids weird overrides of progress % on failure and final 'success' status
+        # using protected method also avoids weird overrides of progress percent on failure and final 'success' status
+        # noinspection PyProtectedMember
         self.response._update_status(status, message, self.percent)
         self.log_message(status=status,
                          message=message,
                          progress=progress)
 
+    def step_update_status(self, message, progress, start_step_progress, end_step_progress, step_name, data_source):
+        self.update_status(
+            "{0} [{1}] - {2}".format(data_source, step_name, message),
+            self.map_progress(progress, start_step_progress, end_step_progress))
+
     def log_message(self, status, message, progress=None, level=logging.INFO):
+        # noinspection PyProtectedMember
         message = get_job_log_msg(status=_WPS_STATUS._fields[status].lower(), msg=message, progress=progress)
         self.logger.log(level, message, exc_info=level > logging.INFO)
 
@@ -876,6 +895,14 @@ class Package(Process):
                          message='{0}: {1}{2}'.format(exception_type.__name__, message, exception_msg),
                          level=logging.ERROR)
         return exception_type('{0}{1}'.format(message, exception_msg))
+
+    @staticmethod
+    def map_progress(progress, range_min, range_max):
+        return range_min + (progress * (range_max - range_min)) / 100
+
+    @classmethod
+    def map_step_progress(cls, step_index, steps_total):
+        return cls.map_progress(100 * step_index / steps_total, PACKAGE_PROGRESS_RUN_CWL, PACKAGE_PROGRESS_CWL_DONE)
 
     def _handler(self, request, response):
         LOGGER.debug("HOME=%s, Current Dir=%s", os.environ.get('HOME'), os.path.abspath(os.curdir))
@@ -923,7 +950,7 @@ class Package(Process):
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed retrieving package input types.")
             try:
-                # identify EOimages from payload
+                # identify EOImages from payload
                 request.inputs = opensearch.get_original_collection_id(self.payload, request.inputs)
                 eoimage_data_sources = opensearch.get_eo_images_data_sources(self.payload, request.inputs)
                 if eoimage_data_sources:
@@ -1034,20 +1061,9 @@ class Package(Process):
                 data_url = value['location']
             data_source = get_data_source_from_url(data_url)
 
-            map_progress = lambda progress, range_min, range_max: range_min + (progress * (range_max - range_min)) / 100
-
             # Progress made with steps presumes that they are done sequentially and have the same progress weight
-            map_step_progress = lambda step_done, steps_nb: map_progress(100 * step_done / steps_nb,
-                                                                         PACKAGE_PROGRESS_RUN_CWL,
-                                                                         PACKAGE_PROGRESS_CWL_DONE)
-
-            start_step_progress = map_step_progress(len(self.step_launched), max(1, len(self.step_packages)))
-            end_step_progress = map_step_progress(len(self.step_launched) + 1, max(1, len(self.step_packages)))
-
-            step_update_status = lambda message, progress: self.update_status(
-                "{0} [{1}] - {2}".format(data_source, jobname, message),
-                map_progress(progress, start_step_progress, end_step_progress))
-
+            start_step_progress = self.map_step_progress(len(self.step_launched), max(1, len(self.step_packages)))
+            end_step_progress = self.map_step_progress(len(self.step_launched) + 1, max(1, len(self.step_packages)))
             url = retrieve_data_source_url(data_source)
 
             self.update_status("Launching {type} {name} on {src}.".format(
@@ -1064,4 +1080,6 @@ class Package(Process):
                           process_id=process_id,
                           deploy_body=step_payload,
                           cookies=self.request.http_request.cookies,
-                          update_status=step_update_status)
+                          update_status=lambda message, progress, status=WPS_STATUS.STARTED: self.step_update_status(
+                              message, progress, start_step_progress, end_step_progress, jobname, data_source
+                          ))

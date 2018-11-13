@@ -7,8 +7,7 @@ import os
 import shutil
 import tempfile
 from functools import cmp_to_key, partial
-from typing import (Any, Callable, Dict, Generator, List, Optional, Set, MutableMapping, Union, cast)
-from typing_extensions import Text, Type
+from typing import (Any, Callable, Dict, Generator, List, Optional, Set, MutableMapping, Union, cast, Text, Type)
 from schema_salad import validate
 from schema_salad.sourceline import SourceLine
 from six import string_types

@@ -11,7 +11,6 @@ from twitcher.wps_restapi.swagger_definitions import (
     processes_uri,
     process_uri,
     process_jobs_uri,
-    process_job_uri,
     process_results_uri,
     process_visibility_uri,
 )
