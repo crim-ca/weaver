@@ -331,7 +331,7 @@ class EOImageDescribeProcessHandler(object):
             u"formats": [{u"mimeType": u"text/plain", u"default": True}],
             u"minOccurs": u"1",
             u"maxOccurs": u"unbounded",
-            u"literalDataDomains": {u"dataType": {u"name": u"String"}},
+            u"literalDataDomains": [{u"dataType": {u"name": u"String"}}],
             u"additionalParameters": [
                 {
                     u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
@@ -363,7 +363,7 @@ class EOImageDescribeProcessHandler(object):
             u"formats": [{u"mimeType": u"text/plain", u"default": True}],
             u"minOccurs": u"1",
             u"maxOccurs": u"1",
-            u"literalDataDomains": {u"dataType": {u"name": u"String"}},
+            u"literalDataDomains": [{u"dataType": {u"name": u"String"}}],
             u"additionalParameters": [
                 {
                     u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
