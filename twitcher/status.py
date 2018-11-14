@@ -7,6 +7,8 @@ STATUS_RUNNING = 'running'
 STATUS_FINISHED = 'finished'
 STATUS_DISMISSED = 'dismissed'
 STATUS_EXCEPTION = 'exception'
+STATUS_PENDING = 'pending'
+STATUS_UNKNOWN = 'unknown'  # don't include in any below collections
 
 job_status_values = frozenset([
     STATUS_ACCEPTED,
@@ -15,7 +17,8 @@ job_status_values = frozenset([
     STATUS_SUCCEEDED,
     STATUS_FAILED,
     STATUS_DISMISSED,
-    STATUS_EXCEPTION
+    STATUS_EXCEPTION,
+    STATUS_PENDING,
 ])
 
 job_status_categories = {
@@ -25,3 +28,12 @@ job_status_categories = {
     STATUS_RUNNING: frozenset([STATUS_ACCEPTED, STATUS_PAUSED, STATUS_STARTED]),
     STATUS_FINISHED: frozenset([STATUS_SUCCEEDED, STATUS_FAILED, STATUS_DISMISSED, STATUS_EXCEPTION]),
 }
+
+
+def map_status(wps_execution_status):
+    job_status = wps_execution_status.lower().replace('process', '')
+    if job_status == STATUS_RUNNING:    # OGC official status but not supported by PyWPS. See twitcher/status.py
+        job_status = STATUS_STARTED     # This is the status used by PyWPS
+    if job_status in job_status_values:
+        return job_status
+    return STATUS_UNKNOWN

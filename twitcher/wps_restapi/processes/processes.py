@@ -141,15 +141,6 @@ def _jsonify_output(output, datatype):
     return json_output
 
 
-def _map_status(wps_execution_status):
-    job_status = wps_execution_status.lower().replace('process', '')
-    if job_status == STATUS_RUNNING:    # OGC official status but not supported by PyWPS. See twitcher/status.py
-        job_status = STATUS_STARTED     # This is the status used by PyWPS
-    if job_status in job_status_values:
-        return job_status
-    return 'unknown'
-
-
 def retrieve_package_job_log(execution, job):
     # If the process is a twitcher package this status xml should be available in the process output dir
     status_xml_fn = execution.statusLocation.split('/')[-1]
@@ -248,7 +239,7 @@ def execute_process(self, url, service, process_id, inputs,
                                          sleep_secs=wait_secs(run_step))
 
                 job.response = etree.tostring(execution.response)
-                job.status = _map_status(execution.getStatus())
+                job.status = map_status(execution.getStatus())
                 job.status_message = execution.statusMessage
                 job.progress = execution.percentCompleted
                 job.save_log(logger=task_logger)
