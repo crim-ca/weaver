@@ -278,8 +278,7 @@ def _load_package_content(package_dict,                             # type: Dict
         # generate sub-package file and update workflow step to point to created sub-package file
         step_process_url = get_process_location(step['reference'], data_source)
         package_body, package_name = _get_process_package(step_process_url)
-        _load_package_content(package_body, package_name, data_source=data_source,
-                              only_dump_file=True, tmp_dir=tmp_dir)
+        _load_package_content(package_body, package_name, data_source=data_source, only_dump_file=True, tmp_dir=tmp_dir)
         package_dict['steps'][step['name']]['run'] = package_name
         step_packages[step['name']] = package_name
 
@@ -288,8 +287,7 @@ def _load_package_content(package_dict,                             # type: Dict
     if only_dump_file:
         return
 
-    cwl_factory = cwltool.factory.Factory(loading_context=loading_context,
-                                          runtime_context=runtime_context)
+    cwl_factory = cwltool.factory.Factory(loading_context=loading_context, runtime_context=runtime_context)
     package = cwl_factory.make(tmp_json_cwl)
     shutil.rmtree(tmp_dir)
     return package, package_type, step_packages
@@ -430,7 +428,8 @@ def _cwl2wps_io(io_info,    # type: Dict[Text, Any]
                           abstract=io_info.get('doc', ''),
                           data_type=io_type,
                           default=io_info.get('default', None),
-                          min_occurs=io_min_occurs, max_occurs=io_max_occurs,
+                          min_occurs=io_min_occurs,
+                          max_occurs=io_max_occurs,
                           # unless extended by custom types, no value validation for literals
                           mode=io_mode,
                           allowed_values=io_allow)
@@ -745,13 +744,17 @@ def get_process_from_wps_request(process_offering, reference=None, package=None,
 
     def try_or_raise_package_error(call, reason):
         try:
-            LOGGER.debug("Attempting: `{}`".format(reason))
+            LOGGER.debug("Attempting: [{}].".format(reason))
             return call()
         except Exception as exc:
+            # re-raise any exception already handled by a 'package' error as is, but with a more detailed message
+            # handle any other sub-exception that wasn't processed by a 'package' error as a registration error
+            package_errors = (PackageRegistrationError, PackageTypeError, PackageRegistrationError, PackageNotFound)
+            exc_type = type(exc) if isinstance(exc, package_errors) else PackageRegistrationError
             LOGGER.exception(exc.message)
-            raise PackageRegistrationError(
+            raise exc_type(
                 "Invalid package/reference definition. " +
-                "{0} generated error: `{1}`".format(reason, repr(exc))
+                "{0} generated error: [{1}].".format(reason, repr(exc))
             )
 
     if not (isinstance(package, dict) or isinstance(reference, six.string_types)):

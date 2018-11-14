@@ -13,10 +13,12 @@ from twitcher.adapter import servicestore_factory, jobstore_factory, processstor
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS
 from twitcher.datatype import Process as ProcessDB, Job as JobDB, Input, Output
 from twitcher.exceptions import (
+    ProcessRegistrationError,
     ProcessNotFound,
     PackageRegistrationError,
     PackageTypeError,
-    ProcessRegistrationError)
+    PackageNotFound,
+)
 from twitcher.processes import wps_package, opensearch
 from twitcher.processes.types import PROCESS_WORKFLOW
 from twitcher.store import processstore_defaultfactory
@@ -531,6 +533,9 @@ def add_local_process(request):
     # obtain updated process information using WPS process offering and CWL package definition
     try:
         process_info = wps_package.get_process_from_wps_request(process_info, reference, package, twitcher_url)
+    except PackageNotFound as ex:
+        # raised when a workflow sub-process is not found (not deployed locally)
+        raise HTTPNotFound(detail=ex.message)
     except (PackageRegistrationError, PackageTypeError) as ex:
         raise HTTPUnprocessableEntity(detail=ex.message)
     except Exception as ex:
