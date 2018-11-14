@@ -549,8 +549,8 @@ def add_local_process(request):
     description_url = "/".join([restapi_url, 'processes', process_info['identifier']])
     execute_endpoint = "/".join([description_url, "jobs"])
 
-    # ensure that required 'executeWPSEndpoint' in db is added, will be auto-fixed to localhost if not specified in body
-    process_info['executeWPSEndpoint'] = process_description.get('executeWPSEndpoint')
+    # ensure that required 'processEndpointWPS1' in db is added, will be auto-fixed to localhost if not specified in body
+    process_info['processEndpointWPS1'] = process_description.get('processEndpointWPS1')
     process_info['executeEndpoint'] = execute_endpoint
     process_info['payload'] = payload
     process_info['jobControlOptions'] = process_description.get('jobControlOptions', [])
@@ -724,7 +724,7 @@ def submit_local_job(request):
     try:
         store = processstore_factory(request.registry)
         process = store.fetch_by_id(process_id, request=request)
-        resp = submit_job_handler(request, process.executeWPSEndpoint, is_workflow=process.type == 'workflow')
+        resp = submit_job_handler(request, process.processEndpointWPS1, is_workflow=process.type == 'workflow')
         return resp
     except HTTPException:
         raise  # re-throw already handled HTTPException

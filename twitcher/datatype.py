@@ -436,13 +436,13 @@ class AccessToken(dict):
 class Process(DescriptionType):
     """
     Dictionary that contains a process description for db storage.
-    It always has ``'identifier'`` and ``executeWPSEndpoint`` keys.
+    It always has ``'identifier'`` and ``processEndpointWPS1`` keys.
     """
 
     def __init__(self, *args, **kwargs):
         super(Process, self).__init__(*args, **kwargs)
-        if 'executeWPSEndpoint' not in self:
-            raise TypeError("'executeWPSEndpoint' is required")
+        if 'processEndpointWPS1' not in self:
+            raise TypeError("'processEndpointWPS1' is required")
         if 'package' not in self:
             raise TypeError("'package' is required")
         if 'inputs' in self:
@@ -497,8 +497,8 @@ class Process(DescriptionType):
         return self.get('processDescriptionURL')
 
     @property
-    def executeWPSEndpoint(self):
-        return self.get('executeWPSEndpoint')
+    def processEndpointWPS1(self):
+        return self.get('processEndpointWPS1')
 
     @property
     def executeEndpoint(self):
@@ -555,7 +555,7 @@ class Process(DescriptionType):
             'outputs': self.outputs,
             'jobControlOptions': self.jobControlOptions,
             'outputTransmission': self.outputTransmission,
-            'executeWPSEndpoint': self.executeWPSEndpoint,
+            'processEndpointWPS1': self.processEndpointWPS1,
             'type': self.type,
             'package': self.package,  # deployment specification (json body)
             'payload': self.payload,

@@ -39,7 +39,7 @@ class DescriptionType(dict):
 class DataDescriptionType(DescriptionType):
     """
     Dictionary that contains a process description for db storage.
-    It always has ``'identifier'`` and ``executeWPSEndpoint`` keys.
+    It always has ``'identifier'`` and ``processEndpointWPS1`` keys.
     """
 
     def __init__(self, *args, **kwargs):
