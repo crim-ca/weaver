@@ -25,6 +25,7 @@ class Hello(Process):
             status_supported=True
         )
 
+    # noinspection PyMethodMayBeStatic
     def _handler(self, request, response):
         response.update_status("saying hello ...", 0)
         LOGGER.debug("HOME=%s, Current Dir=%s", os.environ.get('HOME'), os.path.abspath(os.curdir))

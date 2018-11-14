@@ -134,8 +134,8 @@ def _jsonify_output(output, datatype):
 
 def _map_status(wps_execution_status):
     job_status = wps_execution_status.lower().replace('process', '')
-    if job_status == STATUS_RUNNING:  # OGC official status but not supported by PyWPS. See twitcher/status.py
-        job_status = STATUS_STARTED  # This is the status used by PyWPS
+    if job_status == STATUS_RUNNING:    # OGC official status but not supported by PyWPS. See twitcher/status.py
+        job_status = STATUS_STARTED     # This is the status used by PyWPS
     if job_status in job_status_values:
         return job_status
     return 'unknown'
@@ -177,6 +177,7 @@ def execute_process(self, url, service, process_id, inputs,
 
         try:
             wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), verify=ssl_verify)
+            # noinspection PyProtectedMember
             raise_on_xml_exception(wps._capabilities)
         except Exception as ex:
             raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
@@ -265,7 +266,6 @@ def execute_process(self, url, service, process_id, inputs,
                         retrieve_package_job_log(execution, job)
                         job.save_log(errors=execution.errors, logger=task_logger)
 
-
             except Exception as exc:
                 num_retries += 1
                 task_logger.debug('Exception raised: {}'.format(repr(exc)))
@@ -292,21 +292,17 @@ def execute_process(self, url, service, process_id, inputs,
     finally:
         job.status_message = "Job {}.".format(job.status)
         job.save_log(logger=task_logger)
-
         job = store.update_job(job)
 
     return job.status
 
 
-# noinspection PyProtectedMember
 def submit_job_handler(request, service_url, is_workflow=False):
     # TODO Validate param somehow
     provider_id = request.matchdict.get('provider_id')  # None OK if local
     process_id = request.matchdict.get('process_id')
     tags = request.params.get('tags', '').split(',')
 
-    reqbody = request.json_body
-    test = [k in reqbody for k in ('inputs', 'outputs', 'mode', 'response')]
     if not all(k in request.json_body for k in ('inputs', 'outputs', 'mode', 'response')):
         raise HTTPBadRequest("Missing one of required parameters [inputs, outputs, mode, response].")
 
@@ -317,15 +313,16 @@ def submit_job_handler(request, service_url, is_workflow=False):
     if request.json_body['response'] != 'document':
         raise HTTPNotImplemented(detail='{0} response not supported.'.format(request.json_body['response']))
 
-    for input in request.json_body['inputs']:
-        if not ('id' in input and any(k in input for k in ('data', 'href'))):
+    for job_input in request.json_body['inputs']:
+        if not all(k in job_input for k in ('id', 'href')):
             raise HTTPBadRequest("Missing one of required output parameters [id, href].")
 
-    for output in request.json_body['outputs']:
-        if not all(k in output for k in ('id', 'transmissionMode')):
-            raise HTTPBadRequest("Missing one of required output parameters [id, transmissionMode].")
-        if output['transmissionMode'] != 'reference':
-            raise HTTPNotImplemented(detail='{0} transmissionMode not supported.'.format(output['transmissionMode']))
+    for job_output in request.json_body['outputs']:
+        if not all(k in job_output for k in ('id', 'transmissionMode')):
+            raise HTTPBadRequest(detail="Missing one of required output parameters [id, transmissionMode].")
+        if job_output['transmissionMode'] != 'reference':
+            raise HTTPNotImplemented(detail='{0} transmissionMode not supported.'
+                                     .format(job_output['transmissionMode']))
 
     result = execute_process.delay(
         url=clean_ows_url(service_url),
@@ -473,6 +470,7 @@ def get_processes(request):
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except Exception as ex:
+        LOGGER.exception(ex.message, exc_info=True)
         raise HTTPInternalServerError(ex.message)
 
 
@@ -504,6 +502,8 @@ def add_local_process(request):
     # retrieve CWL package definition, either via owsContext or executionUnit package/reference
     deployment_profile = body.get('deploymentProfileName')
     ows_context = process_info.pop('owsContext', None)
+    reference = None
+    package = None
     if isinstance(ows_context, dict):
         offering = ows_context.get('offering')
         if not isinstance(offering, dict):

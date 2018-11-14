@@ -16,6 +16,7 @@ from pywps import (
     Format,
 )
 from pywps.inout.basic import BasicIO
+# noinspection PyProtectedMember
 from pywps.response.status import WPS_STATUS, _WPS_STATUS
 from pywps.inout.literaltypes import AnyValue, AllowedValue, ALLOWEDVALUETYPE
 from pywps.validator.mode import MODE

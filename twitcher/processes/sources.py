@@ -1,6 +1,6 @@
 import os
 import json
-from urlparse import urlparse
+from six.moves.urllib.parse import urlparse
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
 from twitcher import TWITCHER_ROOT_DIR
@@ -94,6 +94,7 @@ def get_data_source_from_url(data_url):
                 if path.startswith(val['rootdir']):
                     return src
 
-    except Exception as exc:
+    # noinspection PyBroadException
+    except Exception:
         pass
     return get_default_data_source(data_sources)
