@@ -527,12 +527,10 @@ def add_local_process(request):
     else:
         raise HTTPBadRequest("Missing one of required parameters [owsContext, deploymentProfileName being a workflow].")
 
-    settings = request.registry.settings
-    twitcher_url = get_twitcher_url(settings)
-
     # obtain updated process information using WPS process offering and CWL package definition
     try:
-        process_info = wps_package.get_process_from_wps_request(process_info, reference, package, twitcher_url)
+        # data_source `None` forces workflow process to search locally for deployed step applications
+        process_info = wps_package.get_process_from_wps_request(process_info, reference, package, data_source=None)
     except PackageNotFound as ex:
         # raised when a workflow sub-process is not found (not deployed locally)
         raise HTTPNotFound(detail=ex.message)
@@ -546,6 +544,7 @@ def add_local_process(request):
     process_info['outputs'] = [Output.from_wps_names(i) for i in process_info['outputs']]
 
     # validate process type against twitcher configuration
+    settings = request.registry.settings
     process_type = process_info['type']
     if process_type == PROCESS_WORKFLOW:
         twitcher_config = get_twitcher_configuration(settings)
