@@ -317,7 +317,7 @@ def submit_job_handler(request, service_url, is_workflow=False):
 
     for job_input in request.json_body['inputs']:
         if not ('id' in job_input and any(k in job_input for k in ('data', 'href'))):
-            raise HTTPBadRequest("Missing one of required output parameters [id, href].")
+            raise HTTPBadRequest("Missing one of required output parameters [id, data|href].")
 
     for job_output in request.json_body['outputs']:
         if not all(k in job_output for k in ('id', 'transmissionMode')):
