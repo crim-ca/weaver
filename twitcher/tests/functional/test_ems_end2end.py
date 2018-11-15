@@ -11,15 +11,12 @@ from twitcher.status import (
     job_status_values,
     job_status_categories,
 )
-from six.moves.urllib.parse import urlparse, urlunparse
 from typing import Text, Dict, Optional
 from unittest import TestCase
 from pyramid import testing
 from pyramid.httpexceptions import HTTPOk, HTTPCreated, HTTPBadRequest, HTTPUnauthorized, HTTPNotFound
 # noinspection PyPackageRequirements
 from webtest import TestApp, TestResponse
-# noinspection PyPackageRequirements
-from webtest.http import check_server
 from copy import deepcopy
 import unittest
 # noinspection PyPackageRequirements
@@ -217,9 +214,7 @@ class End2EndEMSTestCase(TestCase):
     def validate_test_server(cls):
         # verify that servers are up and ready
         for server_url in [cls.MAGPIE_URL, cls.TWITCHER_URL, cls.WSO2_HOSTNAME]:
-            server_parsed = urlparse(server_url)
-            server_host = '{}://{}'.format(server_parsed.scheme, server_parsed.hostname)
-            check_server(server_host, server_parsed.port)
+            cls.request('GET', server_url, headers=cls.headers, status=HTTPOk.code)
         # verify that EMS configuration requirement is met
         resp = cls.request('GET', cls.TWITCHER_RESTAPI_URL, headers=cls.headers, status=HTTPOk.code)
         assert resp.json.get('configuration') == TWITCHER_CONFIGURATION_EMS, "Twitcher must be configured as EMS."
@@ -254,7 +249,7 @@ class End2EndEMSTestCase(TestCase):
         # processes visible by alice
         resp = self.request('GET', path, headers=headers_a, status=HTTPOk.code)
         proc = resp.json.get('processes')
-        found_processes = filter(lambda p: p['id'] in self.test_processes_info, proc)#
+        found_processes = filter(lambda p: p['id'] in self.test_processes_info, proc)
         assert len(found_processes) == len(self.test_processes_info), "Test processes should exist."
 
         # processes not yet visible by bob
