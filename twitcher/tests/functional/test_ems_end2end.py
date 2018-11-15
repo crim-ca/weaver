@@ -1,8 +1,8 @@
-from twitcher.tests.utils import get_test_twitcher_app, get_settings_from_testapp, get_setting, Null
+from twitcher.tests.utils import get_settings_from_config_ini, get_settings_from_testapp, get_setting, Null
 from twitcher.config import TWITCHER_CONFIGURATION_EMS
 from twitcher.wps_restapi.utils import wps_restapi_base_url
 from twitcher.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
-from twitcher.owsproxy import owsproxy_url
+from twitcher.owsproxy import owsproxy_base_url
 from twitcher.utils import get_twitcher_url
 from twitcher.status import (
     STATUS_SUCCEEDED,
@@ -16,13 +16,14 @@ from unittest import TestCase
 from pyramid import testing
 from pyramid.httpexceptions import HTTPOk, HTTPCreated, HTTPBadRequest, HTTPUnauthorized, HTTPNotFound
 # noinspection PyPackageRequirements
-from webtest import TestApp
+from webtest import TestApp, TestResponse
 from copy import deepcopy
 import unittest
 # noinspection PyPackageRequirements
 import pytest
 import requests
 import time
+import json
 import os
 
 
@@ -35,8 +36,9 @@ class ProcessInfo(object):
         self.execute_payload = execute_payload
 
 
-@unittest.skipIf(not len(str(os.getenv('TEST_SERVER_HOSTNAME', ''))), reason="Test server not defined!")
+@pytest.mark.online
 @pytest.mark.skipif(not len(str(os.getenv('TEST_SERVER_HOSTNAME', ''))), reason="Test server not defined!")
+@unittest.skipIf(not len(str(os.getenv('TEST_SERVER_HOSTNAME', ''))), reason="Test server not defined!")
 class End2EndEMSTestCase(TestCase):
     __settings__ = None
     test_processes_info = dict()
@@ -63,8 +65,8 @@ class End2EndEMSTestCase(TestCase):
         cls.MAGPIE_URL = '{}/magpie'.format(cls.TEST_SERVER_HOSTNAME)
         cls.TWITCHER_URL = get_twitcher_url(cls.settings())
         cls.TWITCHER_RESTAPI_URL = wps_restapi_base_url(cls.settings())
-        cls.TWITCHER_PROTECTED_URL = owsproxy_url(cls.settings())
-        cls.TWITCHER_PROTECTED_EMS_URL = cls.TWITCHER_URL + cls.TWITCHER_PROTECTED_URL + '/ems'
+        cls.TWITCHER_PROTECTED_URL = owsproxy_base_url(cls.settings())
+        cls.TWITCHER_PROTECTED_EMS_URL = '{}/ems'.format(cls.TWITCHER_PROTECTED_URL)
         cls.WSO2_HOSTNAME = get_setting('WSO2_HOSTNAME', cls.app)
         cls.WSO2_CLIENT_ID = get_setting('WSO2_CLIENT_ID', cls.app)
         cls.WSO2_CLIENT_SECRET = get_setting('WSO2_CLIENT_SECRET', cls.app)
@@ -76,9 +78,10 @@ class End2EndEMSTestCase(TestCase):
         cls.BOB_CREDENTIALS = {'username': cls.BOB_USERNAME, 'password': cls.BOB_PASSWORD}
 
         required_params = {
+            'MAGPIE_URL':               cls.MAGPIE_URL,
             'TWITCHER_URL':             cls.TWITCHER_URL,
-            'TWITCHER_RESTAPI_URL':     cls.TWITCHER_RESTAPI_PATH,
-            'TWITCHER_PROTECTED_PATH':  cls.TWITCHER_PROTECTED_PATH,
+            'TWITCHER_RESTAPI_URL':     cls.TWITCHER_RESTAPI_URL,
+            'TWITCHER_PROTECTED_URL':   cls.TWITCHER_PROTECTED_URL,
             'WSO2_HOSTNAME':            cls.WSO2_HOSTNAME,
             'WSO2_CLIENT_ID':           cls.WSO2_CLIENT_ID,
             'WSO2_CLIENT_SECRET':       cls.WSO2_CLIENT_SECRET,
@@ -92,7 +95,7 @@ class End2EndEMSTestCase(TestCase):
                 "Missing required parameter `{}` to run end-2-end EMS tests!".format(param)
 
         cls.validate_test_server()
-        cls.setup_processes_payloads()
+        cls.setup_test_processes()
 
     @classmethod
     def tearDownClass(cls):
@@ -102,23 +105,18 @@ class End2EndEMSTestCase(TestCase):
     @classmethod
     def settings(cls):
         """Provide basic settings that must be defined to use various Twitcher utility functions."""
-        def update_non_override(dict_settings, dict_parameters):
-            [dict_settings.update({k: v}) for k, v in dict_parameters.items()
-             if k not in dict_settings or (v is not None and dict_settings[k] is None)]
-
         if not cls.__settings__:
             cls.__settings__ = get_settings_from_testapp(cls.app)
-            update_non_override(cls.__settings__, {
+            cls.__settings__.update(get_settings_from_config_ini())
+            cls.__settings__.update({
                 'magpie.url': cls.TEST_SERVER_HOSTNAME + '/magpie',
                 'twitcher.url': cls.TEST_SERVER_HOSTNAME + '/twitcher',
                 'twitcher.configuration': TWITCHER_CONFIGURATION_EMS,
-                'twitcher.wps_restapi_path': get_setting('TWITCHER_RESTAPI_PATH', cls.app),
-                'twitcher.ows_proxy_protected_path': get_setting('TWITCHER_PROTECTED_URL', cls.app),
             })
         return cls.__settings__
 
     @staticmethod
-    def get_test_processes(cls, process_id):
+    def get_test_process(cls, process_id):
         return cls.test_processes_info.get(process_id)
 
     @classmethod
@@ -152,12 +150,11 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def clear_test_processes(cls):
-        for process_id in cls.test_processes_info:
-            proc_test_id = cls.test_processes_info[process_id]['test_id']
-            path = '{}/processes/{}'.format(cls.TWITCHER_PROTECTED_EMS_URL, proc_test_id)
-            resp = cls.app.delete(path, headers=cls.headers)
+        for process_id, process_info in cls.test_processes_info.items():
+            path = '{}/processes/{}'.format(cls.TWITCHER_PROTECTED_EMS_URL, process_info.test_id)
+            resp = cls.request('DELETE', path, headers=cls.user_headers(cls.ALICE_CREDENTIALS))
             if resp.status_code not in (HTTPOk.code, HTTPNotFound.code):
-                resp.raise_for_status()
+                raise Exception("Failed cleanup of test processes!")
 
     @classmethod
     def login(cls, username, password):
@@ -179,50 +176,68 @@ class End2EndEMSTestCase(TestCase):
         resp.raise_for_status()
 
     @classmethod
+    def user_headers(cls, credentials):
+        # type: (Dict) -> Dict
+        token = cls.login(**credentials)
+        headers = deepcopy(cls.headers)
+        headers.update(token)
+        return headers
+
+    @classmethod
+    def request(cls, method, url, **kw):
+        # type: (Text, Text, Optional[Dict]) -> TestResponse
+        """Executes the request, but following any server prior redirects as needed."""
+        status = kw.pop('status', None)
+        json_body = kw.pop('json', None)
+        if json_body is not None:
+            kw.update({'param': json.dumps(json_body, cls=json.JSONEncoder)})
+        resp = cls.app._gen_request(method.upper(), url, **kw)
+        resp = resp.follow()
+        assert resp.status_code == status or status is None
+        return resp
+
+    @classmethod
     def validate_test_server(cls):
-        cls.app.get(cls.MAGPIE_URL, headers=cls.headers, status=HTTPOk.code)
-        cls.app.get(cls.WSO2_HOSTNAME, headers=cls.headers, status=HTTPOk.code)
-        resp = cls.app.get(cls.TWITCHER_RESTAPI_URL, headers=cls.headers, status=HTTPOk.code)
+        cls.request('GET', cls.MAGPIE_URL, headers=cls.headers, status=HTTPOk.code)
+        cls.request('GET', cls.WSO2_HOSTNAME, headers=cls.headers, status=HTTPOk.code)
+        resp = cls.request('GET', cls.TWITCHER_RESTAPI_URL, headers=cls.headers, status=HTTPOk.code)
         assert resp.json.get('configuration') == TWITCHER_CONFIGURATION_EMS, "Twitcher must be configured as EMS."
 
     def test_end2end(self):
+        """The actual test!"""
         self.clear_test_processes()
 
-        token_a = self.login(**self.ALICE_CREDENTIALS)
-        token_b = self.login(**self.ALICE_CREDENTIALS)
-        headers_a = deepcopy(self.headers)
-        headers_a.update(token_a)
-        headers_b = deepcopy(self.headers)
-        headers_b.update(token_b)
+        headers_a = self.user_headers(self.ALICE_CREDENTIALS)
+        headers_b = self.user_headers(self.BOB_CREDENTIALS)
 
         # list processes (none of tests)
         path = '{}/processes'.format(self.TWITCHER_PROTECTED_EMS_URL)
-        resp = self.app.get(path, headers=headers_a, status=HTTPOk.code)
+        resp = self.request('GET', path, headers=headers_a, status=HTTPOk.code)
         proc = resp.json.get('processes')
         assert isinstance(proc, list)
         assert len(filter(lambda p: p['id'] in self.test_processes_info, proc)) == 0, "Test processes shouldn't exist!"
 
         # deploy process application
-        self.app.post_json(path, headers=headers_a, status=HTTPCreated.code,
-                           params=self.test_processes_info[self.PROCESS_STACKER_ID].deploy_payload)
+        self.request('POST', path, headers=headers_a, status=HTTPCreated.code,
+                     json=self.test_processes_info[self.PROCESS_STACKER_ID].deploy_payload)
         # deploy process workflow with missing step
-        self.app.post_json(path, headers=headers_a, status=HTTPBadRequest.code,
-                           params=self.test_processes_info[self.PROCESS_WORKFLOW_ID].deploy_payload)
+        self.request('POST', path, headers=headers_a, status=HTTPBadRequest.code,
+                     json=self.test_processes_info[self.PROCESS_WORKFLOW_ID].deploy_payload)
         # deploy other process step
-        self.app.post_json(path, headers=headers_a, status=HTTPCreated.code,
-                           params=self.test_processes_info[self.PROCESS_SFS_ID].deploy_payload)
+        self.request('POST', path, headers=headers_a, status=HTTPCreated.code,
+                     json=self.test_processes_info[self.PROCESS_SFS_ID].deploy_payload)
         # deploy process workflow with all steps available
-        self.app.post_json(path, headers=headers_a, status=HTTPCreated.code,
-                           params=self.test_processes_info[self.PROCESS_WORKFLOW_ID].deploy_payload)
+        self.request('POST', path, headers=headers_a, status=HTTPCreated.code,
+                     json=self.test_processes_info[self.PROCESS_WORKFLOW_ID].deploy_payload)
 
         # processes visible by alice
-        resp = self.app.get(path, headers=headers_a, status=HTTPOk.code)
+        resp = self.request('GET', path, headers=headers_a, status=HTTPOk.code)
         proc = resp.json.get('processes')
         found_processes = filter(lambda p: p['id'] in self.test_processes_info, proc)
         assert len(found_processes) == len(self.test_processes_info), "Test processes should exist."
 
         # processes not yet visible by bob
-        resp = self.app.get(path, headers=headers_b, status=HTTPOk.code)
+        resp = self.request('GET', path, headers=headers_b, status=HTTPOk.code)
         proc = resp.json.get('processes')
         found_processes = filter(lambda p: p['id'] in self.test_processes_info, proc)
         assert len(found_processes) == 0, "Test processes shouldn't be visible by bob."
@@ -239,19 +254,19 @@ class End2EndEMSTestCase(TestCase):
             assert resp.json.get('value') == VISIBILITY_PRIVATE, "Process should be private."
 
             # bob cannot edit, view or execute the process
-            self.app.get(process_path, headers=headers_b, status=HTTPUnauthorized.code)
-            self.app.put_json(visible_path, headers=headers_b, status=HTTPUnauthorized.code, params=visible)
-            self.app.post_json(execute_path, headers=headers_b, status=HTTPUnauthorized.code, params=execute_body)
+            self.request('GET', process_path, headers=headers_b, status=HTTPUnauthorized.code)
+            self.request('PUT', visible_path, headers=headers_b, status=HTTPUnauthorized.code, json=visible)
+            self.request('POST', execute_path, headers=headers_b, status=HTTPUnauthorized.code, json=execute_body)
 
             # make process visible
-            resp = self.app.put_json(visible_path, params=visible, headers=headers_a, status=HTTPOk.code)
+            resp = self.request('PUT', visible_path, headers=headers_a, status=HTTPOk.code, json=visible)
             assert resp.json.get('value') == VISIBILITY_PUBLIC, "Process should be public."
 
             # bob still cannot edit, but can now view and execute the process
-            self.app.put_json(visible_path, headers=headers_b, status=HTTPUnauthorized.code, params=visible)
+            self.request('PUT', visible_path, headers=headers_b, status=HTTPUnauthorized.code, json=visible)
             resp = self.app.get(process_path, headers=headers_b, status=HTTPOk.code)
             assert resp.json.get('process').get('id') == process_id
-            resp = self.app.post_json(execute_path, headers=headers_b, status=HTTPCreated.code, params=execute_body)
+            resp = self.request('POST', execute_path, headers=headers_b, status=HTTPCreated.code, json=execute_body)
             assert resp.json.get('status') in job_status_categories[STATUS_RUNNING]
             job_location = resp.json.get('location')
             job_id = resp.json.get('jobID')
@@ -266,7 +281,7 @@ class End2EndEMSTestCase(TestCase):
         timeout = 600
         while True:
             assert timeout > 0, "Maximum time reached for job execution test."
-            resp = self.app.get(job_location_url, headers=user_headers, status=HTTPOk.code)
+            resp = self.request('GET', job_location_url, headers=user_headers, status=HTTPOk.code)
             status = resp.json.get('status')
             assert status in job_status_values
             if status in job_status_categories[STATUS_RUNNING]:
@@ -277,4 +292,4 @@ class End2EndEMSTestCase(TestCase):
                 self.assertEquals(status, STATUS_SUCCEEDED, "Job execution `{}` failed.".format(job_location_url))
                 break
             self.fail("Unknown job execution status: `{}`.".format(status))
-        self.app.get('{}/result'.format(job_location_url), headers=user_headers, status=HTTPOk.code)
+        self.request('GET', '{}/result'.format(job_location_url), headers=user_headers, status=HTTPOk.code)

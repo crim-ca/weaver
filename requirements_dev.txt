@@ -2,6 +2,8 @@
 pytest
 mock
 WebTest
+wsgiproxy
+WSGIProxy2
 flake8
 # internal WPS
 ##pywps>=4.0.0

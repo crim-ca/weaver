@@ -7,7 +7,7 @@ from twitcher.config import get_twitcher_configuration
 from twitcher.utils import get_twitcher_url
 from twitcher.wps import get_wps_path
 from twitcher.adapter import adapter_factory
-from twitcher.owsproxy import owsproxy_path
+from twitcher.owsproxy import owsproxy_base_path
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import wps_restapi_base_url, wps_restapi_base_path
 
@@ -27,7 +27,7 @@ def api_frontpage(request):
     twitcher_wps = asbool(settings.get('twitcher.wps'))
     twitcher_wps_url = twitcher_url + get_wps_path(settings) if twitcher_wps else None
     twitcher_proxy = asbool(settings.get('twitcher.ows_proxy'))
-    twitcher_proxy_url = twitcher_url + owsproxy_path(settings) if twitcher_proxy else None
+    twitcher_proxy_url = twitcher_url + owsproxy_base_path(settings) if twitcher_proxy else None
 
     return {
         'message': 'Twitcher Information',

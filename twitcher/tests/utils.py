@@ -14,14 +14,19 @@ from twitcher import main
 import os
 
 
-def get_settings_from_config_ini(config_ini_path, ini_main_section_name='app:main'):
+def get_settings_from_config_ini(config_ini_path=None, ini_section_name='app:main'):
     parser = ConfigParser()
-    parser.read([config_ini_path])
-    settings = dict(parser.items(ini_main_section_name))
+    parser.read([config_ini_path or get_default_config_ini_path()])
+    settings = dict(parser.items(ini_section_name))
     return settings
 
 
-def config_setup_from_ini(config_ini_file_path):
+def get_default_config_ini_path():
+    return os.path.expanduser('~/birdhouse/etc/twitcher/twitcher.ini')
+
+
+def config_setup_from_ini(config_ini_file_path=None):
+    config_ini_file_path = config_ini_file_path or get_default_config_ini_path()
     settings = get_settings_from_config_ini(config_ini_file_path, 'app:main')
     settings.update(get_settings_from_config_ini(config_ini_file_path, 'celery'))
     config = testing.setUp(settings=settings)
@@ -31,7 +36,7 @@ def config_setup_from_ini(config_ini_file_path):
 def get_test_twitcher_app(twitcher_settings_override=None):
     twitcher_settings_override = twitcher_settings_override or {}
     # parse settings from ini file to pass them to the application
-    config = config_setup_from_ini('/home/fractal/birdhouse/etc/twitcher/twitcher.ini')
+    config = config_setup_from_ini()
     # create the test application
     config.registry.settings['twitcher.db_factory'] = get_test_store_type_from_env()
     config.registry.settings['twitcher.rpcinterface'] = False
@@ -41,9 +46,12 @@ def get_test_twitcher_app(twitcher_settings_override=None):
     return TestApp(main({}, **config.registry.settings))
 
 
-def get_settings_from_testapp(app):
+def get_settings_from_testapp(testapp):
     # type: (TestApp) -> Dict
-    return app.app.registry.settings or {}
+    settings = {}
+    if hasattr(testapp.app, 'registry'):
+        settings = testapp.app.registry.settings or {}
+    return settings
 
 
 class Null(object):
