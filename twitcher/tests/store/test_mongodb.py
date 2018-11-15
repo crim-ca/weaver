@@ -45,12 +45,12 @@ class MongodbServiceStoreTestCase(unittest.TestCase):
         self.service_public = dict(name="open_pingu", url="http://somewhere.in.the/deep_ocean", type="wps",
                                    public=True, auth='token')
         self.service_special = dict(url="http://wonderload", name="A special Name", type='wps', auth='token')
+        self.sane_name_config = {'assert_invalid': False, 'replace_invalid': True}
 
     def test_fetch_by_name(self):
         collection_mock = mock.Mock(spec=["find_one"])
         collection_mock.find_one.return_value = self.service
-        sane_name_config = {'assert_invalid': False, 'replace_invalid': True}
-        store = MongodbServiceStore(collection=collection_mock, sane_name_config=sane_name_config)
+        store = MongodbServiceStore(collection=collection_mock, sane_name_config=self.sane_name_config)
         service = store.fetch_by_name(name=self.service['name'])
 
         collection_mock.find_one.assert_called_with({"name": self.service['name']})
@@ -60,8 +60,7 @@ class MongodbServiceStoreTestCase(unittest.TestCase):
         collection_mock = mock.Mock(spec=["insert_one", "find_one", "count"])
         collection_mock.count.return_value = 0
         collection_mock.find_one.return_value = self.service
-        sane_name_config = {'assert_invalid': False, 'replace_invalid': True}
-        store = MongodbServiceStore(collection=collection_mock, sane_name_config=sane_name_config)
+        store = MongodbServiceStore(collection=collection_mock, sane_name_config=self.sane_name_config)
         store.save_service(Service(self.service))
 
         collection_mock.insert_one.assert_called_with(self.service)
@@ -70,8 +69,7 @@ class MongodbServiceStoreTestCase(unittest.TestCase):
         collection_mock = mock.Mock(spec=["insert_one", "find_one", "count"])
         collection_mock.count.return_value = 0
         collection_mock.find_one.return_value = self.service_special
-        sane_name_config = {'assert_invalid': False, 'replace_invalid': True}
-        store = MongodbServiceStore(collection=collection_mock, sane_name_config=sane_name_config)
+        store = MongodbServiceStore(collection=collection_mock, sane_name_config=self.sane_name_config)
         store.save_service(Service(self.service_special))
 
         collection_mock.insert_one.assert_called_with({
@@ -81,8 +79,7 @@ class MongodbServiceStoreTestCase(unittest.TestCase):
         collection_mock = mock.Mock(spec=["insert_one", "find_one", "count"])
         collection_mock.count.return_value = 0
         collection_mock.find_one.return_value = self.service_public
-        sane_name_config = {'assert_invalid': False, 'replace_invalid': True}
-        store = MongodbServiceStore(collection=collection_mock, sane_name_config=sane_name_config)
+        store = MongodbServiceStore(collection=collection_mock, sane_name_config=self.sane_name_config)
         store.save_service(Service(self.service_public))
 
         collection_mock.insert_one.assert_called_with(self.service_public)
