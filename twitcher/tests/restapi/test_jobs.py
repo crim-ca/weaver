@@ -14,6 +14,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         cls.config.include('twitcher.wps')
         cls.config.include('twitcher.wps_restapi')
         cls.config.include('twitcher.tweens')
+        cls.config.scan()
         cls.json_headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
         cls.app = webtest.TestApp(cls.config.make_wsgi_app())
 
