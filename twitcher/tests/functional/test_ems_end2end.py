@@ -11,12 +11,15 @@ from twitcher.status import (
     job_status_values,
     job_status_categories,
 )
+from six.moves.urllib.parse import urlparse, urlunparse
 from typing import Text, Dict, Optional
 from unittest import TestCase
 from pyramid import testing
 from pyramid.httpexceptions import HTTPOk, HTTPCreated, HTTPBadRequest, HTTPUnauthorized, HTTPNotFound
 # noinspection PyPackageRequirements
 from webtest import TestApp, TestResponse
+# noinspection PyPackageRequirements
+from webtest.http import check_server
 from copy import deepcopy
 import unittest
 # noinspection PyPackageRequirements
@@ -60,9 +63,11 @@ class End2EndEMSTestCase(TestCase):
     def setUpClass(cls):
         # TODO: adjust environment variables accordingly to the server to be tested
         cls.TEST_SERVER_HOSTNAME = os.getenv('TEST_SERVER_HOSTNAME')
+        cls.TEST_SERVER_MAGPIE_PATH = os.getenv('TEST_SERVER_MAGPIE_PATH', '/magpie')
+        cls.TEST_SERVER_TWITCHER_PATH = os.getenv('TEST_SERVER_TWITCHER_PATH', '/twitcher')
         cls.app = TestApp(cls.TEST_SERVER_HOSTNAME)
 
-        cls.MAGPIE_URL = '{}/magpie'.format(cls.TEST_SERVER_HOSTNAME)
+        cls.MAGPIE_URL = cls.settings().get('magpie.url')
         cls.TWITCHER_URL = get_twitcher_url(cls.settings())
         cls.TWITCHER_RESTAPI_URL = wps_restapi_base_url(cls.settings())
         cls.TWITCHER_PROTECTED_URL = owsproxy_base_url(cls.settings())
@@ -104,23 +109,30 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def settings(cls):
+        # type: (...) -> Dict[Text, Text]
         """Provide basic settings that must be defined to use various Twitcher utility functions."""
         if not cls.__settings__:
+            magpie_url = os.getenv('MAGPIE_URL',
+                                   '{}{}'.format(cls.TEST_SERVER_HOSTNAME, cls.TEST_SERVER_MAGPIE_PATH))
+            twitcher_url = os.getenv('TWITCHER_URL',
+                                     '{}{}'.format(cls.TEST_SERVER_HOSTNAME, cls.TEST_SERVER_TWITCHER_PATH))
             cls.__settings__ = get_settings_from_testapp(cls.app)
             cls.__settings__.update(get_settings_from_config_ini())
             cls.__settings__.update({
-                'magpie.url': cls.TEST_SERVER_HOSTNAME + '/magpie',
-                'twitcher.url': cls.TEST_SERVER_HOSTNAME + '/twitcher',
+                'magpie.url': magpie_url,
+                'twitcher.url': twitcher_url,
                 'twitcher.configuration': TWITCHER_CONFIGURATION_EMS,
             })
         return cls.__settings__
 
     @staticmethod
     def get_test_process(cls, process_id):
+        # type: (End2EndEMSTestCase, Text) -> ProcessInfo
         return cls.test_processes_info.get(process_id)
 
     @classmethod
     def setup_test_processes(cls):
+        # type: (End2EndEMSTestCase) -> None
         cls.PROCESS_STACKER_ID = 'Stacker'
         cls.PROCESS_SFS_ID = 'SFS'
         cls.PROCESS_WORKFLOW_ID = 'Workflow'
@@ -129,6 +141,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def retrieve_process_info(cls, process_id):
+        # type: (End2EndEMSTestCase, Text) -> ProcessInfo
         base = 'https://raw.githubusercontent.com/crim-ca/testbed14/master/application-packages'
         deploy_path = '{base}/{proc}/DeployProcess_{proc}.json'.format(base=base, proc=process_id)
         execute_path = '{base}/{proc}/Execute_{proc}.json'.format(base=base, proc=process_id)
@@ -140,12 +153,14 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def retrieve_payload(cls, url):
+        # type: (End2EndEMSTestCase, Text) -> Dict
         resp = requests.get(url)
         resp.raise_for_status()
         return resp.json()
 
     @classmethod
     def get_test_process_id(cls, real_process_id):
+        # type: (End2EndEMSTestCase, Text) -> Text
         return '{}_{}'.format(cls.__name__, real_process_id)
 
     @classmethod
@@ -158,6 +173,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def login(cls, username, password):
+        # type: (End2EndEMSTestCase, Text, Text) -> Dict[str, str]
         """Login using WSO2 and retrieve the cookie packaged as `{'Authorization': 'Bearer <access_token>'}` header."""
         data = {
             'grant_type': 'password',
@@ -177,7 +193,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def user_headers(cls, credentials):
-        # type: (Dict) -> Dict
+        # type: (Dict[str, str]) -> Dict[str, str]
         token = cls.login(**credentials)
         headers = deepcopy(cls.headers)
         headers.update(token)
@@ -191,6 +207,7 @@ class End2EndEMSTestCase(TestCase):
         json_body = kw.pop('json', None)
         if json_body is not None:
             kw.update({'param': json.dumps(json_body, cls=json.JSONEncoder)})
+        # TestApp
         resp = cls.app._gen_request(method.upper(), url, **kw)
         resp = resp.follow()
         assert resp.status_code == status or status is None
@@ -198,8 +215,12 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def validate_test_server(cls):
-        cls.request('GET', cls.MAGPIE_URL, headers=cls.headers, status=HTTPOk.code)
-        cls.request('GET', cls.WSO2_HOSTNAME, headers=cls.headers, status=HTTPOk.code)
+        # verify that servers are up and ready
+        for server_url in [cls.MAGPIE_URL, cls.TWITCHER_URL, cls.WSO2_HOSTNAME]:
+            server_parsed = urlparse(server_url)
+            server_host = '{}://{}'.format(server_parsed.scheme, server_parsed.hostname)
+            check_server(server_host, server_parsed.port)
+        # verify that EMS configuration requirement is met
         resp = cls.request('GET', cls.TWITCHER_RESTAPI_URL, headers=cls.headers, status=HTTPOk.code)
         assert resp.json.get('configuration') == TWITCHER_CONFIGURATION_EMS, "Twitcher must be configured as EMS."
 
@@ -233,7 +254,7 @@ class End2EndEMSTestCase(TestCase):
         # processes visible by alice
         resp = self.request('GET', path, headers=headers_a, status=HTTPOk.code)
         proc = resp.json.get('processes')
-        found_processes = filter(lambda p: p['id'] in self.test_processes_info, proc)
+        found_processes = filter(lambda p: p['id'] in self.test_processes_info, proc)#
         assert len(found_processes) == len(self.test_processes_info), "Test processes should exist."
 
         # processes not yet visible by bob
