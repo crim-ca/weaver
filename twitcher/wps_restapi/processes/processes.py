@@ -316,7 +316,7 @@ def submit_job_handler(request, service_url, is_workflow=False):
         raise HTTPNotImplemented(detail='{0} response not supported.'.format(request.json_body['response']))
 
     for job_input in request.json_body['inputs']:
-        if not all(k in job_input for k in ('id', 'href')):
+        if not ('id' in job_input and any(k in job_input for k in ('data', 'href'))):
             raise HTTPBadRequest("Missing one of required output parameters [id, href].")
 
     for job_output in request.json_body['outputs']:
