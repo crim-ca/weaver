@@ -28,16 +28,17 @@ def config_setup_from_ini(config_ini_file_path):
     return config
 
 
-def get_test_twitcher_app(twitcher_config=TWITCHER_CONFIGURATION_DEFAULT):
+def get_test_twitcher_app(twitcher_settings_override=None):
+    twitcher_settings_override = twitcher_settings_override or {}
     # parse settings from ini file to pass them to the application
     config = config_setup_from_ini('/home/fractal/birdhouse/etc/twitcher/twitcher.ini')
     # create the test application
     config.registry.settings['twitcher.db_factory'] = get_test_store_type_from_env()
     config.registry.settings['twitcher.rpcinterface'] = False
-    config.registry.settings['twitcher.configuration'] = twitcher_config
     config.registry.settings['twitcher.url'] = 'https://localhost'
-    app = TestApp(main({}, **config.registry.settings))
-    return app
+    twitcher_config = twitcher_settings_override.get('twitcher.configuration', TWITCHER_CONFIGURATION_DEFAULT)
+    config.registry.settings.update({'twitcher.configuration': twitcher_config})
+    return TestApp(main({}, **config.registry.settings))
 
 
 def get_settings_from_testapp(app):
@@ -45,18 +46,29 @@ def get_settings_from_testapp(app):
     return app.app.registry.settings or {}
 
 
-def get_setting(app, env_var_name, setting_name=None):
-    # type: (TestApp, Text, Optional[Text]) -> Any
-    val = os.getenv(env_var_name)
-    if val:
+class Null(object):
+    pass
+
+
+def get_setting(env_var_name, app=None, setting_name=None):
+    # type: (Text, Optional[TestApp], Optional[Text]) -> Any
+    val = os.getenv(env_var_name, Null())
+    if not isinstance(val, Null):
         return val
-    if setting_name:
-        settings = get_settings_from_testapp(app)
-        if settings:
-            val = settings.get(setting_name)
-            if val:
+    if app:
+        val = app.extra_environ.get(env_var_name, Null())
+        if not isinstance(val, Null):
+            return val
+        if setting_name:
+            val = app.extra_environ.get(setting_name, Null())
+            if not isinstance(val, Null):
                 return val
-    return None
+            settings = get_settings_from_testapp(app)
+            if settings:
+                val = settings.get(setting_name, Null())
+                if not isinstance(val, Null):
+                    return val
+    return Null()
 
 
 def init_twitcher_service(registry):
