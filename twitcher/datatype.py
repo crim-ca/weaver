@@ -1,6 +1,7 @@
 """
 Definitions of types used by tokens.
 """
+from copy import copy
 
 import six
 import uuid
@@ -10,7 +11,6 @@ from datetime import datetime, timedelta
 # noinspection PyProtectedMember
 from logging import _levelNames, ERROR, INFO
 
-from twitcher.datatype_schemas import DataDescriptionType, DescriptionType
 from twitcher.utils import now_secs, get_job_log_msg, get_log_fmt, get_log_datefmt, fully_qualified_name
 from twitcher.exceptions import ProcessInstanceError
 from twitcher.processes import process_mapping
@@ -18,6 +18,8 @@ from twitcher.processes.types import PACKAGE_PROCESSES, PROCESS_WPS
 from twitcher.status import job_status_values, STATUS_UNKNOWN
 from twitcher.visibility import visibility_values, VISIBILITY_PRIVATE
 from pywps import Process as ProcessWPS
+
+import twitcher.wps_restapi.swagger_definitions as sd
 
 
 class Service(dict):
@@ -579,37 +581,13 @@ class Process(DescriptionType):
         }
 
     def json(self):
-        description = self.description()
-
-        description["inputs"] = [i.data_description() for i in self.inputs]
-        description["outputs"] = [o.data_description() for o in self.outputs]
-        description["executeEndpoint"] = self.executeEndpoint
-
-        return description
+        return sd.ProcessSchema().deserialize(self)
 
     def process_offering(self):
-        offering = {'process': self.json()}
+        return sd.ProcessOfferingSchema().deserialize(ProcessOffering(self))
 
-        if self.version:
-            offering['processVersion'] = self.version
-
-        properties = [
-            "jobControlOptions",
-            "outputTransmission",
-        ]
-        offering.update({p: self[p] for p in properties if p in self})
-        return offering
-
-    def summary(self):
-        description = self.description()
-        properties = [
-            "version",
-            "jobControlOptions",
-            "processDescriptionURL",
-            "outputTransmission",
-        ]
-        description.update({p: self[p] for p in properties if p in self})
-        return description
+    def process_summary(self):
+        return sd.ProcessSummarySchema().deserialize(self)
 
     @staticmethod
     def from_wps(wps_process, **extra_params):
@@ -630,24 +608,14 @@ class Process(DescriptionType):
         return process_mapping[process_key]()
 
 
-class Input(DataDescriptionType):
-    def inputTypeChoice(self):
-        properties = [
-            "literalDataDomains",  # literalInputType
-            "supportedCRS"  # boundingBoxInputType
-            # complexInputType not defined
-        ]
-        input_type_choice = {p: self[p] for p in properties if p in self}
-        return input_type_choice
-
-    def inputType(self):
-        input_type = self.inputTypeChoice()
-        input_type.update(self.data_description())
-        return input_type
-
-
-class Output(DataDescriptionType):
-    pass
+class ProcessOffering(dict):
+    def __init__(self, process):
+        super(ProcessOffering, self).__init__({
+            "process": process,
+            "processVersion": process.version,
+            "jobControlOptions": process.jobControlOptions,
+            "outputTransmission": process.outputTransmission,
+        })
 
 
 class Quote(dict):

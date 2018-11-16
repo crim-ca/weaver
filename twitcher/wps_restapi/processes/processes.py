@@ -444,7 +444,7 @@ def get_processes(request):
     try:
         # get local processes
         store = processstore_factory(request.registry)
-        processes = [process.summary() for process in
+        processes = [process.process_summary() for process in
                      store.list_processes(visibility=VISIBILITY_PUBLIC, request=request)]
         response_body = {'processes': processes}
 
@@ -563,7 +563,7 @@ def add_local_process(request):
         # raised on invalid process name
         raise HTTPBadRequest(detail=ex.message)
 
-    return HTTPOk(json={'deploymentDone': True, 'processSummary': saved_process.summary()})
+    return HTTPOk(json={'deploymentDone': True, 'processSummary': saved_process.process_summary()})
 
 
 @sd.process_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer='json',

@@ -21,6 +21,13 @@ job_status_values = frozenset([
     STATUS_PENDING,
 ])
 
+job_status_values_ogc = frozenset([
+    STATUS_ACCEPTED,
+    STATUS_RUNNING,
+    STATUS_SUCCEEDED,
+    STATUS_FAILED
+])
+
 job_status_categories = {
     # note: only [Succeeded, Failed, Accepted, Running] are OGC compliant
     # note: PyWPS use [Succeeded, Failed, Accepted, Started, Paused, Exception]
