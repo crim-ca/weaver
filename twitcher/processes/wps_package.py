@@ -25,7 +25,7 @@ from twitcher.processes import opensearch
 
 from twitcher import namesgenerator
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS
-from twitcher.processes.constants import WPS_INPUT, WPS_OUTPUT, WPS_COMPLEX, WPS_BOUNDINGBOX, WPS_LITERAL
+from twitcher.processes.constants import WPS_INPUT, WPS_OUTPUT, WPS_COMPLEX, WPS_BOUNDINGBOX, WPS_LITERAL, WPS_REFERENCE
 from twitcher.processes.wps_process import WpsProcess
 from twitcher.processes.wps_workflow import default_make_tool
 from twitcher.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
@@ -517,6 +517,8 @@ def _json2wps_io(io_info, io_select):
 
     # rename some inputs
     io_info["supported_formats"] = io_info.pop("formats")
+    io_info["identifier"] = _get_field(io_info, "identifier", search_variations=True, pop_found=True)
+    io_info.pop("id", None)
     default_wps_min_max_occurs = 1
     io_info["min_occurs"] = io_info.pop("minOccurs", default_wps_min_max_occurs)
     io_info["max_occurs"] = io_info.pop("maxOccurs", default_wps_min_max_occurs)
@@ -631,8 +633,8 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
         raise PackageTypeError("CWL I/O definitions must be provided, empty list if none required.")
     if not wps_io_list:
         wps_io_list = list()
-    wps_io_dict = OrderedDict((_get_field(wps_io, 'identifier'), wps_io) for wps_io in wps_io_list)
-    cwl_io_dict = OrderedDict((_get_field(cwl_io, 'identifier'), cwl_io) for cwl_io in cwl_io_list)
+    wps_io_dict = OrderedDict((_get_field(wps_io, 'identifier', search_variations=True), wps_io) for wps_io in wps_io_list)
+    cwl_io_dict = OrderedDict((_get_field(cwl_io, 'identifier', search_variations=True), cwl_io) for cwl_io in cwl_io_list)
     missing_io_list = set(cwl_io_dict) - set(wps_io_dict)
     updated_io_list = list()
     # missing WPS I/O are inferred only using CWL->WPS definitions
@@ -640,7 +642,7 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
         updated_io_list.append(cwl_io_dict[cwl_id])
     # evaluate provided WPS I/O definitions
     for wps_io_json in wps_io_list:
-        wps_id = _get_field(wps_io_json, 'identifier')
+        wps_id = _get_field(wps_io_json, 'identifier', search_variations=True)
         # WPS I/O by id not matching any CWL->WPS I/O are discarded, otherwise merge details
         if wps_id not in cwl_io_dict:
             continue
