@@ -4,17 +4,16 @@ so that one can update the swagger without touching any other files after the in
 """
 
 from twitcher.config import TWITCHER_CONFIGURATION_EMS
+from twitcher.wps_restapi.colander_one_of import OneOfMappingType
 from twitcher.wps_restapi.utils import wps_restapi_base_path
-from twitcher.status import job_status_values, STATUS_ACCEPTED
+from twitcher.status import job_status_values_ogc, STATUS_ACCEPTED
 from twitcher.sort import job_sort_values, quote_sort_values, SORT_CREATED, SORT_ID, SORT_PROCESS
 from twitcher.sync import execute_sync_options, EXECUTE_AUTO
 from twitcher.visibility import visibility_values, VISIBILITY_PUBLIC
 from cornice import Service
 from colander import *
 
-
 API_TITLE = 'Twitcher REST API'
-
 
 #########################################################################
 # API endpoints
@@ -145,6 +144,7 @@ bill_id = SchemaNode(String(), description='The bill id')
 quote_id = SchemaNode(String(), description='The quote id')
 result_id = SchemaNode(String(), description='The result id')
 
+
 #########################################################
 # Generic schemas
 #########################################################
@@ -186,6 +186,18 @@ class MetadataList(SequenceSchema):
     metadata = MetadataObject()
 
 
+class JsonLinkSchema(MappingSchema):
+    href = SchemaNode(String(), format='url')
+    rel = SchemaNode(String(), missing=drop)
+    type = SchemaNode(String(), missing=drop)
+    hreflang = SchemaNode(String(), missing=drop)
+    title = SchemaNode(String(), missing=drop)
+
+
+class JsonLinkList(SequenceSchema):
+    jsonlink = JsonLinkSchema()
+
+
 class FormatObject(MappingSchema):
     mimeType = SchemaNode(String())
     schema = SchemaNode(String(), missing=drop)
@@ -194,13 +206,17 @@ class FormatObject(MappingSchema):
     default = SchemaNode(Boolean(), missing=drop, default=False)
 
 
-class FormatList(SequenceSchema):
+class FormatDescriptionSchema(SequenceSchema):
     format = FormatObject()
+
+
+class ParameterValues(SequenceSchema):
+    values = SchemaNode(String())
 
 
 class Parameter(MappingSchema):
     name = SchemaNode(String())
-    value = SchemaNode(String())
+    values = ParameterValues()
 
 
 class ParameterList(SequenceSchema):
@@ -213,7 +229,7 @@ class AdditionalParameter(MappingSchema):
 
 
 class AdditionalParameters(SequenceSchema):
-    additionalParameter = AdditionalParameter(title='AdditionalParameter')
+    additionalParameter = AdditionalParameter()
 
 
 class Content(MappingSchema):
@@ -230,82 +246,136 @@ class OWSContext(MappingSchema):
     offering = Offering(title='offering')
 
 
-class LiteralDataDomainObject(MappingSchema):
-    pass
-
-
-class BaseInputTypeBody(MappingSchema):
+class DescriptionTypeSchema(MappingSchema):
     id = SchemaNode(String())
     title = SchemaNode(String(), missing=drop)
     abstract = SchemaNode(String(), missing=drop)
     keywords = KeywordList(missing=drop)
+    owsContext = OWSContext(missing=drop)
     metadata = MetadataList(missing=drop)
-    formats = FormatList()
-    minOccurs = SchemaNode(Integer(), missing=drop)
-    maxOccurs = SchemaNode(Integer(), missing=drop)
-    additionalParameters = AdditionalParameters(missing=drop)
+    additionalParameters = AdditionalParameters(missing=drop, title='additionalParameters')
+    links = JsonLinkList(missing=drop)
 
 
-class BaseOutputTypeBody(MappingSchema):
-    id = SchemaNode(String())
-    title = SchemaNode(String(), missing=drop)
-    abstract = SchemaNode(String(), missing=drop)
-    keywords = KeywordList(missing=drop)
-    metadata = MetadataList(missing=drop)
-    formats = FormatList()
-    minOccurs = SchemaNode(Integer(), missing=drop)
-    maxOccurs = SchemaNode(Integer(), missing=drop)
-    additionalParameters = AdditionalParameters(missing=drop)
+class DataDescriptionTypeSchema(DescriptionTypeSchema):
+    minOccurs = SchemaNode(String())
+    maxOccurs = SchemaNode(String())
+    formats = FormatDescriptionSchema()
 
 
-class LiteralInputTypeBody(BaseInputTypeBody):
-    LiteralDataDomain = LiteralDataDomainObject(missing=drop)
-
-
-class ComplexInputTypeBody(BaseInputTypeBody):
+class ComplexInputTypeSchema(MappingSchema):
     pass
 
 
-class BoundingBoxInputTypeBody(BaseInputTypeBody):
+class SupportedCrsType(MappingSchema):
+    crs = SchemaNode(String(), format='url')
+    default = SchemaNode(Boolean, missing=drop)
+
+
+class SupportedCrsList(SequenceSchema):
+    supportedCRS = SupportedCrsType()
+
+
+class BoundingBoxInputTypeSchema(MappingSchema):
+    supportedCRS = SupportedCrsList()
+
+
+class DataTypeSchema(MappingSchema):
+    name = SchemaNode(String())
+    reference = SchemaNode(String(), format='url', missing=drop)
+
+
+class UomSchema(DataTypeSchema):
     pass
 
 
-class LiteralOutputTypeBody(BaseOutputTypeBody):
-    LiteralDataDomain = LiteralDataDomainObject(missing=drop)
+class LiteralDataDomainTypeBase(MappingSchema):
+    defaultValue = SchemaNode(String(), missing=drop)
+    dataType = DataTypeSchema(missing=drop)
+    uom = UomSchema(missing=drop)
 
 
-class ComplexOutputTypeBody(BaseOutputTypeBody):
-    pass
+class AllowedValuesList(SequenceSchema):
+    allowedValues = SchemaNode(String())
 
 
-class BoundingBoxOutputTypeBody(BaseOutputTypeBody):
-    pass
+class AllowedValuesType(MappingSchema):
+    allowedValues = AllowedValuesList()
 
 
-class InputTypeBody(BaseInputTypeBody):
-    literal = LiteralInputTypeBody()
-    complex = ComplexInputTypeBody()
-    bounding_box = BoundingBoxInputTypeBody()
+class RangeSchema(MappingSchema):
+    minimumValue = SchemaNode(String(), missing=drop)
+    maximumValue = SchemaNode(String(), missing=drop)
+    spacing = SchemaNode(String(), missing=drop)
+    rangeClosure = SchemaNode(String(), missing=drop, validator=OneOf(["closed",
+                                                                       "open",
+                                                                       "open-closed",
+                                                                       "closed-open"]))
 
 
-class OutputTypeBody(BaseOutputTypeBody):
-    literal = LiteralOutputTypeBody()
-    complex = ComplexOutputTypeBody()
-    bounding_box = BoundingBoxOutputTypeBody()
+class AllowedRangesList(SequenceSchema):
+    allowedRanges = RangeSchema()
+
+
+class AllowedRangesType(MappingSchema):
+    allowedRanges = AllowedRangesList()
+
+
+class AnyValueType(MappingSchema):
+    anyValue = SchemaNode(Boolean(), missing=drop)
+
+
+class ValuesReferenceList(SequenceSchema):
+    valuesReference = SchemaNode(String())
+
+
+class ValuesReferencesType(MappingSchema):
+    valuesReferences = ValuesReferenceList()
+
+
+class LiteralDataDomainTypeOneOfSchema(OneOfMappingType):
+    _one_of = (AllowedValuesType,
+               AllowedRangesType,
+               ValuesReferencesType,
+               AnyValueType)  # must be last because it's the most permissive
+    _mapping = LiteralDataDomainTypeBase
+
+
+class LiteralDataDomainTypeSchema(MappingSchema):
+    schema_type = LiteralDataDomainTypeOneOfSchema
+
+
+class LiteralDataDomainTypeList(SequenceSchema):
+    literalDataDomain = LiteralDataDomainTypeSchema()
+
+
+class LiteralInputTypeSchema(MappingSchema):
+    literalDataDomains = LiteralDataDomainTypeList()
+
+
+class InputTypeChoiceSchema(OneOfMappingType):
+    _one_of = (LiteralInputTypeSchema,
+               BoundingBoxInputTypeSchema,
+               ComplexInputTypeSchema)  # must be last because it's the most permissive
+    _mapping = DataDescriptionTypeSchema
+
+
+class InputTypeSchema(DataDescriptionTypeSchema):
+    schema_type = InputTypeChoiceSchema
 
 
 class InputTypeList(SequenceSchema):
-    input = InputTypeBody(validator=OneOf(['literal', 'complex', 'bounding_box']))
+    input = InputTypeSchema()
 
 
 class OutputTypeList(SequenceSchema):
-    output = OutputTypeBody(validator=OneOf(['literal', 'complex', 'bounding_box']))
+    output = DataDescriptionTypeSchema()
 
 
 JobControlOptionsEnum = SchemaNode(String(), title='jobControlOptions', missing=drop,
-                                   validator=OneOf(execute_sync_options), default=EXECUTE_AUTO)
-OutputTransmissionEnum = SchemaNode(String(), title='outputTransmission', missing=drop,
-                                    validator=OneOf(['value', 'reference']))
+                                   validator=OneOf(['sync-execute', 'async-execute']), default=EXECUTE_AUTO)
+TransmissionModeEnum = SchemaNode(String(), title='transmissionMode', missing=drop,
+                                  validator=OneOf(['value', 'reference']))
 
 
 class LaunchJobQuerystring(MappingSchema):
@@ -494,17 +564,20 @@ class ProviderCapabilitiesSchema(MappingSchema):
     type = SchemaNode(String())
 
 
-class ProcessSummarySchema(MappingSchema):
+class OutputTransmissionList(SequenceSchema):
+    transmissionMode = TransmissionModeEnum
+
+
+class JobControlOptionsList(SequenceSchema):
+    JobControlOptions = JobControlOptionsEnum
+
+
+class ProcessSummarySchema(DescriptionTypeSchema):
     """WPS process definition."""
-    id = SchemaNode(String())
-    title = SchemaNode(String())
-    abstract = SchemaNode(String())
-    keywords = KeywordList(missing=drop)
-    metadata = MetadataList(missing=drop)
-    version = SchemaNode(String())
-    jobControlOptions = JobControlOptionsEnum
-    processDescriptionURL = SchemaNode(String(), format='url', missing=drop, title='processDescriptionURL')
-    outputTransmission = OutputTransmissionEnum
+    version = SchemaNode(String(), missing=drop)
+    jobControlOptions = JobControlOptionsList(missing=drop)
+    outputTransmission = OutputTransmissionList(missing=drop)
+    processDescriptionURL = SchemaNode(String(), format='url', missing=drop)
 
 
 class ProcessListSchema(SequenceSchema):
@@ -519,17 +592,10 @@ class ProviderProcessListSchema(SequenceSchema):
     provider = ProviderSummaryProcessesSchema(missing=drop)
 
 
-class ProcessDetailSchema(MappingSchema):
-    id = SchemaNode(String())
-    title = SchemaNode(String(), missing=drop)
-    abstract = SchemaNode(String(), missing=drop)
-    keywords = KeywordList(missing=drop)
-    metadata = MetadataList(missing=drop)
+class ProcessSchema(DescriptionTypeSchema):
     inputs = InputTypeList(missing=drop)
     outputs = OutputTypeList(missing=drop)
-    executeEndpoint = SchemaNode(String(), format='url', missing=drop, title='executeEndpoint')
-    additionalParameters = AdditionalParameters(missing=drop, title='additionalParameters')
-    owsContext = OWSContext(missing=drop, title='owsContext')
+    executeEndpoint = SchemaNode(String(), format='url', missing=drop)
 
 
 class ProcessOutputDescriptionSchema(MappingSchema):
@@ -544,7 +610,7 @@ class ProcessOutputDescriptionSchema(MappingSchema):
 JobStatusEnum = SchemaNode(
     String(),
     default=None,
-    validator=OneOf(job_status_values),
+    validator=OneOf(job_status_values_ogc),
     example=STATUS_ACCEPTED)
 JobSortEnum = SchemaNode(
     String(),
@@ -572,22 +638,12 @@ class GetJobsRequest(MappingSchema):
 
 
 class SingleJobStatusSchema(MappingSchema):
-    status = JobStatusEnum
     jobID = SchemaNode(String(), example='a9d14bf4-84e0-449a-bac8-16e598efe807', description="ID of the job.")
-    message = SchemaNode(String(), example='Job {}.'.format(STATUS_ACCEPTED))
-    percentCompleted = SchemaNode(Integer(), example=0)
-    exceptions = SchemaNode(
-        String(),
-        missing=drop,
-        example='http://{host}/twitcher/providers/{my-wps-id}/processes/{my-process-id}/jobs/{my-job-id}/exceptions')
-    outputs = SchemaNode(
-        String(),
-        missing=drop,
-        example='http://{host}/twitcher/providers/{my-wps-id}/processes/{my-process-id}/jobs/{my-job-id}/outputs')
-    logs = SchemaNode(
-        String(),
-        missing=drop,
-        example='http://{host}/twitcher/providers/{my-wps-id}/processes/{my-process-id}/jobs/{my-job-id}/logs')
+    status = JobStatusEnum
+    expirationDate = SchemaNode(DateTime(), missing=drop)
+    estimatedCompletion = SchemaNode(DateTime(), missing=drop)
+    nextPoll = SchemaNode(DateTime(), missing=drop)
+    percentCompleted = SchemaNode(Integer(), example=0, validator=Range(min=0, max=100))
 
 
 class JobListSchema(SequenceSchema):
@@ -706,7 +762,7 @@ class ProvidersSchema(SequenceSchema):
 
 
 class ProcessesSchema(SequenceSchema):
-    provider_processes_service = ProcessDetailSchema()
+    provider_processes_service = ProcessSchema()
 
 
 class JobOutputSchema(MappingSchema):
@@ -722,16 +778,37 @@ class JobOutputsSchema(SequenceSchema):
     output = JobOutputSchema()
 
 
-class JobLinkSchema(MappingSchema):
-    href = SchemaNode(String(), format='url')
-    rel = SchemaNode(String(), missing=drop, description="Relationship type of the link to the job.", example="bill")
-    type = SchemaNode(String(), missing=drop, description="Content-Type of the link's response.")
-    lang = SchemaNode(String(), missing=drop)
-    title = SchemaNode(String(), missing=drop)
+class ReferenceSchema(MappingSchema):
+    href = SchemaNode(String())
+    mimeType = SchemaNode(String(), missing=drop)
+    schema = SchemaNode(String(), missing=drop)
+    encoding = SchemaNode(String(), missing=drop)
+    body = SchemaNode(String(), missing=drop)
+    bodyReference = SchemaNode(String(), missing=drop, format='url')
 
 
-class JobLinksSchema(SequenceSchema):
-    link = JobLinkSchema()
+class OutputInfoSchemaBase(MappingSchema):
+    id = SchemaNode(String())
+
+
+class DataEncodingAttributesSchema(MappingSchema):
+    mimeType = SchemaNode(String(), missing=drop)
+    schema = SchemaNode(String(), missing=drop)
+    encoding = SchemaNode(String(), missing=drop)
+
+
+class OutputValueSchema(DataEncodingAttributesSchema):
+    data = SchemaNode(String())
+
+
+class OutputInfoSchemaOneOfSchema(OneOfMappingType):
+    _one_of = (OutputValueSchema,
+               ReferenceSchema)
+    _mapping = OutputInfoSchemaBase
+
+
+class OutputInfoSchema(OneOfMappingType):
+    schema_type = OutputInfoSchemaOneOfSchema
 
 
 class ExceptionTextList(SequenceSchema):
@@ -797,7 +874,7 @@ class VersionsSchema(MappingSchema):
 
 
 class ProcessOfferingBody(MappingSchema):
-    process = ProcessDetailSchema(title='Process')
+    process = ProcessSchema(title='Process')
 
 
 class PackageBody(MappingSchema):
@@ -830,8 +907,8 @@ class ProcessesEndpoint(MappingSchema):
 class PostProcessJobBody(MappingSchema):
     inputs = JobInputList(missing=drop)
     outputs = JobOutputList()
-    mode = SchemaNode(String())
-    response = SchemaNode(String())
+    mode = SchemaNode(String(), validator=OneOf(execute_sync_options))
+    response = SchemaNode(String(), validator=OneOf(["raw", "document"]))
 
 
 class PostProcessJobsEndpoint(MappingSchema):
@@ -1041,16 +1118,16 @@ class OkPostProcessesSchema(MappingSchema):
     body = OkPostProcessDeployBodySchema()
 
 
-class OkGetProcessBodySchema(MappingSchema):
-    process = ProcessDetailSchema()
-    processVersion = SchemaNode(String())
-    jobControlOptions = JobControlOptionsEnum
-    outputTransmission = OutputTransmissionEnum
+class ProcessOfferingSchema(MappingSchema):
+    process = ProcessSchema()
+    processVersion = SchemaNode(String(), missing=drop)
+    jobControlOptions = JobControlOptionsList(missing=drop)
+    outputTransmission = OutputTransmissionList(missing=drop)
 
 
 class OkGetProcessSchema(MappingSchema):
     header = JsonHeader()
-    body = OkGetProcessBodySchema()
+    body = ProcessOfferingSchema()
 
 
 class OkGetProcessPackageSchema(MappingSchema):
@@ -1134,14 +1211,14 @@ class OkGetSingleJobStatusResponse(MappingSchema):
     body = SingleJobStatusSchema()
 
 
-class OkGetSingleJobOutputsBodySchema(MappingSchema):
-    outputs = JobOutputsSchema()
-    links = JobLinksSchema()
+class OkGetSingleJobResultsBodySchema(MappingSchema):
+    outputs = OutputInfoSchema()
+    links = JsonLinkList(missing=drop)
 
 
-class OkGetSingleJobOutputsResponse(MappingSchema):
+class OkGetSingleJobResultsResponse(MappingSchema):
     header = JsonHeader()
-    body = OkGetSingleJobOutputsBodySchema()
+    body = OkGetSingleJobResultsBodySchema()
 
 
 class OkGetSingleOutputResponse(MappingSchema):
@@ -1281,7 +1358,7 @@ delete_job_responses = {
     '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_job_results_responses = {
-    '200': OkGetSingleJobOutputsResponse(description='success'),
+    '200': OkGetSingleJobResultsResponse(description='success'),
     '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_quote_list_responses = {
