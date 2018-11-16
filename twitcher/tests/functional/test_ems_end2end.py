@@ -11,7 +11,7 @@ from twitcher.status import (
     job_status_values,
     job_status_categories,
 )
-from typing import Text, Dict, Optional
+from typing import Text, Dict, Optional, Any
 from unittest import TestCase
 from pyramid import testing
 from pyramid.httpexceptions import HTTPOk, HTTPCreated, HTTPBadRequest, HTTPUnauthorized, HTTPNotFound
@@ -164,8 +164,9 @@ class End2EndEMSTestCase(TestCase):
     def clear_test_processes(cls):
         for process_id, process_info in cls.test_processes_info.items():
             path = '{}/processes/{}'.format(cls.TWITCHER_PROTECTED_EMS_URL, process_info.test_id)
-            resp = cls.request('DELETE', path, headers=cls.user_headers(cls.ALICE_CREDENTIALS))
-            if resp.status_code not in (HTTPOk.code, HTTPNotFound.code):
+            resp = cls.request('DELETE', path, headers=cls.user_headers(cls.ALICE_CREDENTIALS), expect_errors=True)
+            # unauthorized also would mean the process doesn't exist since Alice should have permissions on it
+            if resp.status_code not in (HTTPOk.code, HTTPUnauthorized.code, HTTPNotFound.code):
                 raise Exception("Failed cleanup of test processes!")
 
     @classmethod
@@ -198,15 +199,20 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def request(cls, method, url, **kw):
-        # type: (Text, Text, Optional[Dict]) -> TestResponse
-        """Executes the request, but following any server prior redirects as needed."""
+        # type: (Text, Text, Optional[Any]) -> TestResponse
+        """
+        Executes the request, but following any server prior redirects as needed.
+        Also prepares JSON body and obvious error handling according to a given status code.
+        """
         status = kw.pop('status', None)
         json_body = kw.pop('json', None)
         if json_body is not None:
-            kw.update({'param': json.dumps(json_body, cls=json.JSONEncoder)})
-        # TestApp
+            kw.update({'params': json.dumps(json_body, cls=json.JSONEncoder)})
+        if status and status >= 300:
+            kw.update({'expect_errors': True})
         resp = cls.app._gen_request(method.upper(), url, **kw)
-        resp = resp.follow()
+        if 300 <= resp.status_code < 400:
+            resp = resp.follow()
         assert resp.status_code == status or status is None
         return resp
 
