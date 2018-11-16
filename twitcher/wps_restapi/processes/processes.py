@@ -12,7 +12,7 @@ from time import sleep
 from twitcher.wps import load_pywps_cfg
 from twitcher.adapter import servicestore_factory, jobstore_factory, processstore_factory
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS
-from twitcher.datatype import Process as ProcessDB, Job as JobDB, Input, Output
+from twitcher.datatype import Process as ProcessDB, Job as JobDB
 from twitcher.exceptions import (
     ProcessRegistrationError,
     ProcessNotFound,
@@ -532,10 +532,6 @@ def add_local_process(request):
         raise HTTPUnprocessableEntity(detail=ex.message)
     except Exception as ex:
         raise HTTPBadRequest("Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex)))
-
-    # convert inputs and outputs to be compliant with schema
-    process_info['inputs'] = [Input.from_wps_names(i) for i in process_info['inputs']]
-    process_info['outputs'] = [Output.from_wps_names(i) for i in process_info['outputs']]
 
     # validate process type against twitcher configuration
     settings = request.registry.settings
