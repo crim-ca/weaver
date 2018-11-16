@@ -546,7 +546,7 @@ def _json2wps_io(io_info, io_select):
     # convert by type
     io_type = io_info.pop('type', WPS_COMPLEX)  # only ComplexData doesn't have 'type'
     if io_select == WPS_INPUT:
-        if io_type == WPS_COMPLEX:
+        if io_type in (WPS_REFERENCE, WPS_COMPLEX):
             io_info.pop('data_type', None)
             if 'supported_formats' not in io_info:
                 io_info['supported_formats'] = [Format(mime_type="text/plain")]
@@ -565,7 +565,7 @@ def _json2wps_io(io_info, io_select):
         # extra params to remove for outputs
         io_info.pop('min_occurs', None)
         io_info.pop('max_occurs', None)
-        if io_type == WPS_COMPLEX:
+        if io_type in (WPS_REFERENCE, WPS_COMPLEX):
             return ComplexOutput(**io_info)
         if io_type == WPS_BOUNDINGBOX:
             return BoundingBoxOutput(**io_info)
