@@ -308,7 +308,7 @@ def submit_job_handler(request, service_url, is_workflow=False):
 
     if request.json_body['mode'] not in [EXECUTE_ASYNC, EXECUTE_AUTO]:
         raise HTTPNotImplemented(detail='{0} mode not supported.'.format(request.json_body['mode']))
-    async_execute = request.json_body['mode'] != EXECUTE_SYNC
+    execute_async = request.json_body['mode'] != EXECUTE_SYNC
 
     if request.json_body['response'] != 'document':
         raise HTTPNotImplemented(detail='{0} response not supported.'.format(request.json_body['response']))
@@ -324,17 +324,16 @@ def submit_job_handler(request, service_url, is_workflow=False):
             raise HTTPNotImplemented(detail='{0} transmissionMode not supported.'
                                      .format(job_output['transmissionMode']))
 
+    store = jobstore_factory(request.registry)
+    job = store.save_job(task_id=STATUS_PENDING, process=process_id, service=provider_id,
+                         inputs=request.json_body['inputs'], is_workflow=is_workflow,
+                         user_id=request.authenticated_userid, execute_async=execute_async, custom_tags=tags)
     result = execute_process.delay(
+        job_id=job.id,
         url=clean_ows_url(service_url),
-        service=provider_id,
-        process_id=process_id,
-        inputs=request.json_body['inputs'],
-        is_workflow=is_workflow,
-        user_id=request.authenticated_userid,
-        async=async_execute,
-        custom_tags=tags,
         # Convert EnvironHeaders to a simple dict (should cherrypick the required headers)
         headers={k: v for k, v in request.headers.items()})
+    LOGGER.debug("Celery pending task `{}` for job `{}`.", result.id, job.id)
 
     # local/provider process location
     location_base = '/providers/{provider_id}'.format(provider_id=provider_id) if provider_id else ''
@@ -342,29 +341,9 @@ def submit_job_handler(request, service_url, is_workflow=False):
         base_url=wps_restapi_base_url(request.registry.settings),
         location_base=location_base,
         process_id=process_id,
-        job_id=result.id)
-
-    retry = 0
-    max_retry = 5
-    while True:
-        try:
-            subreq = Request.blank(location)
-            response = request.invoke_subrequest(subreq)
-            if response.status_code == HTTPOk.code:
-                break
-        except HTTPNotFound:
-            # It's expected, raise any other exception
-            pass
-
-        retry += 1
-        if retry > max_retry:
-            raise HTTPInternalServerError('Submit job failed. Status is unavailable after {0} seconds'
-                .format(max_retry))
-        else:
-            sleep(1)
-
+        job_id=job.id)
     body_data = {
-        'jobID': result.id,
+        'jobID': job.id,
         'status': STATUS_ACCEPTED,
         'location': location
     }
