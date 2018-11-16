@@ -2,6 +2,10 @@
 extends = buildout.cfg
 parts += adapter_impl
 
+[config]
+workers = 5
+timeout = 30
+
 ## Development options
 # versions = noversions
 
