@@ -68,7 +68,8 @@ class End2EndEMSTestCase(TestCase):
         cls.TWITCHER_URL = get_twitcher_url(cls.settings())
         cls.TWITCHER_RESTAPI_URL = wps_restapi_base_url(cls.settings())
         cls.TWITCHER_PROTECTED_URL = owsproxy_base_url(cls.settings())
-        cls.TWITCHER_PROTECTED_EMS_URL = '{}/ems'.format(cls.TWITCHER_PROTECTED_URL)
+        cls.TWITCHER_PROTECTED_EMS_URL = os.getenv('TWITCHER_PROTECTED_EMS_URL',
+                                                   '{}/ems'.format(cls.TWITCHER_PROTECTED_URL))
         cls.WSO2_HOSTNAME = get_setting('WSO2_HOSTNAME', cls.app)
         cls.WSO2_CLIENT_ID = get_setting('WSO2_CLIENT_ID', cls.app)
         cls.WSO2_CLIENT_SECRET = get_setting('WSO2_CLIENT_SECRET', cls.app)
@@ -167,7 +168,8 @@ class End2EndEMSTestCase(TestCase):
             resp = cls.request('DELETE', path, headers=cls.user_headers(cls.ALICE_CREDENTIALS), expect_errors=True)
             # unauthorized also would mean the process doesn't exist since Alice should have permissions on it
             if resp.status_code not in (HTTPOk.code, HTTPUnauthorized.code, HTTPNotFound.code):
-                raise Exception("Failed cleanup of test processes!")
+                raise Exception("Failed cleanup of test processes! " +
+                                "Unexpected HTTP code: `{}`.".format(resp.status_code))
 
     @classmethod
     def login(cls, username, password):
