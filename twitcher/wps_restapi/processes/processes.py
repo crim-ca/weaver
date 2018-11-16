@@ -579,16 +579,10 @@ def get_local_process(request):
     try:
         store = processstore_factory(request.registry)
         process = store.fetch_by_id(process_id, request=request)
+        process.inputs = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
+
         offering = process.process_offering()
 
-        try:
-            inputs, payload = process.inputs, process["payload"]
-            new_inputs = opensearch.replace_inputs_describe_process(inputs, payload)
-            new_inputs = [Input(i).inputType() for i in new_inputs]
-            offering["process"]["inputs"] = new_inputs
-        except KeyError:
-            # Process may not have a payload... in this case no eoimage inputs anyway
-            pass
         return HTTPOk(json=offering)
     except HTTPException:
         raise  # re-throw already handled HTTPException
