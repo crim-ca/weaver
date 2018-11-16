@@ -184,8 +184,7 @@
                 "name": "UniqueTOI",
                 "values": ["true"]
               }
-            ],
-            "role": "http://www.opengis.net/eoc/applicationContext"
+            ]
           }
         ],
         "identifier": "StackCreation-graph-json-remote",
@@ -198,8 +197,7 @@
                     "name": "EOImage",
                     "values": ["true"]
                   }
-                ],
-                "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata"
+                ]
               }
             ],
             "formats": [

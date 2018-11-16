@@ -312,7 +312,6 @@ class EOImageDescribeProcessHandler(object):
             u"maxOccurs": u"1",
             u"additionalParameters": [
                 {
-                    u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
                     u"parameters": [
                         {u"name": u"CatalogSearchField", u"values": [u"bbox"]}
                     ],
@@ -334,7 +333,6 @@ class EOImageDescribeProcessHandler(object):
             u"literalDataDomains": [{u"dataType": {u"name": u"String"}}],
             u"additionalParameters": [
                 {
-                    u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
                     u"parameters": [
                         {
                             u"name": u"CatalogSearchField",
@@ -366,7 +364,6 @@ class EOImageDescribeProcessHandler(object):
             u"literalDataDomains": [{u"dataType": {u"name": u"String"}}],
             u"additionalParameters": [
                 {
-                    u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
                     u"parameters": [
                         {u"name": u"CatalogSearchField", u"values": [search_field]}
                     ],
@@ -525,6 +522,8 @@ def replace_inputs_describe_process(inputs, payload):
     :param inputs:
     :param payload:
     """
+    if not payload:
+        return inputs
 
     # add "additionalParameters" property from the payload
     process = payload["processDescription"]["process"]
