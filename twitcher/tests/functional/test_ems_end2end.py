@@ -140,6 +140,10 @@ class End2EndEMSTestCase(TestCase):
         return cls.test_processes_info.get(process_id)
 
     @classmethod
+    def get_test_processes_id(cls):
+        return [process.test_id for process in cls.test_processes_info.values()]
+
+    @classmethod
     def setup_test_processes(cls):
         # type: (...) -> None
         cls.PROCESS_STACKER_ID = 'Stacker'
@@ -177,7 +181,7 @@ class End2EndEMSTestCase(TestCase):
         for process_id, process_info in cls.test_processes_info.items():
             path = '{}/processes/{}'.format(cls.TWITCHER_PROTECTED_EMS_URL, process_info.test_id)
             headers, cookies = cls.user_headers_cookies(cls.ALICE_CREDENTIALS)
-            resp = cls.request('DELETE', path, headers=headers, cookies=cookies, expect_errors=True)
+            resp = cls.request('DELETE', path, headers=headers, cookies=cookies, ignore_errors=True)
             # unauthorized also would mean the process doesn't exist since Alice should have permissions on it
             if resp.status_code not in (HTTPOk.code, HTTPUnauthorized.code, HTTPNotFound.code):
                 raise Exception("Failed cleanup of test processes! " +
@@ -185,7 +189,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def login(cls, username, password):
-        # type: (Text, Text) -> Tuple[Dict[str, str], bool]
+        # type: (Text, Text) -> Tuple[Dict[str, str], Dict[str, str]]
         """
         Login using WSO2 or Magpie according to `WSO2_ENABLED` to retrieve session cookies.
 
@@ -196,7 +200,7 @@ class End2EndEMSTestCase(TestCase):
         Magpie:
             Retrieves the cookie using a simple local user login.
 
-        :returns: (Headers/Cookies, False/True) respectively to WSO2/Magpie login.
+        :returns: (Headers, Cookies) respectively to WSO2/Magpie login procedures.
         """
         if cls.WSO2_ENABLED:
             data = {
@@ -212,37 +216,37 @@ class End2EndEMSTestCase(TestCase):
             if resp.status_code == HTTPOk.code:
                 access_token = resp.json().get('access_token')
                 assert access_token is not None, "Failed login!"
-                return {'Authorization': 'Bearer {}'.format(access_token)}, False
+                return {'Authorization': 'Bearer {}'.format(access_token)}, {}
             cls.assert_response(resp)
         else:
             data = {'user_name': username, 'password': password}
             headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
             resp = requests.post('{}/signin'.format(cls.MAGPIE_URL), json=data, headers=headers)
             if resp.status_code == HTTPOk.code:
-                return dict(resp.cookies), False
+                return {}, dict(resp.cookies)
             cls.assert_response(resp)
 
     @classmethod
     def user_headers_cookies(cls, credentials):
         # type: (Dict[str, str]) -> Tuple[Dict[str, str], Dict[str, str]]
-        tokens, are_cookies = cls.login(**credentials)
+        header_tokens, cookie_tokens = cls.login(**credentials)
         headers = deepcopy(cls.headers)
         cookies = deepcopy(cls.cookies)
-        if are_cookies:
-            cookies.update(tokens)
-        else:
-            headers.update(tokens)
+        headers.update(header_tokens)
+        cookies.update(cookie_tokens)
         return headers, cookies
 
     @classmethod
-    def request(cls, method, url, **kw):
-        # type: (Text, Text, Optional[Any]) -> TestResponse
+    def request(cls, method, url, ignore_errors=False, **kw):
+        # type: (Text, Text, Optional[bool], Optional[Any]) -> TestResponse
         """
         Executes the request, but following any server prior redirects as needed.
         Also prepares JSON body and obvious error handling according to a given status code.
         """
         status = kw.pop('status', None)
         json_body = kw.pop('json', None)
+        expect_errors = kw.pop('expect_errors', ignore_errors)
+        message = kw.pop('message', '')
         method = method.upper()
 
         # use `requests.Request` with cases that doesn't work well with `webtest.TestApp`
@@ -261,12 +265,12 @@ class End2EndEMSTestCase(TestCase):
 
             if json_body is not None:
                 kw.update({'params': json.dumps(json_body, cls=json.JSONEncoder)})
-            if status and status >= 300:
+            if status and status >= 400:
                 kw.update({'expect_errors': True})
             cookies = kw.pop('cookies', dict())
             for cookie_name, cookie_value in cookies.items():
                 cls.app.set_cookie(cookie_name, cookie_value)
-            resp = cls.app._gen_request(method, url, **kw)
+            resp = cls.app._gen_request(method, url, expect_errors, **kw)
 
             while 300 <= resp.status_code < 400 and max_redirects > 0:
                 resp = resp.follow()
@@ -274,7 +278,8 @@ class End2EndEMSTestCase(TestCase):
             assert max_redirects >= 0
             cls.app.reset()  # reset cookies as required
 
-        cls.assert_response(resp, status)
+        if not ignore_errors:
+            cls.assert_response(resp, status, message)
         return resp
 
     @classmethod
@@ -284,7 +289,7 @@ class End2EndEMSTestCase(TestCase):
         reason = getattr(response, 'reason', '')
         content = getattr(response, 'content', '')
         msg = "HTTPError: {} {} [{}, {}]".format(response.status_code, reason, message, content)
-        assert (status is not None and status == rs) or (status is None and rs < 400), msg
+        assert (status is not None and status == rs) or (status is None and rs <= 400), msg
 
     @classmethod
     def validate_test_server(cls):
@@ -306,33 +311,33 @@ class End2EndEMSTestCase(TestCase):
         path = '{}/processes'.format(self.TWITCHER_PROTECTED_EMS_URL)
         resp = self.request('GET', path, headers=headers_a, cookies=cookies_a, status=HTTPOk.code)
         proc = resp.json.get('processes')
-        assert isinstance(proc, list)
-        assert len(filter(lambda p: p['id'] in self.test_processes_info, proc)) == 0, "Test processes shouldn't exist!"
+        test_processes = filter(lambda p: p['id'] in self.get_test_processes_id(), proc)
+        assert len(test_processes) == 0, "Test processes shouldn't exist!"
 
-        # deploy process application
         self.request('POST', path, headers=headers_a, cookies=cookies_a, status=HTTPCreated.code,
-                     json=self.test_processes_info[self.PROCESS_STACKER_ID].deploy_payload)
-        # deploy process workflow with missing step
+                     json=self.test_processes_info[self.PROCESS_STACKER_ID].deploy_payload,
+                     message="Expect created and deployed application process.")
         self.request('POST', path, headers=headers_a, cookies=cookies_a, status=HTTPBadRequest.code,
-                     json=self.test_processes_info[self.PROCESS_WORKFLOW_ID].deploy_payload)
-        # deploy other process step
+                     json=self.test_processes_info[self.PROCESS_WORKFLOW_ID].deploy_payload,
+                     message="Expect failure to deployed workflow process with missing step.")
         self.request('POST', path, headers=headers_a, cookies=cookies_a, status=HTTPCreated.code,
-                     json=self.test_processes_info[self.PROCESS_SFS_ID].deploy_payload)
-        # deploy process workflow with all steps available
+                     json=self.test_processes_info[self.PROCESS_SFS_ID].deploy_payload,
+                     message="Expect created and deployed application process.")
         self.request('POST', path, headers=headers_a, cookies=cookies_a, status=HTTPCreated.code,
-                     json=self.test_processes_info[self.PROCESS_WORKFLOW_ID].deploy_payload)
+                     json=self.test_processes_info[self.PROCESS_WORKFLOW_ID].deploy_payload,
+                     message="Expect created and deployed workflow process.")
 
         # processes visible by alice
         resp = self.request('GET', path, headers=headers_a, cookies=cookies_a, status=HTTPOk.code)
         proc = resp.json.get('processes')
-        found_processes = filter(lambda p: p['id'] in self.test_processes_info, proc)
-        assert len(found_processes) == len(self.test_processes_info), "Test processes should exist."
+        test_processes = filter(lambda p: p['id'] in self.get_test_processes_id(), proc)
+        assert len(test_processes) == len(self.test_processes_info), "Test processes should exist."
 
         # processes not yet visible by bob
         resp = self.request('GET', path, headers=headers_b, cookies=cookies_b, status=HTTPOk.code)
         proc = resp.json.get('processes')
-        found_processes = filter(lambda p: p['id'] in self.test_processes_info, proc)
-        assert len(found_processes) == 0, "Test processes shouldn't be visible by bob."
+        test_processes = filter(lambda p: p['id'] in self.get_test_processes_id(), proc)
+        assert len(test_processes) == 0, "Test processes shouldn't be visible by bob."
 
         # processes visibility
         visible = {'value': VISIBILITY_PUBLIC}
