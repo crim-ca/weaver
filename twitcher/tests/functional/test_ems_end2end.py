@@ -152,6 +152,20 @@ class End2EndEMSTestCase(TestCase):
         for process in [cls.PROCESS_STACKER_ID, cls.PROCESS_SFS_ID, cls.PROCESS_WORKFLOW_ID]:
             cls.test_processes_info.update({process: cls.retrieve_process_info(process)})
 
+        # update the workflow to use 'test_id' instead of originals
+        workflow_deploy = cls.test_processes_info[cls.PROCESS_WORKFLOW_ID].deploy_payload
+        for exec_unit in range(len(workflow_deploy['executionUnit'])):
+            workflow_cwl_ref = workflow_deploy['executionUnit'][exec_unit].pop('href')
+            workflow_cwl_raw = cls.retrieve_payload(workflow_cwl_ref)
+            for step in workflow_cwl_raw.get('steps'):
+                step_id = workflow_cwl_raw['steps'][step]['run'].strip('.cwl')
+                for app_id in [cls.PROCESS_STACKER_ID, cls.PROCESS_SFS_ID]:
+                    if app_id == step_id:
+                        test_id = cls.test_processes_info[app_id].test_id
+                        real_id = workflow_cwl_raw['steps'][step]['run']
+                        workflow_cwl_raw['steps'][step]['run'] = real_id.replace(app_id, test_id)
+            workflow_deploy['executionUnit'][exec_unit]['unit'] = workflow_cwl_raw
+
     @classmethod
     def retrieve_process_info(cls, process_id):
         # type: (Text) -> ProcessInfo
@@ -243,9 +257,8 @@ class End2EndEMSTestCase(TestCase):
         Executes the request, but following any server prior redirects as needed.
         Also prepares JSON body and obvious error handling according to a given status code.
         """
-        status = kw.pop('status', None)
-        json_body = kw.pop('json', None)
         expect_errors = kw.pop('expect_errors', ignore_errors)
+        status = kw.pop('status', None)
         message = kw.pop('message', '')
         method = method.upper()
 
@@ -262,7 +275,7 @@ class End2EndEMSTestCase(TestCase):
 
         else:
             max_redirects = kw.pop('max_redirects', 5)
-
+            json_body = kw.pop('json', None)
             if json_body is not None:
                 kw.update({'params': json.dumps(json_body, cls=json.JSONEncoder)})
             if status and status >= 400:
@@ -314,18 +327,18 @@ class End2EndEMSTestCase(TestCase):
         test_processes = filter(lambda p: p['id'] in self.get_test_processes_id(), proc)
         assert len(test_processes) == 0, "Test processes shouldn't exist!"
 
-        self.request('POST', path, headers=headers_a, cookies=cookies_a, status=HTTPCreated.code,
+        self.request('POST', path, headers=headers_a, cookies=cookies_a, status=HTTPOk.code,
                      json=self.test_processes_info[self.PROCESS_STACKER_ID].deploy_payload,
-                     message="Expect created and deployed application process.")
-        self.request('POST', path, headers=headers_a, cookies=cookies_a, status=HTTPBadRequest.code,
+                     message="Expect deployed application process.")
+        self.request('POST', path, headers=headers_a, cookies=cookies_a, status=HTTPNotFound.code,
                      json=self.test_processes_info[self.PROCESS_WORKFLOW_ID].deploy_payload,
-                     message="Expect failure to deployed workflow process with missing step.")
-        self.request('POST', path, headers=headers_a, cookies=cookies_a, status=HTTPCreated.code,
+                     message="Expect deploy failure of workflow process with missing step.")
+        self.request('POST', path, headers=headers_a, cookies=cookies_a, status=HTTPOk.code,
                      json=self.test_processes_info[self.PROCESS_SFS_ID].deploy_payload,
-                     message="Expect created and deployed application process.")
-        self.request('POST', path, headers=headers_a, cookies=cookies_a, status=HTTPCreated.code,
+                     message="Expect deployed application process.")
+        self.request('POST', path, headers=headers_a, cookies=cookies_a, status=HTTPOk.code,
                      json=self.test_processes_info[self.PROCESS_WORKFLOW_ID].deploy_payload,
-                     message="Expect created and deployed workflow process.")
+                     message="Expect deployed workflow process.")
 
         # processes visible by alice
         resp = self.request('GET', path, headers=headers_a, cookies=cookies_a, status=HTTPOk.code)
