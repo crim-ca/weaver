@@ -266,7 +266,7 @@ class End2EndEMSTestCase(TestCase):
         url_parsed = urlparse(url)
         is_localhost = url_parsed.hostname == 'localhost'
         has_port = url_parsed.port is not None
-        is_remote = hasattr(cls.app.app, 'net_loc') and cls.app.app.net_loc != url_parsed.hostname
+        is_remote = hasattr(cls.app.app, 'net_loc') and cls.app.app.net_loc != 'localhost'
         if is_localhost and has_port or is_remote:
             kw.update({'verify': False})
             resp = requests.request(method, url, **kw)
