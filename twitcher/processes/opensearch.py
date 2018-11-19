@@ -77,7 +77,7 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
             eoimages_queue = deque()
             if input_id in eoimage_source_info:
                 collection_id = queue[0].data
-                max_occurs = queue[0].max_occurs
+                max_occurs = min(queue[0].max_occurs, 100000)
 
                 aoi_ids = _make_specific_identifier(AOI, input_id), AOI
                 startdate_ids = (
