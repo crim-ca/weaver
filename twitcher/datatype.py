@@ -581,13 +581,13 @@ class Process(DescriptionType):
         }
 
     def json(self):
-        return sd.ProcessSchema().deserialize(self)
+        return sd.Process().deserialize(self)
 
     def process_offering(self):
-        return sd.ProcessOfferingSchema().deserialize(ProcessOffering(self))
+        return sd.ProcessOffering().deserialize(ProcessOffering(self))
 
     def process_summary(self):
-        return sd.ProcessSummarySchema().deserialize(self)
+        return sd.ProcessSummary().deserialize(self)
 
     @staticmethod
     def from_wps(wps_process, **extra_params):
