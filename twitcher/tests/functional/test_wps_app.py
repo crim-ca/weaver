@@ -14,6 +14,8 @@ import unittest
 import pyramid.testing
 from twitcher.tests.functional.common import setup_with_mongodb, setup_mongodb_tokenstore
 from twitcher.tests.utils import get_default_config_ini_path
+import sys
+import os
 
 
 class WpsAppTest(unittest.TestCase):
@@ -28,6 +30,7 @@ class WpsAppTest(unittest.TestCase):
         config.include('twitcher.wps')
         config.include('twitcher.tweens')
         config.include('pyramid_celery')
+        sys.path.append(os.path.expanduser('~/birdhouse/etc/celery'))   # allow finding celeryconfig
         config.configure_celery(get_default_config_ini_path())
         self.app = webtest.TestApp(config.make_wsgi_app())
 
