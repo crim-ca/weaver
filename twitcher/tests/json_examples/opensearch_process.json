@@ -20,6 +20,7 @@
     }
   ],
   "executeEndpoint": null,
+  "processEndpointWPS1": null,
   "identifier": "stackcreation_graph_json_",
   "inputs": [
     {

@@ -312,6 +312,7 @@ class EOImageDescribeProcessHandler(object):
             u"maxOccurs": u"1",
             u"additionalParameters": [
                 {
+                    u"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
                     u"parameters": [
                         {u"name": u"CatalogSearchField", u"values": [u"bbox"]}
                     ],
@@ -333,6 +334,7 @@ class EOImageDescribeProcessHandler(object):
             u"literalDataDomains": [{u"dataType": {u"name": u"String"}}],
             u"additionalParameters": [
                 {
+                    u"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
                     u"parameters": [
                         {
                             u"name": u"CatalogSearchField",
@@ -364,6 +366,7 @@ class EOImageDescribeProcessHandler(object):
             u"literalDataDomains": [{u"dataType": {u"name": u"String"}}],
             u"additionalParameters": [
                 {
+                    u"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
                     u"parameters": [
                         {u"name": u"CatalogSearchField", u"values": [search_field]}
                     ],
