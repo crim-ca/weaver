@@ -463,7 +463,9 @@ def get_eo_images_inputs_from_payload(payload):
 def get_original_collection_id(payload, wps_inputs):
     # type: (Dict, Dict[deque]) -> Dict[deque]
     """
-    When we deploy a Process that contains OpenSearch parameters, the collection identifier if modified.
+    When we deploy a Process that contains OpenSearch parameters, the collection identifier is modified.
+    Ex: files -> collection
+    Ex: s2 -> collection_s2, probav -> collection_probav
     This function changes the id in the execute request to the one in the deploy description.
     :param payload:
     :param wps_inputs:
