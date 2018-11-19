@@ -278,12 +278,11 @@ class End2EndEMSTestCase(TestCase):
             json_body = kw.pop('json', None)
             if json_body is not None:
                 kw.update({'params': json.dumps(json_body, cls=json.JSONEncoder)})
-            if status and status >= 400:
-                kw.update({'expect_errors': True})
+            kw.update({'expect_errors': status and status >= 400 or expect_errors})
             cookies = kw.pop('cookies', dict())
             for cookie_name, cookie_value in cookies.items():
                 cls.app.set_cookie(cookie_name, cookie_value)
-            resp = cls.app._gen_request(method, url, expect_errors, **kw)
+            resp = cls.app._gen_request(method, url, **kw)
 
             while 300 <= resp.status_code < 400 and max_redirects > 0:
                 resp = resp.follow()
