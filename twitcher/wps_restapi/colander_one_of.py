@@ -20,6 +20,9 @@ class OneOfMappingSchema(colander.MappingSchema):
             raise colander.Invalid(message)
 
     def deserialize(self, cstruct):
+        if cstruct is colander.null:
+            return colander.null
+
         result = self.deserialize_one_of(cstruct)
         mapping_data = super(OneOfMappingSchema, self).deserialize(cstruct)
 
