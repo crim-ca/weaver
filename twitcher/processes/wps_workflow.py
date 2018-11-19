@@ -420,19 +420,20 @@ class WpsWorkflowJob(JobBase):
                 ):              # type: (...) -> None
 
         visible = self.wps_process.is_visible()
-        if visible is None:
-            LOGGER.info(u"Unauthorized access to process {} on {} - aborting.".format(
-                        self.wps_process.process_id, self.wps_process.url))
-            raise OWSAccessForbidden(u"Unauthorized access to process {} on {} - aborting.".format(
-                                     self.wps_process.process_id, self.wps_process.url))
-        elif visible is False:
-            LOGGER.info(u"Process {} is not deployed on {} - deploying.".format(
-                        self.wps_process.process_id, self.wps_process.url))
+        if not visible:     # includes private visibility and non-existing cases
+            if visible is None:
+                LOGGER.info(u"Process {} access is unauthorized on {} - deploying as admin.".format(
+                            self.wps_process.process_id, self.wps_process.url))
+            elif visible is False:
+                LOGGER.info(u"Process {} is not deployed on {} - deploying.".format(
+                            self.wps_process.process_id, self.wps_process.url))
             # TODO: Maybe always redeploy? What about cases of outdated deployed process?
             try:
                 self.wps_process.deploy()
             except HTTPConflict:
                 pass
+        LOGGER.info(u"Process {} enforced to public visibility.".format(
+                    self.wps_process.process_id, self.wps_process.url))
         self.wps_process.set_visibility(visibility=VISIBILITY_PUBLIC)
 
         self.results = self.wps_process.execute(self.builder.job, self.outdir, self.expected_outputs)

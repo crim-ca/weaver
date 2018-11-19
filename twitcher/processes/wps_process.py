@@ -86,20 +86,20 @@ class WpsProcess(object):
                                 verify=self.verify)
         if response.status_code in (HTTPUnauthorized.code, HTTPForbidden.code):
             return None
-        elif response.status_code == HTTPOk.status_code:
-            return response.json()['value'] == VISIBILITY_PUBLIC
         elif response.status_code == HTTPNotFound.code:
             return False
+        elif response.status_code == HTTPOk.status_code:
+            return response.json()['value'] == VISIBILITY_PUBLIC
         response.raise_for_status()
 
     def set_visibility(self, visibility):
         self.update_status('Updating process visibility on remote ADES.', REMOTE_JOB_PROGRESS_VISIBLE)
         LOGGER.debug("Update process WPS visibility request for {0}".format(self.process_id))
-        auth_headers = deepcopy(self.headers)
-        auth_headers.update(self.get_admin_auth_header())
+        admin_headers = deepcopy(self.headers)
+        admin_headers.update(self.get_admin_auth_header())
         response = requests.put(self.url + process_visibility_uri,
                                 json={'value': visibility},
-                                headers=auth_headers,
+                                headers=admin_headers,
                                 cookies=self.cookies,
                                 verify=self.verify)
         response.raise_for_status()
@@ -126,9 +126,11 @@ class WpsProcess(object):
     def deploy(self):
         self.update_status('Deploying process on remote ADES.', REMOTE_JOB_PROGRESS_DEPLOY)
         LOGGER.debug("Deploy process WPS request for {0}".format(self.process_id))
+        admin_headers = deepcopy(self.headers)
+        admin_headers.update(self.get_admin_auth_header())
         response = requests.post(self.url + processes_uri,
                                  json=self.deploy_body,
-                                 headers=self.headers,
+                                 headers=admin_headers,
                                  cookies=self.cookies,
                                  verify=self.verify)
         response.raise_for_status()
