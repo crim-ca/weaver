@@ -563,7 +563,8 @@ def add_local_process(request):
         # raised on invalid process name
         raise HTTPBadRequest(detail=ex.message)
 
-    return HTTPOk(json={'deploymentDone': True, 'processSummary': saved_process.process_summary()})
+    json_response = {'processSummary': saved_process.process_summary()}
+    return HTTPOk(json=json_response)
 
 
 @sd.process_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer='json',
