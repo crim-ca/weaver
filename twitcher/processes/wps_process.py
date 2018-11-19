@@ -16,7 +16,7 @@ from twitcher.wps_restapi.swagger_definitions import (
 )
 from pyramid_celery import celery_app as app
 from pyramid.settings import asbool
-from pyramid.httpexceptions import HTTPOk, HTTPNotFound, HTTPForbidden, HTTPInternalServerError
+from pyramid.httpexceptions import HTTPOk, HTTPUnauthorized, HTTPNotFound, HTTPForbidden, HTTPInternalServerError
 
 LOGGER = logging.getLogger(__name__)
 
@@ -74,19 +74,22 @@ class WpsProcess(object):
         """
         Gets the process visibility.
 
-        :returns: True/False correspondingly for public/private if visibility is retrievable, None if forbidden access.
+        :returns:
+            True/False correspondingly for public/private if visibility is retrievable,
+            False if authorized access but process cannot be found,
+            None if forbidden access.
         """
         LOGGER.debug("Get process WPS visibility request for {0}".format(self.process_id))
-        admin_headers = deepcopy(self.headers)
-        admin_headers.update({'Authorization': 'Bea'})
         response = requests.get(self.url + process_visibility_uri.format(process_id=self.process_id),
                                 headers=self.headers,
                                 cookies=self.cookies,
                                 verify=self.verify)
-        if response.status_code == HTTPForbidden.code:
+        if response.status_code in (HTTPUnauthorized.code, HTTPForbidden.code):
             return None
         elif response.status_code == HTTPOk.status_code:
             return response.json()['value'] == VISIBILITY_PUBLIC
+        elif response.status_code == HTTPNotFound.code:
+            return False
         response.raise_for_status()
 
     def set_visibility(self, visibility):

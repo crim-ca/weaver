@@ -27,9 +27,11 @@ from cwltool.utils import (aslist, json_dumps, onWindows, bytes2str_in_dicts)
 from cwltool.context import (LoadingContext, RuntimeContext, getdefault)
 from cwltool.workflow import Workflow
 from pyramid_celery import celery_app as app
+from pyramid.httpexceptions import HTTPConflict
 
 from twitcher.visibility import VISIBILITY_PUBLIC
 from twitcher.processes.wps_process import WpsProcess
+from twitcher.owsexceptions import OWSAccessForbidden
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_TMP_PREFIX = "tmp"
@@ -419,12 +421,18 @@ class WpsWorkflowJob(JobBase):
 
         visible = self.wps_process.is_visible()
         if visible is None:
-            LOGGER.info(u"Process %s is not deployed on %s - deploying.",
-                        self.wps_process.process_id, self.wps_process.url)
-            self.wps_process.deploy()
+            LOGGER.info(u"Unauthorized access to process {} on {} - aborting.".format(
+                        self.wps_process.process_id, self.wps_process.url))
+            raise OWSAccessForbidden(u"Unauthorized access to process {} on {} - aborting.".format(
+                                     self.wps_process.process_id, self.wps_process.url))
         elif visible is False:
-            LOGGER.info(u"Process %s is not deployed on %s - deploying.",
-                        self.wps_process.process_id, self.wps_process.url)
+            LOGGER.info(u"Process {} is not deployed on {} - deploying.".format(
+                        self.wps_process.process_id, self.wps_process.url))
+            # TODO: Maybe always redeploy? What about cases of outdated deployed process?
+            try:
+                self.wps_process.deploy()
+            except HTTPConflict:
+                pass
         self.wps_process.set_visibility(visibility=VISIBILITY_PUBLIC)
 
         self.results = self.wps_process.execute(self.builder.job, self.outdir, self.expected_outputs)
