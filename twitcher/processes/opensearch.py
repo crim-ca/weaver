@@ -67,6 +67,9 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
         for input_id, queue in wps_inputs.items():
             eoimages_queue = deque()
             if input_id in eoimage_source_info:
+                collection_id = queue[0].data
+                max_occurs = queue[0].max_occurs
+
                 aoi_ids = _make_specific_identifier(AOI, input_id), AOI
                 startdate_ids = (
                     _make_specific_identifier(START_DATE, input_id),
@@ -78,11 +81,14 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
                 startdate = pop_first_data(startdate_ids)
                 enddate = pop_first_data(enddate_ids)
 
-                params = {"startDate": startdate, "endDate": enddate, "bbox": bbox_str}
+                params = {"startDate": startdate,
+                          "endDate": enddate,
+                          "bbox": bbox_str,
+                          "maximumRecords": max_occurs}
                 osdd_url = eoimage_source_info[input_id]["osdd_url"]
                 accept_schemes = eoimage_source_info[input_id]["accept_schemes"]
                 os = OpenSearchQuery(
-                    collection_identifier=queue[0].data, osdd_url=osdd_url
+                    collection_identifier=collection_id, osdd_url=osdd_url
                 )
                 for link in os.query_datasets(params, accept_schemes=accept_schemes):
                     new_input = deepcopy(queue[0])
@@ -121,7 +127,7 @@ def load_wkt(wkt):
 
 
 class OpenSearchQuery(object):
-    MAX_QUERY_RESULTS = 10  # usually the default at the OpenSearch server too
+    DEFAULT_MAX_QUERY_RESULTS = 5  # usually the default at the OpenSearch server too
 
     def __init__(
         self,
@@ -185,7 +191,8 @@ class OpenSearchQuery(object):
                 )
             query_params[key] = value
 
-        query_params["maximumRecords"] = self.MAX_QUERY_RESULTS
+        if "maximumRecords" not in query_params:
+            query_params["maximumRecords"] = self.DEFAULT_MAX_QUERY_RESULTS
 
         return base_url, query_params
 
@@ -212,6 +219,7 @@ class OpenSearchQuery(object):
         :param params: query parameters
         """
         start_index = 1
+        maximum_records = params.get("maximumRecords")
         template_url = self.get_template_url()
         base_url, query_params = self._prepare_query_url(template_url, params)
         while True:
@@ -224,10 +232,13 @@ class OpenSearchQuery(object):
             for feature in features:
                 yield feature, response.url
             n_received_features = len(features)
+            n_recieved_so_far = start_index + n_received_features - 1  # index starts at 1
             total_results = json_body["totalResults"]
             if not n_received_features:
                 break
-            if start_index + n_received_features > total_results:
+            if n_recieved_so_far >= total_results:
+                break
+            if maximum_records and n_recieved_so_far >= maximum_records:
                 break
             start_index += n_received_features
 

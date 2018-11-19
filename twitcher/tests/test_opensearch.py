@@ -288,7 +288,7 @@ def inputs_unique_aoi_toi(files_id):
         ),
         END_DATE: deque([LiteralInput(END_DATE, "End Date", data_type="string")]),
         files_id: deque(
-            [LiteralInput(files_id, "Collection of the data.", data_type="string")]
+            [LiteralInput(files_id, "Collection of the data.", data_type="string", max_occurs=4)]
         ),
     }
 
@@ -303,7 +303,7 @@ def inputs_non_unique_aoi_toi(files_id):
         start_date: deque([LiteralInput(start_date, "Area", data_type="string")]),
         end_date: deque([LiteralInput(end_date, "Area", data_type="string")]),
         files_id: deque(
-            [LiteralInput(files_id, "Collection of the data.", data_type="string")]
+            [LiteralInput(files_id, "Collection of the data.", data_type="string", max_occurs=4)]
         ),
     }
 
@@ -328,7 +328,8 @@ def sentinel2_inputs(unique_aoi_toi=True):
     inputs[sentinel_id][0].data = "EOP:IPT:Sentinel2"
     inputs[end_date][0].data = u"2018-01-31T23:59:59.999Z"
     inputs[start_date][0].data = u"2018-01-30T00:00:00.000Z"
-    inputs[aoi][0].data = u"POLYGON ((100 15, 104 15, 104 19, 100 19, 100 15))"
+    # inputs[aoi][0].data = u"POLYGON ((100 15, 104 15, 104 19, 100 19, 100 15))"
+    inputs[aoi][0].data = u"100.0, 15.0, 104.0, 19.0"
 
     eo_image_source_info = make_eo_image_source_info(sentinel_id, "EOP:IPT:Sentinel2")
     return inputs, eo_image_source_info
@@ -345,7 +346,8 @@ def probav_inputs(unique_aoi_toi=True):
     inputs[probav_id][0].data = "EOP:VITO:PROBAV_P_V001"
     inputs[end_date][0].data = u"2018-01-31T23:59:59.999Z"
     inputs[start_date][0].data = u"2018-01-30T00:00:00.000Z"
-    inputs[aoi][0].data = u"POLYGON ((100 15, 104 15, 104 19, 100 19, 100 15))"
+    # inputs[aoi][0].data = u"POLYGON ((100 15, 104 15, 104 19, 100 19, 100 15))"
+    inputs[aoi][0].data = u"100.0, 15.0, 104.0, 19.0"
 
     eo_image_source_info = make_eo_image_source_info(
         probav_id, "EOP:VITO:PROBAV_P_V001"
@@ -374,7 +376,8 @@ def deimos_inputs(unique_aoi_toi=True):
     inputs[deimos_id][0].data = "DE2_PS3_L1C"
     inputs[start_date][0].data = u"2008-01-01T00:00:00Z"
     inputs[end_date][0].data = u"2009-01-01T00:00:00Z"
-    inputs[aoi][0].data = u"MULTIPOINT ((-117 32), (-115 34))"
+    # inputs[aoi][0].data = u"MULTIPOINT ((-117 32), (-115 34))"
+    inputs[aoi][0].data = u"-117, 32, -115, 34"
 
     eo_image_source_info = make_eo_image_source_info(deimos_id, "DE2_PS3_L1C")
     return inputs, eo_image_source_info
@@ -386,7 +389,7 @@ def test_query_sentinel2():
 
     data = opensearch.query_eo_images_from_wps_inputs(inputs, eo_image_source_info)
 
-    assert 15 == len(data["image-sentinel2"])
+    assert 4 == len(data["image-sentinel2"])
 
 
 @pytest.mark.online
@@ -421,5 +424,5 @@ def test_query_non_unique():
 
     data = opensearch.query_eo_images_from_wps_inputs(inputs, eo_image_source_info)
 
-    assert len(data["image-sentinel2"]) == 15
+    assert len(data["image-sentinel2"]) == 4
     assert len(data["image-probav"]) == 3
