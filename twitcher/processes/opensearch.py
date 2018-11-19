@@ -12,7 +12,6 @@ from twitcher.processes.wps_process import OPENSEARCH_LOCAL_FILE_SCHEME
 from twitcher.processes.constants import START_DATE, END_DATE, AOI, COLLECTION
 import lxml.etree
 import requests
-import shapely.wkt
 import logging
 import time
 
@@ -75,11 +74,9 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
                 )
                 enddate_ids = _make_specific_identifier(END_DATE, input_id), END_DATE
 
-                wkt = pop_first_data(aoi_ids)
+                bbox_str = pop_first_data(aoi_ids)
                 startdate = pop_first_data(startdate_ids)
                 enddate = pop_first_data(enddate_ids)
-
-                bbox_str = load_wkt(wkt)
 
                 params = {"startDate": startdate, "endDate": enddate, "bbox": bbox_str}
                 osdd_url = eoimage_source_info[input_id]["osdd_url"]
@@ -117,6 +114,7 @@ def load_wkt(wkt):
     :type wkt: string
 
     """
+    import shapely.wkt
     bounds = shapely.wkt.loads(wkt).bounds
     bbox_str = ",".join(map(str, bounds))
     return bbox_str

@@ -166,6 +166,7 @@ def test_transform_execute_parameters_wps():
     assert compare(transformed) == compare(expected)
 
 
+@pytest.mark.skip(reason="The user-provided bbox is now a comma delimited string, not a WKT.")
 def test_load_wkt():
     data = [
         ("POLYGON ((100 15, 104 15, 104 19, 100 19, 100 15))", "100.0,15.0,104.0,19.0"),
