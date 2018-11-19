@@ -32,6 +32,15 @@ def alter_payload_after_query(payload):
     return new_payload
 
 
+def validate_bbox(bbox):
+    # u"100.0, 15.0, 104.0, 19.0"
+    try:
+        if not len(list(map(float, bbox.split(",")))) == 4:
+            raise ValueError
+    except ValueError:
+        raise ValueError("Could not parse bbox as a list of 4 floats: {}".format(bbox))
+
+
 def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
     # type: (Dict[Deque], Dict[str, Dict]) -> Dict[Deque]
     """Query OpenSearch using parameters in inputs and return file links.
@@ -78,6 +87,7 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
                 enddate_ids = _make_specific_identifier(END_DATE, input_id), END_DATE
 
                 bbox_str = pop_first_data(aoi_ids)
+                validate_bbox(bbox_str)
                 startdate = pop_first_data(startdate_ids)
                 enddate = pop_first_data(enddate_ids)
 
