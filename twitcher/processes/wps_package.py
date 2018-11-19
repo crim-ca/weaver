@@ -684,9 +684,6 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
                 continue
             if type(cwl_field) != type(wps_field) or (cwl_field is not None and wps_field is None):
                 continue
-            # noinspection PyTypeChecker
-            if hasattr(cwl_field, '__iter__') and len(cwl_field):
-                continue
             _set_field(updated_io_list[-1], field_type, wps_field)
     return updated_io_list
 
