@@ -443,6 +443,11 @@ class Process(dict):
 
     def __init__(self, *args, **kwargs):
         super(Process, self).__init__(*args, **kwargs)
+        # use both 'id' and 'identifier' to support any call (WPS and recurrent 'id')
+        if 'id' not in self and 'identifier' not in self:
+            raise TypeError("'id' OR 'identifier' is required")
+        if 'id' not in self:
+            self['id'] = self.pop('identifier')
         if 'processEndpointWPS1' not in self:
             raise TypeError("'processEndpointWPS1' is required")
         if 'package' not in self:
@@ -453,6 +458,14 @@ class Process(dict):
             self[item] = value
         else:
             raise AttributeError("Can't set attribute")
+
+    @property
+    def id(self):
+        return self['id']
+
+    @property
+    def identifier(self):
+        return self.id
 
     @property
     def title(self):
