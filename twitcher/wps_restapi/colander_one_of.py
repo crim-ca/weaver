@@ -3,28 +3,12 @@ from cornice_swagger.converters import schema
 from cornice_swagger.converters.exceptions import NoSuchConverter
 
 
-class OneOfType(colander.SchemaType):
-    _one_of = ()
-
-    def _schema_names(self):
-        return ", ".join(c.__name__ for c in self._one_of)
-
-    def serialize(self, node, appstruct):
-        if appstruct is colander.null:
-            return colander.null
-
-        for c in self._one_of:
-            try:
-                return c().serialize(appstruct)
-            except colander.Invalid:
-                pass
-        else:
-            message = 'Incorrect type, must be one of: ' + self._schema_names()
-            raise colander.Invalid(node, message)
-
-    def deserialize(self, node, cstruct):
+class OneOfMappingSchema(colander.MappingSchema):
+    def deserialize_one_of(self, cstruct):
         if cstruct is colander.null:
             return colander.null
+        if not hasattr(self, "_one_of"):
+            return {}
 
         for c in self._one_of:
             try:
@@ -33,31 +17,14 @@ class OneOfType(colander.SchemaType):
                 pass
         else:
             message = 'Incorrect type, must be one of: ' + self._schema_names()
-            raise colander.Invalid(node, message)
+            raise colander.Invalid(message)
 
+    def deserialize(self, cstruct):
+        result = self.deserialize_one_of(cstruct)
+        mapping_data = super(OneOfMappingSchema, self).deserialize(cstruct)
 
-class OneOfMappingType(OneOfType):
-    _mapping = None
-
-    def __init__(self, unknown='ignore'):
-        self.unknown = unknown
-
-    @property
-    def unknown(self):
-        return self._unknown
-
-    @unknown.setter
-    def unknown(self, value):
-        if value not in ('ignore', 'raise', 'preserve'):
-            raise ValueError(
-                'unknown attribute must be one of "ignore", "raise", '
-                'or "preserve"')
-        self._unknown = value
-
-    def deserialize(self, node, cstruct):
-        one_of_result = super(OneOfMappingType, self).deserialize(node, cstruct)
-        one_of_result.update(self._mapping().deserialize(cstruct))
-        return one_of_result
+        result.update(mapping_data)
+        return result
 
 
 class CustomTypeConversionDispatcher(object):
@@ -77,7 +44,7 @@ class CustomTypeConversionDispatcher(object):
         }
 
         self.converters_base_classes = {
-            OneOfMappingType: schema.ObjectTypeConverter,
+            OneOfMappingSchema: schema.ObjectTypeConverter,
         }
 
         self.converters.update(custom_converters)
