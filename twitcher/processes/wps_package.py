@@ -491,19 +491,30 @@ def _json2wps_io(io_info, io_select):
     :param io_select: ``WPS_INPUT`` or ``WPS_OUTPUT`` to specify desired WPS type conversion.
     :return: corresponding IO in WPS format.
     """
-    # remove extra fields added by pywps (usually added by type's `json` property)
-    io_info.pop('workdir', None)
-    io_info.pop('any_value', None)
-    io_info.pop('data_format', None)
-    io_info.pop('data', None)
-    io_info.pop('file', None)
-    io_info.pop('mimetype', None)
-    io_info.pop('encoding', None)
-    io_info.pop('schema', None)
-    io_info.pop('asreference', None)
 
-    # remove additionalParameters add for the OGC purpose
-    io_info.pop('additionalParameters', None)
+    io_info["identifier"] = _get_field(io_info, "identifier", search_variations=True, pop_found=True)
+
+    rename = {
+        'formats': 'supported_formats',
+        'minOccurs': 'min_occurs',
+        'maxOccurs': 'max_occurs',
+    }
+    remove = [
+        'id',
+        'workdir',
+        'any_value',
+        'data_format',
+        'data',
+        'file',
+        'mimetype',
+        'encoding',
+        'schema',
+        'asreference',
+        'additionalParameters',
+    ]
+    replace_values = {'unbounded': PACKAGE_ARRAY_MAX_SIZE}
+
+    transform_json(io_info, rename=rename, remove=remove, replace_values=replace_values)
 
     # convert allowed value objects
     values = _get_field(io_info, 'allowed_values', search_variations=True, pop_found=True)
@@ -514,14 +525,6 @@ def _json2wps_io(io_info, io_select):
                 io_info['allowed_values'].append(_json2wps_type(allow_value, 'allowed_values'))
         else:
             io_info['allowed_values'] = AnyValue
-
-    # rename some inputs
-    io_info["supported_formats"] = io_info.pop("formats")
-    io_info["identifier"] = _get_field(io_info, "identifier", search_variations=True, pop_found=True)
-    io_info.pop("id", None)
-    default_wps_min_max_occurs = 1
-    io_info["min_occurs"] = io_info.pop("minOccurs", default_wps_min_max_occurs)
-    io_info["max_occurs"] = io_info.pop("maxOccurs", default_wps_min_max_occurs)
 
     # convert supported format objects
     formats = _get_field(io_info, 'supported_formats', search_variations=True, pop_found=True)
