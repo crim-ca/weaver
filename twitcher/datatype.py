@@ -435,7 +435,7 @@ class AccessToken(dict):
         return '{0}.{1}({2})'.format(cls.__module__, cls.__name__, repr_)
 
 
-class Process(DescriptionType):
+class Process(dict):
     """
     Dictionary that contains a process description for db storage.
     It always has ``'identifier'`` and ``processEndpointWPS1`` keys.
@@ -447,10 +447,6 @@ class Process(DescriptionType):
             raise TypeError("'processEndpointWPS1' is required")
         if 'package' not in self:
             raise TypeError("'package' is required")
-        if 'inputs' in self:
-            self['inputs'] = [Input(i) for i in self['inputs']]
-        if 'outputs' in self:
-            self['outputs'] = [Output(o) for o in self['outputs']]
 
     def __setattr__(self, item, value):
         if item in self:
