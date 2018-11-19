@@ -471,7 +471,7 @@ def get_processes(request):
 
 
 @sd.processes_service.post(tags=[sd.processes_tag, sd.deploy_tag], renderer='json',
-                           schema=sd.ProcessesEndpoint(), response_schemas=sd.post_processes_responses)
+                           schema=sd.PostProcessEndpoint(), response_schemas=sd.post_processes_responses)
 def add_local_process(request):
     """
     Register a local process.

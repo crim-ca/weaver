@@ -940,10 +940,6 @@ class VersionsSchema(MappingSchema):
 #################################
 
 
-class ProcessOfferingBody(MappingSchema):
-    process = Process(title='Process')
-
-
 class PackageBody(MappingSchema):
     pass
 
@@ -957,22 +953,28 @@ class ExecutionUnitList(SequenceSchema):
     item = ExecutionUnit()
 
 
-class DeploymentProfileBody(MappingSchema):
-    executionUnit = ExecutionUnit(description="Package/Reference definition.", title='ExecutionUnit',
-                                  validator=OneOf(['reference', 'package']))
+class ProcessOffering(MappingSchema):
+    process = Process()
+    processVersion = SchemaNode(String(), missing=drop)
+    jobControlOptions = JobControlOptionsList(missing=drop)
+    outputTransmission = TransmissionModeList(missing=drop)
 
 
-class PostProcessRequestBody(MappingSchema):
-    # TODO ProcessOffering has been replaced by ProcessDefinition...
-    # Swagger should be updated based on https://github.com/opengeospatial/D009-ADES_and_EMS_Results_and_Best_Practices_Engineering_Report/blob/master/code/ades_wpst.json
-    processOffering = ProcessOfferingBody(title='ProcessOffering')
-    deploymentProfile = DeploymentProfileBody(title='DeploymentProfile')
-    deploymentProfileName = SchemaNode(String(), missing=drop, description="Name of the deployment profile.")
+class ProcessDescriptionChoiceType(OneOfMappingSchema):
+    _one_of = (Reference,
+               ProcessOffering)
 
 
-class ProcessesEndpoint(MappingSchema):
+class Deploy(MappingSchema):
+    immediateDeployment = SchemaNode(Boolean(), missing=drop, default=True)
+    processDescription = ProcessDescriptionChoiceType(missing=drop)
+    executionUnit = ExecutionUnitList()
+    deploymentProfileName = SchemaNode(String(), missing=drop)
+
+
+class PostProcessEndpoint(MappingSchema):
     header = AcceptHeader()
-    body = PostProcessRequestBody(title='Deploy')
+    body = Deploy(title='Deploy')
 
 
 class PostProcessJobsEndpoint(MappingSchema):
@@ -1175,25 +1177,6 @@ class OkPostProcessDeployBodySchema(MappingSchema):
 class OkPostProcessesSchema(MappingSchema):
     header = JsonHeader()
     body = OkPostProcessDeployBodySchema()
-
-
-class ProcessOffering(MappingSchema):
-    process = Process()
-    processVersion = SchemaNode(String(), missing=drop)
-    jobControlOptions = JobControlOptionsList(missing=drop)
-    outputTransmission = TransmissionModeList(missing=drop)
-
-
-class ProcessDescriptionChoiceType(OneOfMappingSchema):
-    _one_of = (Reference,
-               ProcessOffering)
-
-
-class Deploy(MappingSchema):
-    immediateDeployment = SchemaNode(Boolean(), missing=drop, default=True)
-    processDescription = ProcessDescriptionChoiceType(missing=drop)
-    executionUnit = ExecutionUnitList()
-    deploymentProfileName = SchemaNode(String(), missing=drop)
 
 
 class OkGetProcessSchema(MappingSchema):
