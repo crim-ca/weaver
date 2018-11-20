@@ -361,6 +361,7 @@ def make_eo_image_source_info(name, collection_id):
         name: {
             "collection_id": collection_id,
             "accept_schemes": ["http", "https"],
+            "mime_types": ["application/zip"],
             "rootdir": "",
             "ades": "http://localhost:5001",
             "osdd_url": "http://geo.spacebel.be/opensearch/description.xml",

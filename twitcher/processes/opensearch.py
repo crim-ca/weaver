@@ -97,10 +97,13 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
                           "maximumRecords": max_occurs}
                 osdd_url = eoimage_source_info[input_id]["osdd_url"]
                 accept_schemes = eoimage_source_info[input_id]["accept_schemes"]
+                mime_types = eoimage_source_info[input_id]["mime_types"]
                 os = OpenSearchQuery(
                     collection_identifier=collection_id, osdd_url=osdd_url
                 )
-                for link in os.query_datasets(params, accept_schemes=accept_schemes):
+                for link in os.query_datasets(params,
+                                              accept_schemes=accept_schemes,
+                                              accept_mime_types=mime_types):
                     new_input = deepcopy(queue[0])
                     new_input.data = replace_with_opensearch_scheme(link)
                     eoimages_queue.append(new_input)
@@ -214,7 +217,7 @@ class OpenSearchQuery(object):
         :param kwargs: passed to requests.get
         """
         response = HTTPGatewayTimeout(detail="Request ran out of retries.")
-        retries_in_secs = range(1, 6)   # 1 to 5 secs
+        retries_in_secs = range(1, 6)  # 1 to 5 secs
         for wait in retries_in_secs:
             response = requests.get(*args, **kwargs)
             if response.status_code == HTTPOk.code:
@@ -252,8 +255,8 @@ class OpenSearchQuery(object):
                 break
             start_index += n_received_features
 
-    def query_datasets(self, params, accept_schemes):
-        # type: (Dict, Tuple) -> Iterable
+    def query_datasets(self, params, accept_schemes, accept_mime_types):
+        # type: (Dict, Tuple, List) -> Iterable
         """
 
         :param params: query parameters
@@ -265,18 +268,21 @@ class OpenSearchQuery(object):
 
         for feature, url in self._query_features_paginated(params):
             try:
-                data_links = [d["href"] for d in feature["properties"]["links"]["data"]]
+                data_links = feature["properties"]["links"]["data"]
+                data_links_mime_types = [d["type"] for d in data_links]
             except KeyError:
                 LOGGER.exception("Badly formatted json at: {}".format(url))
                 raise
-
-            for link in data_links:
-                scheme = urlparse(link).scheme
-                if scheme in accept_schemes:
-                    yield link
-                    continue
-                else:
-                    LOGGER.debug("No accepted scheme for feature at: {}".format(url))
+            for mime_type in accept_mime_types:
+                links = [data["href"] for data in data_links if data["type"] == mime_type]
+                if links:
+                    yield links[0]
+                    break
+            else:
+                message = "Could not match any accepted mimetype ({}) to received mimetype ({})"
+                message = message.format(", ".join(accept_mime_types),
+                                         ", ".join(data_links_mime_types))
+                raise ValueError(message)
 
 
 def get_additional_parameters(input_data):
@@ -495,7 +501,16 @@ def get_eo_images_data_sources(payload, wps_inputs):
     """
     inputs = get_eo_images_inputs_from_payload(payload)
     eo_image_identifiers = [get_any_id(i) for i in inputs]
-    return {i: get_data_source(wps_inputs[i][0].data) for i in eo_image_identifiers}
+    data_sources = {i: get_data_source(wps_inputs[i][0].data) for i in eo_image_identifiers}
+
+    # add formats information
+    for input_ in inputs:
+        formats_default_first = sorted(input_["formats"],
+                                       key=lambda x: x.get("default", False),
+                                       reverse=True)
+        mimetypes = [f["mimeType"] for f in formats_default_first]
+        data_sources[get_any_id(input_)]["mime_types"] = mimetypes
+    return data_sources
 
 
 def modified_collection_identifiers(eo_image_identifiers):
