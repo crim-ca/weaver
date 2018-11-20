@@ -1033,7 +1033,10 @@ class Package(Process):
                 request.inputs = opensearch.get_original_collection_id(self.payload, request.inputs)
                 eoimage_data_sources = opensearch.get_eo_images_data_sources(self.payload, request.inputs)
                 if eoimage_data_sources:
-                    request.inputs = opensearch.query_eo_images_from_wps_inputs(request.inputs, eoimage_data_sources)
+                    accept_mime_types = opensearch.get_eo_images_mime_types(self.payload)
+                    request.inputs = opensearch.query_eo_images_from_wps_inputs(request.inputs,
+                                                                                eoimage_data_sources,
+                                                                                accept_mime_types)
 
                 cwl_inputs = dict()
                 for input_id in request.inputs:

@@ -41,14 +41,15 @@ def validate_bbox(bbox):
         raise ValueError("Could not parse bbox as a list of 4 floats: {}".format(bbox))
 
 
-def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
-    # type: (Dict[Deque], Dict[str, Dict]) -> Dict[Deque]
+def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info, accept_mime_types):
+    # type: (Dict[str, Deque], Dict[str, Dict], Dict[str, List[str]]) -> Dict[str, Deque]
     """Query OpenSearch using parameters in inputs and return file links.
 
     eoimage_ids is used to identify if a certain input is an eoimage.
 
     :param wps_inputs: inputs containing info to query
     :param eoimage_source_info: data source info of eoimages
+    :param accept_mime_types: dict of list of accepted mime types, ordered by preference
     """
     new_inputs = deepcopy(wps_inputs)
 
@@ -97,7 +98,7 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
                           "maximumRecords": max_occurs}
                 osdd_url = eoimage_source_info[input_id]["osdd_url"]
                 accept_schemes = eoimage_source_info[input_id]["accept_schemes"]
-                mime_types = eoimage_source_info[input_id]["mime_types"]
+                mime_types = accept_mime_types[input_id]
                 os = OpenSearchQuery(
                     collection_identifier=collection_id, osdd_url=osdd_url
                 )
@@ -261,6 +262,7 @@ class OpenSearchQuery(object):
 
         :param params: query parameters
         :param accept_schemes: only return links of this scheme
+        :param accept_mime_types: list of accepted mime types, ordered by preference
 
         """
         if params is None:
@@ -274,9 +276,12 @@ class OpenSearchQuery(object):
                 LOGGER.exception("Badly formatted json at: {}".format(url))
                 raise
             for mime_type in accept_mime_types:
-                links = [data["href"] for data in data_links if data["type"] == mime_type]
-                if links:
-                    yield links[0]
+                good_links = [data["href"]
+                              for data in data_links
+                              if data["type"] == mime_type and
+                              urlparse(data["href"]).scheme in accept_schemes]
+                if good_links:
+                    yield good_links[0]
                     break
             else:
                 message = "Could not match any accepted mimetype ({}) to received mimetype ({})"
@@ -467,7 +472,7 @@ def get_eo_images_inputs_from_payload(payload):
 
 
 def get_original_collection_id(payload, wps_inputs):
-    # type: (Dict, Dict[deque]) -> Dict[deque]
+    # type: (Dict, Dict[str, deque]) -> Dict[str, deque]
     """
     When we deploy a Process that contains OpenSearch parameters, the collection identifier is modified.
     Ex: files -> collection
@@ -492,7 +497,7 @@ def get_original_collection_id(payload, wps_inputs):
 
 
 def get_eo_images_data_sources(payload, wps_inputs):
-    # type: (Dict, Dict[deque]) -> Dict[str, Dict]
+    # type: (Dict, Dict[str, deque]) -> Dict[str, Dict]
     """
 
     :param payload: Deploy payload
@@ -502,15 +507,25 @@ def get_eo_images_data_sources(payload, wps_inputs):
     inputs = get_eo_images_inputs_from_payload(payload)
     eo_image_identifiers = [get_any_id(i) for i in inputs]
     data_sources = {i: get_data_source(wps_inputs[i][0].data) for i in eo_image_identifiers}
+    return data_sources
 
-    # add formats information
+
+def get_eo_images_mime_types(payload):
+    # type: (Dict) -> Dict[str, List]
+    """
+    From the deploy payload, get the accepted mime types.
+    :param payload: Deploy payload
+    """
+    inputs = get_eo_images_inputs_from_payload(payload)
+
+    result = {}
     for input_ in inputs:
         formats_default_first = sorted(input_["formats"],
                                        key=lambda x: x.get("default", False),
                                        reverse=True)
         mimetypes = [f["mimeType"] for f in formats_default_first]
-        data_sources[get_any_id(input_)]["mime_types"] = mimetypes
-    return data_sources
+        result[get_any_id(input_)] = mimetypes
+    return result
 
 
 def modified_collection_identifiers(eo_image_identifiers):
