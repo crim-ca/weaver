@@ -346,7 +346,8 @@ def submit_job_handler(request, service_url, is_workflow=False):
         job_id=result.id)
 
     retry = 0
-    while retry < 5:
+    max_retry = 5
+    while True:
         try:
             subreq = Request.blank(location)
             response = request.invoke_subrequest(subreq)
@@ -355,9 +356,13 @@ def submit_job_handler(request, service_url, is_workflow=False):
         except HTTPNotFound:
             # It's expected, raise any other exception
             pass
-        sleep(1)
-        retry += 1
 
+        retry += 1
+        if retry > max_retry:
+            raise HTTPInternalServerError('Submit job failed. Status is unavailable after {0} seconds'
+                .format(max_retry))
+        else:
+            sleep(1)
 
     body_data = {
         'jobID': result.id,
