@@ -57,6 +57,7 @@ help:
 	@echo "  version     to print version number of this Makefile."
 	@echo "  info        to print information about $(APP_NAME)."
 	@echo "  install     to install $(APP_NAME) by running 'bin/buildout -c custom.cfg'."
+	@echo "  devinstall  to install test packages as well as $(APP_NAME) using buildout."
 	@echo "  pipinstall  to install as a package to allow import in another python code."
 	@echo "  sysinstall  to install system packages from requirements.sh. You can also call 'bash requirements.sh' directly."
 	@echo "  update      to update your application by running 'bin/buildout -o -c custom.cfg' (buildout offline mode)."
@@ -178,6 +179,12 @@ envexport:
 bootstrap: init conda_env conda_pinned bootstrap-buildout.py
 	@echo "Bootstrap buildout ..."
 	@test -f bin/buildout || bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);python bootstrap-buildout.py -c custom.cfg --allow-site-packages --setuptools-version=$(SETUPTOOLS_VERSION) --buildout-version=$(BUILDOUT_VERSION)"
+
+.PHONY: devinstall
+install: install
+	@echo "Installing application with buildout ..."
+	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);pip install -r $(APP_ROOT)/requirements-dev.txt"
+	@echo "\nStart service with \`make start', Test service with \`make test*' variations."
 
 .PHONY: sysinstall
 sysinstall:
