@@ -73,6 +73,7 @@ class End2EndEMSTestCase(TestCase):
         cls.TWITCHER_PROTECTED_URL = owsproxy_base_url(cls.settings())
         cls.TWITCHER_PROTECTED_EMS_URL = os.getenv('TWITCHER_PROTECTED_EMS_URL',
                                                    '{}/ems'.format(cls.TWITCHER_PROTECTED_URL))
+        cls.TWITCHER_PROTECTED_ENABLED = asbool(os.getenv('TWITCHER_PROTECTED_ENABLED', True))
 
         # if enabled, login uses WSO2 external provider, otherwise use Magpie with same credentials
         # NOTE: this will correspond to two different users (WSO2 external user will have `_wso2` appended)
@@ -135,8 +136,18 @@ class End2EndEMSTestCase(TestCase):
         return cls.__settings__
 
     @classmethod
+    def get_twitcher_ems_url(cls):
+        # type: (...) -> str
+        return cls.TWITCHER_PROTECTED_EMS_URL if cls.TWITCHER_PROTECTED_ENABLED else cls.TWITCHER_URL
+
+    @classmethod
+    def get_http_auth_code(cls, unprotected_code=HTTPOk.code):
+        # type: (Optional[int]) -> int
+        return HTTPUnauthorized.code if cls.TWITCHER_PROTECTED_ENABLED else unprotected_code
+
+    @classmethod
     def get_test_process(cls, process_id):
-        # type: (Text) -> ProcessInfo
+        # type: (str) -> ProcessInfo
         return cls.test_processes_info.get(process_id)
 
     @classmethod
@@ -193,7 +204,7 @@ class End2EndEMSTestCase(TestCase):
     @classmethod
     def clear_test_processes(cls):
         for process_id, process_info in cls.test_processes_info.items():
-            path = '{}/processes/{}'.format(cls.TWITCHER_PROTECTED_EMS_URL, process_info.test_id)
+            path = '{}/processes/{}'.format(cls.get_twitcher_ems_url(), process_info.test_id)
             headers, cookies = cls.user_headers_cookies(cls.ALICE_CREDENTIALS)
             resp = cls.request('DELETE', path, headers=headers, cookies=cookies, ignore_errors=True)
             # unauthorized also would mean the process doesn't exist since Alice should have permissions on it
@@ -266,7 +277,7 @@ class End2EndEMSTestCase(TestCase):
         url_parsed = urlparse(url)
         is_localhost = url_parsed.hostname == 'localhost'
         has_port = url_parsed.port is not None
-        is_remote = hasattr(cls.app.app, 'net_loc') and cls.app.app.net_loc != 'localhost'
+        is_remote = hasattr(cls.app.app, 'net_loc') and cls.app.app.net_loc != 'localhost' and not is_localhost
         if is_localhost and has_port or is_remote:
             kw.update({'verify': False})
             resp = requests.request(method, url, **kw)
@@ -300,13 +311,24 @@ class End2EndEMSTestCase(TestCase):
         rs = response.status_code
         reason = getattr(response, 'reason', '')
         content = getattr(response, 'content', '')
-        msg = "HTTPError: {} {} [{}, {}]".format(response.status_code, reason, message, content)
+        req_url = ''
+        req_body = ''
+        req_method = ''
+        if hasattr(response, 'request'):
+            req_url = getattr(response.request, 'url', '')
+            req_body = getattr(response.request, 'body', '')
+            req_method = getattr(response.request, 'method', '')
+        msg = "HTTPError: {} {} [{}, {}] from [{} {} {}]" \
+              .format(response.status_code, reason, message, content, req_method, req_url, req_body)
         assert (status is not None and status == rs) or (status is None and rs <= 400), msg
 
     @classmethod
     def validate_test_server(cls):
         # verify that servers are up and ready
-        for server_url in [cls.MAGPIE_URL, cls.TWITCHER_URL, cls.WSO2_HOSTNAME]:
+        servers = [cls.MAGPIE_URL, cls.TWITCHER_URL]
+        if cls.WSO2_ENABLED:
+            servers.append(cls.WSO2_HOSTNAME)
+        for server_url in servers:
             cls.request('GET', server_url, headers=cls.headers, status=HTTPOk.code)
         # verify that EMS configuration requirement is met
         resp = cls.request('GET', cls.TWITCHER_RESTAPI_URL, headers=cls.headers, status=HTTPOk.code)
@@ -320,7 +342,7 @@ class End2EndEMSTestCase(TestCase):
         headers_b, cookies_b = self.user_headers_cookies(self.BOB_CREDENTIALS)
 
         # list processes (none of tests)
-        path = '{}/processes'.format(self.TWITCHER_PROTECTED_EMS_URL)
+        path = '{}/processes'.format(self.get_twitcher_ems_url())
         resp = self.request('GET', path, headers=headers_a, cookies=cookies_a, status=HTTPOk.code)
         proc = resp.json.get('processes')
         test_processes = filter(lambda p: p['id'] in self.get_test_processes_id(), proc)
@@ -355,7 +377,7 @@ class End2EndEMSTestCase(TestCase):
         visible = {'value': VISIBILITY_PUBLIC}
         for process_id, process_info in self.test_processes_info.items():
             # get private visibility initially
-            process_path = '{}/processes/{}'.format(self.TWITCHER_PROTECTED_EMS_URL, process_info.test_id)
+            process_path = '{}/processes/{}'.format(self.get_twitcher_ems_url(), process_info.test_id)
             visible_path = '{}/visibility'.format(process_path)
             execute_path = '{}/jobs'.format(process_path)
             execute_body = process_info.execute_payload
@@ -365,11 +387,11 @@ class End2EndEMSTestCase(TestCase):
 
             # bob cannot edit, view or execute the process
             self.request('GET', process_path,
-                         headers=headers_b, cookies=cookies_b, status=HTTPUnauthorized.code)
+                         headers=headers_b, cookies=cookies_b, status=self.get_http_auth_code(HTTPOk.code))
             self.request('PUT', visible_path, json=visible,
-                         headers=headers_b, cookies=cookies_b, status=HTTPUnauthorized.code)
+                         headers=headers_b, cookies=cookies_b, status=self.get_http_auth_code(HTTPOk.code))
             self.request('POST', execute_path, json=execute_body,
-                         headers=headers_b, cookies=cookies_b, status=HTTPUnauthorized.code)
+                         headers=headers_b, cookies=cookies_b, status=self.get_http_auth_code(HTTPCreated.code))
 
             # make process visible
             resp = self.request('PUT', visible_path, json=visible,
@@ -378,10 +400,10 @@ class End2EndEMSTestCase(TestCase):
 
             # bob still cannot edit, but can now view and execute the process
             self.request('PUT', visible_path,  json=visible,
-                         headers=headers_b, cookies=cookies_b, status=HTTPUnauthorized.code)
+                         headers=headers_b, cookies=cookies_b, status=self.get_http_auth_code(HTTPOk.code))
             resp = self.request('GET', process_path,
                                 headers=headers_b, cookies=cookies_b, status=HTTPOk.code)
-            assert resp.json.get('process').get('id') == process_id
+            assert resp.json.get('process').get('id') == process_info.test_id
             resp = self.request('POST', execute_path, json=execute_body,
                                 headers=headers_b, cookies=cookies_b, status=HTTPCreated.code)
             assert resp.json.get('status') in job_status_categories[STATUS_RUNNING]
