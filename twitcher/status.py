@@ -1,3 +1,5 @@
+OGC_COMPLIANT = 'OGC_COMPLIANT'
+
 STATUS_ACCEPTED = 'accepted'
 STATUS_STARTED = 'started'
 STATUS_PAUSED = 'paused'
@@ -21,17 +23,11 @@ job_status_values = frozenset([
     STATUS_PENDING,
 ])
 
-job_status_values_ogc = frozenset([
-    STATUS_ACCEPTED,
-    STATUS_RUNNING,
-    STATUS_SUCCEEDED,
-    STATUS_FAILED
-])
-
 job_status_categories = {
     # note: only [Succeeded, Failed, Accepted, Running] are OGC compliant
     # note: PyWPS use [Succeeded, Failed, Accepted, Started, Paused, Exception]
     # http://docs.opengeospatial.org/is/14-065/14-065.html#17
+    OGC_COMPLIANT: frozenset([STATUS_ACCEPTED, STATUS_RUNNING, STATUS_SUCCEEDED, STATUS_FAILED]),
     STATUS_RUNNING: frozenset([STATUS_ACCEPTED, STATUS_PAUSED, STATUS_STARTED]),
     STATUS_FINISHED: frozenset([STATUS_SUCCEEDED, STATUS_FAILED, STATUS_DISMISSED, STATUS_EXCEPTION]),
 }

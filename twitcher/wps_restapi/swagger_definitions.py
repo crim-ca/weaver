@@ -6,7 +6,7 @@ so that one can update the swagger without touching any other files after the in
 from twitcher.config import TWITCHER_CONFIGURATION_EMS
 from twitcher.wps_restapi.colander_one_of import OneOfMappingSchema
 from twitcher.wps_restapi.utils import wps_restapi_base_path
-from twitcher.status import job_status_values_ogc, STATUS_ACCEPTED
+from twitcher.status import job_status_categories, STATUS_ACCEPTED, OGC_COMPLIANT
 from twitcher.sort import job_sort_values, quote_sort_values, SORT_CREATED, SORT_ID, SORT_PROCESS
 from twitcher.sync import execute_sync_options, EXECUTE_AUTO
 from twitcher.visibility import visibility_values, VISIBILITY_PUBLIC
@@ -612,7 +612,7 @@ class ProcessOutputDescriptionSchema(MappingSchema):
 JobStatusEnum = SchemaNode(
     String(),
     default=None,
-    validator=OneOf(job_status_values_ogc),
+    validator=OneOf(job_status_categories[OGC_COMPLIANT]),
     example=STATUS_ACCEPTED)
 JobSortEnum = SchemaNode(
     String(),
