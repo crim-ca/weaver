@@ -163,7 +163,14 @@ class End2EndEMSTestCase(TestCase):
         for process in [cls.PROCESS_STACKER_ID, cls.PROCESS_SFS_ID, cls.PROCESS_WORKFLOW_ID]:
             cls.test_processes_info.update({process: cls.retrieve_process_info(process)})
 
-        # update the workflow to use 'test_id' instead of originals
+        # replace max occur of 'Stacker' to minimize data size during tests
+        stacker_deploy = cls.test_processes_info[cls.PROCESS_STACKER_ID].deploy_payload
+        stacker_deploy_inputs = stacker_deploy['processDescription']['process']['inputs']
+        for i_input, proc_input in enumerate(stacker_deploy_inputs):
+            if proc_input.get('maxOccurs') == 'unbounded':
+                stacker_deploy_inputs[i_input]['maxOccurs'] = 2
+
+        # update 'Workflow' to use 'test_id' instead of originals
         workflow_deploy = cls.test_processes_info[cls.PROCESS_WORKFLOW_ID].deploy_payload
         for exec_unit in range(len(workflow_deploy['executionUnit'])):
             workflow_cwl_ref = workflow_deploy['executionUnit'][exec_unit].pop('href')
