@@ -38,7 +38,8 @@ class ProcessInfo(object):
         self.execute_payload = execute_payload
 
 
-@pytest.mark.online
+@pytest.mark.slow
+@pytest.mark.functional
 @pytest.mark.skipif(not len(str(os.getenv('TEST_SERVER_HOSTNAME', ''))), reason="Test server not defined!")
 @unittest.skipIf(not len(str(os.getenv('TEST_SERVER_HOSTNAME', ''))), reason="Test server not defined!")
 class End2EndEMSTestCase(TestCase):

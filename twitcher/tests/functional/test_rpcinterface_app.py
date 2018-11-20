@@ -14,6 +14,7 @@ from twitcher.tests. functional.common import setup_mongodb_tokenstore
 from twitcher.tests.functional.common import setup_mongodb_servicestore
 
 
+@pytest.mark.functional
 class XMLRPCInterfaceAppTest(unittest.TestCase):
 
     def setUp(self):

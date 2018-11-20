@@ -18,6 +18,7 @@ import sys
 import os
 
 
+@pytest.mark.functional
 class WpsAppTest(unittest.TestCase):
 
     def setUp(self):

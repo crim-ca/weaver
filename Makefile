@@ -57,13 +57,15 @@ help:
 	@echo "  version     to print version number of this Makefile."
 	@echo "  info        to print information about $(APP_NAME)."
 	@echo "  install     to install $(APP_NAME) by running 'bin/buildout -c custom.cfg'."
-	@echo "  pipinstall  to install as a package to allow import in another python code.
+	@echo "  pipinstall  to install as a package to allow import in another python code."
 	@echo "  sysinstall  to install system packages from requirements.sh. You can also call 'bash requirements.sh' directly."
 	@echo "  update      to update your application by running 'bin/buildout -o -c custom.cfg' (buildout offline mode)."
 	@echo "  clean       to delete all files that are created by running buildout."
 	@echo "\nTesting targets:"
-	@echo "  test        to run tests (but skip long running tests)."
+	@echo "  test        to run tests (but skip long running and online tests)."
+	@echo "  testfunc    to run funtional tests (online and usage specific)."
 	@echo "  testall     to run all tests (including long running tests)."
+	@echo "  coverage    to run all tests using coverage analysis."
 	@echo "  pep8        to run pep8 code style checks."
 	@echo "\nSphinx targets:"
 	@echo "  docs        to generate HTML documentation with Sphinx."
@@ -245,12 +247,25 @@ passwd: custom.cfg
 .PHONY: test
 test:
 	@echo "Running tests (skip slow and online tests) ..."
-	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); bin/py.test -v -m 'not slow and not online'"
+	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); py.test -v -m 'not slow and not online'"
 
 .PHONY: testall
 testall:
 	@echo "Running all tests (including slow and online tests) ..."
-	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); bin/py.test -v"
+	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); pytest -v"
+
+.PHONY: testfunc
+testfunc:
+	@echo "Running functional tests ..."
+	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); pytest -v -m 'functional'"
+
+.PHONY: coverage
+coverage:
+	@echo "Running coverage analysis..."
+	coverage run --source twitcher setup.py test
+	coverage report -m
+	coverage html -d coverage
+	$(BROWSER) coverage/index.html
 
 .PHONY: pep8
 pep8:
