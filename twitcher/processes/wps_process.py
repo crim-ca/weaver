@@ -101,7 +101,7 @@ class WpsProcess(object):
         LOGGER.debug("Update process WPS visibility request for {0}".format(self.process_id))
         admin_headers = deepcopy(self.headers)
         admin_headers.update(self.get_admin_auth_header())
-        response = requests.put(self.url + process_visibility_uri,
+        response = requests.put(self.url + process_visibility_uri.format(process_id=self.process_id),
                                 json={'value': visibility},
                                 headers=admin_headers,
                                 cookies=self.cookies,
