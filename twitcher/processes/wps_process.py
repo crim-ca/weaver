@@ -88,7 +88,7 @@ class WpsProcess(object):
             return None
         elif response.status_code == HTTPNotFound.code:
             return False
-        elif response.status_code == HTTPOk.status_code:
+        elif response.status_code == HTTPOk.code:
             json_body = response.json()
             # TODO: support for Spacebel, always returns dummy visibility response, enforce deploy with `False`
             if json_body.get('message') == "magic!" or json_body.get('type') == "ok" or json_body.get('code') == 4:
