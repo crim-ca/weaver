@@ -5,6 +5,7 @@ from twitcher.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 from twitcher.owsproxy import owsproxy_base_url
 from twitcher.utils import get_twitcher_url
 from twitcher.status import (
+    STATUS_ACCEPTED,
     STATUS_SUCCEEDED,
     STATUS_RUNNING,
     STATUS_FINISHED,
@@ -427,16 +428,23 @@ class End2EndEMSTestCase(TestCase):
         Validates that the job is stated, running, and polls it until completed successfully.
         Then validates that results are accessible (no data integrity check).
         """
-        timeout = 600
+        timeout_accept = 30
+        timeout_running = 600
+        timeout_interval = 5
         while True:
-            assert timeout > 0, "Maximum time reached for job execution test."
+            assert timeout_accept > 0 and timeout_running > 0, \
+                "Maximum timeout reached for job execution test. (Accept: {}s, Running: {}s)." \
+                .format(timeout_accept, timeout_running)
             resp = self.request('GET', job_location_url,
                                 headers=user_headers, cookies=user_cookies, status=HTTPOk.code)
             status = resp.json.get('status')
             assert status in job_status_values
             if status in job_status_categories[STATUS_RUNNING]:
-                timeout -= 5
-                time.sleep(5)
+                if status == STATUS_ACCEPTED:
+                    timeout_accept -= timeout_interval
+                else:
+                    timeout_running -= timeout_interval
+                time.sleep(timeout_interval)
                 continue
             elif status in job_status_categories[STATUS_FINISHED]:
                 self.assertEquals(status, STATUS_SUCCEEDED, "Job execution `{}` failed.".format(job_location_url))
