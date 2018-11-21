@@ -435,7 +435,14 @@ class WpsWorkflowJob(JobBase):
 
         LOGGER.info(u"Process {} enforced to public visibility.".format(
                     self.wps_process.process_id, self.wps_process.url))
-        self.wps_process.set_visibility(visibility=VISIBILITY_PUBLIC)
+        try:
+            self.wps_process.set_visibility(visibility=VISIBILITY_PUBLIC)
+        except RequestsHTTPError as error:
+            if error.response.status_code == HTTPNotFound.code:
+                # Route not implemented on the ADES. Carry on.
+                pass
+            else:
+                raise
 
         self.results = self.wps_process.execute(self.builder.job, self.outdir, self.expected_outputs)
 
