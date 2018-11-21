@@ -12,7 +12,7 @@ from twitcher.status import (
     job_status_categories,
 )
 from six.moves.urllib.parse import urlparse
-from typing import Text, Dict, Optional, Any, Tuple, Union
+from typing import Text, Dict, Optional, Any, Tuple, Iterable, Union
 from unittest import TestCase
 from pyramid import testing
 from pyramid.settings import asbool
@@ -213,16 +213,15 @@ class End2EndEMSTestCase(TestCase):
     def clear_test_processes(cls):
         for process_id, process_info in cls.test_processes_info.items():
             path = '{}/processes/{}'.format(cls.get_twitcher_ems_url(), process_info.test_id)
-            headers, cookies = cls.user_headers_cookies(cls.ALICE_CREDENTIALS)
+            headers, cookies = cls.user_headers_cookies(cls.ALICE_CREDENTIALS, force_magpie=True)
             resp = cls.request('DELETE', path, headers=headers, cookies=cookies, ignore_errors=True)
             # unauthorized also would mean the process doesn't exist since Alice should have permissions on it
-            if resp.status_code not in (HTTPOk.code, HTTPUnauthorized.code, HTTPNotFound.code):
-                raise Exception("Failed cleanup of test processes! " +
-                                "Unexpected HTTP code: `{}`.".format(resp.status_code))
+            cls.assert_response(resp, [HTTPOk.code, HTTPUnauthorized.code, HTTPNotFound.code],
+                                message="Failed cleanup of test processes!")
 
     @classmethod
-    def login(cls, username, password):
-        # type: (Text, Text) -> Tuple[Dict[str, str], Dict[str, str]]
+    def login(cls, username, password, force_magpie=False):
+        # type: (Text, Text, Optional[bool]) -> Tuple[Dict[str, str], Dict[str, str]]
         """
         Login using WSO2 or Magpie according to `WSO2_ENABLED` to retrieve session cookies.
 
@@ -235,7 +234,7 @@ class End2EndEMSTestCase(TestCase):
 
         :returns: (Headers, Cookies) respectively to WSO2/Magpie login procedures.
         """
-        if cls.WSO2_ENABLED:
+        if cls.WSO2_ENABLED and not force_magpie:
             data = {
                 'grant_type': 'password',
                 'scope': 'openid',
@@ -250,18 +249,19 @@ class End2EndEMSTestCase(TestCase):
                 access_token = resp.json().get('access_token')
                 assert access_token is not None, "Failed login!"
                 return {'Authorization': 'Bearer {}'.format(access_token)}, {}
-            cls.assert_response(resp)
+            cls.assert_response(resp, status=HTTPOk.code, message="Failed token retrieval from login!")
         else:
             data = {'user_name': username, 'password': password}
             headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
             resp = requests.post('{}/signin'.format(cls.MAGPIE_URL), json=data, headers=headers)
             if resp.status_code == HTTPOk.code:
                 return {}, dict(resp.cookies)
-            cls.assert_response(resp)
+            cls.assert_response(resp, status=HTTPOk.code, message="Failed token retrieval from login!")
 
     @classmethod
-    def user_headers_cookies(cls, credentials):
-        # type: (Dict[str, str]) -> Tuple[Dict[str, str], Dict[str, str]]
+    def user_headers_cookies(cls, credentials, force_magpie=False):
+        # type: (Dict[str, Union[str, bool]], Optional[bool]) -> Tuple[Dict[str, str], Dict[str, str]]
+        credentials.update({'force_magpie': force_magpie})
         header_tokens, cookie_tokens = cls.login(**credentials)
         headers = deepcopy(cls.headers)
         cookies = deepcopy(cls.cookies)
@@ -315,7 +315,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def assert_response(cls, response, status=None, message=''):
-        # type: (Union[TestResponse, requests.Response], Optional[int], Optional[str]) -> None
+        # type: (Union[TestResponse, requests.Response], Optional[int, Iterable[int]], Optional[str]) -> None
         rs = response.status_code
         reason = getattr(response, 'reason', '')
         content = getattr(response, 'content', '')
@@ -326,9 +326,10 @@ class End2EndEMSTestCase(TestCase):
             req_url = getattr(response.request, 'url', '')
             req_body = getattr(response.request, 'body', '')
             req_method = getattr(response.request, 'method', '')
-        msg = "HTTPError: {} {} [{}, {}] from [{} {} {}]" \
+        msg = "Unexpected HTTP Status: {} {} [{}, {}] from [{} {} {}]" \
               .format(response.status_code, reason, message, content, req_method, req_url, req_body)
-        assert (status is not None and status == rs) or (status is None and rs <= 400), msg
+        status = [status] if status is not None and not hasattr(status, '__iter__') else status
+        assert (status is not None and rs in status) or (status is None and rs <= 400), msg
 
     @classmethod
     def validate_test_server(cls):
@@ -337,7 +338,7 @@ class End2EndEMSTestCase(TestCase):
         if cls.WSO2_ENABLED:
             servers.append(cls.WSO2_HOSTNAME)
         for server_url in servers:
-            cls.request('GET', server_url, headers=cls.headers, status=HTTPOk.code)
+            cls.request('GET', server_url, headers=cls.headers, status=HTTPOk.code, timeout=10)
         # verify that EMS configuration requirement is met
         resp = cls.request('GET', cls.TWITCHER_RESTAPI_URL, headers=cls.headers, status=HTTPOk.code)
         assert resp.json.get('configuration') == TWITCHER_CONFIGURATION_EMS, "Twitcher must be configured as EMS."
@@ -423,7 +424,7 @@ class End2EndEMSTestCase(TestCase):
     def validate_test_job_execution(self, job_location_url, user_headers, user_cookies):
         # type: (str, Dict[str, str], Dict[str, str]) -> None
         """
-        Validates that the job is stated, running, and pools it until completed successfully.
+        Validates that the job is stated, running, and polls it until completed successfully.
         Then validates that results are accessible (no data integrity check).
         """
         timeout = 600
