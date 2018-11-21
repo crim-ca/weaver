@@ -2,6 +2,7 @@ import os
 from pyramid.httpexceptions import *
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
+from pyramid.request import Request
 from celery.utils.log import get_task_logger
 from six.moves.urllib.parse import urlparse
 from six.moves.urllib.request import urlopen
@@ -343,6 +344,26 @@ def submit_job_handler(request, service_url, is_workflow=False):
         location_base=location_base,
         process_id=process_id,
         job_id=result.id)
+
+    retry = 0
+    max_retry = 5
+    while True:
+        try:
+            subreq = Request.blank(location)
+            response = request.invoke_subrequest(subreq)
+            if response.status_code == HTTPOk.code:
+                break
+        except HTTPNotFound:
+            # It's expected, raise any other exception
+            pass
+
+        retry += 1
+        if retry > max_retry:
+            raise HTTPInternalServerError('Submit job failed. Status is unavailable after {0} seconds'
+                .format(max_retry))
+        else:
+            sleep(1)
+
     body_data = {
         'jobID': result.id,
         'status': STATUS_ACCEPTED,
