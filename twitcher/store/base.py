@@ -7,8 +7,8 @@ solution specific to your needs.
 
 The implementation is based on `python-oauth2 <http://python-oauth2.readthedocs.io/en/latest/>`_.
 """
-from requests import Request
-from typing import Text, Optional, List
+from pyramid.request import Request
+from typing import Any, Optional, List
 from twitcher.datatype import Job, Service, Process, Quote, Bill, AccessToken
 
 
@@ -22,7 +22,7 @@ class AccessTokenStore(object):
         raise NotImplementedError
 
     def delete_token(self, token):
-        # type: (Text) -> None
+        # type: (str) -> None
         """
         Deletes an access token from the store using its token string to identify it.
         This invalidates both the access token and the token.
@@ -30,7 +30,7 @@ class AccessTokenStore(object):
         raise NotImplementedError
 
     def fetch_by_token(self, token):
-        # type: (Text) -> AccessToken
+        # type: (str) -> AccessToken
         """
         Fetches an access token from the store using its token string to identify it.
         """
@@ -57,7 +57,7 @@ class ServiceStore(object):
         raise NotImplementedError
 
     def delete_service(self, name, request=None):
-        # type: (Text, Optional[Request]) -> bool
+        # type: (str, Optional[Request]) -> bool
         """
         Removes service from database.
         """
@@ -71,14 +71,14 @@ class ServiceStore(object):
         raise NotImplementedError
 
     def fetch_by_name(self, name, request=None):
-        # type: (Text, Optional[Request]) -> Service
+        # type: (str, Optional[Request]) -> Service
         """
         Get service for given ``name`` from storage.
         """
         raise NotImplementedError
 
     def fetch_by_url(self, url, request=None):
-        # type: (Text, Optional[Request]) -> Service
+        # type: (str, Optional[Request]) -> Service
         """
         Get service for given ``url`` from storage.
         """
@@ -105,14 +105,14 @@ class ProcessStore(object):
         raise NotImplementedError
 
     def delete_process(self, process_id, request=None):
-        # type: (Text, Optional[Request]) -> bool
+        # type: (str, Optional[Request]) -> bool
         """
         Removes process from database.
         """
         raise NotImplementedError
 
     def list_processes(self, visibility=None, request=None):
-        # type: (Optional[Text], Optional[Request]) -> List[Process]
+        # type: (Optional[str], Optional[Request]) -> List[Process]
         """
         Lists all processes in database, optionally filtered by visibility.
 
@@ -122,7 +122,7 @@ class ProcessStore(object):
         raise NotImplementedError
 
     def fetch_by_id(self, process_id, request=None):
-        # type: (Text, Optional[Request]) -> Process
+        # type: (str, Optional[Request]) -> Process
         """
         Get process for given ``name`` from storage.
 
@@ -131,7 +131,7 @@ class ProcessStore(object):
         raise NotImplementedError
 
     def get_visibility(self, process_id, request=None):
-        # type: (Text, Optional[Request]) -> Text
+        # type: (str, Optional[Request]) -> str
         """
         Get visibility of a process.
 
@@ -140,7 +140,7 @@ class ProcessStore(object):
         raise NotImplementedError
 
     def set_visibility(self, process_id, visibility, request=None):
-        # type: (Text, Text, Optional[Request]) -> None
+        # type: (str, str, Optional[Request]) -> None
         """
         Set visibility of a process.
 
@@ -157,8 +157,16 @@ class JobStore(object):
     Storage for job tracking.
     """
 
-    def save_job(self, task_id, process, service=None, is_workflow=False, user_id=None, async=True, custom_tags=None):
-        # type: (Text, Text, Optional[Text], Optional[bool], Optional[int], Optional[bool], Optional[List[Text]]) -> Job
+    def save_job(self,
+                 task_id,               # type: str
+                 process,               # type: str
+                 service=None,          # type: Optional[str]
+                 inputs=None,           # type: Optional[List[Any]]
+                 is_workflow=False,     # type: Optional[bool]
+                 user_id=None,          # type: Optional[int]
+                 execute_async=True,    # type: Optional[bool]
+                 custom_tags=None       # type: Optional[List[str]]
+                 ):                     # type: (...) -> Job
         """
         Stores a job in storage.
         """
@@ -172,14 +180,14 @@ class JobStore(object):
         raise NotImplementedError
 
     def delete_job(self, name, request=None):
-        # type: (Text, Optional[Request]) -> bool
+        # type: (str, Optional[Request]) -> bool
         """
         Removes job from database.
         """
         raise NotImplementedError
 
     def fetch_by_id(self, job_id, request=None):
-        # type: (Text, Optional[Request]) -> Job
+        # type: (str, Optional[Request]) -> Job
         """
         Get job for given ``job_id`` from storage.
         """
@@ -196,12 +204,12 @@ class JobStore(object):
                   request,          # type: Request
                   page=0,           # type: Optional[int]
                   limit=10,         # type: Optional[int]
-                  process=None,     # type: Optional[Text]
-                  service=None,     # type: Optional[Text]
-                  tags=None,        # type: Optional[List[Text]]
-                  access=None,      # type: Optional[Text]
-                  status=None,      # type: Optional[Text]
-                  sort=None,        # type: Optional[Text]
+                  process=None,     # type: Optional[str]
+                  service=None,     # type: Optional[str]
+                  tags=None,        # type: Optional[List[str]]
+                  access=None,      # type: Optional[str]
+                  status=None,      # type: Optional[str]
+                  sort=None,        # type: Optional[str]
                   ):                # type: (...) -> List[Job]
         """
         Finds all jobs in database matching search filters.
@@ -229,7 +237,7 @@ class QuoteStore(object):
         raise NotImplementedError
 
     def fetch_by_id(self, quote_id):
-        # type: (Text) -> Quote
+        # type: (str) -> Quote
         """
         Get quote for given ``quote_id`` from storage.
         """
@@ -243,7 +251,7 @@ class QuoteStore(object):
         raise NotImplementedError
 
     def find_quotes(self, process_id=None, page=0, limit=10, sort=None):
-        # type: (Optional[Text], Optional[int], Optional[int], Optional[Text]) -> List[Quote]
+        # type: (Optional[str], Optional[int], Optional[int], Optional[str]) -> List[Quote]
         """
         Finds all quotes in database matching search filters.
         """
@@ -263,7 +271,7 @@ class BillStore(object):
         raise NotImplementedError
 
     def fetch_by_id(self, bill_id):
-        # type: (Text) -> List[Bill]
+        # type: (str) -> List[Bill]
         """
         Get bill for given ``bill_id`` from storage.
         """
@@ -277,7 +285,7 @@ class BillStore(object):
         raise NotImplementedError
 
     def find_bills(self, quote_id=None, page=0, limit=10, sort=None):
-        # type: (Optional[Text], Optional[int], Optional[int], Optional[Text]) -> List[Bill]
+        # type: (Optional[str], Optional[int], Optional[int], Optional[str]) -> List[Bill]
         """
         Finds all bills in database matching search filters.
         """

@@ -234,6 +234,7 @@ class MemoryProcessStore(ProcessStore):
         self.save_process(process)
 
 
+from twitcher.datatype import Job
 from twitcher.store.base import JobStore
 from twitcher.exceptions import JobNotFound
 
@@ -247,27 +248,29 @@ class MemoryJobStore(JobStore):
     def __init__(self):
         self.store = {}
 
-    def save_job(self, task_id, process, service=None, is_workflow=False, user_id=None, async=True, custom_tags=None):
+    def save_job(self, task_id, process, service=None, inputs=None,
+                 is_workflow=False, user_id=None, execute_async=True, custom_tags=None):
         """
         Stores a job in memory.
         """
-        job = {
+        job = Job({
             'task_id': task_id,
             'process': process,
             'service': service,
+            'inputs': inputs,
             'is_workflow': is_workflow,
             'user_id': user_id,
-            'async': async,
+            'execute_async': execute_async,
             'custom_tags': [] if not custom_tags else custom_tags,
-        }
-        self.store[task_id] = job
+        })
+        self.store[job.id] = job
 
     def update_job(self, job):
         """
         Updates a job parameters in mongodb storage.
         :param job: instance of ``twitcher.datatype.Job``.
         """
-        self.store[job.task_id] = job
+        self.store[job.id] = job
 
     def delete_job(self, job_id, request=None):
         """

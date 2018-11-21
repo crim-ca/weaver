@@ -161,20 +161,17 @@ def retrieve_package_job_log(execution, job):
 
 
 @app.task(bind=True)
-def execute_process(self, url, service, process_id, inputs,
-                    is_workflow=False, user_id=None, async=True, custom_tags=None, headers=None):
-    custom_tags = list() if custom_tags is None else custom_tags
+def execute_process(self, job_id, url, headers=None):
     registry = app.conf['PYRAMID_REGISTRY']
     load_pywps_cfg(registry)
 
     ssl_verify = asbool(registry.settings.get('twitcher.ows_proxy_ssl_verify', True))
     store = jobstore_factory(registry)
-    task_id = self.request.id
-    job = JobDB({'task_id': task_id})  # default in case of error during registration to job store
-    try:
-        job = store.save_job(task_id=task_id, process=process_id, service=service, is_workflow=is_workflow,
-                             user_id=user_id, async=async, custom_tags=custom_tags)
+    job = store.fetch_by_id(job_id)
+    job.task_id = self.request.id
+    job = store.update_job(job)
 
+    try:
         try:
             wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), verify=ssl_verify)
             # noinspection PyProtectedMember
@@ -182,7 +179,7 @@ def execute_process(self, url, service, process_id, inputs,
         except Exception as ex:
             raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
         try:
-            process = wps.describeprocess(process_id)
+            process = wps.describeprocess(job.process)
         except Exception as ex:
             raise OWSNoApplicableCode("Failed to retrieve WPS process description. Error: [{}].".format(str(ex)))
 
@@ -194,7 +191,7 @@ def execute_process(self, url, service, process_id, inputs,
 
         try:
             wps_inputs = list()
-            for process_input in inputs:
+            for process_input in job.inputs:
                 input_id = get_any_id(process_input)
                 process_value = get_any_value(process_input)
                 # in case of array inputs, must repeat (id,value)
@@ -215,8 +212,8 @@ def execute_process(self, url, service, process_id, inputs,
             (o.identifier, o.dataType == 'ComplexData') for o in process.processOutputs
         ]
 
-        mode = EXECUTE_ASYNC if async else EXECUTE_SYNC
-        execution = wps.execute(process_id, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
+        mode = EXECUTE_ASYNC if job.execute_async else EXECUTE_SYNC
+        execution = wps.execute(job.process, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
 
         if not execution.process and execution.errors:
             raise execution.errors[0]

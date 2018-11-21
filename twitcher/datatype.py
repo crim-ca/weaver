@@ -15,7 +15,7 @@ from twitcher.utils import now_secs, get_job_log_msg, get_log_fmt, get_log_datef
 from twitcher.exceptions import ProcessInstanceError
 from twitcher.processes import process_mapping
 from twitcher.processes.types import PACKAGE_PROCESSES, PROCESS_WPS
-from twitcher.status import job_status_values
+from twitcher.status import job_status_values, STATUS_UNKNOWN
 from twitcher.visibility import visibility_values, VISIBILITY_PRIVATE
 from pywps import Process as ProcessWPS
 
@@ -38,7 +38,7 @@ class Service(dict):
     @property
     def name(self):
         """Service name."""
-        return self.get('name', 'unknown')
+        return self.get('name', STATUS_UNKNOWN)
 
     @property
     def type(self):
@@ -76,7 +76,7 @@ class Service(dict):
 
 class Job(dict):
     """
-    Dictionary that contains OWS service jobs. It always has ``'task_id'`` and ``identifier`` keys.
+    Dictionary that contains OWS service jobs. It always has ``'id'`` and ``task_id`` keys.
     """
 
     def __init__(self, *args, **kwargs):
@@ -85,6 +85,8 @@ class Job(dict):
             raise TypeError("Parameter `task_id` is required for `{}` creation.".format(type(self)))
         if not isinstance(self['task_id'], six.string_types):
             raise TypeError("Type `str` is required for `{}.task_id`".format(type(self)))
+        if not isinstance(self.id, six.string_types):
+            raise TypeError("Type `str` is required for `{}.id`".format(type(self)))
 
     def _get_log_msg(self, msg=None):
         if not msg:
@@ -117,6 +119,14 @@ class Job(dict):
                     logger.log(level, msg)
 
     @property
+    def id(self):
+        job_id = self.get('id')
+        if not job_id:
+            job_id = str(uuid.uuid4())
+            self['id'] = job_id
+        return job_id
+
+    @property
     def task_id(self):
         return self['task_id']
 
@@ -140,6 +150,19 @@ class Job(dict):
             raise TypeError("Type `str` is required for `{}.process`".format(type(self)))
         self['process'] = process
 
+    def _get_inputs(self):
+        if self.get('inputs') is None:
+            self['inputs'] = list()
+        return self['inputs']
+
+    def _set_inputs(self, inputs):
+        if not isinstance(inputs, list):
+            raise TypeError("Type `list` is required for `{}.inputs`".format(type(self)))
+        self['inputs'] = inputs
+
+    # allows to correctly update list by ref using `job.inputs.extend()`
+    inputs = property(_get_inputs, _set_inputs)
+
     @property
     def user_id(self):
         return self.get('user_id', None)
@@ -152,7 +175,7 @@ class Job(dict):
 
     @property
     def status(self):
-        return self.get('status', 'unknown')
+        return self.get('status', STATUS_UNKNOWN)
 
     @status.setter
     def status(self, status):
@@ -184,6 +207,10 @@ class Job(dict):
         if not isinstance(location_url, six.string_types):
             raise TypeError("Type `str` is required for `{}.status_location`".format(type(self)))
         self['status_location'] = location_url
+
+    @property
+    def execute_async(self):
+        return self.get('execute_async', True)
 
     @property
     def is_workflow(self):
@@ -299,13 +326,16 @@ class Job(dict):
     @property
     def params(self):
         return {
+            'id': self.id,
             'task_id': self.task_id,
             'service': self.service,
             'process': self.process,
+            'inputs': self.inputs,
             'user_id': self.user_id,
             'status': self.status,
             'status_message': self.status_message,
             'status_location': self.status_location,
+            'execute_async': self.execute_async,
             'is_workflow': self.is_workflow,
             'created': self.created,
             'finished': self.finished,
@@ -320,7 +350,7 @@ class Job(dict):
         }
 
     def __str__(self):
-        return 'Job <{}>'.format(self.task_id)
+        return 'Job <{}>'.format(self.id)
 
     def __repr__(self):
         cls = type(self)

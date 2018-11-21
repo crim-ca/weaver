@@ -22,7 +22,7 @@ def job_url(request, job):
     return '{base_job_url}/processes/{process_id}/jobs/{job_id}'.format(
         base_job_url=base_job_url,
         process_id=job.process,
-        job_id=job.task_id)
+        job_id=job.id)
 
 
 def job_format_json(request, job):
@@ -167,7 +167,7 @@ def cancel_job(request):
     store.update_job(job)
 
     return HTTPOk(json={
-        'jobID': job.task_id,
+        'jobID': job.id,
         'status': job.status,
         'message': job.status_message,
         'percentCompleted': job.progress,
@@ -185,8 +185,7 @@ def get_job_results(request):
     Retrieve the results of a job.
     """
     job = get_job(request)
-    results = dict(outputs=[dict(id=result['identifier'],
-                                 href=result['reference']) for result in job.results])
+    results = dict(outputs=[dict(id=result['identifier'], href=result['reference']) for result in job.results])
     return HTTPOk(json=results)
 
 
