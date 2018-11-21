@@ -248,8 +248,7 @@ class WpsProcess(object):
         job_status['status'] = job_status['status'].lower()
         if job_status['status'] == 'successful':
             job_status['status'] = status.STATUS_SUCCEEDED
-
-        return status
+        return job_status
 
     def get_job_results(self, job_id):
         response = requests.get(self.url + process_results_uri.format(process_id=self.process_id, job_id=job_id),
