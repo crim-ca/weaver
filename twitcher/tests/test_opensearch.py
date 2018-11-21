@@ -4,9 +4,11 @@ from copy import deepcopy
 import unittest
 import os
 from pprint import pformat
-import urlparse
+from six.moves.urllib.parse import urlparse
 
+# noinspection PyPackageRequirements
 import pytest
+# noinspection PyPackageRequirements
 from mock import mock
 from pyramid import testing
 from pyramid.testing import DummyRequest
@@ -32,11 +34,11 @@ COLLECTION_IDS = {
 def assert_json_equals(json1, json2):
     def ordered_json(obj):
         if isinstance(obj, dict):
-            return sorted((unicode(k), ordered_json(v)) for k, v in obj.items())
+            return sorted((str(k), ordered_json(v)) for k, v in obj.items())
         elif isinstance(obj, list):
             return sorted(ordered_json(x) for x in obj)
         else:
-            return unicode(obj)
+            return str(obj)
 
     json1_lines = pformat(ordered_json(json1)).split("\n")
     json2_lines = pformat(ordered_json(json2)).split("\n")
@@ -115,7 +117,7 @@ def memory_store_with_opensearch_process(memory_store, opensearch_process):
     return memory_store
 
 
-def test_transform_execute_parameters_wps(opensearch_process):
+def test_transform_execute_parameters_wps():
     def make_input(id_, value):
         input_ = LiteralInput(id_, "", data_type="string")
         input_.data = value

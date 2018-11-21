@@ -23,6 +23,7 @@ def api_frontpage(request):
     twitcher_api = asbool(settings.get('twitcher.wps_restapi'))
     twitcher_api_url = wps_restapi_base_url(settings) if twitcher_api else None
     twitcher_api_doc = twitcher_api_url + sd.api_swagger_ui_uri if twitcher_api else None
+    twitcher_api_ref = settings.get('twitcher.wps_restapi_ref', None) if twitcher_api else None
     twitcher_wps = asbool(settings.get('twitcher.wps'))
     twitcher_wps_url = twitcher_url + get_wps_path(settings) if twitcher_wps else None
     twitcher_proxy = asbool(settings.get('twitcher.ows_proxy'))
@@ -32,9 +33,14 @@ def api_frontpage(request):
         'message': 'Twitcher Information',
         'configuration': twitcher_config,
         'parameters': [
-            {'name': 'api', 'enabled': twitcher_api, 'url': twitcher_api_url, 'doc': twitcher_api_doc},
-            {'name': 'proxy', 'enabled': twitcher_proxy, 'url': twitcher_proxy_url},
-            {'name': 'wps', 'enabled': twitcher_wps, 'url': twitcher_wps_url},
+            {'name': 'api', 'enabled': twitcher_api,
+             'url': twitcher_api_url,
+             'doc': twitcher_api_doc,
+             'ref': twitcher_api_ref},
+            {'name': 'proxy', 'enabled': twitcher_proxy,
+             'url': twitcher_proxy_url},
+            {'name': 'wps', 'enabled': twitcher_wps,
+             'url': twitcher_wps_url},
         ]
     }
 

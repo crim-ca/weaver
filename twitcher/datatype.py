@@ -4,8 +4,10 @@ Definitions of types used by tokens.
 
 import six
 import uuid
-from dateutil.parser import parse as dtparse
+# noinspection PyProtectedMember
+from dateutil.parser import parse as dt_parse
 from datetime import datetime, timedelta
+# noinspection PyProtectedMember
 from logging import _levelNames, ERROR, INFO
 
 from twitcher.datatype_schemas import DataDescriptionType, DescriptionType
@@ -89,6 +91,7 @@ class Job(dict):
             msg = self.status_message
         return get_job_log_msg(duration=self.duration, progress=self.progress, status=self.status, msg=msg)
 
+    # noinspection PyUnusedLocal
     def save_log(self, errors=None, logger=None, module=None):
         if isinstance(errors, six.string_types):
             log_msg = [(ERROR, self._get_log_msg())]
@@ -631,13 +634,13 @@ class Quote(dict):
         if 'created' not in self:
             self['created'] = str(datetime.now())
         try:
-            self['created'] = dtparse(self.get('created')).isoformat()
+            self['created'] = dt_parse(self.get('created')).isoformat()
         except ValueError:
             raise ValueError("Field `Quote.created` must be an ISO-8601 datetime string.")
         if 'expire' not in self:
             self['expire'] = str(datetime.now() + timedelta(days=1))
         try:
-            self['expire'] = dtparse(self.get('expire')).isoformat()
+            self['expire'] = dt_parse(self.get('expire')).isoformat()
         except ValueError:
             raise ValueError("Field `Quote.expire` must be an ISO-8601 datetime string.")
         if 'id' not in self:
@@ -775,7 +778,7 @@ class Bill(dict):
         if 'created' not in self:
             self['created'] = str(datetime.now())
         try:
-            self['created'] = dtparse(self.get('created')).isoformat()
+            self['created'] = dt_parse(self.get('created')).isoformat()
         except ValueError:
             raise ValueError("Field `Bill.created` must be an ISO-8601 datetime string.")
         if 'id' not in self:

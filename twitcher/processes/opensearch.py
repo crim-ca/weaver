@@ -34,7 +34,7 @@ def alter_payload_after_query(payload):
 
 
 def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
-    # type: (Dict[str, Deque], Dict[str, Dict]) -> Dict[str, Deque]
+    # type: (Dict[Deque], Dict[str, Dict]) -> Dict[Deque]
     """Query OpenSearch using parameters in inputs and return file links.
 
     eoimage_ids is used to identify if a certain input is an eoimage.
@@ -442,7 +442,7 @@ def get_eo_images_inputs_from_payload(payload):
 
 
 def get_original_collection_id(payload, wps_inputs):
-    # type: (Dict[deque]) -> Dict[deque]
+    # type: (Dict, Dict[deque]) -> Dict[deque]
     """
     When we deploy a Process that contains OpenSearch parameters, the collection identifier if modified.
     This function changes the id in the execute request to the one in the deploy description.
@@ -454,10 +454,10 @@ def get_original_collection_id(payload, wps_inputs):
     inputs = get_eo_images_inputs_from_payload(payload)
     original_ids = [get_any_id(i) for i in inputs]
 
-    correspondance = dict(
+    correspondence = dict(
         zip(modified_collection_identifiers(original_ids), original_ids)
     )
-    for execute_id, deploy_id in correspondance.items():
+    for execute_id, deploy_id in correspondence.items():
         if execute_id not in new_inputs:
             raise ValueError("Missing required input parameter: {}".format(execute_id))
         new_inputs[deploy_id] = new_inputs.pop(execute_id)

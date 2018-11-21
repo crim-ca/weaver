@@ -23,8 +23,9 @@ class MongodbStore(object):
     Base class extended by all concrete store adapters.
     """
 
-    def __init__(self, collection):
+    def __init__(self, collection, sane_name_config=None):
         self.collection = collection
+        self.sane_name_config = sane_name_config or {}
 
 
 class MongodbTokenStore(AccessTokenStore, MongodbStore):
@@ -69,7 +70,7 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
             else:
                 raise ServiceRegistrationError("service url already registered.")
 
-        name = namesgenerator.get_sane_name(service.name)
+        name = namesgenerator.get_sane_name(service.name, **self.sane_name_config)
         if not name:
             name = namesgenerator.get_random_name()
             if self.collection.count({'name': name}) > 0:
@@ -148,8 +149,8 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         if default_processes:
             registered_processes = [process.identifier for process in self.list_processes()]
             for process in default_processes:
-                sane_name = self._get_process_id(process)
-                if sane_name not in registered_processes:
+                process_name = self._get_process_id(process)
+                if process_name not in registered_processes:
                     self._add_process(process)
 
     def _add_process(self, process):
@@ -193,10 +194,12 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         return self._get_process_field(process, lambda: process.identifier)
 
     def _get_process_type(self, process):
-        return self._get_process_field(process, {ProcessDB: lambda: process.type, ProcessWPS: lambda: 'wps'}).lower()
+        return self._get_process_field(process, {ProcessDB: lambda: process.type,
+                                                 ProcessWPS: lambda: 'wps'}).lower()
 
     def _get_process_url(self, process):
-        url = self._get_process_field(process, {ProcessDB: lambda: process.executeWPSEndpoint, ProcessWPS: lambda: None})
+        url = self._get_process_field(process, {ProcessDB: lambda: process.executeWPSEndpoint,
+                                                ProcessWPS: lambda: None})
         if not url:
             url = self.default_wps_endpoint
         return url
@@ -210,7 +213,7 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         :param request: <unused>
         """
         process_id = self._get_process_id(process)
-        sane_name = namesgenerator.get_sane_name(process_id)
+        sane_name = namesgenerator.get_sane_name(process_id, **self.sane_name_config)
         if self.collection.count({'identifier': sane_name}) > 0:
             if overwrite:
                 self.collection.delete_one({'identifier': sane_name})
@@ -224,7 +227,7 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         """
         Removes process from database.
         """
-        sane_name = namesgenerator.get_sane_name(process_id)
+        sane_name = namesgenerator.get_sane_name(process_id, **self.sane_name_config)
         process = self.collection.find_one({'identifier': sane_name})
         if not process:
             raise ProcessNotFound("Process `{}` could not be found.".format(sane_name))
@@ -235,6 +238,7 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         Lists all processes in database, optionally filtered by visibility.
 
         :param visibility: One value amongst `twitcher.visibility`.
+        :param request:
         """
         db_processes = []
         search_filters = {}
@@ -257,7 +261,7 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
 
         :return: An instance of :class:`twitcher.datatype.Process`.
         """
-        sane_name = namesgenerator.get_sane_name(process_id)
+        sane_name = namesgenerator.get_sane_name(process_id, **self.sane_name_config)
         process = self.collection.find_one({'identifier': sane_name})
         if not process:
             raise ProcessNotFound("Process `{}` could not be found.".format(sane_name))
@@ -277,6 +281,8 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         Set visibility of a process.
 
         :param visibility: One value amongst `twitcher.visibility`.
+        :param process_id:
+        :param request:
         :raises: TypeError or ValueError in case of invalid parameter.
         """
         process = self.fetch_by_id(process_id)
@@ -294,13 +300,13 @@ class MongodbJobStore(JobStore, MongodbStore):
     Registry for OWS service process jobs tracking. Uses mongodb to store job attributes.
     """
 
-    def save_job(self, task_id, process, service=None, is_workflow=False, user_id=None, async=True, custom_tags=[]):
+    def save_job(self, task_id, process, service=None, is_workflow=False, user_id=None, async=True, custom_tags=None):
         """
         Stores a job in mongodb.
         """
         try:
             tags = ['dev']
-            tags.extend(custom_tags)
+            tags.extend(custom_tags or list())
             if is_workflow:
                 tags.append('workflow')
             else:

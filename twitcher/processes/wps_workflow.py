@@ -6,17 +6,17 @@ import logging
 import os
 import shutil
 import tempfile
-from six.moves import urllib
 from functools import cmp_to_key, partial
-from typing import (Any, Callable, Dict, Generator, List, Optional, Set, MutableMapping, Union, cast)
-from typing_extensions import Text, Type
-
+from typing import (Any, Callable, Dict, Generator, List, Optional, Set, MutableMapping, Union, cast, Text, Type)
 from schema_salad import validate
 from schema_salad.sourceline import SourceLine
 from six import string_types
+from six.moves import urllib
 
 from cwltool.process import stageFiles
 from cwltool import command_line_tool
+from cwltool.command_line_tool import OutputPorts
+from cwltool.provenance import CreateProvProfile
 from cwltool.builder import (CONTENT_LIMIT, Builder, substitute)
 from cwltool.errors import WorkflowException
 from cwltool.job import JobBase, relink_initialworkdir
@@ -27,15 +27,22 @@ from cwltool.utils import (aslist, json_dumps, onWindows, bytes2str_in_dicts)
 from cwltool.context import (LoadingContext, RuntimeContext, getdefault)
 from cwltool.workflow import Workflow
 from pyramid_celery import celery_app as app
+from pyramid.httpexceptions import HTTPConflict
+
+from twitcher.visibility import VISIBILITY_PUBLIC
+from twitcher.processes.wps_process import WpsProcess
+from twitcher.owsexceptions import OWSAccessForbidden
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_TMP_PREFIX = "tmp"
 
+# TODO: The code started as a copy of the class cwltool/command_line_tool.py,
+#       and still has useless code in the context of a WPS workflow
 
-# TODO: The code started as a copy of the class cwltool/command_line_tool.py, and still has useless code in the context of a WPS workflow
+
 def default_make_tool(toolpath_object,              # type: Dict[Text, Any]
                       loadingContext,               # type: LoadingContext
-                      get_job_process_definition,   # type: (Any, Any)
+                      get_job_process_definition,   # type: Callable[[str, int], WpsProcess]
                       ):                            # type: (...) -> Process
     if not isinstance(toolpath_object, MutableMapping):
         raise WorkflowException(u"Not a dict: '%s'" % toolpath_object)
@@ -72,7 +79,7 @@ class CallbackJob(object):
 
 class WpsWorkflow(Process):
     def __init__(self, toolpath_object, loadingContext, get_job_process_definition):
-        # type: (Dict[Text, Any], LoadingContext) -> None
+        # type: (Dict[Text, Any], LoadingContext, Callable[[str, int], WpsProcess]) -> None
         super(WpsWorkflow, self).__init__(toolpath_object, loadingContext)
         self.prov_obj = loadingContext.prov_obj
         self.get_job_process_definition = get_job_process_definition
@@ -148,7 +155,7 @@ class WpsWorkflow(Process):
                              compute_checksum=True,  # type: bool
                              jobname="",             # type: Text
                              readers=None            # type: Dict[Text, Any]
-                             ):  # type: (...) -> OutputPorts
+                             ):                      # type: (...) -> OutputPorts
         ret = {}  # type: OutputPorts
         debug = LOGGER.isEnabledFor(logging.DEBUG)
         try:
@@ -158,8 +165,7 @@ class WpsWorkflow(Process):
                 with fs_access.open(custom_output, "r") as f:
                     ret = json.load(f)
                 if debug:
-                    LOGGER.debug(u"Raw output from %s: %s", custom_output,
-                                  json_dumps(ret, indent=4))
+                    LOGGER.debug(u"Raw output from %s: %s", custom_output, json_dumps(ret, indent=4))
             else:
                 for i, port in enumerate(ports):
                     def makeWorkflowException(msg):
@@ -232,6 +238,7 @@ class WpsWorkflow(Process):
                                 "glob patterns must not start with '/'")
                         try:
                             prefix = fs_access.glob(outdir)
+                            key = cmp_to_key(cast(Callable[[Text, Text], int], locale.strcoll))
                             r.extend([{"location": g,
                                        "path": fs_access.join(builder.outdir,
                                                               g[len(prefix[0])+1:]),
@@ -242,11 +249,7 @@ class WpsWorkflow(Process):
                                            os.path.basename(g))[1],
                                        "class": "File" if fs_access.isfile(g)
                                        else "Directory"}
-                                      for g in sorted(fs_access.glob(
-                                    fs_access.join(outdir, gb)),
-                                    key=cmp_to_key(cast(
-                                        Callable[[Text, Text],
-                                                 int], locale.strcoll)))])
+                                      for g in sorted(fs_access.glob(fs_access.join(outdir, gb)), key=key)])
                         except (OSError, IOError) as e:
                             LOGGER.warning(Text(e))
                         except Exception:
@@ -353,6 +356,7 @@ class WpsWorkflow(Process):
             return out
         return r
 
+
 class WpsWorkflowJob(JobBase):
     def __init__(self,
                  builder,           # type: Builder
@@ -361,10 +365,11 @@ class WpsWorkflowJob(JobBase):
                  hints,             # type: List[Dict[Text, Text]]
                  name,              # type: Text
                  wps_process,       # type: WpsProcess
-                 expected_outputs,  # type: List[Dict[id, type, outputBinding]]
-                 ):  # type: (...) -> None
+                 expected_outputs,  # type: List[Dict[{'type': Text, 'id': Text, 'outputBinding': Dict['glob': Text]}]]
+                 ):                 # type: (...) -> None
         super(WpsWorkflowJob, self).__init__(builder, joborder, None, requirements, hints, name)
         self.wps_process = wps_process
+        self.results = None
         self.expected_outputs = {}
         for output in expected_outputs:
             # TODO Should we support something else?
@@ -377,10 +382,9 @@ class WpsWorkflowJob(JobBase):
                 output_id = shortname(output['id'])
                 self.expected_outputs[output_id] = output['outputBinding']['glob']
 
-
     def run(self,
-            runtimeContext     # type: RuntimeContext
-            ):  # type: (...) -> None
+            runtimeContext      # type: RuntimeContext
+            ):                  # type: (...) -> None
 
         if not os.path.exists(self.tmpdir):
             os.makedirs(self.tmpdir)
@@ -410,14 +414,27 @@ class WpsWorkflowJob(JobBase):
         self.execute([], env, runtimeContext)
 
     def execute(self,
-                runtime,  # type: List[Text]
-                 env,  # type: MutableMapping[Text, Text]
-                 runtimeContext  # type: RuntimeContext
-                ):  # type: (...) -> None
+                runtime,        # type: List[Text]
+                env,            # type: MutableMapping[Text, Text]
+                runtimeContext  # type: RuntimeContext
+                ):              # type: (...) -> None
 
-        if not self.wps_process.is_deployed():
-            LOGGER.info(u"Process %s is not deployed on %s - deploying.", self.wps_process.process_id, self.wps_process.url)
-            self.wps_process.deploy()
+        visible = self.wps_process.is_visible()
+        if not visible:     # includes private visibility and non-existing cases
+            if visible is None:
+                LOGGER.info(u"Process {} access is unauthorized on {} - deploying as admin.".format(
+                            self.wps_process.process_id, self.wps_process.url))
+            elif visible is False:
+                LOGGER.info(u"Process {} is not deployed on {} - deploying.".format(
+                            self.wps_process.process_id, self.wps_process.url))
+            # TODO: Maybe always redeploy? What about cases of outdated deployed process?
+            try:
+                self.wps_process.deploy()
+            except HTTPConflict:
+                pass
+        LOGGER.info(u"Process {} enforced to public visibility.".format(
+                    self.wps_process.process_id, self.wps_process.url))
+        self.wps_process.set_visibility(visibility=VISIBILITY_PUBLIC)
 
         self.results = self.wps_process.execute(self.builder.job, self.outdir, self.expected_outputs)
 
@@ -432,15 +449,15 @@ class WpsWorkflowJob(JobBase):
             rcode = 0
 
             if self.successCodes:
-                processStatus = "success"
+                process_status = "success"
             elif self.temporaryFailCodes:
-                processStatus = "temporaryFail"
+                process_status = "temporaryFail"
             elif self.permanentFailCodes:
-                processStatus = "permanentFail"
+                process_status = "permanentFail"
             elif rcode == 0:
-                processStatus = "success"
+                process_status = "success"
             else:
-                processStatus = "permanentFail"
+                process_status = "permanentFail"
 
             if self.generatefiles["listing"]:
                 assert self.generatemapper is not None
@@ -458,29 +475,28 @@ class WpsWorkflowJob(JobBase):
                     LOGGER.error(u"'%s' not found", self.command_line[0])
             else:
                 LOGGER.exception("Exception while running job")
-            processStatus = "permanentFail"
+            process_status = "permanentFail"
         except WorkflowException as err:
             LOGGER.error(u"[job %s] Job error:\n%s", self.name, err)
-            processStatus = "permanentFail"
-        except Exception as e:
+            process_status = "permanentFail"
+        except Exception:
             LOGGER.exception("Exception while running job")
-            processStatus = "permanentFail"
+            process_status = "permanentFail"
         if runtimeContext.research_obj and self.prov_obj and \
                 runtimeContext.process_run_id:
-            #creating entities for the outputs produced by each step (in the provenance document)
+            # creating entities for the outputs produced by each step (in the provenance document)
             self.prov_obj.generate_output_prov(
                 outputs, runtimeContext.process_run_id, str(self.name))
             self.prov_obj.document.wasEndedBy(
                 runtimeContext.process_run_id, None, self.prov_obj.workflow_run_uri,
                 datetime.datetime.now())
-        if processStatus != "success":
-            LOGGER.warning(u"[job %s] completed %s", self.name, processStatus)
+        if process_status != "success":
+            LOGGER.warning(u"[job %s] completed %s", self.name, process_status)
         else:
-            LOGGER.info(u"[job %s] completed %s", self.name, processStatus)
+            LOGGER.info(u"[job %s] completed %s", self.name, process_status)
 
         if LOGGER.isEnabledFor(logging.DEBUG):
-            LOGGER.debug(u"[job %s] %s", self.name,
-                          json_dumps(outputs, indent=4))
+            LOGGER.debug(u"[job %s] %s", self.name, json_dumps(outputs, indent=4))
 
         if self.generatemapper and runtimeContext.secret_store:
             # Delete any runtime-generated files containing secrets.
@@ -499,7 +515,7 @@ class WpsWorkflowJob(JobBase):
             raise WorkflowException("runtimeContext.workflow_eval_lock must not be None")
 
         with runtimeContext.workflow_eval_lock:
-            self.output_callback(outputs, processStatus)
+            self.output_callback(outputs, process_status)
 
         if self.stagedir and os.path.exists(self.stagedir):
             LOGGER.debug(u"[job %s] Removing input staging directory %s", self.name, self.stagedir)

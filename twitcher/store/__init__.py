@@ -58,6 +58,9 @@ def tokenstore_factory(registry):
     return store
 
 
+service_store = None
+
+
 def servicestore_defaultfactory(registry):
     """
     Creates a service store with the interface of :class:`twitcher.store.ServiceStore`.
@@ -68,10 +71,11 @@ def servicestore_defaultfactory(registry):
     database = get_db_factory(registry)
     if database == DB_MONGODB:
         db = mongodb_factory(registry)
-        store = MongodbServiceStore(collection=db.services)
-    else:
-        store = MemoryServiceStore()
-    return store
+        return MongodbServiceStore(collection=db.services)
+    global service_store
+    if service_store is None:
+        service_store = MemoryServiceStore()
+    return service_store
 
 
 def processstore_defaultfactory(registry):

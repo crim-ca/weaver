@@ -52,6 +52,7 @@ class MemoryServiceStore(ServiceStore):
     def __init__(self):
         self.url_index = {}
         self.name_index = {}
+        self.sane_name_config = {'assert_invalid': False, 'replace_invalid': True}
 
     def _delete(self, url=None, name=None):
         if url:
@@ -80,7 +81,7 @@ class MemoryServiceStore(ServiceStore):
             else:
                 raise ServiceRegistrationError("service url already registered.")
 
-        name = namesgenerator.get_sane_name(service.name)
+        name = namesgenerator.get_sane_name(service.name, **self.sane_name_config)
         if not name:
             name = namesgenerator.get_random_name()
             if name in self.name_index:
@@ -152,6 +153,7 @@ class MemoryProcessStore(ProcessStore):
 
     def __init__(self, init_processes=None):
         self.name_index = {}
+        self.sane_name_config = {'assert_invalid': False, 'replace_invalid': True}
         if isinstance(init_processes, list):
             for process in init_processes:
                 self.save_process(process)
@@ -161,8 +163,10 @@ class MemoryProcessStore(ProcessStore):
         Stores a WPS process in storage.
 
         :param process: An instance of :class:`twitcher.datatype.Process`.
+        :param overwrite: Overwrite the process by name if existing.
+        :param request:
         """
-        sane_name = namesgenerator.get_sane_name(process.identifier)
+        sane_name = namesgenerator.get_sane_name(process.identifier, **self.sane_name_config)
         if not self.name_index.get(sane_name) or overwrite:
             if not process.title:
                 process.title = sane_name
@@ -173,7 +177,7 @@ class MemoryProcessStore(ProcessStore):
         """
         Removes process from database.
         """
-        sane_name = namesgenerator.get_sane_name(process_id)
+        sane_name = namesgenerator.get_sane_name(process_id, **self.sane_name_config)
         if self.name_index.get(sane_name):
             del self.name_index[sane_name]
 
@@ -182,6 +186,7 @@ class MemoryProcessStore(ProcessStore):
         Lists all processes in database, optionally filtered by visibility.
 
         :param visibility: One value amongst `twitcher.visibility`.
+        :param request:
         """
         if visibility is None:
             visibility = list(visibility_values)
@@ -200,7 +205,7 @@ class MemoryProcessStore(ProcessStore):
 
         :return: An instance of :class:`twitcher.datatype.Process`.
         """
-        sane_name = namesgenerator.get_sane_name(process_id)
+        sane_name = namesgenerator.get_sane_name(process_id, **self.sane_name_config)
         process = self.name_index.get(sane_name)
         if not process:
             raise ProcessNotFound("Process `{}` could not be found.".format(sane_name))
@@ -220,6 +225,8 @@ class MemoryProcessStore(ProcessStore):
         Set visibility of a process.
 
         :param visibility: One value amongst `twitcher.visibility`.
+        :param process_id:
+        :param request:
         :raises: TypeError or ValueError in case of invalid parameter.
         """
         process = self.fetch_by_id(process_id)
@@ -228,55 +235,71 @@ class MemoryProcessStore(ProcessStore):
 
 
 from twitcher.store.base import JobStore
+from twitcher.exceptions import JobNotFound
 
 
 class MemoryJobStore(JobStore):
     """
     Stores job tracking in memory. Useful for testing purposes.
     """
-    def save_job(self, task_id, process, service=None, is_workflow=False, user_id=None, async=True, custom_tags=[]):
+    def __init__(self):
+        self.store = {}
+
+    def save_job(self, task_id, process, service=None, is_workflow=False, user_id=None, async=True, custom_tags=None):
         """
         Stores a job in memory.
         """
-        raise NotImplementedError
+        job = {
+            'task_id': task_id,
+            'process': process,
+            'service': service,
+            'is_workflow': is_workflow,
+            'user_id': user_id,
+            'async': async,
+            'custom_tags': custom_tags,
+        }
+        self.store[task_id] = job
 
     def update_job(self, job):
         """
         Updates a job parameters in mongodb storage.
         :param job: instance of ``twitcher.datatype.Job``.
         """
-        raise NotImplementedError
+        self.store[job.task_id] = job
 
     def delete_job(self, job_id, request=None):
         """
         Removes job from memory.
         """
-        raise NotImplementedError
+        del self.store[job_id]
 
     def fetch_by_id(self, job_id, request=None):
         """
         Gets job for given ``job_id`` from memory.
         """
-        raise NotImplementedError
+        job = self.store.get(job_id)
+        if job is None:
+            raise JobNotFound
+        return job
 
     def list_jobs(self, request=None):
         """
         Lists all jobs in memory.
         """
-        raise NotImplementedError
+        return self.store
 
     def find_jobs(self, request, page=0, limit=10, process=None, service=None,
                   tags=None, access=None, status=None, sort=None):
         """
         Finds all jobs in memory matching search filters.
         """
-        raise NotImplementedError
+        return {}, 0
 
     def clear_jobs(self, request=None):
         """
         Removes all jobs from memory.
         """
-        raise NotImplementedError
+        self.__init__()
 
 
 class MemoryQuoteStore(object):

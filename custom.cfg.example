@@ -33,6 +33,7 @@ wps-path = /path/to/wsp (or value in 'wps-cfg.server.url')
 wps-output = /path/to/custom/wps-outputs
 wps-restapi = true|false
 wps-restapi-path = /base/path/of/rest/api
+wps-restapi-ref = https://rest-api-reference.com/conformance-path
 
 adapter = package.path.to.AdapterImpl
 extra-options = adapter_impl.opt1=value1,adapter_impl.opt2=value2

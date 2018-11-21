@@ -14,10 +14,12 @@ from twitcher.adapter import servicestore_factory, jobstore_factory, processstor
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS
 from twitcher.datatype import Process as ProcessDB, Job as JobDB, Input, Output
 from twitcher.exceptions import (
+    ProcessRegistrationError,
     ProcessNotFound,
     PackageRegistrationError,
     PackageTypeError,
-    ProcessRegistrationError)
+    PackageNotFound,
+)
 from twitcher.processes import wps_package, opensearch
 from twitcher.processes.types import PROCESS_WORKFLOW
 from twitcher.store import processstore_defaultfactory
@@ -315,8 +317,8 @@ def submit_job_handler(request, service_url, is_workflow=False):
         raise HTTPNotImplemented(detail='{0} response not supported.'.format(request.json_body['response']))
 
     for job_input in request.json_body['inputs']:
-        if not all(k in job_input for k in ('id', 'href')):
-            raise HTTPBadRequest("Missing one of required output parameters [id, href].")
+        if not ('id' in job_input and any(k in job_input for k in ('data', 'href'))):
+            raise HTTPBadRequest("Missing one of required output parameters [id, data|href].")
 
     for job_output in request.json_body['outputs']:
         if not all(k in job_output for k in ('id', 'transmissionMode')):
@@ -546,12 +548,13 @@ def add_local_process(request):
     else:
         raise HTTPBadRequest("Missing one of required parameters [owsContext, deploymentProfileName being a workflow].")
 
-    settings = request.registry.settings
-    twitcher_url = get_twitcher_url(settings)
-
     # obtain updated process information using WPS process offering and CWL package definition
     try:
-        process_info = wps_package.get_process_from_wps_request(process_info, reference, package, twitcher_url)
+        # data_source `None` forces workflow process to search locally for deployed step applications
+        process_info = wps_package.get_process_from_wps_request(process_info, reference, package, data_source=None)
+    except PackageNotFound as ex:
+        # raised when a workflow sub-process is not found (not deployed locally)
+        raise HTTPNotFound(detail=ex.message)
     except (PackageRegistrationError, PackageTypeError) as ex:
         raise HTTPUnprocessableEntity(detail=ex.message)
     except Exception as ex:
@@ -562,6 +565,7 @@ def add_local_process(request):
     process_info['outputs'] = [Output.from_wps_names(i) for i in process_info['outputs']]
 
     # validate process type against twitcher configuration
+    settings = request.registry.settings
     process_type = process_info['type']
     if process_type == PROCESS_WORKFLOW:
         twitcher_config = get_twitcher_configuration(settings)
@@ -586,6 +590,9 @@ def add_local_process(request):
         saved_process = store.save_process(ProcessDB(process_info), overwrite=False, request=request)
     except ProcessRegistrationError as ex:
         raise HTTPConflict(detail=ex.message)
+    except ValueError as ex:
+        # raised on invalid process name
+        raise HTTPBadRequest(detail=ex.message)
 
     return HTTPOk(json={'deploymentDone': True, 'processSummary': saved_process.summary()})
 
@@ -668,11 +675,10 @@ def get_process_visibility(request):
     process_id = request.matchdict.get('process_id')
     if not isinstance(process_id, string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
-
     try:
         store = processstore_factory(request.registry)
         visibility_value = store.get_visibility(process_id, request=request)
-        return HTTPOk(json={u'visibility': visibility_value})
+        return HTTPOk(json={u'value': visibility_value})
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except ProcessNotFound as ex:
@@ -696,7 +702,7 @@ def set_process_visibility(request):
     try:
         store = processstore_factory(request.registry)
         store.set_visibility(process_id, visibility_value, request=request)
-        return HTTPOk(json={u'visibility': visibility_value})
+        return HTTPOk(json={u'value': visibility_value})
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except TypeError:
