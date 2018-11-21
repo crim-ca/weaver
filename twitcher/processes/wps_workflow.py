@@ -7,7 +7,7 @@ import os
 import shutil
 import tempfile
 from functools import cmp_to_key, partial
-from typing import (Any, Callable, Dict, Generator, List, Optional, Set, MutableMapping, Union, cast, Text)
+from typing import Any, Callable, Dict, Generator, List, Optional, Set, MutableMapping, Union, cast, Text
 from schema_salad import validate
 from schema_salad.sourceline import SourceLine
 from six import string_types
@@ -40,7 +40,7 @@ DEFAULT_TMP_PREFIX = "tmp"
 
 def default_make_tool(toolpath_object,              # type: Dict[Text, Any]
                       loadingContext,               # type: LoadingContext
-                      get_job_process_definition,   # type: Callable[[str, int], WpsProcess]
+                      get_job_process_definition,   # type: Callable[[Text, int], WpsProcess]
                       ):                            # type: (...) -> Process
     if not isinstance(toolpath_object, MutableMapping):
         raise WorkflowException(u"Not a dict: '%s'" % toolpath_object)
@@ -77,7 +77,7 @@ class CallbackJob(object):
 
 class WpsWorkflow(Process):
     def __init__(self, toolpath_object, loadingContext, get_job_process_definition):
-        # type: (Dict[Text, Any], LoadingContext, Callable[[str, int], WpsProcess]) -> None
+        # type: (Dict[Text, Any], LoadingContext, Callable[[Text, int], WpsProcess]) -> None
         super(WpsWorkflow, self).__init__(toolpath_object, loadingContext)
         self.prov_obj = loadingContext.prov_obj
         self.get_job_process_definition = get_job_process_definition
@@ -195,9 +195,8 @@ class WpsWorkflow(Process):
                 adjustFileObjs(ret, builder.mutation_manager.set_generation)
             return ret if ret is not None else {}
         except validate.ValidationException as e:
-            raise WorkflowException(
-                "Error validating output record. " + Text(e) + "\n in " +
-                json_dumps(ret, indent=4))
+            raise WorkflowException("Error validating output record: {}\nIn:\n{}"
+                                    .format(str(e), json_dumps(ret, indent=4)))
         finally:
             if builder.mutation_manager and readers:
                 for r in readers.values():
@@ -345,8 +344,7 @@ class WpsWorkflow(Process):
             if not r and optional:
                 return None
 
-        if (not empty_and_optional and isinstance(schema["type"], dict)
-            and schema["type"]["type"] == "record"):
+        if not empty_and_optional and isinstance(schema["type"], dict) and schema["type"]["type"] == "record":
             out = {}
             for f in schema["type"]["fields"]:
                 out[shortname(f["name"])] = self.collect_output(  # type: ignore
@@ -434,6 +432,7 @@ class WpsWorkflowJob(JobBase):
             # TODO: support for Spacebel, avoid conflict error incorrectly handled until fixed
             except HTTPInternalServerError:
                 pass
+
         LOGGER.info(u"Process {} enforced to public visibility.".format(
                     self.wps_process.process_id, self.wps_process.url))
         self.wps_process.set_visibility(visibility=VISIBILITY_PUBLIC)
@@ -446,7 +445,7 @@ class WpsWorkflowJob(JobBase):
             assert runtimeContext.process_run_id
             runtimeContext.prov_obj.used_artefacts(
                 job_order, runtimeContext.process_run_id, str(self.name))
-        outputs = {}  # type: Dict[Text,Text]
+        outputs = {}  # type: Dict[Text, Text]
         try:
             rcode = 0
 
