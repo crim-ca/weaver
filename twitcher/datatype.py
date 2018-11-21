@@ -83,8 +83,6 @@ class Job(dict):
         super(Job, self).__init__(*args, **kwargs)
         if 'task_id' not in self:
             raise TypeError("Parameter `task_id` is required for `{}` creation.".format(type(self)))
-        if not isinstance(self['task_id'], six.string_types):
-            raise TypeError("Type `str` is required for `{}.task_id`".format(type(self)))
         if not isinstance(self.id, six.string_types):
             raise TypeError("Type `str` is required for `{}.id`".format(type(self)))
 
@@ -129,6 +127,12 @@ class Job(dict):
     @property
     def task_id(self):
         return self['task_id']
+
+    @task_id.setter
+    def task_id(self, task_id):
+        if not isinstance(task_id, six.string_types):
+            raise TypeError("Type `str` is required for `{}.task_id`".format(type(self)))
+        self['task_id'] = task_id
 
     @property
     def service(self):
@@ -212,6 +216,12 @@ class Job(dict):
     def execute_async(self):
         return self.get('execute_async', True)
 
+    @execute_async.setter
+    def execute_async(self, execute_async):
+        if not isinstance(execute_async, bool):
+            raise TypeError("Type `bool` is required for `{}.execute_async`".format(type(self)))
+        self['execute_async'] = execute_async
+
     @property
     def is_workflow(self):
         return self.get('is_workflow', False)
@@ -234,6 +244,9 @@ class Job(dict):
         return self.get('finished', None)
 
     def is_finished(self):
+        return self.finished is not None
+
+    def mark_finished(self):
         self['finished'] = datetime.now()
 
     @property

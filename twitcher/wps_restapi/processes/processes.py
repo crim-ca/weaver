@@ -242,7 +242,7 @@ def execute_process(self, job_id, url, headers=None):
                 job.save_log(logger=task_logger)
 
                 if execution.isComplete():
-                    job.is_finished()
+                    job.mark_finished()
                     if execution.isSucceded():
                         job.progress = 100
                         job.status = STATUS_SUCCEEDED
