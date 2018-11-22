@@ -27,6 +27,7 @@ from cwltool.context import (LoadingContext, RuntimeContext, getdefault)
 from cwltool.workflow import Workflow
 from pyramid_celery import celery_app as app
 from pyramid.httpexceptions import HTTPNotFound, HTTPConflict, HTTPInternalServerError
+from requests import HTTPError as RequestsHTTPError
 
 from twitcher.visibility import VISIBILITY_PUBLIC
 from twitcher.processes.wps_process import WpsProcess
@@ -427,8 +428,11 @@ class WpsWorkflowJob(JobBase):
             # TODO: Maybe always redeploy? What about cases of outdated deployed process?
             try:
                 self.wps_process.deploy()
-            except HTTPConflict:
-                pass
+            except RequestsHTTPError as e:
+                if e.response.status_code == HTTPConflict.code:
+                    pass
+                else:
+                    raise
             # TODO: support for Spacebel, avoid conflict error incorrectly handled until fixed
             except HTTPInternalServerError:
                 pass
