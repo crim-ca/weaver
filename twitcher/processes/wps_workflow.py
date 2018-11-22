@@ -27,10 +27,10 @@ from cwltool.context import (LoadingContext, RuntimeContext, getdefault)
 from cwltool.workflow import Workflow
 from pyramid_celery import celery_app as app
 from pyramid.httpexceptions import HTTPNotFound, HTTPConflict, HTTPInternalServerError
-from requests import HTTPError as RequestsHTTPError
 
 from twitcher.visibility import VISIBILITY_PUBLIC
 from twitcher.processes.wps_process import WpsProcess
+from twitcher.utils import pass_http_error
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_TMP_PREFIX = "tmp"
@@ -428,22 +428,17 @@ class WpsWorkflowJob(JobBase):
             # TODO: Maybe always redeploy? What about cases of outdated deployed process?
             try:
                 self.wps_process.deploy()
-            except RequestsHTTPError as e:
-                if e.response.status_code == HTTPConflict.code:
-                    pass
-                else:
-                    raise
-            # TODO: support for Spacebel, avoid conflict error incorrectly handled until fixed
-            except HTTPInternalServerError:
-                pass
+            except Exception as e:
+                # TODO: support for Spacebel, avoid conflict error incorrectly handled, remove 500 when fixed
+                pass_http_error(e, [HTTPConflict, HTTPInternalServerError])
 
         LOGGER.info(u"Process {} enforced to public visibility.".format(
                     self.wps_process.process_id, self.wps_process.url))
         try:
             self.wps_process.set_visibility(visibility=VISIBILITY_PUBLIC)
         # TODO: support for Spacebel, remove when visibility route properly implemented on ADES
-        except HTTPNotFound:
-            pass
+        except Exception as e:
+            pass_http_error(e, HTTPNotFound)
 
         self.results = self.wps_process.execute(self.builder.job, self.outdir, self.expected_outputs)
 

@@ -1,10 +1,12 @@
 import time
 import pytz
-from datetime import datetime
-from lxml import etree
 import types
 import re
-from typing import Union, Any, Dict
+from datetime import datetime
+from lxml import etree
+from typing import Union, Any, Dict, Iterable
+from pyramid.httpexceptions import HTTPError as PyramidHTTPError
+from requests import HTTPError as RequestsHTTPError
 
 from twitcher.exceptions import ServiceNotFound
 from twitcher._compat import urlparse, parse_qs
@@ -43,7 +45,7 @@ def get_any_message(info):
 
 
 def is_valid_url(url):
-    # type: (str) -> bool
+    # type: (Union[str, None]) -> bool
     try:
         parsed_url = urlparse(url)
         return True if all([parsed_url.scheme, ]) else False
@@ -130,11 +132,29 @@ def lxml_strip_ns(tree):
             node.tag = node.tag.split('}', 1)[1]
 
 
+def pass_http_error(exception, expected_http_error):
+    # type: (Exception, Union[PyramidHTTPError, Iterable[PyramidHTTPError]]) -> None
+    """
+    Given an `HTTPError` of any type (pyramid, requests), ignores (pass) the exception if the actual
+    error matches the status code. Other exceptions are re-raised.
+
+    :param exception: any `Exception` instance ("object" from a `try..except exception as "object"` block).
+    :param expected_http_error: single or list of specific pyramid `HTTPError` to handle and ignore.
+    :raise exception: if it doesn't match the status code or is not an `HTTPError` of any module.
+    """
+    if not hasattr(expected_http_error, '__iter__'):
+        expected_http_error = [expected_http_error]
+    if isinstance(exception, (PyramidHTTPError, RequestsHTTPError)):
+        if exception.status_code in [e.code for e in expected_http_error]:
+            return
+    raise exception
+
+
 def raise_on_xml_exception(xml_node):
     """
     Raises an exception with the description if the XML response document defines an ExceptionReport.
     :param xml_node: instance of :class:`etree.Element`
-    :raises: Exception on found ExceptionReport document.
+    :raise Exception: on found ExceptionReport document.
     """
     # noinspection PyProtectedMember
     if not isinstance(xml_node, etree._Element):

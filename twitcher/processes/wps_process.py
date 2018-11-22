@@ -62,7 +62,7 @@ class WpsProcess(object):
                 'scope': 'openid',
             }
             ades_headers = {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'}
-            cred_resp = requests.post(ades_url, body=ades_body, headers=ades_headers)
+            cred_resp = requests.post(ades_url, data=ades_body, headers=ades_headers)
             access_token = cred_resp.json().get('access_token', None)
         return {'Authorization': 'Bearer {}'.format(access_token) if access_token else None}
 
