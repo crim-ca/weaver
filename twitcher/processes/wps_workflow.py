@@ -26,7 +26,7 @@ from cwltool.utils import (aslist, json_dumps, onWindows, bytes2str_in_dicts)
 from cwltool.context import (LoadingContext, RuntimeContext, getdefault)
 from cwltool.workflow import Workflow
 from pyramid_celery import celery_app as app
-from pyramid.httpexceptions import HTTPConflict, HTTPInternalServerError
+from pyramid.httpexceptions import HTTPNotFound, HTTPConflict, HTTPInternalServerError
 
 from twitcher.visibility import VISIBILITY_PUBLIC
 from twitcher.processes.wps_process import WpsProcess
@@ -437,12 +437,9 @@ class WpsWorkflowJob(JobBase):
                     self.wps_process.process_id, self.wps_process.url))
         try:
             self.wps_process.set_visibility(visibility=VISIBILITY_PUBLIC)
-        except RequestsHTTPError as error:
-            if error.response.status_code == HTTPNotFound.code:
-                # Route not implemented on the ADES. Carry on.
-                pass
-            else:
-                raise
+        # TODO: support for Spacebel, remove when visibility route properly implemented on ADES
+        except HTTPNotFound:
+            pass
 
         self.results = self.wps_process.execute(self.builder.job, self.outdir, self.expected_outputs)
 
