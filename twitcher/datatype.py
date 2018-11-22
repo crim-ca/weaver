@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from logging import _levelNames, ERROR, INFO
 
 from twitcher.datatype_schemas import DataDescriptionType, DescriptionType
-from twitcher.utils import now_secs, get_job_log_msg, get_log_fmt, get_log_datefmt
+from twitcher.utils import now_secs, get_job_log_msg, get_log_fmt, get_log_datefmt, fully_qualified_name
 from twitcher.exceptions import ProcessInstanceError
 from twitcher.processes import process_mapping
 from twitcher.processes.types import PACKAGE_PROCESSES, PROCESS_WPS
@@ -109,7 +109,7 @@ class Job(dict):
         for level, msg in log_msg:
             fmt_msg = get_log_fmt() % dict(asctime=datetime.now().strftime(get_log_datefmt()),
                                            levelname=_levelNames[level],
-                                           name='datatype.job',
+                                           name=fully_qualified_name(self),
                                            message=msg)
             if len(self.logs) == 0 or self.logs[-1] != fmt_msg:
                 self.logs.append(fmt_msg)

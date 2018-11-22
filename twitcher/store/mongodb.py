@@ -6,12 +6,11 @@ import pymongo
 from twitcher.store.base import AccessTokenStore
 from twitcher.datatype import AccessToken
 from twitcher.exceptions import AccessTokenNotFound
-from twitcher.utils import islambda
+from twitcher.utils import islambda, now
 from twitcher.sort import *
 from twitcher.status import *
 from pyramid.security import authenticated_userid
 from pymongo import ASCENDING, DESCENDING
-from datetime import datetime
 import six
 
 import logging
@@ -325,7 +324,7 @@ class MongodbJobStore(JobStore, MongodbStore):
                 'status': STATUS_ACCEPTED,
                 'execute_async': execute_async,
                 'is_workflow': is_workflow,
-                'created': datetime.now(),
+                'created': now(),
                 'tags': tags,
             })
             self.collection.insert_one(new_job)
