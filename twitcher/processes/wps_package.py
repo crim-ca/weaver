@@ -1034,6 +1034,7 @@ class Package(Process):
                 eoimage_data_sources = opensearch.get_eo_images_data_sources(self.payload, request.inputs)
                 if eoimage_data_sources:
                     accept_mime_types = opensearch.get_eo_images_mime_types(self.payload)
+                    opensearch.insert_max_occurs(self.payload, request.inputs)
                     request.inputs = opensearch.query_eo_images_from_wps_inputs(request.inputs,
                                                                                 eoimage_data_sources,
                                                                                 accept_mime_types)

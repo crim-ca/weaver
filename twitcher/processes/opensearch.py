@@ -528,6 +528,23 @@ def get_eo_images_mime_types(payload):
     return result
 
 
+def insert_max_occurs(payload, wps_inputs):
+    # type: (Dict, Dict[str, Deque]) -> None
+    """
+    Insert maxOccurs value in wps inputs using the deploy payload.
+    :param payload: Deploy payload
+    :param wps_inputs: WPS inputs
+    """
+    inputs = get_eo_images_inputs_from_payload(payload)
+
+    for input_ in inputs:
+        try:
+            wps_inputs[get_any_id(input_)][0].max_occurs = int(input_["maxOccurs"])
+        except ValueError:
+            pass
+    return
+
+
 def modified_collection_identifiers(eo_image_identifiers):
     unique_eoimage = len(eo_image_identifiers) == 1
     new_identifiers = []
