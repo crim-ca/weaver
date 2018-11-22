@@ -1,3 +1,4 @@
+# noinspection PyPackageRequirements
 import mock
 
 from pyramid.testing import DummyRequest

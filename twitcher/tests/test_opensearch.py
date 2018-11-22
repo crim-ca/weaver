@@ -4,7 +4,7 @@ from copy import deepcopy
 import unittest
 import os
 from pprint import pformat
-from six.moves.urllib.parse import urlparse
+from six.moves.urllib.parse import urlparse, parse_qsl
 
 # noinspection PyPackageRequirements
 import pytest
@@ -18,6 +18,8 @@ import twitcher
 from twitcher.processes.constants import START_DATE, END_DATE, AOI
 from twitcher.datatype import Process
 from twitcher.processes import opensearch
+# noinspection PyProtectedMember
+from twitcher.processes.opensearch import _make_specific_identifier
 from twitcher.store import DB_MEMORY, MemoryProcessStore
 from twitcher.utils import get_any_id
 from twitcher.wps_restapi.processes import processes
@@ -131,10 +133,7 @@ def test_transform_execute_parameters_wps():
         [
             make_deque(START_DATE, "2018-01-30T00:00:00.000Z"),
             make_deque(END_DATE, "2018-01-31T23:59:59.999Z"),
-            make_deque(
-                AOI,
-                "POLYGON ((100.4 15.3, 104.6 15.3, 104.6 19.3, 100.4 19.3, 100.4 15.3))",
-            ),
+            make_deque(AOI, "100.4,15.3,104.6,19.3"),
             make_deque("files", "EOP:IPT:Sentinel2"),
             make_deque("output_file_type", "GEOTIFF"),
             make_deque("output_name", "stack_result.tif"),
@@ -152,13 +151,10 @@ def test_transform_execute_parameters_wps():
         ]
     )
 
-    with mock.patch.object(
-        opensearch.OpenSearchQuery, "query_datasets", return_value=mocked_query
-    ):
+    with mock.patch.object(opensearch.OpenSearchQuery, "query_datasets", return_value=mocked_query):
         eo_image_source_info = make_eo_image_source_info("files", "EOP:IPT:Sentinel2")
-        transformed = opensearch.query_eo_images_from_wps_inputs(
-            inputs, eo_image_source_info
-        )
+        mime_types = {'files': eo_image_source_info['files']['mime_types']}
+        transformed = opensearch.query_eo_images_from_wps_inputs(inputs, eo_image_source_info, mime_types)
 
     def compare(items):
         return sorted([(k, [v.data for v in values]) for k, values in items.items()])
@@ -254,7 +250,7 @@ def test_get_template_urls():
     for name, collection_id in COLLECTION_IDS.items():
         o = opensearch.OpenSearchQuery(collection_id, osdd_url=OSDD_URL)
         template = o.get_template_url()
-        params = urlparse.parse_qsl(urlparse.urlparse(template).query)
+        params = parse_qsl(urlparse(template).query)
         param_names = list(sorted(p[0] for p in params))
         if all_fields:
             all_fields = all_fields.intersection(param_names)
@@ -294,10 +290,9 @@ def inputs_unique_aoi_toi(files_id):
 
 
 def inputs_non_unique_aoi_toi(files_id):
-    def make_specific(name):
-        return opensearch._make_specific_identifier(name, files_id)
-
-    end_date, start_date, aoi = map(make_specific, [END_DATE, START_DATE, AOI])
+    end_date = _make_specific_identifier(END_DATE, files_id)
+    start_date = _make_specific_identifier(START_DATE, files_id)
+    aoi = _make_specific_identifier(AOI, files_id)
     return {
         aoi: deque([LiteralInput(aoi, "Area", data_type="string")]),
         start_date: deque([LiteralInput(start_date, "Area", data_type="string")]),
@@ -311,9 +306,9 @@ def inputs_non_unique_aoi_toi(files_id):
 def query_param_names(unique_aoi_toi, identifier):
     end_date, start_date, aoi = END_DATE, START_DATE, AOI
     if not unique_aoi_toi:
-        end_date = opensearch._make_specific_identifier(end_date, identifier)
-        start_date = opensearch._make_specific_identifier(start_date, identifier)
-        aoi = opensearch._make_specific_identifier(aoi, identifier)
+        end_date = _make_specific_identifier(end_date, identifier)
+        start_date = _make_specific_identifier(start_date, identifier)
+        aoi = _make_specific_identifier(aoi, identifier)
     return end_date, start_date, aoi
 
 
@@ -387,29 +382,29 @@ def deimos_inputs(unique_aoi_toi=True):
 @pytest.mark.online
 def test_query_sentinel2():
     inputs, eo_image_source_info = sentinel2_inputs()
+    mime_types = {k: eo_image_source_info[k]['mime_types'] for k in eo_image_source_info}
+    data = opensearch.query_eo_images_from_wps_inputs(inputs, eo_image_source_info, mime_types)
 
-    data = opensearch.query_eo_images_from_wps_inputs(inputs, eo_image_source_info)
-
-    assert 4 == len(data["image-sentinel2"])
+    assert len(data["image-sentinel2"]) == inputs["image-sentinel2"][0].max_occurs
 
 
 @pytest.mark.online
 def test_query_probav():
     inputs, eo_image_source_info = probav_inputs()
+    mime_types = {k: eo_image_source_info[k]['mime_types'] for k in eo_image_source_info}
+    data = opensearch.query_eo_images_from_wps_inputs(inputs, eo_image_source_info, mime_types)
 
-    data = opensearch.query_eo_images_from_wps_inputs(inputs, eo_image_source_info)
-
-    assert 3 == len(data["image-probav"])
+    assert len(data["image-probav"]) == inputs["image-probav"][0].max_occurs
 
 
 @pytest.mark.skip(reason="The server is not implemented yet.")
 @pytest.mark.online
 def test_query_deimos():
     inputs, eo_image_source_info = deimos_inputs()
+    mime_types = {k: eo_image_source_info[k]['mime_types'] for k in eo_image_source_info}
+    data = opensearch.query_eo_images_from_wps_inputs(inputs, eo_image_source_info, mime_types)
 
-    data = opensearch.query_eo_images_from_wps_inputs(inputs, eo_image_source_info)
-
-    assert 999 == len(data["image-deimos"])
+    assert len(data["image-deimos"]) == inputs["image-deimos"][0].max_occurs
 
 
 @pytest.mark.online
@@ -422,8 +417,8 @@ def test_query_non_unique():
 
     eo_image_source_info = eo_image_source_info_s2
     eo_image_source_info.update(eo_image_source_info_probav)
+    mime_types = {k: eo_image_source_info[k]['mime_types'] for k in eo_image_source_info}
+    data = opensearch.query_eo_images_from_wps_inputs(inputs, eo_image_source_info, mime_types)
 
-    data = opensearch.query_eo_images_from_wps_inputs(inputs, eo_image_source_info)
-
-    assert len(data["image-sentinel2"]) == 4
-    assert len(data["image-probav"]) == 3
+    assert len(data["image-sentinel2"]) == inputs["image-sentinel2"][0].max_occurs
+    assert len(data["image-probav"]) == inputs["image-probav"][0].max_occurs

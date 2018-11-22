@@ -545,7 +545,8 @@ def add_local_process(request):
     description_url = "/".join([restapi_url, 'processes', process_info['identifier']])
     execute_endpoint = "/".join([description_url, "jobs"])
 
-    # ensure that required 'processEndpointWPS1' in db is added, will be auto-fixed to localhost if not specified in body
+    # ensure that required 'processEndpointWPS1' in db is added,
+    # will be auto-fixed to localhost if not specified in body
     process_info['processEndpointWPS1'] = process_description.get('processEndpointWPS1')
     process_info['executeEndpoint'] = execute_endpoint
     process_info['payload'] = payload
@@ -564,7 +565,7 @@ def add_local_process(request):
         # raised on invalid process name
         raise HTTPBadRequest(detail=ex.message)
 
-    json_response = {'processSummary': saved_process.process_summary()}
+    json_response = {'processSummary': saved_process.process_summary(), 'deploymentDone': True}
     return HTTPOk(json=json_response)
 
 
