@@ -551,7 +551,8 @@ def add_local_process(request):
     process_info['payload'] = payload
     process_info['jobControlOptions'] = process_description.get('jobControlOptions', [])
     process_info['outputTransmission'] = process_description.get('outputTransmission', [])
-    process_info['owsContext'] = ows_context
+    if ows_context:
+        process_info['owsContext'] = ows_context
     process_info['processDescriptionURL'] = description_url
 
     try:
