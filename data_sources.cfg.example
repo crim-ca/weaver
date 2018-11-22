@@ -8,6 +8,13 @@
         "ades":"https://localhost:5001",
         "default":"true"
     },
+    "opensearchdefault": {
+        "collection_id": "",
+        "accept_schemes": ["http", "https"],
+        "rootdir": "",
+        "ades": "http://localhost:5001",
+        "osdd_url": "http://geo.spacebel.be/opensearch/description.xml"
+    },
     "sentinel2": {
         "collection_id": "EOP:IPT:Sentinel2",
         "accept_schemes": ["http", "https"],
