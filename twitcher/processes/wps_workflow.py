@@ -7,11 +7,10 @@ import os
 import shutil
 import tempfile
 from functools import cmp_to_key, partial
-from typing import (Any, Callable, Dict, Generator, List, Optional, Set, MutableMapping, Union, cast, Text, Type)
+from typing import (Any, Callable, Dict, Generator, List, Optional, Set, MutableMapping, Union, cast, Text)
 from schema_salad import validate
 from schema_salad.sourceline import SourceLine
 from six import string_types
-from six.moves import urllib
 
 from cwltool.process import stageFiles
 from cwltool import command_line_tool
@@ -20,18 +19,17 @@ from cwltool.provenance import CreateProvProfile
 from cwltool.builder import (CONTENT_LIMIT, Builder, substitute)
 from cwltool.errors import WorkflowException
 from cwltool.job import JobBase, relink_initialworkdir
-from cwltool.pathmapper import (PathMapper, adjustDirObjs, adjustFileObjs, get_listing, trim_listing, visit_class)
+from cwltool.pathmapper import (adjustDirObjs, adjustFileObjs, get_listing, trim_listing, visit_class)
 from cwltool.process import (Process, compute_checksums, normalizeFilesDirs, shortname, uniquename)
 from cwltool.stdfsaccess import StdFsAccess
 from cwltool.utils import (aslist, json_dumps, onWindows, bytes2str_in_dicts)
 from cwltool.context import (LoadingContext, RuntimeContext, getdefault)
 from cwltool.workflow import Workflow
 from pyramid_celery import celery_app as app
-from pyramid.httpexceptions import HTTPConflict
+from pyramid.httpexceptions import HTTPConflict, HTTPInternalServerError
 
 from twitcher.visibility import VISIBILITY_PUBLIC
 from twitcher.processes.wps_process import WpsProcess
-from twitcher.owsexceptions import OWSAccessForbidden
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_TMP_PREFIX = "tmp"
@@ -180,7 +178,8 @@ class WpsWorkflow(Process):
                 revmap = partial(command_line_tool.revmap_file, builder, outdir)
                 adjustDirObjs(ret, trim_listing)
 
-                # TODO Attempt to avoid a crash because the revmap fct is not functionnal (intend for a docker usage only?)
+                # TODO: Attempt to avoid a crash because the revmap fct is not functionnal
+                #       (intend for a docker usage only?)
                 # visit_class(ret, ("File", "Directory"), cast(Callable[[Any], Any], revmap))
                 visit_class(ret, ("File", "Directory"), command_line_tool.remove_path)
                 normalizeFilesDirs(ret)
@@ -431,6 +430,9 @@ class WpsWorkflowJob(JobBase):
             try:
                 self.wps_process.deploy()
             except HTTPConflict:
+                pass
+            # TODO: support for Spacebel, avoid conflict error incorrectly handled until fixed
+            except HTTPInternalServerError:
                 pass
         LOGGER.info(u"Process {} enforced to public visibility.".format(
                     self.wps_process.process_id, self.wps_process.url))

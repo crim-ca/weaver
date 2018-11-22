@@ -89,7 +89,11 @@ class WpsProcess(object):
         elif response.status_code == HTTPNotFound.code:
             return False
         elif response.status_code == HTTPOk.status_code:
-            return response.json()['value'] == VISIBILITY_PUBLIC
+            json_body = response.json()
+            # TODO: support for Spacebel, always returns dummy visibility response, enforce deploy with `False`
+            if json_body.get('message') == "magic!" or json_body.get('type') == "ok" or json_body.get('code') == 4:
+                return False
+            return json_body.get('value') == VISIBILITY_PUBLIC
         response.raise_for_status()
 
     def set_visibility(self, visibility):
