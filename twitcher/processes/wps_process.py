@@ -46,7 +46,7 @@ class WpsProcess(object):
 
     def get_user_auth_header(self):
         # TODO: find a better way to generalize this to Magpie credentials?
-        if asbool(self.settings.get('ades.use_auth_token', True)):
+        if not asbool(self.settings.get('ades.use_auth_token', True)):
             return {}
 
         ades_usr = self.settings.get('ades.username', None)
