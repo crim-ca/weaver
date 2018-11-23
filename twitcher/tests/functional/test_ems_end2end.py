@@ -27,6 +27,8 @@ import unittest
 import pytest
 import requests
 import logging
+# noinspection PyProtectedMember
+from logging import _loggerClass
 import time
 import json
 import os
@@ -53,13 +55,14 @@ class End2EndEMSTestCase(TestCase):
     test_processes_info = dict()
     headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
     cookies = dict()                # type: Dict[AnyStr, AnyStr]
+    app = None                      # type: TestApp
     separator_calls = None          # type: AnyStr
     separator_steps = None          # type: AnyStr
     separator_tests = None          # type: AnyStr
-    logger_json_indent = 2          # type: int
-    logger = None                   # type: logging.manager.loggerClass
     logger_level = logging.INFO     # type: int
-    app = None                      # type: TestApp
+    logger = None                   # type: _loggerClass
+    # setting indent to `None` disables pretty-printing of JSON payload
+    logger_json_indent = None       # type: Union[int, None]
 
     TWITCHER_URL = None
     TWITCHER_RESTAPI_URL = None
@@ -311,7 +314,7 @@ class End2EndEMSTestCase(TestCase):
         with_requests = is_localhost and has_port or is_remote or force_requests
 
         if json_body or headers and 'application/json' in headers.get('Content-Type'):
-            payload = "\n" + json.dumps(json_body, indent=cls.logger_json_indent)
+            payload = "\n" if cls.logger_json_indent else '' + json.dumps(json_body, indent=cls.logger_json_indent)
         else:
             payload = data_body
         cls.log("{}Request Details:\n".format(cls.separator_steps) +
@@ -357,7 +360,7 @@ class End2EndEMSTestCase(TestCase):
             cls.assert_response(resp, status, message)
 
         if 'application/json' in resp.headers['Content-Type']:
-            payload = "\n" + json.dumps(resp.json, indent=cls.logger_json_indent)
+            payload = "\n" if cls.logger_json_indent else '' + json.dumps(resp.json, indent=cls.logger_json_indent)
         else:
             payload = resp.body
         cls.log("{}Response Details:\n".format(cls.separator_calls) +
