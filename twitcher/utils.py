@@ -4,7 +4,7 @@ import types
 import re
 from datetime import datetime
 from lxml import etree
-from typing import Union, Any, Dict, Iterable
+from typing import Union, Any, Dict, AnyStr, Iterable
 from pyramid.httpexceptions import HTTPError as PyramidHTTPError
 from requests import HTTPError as RequestsHTTPError
 
@@ -16,12 +16,12 @@ LOGGER = logging.getLogger(__name__)
 
 
 def get_twitcher_url(settings):
-    # type: (Dict[str, str]) -> str
+    # type: (Dict[AnyStr, AnyStr]) -> AnyStr
     return settings.get('twitcher.url').rstrip('/').strip()
 
 
 def get_any_id(info):
-    # type: (dict) -> str
+    # type: (Dict[AnyStr, AnyStr]) -> AnyStr
     """Retrieves a dictionary 'id'-like key using multiple common variations [id, identifier, _id].
     :param info: dictionary that potentially contains an 'id'-like key.
     :returns: value of the matched 'id'-like key."""
@@ -29,7 +29,7 @@ def get_any_id(info):
 
 
 def get_any_value(info):
-    # type: (dict) -> Union[str, None]
+    # type: (Dict[AnyStr, AnyStr]) -> Union[AnyStr, None]
     """Retrieves a dictionary 'value'-like key using multiple common variations [href, value, reference].
     :param info: dictionary that potentially contains a 'value'-like key.
     :returns: value of the matched 'id'-like key."""
@@ -37,7 +37,7 @@ def get_any_value(info):
 
 
 def get_any_message(info):
-    # type: (dict) -> str
+    # type: (Dict[AnyStr, AnyStr]) -> AnyStr
     """Retrieves a dictionary 'value'-like key using multiple common variations [message].
     :param info: dictionary that potentially contains a 'message'-like key.
     :returns: value of the matched 'message'-like key or an empty string if not found. """
@@ -45,7 +45,7 @@ def get_any_message(info):
 
 
 def is_valid_url(url):
-    # type: (Union[str, None]) -> bool
+    # type: (Union[AnyStr, None]) -> bool
     try:
         parsed_url = urlparse(url)
         return True if all([parsed_url.scheme, ]) else False
@@ -54,7 +54,7 @@ def is_valid_url(url):
 
 
 def parse_service_name(url, protected_path):
-    # type: (str, str) -> str
+    # type: (AnyStr, AnyStr) -> AnyStr
     parsed_url = urlparse(url)
     service_name = None
     if parsed_url.path.startswith(protected_path):
@@ -69,7 +69,7 @@ def parse_service_name(url, protected_path):
 
 
 def fully_qualified_name(obj):
-    # type: (Any) -> str
+    # type: (Any) -> AnyStr
     return '.'.join([obj.__module__, type(obj).__name__])
 
 
@@ -105,7 +105,7 @@ def localize_datetime(dt, tz_name='UTC'):
 
 
 def baseurl(url):
-    # type: (str) -> str
+    # type: (AnyStr) -> AnyStr
     """
     return baseurl of given url
     """
@@ -203,7 +203,7 @@ def replace_caps_url(xml, url, prev_url=None):
 
 
 def islambda(func):
-    # type: (Any) -> bool
+    # type: (AnyStr) -> bool
     return isinstance(func, types.LambdaType) and func.__name__ == (lambda: None).__name__
 
 
@@ -212,7 +212,7 @@ all_cap_re = re.compile('([a-z0-9])([A-Z])')
 
 
 def convert_snake_case(name):
-    # type: (str) -> str
+    # type: (AnyStr) -> AnyStr
     s1 = first_cap_re.sub(r'\1_\2', name)
     return all_cap_re.sub(r'\1_\2', s1).lower()
 
@@ -236,15 +236,15 @@ def parse_request_query(request):
 
 
 def get_log_fmt():
-    # type: (...) -> str
+    # type: (...) -> AnyStr
     return '[%(asctime)s] %(levelname)-8s [%(name)s] %(message)s'
 
 
 def get_log_datefmt():
-    # type: (...) -> str
+    # type: (...) -> AnyStr
     return '%Y-%m-%d %H:%M:%S'
 
 
 def get_job_log_msg(status, msg, progress=0, duration=None):
-    # type: (str, str, int, str) -> str
+    # type: (AnyStr, AnyStr, int, AnyStr) -> AnyStr
     return '{dur} {p:3d}% {stat:10} {msg}'.format(dur=duration or '', p=int(progress or 0), stat=status, msg=msg)
