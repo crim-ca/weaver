@@ -145,7 +145,13 @@ def pass_http_error(exception, expected_http_error):
     if not hasattr(expected_http_error, '__iter__'):
         expected_http_error = [expected_http_error]
     if isinstance(exception, (PyramidHTTPError, RequestsHTTPError)):
-        if exception.status_code in [e.code for e in expected_http_error]:
+        try:
+            status_code = exception.status_code
+        except AttributeError:
+            # exception may be a response raised for status in which case status code is here:
+            status_code = exception.response.status_code
+
+        if status_code in [e.code for e in expected_http_error]:
             return
     raise exception
 
