@@ -181,7 +181,7 @@ bootstrap: init conda_env conda_pinned bootstrap-buildout.py
 	@test -f bin/buildout || bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);python bootstrap-buildout.py -c custom.cfg --allow-site-packages --setuptools-version=$(SETUPTOOLS_VERSION) --buildout-version=$(BUILDOUT_VERSION)"
 
 .PHONY: devinstall
-install: install
+devinstall: install
 	@echo "Installing application with buildout ..."
 	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);pip install -r $(APP_ROOT)/requirements-dev.txt"
 	@echo "\nStart service with \`make start', Test service with \`make test*' variations."
