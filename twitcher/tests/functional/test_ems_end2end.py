@@ -311,11 +311,11 @@ class End2EndEMSTestCase(TestCase):
         cls.log("{}Request Details:\n".format(cls.separator_steps) +
                 "  Request: {method} {url}\n".format(method=method, url=url) +
                 "  Payload: {payload}\n".format(payload=json_body) +
-                "  Headers: {headers}".format(headers=headers) +
-                "  Cookies: {cookies}".format(cookies=cookies) +
+                "  Headers: {headers}\n".format(headers=headers) +
+                "  Cookies: {cookies}\n".format(cookies=cookies) +
                 "  Status:  {status} (expected)\n".format(status=status) +
                 "  Message: {message} (expected)\n".format(message=message) +
-                "  Module:  {module}".format(module='requests' if with_requests else 'webtest.TestApp'))
+                "  Module:  {module}\n".format(module='requests' if with_requests else 'webtest.TestApp'))
 
         if with_requests:
             kw.update({'verify': False})
@@ -354,7 +354,7 @@ class End2EndEMSTestCase(TestCase):
                 "  Status:  {status} (received)\n".format(status=resp.status_code) +
                 "  Content: {content}\n".format(content=resp.content_type) +
                 "  Payload: {payload}\n".format(payload=resp.json or resp.body) +
-                "  Headers: {headers}".format(headers=resp.headers))
+                "  Headers: {headers}\n".format(headers=resp.headers))
 
         return resp
 
