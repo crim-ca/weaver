@@ -17,6 +17,5 @@ duration
 cornice
 cornice_swagger>=0.7.0
 colander
-shapely
 pytz
 pyyaml

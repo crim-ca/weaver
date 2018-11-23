@@ -51,24 +51,34 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info, accept_mime
     :param eoimage_source_info: data source info of eoimages
     :param accept_mime_types: dict of list of accepted mime types, ordered by preference
     """
-    new_inputs = deepcopy(wps_inputs)
+    new_inputs = {}
 
-    def pop_first_data(ids_to_pop):
+    def get_input_data(ids_to_get):
         # type: (Iterable[str]) -> str
         """
 
-        :param ids_to_pop: list of elements to pop. Only the first will be popped
+        :param ids_to_get: list of elements to check
 
         """
-        for id_ in ids_to_pop:
+        for id_ in ids_to_get:
             try:
-                return new_inputs.pop(id_)[0].data
+                return wps_inputs[id_][0].data
             except KeyError:
                 pass
         else:
             raise ValueError(
-                "Missing input identifier: {}".format(" or ".join(aoi_ids))
+                "Missing input identifier: {}".format(" or ".join(ids_to_get))
             )
+
+    def is_eoimage_parameter(param):
+        # type: (str) -> bool
+        """Return True if the name of this parameter is a query parameter"""
+        parameters = [
+            AOI,
+            START_DATE,
+            END_DATE
+        ]
+        return any(param.startswith(p) for p in parameters)
 
     eoimages_inputs = [
         input_id for input_id in wps_inputs if input_id in eoimage_source_info
@@ -76,7 +86,10 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info, accept_mime
     if eoimages_inputs:
         for input_id, queue in wps_inputs.items():
             eoimages_queue = deque()
-            if input_id in eoimage_source_info:
+            if input_id not in eoimage_source_info:
+                if not is_eoimage_parameter(input_id):
+                    new_inputs[input_id] = queue
+            else:
                 collection_id = queue[0].data
                 max_occurs = min(queue[0].max_occurs, 100000)
 
@@ -87,10 +100,10 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info, accept_mime
                 )
                 enddate_ids = _make_specific_identifier(END_DATE, input_id), END_DATE
 
-                bbox_str = pop_first_data(aoi_ids)
+                bbox_str = get_input_data(aoi_ids)
                 validate_bbox(bbox_str)
-                startdate = pop_first_data(startdate_ids)
-                enddate = pop_first_data(enddate_ids)
+                startdate = get_input_data(startdate_ids)
+                enddate = get_input_data(enddate_ids)
 
                 params = {"startDate": startdate,
                           "endDate": enddate,

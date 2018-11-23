@@ -46,6 +46,9 @@ class WpsProcess(object):
 
     def get_user_auth_header(self):
         # TODO: find a better way to generalize this to Magpie credentials?
+        if not asbool(self.settings.get('ades.use_auth_token', True)):
+            return {}
+
         ades_usr = self.settings.get('ades.username', None)
         ades_pwd = self.settings.get('ades.password', None)
         ades_url = self.settings.get('ades.wso2_hostname', None)
@@ -106,6 +109,7 @@ class WpsProcess(object):
         self.update_status('Updating process visibility on remote ADES.', REMOTE_JOB_PROGRESS_VISIBLE)
         LOGGER.debug("Update process WPS visibility request for {0}".format(self.process_id))
         user_headers = deepcopy(self.headers)
+
         user_headers.update(self.get_user_auth_header())
         response = requests.put(self.url + process_visibility_uri.format(process_id=self.process_id),
                                 json={'value': visibility},
