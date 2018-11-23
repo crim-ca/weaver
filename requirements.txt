@@ -11,12 +11,11 @@ argcomplete
 celery
 owslib
 lxml
-cwltool
+cwltool==1.0.20180820141117
 six
 duration
 cornice
 cornice_swagger>=0.7.0
 colander
-shapely
 pytz
 pyyaml

@@ -7,11 +7,10 @@ import os
 import shutil
 import tempfile
 from functools import cmp_to_key, partial
-from typing import (Any, Callable, Dict, Generator, List, Optional, Set, MutableMapping, Union, cast, Text, Type)
+from typing import Any, Callable, Dict, Generator, List, Optional, Set, MutableMapping, Union, cast, Text
 from schema_salad import validate
 from schema_salad.sourceline import SourceLine
 from six import string_types
-from six.moves import urllib
 
 from cwltool.process import stageFiles
 from cwltool import command_line_tool
@@ -20,18 +19,18 @@ from cwltool.provenance import CreateProvProfile
 from cwltool.builder import (CONTENT_LIMIT, Builder, substitute)
 from cwltool.errors import WorkflowException
 from cwltool.job import JobBase, relink_initialworkdir
-from cwltool.pathmapper import (PathMapper, adjustDirObjs, adjustFileObjs, get_listing, trim_listing, visit_class)
+from cwltool.pathmapper import (adjustDirObjs, adjustFileObjs, get_listing, trim_listing, visit_class)
 from cwltool.process import (Process, compute_checksums, normalizeFilesDirs, shortname, uniquename)
 from cwltool.stdfsaccess import StdFsAccess
 from cwltool.utils import (aslist, json_dumps, onWindows, bytes2str_in_dicts)
 from cwltool.context import (LoadingContext, RuntimeContext, getdefault)
 from cwltool.workflow import Workflow
 from pyramid_celery import celery_app as app
-from pyramid.httpexceptions import HTTPConflict
+from pyramid.httpexceptions import HTTPNotFound, HTTPConflict, HTTPInternalServerError
 
 from twitcher.visibility import VISIBILITY_PUBLIC
 from twitcher.processes.wps_process import WpsProcess
-from twitcher.owsexceptions import OWSAccessForbidden
+from twitcher.utils import pass_http_error
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_TMP_PREFIX = "tmp"
@@ -42,7 +41,7 @@ DEFAULT_TMP_PREFIX = "tmp"
 
 def default_make_tool(toolpath_object,              # type: Dict[Text, Any]
                       loadingContext,               # type: LoadingContext
-                      get_job_process_definition,   # type: Callable[[str, int], WpsProcess]
+                      get_job_process_definition,   # type: Callable[[Text, int], WpsProcess]
                       ):                            # type: (...) -> Process
     if not isinstance(toolpath_object, MutableMapping):
         raise WorkflowException(u"Not a dict: '%s'" % toolpath_object)
@@ -79,7 +78,7 @@ class CallbackJob(object):
 
 class WpsWorkflow(Process):
     def __init__(self, toolpath_object, loadingContext, get_job_process_definition):
-        # type: (Dict[Text, Any], LoadingContext, Callable[[str, int], WpsProcess]) -> None
+        # type: (Dict[Text, Any], LoadingContext, Callable[[Text, int], WpsProcess]) -> None
         super(WpsWorkflow, self).__init__(toolpath_object, loadingContext)
         self.prov_obj = loadingContext.prov_obj
         self.get_job_process_definition = get_job_process_definition
@@ -180,7 +179,8 @@ class WpsWorkflow(Process):
                 revmap = partial(command_line_tool.revmap_file, builder, outdir)
                 adjustDirObjs(ret, trim_listing)
 
-                # TODO Attempt to avoid a crash because the revmap fct is not functionnal (intend for a docker usage only?)
+                # TODO: Attempt to avoid a crash because the revmap fct is not functionnal
+                #       (intend for a docker usage only?)
                 # visit_class(ret, ("File", "Directory"), cast(Callable[[Any], Any], revmap))
                 visit_class(ret, ("File", "Directory"), command_line_tool.remove_path)
                 normalizeFilesDirs(ret)
@@ -196,9 +196,8 @@ class WpsWorkflow(Process):
                 adjustFileObjs(ret, builder.mutation_manager.set_generation)
             return ret if ret is not None else {}
         except validate.ValidationException as e:
-            raise WorkflowException(
-                "Error validating output record. " + Text(e) + "\n in " +
-                json_dumps(ret, indent=4))
+            raise WorkflowException("Error validating output record: {}\nIn:\n{}"
+                                    .format(str(e), json_dumps(ret, indent=4)))
         finally:
             if builder.mutation_manager and readers:
                 for r in readers.values():
@@ -346,8 +345,7 @@ class WpsWorkflow(Process):
             if not r and optional:
                 return None
 
-        if (not empty_and_optional and isinstance(schema["type"], dict)
-            and schema["type"]["type"] == "record"):
+        if not empty_and_optional and isinstance(schema["type"], dict) and schema["type"]["type"] == "record":
             out = {}
             for f in schema["type"]["fields"]:
                 out[shortname(f["name"])] = self.collect_output(  # type: ignore
@@ -430,11 +428,17 @@ class WpsWorkflowJob(JobBase):
             # TODO: Maybe always redeploy? What about cases of outdated deployed process?
             try:
                 self.wps_process.deploy()
-            except HTTPConflict:
-                pass
+            except Exception as e:
+                # TODO: support for Spacebel, avoid conflict error incorrectly handled, remove 500 when fixed
+                pass_http_error(e, [HTTPConflict, HTTPInternalServerError])
+
         LOGGER.info(u"Process {} enforced to public visibility.".format(
                     self.wps_process.process_id, self.wps_process.url))
-        self.wps_process.set_visibility(visibility=VISIBILITY_PUBLIC)
+        try:
+            self.wps_process.set_visibility(visibility=VISIBILITY_PUBLIC)
+        # TODO: support for Spacebel, remove when visibility route properly implemented on ADES
+        except Exception as e:
+            pass_http_error(e, HTTPNotFound)
 
         self.results = self.wps_process.execute(self.builder.job, self.outdir, self.expected_outputs)
 
@@ -444,7 +448,7 @@ class WpsWorkflowJob(JobBase):
             assert runtimeContext.process_run_id
             runtimeContext.prov_obj.used_artefacts(
                 job_order, runtimeContext.process_run_id, str(self.name))
-        outputs = {}  # type: Dict[Text,Text]
+        outputs = {}  # type: Dict[Text, Text]
         try:
             rcode = 0
 

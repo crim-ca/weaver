@@ -1,9 +1,13 @@
+# noinspection PyPackageRequirements
 import pytest
 from lxml import etree
+from typing import Type
 from twitcher import utils
 from twitcher._compat import urlparse
 from twitcher.exceptions import ServiceNotFound
 from twitcher.tests.common import WPS_CAPS_EMU_XML, WMS_CAPS_NCWMS2_111_XML, WMS_CAPS_NCWMS2_130_XML
+from pyramid.httpexceptions import HTTPError as PyramidHTTPError, HTTPInternalServerError, HTTPNotFound, HTTPConflict
+from requests.exceptions import HTTPError as RequestsHTTPError
 
 
 def test_is_url_valid():
@@ -19,9 +23,9 @@ def test_parse_service_name():
     assert 'emu' == utils.parse_service_name("/ows/proxy/emu", protected_path)
     assert 'emu' == utils.parse_service_name("/ows/proxy/emu/foo/bar", protected_path)
     assert 'emu' == utils.parse_service_name("/ows/proxy/emu/", protected_path)
-    with pytest.raises(ServiceNotFound) as e_info:
+    with pytest.raises(ServiceNotFound):
         assert 'emu' == utils.parse_service_name("/ows/proxy/", protected_path)
-    with pytest.raises(ServiceNotFound) as e_info:
+    with pytest.raises(ServiceNotFound):
         assert 'emu' == utils.parse_service_name("/ows/nowhere/emu", protected_path)
 
 
@@ -30,7 +34,7 @@ def test_baseurl():
     assert utils.baseurl('http://localhost:8094/wps?service=wps&request=getcapabilities') == 'http://localhost:8094/wps'
     assert utils.baseurl('https://localhost:8094/wps?service=wps&request=getcapabilities') ==\
         'https://localhost:8094/wps'
-    with pytest.raises(ValueError) as e_info:
+    with pytest.raises(ValueError):
         utils.baseurl('ftp://localhost:8094/wps')
 
 
@@ -118,3 +122,93 @@ def test_parse_request_query_many_datainputs_multicase():
     assert 'value1' in queries['datainputs'].values()
     assert 'value2' in queries['datainputs'].values()
     assert 'value3' in queries['datainputs'].values()
+
+
+def raise_http_error(http):
+    raise http('Excepted raise HTTPError')
+
+
+def make_http_error(http):
+    # type: (PyramidHTTPError) -> Type[RequestsHTTPError]
+    err = RequestsHTTPError
+    err.status_code = http.code
+    return err
+
+
+@pytest.mark.xfail(raises=PyramidHTTPError)
+def test_pass_http_error_doesnt_raise_single_pyramid_error():
+    http_errors = [HTTPNotFound, HTTPInternalServerError]
+    for err in http_errors:
+        try:
+            raise_http_error(err)
+        except Exception as ex:
+            utils.pass_http_error(ex, err)
+
+
+@pytest.mark.xfail(raises=PyramidHTTPError)
+def test_pass_http_error_doesnt_raise_multi_pyramid_error():
+    http_errors = [HTTPNotFound, HTTPInternalServerError]
+    for err in http_errors:
+        try:
+            raise_http_error(err)
+        except Exception as ex:
+            utils.pass_http_error(ex, http_errors)
+
+
+@pytest.mark.xfail(raises=RequestsHTTPError)
+def test_pass_http_error_doesnt_raise_requests_error():
+    http_errors = [HTTPNotFound, HTTPInternalServerError]
+    for err in http_errors:
+        req_err = make_http_error(err)
+        try:
+            raise_http_error(req_err)
+        except Exception as ex:
+            utils.pass_http_error(ex, err)
+
+
+def test_pass_http_error_raises_pyramid_error_with_single_pyramid_error():
+    with pytest.raises(HTTPNotFound):
+        try:
+            raise_http_error(HTTPNotFound)
+        except Exception as ex:
+            utils.pass_http_error(ex, HTTPConflict)
+
+
+def test_pass_http_error_raises_pyramid_error_with_multi_pyramid_error():
+    with pytest.raises(HTTPNotFound):
+        try:
+            raise_http_error(HTTPNotFound)
+        except Exception as ex:
+            utils.pass_http_error(ex, [HTTPConflict, HTTPInternalServerError])
+
+
+def test_pass_http_error_raises_requests_error_with_single_pyramid_error():
+    with pytest.raises(RequestsHTTPError):
+        try:
+            raise_http_error(make_http_error(HTTPNotFound))
+        except Exception as ex:
+            utils.pass_http_error(ex, HTTPConflict)
+
+
+def test_pass_http_error_raises_requests_error_with_multi_pyramid_error():
+    with pytest.raises(RequestsHTTPError):
+        try:
+            raise_http_error(make_http_error(HTTPNotFound))
+        except Exception as ex:
+            utils.pass_http_error(ex, [HTTPConflict, HTTPInternalServerError])
+
+
+def test_pass_http_error_raises_other_error_with_single_pyramid_error():
+    with pytest.raises(ValueError):
+        try:
+            raise ValueError("Test Error")
+        except Exception as ex:
+            utils.pass_http_error(ex, HTTPConflict)
+
+
+def test_pass_http_error_raises_other_error_with_multi_pyramid_error():
+    with pytest.raises(ValueError):
+        try:
+            raise ValueError("Test Error")
+        except Exception as ex:
+            utils.pass_http_error(ex, [HTTPConflict, HTTPInternalServerError])

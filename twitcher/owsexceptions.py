@@ -122,6 +122,15 @@ class OWSAccessForbidden(OWSException):
         self.status = 401
 
 
+class OWSNotFound(OWSException):
+    locator = "NotFound"
+    explanation = "This resource does not exist"
+
+    def __init__(self, detail=None, value=None, **kw):
+        OWSException.__init__(self, detail=detail, value=value, **kw)
+        self.status = 404
+
+
 class OWSAccessFailed(OWSException):
     locator = "NotAcceptable"
     explanation = "Access to this service failed"

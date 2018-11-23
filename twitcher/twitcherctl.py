@@ -17,7 +17,8 @@ class TwitcherCtl(object):
     Command line to interact with the xmlrpc interface of the ``twitcher`` service.
     """
 
-    def create_parser(self):
+    @staticmethod
+    def create_parser():
         parser = argparse.ArgumentParser(
             prog="twitcherctl",
             description='twitcherctl -- control twitcher service from the cmd line.',
@@ -44,7 +45,7 @@ class TwitcherCtl(object):
             description='List of available commands',
         )
 
-        # token managment
+        # token management
         # ---------------
 
         # gentoken
@@ -93,7 +94,8 @@ class TwitcherCtl(object):
 
         return parser
 
-    def run(self, args):
+    @staticmethod
+    def run(args):
         if args.debug:
             LOGGER.setLevel(logging.DEBUG)
 

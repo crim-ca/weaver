@@ -25,7 +25,7 @@ from twitcher.processes import opensearch
 
 from twitcher import namesgenerator
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS
-from twitcher.processes.constants import WPS_INPUT, WPS_OUTPUT, WPS_COMPLEX, WPS_BOUNDINGBOX, WPS_LITERAL
+from twitcher.processes.constants import WPS_INPUT, WPS_OUTPUT, WPS_COMPLEX, WPS_BOUNDINGBOX, WPS_LITERAL, WPS_REFERENCE
 from twitcher.processes.wps_process import WpsProcess
 from twitcher.processes.wps_workflow import default_make_tool
 from twitcher.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
@@ -491,19 +491,30 @@ def _json2wps_io(io_info, io_select):
     :param io_select: ``WPS_INPUT`` or ``WPS_OUTPUT`` to specify desired WPS type conversion.
     :return: corresponding IO in WPS format.
     """
-    # remove extra fields added by pywps (usually added by type's `json` property)
-    io_info.pop('workdir', None)
-    io_info.pop('any_value', None)
-    io_info.pop('data_format', None)
-    io_info.pop('data', None)
-    io_info.pop('file', None)
-    io_info.pop('mimetype', None)
-    io_info.pop('encoding', None)
-    io_info.pop('schema', None)
-    io_info.pop('asreference', None)
 
-    # remove additionalParameters add for the OGC purpose
-    io_info.pop('additionalParameters', None)
+    io_info["identifier"] = _get_field(io_info, "identifier", search_variations=True, pop_found=True)
+
+    rename = {
+        'formats': 'supported_formats',
+        'minOccurs': 'min_occurs',
+        'maxOccurs': 'max_occurs',
+    }
+    remove = [
+        'id',
+        'workdir',
+        'any_value',
+        'data_format',
+        'data',
+        'file',
+        'mimetype',
+        'encoding',
+        'schema',
+        'asreference',
+        'additionalParameters',
+    ]
+    replace_values = {'unbounded': PACKAGE_ARRAY_MAX_SIZE}
+
+    transform_json(io_info, rename=rename, remove=remove, replace_values=replace_values)
 
     # convert allowed value objects
     values = _get_field(io_info, 'allowed_values', search_variations=True, pop_found=True)
@@ -514,12 +525,6 @@ def _json2wps_io(io_info, io_select):
                 io_info['allowed_values'].append(_json2wps_type(allow_value, 'allowed_values'))
         else:
             io_info['allowed_values'] = AnyValue
-
-    # rename some inputs
-    io_info["supported_formats"] = io_info.pop("formats")
-    default_wps_min_max_occurs = 1
-    io_info["min_occurs"] = io_info.pop("minOccurs", default_wps_min_max_occurs)
-    io_info["max_occurs"] = io_info.pop("maxOccurs", default_wps_min_max_occurs)
 
     # convert supported format objects
     formats = _get_field(io_info, 'supported_formats', search_variations=True, pop_found=True)
@@ -544,7 +549,7 @@ def _json2wps_io(io_info, io_select):
     # convert by type
     io_type = io_info.pop('type', WPS_COMPLEX)  # only ComplexData doesn't have 'type'
     if io_select == WPS_INPUT:
-        if io_type == WPS_COMPLEX:
+        if io_type in (WPS_REFERENCE, WPS_COMPLEX):
             io_info.pop('data_type', None)
             if 'supported_formats' not in io_info:
                 io_info['supported_formats'] = [Format(mime_type="text/plain")]
@@ -563,7 +568,7 @@ def _json2wps_io(io_info, io_select):
         # extra params to remove for outputs
         io_info.pop('min_occurs', None)
         io_info.pop('max_occurs', None)
-        if io_type == WPS_COMPLEX:
+        if io_type in (WPS_REFERENCE, WPS_COMPLEX):
             return ComplexOutput(**io_info)
         if io_type == WPS_BOUNDINGBOX:
             return BoundingBoxOutput(**io_info)
@@ -578,8 +583,27 @@ def _wps2json_io(io_wps):
     # in some cases (Complex I/O), 'as_reference=True' causes 'type' to be overwritten, revert it back
     # noinspection PyUnresolvedReferences
     wps_json = io_wps.json
+
+    rename = {
+        u"identifier": u"id",
+        u"supported_formats": u"formats",
+        u"mime_type": u"mimeType",
+        u"min_occurs": u"minOccurs",
+        u"max_occurs": u"maxOccurs",
+    }
+    replace_values = {
+        PACKAGE_ARRAY_MAX_SIZE: "unbounded",
+    }
+    replace_func = {
+        "maxOccurs": str,
+        "minOccurs": str,
+    }
+
+    transform_json(wps_json, rename=rename, replace_values=replace_values, replace_func=replace_func)
+
     if 'type' in wps_json and wps_json['type'] == 'reference':
         wps_json['type'] = WPS_COMPLEX
+
     return wps_json
 
 
@@ -631,8 +655,8 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
         raise PackageTypeError("CWL I/O definitions must be provided, empty list if none required.")
     if not wps_io_list:
         wps_io_list = list()
-    wps_io_dict = OrderedDict((_get_field(wps_io, 'identifier'), wps_io) for wps_io in wps_io_list)
-    cwl_io_dict = OrderedDict((_get_field(cwl_io, 'identifier'), cwl_io) for cwl_io in cwl_io_list)
+    wps_io_dict = OrderedDict((_get_field(wps_io, 'identifier', search_variations=True), wps_io) for wps_io in wps_io_list)
+    cwl_io_dict = OrderedDict((_get_field(cwl_io, 'identifier', search_variations=True), cwl_io) for cwl_io in cwl_io_list)
     missing_io_list = set(cwl_io_dict) - set(wps_io_dict)
     updated_io_list = list()
     # missing WPS I/O are inferred only using CWL->WPS definitions
@@ -640,7 +664,7 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
         updated_io_list.append(cwl_io_dict[cwl_id])
     # evaluate provided WPS I/O definitions
     for wps_io_json in wps_io_list:
-        wps_id = _get_field(wps_io_json, 'identifier')
+        wps_id = _get_field(wps_io_json, 'identifier', search_variations=True)
         # WPS I/O by id not matching any CWL->WPS I/O are discarded, otherwise merge details
         if wps_id not in cwl_io_dict:
             continue
@@ -663,11 +687,63 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
                 continue
             if type(cwl_field) != type(wps_field) or (cwl_field is not None and wps_field is None):
                 continue
-            # noinspection PyTypeChecker
-            if hasattr(cwl_field, '__iter__') and len(cwl_field):
-                continue
             _set_field(updated_io_list[-1], field_type, wps_field)
     return updated_io_list
+
+
+def transform_json(json_data,
+                   rename=None,
+                   remove=None,
+                   add=None,
+                   replace_values=None,
+                   replace_func=None,
+                   ):
+    """Transforms the input json_data with different methods.
+
+    The transformations are applied in the same order as the arguments.
+    """
+    rename = rename or {}
+    remove = remove or []
+    add = add or {}
+    replace_values = replace_values or {}
+    replace_func = replace_func or {}
+
+    # rename
+    for k, v in rename.items():
+        if k in json_data:
+            json_data[v] = json_data.pop(k)
+
+    # remove
+    for r in remove:
+        json_data.pop(r, None)
+
+    # add
+    for k, v in add.items():
+        json_data[k] = v
+
+    # replace values
+    for key, value in json_data.items():
+        for old_value, new_value in replace_values.items():
+            if value == old_value:
+                json_data[key] = new_value
+
+    # replace with function call
+    for k, func in replace_func.items():
+        if k in json_data:
+            json_data[k] = func(json_data[k])
+
+    # also rename if the type of the value is a list of dicts
+    for key, value in json_data.items():
+        if isinstance(value, list):
+            for nested_item in value:
+                if isinstance(nested_item, dict):
+                    for k, v in rename.items():
+                        if k in nested_item:
+                            nested_item[v] = nested_item.pop(k)
+                    for k, func in replace_func.items():
+                        if k in nested_item:
+                            nested_item[k] = func(nested_item[k])
+    return json_data
 
 
 def _merge_package_inputs_outputs(wps_inputs_list, cwl_inputs_list, wps_outputs_list, cwl_outputs_list):
@@ -957,7 +1033,11 @@ class Package(Process):
                 request.inputs = opensearch.get_original_collection_id(self.payload, request.inputs)
                 eoimage_data_sources = opensearch.get_eo_images_data_sources(self.payload, request.inputs)
                 if eoimage_data_sources:
-                    request.inputs = opensearch.query_eo_images_from_wps_inputs(request.inputs, eoimage_data_sources)
+                    accept_mime_types = opensearch.get_eo_images_mime_types(self.payload)
+                    opensearch.insert_max_occurs(self.payload, request.inputs)
+                    request.inputs = opensearch.query_eo_images_from_wps_inputs(request.inputs,
+                                                                                eoimage_data_sources,
+                                                                                accept_mime_types)
 
                 cwl_inputs = dict()
                 for input_id in request.inputs:

@@ -9,6 +9,7 @@ opt/
 # custom configs
 custom.cfg
 data_sources.cfg
+custom_wps.cfg
 Makefile.config
 
 # Python / Extensions etc.

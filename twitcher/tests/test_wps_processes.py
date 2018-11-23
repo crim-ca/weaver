@@ -1,3 +1,4 @@
+# noinspection PyPackageRequirements
 import mock
 
 from pyramid.testing import DummyRequest
@@ -20,7 +21,7 @@ def test_deploy(mock_get_process):
     # given
     dummy_payload = {"processDescription": {
         "process": {
-            "id": "workflow_stacker_sfs_id",
+            "identifier": "workflow_stacker_sfs_id",
             "title": "Application StackCreation followed by SFS dynamically added by POST /processes",
             "owsContext": {
                 "offering": {"code": "http://www.opengis.net/eoc/applicationContext/cwl",

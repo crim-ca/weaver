@@ -4,17 +4,16 @@ so that one can update the swagger without touching any other files after the in
 """
 
 from twitcher.config import TWITCHER_CONFIGURATION_EMS
+from twitcher.wps_restapi.colander_one_of import OneOfMappingSchema
 from twitcher.wps_restapi.utils import wps_restapi_base_path
-from twitcher.status import job_status_values, STATUS_ACCEPTED
+from twitcher.status import job_status_categories, STATUS_ACCEPTED, OGC_COMPLIANT
 from twitcher.sort import job_sort_values, quote_sort_values, SORT_CREATED, SORT_ID, SORT_PROCESS
 from twitcher.sync import execute_sync_options, EXECUTE_AUTO
 from twitcher.visibility import visibility_values, VISIBILITY_PUBLIC
 from cornice import Service
 from colander import *
 
-
 API_TITLE = 'Twitcher REST API'
-
 
 #########################################################################
 # API endpoints
@@ -145,6 +144,7 @@ bill_id = SchemaNode(String(), description='The bill id')
 quote_id = SchemaNode(String(), description='The quote id')
 result_id = SchemaNode(String(), description='The result id')
 
+
 #########################################################
 # Generic schemas
 #########################################################
@@ -177,43 +177,66 @@ class KeywordList(SequenceSchema):
     keyword = SchemaNode(String())
 
 
-class MetadataObject(MappingSchema):
-    role = SchemaNode(String(), missing=drop)
-    href = SchemaNode(String(), missing=drop)
+class JsonLink(MappingSchema):
+    href = SchemaNode(String(), format='url')
+    rel = SchemaNode(String(), missing=drop)
+    type = SchemaNode(String(), missing=drop)
+    hreflang = SchemaNode(String(), missing=drop)
+    title = SchemaNode(String(), missing=drop)
+
+
+class Metadata(JsonLink):
+    role = SchemaNode(String(), format='url', missing=drop)
+    value = SchemaNode(String(), missing=drop)
 
 
 class MetadataList(SequenceSchema):
-    metadata = MetadataObject()
+    item = Metadata()
 
 
-class FormatObject(MappingSchema):
+class JsonLinkList(SequenceSchema):
+    item = JsonLink()
+
+
+class LandingPage(MappingSchema):
+    links = JsonLinkList()
+
+
+class Format(MappingSchema):
     mimeType = SchemaNode(String())
     schema = SchemaNode(String(), missing=drop)
     encoding = SchemaNode(String(), missing=drop)
+
+
+class FormatDescription(Format):
     maximumMegabytes = SchemaNode(Integer(), missing=drop)
     default = SchemaNode(Boolean(), missing=drop, default=False)
 
 
-class FormatList(SequenceSchema):
-    format = FormatObject()
+class FormatDescriptionList(SequenceSchema):
+    format = FormatDescription()
 
 
-class Parameter(MappingSchema):
-    name = SchemaNode(String())
-    value = SchemaNode(String())
-
-
-class ParameterList(SequenceSchema):
-    parameter = Parameter()
+class AdditionalParameterValuesList(SequenceSchema):
+    values = SchemaNode(String())
 
 
 class AdditionalParameter(MappingSchema):
+    name = SchemaNode(String())
+    values = AdditionalParameterValuesList()
+
+
+class AdditionalParameterList(SequenceSchema):
+    item = AdditionalParameter()
+
+
+class AdditionalParameters(MappingSchema):
     role = SchemaNode(String(), missing=drop)
-    parameters = ParameterList(missing=drop)
+    parameters = AdditionalParameterList(missing=drop)
 
 
-class AdditionalParameters(SequenceSchema):
-    additionalParameter = AdditionalParameter(title='AdditionalParameter')
+class AdditionalParametersList(SequenceSchema):
+    additionalParameter = AdditionalParameters()
 
 
 class Content(MappingSchema):
@@ -222,96 +245,143 @@ class Content(MappingSchema):
 
 
 class Offering(MappingSchema):
-    code = SchemaNode(String(), format='url', missing=drop)
-    content = Content(title='content')
+    code = SchemaNode(String(), missing=drop)
+    content = Content(title='content', missing=drop)
 
 
 class OWSContext(MappingSchema):
     offering = Offering(title='offering')
 
 
-class LiteralDataDomainObject(MappingSchema):
-    pass
-
-
-class BaseInputTypeBody(MappingSchema):
+class DescriptionType(MappingSchema):
     id = SchemaNode(String())
     title = SchemaNode(String(), missing=drop)
     abstract = SchemaNode(String(), missing=drop)
     keywords = KeywordList(missing=drop)
+    owsContext = OWSContext(missing=drop)
     metadata = MetadataList(missing=drop)
-    formats = FormatList()
-    minOccurs = SchemaNode(Integer(), missing=drop)
-    maxOccurs = SchemaNode(Integer(), missing=drop)
-    additionalParameters = AdditionalParameters(missing=drop)
+    additionalParameters = AdditionalParametersList(missing=drop, title='additionalParameters')
+    links = JsonLinkList(missing=drop)
 
 
-class BaseOutputTypeBody(MappingSchema):
-    id = SchemaNode(String())
-    title = SchemaNode(String(), missing=drop)
-    abstract = SchemaNode(String(), missing=drop)
-    keywords = KeywordList(missing=drop)
-    metadata = MetadataList(missing=drop)
-    formats = FormatList()
-    minOccurs = SchemaNode(Integer(), missing=drop)
-    maxOccurs = SchemaNode(Integer(), missing=drop)
-    additionalParameters = AdditionalParameters(missing=drop)
+class DataDescriptionType(DescriptionType):
+    minOccurs = SchemaNode(String(), missing=drop)
+    maxOccurs = SchemaNode(String(), missing=drop)
+    formats = FormatDescriptionList()
 
 
-class LiteralInputTypeBody(BaseInputTypeBody):
-    LiteralDataDomain = LiteralDataDomainObject(missing=drop)
-
-
-class ComplexInputTypeBody(BaseInputTypeBody):
+class ComplexInputType(MappingSchema):
     pass
 
 
-class BoundingBoxInputTypeBody(BaseInputTypeBody):
+class SupportedCrs(MappingSchema):
+    crs = SchemaNode(String(), format='url')
+    default = SchemaNode(Boolean(), missing=drop)
+
+
+class SupportedCrsList(SequenceSchema):
+    item = SupportedCrs()
+
+
+class BoundingBoxInputType(MappingSchema):
+    supportedCRS = SupportedCrsList()
+
+
+class DataTypeSchema(MappingSchema):
+    name = SchemaNode(String())
+    reference = SchemaNode(String(), format='url', missing=drop)
+
+
+class UomSchema(DataTypeSchema):
     pass
 
 
-class LiteralOutputTypeBody(BaseOutputTypeBody):
-    LiteralDataDomain = LiteralDataDomainObject(missing=drop)
+class AllowedValuesList(SequenceSchema):
+    allowedValues = SchemaNode(String())
 
 
-class ComplexOutputTypeBody(BaseOutputTypeBody):
-    pass
+class AllowedValues(MappingSchema):
+    allowedValues = AllowedValuesList()
 
 
-class BoundingBoxOutputTypeBody(BaseOutputTypeBody):
-    pass
+class Range(MappingSchema):
+    minimumValue = SchemaNode(String(), missing=drop)
+    maximumValue = SchemaNode(String(), missing=drop)
+    spacing = SchemaNode(String(), missing=drop)
+    rangeClosure = SchemaNode(String(), missing=drop, validator=OneOf(["closed",
+                                                                       "open",
+                                                                       "open-closed",
+                                                                       "closed-open"]))
 
 
-class InputTypeBody(BaseInputTypeBody):
-    literal = LiteralInputTypeBody()
-    complex = ComplexInputTypeBody()
-    bounding_box = BoundingBoxInputTypeBody()
+class AllowedRangesList(SequenceSchema):
+    allowedRanges = Range()
 
 
-class OutputTypeBody(BaseOutputTypeBody):
-    literal = LiteralOutputTypeBody()
-    complex = ComplexOutputTypeBody()
-    bounding_box = BoundingBoxOutputTypeBody()
+class AllowedRanges(MappingSchema):
+    allowedRanges = AllowedRangesList()
+
+
+class AnyValue(MappingSchema):
+    anyValue = SchemaNode(Boolean(), missing=drop)
+
+
+class ValuesReference(MappingSchema):
+    valueReference = SchemaNode(String(), format='url', )
+
+
+class LiteralDataDomainType(OneOfMappingSchema):
+    _one_of = (AllowedValues,
+               AllowedRanges,
+               ValuesReference,
+               AnyValue)  # must be last because it's the most permissive
+    defaultValue = SchemaNode(String(), missing=drop)
+    dataType = DataTypeSchema(missing=drop)
+    uom = UomSchema(missing=drop)
+
+
+class LiteralDataDomainTypeList(SequenceSchema):
+    literalDataDomain = LiteralDataDomainType()
+
+
+class LiteralInputType(MappingSchema):
+    literalDataDomains = LiteralDataDomainTypeList()
+
+
+class InputType(OneOfMappingSchema, DataDescriptionType):
+    _one_of = (LiteralInputType,
+               BoundingBoxInputType,
+               ComplexInputType)  # must be last because it's the most permissive
 
 
 class InputTypeList(SequenceSchema):
-    input = InputTypeBody(validator=OneOf(['literal', 'complex', 'bounding_box']))
+    input = InputType()
 
 
-class OutputTypeList(SequenceSchema):
-    output = OutputTypeBody(validator=OneOf(['literal', 'complex', 'bounding_box']))
+class OutputDescription(DataDescriptionType):
+    pass
+
+
+class OutputDescriptionList(SequenceSchema):
+    item = OutputDescription()
 
 
 JobControlOptionsEnum = SchemaNode(String(), title='jobControlOptions', missing=drop,
-                                   validator=OneOf(execute_sync_options), default=EXECUTE_AUTO)
-OutputTransmissionEnum = SchemaNode(String(), title='outputTransmission', missing=drop,
-                                    validator=OneOf(['value', 'reference']))
+                                   validator=OneOf(['sync-execute', 'async-execute']), default=EXECUTE_AUTO)
+TransmissionModeEnum = SchemaNode(String(), title='transmissionMode', missing=drop,
+                                  validator=OneOf(['value', 'reference']))
 
 
 class LaunchJobQuerystring(MappingSchema):
+    sync_execute = SchemaNode(Boolean(), default=False, missing=drop)
+    sync_execute.name = 'sync-execute'
     field_string = SchemaNode(String(), default=None, missing=drop,
                               description='Comma separated tags that can be used to filter jobs later')
     field_string.name = 'tags'
+
+
+class Visibility(MappingSchema):
+    value = SchemaNode(String(), validator=OneOf(list(visibility_values)), example=VISIBILITY_PUBLIC)
 
 
 #########################################################
@@ -366,14 +436,10 @@ class ProcessVisibilityGetEndpoint(MappingSchema):
     process_id = process_id
 
 
-class ProcessVisibilityPutBodySchema(MappingSchema):
-    value = SchemaNode(String(), validator=OneOf(list(visibility_values)), example=VISIBILITY_PUBLIC)
-
-
 class ProcessVisibilityPutEndpoint(MappingSchema):
     header = AcceptHeader()
     process_id = process_id
-    body = ProcessVisibilityPutBodySchema()
+    body = Visibility()
 
 
 class FullJobEndpoint(MappingSchema):
@@ -455,22 +521,21 @@ class CreateProviderRequestBody(MappingSchema):
     public = SchemaNode(Boolean())
 
 
-class JobInput(MappingSchema):
+class InputDataType(MappingSchema):
     id = SchemaNode(String())
-    href = SchemaNode(String())
 
 
-class JobOutput(MappingSchema):
+class OutputDataType(MappingSchema):
     id = SchemaNode(String())
-    transmissionMode = SchemaNode(String())
+    format = Format(missing=drop)
 
 
-class JobInputList(SequenceSchema):
-    item = JobInput()
+class Output(OutputDataType):
+    transmissionMode = TransmissionModeEnum
 
 
-class JobOutputList(SequenceSchema):
-    item = JobOutput()
+class OutputList(SequenceSchema):
+    output = Output()
 
 
 class ProviderSummarySchema(MappingSchema):
@@ -492,42 +557,47 @@ class ProviderCapabilitiesSchema(MappingSchema):
     type = SchemaNode(String())
 
 
-class ProcessSummarySchema(MappingSchema):
+class TransmissionModeList(SequenceSchema):
+    item = TransmissionModeEnum
+
+
+class JobControlOptionsList(SequenceSchema):
+    item = JobControlOptionsEnum
+
+
+class ExceptionReportType(MappingSchema):
+    code = SchemaNode(String())
+    description = SchemaNode(String(), missing=drop)
+
+
+class ConformsToList(SequenceSchema):
+    item = SchemaNode(String())
+
+
+class ReqClasses(MappingSchema):
+    conformsTo = ConformsToList()
+
+
+class ProcessSummary(DescriptionType):
     """WPS process definition."""
-    id = SchemaNode(String())
-    title = SchemaNode(String())
-    abstract = SchemaNode(String())
-    keywords = KeywordList(missing=drop)
-    metadata = MetadataList(missing=drop)
-    version = SchemaNode(String())
-    jobControlOptions = JobControlOptionsEnum
-    processDescriptionURL = SchemaNode(String(), format='url', missing=drop, title='processDescriptionURL')
-    outputTransmission = OutputTransmissionEnum
+    version = SchemaNode(String(), missing=drop)
+    jobControlOptions = JobControlOptionsList(missing=drop)
+    outputTransmission = TransmissionModeList(missing=drop)
+    processDescriptionURL = SchemaNode(String(), format='url', missing=drop)
 
 
-class ProcessListSchema(SequenceSchema):
-    process = ProcessSummarySchema(missing=drop)
+class ProcessSummaryList(SequenceSchema):
+    item = ProcessSummary()
 
 
-class ProviderSummaryProcessesSchema(ProviderSummarySchema):
-    processes = ProcessListSchema()
+class ProcessCollection(MappingSchema):
+    processes = ProcessSummaryList()
 
 
-class ProviderProcessListSchema(SequenceSchema):
-    provider = ProviderSummaryProcessesSchema(missing=drop)
-
-
-class ProcessDetailSchema(MappingSchema):
-    id = SchemaNode(String())
-    title = SchemaNode(String(), missing=drop)
-    abstract = SchemaNode(String(), missing=drop)
-    keywords = KeywordList(missing=drop)
-    metadata = MetadataList(missing=drop)
+class Process(DescriptionType):
     inputs = InputTypeList(missing=drop)
-    outputs = OutputTypeList(missing=drop)
-    executeEndpoint = SchemaNode(String(), format='url', missing=drop, title='executeEndpoint')
-    additionalParameters = AdditionalParameters(missing=drop, title='additionalParameters')
-    owsContext = OWSContext(missing=drop, title='owsContext')
+    outputs = OutputDescriptionList(missing=drop)
+    executeEndpoint = SchemaNode(String(), format='url', missing=drop)
 
 
 class ProcessOutputDescriptionSchema(MappingSchema):
@@ -542,7 +612,7 @@ class ProcessOutputDescriptionSchema(MappingSchema):
 JobStatusEnum = SchemaNode(
     String(),
     default=None,
-    validator=OneOf(job_status_values),
+    validator=OneOf(job_status_categories[OGC_COMPLIANT]),
     example=STATUS_ACCEPTED)
 JobSortEnum = SchemaNode(
     String(),
@@ -569,27 +639,21 @@ class GetJobsRequest(MappingSchema):
     querystring = GetJobsQueries()
 
 
-class SingleJobStatusSchema(MappingSchema):
-    status = JobStatusEnum
+class StatusInfo(MappingSchema):
     jobID = SchemaNode(String(), example='a9d14bf4-84e0-449a-bac8-16e598efe807', description="ID of the job.")
-    message = SchemaNode(String(), example='Job {}.'.format(STATUS_ACCEPTED))
-    percentCompleted = SchemaNode(Integer(), example=0)
-    exceptions = SchemaNode(
-        String(),
-        missing=drop,
-        example='http://{host}/twitcher/providers/{my-wps-id}/processes/{my-process-id}/jobs/{my-job-id}/exceptions')
-    outputs = SchemaNode(
-        String(),
-        missing=drop,
-        example='http://{host}/twitcher/providers/{my-wps-id}/processes/{my-process-id}/jobs/{my-job-id}/outputs')
-    logs = SchemaNode(
-        String(),
-        missing=drop,
-        example='http://{host}/twitcher/providers/{my-wps-id}/processes/{my-process-id}/jobs/{my-job-id}/logs')
+    status = JobStatusEnum
+    expirationDate = SchemaNode(DateTime(), missing=drop)
+    estimatedCompletion = SchemaNode(DateTime(), missing=drop)
+    nextPoll = SchemaNode(DateTime(), missing=drop)
+    percentCompleted = SchemaNode(Integer(), example=0, validator=Range(min=0, max=100))
 
 
-class JobListSchema(SequenceSchema):
-    job = SchemaNode(String(), description='Job ID.')
+class JobCollectionList(SequenceSchema):
+    item = SchemaNode(String(), description='Job ID.')
+
+
+class JobCollection(MappingSchema):
+    jobs = JobCollectionList()
 
 
 class CreatedJobStatusSchema(MappingSchema):
@@ -604,7 +668,7 @@ class CreatedQuotedJobStatusSchema(CreatedJobStatusSchema):
 
 class GetAllJobsSchema(MappingSchema):
     count = SchemaNode(Integer())
-    jobs = JobListSchema()
+    jobs = JobCollection()
     limit = SchemaNode(Integer())
     page = SchemaNode(Integer())
 
@@ -618,30 +682,88 @@ class DismissedJobSchema(MappingSchema):
 
 class QuoteProcessParametersSchema(MappingSchema):
     inputs = InputTypeList(missing=drop)
-    outputs = OutputTypeList(missing=drop)
+    outputs = OutputDescriptionList(missing=drop)
     mode = JobControlOptionsEnum
     response = SchemaNode(String(), validator=OneOf(['raw', 'document']), missing=drop)
 
 
-class QuoteStepSchema(MappingSchema):
+class AlternateQuotation(MappingSchema):
     id = SchemaNode(String(), description="Quote ID.")
-    price = SchemaNode(Float(), description="Process execution price.")
-    currency = SchemaNode(String(), description="Currency code in ISO-4217 format.")
-    user = SchemaNode(String(), description="User id that requested the quote.")
-    process = SchemaNode(String(), description="Corresponding process ID.")
-    location = SchemaNode(String(), description="Corresponding process location.", missing=drop)
     title = SchemaNode(String(), description="Name of the quotation.", missing=drop)
     description = SchemaNode(String(), description="Description of the quotation.", missing=drop)
+    price = SchemaNode(Float(), description="Process execution price.")
+    currency = SchemaNode(String(), description="Currency code in ISO-4217 format.")
+    expire = SchemaNode(DateTime(), description="Expiration date and time of the quote in ISO-8601 format.")
+    created = SchemaNode(DateTime(), description="Creation date and time of the quote in ISO-8601 format.")
     details = SchemaNode(String(), description="Details of the quotation.", missing=drop)
-    created = SchemaNode(String(), description="Creation date and time of the quote in ISO-8601 format.")
-    expire = SchemaNode(String(), description="Expiration date and time of the quote in ISO-8601 format.")
     estimatedTime = SchemaNode(String(), description="Estimated duration of the process execution.", missing=drop)
-    processParameters = QuoteProcessParametersSchema()
-    alternativeQuotations = MappingSchema(missing=drop)
+
+
+class AlternateQuotationList(SequenceSchema):
+    step = AlternateQuotation(description="Quote of a workflow step process.")
+
+
+class Reference(MappingSchema):
+    href = SchemaNode(String())
+    mimeType = SchemaNode(String(), missing=drop)
+    schema = SchemaNode(String(), missing=drop)
+    encoding = SchemaNode(String(), missing=drop)
+    body = SchemaNode(String(), missing=drop)
+    bodyReference = SchemaNode(String(), missing=drop, format='url')
+
+
+class DataEncodingAttributes(MappingSchema):
+    mimeType = SchemaNode(String(), missing=drop)
+    schema = SchemaNode(String(), missing=drop)
+    encoding = SchemaNode(String(), missing=drop)
+
+
+class OutputValue(DataEncodingAttributes):
+    data = SchemaNode(String())
+
+
+class InlineValue(DataEncodingAttributes):
+    data = SchemaNode(String())
+
+
+class ValueType(OneOfMappingSchema):
+    _one_of = (InlineValue,
+               Reference)
+
+
+class Input(InputDataType, ValueType):
+    pass
+
+
+class InputList(SequenceSchema):
+    item = Input()
+
+
+class Execute(MappingSchema):
+    inputs = InputList(missing=drop)
+    outputs = OutputList()
+    mode = SchemaNode(String(), validator=OneOf(execute_sync_options))
+    response = SchemaNode(String(), validator=OneOf(["raw", "document"]))
+
+
+class Quotation(MappingSchema):
+    id = SchemaNode(String(), description="Quote ID.")
+    title = SchemaNode(String(), description="Name of the quotation.", missing=drop)
+    description = SchemaNode(String(), description="Description of the quotation.", missing=drop)
+    processId = SchemaNode(String(), description="Corresponding process ID.")
+    price = SchemaNode(Float(), description="Process execution price.")
+    currency = SchemaNode(String(), description="Currency code in ISO-4217 format.")
+    expire = SchemaNode(DateTime(), description="Expiration date and time of the quote in ISO-8601 format.")
+    created = SchemaNode(DateTime(), description="Creation date and time of the quote in ISO-8601 format.")
+    userId = SchemaNode(String(), description="User id that requested the quote.")
+    details = SchemaNode(String(), description="Details of the quotation.", missing=drop)
+    estimatedTime = SchemaNode(String(), description="Estimated duration of the process execution.", missing=drop)
+    processParameters = Execute()
+    alternativeQuotations = AlternateQuotationList(missing=drop)
 
 
 class QuoteProcessListSchema(SequenceSchema):
-    step = QuoteStepSchema(description="Quote of a workflow step process.")
+    step = Quotation(description="Quote of a workflow step process.")
 
 
 class QuoteSchema(MappingSchema):
@@ -651,21 +773,31 @@ class QuoteSchema(MappingSchema):
     total = SchemaNode(Float(), description="Total of the quote including step processes.")
 
 
-class QuoteListSchema(SequenceSchema):
-    quote_id = SchemaNode(String(), description="Quote ID.")
+class QuotationList(SequenceSchema):
+    item = SchemaNode(String(), description="Bill ID.")
+
+
+class QuotationListSchema(MappingSchema):
+    quotations = QuotationList()
 
 
 class BillSchema(MappingSchema):
     id = SchemaNode(String(), description="Bill ID.")
+    title = SchemaNode(String(), description="Name of the bill.")
+    description = SchemaNode(String(), missing=drop)
     price = SchemaNode(Float(), description="Price associated to the bill.")
     currency = SchemaNode(String(), description="Currency code in ISO-4217 format.")
-    created = SchemaNode(String(), description="Creation date and time of the bill in ISO-8601 format.")
-    quote = SchemaNode(String(), description="Corresponding quote ID.")
-    user = SchemaNode(String(), description="User id that requested the quote.")
+    created = SchemaNode(DateTime(), description="Creation date and time of the bill in ISO-8601 format.")
+    userId = SchemaNode(String(), description="User id that requested the quote.")
+    quotationId = SchemaNode(String(), description="Corresponding quote ID.", missing=drop)
 
 
-class BillListSchema(SequenceSchema):
-    bill_id = SchemaNode(String(), description="Bill ID.")
+class BillList(SequenceSchema):
+    item = SchemaNode(String(), description="Bill ID.")
+
+
+class BillListSchema(MappingSchema):
+    bills = BillList()
 
 
 class SupportedValues(MappingSchema):
@@ -674,6 +806,14 @@ class SupportedValues(MappingSchema):
 
 class DefaultValues(MappingSchema):
     pass
+
+
+class Unit(MappingSchema):
+    pass
+
+
+class UnitType(MappingSchema):
+    unit = Unit()
 
 
 class ProcessInputDescriptionSchema(MappingSchema):
@@ -695,6 +835,14 @@ class ProcessDescriptionSchema(MappingSchema):
     label = SchemaNode(String())
 
 
+class UndeploymentResult(MappingSchema):
+    id = SchemaNode(String())
+
+
+class DeploymentResult(MappingSchema):
+    processSummary = ProcessSummary()
+
+
 class ProcessDescriptionBodySchema(MappingSchema):
     process = ProcessDescriptionSchema()
 
@@ -704,7 +852,7 @@ class ProvidersSchema(SequenceSchema):
 
 
 class ProcessesSchema(SequenceSchema):
-    provider_processes_service = ProcessDetailSchema()
+    provider_processes_service = Process()
 
 
 class JobOutputSchema(MappingSchema):
@@ -720,16 +868,14 @@ class JobOutputsSchema(SequenceSchema):
     output = JobOutputSchema()
 
 
-class JobLinkSchema(MappingSchema):
-    href = SchemaNode(String(), format='url')
-    rel = SchemaNode(String(), missing=drop, description="Relationship type of the link to the job.", example="bill")
-    type = SchemaNode(String(), missing=drop, description="Content-Type of the link's response.")
-    lang = SchemaNode(String(), missing=drop)
-    title = SchemaNode(String(), missing=drop)
+class OutputInfo(OneOfMappingSchema):
+    _one_of = (OutputValue,
+               Reference)
+    id = SchemaNode(String())
 
 
-class JobLinksSchema(SequenceSchema):
-    link = JobLinkSchema()
+class OutputInfoList(SequenceSchema):
+    output = OutputInfo()
 
 
 class ExceptionTextList(SequenceSchema):
@@ -794,48 +940,47 @@ class VersionsSchema(MappingSchema):
 #################################
 
 
-class ProcessOfferingBody(MappingSchema):
-    process = ProcessDetailSchema(title='Process')
-
-
 class PackageBody(MappingSchema):
     pass
 
 
 class ExecutionUnit(MappingSchema):
-    package = PackageBody(missing=drop, description="CWL file content as JSON.")
-    reference = SchemaNode(String(), missing=drop, description="CWL file or docker image reference.")
+    _one_of = (Reference,
+               UnitType)
 
 
-class DeploymentProfileBody(MappingSchema):
-    executionUnit = ExecutionUnit(description="Package/Reference definition.", title='ExecutionUnit',
-                                  validator=OneOf(['reference', 'package']))
+class ExecutionUnitList(SequenceSchema):
+    item = ExecutionUnit()
 
 
-class PostProcessRequestBody(MappingSchema):
-    # TODO ProcessOffering has been replaced by ProcessDefinition...
-    # Swagger should be updated based on https://github.com/opengeospatial/D009-ADES_and_EMS_Results_and_Best_Practices_Engineering_Report/blob/master/code/ades_wpst.json
-    processOffering = ProcessOfferingBody(title='ProcessOffering')
-    deploymentProfile = DeploymentProfileBody(title='DeploymentProfile')
-    deploymentProfileName = SchemaNode(String(), missing=drop, description="Name of the deployment profile.")
+class ProcessOffering(MappingSchema):
+    process = Process()
+    processVersion = SchemaNode(String(), missing=drop)
+    jobControlOptions = JobControlOptionsList(missing=drop)
+    outputTransmission = TransmissionModeList(missing=drop)
 
 
-class ProcessesEndpoint(MappingSchema):
+class ProcessDescriptionChoiceType(OneOfMappingSchema):
+    _one_of = (Reference,
+               ProcessOffering)
+
+
+class Deploy(MappingSchema):
+    immediateDeployment = SchemaNode(Boolean(), missing=drop, default=True)
+    processDescription = ProcessDescriptionChoiceType(missing=drop)
+    executionUnit = ExecutionUnitList()
+    deploymentProfileName = SchemaNode(String(), missing=drop)
+
+
+class PostProcessEndpoint(MappingSchema):
     header = AcceptHeader()
-    body = PostProcessRequestBody(title='Deploy')
-
-
-class PostProcessJobBody(MappingSchema):
-    inputs = JobInputList(missing=drop)
-    outputs = JobOutputList()
-    mode = SchemaNode(String())
-    response = SchemaNode(String())
+    body = Deploy(title='Deploy')
 
 
 class PostProcessJobsEndpoint(MappingSchema):
     process_id = process_id
     header = AcceptHeader()
-    body = PostProcessJobBody()
+    body = Execute()
 
 
 class GetProcessJobsEndpoint(MappingSchema):
@@ -938,8 +1083,8 @@ class GetProviderProcess(MappingSchema):
 
 
 class PostProviderProcessJobRequestBody(MappingSchema):
-    inputs = JobInputList()
-    outputs = JobOutputList()
+    inputs = InputList()
+    outputs = OutputList()
     mode = SchemaNode(String())
     response = SchemaNode(String())
 
@@ -1017,20 +1162,15 @@ class GetProcessesRequest(MappingSchema):
     querystring = GetProcessesQuery()
 
 
-class OkGetProcessesBodySchema(MappingSchema):
-    processes = ProcessListSchema(title='ProcessCollection')
-    providers = ProviderProcessListSchema(missing=drop)
-
-
 class OkGetProcessesSchema(MappingSchema):
     header = JsonHeader()
-    body = OkGetProcessesBodySchema()
+    body = ProcessCollection()
 
 
 class OkPostProcessDeployBodySchema(MappingSchema):
     deploymentDone = SchemaNode(Boolean(), description="Indicates if the process was successfully deployed.",
                                 default=False, example=True)
-    processSummary = ProcessSummarySchema(missing=drop, description="Deployed process summary if successful.")
+    processSummary = ProcessSummary(missing=drop, description="Deployed process summary if successful.")
     failureReason = SchemaNode(String(), missing=drop, description="Description of deploy failure if applicable.")
 
 
@@ -1039,16 +1179,9 @@ class OkPostProcessesSchema(MappingSchema):
     body = OkPostProcessDeployBodySchema()
 
 
-class OkGetProcessBodySchema(MappingSchema):
-    process = ProcessDetailSchema()
-    processVersion = SchemaNode(String())
-    jobControlOptions = JobControlOptionsEnum
-    outputTransmission = OutputTransmissionEnum
-
-
 class OkGetProcessSchema(MappingSchema):
     header = JsonHeader()
-    body = OkGetProcessBodySchema()
+    body = ProcessOffering()
 
 
 class OkGetProcessPackageSchema(MappingSchema):
@@ -1104,12 +1237,12 @@ class CreatedLaunchJobResponse(MappingSchema):
 
 class OkGetAllProcessJobsResponse(MappingSchema):
     header = JsonHeader()
-    body = JobListSchema()
+    body = JobCollection()
 
 
 class OkGetProcessJobResponse(MappingSchema):
     header = JsonHeader()
-    body = SingleJobStatusSchema()
+    body = StatusInfo()
 
 
 class OkDeleteProcessJobResponse(MappingSchema):
@@ -1129,17 +1262,17 @@ class OkDismissJobResponse(MappingSchema):
 
 class OkGetSingleJobStatusResponse(MappingSchema):
     header = JsonHeader()
-    body = SingleJobStatusSchema()
+    body = StatusInfo()
 
 
-class OkGetSingleJobOutputsBodySchema(MappingSchema):
-    outputs = JobOutputsSchema()
-    links = JobLinksSchema()
+class Result(MappingSchema):
+    outputs = OutputInfoList()
+    links = JsonLinkList(missing=drop)
 
 
-class OkGetSingleJobOutputsResponse(MappingSchema):
+class OkGetSingleJobResultsResponse(MappingSchema):
     header = JsonHeader()
-    body = OkGetSingleJobOutputsBodySchema()
+    body = Result()
 
 
 class OkGetSingleOutputResponse(MappingSchema):
@@ -1164,7 +1297,7 @@ class OkGetQuoteResponse(MappingSchema):
 
 class OkGetQuoteListResponse(MappingSchema):
     header = JsonHeader()
-    body = QuoteListSchema()
+    body = QuotationListSchema()
 
 
 class OkGetBillDetailResponse(MappingSchema):
@@ -1279,7 +1412,7 @@ delete_job_responses = {
     '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_job_results_responses = {
-    '200': OkGetSingleJobOutputsResponse(description='success'),
+    '200': OkGetSingleJobResultsResponse(description='success'),
     '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
 }
 get_quote_list_responses = {

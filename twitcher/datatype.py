@@ -1,23 +1,25 @@
 """
 Definitions of types used by tokens.
 """
+from copy import copy
 
 import six
 import uuid
-# noinspection PyProtectedMember
+# noinspection PyPackageRequirements
 from dateutil.parser import parse as dt_parse
 from datetime import datetime, timedelta
 # noinspection PyProtectedMember
 from logging import _levelNames, ERROR, INFO
 
-from twitcher.datatype_schemas import DataDescriptionType, DescriptionType
-from twitcher.utils import now_secs, get_job_log_msg, get_log_fmt, get_log_datefmt
+from twitcher.utils import now_secs, get_job_log_msg, get_log_fmt, get_log_datefmt, fully_qualified_name
 from twitcher.exceptions import ProcessInstanceError
 from twitcher.processes import process_mapping
 from twitcher.processes.types import PACKAGE_PROCESSES, PROCESS_WPS
-from twitcher.status import job_status_values
+from twitcher.status import job_status_values, STATUS_UNKNOWN
 from twitcher.visibility import visibility_values, VISIBILITY_PRIVATE
 from pywps import Process as ProcessWPS
+
+import twitcher.wps_restapi.swagger_definitions as sd
 
 
 class Service(dict):
@@ -38,7 +40,7 @@ class Service(dict):
     @property
     def name(self):
         """Service name."""
-        return self.get('name', 'unknown')
+        return self.get('name', STATUS_UNKNOWN)
 
     @property
     def type(self):
@@ -76,15 +78,15 @@ class Service(dict):
 
 class Job(dict):
     """
-    Dictionary that contains OWS service jobs. It always has ``'task_id'`` and ``identifier`` keys.
+    Dictionary that contains OWS service jobs. It always has ``'id'`` and ``task_id`` keys.
     """
 
     def __init__(self, *args, **kwargs):
         super(Job, self).__init__(*args, **kwargs)
         if 'task_id' not in self:
             raise TypeError("Parameter `task_id` is required for `{}` creation.".format(type(self)))
-        if not isinstance(self['task_id'], six.string_types):
-            raise TypeError("Type `str` is required for `{}.task_id`".format(type(self)))
+        if not isinstance(self.id, six.string_types):
+            raise TypeError("Type `str` is required for `{}.id`".format(type(self)))
 
     def _get_log_msg(self, msg=None):
         if not msg:
@@ -109,7 +111,7 @@ class Job(dict):
         for level, msg in log_msg:
             fmt_msg = get_log_fmt() % dict(asctime=datetime.now().strftime(get_log_datefmt()),
                                            levelname=_levelNames[level],
-                                           name='datatype.job',
+                                           name=fully_qualified_name(self),
                                            message=msg)
             if len(self.logs) == 0 or self.logs[-1] != fmt_msg:
                 self.logs.append(fmt_msg)
@@ -117,8 +119,22 @@ class Job(dict):
                     logger.log(level, msg)
 
     @property
+    def id(self):
+        job_id = self.get('id')
+        if not job_id:
+            job_id = str(uuid.uuid4())
+            self['id'] = job_id
+        return job_id
+
+    @property
     def task_id(self):
         return self['task_id']
+
+    @task_id.setter
+    def task_id(self, task_id):
+        if not isinstance(task_id, six.string_types):
+            raise TypeError("Type `str` is required for `{}.task_id`".format(type(self)))
+        self['task_id'] = task_id
 
     @property
     def service(self):
@@ -140,6 +156,19 @@ class Job(dict):
             raise TypeError("Type `str` is required for `{}.process`".format(type(self)))
         self['process'] = process
 
+    def _get_inputs(self):
+        if self.get('inputs') is None:
+            self['inputs'] = list()
+        return self['inputs']
+
+    def _set_inputs(self, inputs):
+        if not isinstance(inputs, list):
+            raise TypeError("Type `list` is required for `{}.inputs`".format(type(self)))
+        self['inputs'] = inputs
+
+    # allows to correctly update list by ref using `job.inputs.extend()`
+    inputs = property(_get_inputs, _set_inputs)
+
     @property
     def user_id(self):
         return self.get('user_id', None)
@@ -152,7 +181,7 @@ class Job(dict):
 
     @property
     def status(self):
-        return self.get('status', 'unknown')
+        return self.get('status', STATUS_UNKNOWN)
 
     @status.setter
     def status(self, status):
@@ -186,6 +215,16 @@ class Job(dict):
         self['status_location'] = location_url
 
     @property
+    def execute_async(self):
+        return self.get('execute_async', True)
+
+    @execute_async.setter
+    def execute_async(self, execute_async):
+        if not isinstance(execute_async, bool):
+            raise TypeError("Type `bool` is required for `{}.execute_async`".format(type(self)))
+        self['execute_async'] = execute_async
+
+    @property
     def is_workflow(self):
         return self.get('is_workflow', False)
 
@@ -207,6 +246,9 @@ class Job(dict):
         return self.get('finished', None)
 
     def is_finished(self):
+        return self.finished is not None
+
+    def mark_finished(self):
         self['finished'] = datetime.now()
 
     @property
@@ -299,13 +341,16 @@ class Job(dict):
     @property
     def params(self):
         return {
+            'id': self.id,
             'task_id': self.task_id,
             'service': self.service,
             'process': self.process,
+            'inputs': self.inputs,
             'user_id': self.user_id,
             'status': self.status,
             'status_message': self.status_message,
             'status_location': self.status_location,
+            'execute_async': self.execute_async,
             'is_workflow': self.is_workflow,
             'created': self.created,
             'finished': self.finished,
@@ -320,7 +365,7 @@ class Job(dict):
         }
 
     def __str__(self):
-        return 'Job <{}>'.format(self.task_id)
+        return 'Job <{}>'.format(self.id)
 
     def __repr__(self):
         cls = type(self)
@@ -390,28 +435,37 @@ class AccessToken(dict):
         return '{0}.{1}({2})'.format(cls.__module__, cls.__name__, repr_)
 
 
-class Process(DescriptionType):
+class Process(dict):
     """
     Dictionary that contains a process description for db storage.
-    It always has ``'identifier'`` and ``executeWPSEndpoint`` keys.
+    It always has ``'identifier'`` and ``processEndpointWPS1`` keys.
     """
 
     def __init__(self, *args, **kwargs):
         super(Process, self).__init__(*args, **kwargs)
-        if 'executeWPSEndpoint' not in self:
-            raise TypeError("'executeWPSEndpoint' is required")
+        # use both 'id' and 'identifier' to support any call (WPS and recurrent 'id')
+        if 'id' not in self and 'identifier' not in self:
+            raise TypeError("'id' OR 'identifier' is required")
+        if 'id' not in self:
+            self['id'] = self.pop('identifier')
+        if 'processEndpointWPS1' not in self:
+            raise TypeError("'processEndpointWPS1' is required")
         if 'package' not in self:
             raise TypeError("'package' is required")
-        if 'inputs' in self:
-            self['inputs'] = [Input(i) for i in self['inputs']]
-        if 'outputs' in self:
-            self['outputs'] = [Output(o) for o in self['outputs']]
 
     def __setattr__(self, item, value):
         if item in self:
             self[item] = value
         else:
             raise AttributeError("Can't set attribute")
+
+    @property
+    def id(self):
+        return self['id']
+
+    @property
+    def identifier(self):
+        return self.id
 
     @property
     def title(self):
@@ -454,8 +508,8 @@ class Process(DescriptionType):
         return self.get('processDescriptionURL')
 
     @property
-    def executeWPSEndpoint(self):
-        return self.get('executeWPSEndpoint')
+    def processEndpointWPS1(self):
+        return self.get('processEndpointWPS1')
 
     @property
     def executeEndpoint(self):
@@ -512,7 +566,7 @@ class Process(DescriptionType):
             'outputs': self.outputs,
             'jobControlOptions': self.jobControlOptions,
             'outputTransmission': self.outputTransmission,
-            'executeWPSEndpoint': self.executeWPSEndpoint,
+            'processEndpointWPS1': self.processEndpointWPS1,
             'type': self.type,
             'package': self.package,  # deployment specification (json body)
             'payload': self.payload,
@@ -536,37 +590,13 @@ class Process(DescriptionType):
         }
 
     def json(self):
-        description = self.description()
-
-        description["inputs"] = [i.data_description() for i in self.inputs]
-        description["outputs"] = [o.data_description() for o in self.outputs]
-        description["executeEndpoint"] = self.executeEndpoint
-
-        return description
+        return sd.Process().deserialize(self)
 
     def process_offering(self):
-        offering = {'process': self.json()}
+        return sd.ProcessOffering().deserialize(ProcessOffering(self))
 
-        if self.version:
-            offering['processVersion'] = self.version
-
-        properties = [
-            "jobControlOptions",
-            "outputTransmission",
-        ]
-        offering.update({p: self[p] for p in properties if p in self})
-        return offering
-
-    def summary(self):
-        description = self.description()
-        properties = [
-            "version",
-            "jobControlOptions",
-            "processDescriptionURL",
-            "outputTransmission",
-        ]
-        description.update({p: self[p] for p in properties if p in self})
-        return description
+    def process_summary(self):
+        return sd.ProcessSummary().deserialize(self)
 
     @staticmethod
     def from_wps(wps_process, **extra_params):
@@ -587,24 +617,14 @@ class Process(DescriptionType):
         return process_mapping[process_key]()
 
 
-class Input(DataDescriptionType):
-    def inputTypeChoice(self):
-        properties = [
-            "literalDataDomains",  # literalInputType
-            "supportedCRS"  # boundingBoxInputType
-            # complexInputType not defined
-        ]
-        input_type_choice = {p: self[p] for p in properties if p in self}
-        return input_type_choice
-
-    def inputType(self):
-        input_type = self.inputTypeChoice()
-        input_type.update(self.data_description())
-        return input_type
-
-
-class Output(DataDescriptionType):
-    pass
+class ProcessOffering(dict):
+    def __init__(self, process):
+        super(ProcessOffering, self).__init__({
+            "process": process,
+            "processVersion": process.version,
+            "jobControlOptions": process.jobControlOptions,
+            "outputTransmission": process.outputTransmission,
+        })
 
 
 class Quote(dict):

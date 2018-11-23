@@ -6,12 +6,11 @@ import pymongo
 from twitcher.store.base import AccessTokenStore
 from twitcher.datatype import AccessToken
 from twitcher.exceptions import AccessTokenNotFound
-from twitcher.utils import islambda
+from twitcher.utils import islambda, now
 from twitcher.sort import *
 from twitcher.status import *
 from pyramid.security import authenticated_userid
 from pymongo import ASCENDING, DESCENDING
-from datetime import datetime
 import six
 
 import logging
@@ -155,7 +154,7 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
 
     def _add_process(self, process):
         if isinstance(process, ProcessWPS):
-            new_process = ProcessDB.from_wps(process, executeWPSEndpoint=self.default_wps_endpoint)
+            new_process = ProcessDB.from_wps(process, processEndpointWPS1=self.default_wps_endpoint)
         else:
             new_process = process
         if not isinstance(new_process, ProcessDB):
@@ -164,7 +163,7 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         # apply defaults if not specified
         new_process['type'] = self._get_process_type(process)
         new_process['identifier'] = self._get_process_id(process)
-        new_process['executeWPSEndpoint'] = self._get_process_url(process)
+        new_process['processEndpointWPS1'] = self._get_process_endpoint_wps1(process)
         new_process['visibility'] = new_process.visibility
         self.collection.insert_one(new_process)
 
@@ -197,8 +196,8 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         return self._get_process_field(process, {ProcessDB: lambda: process.type,
                                                  ProcessWPS: lambda: 'wps'}).lower()
 
-    def _get_process_url(self, process):
-        url = self._get_process_field(process, {ProcessDB: lambda: process.executeWPSEndpoint,
+    def _get_process_endpoint_wps1(self, process):
+        url = self._get_process_field(process, {ProcessDB: lambda: process.processEndpointWPS1,
                                                 ProcessWPS: lambda: None})
         if not url:
             url = self.default_wps_endpoint
@@ -300,7 +299,8 @@ class MongodbJobStore(JobStore, MongodbStore):
     Registry for OWS service process jobs tracking. Uses mongodb to store job attributes.
     """
 
-    def save_job(self, task_id, process, service=None, is_workflow=False, user_id=None, async=True, custom_tags=None):
+    def save_job(self, task_id, process, service=None, inputs=None, is_workflow=False,
+                 user_id=None, execute_async=True, custom_tags=None):
         """
         Stores a job in mongodb.
         """
@@ -311,7 +311,7 @@ class MongodbJobStore(JobStore, MongodbStore):
                 tags.append('workflow')
             else:
                 tags.append('single')
-            if async:
+            if execute_async:
                 tags.append('async')
             else:
                 tags.append('sync')
@@ -320,13 +320,15 @@ class MongodbJobStore(JobStore, MongodbStore):
                 'user_id': user_id,
                 'service': service,     # provider identifier (WPS service)
                 'process': process,     # process identifier (WPS request)
+                'inputs': inputs,
                 'status': STATUS_ACCEPTED,
+                'execute_async': execute_async,
                 'is_workflow': is_workflow,
-                'created': datetime.now(),
+                'created': now(),
                 'tags': tags,
             })
             self.collection.insert_one(new_job)
-            job = self.fetch_by_id(job_id=task_id)
+            job = self.fetch_by_id(job_id=new_job.id)
         except Exception as ex:
             raise JobRegistrationError("Error occurred during job registration: [{}]".format(repr(ex)))
         if job is None:
@@ -339,9 +341,9 @@ class MongodbJobStore(JobStore, MongodbStore):
         :param job: instance of ``twitcher.datatype.Job``.
         """
         try:
-            result = self.collection.update_one({'task_id': job.task_id}, {'$set': job.params})
+            result = self.collection.update_one({'id': job.id}, {'$set': job.params})
             if result.acknowledged and result.modified_count == 1:
-                return self.fetch_by_id(job.task_id)
+                return self.fetch_by_id(job.id)
         except Exception as ex:
             raise JobUpdateError("Error occurred during job update: [{}]".format(repr(ex)))
         raise JobUpdateError("Failed to update specified job: `{}`".format(str(job)))
@@ -350,14 +352,14 @@ class MongodbJobStore(JobStore, MongodbStore):
         """
         Removes job from mongodb storage.
         """
-        self.collection.delete_one({'task_id': job_id})
+        self.collection.delete_one({'id': job_id})
         return True
 
     def fetch_by_id(self, job_id, request=None):
         """
         Gets job for given ``job_id`` from mongodb storage.
         """
-        job = self.collection.find_one({'task_id': job_id})
+        job = self.collection.find_one({'id': job_id})
         if not job:
             raise JobNotFound("Could not find job matching: `{}`".format(job_id))
         return Job(job)
@@ -367,7 +369,7 @@ class MongodbJobStore(JobStore, MongodbStore):
         Lists all jobs in mongodb storage.
         """
         jobs = []
-        for job in self.collection.find().sort('task_id', ASCENDING):
+        for job in self.collection.find().sort('id', ASCENDING):
             jobs.append(Job(job))
         return jobs
 

@@ -12,7 +12,6 @@ from twitcher.processes.wps_process import OPENSEARCH_LOCAL_FILE_SCHEME
 from twitcher.processes.constants import START_DATE, END_DATE, AOI, COLLECTION
 import lxml.etree
 import requests
-import shapely.wkt
 import logging
 import time
 
@@ -33,33 +32,53 @@ def alter_payload_after_query(payload):
     return new_payload
 
 
-def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
-    # type: (Dict[Deque], Dict[str, Dict]) -> Dict[Deque]
+def validate_bbox(bbox):
+    # u"100.0, 15.0, 104.0, 19.0"
+    try:
+        if not len(list(map(float, bbox.split(",")))) == 4:
+            raise ValueError
+    except ValueError:
+        raise ValueError("Could not parse bbox as a list of 4 floats: {}".format(bbox))
+
+
+def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info, accept_mime_types):
+    # type: (Dict[str, Deque], Dict[str, Dict], Dict[str, List[str]]) -> Dict[str, Deque]
     """Query OpenSearch using parameters in inputs and return file links.
 
     eoimage_ids is used to identify if a certain input is an eoimage.
 
     :param wps_inputs: inputs containing info to query
     :param eoimage_source_info: data source info of eoimages
+    :param accept_mime_types: dict of list of accepted mime types, ordered by preference
     """
-    new_inputs = deepcopy(wps_inputs)
+    new_inputs = {}
 
-    def pop_first_data(ids_to_pop):
+    def get_input_data(ids_to_get):
         # type: (Iterable[str]) -> str
         """
 
-        :param ids_to_pop: list of elements to pop. Only the first will be popped
+        :param ids_to_get: list of elements to check
 
         """
-        for id_ in ids_to_pop:
+        for id_ in ids_to_get:
             try:
-                return new_inputs.pop(id_)[0].data
+                return wps_inputs[id_][0].data
             except KeyError:
                 pass
         else:
             raise ValueError(
-                "Missing input identifier: {}".format(" or ".join(aoi_ids))
+                "Missing input identifier: {}".format(" or ".join(ids_to_get))
             )
+
+    def is_eoimage_parameter(param):
+        # type: (str) -> bool
+        """Return True if the name of this parameter is a query parameter"""
+        parameters = [
+            AOI,
+            START_DATE,
+            END_DATE
+        ]
+        return any(param.startswith(p) for p in parameters)
 
     eoimages_inputs = [
         input_id for input_id in wps_inputs if input_id in eoimage_source_info
@@ -67,7 +86,13 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
     if eoimages_inputs:
         for input_id, queue in wps_inputs.items():
             eoimages_queue = deque()
-            if input_id in eoimage_source_info:
+            if input_id not in eoimage_source_info:
+                if not is_eoimage_parameter(input_id):
+                    new_inputs[input_id] = queue
+            else:
+                collection_id = queue[0].data
+                max_occurs = min(queue[0].max_occurs, 100000)
+
                 aoi_ids = _make_specific_identifier(AOI, input_id), AOI
                 startdate_ids = (
                     _make_specific_identifier(START_DATE, input_id),
@@ -75,19 +100,24 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info):
                 )
                 enddate_ids = _make_specific_identifier(END_DATE, input_id), END_DATE
 
-                wkt = pop_first_data(aoi_ids)
-                startdate = pop_first_data(startdate_ids)
-                enddate = pop_first_data(enddate_ids)
+                bbox_str = get_input_data(aoi_ids)
+                validate_bbox(bbox_str)
+                startdate = get_input_data(startdate_ids)
+                enddate = get_input_data(enddate_ids)
 
-                bbox_str = load_wkt(wkt)
-
-                params = {"startDate": startdate, "endDate": enddate, "bbox": bbox_str}
+                params = {"startDate": startdate,
+                          "endDate": enddate,
+                          "bbox": bbox_str,
+                          "maximumRecords": max_occurs}
                 osdd_url = eoimage_source_info[input_id]["osdd_url"]
                 accept_schemes = eoimage_source_info[input_id]["accept_schemes"]
+                mime_types = accept_mime_types[input_id]
                 os = OpenSearchQuery(
-                    collection_identifier=queue[0].data, osdd_url=osdd_url
+                    collection_identifier=collection_id, osdd_url=osdd_url
                 )
-                for link in os.query_datasets(params, accept_schemes=accept_schemes):
+                for link in os.query_datasets(params,
+                                              accept_schemes=accept_schemes,
+                                              accept_mime_types=mime_types):
                     new_input = deepcopy(queue[0])
                     new_input.data = replace_with_opensearch_scheme(link)
                     eoimages_queue.append(new_input)
@@ -117,13 +147,14 @@ def load_wkt(wkt):
     :type wkt: string
 
     """
+    import shapely.wkt
     bounds = shapely.wkt.loads(wkt).bounds
     bbox_str = ",".join(map(str, bounds))
     return bbox_str
 
 
 class OpenSearchQuery(object):
-    MAX_QUERY_RESULTS = 10  # usually the default at the OpenSearch server too
+    DEFAULT_MAX_QUERY_RESULTS = 5  # usually the default at the OpenSearch server too
 
     def __init__(
         self,
@@ -187,7 +218,8 @@ class OpenSearchQuery(object):
                 )
             query_params[key] = value
 
-        query_params["maximumRecords"] = self.MAX_QUERY_RESULTS
+        if "maximumRecords" not in query_params:
+            query_params["maximumRecords"] = self.DEFAULT_MAX_QUERY_RESULTS
 
         return base_url, query_params
 
@@ -199,7 +231,7 @@ class OpenSearchQuery(object):
         :param kwargs: passed to requests.get
         """
         response = HTTPGatewayTimeout(detail="Request ran out of retries.")
-        retries_in_secs = range(1, 6)   # 1 to 5 secs
+        retries_in_secs = range(1, 6)  # 1 to 5 secs
         for wait in retries_in_secs:
             response = requests.get(*args, **kwargs)
             if response.status_code == HTTPOk.code:
@@ -214,6 +246,7 @@ class OpenSearchQuery(object):
         :param params: query parameters
         """
         start_index = 1
+        maximum_records = params.get("maximumRecords")
         template_url = self.get_template_url()
         base_url, query_params = self._prepare_query_url(template_url, params)
         while True:
@@ -226,19 +259,23 @@ class OpenSearchQuery(object):
             for feature in features:
                 yield feature, response.url
             n_received_features = len(features)
+            n_recieved_so_far = start_index + n_received_features - 1  # index starts at 1
             total_results = json_body["totalResults"]
             if not n_received_features:
                 break
-            if start_index + n_received_features > total_results:
+            if n_recieved_so_far >= total_results:
+                break
+            if maximum_records and n_recieved_so_far >= maximum_records:
                 break
             start_index += n_received_features
 
-    def query_datasets(self, params, accept_schemes):
-        # type: (Dict, Tuple) -> Iterable
+    def query_datasets(self, params, accept_schemes, accept_mime_types):
+        # type: (Dict, Tuple, List) -> Iterable
         """
 
         :param params: query parameters
         :param accept_schemes: only return links of this scheme
+        :param accept_mime_types: list of accepted mime types, ordered by preference
 
         """
         if params is None:
@@ -246,18 +283,24 @@ class OpenSearchQuery(object):
 
         for feature, url in self._query_features_paginated(params):
             try:
-                data_links = [d["href"] for d in feature["properties"]["links"]["data"]]
+                data_links = feature["properties"]["links"]["data"]
+                data_links_mime_types = [d["type"] for d in data_links]
             except KeyError:
                 LOGGER.exception("Badly formatted json at: {}".format(url))
                 raise
-
-            for link in data_links:
-                scheme = urlparse(link).scheme
-                if scheme in accept_schemes:
-                    yield link
-                    continue
-                else:
-                    LOGGER.debug("No accepted scheme for feature at: {}".format(url))
+            for mime_type in accept_mime_types:
+                good_links = [data["href"]
+                              for data in data_links
+                              if data["type"] == mime_type and
+                              urlparse(data["href"]).scheme in accept_schemes]
+                if good_links:
+                    yield good_links[0]
+                    break
+            else:
+                message = "Could not match any accepted mimetype ({}) to received mimetype ({})"
+                message = message.format(", ".join(accept_mime_types),
+                                         ", ".join(data_links_mime_types))
+                raise ValueError(message)
 
 
 def get_additional_parameters(input_data):
@@ -312,7 +355,7 @@ class EOImageDescribeProcessHandler(object):
             u"maxOccurs": u"1",
             u"additionalParameters": [
                 {
-                    u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
+                    u"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
                     u"parameters": [
                         {u"name": u"CatalogSearchField", u"values": [u"bbox"]}
                     ],
@@ -331,10 +374,10 @@ class EOImageDescribeProcessHandler(object):
             u"formats": [{u"mimeType": u"text/plain", u"default": True}],
             u"minOccurs": u"1",
             u"maxOccurs": u"unbounded",
-            u"literalDataDomains": {u"dataType": {u"name": u"String"}},
+            u"literalDataDomains": [{u"dataType": {u"name": u"String"}}],
             u"additionalParameters": [
                 {
-                    u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
+                    u"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
                     u"parameters": [
                         {
                             u"name": u"CatalogSearchField",
@@ -363,10 +406,10 @@ class EOImageDescribeProcessHandler(object):
             u"formats": [{u"mimeType": u"text/plain", u"default": True}],
             u"minOccurs": u"1",
             u"maxOccurs": u"1",
-            u"literalDataDomains": {u"dataType": {u"name": u"String"}},
+            u"literalDataDomains": [{u"dataType": {u"name": u"String"}}],
             u"additionalParameters": [
                 {
-                    u"role": u"http://www.opengis.net/eoc/applicationContext/inputMetadata",
+                    u"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
                     u"parameters": [
                         {u"name": u"CatalogSearchField", u"values": [search_field]}
                     ],
@@ -442,9 +485,11 @@ def get_eo_images_inputs_from_payload(payload):
 
 
 def get_original_collection_id(payload, wps_inputs):
-    # type: (Dict, Dict[deque]) -> Dict[deque]
+    # type: (Dict, Dict[str, deque]) -> Dict[str, deque]
     """
-    When we deploy a Process that contains OpenSearch parameters, the collection identifier if modified.
+    When we deploy a Process that contains OpenSearch parameters, the collection identifier is modified.
+    Ex: files -> collection
+    Ex: s2 -> collection_s2, probav -> collection_probav
     This function changes the id in the execute request to the one in the deploy description.
     :param payload:
     :param wps_inputs:
@@ -465,7 +510,7 @@ def get_original_collection_id(payload, wps_inputs):
 
 
 def get_eo_images_data_sources(payload, wps_inputs):
-    # type: (Dict, Dict[deque]) -> Dict[str, Dict]
+    # type: (Dict, Dict[str, deque]) -> Dict[str, Dict]
     """
 
     :param payload: Deploy payload
@@ -474,7 +519,43 @@ def get_eo_images_data_sources(payload, wps_inputs):
     """
     inputs = get_eo_images_inputs_from_payload(payload)
     eo_image_identifiers = [get_any_id(i) for i in inputs]
-    return {i: get_data_source(wps_inputs[i][0].data) for i in eo_image_identifiers}
+    data_sources = {i: get_data_source(wps_inputs[i][0].data) for i in eo_image_identifiers}
+    return data_sources
+
+
+def get_eo_images_mime_types(payload):
+    # type: (Dict) -> Dict[str, List]
+    """
+    From the deploy payload, get the accepted mime types.
+    :param payload: Deploy payload
+    """
+    inputs = get_eo_images_inputs_from_payload(payload)
+
+    result = {}
+    for input_ in inputs:
+        formats_default_first = sorted(input_["formats"],
+                                       key=lambda x: x.get("default", False),
+                                       reverse=True)
+        mimetypes = [f["mimeType"] for f in formats_default_first]
+        result[get_any_id(input_)] = mimetypes
+    return result
+
+
+def insert_max_occurs(payload, wps_inputs):
+    # type: (Dict, Dict[str, Deque]) -> None
+    """
+    Insert maxOccurs value in wps inputs using the deploy payload.
+    :param payload: Deploy payload
+    :param wps_inputs: WPS inputs
+    """
+    inputs = get_eo_images_inputs_from_payload(payload)
+
+    for input_ in inputs:
+        try:
+            wps_inputs[get_any_id(input_)][0].max_occurs = int(input_["maxOccurs"])
+        except ValueError:
+            pass
+    return
 
 
 def modified_collection_identifiers(eo_image_identifiers):
@@ -525,6 +606,8 @@ def replace_inputs_describe_process(inputs, payload):
     :param inputs:
     :param payload:
     """
+    if not payload:
+        return inputs
 
     # add "additionalParameters" property from the payload
     process = payload["processDescription"]["process"]

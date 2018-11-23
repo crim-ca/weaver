@@ -44,8 +44,11 @@ class WpsProcess(object):
         self.verify = asbool(self.settings.get('twitcher.ows_proxy_ssl_verify', True))
         self.update_status = update_status
 
-    def get_admin_auth_header(self):
+    def get_user_auth_header(self):
         # TODO: find a better way to generalize this to Magpie credentials?
+        if not asbool(self.settings.get('ades.use_auth_token', True)):
+            return {}
+
         ades_usr = self.settings.get('ades.username', None)
         ades_pwd = self.settings.get('ades.password', None)
         ades_url = self.settings.get('ades.wso2_hostname', None)
@@ -62,8 +65,14 @@ class WpsProcess(object):
                 'scope': 'openid',
             }
             ades_headers = {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'}
-            cred_resp = requests.post(ades_url, body=ades_body, headers=ades_headers)
+            cred_resp = requests.post(ades_url, data=ades_body, headers=ades_headers)
+            cred_resp.raise_for_status()
             access_token = cred_resp.json().get('access_token', None)
+        else:
+            LOGGER.warn(
+                "Could not retrieve at least one of required login parameters: "
+                "[ades.username, ades.password, ades.wso2_hostname, ades.wso2_client_id, ades.wso2_client_secret]"
+            )
         return {'Authorization': 'Bearer {}'.format(access_token) if access_token else None}
 
     def is_deployed(self):
@@ -88,18 +97,23 @@ class WpsProcess(object):
             return None
         elif response.status_code == HTTPNotFound.code:
             return False
-        elif response.status_code == HTTPOk.status_code:
-            return response.json()['value'] == VISIBILITY_PUBLIC
+        elif response.status_code == HTTPOk.code:
+            json_body = response.json()
+            # TODO: support for Spacebel, always returns dummy visibility response, enforce deploy with `False`
+            if json_body.get('message') == "magic!" or json_body.get('type') == "ok" or json_body.get('code') == 4:
+                return False
+            return json_body.get('value') == VISIBILITY_PUBLIC
         response.raise_for_status()
 
     def set_visibility(self, visibility):
         self.update_status('Updating process visibility on remote ADES.', REMOTE_JOB_PROGRESS_VISIBLE)
         LOGGER.debug("Update process WPS visibility request for {0}".format(self.process_id))
-        admin_headers = deepcopy(self.headers)
-        admin_headers.update(self.get_admin_auth_header())
-        response = requests.put(self.url + process_visibility_uri,
+        user_headers = deepcopy(self.headers)
+
+        user_headers.update(self.get_user_auth_header())
+        response = requests.put(self.url + process_visibility_uri.format(process_id=self.process_id),
                                 json={'value': visibility},
-                                headers=admin_headers,
+                                headers=user_headers,
                                 cookies=self.cookies,
                                 verify=self.verify)
         response.raise_for_status()
@@ -126,11 +140,11 @@ class WpsProcess(object):
     def deploy(self):
         self.update_status('Deploying process on remote ADES.', REMOTE_JOB_PROGRESS_DEPLOY)
         LOGGER.debug("Deploy process WPS request for {0}".format(self.process_id))
-        admin_headers = deepcopy(self.headers)
-        admin_headers.update(self.get_admin_auth_header())
+        user_headers = deepcopy(self.headers)
+        user_headers.update(self.get_user_auth_header())
         response = requests.post(self.url + processes_uri,
                                  json=self.deploy_body,
-                                 headers=admin_headers,
+                                 headers=user_headers,
                                  cookies=self.cookies,
                                  verify=self.verify)
         response.raise_for_status()
@@ -248,8 +262,7 @@ class WpsProcess(object):
         job_status['status'] = job_status['status'].lower()
         if job_status['status'] == 'successful':
             job_status['status'] = status.STATUS_SUCCEEDED
-
-        return status
+        return job_status
 
     def get_job_results(self, job_id):
         response = requests.get(self.url + process_results_uri.format(process_id=self.process_id, job_id=job_id),

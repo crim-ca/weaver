@@ -1,6 +1,8 @@
+# noinspection PyPackageRequirements
 import pytest
-import unittest
+# noinspection PyPackageRequirements
 import webtest
+import unittest
 import pyramid.testing
 import six
 from twitcher.tests.functional.common import setup_with_mongodb, setup_mongodb_jobstore
@@ -14,6 +16,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         cls.config.include('twitcher.wps')
         cls.config.include('twitcher.wps_restapi')
         cls.config.include('twitcher.tweens')
+        cls.config.scan()
         cls.json_headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
         cls.app = webtest.TestApp(cls.config.make_wsgi_app())
 
@@ -27,12 +30,12 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     def setup_jobs(self):
         j1 = self.jobstore.save_job('0123-4567-8910-1112', 'process-1', service=None,
-                                    is_workflow=False, user_id=None, async=True)
+                                    is_workflow=False, user_id=None, execute_async=True)
         j1.status = STATUS_SUCCEEDED
 
         self.jobstore.update_job(j1)
         j2 = self.jobstore.save_job('9998-9796-9594-9392', 'process-2', service='service-A',
-                                    is_workflow=True, user_id=1, async=False)
+                                    is_workflow=True, user_id=1, execute_async=False)
         j2.status = STATUS_FAILED
         self.jobstore.update_job(j2)
 

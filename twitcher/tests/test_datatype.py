@@ -9,8 +9,10 @@ import mock
 from twitcher.datatype import AccessToken
 from twitcher.datatype import Service
 from twitcher.utils import expires_at
+from twitcher.status import STATUS_UNKNOWN
 
 
+# noinspection PyMethodMayBeStatic
 class AccessTokenTestCase(unittest.TestCase):
 
     def test_access_token(self):
@@ -37,11 +39,12 @@ class AccessTokenTestCase(unittest.TestCase):
         assert access_token.data == {'esgf_token': 'bfghk'}
 
 
+# noinspection PyMethodMayBeStatic
 class ServiceTestCase(unittest.TestCase):
     def test_service_with_url_only(self):
         service = Service(url='http://nowhere/wps')
         assert service.url == 'http://nowhere/wps'
-        assert service.name == 'unknown'
+        assert service.name == STATUS_UNKNOWN
 
     def test_missing_url(self):
         with pytest.raises(TypeError) as e_info:

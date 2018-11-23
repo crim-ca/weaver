@@ -12,7 +12,7 @@ from time import sleep
 from twitcher.wps import load_pywps_cfg
 from twitcher.adapter import servicestore_factory, jobstore_factory, processstore_factory
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS
-from twitcher.datatype import Process as ProcessDB, Job as JobDB, Input, Output
+from twitcher.datatype import Process as ProcessDB, Job as JobDB
 from twitcher.exceptions import (
     ProcessRegistrationError,
     ProcessNotFound,
@@ -31,8 +31,14 @@ from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import check_status
 from twitcher.visibility import VISIBILITY_PUBLIC, visibility_values
-from twitcher.status import STATUS_ACCEPTED, STATUS_STARTED, STATUS_FAILED, STATUS_SUCCEEDED, STATUS_RUNNING
-from twitcher.status import job_status_values
+from twitcher.status import (
+    map_status,
+    STATUS_ACCEPTED,
+    STATUS_STARTED,
+    STATUS_FAILED,
+    STATUS_SUCCEEDED,
+    STATUS_PENDING,
+)
 from twitcher.sync import EXECUTE_AUTO, EXECUTE_ASYNC, EXECUTE_SYNC
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference
 from owslib.util import clean_ows_url
@@ -135,15 +141,6 @@ def _jsonify_output(output, datatype):
     return json_output
 
 
-def _map_status(wps_execution_status):
-    job_status = wps_execution_status.lower().replace('process', '')
-    if job_status == STATUS_RUNNING:    # OGC official status but not supported by PyWPS. See twitcher/status.py
-        job_status = STATUS_STARTED     # This is the status used by PyWPS
-    if job_status in job_status_values:
-        return job_status
-    return 'unknown'
-
-
 def retrieve_package_job_log(execution, job):
     # If the process is a twitcher package this status xml should be available in the process output dir
     status_xml_fn = execution.statusLocation.split('/')[-1]
@@ -164,20 +161,17 @@ def retrieve_package_job_log(execution, job):
 
 
 @app.task(bind=True)
-def execute_process(self, url, service, process_id, inputs,
-                    is_workflow=False, user_id=None, async=True, custom_tags=None, headers=None):
-    custom_tags = list() if custom_tags is None else custom_tags
+def execute_process(self, job_id, url, headers=None):
     registry = app.conf['PYRAMID_REGISTRY']
     load_pywps_cfg(registry)
 
     ssl_verify = asbool(registry.settings.get('twitcher.ows_proxy_ssl_verify', True))
     store = jobstore_factory(registry)
-    task_id = self.request.id
-    job = JobDB({'task_id': task_id})  # default in case of error during registration to job store
-    try:
-        job = store.save_job(task_id=task_id, process=process_id, service=service, is_workflow=is_workflow,
-                             user_id=user_id, async=async, custom_tags=custom_tags)
+    job = store.fetch_by_id(job_id)
+    job.task_id = self.request.id
+    job = store.update_job(job)
 
+    try:
         try:
             wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), verify=ssl_verify)
             # noinspection PyProtectedMember
@@ -185,7 +179,7 @@ def execute_process(self, url, service, process_id, inputs,
         except Exception as ex:
             raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
         try:
-            process = wps.describeprocess(process_id)
+            process = wps.describeprocess(job.process)
         except Exception as ex:
             raise OWSNoApplicableCode("Failed to retrieve WPS process description. Error: [{}].".format(str(ex)))
 
@@ -197,7 +191,7 @@ def execute_process(self, url, service, process_id, inputs,
 
         try:
             wps_inputs = list()
-            for process_input in inputs:
+            for process_input in job.inputs:
                 input_id = get_any_id(process_input)
                 process_value = get_any_value(process_input)
                 # in case of array inputs, must repeat (id,value)
@@ -218,8 +212,8 @@ def execute_process(self, url, service, process_id, inputs,
             (o.identifier, o.dataType == 'ComplexData') for o in process.processOutputs
         ]
 
-        mode = EXECUTE_ASYNC if async else EXECUTE_SYNC
-        execution = wps.execute(process_id, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
+        mode = EXECUTE_ASYNC if job.execute_async else EXECUTE_SYNC
+        execution = wps.execute(job.process, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
 
         if not execution.process and execution.errors:
             raise execution.errors[0]
@@ -242,13 +236,13 @@ def execute_process(self, url, service, process_id, inputs,
                                          sleep_secs=wait_secs(run_step))
 
                 job.response = etree.tostring(execution.response)
-                job.status = _map_status(execution.getStatus())
+                job.status = map_status(execution.getStatus())
                 job.status_message = execution.statusMessage
                 job.progress = execution.percentCompleted
                 job.save_log(logger=task_logger)
 
                 if execution.isComplete():
-                    job.is_finished()
+                    job.mark_finished()
                     if execution.isSucceded():
                         job.progress = 100
                         job.status = STATUS_SUCCEEDED
@@ -311,7 +305,7 @@ def submit_job_handler(request, service_url, is_workflow=False):
 
     if request.json_body['mode'] not in [EXECUTE_ASYNC, EXECUTE_AUTO]:
         raise HTTPNotImplemented(detail='{0} mode not supported.'.format(request.json_body['mode']))
-    async_execute = request.json_body['mode'] != EXECUTE_SYNC
+    execute_async = request.json_body['mode'] != EXECUTE_SYNC
 
     if request.json_body['response'] != 'document':
         raise HTTPNotImplemented(detail='{0} response not supported.'.format(request.json_body['response']))
@@ -327,17 +321,16 @@ def submit_job_handler(request, service_url, is_workflow=False):
             raise HTTPNotImplemented(detail='{0} transmissionMode not supported.'
                                      .format(job_output['transmissionMode']))
 
+    store = jobstore_factory(request.registry)
+    job = store.save_job(task_id=STATUS_PENDING, process=process_id, service=provider_id,
+                         inputs=request.json_body['inputs'], is_workflow=is_workflow,
+                         user_id=request.authenticated_userid, execute_async=execute_async, custom_tags=tags)
     result = execute_process.delay(
+        job_id=job.id,
         url=clean_ows_url(service_url),
-        service=provider_id,
-        process_id=process_id,
-        inputs=request.json_body['inputs'],
-        is_workflow=is_workflow,
-        user_id=request.authenticated_userid,
-        async=async_execute,
-        custom_tags=tags,
         # Convert EnvironHeaders to a simple dict (should cherrypick the required headers)
         headers={k: v for k, v in request.headers.items()})
+    LOGGER.debug("Celery pending task `{}` for job `{}`.", result.id, job.id)
 
     # local/provider process location
     location_base = '/providers/{provider_id}'.format(provider_id=provider_id) if provider_id else ''
@@ -345,29 +338,9 @@ def submit_job_handler(request, service_url, is_workflow=False):
         base_url=wps_restapi_base_url(request.registry.settings),
         location_base=location_base,
         process_id=process_id,
-        job_id=result.id)
-
-    retry = 0
-    max_retry = 5
-    while True:
-        try:
-            subreq = Request.blank(location)
-            response = request.invoke_subrequest(subreq)
-            if response.status_code == HTTPOk.code:
-                break
-        except HTTPNotFound:
-            # It's expected, raise any other exception
-            pass
-
-        retry += 1
-        if retry > max_retry:
-            raise HTTPInternalServerError('Submit job failed. Status is unavailable after {0} seconds'
-                .format(max_retry))
-        else:
-            sleep(1)
-
+        job_id=job.id)
     body_data = {
-        'jobID': result.id,
+        'jobID': job.id,
         'status': STATUS_ACCEPTED,
         'location': location
     }
@@ -471,7 +444,7 @@ def get_processes(request):
     try:
         # get local processes
         store = processstore_factory(request.registry)
-        processes = [process.summary() for process in
+        processes = [process.process_summary() for process in
                      store.list_processes(visibility=VISIBILITY_PUBLIC, request=request)]
         response_body = {'processes': processes}
 
@@ -498,7 +471,7 @@ def get_processes(request):
 
 
 @sd.processes_service.post(tags=[sd.processes_tag, sd.deploy_tag], renderer='json',
-                           schema=sd.ProcessesEndpoint(), response_schemas=sd.post_processes_responses)
+                           schema=sd.PostProcessEndpoint(), response_schemas=sd.post_processes_responses)
 def add_local_process(request):
     """
     Register a local process.
@@ -560,10 +533,6 @@ def add_local_process(request):
     except Exception as ex:
         raise HTTPBadRequest("Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex)))
 
-    # convert inputs and outputs to be compliant with schema
-    process_info['inputs'] = [Input.from_wps_names(i) for i in process_info['inputs']]
-    process_info['outputs'] = [Output.from_wps_names(i) for i in process_info['outputs']]
-
     # validate process type against twitcher configuration
     settings = request.registry.settings
     process_type = process_info['type']
@@ -576,13 +545,15 @@ def add_local_process(request):
     description_url = "/".join([restapi_url, 'processes', process_info['identifier']])
     execute_endpoint = "/".join([description_url, "jobs"])
 
-    # ensure that required 'executeWPSEndpoint' in db is added, will be auto-fixed to localhost if not specified in body
-    process_info['executeWPSEndpoint'] = process_description.get('executeWPSEndpoint')
+    # ensure that required 'processEndpointWPS1' in db is added,
+    # will be auto-fixed to localhost if not specified in body
+    process_info['processEndpointWPS1'] = process_description.get('processEndpointWPS1')
     process_info['executeEndpoint'] = execute_endpoint
     process_info['payload'] = payload
     process_info['jobControlOptions'] = process_description.get('jobControlOptions', [])
     process_info['outputTransmission'] = process_description.get('outputTransmission', [])
-    process_info['owsContext'] = ows_context
+    if ows_context:
+        process_info['owsContext'] = ows_context
     process_info['processDescriptionURL'] = description_url
 
     try:
@@ -594,7 +565,8 @@ def add_local_process(request):
         # raised on invalid process name
         raise HTTPBadRequest(detail=ex.message)
 
-    return HTTPOk(json={'deploymentDone': True, 'processSummary': saved_process.summary()})
+    json_response = {'processSummary': saved_process.process_summary(), 'deploymentDone': True}
+    return HTTPOk(json=json_response)
 
 
 @sd.process_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer='json',
@@ -610,16 +582,10 @@ def get_local_process(request):
     try:
         store = processstore_factory(request.registry)
         process = store.fetch_by_id(process_id, request=request)
+        process.inputs = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
+
         offering = process.process_offering()
 
-        try:
-            inputs, payload = process.inputs, process["payload"]
-            new_inputs = opensearch.replace_inputs_describe_process(inputs, payload)
-            new_inputs = [Input(i).inputType() for i in new_inputs]
-            offering["process"]["inputs"] = new_inputs
-        except KeyError:
-            # Process may not have a payload... in this case no eoimage inputs anyway
-            pass
         return HTTPOk(json=offering)
     except HTTPException:
         raise  # re-throw already handled HTTPException
@@ -751,7 +717,7 @@ def submit_local_job(request):
     try:
         store = processstore_factory(request.registry)
         process = store.fetch_by_id(process_id, request=request)
-        resp = submit_job_handler(request, process.executeWPSEndpoint, is_workflow=process.type == 'workflow')
+        resp = submit_job_handler(request, process.processEndpointWPS1, is_workflow=process.type == 'workflow')
         return resp
     except HTTPException:
         raise  # re-throw already handled HTTPException

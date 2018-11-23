@@ -20,6 +20,7 @@
     }
   ],
   "executeEndpoint": null,
+  "processEndpointWPS1": null,
   "identifier": "stackcreation_graph_json_",
   "inputs": [
     {
@@ -184,8 +185,7 @@
                 "name": "UniqueTOI",
                 "values": ["true"]
               }
-            ],
-            "role": "http://www.opengis.net/eoc/applicationContext"
+            ]
           }
         ],
         "identifier": "StackCreation-graph-json-remote",
@@ -198,8 +198,7 @@
                     "name": "EOImage",
                     "values": ["true"]
                   }
-                ],
-                "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata"
+                ]
               }
             ],
             "formats": [

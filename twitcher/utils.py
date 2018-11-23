@@ -1,9 +1,12 @@
 import time
 import pytz
-from datetime import datetime
-from lxml import etree
 import types
 import re
+from datetime import datetime
+from lxml import etree
+from typing import Union, Any, Dict, AnyStr, Iterable
+from pyramid.httpexceptions import HTTPError as PyramidHTTPError
+from requests import HTTPError as RequestsHTTPError
 
 from twitcher.exceptions import ServiceNotFound
 from twitcher._compat import urlparse, parse_qs
@@ -13,24 +16,28 @@ LOGGER = logging.getLogger(__name__)
 
 
 def get_twitcher_url(settings):
+    # type: (Dict[AnyStr, AnyStr]) -> AnyStr
     return settings.get('twitcher.url').rstrip('/').strip()
 
 
-def get_any_id(info):  # type: (dict) -> Any
+def get_any_id(info):
+    # type: (Dict[AnyStr, AnyStr]) -> AnyStr
     """Retrieves a dictionary 'id'-like key using multiple common variations [id, identifier, _id].
     :param info: dictionary that potentially contains an 'id'-like key.
     :returns: value of the matched 'id'-like key."""
     return info.get('id', info.get('identifier', info.get('_id')))
 
 
-def get_any_value(info):  # type: (dict) -> Any
+def get_any_value(info):
+    # type: (Dict[AnyStr, AnyStr]) -> Union[AnyStr, None]
     """Retrieves a dictionary 'value'-like key using multiple common variations [href, value, reference].
     :param info: dictionary that potentially contains a 'value'-like key.
     :returns: value of the matched 'id'-like key."""
     return info.get('href', info.get('value', info.get('reference', info.get('data'))))
 
 
-def get_any_message(info):  # type: (dict) -> Any
+def get_any_message(info):
+    # type: (Dict[AnyStr, AnyStr]) -> AnyStr
     """Retrieves a dictionary 'value'-like key using multiple common variations [message].
     :param info: dictionary that potentially contains a 'message'-like key.
     :returns: value of the matched 'message'-like key or an empty string if not found. """
@@ -38,6 +45,7 @@ def get_any_message(info):  # type: (dict) -> Any
 
 
 def is_valid_url(url):
+    # type: (Union[AnyStr, None]) -> bool
     try:
         parsed_url = urlparse(url)
         return True if all([parsed_url.scheme, ]) else False
@@ -46,6 +54,7 @@ def is_valid_url(url):
 
 
 def parse_service_name(url, protected_path):
+    # type: (AnyStr, AnyStr) -> AnyStr
     parsed_url = urlparse(url)
     service_name = None
     if parsed_url.path.startswith(protected_path):
@@ -59,11 +68,18 @@ def parse_service_name(url, protected_path):
     return service_name
 
 
+def fully_qualified_name(obj):
+    # type: (Any) -> AnyStr
+    return '.'.join([obj.__module__, type(obj).__name__])
+
+
 def now():
+    # type: (...) -> datetime
     return localize_datetime(datetime.utcnow())
 
 
 def now_secs():
+    # type: (...) -> int
     """
     Return the current time in seconds since the Epoch.
     """
@@ -89,6 +105,7 @@ def localize_datetime(dt, tz_name='UTC'):
 
 
 def baseurl(url):
+    # type: (AnyStr) -> AnyStr
     """
     return baseurl of given url
     """
@@ -115,12 +132,37 @@ def lxml_strip_ns(tree):
             node.tag = node.tag.split('}', 1)[1]
 
 
+def pass_http_error(exception, expected_http_error):
+    # type: (Exception, Union[PyramidHTTPError, Iterable[PyramidHTTPError]]) -> None
+    """
+    Given an `HTTPError` of any type (pyramid, requests), ignores (pass) the exception if the actual
+    error matches the status code. Other exceptions are re-raised.
+
+    :param exception: any `Exception` instance ("object" from a `try..except exception as "object"` block).
+    :param expected_http_error: single or list of specific pyramid `HTTPError` to handle and ignore.
+    :raise exception: if it doesn't match the status code or is not an `HTTPError` of any module.
+    """
+    if not hasattr(expected_http_error, '__iter__'):
+        expected_http_error = [expected_http_error]
+    if isinstance(exception, (PyramidHTTPError, RequestsHTTPError)):
+        try:
+            status_code = exception.status_code
+        except AttributeError:
+            # exception may be a response raised for status in which case status code is here:
+            status_code = exception.response.status_code
+
+        if status_code in [e.code for e in expected_http_error]:
+            return
+    raise exception
+
+
 def raise_on_xml_exception(xml_node):
     """
     Raises an exception with the description if the XML response document defines an ExceptionReport.
     :param xml_node: instance of :class:`etree.Element`
-    :raises: Exception on found ExceptionReport document.
+    :raise Exception: on found ExceptionReport document.
     """
+    # noinspection PyProtectedMember
     if not isinstance(xml_node, etree._Element):
         raise TypeError("Invalid input, expecting XML element node.")
     if 'ExceptionReport' in xml_node.tag:
@@ -167,12 +209,16 @@ def replace_caps_url(xml, url, prev_url=None):
 
 
 def islambda(func):
+    # type: (AnyStr) -> bool
     return isinstance(func, types.LambdaType) and func.__name__ == (lambda: None).__name__
 
 
 first_cap_re = re.compile('(.)([A-Z][a-z]+)')
 all_cap_re = re.compile('([a-z0-9])([A-Z])')
+
+
 def convert_snake_case(name):
+    # type: (AnyStr) -> AnyStr
     s1 = first_cap_re.sub(r'\1_\2', name)
     return all_cap_re.sub(r'\1_\2', s1).lower()
 
@@ -196,12 +242,15 @@ def parse_request_query(request):
 
 
 def get_log_fmt():
-    return '%(asctime)s %(levelname)s [%(name)s]  %(message)s'
+    # type: (...) -> AnyStr
+    return '[%(asctime)s] %(levelname)-8s [%(name)s] %(message)s'
 
 
 def get_log_datefmt():
+    # type: (...) -> AnyStr
     return '%Y-%m-%d %H:%M:%S'
 
 
 def get_job_log_msg(status, msg, progress=0, duration=None):
-    return '{dur} {lvl:3d}% {stat:10} {msg}'.format(dur=duration or '', lvl=int(progress or 0), stat=status, msg=msg)
+    # type: (AnyStr, AnyStr, int, AnyStr) -> AnyStr
+    return '{dur} {p:3d}% {stat:10} {msg}'.format(dur=duration or '', p=int(progress or 0), stat=status, msg=msg)

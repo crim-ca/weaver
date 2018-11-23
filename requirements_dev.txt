@@ -2,7 +2,10 @@
 pytest
 mock
 WebTest
+wsgiproxy
+WSGIProxy2
 flake8
+coverage
 # internal WPS
 ##pywps>=4.0.0
 -e git+https://github.com/geopython/pywps#egg=pywps

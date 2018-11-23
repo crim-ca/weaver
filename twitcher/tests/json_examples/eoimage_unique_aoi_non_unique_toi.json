@@ -39,11 +39,7 @@
     ],
     "minOccurs": "1",
     "maxOccurs": "1",
-    "LiteralDataDomain": {
-      "dataType": {
-        "name": "String"
-      }
-    },
+    "literalDataDomains": [{"dataType": {"name": "String"}}],
     "additionalParameters": [
       {
         "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
@@ -70,13 +66,9 @@
         "default": true
       }
     ],
+    "literalDataDomains": [{"dataType": {"name": "String"}}],
     "minOccurs": "1",
     "maxOccurs": "1",
-    "LiteralDataDomain": {
-      "dataType": {
-        "name": "String"
-      }
-    },
     "additionalParameters": [
       {
         "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
@@ -105,11 +97,7 @@
     ],
     "minOccurs": "1",
     "maxOccurs": "1",
-    "LiteralDataDomain": {
-      "dataType": {
-        "name": "String"
-      }
-    },
+    "literalDataDomains": [{"dataType": {"name": "String"}}],
     "additionalParameters": [
       {
         "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
@@ -138,11 +126,7 @@
     ],
     "minOccurs": "1",
     "maxOccurs": "1",
-    "LiteralDataDomain": {
-      "dataType": {
-        "name": "String"
-      }
-    },
+    "literalDataDomains": [{"dataType": {"name": "String"}}],
     "additionalParameters": [
       {
         "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
@@ -171,11 +155,7 @@
     ],
     "minOccurs": "1",
     "maxOccurs": "unbounded",
-    "LiteralDataDomain": {
-      "dataType": {
-        "name": "String"
-      }
-    },
+    "literalDataDomains": [{"dataType": {"name": "String"}}],
     "additionalParameters": [
       {
         "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
@@ -204,11 +184,7 @@
     ],
     "minOccurs": "1",
     "maxOccurs": "unbounded",
-    "LiteralDataDomain": {
-      "dataType": {
-        "name": "String"
-      }
-    },
+    "literalDataDomains": [{"dataType": {"name": "String"}}],
     "additionalParameters": [
       {
         "role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
