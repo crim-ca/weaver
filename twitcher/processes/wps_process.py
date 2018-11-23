@@ -44,7 +44,7 @@ class WpsProcess(object):
         self.verify = asbool(self.settings.get('twitcher.ows_proxy_ssl_verify', True))
         self.update_status = update_status
 
-    def get_admin_auth_header(self):
+    def get_user_auth_header(self):
         # TODO: find a better way to generalize this to Magpie credentials?
         ades_usr = self.settings.get('ades.username', None)
         ades_pwd = self.settings.get('ades.password', None)
@@ -63,7 +63,13 @@ class WpsProcess(object):
             }
             ades_headers = {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'}
             cred_resp = requests.post(ades_url, data=ades_body, headers=ades_headers)
+            cred_resp.raise_for_status()
             access_token = cred_resp.json().get('access_token', None)
+        else:
+            LOGGER.warn(
+                "Could not retrieve at least one of required login parameters: "
+                "[ades.username, ades.password, ades.wso2_hostname, ades.wso2_client_id, ades.wso2_client_secret]"
+            )
         return {'Authorization': 'Bearer {}'.format(access_token) if access_token else None}
 
     def is_deployed(self):
@@ -99,11 +105,11 @@ class WpsProcess(object):
     def set_visibility(self, visibility):
         self.update_status('Updating process visibility on remote ADES.', REMOTE_JOB_PROGRESS_VISIBLE)
         LOGGER.debug("Update process WPS visibility request for {0}".format(self.process_id))
-        admin_headers = deepcopy(self.headers)
-        admin_headers.update(self.get_admin_auth_header())
+        user_headers = deepcopy(self.headers)
+        user_headers.update(self.get_user_auth_header())
         response = requests.put(self.url + process_visibility_uri.format(process_id=self.process_id),
                                 json={'value': visibility},
-                                headers=admin_headers,
+                                headers=user_headers,
                                 cookies=self.cookies,
                                 verify=self.verify)
         response.raise_for_status()
@@ -130,11 +136,11 @@ class WpsProcess(object):
     def deploy(self):
         self.update_status('Deploying process on remote ADES.', REMOTE_JOB_PROGRESS_DEPLOY)
         LOGGER.debug("Deploy process WPS request for {0}".format(self.process_id))
-        admin_headers = deepcopy(self.headers)
-        admin_headers.update(self.get_admin_auth_header())
+        user_headers = deepcopy(self.headers)
+        user_headers.update(self.get_user_auth_header())
         response = requests.post(self.url + processes_uri,
                                  json=self.deploy_body,
-                                 headers=admin_headers,
+                                 headers=user_headers,
                                  cookies=self.cookies,
                                  verify=self.verify)
         response.raise_for_status()
