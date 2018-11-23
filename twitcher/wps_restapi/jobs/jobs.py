@@ -37,7 +37,7 @@ def job_format_json(request, job):
     job_finished = list(status.job_status_categories[status.STATUS_FINISHED]) + list([status.STATUS_FINISHED])
     if job.status in job_finished:
         if job.status in [status.STATUS_SUCCEEDED, status.STATUS_FINISHED]:
-            resource_type = 'results'
+            resource_type = 'result'
         else:
             resource_type = 'exceptions'
         job_json[resource_type] = '{job_url}/{res}'.format(job_url=job_url(request, job), res=resource_type.lower())
