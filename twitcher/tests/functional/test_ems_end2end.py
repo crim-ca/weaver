@@ -56,6 +56,7 @@ class End2EndEMSTestCase(TestCase):
     separator_calls = None          # type: AnyStr
     separator_steps = None          # type: AnyStr
     separator_tests = None          # type: AnyStr
+    logger_json_indent = 2          # type: int
     logger = None                   # type: logging.manager.loggerClass
     logger_level = logging.INFO     # type: int
     app = None                      # type: TestApp
@@ -296,6 +297,7 @@ class End2EndEMSTestCase(TestCase):
         expect_errors = kw.pop('expect_errors', ignore_errors)
         message = kw.pop('message', None)
         json_body = kw.pop('json', None)
+        data_body = kw.pop('data', None)
         status = kw.pop('status', None)
         method = method.upper()
         headers = kw.get('headers', {})
@@ -308,9 +310,13 @@ class End2EndEMSTestCase(TestCase):
         is_remote = hasattr(cls.app.app, 'net_loc') and cls.app.app.net_loc != 'localhost' and not is_localhost
         with_requests = is_localhost and has_port or is_remote or force_requests
 
+        if json_body or headers and 'application/json' in headers.get('Content-Type'):
+            payload = "\n" + json.dumps(json_body, indent=cls.logger_json_indent)
+        else:
+            payload = data_body
         cls.log("{}Request Details:\n".format(cls.separator_steps) +
                 "  Request: {method} {url}\n".format(method=method, url=url) +
-                "  Payload: {payload}\n".format(payload=json_body) +
+                "  Payload: {payload}\n".format(payload=payload) +
                 "  Headers: {headers}\n".format(headers=headers) +
                 "  Cookies: {cookies}\n".format(cookies=cookies) +
                 "  Status:  {status} (expected)\n".format(status=status) +
@@ -319,10 +325,10 @@ class End2EndEMSTestCase(TestCase):
 
         if with_requests:
             kw.update({'verify': False})
-            resp = requests.request(method, url, json=json_body, **kw)
+            resp = requests.request(method, url, json=json_body, data=data_body, **kw)
 
             # add some properties similar to `webtest.TestApp`
-            if resp.headers.get('Content-Type') == 'application/json':
+            if 'application/json' in resp.headers.get('Content-Type'):
                 setattr(resp, 'json', resp.json())
                 setattr(resp, 'body', resp.json)
                 setattr(resp, 'content_type', 'application/json')
@@ -350,10 +356,14 @@ class End2EndEMSTestCase(TestCase):
         if not ignore_errors:
             cls.assert_response(resp, status, message)
 
+        if 'application/json' in resp.headers['Content-Type']:
+            payload = "\n" + json.dumps(resp.json, indent=cls.logger_json_indent)
+        else:
+            payload = resp.body
         cls.log("{}Response Details:\n".format(cls.separator_calls) +
                 "  Status:  {status} (received)\n".format(status=resp.status_code) +
                 "  Content: {content}\n".format(content=resp.content_type) +
-                "  Payload: {payload}\n".format(payload=resp.json or resp.body) +
+                "  Payload: {payload}\n".format(payload=payload) +
                 "  Headers: {headers}\n".format(headers=resp.headers))
 
         return resp
