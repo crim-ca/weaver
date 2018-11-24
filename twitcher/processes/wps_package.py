@@ -950,19 +950,22 @@ class Package(Process):
 
     def update_status(self, message, progress, status):
         # type: (AnyStr, int, AnyStr) -> None
+        """Updates the PyWPS real job status from a specified parameters."""
         self.percent = progress or self.percent or 0
-        # noinspection PyProtectedMember
-        wps_status = ts.map_status(_WPS_STATUS._fields[status])
+
+        # find the enum PyWPS status matching the given one as string
+        pywps_status = ts.map_status(status, ts.STATUS_COMPLIANT_PYWPS)
+        pywps_status_id = ts.STATUS_PYWPS_IDS[pywps_status]
 
         # pywps overrides 'status' by 'accepted' in 'update_status', so use the '_update_status' to enforce the status
         # using protected method also avoids weird overrides of progress percent on failure and final 'success' status
         # noinspection PyProtectedMember
-        self.response._update_status(status, message, self.percent)
+        self.response._update_status(pywps_status_id, message, self.percent)
         self.log_message(status=status, message=message, progress=progress)
 
     def step_update_status(self, message, progress, start_step_progress, end_step_progress, step_name,
                            data_source, status):
-        # type: (AnyStr, int, int, int, AnyStr, AnyValue, WPS_STATUS) -> None
+        # type: (AnyStr, int, int, int, AnyStr, AnyValue, AnyStr) -> None
         self.update_status(
             message="{0} [{1}] - {2}".format(data_source, step_name, str(message).strip()),
             progress=self.map_progress(progress, start_step_progress, end_step_progress),
@@ -970,7 +973,7 @@ class Package(Process):
         )
 
     def log_message(self, status, message, progress=None, level=logging.INFO):
-        message = get_job_log_msg(status=ts.map_status(status), msg=message, progress=progress)
+        message = get_job_log_msg(status=ts.map_status(status), message=message, progress=progress)
         self.logger.log(level, message, exc_info=level > logging.INFO)
 
     def exception_message(self, exception_type, exception=None, message='no message'):

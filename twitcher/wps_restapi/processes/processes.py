@@ -33,7 +33,6 @@ from twitcher.status import (
     STATUS_STARTED,
     STATUS_FAILED,
     STATUS_SUCCEEDED,
-    STATUS_PENDING,
 )
 from twitcher.sync import EXECUTE_AUTO, EXECUTE_ASYNC, EXECUTE_SYNC
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference

@@ -265,7 +265,11 @@ def test_map_status_back_compatibility_and_special_cases():
 
 def test_map_status_pywps_compliant_as_int_statuses():
     for s in range(len(WPS_STATUS)):
-        if status.STATUS_PYWPS_MAP[s] == 'UNKNOWN':
-            continue
-        assert status.map_status(s, status.STATUS_COMPLIANT_PYWPS) in \
-               status.job_status_categories[status.STATUS_COMPLIANT_PYWPS]
+        if status.STATUS_PYWPS_MAP[s] != status.STATUS_UNKNOWN:
+            assert status.map_status(s, status.STATUS_COMPLIANT_PYWPS) in \
+                   status.job_status_categories[status.STATUS_COMPLIANT_PYWPS]
+
+
+def test_map_status_pywps_back_and_forth():
+    for s, i in status.STATUS_PYWPS_MAP.items():
+        assert status.STATUS_PYWPS_IDS[i] == s

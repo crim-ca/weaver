@@ -50,7 +50,8 @@ job_status_categories = {
 
 
 # noinspection PyProtectedMember
-STATUS_PYWPS_MAP = {s: _WPS_STATUS._fields[s] for s in range(len(WPS_STATUS))}
+STATUS_PYWPS_MAP = {s: _WPS_STATUS._fields[s].lower() for s in range(len(WPS_STATUS))}  # id -> str
+STATUS_PYWPS_IDS = {k.lower(): v for v, k in STATUS_PYWPS_MAP.items()}                  # str -> id
 
 
 def map_status(wps_status, compliant=STATUS_COMPLIANT_OGC):
