@@ -2,9 +2,8 @@ import logging
 import requests
 from copy import deepcopy
 from time import sleep
-from typing import Union
+from typing import Union, AnyStr, Callable
 from twitcher import status
-from twitcher.status import job_status_categories
 from twitcher.visibility import VISIBILITY_PUBLIC
 from twitcher.utils import get_any_id, get_any_value, get_any_message, get_job_log_msg
 from twitcher.wps_restapi.swagger_definitions import (
@@ -42,7 +41,7 @@ class WpsProcess(object):
         registry = app.conf['PYRAMID_REGISTRY']
         self.settings = registry.settings
         self.verify = asbool(self.settings.get('twitcher.ows_proxy_ssl_verify', True))
-        self.update_status = update_status
+        self.update_status = update_status  # type: Callable[[AnyStr, int, AnyStr], None]
 
     def get_user_auth_header(self):
         # TODO: find a better way to generalize this to Magpie credentials?
@@ -106,7 +105,8 @@ class WpsProcess(object):
         response.raise_for_status()
 
     def set_visibility(self, visibility):
-        self.update_status('Updating process visibility on remote ADES.', REMOTE_JOB_PROGRESS_VISIBLE)
+        self.update_status('Updating process visibility on remote ADES.',
+                           REMOTE_JOB_PROGRESS_VISIBLE, status.STATUS_RUNNING)
         LOGGER.debug("Update process WPS visibility request for {0}".format(self.process_id))
         user_headers = deepcopy(self.headers)
 
@@ -138,7 +138,8 @@ class WpsProcess(object):
         response.raise_for_status()
 
     def deploy(self):
-        self.update_status('Deploying process on remote ADES.', REMOTE_JOB_PROGRESS_DEPLOY)
+        self.update_status('Deploying process on remote ADES.',
+                           REMOTE_JOB_PROGRESS_DEPLOY, status.STATUS_RUNNING)
         LOGGER.debug("Deploy process WPS request for {0}".format(self.process_id))
         user_headers = deepcopy(self.headers)
         user_headers.update(self.get_user_auth_header())
@@ -150,7 +151,8 @@ class WpsProcess(object):
         response.raise_for_status()
 
     def execute(self, workflow_inputs, out_dir, expected_outputs):
-        self.update_status('Preparing execute request for remote ADES.', REMOTE_JOB_PROGRESS_REQ_PREP)
+        self.update_status('Preparing execute request for remote ADES.',
+                           REMOTE_JOB_PROGRESS_REQ_PREP, status.STATUS_RUNNING)
         LOGGER.debug("Execute process WPS request for {0}".format(self.process_id))
 
         execute_body_inputs = []
@@ -177,7 +179,7 @@ class WpsProcess(object):
 
         execute_body_outputs = [{execute_req_id: output,
                                  execute_req_out_trans_mode: 'reference'} for output in expected_outputs]
-        self.update_status('Executing job on remote ADES.', REMOTE_JOB_PROGRESS_EXECUTION)
+        self.update_status('Executing job on remote ADES.', REMOTE_JOB_PROGRESS_EXECUTION, status.STATUS_RUNNING)
 
         execute_body = dict(mode='async',
                             response='document',
@@ -194,34 +196,40 @@ class WpsProcess(object):
             raise Exception('Was expecting a 201 status code from the execute request : {0}'.format(request_url))
         job_status_uri = response.headers['Location']
         job_status = self.get_job_status(job_status_uri)
+        job_status_value = status.map_status(job_status['status'])
 
-        self.update_status('Monitoring job on remote ADES : {0}'.format(job_status_uri), REMOTE_JOB_PROGRESS_MONITORING)
-        while job_status['status'] not in job_status_categories[status.STATUS_FINISHED]:
+        self.update_status('Monitoring job on remote ADES : {0}'.format(job_status_uri),
+                           REMOTE_JOB_PROGRESS_MONITORING, status.STATUS_RUNNING)
+
+        while job_status_value not in status.job_status_categories[status.STATUS_CATEGORY_FINISHED]:
             sleep(5)
             job_status = self.get_job_status(job_status_uri)
+            job_status_value = status.map_status(job_status['status'])
 
             LOGGER.debug("Monitoring job {jobID} : [{status}] {percentCompleted}  {message}".format(
                 jobID=job_status['jobID'],
-                status=job_status['status'],
+                status=job_status_value,
                 percentCompleted=job_status.get('percentCompleted', ''),
                 message=get_any_message(job_status)
             ))
-            self.update_status(get_job_log_msg(status=job_status['status'],
-                                               msg=get_any_message(job_status),
+            self.update_status(get_job_log_msg(status=job_status_value,
+                                               message=get_any_message(job_status),
                                                progress=job_status.get('percentCompleted', 0)),
                                self.map_progress(job_status.get('percentCompleted', 0),
-                                                 REMOTE_JOB_PROGRESS_MONITORING, REMOTE_JOB_PROGRESS_FETCH_OUT))
+                                                 REMOTE_JOB_PROGRESS_MONITORING, REMOTE_JOB_PROGRESS_FETCH_OUT),
+                               status.STATUS_RUNNING)
 
-        if job_status['status'] != status.STATUS_SUCCEEDED:
+        if job_status_value != status.STATUS_SUCCEEDED:
             LOGGER.debug("Monitoring job {jobID} : [{status}] {percentCompleted}  {message}".format(
                 jobID=job_status['jobID'],
-                status=job_status['status'],
+                status=job_status_value,
                 percentCompleted=job_status.get('percentCompleted', ''),
                 message=get_any_message(job_status)
             ))
             raise Exception(job_status)
 
-        self.update_status('Fetching job outputs from remote ADES.', REMOTE_JOB_PROGRESS_FETCH_OUT)
+        self.update_status('Fetching job outputs from remote ADES.',
+                           REMOTE_JOB_PROGRESS_FETCH_OUT, status.STATUS_RUNNING)
         results = self.get_job_results(job_status['jobID'])
         for result in results:
             if get_any_id(result) in expected_outputs:
@@ -238,7 +246,8 @@ class WpsProcess(object):
                 with open(dst_fn, mode='wb') as dst_fh:
                     dst_fh.write(r.content)
 
-        self.update_status('Execution on remote ADES completed.', REMOTE_JOB_PROGRESS_COMPLETED)
+        self.update_status('Execution on remote ADES completed.',
+                           REMOTE_JOB_PROGRESS_COMPLETED, status.STATUS_SUCCEEDED)
 
     def get_job_status(self, job_status_uri, retry=True):
         response = requests.get(job_status_uri,
@@ -255,13 +264,12 @@ class WpsProcess(object):
         job_status = response.json()
 
         # TODO Remove patch for Geomatys not conforming to the status schema
-        # (jobID is missing, status are upper cases and succeeded process are indicated as successful)
+        #  - jobID is missing
+        #  - handled by 'map_status': status are upper cases and succeeded process are indicated as successful
         job_id = job_status_uri.split('/')[-1]
         if 'jobID' not in job_status:
             job_status['jobID'] = job_id
-        job_status['status'] = job_status['status'].lower()
-        if job_status['status'] == 'successful':
-            job_status['status'] = status.STATUS_SUCCEEDED
+        job_status['status'] = status.map_status(job_status['status'])
         return job_status
 
     def get_job_results(self, job_id):

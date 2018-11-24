@@ -3,10 +3,12 @@ import pytest
 from lxml import etree
 from typing import Type
 from twitcher import utils
+from twitcher import status
 from twitcher._compat import urlparse
 from twitcher.exceptions import ServiceNotFound
 from twitcher.tests.common import WPS_CAPS_EMU_XML, WMS_CAPS_NCWMS2_111_XML, WMS_CAPS_NCWMS2_130_XML
 from pyramid.httpexceptions import HTTPError as PyramidHTTPError, HTTPInternalServerError, HTTPNotFound, HTTPConflict
+from pywps.response.status import WPS_STATUS
 from requests.exceptions import HTTPError as RequestsHTTPError
 
 
@@ -135,35 +137,47 @@ def make_http_error(http):
     return err
 
 
-@pytest.mark.xfail(raises=PyramidHTTPError)
 def test_pass_http_error_doesnt_raise_single_pyramid_error():
     http_errors = [HTTPNotFound, HTTPInternalServerError]
     for err in http_errors:
+        # test try/except
         try:
-            raise_http_error(err)
-        except Exception as ex:
-            utils.pass_http_error(ex, err)
+            # normal usage try/except
+            try:
+                raise_http_error(err)
+            except Exception as ex:
+                utils.pass_http_error(ex, err)
+        except PyramidHTTPError:
+            pytest.fail("PyramidHTTPError should be ignored but was raised.")
 
 
-@pytest.mark.xfail(raises=PyramidHTTPError)
 def test_pass_http_error_doesnt_raise_multi_pyramid_error():
     http_errors = [HTTPNotFound, HTTPInternalServerError]
     for err in http_errors:
+        # test try/except
         try:
-            raise_http_error(err)
-        except Exception as ex:
-            utils.pass_http_error(ex, http_errors)
+            # normal usage try/except
+            try:
+                raise_http_error(err)
+            except Exception as ex:
+                utils.pass_http_error(ex, http_errors)
+        except PyramidHTTPError:
+            pytest.fail("PyramidHTTPError should be ignored but was raised.")
 
 
-@pytest.mark.xfail(raises=RequestsHTTPError)
 def test_pass_http_error_doesnt_raise_requests_error():
     http_errors = [HTTPNotFound, HTTPInternalServerError]
     for err in http_errors:
         req_err = make_http_error(err)
+        # test try/except
         try:
-            raise_http_error(req_err)
-        except Exception as ex:
-            utils.pass_http_error(ex, err)
+            # normal usage try/except
+            try:
+                raise_http_error(req_err)
+            except Exception as ex:
+                utils.pass_http_error(ex, err)
+        except RequestsHTTPError:
+            pytest.fail("RequestsHTTPError should be ignored but was raised.")
 
 
 def test_pass_http_error_raises_pyramid_error_with_single_pyramid_error():
@@ -212,3 +226,46 @@ def test_pass_http_error_raises_other_error_with_multi_pyramid_error():
             raise ValueError("Test Error")
         except Exception as ex:
             utils.pass_http_error(ex, [HTTPConflict, HTTPInternalServerError])
+
+
+def get_status_variations(status_value):
+    return [status_value.lower(),
+            status_value.upper(),
+            status_value.capitalize(),
+            'Process' + status_value.capitalize()]
+
+
+def test_map_status_ogc_compliant():
+    for sv in status.job_status_values:
+        for s in get_status_variations(sv):
+            assert status.map_status(s, status.STATUS_COMPLIANT_OGC) in \
+                   status.job_status_categories[status.STATUS_COMPLIANT_OGC]
+
+
+def test_map_status_pywps_compliant():
+    for sv in status.job_status_values:
+        for s in get_status_variations(sv):
+            assert status.map_status(s, status.STATUS_COMPLIANT_PYWPS) in \
+                   status.job_status_categories[status.STATUS_COMPLIANT_PYWPS]
+
+
+def test_map_status_owslib_compliant():
+    for sv in status.job_status_values:
+        for s in get_status_variations(sv):
+            assert status.map_status(s, status.STATUS_COMPLIANT_OWSLIB) in \
+                   status.job_status_categories[status.STATUS_COMPLIANT_OWSLIB]
+
+
+def test_map_status_back_compatibility_and_special_cases():
+    for c in [status.STATUS_COMPLIANT_OGC, status.STATUS_COMPLIANT_PYWPS, status.STATUS_COMPLIANT_OWSLIB]:
+        assert status.map_status(status.STATUS_FINISHED, c) == status.STATUS_SUCCEEDED
+        assert status.map_status(status.STATUS_PENDING, c) == status.STATUS_ACCEPTED
+        assert status.map_status('successful', c) == status.STATUS_SUCCEEDED
+
+
+def test_map_status_pywps_compliant_as_int_statuses():
+    for s in range(len(WPS_STATUS)):
+        if status.STATUS_PYWPS_MAP[s] == 'UNKNOWN':
+            continue
+        assert status.map_status(s, status.STATUS_COMPLIANT_PYWPS) in \
+               status.job_status_categories[status.STATUS_COMPLIANT_PYWPS]

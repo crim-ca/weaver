@@ -10,6 +10,7 @@ from requests import HTTPError as RequestsHTTPError
 
 from twitcher.exceptions import ServiceNotFound
 from twitcher._compat import urlparse, parse_qs
+from twitcher.status import map_status
 
 import logging
 LOGGER = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ def get_any_message(info):
     """Retrieves a dictionary 'value'-like key using multiple common variations [message].
     :param info: dictionary that potentially contains a 'message'-like key.
     :returns: value of the matched 'message'-like key or an empty string if not found. """
-    return info.get('message', '')
+    return info.get('message', '').strip()
 
 
 def is_valid_url(url):
@@ -251,6 +252,6 @@ def get_log_datefmt():
     return '%Y-%m-%d %H:%M:%S'
 
 
-def get_job_log_msg(status, msg, progress=0, duration=None):
+def get_job_log_msg(status, message, progress=0, duration=None):
     # type: (AnyStr, AnyStr, int, AnyStr) -> AnyStr
-    return '{dur} {p:3d}% {stat:10} {msg}'.format(dur=duration or '', p=int(progress or 0), stat=status, msg=msg)
+    return '{d} {p:3d}% {s:10} {m}'.format(d=duration or '', p=int(progress or 0), s=map_status(status), m=message)

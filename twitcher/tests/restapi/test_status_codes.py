@@ -1,8 +1,9 @@
 # noinspection PyPackageRequirements
 import pytest
 from unittest import TestCase
+# use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
 # noinspection PyPackageRequirements
-from webtest import TestApp
+from webtest import TestApp as WebTestApp
 from twitcher.wps_restapi.swagger_definitions import (
     api_frontpage_uri,
     api_swagger_ui_uri,
@@ -60,14 +61,14 @@ class StatusCodeTestCase(TestCase):
         config.registry.settings['twitcher.configuration'] = TWITCHER_CONFIGURATION_DEFAULT
         config.registry.settings['twitcher.url'] = 'https://localhost'
         app = main({}, **config.registry.settings)
-        self.testapp = TestApp(app)
+        self.testapp = WebTestApp(app)
 
     def test_200(self):
         for uri in public_routes:
             resp = self.testapp.get(uri, expect_errors=True, headers=self.headers)
             self.assertEqual(200, resp.status_code, 'route {} did not return 200'.format(uri))
 
-    @pytest.mark.skip(reason="Not working if not behind proxy.")
+    @pytest.mark.xfail(reason="Not working if not behind proxy. Protected implementation to be done.")
     def test_401(self):
         for uri in forbidden_routes:
             resp = self.app.get(uri, expect_errors=True, headers=self.headers)
