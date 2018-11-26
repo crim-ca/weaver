@@ -27,6 +27,8 @@ import unittest
 import pytest
 import requests
 import logging
+# noinspection PyProtectedMember
+from logging import _loggerClass
 import time
 import json
 import os
@@ -53,12 +55,14 @@ class End2EndEMSTestCase(TestCase):
     test_processes_info = dict()
     headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
     cookies = dict()                # type: Dict[AnyStr, AnyStr]
-    separator_calls = None          # type: AnyStr
-    separator_steps = None          # type: AnyStr
-    separator_tests = None          # type: AnyStr
-    logger = None                   # type: logging.manager.loggerClass
-    logger_level = logging.INFO     # type: int
     app = None                      # type: TestApp
+    logger_separator_calls = None   # type: AnyStr
+    logger_separator_steps = None   # type: AnyStr
+    logger_separator_tests = None   # type: AnyStr
+    logger_level = logging.INFO     # type: int
+    logger = None                   # type: _loggerClass
+    # setting indent to `None` disables pretty-printing of JSON payload
+    logger_json_indent = None       # type: Union[int, None]
 
     TWITCHER_URL = None
     TWITCHER_RESTAPI_URL = None
@@ -74,13 +78,21 @@ class End2EndEMSTestCase(TestCase):
     @classmethod
     def setUpClass(cls):
         cls.setup_logger()
-        cls.log("{}Starting new End-2-End test: {}\n{}".format(cls.separator_tests, now(), cls.separator_steps))
+        cls.log("{}Start of End-2-End test: {}\n{}"
+                .format(cls.logger_separator_tests, now(), cls.logger_separator_steps))
 
         # TODO: adjust environment variables accordingly to the server to be tested
         cls.TEST_SERVER_HOSTNAME = os.getenv('TEST_SERVER_HOSTNAME')
         cls.TEST_SERVER_MAGPIE_PATH = os.getenv('TEST_SERVER_MAGPIE_PATH', '/magpie')
         cls.TEST_SERVER_TWITCHER_PATH = os.getenv('TEST_SERVER_TWITCHER_PATH', '/twitcher')
         cls.app = TestApp(cls.TEST_SERVER_HOSTNAME)
+
+        # logging parameter overrides
+        cls.logger_level = os.getenv('TEST_LOGGER_LEVEL', cls.logger_level)
+        cls.logger_json_indent = os.getenv('TEST_LOGGER_JSON_INDENT', cls.logger_json_indent)
+        cls.logger_separator_calls = os.getenv('TEST_LOGGER_SEPARATOR_CALLS', cls.logger_separator_calls)
+        cls.logger_separator_steps = os.getenv('TEST_LOGGER_SEPARATOR_STEPS', cls.logger_separator_steps)
+        cls.logger_separator_tests = os.getenv('TEST_LOGGER_SEPARATOR_TESTS', cls.logger_separator_tests)
 
         cls.MAGPIE_URL = cls.settings().get('magpie.url')
         cls.TWITCHER_URL = get_twitcher_url(cls.settings())
@@ -131,7 +143,8 @@ class End2EndEMSTestCase(TestCase):
     def tearDownClass(cls):
         cls.clear_test_processes()
         testing.tearDown()
-        cls.log("{}Ending End-2-End test: {}\n{}".format(cls.separator_steps, now(), cls.separator_tests))
+        cls.log("{}End of End-2-End test: {}\n{}"
+                .format(cls.logger_separator_steps, now(), cls.logger_separator_tests))
 
     @classmethod
     def settings(cls):
@@ -296,6 +309,7 @@ class End2EndEMSTestCase(TestCase):
         expect_errors = kw.pop('expect_errors', ignore_errors)
         message = kw.pop('message', None)
         json_body = kw.pop('json', None)
+        data_body = kw.pop('data', None)
         status = kw.pop('status', None)
         method = method.upper()
         headers = kw.get('headers', {})
@@ -308,21 +322,25 @@ class End2EndEMSTestCase(TestCase):
         is_remote = hasattr(cls.app.app, 'net_loc') and cls.app.app.net_loc != 'localhost' and not is_localhost
         with_requests = is_localhost and has_port or is_remote or force_requests
 
-        cls.log("{}Request Details:\n".format(cls.separator_steps) +
+        if json_body or headers and 'application/json' in headers.get('Content-Type'):
+            payload = "\n" if cls.logger_json_indent else '' + json.dumps(json_body, indent=cls.logger_json_indent)
+        else:
+            payload = data_body
+        cls.log("{}Request Details:\n".format(cls.logger_separator_steps) +
                 "  Request: {method} {url}\n".format(method=method, url=url) +
-                "  Payload: {payload}\n".format(payload=json_body) +
-                "  Headers: {headers}".format(headers=headers) +
-                "  Cookies: {cookies}".format(cookies=cookies) +
+                "  Payload: {payload}\n".format(payload=payload) +
+                "  Headers: {headers}\n".format(headers=headers) +
+                "  Cookies: {cookies}\n".format(cookies=cookies) +
                 "  Status:  {status} (expected)\n".format(status=status) +
                 "  Message: {message} (expected)\n".format(message=message) +
-                "  Module:  {module}".format(module='requests' if with_requests else 'webtest.TestApp'))
+                "  Module:  {module}\n".format(module='requests' if with_requests else 'webtest.TestApp'))
 
         if with_requests:
             kw.update({'verify': False})
-            resp = requests.request(method, url, json=json_body, **kw)
+            resp = requests.request(method, url, json=json_body, data=data_body, **kw)
 
             # add some properties similar to `webtest.TestApp`
-            if resp.headers.get('Content-Type') == 'application/json':
+            if 'application/json' in resp.headers.get('Content-Type'):
                 setattr(resp, 'json', resp.json())
                 setattr(resp, 'body', resp.json)
                 setattr(resp, 'content_type', 'application/json')
@@ -350,11 +368,15 @@ class End2EndEMSTestCase(TestCase):
         if not ignore_errors:
             cls.assert_response(resp, status, message)
 
-        cls.log("{}Response Details:\n".format(cls.separator_calls) +
+        if 'application/json' in resp.headers['Content-Type']:
+            payload = "\n" if cls.logger_json_indent else '' + json.dumps(resp.json, indent=cls.logger_json_indent)
+        else:
+            payload = resp.body
+        cls.log("{}Response Details:\n".format(cls.logger_separator_calls) +
                 "  Status:  {status} (received)\n".format(status=resp.status_code) +
                 "  Content: {content}\n".format(content=resp.content_type) +
-                "  Payload: {payload}\n".format(payload=resp.json or resp.body) +
-                "  Headers: {headers}".format(headers=resp.headers))
+                "  Payload: {payload}\n".format(payload=payload) +
+                "  Headers: {headers}\n".format(headers=resp.headers))
 
         return resp
 
@@ -385,7 +407,7 @@ class End2EndEMSTestCase(TestCase):
         try:
             assert assert_test(), message
         except AssertionError:
-            cls.log("{}{}:\n{}\n".format(cls.separator_calls, title, message), exception=True)
+            cls.log("{}{}:\n{}\n".format(cls.logger_separator_calls, title, message), exception=True)
             raise
 
     @classmethod
@@ -399,9 +421,9 @@ class End2EndEMSTestCase(TestCase):
     @classmethod
     def setup_logger(cls):
         log_path = os.path.abspath(os.path.join(TWITCHER_ROOT_DIR, cls.__name__ + '.log'))
-        cls.separator_calls = '-' * 80 + '\n'   # used between function calls (of same request)
-        cls.separator_steps = '=' * 80 + '\n'   # used between overall test steps (between requests)
-        cls.separator_tests = '*' * 80 + '\n'   # used between various test runs
+        cls.logger_separator_calls = '-' * 80 + '\n'   # used between function calls (of same request)
+        cls.logger_separator_steps = '=' * 80 + '\n'   # used between overall test steps (between requests)
+        cls.logger_separator_tests = '*' * 80 + '\n'   # used between various test runs
         cls.logger = logging.getLogger(cls.__name__)
         cls.logger.setLevel(cls.logger_level)
         cls.logger.addHandler(logging.FileHandler(log_path))
@@ -507,13 +529,20 @@ class End2EndEMSTestCase(TestCase):
         Validates that the job is stated, running, and polls it until completed successfully.
         Then validates that results are accessible (no data integrity check).
         """
-        timeout_accept = 30
-        timeout_running = 600
+        timeout_accept_max = 30
+        timeout_running_max = 600
+        timeout_accept = timeout_accept_max
+        timeout_running = timeout_running_max
         timeout_interval = 5
         while True:
-            self.assert_test(lambda: timeout_accept > 0 and timeout_running > 0,
-                             message="Maximum timeout reached for job execution test. (Accept: {}s, Running: {}s)."
-                                     .format(timeout_accept, timeout_running))
+            self.assert_test(lambda: timeout_accept > 0,
+                             message="Maximum timeout reached for job execution test. " +
+                                     "Expected job status change from '{0}' to '{1}' within {2}s since first '{0}'."
+                                     .format(STATUS_ACCEPTED, STATUS_RUNNING, timeout_accept_max))
+            self.assert_test(lambda: timeout_running > 0,
+                             message="Maximum timeout reached for job execution test. " +
+                                     "Expected job status change from '{0}' to '{1}' within {2}s since first '{0}'."
+                                     .format(STATUS_RUNNING, STATUS_SUCCEEDED, timeout_running_max))
             resp = self.request('GET', job_location_url,
                                 headers=user_headers, cookies=user_cookies, status=HTTPOk.code)
             status = resp.json.get('status')
@@ -528,7 +557,7 @@ class End2EndEMSTestCase(TestCase):
                 continue
             elif status in job_status_categories[STATUS_FINISHED]:
                 self.assert_test(lambda: status == STATUS_SUCCEEDED,
-                                 message="Job execution `{}` failed.".format(job_location_url))
+                                 message="Job execution `{}` failed, but expected to succeed.".format(job_location_url))
                 break
             self.assert_test(lambda: False, message="Unknown job execution status: `{}`.".format(status))
         self.request('GET', '{}/result'.format(job_location_url),
