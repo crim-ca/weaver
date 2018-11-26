@@ -223,7 +223,8 @@ class WpsProcess(object):
             ))
             self.update_status(get_job_log_msg(status=job_status_value,
                                                message=get_any_message(job_status),
-                                               progress=job_status.get('percentCompleted', 0)),
+                                               progress=job_status.get('percentCompleted', 0),
+                                               duration=job_status.get('duration', None)),  # get if available
                                self.map_progress(job_status.get('percentCompleted', 0),
                                                  REMOTE_JOB_PROGRESS_MONITORING, REMOTE_JOB_PROGRESS_FETCH_OUT),
                                status.STATUS_RUNNING)

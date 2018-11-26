@@ -31,7 +31,8 @@ def job_format_json(request, job):
         "jobID": job.id,
         "status": job.status,
         "message": job.status_message,
-        "progress": job.progress
+        "duration": job.duration,
+        "percentCompleted": job.progress,
     }
     if job.status in status.job_status_categories[status.STATUS_CATEGORY_FINISHED]:
         job_status = status.map_status(job.status)
