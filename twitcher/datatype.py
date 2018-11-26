@@ -6,11 +6,19 @@ import six
 import uuid
 # noinspection PyPackageRequirements
 from dateutil.parser import parse as dt_parse
-from datetime import datetime, timedelta
+from datetime import timedelta
 # noinspection PyProtectedMember
 from logging import _levelNames, ERROR, INFO
 
-from twitcher.utils import now_secs, get_job_log_msg, get_log_fmt, get_log_datefmt, fully_qualified_name
+from twitcher.utils import (
+    now,
+    now_secs,
+    localize_datetime,  # for backward compatibility of previously saved jobs not local-aware
+    get_job_log_msg,
+    get_log_fmt,
+    get_log_datefmt,
+    fully_qualified_name,
+)
 from twitcher.exceptions import ProcessInstanceError
 from twitcher.processes import process_mapping
 from twitcher.processes.types import PACKAGE_PROCESSES, PROCESS_WPS
@@ -108,7 +116,7 @@ class Job(dict):
         else:
             log_msg = [(INFO, self._get_log_msg())]
         for level, msg in log_msg:
-            fmt_msg = get_log_fmt() % dict(asctime=datetime.now().strftime(get_log_datefmt()),
+            fmt_msg = get_log_fmt() % dict(asctime=now().strftime(get_log_datefmt()),
                                            levelname=_levelNames[level],
                                            name=fully_qualified_name(self),
                                            message=msg)
@@ -237,8 +245,8 @@ class Job(dict):
     def created(self):
         created = self.get('created', None)
         if not created:
-            self['created'] = datetime.now()
-        return self.get('created')
+            self['created'] = now()
+        return localize_datetime(self.get('created'))
 
     @property
     def finished(self):
@@ -248,12 +256,12 @@ class Job(dict):
         return self.finished is not None
 
     def mark_finished(self):
-        self['finished'] = datetime.now()
+        self['finished'] = now()
 
     @property
     def duration(self):
-        final_time = self.finished or datetime.now()
-        duration = final_time - self.created
+        final_time = self.finished or now()
+        duration = final_time - localize_datetime(self.created)
         self['duration'] = str(duration).split('.')[0]
         return self['duration']
 
@@ -651,15 +659,15 @@ class Quote(dict):
         elif not isinstance(self.get('currency'), six.string_types) or len(self.get('currency')) != 3:
             raise ValueError("Field `Quote.currency` must be an ISO-4217 currency string code.")
         if 'created' not in self:
-            self['created'] = str(datetime.now())
+            self['created'] = now()
         try:
-            self['created'] = dt_parse(self.get('created')).isoformat()
+            self['created'] = dt_parse(str(self.get('created'))).isoformat()
         except ValueError:
             raise ValueError("Field `Quote.created` must be an ISO-8601 datetime string.")
         if 'expire' not in self:
-            self['expire'] = str(datetime.now() + timedelta(days=1))
+            self['expire'] = now() + timedelta(days=1)
         try:
-            self['expire'] = dt_parse(self.get('expire')).isoformat()
+            self['expire'] = dt_parse(str(self.get('expire'))).isoformat()
         except ValueError:
             raise ValueError("Field `Quote.expire` must be an ISO-8601 datetime string.")
         if 'id' not in self:
@@ -795,9 +803,9 @@ class Bill(dict):
         elif not isinstance(self.get('currency'), six.string_types) or len(self.get('currency')) != 3:
             raise ValueError("Field `Bill.currency` must be an ISO-4217 currency string code.")
         if 'created' not in self:
-            self['created'] = str(datetime.now())
+            self['created'] = now()
         try:
-            self['created'] = dt_parse(self.get('created')).isoformat()
+            self['created'] = dt_parse(str(self.get('created'))).isoformat()
         except ValueError:
             raise ValueError("Field `Bill.created` must be an ISO-8601 datetime string.")
         if 'id' not in self:

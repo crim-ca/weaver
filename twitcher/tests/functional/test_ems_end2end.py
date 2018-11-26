@@ -235,7 +235,8 @@ class End2EndEMSTestCase(TestCase):
     @classmethod
     def retrieve_process_info(cls, process_id):
         # type: (AnyStr) -> ProcessInfo
-        base = 'https://raw.githubusercontent.com/crim-ca/testbed14/master/application-packages'
+        base = os.getenv("TEST_GITHUB_SOURCE_URL",
+                         "https://raw.githubusercontent.com/crim-ca/testbed14/master/application-packages")
         deploy_path = '{base}/{proc}/DeployProcess_{proc}.json'.format(base=base, proc=process_id)
         execute_path = '{base}/{proc}/Execute_{proc}.json'.format(base=base, proc=process_id)
         deploy_payload = cls.retrieve_payload(deploy_path)
@@ -597,8 +598,8 @@ class End2EndEMSTestCase(TestCase):
                          message="Response process execution job ID must match expected value to validate results.")
         self.validate_test_job_execution(job_location, None, None)
 
-    def validate_test_job_execution(self, job_location_url, user_headers, user_cookies):
-        # type: (AnyStr, Dict[AnyStr, AnyStr], Dict[AnyStr, AnyStr]) -> None
+    def validate_test_job_execution(self, job_location_url, user_headers=None, user_cookies=None):
+        # type: (AnyStr, Optional[Dict[AnyStr, AnyStr]], Optional[Dict[AnyStr, AnyStr]]) -> None
         """
         Validates that the job is stated, running, and polls it until completed successfully.
         Then validates that results are accessible (no data integrity check).

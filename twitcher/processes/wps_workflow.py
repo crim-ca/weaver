@@ -1,4 +1,3 @@
-import datetime
 import hashlib
 import json
 import locale
@@ -30,7 +29,7 @@ from pyramid.httpexceptions import HTTPNotFound, HTTPConflict, HTTPInternalServe
 
 from twitcher.visibility import VISIBILITY_PUBLIC
 from twitcher.processes.wps_process import WpsProcess
-from twitcher.utils import pass_http_error
+from twitcher.utils import pass_http_error, now
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_TMP_PREFIX = "tmp"
@@ -493,7 +492,7 @@ class WpsWorkflowJob(JobBase):
                 outputs, runtimeContext.process_run_id, str(self.name))
             self.prov_obj.document.wasEndedBy(
                 runtimeContext.process_run_id, None, self.prov_obj.workflow_run_uri,
-                datetime.datetime.now())
+                now())
         if process_status != "success":
             LOGGER.warning(u"[job %s] completed %s", self.name, process_status)
         else:
