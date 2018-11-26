@@ -1,7 +1,6 @@
 """
 Definitions of types used by tokens.
 """
-from copy import copy
 
 import six
 import uuid
@@ -91,7 +90,7 @@ class Job(dict):
     def _get_log_msg(self, msg=None):
         if not msg:
             msg = self.status_message
-        return get_job_log_msg(duration=self.duration, progress=self.progress, status=self.status, msg=msg)
+        return get_job_log_msg(duration=self.duration, progress=self.progress, status=self.status, message=msg)
 
     # noinspection PyUnusedLocal
     def save_log(self, errors=None, logger=None, module=None):

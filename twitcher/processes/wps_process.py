@@ -64,9 +64,14 @@ class WpsProcess(object):
                 'scope': 'openid',
             }
             ades_headers = {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'}
-            cred_resp = requests.post(ades_url, data=ades_body, headers=ades_headers)
+            ades_access_token_url = '{}/oauth2/token'.format(ades_url)
+            cred_resp = requests.post(ades_access_token_url, data=ades_body, headers=ades_headers)
             cred_resp.raise_for_status()
+            if 'application/json' not in cred_resp.headers.get('Content-Type'):
+                raise HTTPUnauthorized("Cannot retrieve valid access token using credential or ADES configurations.")
             access_token = cred_resp.json().get('access_token', None)
+            if not access_token:
+                LOGGER.warn("Could not retrieve valid access token although response is expected to contain one.")
         else:
             LOGGER.warn(
                 "Could not retrieve at least one of required login parameters: "
@@ -105,13 +110,14 @@ class WpsProcess(object):
         response.raise_for_status()
 
     def set_visibility(self, visibility):
-        self.update_status('Updating process visibility on remote ADES.',
+        self.update_status("Updating process visibility on remote ADES.",
                            REMOTE_JOB_PROGRESS_VISIBLE, status.STATUS_RUNNING)
-        LOGGER.debug("Update process WPS visibility request for {0}".format(self.process_id))
+        path = self.url + process_visibility_uri.format(process_id=self.process_id)
         user_headers = deepcopy(self.headers)
-
         user_headers.update(self.get_user_auth_header())
-        response = requests.put(self.url + process_visibility_uri.format(process_id=self.process_id),
+
+        LOGGER.debug("Update process WPS visibility request for {0} at {1}".format(self.process_id, path))
+        response = requests.put(path,
                                 json={'value': visibility},
                                 headers=user_headers,
                                 cookies=self.cookies,
@@ -119,8 +125,9 @@ class WpsProcess(object):
         response.raise_for_status()
 
     def describe_process(self):
-        LOGGER.debug("Describe process WPS request for {0}".format(self.process_id))
-        response = requests.get(self.url + process_uri.format(process_id=self.process_id),
+        path = self.url + process_uri.format(process_id=self.process_id)
+        LOGGER.debug("Describe process WPS request for {0} at {1}".format(self.process_id, path))
+        response = requests.get(path,
                                 headers=self.headers,
                                 cookies=self.cookies,
                                 verify=self.verify)
@@ -138,12 +145,14 @@ class WpsProcess(object):
         response.raise_for_status()
 
     def deploy(self):
-        self.update_status('Deploying process on remote ADES.',
+        self.update_status("Deploying process on remote ADES.",
                            REMOTE_JOB_PROGRESS_DEPLOY, status.STATUS_RUNNING)
-        LOGGER.debug("Deploy process WPS request for {0}".format(self.process_id))
+        path = self.url + processes_uri
         user_headers = deepcopy(self.headers)
         user_headers.update(self.get_user_auth_header())
-        response = requests.post(self.url + processes_uri,
+
+        LOGGER.debug("Deploy process WPS request for {0} at {1}".format(self.process_id, path))
+        response = requests.post(path,
                                  json=self.deploy_body,
                                  headers=user_headers,
                                  cookies=self.cookies,
@@ -151,7 +160,7 @@ class WpsProcess(object):
         response.raise_for_status()
 
     def execute(self, workflow_inputs, out_dir, expected_outputs):
-        self.update_status('Preparing execute request for remote ADES.',
+        self.update_status("Preparing execute request for remote ADES.",
                            REMOTE_JOB_PROGRESS_REQ_PREP, status.STATUS_RUNNING)
         LOGGER.debug("Execute process WPS request for {0}".format(self.process_id))
 
