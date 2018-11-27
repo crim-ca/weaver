@@ -5,6 +5,7 @@ pywps 4.x wrapper
 from pyramid.wsgi import wsgiapp2
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
+from pyramid.threadlocal import get_current_request
 from pywps import configuration as pywps_config
 from six.moves.configparser import SafeConfigParser
 from twitcher.owsexceptions import OWSNoApplicableCode
@@ -79,10 +80,11 @@ def pywps_view(environ, start_response):
             environ['PYWPS_CFG'] = os.getenv('PYWPS_CFG') or get_wps_cfg_path(registry.settings)
         load_pywps_cfg(registry, config_file=environ['PYWPS_CFG'])
 
-        # call pywps application
-        from twitcher.store import processstore_defaultfactory
-        processstore = processstore_defaultfactory(registry)
-        processes_wps = [process.wps() for process in processstore.list_processes(visibility=VISIBILITY_PUBLIC)]
+        # call pywps application with processes filtered according to the adapter's definition
+        from twitcher.adapter import adapter_factory
+        processstore = adapter_factory(registry.settings).processstore_factory(registry)
+        processes_wps = [process.wps() for process in
+                         processstore.list_processes(visibility=VISIBILITY_PUBLIC, request=get_current_request())]
         service = Service(processes_wps, [environ['PYWPS_CFG']])
     except Exception as ex:
         raise OWSNoApplicableCode("Failed setup of PyWPS Service and/or Processes. Error [{}]".format(ex))
