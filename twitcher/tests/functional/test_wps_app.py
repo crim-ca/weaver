@@ -45,12 +45,12 @@ class WpsAppTest(unittest.TestCase):
         self.token = setup_mongodb_tokenstore(config)
         self.app = webtest.TestApp(config.make_wsgi_app())
 
-        public_process = Process(id='public_process', processEndpointWPS1='wps', package={})
-        private_process = Process(id='private_process', processEndpointWPS1='wps', package={})
-        self.process.save_process(public_process)
-        self.process.save_process(private_process)
-        self.process.set_visibility(public_process.id, VISIBILITY_PUBLIC)
-        self.process.set_visibility(private_process.id, VISIBILITY_PRIVATE)
+        self.process_public = Process(id='process_public', processEndpointWPS1='wps', package={})
+        self.process_private = Process(id='process_private', processEndpointWPS1='wps', package={})
+        self.process.save_process(self.process_public)
+        self.process.save_process(self.process_private)
+        self.process.set_visibility(self.process_public.id, VISIBILITY_PUBLIC)
+        self.process.set_visibility(self.process_private.id, VISIBILITY_PRIVATE)
 
     def tearDown(self):
         pyramid.testing.tearDown()
