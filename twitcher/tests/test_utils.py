@@ -258,8 +258,6 @@ def test_map_status_owslib_compliant():
 
 def test_map_status_back_compatibility_and_special_cases():
     for c in [status.STATUS_COMPLIANT_OGC, status.STATUS_COMPLIANT_PYWPS, status.STATUS_COMPLIANT_OWSLIB]:
-        assert status.map_status(status.STATUS_FINISHED, c) == status.STATUS_SUCCEEDED
-        assert status.map_status(status.STATUS_PENDING, c) == status.STATUS_ACCEPTED
         assert status.map_status('successful', c) == status.STATUS_SUCCEEDED
 
 

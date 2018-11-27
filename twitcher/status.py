@@ -15,10 +15,8 @@ STATUS_PAUSED = 'paused'
 STATUS_SUCCEEDED = 'succeeded'
 STATUS_FAILED = 'failed'
 STATUS_RUNNING = 'running'
-STATUS_FINISHED = 'finished'
 STATUS_DISMISSED = 'dismissed'
 STATUS_EXCEPTION = 'exception'
-STATUS_PENDING = 'pending'
 STATUS_UNKNOWN = 'unknown'  # don't include in any below collections
 
 job_status_values = frozenset([
@@ -28,10 +26,8 @@ job_status_values = frozenset([
     STATUS_SUCCEEDED,
     STATUS_FAILED,
     STATUS_RUNNING,
-    STATUS_FINISHED,
     STATUS_DISMISSED,
     STATUS_EXCEPTION,
-    STATUS_PENDING,
 ])
 
 job_status_categories = {
@@ -40,11 +36,13 @@ job_status_categories = {
     #   PyWPS uses:     [Accepted, Started, Succeeded, Failed, Paused, Exception]
     #   OWSLib users:   [Accepted, Running, Succeeded, Failed, Paused] (with 'Process' in front)
     # http://docs.opengeospatial.org/is/14-065/14-065.html#17
+    # corresponding statuses are aligned vertically for 'COMPLIANT' groups
     STATUS_COMPLIANT_OGC:       frozenset([STATUS_ACCEPTED, STATUS_RUNNING, STATUS_SUCCEEDED, STATUS_FAILED]),
     STATUS_COMPLIANT_PYWPS:     frozenset([STATUS_ACCEPTED, STATUS_STARTED, STATUS_SUCCEEDED, STATUS_FAILED, STATUS_PAUSED, STATUS_EXCEPTION]),
     STATUS_COMPLIANT_OWSLIB:    frozenset([STATUS_ACCEPTED, STATUS_RUNNING, STATUS_SUCCEEDED, STATUS_FAILED, STATUS_PAUSED]),
+    # utility categories
     STATUS_CATEGORY_RUNNING:    frozenset([STATUS_ACCEPTED, STATUS_RUNNING, STATUS_STARTED, STATUS_PAUSED]),
-    STATUS_CATEGORY_FINISHED:   frozenset([STATUS_FAILED, STATUS_DISMISSED, STATUS_EXCEPTION, STATUS_SUCCEEDED, STATUS_FINISHED]),
+    STATUS_CATEGORY_FINISHED:   frozenset([STATUS_FAILED, STATUS_DISMISSED, STATUS_EXCEPTION, STATUS_SUCCEEDED]),
     STATUS_CATEGORY_FAILED:     frozenset([STATUS_FAILED, STATUS_DISMISSED, STATUS_EXCEPTION])
 }
 
@@ -69,15 +67,16 @@ def map_status(wps_status, compliant=STATUS_COMPLIANT_OGC):
     # case of raw PyWPS status
     if isinstance(wps_status, int):
         return map_status(STATUS_PYWPS_MAP[wps_status], compliant)
+
+    # remove 'Process' from OWSLib statuses and lower for every compliant
     job_status = wps_status.lower().replace('process', '')
 
     if compliant == STATUS_COMPLIANT_OGC:
         if job_status in job_status_categories[STATUS_CATEGORY_RUNNING]:
             if job_status in [STATUS_STARTED, STATUS_PAUSED]:
                 job_status = STATUS_RUNNING
-        elif job_status in job_status_categories[STATUS_CATEGORY_FINISHED]:
-            if job_status in [STATUS_DISMISSED, STATUS_EXCEPTION]:
-                job_status = STATUS_FAILED
+        elif job_status in job_status_categories[STATUS_CATEGORY_FAILED] and job_status != STATUS_FAILED:
+            job_status = STATUS_FAILED
 
     elif compliant == STATUS_COMPLIANT_PYWPS:
         if job_status == STATUS_RUNNING:
@@ -91,10 +90,9 @@ def map_status(wps_status, compliant=STATUS_COMPLIANT_OGC):
         elif job_status in job_status_categories[STATUS_CATEGORY_FAILED] and job_status != STATUS_FAILED:
             job_status = STATUS_FAILED
 
-    # special cases applicable to all
-    if job_status == STATUS_PENDING:
-        job_status = STATUS_ACCEPTED
-    if job_status in [STATUS_FINISHED, 'successful']:
+    # TODO: patch for Geomatys not conforming to the status schema
+    #       (status are upper cases and succeeded process are indicated as 'successful')
+    if job_status == 'successful':
         job_status = STATUS_SUCCEEDED
 
     if job_status in job_status_values:
