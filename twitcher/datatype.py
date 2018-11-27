@@ -13,7 +13,7 @@ from logging import _levelNames, ERROR, INFO
 from twitcher.utils import (
     now,
     now_secs,
-    localize_datetime,  # for backward compatibility of previously saved jobs not local-aware
+    localize_datetime,  # for backward compatibility of previously saved jobs not time-locale-aware
     get_job_log_msg,
     get_log_fmt,
     get_log_datefmt,
@@ -261,7 +261,7 @@ class Job(dict):
     @property
     def duration(self):
         final_time = self.finished or now()
-        duration = final_time - localize_datetime(self.created)
+        duration = localize_datetime(final_time) - localize_datetime(self.created)
         self['duration'] = str(duration).split('.')[0]
         return self['duration']
 
