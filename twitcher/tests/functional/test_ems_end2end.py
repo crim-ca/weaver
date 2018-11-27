@@ -63,6 +63,7 @@ class End2EndEMSTestCase(TestCase):
     logger = None                   # type: _loggerClass
     # setting indent to `None` disables pretty-printing of JSON payload
     logger_json_indent = None       # type: Union[int, None]
+    log_full_trace = True           # type: bool
 
     TWITCHER_URL = None
     TWITCHER_RESTAPI_URL = None
@@ -138,7 +139,6 @@ class End2EndEMSTestCase(TestCase):
 
         cls.validate_test_server()
         cls.setup_test_processes()
-        cls.log_full_trace = True
 
     @classmethod
     def tearDownClass(cls):
