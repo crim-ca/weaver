@@ -552,6 +552,48 @@ class End2EndEMSTestCase(TestCase):
                              message="Response process execution job ID must match expected value to validate results.")
             self.validate_test_job_execution(job_location, headers_b, cookies_b)
 
+    def test_demo(self):
+        """Simplify test for demonstration purpose"""
+
+        # Demo test will log basic information
+        self.log_full_trace = False
+
+        self.clear_test_processes()
+
+        # deploy processes
+        path = '{}/processes'.format(self.get_twitcher_ems_url())
+        self.request('POST', path, status=HTTPOk.code,
+                     json=self.test_processes_info[self.PROCESS_STACKER_ID].deploy_payload,
+                     message="Expect deployed application process.")
+        self.request('POST', path, status=HTTPOk.code,
+                     json=self.test_processes_info[self.PROCESS_SFS_ID].deploy_payload,
+                     message="Expect deployed application process.")
+        self.request('POST', path, status=HTTPOk.code,
+                     json=self.test_processes_info[self.PROCESS_WORKFLOW_ID].deploy_payload,
+                     message="Expect deployed workflow process.")
+
+        workflow_info = self.test_processes_info[self.PROCESS_WORKFLOW_ID]
+
+        # make process visible
+        process_path = '{}/processes/{}'.format(self.get_twitcher_ems_url(), workflow_info.test_id)
+        visible_path = '{}/visibility'.format(process_path)
+        visible = {'value': VISIBILITY_PUBLIC}
+        resp = self.request('PUT', visible_path, json=visible, status=HTTPOk.code)
+        self.assert_test(lambda: resp.json.get('value') == VISIBILITY_PUBLIC,
+                         message="Process should be public.")
+
+        # execute workflow
+        execute_body = workflow_info.execute_payload
+        execute_path = '{}/jobs'.format(process_path)
+        resp = self.request('POST', execute_path, json=execute_body, status=HTTPCreated.code)
+        self.assert_test(lambda: resp.json.get('status') in job_status_categories[STATUS_RUNNING],
+                         message="Response process execution job status should be one of running category values.")
+        job_location = resp.json.get('location')
+        job_id = resp.json.get('jobID')
+        self.assert_test(lambda: job_id and job_location and job_location.endswith(job_id),
+                         message="Response process execution job ID must match expected value to validate results.")
+        self.validate_test_job_execution(job_location, None, None)
+
     def validate_test_job_execution(self, job_location_url, user_headers, user_cookies):
         # type: (AnyStr, Dict[AnyStr, AnyStr], Dict[AnyStr, AnyStr]) -> None
         """
