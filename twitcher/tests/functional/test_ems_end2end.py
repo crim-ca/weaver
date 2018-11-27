@@ -469,7 +469,7 @@ class End2EndEMSTestCase(TestCase):
         """The actual test!"""
 
         # End to end test will log everything
-        cls.log_full_trace = True
+        self.__class__.log_full_trace = True
 
         headers, cookies = self.user_headers_cookies(self.ALICE_CREDENTIALS, force_magpie=True)
         self.clear_test_processes(headers, cookies)
@@ -556,7 +556,7 @@ class End2EndEMSTestCase(TestCase):
         """Simplify test for demonstration purpose"""
 
         # Demo test will log basic information
-        self.log_full_trace = False
+        self.__class__.log_full_trace = False
 
         self.clear_test_processes()
 
