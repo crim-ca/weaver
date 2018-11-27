@@ -600,7 +600,7 @@ class Process(dict):
         return sd.Process().deserialize(self)
 
     def process_offering(self):
-        return sd.ProcessOffering().deserialize(ProcessOffering(self))
+        return sd.ProcessOffering().deserialize(self)
 
     def process_summary(self):
         return sd.ProcessSummary().deserialize(self)
@@ -618,20 +618,10 @@ class Process(dict):
         if self.type == PROCESS_WPS:
             process_key = self.identifier
         if process_key not in process_mapping:
-            ProcessInstanceError("Unknown process `{}` in mapping".format(process_key))
+            ProcessInstanceError("Unknown process `{}` in mapping.".format(process_key))
         if process_key in PACKAGE_PROCESSES:
             return process_mapping[process_key](**self.params_wps)
         return process_mapping[process_key]()
-
-
-class ProcessOffering(dict):
-    def __init__(self, process):
-        super(ProcessOffering, self).__init__({
-            "process": process,
-            "processVersion": process.version,
-            "jobControlOptions": process.jobControlOptions,
-            "outputTransmission": process.outputTransmission,
-        })
 
 
 class Quote(dict):

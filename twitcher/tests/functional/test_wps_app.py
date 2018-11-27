@@ -12,10 +12,13 @@ import pytest
 import webtest
 import unittest
 import pyramid.testing
-from twitcher.tests.functional.common import setup_with_mongodb, setup_mongodb_tokenstore
-from twitcher.tests.utils import get_default_config_ini_path
 import sys
 import os
+from xml.etree import ElementTree
+from twitcher.tests.functional.common import setup_with_mongodb, setup_mongodb_processstore, setup_mongodb_tokenstore
+from twitcher.tests.utils import get_default_config_ini_path
+from twitcher.datatype import Process
+from twitcher.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
 
 
 @pytest.mark.functional
@@ -23,6 +26,7 @@ class WpsAppTest(unittest.TestCase):
 
     def setUp(self):
         config = setup_with_mongodb()
+        self.process = setup_mongodb_processstore(config)
         self.token = setup_mongodb_tokenstore(config)
         self.protected_path = '/ows'
         self.wps_path = '/wps'
@@ -34,6 +38,13 @@ class WpsAppTest(unittest.TestCase):
         sys.path.append(os.path.expanduser('~/birdhouse/etc/celery'))   # allow finding celeryconfig
         config.configure_celery(get_default_config_ini_path())
         self.app = webtest.TestApp(config.make_wsgi_app())
+
+        public_process = Process(id='public_process', processEndpointWPS1='wps', package={})
+        private_process = Process(id='private_process', processEndpointWPS1='wps', package={})
+        self.process.save_process(public_process)
+        self.process.save_process(private_process)
+        self.process.set_visibility(public_process.id, VISIBILITY_PUBLIC)
+        self.process.set_visibility(private_process.id, VISIBILITY_PRIVATE)
 
     def tearDown(self):
         pyramid.testing.tearDown()
@@ -49,11 +60,23 @@ class WpsAppTest(unittest.TestCase):
         resp.mustcontain('</wps:Capabilities>')
 
     @pytest.mark.online
+    def test_getcaps_filtered_processes_by_visibility(self):
+        resp = self.app.get(self.make_url("service=wps&request=getcapabilities"))
+        assert resp.status_code == 200
+        assert resp.content_type == 'text/xml'
+        resp.mustcontain('</wps:Capabilities>')
+
+    @pytest.mark.online
     def test_getcaps_with_invalid_token(self):
         resp = self.app.get(self.make_url("service=wps&request=getcapabilities", token='invalid'))
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
-        resp.mustcontain('</wps:Capabilities>')
+        resp.mustcontain('<wps:ProcessOfferings>')
+        tree = ElementTree.parse(resp)
+        root = tree.getroot()
+        getcap_processes_ids = [process.get('ows:Identifier') for process in root.findall('wps:Process')]
+        assert self.private_process.id not in getcap_processes_ids
+        assert self.public_process.id in getcap_processes_ids
 
     @pytest.mark.online
     def test_describeprocess(self):
@@ -71,12 +94,27 @@ class WpsAppTest(unittest.TestCase):
         resp.mustcontain('</wps:ProcessDescriptions>')
 
     @pytest.mark.online
+    def test_describeprocess_filtered_processes_by_visibility(self):
+        params = "service=wps&request=describeprocess&version=1.0.0&identifier={}".format(self.public_process.id)
+        url = self.make_url(params)
+        resp = self.app.get(url)
+        assert resp.status_code == 200
+        assert resp.content_type == 'text/xml'
+        resp.mustcontain('</wps:ProcessDescriptions>')
+
+        params = "service=wps&request=describeprocess&version=1.0.0&identifier={}".format(self.private_process.id)
+        url = self.make_url(params)
+        resp = self.app.get(url)
+        assert resp.status_code == 200
+        assert resp.content_type == 'text/xml'
+        resp.mustcontain('<ows:ExceptionText>Unknown process')
+
+    @pytest.mark.online
     def test_execute_not_allowed(self):
         url = self.make_url("service=wps&request=execute&version=1.0.0&identifier=hello&datainputs=name=tux")
         resp = self.app.get(url)
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
-        print(resp.body)
         resp.mustcontain('<Exception exceptionCode="NoApplicableCode" locator="AccessForbidden">')
 
     @pytest.mark.online
@@ -86,5 +124,4 @@ class WpsAppTest(unittest.TestCase):
         resp = self.app.get(url)
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
-        print(resp.body)
         resp.mustcontain('<wps:ProcessSucceeded>PyWPS Process Say Hello finished</wps:ProcessSucceeded>')
