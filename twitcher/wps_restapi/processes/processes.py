@@ -315,7 +315,7 @@ def submit_job_handler(request, service_url, is_workflow=False):
                                      .format(job_output['transmissionMode']))
 
     store = jobstore_factory(request.registry)
-    job = store.save_job(task_id='pending', process=process_id, service=provider_id,
+    job = store.save_job(task_id=STATUS_ACCEPTED, process=process_id, service=provider_id,
                          inputs=request.json_body['inputs'], is_workflow=is_workflow,
                          user_id=request.authenticated_userid, execute_async=execute_async, custom_tags=tags)
     result = execute_process.delay(
