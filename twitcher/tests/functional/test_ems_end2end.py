@@ -63,6 +63,7 @@ class End2EndEMSTestCase(TestCase):
     logger = None                   # type: _loggerClass
     # setting indent to `None` disables pretty-printing of JSON payload
     logger_json_indent = None       # type: Union[int, None]
+    log_full_trace = True           # type: bool
 
     TWITCHER_URL = None
     TWITCHER_RESTAPI_URL = None
@@ -189,29 +190,44 @@ class End2EndEMSTestCase(TestCase):
         cls.PROCESS_STACKER_ID = 'Stacker'
         cls.PROCESS_SFS_ID = 'SFS'
         cls.PROCESS_WORKFLOW_ID = 'Workflow'
-        for process in [cls.PROCESS_STACKER_ID, cls.PROCESS_SFS_ID, cls.PROCESS_WORKFLOW_ID]:
+        cls.PROCESS_WORKFLOW_SC_ID = 'WorkflowSimpleChain'
+        cls.PROCESS_WORKFLOW_S2P_ID = 'WorkflowS2Probav'
+        test_set = [cls.PROCESS_STACKER_ID,
+                    cls.PROCESS_SFS_ID,
+                    cls.PROCESS_WORKFLOW_ID,
+                    cls.PROCESS_WORKFLOW_SC_ID,
+                    cls.PROCESS_WORKFLOW_S2P_ID]
+        workflow_set = [cls.PROCESS_WORKFLOW_ID,
+                        cls.PROCESS_WORKFLOW_SC_ID,
+                        cls.PROCESS_WORKFLOW_S2P_ID]
+        for process in test_set:
             cls.test_processes_info.update({process: cls.retrieve_process_info(process)})
 
-        # replace max occur of 'Stacker' to minimize data size during tests
-        stacker_deploy = cls.test_processes_info[cls.PROCESS_STACKER_ID].deploy_payload
-        stacker_deploy_inputs = stacker_deploy['processDescription']['process']['inputs']
-        for i_input, proc_input in enumerate(stacker_deploy_inputs):
-            if proc_input.get('maxOccurs') == 'unbounded':
-                stacker_deploy_inputs[i_input]['maxOccurs'] = 2
+        # replace max occur of processes to minimize data size during tests
+        for process_id in test_set:
+            process_deploy = cls.test_processes_info[process_id].deploy_payload
+            process_deploy_inputs = process_deploy['processDescription']['process']['inputs']
+            for i_input, proc_input in enumerate(process_deploy_inputs):
+                if proc_input.get('maxOccurs') == 'unbounded':
+                    process_deploy_inputs[i_input]['maxOccurs'] = 2
 
-        # update 'Workflow' to use 'test_id' instead of originals
-        workflow_deploy = cls.test_processes_info[cls.PROCESS_WORKFLOW_ID].deploy_payload
-        for exec_unit in range(len(workflow_deploy['executionUnit'])):
-            workflow_cwl_ref = workflow_deploy['executionUnit'][exec_unit].pop('href')
-            workflow_cwl_raw = cls.retrieve_payload(workflow_cwl_ref)
-            for step in workflow_cwl_raw.get('steps'):
-                step_id = workflow_cwl_raw['steps'][step]['run'].strip('.cwl')
-                for app_id in [cls.PROCESS_STACKER_ID, cls.PROCESS_SFS_ID]:
-                    if app_id == step_id:
-                        test_id = cls.test_processes_info[app_id].test_id
-                        real_id = workflow_cwl_raw['steps'][step]['run']
-                        workflow_cwl_raw['steps'][step]['run'] = real_id.replace(app_id, test_id)
-            workflow_deploy['executionUnit'][exec_unit]['unit'] = workflow_cwl_raw
+        # update workflows to use 'test_id' instead of originals
+        for workflow_id in workflow_set:
+            workflow_deploy = cls.test_processes_info[workflow_id].deploy_payload
+            for exec_unit in range(len(workflow_deploy['executionUnit'])):
+                try:
+                    workflow_cwl_ref = workflow_deploy['executionUnit'][exec_unit].pop('href')
+                    workflow_cwl_raw = cls.retrieve_payload(workflow_cwl_ref)
+                except KeyError:
+                    workflow_cwl_raw = workflow_deploy['executionUnit'][exec_unit].pop('unit')
+                for step in workflow_cwl_raw.get('steps'):
+                    step_id = workflow_cwl_raw['steps'][step]['run'].strip('.cwl')
+                    for app_id in [cls.PROCESS_STACKER_ID, cls.PROCESS_SFS_ID]:
+                        if app_id == step_id:
+                            test_id = cls.test_processes_info[app_id].test_id
+                            real_id = workflow_cwl_raw['steps'][step]['run']
+                            workflow_cwl_raw['steps'][step]['run'] = real_id.replace(app_id, test_id)
+                workflow_deploy['executionUnit'][exec_unit]['unit'] = workflow_cwl_raw
 
     @classmethod
     def retrieve_process_info(cls, process_id):
@@ -238,10 +254,10 @@ class End2EndEMSTestCase(TestCase):
         return '{}_{}'.format(cls.__name__, real_process_id)
 
     @classmethod
-    def clear_test_processes(cls):
+    def clear_test_processes(cls, headers=None, cookies=None):
         for process_id, process_info in cls.test_processes_info.items():
             path = '{}/processes/{}'.format(cls.get_twitcher_ems_url(), process_info.test_id)
-            headers, cookies = cls.user_headers_cookies(cls.ALICE_CREDENTIALS, force_magpie=True)
+
             resp = cls.request('DELETE', path, headers=headers, cookies=cookies, ignore_errors=True)
             # unauthorized also would mean the process doesn't exist since Alice should have permissions on it
             cls.assert_response(resp, [HTTPOk.code, HTTPUnauthorized.code, HTTPNotFound.code],
@@ -326,14 +342,17 @@ class End2EndEMSTestCase(TestCase):
             payload = "\n" if cls.logger_json_indent else '' + json.dumps(json_body, indent=cls.logger_json_indent)
         else:
             payload = data_body
-        cls.log("{}Request Details:\n".format(cls.logger_separator_steps) +
-                "  Request: {method} {url}\n".format(method=method, url=url) +
-                "  Payload: {payload}\n".format(payload=payload) +
-                "  Headers: {headers}\n".format(headers=headers) +
-                "  Cookies: {cookies}\n".format(cookies=cookies) +
-                "  Status:  {status} (expected)\n".format(status=status) +
-                "  Message: {message} (expected)\n".format(message=message) +
-                "  Module:  {module}\n".format(module='requests' if with_requests else 'webtest.TestApp'))
+        trace = ("{}Request Details:\n".format(cls.logger_separator_steps) +
+                 "  Request: {method} {url}\n".format(method=method, url=url) +
+                 "  Payload: {payload}".format(payload=payload))
+        if cls.log_full_trace:
+            trace += ("\n" +
+                      "  Headers: {headers}\n".format(headers=headers) +
+                      "  Cookies: {cookies}\n".format(cookies=cookies) +
+                      "  Status:  {status} (expected)\n".format(status=status) +
+                      "  Message: {message} (expected)\n".format(message=message) +
+                      "  Module:  {module}\n".format(module='requests' if with_requests else 'webtest.TestApp'))
+        cls.log(trace)
 
         if with_requests:
             kw.update({'verify': False})
@@ -372,12 +391,17 @@ class End2EndEMSTestCase(TestCase):
             payload = "\n" if cls.logger_json_indent else '' + json.dumps(resp.json, indent=cls.logger_json_indent)
         else:
             payload = resp.body
+        if cls.log_full_trace:
+            headers = resp.headers
+        else:
+            header_filter = ['Location']
+            headers = {k: v for k, v in resp.headers.items() if k in header_filter}
+
         cls.log("{}Response Details:\n".format(cls.logger_separator_calls) +
                 "  Status:  {status} (received)\n".format(status=resp.status_code) +
                 "  Content: {content}\n".format(content=resp.content_type) +
                 "  Payload: {payload}\n".format(payload=payload) +
-                "  Headers: {headers}\n".format(headers=resp.headers))
-
+                "  Headers: {headers}\n".format(headers=headers))
         return resp
 
     @classmethod
@@ -443,7 +467,11 @@ class End2EndEMSTestCase(TestCase):
 
     def test_end2end(self):
         """The actual test!"""
-        self.clear_test_processes()
+        # End to end test will log everything
+        self.__class__.log_full_trace = True
+
+        headers, cookies = self.user_headers_cookies(self.ALICE_CREDENTIALS, force_magpie=True)
+        self.clear_test_processes(headers, cookies)
 
         headers_a, cookies_a = self.user_headers_cookies(self.ALICE_CREDENTIALS)
         headers_b, cookies_b = self.user_headers_cookies(self.BOB_CREDENTIALS)
@@ -522,6 +550,49 @@ class End2EndEMSTestCase(TestCase):
             self.assert_test(lambda: job_id and job_location and job_location.endswith(job_id),
                              message="Response process execution job ID must match expected value to validate results.")
             self.validate_test_job_execution(job_location, headers_b, cookies_b)
+
+    @pytest.mark.demo
+    def test_demo(self):
+        """Simplify test for demonstration purpose"""
+
+        # Demo test will log basic information
+        self.__class__.log_full_trace = False
+
+        self.clear_test_processes()
+
+        # deploy processes
+        path = '{}/processes'.format(self.get_twitcher_ems_url())
+        self.request('POST', path, status=HTTPOk.code,
+                     json=self.test_processes_info[self.PROCESS_STACKER_ID].deploy_payload,
+                     message="Expect deployed application process.")
+        self.request('POST', path, status=HTTPOk.code,
+                     json=self.test_processes_info[self.PROCESS_SFS_ID].deploy_payload,
+                     message="Expect deployed application process.")
+        self.request('POST', path, status=HTTPOk.code,
+                     json=self.test_processes_info[self.PROCESS_WORKFLOW_ID].deploy_payload,
+                     message="Expect deployed workflow process.")
+
+        workflow_info = self.test_processes_info[self.PROCESS_WORKFLOW_ID]
+
+        # make process visible
+        process_path = '{}/processes/{}'.format(self.get_twitcher_ems_url(), workflow_info.test_id)
+        visible_path = '{}/visibility'.format(process_path)
+        visible = {'value': VISIBILITY_PUBLIC}
+        resp = self.request('PUT', visible_path, json=visible, status=HTTPOk.code)
+        self.assert_test(lambda: resp.json.get('value') == VISIBILITY_PUBLIC,
+                         message="Process should be public.")
+
+        # execute workflow
+        execute_body = workflow_info.execute_payload
+        execute_path = '{}/jobs'.format(process_path)
+        resp = self.request('POST', execute_path, json=execute_body, status=HTTPCreated.code)
+        self.assert_test(lambda: resp.json.get('status') in job_status_categories[STATUS_RUNNING],
+                         message="Response process execution job status should be one of running category values.")
+        job_location = resp.json.get('location')
+        job_id = resp.json.get('jobID')
+        self.assert_test(lambda: job_id and job_location and job_location.endswith(job_id),
+                         message="Response process execution job ID must match expected value to validate results.")
+        self.validate_test_job_execution(job_location, None, None)
 
     def validate_test_job_execution(self, job_location_url, user_headers, user_cookies):
         # type: (AnyStr, Dict[AnyStr, AnyStr], Dict[AnyStr, AnyStr]) -> None
