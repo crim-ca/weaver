@@ -254,10 +254,10 @@ class End2EndEMSTestCase(TestCase):
         return '{}_{}'.format(cls.__name__, real_process_id)
 
     @classmethod
-    def clear_test_processes(cls):
+    def clear_test_processes(cls, headers=None, cookies=None):
         for process_id, process_info in cls.test_processes_info.items():
             path = '{}/processes/{}'.format(cls.get_twitcher_ems_url(), process_info.test_id)
-            headers, cookies = cls.user_headers_cookies(cls.ALICE_CREDENTIALS, force_magpie=True)
+
             resp = cls.request('DELETE', path, headers=headers, cookies=cookies, ignore_errors=True)
             # unauthorized also would mean the process doesn't exist since Alice should have permissions on it
             cls.assert_response(resp, [HTTPOk.code, HTTPUnauthorized.code, HTTPNotFound.code],
@@ -471,7 +471,8 @@ class End2EndEMSTestCase(TestCase):
         # End to end test will log everything
         cls.log_full_trace = True
 
-        self.clear_test_processes()
+        headers, cookies = self.user_headers_cookies(self.ALICE_CREDENTIALS, force_magpie=True)
+        self.clear_test_processes(headers, cookies)
 
         headers_a, cookies_a = self.user_headers_cookies(self.ALICE_CREDENTIALS)
         headers_b, cookies_b = self.user_headers_cookies(self.BOB_CREDENTIALS)
