@@ -1,5 +1,4 @@
 import ssl
-from datetime import datetime
 
 from twitcher._compat import urlparse
 from twitcher._compat import xmlrpclib
@@ -9,6 +8,7 @@ LOGGER = logging.getLogger("TWITCHER")
 
 
 def _create_https_context(verify=True):
+    # noinspection PyProtectedMember
     context = ssl._create_default_https_context()
     if verify is False:
         context.check_hostname = False

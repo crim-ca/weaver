@@ -16,14 +16,12 @@ from pywps import (
     Format,
 )
 from pywps.inout.basic import BasicIO
-# noinspection PyProtectedMember
-from pywps.response.status import WPS_STATUS, _WPS_STATUS
 from pywps.inout.literaltypes import AnyValue, AllowedValue, ALLOWEDVALUETYPE
 from pywps.validator.mode import MODE
 from pywps.app.Common import Metadata
-from twitcher.processes import opensearch
 
-from twitcher import namesgenerator
+from twitcher.processes import opensearch
+from twitcher import namesgenerator, status as ts
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS
 from twitcher.processes.constants import WPS_INPUT, WPS_OUTPUT, WPS_COMPLEX, WPS_BOUNDINGBOX, WPS_LITERAL, WPS_REFERENCE
 from twitcher.processes.wps_process import WpsProcess
@@ -40,7 +38,7 @@ from pyramid.httpexceptions import HTTPOk
 from pyramid_celery import celery_app as app
 from collections import OrderedDict, Hashable
 from six.moves.urllib.parse import urlparse
-from typing import Dict, Tuple, Union, Any, Optional, Text
+from typing import Dict, Tuple, Union, Any, Optional, AnyStr
 from yaml import safe_load
 from yaml.scanner import ScannerError
 import json
@@ -241,13 +239,13 @@ def _load_package_file(file_path):
 
 
 def _load_package_content(package_dict,                             # type: Dict
-                          package_name=PACKAGE_DEFAULT_FILE_NAME,   # type: Optional[Text]
-                          data_source=None,                         # type: Optional[Text]
+                          package_name=PACKAGE_DEFAULT_FILE_NAME,   # type: Optional[AnyStr]
+                          data_source=None,                         # type: Optional[AnyStr]
                           only_dump_file=False,                     # type: Optional[bool]
-                          tmp_dir=None,                             # type: Optional[Text]
+                          tmp_dir=None,                             # type: Optional[AnyStr]
                           loading_context=None,                     # type: Optional[LoadingContext]
                           runtime_context=None,                     # type: Optional[RuntimeContext]
-                          ):  # type: (...) -> Union[Tuple[cwltool.factory.Factory, Text, Dict], None]
+                          ):  # type: (...) -> Union[Tuple[cwltool.factory.Factory, AnyStr, Dict], None]
     """
     Loads the package content to file in a temporary directory.
     Recursively processes sub-packages steps if the parent is of 'workflow' type (CWL class).
@@ -357,8 +355,8 @@ def _is_cwl_enum_type(io_info):
 
 
 # noinspection PyUnusedLocal
-def _cwl2wps_io(io_info,    # type: Dict[Text, Any]
-                io_select   # type: Text
+def _cwl2wps_io(io_info,    # type: Dict[AnyStr, Any]
+                io_select   # type: AnyStr
                 ):
     # type:(...) -> Union[LiteralInput, LiteralOutput, BoundingBoxInput, BoundingBoxOutput, ComplexInput, ComplexOutput]
     """Converts input/output parameters from CWL types to WPS types.
@@ -655,8 +653,10 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
         raise PackageTypeError("CWL I/O definitions must be provided, empty list if none required.")
     if not wps_io_list:
         wps_io_list = list()
-    wps_io_dict = OrderedDict((_get_field(wps_io, 'identifier', search_variations=True), wps_io) for wps_io in wps_io_list)
-    cwl_io_dict = OrderedDict((_get_field(cwl_io, 'identifier', search_variations=True), cwl_io) for cwl_io in cwl_io_list)
+    wps_io_dict = OrderedDict((_get_field(wps_io, 'identifier', search_variations=True), wps_io)
+                              for wps_io in wps_io_list)
+    cwl_io_dict = OrderedDict((_get_field(cwl_io, 'identifier', search_variations=True), cwl_io)
+                              for cwl_io in cwl_io_list)
     missing_io_list = set(cwl_io_dict) - set(wps_io_dict)
     updated_io_list = list()
     # missing WPS I/O are inferred only using CWL->WPS definitions
@@ -805,7 +805,7 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
 
 
 def get_process_from_wps_request(process_offering, reference=None, package=None, data_source=None):
-    # type: (Dict, Optional[Text], Optional[Text], Optional[Text]) -> Dict
+    # type: (Dict, Optional[AnyStr], Optional[AnyStr], Optional[AnyStr]) -> Dict
     """
     Returns an updated process information dictionary ready for storage using provided WPS ``process_offering``
     and a package definition passed by ``reference`` or ``package`` JSON content.
@@ -948,29 +948,37 @@ class Package(Process):
         twitcher_tweens_logger.addHandler(log_file_handler)
         twitcher_tweens_logger.setLevel(self.log_level)
 
-    def update_status(self, message, progress=None, status=WPS_STATUS.STARTED):
+    def update_status(self, message, progress, status):
+        # type: (AnyStr, int, AnyStr) -> None
+        """Updates the PyWPS real job status from a specified parameters."""
         self.percent = progress or self.percent or 0
+
+        # find the enum PyWPS status matching the given one as string
+        pywps_status = ts.map_status(status, ts.STATUS_COMPLIANT_PYWPS)
+        pywps_status_id = ts.STATUS_PYWPS_IDS[pywps_status]
+
         # pywps overrides 'status' by 'accepted' in 'update_status', so use the '_update_status' to enforce the status
         # using protected method also avoids weird overrides of progress percent on failure and final 'success' status
         # noinspection PyProtectedMember
-        self.response._update_status(status, message, self.percent)
-        self.log_message(status=status,
-                         message=message,
-                         progress=progress)
+        self.response._update_status(pywps_status_id, message, self.percent)
+        self.log_message(status=status, message=message, progress=progress)
 
-    def step_update_status(self, message, progress, start_step_progress, end_step_progress, step_name, data_source):
+    def step_update_status(self, message, progress, start_step_progress, end_step_progress, step_name,
+                           data_source, status):
+        # type: (AnyStr, int, int, int, AnyStr, AnyValue, AnyStr) -> None
         self.update_status(
-            "{0} [{1}] - {2}".format(data_source, step_name, message),
-            self.map_progress(progress, start_step_progress, end_step_progress))
+            message="{0} [{1}] - {2}".format(data_source, step_name, str(message).strip()),
+            progress=self.map_progress(progress, start_step_progress, end_step_progress),
+            status=status,
+        )
 
     def log_message(self, status, message, progress=None, level=logging.INFO):
-        # noinspection PyProtectedMember
-        message = get_job_log_msg(status=_WPS_STATUS._fields[status].lower(), msg=message, progress=progress)
+        message = get_job_log_msg(status=ts.map_status(status), message=message, progress=progress)
         self.logger.log(level, message, exc_info=level > logging.INFO)
 
     def exception_message(self, exception_type, exception=None, message='no message'):
         exception_msg = ' [{}]'.format(repr(exception)) if isinstance(exception, Exception) else ''
-        self.log_message(status=WPS_STATUS.FAILED,
+        self.log_message(status=ts.STATUS_EXCEPTION,
                          message='{0}: {1}{2}'.format(exception_type.__name__, message, exception_msg),
                          level=logging.ERROR)
         return exception_type('{0}{1}'.format(message, exception_msg))
@@ -994,11 +1002,11 @@ class Package(Process):
                 self.setup_logger()
                 # self.response.outputs[PACKAGE_LOG_FILE].file = self.log_file
                 # self.response.outputs[PACKAGE_LOG_FILE].as_reference = True
-                self.update_status("Preparing package logs done.", PACKAGE_PROGRESS_PREP_LOG)
+                self.update_status("Preparing package logs done.", PACKAGE_PROGRESS_PREP_LOG, ts.STATUS_RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed preparing package logging.")
 
-            self.update_status("Launching package ...", PACKAGE_PROGRESS_LAUNCHING)
+            self.update_status("Launching package ...", PACKAGE_PROGRESS_LAUNCHING, ts.STATUS_RUNNING)
 
             registry = app.conf['PYRAMID_REGISTRY']
             if get_twitcher_configuration(registry.settings) == TWITCHER_CONFIGURATION_EMS:
@@ -1021,11 +1029,11 @@ class Package(Process):
 
             except Exception as ex:
                 raise PackageRegistrationError("Exception occurred on package instantiation: `{}`".format(repr(ex)))
-            self.update_status("Loading package content done.", PACKAGE_PROGRESS_LOADING)
+            self.update_status("Loading package content done.", PACKAGE_PROGRESS_LOADING, ts.STATUS_RUNNING)
 
             try:
                 cwl_input_info = dict([(i['name'], i) for i in self.package_inst.t.inputs_record_schema['fields']])
-                self.update_status("Retrieve package inputs done.", PACKAGE_PROGRESS_GET_INPT)
+                self.update_status("Retrieve package inputs done.", PACKAGE_PROGRESS_GET_INPT, ts.STATUS_RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed retrieving package input types.")
             try:
@@ -1065,18 +1073,18 @@ class Package(Process):
                     else:
                         raise self.exception_message(PackageTypeError, None,
                                                      "Undefined package input for execution: {}.".format(type(input_i)))
-                self.update_status("Convert package inputs done.", PACKAGE_PROGRESS_CONV_INPT)
+                self.update_status("Convert package inputs done.", PACKAGE_PROGRESS_CONV_INPT, ts.STATUS_RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed to load package inputs.")
 
             try:
-                self.update_status("Running package ...", PACKAGE_PROGRESS_RUN_CWL)
+                self.update_status("Running package ...", PACKAGE_PROGRESS_RUN_CWL, ts.STATUS_RUNNING)
 
                 # Inputs starting with file:// will be interpreted as ems local files
                 # If OpenSearch obtain file:// references that must be passed to the ADES use an uri starting
                 # with OPENSEARCH_LOCAL_FILE_SCHEME://
                 result = self.package_inst(**cwl_inputs)
-                self.update_status("Package execution done.", PACKAGE_PROGRESS_CWL_DONE)
+                self.update_status("Package execution done.", PACKAGE_PROGRESS_CWL_DONE, ts.STATUS_RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed package execution.")
             try:
@@ -1086,17 +1094,17 @@ class Package(Process):
                         self.response.outputs[output].file = result[output]['location'].replace('file://', '')
                     else:
                         self.response.outputs[output].data = result[output]
-                self.update_status("Generate package outputs done.", PACKAGE_PROGRESS_PREP_OUT)
+                self.update_status("Generate package outputs done.", PACKAGE_PROGRESS_PREP_OUT, ts.STATUS_RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed to save package outputs.")
         # noinspection PyBroadException
         except Exception:
             # return log file location by status message since outputs are not obtained by WPS failed process
             error_msg = "Package completed with errors. Server logs: {}".format(self.log_file)
-            self.update_status(error_msg, status=WPS_STATUS.FAILED)
+            self.update_status(error_msg, self.percent, ts.STATUS_FAILED)
             raise
         else:
-            self.update_status("Package complete.", PACKAGE_PROGRESS_DONE, status=WPS_STATUS.SUCCEEDED)
+            self.update_status("Package complete.", PACKAGE_PROGRESS_DONE, ts.STATUS_SUCCEEDED)
         return self.response
 
     def make_tool(self, toolpath_object, loadingContext):
@@ -1149,10 +1157,8 @@ class Package(Process):
             end_step_progress = self.map_step_progress(len(self.step_launched) + 1, max(1, len(self.step_packages)))
             url = retrieve_data_source_url(data_source)
 
-            self.update_status("Launching {type} {name} on {src}.".format(
-                type=jobtype,
-                name=jobname,
-                src=data_source), start_step_progress)
+            self.update_status("Launching {type} {name} on {src}.".format(type=jobtype, name=jobname, src=data_source),
+                               start_step_progress, ts.STATUS_RUNNING)
 
         except (IndexError, KeyError) as exc:
             raise self.exception_message(PackageExecutionError, exc, "Failed to save package outputs.")
@@ -1163,6 +1169,6 @@ class Package(Process):
                           process_id=process_id,
                           deploy_body=step_payload,
                           cookies=self.request.http_request.cookies,
-                          update_status=lambda message, progress, status=WPS_STATUS.STARTED: self.step_update_status(
-                              message, progress, start_step_progress, end_step_progress, jobname, data_source
+                          update_status=lambda message, progress, status: self.step_update_status(
+                              message, progress, start_step_progress, end_step_progress, jobname, data_source, status
                           ))

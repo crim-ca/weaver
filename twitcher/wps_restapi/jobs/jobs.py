@@ -6,6 +6,7 @@ from twitcher.exceptions import JobNotFound
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import wps_restapi_base_url
 from twitcher import status, sort
+from typing import AnyStr, Optional
 from owslib.wps import WPSExecution
 from lxml import etree
 from celery.utils.log import get_task_logger
@@ -30,13 +31,12 @@ def job_format_json(request, job):
         "jobID": job.id,
         "status": job.status,
         "message": job.status_message,
-        "progress": job.progress
+        "duration": job.duration,
+        "percentCompleted": job.progress,
     }
-    # TODO: remove when all jobs cleaned up and fixed on other participants servers
-    # back compatibility: check also finished jobs that should have succeeded status
-    job_finished = list(status.job_status_categories[status.STATUS_FINISHED]) + list([status.STATUS_FINISHED])
-    if job.status in job_finished:
-        if job.status in [status.STATUS_SUCCEEDED, status.STATUS_FINISHED]:
+    if job.status in status.job_status_categories[status.STATUS_CATEGORY_FINISHED]:
+        job_status = status.map_status(job.status)
+        if job_status == status.STATUS_SUCCEEDED:
             resource_type = 'result'
         else:
             resource_type = 'exceptions'
@@ -47,10 +47,14 @@ def job_format_json(request, job):
 
 
 def check_status(url=None, response=None, sleep_secs=2, verify=False):
+    # type: (Optional[AnyStr, None], Optional[etree.ElementBase], Optional[int], Optional[bool]) -> WPSExecution
     """
     Run owslib.wps check_status with additional exception handling.
 
-    :param verify: Flag to enable SSL verification. Default: False
+    :param url: job URL where to look for job status.
+    :param response: WPS response document of job status.
+    :param sleep_secs: number of seconds to sleep before returning control to the caller.
+    :param verify: Flag to enable SSL verification.
     :return: OWSLib.wps.WPSExecution object.
     """
     execution = WPSExecution()
@@ -163,7 +167,7 @@ def cancel_job(request):
     app.control.revoke(job.task_id, terminate=True)
     store = jobstore_factory(request.registry)
     job.status_message = 'Job dismissed.'
-    job.status = status.STATUS_DISMISSED
+    job.status = status.map_status(status.STATUS_DISMISSED)
     store.update_job(job)
 
     return HTTPOk(json={

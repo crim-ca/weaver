@@ -8,7 +8,7 @@ from twitcher.datatype import AccessToken
 from twitcher.exceptions import AccessTokenNotFound
 from twitcher.utils import islambda, now
 from twitcher.sort import *
-from twitcher.status import *
+from twitcher.status import STATUS_ACCEPTED, map_status, job_status_categories
 from pyramid.security import authenticated_userid
 from pymongo import ASCENDING, DESCENDING
 import six
@@ -321,7 +321,7 @@ class MongodbJobStore(JobStore, MongodbStore):
                 'service': service,     # provider identifier (WPS service)
                 'process': process,     # process identifier (WPS request)
                 'inputs': inputs,
-                'status': STATUS_ACCEPTED,
+                'status': map_status(STATUS_ACCEPTED),
                 'execute_async': execute_async,
                 'is_workflow': is_workflow,
                 'created': now(),

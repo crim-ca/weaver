@@ -6,7 +6,7 @@ so that one can update the swagger without touching any other files after the in
 from twitcher.config import TWITCHER_CONFIGURATION_EMS
 from twitcher.wps_restapi.colander_one_of import OneOfMappingSchema
 from twitcher.wps_restapi.utils import wps_restapi_base_path
-from twitcher.status import job_status_categories, STATUS_ACCEPTED, OGC_COMPLIANT
+from twitcher.status import job_status_categories, STATUS_ACCEPTED, STATUS_COMPLIANT_OGC
 from twitcher.sort import job_sort_values, quote_sort_values, SORT_CREATED, SORT_ID, SORT_PROCESS
 from twitcher.sync import execute_sync_options, EXECUTE_AUTO
 from twitcher.visibility import visibility_values, VISIBILITY_PUBLIC
@@ -612,7 +612,7 @@ class ProcessOutputDescriptionSchema(MappingSchema):
 JobStatusEnum = SchemaNode(
     String(),
     default=None,
-    validator=OneOf(job_status_categories[OGC_COMPLIANT]),
+    validator=OneOf(job_status_categories[STATUS_COMPLIANT_OGC]),
     example=STATUS_ACCEPTED)
 JobSortEnum = SchemaNode(
     String(),
@@ -639,11 +639,14 @@ class GetJobsRequest(MappingSchema):
     querystring = GetJobsQueries()
 
 
-class StatusInfo(MappingSchema):
+class JobStatusInfo(MappingSchema):
     jobID = SchemaNode(String(), example='a9d14bf4-84e0-449a-bac8-16e598efe807', description="ID of the job.")
     status = JobStatusEnum
+    message = SchemaNode(String(), missing=drop)
+    logs = SchemaNode(String(), missing=drop)
     expirationDate = SchemaNode(DateTime(), missing=drop)
     estimatedCompletion = SchemaNode(DateTime(), missing=drop)
+    duration = SchemaNode(DateTime(), missing=drop)
     nextPoll = SchemaNode(DateTime(), missing=drop)
     percentCompleted = SchemaNode(Integer(), example=0, validator=Range(min=0, max=100))
 
@@ -1242,7 +1245,7 @@ class OkGetAllProcessJobsResponse(MappingSchema):
 
 class OkGetProcessJobResponse(MappingSchema):
     header = JsonHeader()
-    body = StatusInfo()
+    body = JobStatusInfo()
 
 
 class OkDeleteProcessJobResponse(MappingSchema):
@@ -1262,7 +1265,7 @@ class OkDismissJobResponse(MappingSchema):
 
 class OkGetSingleJobStatusResponse(MappingSchema):
     header = JsonHeader()
-    body = StatusInfo()
+    body = JobStatusInfo()
 
 
 class Result(MappingSchema):

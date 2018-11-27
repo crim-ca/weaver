@@ -1,20 +1,16 @@
 """
 pywps 4.x wrapper
 """
-import os
 
-from pyramid.response import Response
 from pyramid.wsgi import wsgiapp2
-from pyramid.httpexceptions import HTTPBadRequest
-from pyramid.settings import asbool, aslist
+from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
 from pywps import configuration as pywps_config
 from six.moves.configparser import SafeConfigParser
-import six
-
 from twitcher.owsexceptions import OWSNoApplicableCode
 from twitcher.visibility import VISIBILITY_PUBLIC
-
+import six
+import os
 import logging
 LOGGER = logging.getLogger(__name__)
 
@@ -65,7 +61,7 @@ def _processes(request):
     return processstore_defaultfactory(request.registry)
 
 
-#@app.task(bind=True)
+# @app.task(bind=True)
 @wsgiapp2
 def pywps_view(environ, start_response):
     """

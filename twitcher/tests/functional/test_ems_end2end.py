@@ -7,9 +7,10 @@ from twitcher.owsproxy import owsproxy_base_url
 from twitcher.utils import get_twitcher_url, now
 from twitcher.status import (
     STATUS_ACCEPTED,
-    STATUS_SUCCEEDED,
     STATUS_RUNNING,
-    STATUS_FINISHED,
+    STATUS_SUCCEEDED,
+    STATUS_CATEGORY_RUNNING,
+    STATUS_CATEGORY_FINISHED,
     job_status_values,
     job_status_categories,
 )
@@ -19,13 +20,15 @@ from unittest import TestCase
 from pyramid import testing
 from pyramid.settings import asbool
 from pyramid.httpexceptions import HTTPOk, HTTPCreated, HTTPUnauthorized, HTTPNotFound
+# use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
 # noinspection PyPackageRequirements
-from webtest import TestApp, TestResponse
+from webtest import TestApp as WebTestApp, TestResponse as WebTestResponse
 from copy import deepcopy
 import unittest
 # noinspection PyPackageRequirements
 import pytest
 import requests
+from requests import Request, Response
 import logging
 # noinspection PyProtectedMember
 from logging import _loggerClass
@@ -55,7 +58,7 @@ class End2EndEMSTestCase(TestCase):
     test_processes_info = dict()
     headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
     cookies = dict()                # type: Dict[AnyStr, AnyStr]
-    app = None                      # type: TestApp
+    app = None                      # type: WebTestApp
     logger_separator_calls = None   # type: AnyStr
     logger_separator_steps = None   # type: AnyStr
     logger_separator_tests = None   # type: AnyStr
@@ -86,7 +89,7 @@ class End2EndEMSTestCase(TestCase):
         cls.TEST_SERVER_HOSTNAME = os.getenv('TEST_SERVER_HOSTNAME')
         cls.TEST_SERVER_MAGPIE_PATH = os.getenv('TEST_SERVER_MAGPIE_PATH', '/magpie')
         cls.TEST_SERVER_TWITCHER_PATH = os.getenv('TEST_SERVER_TWITCHER_PATH', '/twitcher')
-        cls.app = TestApp(cls.TEST_SERVER_HOSTNAME)
+        cls.app = WebTestApp(cls.TEST_SERVER_HOSTNAME)
 
         # logging parameter overrides
         cls.logger_level = os.getenv('TEST_LOGGER_LEVEL', cls.logger_level)
@@ -232,7 +235,8 @@ class End2EndEMSTestCase(TestCase):
     @classmethod
     def retrieve_process_info(cls, process_id):
         # type: (AnyStr) -> ProcessInfo
-        base = 'https://raw.githubusercontent.com/crim-ca/testbed14/master/application-packages'
+        base = os.getenv("TEST_GITHUB_SOURCE_URL",
+                         "https://raw.githubusercontent.com/crim-ca/testbed14/master/application-packages")
         deploy_path = '{base}/{proc}/DeployProcess_{proc}.json'.format(base=base, proc=process_id)
         execute_path = '{base}/{proc}/Execute_{proc}.json'.format(base=base, proc=process_id)
         deploy_payload = cls.retrieve_payload(deploy_path)
@@ -317,7 +321,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def request(cls, method, url, ignore_errors=False, force_requests=False, **kw):
-        # type: (AnyStr, AnyStr, Optional[bool], Optional[bool], Optional[Any]) -> Union[TestResponse, requests.Request]
+        # type: (AnyStr, AnyStr, Optional[bool], Optional[bool], Optional[Any]) -> Union[WebTestResponse, Request]
         """
         Executes the request, but following any server prior redirects as needed.
         Also prepares JSON body and obvious error handling according to a given status code.
@@ -406,7 +410,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def assert_response(cls, response, status=None, message=''):
-        # type: (Union[TestResponse, requests.Response], Optional[int, Iterable[int]], Optional[str]) -> None
+        # type: (Union[WebTestResponse, Response], Optional[int, Iterable[int]], Optional[str]) -> None
         """Tests a response for expected status and raises an error if not matching."""
         rs = response.status_code
         reason = getattr(response, 'reason', '')
@@ -543,7 +547,7 @@ class End2EndEMSTestCase(TestCase):
                              message="Response process ID should match specified test process id.")
             resp = self.request('POST', execute_path, json=execute_body,
                                 headers=headers_b, cookies=cookies_b, status=HTTPCreated.code)
-            self.assert_test(lambda: resp.json.get('status') in job_status_categories[STATUS_RUNNING],
+            self.assert_test(lambda: resp.json.get('status') in job_status_categories[STATUS_CATEGORY_RUNNING],
                              message="Response process execution job status should be one of running category values.")
             job_location = resp.json.get('location')
             job_id = resp.json.get('jobID')
@@ -586,7 +590,7 @@ class End2EndEMSTestCase(TestCase):
         execute_body = workflow_info.execute_payload
         execute_path = '{}/jobs'.format(process_path)
         resp = self.request('POST', execute_path, json=execute_body, status=HTTPCreated.code)
-        self.assert_test(lambda: resp.json.get('status') in job_status_categories[STATUS_RUNNING],
+        self.assert_test(lambda: resp.json.get('status') in job_status_categories[STATUS_CATEGORY_RUNNING],
                          message="Response process execution job status should be one of running category values.")
         job_location = resp.json.get('location')
         job_id = resp.json.get('jobID')
@@ -594,8 +598,8 @@ class End2EndEMSTestCase(TestCase):
                          message="Response process execution job ID must match expected value to validate results.")
         self.validate_test_job_execution(job_location, None, None)
 
-    def validate_test_job_execution(self, job_location_url, user_headers, user_cookies):
-        # type: (AnyStr, Dict[AnyStr, AnyStr], Dict[AnyStr, AnyStr]) -> None
+    def validate_test_job_execution(self, job_location_url, user_headers=None, user_cookies=None):
+        # type: (AnyStr, Optional[Dict[AnyStr, AnyStr]], Optional[Dict[AnyStr, AnyStr]]) -> None
         """
         Validates that the job is stated, running, and polls it until completed successfully.
         Then validates that results are accessible (no data integrity check).
@@ -619,14 +623,14 @@ class End2EndEMSTestCase(TestCase):
             status = resp.json.get('status')
             self.assert_test(lambda: status in job_status_values,
                              message="Cannot identify a valid job status for result validation.")
-            if status in job_status_categories[STATUS_RUNNING]:
+            if status in job_status_categories[STATUS_CATEGORY_RUNNING]:
                 if status == STATUS_ACCEPTED:
                     timeout_accept -= timeout_interval
                 else:
                     timeout_running -= timeout_interval
                 time.sleep(timeout_interval)
                 continue
-            elif status in job_status_categories[STATUS_FINISHED]:
+            elif status in job_status_categories[STATUS_CATEGORY_FINISHED]:
                 self.assert_test(lambda: status == STATUS_SUCCEEDED,
                                  message="Job execution `{}` failed, but expected to succeed.".format(job_location_url))
                 break

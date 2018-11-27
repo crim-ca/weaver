@@ -2,9 +2,7 @@ import os
 from pyramid.httpexceptions import *
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
-from pyramid.request import Request
 from celery.utils.log import get_task_logger
-from six.moves.urllib.parse import urlparse
 from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import URLError
 from time import sleep
@@ -12,7 +10,7 @@ from time import sleep
 from twitcher.wps import load_pywps_cfg
 from twitcher.adapter import servicestore_factory, jobstore_factory, processstore_factory
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS
-from twitcher.datatype import Process as ProcessDB, Job as JobDB
+from twitcher.datatype import Process as ProcessDB
 from twitcher.exceptions import (
     ProcessRegistrationError,
     ProcessNotFound,
@@ -22,10 +20,8 @@ from twitcher.exceptions import (
 )
 from twitcher.processes import wps_package, opensearch
 from twitcher.processes.types import PROCESS_WORKFLOW
-from twitcher.store import processstore_defaultfactory
 from twitcher.utils import get_any_id, get_any_value, raise_on_xml_exception
 from twitcher.namesgenerator import get_sane_name
-from twitcher.utils import get_any_id, raise_on_xml_exception
 from twitcher.owsexceptions import OWSNoApplicableCode
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
@@ -37,7 +33,6 @@ from twitcher.status import (
     STATUS_STARTED,
     STATUS_FAILED,
     STATUS_SUCCEEDED,
-    STATUS_PENDING,
 )
 from twitcher.sync import EXECUTE_AUTO, EXECUTE_ASYNC, EXECUTE_SYNC
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference
@@ -208,17 +203,14 @@ def execute_process(self, job_id, url, headers=None):
             wps_inputs = []
 
         # prepare outputs
-        outputs = [
-            (o.identifier, o.dataType == 'ComplexData') for o in process.processOutputs
-        ]
+        outputs = [(o.identifier, o.dataType == 'ComplexData') for o in process.processOutputs]
 
         mode = EXECUTE_ASYNC if job.execute_async else EXECUTE_SYNC
         execution = wps.execute(job.process, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
-
         if not execution.process and execution.errors:
             raise execution.errors[0]
 
-        job.status = STATUS_STARTED
+        job.status = map_status(STATUS_STARTED)
         job.status_message = execution.statusMessage or "{} initiation done.".format(str(job))
         job.status_location = execution.statusLocation
         job.request = execution.request
@@ -226,11 +218,12 @@ def execute_process(self, job_id, url, headers=None):
         job.save_log(logger=task_logger)
         job = store.update_job(job)
 
+        max_retries = 5
         num_retries = 0
         run_step = 0
         while execution.isNotComplete() or run_step == 0:
-            if num_retries >= 5:
-                raise Exception("Could not read status document after 5 retries. Giving up.")
+            if num_retries >= max_retries:
+                raise Exception("Could not read status document after {} retries. Giving up.".format(max_retries))
             try:
                 execution = check_status(url=execution.statusLocation, verify=ssl_verify,
                                          sleep_secs=wait_secs(run_step))
@@ -245,7 +238,7 @@ def execute_process(self, job_id, url, headers=None):
                     job.mark_finished()
                     if execution.isSucceded():
                         job.progress = 100
-                        job.status = STATUS_SUCCEEDED
+                        job.status = map_status(STATUS_SUCCEEDED)
                         job.status_message = execution.statusMessage or "Job succeeded."
                         retrieve_package_job_log(execution, job)
                         job.save_log(logger=task_logger)
@@ -253,8 +246,8 @@ def execute_process(self, job_id, url, headers=None):
                         process = wps.describeprocess(job.process)
                         output_datatype = {
                             getattr(processOutput, 'identifier', ''): processOutput.dataType
-                            for processOutput in getattr(process, 'processOutputs', [])}
-
+                            for processOutput in getattr(process, 'processOutputs', [])
+                        }
                         job.results = [_jsonify_output(output, output_datatype[output.identifier])
                                        for output in execution.processOutputs]
                     else:
@@ -278,7 +271,7 @@ def execute_process(self, job_id, url, headers=None):
                 job = store.update_job(job)
 
     except (WPSException, Exception) as exc:
-        job.status = STATUS_FAILED
+        job.status = map_status(STATUS_FAILED)
         job.status_message = "Failed to run {}.".format(str(job))
         if isinstance(exc, WPSException):
             errors = "[{0}] {1}".format(exc.locator, exc.text)
@@ -322,7 +315,7 @@ def submit_job_handler(request, service_url, is_workflow=False):
                                      .format(job_output['transmissionMode']))
 
     store = jobstore_factory(request.registry)
-    job = store.save_job(task_id=STATUS_PENDING, process=process_id, service=provider_id,
+    job = store.save_job(task_id=STATUS_ACCEPTED, process=process_id, service=provider_id,
                          inputs=request.json_body['inputs'], is_workflow=is_workflow,
                          user_id=request.authenticated_userid, execute_async=execute_async, custom_tags=tags)
     result = execute_process.delay(
@@ -341,7 +334,7 @@ def submit_job_handler(request, service_url, is_workflow=False):
         job_id=job.id)
     body_data = {
         'jobID': job.id,
-        'status': STATUS_ACCEPTED,
+        'status': map_status(STATUS_ACCEPTED),
         'location': location
     }
     return HTTPCreated(location=location, json=body_data)
