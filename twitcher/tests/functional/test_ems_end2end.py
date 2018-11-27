@@ -590,7 +590,7 @@ class End2EndEMSTestCase(TestCase):
         execute_body = workflow_info.execute_payload
         execute_path = '{}/jobs'.format(process_path)
         resp = self.request('POST', execute_path, json=execute_body, status=HTTPCreated.code)
-        self.assert_test(lambda: resp.json.get('status') in job_status_categories[STATUS_RUNNING],
+        self.assert_test(lambda: resp.json.get('status') in job_status_categories[STATUS_CATEGORY_RUNNING],
                          message="Response process execution job status should be one of running category values.")
         job_location = resp.json.get('location')
         job_id = resp.json.get('jobID')
