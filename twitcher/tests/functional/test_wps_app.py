@@ -15,28 +15,34 @@ import pyramid.testing
 import sys
 import os
 from xml.etree import ElementTree
-from twitcher.tests.functional.common import setup_with_mongodb, setup_mongodb_processstore, setup_mongodb_tokenstore
-from twitcher.tests.utils import get_default_config_ini_path
 from twitcher.datatype import Process
 from twitcher.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
+from twitcher.tests.utils import get_default_config_ini_path
+from twitcher.tests.functional.common import (
+    setup_with_mongodb,
+    setup_mongodb_processstore,
+    setup_mongodb_tokenstore,
+    setup_with_pywps,
+)
 
 
 @pytest.mark.functional
 class WpsAppTest(unittest.TestCase):
 
     def setUp(self):
+        self.wps_path = '/ows/wps'
         config = setup_with_mongodb()
-        self.process = setup_mongodb_processstore(config)
-        self.token = setup_mongodb_tokenstore(config)
-        self.protected_path = '/ows'
-        self.wps_path = '/wps'
+        config.registry.settings['twitcher.url'] = ''
         config.registry.settings['twitcher.wps'] = True
-        config.registry.settings['twitcher.wps_path'] = '{}{}'.format(self.protected_path, self.wps_path)
+        config.registry.settings['twitcher.wps_path'] = self.wps_path
         config.include('twitcher.wps')
         config.include('twitcher.tweens')
         config.include('pyramid_celery')
         sys.path.append(os.path.expanduser('~/birdhouse/etc/celery'))   # allow finding celeryconfig
         config.configure_celery(get_default_config_ini_path())
+        config = setup_with_pywps(config.get_settings())
+        self.process = setup_mongodb_processstore(config)
+        self.token = setup_mongodb_tokenstore(config)
         self.app = webtest.TestApp(config.make_wsgi_app())
 
         public_process = Process(id='public_process', processEndpointWPS1='wps', package={})
@@ -50,7 +56,7 @@ class WpsAppTest(unittest.TestCase):
         pyramid.testing.tearDown()
 
     def make_url(self, params, token=None):
-        return '{}{}?{}&access_token={}'.format(self.protected_path, self.wps_path, params, token or self.token)
+        return '{}?{}&access_token={}'.format(self.wps_path, params, token or self.token)
 
     @pytest.mark.online
     def test_getcaps(self):

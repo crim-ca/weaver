@@ -288,6 +288,13 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         process.visibility = visibility
         self.save_process(process, overwrite=True)
 
+    def clear_processes(self, request=None):
+        """
+        Clears all processes from the store.
+        """
+        self.collection.drop()
+        return True
+
 
 from twitcher.store.base import JobStore
 from twitcher.datatype import Job

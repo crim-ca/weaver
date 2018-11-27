@@ -4,14 +4,17 @@ pywps 4.x wrapper
 
 from pyramid.wsgi import wsgiapp2
 from pyramid.settings import asbool
+from pyramid.registry import Registry
 from pyramid_celery import celery_app as app
 from pyramid.threadlocal import get_current_request
 from pywps import configuration as pywps_config
 from six.moves.configparser import SafeConfigParser
+from typing import AnyStr, Dict, Union, Optional
 from twitcher.owsexceptions import OWSNoApplicableCode
 from twitcher.visibility import VISIBILITY_PUBLIC
-import six
+from twitcher.utils import get_twitcher_url
 import os
+import six
 import logging
 LOGGER = logging.getLogger(__name__)
 
@@ -20,30 +23,89 @@ DEFAULT_PYWPS_CFG = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'wp
 PYWPS_CFG = None
 
 
-def get_wps_cfg_path(settings):
-    return settings.get('twitcher.wps_cfg', DEFAULT_PYWPS_CFG)
-
-
-def get_wps_path(settings):
-    wps_path = settings.get('twitcher.wps_path')
+def _get_settings_or_wps_config(
+        settings,                   # type: Dict[AnyStr, AnyStr]
+        twitcher_setting_name,      # type: AnyStr
+        config_setting_section,     # type: AnyStr
+        config_setting_name,        # type: AnyStr
+        default_not_found,          # type: AnyStr
+        message_not_found,          # type: AnyStr
+        ):                          # type: (...) -> AnyStr
+    wps_path = settings.get(twitcher_setting_name)
     if not wps_path:
         wps_cfg = get_wps_cfg_path(settings)
         config = SafeConfigParser()
         config.read(wps_cfg)
-        wps_path = config.get('server', 'url')
+        wps_path = config.get(config_setting_section, config_setting_name)
     if not isinstance(wps_path, six.string_types):
-        LOGGER.warn("WPS path not set in configuration, using default value.")
-        wps_path = '/ows/wps'
+        LOGGER.warn("{} not set in settings or WPS configuration, using default value.".format(message_not_found))
+        wps_path = default_not_found
     return wps_path.rstrip('/').strip()
 
 
-def load_pywps_cfg(registry, config_file=None):
+def get_wps_cfg_path(settings):
+    # type: (Dict[AnyStr, AnyStr]) -> AnyStr
+    """
+    Retrieves the WPS configuration file (`wps.cfg` by default or `twitcher.wps_cfg` if specified).
+    """
+    return settings.get('twitcher.wps_cfg', DEFAULT_PYWPS_CFG)
+
+
+def get_wps_path(settings):
+    # type: (Dict[AnyStr, AnyStr]) -> AnyStr
+    """
+    Retrieves the WPS path (without hostname).
+    Searches directly in settings, then `twitcher.wps_cfg` file, or finally, uses the default values if not found.
+    """
+    return _get_settings_or_wps_config(
+        settings, 'twitcher.wps_path', 'server', 'url', '/ows/wps', 'WPS path')
+
+
+def get_wps_url(settings):
+    # type: (Dict[AnyStr, AnyStr]) -> AnyStr
+    """
+    Retrieves the full WPS URL (hostname + WPS path).
+    Searches directly in settings, then `twitcher.wps_cfg` file, or finally, uses the default values if not found.
+    """
+    return get_twitcher_url(settings) + get_wps_path(settings)
+
+
+def get_wps_output_path(settings):
+    # type: (Dict[AnyStr, AnyStr]) -> AnyStr
+    """
+    Retrieves the WPS output path directory where to write XML and result files.
+    Searches directly in settings, then `twitcher.wps_cfg` file, or finally, uses the default values if not found.
+    """
+    return _get_settings_or_wps_config(
+        settings, 'twitcher.wps_output_path', 'server', 'outputpath', '/tmp', 'WPS output path')
+
+
+def get_wps_output_url(settings):
+    # type: (Dict[AnyStr, AnyStr]) -> AnyStr
+    """
+    Retrieves the WPS output URL that maps to WPS output path directory.
+    Searches directly in settings, then `twitcher.wps_cfg` file, or finally, uses the default values if not found.
+    """
+    wps_output_default = get_twitcher_url(settings) + '/wpsoutputs'
+    return _get_settings_or_wps_config(
+        settings, 'twitcher.wps_output_url', 'server', 'outputurl', wps_output_default, 'WPS output url')
+
+
+def load_pywps_cfg(registry, config=None):
+    # type: (Registry, Optional[Union[AnyStr, Dict[AnyStr, AnyStr]]]) -> None
     global PYWPS_CFG
 
     if PYWPS_CFG is None:
         # get PyWPS config
-        pywps_config.load_configuration(config_file or get_wps_cfg_path(registry.settings))
+        file_config = config if isinstance(config, six.string_types) or isinstance(config, list) else None
+        pywps_config.load_configuration(file_config or get_wps_cfg_path(registry.settings))
         PYWPS_CFG = pywps_config
+
+    # add additional config passed as dictionary of {'section.key': 'value'}
+    if isinstance(config, dict):
+        for key, value in config.items():
+            section, key = key.split('.')
+            PYWPS_CFG.CONFIG.set(section, key, value)
 
     if 'twitcher.wps_output_path' not in registry.settings:
         # ensure the output dir exists if specified
@@ -78,7 +140,7 @@ def pywps_view(environ, start_response):
         # get config file
         if 'PYWPS_CFG' not in environ:
             environ['PYWPS_CFG'] = os.getenv('PYWPS_CFG') or get_wps_cfg_path(registry.settings)
-        load_pywps_cfg(registry, config_file=environ['PYWPS_CFG'])
+        load_pywps_cfg(registry, config=environ['PYWPS_CFG'])
 
         # call pywps application with processes filtered according to the adapter's definition
         from twitcher.adapter import adapter_factory

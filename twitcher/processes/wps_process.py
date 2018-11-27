@@ -6,6 +6,7 @@ from typing import Union, AnyStr, Callable
 from twitcher import status
 from twitcher.visibility import VISIBILITY_PUBLIC
 from twitcher.utils import get_any_id, get_any_value, get_any_message, get_job_log_msg
+from twitcher.wps import get_wps_output_path, get_wps_output_url
 from twitcher.wps_restapi.swagger_definitions import (
     processes_uri,
     process_uri,
@@ -293,8 +294,8 @@ class WpsProcess(object):
     @staticmethod
     def host_file(fn):
         registry = app.conf['PYRAMID_REGISTRY']
-        twitcher_output_url = registry.settings.get('twitcher.wps_output_url')
-        twitcher_output_path = registry.settings.get('twitcher.wps_output_path')
+        twitcher_output_url = get_wps_output_url(registry.settings)
+        twitcher_output_path = get_wps_output_path(registry.settings)
         fn = fn.replace('file://', '')
 
         if not fn.startswith(twitcher_output_path):

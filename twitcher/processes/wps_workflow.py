@@ -30,6 +30,7 @@ from pyramid.httpexceptions import HTTPNotFound, HTTPConflict, HTTPInternalServe
 from twitcher.visibility import VISIBILITY_PUBLIC
 from twitcher.processes.wps_process import WpsProcess
 from twitcher.utils import pass_http_error, now
+from twitcher.wps import get_wps_output_path, get_wps_output_url
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_TMP_PREFIX = "tmp"
@@ -100,7 +101,7 @@ class WpsWorkflow(Process):
         jobname = uniquename(runtimeContext.name or shortname(self.tool.get("id", "job")))
 
         registry = app.conf['PYRAMID_REGISTRY']
-        twitcher_output_path = registry.settings.get('twitcher.wps_output_path')
+        twitcher_output_path = get_wps_output_path(registry.settings)
 
         # outdir must be served by the EMS because downstream step will need access to upstream steps output
         runtimeContext.outdir = tempfile.mkdtemp(

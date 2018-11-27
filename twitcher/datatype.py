@@ -529,7 +529,7 @@ class Process(dict):
     # wps, workflow, etc.
     @property
     def type(self):
-        return self.get('type')
+        return self.get('type', 'WPS')
 
     @property
     def package(self):

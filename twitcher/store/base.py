@@ -151,6 +151,13 @@ class ProcessStore(object):
         """
         raise NotImplementedError
 
+    def clear_processes(self, request=None):
+        # type: (Optional[Request]) -> bool
+        """
+        Clears all processes from the store.
+        """
+        raise NotImplementedError
+
 
 class JobStore(object):
     """

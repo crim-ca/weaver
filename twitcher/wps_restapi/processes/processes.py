@@ -26,6 +26,7 @@ from twitcher.owsexceptions import OWSNoApplicableCode
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import check_status
+from twitcher.wps import get_wps_output_path
 from twitcher.visibility import VISIBILITY_PUBLIC, visibility_values
 from twitcher.status import (
     map_status,
@@ -141,7 +142,7 @@ def retrieve_package_job_log(execution, job):
     status_xml_fn = execution.statusLocation.split('/')[-1]
     try:
         registry = app.conf['PYRAMID_REGISTRY']
-        output_path = registry.settings['twitcher.wps_output_path']
+        output_path = get_wps_output_path(registry.settings)
 
         # twitcher package log every status update into this file (we no longer rely on the http monitoring)
         log_fn = os.path.join(output_path, '{0}.log'.format(status_xml_fn))
