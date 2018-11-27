@@ -190,29 +190,44 @@ class End2EndEMSTestCase(TestCase):
         cls.PROCESS_STACKER_ID = 'Stacker'
         cls.PROCESS_SFS_ID = 'SFS'
         cls.PROCESS_WORKFLOW_ID = 'Workflow'
-        for process in [cls.PROCESS_STACKER_ID, cls.PROCESS_SFS_ID, cls.PROCESS_WORKFLOW_ID]:
+        cls.PROCESS_WORKFLOW_SC_ID = 'WorkflowSimpleChain'
+        cls.PROCESS_WORKFLOW_S2P_ID = 'WorkflowS2Probav'
+        test_set = [cls.PROCESS_STACKER_ID,
+                    cls.PROCESS_SFS_ID,
+                    cls.PROCESS_WORKFLOW_ID,
+                    cls.PROCESS_WORKFLOW_SC_ID,
+                    cls.PROCESS_WORKFLOW_S2P_ID]
+        workflow_set = [cls.PROCESS_WORKFLOW_ID,
+                        cls.PROCESS_WORKFLOW_SC_ID,
+                        cls.PROCESS_WORKFLOW_S2P_ID]
+        for process in test_set:
             cls.test_processes_info.update({process: cls.retrieve_process_info(process)})
 
-        # replace max occur of 'Stacker' to minimize data size during tests
-        stacker_deploy = cls.test_processes_info[cls.PROCESS_STACKER_ID].deploy_payload
-        stacker_deploy_inputs = stacker_deploy['processDescription']['process']['inputs']
-        for i_input, proc_input in enumerate(stacker_deploy_inputs):
-            if proc_input.get('maxOccurs') == 'unbounded':
-                stacker_deploy_inputs[i_input]['maxOccurs'] = 2
+        # replace max occur of processes to minimize data size during tests
+        for process_id in test_set:
+            process_deploy = cls.test_processes_info[process_id].deploy_payload
+            process_deploy_inputs = process_deploy['processDescription']['process']['inputs']
+            for i_input, proc_input in enumerate(process_deploy_inputs):
+                if proc_input.get('maxOccurs') == 'unbounded':
+                    process_deploy_inputs[i_input]['maxOccurs'] = 2
 
-        # update 'Workflow' to use 'test_id' instead of originals
-        workflow_deploy = cls.test_processes_info[cls.PROCESS_WORKFLOW_ID].deploy_payload
-        for exec_unit in range(len(workflow_deploy['executionUnit'])):
-            workflow_cwl_ref = workflow_deploy['executionUnit'][exec_unit].pop('href')
-            workflow_cwl_raw = cls.retrieve_payload(workflow_cwl_ref)
-            for step in workflow_cwl_raw.get('steps'):
-                step_id = workflow_cwl_raw['steps'][step]['run'].strip('.cwl')
-                for app_id in [cls.PROCESS_STACKER_ID, cls.PROCESS_SFS_ID]:
-                    if app_id == step_id:
-                        test_id = cls.test_processes_info[app_id].test_id
-                        real_id = workflow_cwl_raw['steps'][step]['run']
-                        workflow_cwl_raw['steps'][step]['run'] = real_id.replace(app_id, test_id)
-            workflow_deploy['executionUnit'][exec_unit]['unit'] = workflow_cwl_raw
+        # update workflows to use 'test_id' instead of originals
+        for workflow_id in workflow_set:
+            workflow_deploy = cls.test_processes_info[workflow_id].deploy_payload
+            for exec_unit in range(len(workflow_deploy['executionUnit'])):
+                try:
+                    workflow_cwl_ref = workflow_deploy['executionUnit'][exec_unit].pop('href')
+                    workflow_cwl_raw = cls.retrieve_payload(workflow_cwl_ref)
+                except KeyError:
+                    workflow_cwl_raw = workflow_deploy['executionUnit'][exec_unit].pop('unit')
+                for step in workflow_cwl_raw.get('steps'):
+                    step_id = workflow_cwl_raw['steps'][step]['run'].strip('.cwl')
+                    for app_id in [cls.PROCESS_STACKER_ID, cls.PROCESS_SFS_ID]:
+                        if app_id == step_id:
+                            test_id = cls.test_processes_info[app_id].test_id
+                            real_id = workflow_cwl_raw['steps'][step]['run']
+                            workflow_cwl_raw['steps'][step]['run'] = real_id.replace(app_id, test_id)
+                workflow_deploy['executionUnit'][exec_unit]['unit'] = workflow_cwl_raw
 
     @classmethod
     def retrieve_process_info(cls, process_id):
