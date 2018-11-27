@@ -8,8 +8,9 @@ solution specific to your needs.
 The implementation is based on `python-oauth2 <http://python-oauth2.readthedocs.io/en/latest/>`_.
 """
 from pyramid.request import Request
-from typing import Any, Optional, List
+from typing import Any, Optional, List, Union
 from twitcher.datatype import Job, Service, Process, Quote, Bill, AccessToken
+from pywps import Process as ProcessWPS
 
 
 class AccessTokenStore(object):
@@ -98,7 +99,7 @@ class ProcessStore(object):
     """
 
     def save_process(self, process, overwrite=True, request=None):
-        # type: (Process, Optional[bool], Optional[Request]) -> Process
+        # type: (Union[Process, ProcessWPS], Optional[bool], Optional[Request]) -> Process
         """
         Stores a WPS process in storage.
         """

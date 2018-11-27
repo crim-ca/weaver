@@ -9,6 +9,7 @@ from twitcher.exceptions import AccessTokenNotFound
 from twitcher.utils import islambda, now
 from twitcher.sort import *
 from twitcher.status import STATUS_ACCEPTED, map_status, job_status_categories
+from twitcher.processes.types import PROCESS_WPS
 from pyramid.security import authenticated_userid
 from pymongo import ASCENDING, DESCENDING
 import six
@@ -194,7 +195,7 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
 
     def _get_process_type(self, process):
         return self._get_process_field(process, {ProcessDB: lambda: process.type,
-                                                 ProcessWPS: lambda: 'wps'}).lower()
+                                                 ProcessWPS: lambda: getattr(process, 'type', PROCESS_WPS)}).lower()
 
     def _get_process_endpoint_wps1(self, process):
         url = self._get_process_field(process, {ProcessDB: lambda: process.processEndpointWPS1,
@@ -218,7 +219,7 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
                 self.collection.delete_one({'identifier': sane_name})
             else:
                 raise ProcessRegistrationError("Process `{}` already registered.".format(sane_name))
-        process["identifier"] = sane_name
+        process.identifier = sane_name  # must use property getter/setter to match both 'Process' types
         self._add_process(process)
         return self.fetch_by_id(sane_name)
 

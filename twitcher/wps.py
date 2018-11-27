@@ -106,6 +106,9 @@ def load_pywps_cfg(registry, config=None):
         for key, value in config.items():
             section, key = key.split('.')
             PYWPS_CFG.CONFIG.set(section, key, value)
+        # cleanup alternative dict 'PYWPS_CFG' which is not expected elsewhere
+        if isinstance(registry.settings.get('PYWPS_CFG'), dict):
+            del registry.settings['PYWPS_CFG']
 
     if 'twitcher.wps_output_path' not in registry.settings:
         # ensure the output dir exists if specified
@@ -138,16 +141,17 @@ def pywps_view(environ, start_response):
         registry = app.conf['PYRAMID_REGISTRY']
 
         # get config file
-        if 'PYWPS_CFG' not in environ:
+        pywps_cfg = environ.get('PYWPS_CFG') or registry.settings.get('PYWPS_CFG')
+        if not pywps_cfg:
             environ['PYWPS_CFG'] = os.getenv('PYWPS_CFG') or get_wps_cfg_path(registry.settings)
-        load_pywps_cfg(registry, config=environ['PYWPS_CFG'])
+        load_pywps_cfg(registry, config=pywps_cfg)
 
         # call pywps application with processes filtered according to the adapter's definition
         from twitcher.adapter import adapter_factory
         processstore = adapter_factory(registry.settings).processstore_factory(registry)
         processes_wps = [process.wps() for process in
                          processstore.list_processes(visibility=VISIBILITY_PUBLIC, request=get_current_request())]
-        service = Service(processes_wps, [environ['PYWPS_CFG']])
+        service = Service(processes_wps)
     except Exception as ex:
         raise OWSNoApplicableCode("Failed setup of PyWPS Service and/or Processes. Error [{}]".format(ex))
 

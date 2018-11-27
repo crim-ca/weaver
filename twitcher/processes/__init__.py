@@ -1,6 +1,7 @@
-from .wps_hello import Hello
-from .wps_package import Package
-from .types import PROCESS_APPLICATION, PROCESS_WORKFLOW
+from twitcher.processes.wps_default import Hello
+from twitcher.processes.wps_testing import WpsTestProcess
+from twitcher.processes.wps_package import Package
+from twitcher.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 
 
 default_processes = [
@@ -9,6 +10,7 @@ default_processes = [
 
 process_mapping = {
     'hello': Hello,
+    'test': WpsTestProcess,
     PROCESS_APPLICATION: Package,
     PROCESS_WORKFLOW: Package
 }
@@ -16,4 +18,3 @@ process_mapping = {
 
 def includeme(config):
     pass
-    #config.registry.processes = processstore_defaultfactory(config.registry, init_processes=default_processes)

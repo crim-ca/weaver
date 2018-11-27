@@ -15,8 +15,9 @@ import pyramid.testing
 import sys
 import os
 from xml.etree import ElementTree
-from twitcher.datatype import Process
 from twitcher.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
+from twitcher.processes.wps_default import Hello
+from twitcher.processes.wps_testing import WpsTestProcess
 from twitcher.tests.utils import get_default_config_ini_path
 from twitcher.tests.functional.common import (
     setup_with_mongodb,
@@ -35,22 +36,25 @@ class WpsAppTest(unittest.TestCase):
         config.registry.settings['twitcher.url'] = ''
         config.registry.settings['twitcher.wps'] = True
         config.registry.settings['twitcher.wps_path'] = self.wps_path
+        config = setup_with_pywps(config)
         config.include('twitcher.wps')
         config.include('twitcher.tweens')
         config.include('pyramid_celery')
         sys.path.append(os.path.expanduser('~/birdhouse/etc/celery'))   # allow finding celeryconfig
         config.configure_celery(get_default_config_ini_path())
-        config = setup_with_pywps(config.get_settings())
         self.process = setup_mongodb_processstore(config)
         self.token = setup_mongodb_tokenstore(config)
         self.app = webtest.TestApp(config.make_wsgi_app())
 
-        self.process_public = Process(id='process_public', processEndpointWPS1='wps', package={})
-        self.process_private = Process(id='process_private', processEndpointWPS1='wps', package={})
+        self.process_public = WpsTestProcess(identifier='process_public')
+        self.process_private = WpsTestProcess(identifier='process_private')
         self.process.save_process(self.process_public)
         self.process.save_process(self.process_private)
-        self.process.set_visibility(self.process_public.id, VISIBILITY_PUBLIC)
-        self.process.set_visibility(self.process_private.id, VISIBILITY_PRIVATE)
+        self.process.set_visibility(self.process_public.identifier, VISIBILITY_PUBLIC)
+        self.process.set_visibility(self.process_private.identifier, VISIBILITY_PRIVATE)
+
+        # default process Hello needs visibility
+        self.process.set_visibility(Hello.identifier, VISIBILITY_PUBLIC)
 
     def tearDown(self):
         pyramid.testing.tearDown()
@@ -86,14 +90,16 @@ class WpsAppTest(unittest.TestCase):
 
     @pytest.mark.online
     def test_describeprocess(self):
-        resp = self.app.get(self.make_url("service=wps&request=describeprocess&version=1.0.0&identifier=hello"))
+        params = "service=wps&request=describeprocess&version=1.0.0&identifier={}".format(Hello.identifier)
+        resp = self.app.get(self.make_url(params))
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
         resp.mustcontain('</wps:ProcessDescriptions>')
 
     @pytest.mark.online
     def test_describeprocess_with_invalid_token(self):
-        url = self.make_url("service=wps&request=describeprocess&version=1.0.0&identifier=hello", token='invalid')
+        params = "service=wps&request=describeprocess&version=1.0.0&identifier={}".format(Hello.identifier)
+        url = self.make_url(params, token='invalid')
         resp = self.app.get(url)
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
@@ -101,23 +107,24 @@ class WpsAppTest(unittest.TestCase):
 
     @pytest.mark.online
     def test_describeprocess_filtered_processes_by_visibility(self):
-        params = "service=wps&request=describeprocess&version=1.0.0&identifier={}".format(self.public_process.id)
-        url = self.make_url(params)
+        param_template = "service=wps&request=describeprocess&version=1.0.0&identifier={}"
+
+        url = self.make_url(param_template.format(self.process_public.identifier))
         resp = self.app.get(url)
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
         resp.mustcontain('</wps:ProcessDescriptions>')
 
-        params = "service=wps&request=describeprocess&version=1.0.0&identifier={}".format(self.private_process.id)
-        url = self.make_url(params)
-        resp = self.app.get(url)
-        assert resp.status_code == 200
+        url = self.make_url(param_template.format(self.process_private.identifier))
+        resp = self.app.get(url, expect_errors=True)
+        assert resp.status_code == 400
         assert resp.content_type == 'text/xml'
         resp.mustcontain('<ows:ExceptionText>Unknown process')
 
     @pytest.mark.online
     def test_execute_not_allowed(self):
-        url = self.make_url("service=wps&request=execute&version=1.0.0&identifier=hello&datainputs=name=tux")
+        params = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=name=tux".format(Hello.identifier)
+        url = self.make_url(params)
         resp = self.app.get(url)
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
@@ -125,9 +132,10 @@ class WpsAppTest(unittest.TestCase):
 
     @pytest.mark.online
     def test_execute_allowed(self):
-        url = self.make_url("service=wps&request=execute&version=1.0.0&identifier=hello&datainputs=name=tux")
+        params = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=name=tux".format(Hello.identifier)
+        url = self.make_url(params)
         url += "&access_token={}".format(self.token)
         resp = self.app.get(url)
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
-        resp.mustcontain('<wps:ProcessSucceeded>PyWPS Process Say Hello finished</wps:ProcessSucceeded>')
+        resp.mustcontain('<wps:ProcessSucceeded>PyWPS Process {} finished</wps:ProcessSucceeded>'.format(Hello.title))

@@ -21,7 +21,7 @@ from twitcher.utils import (
 )
 from twitcher.exceptions import ProcessInstanceError
 from twitcher.processes import process_mapping
-from twitcher.processes.types import PACKAGE_PROCESSES, PROCESS_WPS
+from twitcher.processes.types import PROCESS_WITH_MAPPING, PROCESS_WPS
 from twitcher.status import job_status_values, STATUS_UNKNOWN
 from twitcher.visibility import visibility_values, VISIBILITY_PRIVATE
 from pywps import Process as ProcessWPS
@@ -474,6 +474,10 @@ class Process(dict):
     def identifier(self):
         return self.id
 
+    @identifier.setter
+    def identifier(self, value):
+        self['id'] = value
+
     @property
     def title(self):
         return self.get('title', self.id)
@@ -609,7 +613,8 @@ class Process(dict):
     def from_wps(wps_process, **extra_params):
         assert isinstance(wps_process, ProcessWPS)
         process = wps_process.json
-        process.update({'type': wps_process.identifier, 'package': None, 'reference': None})
+        process_type = getattr(wps_process, 'type', wps_process.identifier)
+        process.update({'type': process_type, 'package': None, 'reference': None})
         process.update(**extra_params)
         return Process(process)
 
@@ -619,7 +624,7 @@ class Process(dict):
             process_key = self.identifier
         if process_key not in process_mapping:
             ProcessInstanceError("Unknown process `{}` in mapping.".format(process_key))
-        if process_key in PACKAGE_PROCESSES:
+        if process_key in PROCESS_WITH_MAPPING:
             return process_mapping[process_key](**self.params_wps)
         return process_mapping[process_key]()
 
