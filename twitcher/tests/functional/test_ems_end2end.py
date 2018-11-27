@@ -467,7 +467,6 @@ class End2EndEMSTestCase(TestCase):
 
     def test_end2end(self):
         """The actual test!"""
-
         # End to end test will log everything
         self.__class__.log_full_trace = True
 
@@ -552,6 +551,7 @@ class End2EndEMSTestCase(TestCase):
                              message="Response process execution job ID must match expected value to validate results.")
             self.validate_test_job_execution(job_location, headers_b, cookies_b)
 
+    @pytest.mark.demo
     def test_demo(self):
         """Simplify test for demonstration purpose"""
 
