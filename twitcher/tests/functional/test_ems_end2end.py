@@ -138,6 +138,7 @@ class End2EndEMSTestCase(TestCase):
 
         cls.validate_test_server()
         cls.setup_test_processes()
+        cls.log_full_trace = True
 
     @classmethod
     def tearDownClass(cls):
@@ -326,14 +327,17 @@ class End2EndEMSTestCase(TestCase):
             payload = "\n" if cls.logger_json_indent else '' + json.dumps(json_body, indent=cls.logger_json_indent)
         else:
             payload = data_body
-        cls.log("{}Request Details:\n".format(cls.logger_separator_steps) +
-                "  Request: {method} {url}\n".format(method=method, url=url) +
-                "  Payload: {payload}\n".format(payload=payload) +
-                "  Headers: {headers}\n".format(headers=headers) +
-                "  Cookies: {cookies}\n".format(cookies=cookies) +
-                "  Status:  {status} (expected)\n".format(status=status) +
-                "  Message: {message} (expected)\n".format(message=message) +
-                "  Module:  {module}\n".format(module='requests' if with_requests else 'webtest.TestApp'))
+        trace = ("{}Request Details:\n".format(cls.logger_separator_steps) +
+                 "  Request: {method} {url}\n".format(method=method, url=url) +
+                 "  Payload: {payload}".format(payload=payload))
+        if cls.log_full_trace:
+            trace += ("\n" +
+                      "  Headers: {headers}\n".format(headers=headers) +
+                      "  Cookies: {cookies}\n".format(cookies=cookies) +
+                      "  Status:  {status} (expected)\n".format(status=status) +
+                      "  Message: {message} (expected)\n".format(message=message) +
+                      "  Module:  {module}\n".format(module='requests' if with_requests else 'webtest.TestApp'))
+        cls.log(trace)
 
         if with_requests:
             kw.update({'verify': False})
@@ -372,12 +376,17 @@ class End2EndEMSTestCase(TestCase):
             payload = "\n" if cls.logger_json_indent else '' + json.dumps(resp.json, indent=cls.logger_json_indent)
         else:
             payload = resp.body
+        if cls.log_full_trace:
+            headers = resp.headers
+        else:
+            header_filter = ['Location']
+            headers = {k: v for k, v in resp.headers.items() if k in header_filter}
+
         cls.log("{}Response Details:\n".format(cls.logger_separator_calls) +
                 "  Status:  {status} (received)\n".format(status=resp.status_code) +
                 "  Content: {content}\n".format(content=resp.content_type) +
                 "  Payload: {payload}\n".format(payload=payload) +
-                "  Headers: {headers}\n".format(headers=resp.headers))
-
+                "  Headers: {headers}\n".format(headers=headers))
         return resp
 
     @classmethod
@@ -443,6 +452,10 @@ class End2EndEMSTestCase(TestCase):
 
     def test_end2end(self):
         """The actual test!"""
+
+        # End to end test will log everything
+        cls.log_full_trace = True
+
         self.clear_test_processes()
 
         headers_a, cookies_a = self.user_headers_cookies(self.ALICE_CREDENTIALS)
