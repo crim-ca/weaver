@@ -15,13 +15,10 @@ import webtest
 import unittest
 import pyramid.testing
 import pyramid_celery
-import sys
-import os
 from xml.etree import ElementTree
 from twitcher.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
 from twitcher.processes.wps_default import Hello
 from twitcher.processes.wps_testing import WpsTestProcess
-from twitcher.tests.utils import get_default_config_ini_path
 from twitcher.tests.functional.common import (
     setup_with_mongodb,
     setup_mongodb_processstore,
@@ -146,3 +143,19 @@ class WpsAppTest(unittest.TestCase):
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
         resp.mustcontain('<wps:ProcessSucceeded>PyWPS Process {} finished</wps:ProcessSucceeded>'.format(Hello.title))
+
+    @pytest.mark.online
+    def test_execute_with_visibility(self):
+        params_template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=test_input=test"
+        url = self.make_url(params_template.format(self.process_public.identifier, ), token=self.token)
+        resp = self.app.get(url)
+        assert resp.status_code == 200
+        assert resp.content_type == 'text/xml'
+        resp.mustcontain('<wps:ProcessSucceeded>PyWPS Process {} finished</wps:ProcessSucceeded>'
+                         .format(self.process_public.title))
+
+        url = self.make_url(params_template.format(self.process_private.identifier), token=self.token)
+        resp = self.app.get(url, expect_errors=True)
+        assert resp.status_code == 400
+        assert resp.content_type == 'text/xml'
+        resp.mustcontain('<ows:ExceptionText>Unknown process')
