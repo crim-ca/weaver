@@ -121,6 +121,14 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info, accept_mime
                     new_input = deepcopy(queue[0])
                     new_input.data = replace_with_opensearch_scheme(link)
                     eoimages_queue.append(new_input)
+                    if len(eoimages_queue) >= max_occurs:
+                        break
+                if len(eoimages_queue) < queue[0].min_occurs:
+                    message = "Could not find enough images ({}/{}) matching accepted mimetype ({})"
+                    message = message.format(len(eoimages_queue),
+                                             queue[0].min_occurs,
+                                             ", ".join(mime_types))
+                    raise ValueError(message)
                 new_inputs[input_id] = eoimages_queue
 
     return new_inputs
@@ -223,6 +231,21 @@ class OpenSearchQuery(object):
 
         return base_url, query_params
 
+    def _fetch_datatsets_from_alternates_links(self, alternate_links):
+        # Try loading from atom alternate link
+        for link in alternate_links:
+            if link["type"] == "application/atom+xml":
+                r = requests.get(link["href"])
+                r.raise_for_status()
+
+                et = lxml.etree.fromstring(r.content)
+                xpath = "//*[local-name() = 'entry']/*[local-name() = 'link']"
+
+                # noinspection PyProtectedMember
+                links = et.xpath(xpath)  # type: lxml.etree._Element
+                return [link.attrib for link in links]
+        return []
+
     # noinspection PyMethodMayBeStatic
     def requests_get_retry(self, *args, **kwargs):
         """Retry a requests.get call
@@ -283,7 +306,12 @@ class OpenSearchQuery(object):
 
         for feature, url in self._query_features_paginated(params):
             try:
-                data_links = feature["properties"]["links"]["data"]
+                try:
+                    data_links = feature["properties"]["links"]["data"]
+                except KeyError:
+                    # Try loading from atom alternate link
+                    data_links = self._fetch_datatsets_from_alternates_links(
+                        feature["properties"]["links"]["alternates"])
                 data_links_mime_types = [d["type"] for d in data_links]
             except KeyError:
                 LOGGER.exception("Badly formatted json at: {}".format(url))
@@ -300,7 +328,9 @@ class OpenSearchQuery(object):
                 message = "Could not match any accepted mimetype ({}) to received mimetype ({})"
                 message = message.format(", ".join(accept_mime_types),
                                          ", ".join(data_links_mime_types))
-                raise ValueError(message)
+                # Do not raise an error right now, just loop until we reach the number of inputs we want
+                # Raise only if that number isn't reach
+                LOGGER.warning(message)
 
 
 def get_additional_parameters(input_data):
