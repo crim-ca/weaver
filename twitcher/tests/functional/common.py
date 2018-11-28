@@ -25,10 +25,17 @@ def setup_with_pywps(config):
             'server.outputurl': get_wps_output_url(settings),
             'server.outputpath': get_wps_output_path(settings),
         },
-        'CELERY_BROKER_URL': 'mongodb://{}:{}/celery'.format(settings.get('mongodb.host'), settings.get('mongodb.port'))
     })
     config.registry.settings.update(settings)
     return config
+
+
+def setup_celery(config):
+    settings = config.get_settings()
+    return {
+        ''
+        'CELERY_BROKER_URL': 'mongodb://{}:{}/celery'.format(settings.get('mongodb.host'), settings.get('mongodb.port'))
+    }
 
 
 def setup_mongodb_tokenstore(config):

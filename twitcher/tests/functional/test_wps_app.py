@@ -7,11 +7,14 @@ Based on tests from:
 * http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/testing.html
 """
 # noinspection PyPackageRequirements
+import mock
+# noinspection PyPackageRequirements
 import pytest
 # noinspection PyPackageRequirements
 import webtest
 import unittest
 import pyramid.testing
+import pyramid_celery
 import sys
 import os
 from xml.etree import ElementTree
@@ -24,12 +27,12 @@ from twitcher.tests.functional.common import (
     setup_mongodb_processstore,
     setup_mongodb_tokenstore,
     setup_with_pywps,
+    setup_celery,
 )
 
 
 @pytest.mark.functional
 class WpsAppTest(unittest.TestCase):
-
     def setUp(self):
         self.wps_path = '/ows/wps'
         config = setup_with_mongodb()
@@ -39,9 +42,11 @@ class WpsAppTest(unittest.TestCase):
         config = setup_with_pywps(config)
         config.include('twitcher.wps')
         config.include('twitcher.tweens')
+
+        # override celery loader to specify configuration directly instead of ini file
+        pyramid_celery.loaders.INILoader.read_configuration = mock.MagicMock(return_value=setup_celery(config))
         config.include('pyramid_celery')
-        sys.path.append(os.path.expanduser('~/birdhouse/etc/celery'))   # allow finding celeryconfig
-        config.configure_celery(get_default_config_ini_path())
+        config.configure_celery('')     # value doesn't matter because overloaded
         self.process = setup_mongodb_processstore(config)
         self.token = setup_mongodb_tokenstore(config)
         self.app = webtest.TestApp(config.make_wsgi_app())
@@ -74,7 +79,14 @@ class WpsAppTest(unittest.TestCase):
         resp = self.app.get(self.make_url("service=wps&request=getcapabilities"))
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
-        resp.mustcontain('</wps:Capabilities>')
+        resp.mustcontain('<wps:ProcessOfferings>')
+        root = ElementTree.fromstring(resp.text)
+        process_offerings = list(filter(lambda e: 'ProcessOfferings' in e.tag, list(root)))
+        assert len(process_offerings) == 1
+        processes = [p for p in process_offerings[0]]
+        identifiers = [pi.text for pi in [filter(lambda e: e.tag.endswith('Identifier'), p)[0] for p in processes]]
+        assert self.process_private.identifier not in identifiers
+        assert self.process_public.identifier in identifiers
 
     @pytest.mark.online
     def test_getcaps_with_invalid_token(self):
@@ -82,11 +94,6 @@ class WpsAppTest(unittest.TestCase):
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
         resp.mustcontain('<wps:ProcessOfferings>')
-        tree = ElementTree.parse(resp)
-        root = tree.getroot()
-        getcap_processes_ids = [process.get('ows:Identifier') for process in root.findall('wps:Process')]
-        assert self.private_process.id not in getcap_processes_ids
-        assert self.public_process.id in getcap_processes_ids
 
     @pytest.mark.online
     def test_describeprocess(self):
@@ -121,6 +128,7 @@ class WpsAppTest(unittest.TestCase):
         assert resp.content_type == 'text/xml'
         resp.mustcontain('<ows:ExceptionText>Unknown process')
 
+    @pytest.mark.xfail(reason="Access token validation not implemented.")
     @pytest.mark.online
     def test_execute_not_allowed(self):
         params = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=name=tux".format(Hello.identifier)
@@ -133,8 +141,7 @@ class WpsAppTest(unittest.TestCase):
     @pytest.mark.online
     def test_execute_allowed(self):
         params = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=name=tux".format(Hello.identifier)
-        url = self.make_url(params)
-        url += "&access_token={}".format(self.token)
+        url = self.make_url(params, token=self.token)
         resp = self.app.get(url)
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
