@@ -4,7 +4,7 @@ from itertools import ifilterfalse
 from pyramid.httpexceptions import HTTPGatewayTimeout, HTTPOk
 from pyramid.settings import asbool
 from six.moves.urllib.parse import urlparse, parse_qsl
-from typing import Iterable, Dict, Tuple, List, Deque
+from typing import Iterable, Dict, Tuple, List, Deque, AnyStr
 from twitcher.processes.sources import fetch_data_sources
 from twitcher.processes.constants import WPS_LITERAL
 from twitcher.utils import get_any_id
@@ -293,13 +293,15 @@ class OpenSearchQuery(object):
             start_index += n_received_features
 
     def query_datasets(self, params, accept_schemes, accept_mime_types):
-        # type: (Dict, Tuple, List) -> Iterable
+        # type: (Dict, Tuple, List) -> Iterable[AnyStr]
         """
+        Loop on every opensearch result feature and yield url mathching required mimetype and scheme.
+        Log a warning if a feature cannot yield a valid url (either no compatible mimetype or scheme)
 
         :param params: query parameters
         :param accept_schemes: only return links of this scheme
         :param accept_mime_types: list of accepted mime types, ordered by preference
-
+        :raise KeyError: If the feature doesn't contain a json data section or an atom alternative link
         """
         if params is None:
             params = {}
