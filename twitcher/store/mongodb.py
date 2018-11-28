@@ -9,7 +9,6 @@ from twitcher.exceptions import AccessTokenNotFound
 from twitcher.utils import islambda, now
 from twitcher.sort import *
 from twitcher.status import STATUS_ACCEPTED, map_status, job_status_categories
-from twitcher.processes.types import PROCESS_WPS
 from pyramid.security import authenticated_userid
 from pymongo import ASCENDING, DESCENDING
 import six
@@ -131,9 +130,10 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
 
 
 from twitcher.store.base import ProcessStore
-from twitcher.exceptions import ProcessNotFound, ProcessRegistrationError, ProcessInstanceError
 from twitcher.datatype import Process as ProcessDB
+from twitcher.exceptions import ProcessNotAccessible, ProcessNotFound, ProcessRegistrationError, ProcessInstanceError
 from twitcher.visibility import visibility_values
+from twitcher.processes.types import PROCESS_WPS
 from pywps import Process as ProcessWPS
 
 
@@ -255,9 +255,9 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
             db_processes.append(ProcessDB(process))
         return db_processes
 
-    def fetch_by_id(self, process_id, request=None):
+    def fetch_by_id(self, process_id, visibility=None, request=None):
         """
-        Get process for given ``name`` from storage.
+        Get process for given ``name`` from storage, optionally filtered by visibility.
 
         :return: An instance of :class:`twitcher.datatype.Process`.
         """
@@ -265,7 +265,10 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         process = self.collection.find_one({'identifier': sane_name})
         if not process:
             raise ProcessNotFound("Process `{}` could not be found.".format(sane_name))
-        return ProcessDB(process)
+        process = ProcessDB(process)
+        if visibility is not None and process.visibility != visibility:
+            raise ProcessNotAccessible("Process `{}` cannot be accessed.".format(sane_name))
+        return process
 
     def get_visibility(self, process_id, request=None):
         """

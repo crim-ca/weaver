@@ -9,7 +9,7 @@ from dateutil.parser import parse as dt_parse
 from datetime import timedelta
 # noinspection PyProtectedMember
 from logging import _levelNames, ERROR, INFO
-
+from typing import Any, AnyStr, Dict, Optional
 from twitcher.utils import (
     now,
     now_secs,
@@ -22,6 +22,8 @@ from twitcher.utils import (
 from twitcher.exceptions import ProcessInstanceError
 from twitcher.processes import process_mapping
 from twitcher.processes.types import PROCESS_WITH_MAPPING, PROCESS_WPS
+# noinspection PyProtectedMember
+from twitcher.processes.wps_package import _wps2json_io
 from twitcher.status import job_status_values, STATUS_UNKNOWN
 from twitcher.visibility import visibility_values, VISIBILITY_PRIVATE
 from pywps import Process as ProcessWPS
@@ -586,7 +588,7 @@ class Process(dict):
 
     @property
     def params_wps(self):
-        """Values applicable to WPS Process __init__"""
+        """Values applicable to PyWPS Process __init__"""
         return {
             'identifier': self.identifier,
             'title': self.title,
@@ -604,17 +606,30 @@ class Process(dict):
         return sd.Process().deserialize(self)
 
     def process_offering(self):
-        return sd.ProcessOffering().deserialize(self)
+        process_offering = {"process": self}
+        if self.version:
+            process_offering.update({"processVersion": self.version})
+        if self.jobControlOptions:
+            process_offering.update({"jobControlOptions": self.jobControlOptions})
+        if self.outputTransmission:
+            process_offering.update({"outputTransmission": self.outputTransmission})
+        return sd.ProcessOffering().deserialize(process_offering)
 
     def process_summary(self):
         return sd.ProcessSummary().deserialize(self)
 
     @staticmethod
     def from_wps(wps_process, **extra_params):
+        # type: (ProcessWPS, Any) -> Process
+        """
+        Converts a PyWPS Process into a `twitcher.datatype.Process` using provided parameters.
+        """
         assert isinstance(wps_process, ProcessWPS)
         process = wps_process.json
         process_type = getattr(wps_process, 'type', wps_process.identifier)
-        process.update({'type': process_type, 'package': None, 'reference': None})
+        process.update({'type': process_type, 'package': None, 'reference': None,
+                        'inputs': [_wps2json_io(i) for i in wps_process.inputs],
+                        'outputs': [_wps2json_io(o) for o in wps_process.outputs]})
         process.update(**extra_params)
         return Process(process)
 

@@ -6,16 +6,14 @@ See also: https://github.com/geopython/pywps/blob/master/pywps/exceptions.py
 
 import json
 from string import Template
-
+from typing import AnyStr, Dict
+# noinspection PyPackageRequirements
 from zope.interface import implementer
-
 from webob import html_escape as _html_escape
-from webob.acceptparse import MIMEAccept
-
+from webob.acceptparse import create_accept_header
 from pyramid.interfaces import IExceptionResponse
 from pyramid.response import Response
 from pyramid.compat import text_type
-import os
 
 
 @implementer(IExceptionResponse)
@@ -47,16 +45,19 @@ class OWSException(Response, Exception):
     def __str__(self, skip_body=False):
         return self.message
 
+    # noinspection PyUnusedLocal
     @staticmethod
     def json_formatter(status, body, title, environ):
-        # Remove new line symbol and multiple spaces from body
-        return {'description': ' '.join(body.replace('\n\n', '. ').split()),
-                'code': status}
+        # type: (AnyStr, AnyStr, AnyStr, Dict[AnyStr, AnyStr]) -> Dict[AnyStr, AnyStr]
+        body_parts = body.replace('\n\n', '\n').split(' ')          # remove excess new line symbols
+        description = ' '.join(p for p in body_parts if p).strip()  # remove multiple spaces and blank characters
+        description += '' if description.endswith('.') else '.'     # add terminating dot
+        return {'description': description, 'code': status}
 
     def prepare(self, environ):
         if not self.body:
             accept_value = environ.get('HTTP_ACCEPT', '')
-            accept = MIMEAccept(accept_value)
+            accept = create_accept_header(accept_value)
 
             # Attempt to match text/xml or application/json, if those don't
             # match, we will fall through to defaulting to text/xml
@@ -73,6 +74,7 @@ class OWSException(Response, Exception):
                     def __init__(self, excobj):
                         self.excobj = excobj
 
+                    # noinspection PyUnusedLocal
                     def substitute(self, code, locator, message):
                         return json.dumps(self.excobj.json_formatter(
                             status=code, body=message, title=None, environ=environ))

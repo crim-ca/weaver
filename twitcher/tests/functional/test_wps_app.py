@@ -44,19 +44,19 @@ class WpsAppTest(unittest.TestCase):
         pyramid_celery.loaders.INILoader.read_configuration = mock.MagicMock(return_value=setup_celery(config))
         config.include('pyramid_celery')
         config.configure_celery('')     # value doesn't matter because overloaded
-        self.process = setup_mongodb_processstore(config)
+        self.process_store = setup_mongodb_processstore(config)
         self.token = setup_mongodb_tokenstore(config)
         self.app = webtest.TestApp(config.make_wsgi_app())
 
         self.process_public = WpsTestProcess(identifier='process_public')
         self.process_private = WpsTestProcess(identifier='process_private')
-        self.process.save_process(self.process_public)
-        self.process.save_process(self.process_private)
-        self.process.set_visibility(self.process_public.identifier, VISIBILITY_PUBLIC)
-        self.process.set_visibility(self.process_private.identifier, VISIBILITY_PRIVATE)
+        self.process_store.save_process(self.process_public)
+        self.process_store.save_process(self.process_private)
+        self.process_store.set_visibility(self.process_public.identifier, VISIBILITY_PUBLIC)
+        self.process_store.set_visibility(self.process_private.identifier, VISIBILITY_PRIVATE)
 
         # default process Hello needs visibility
-        self.process.set_visibility(Hello.identifier, VISIBILITY_PUBLIC)
+        self.process_store.set_visibility(Hello.identifier, VISIBILITY_PUBLIC)
 
     def tearDown(self):
         pyramid.testing.tearDown()
@@ -125,6 +125,7 @@ class WpsAppTest(unittest.TestCase):
         assert resp.content_type == 'text/xml'
         resp.mustcontain('<ows:ExceptionText>Unknown process')
 
+    @unittest.expectedFailure
     @pytest.mark.xfail(reason="Access token validation not implemented.")
     @pytest.mark.online
     def test_execute_not_allowed(self):

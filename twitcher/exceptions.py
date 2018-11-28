@@ -27,9 +27,17 @@ class ServiceRegistrationError(Exception):
     pass
 
 
+class ProcessNotAccessible(Exception):
+    """
+    Error indicating that a local WPS process exists but is not visible to retrieve
+    from the storage backend of an instance of :class:`twitcher.store.ProcessStore`.
+    """
+    pass
+
+
 class ProcessNotFound(Exception):
     """
-    Error indicating that a local WPS service could not be read from the
+    Error indicating that a local WPS process could not be read from the
     storage backend by an instance of :class:`twitcher.store.ProcessStore`.
     """
     pass

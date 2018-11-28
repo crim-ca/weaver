@@ -1,4 +1,5 @@
 import os
+import colander
 from pyramid.httpexceptions import *
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
@@ -14,6 +15,7 @@ from twitcher.datatype import Process as ProcessDB
 from twitcher.exceptions import (
     ProcessRegistrationError,
     ProcessNotFound,
+    ProcessNotAccessible,
     PackageRegistrationError,
     PackageTypeError,
     PackageNotFound,
@@ -563,46 +565,36 @@ def add_local_process(request):
     return HTTPOk(json=json_response)
 
 
-@sd.process_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer='json',
-                        schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_responses)
-def get_local_process(request):
-    """
-    Get a registered local process information (DescribeProcess).
-    """
-
-    process_id = request.matchdict.get('process_id')
-    if not isinstance(process_id, string_types):
-        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
-    try:
-        store = processstore_factory(request.registry)
-        process = store.fetch_by_id(process_id, request=request)
-        process.inputs = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
-
-        offering = process.process_offering()
-
-        return HTTPOk(json=offering)
-    except HTTPException:
-        raise  # re-throw already handled HTTPException
-    except ProcessNotFound:
-        raise HTTPNotFound("The process with id `{}` does not exist.".format(str(process_id)))
-    except Exception as ex:
-        raise HTTPInternalServerError(ex.message)
-
-
 def get_process(request):
     process_id = request.matchdict.get('process_id')
     if not isinstance(process_id, string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
         store = processstore_factory(request.registry)
-        process = store.fetch_by_id(process_id, request=request)
+        process = store.fetch_by_id(process_id, visibility=VISIBILITY_PUBLIC, request=request)
         return process
     except HTTPException:
         raise  # re-throw already handled HTTPException
+    except ProcessNotAccessible:
+        raise HTTPUnauthorized("Process with id `{}` is not accessible.".format(str(process_id)))
     except ProcessNotFound:
-        raise HTTPNotFound("The process with id `{}` does not exist.".format(str(process_id)))
+        raise HTTPNotFound("Process with id `{}` does not exist.".format(str(process_id)))
+    except colander.Invalid as ex:
+        raise HTTPInternalServerError("Invalid schema:\n[{0!r}]\n[{0!s}].".format(ex))
     except Exception as ex:
         raise HTTPInternalServerError(ex.message)
+
+
+@sd.process_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer='json',
+                        schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_responses)
+def get_local_process(request):
+    """
+    Get a registered local process information (DescribeProcess).
+    """
+    process = get_process(request)
+    process.inputs = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
+    process_offering = process.process_offering()
+    return HTTPOk(json=process_offering)
 
 
 @sd.process_package_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer='json',

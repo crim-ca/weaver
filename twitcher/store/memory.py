@@ -7,7 +7,7 @@ for testing purposes.
 
 import six
 from twitcher.store.base import AccessTokenStore
-from twitcher.exceptions import AccessTokenNotFound, ProcessNotFound
+from twitcher.exceptions import AccessTokenNotFound
 
 
 class MemoryTokenStore(AccessTokenStore):
@@ -143,7 +143,9 @@ class MemoryServiceStore(ServiceStore):
 
 
 from twitcher.store.base import ProcessStore
+from twitcher.exceptions import ProcessNotAccessible, ProcessNotFound
 from twitcher.visibility import visibility_values
+from twitcher.datatype import Process
 
 
 class MemoryProcessStore(ProcessStore):
@@ -170,7 +172,7 @@ class MemoryProcessStore(ProcessStore):
         if not self.name_index.get(sane_name) or overwrite:
             if not process.title:
                 process['title'] = sane_name
-            self.name_index[sane_name] = process
+            self.name_index[sane_name] = Process(process)
         return self.fetch_by_id(sane_name)
 
     def delete_process(self, process_id, request=None):
@@ -196,12 +198,11 @@ class MemoryProcessStore(ProcessStore):
             if v not in visibility_values:
                 raise ValueError("Invalid visibility value `{0!s}` is not one of {1!s}"
                                  .format(v, list(visibility_values)))
-        return [process.identifier for process in self.name_index
-                if process.visibility in visibility]
+        return [process.identifier for process in self.name_index if process.visibility in visibility]
 
-    def fetch_by_id(self, process_id, request=None):
+    def fetch_by_id(self, process_id, visibility=None, request=None):
         """
-        Get process for given ``name`` from storage.
+        Get process for given ``name`` from storage, optionally filtered by visibility.
 
         :return: An instance of :class:`twitcher.datatype.Process`.
         """
@@ -209,6 +210,9 @@ class MemoryProcessStore(ProcessStore):
         process = self.name_index.get(sane_name)
         if not process:
             raise ProcessNotFound("Process `{}` could not be found.".format(sane_name))
+        process = Process(process)
+        if visibility is not None and process.visibility != visibility:
+            raise ProcessNotAccessible("Process `{}` cannot be accessed.".format(sane_name))
         return process
 
     def get_visibility(self, process_id, request=None):
@@ -232,6 +236,13 @@ class MemoryProcessStore(ProcessStore):
         process = self.fetch_by_id(process_id)
         process.visibility = visibility
         self.save_process(process)
+
+    def clear_processes(self, request=None):
+        """
+        Clears all processes from the store.
+        """
+        self.name_index = {}
+        return True
 
 
 from twitcher.datatype import Job
