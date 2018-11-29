@@ -874,10 +874,10 @@ def get_process_from_wps_request(process_offering, reference=None, package=None,
 
     if not (isinstance(package, dict) or isinstance(reference, six.string_types)):
         raise PackageRegistrationError(
-            "Invalid parameters amongst one of [package,reference].")
+            "Invalid parameters amongst one of [package, reference].")
     if package and reference:
         raise PackageRegistrationError(
-            "Simultaneous parameters [package,reference] not allowed.")
+            "Simultaneous parameters [package, reference] not allowed.")
 
     if reference:
         package = _load_package_file(reference)

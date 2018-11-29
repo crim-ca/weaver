@@ -492,7 +492,7 @@ def add_local_process(request):
     process_info['identifier'] = get_sane_name(get_any_id(process_info))
 
     # retrieve CWL package definition, either via owsContext or executionUnit package/reference
-    deployment_profile = body.get('deploymentProfileName')
+    deployment_profile_name = body.get('deploymentProfileName', '').lower()
     ows_context = process_info.pop('owsContext', None)
     reference = None
     package = None
@@ -505,7 +505,7 @@ def add_local_process(request):
             raise HTTPUnprocessableEntity("Invalid parameter 'processDescription.process.owsContext.offering.content'.")
         package = None
         reference = content.get('href')
-    elif deployment_profile.endswith('workflow'):
+    elif deployment_profile_name.endswith('workflow') or deployment_profile_name.endswith('application'):
         execution_units = body.get('executionUnit')
         if not isinstance(execution_units, list):
             raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
@@ -514,8 +514,11 @@ def add_local_process(request):
                 raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
             package = execution_unit.get('unit')
             reference = execution_unit.get('href')
+            # stop on first package/reference found, simultaneous usage will raise during package retrieval
+            if package or reference:
+                break
     else:
-        raise HTTPBadRequest("Missing one of required parameters [owsContext, deploymentProfileName being a workflow].")
+        raise HTTPBadRequest("Missing one of required parameters [owsContext, deploymentProfileName].")
 
     # obtain updated process information using WPS process offering and CWL package definition
     try:
