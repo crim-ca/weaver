@@ -105,10 +105,12 @@ class ProcessStore(object):
         """
         raise NotImplementedError
 
-    def delete_process(self, process_id, request=None):
-        # type: (AnyStr, Optional[Request]) -> bool
+    def delete_process(self, process_id, visibility=None, request=None):
+        # type: (AnyStr, Optional[AnyStr], Optional[Request]) -> bool
         """
-        Removes process from database.
+        Removes process from database, optionally filtered by visibility.
+        If visibility isn't specified (`None`), the process is deleted (if existing)
+        regardless of its visibility value.
         """
         raise NotImplementedError
 

@@ -682,13 +682,15 @@ def delete_local_process(request):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
         store = processstore_factory(request.registry)
-        if store.delete_process(process_id, request=request):
+        if store.delete_process(process_id, visibility=VISIBILITY_PUBLIC, request=request):
             return HTTPOk(json={'undeploymentDone': True, 'identifier': process_id})
-        raise HTTPInternalServerError("Delete process failed.")
+        raise HTTPInternalServerError("Delete process failed for unhandled reason.")
     except HTTPException:
         raise  # re-throw already handled HTTPException
+    except ProcessNotAccessible:
+        raise HTTPUnauthorized("Process with id `{}` is not accessible.".format(str(process_id)))
     except ProcessNotFound:
-        description = "The process with process_id `{}` does not exist.".format(str(process_id))
+        description = "Process with id `{}` does not exist.".format(str(process_id))
         raise HTTPNotFound(description)
     except Exception as ex:
         raise HTTPInternalServerError(ex.message)

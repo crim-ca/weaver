@@ -223,12 +223,12 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         self._add_process(process)
         return self.fetch_by_id(sane_name)
 
-    def delete_process(self, process_id, request=None):
+    def delete_process(self, process_id, visibility=None, request=None):
         """
-        Removes process from database.
+        Removes process from database, optionally filtered by visibility.
         """
         sane_name = namesgenerator.get_sane_name(process_id, **self.sane_name_config)
-        process = self.collection.find_one({'identifier': sane_name})
+        process = self.fetch_by_id(sane_name, visibility=visibility, request=request)
         if not process:
             raise ProcessNotFound("Process `{}` could not be found.".format(sane_name))
         return bool(self.collection.delete_one({'identifier': sane_name}).deleted_count)

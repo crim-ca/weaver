@@ -12,6 +12,7 @@ from contextlib import nested
 from twitcher.tests.functional.common import setup_with_mongodb, setup_mongodb_processstore, setup_mongodb_jobstore
 from twitcher.processes.wps_testing import WpsTestProcess
 from twitcher.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
+from twitcher.exceptions import ProcessNotFound
 from twitcher.utils import fully_qualified_name
 
 
@@ -145,7 +146,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process_data_tests[6]['executionUnit'] = list()
         process_data_tests[7]['executionUnit'][0] = {"unit": "something"}       # unit as string instead of package
         process_data_tests[8]['executionUnit'][0] = {"href": {}}                # href as package instead of url
-        process_data_tests[9]['executionUnit'][0] = {"unit": {}, "href": {}}    # both unit/href together not allowed
+        process_data_tests[9]['executionUnit'][0] = {"unit": {}, "href": ""}    # both unit/href together not allowed
 
         with nested(*package_mock):
             uri = "/processes"
@@ -155,8 +156,21 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 assert resp.status_code in [400, 422], msg.format(i, resp.status_code)
                 assert resp.content_type == self.json_app, msg.format(i, resp.content_type)
 
-    def test_delete_process(self):
-        pass
+    def test_delete_process_success(self):
+        uri = "/processes/{}".format(self.process_public.identifier)
+        resp = self.app.delete_json(uri, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == self.json_app
+        assert resp.json['identifier'] == self.process_public.identifier
+        assert isinstance(resp.json['undeploymentDone'], bool) and resp.json['undeploymentDone']
+        with pytest.raises(ProcessNotFound):
+            self.process_store.fetch_by_id(self.process_public.identifier)
+
+    def test_delete_process_not_accessible(self):
+        uri = "/processes/{}".format(self.process_private.identifier)
+        resp = self.app.delete_json(uri, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 401
+        assert resp.content_type == self.json_app
 
     def test_execute_process(self):
         pass

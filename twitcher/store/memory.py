@@ -175,12 +175,12 @@ class MemoryProcessStore(ProcessStore):
             self.name_index[sane_name] = Process(process)
         return self.fetch_by_id(sane_name)
 
-    def delete_process(self, process_id, request=None):
+    def delete_process(self, process_id, visibility=None, request=None):
         """
-        Removes process from database.
+        Removes process from database, optionally filtered by visibility.
         """
         sane_name = namesgenerator.get_sane_name(process_id, **self.sane_name_config)
-        if self.name_index.get(sane_name):
+        if self.fetch_by_id(sane_name, visibility=visibility, request=request):
             del self.name_index[sane_name]
 
     def list_processes(self, visibility=None, request=None):
