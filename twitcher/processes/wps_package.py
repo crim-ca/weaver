@@ -1141,6 +1141,7 @@ class Package(Process):
             eodata_inputs = opensearch.get_eo_images_ids_from_payload(step_payload)
 
             data_url = ""  # data_source will be set to the default ADES if no EOImages
+
             if eodata_inputs:
                 step_payload = opensearch.alter_payload_after_query(step_payload)
                 value = joborder[eodata_inputs[0]]
@@ -1150,6 +1151,10 @@ class Package(Process):
                     value = value[0]
 
                 data_url = value['location']
+                data_source_reason = '(ADES based on {0})'.format(data_url)
+            else:
+                data_source_reason = '(No EOImage -> Default ADES)'
+
             data_source = get_data_source_from_url(data_url)
 
             # Progress made with steps presumes that they are done sequentially and have the same progress weight
@@ -1157,7 +1162,11 @@ class Package(Process):
             end_step_progress = self.map_step_progress(len(self.step_launched) + 1, max(1, len(self.step_packages)))
             url = retrieve_data_source_url(data_source)
 
-            self.update_status("Launching {type} {name} on {src}.".format(type=jobtype, name=jobname, src=data_source),
+            self.update_status("Launching {type} {name} on {src}.".format(
+                type=jobtype,
+                name=jobname,
+                src=data_source,
+                reason=data_source_reason),
                                start_step_progress, ts.STATUS_RUNNING)
 
         except (IndexError, KeyError) as exc:
