@@ -125,8 +125,8 @@ class WpsAppTest(unittest.TestCase):
         assert resp.content_type == 'text/xml'
         resp.mustcontain('<ows:ExceptionText>Unknown process')
 
-    @unittest.expectedFailure
     @pytest.mark.xfail(reason="Access token validation not implemented.")
+    @unittest.expectedFailure
     @pytest.mark.online
     def test_execute_not_allowed(self):
         params = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=name=tux".format(Hello.identifier)

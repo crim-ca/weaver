@@ -3,6 +3,14 @@ Errors raised during the Twitcher flow.
 """
 
 
+class InvalidIdentifierValue(ValueError):
+    """
+    Error indicating that an id to be employed for following operations
+    is not considered as valid to allow further processed or usage.
+    """
+    pass
+
+
 class AccessTokenNotFound(Exception):
     """
     Error indicating that an access token could not be read from the
