@@ -293,7 +293,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     @pytest.mark.xfail("Mode `{}` not supported for job execution.".format(EXECUTE_TRANSMISSION_MODE_VALUE))
     @unittest.expectedFailure
-    def test_execute_process_mode_sync_not_supported(self):
+    def test_execute_process_transmission_mode_value_not_supported(self):
         execute_data = self.get_process_execute_template(fully_qualified_name(self))
         execute_data['outputs'][0]['transmissionMode'] = EXECUTE_TRANSMISSION_MODE_VALUE
         uri = "/processes/{}/jobs".format(self.process_public.identifier)
