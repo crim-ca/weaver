@@ -242,7 +242,7 @@ class OpenSearchQuery(object):
                 xpath = "//*[local-name() = 'entry']/*[local-name() = 'link']"
 
                 # noinspection PyProtectedMember
-                links = et.xpath(xpath)  # type: lxml.etree._Element
+                links = et.xpath(xpath)  # type: List[lxml.etree._Element]
                 return [link.attrib for link in links]
         return []
 
