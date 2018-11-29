@@ -281,7 +281,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert resp.status_code in [400, 422], msg.format(i, resp.status_code)
             assert resp.content_type == self.json_app, msg.format(i, resp.content_type)
 
-    @pytest.mark.xfail("Mode `{}` not supported for job execution.".format(EXECUTE_MODE_SYNC))
+    @pytest.mark.xfail(reason="Mode '{}' not supported for job execution.".format(EXECUTE_MODE_SYNC))
     @unittest.expectedFailure
     def test_execute_process_mode_sync_not_supported(self):
         execute_data = self.get_process_execute_template(fully_qualified_name(self))
@@ -291,7 +291,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.status_code in 501
         assert resp.content_type == self.json_app
 
-    @pytest.mark.xfail("Mode `{}` not supported for job execution.".format(EXECUTE_TRANSMISSION_MODE_VALUE))
+    @pytest.mark.xfail(reason="Mode '{}' not supported for job execution.".format(EXECUTE_TRANSMISSION_MODE_VALUE))
     @unittest.expectedFailure
     def test_execute_process_transmission_mode_value_not_supported(self):
         execute_data = self.get_process_execute_template(fully_qualified_name(self))
