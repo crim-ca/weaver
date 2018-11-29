@@ -49,10 +49,11 @@ class OWSException(Response, Exception):
     @staticmethod
     def json_formatter(status, body, title, environ):
         # type: (AnyStr, AnyStr, AnyStr, Dict[AnyStr, AnyStr]) -> Dict[AnyStr, AnyStr]
-        body_parts = body.replace('\n\n', '\n').split(' ')          # remove excess new line symbols
-        description = ' '.join(p for p in body_parts if p).strip()  # remove multiple spaces and blank characters
-        description += '' if description.endswith('.') else '.'     # add terminating dot
-        return {'description': description, 'code': status}
+        body_parts = [p.strip() for p in body.split('\n') if p != '']               # remove new line and extra spaces
+        body_parts = [p + '.' if not p.endswith('.') else p for p in body_parts]    # add terminating dot per sentence
+        body_parts = [p[0].upper() + p[1:] for p in body_parts if len(p)]           # capitalize first word
+        body_parts = ' '.join(p for p in body_parts if p)
+        return {'description': body_parts, 'code': status}
 
     def prepare(self, environ):
         if not self.body:
