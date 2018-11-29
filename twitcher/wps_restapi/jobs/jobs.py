@@ -119,7 +119,8 @@ def get_jobs(request):
     filters = {
         'page': page,
         'limit': limit,
-        'tags': request.params.get('tags', '').split(','),
+        # split by comma and filter empty stings
+        'tags': filter(lambda s: s, request.params.get('tags', '').split(',')),
         'access': request.params.get('access', None),
         'status': request.params.get('status', None),
         'sort': request.params.get('sort', sort.SORT_CREATED),

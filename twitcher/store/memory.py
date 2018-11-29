@@ -284,20 +284,24 @@ class MemoryJobStore(JobStore, MemoryStore):
             'execute_async': execute_async,
             'custom_tags': [] if not custom_tags else custom_tags,
         })
-        self.store[job.id] = job
+        return self.update_job(job)
 
     def update_job(self, job):
         """
         Updates a job parameters in mongodb storage.
         :param job: instance of ``twitcher.datatype.Job``.
         """
+        if not isinstance(job, Job):
+            raise TypeError("Not a valid `twitcher.datatype.Job`.")
         self.store[job.id] = job
+        return self.store[job.id]
 
     def delete_job(self, job_id, request=None):
         """
         Removes job from memory.
         """
-        del self.store[job_id]
+        job = self.fetch_by_id(job_id, request)
+        del self.store[job.id]
 
     def fetch_by_id(self, job_id, request=None):
         """
@@ -312,14 +316,24 @@ class MemoryJobStore(JobStore, MemoryStore):
         """
         Lists all jobs in memory.
         """
-        return self.store
+        jobs = self.store.values()
+        return jobs, len(jobs)
 
     def find_jobs(self, request, page=0, limit=10, process=None, service=None,
                   tags=None, access=None, status=None, sort=None):
         """
         Finds all jobs in memory matching search filters.
         """
-        return {}, 0
+        # FIXME: validate inputs before filtering, sorting and paging
+        jobs, count = self.list_jobs(request=request)
+        jobs = filter(lambda j: j.process == process or process is None, jobs)
+        jobs = filter(lambda j: j.service == service or service is None, jobs)
+        jobs = filter(lambda j: j.access == access or access is None, jobs)
+        jobs = filter(lambda j: j.status == status or status is None, jobs)
+        jobs = filter(lambda j: all(t in j.tags for t in tags) if tags else True, jobs)
+        jobs = sorted(jobs, key=lambda j: j.get(sort) if sort else j.id)
+        jobs = [jobs[i:i+limit] for i in range(0, len(jobs), limit)]
+        return jobs[page]
 
     def clear_jobs(self, request=None):
         """

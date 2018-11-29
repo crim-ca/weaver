@@ -17,6 +17,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         cls.config.include('twitcher.wps')
         cls.config.include('twitcher.wps_restapi')
         cls.config.include('twitcher.tweens')
+        cls.config.registry.settings['twitcher.url'] = "localhost"
         cls.config.scan()
         cls.json_headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
         cls.app = webtest.TestApp(cls.config.make_wsgi_app())
@@ -42,8 +43,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     @staticmethod
     def check_job_format(job):
-        assert job is dict
-        assert 'id' in job and isinstance(job['id'], six.string_types)
+        assert isinstance(job, dict)
+        assert 'jobID' in job and isinstance(job['jobID'], six.string_types)
         assert 'status' in job and isinstance(job['status'], six.string_types)
         assert 'message' in job and isinstance(job['message'], six.string_types)
         assert 'percentCompleted' in job and isinstance(job['percentCompleted'], int)

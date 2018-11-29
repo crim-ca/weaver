@@ -7,7 +7,7 @@ from twitcher.exceptions import AccessTokenNotFound
 from twitcher.utils import islambda, now, baseurl
 from twitcher.sort import *
 from twitcher.status import STATUS_ACCEPTED, map_status, job_status_categories
-from twitcher.visibility import visibility_values
+from twitcher.visibility import visibility_values, VISIBILITY_PRIVATE, VISIBILITY_PUBLIC, VISIBILITY_ALL
 from twitcher.exceptions import (
     ServiceRegistrationError, ServiceNotFound,
     ProcessNotAccessible, ProcessNotFound, ProcessRegistrationError, ProcessInstanceError,
@@ -420,15 +420,17 @@ class MongodbJobStore(JobStore, MongodbStore):
         Finds all jobs in mongodb storage matching search filters.
         """
         search_filters = {}
-        if access == 'public':
-            search_filters['tags'] = 'public'
-        elif access == 'private':
-            search_filters['tags'] = {'$ne': 'public'}
+        if access == VISIBILITY_PUBLIC:
+            search_filters['tags'] = VISIBILITY_PUBLIC
+            if not search_filters.get('user_id'):
+                search_filters.pop('user_id', None)
+        elif access == VISIBILITY_PRIVATE:
+            search_filters['tags'] = {'$ne': VISIBILITY_PUBLIC}
             search_filters['user_id'] = authenticated_userid(request)
-        elif access == 'all' and request.has_permission('admin'):
-            pass
+        elif access == VISIBILITY_ALL and request.has_permission('admin'):
+            search_filters.pop('user_id', None)
         else:
-            if tags is not None:
+            if tags:
                 search_filters['tags'] = {'$all': tags}
             search_filters['user_id'] = authenticated_userid(request)
 

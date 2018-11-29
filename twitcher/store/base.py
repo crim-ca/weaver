@@ -8,7 +8,7 @@ solution specific to your needs.
 The implementation is based on `python-oauth2 <http://python-oauth2.readthedocs.io/en/latest/>`_.
 """
 from pyramid.request import Request
-from typing import Any, Optional, List, Union, AnyStr
+from typing import Any, Optional, List, Union, AnyStr, Tuple
 from twitcher.datatype import Job, Service, Process, Quote, Bill, AccessToken
 # noinspection PyPackageRequirements
 from pywps import Process as ProcessWPS
@@ -241,7 +241,7 @@ class JobStore(StoreInterface):
                   access=None,      # type: Optional[AnyStr]
                   status=None,      # type: Optional[AnyStr]
                   sort=None,        # type: Optional[AnyStr]
-                  ):                # type: (...) -> List[Job]
+                  ):                # type: (...) -> Tuple[List[Job], int]
         """
         Finds all jobs in database matching search filters.
         """
