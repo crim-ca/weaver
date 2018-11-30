@@ -4,8 +4,11 @@ import types
 import re
 from datetime import datetime
 from lxml import etree
-from typing import Union, Any, Dict, AnyStr, Iterable
+# noinspection PyProtectedMember
+from lxml.etree import _Element as xmlElement
+from typing import Union, Any, Dict, List, AnyStr, Iterable, Optional
 from pyramid.httpexceptions import HTTPError as PyramidHTTPError
+from pyramid.request import Request
 from requests import HTTPError as RequestsHTTPError
 
 from twitcher.exceptions import ServiceNotFound
@@ -114,11 +117,14 @@ def now_secs():
 
 
 def expires_at(hours=1):
+    # type: (Optional[int]) -> int
     return now_secs() + hours * 3600
 
 
 def localize_datetime(dt, tz_name='UTC'):
-    """Provide a timezone-aware object for a given datetime and timezone name
+    # type: (datetime, Optional[AnyStr]) -> datetime
+    """
+    Provide a timezone-aware object for a given datetime and timezone name
     """
     tz_aware_dt = dt
     if dt.tzinfo is None:
@@ -144,12 +150,14 @@ def baseurl(url):
 
 
 def path_elements(path):
+    # type: (AnyStr) -> List[AnyStr]
     elements = [el.strip() for el in path.split('/')]
     elements = [el for el in elements if len(el) > 0]
     return elements
 
 
 def lxml_strip_ns(tree):
+    # type: (xmlElement) -> None
     for node in tree.iter():
         try:
             has_namespace = node.tag.startswith('{')
@@ -251,6 +259,7 @@ def convert_snake_case(name):
 
 
 def parse_request_query(request):
+    # type: (Request) -> Dict[Dict[Union[int, AnyStr], AnyStr]]
     """
     :param request:
     :return: dict of dict where k=v are accessible by d[k][0] == v and q=k=v are accessible by d[q][k] == v, lowercase

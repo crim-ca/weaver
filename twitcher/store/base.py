@@ -196,7 +196,8 @@ class JobStore(StoreInterface):
                  is_workflow=False,     # type: Optional[bool]
                  user_id=None,          # type: Optional[int]
                  execute_async=True,    # type: Optional[bool]
-                 custom_tags=None       # type: Optional[List[AnyStr]]
+                 custom_tags=None,      # type: Optional[List[AnyStr]]
+                 access=None,           # type: Optional[AnyStr]
                  ):                     # type: (...) -> Job
         """
         Stores a job in storage.

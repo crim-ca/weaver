@@ -6,14 +6,9 @@ for testing purposes.
 """
 
 import six
-from twitcher.store.base import (
-    AccessTokenStore,
-    ServiceStore,
-    ProcessStore,
-    JobStore,
-    QuoteStore,
-    BillStore,
-)
+from twitcher.store.base import AccessTokenStore, ServiceStore, ProcessStore, JobStore, QuoteStore, BillStore
+from twitcher.visibility import visibility_values, VISIBILITY_PUBLIC
+from twitcher.datatype import Service, Process, Job
 from twitcher.exceptions import (
     AccessTokenNotFound,
     ServiceRegistrationError,
@@ -22,10 +17,8 @@ from twitcher.exceptions import (
     ProcessNotFound,
     JobNotFound,
 )
-from twitcher.datatype import Service, Process, Job
 from twitcher import namesgenerator
 from twitcher.utils import baseurl
-from twitcher.visibility import visibility_values
 
 
 class MemoryStore(object):
@@ -270,10 +263,12 @@ class MemoryJobStore(JobStore, MemoryStore):
         MemoryStore.__init__(self, *args, **kwargs)
 
     def save_job(self, task_id, process, service=None, inputs=None,
-                 is_workflow=False, user_id=None, execute_async=True, custom_tags=None):
+                 is_workflow=False, user_id=None, execute_async=True,
+                 custom_tags=None, access=None):
         """
         Stores a job in memory.
         """
+        access = [access] if access in visibility_values else [VISIBILITY_PUBLIC]
         job = Job({
             'task_id': task_id,
             'process': process,
@@ -282,7 +277,7 @@ class MemoryJobStore(JobStore, MemoryStore):
             'is_workflow': is_workflow,
             'user_id': user_id,
             'execute_async': execute_async,
-            'custom_tags': [] if not custom_tags else custom_tags,
+            'tags': [] if not custom_tags else custom_tags + access,
         })
         return self.update_job(job)
 

@@ -9,7 +9,6 @@ from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import URLError
 from time import sleep
 from typing import Any, AnyStr, Dict, List, Tuple
-
 from twitcher.wps import load_pywps_cfg
 from twitcher.adapter import servicestore_factory, jobstore_factory, processstore_factory
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS
@@ -303,7 +302,6 @@ def validate_supported_submit_job_handler_parameters(json_body):
     """
     Tests supported parameters not automatically validated by colander deserialize.
     """
-
     if json_body['mode'] not in [EXECUTE_MODE_ASYNC, EXECUTE_MODE_AUTO]:
         raise HTTPNotImplemented(detail="Execution mode `{0}` not supported.".format(json_body['mode']))
 
@@ -772,7 +770,9 @@ def submit_local_job(request):
     try:
         store = processstore_factory(request.registry)
         process = store.fetch_by_id(process_id, visibility=VISIBILITY_PUBLIC, request=request)
-        resp = submit_job_handler(request, process.processEndpointWPS1, is_workflow=process.type == PROCESS_WORKFLOW)
+        resp = submit_job_handler(request, process.processEndpointWPS1,
+                                  is_workflow=process.type == PROCESS_WORKFLOW,
+                                  visibility=process.visibility)
         return resp
     except HTTPException:
         raise  # re-throw already handled HTTPException

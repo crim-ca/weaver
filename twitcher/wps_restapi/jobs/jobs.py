@@ -12,7 +12,6 @@ from twitcher.exceptions import (
 )
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import wps_restapi_base_url
-from twitcher.utils import parse_request_query
 from twitcher.visibility import VISIBILITY_PUBLIC
 from twitcher import status, sort
 from typing import AnyStr, Optional, Union, Tuple
@@ -97,7 +96,7 @@ def get_job(request):
     job_id = request.matchdict.get('job_id')
     store = jobstore_factory(request.registry)
     try:
-        job = store.fetch_by_id(job_id)
+        job = store.fetch_by_id(job_id, request=request)
     except JobNotFound:
         raise HTTPNotFound('Could not find job with specified `job_id`.')
 

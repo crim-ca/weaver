@@ -1,28 +1,29 @@
 """
 Store adapters to read/write data to from/to mongodb using pymongo.
 """
+
 from twitcher.store.base import AccessTokenStore, ServiceStore, ProcessStore, JobStore, QuoteStore, BillStore
 from twitcher.datatype import AccessToken, Service, Process as ProcessDB, Job, Quote, Bill
-from twitcher.exceptions import AccessTokenNotFound
-from twitcher.utils import islambda, now, baseurl
-from twitcher.sort import *
-from twitcher.status import STATUS_ACCEPTED, map_status, job_status_categories
-from twitcher.visibility import visibility_values, VISIBILITY_PRIVATE, VISIBILITY_PUBLIC, VISIBILITY_ALL
 from twitcher.exceptions import (
+    AccessTokenNotFound,
     ServiceRegistrationError, ServiceNotFound,
     ProcessNotAccessible, ProcessNotFound, ProcessRegistrationError, ProcessInstanceError,
     JobRegistrationError, JobNotFound, JobUpdateError,
     QuoteRegistrationError, QuoteNotFound, QuoteInstanceError,
     BillRegistrationError, BillNotFound, BillInstanceError,
 )
-from twitcher.execute import EXECUTE_MODE_ASYNC, EXECUTE_MODE_SYNC
 from twitcher import namesgenerator
-from twitcher.processes.types import PROCESS_WPS, PROCESS_WORKFLOW, PROCESS_APPLICATION
+from twitcher.utils import baseurl, islambda, now
+from twitcher.execute import EXECUTE_MODE_ASYNC, EXECUTE_MODE_SYNC
+from twitcher.processes.types import PROCESS_WORKFLOW, PROCESS_APPLICATION, PROCESS_WPS
+from twitcher.status import STATUS_ACCEPTED, map_status, job_status_categories
+from twitcher.visibility import visibility_values, VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
+from twitcher.sort import *
 # noinspection PyPackageRequirements
 from pywps import Process as ProcessWPS
 from pyramid.security import authenticated_userid
-from pymongo import ASCENDING, DESCENDING
 from typing import Any, Dict, Tuple
+from pymongo import ASCENDING, DESCENDING
 import pymongo
 import six
 import logging
@@ -342,7 +343,7 @@ class MongodbJobStore(JobStore, MongodbStore):
         MongodbStore.__init__(self, *db_args, **db_kwargs)
 
     def save_job(self, task_id, process, service=None, inputs=None, is_workflow=False,
-                 user_id=None, execute_async=True, custom_tags=None):
+                 user_id=None, execute_async=True, custom_tags=None, access=None):
         """
         Stores a job in mongodb.
         """
@@ -357,6 +358,10 @@ class MongodbJobStore(JobStore, MongodbStore):
                 tags.append(EXECUTE_MODE_ASYNC)
             else:
                 tags.append(EXECUTE_MODE_SYNC)
+            if access:
+                tags.append(access)
+            else:
+                tags.append(VISIBILITY_PUBLIC)
             new_job = Job({
                 'task_id': task_id,
                 'user_id': user_id,
@@ -409,6 +414,7 @@ class MongodbJobStore(JobStore, MongodbStore):
     def list_jobs(self, request=None):
         """
         Lists all jobs in mongodb storage.
+        For user-specific access to available jobs, use `find_jobs` instead.
         """
         jobs = []
         for job in self.collection.find().sort('id', ASCENDING):
@@ -421,17 +427,18 @@ class MongodbJobStore(JobStore, MongodbStore):
         Finds all jobs in mongodb storage matching search filters.
         """
         search_filters = {}
+        user_id = None if request.has_permission('admin') else authenticated_userid(request)
+
         if access == VISIBILITY_PUBLIC:
             search_filters['tags'] = VISIBILITY_PUBLIC
         elif access == VISIBILITY_PRIVATE:
             search_filters['tags'] = {'$ne': VISIBILITY_PUBLIC}
-            search_filters['user_id'] = authenticated_userid(request)
-        elif access == VISIBILITY_ALL and request.has_permission('admin'):
-            pass
+            search_filters['user_id'] = user_id
         else:
             if tags:
                 search_filters['tags'] = {'$all': tags}
-            search_filters['user_id'] = authenticated_userid(request)
+            if user_id:
+                search_filters['user_id'] = user_id
 
         if status in job_status_categories.keys():
             search_filters['status'] = {'$in': job_status_categories[status]}
