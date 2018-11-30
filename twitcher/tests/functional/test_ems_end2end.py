@@ -35,6 +35,9 @@ from logging import _loggerClass
 import time
 import json
 import os
+import mock
+from contextlib import nested
+from twitcher.processes.sources import fetch_data_sources
 
 
 class ProcessInfo(object):
@@ -78,6 +81,39 @@ class End2EndEMSTestCase(TestCase):
     ALICE_PASSWORD = None
     BOB_USERNAME = None
     BOB_PASSWORD = None
+
+    @staticmethod
+    def mock_get_data_source_from_url(data_url):
+        forbidden_data_source = ['probav-l1-ades.vgt.vito.be',
+                                 'probav - l2 - ades.vgt.vito.be',
+                                 'deimos-cubewerx']
+        data_sources = fetch_data_sources()
+        try:
+            parsed = urlparse(data_url)
+            netloc, path, scheme = parsed.netloc, parsed.path, parsed.scheme
+            if netloc:
+                for src, val in data_sources.items():
+                    if src not in forbidden_data_source and val['netloc'] == netloc:
+                        return src
+        # noinspection PyBroadException
+        except Exception:
+            pass
+        # Default mocked data source
+        return "ipt-poland"
+
+    @staticmethod
+    def get_process_package_mock():
+        return (
+            mock.patch('twitcher.processes.sources.get_data_source_from_url',
+                       new_callable=End2EndEMSTestCase.mock_get_data_source_from_url),
+        )
+
+    @staticmethod
+    def get_collection_swapping():
+        return [
+            # Swap because Spacebel cannot retrieve probav images and Geomatys ADES is not ready
+            ('EOP:VITO:PROBAV_S1-TOA_1KM_V001', 'EOP:IPT:Sentinel2'),
+        ]
 
     @classmethod
     def setUpClass(cls):
@@ -243,6 +279,13 @@ class End2EndEMSTestCase(TestCase):
         new_process_id = cls.get_test_process_id(deploy_payload['processDescription']['process']['id'])
         deploy_payload['processDescription']['process']['id'] = new_process_id
         execute_payload = cls.retrieve_payload(execute_path)
+
+        # Apply collection swapping
+        for swap in cls.get_collection_swapping():
+            for i in execute_payload['inputs']:
+                if 'data' in i and i['data'] == swap[0]:
+                    i['data'] = swap[1]
+
         return ProcessInfo(process_id, new_process_id, deploy_payload, execute_payload)
 
     @classmethod
@@ -572,31 +615,40 @@ class End2EndEMSTestCase(TestCase):
         self.request('POST', path, status=HTTPOk.code,
                      json=self.test_processes_info[self.PROCESS_SFS_ID].deploy_payload,
                      message="Expect deployed application process.")
-        self.request('POST', path, status=HTTPOk.code,
-                     json=self.test_processes_info[self.PROCESS_WORKFLOW_ID].deploy_payload,
-                     message="Expect deployed workflow process.")
 
-        workflow_info = self.test_processes_info[self.PROCESS_WORKFLOW_ID]
+        # TODO For now only simple chain is expected to work
+        # test_set = self.workflow_set
+        test_set = [self.PROCESS_WORKFLOW_SC_ID, ]
 
-        # make process visible
-        process_path = '{}/processes/{}'.format(self.get_twitcher_ems_url(), workflow_info.test_id)
-        visible_path = '{}/visibility'.format(process_path)
-        visible = {'value': VISIBILITY_PUBLIC}
-        resp = self.request('PUT', visible_path, json=visible, status=HTTPOk.code)
-        self.assert_test(lambda: resp.json.get('value') == VISIBILITY_PUBLIC,
-                         message="Process should be public.")
+        package_mock = self.get_process_package_mock()
+        with nested(*package_mock):
 
-        # execute workflow
-        execute_body = workflow_info.execute_payload
-        execute_path = '{}/jobs'.format(process_path)
-        resp = self.request('POST', execute_path, json=execute_body, status=HTTPCreated.code)
-        self.assert_test(lambda: resp.json.get('status') in job_status_categories[STATUS_CATEGORY_RUNNING],
-                         message="Response process execution job status should be one of running category values.")
-        job_location = resp.json.get('location')
-        job_id = resp.json.get('jobID')
-        self.assert_test(lambda: job_id and job_location and job_location.endswith(job_id),
-                         message="Response process execution job ID must match expected value to validate results.")
-        self.validate_test_job_execution(job_location, None, None)
+            for workflow_id in test_set:
+                self.request('POST', path, status=HTTPOk.code,
+                             json=self.test_processes_info[workflow_id].deploy_payload,
+                             message="Expect deployed workflow process.")
+
+                workflow_info = self.test_processes_info[workflow_id]
+
+                # make process visible
+                process_path = '{}/processes/{}'.format(self.get_twitcher_ems_url(), workflow_info.test_id)
+                visible_path = '{}/visibility'.format(process_path)
+                visible = {'value': VISIBILITY_PUBLIC}
+                resp = self.request('PUT', visible_path, json=visible, status=HTTPOk.code)
+                self.assert_test(lambda: resp.json.get('value') == VISIBILITY_PUBLIC,
+                                 message="Process should be public.")
+
+                # execute workflow
+                execute_body = workflow_info.execute_payload
+                execute_path = '{}/jobs'.format(process_path)
+                resp = self.request('POST', execute_path, json=execute_body, status=HTTPCreated.code)
+                self.assert_test(lambda: resp.json.get('status') in job_status_categories[STATUS_CATEGORY_RUNNING],
+                                 message="Response process execution job status should be one of running category values.")
+                job_location = resp.json.get('location')
+                job_id = resp.json.get('jobID')
+                self.assert_test(lambda: job_id and job_location and job_location.endswith(job_id),
+                                 message="Response process execution job ID must match expected value to validate results.")
+                self.validate_test_job_execution(job_location, None, None)
 
     def validate_test_job_execution(self, job_location_url, user_headers=None, user_cookies=None):
         # type: (AnyStr, Optional[Dict[AnyStr, AnyStr]], Optional[Dict[AnyStr, AnyStr]]) -> None
