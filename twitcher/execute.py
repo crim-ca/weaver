@@ -17,7 +17,7 @@ execute_response_options = frozenset([
 ])
 
 EXECUTE_TRANSMISSION_MODE_VALUE = 'value'
-EXECUTE_TRANSMISSION_MODE_REFERENCE = 'value'
+EXECUTE_TRANSMISSION_MODE_REFERENCE = 'reference'
 
 execute_transmission_mode_options = frozenset([
     EXECUTE_TRANSMISSION_MODE_VALUE,

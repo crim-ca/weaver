@@ -456,7 +456,7 @@ class Process(dict):
         if 'id' not in self and 'identifier' not in self:
             raise TypeError("'id' OR 'identifier' is required")
         if 'id' not in self:
-            self['id'] = self.get('identifier')
+            self['id'] = self.pop('identifier')
         if 'processEndpointWPS1' not in self:
             raise TypeError("'processEndpointWPS1' is required")
         if 'package' not in self:
