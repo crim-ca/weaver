@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Text
+from typing import Dict, AnyStr
 from twitcher.adapter.default import DefaultAdapter, AdapterInterface
 
 LOGGER = logging.getLogger("TWITCHER")
@@ -19,7 +19,7 @@ def import_adapter(name):
 
 
 def adapter_factory(settings):
-    # type: (Dict[Text, Text]) -> AdapterInterface
+    # type: (Dict[AnyStr, AnyStr]) -> AdapterInterface
     """
     Creates an adapter with the interface of :class:`twitcher.adapter.AdapterInterface`.
     By default the twitcher.adapter.DefaultAdapter implementation will be used.

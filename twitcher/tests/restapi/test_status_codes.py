@@ -1,6 +1,6 @@
 # noinspection PyPackageRequirements
 import pytest
-from unittest import TestCase
+import unittest
 # use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
 # noinspection PyPackageRequirements
 from webtest import TestApp as WebTestApp
@@ -33,7 +33,7 @@ not_found_routes = [
 ]
 
 
-class StatusCodeTestCase(TestCase):
+class StatusCodeTestCase(unittest.TestCase):
     """
     this routine should verify that the twitcher app returns correct status codes for common cases, such as
     - not found
@@ -69,6 +69,7 @@ class StatusCodeTestCase(TestCase):
             self.assertEqual(200, resp.status_code, 'route {} did not return 200'.format(uri))
 
     @pytest.mark.xfail(reason="Not working if not behind proxy. Protected implementation to be done.")
+    @unittest.expectedFailure
     def test_401(self):
         for uri in forbidden_routes:
             resp = self.app.get(uri, expect_errors=True, headers=self.headers)
@@ -80,7 +81,7 @@ class StatusCodeTestCase(TestCase):
             self.assertEqual(404, resp.status_code, 'route {} did not return 404'.format(uri))
 
 
-class CRUDTestCase(TestCase):
+class CRUDTestCase(unittest.TestCase):
     """
     this routine should make sure that the services store jobs, processes and providers correctly,
       but directly from the services, and not only by status codes

@@ -76,7 +76,7 @@ class WpsHandleEOITestCase(unittest.TestCase):
 
 @pytest.fixture
 def memory_store():
-    hello = twitcher.processes.wps_hello.Hello()
+    hello = twitcher.processes.wps_default.Hello()
     store = MemoryProcessStore([hello])
     return store
 

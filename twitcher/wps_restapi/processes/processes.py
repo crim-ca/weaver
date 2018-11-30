@@ -1,19 +1,24 @@
 import os
+import colander
 from pyramid.httpexceptions import *
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
+from pyramid.request import Request
 from celery.utils.log import get_task_logger
 from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import URLError
 from time import sleep
+from typing import AnyStr
 
 from twitcher.wps import load_pywps_cfg
 from twitcher.adapter import servicestore_factory, jobstore_factory, processstore_factory
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS
 from twitcher.datatype import Process as ProcessDB
 from twitcher.exceptions import (
+    InvalidIdentifierValue,
     ProcessRegistrationError,
     ProcessNotFound,
+    ProcessNotAccessible,
     PackageRegistrationError,
     PackageTypeError,
     PackageNotFound,
@@ -26,6 +31,7 @@ from twitcher.owsexceptions import OWSNoApplicableCode
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import check_status
+from twitcher.wps import get_wps_output_path
 from twitcher.visibility import VISIBILITY_PUBLIC, visibility_values
 from twitcher.status import (
     map_status,
@@ -34,7 +40,16 @@ from twitcher.status import (
     STATUS_FAILED,
     STATUS_SUCCEEDED,
 )
-from twitcher.sync import EXECUTE_AUTO, EXECUTE_ASYNC, EXECUTE_SYNC
+from twitcher.execute import (
+    EXECUTE_MODE_AUTO,
+    EXECUTE_MODE_ASYNC,
+    EXECUTE_MODE_SYNC,
+    execute_mode_options,
+    EXECUTE_RESPONSE_DOCUMENT,
+    execute_response_options,
+    EXECUTE_TRANSMISSION_MODE_REFERENCE,
+    execute_transmission_mode_options,
+)
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference
 from owslib.util import clean_ows_url
 from lxml import etree
@@ -141,7 +156,7 @@ def retrieve_package_job_log(execution, job):
     status_xml_fn = execution.statusLocation.split('/')[-1]
     try:
         registry = app.conf['PYRAMID_REGISTRY']
-        output_path = registry.settings['twitcher.wps_output_path']
+        output_path = get_wps_output_path(registry.settings)
 
         # twitcher package log every status update into this file (we no longer rely on the http monitoring)
         log_fn = os.path.join(output_path, '{0}.log'.format(status_xml_fn))
@@ -205,7 +220,7 @@ def execute_process(self, job_id, url, headers=None):
         # prepare outputs
         outputs = [(o.identifier, o.dataType == 'ComplexData') for o in process.processOutputs]
 
-        mode = EXECUTE_ASYNC if job.execute_async else EXECUTE_SYNC
+        mode = EXECUTE_MODE_ASYNC if job.execute_async else EXECUTE_MODE_SYNC
         execution = wps.execute(job.process, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
         if not execution.process and execution.errors:
             raise execution.errors[0]
@@ -288,42 +303,59 @@ def execute_process(self, job_id, url, headers=None):
 
 
 def submit_job_handler(request, service_url, is_workflow=False):
+    # type: (Request, AnyStr, bool) -> HTTPSuccessful
+
     # TODO Validate param somehow
     provider_id = request.matchdict.get('provider_id')  # None OK if local
     process_id = request.matchdict.get('process_id')
     tags = request.params.get('tags', '').split(',')
 
-    if not all(k in request.json_body for k in ('inputs', 'outputs', 'mode', 'response')):
-        raise HTTPBadRequest("Missing one of required parameters [inputs, outputs, mode, response].")
+    try:
+        if 'application/json' not in request.content_type:
+            raise ValueError("Request 'Content-Type' header is not 'application/json'.")
+        json_body = request.json_body
+    except Exception as ex:
+        raise HTTPBadRequest("Invalid JSON body cannot be decoded for job submission. [{}]".format(ex))
 
-    if request.json_body['mode'] not in [EXECUTE_ASYNC, EXECUTE_AUTO]:
-        raise HTTPNotImplemented(detail='{0} mode not supported.'.format(request.json_body['mode']))
-    execute_async = request.json_body['mode'] != EXECUTE_SYNC
+    required_params = ['inputs', 'outputs', 'mode', 'response']
+    if not all(k in json_body for k in required_params):
+        raise HTTPBadRequest("Missing one of required parameters [{}].".format(', '.join(required_params)))
 
-    if request.json_body['response'] != 'document':
-        raise HTTPNotImplemented(detail='{0} response not supported.'.format(request.json_body['response']))
+    if json_body['mode'] not in execute_mode_options:
+        raise HTTPBadRequest(detail="Invalid execution mode `{0}` specified.".format(json_body['mode']))
+    if json_body['mode'] not in [EXECUTE_MODE_ASYNC, EXECUTE_MODE_AUTO]:
+        raise HTTPNotImplemented(detail="Execution mode `{0}` not supported.".format(json_body['mode']))
+    execute_async = json_body['mode'] != EXECUTE_MODE_SYNC
 
-    for job_input in request.json_body['inputs']:
+    if json_body['response'] not in execute_response_options:
+        raise HTTPBadRequest(detail="Invalid execution response `{0}` specified.".format(json_body['response']))
+    if json_body['response'] != EXECUTE_RESPONSE_DOCUMENT:
+        raise HTTPNotImplemented(detail="Execution response type `{0}` not supported.".format(json_body['response']))
+
+    for job_input in json_body['inputs']:
         if not ('id' in job_input and any(k in job_input for k in ('data', 'href'))):
             raise HTTPBadRequest("Missing one of required output parameters [id, data|href].")
 
-    for job_output in request.json_body['outputs']:
+    for job_output in json_body['outputs']:
         if not all(k in job_output for k in ('id', 'transmissionMode')):
             raise HTTPBadRequest(detail="Missing one of required output parameters [id, transmissionMode].")
-        if job_output['transmissionMode'] != 'reference':
-            raise HTTPNotImplemented(detail='{0} transmissionMode not supported.'
+        if job_output['transmissionMode'] not in execute_transmission_mode_options:
+            raise HTTPBadRequest(detail="Invalid execution transmissionMode `{0}` specified."
+                                 .format(job_output['transmissionMode']))
+        if job_output['transmissionMode'] != EXECUTE_TRANSMISSION_MODE_REFERENCE:
+            raise HTTPNotImplemented(detail="Execute transmissionMode `{0}` not supported."
                                      .format(job_output['transmissionMode']))
 
     store = jobstore_factory(request.registry)
     job = store.save_job(task_id=STATUS_ACCEPTED, process=process_id, service=provider_id,
-                         inputs=request.json_body['inputs'], is_workflow=is_workflow,
+                         inputs=json_body['inputs'], is_workflow=is_workflow,
                          user_id=request.authenticated_userid, execute_async=execute_async, custom_tags=tags)
     result = execute_process.delay(
         job_id=job.id,
         url=clean_ows_url(service_url),
         # Convert EnvironHeaders to a simple dict (should cherrypick the required headers)
         headers={k: v for k, v in request.headers.items()})
-    LOGGER.debug("Celery pending task `{}` for job `{}`.", result.id, job.id)
+    LOGGER.debug("Celery pending task `{}` for job `{}`.".format(result.id, job.id))
 
     # local/provider process location
     location_base = '/providers/{provider_id}'.format(provider_id=provider_id) if provider_id else ''
@@ -486,10 +518,13 @@ def add_local_process(request):
         raise HTTPUnprocessableEntity("Invalid parameter 'processDescription.process'.")
     if not isinstance(get_any_id(process_info), string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'processDescription.process.identifier'.")
-    process_info['identifier'] = get_sane_name(get_any_id(process_info))
+    try:
+        process_info['identifier'] = get_sane_name(get_any_id(process_info))
+    except InvalidIdentifierValue as ex:
+        raise HTTPBadRequest(ex.message)
 
     # retrieve CWL package definition, either via owsContext or executionUnit package/reference
-    deployment_profile = body.get('deploymentProfileName')
+    deployment_profile_name = body.get('deploymentProfileName', '').lower()
     ows_context = process_info.pop('owsContext', None)
     reference = None
     package = None
@@ -502,7 +537,7 @@ def add_local_process(request):
             raise HTTPUnprocessableEntity("Invalid parameter 'processDescription.process.owsContext.offering.content'.")
         package = None
         reference = content.get('href')
-    elif deployment_profile.endswith('workflow'):
+    elif deployment_profile_name.endswith('workflow') or deployment_profile_name.endswith('application'):
         execution_units = body.get('executionUnit')
         if not isinstance(execution_units, list):
             raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
@@ -511,8 +546,11 @@ def add_local_process(request):
                 raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
             package = execution_unit.get('unit')
             reference = execution_unit.get('href')
+            # stop on first package/reference found, simultaneous usage will raise during package retrieval
+            if package or reference:
+                break
     else:
-        raise HTTPBadRequest("Missing one of required parameters [owsContext, deploymentProfileName being a workflow].")
+        raise HTTPBadRequest("Missing one of required parameters [owsContext, deploymentProfileName].")
 
     # obtain updated process information using WPS process offering and CWL package definition
     try:
@@ -562,46 +600,38 @@ def add_local_process(request):
     return HTTPOk(json=json_response)
 
 
-@sd.process_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer='json',
-                        schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_responses)
-def get_local_process(request):
-    """
-    Get a registered local process information (DescribeProcess).
-    """
-
-    process_id = request.matchdict.get('process_id')
-    if not isinstance(process_id, string_types):
-        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
-    try:
-        store = processstore_factory(request.registry)
-        process = store.fetch_by_id(process_id, request=request)
-        process.inputs = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
-
-        offering = process.process_offering()
-
-        return HTTPOk(json=offering)
-    except HTTPException:
-        raise  # re-throw already handled HTTPException
-    except ProcessNotFound:
-        raise HTTPNotFound("The process with id `{}` does not exist.".format(str(process_id)))
-    except Exception as ex:
-        raise HTTPInternalServerError(ex.message)
-
-
 def get_process(request):
     process_id = request.matchdict.get('process_id')
     if not isinstance(process_id, string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
         store = processstore_factory(request.registry)
-        process = store.fetch_by_id(process_id, request=request)
+        process = store.fetch_by_id(process_id, visibility=VISIBILITY_PUBLIC, request=request)
         return process
     except HTTPException:
         raise  # re-throw already handled HTTPException
+    except InvalidIdentifierValue as ex:
+        raise HTTPBadRequest(ex.message)
+    except ProcessNotAccessible:
+        raise HTTPUnauthorized("Process with id `{}` is not accessible.".format(str(process_id)))
     except ProcessNotFound:
-        raise HTTPNotFound("The process with id `{}` does not exist.".format(str(process_id)))
+        raise HTTPNotFound("Process with id `{}` does not exist.".format(str(process_id)))
+    except colander.Invalid as ex:
+        raise HTTPInternalServerError("Invalid schema:\n[{0!r}]\n[{0!s}].".format(ex))
     except Exception as ex:
         raise HTTPInternalServerError(ex.message)
+
+
+@sd.process_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer='json',
+                        schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_responses)
+def get_local_process(request):
+    """
+    Get a registered local process information (DescribeProcess).
+    """
+    process = get_process(request)
+    process.inputs = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
+    process_offering = process.process_offering()
+    return HTTPOk(json=process_offering)
 
 
 @sd.process_package_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer='json',
@@ -657,6 +687,10 @@ def set_process_visibility(request):
     process_id = request.matchdict.get('process_id')
     if not isinstance(process_id, string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
+    if not isinstance(visibility_value, string_types):
+        raise HTTPUnprocessableEntity("Invalid visibility value specified.")
+    if visibility_value not in visibility_values:
+        raise HTTPBadRequest("Invalid visibility value specified.")
 
     try:
         store = processstore_factory(request.registry)
@@ -686,13 +720,17 @@ def delete_local_process(request):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
         store = processstore_factory(request.registry)
-        if store.delete_process(process_id, request=request):
+        if store.delete_process(process_id, visibility=VISIBILITY_PUBLIC, request=request):
             return HTTPOk(json={'undeploymentDone': True, 'identifier': process_id})
-        raise HTTPInternalServerError("Delete process failed.")
+        raise HTTPInternalServerError("Delete process failed for unhandled reason.")
     except HTTPException:
         raise  # re-throw already handled HTTPException
+    except InvalidIdentifierValue as ex:
+        raise HTTPBadRequest(ex.message)
+    except ProcessNotAccessible:
+        raise HTTPUnauthorized("Process with id `{}` is not accessible.".format(str(process_id)))
     except ProcessNotFound:
-        description = "The process with process_id `{}` does not exist.".format(str(process_id))
+        description = "Process with id `{}` does not exist.".format(str(process_id))
         raise HTTPNotFound(description)
     except Exception as ex:
         raise HTTPInternalServerError(ex.message)
@@ -709,11 +747,15 @@ def submit_local_job(request):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
         store = processstore_factory(request.registry)
-        process = store.fetch_by_id(process_id, request=request)
-        resp = submit_job_handler(request, process.processEndpointWPS1, is_workflow=process.type == 'workflow')
+        process = store.fetch_by_id(process_id, visibility=VISIBILITY_PUBLIC, request=request)
+        resp = submit_job_handler(request, process.processEndpointWPS1, is_workflow=process.type == PROCESS_WORKFLOW)
         return resp
     except HTTPException:
         raise  # re-throw already handled HTTPException
+    except InvalidIdentifierValue as ex:
+        raise HTTPBadRequest(ex.message)
+    except ProcessNotAccessible:
+        raise HTTPUnauthorized("Process with id `{}` is not accessible.".format(str(process_id)))
     except ProcessNotFound:
         raise HTTPNotFound("The process with id `{}` does not exist.".format(str(process_id)))
     except Exception as ex:

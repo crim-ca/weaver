@@ -8,7 +8,12 @@ from twitcher.wps_restapi.colander_one_of import OneOfMappingSchema
 from twitcher.wps_restapi.utils import wps_restapi_base_path
 from twitcher.status import job_status_categories, STATUS_ACCEPTED, STATUS_COMPLIANT_OGC
 from twitcher.sort import job_sort_values, quote_sort_values, SORT_CREATED, SORT_ID, SORT_PROCESS
-from twitcher.sync import execute_sync_options, EXECUTE_AUTO
+from twitcher.execute import (
+    EXECUTE_MODE_AUTO,
+    execute_mode_options,
+    execute_response_options,
+    execute_transmission_mode_options,
+)
 from twitcher.visibility import visibility_values, VISIBILITY_PUBLIC
 from cornice import Service
 from colander import *
@@ -367,9 +372,11 @@ class OutputDescriptionList(SequenceSchema):
 
 
 JobControlOptionsEnum = SchemaNode(String(), title='jobControlOptions', missing=drop,
-                                   validator=OneOf(['sync-execute', 'async-execute']), default=EXECUTE_AUTO)
+                                   validator=OneOf(list(execute_mode_options)), default=EXECUTE_MODE_AUTO)
+JobResponseOptionsEnum = SchemaNode(String(), title='response', missing=drop,
+                                    validator=OneOf(list(execute_response_options)))
 TransmissionModeEnum = SchemaNode(String(), title='transmissionMode', missing=drop,
-                                  validator=OneOf(['value', 'reference']))
+                                  validator=OneOf(list(execute_transmission_mode_options)))
 
 
 class LaunchJobQuerystring(MappingSchema):
@@ -687,7 +694,7 @@ class QuoteProcessParametersSchema(MappingSchema):
     inputs = InputTypeList(missing=drop)
     outputs = OutputDescriptionList(missing=drop)
     mode = JobControlOptionsEnum
-    response = SchemaNode(String(), validator=OneOf(['raw', 'document']), missing=drop)
+    response = JobResponseOptionsEnum
 
 
 class AlternateQuotation(MappingSchema):
@@ -745,7 +752,7 @@ class InputList(SequenceSchema):
 class Execute(MappingSchema):
     inputs = InputList(missing=drop)
     outputs = OutputList()
-    mode = SchemaNode(String(), validator=OneOf(execute_sync_options))
+    mode = SchemaNode(String(), validator=OneOf(execute_mode_options))
     response = SchemaNode(String(), validator=OneOf(["raw", "document"]))
 
 

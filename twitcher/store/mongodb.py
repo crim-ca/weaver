@@ -130,9 +130,10 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
 
 
 from twitcher.store.base import ProcessStore
-from twitcher.exceptions import ProcessNotFound, ProcessRegistrationError, ProcessInstanceError
 from twitcher.datatype import Process as ProcessDB
+from twitcher.exceptions import ProcessNotAccessible, ProcessNotFound, ProcessRegistrationError, ProcessInstanceError
 from twitcher.visibility import visibility_values
+from twitcher.processes.types import PROCESS_WPS
 from pywps import Process as ProcessWPS
 
 
@@ -194,7 +195,7 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
 
     def _get_process_type(self, process):
         return self._get_process_field(process, {ProcessDB: lambda: process.type,
-                                                 ProcessWPS: lambda: 'wps'}).lower()
+                                                 ProcessWPS: lambda: getattr(process, 'type', PROCESS_WPS)}).lower()
 
     def _get_process_endpoint_wps1(self, process):
         url = self._get_process_field(process, {ProcessDB: lambda: process.processEndpointWPS1,
@@ -218,16 +219,16 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
                 self.collection.delete_one({'identifier': sane_name})
             else:
                 raise ProcessRegistrationError("Process `{}` already registered.".format(sane_name))
-        process["identifier"] = sane_name
+        process.identifier = sane_name  # must use property getter/setter to match both 'Process' types
         self._add_process(process)
         return self.fetch_by_id(sane_name)
 
-    def delete_process(self, process_id, request=None):
+    def delete_process(self, process_id, visibility=None, request=None):
         """
-        Removes process from database.
+        Removes process from database, optionally filtered by visibility.
         """
         sane_name = namesgenerator.get_sane_name(process_id, **self.sane_name_config)
-        process = self.collection.find_one({'identifier': sane_name})
+        process = self.fetch_by_id(sane_name, visibility=visibility, request=request)
         if not process:
             raise ProcessNotFound("Process `{}` could not be found.".format(sane_name))
         return bool(self.collection.delete_one({'identifier': sane_name}).deleted_count)
@@ -254,9 +255,9 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
             db_processes.append(ProcessDB(process))
         return db_processes
 
-    def fetch_by_id(self, process_id, request=None):
+    def fetch_by_id(self, process_id, visibility=None, request=None):
         """
-        Get process for given ``name`` from storage.
+        Get process for given ``name`` from storage, optionally filtered by visibility.
 
         :return: An instance of :class:`twitcher.datatype.Process`.
         """
@@ -264,7 +265,10 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         process = self.collection.find_one({'identifier': sane_name})
         if not process:
             raise ProcessNotFound("Process `{}` could not be found.".format(sane_name))
-        return ProcessDB(process)
+        process = ProcessDB(process)
+        if visibility is not None and process.visibility != visibility:
+            raise ProcessNotAccessible("Process `{}` cannot be accessed.".format(sane_name))
+        return process
 
     def get_visibility(self, process_id, request=None):
         """
@@ -287,6 +291,13 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         process = self.fetch_by_id(process_id)
         process.visibility = visibility
         self.save_process(process, overwrite=True)
+
+    def clear_processes(self, request=None):
+        """
+        Clears all processes from the store.
+        """
+        self.collection.drop()
+        return True
 
 
 from twitcher.store.base import JobStore

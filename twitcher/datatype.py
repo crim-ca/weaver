@@ -9,7 +9,7 @@ from dateutil.parser import parse as dt_parse
 from datetime import timedelta
 # noinspection PyProtectedMember
 from logging import _levelNames, ERROR, INFO
-
+from typing import Any, AnyStr, Dict, List, Optional, Union
 from twitcher.utils import (
     now,
     now_secs,
@@ -21,7 +21,9 @@ from twitcher.utils import (
 )
 from twitcher.exceptions import ProcessInstanceError
 from twitcher.processes import process_mapping
-from twitcher.processes.types import PACKAGE_PROCESSES, PROCESS_WPS
+from twitcher.processes.types import PROCESS_WITH_MAPPING, PROCESS_WPS
+# noinspection PyProtectedMember
+from twitcher.processes.wps_package import _wps2json_io
 from twitcher.status import job_status_values, STATUS_UNKNOWN
 from twitcher.visibility import visibility_values, VISIBILITY_PRIVATE
 from pywps import Process as ProcessWPS
@@ -468,83 +470,108 @@ class Process(dict):
 
     @property
     def id(self):
+        # type: (...) -> AnyStr
         return self['id']
 
     @property
     def identifier(self):
+        # type: (...) -> AnyStr
         return self.id
+
+    @identifier.setter
+    def identifier(self, value):
+        # type: (AnyStr) -> None
+        self['id'] = value
 
     @property
     def title(self):
+        # type: (...) -> AnyStr
         return self.get('title', self.id)
 
     @property
     def abstract(self):
+        # type: (...) -> AnyStr
         return self.get('abstract', '')
 
     @property
     def keywords(self):
+        # type: (...) -> List[AnyStr]
         return self.get('keywords', [])
 
     @property
     def metadata(self):
+        # type: (...) -> List[AnyStr]
         return self.get('metadata', [])
 
     @property
     def version(self):
+        # type: (...) -> Union[None, AnyStr]
         return self.get('version')
 
     @property
     def inputs(self):
+        # type: (...) -> Union[None, List[Dict[AnyStr, Any]]]
         return self.get('inputs')
 
     @property
     def outputs(self):
+        # type: (...) -> Union[None, List[Dict[AnyStr, Any]]]
         return self.get('outputs')
 
     @property
     def jobControlOptions(self):
+        # type: (...) -> Union[None, List[AnyStr]]
         return self.get('jobControlOptions')
 
     @property
     def outputTransmission(self):
+        # type: (...) -> Union[None, List[AnyStr]]
         return self.get('outputTransmission')
 
     @property
     def processDescriptionURL(self):
+        # type: (...) -> Union[None, AnyStr]
         return self.get('processDescriptionURL')
 
     @property
     def processEndpointWPS1(self):
+        # type: (...) -> Optional[AnyStr]
         return self.get('processEndpointWPS1')
 
     @property
     def executeEndpoint(self):
+        # type: (...) -> Union[None, AnyStr]
         return self.get('executeEndpoint')
 
     @property
     def owsContext(self):
+        # type: (...) -> Union[None, Dict[AnyStr, Any]]
         return self.get('owsContext')
 
     # wps, workflow, etc.
     @property
     def type(self):
-        return self.get('type')
+        # type: (...) -> AnyStr
+        return self.get('type', 'WPS')
 
     @property
     def package(self):
+        # type: (...) -> Union[None, Dict[AnyStr, Any]]
         return self.get('package')
 
     @property
     def payload(self):
+        # type: (...) -> Union[None, Dict[AnyStr, Any]]
         return self.get('payload')
 
     @property
     def visibility(self):
+        # type: (...) -> AnyStr
         return self.get('visibility', VISIBILITY_PRIVATE)
 
     @visibility.setter
     def visibility(self, visibility):
+        # type: (AnyStr) -> None
         if not isinstance(visibility, six.string_types):
             raise TypeError("Type `str` is required for `{}.visibility`".format(type(self)))
         if visibility not in visibility_values:
@@ -553,15 +580,18 @@ class Process(dict):
         self['visibility'] = visibility
 
     def __str__(self):
+        # type: (...) -> AnyStr
         return "Process <{0}> ({1})".format(self.identifier, self.title)
 
     def __repr__(self):
+        # type: (...) -> AnyStr
         cls = type(self)
         repr_ = dict.__repr__(self)
         return '{0}.{1}({2})'.format(cls.__module__, cls.__name__, repr_)
 
     @property
     def params(self):
+        # type: (...) -> Dict[AnyStr, Any]
         return {
             'identifier': self.identifier,
             'title': self.title,
@@ -582,7 +612,8 @@ class Process(dict):
 
     @property
     def params_wps(self):
-        """Values applicable to WPS Process __init__"""
+        # type: (...) -> Dict[AnyStr, Any]
+        """Values applicable to PyWPS Process __init__"""
         return {
             'identifier': self.identifier,
             'title': self.title,
@@ -597,19 +628,36 @@ class Process(dict):
         }
 
     def json(self):
+        # type: (...) -> Dict[AnyStr, Any]
         return sd.Process().deserialize(self)
 
     def process_offering(self):
-        return sd.ProcessOffering().deserialize(ProcessOffering(self))
+        # type: (...) -> Dict[AnyStr, Any]
+        process_offering = {"process": self}
+        if self.version:
+            process_offering.update({"processVersion": self.version})
+        if self.jobControlOptions:
+            process_offering.update({"jobControlOptions": self.jobControlOptions})
+        if self.outputTransmission:
+            process_offering.update({"outputTransmission": self.outputTransmission})
+        return sd.ProcessOffering().deserialize(process_offering)
 
     def process_summary(self):
+        # type: (...) -> Dict[AnyStr, Any]
         return sd.ProcessSummary().deserialize(self)
 
     @staticmethod
     def from_wps(wps_process, **extra_params):
+        # type: (ProcessWPS, Any) -> Process
+        """
+        Converts a PyWPS Process into a `twitcher.datatype.Process` using provided parameters.
+        """
         assert isinstance(wps_process, ProcessWPS)
         process = wps_process.json
-        process.update({'type': wps_process.identifier, 'package': None, 'reference': None})
+        process_type = getattr(wps_process, 'type', wps_process.identifier)
+        process.update({'type': process_type, 'package': None, 'reference': None,
+                        'inputs': [_wps2json_io(i) for i in wps_process.inputs],
+                        'outputs': [_wps2json_io(o) for o in wps_process.outputs]})
         process.update(**extra_params)
         return Process(process)
 
@@ -618,20 +666,10 @@ class Process(dict):
         if self.type == PROCESS_WPS:
             process_key = self.identifier
         if process_key not in process_mapping:
-            ProcessInstanceError("Unknown process `{}` in mapping".format(process_key))
-        if process_key in PACKAGE_PROCESSES:
+            ProcessInstanceError("Unknown process `{}` in mapping.".format(process_key))
+        if process_key in PROCESS_WITH_MAPPING:
             return process_mapping[process_key](**self.params_wps)
         return process_mapping[process_key]()
-
-
-class ProcessOffering(dict):
-    def __init__(self, process):
-        super(ProcessOffering, self).__init__({
-            "process": process,
-            "processVersion": process.version,
-            "jobControlOptions": process.jobControlOptions,
-            "outputTransmission": process.outputTransmission,
-        })
 
 
 class Quote(dict):

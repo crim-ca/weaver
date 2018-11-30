@@ -81,6 +81,11 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def setUpClass(cls):
+        # disable SSL warnings from logs
+        # noinspection PyPackageRequirements
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
         cls.setup_logger()
         cls.log("{}Start of End-2-End test: {}\n{}"
                 .format(cls.logger_separator_tests, now(), cls.logger_separator_steps))
@@ -182,10 +187,6 @@ class End2EndEMSTestCase(TestCase):
     def get_test_process(cls, process_id):
         # type: (str) -> ProcessInfo
         return cls.test_processes_info.get(process_id)
-
-    @classmethod
-    def get_test_processes_id(cls):
-        return [process.test_id for process in cls.test_processes_info.values()]
 
     @classmethod
     def setup_test_processes(cls):
@@ -480,11 +481,15 @@ class End2EndEMSTestCase(TestCase):
         headers_a, cookies_a = self.user_headers_cookies(self.ALICE_CREDENTIALS)
         headers_b, cookies_b = self.user_headers_cookies(self.BOB_CREDENTIALS)
 
+        # this test's set of processes
+        end2_end_test_processes = [self.get_test_process(process_id) for process_id in
+                                   (self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID, self.PROCESS_WORKFLOW_ID)]
+
         # list processes (none of tests)
         path = '{}/processes'.format(self.get_twitcher_ems_url())
         resp = self.request('GET', path, headers=headers_a, cookies=cookies_a, status=HTTPOk.code)
         proc = resp.json.get('processes')
-        test_processes = filter(lambda p: p['id'] in self.get_test_processes_id(), proc)
+        test_processes = filter(lambda p: p['id'] in [tp.test_id for tp in end2_end_test_processes], proc)
         self.assert_test(lambda: len(test_processes) == 0, message="Test processes shouldn't exist!")
 
         self.request('POST', path, headers=headers_a, cookies=cookies_a, status=HTTPOk.code,
@@ -503,14 +508,14 @@ class End2EndEMSTestCase(TestCase):
         # processes visible by alice
         resp = self.request('GET', path, headers=headers_a, cookies=cookies_a, status=HTTPOk.code)
         proc = resp.json.get('processes')
-        test_processes = filter(lambda p: p['id'] in self.get_test_processes_id(), proc)
-        self.assert_test(lambda: len(test_processes) == len(self.test_processes_info),
+        test_processes = filter(lambda p: p['id'] in [tp.test_id for tp in end2_end_test_processes], proc)
+        self.assert_test(lambda: len(test_processes) == len(end2_end_test_processes),
                          message="Test processes should exist.")
 
         # processes not yet visible by bob
         resp = self.request('GET', path, headers=headers_b, cookies=cookies_b, status=HTTPOk.code)
         proc = resp.json.get('processes')
-        test_processes = filter(lambda p: p['id'] in self.get_test_processes_id(), proc)
+        test_processes = filter(lambda p: p['id'] in [tp.test_id for tp in end2_end_test_processes], proc)
         self.assert_test(lambda: len(test_processes) == 0, message="Test processes shouldn't be visible by bob.")
 
         # processes visibility

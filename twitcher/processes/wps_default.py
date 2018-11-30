@@ -1,12 +1,16 @@
-import os
-
 from pywps import Process, LiteralInput, LiteralOutput
+from twitcher.processes.types import PROCESS_WPS
 
+import os
 import logging
 LOGGER = logging.getLogger("PYWPS")
 
 
 class Hello(Process):
+    identifier = 'hello'
+    title = 'Say Hello'
+    type = PROCESS_WPS
+
     def __init__(self):
         inputs = [
             LiteralInput('name', 'Your name', data_type='string')]
@@ -16,8 +20,8 @@ class Hello(Process):
 
         super(Hello, self).__init__(
             self._handler,
-            identifier='hello',
-            title='Say Hello',
+            identifier=self.identifier,
+            title=self.title,
             version='1.4',
             inputs=inputs,
             outputs=outputs,

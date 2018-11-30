@@ -5,6 +5,7 @@ This module is inspired by
 `docker names-generator.go <https://github.com/docker/docker/blob/master/pkg/namesgenerator/names-generator.go>`_
 """
 
+from twitcher.exceptions import InvalidIdentifierValue
 import random
 import re
 
@@ -169,7 +170,7 @@ def get_sane_name(name, minlen=3, maxlen=None, assert_invalid=True, replace_inva
 
 def assert_sane_name(name, minlen=3, maxlen=None):
     if name is None:
-        raise ValueError('Invalid process name : {0}'.format(name))
+        raise InvalidIdentifierValue('Invalid process name : {0}'.format(name))
     name = name.strip()
     if '--' in name \
        or name.startswith('-') \
@@ -177,4 +178,4 @@ def assert_sane_name(name, minlen=3, maxlen=None):
        or len(name) < minlen \
        or (maxlen is not None and len(name) > maxlen) \
        or not re.match("^[a-zA-Z0-9_\-]+$", name):
-        raise ValueError('Invalid process name : {0}'.format(name))
+        raise InvalidIdentifierValue('Invalid process name : {0}'.format(name))
