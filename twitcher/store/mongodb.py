@@ -15,8 +15,9 @@ from twitcher.exceptions import (
     QuoteRegistrationError, QuoteNotFound, QuoteInstanceError,
     BillRegistrationError, BillNotFound, BillInstanceError,
 )
+from twitcher.execute import EXECUTE_MODE_ASYNC, EXECUTE_MODE_SYNC
 from twitcher import namesgenerator
-from twitcher.processes.types import PROCESS_WPS
+from twitcher.processes.types import PROCESS_WPS, PROCESS_WORKFLOW, PROCESS_APPLICATION
 # noinspection PyPackageRequirements
 from pywps import Process as ProcessWPS
 from pyramid.security import authenticated_userid
@@ -347,15 +348,15 @@ class MongodbJobStore(JobStore, MongodbStore):
         """
         try:
             tags = ['dev']
-            tags.extend(custom_tags or list())
+            tags.extend(filter(lambda t: t, custom_tags or list()))
             if is_workflow:
-                tags.append('workflow')
+                tags.append(PROCESS_WORKFLOW)
             else:
-                tags.append('single')
+                tags.append(PROCESS_APPLICATION)
             if execute_async:
-                tags.append('async')
+                tags.append(EXECUTE_MODE_ASYNC)
             else:
-                tags.append('sync')
+                tags.append(EXECUTE_MODE_SYNC)
             new_job = Job({
                 'task_id': task_id,
                 'user_id': user_id,
@@ -422,13 +423,11 @@ class MongodbJobStore(JobStore, MongodbStore):
         search_filters = {}
         if access == VISIBILITY_PUBLIC:
             search_filters['tags'] = VISIBILITY_PUBLIC
-            if not search_filters.get('user_id'):
-                search_filters.pop('user_id', None)
         elif access == VISIBILITY_PRIVATE:
             search_filters['tags'] = {'$ne': VISIBILITY_PUBLIC}
             search_filters['user_id'] = authenticated_userid(request)
         elif access == VISIBILITY_ALL and request.has_permission('admin'):
-            search_filters.pop('user_id', None)
+            pass
         else:
             if tags:
                 search_filters['tags'] = {'$all': tags}

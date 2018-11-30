@@ -1,12 +1,21 @@
 from pyramid.httpexceptions import *
 from pyramid.settings import asbool
+from pyramid.request import Request
 from pyramid_celery import celery_app as app
-from twitcher.adapter import jobstore_factory
-from twitcher.exceptions import JobNotFound
+from twitcher.adapter import servicestore_factory, processstore_factory, jobstore_factory
+from twitcher.exceptions import (
+    InvalidIdentifierValue,
+    ServiceNotFound,
+    ProcessNotAccessible,
+    ProcessNotFound,
+    JobNotFound,
+)
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import wps_restapi_base_url
+from twitcher.utils import parse_request_query
+from twitcher.visibility import VISIBILITY_PUBLIC
 from twitcher import status, sort
-from typing import AnyStr, Optional
+from typing import AnyStr, Optional, Union, Tuple
 from owslib.wps import WPSExecution
 from lxml import etree
 from celery.utils.log import get_task_logger
@@ -102,6 +111,37 @@ def get_job(request):
     return job
 
 
+def validate_service_process(request):
+    # type: (Request) -> Tuple[Union[None, AnyStr], Union[None, AnyStr]]
+    """
+    Verifies that service or process specified by path will raise the appropriate error if applicable.
+    """
+    path_service = request.matchdict.get('provider_id', None)
+    path_process = request.matchdict.get('process_id', None)
+    path_type = None
+    path_test = None
+
+    try:
+        if path_service:
+            path_type = 'Service'
+            path_test = path_service
+            store = servicestore_factory(request.registry)
+            store.fetch_by_name(path_service, request=request)
+        if path_process:
+            path_type = 'Process'
+            path_test = path_process
+            store = processstore_factory(request.registry)
+            store.fetch_by_id(path_process, visibility=VISIBILITY_PUBLIC, request=request)
+    except (ServiceNotFound, ProcessNotFound):
+        raise HTTPNotFound("{} of id `{}` cannot be found.".format(path_type, path_test))
+    except ProcessNotAccessible:
+        raise HTTPUnauthorized("{} of id `{}` is not accessible.".format(path_type, path_test))
+    except InvalidIdentifierValue as ex:
+        raise HTTPBadRequest(ex.message)
+
+    return path_service, path_process
+
+
 @sd.process_jobs_service.get(tags=[sd.processes_tag, sd.jobs_tag], renderer='json',
                              schema=sd.GetProcessJobsEndpoint(), response_schemas=sd.get_all_jobs_responses)
 @sd.jobs_full_service.get(tags=[sd.jobs_tag, sd.providers_tag], renderer='json',
@@ -112,7 +152,7 @@ def get_jobs(request):
     """
     Retrieve the list of jobs which can be filtered/sorted using queries.
     """
-
+    path_service, path_process = validate_service_process(request)
     detail = asbool(request.params.get('detail', False))
     page = int(request.params.get('page', '0'))
     limit = int(request.params.get('limit', '10'))
@@ -125,8 +165,8 @@ def get_jobs(request):
         'status': request.params.get('status', None),
         'sort': request.params.get('sort', sort.SORT_CREATED),
         # service and process can be specified by query (short route) or by path (full route)
-        'process': request.params.get('process', None) or request.matchdict.get('process_id', None),
-        'service': request.params.get('provider', None) or request.matchdict.get('provider_id', None),
+        'process': path_process or request.params.get('process', None),
+        'service': path_service or request.params.get('provider', None),
     }
     store = jobstore_factory(request.registry)
     items, count = store.find_jobs(request, **filters)
