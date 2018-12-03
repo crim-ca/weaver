@@ -625,14 +625,17 @@ class End2EndEMSTestCase(TestCase):
         headers, cookies = self.user_headers_cookies(self.ADMIN_CREDENTIALS, force_magpie=True)
         self.clear_test_processes(headers, cookies)
 
-        # deploy processes
-        path = '{}/processes'.format(self.get_twitcher_ems_url())
-        self.request('POST', path, status=HTTPOk.code, headers=self.headers,
-                     json=self.test_processes_info[self.PROCESS_STACKER_ID].deploy_payload,
-                     message="Expect deployed application process.")
-        self.request('POST', path, status=HTTPOk.code, headers=self.headers,
-                     json=self.test_processes_info[self.PROCESS_SFS_ID].deploy_payload,
-                     message="Expect deployed application process.")
+        path_deploy = '{}/processes'.format(self.get_twitcher_ems_url())
+
+        # deploy processes and make them visible for workflows
+        for process_id in [self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID]:
+            path_visible = '{}/{}/visibility'.format(path_deploy, self.test_processes_info[process_id].test_id)
+            data_visible = {'value': VISIBILITY_PUBLIC}
+            self.request('POST', path_deploy, status=HTTPOk.code, headers=self.headers,
+                         json=self.test_processes_info[process_id].deploy_payload,
+                         message="Expect deployed application process.")
+            self.request('PUT', path_visible, status=HTTPOk.code, headers=self.headers, json=data_visible,
+                         message="Expect visible application process.")
 
         # TODO For now only simple chain is expected to work
         # test_set = self.workflow_set
@@ -642,14 +645,14 @@ class End2EndEMSTestCase(TestCase):
         with nested(*package_mock):
 
             for workflow_id in test_set:
-                self.request('POST', path, status=HTTPOk.code, headers=self.headers,
-                             json=self.test_processes_info[workflow_id].deploy_payload,
-                             message="Expect deployed workflow process.")
-
                 workflow_info = self.test_processes_info[workflow_id]
 
+                self.request('POST', path_deploy, status=HTTPOk.code, headers=self.headers,
+                             json=workflow_info.deploy_payload,
+                             message="Expect deployed workflow process.")
+
                 # make process visible
-                process_path = '{}/processes/{}'.format(self.get_twitcher_ems_url(), workflow_info.test_id)
+                process_path = '{}/{}'.format(path_deploy, workflow_info.test_id)
                 visible_path = '{}/visibility'.format(process_path)
                 visible = {'value': VISIBILITY_PUBLIC}
                 resp = self.request('PUT', visible_path, json=visible, status=HTTPOk.code, headers=self.headers)
