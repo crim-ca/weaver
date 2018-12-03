@@ -8,6 +8,7 @@ import unittest
 import pyramid.testing
 import six
 from copy import deepcopy
+# noinspection PyDeprecation
 from contextlib import nested
 from twitcher.tests.functional.common import setup_with_mongodb, setup_mongodb_processstore, setup_mongodb_jobstore
 from twitcher.processes.wps_testing import WpsTestProcess
@@ -148,6 +149,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process_data = self.get_process_deploy_template(process_name)
         package_mock = self.get_process_package_mock()
 
+        # noinspection PyDeprecation
         with nested(*package_mock):
             uri = "/processes"
             resp = self.app.post_json(uri, params=process_data, headers=self.json_headers, expect_errors=True)
@@ -162,6 +164,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process_data = self.get_process_deploy_template(process_name)
         package_mock = self.get_process_package_mock()
 
+        # noinspection PyDeprecation
         with nested(*package_mock):
             uri = "/processes"
             resp = self.app.post_json(uri, params=process_data, headers=self.json_headers, expect_errors=True)
@@ -173,12 +176,14 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process_data = self.get_process_deploy_template(process_name)
         package_mock = self.get_process_package_mock()
 
+        # noinspection PyDeprecation
         with nested(*package_mock):
             uri = "/processes"
             resp = self.app.post_json(uri, params=process_data, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 409
             assert resp.content_type == self.json_app
 
+    # noinspection PyTypeChecker
     def test_create_process_missing_or_invalid_components(self):
         process_name = self.fully_qualified_test_process_name()
         process_data = self.get_process_deploy_template(process_name)
@@ -197,6 +202,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process_data_tests[8]['executionUnit'][0] = {"href": {}}                # href as package instead of url
         process_data_tests[9]['executionUnit'][0] = {"unit": {}, "href": ""}    # both unit/href together not allowed
 
+        # noinspection PyDeprecation
         with nested(*package_mock):
             uri = "/processes"
             for i, data in enumerate(process_data_tests):
@@ -239,6 +245,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         task = "job-{}".format(fully_qualified_name(self))
         mock_execute = self.get_process_job_runner_mock(task)
 
+        # noinspection PyDeprecation
         with nested(*mock_execute):
             resp = self.app.post_json(uri, params=data, headers=self.json_headers)
             assert resp.status_code == 201

@@ -135,7 +135,7 @@
       ],
       "version": "1.0.0",
       "jobControlOptions": [
-        "async-execute"
+        "async"
       ],
       "outputTransmission": [
         "reference"

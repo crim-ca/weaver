@@ -1863,7 +1863,7 @@
         "type": "string",
         "enum": [
           "sync-execute",
-          "async-execute"
+          "async"
         ]
       },
       "transmissionMode": {
@@ -2187,11 +2187,11 @@
                 "type": "string",
                 "format": "uri"
               },
-              
+
               "value": {
                 "type": "string"
               }
-            
+
             }
           },
           {
