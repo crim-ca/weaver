@@ -358,10 +358,8 @@ class MongodbJobStore(JobStore, MongodbStore):
                 tags.append(EXECUTE_MODE_ASYNC)
             else:
                 tags.append(EXECUTE_MODE_SYNC)
-            if access:
-                tags.append(access)
-            else:
-                tags.append(VISIBILITY_PUBLIC)
+            if not access:
+                access = VISIBILITY_PRIVATE
             new_job = Job({
                 'task_id': task_id,
                 'user_id': user_id,
@@ -373,6 +371,7 @@ class MongodbJobStore(JobStore, MongodbStore):
                 'is_workflow': is_workflow,
                 'created': now(),
                 'tags': tags,
+                'access': access,
             })
             self.collection.insert_one(new_job)
             job = self.fetch_by_id(job_id=new_job.id)
@@ -428,17 +427,19 @@ class MongodbJobStore(JobStore, MongodbStore):
         """
         search_filters = {}
         user_id = None if request.has_permission('admin') else authenticated_userid(request)
+        if any(v in tags for v in visibility_values):
+            raise ValueError("Visibility values not acceptable in `tags`, use `access` instead.")
 
         if access == VISIBILITY_PUBLIC:
-            search_filters['tags'] = VISIBILITY_PUBLIC
-        elif access == VISIBILITY_PRIVATE:
-            search_filters['tags'] = {'$ne': VISIBILITY_PUBLIC}
-            search_filters['user_id'] = user_id
+            search_filters['access'] = VISIBILITY_PUBLIC
         else:
-            if tags:
-                search_filters['tags'] = {'$all': tags}
-            if user_id:
-                search_filters['user_id'] = user_id
+            search_filters['access'] = {'$ne': VISIBILITY_PUBLIC}
+
+        if user_id:
+            search_filters['user_id'] = user_id
+
+        if tags:
+            search_filters['tags'] = {'$all': tags}
 
         if status in job_status_categories.keys():
             search_filters['status'] = {'$in': job_status_categories[status]}

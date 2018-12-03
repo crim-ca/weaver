@@ -256,4 +256,5 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 self.check_basic_jobs_info(resp)
                 job_ids = [job.id for job in expected_jobs]
                 job_match = all(job in job_ids for job in resp.json['jobs'])
-                assert job_match, self.message_with_jobs_diffs(resp.json['jobs'], job_ids)
+                test_values = dict(path=path, query=query, user_id=user_id)
+                assert job_match, self.message_with_jobs_diffs(resp.json['jobs'], job_ids, test_values)

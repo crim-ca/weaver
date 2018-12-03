@@ -25,7 +25,7 @@ from twitcher.processes.types import PROCESS_WITH_MAPPING, PROCESS_WPS
 # noinspection PyProtectedMember
 from twitcher.processes.wps_package import _wps2json_io
 from twitcher.status import job_status_values, STATUS_UNKNOWN
-from twitcher.visibility import visibility_values, VISIBILITY_PRIVATE
+from twitcher.visibility import visibility_values, VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 from owslib.wps import WPSException
 from pywps import Process as ProcessWPS
 
@@ -370,6 +370,22 @@ class Job(dict):
     tags = property(_get_tags, _set_tags)
 
     @property
+    def access(self):
+        # type: (...) -> AnyStr
+        """Job visibility access from execution."""
+        return self.get('access', VISIBILITY_PRIVATE)
+
+    @access.setter
+    def access(self, visibility):
+        # type: (AnyStr) -> None
+        """Job visibility access from execution."""
+        if not isinstance(visibility, six.string_types):
+            raise TypeError("Type `str` is required for `{}.access`".format(type(self)))
+        if visibility not in visibility_values:
+            raise ValueError("Invalid `visibility` value specified for `{}.access`".format(type(self)))
+        self['access'] = visibility
+
+    @property
     def request(self):
         # type: (...) -> Union[None, AnyStr]
         """XML request for WPS execution submission as string."""
@@ -416,6 +432,7 @@ class Job(dict):
             'exceptions': self.exceptions,
             'logs': self.logs,
             'tags': self.tags,
+            'access': self.access,
             'request': self.request,
             'response': self.response,
         }
