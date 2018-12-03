@@ -105,7 +105,7 @@ class End2EndEMSTestCase(TestCase):
     def get_process_package_mock():
         return (
             mock.patch('twitcher.processes.sources.get_data_source_from_url',
-                       new_callable=End2EndEMSTestCase.mock_get_data_source_from_url),
+                       side_effect=End2EndEMSTestCase.mock_get_data_source_from_url),
         )
 
     @staticmethod
