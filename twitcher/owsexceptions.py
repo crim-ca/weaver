@@ -49,6 +49,15 @@ class OWSException(Response, Exception):
     @staticmethod
     def json_formatter(status, body, title, environ):
         # type: (AnyStr, AnyStr, AnyStr, Dict[AnyStr, AnyStr]) -> Dict[AnyStr, AnyStr]
+
+        # cleanup various escape characters and u'' stings
+        while '\"' in body:
+            body = body.replace('\"', '\'')
+        while '\\' in body:
+            body = body.replace('\\', '')
+        while 'u\'' in body or 'u\"' in body:
+            body = body.replace('u\'', '').replace('u\"', '')
+
         body_parts = [p.strip() for p in body.split('\n') if p != '']               # remove new line and extra spaces
         body_parts = [p + '.' if not p.endswith('.') else p for p in body_parts]    # add terminating dot per sentence
         body_parts = [p[0].upper() + p[1:] for p in body_parts if len(p)]           # capitalize first word

@@ -4,20 +4,35 @@ from cornice_swagger.converters.exceptions import NoSuchConverter
 
 
 class OneOfMappingSchema(colander.MappingSchema):
+
+    def __init__(self, *args, **kwargs):
+        super(OneOfMappingSchema, self).__init__(*args, **kwargs)
+        if not hasattr(self, "_one_of"):
+            raise TypeError("Type {} must define '_one_of' element.".format(self))
+        if not hasattr(self._one_of, '__iter__') or not len(self._one_of):
+            raise ValueError("Type {} '_one_of' element must be an iterable of at least 1 value.".format(self))
+
+    def __str__(self):
+        return self.__name__
+
     def deserialize_one_of(self, cstruct):
         if cstruct is colander.null:
             return colander.null
         if not hasattr(self, "_one_of"):
             return {}
 
+        # test each possible case, return all errors if none valid found
+        invalid_one_of = dict()
         for c in self._one_of:
             try:
                 return c().deserialize(cstruct)
-            except colander.Invalid:
+            except colander.Invalid as invalid:
+                invalid_one_of.update({type(invalid.node).__name__: str(invalid)})
                 pass
         else:
-            message = 'Incorrect type, must be one of: ' + self._schema_names()
-            raise colander.Invalid(message)
+            message = 'Incorrect type, must be one of: {}. Errors for each case: {}' \
+                      .format(list(invalid_one_of), invalid_one_of)
+            raise colander.Invalid(node=self, msg=message)
 
     def deserialize(self, cstruct):
         if cstruct is colander.null:

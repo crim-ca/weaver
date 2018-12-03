@@ -501,23 +501,22 @@ def add_local_process(request):
     """
     Register a local process.
     """
-    # validate minimum field requirements
-    body = request.json
-
     # use deepcopy of body payload to avoid circular dependencies when writing to mongodb
     # and before parsing it because the body is altered by some pop operations
+    body = request.json
     payload = deepcopy(body)
 
-    if 'processDescription' not in body:
-        raise HTTPBadRequest("Missing required parameter 'processDescription'.")
+    # validate minimum field requirements
+    try:
+        sd.Deploy().deserialize(body)
+    except colander.Invalid as ex:
+        raise HTTPBadRequest("Invalid schema: [{}]".format(str(ex)))
+    except Exception as ex:
+        raise HTTPInternalServerError("Unhandled error when parsing 'processDescription': [{}]".format(str(ex)))
+
+    # validate identifier naming for unsupported characters
     process_description = body.get('processDescription')
-    if not isinstance(process_description, dict):
-        raise HTTPUnprocessableEntity("Invalid parameter 'processDescription'.")
     process_info = process_description.get('process')
-    if not isinstance(process_info, dict):
-        raise HTTPUnprocessableEntity("Invalid parameter 'processDescription.process'.")
-    if not isinstance(get_any_id(process_info), string_types):
-        raise HTTPUnprocessableEntity("Invalid parameter 'processDescription.process.identifier'.")
     try:
         process_info['identifier'] = get_sane_name(get_any_id(process_info))
     except InvalidIdentifierValue as ex:
@@ -617,9 +616,9 @@ def get_process(request):
     except ProcessNotFound:
         raise HTTPNotFound("Process with id `{}` does not exist.".format(str(process_id)))
     except colander.Invalid as ex:
-        raise HTTPInternalServerError("Invalid schema:\n[{0!r}]\n[{0!s}].".format(ex))
+        raise HTTPBadRequest("Invalid schema:\n[{0!r}]\n[{0!s}].".format(ex))
     except Exception as ex:
-        raise HTTPInternalServerError(ex.message)
+        raise HTTPInternalServerError(str(ex))
 
 
 @sd.process_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer='json',
@@ -628,10 +627,15 @@ def get_local_process(request):
     """
     Get a registered local process information (DescribeProcess).
     """
-    process = get_process(request)
-    process.inputs = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
-    process_offering = process.process_offering()
-    return HTTPOk(json=process_offering)
+    try:
+        process = get_process(request)
+        process.inputs = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
+        process_offering = process.process_offering()
+        return HTTPOk(json=process_offering)
+    except colander.Invalid as ex:
+        raise HTTPBadRequest("Invalid schema: [{}]".format(str(ex)))
+    except Exception as ex:
+        raise HTTPInternalServerError(str(ex))
 
 
 @sd.process_package_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer='json',
