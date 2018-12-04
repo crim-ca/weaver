@@ -976,8 +976,8 @@ class ProcessDescriptionChoiceType(OneOfMappingSchema):
 
 
 class Deploy(MappingSchema):
+    processDescription = ProcessDescriptionChoiceType()
     immediateDeployment = SchemaNode(Boolean(), missing=drop, default=True)
-    processDescription = ProcessDescriptionChoiceType(missing=drop)
     executionUnit = ExecutionUnitList()
     deploymentProfileName = SchemaNode(String(), missing=drop)
 

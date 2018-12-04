@@ -10,6 +10,11 @@ def test_owsexceptions_json_formatter():
         ("Already has dot at the end.\n", "Already has dot at the end."),
         ("\nDot only\n\n\nat the end.", "Dot only. At the end."),
         ("Loads of dots remains...\n", "Loads of dots remains..."),
+        ("Contains some u''strings' not escaped", "Contains some 'strings' not escaped."),
+        ("With \"double quotes\" not escaped.", "With 'double quotes' not escaped."),
+        ("With \'single quotes\' not escaped.", "With 'single quotes' not escaped."),
+        ("With many spacing \\\\slashes not escaped.", "With many spacing slashes not escaped."),
+        ("With combo of wrong \\\"\'u''escapes'\'\" not cleaned.", "With combo of wrong 'escapes' not cleaned."),
     ]
 
     test_code = "Test Exception 1337"
