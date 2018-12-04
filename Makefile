@@ -261,17 +261,17 @@ passwd: custom.cfg
 .PHONY: test
 test:
 	@echo "Running tests (skip slow and online tests) ..."
-	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); py.test -v -m 'not slow and not online'"
+	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); py.test -v -m 'not slow and not online' --junitxml $(CURDIR)/tests/results.xml"
 
 .PHONY: testall
 testall:
 	@echo "Running all tests (including slow and online tests) ..."
-	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); pytest -v"
+	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); pytest -v --junitxml $(CURDIR)/tests/results.xml"
 
 .PHONY: testfunc
 testfunc:
 	@echo "Running functional tests ..."
-	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); pytest -v -m 'functional'"
+	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); pytest -v -m 'functional' --junitxml $(CURDIR)/tests/results.xml"
 
 .PHONY: coverage
 coverage:

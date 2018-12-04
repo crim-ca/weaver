@@ -449,7 +449,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def setup_logger(cls):
-        log_path = os.path.abspath(os.path.join(TWITCHER_ROOT_DIR, cls.__name__ + '.log'))
+        log_path = os.path.abspath(os.path.join(TWITCHER_ROOT_DIR, 'tests', cls.__name__ + '.log'))
         cls.logger_separator_calls = '-' * 80 + '\n'   # used between function calls (of same request)
         cls.logger_separator_steps = '=' * 80 + '\n'   # used between overall test steps (between requests)
         cls.logger_separator_tests = '*' * 80 + '\n'   # used between various test runs
