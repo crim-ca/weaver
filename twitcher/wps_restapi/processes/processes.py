@@ -632,6 +632,8 @@ def get_local_process(request):
         process.inputs = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
         process_offering = process.process_offering()
         return HTTPOk(json=process_offering)
+    except HTTPException:
+        raise  # re-throw already handled HTTPException
     except colander.Invalid as ex:
         raise HTTPBadRequest("Invalid schema: [{}]".format(str(ex)))
     except Exception as ex:
