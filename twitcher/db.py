@@ -27,7 +27,7 @@ def get_mongodb_client(registry):
 
 
 def get_mongodb_engine(registry):
-    db = MongoDB.get(registry)
+    db = get_mongodb_client(registry)
     db.services.create_index("name", unique=True)
     db.services.create_index("url", unique=True)
     db.processes.create_index("identifier", unique=True)
