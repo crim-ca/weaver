@@ -252,30 +252,30 @@ passwd: custom.cfg
 	@echo "Run \`make install restart' to activate this password."
 
 .PHONY: test
-test:
+test: devinstall
 	@echo "Running tests (skip slow and online tests) ..."
 	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); py.test -v -m 'not slow and not online'"
 
 .PHONY: testall
-testall:
+testall: devinstall
 	@echo "Running all tests (including slow and online tests) ..."
 	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); pytest -v"
 
 .PHONY: testfunc
-testfunc:
+testfunc: devinstall
 	@echo "Running functional tests ..."
 	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); pytest -v -m 'functional'"
 
 .PHONY: coverage
-coverage:
+coverage: devinstall
 	@echo "Running coverage analysis..."
-	coverage run --source twitcher setup.py test
-	coverage report -m
-	coverage html -d coverage
+	@bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); coverage run --source twitcher setup.py test"
+	@bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); coverage report -m"
+	@bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); coverage html -d coverage"
 	$(BROWSER) coverage/index.html
 
 .PHONY: pep8
-pep8:
+pep8: devinstall
 	@echo "Running pep8 code style checks ..."
 	$(CONDA_ENV_PATH)/bin/flake8
 
