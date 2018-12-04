@@ -27,6 +27,8 @@ from copy import deepcopy
 import unittest
 # noinspection PyPackageRequirements
 import pytest
+# noinspection PyPackageRequirements
+import mock
 import requests
 from requests import Request, Response
 import logging
@@ -35,7 +37,7 @@ from logging import _loggerClass
 import time
 import json
 import os
-import mock
+# noinspection PyDeprecation
 from contextlib import nested
 from twitcher.processes.sources import fetch_data_sources
 
@@ -77,6 +79,8 @@ class End2EndEMSTestCase(TestCase):
     WSO2_HOSTNAME = None
     WSO2_CLIENT_ID = None
     WSO2_CLIENT_SECRET = None
+    ADMIN_USERNAME = None
+    ADMIN_PASSWORD = None
     ALICE_USERNAME = None
     ALICE_PASSWORD = None
     BOB_USERNAME = None
@@ -105,7 +109,7 @@ class End2EndEMSTestCase(TestCase):
     def get_process_package_mock():
         return (
             mock.patch('twitcher.processes.sources.get_data_source_from_url',
-                       new_callable=End2EndEMSTestCase.mock_get_data_source_from_url),
+                       side_effect=End2EndEMSTestCase.mock_get_data_source_from_url),
         )
 
     @staticmethod
@@ -117,6 +121,11 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def setUpClass(cls):
+        # disable SSL warnings from logs
+        # noinspection PyPackageRequirements
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
         cls.setup_logger()
         cls.log("{}Start of End-2-End test: {}\n{}"
                 .format(cls.logger_separator_tests, now(), cls.logger_separator_steps))
@@ -149,6 +158,9 @@ class End2EndEMSTestCase(TestCase):
         cls.WSO2_HOSTNAME = get_setting('WSO2_HOSTNAME', cls.app)
         cls.WSO2_CLIENT_ID = get_setting('WSO2_CLIENT_ID', cls.app)
         cls.WSO2_CLIENT_SECRET = get_setting('WSO2_CLIENT_SECRET', cls.app)
+        cls.ADMIN_USERNAME = get_setting('ADMIN_USERNAME', cls.app)
+        cls.ADMIN_PASSWORD = get_setting('ADMIN_PASSWORD', cls.app)
+        cls.ADMIN_CREDENTIALS = {'username': cls.ADMIN_USERNAME, 'password': cls.ADMIN_PASSWORD}
         cls.ALICE_USERNAME = get_setting('ALICE_USERNAME', cls.app)
         cls.ALICE_PASSWORD = get_setting('ALICE_PASSWORD', cls.app)
         cls.ALICE_CREDENTIALS = {'username': cls.ALICE_USERNAME, 'password': cls.ALICE_PASSWORD}
@@ -161,6 +173,8 @@ class End2EndEMSTestCase(TestCase):
             'TWITCHER_URL':             cls.TWITCHER_URL,
             'TWITCHER_RESTAPI_URL':     cls.TWITCHER_RESTAPI_URL,
             'TWITCHER_PROTECTED_URL':   cls.TWITCHER_PROTECTED_URL,
+            'ADMIN_USERNAME':           cls.ADMIN_USERNAME,
+            'ADMIN_PASSWORD':           cls.ADMIN_PASSWORD,
             'ALICE_USERNAME':           cls.ALICE_USERNAME,
             'ALICE_PASSWORD':           cls.ALICE_PASSWORD,
             'BOB_USERNAME':             cls.BOB_USERNAME,
@@ -220,10 +234,6 @@ class End2EndEMSTestCase(TestCase):
         return cls.test_processes_info.get(process_id)
 
     @classmethod
-    def get_test_processes_id(cls):
-        return [process.test_id for process in cls.test_processes_info.values()]
-
-    @classmethod
     def setup_test_processes(cls):
         # type: (...) -> None
         cls.PROCESS_STACKER_ID = 'Stacker'
@@ -248,7 +258,7 @@ class End2EndEMSTestCase(TestCase):
             process_deploy_inputs = process_deploy['processDescription']['process']['inputs']
             for i_input, proc_input in enumerate(process_deploy_inputs):
                 if proc_input.get('maxOccurs') == 'unbounded':
-                    process_deploy_inputs[i_input]['maxOccurs'] = 2
+                    process_deploy_inputs[i_input]['maxOccurs'] = str(2)
 
         # update workflows to use 'test_id' instead of originals
         for workflow_id in workflow_set:
@@ -491,7 +501,8 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def setup_logger(cls):
-        log_path = os.path.abspath(os.path.join(TWITCHER_ROOT_DIR, cls.__name__ + '.log'))
+        root_dir = os.getenv('TEST_LOGGER_RESULT_DIR', os.path.join(TWITCHER_ROOT_DIR, 'tests'))
+        log_path = os.path.abspath(os.path.join(root_dir, cls.__name__ + '.log'))
         cls.logger_separator_calls = '-' * 80 + '\n'   # used between function calls (of same request)
         cls.logger_separator_steps = '=' * 80 + '\n'   # used between overall test steps (between requests)
         cls.logger_separator_tests = '*' * 80 + '\n'   # used between various test runs
@@ -517,17 +528,21 @@ class End2EndEMSTestCase(TestCase):
         # End to end test will log everything
         self.__class__.log_full_trace = True
 
-        headers, cookies = self.user_headers_cookies(self.ALICE_CREDENTIALS, force_magpie=True)
+        headers, cookies = self.user_headers_cookies(self.ADMIN_CREDENTIALS, force_magpie=True)
         self.clear_test_processes(headers, cookies)
 
         headers_a, cookies_a = self.user_headers_cookies(self.ALICE_CREDENTIALS)
         headers_b, cookies_b = self.user_headers_cookies(self.BOB_CREDENTIALS)
 
+        # this test's set of processes
+        end2_end_test_processes = [self.get_test_process(process_id) for process_id in
+                                   (self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID, self.PROCESS_WORKFLOW_ID)]
+
         # list processes (none of tests)
         path = '{}/processes'.format(self.get_twitcher_ems_url())
         resp = self.request('GET', path, headers=headers_a, cookies=cookies_a, status=HTTPOk.code)
         proc = resp.json.get('processes')
-        test_processes = filter(lambda p: p['id'] in self.get_test_processes_id(), proc)
+        test_processes = filter(lambda p: p['id'] in [tp.test_id for tp in end2_end_test_processes], proc)
         self.assert_test(lambda: len(test_processes) == 0, message="Test processes shouldn't exist!")
 
         self.request('POST', path, headers=headers_a, cookies=cookies_a, status=HTTPOk.code,
@@ -546,14 +561,14 @@ class End2EndEMSTestCase(TestCase):
         # processes visible by alice
         resp = self.request('GET', path, headers=headers_a, cookies=cookies_a, status=HTTPOk.code)
         proc = resp.json.get('processes')
-        test_processes = filter(lambda p: p['id'] in self.get_test_processes_id(), proc)
-        self.assert_test(lambda: len(test_processes) == len(self.test_processes_info),
+        test_processes = filter(lambda p: p['id'] in [tp.test_id for tp in end2_end_test_processes], proc)
+        self.assert_test(lambda: len(test_processes) == len(end2_end_test_processes),
                          message="Test processes should exist.")
 
         # processes not yet visible by bob
         resp = self.request('GET', path, headers=headers_b, cookies=cookies_b, status=HTTPOk.code)
         proc = resp.json.get('processes')
-        test_processes = filter(lambda p: p['id'] in self.get_test_processes_id(), proc)
+        test_processes = filter(lambda p: p['id'] in [tp.test_id for tp in end2_end_test_processes], proc)
         self.assert_test(lambda: len(test_processes) == 0, message="Test processes shouldn't be visible by bob.")
 
         # processes visibility
@@ -598,6 +613,7 @@ class End2EndEMSTestCase(TestCase):
                              message="Response process execution job ID must match expected value to validate results.")
             self.validate_test_job_execution(job_location, headers_b, cookies_b)
 
+    # noinspection PyDeprecation
     @pytest.mark.demo
     def test_demo(self):
         """Simplify test for demonstration purpose"""
@@ -605,16 +621,21 @@ class End2EndEMSTestCase(TestCase):
         # Demo test will log basic information
         self.__class__.log_full_trace = False
 
-        self.clear_test_processes()
+        # cleanup old processes
+        headers, cookies = self.user_headers_cookies(self.ADMIN_CREDENTIALS, force_magpie=True)
+        self.clear_test_processes(headers, cookies)
 
-        # deploy processes
-        path = '{}/processes'.format(self.get_twitcher_ems_url())
-        self.request('POST', path, status=HTTPOk.code,
-                     json=self.test_processes_info[self.PROCESS_STACKER_ID].deploy_payload,
-                     message="Expect deployed application process.")
-        self.request('POST', path, status=HTTPOk.code,
-                     json=self.test_processes_info[self.PROCESS_SFS_ID].deploy_payload,
-                     message="Expect deployed application process.")
+        path_deploy = '{}/processes'.format(self.get_twitcher_ems_url())
+
+        # deploy processes and make them visible for workflows
+        for process_id in [self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID]:
+            path_visible = '{}/{}/visibility'.format(path_deploy, self.test_processes_info[process_id].test_id)
+            data_visible = {'value': VISIBILITY_PUBLIC}
+            self.request('POST', path_deploy, status=HTTPOk.code, headers=self.headers,
+                         json=self.test_processes_info[process_id].deploy_payload,
+                         message="Expect deployed application process.")
+            self.request('PUT', path_visible, status=HTTPOk.code, headers=self.headers, json=data_visible,
+                         message="Expect visible application process.")
 
         # TODO For now only simple chain is expected to work
         # test_set = self.workflow_set
@@ -624,30 +645,31 @@ class End2EndEMSTestCase(TestCase):
         with nested(*package_mock):
 
             for workflow_id in test_set:
-                self.request('POST', path, status=HTTPOk.code,
-                             json=self.test_processes_info[workflow_id].deploy_payload,
-                             message="Expect deployed workflow process.")
-
                 workflow_info = self.test_processes_info[workflow_id]
 
+                self.request('POST', path_deploy, status=HTTPOk.code, headers=self.headers,
+                             json=workflow_info.deploy_payload,
+                             message="Expect deployed workflow process.")
+
                 # make process visible
-                process_path = '{}/processes/{}'.format(self.get_twitcher_ems_url(), workflow_info.test_id)
+                process_path = '{}/{}'.format(path_deploy, workflow_info.test_id)
                 visible_path = '{}/visibility'.format(process_path)
                 visible = {'value': VISIBILITY_PUBLIC}
-                resp = self.request('PUT', visible_path, json=visible, status=HTTPOk.code)
+                resp = self.request('PUT', visible_path, json=visible, status=HTTPOk.code, headers=self.headers)
                 self.assert_test(lambda: resp.json.get('value') == VISIBILITY_PUBLIC,
                                  message="Process should be public.")
 
                 # execute workflow
                 execute_body = workflow_info.execute_payload
                 execute_path = '{}/jobs'.format(process_path)
-                resp = self.request('POST', execute_path, json=execute_body, status=HTTPCreated.code)
+                resp = self.request('POST', execute_path, status=HTTPCreated.code,
+                                    headers=self.headers, json=execute_body)
                 self.assert_test(lambda: resp.json.get('status') in job_status_categories[STATUS_CATEGORY_RUNNING],
-                                 message="Response process execution job status should be one of running category values.")
+                                 message="Response process execution job status should be one of running values.")
                 job_location = resp.json.get('location')
                 job_id = resp.json.get('jobID')
                 self.assert_test(lambda: job_id and job_location and job_location.endswith(job_id),
-                                 message="Response process execution job ID must match expected value to validate results.")
+                                 message="Response process execution job ID must match to validate results.")
                 self.validate_test_job_execution(job_location, None, None)
 
     def validate_test_job_execution(self, job_location_url, user_headers=None, user_cookies=None):

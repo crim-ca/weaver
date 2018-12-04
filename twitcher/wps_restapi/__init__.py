@@ -1,5 +1,4 @@
 from pyramid.settings import asbool
-from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.api import api_frontpage, api_swagger_json, api_swagger_ui, api_versions
 from twitcher.db import database_factory
 import logging
@@ -7,11 +6,7 @@ logger = logging.getLogger(__name__)
 
 
 def includeme(config):
-    """
-    called from twitcher config.include
-    :param config:
-    :return:
-    """
+    from twitcher.wps_restapi import swagger_definitions as sd
     settings = config.registry.settings
     if asbool(settings.get('twitcher.wps_restapi', True)):
         logger.info('Adding WPS REST API ...')

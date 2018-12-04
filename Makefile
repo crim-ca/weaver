@@ -57,7 +57,8 @@ help:
 	@echo "  version     to print version number of this Makefile."
 	@echo "  info        to print information about $(APP_NAME)."
 	@echo "  install     to install $(APP_NAME) by running 'bin/buildout -c custom.cfg'."
-	@echo "  devinstall  to install test packages as well as $(APP_NAME) using buildout."
+	@echo "  baseinstall to install base packages using pip."
+	@echo "  devinstall  to install test packages using pip (also installs $(APP_NAME) with buildout)."
 	@echo "  pipinstall  to install as a package to allow import in another python code."
 	@echo "  sysinstall  to install system packages from requirements.sh. You can also call 'bash requirements.sh' directly."
 	@echo "  update      to update your application by running 'bin/buildout -o -c custom.cfg' (buildout offline mode)."
@@ -140,8 +141,8 @@ bootstrap-buildout.py:
 .PHONY: anaconda
 anaconda:
 	@echo "Installing Anaconda ..."
-	@test -d $(ANACONDA_HOME) || curl $(ANACONDA_URL)/$(FN) --silent --insecure --output "$(DOWNLOAD_CACHE)/$(FN)"
-	@test -d $(ANACONDA_HOME) || bash "$(DOWNLOAD_CACHE)/$(FN)" -b -p $(ANACONDA_HOME)
+	@test -f $(ANACONDA_HOME)/bin/conda || curl $(ANACONDA_URL)/$(FN) --silent --insecure --output "$(DOWNLOAD_CACHE)/$(FN)"
+	@test -f $(ANACONDA_HOME)/bin/conda || bash "$(DOWNLOAD_CACHE)/$(FN)" -b -u -p $(ANACONDA_HOME)
 	@echo "Add '$(ANACONDA_HOME)/bin' to your PATH variable in '.bashrc'."
 
 .PHONY: conda_config
@@ -181,10 +182,16 @@ bootstrap: init conda_env conda_pinned bootstrap-buildout.py
 	@test -f bin/buildout || bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);python bootstrap-buildout.py -c custom.cfg --allow-site-packages --setuptools-version=$(SETUPTOOLS_VERSION) --buildout-version=$(BUILDOUT_VERSION)"
 
 .PHONY: devinstall
-devinstall: install
-	@echo "Installing application with buildout ..."
+devinstall: pipinstall
+	@echo "Installing development packages with pip ..."
 	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);pip install -r $(APP_ROOT)/requirements-dev.txt"
-	@echo "\nStart service with \`make start', Test service with \`make test*' variations."
+	@echo "\nInstall with pip complete. Test service with \`make test*' variations."
+
+.PHONY: baseinstall
+baseinstall:
+	@echo "Installing base packages with pip ..."
+	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);pip install -r $(APP_ROOT)/requirements.txt"
+	@echo "\nInstall with pip complete."
 
 .PHONY: sysinstall
 sysinstall:
@@ -254,24 +261,24 @@ passwd: custom.cfg
 .PHONY: test
 test:
 	@echo "Running tests (skip slow and online tests) ..."
-	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); py.test -v -m 'not slow and not online'"
+	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); py.test -v -m 'not slow and not online' --junitxml $(CURDIR)/tests/results.xml"
 
 .PHONY: testall
 testall:
 	@echo "Running all tests (including slow and online tests) ..."
-	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); pytest -v"
+	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); pytest -v --junitxml $(CURDIR)/tests/results.xml"
 
 .PHONY: testfunc
 testfunc:
 	@echo "Running functional tests ..."
-	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); pytest -v -m 'functional'"
+	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); pytest -v -m 'functional' --junitxml $(CURDIR)/tests/results.xml"
 
 .PHONY: coverage
 coverage:
 	@echo "Running coverage analysis..."
-	coverage run --source twitcher setup.py test
-	coverage report -m
-	coverage html -d coverage
+	@bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); coverage run --source twitcher setup.py test"
+	@bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); coverage report -m"
+	@bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); coverage html -d coverage"
 	$(BROWSER) coverage/index.html
 
 .PHONY: pep8

@@ -83,7 +83,7 @@
     }
   ],
   "jobControlOptions": [
-    "async-execute"
+    "async"
   ],
   "keywords": [],
   "outputTransmission": [
@@ -208,8 +208,8 @@
               }
             ],
             "identifier": "files",
-            "maxOccurs": 1,
-            "minOccurs": 1,
+            "maxOccurs": "1",
+            "minOccurs": "1",
             "title": "Input Image"
           },
           {
@@ -217,8 +217,8 @@
               "dataType": "String"
             },
             "identifier": "output_file_type",
-            "maxOccurs": 1,
-            "minOccurs": 1,
+            "maxOccurs": "1",
+            "minOccurs": "1",
             "title": "Type of Stacked Image"
           },
           {
@@ -226,13 +226,13 @@
               "dataType": "String"
             },
             "identifier": "output_name",
-            "maxOccurs": 1,
-            "minOccurs": 1,
+            "maxOccurs": "1",
+            "minOccurs": "1",
             "title": "Name of the Produced Image"
           }
         ],
         "jobControlOptions": [
-          "async-execute"
+          "async"
         ],
         "keywords": [],
         "outputTransmission": [

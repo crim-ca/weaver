@@ -44,7 +44,7 @@
               "default": true
             }
           ],
-          "minOccurs": 1,
+          "minOccurs": "1",
           "maxOccurs": "unbounded",
           "additionalParameters": [
             {
@@ -76,7 +76,7 @@
     },
     "processVersion": "1.0.0",
     "jobControlOptions": [
-      "async-execute"
+      "async"
     ],
     "outputTransmission": [
       "reference"

@@ -4,6 +4,7 @@
 
 from sqlalchemy.engine import engine_from_config
 from sqlalchemy.orm.session import sessionmaker
+# noinspection PyPackageRequirements
 from zope.sqlalchemy import register as sa_register
 import transaction
 import pymongo
@@ -12,21 +13,21 @@ import os
 import logging
 logger = logging.getLogger(__name__)
 
-
-class MongoDB:
-    __db = None
-
-    @classmethod
-    def get(cls, registry):
-        if not cls.__db:
-            settings = registry.settings
-            client = pymongo.MongoClient(settings['mongodb.host'], int(settings['mongodb.port']))
-            cls.__db = client[settings['mongodb.db_name']]
-        return cls.__db
+MongoDB = None
 
 
-def mongodb(registry):
-    db = MongoDB.get(registry)
+def get_mongodb_client(registry):
+    global MongoDB
+
+    if not MongoDB:
+        settings = registry.settings
+        client = pymongo.MongoClient(settings['mongodb.host'], int(settings['mongodb.port']))
+        MongoDB = client[settings['mongodb.db_name']]
+    return MongoDB
+
+
+def get_mongodb_engine(registry):
+    db = get_mongodb_client(registry)
     db.services.create_index("name", unique=True)
     db.services.create_index("url", unique=True)
     db.processes.create_index("identifier", unique=True)
@@ -70,7 +71,7 @@ def database_factory(registry):
     settings = registry.settings
     if settings.get('twitcher.db_factory') == 'postgres':
         return get_postgresdb_session_from_settings(settings)
-    return mongodb(registry)
+    return get_mongodb_engine(registry)
 
 
 def includeme(config):
