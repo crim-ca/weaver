@@ -16,8 +16,6 @@ class OneOfMappingSchema(colander.MappingSchema):
         return self.__name__
 
     def deserialize_one_of(self, cstruct):
-        if cstruct is colander.null:
-            return colander.null
         if not hasattr(self, "_one_of"):
             return {}
 
@@ -35,9 +33,6 @@ class OneOfMappingSchema(colander.MappingSchema):
             raise colander.Invalid(node=self, msg=message)
 
     def deserialize(self, cstruct):
-        if cstruct is colander.null:
-            return colander.null
-
         result = self.deserialize_one_of(cstruct)
         mapping_data = super(OneOfMappingSchema, self).deserialize(cstruct)
 
