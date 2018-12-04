@@ -3,7 +3,7 @@ Factories to create storage backends.
 """
 
 # Factories
-from twitcher.db import mongodb as mongodb_factory
+from twitcher.db import get_mongodb_engine
 # Interfaces
 from twitcher.store.memory import (
     MemoryTokenStore,
@@ -51,7 +51,7 @@ def tokenstore_factory(registry):
     """
     database = get_db_factory(registry)
     if database == DB_MONGODB:
-        db = mongodb_factory(registry)
+        db = get_mongodb_engine(registry)
         store = MongodbTokenStore(db.tokens)
     else:
         store = MemoryTokenStore()
@@ -70,7 +70,7 @@ def servicestore_defaultfactory(registry):
     """
     database = get_db_factory(registry)
     if database == DB_MONGODB:
-        db = mongodb_factory(registry)
+        db = get_mongodb_engine(registry)
         return MongodbServiceStore(collection=db.services)
     global service_store
     if service_store is None:
@@ -87,7 +87,7 @@ def processstore_defaultfactory(registry):
     """
     database = get_db_factory(registry)
     if database == DB_MONGODB:
-        db = mongodb_factory(registry)
+        db = get_mongodb_engine(registry)
         store = MongodbProcessStore(collection=db.processes, settings=registry.settings,
                                     default_processes=default_processes)
     else:
@@ -104,7 +104,7 @@ def jobstore_defaultfactory(registry):
     """
     database = get_db_factory(registry)
     if database == DB_MONGODB:
-        db = mongodb_factory(registry)
+        db = get_mongodb_engine(registry)
         store = MongodbJobStore(collection=db.jobs)
     else:
         store = MemoryJobStore()
@@ -120,7 +120,7 @@ def quotestore_defaultfactory(registry):
     """
     database = get_db_factory(registry)
     if database == DB_MONGODB:
-        db = mongodb_factory(registry)
+        db = get_mongodb_engine(registry)
         store = MongodbQuoteStore(collection=db.quotes)
     else:
         store = MemoryQuoteStore()
@@ -136,7 +136,7 @@ def billstore_defaultfactory(registry):
     """
     database = get_db_factory(registry)
     if database == DB_MONGODB:
-        db = mongodb_factory(registry)
+        db = get_mongodb_engine(registry)
         store = MongodbBillStore(collection=db.bills)
     else:
         store = MemoryBillStore()
