@@ -44,7 +44,7 @@
               "default": true
             }
           ],
-          "minOccurs": 1,
+          "minOccurs": "1",
           "maxOccurs": "unbounded",
           "additionalParameters": [
             {
