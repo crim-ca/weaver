@@ -83,7 +83,7 @@
     }
   ],
   "jobControlOptions": [
-    "async"
+    "async-execute"
   ],
   "keywords": [],
   "outputTransmission": [
@@ -232,7 +232,7 @@
           }
         ],
         "jobControlOptions": [
-          "async"
+          "async-execute"
         ],
         "keywords": [],
         "outputTransmission": [

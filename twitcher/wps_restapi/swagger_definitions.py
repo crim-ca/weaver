@@ -11,6 +11,8 @@ from twitcher.sort import job_sort_values, quote_sort_values, SORT_CREATED, SORT
 from twitcher.execute import (
     EXECUTE_MODE_AUTO,
     execute_mode_options,
+    EXECUTE_CONTROL_OPTION_ASYNC,
+    execute_control_options,
     execute_response_options,
     execute_transmission_mode_options,
 )
@@ -371,8 +373,10 @@ class OutputDescriptionList(SequenceSchema):
     item = OutputDescription()
 
 
+JobExecuteModeEnum = SchemaNode(String(), title='mode', missing=drop,
+                                validator=OneOf(list(execute_mode_options)), default=EXECUTE_MODE_AUTO)
 JobControlOptionsEnum = SchemaNode(String(), title='jobControlOptions', missing=drop,
-                                   validator=OneOf(list(execute_mode_options)), default=EXECUTE_MODE_AUTO)
+                                   validator=OneOf(list(execute_control_options)), default=EXECUTE_CONTROL_OPTION_ASYNC)
 JobResponseOptionsEnum = SchemaNode(String(), title='response', missing=drop,
                                     validator=OneOf(list(execute_response_options)))
 TransmissionModeEnum = SchemaNode(String(), title='transmissionMode', missing=drop,
@@ -693,7 +697,7 @@ class DismissedJobSchema(MappingSchema):
 class QuoteProcessParametersSchema(MappingSchema):
     inputs = InputTypeList(missing=drop)
     outputs = OutputDescriptionList(missing=drop)
-    mode = JobControlOptionsEnum
+    mode = JobExecuteModeEnum
     response = JobResponseOptionsEnum
 
 
