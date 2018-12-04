@@ -1,0 +1,60 @@
+{
+  "mode": "async",
+  "response": "document",
+  "inputs": [
+    {
+      "id": "StartDate_image-s2",
+      "data": "2018-01-30T00:00:00.000Z"
+    },
+    {
+      "id": "EndDate_image-s2",
+      "data": "2018-01-31T23:00:59.000Z"
+    },
+    {
+      "id": "StartDate_image-probav",
+      "data": "2018-01-30T00:00:00.000Z"
+    },
+    {
+      "id": "EndDate_image-probav",
+      "data": "2018-01-31T23:00:59.000Z"
+    },
+    {
+      "id": "StartDate_image-deimos",
+      "data": "2016-09-03T23:00:00Z"
+    },
+    {
+      "id": "EndDate_image-deimos",
+      "data": "2016-09-06T20:00:00Z"
+    },
+    {
+      "id": "aoi_image-s2",
+      "data": "100.4,18.3,104.6,19.3"
+    },
+    {
+      "id": "aoi_image-probav",
+      "data": "100.4,18.3,104.6,19.3"
+    },
+    {
+      "id": "aoi_image-deimos",
+      "data": "-95,29.8,-95.5,30"
+    },
+    {
+      "id": "image-s2_collection",
+      "data" :"EOP:IPT:Sentinel2"
+    },
+    {
+      "id": "image-probav_collection",
+      "data" :"EOP:VITO:PROBAV_S1-TOA_1KM_V001"
+    },
+    {
+      "id": "image-deimos_collection",
+      "data": "DE2_MS4_L1B"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "output",
+      "transmissionMode": "reference"
+    }
+  ]
+}
