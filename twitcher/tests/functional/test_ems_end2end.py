@@ -241,14 +241,17 @@ class End2EndEMSTestCase(TestCase):
         cls.PROCESS_WORKFLOW_ID = 'Workflow'
         cls.PROCESS_WORKFLOW_SC_ID = 'WorkflowSimpleChain'
         cls.PROCESS_WORKFLOW_S2P_ID = 'WorkflowS2Probav'
+        cls.PROCESS_WORKFLOW_CUSTOM_ID = 'CustomWorkflow'
         test_set = [cls.PROCESS_STACKER_ID,
                     cls.PROCESS_SFS_ID,
                     cls.PROCESS_WORKFLOW_ID,
                     cls.PROCESS_WORKFLOW_SC_ID,
-                    cls.PROCESS_WORKFLOW_S2P_ID]
+                    cls.PROCESS_WORKFLOW_S2P_ID,
+                    cls.PROCESS_WORKFLOW_CUSTOM_ID]
         workflow_set = [cls.PROCESS_WORKFLOW_ID,
                         cls.PROCESS_WORKFLOW_SC_ID,
-                        cls.PROCESS_WORKFLOW_S2P_ID]
+                        cls.PROCESS_WORKFLOW_S2P_ID,
+                        cls.PROCESS_WORKFLOW_CUSTOM_ID]
         for process in test_set:
             cls.test_processes_info.update({process: cls.retrieve_process_info(process)})
 
@@ -301,7 +304,19 @@ class End2EndEMSTestCase(TestCase):
     @classmethod
     def retrieve_payload(cls, url):
         # type: (AnyStr) -> Dict
-        resp = cls.request('GET', url, force_requests=True)
+        resp = cls.request('GET', url, force_requests=True, ignore_errors=True)
+        if resp.status_code == requests.codes.not_found:
+            # Try to find it locally
+            try:
+                fn = url[url.find('application-package'):]
+                local_path = os.path.join(os.path.dirname(__file__), fn)
+                with open(local_path, 'r') as f:
+                    json_payload = json.load(f)
+                    return json_payload
+            except (IOError, ValueError) as e:
+                # Will raise the original query exception
+                pass
+
         cls.assert_response(resp, message="Invalid payload not retrieved.")
         return resp.json()
 
@@ -416,7 +431,7 @@ class End2EndEMSTestCase(TestCase):
             resp = requests.request(method, url, json=json_body, data=data_body, **kw)
 
             # add some properties similar to `webtest.TestApp`
-            if 'application/json' in resp.headers.get('Content-Type'):
+            if 'application/json' in resp.headers.get('Content-Type', []):
                 setattr(resp, 'json', resp.json())
                 setattr(resp, 'body', resp.json)
                 setattr(resp, 'content_type', 'application/json')
@@ -444,7 +459,7 @@ class End2EndEMSTestCase(TestCase):
         if not ignore_errors:
             cls.assert_response(resp, status, message)
 
-        if 'application/json' in resp.headers['Content-Type']:
+        if 'application/json' in resp.headers.get('Content-Type', []):
             payload = "\n" if cls.logger_json_indent else '' + json.dumps(resp.json, indent=cls.logger_json_indent)
         else:
             payload = resp.body
@@ -679,7 +694,7 @@ class End2EndEMSTestCase(TestCase):
         Then validates that results are accessible (no data integrity check).
         """
         timeout_accept_max = 30
-        timeout_running_max = 600
+        timeout_running_max = 6000
         timeout_accept = timeout_accept_max
         timeout_running = timeout_running_max
         timeout_interval = 5

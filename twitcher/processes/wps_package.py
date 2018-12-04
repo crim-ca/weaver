@@ -1197,7 +1197,7 @@ class WpsPackage(Process):
             end_step_progress = self.map_step_progress(len(self.step_launched) + 1, max(1, len(self.step_packages)))
             url = retrieve_data_source_url(data_source)
 
-            self.update_status("Launching {type} {name} on {src}.".format(
+            self.update_status("Launching {type} {name} on {src} {reason}.".format(
                 type=jobtype,
                 name=jobname,
                 src=data_source,
