@@ -9,7 +9,7 @@ from six.moves.urllib.parse import urlparse, parse_qsl
 # noinspection PyPackageRequirements
 import pytest
 # noinspection PyPackageRequirements
-from mock import mock
+import mock
 from pyramid import testing
 from pyramid.testing import DummyRequest
 from pywps.inout.inputs import LiteralInput
@@ -74,15 +74,13 @@ class WpsHandleEOITestCase(unittest.TestCase):
         testing.tearDown()
 
 
-@pytest.fixture
-def memory_store():
+def get_memory_store():
     hello = twitcher.processes.wps_default.Hello()
     store = MemoryProcessStore([hello])
     return store
 
 
-@pytest.fixture
-def dummy_payload():
+def get_dummy_payload():
     return {
         "processDescription": {
             "process": {
@@ -101,20 +99,19 @@ def dummy_payload():
     }
 
 
-@pytest.fixture
-def opensearch_payload():
+def get_opensearch_payload():
     js = load_json_test_file("opensearch_deploy.json")
     return js
 
 
-@pytest.fixture
-def opensearch_process():
+def get_opensearch_process():
     opensearch_process = Process(load_json_test_file("opensearch_process.json"))
     return opensearch_process
 
 
-@pytest.fixture
-def memory_store_with_opensearch_process(memory_store, opensearch_process):
+def get_memory_store_with_opensearch_process():
+    memory_store = get_memory_store()
+    opensearch_process = get_opensearch_process()
     memory_store.save_process(opensearch_process)
     return memory_store
 
@@ -178,26 +175,26 @@ def test_load_wkt():
         assert opensearch.load_wkt(wkt) == expected
 
 
-@mock.patch("twitcher.wps_restapi.processes.processes.processstore_factory")
-def test_deploy_opensearch(processstore_factory, opensearch_payload):
-    # given
-    initial_payload = deepcopy(opensearch_payload)
-    request = make_request(json=opensearch_payload, method="POST")
-    process_id = get_any_id(opensearch_payload["processDescription"]["process"])
-
+def test_deploy_opensearch():
     store = MemoryProcessStore()
-    processstore_factory.return_value = store
-    # when
-    response = processes.add_local_process(request)
+    with mock.patch("twitcher.wps_restapi.processes.processes.processstore_factory", return_value=store):
+        # given
+        opensearch_payload = get_opensearch_payload()
+        initial_payload = deepcopy(opensearch_payload)
+        request = make_request(json=opensearch_payload, method="POST")
+        process_id = get_any_id(opensearch_payload["processDescription"]["process"])
 
-    # then
-    assert response.code == 200
-    assert response.json["deploymentDone"]
-    process = store.fetch_by_id(process_id)
-    assert process
-    assert process.package
-    assert process.payload
-    assert_json_equals(process.payload, initial_payload)
+        # when
+        response = processes.add_local_process(request)
+
+        # then
+        assert response.code == 200
+        assert response.json["deploymentDone"]
+        process = store.fetch_by_id(process_id)
+        assert process
+        assert process.package
+        assert process.payload
+        assert_json_equals(process.payload, initial_payload)
 
 
 def test_handle_EOI_unique_aoi_unique_toi():

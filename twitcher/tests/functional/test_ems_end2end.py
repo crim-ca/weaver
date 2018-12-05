@@ -27,6 +27,8 @@ from copy import deepcopy
 import unittest
 # noinspection PyPackageRequirements
 import pytest
+# noinspection PyPackageRequirements
+import mock
 import requests
 from requests import Request, Response
 import logging
@@ -35,6 +37,9 @@ from logging import _loggerClass
 import time
 import json
 import os
+# noinspection PyDeprecation
+from contextlib import nested
+from twitcher.processes.sources import fetch_data_sources
 
 
 class ProcessInfo(object):
@@ -74,10 +79,45 @@ class End2EndEMSTestCase(TestCase):
     WSO2_HOSTNAME = None
     WSO2_CLIENT_ID = None
     WSO2_CLIENT_SECRET = None
+    ADMIN_USERNAME = None
+    ADMIN_PASSWORD = None
     ALICE_USERNAME = None
     ALICE_PASSWORD = None
     BOB_USERNAME = None
     BOB_PASSWORD = None
+
+    @staticmethod
+    def mock_get_data_source_from_url(data_url):
+        forbidden_data_source = ['probav-l1-ades.vgt.vito.be',
+                                 'probav - l2 - ades.vgt.vito.be',
+                                 'deimos-cubewerx']
+        data_sources = fetch_data_sources()
+        try:
+            parsed = urlparse(data_url)
+            netloc, path, scheme = parsed.netloc, parsed.path, parsed.scheme
+            if netloc:
+                for src, val in data_sources.items():
+                    if src not in forbidden_data_source and val['netloc'] == netloc:
+                        return src
+        # noinspection PyBroadException
+        except Exception:
+            pass
+        # Default mocked data source
+        return "ipt-poland"
+
+    @staticmethod
+    def get_process_package_mock():
+        return (
+            mock.patch('twitcher.processes.sources.get_data_source_from_url',
+                       side_effect=End2EndEMSTestCase.mock_get_data_source_from_url),
+        )
+
+    @staticmethod
+    def get_collection_swapping():
+        return [
+            # Swap because Spacebel cannot retrieve probav images and Geomatys ADES is not ready
+            ('EOP:VITO:PROBAV_S1-TOA_1KM_V001', 'EOP:IPT:Sentinel2'),
+        ]
 
     @classmethod
     def setUpClass(cls):
@@ -118,6 +158,9 @@ class End2EndEMSTestCase(TestCase):
         cls.WSO2_HOSTNAME = get_setting('WSO2_HOSTNAME', cls.app)
         cls.WSO2_CLIENT_ID = get_setting('WSO2_CLIENT_ID', cls.app)
         cls.WSO2_CLIENT_SECRET = get_setting('WSO2_CLIENT_SECRET', cls.app)
+        cls.ADMIN_USERNAME = get_setting('ADMIN_USERNAME', cls.app)
+        cls.ADMIN_PASSWORD = get_setting('ADMIN_PASSWORD', cls.app)
+        cls.ADMIN_CREDENTIALS = {'username': cls.ADMIN_USERNAME, 'password': cls.ADMIN_PASSWORD}
         cls.ALICE_USERNAME = get_setting('ALICE_USERNAME', cls.app)
         cls.ALICE_PASSWORD = get_setting('ALICE_PASSWORD', cls.app)
         cls.ALICE_CREDENTIALS = {'username': cls.ALICE_USERNAME, 'password': cls.ALICE_PASSWORD}
@@ -130,6 +173,8 @@ class End2EndEMSTestCase(TestCase):
             'TWITCHER_URL':             cls.TWITCHER_URL,
             'TWITCHER_RESTAPI_URL':     cls.TWITCHER_RESTAPI_URL,
             'TWITCHER_PROTECTED_URL':   cls.TWITCHER_PROTECTED_URL,
+            'ADMIN_USERNAME':           cls.ADMIN_USERNAME,
+            'ADMIN_PASSWORD':           cls.ADMIN_PASSWORD,
             'ALICE_USERNAME':           cls.ALICE_USERNAME,
             'ALICE_PASSWORD':           cls.ALICE_PASSWORD,
             'BOB_USERNAME':             cls.BOB_USERNAME,
@@ -196,14 +241,17 @@ class End2EndEMSTestCase(TestCase):
         cls.PROCESS_WORKFLOW_ID = 'Workflow'
         cls.PROCESS_WORKFLOW_SC_ID = 'WorkflowSimpleChain'
         cls.PROCESS_WORKFLOW_S2P_ID = 'WorkflowS2Probav'
+        cls.PROCESS_WORKFLOW_CUSTOM_ID = 'CustomWorkflow'
         test_set = [cls.PROCESS_STACKER_ID,
                     cls.PROCESS_SFS_ID,
                     cls.PROCESS_WORKFLOW_ID,
                     cls.PROCESS_WORKFLOW_SC_ID,
-                    cls.PROCESS_WORKFLOW_S2P_ID]
+                    cls.PROCESS_WORKFLOW_S2P_ID,
+                    cls.PROCESS_WORKFLOW_CUSTOM_ID]
         workflow_set = [cls.PROCESS_WORKFLOW_ID,
                         cls.PROCESS_WORKFLOW_SC_ID,
-                        cls.PROCESS_WORKFLOW_S2P_ID]
+                        cls.PROCESS_WORKFLOW_S2P_ID,
+                        cls.PROCESS_WORKFLOW_CUSTOM_ID]
         for process in test_set:
             cls.test_processes_info.update({process: cls.retrieve_process_info(process)})
 
@@ -213,7 +261,7 @@ class End2EndEMSTestCase(TestCase):
             process_deploy_inputs = process_deploy['processDescription']['process']['inputs']
             for i_input, proc_input in enumerate(process_deploy_inputs):
                 if proc_input.get('maxOccurs') == 'unbounded':
-                    process_deploy_inputs[i_input]['maxOccurs'] = 2
+                    process_deploy_inputs[i_input]['maxOccurs'] = str(2)
 
         # update workflows to use 'test_id' instead of originals
         for workflow_id in workflow_set:
@@ -244,12 +292,31 @@ class End2EndEMSTestCase(TestCase):
         new_process_id = cls.get_test_process_id(deploy_payload['processDescription']['process']['id'])
         deploy_payload['processDescription']['process']['id'] = new_process_id
         execute_payload = cls.retrieve_payload(execute_path)
+
+        # Apply collection swapping
+        for swap in cls.get_collection_swapping():
+            for i in execute_payload['inputs']:
+                if 'data' in i and i['data'] == swap[0]:
+                    i['data'] = swap[1]
+
         return ProcessInfo(process_id, new_process_id, deploy_payload, execute_payload)
 
     @classmethod
     def retrieve_payload(cls, url):
         # type: (AnyStr) -> Dict
-        resp = cls.request('GET', url, force_requests=True)
+        resp = cls.request('GET', url, force_requests=True, ignore_errors=True)
+        if resp.status_code == requests.codes.not_found:
+            # Try to find it locally
+            try:
+                fn = url[url.find('application-package'):]
+                local_path = os.path.join(os.path.dirname(__file__), fn)
+                with open(local_path, 'r') as f:
+                    json_payload = json.load(f)
+                    return json_payload
+            except (IOError, ValueError) as e:
+                # Will raise the original query exception
+                pass
+
         cls.assert_response(resp, message="Invalid payload not retrieved.")
         return resp.json()
 
@@ -364,7 +431,7 @@ class End2EndEMSTestCase(TestCase):
             resp = requests.request(method, url, json=json_body, data=data_body, **kw)
 
             # add some properties similar to `webtest.TestApp`
-            if 'application/json' in resp.headers.get('Content-Type'):
+            if 'application/json' in resp.headers.get('Content-Type', []):
                 setattr(resp, 'json', resp.json())
                 setattr(resp, 'body', resp.json)
                 setattr(resp, 'content_type', 'application/json')
@@ -392,7 +459,7 @@ class End2EndEMSTestCase(TestCase):
         if not ignore_errors:
             cls.assert_response(resp, status, message)
 
-        if 'application/json' in resp.headers['Content-Type']:
+        if 'application/json' in resp.headers.get('Content-Type', []):
             payload = "\n" if cls.logger_json_indent else '' + json.dumps(resp.json, indent=cls.logger_json_indent)
         else:
             payload = resp.body
@@ -449,7 +516,8 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def setup_logger(cls):
-        log_path = os.path.abspath(os.path.join(TWITCHER_ROOT_DIR, 'tests', cls.__name__ + '.log'))
+        root_dir = os.getenv('TEST_LOGGER_RESULT_DIR', os.path.join(TWITCHER_ROOT_DIR, 'tests'))
+        log_path = os.path.abspath(os.path.join(root_dir, cls.__name__ + '.log'))
         cls.logger_separator_calls = '-' * 80 + '\n'   # used between function calls (of same request)
         cls.logger_separator_steps = '=' * 80 + '\n'   # used between overall test steps (between requests)
         cls.logger_separator_tests = '*' * 80 + '\n'   # used between various test runs
@@ -475,7 +543,7 @@ class End2EndEMSTestCase(TestCase):
         # End to end test will log everything
         self.__class__.log_full_trace = True
 
-        headers, cookies = self.user_headers_cookies(self.ALICE_CREDENTIALS, force_magpie=True)
+        headers, cookies = self.user_headers_cookies(self.ADMIN_CREDENTIALS, force_magpie=True)
         self.clear_test_processes(headers, cookies)
 
         headers_a, cookies_a = self.user_headers_cookies(self.ALICE_CREDENTIALS)
@@ -560,6 +628,7 @@ class End2EndEMSTestCase(TestCase):
                              message="Response process execution job ID must match expected value to validate results.")
             self.validate_test_job_execution(job_location, headers_b, cookies_b)
 
+    # noinspection PyDeprecation
     @pytest.mark.demo
     def test_demo(self):
         """Simplify test for demonstration purpose"""
@@ -567,41 +636,56 @@ class End2EndEMSTestCase(TestCase):
         # Demo test will log basic information
         self.__class__.log_full_trace = False
 
-        self.clear_test_processes()
+        # cleanup old processes
+        headers, cookies = self.user_headers_cookies(self.ADMIN_CREDENTIALS, force_magpie=True)
+        self.clear_test_processes(headers, cookies)
 
-        # deploy processes
-        path = '{}/processes'.format(self.get_twitcher_ems_url())
-        self.request('POST', path, status=HTTPOk.code,
-                     json=self.test_processes_info[self.PROCESS_STACKER_ID].deploy_payload,
-                     message="Expect deployed application process.")
-        self.request('POST', path, status=HTTPOk.code,
-                     json=self.test_processes_info[self.PROCESS_SFS_ID].deploy_payload,
-                     message="Expect deployed application process.")
-        self.request('POST', path, status=HTTPOk.code,
-                     json=self.test_processes_info[self.PROCESS_WORKFLOW_ID].deploy_payload,
-                     message="Expect deployed workflow process.")
+        path_deploy = '{}/processes'.format(self.get_twitcher_ems_url())
 
-        workflow_info = self.test_processes_info[self.PROCESS_WORKFLOW_ID]
+        # deploy processes and make them visible for workflows
+        for process_id in [self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID]:
+            path_visible = '{}/{}/visibility'.format(path_deploy, self.test_processes_info[process_id].test_id)
+            data_visible = {'value': VISIBILITY_PUBLIC}
+            self.request('POST', path_deploy, status=HTTPOk.code, headers=self.headers,
+                         json=self.test_processes_info[process_id].deploy_payload,
+                         message="Expect deployed application process.")
+            self.request('PUT', path_visible, status=HTTPOk.code, headers=self.headers, json=data_visible,
+                         message="Expect visible application process.")
 
-        # make process visible
-        process_path = '{}/processes/{}'.format(self.get_twitcher_ems_url(), workflow_info.test_id)
-        visible_path = '{}/visibility'.format(process_path)
-        visible = {'value': VISIBILITY_PUBLIC}
-        resp = self.request('PUT', visible_path, json=visible, status=HTTPOk.code)
-        self.assert_test(lambda: resp.json.get('value') == VISIBILITY_PUBLIC,
-                         message="Process should be public.")
+        # TODO For now only simple chain is expected to work
+        # test_set = self.workflow_set
+        test_set = [self.PROCESS_WORKFLOW_SC_ID, ]
 
-        # execute workflow
-        execute_body = workflow_info.execute_payload
-        execute_path = '{}/jobs'.format(process_path)
-        resp = self.request('POST', execute_path, json=execute_body, status=HTTPCreated.code)
-        self.assert_test(lambda: resp.json.get('status') in job_status_categories[STATUS_CATEGORY_RUNNING],
-                         message="Response process execution job status should be one of running category values.")
-        job_location = resp.json.get('location')
-        job_id = resp.json.get('jobID')
-        self.assert_test(lambda: job_id and job_location and job_location.endswith(job_id),
-                         message="Response process execution job ID must match expected value to validate results.")
-        self.validate_test_job_execution(job_location, None, None)
+        package_mock = self.get_process_package_mock()
+        with nested(*package_mock):
+
+            for workflow_id in test_set:
+                workflow_info = self.test_processes_info[workflow_id]
+
+                self.request('POST', path_deploy, status=HTTPOk.code, headers=self.headers,
+                             json=workflow_info.deploy_payload,
+                             message="Expect deployed workflow process.")
+
+                # make process visible
+                process_path = '{}/{}'.format(path_deploy, workflow_info.test_id)
+                visible_path = '{}/visibility'.format(process_path)
+                visible = {'value': VISIBILITY_PUBLIC}
+                resp = self.request('PUT', visible_path, json=visible, status=HTTPOk.code, headers=self.headers)
+                self.assert_test(lambda: resp.json.get('value') == VISIBILITY_PUBLIC,
+                                 message="Process should be public.")
+
+                # execute workflow
+                execute_body = workflow_info.execute_payload
+                execute_path = '{}/jobs'.format(process_path)
+                resp = self.request('POST', execute_path, status=HTTPCreated.code,
+                                    headers=self.headers, json=execute_body)
+                self.assert_test(lambda: resp.json.get('status') in job_status_categories[STATUS_CATEGORY_RUNNING],
+                                 message="Response process execution job status should be one of running values.")
+                job_location = resp.json.get('location')
+                job_id = resp.json.get('jobID')
+                self.assert_test(lambda: job_id and job_location and job_location.endswith(job_id),
+                                 message="Response process execution job ID must match to validate results.")
+                self.validate_test_job_execution(job_location, None, None)
 
     def validate_test_job_execution(self, job_location_url, user_headers=None, user_cookies=None):
         # type: (AnyStr, Optional[Dict[AnyStr, AnyStr]], Optional[Dict[AnyStr, AnyStr]]) -> None
@@ -610,7 +694,7 @@ class End2EndEMSTestCase(TestCase):
         Then validates that results are accessible (no data integrity check).
         """
         timeout_accept_max = 30
-        timeout_running_max = 600
+        timeout_running_max = 6000
         timeout_accept = timeout_accept_max
         timeout_running = timeout_running_max
         timeout_interval = 5

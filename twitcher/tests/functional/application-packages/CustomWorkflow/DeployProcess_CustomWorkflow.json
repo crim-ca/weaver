@@ -1,0 +1,113 @@
+{
+    "processDescription": {
+        "process": {
+            "id": "CustomWorkflow",
+            "title": "Workflow",
+            "abstract": "",
+            "keywords": [],
+            "additionalParameters": [
+            {
+              "role": "http://www.opengis.net/eoc/applicationContext",
+              "parameters": [
+                {
+                  "name": "UniqueAOI",
+                  "values": [
+                    "false"
+                  ]
+                },
+                {
+                  "name": "UniqueTOI",
+                  "values": [
+                    "false"
+                  ]
+                }
+              ]
+            }],
+            "inputs": [{
+				"id": "image-s2",
+				"title": "Input Image",
+				"formats": [{
+					"mimeType": "application/zip",
+					"default": true
+				}],
+				"minOccurs": "1",
+				"maxOccurs": "2",
+				"additionalParameters": [{
+					"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
+					"parameters": [{
+						"name": "EOImage",
+						"values": ["true"]
+					}]
+				}]
+			},
+			{
+				"id": "image-probav",
+				"title": "Input Image",
+				"formats": [{
+					"mimeType": "application/zip",
+					"default": true
+				},
+				{
+					"mimeType": "application/x-hdf"
+				},
+				{
+					"mimeType": "application/x-binary"
+				}],
+				"minOccurs": "1",
+				"maxOccurs": "2",
+				"additionalParameters": [{
+					"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
+					"parameters": [{
+						"name": "EOImage",
+						"values": ["true"]
+					}]
+				}]
+			},
+            {
+				"id": "image-deimos",
+				"title": "Input Image",
+				"formats": [{
+					"mimeType": "application/zip",
+					"default": true
+				},
+				{
+					"mimeType": "image/tiff"
+				}],
+				"minOccurs": "1",
+				"maxOccurs": "2",
+				"additionalParameters": [{
+					"role": "http://www.opengis.net/eoc/applicationContext/inputMetadata",
+					"parameters": [{
+						"name": "EOImage",
+						"values": ["true"]
+					}]
+				}]
+			}],
+            "outputs": [
+                {
+                    "id": "output",
+                    "title": "Workflow SFS Image",
+                    "formats": [
+                        {
+                            "mimeType": "application/zip",
+                            "default": true
+                        }
+                    ]
+                }
+            ]
+        },
+        "processVersion": "1.0.0",
+        "jobControlOptions": [
+            "async"
+        ],
+        "outputTransmission": [
+            "reference"
+        ]
+    },
+    "executionUnit": [
+        {
+            "href": "https://raw.githubusercontent.com/crim-ca/testbed14/master/application-packages/Workflow/Workflow.cwl"
+        }
+    ],
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow"
+}

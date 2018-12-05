@@ -11,7 +11,11 @@ from twitcher.sort import job_sort_values, quote_sort_values, SORT_CREATED, SORT
 from twitcher.execute import (
     EXECUTE_MODE_AUTO,
     execute_mode_options,
+    EXECUTE_CONTROL_OPTION_ASYNC,
+    execute_control_options,
+    EXECUTE_RESPONSE_RAW,
     execute_response_options,
+    EXECUTE_TRANSMISSION_MODE_REFERENCE,
     execute_transmission_mode_options,
 )
 from twitcher.visibility import visibility_values, VISIBILITY_PUBLIC
@@ -313,10 +317,8 @@ class Range(MappingSchema):
     minimumValue = SchemaNode(String(), missing=drop)
     maximumValue = SchemaNode(String(), missing=drop)
     spacing = SchemaNode(String(), missing=drop)
-    rangeClosure = SchemaNode(String(), missing=drop, validator=OneOf(["closed",
-                                                                       "open",
-                                                                       "open-closed",
-                                                                       "closed-open"]))
+    rangeClosure = SchemaNode(String(), missing=drop,
+                              validator=OneOf(["closed", "open", "open-closed", "closed-open"]))
 
 
 class AllowedRangesList(SequenceSchema):
@@ -371,17 +373,20 @@ class OutputDescriptionList(SequenceSchema):
     item = OutputDescription()
 
 
+JobExecuteModeEnum = SchemaNode(String(), title='mode', missing=drop,
+                                default=EXECUTE_MODE_AUTO,
+                                validator=OneOf(list(execute_mode_options)))
 JobControlOptionsEnum = SchemaNode(String(), title='jobControlOptions', missing=drop,
-                                   validator=OneOf(list(execute_mode_options)), default=EXECUTE_MODE_AUTO)
+                                   default=EXECUTE_CONTROL_OPTION_ASYNC,
+                                   validator=OneOf(list(execute_control_options)))
 JobResponseOptionsEnum = SchemaNode(String(), title='response', missing=drop,
                                     validator=OneOf(list(execute_response_options)))
 TransmissionModeEnum = SchemaNode(String(), title='transmissionMode', missing=drop,
+                                  default=EXECUTE_TRANSMISSION_MODE_REFERENCE,
                                   validator=OneOf(list(execute_transmission_mode_options)))
 
 
 class LaunchJobQuerystring(MappingSchema):
-    sync_execute = SchemaNode(Boolean(), default=False, missing=drop)
-    sync_execute.name = 'sync-execute'
     field_string = SchemaNode(String(), default=None, missing=drop,
                               description='Comma separated tags that can be used to filter jobs later')
     field_string.name = 'tags'
@@ -619,13 +624,13 @@ class ProcessOutputDescriptionSchema(MappingSchema):
 JobStatusEnum = SchemaNode(
     String(),
     default=None,
-    validator=OneOf(job_status_categories[STATUS_COMPLIANT_OGC]),
+    validator=OneOf(list(job_status_categories[STATUS_COMPLIANT_OGC])),
     example=STATUS_ACCEPTED)
 JobSortEnum = SchemaNode(
     String(),
     missing=drop,
     default=SORT_CREATED,
-    validator=OneOf(job_sort_values),
+    validator=OneOf(list(job_sort_values)),
     example=SORT_CREATED)
 
 
@@ -693,7 +698,7 @@ class DismissedJobSchema(MappingSchema):
 class QuoteProcessParametersSchema(MappingSchema):
     inputs = InputTypeList(missing=drop)
     outputs = OutputDescriptionList(missing=drop)
-    mode = JobControlOptionsEnum
+    mode = JobExecuteModeEnum
     response = JobResponseOptionsEnum
 
 
@@ -752,8 +757,8 @@ class InputList(SequenceSchema):
 class Execute(MappingSchema):
     inputs = InputList(missing=drop)
     outputs = OutputList()
-    mode = SchemaNode(String(), validator=OneOf(execute_mode_options))
-    response = SchemaNode(String(), validator=OneOf(["raw", "document"]))
+    mode = SchemaNode(String(), validator=OneOf(list(execute_mode_options)))
+    response = SchemaNode(String(), validator=OneOf(list(execute_response_options)))
 
 
 class Quotation(MappingSchema):
@@ -1092,18 +1097,11 @@ class GetProviderProcess(MappingSchema):
     header = AcceptHeader()
 
 
-class PostProviderProcessJobRequestBody(MappingSchema):
-    inputs = InputList()
-    outputs = OutputList()
-    mode = SchemaNode(String())
-    response = SchemaNode(String())
-
-
 class PostProviderProcessJobRequest(MappingSchema):
     """Launching a new process request definition."""
     header = AcceptHeader()
     querystring = LaunchJobQuerystring()
-    body = PostProviderProcessJobRequestBody()
+    body = Execute()
 
 
 #################################

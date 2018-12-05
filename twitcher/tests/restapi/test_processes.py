@@ -8,6 +8,7 @@ import unittest
 import pyramid.testing
 import six
 from copy import deepcopy
+# noinspection PyDeprecation
 from contextlib import nested
 from twitcher.tests.functional.common import setup_with_mongodb, setup_mongodb_processstore, setup_mongodb_jobstore
 from twitcher.processes.wps_testing import WpsTestProcess
@@ -18,6 +19,7 @@ from twitcher.utils import fully_qualified_name
 from twitcher.execute import (
     EXECUTE_MODE_SYNC,
     EXECUTE_MODE_ASYNC,
+    EXECUTE_CONTROL_OPTION_ASYNC,
     EXECUTE_RESPONSE_DOCUMENT,
     EXECUTE_TRANSMISSION_MODE_VALUE,
     EXECUTE_TRANSMISSION_MODE_REFERENCE,
@@ -143,11 +145,12 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.status_code == 401
         assert resp.content_type == self.json_app
 
-    def test_create_process_success(self):
+    def test_deploy_process_success(self):
         process_name = self.fully_qualified_test_process_name()
         process_data = self.get_process_deploy_template(process_name)
         package_mock = self.get_process_package_mock()
 
+        # noinspection PyDeprecation
         with nested(*package_mock):
             uri = "/processes"
             resp = self.app.post_json(uri, params=process_data, headers=self.json_headers, expect_errors=True)
@@ -157,46 +160,52 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert resp.json['processSummary']['id'] == process_name
             assert isinstance(resp.json["deploymentDone"], bool) and resp.json["deploymentDone"]
 
-    def test_create_process_bad_name(self):
+    def test_deploy_process_bad_name(self):
         process_name = self.fully_qualified_test_process_name() + "..."
         process_data = self.get_process_deploy_template(process_name)
         package_mock = self.get_process_package_mock()
 
+        # noinspection PyDeprecation
         with nested(*package_mock):
             uri = "/processes"
             resp = self.app.post_json(uri, params=process_data, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 400
             assert resp.content_type == self.json_app
 
-    def test_create_process_conflict(self):
+    def test_deploy_process_conflict(self):
         process_name = self.process_private.identifier
         process_data = self.get_process_deploy_template(process_name)
         package_mock = self.get_process_package_mock()
 
+        # noinspection PyDeprecation
         with nested(*package_mock):
             uri = "/processes"
             resp = self.app.post_json(uri, params=process_data, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 409
             assert resp.content_type == self.json_app
 
-    def test_create_process_missing_or_invalid_components(self):
+    # noinspection PyTypeChecker
+    def test_deploy_process_missing_or_invalid_components(self):
         process_name = self.fully_qualified_test_process_name()
         process_data = self.get_process_deploy_template(process_name)
         package_mock = self.get_process_package_mock()
 
         # remove components for testing different cases
-        process_data_tests = [deepcopy(process_data) for _ in range(10)]
+        process_data_tests = [deepcopy(process_data) for _ in range(12)]
         process_data_tests[0].pop('processDescription')
         process_data_tests[1]['processDescription'].pop('process')
         process_data_tests[2]['processDescription']['process'].pop('id')
-        process_data_tests[3].pop('deploymentProfileName')
-        process_data_tests[4].pop('executionUnit')
-        process_data_tests[5]['executionUnit'] = {}
-        process_data_tests[6]['executionUnit'] = list()
-        process_data_tests[7]['executionUnit'][0] = {"unit": "something"}       # unit as string instead of package
-        process_data_tests[8]['executionUnit'][0] = {"href": {}}                # href as package instead of url
-        process_data_tests[9]['executionUnit'][0] = {"unit": {}, "href": ""}    # both unit/href together not allowed
+        process_data_tests[3]['processDescription']['jobControlOptions'] = EXECUTE_CONTROL_OPTION_ASYNC
+        process_data_tests[4]['processDescription']['jobControlOptions'] = [EXECUTE_MODE_ASYNC]
+        process_data_tests[5].pop('deploymentProfileName')
+        process_data_tests[6].pop('executionUnit')
+        process_data_tests[7]['executionUnit'] = {}
+        process_data_tests[8]['executionUnit'] = list()
+        process_data_tests[9]['executionUnit'][0] = {"unit": "something"}       # unit as string instead of package
+        process_data_tests[10]['executionUnit'][0] = {"href": {}}               # href as package instead of url
+        process_data_tests[11]['executionUnit'][0] = {"unit": {}, "href": ""}   # can't have both unit/href together
 
+        # noinspection PyDeprecation
         with nested(*package_mock):
             uri = "/processes"
             for i, data in enumerate(process_data_tests):
@@ -239,6 +248,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         task = "job-{}".format(fully_qualified_name(self))
         mock_execute = self.get_process_job_runner_mock(task)
 
+        # noinspection PyDeprecation
         with nested(*mock_execute):
             resp = self.app.post_json(uri, params=data, headers=self.json_headers)
             assert resp.status_code == 201

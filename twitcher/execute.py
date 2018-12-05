@@ -8,6 +8,14 @@ execute_mode_options = frozenset([
     EXECUTE_MODE_SYNC,
 ])
 
+EXECUTE_CONTROL_OPTION_ASYNC = 'async-execute'
+EXECUTE_CONTROL_OPTION_SYNC = 'sync-execute'
+
+execute_control_options = frozenset([
+    EXECUTE_CONTROL_OPTION_ASYNC,
+    EXECUTE_CONTROL_OPTION_SYNC,
+])
+
 EXECUTE_RESPONSE_RAW = 'raw'
 EXECUTE_RESPONSE_DOCUMENT = 'document'
 
