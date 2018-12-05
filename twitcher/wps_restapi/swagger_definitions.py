@@ -4,7 +4,6 @@ so that one can update the swagger without touching any other files after the in
 """
 
 from twitcher.config import TWITCHER_CONFIGURATION_EMS
-from twitcher.wps_restapi.colander_one_of import OneOfMappingSchema
 from twitcher.wps_restapi.utils import wps_restapi_base_path
 from twitcher.status import job_status_categories, STATUS_ACCEPTED, STATUS_COMPLIANT_OGC
 from twitcher.sort import job_sort_values, quote_sort_values, SORT_CREATED, SORT_ID, SORT_PROCESS
@@ -21,6 +20,8 @@ from twitcher.execute import (
 from twitcher.visibility import visibility_values, VISIBILITY_PUBLIC
 from cornice import Service
 from colander import *
+from twitcher.wps_restapi.colander_one_of import OneOfMappingSchema
+from twitcher.wps_restapi.colander_defaults import SchemaNodeDefault as SchemaNode  # import after to override colander
 
 API_TITLE = 'Twitcher REST API'
 
@@ -380,6 +381,7 @@ JobControlOptionsEnum = SchemaNode(String(), title='jobControlOptions', missing=
                                    default=EXECUTE_CONTROL_OPTION_ASYNC,
                                    validator=OneOf(list(execute_control_options)))
 JobResponseOptionsEnum = SchemaNode(String(), title='response', missing=drop,
+                                    default=EXECUTE_RESPONSE_RAW,
                                     validator=OneOf(list(execute_response_options)))
 TransmissionModeEnum = SchemaNode(String(), title='transmissionMode', missing=drop,
                                   default=EXECUTE_TRANSMISSION_MODE_REFERENCE,
@@ -751,7 +753,7 @@ class Input(InputDataType, ValueType):
 
 
 class InputList(SequenceSchema):
-    item = Input()
+    item = Input(missing=drop)
 
 
 class Execute(MappingSchema):

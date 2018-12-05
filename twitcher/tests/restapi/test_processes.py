@@ -272,17 +272,14 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         execute_data = self.get_process_execute_template(fully_qualified_name(self))
 
         # remove components for testing different cases
-        execute_data_tests = [deepcopy(execute_data) for _ in range(10)]
-        execute_data_tests[0].pop('inputs')
-        execute_data_tests[1].pop('outputs')
-        execute_data_tests[2].pop('mode')
-        execute_data_tests[3].pop('response')
-        execute_data_tests[4]['mode'] = "random"
-        execute_data_tests[5]['response'] = "random"
-        execute_data_tests[6]['inputs'] = [{"test_input": "test_value"}]    # bad format
-        execute_data_tests[7]['outputs'] = [{"id": "test_input"}]           # no data/href
-        execute_data_tests[8]['outputs'] = [{"id": "test_output"}]          # no transmission mode
-        execute_data_tests[9]['outputs'] = [{"id": "test_output", "transmissionMode": "random"}]
+        execute_data_tests = [deepcopy(execute_data) for _ in range(7)]
+        execute_data_tests[0].pop('outputs')
+        execute_data_tests[1].pop('mode')
+        execute_data_tests[2].pop('response')
+        execute_data_tests[3]['mode'] = "random"
+        execute_data_tests[4]['response'] = "random"
+        execute_data_tests[5]['inputs'] = [{"test_input": "test_value"}]    # bad format
+        execute_data_tests[6]['outputs'] = [{"id": "test_output", "transmissionMode": "random"}]
 
         uri = "/processes/{}/jobs".format(self.process_public.identifier)
         for i, exec_data in enumerate(execute_data_tests):
@@ -290,6 +287,30 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             msg = "Failed with test variation `{}` with value `{}`."
             assert resp.status_code in [400, 422], msg.format(i, resp.status_code)
             assert resp.content_type == self.json_app, msg.format(i, resp.content_type)
+
+    def test_execute_process_no_error_not_required_params(self):
+        """
+        Optional parameters for execute job shouldn't raise an error if omitted,
+        and should resolve to default values if any was specified.
+        """
+        # get basic mock/data templates
+        name = fully_qualified_name(self)
+        execute_mock_data_tests = list()
+        for i in range(2):
+            mock_execute = self.get_process_job_runner_mock("job-{}-{}".format(name, i))
+            data_execute = self.get_process_execute_template("{}-{}".format(name, i))
+            execute_mock_data_tests.append((mock_execute, data_execute))
+
+        # apply modifications for testing
+        execute_mock_data_tests[0][1].pop('inputs')     # no inputs is valid (although can be required for WPS process)
+        execute_mock_data_tests[0][1]['outputs'][0].pop('transmissionMode')     # should resolve to default value
+
+        for mock_execute, data_execute in execute_mock_data_tests:
+            # noinspection PyDeprecation
+            with nested(*mock_execute):
+                path = "/processes/{}/jobs".format(self.process_public.identifier)
+                resp = self.app.post_json(path, params=data_execute, headers=self.json_headers)
+                assert resp.status_code == 201, "Expected job submission without inputs created without error."
 
     @pytest.mark.xfail(reason="Mode '{}' not supported for job execution.".format(EXECUTE_MODE_SYNC))
     @unittest.expectedFailure

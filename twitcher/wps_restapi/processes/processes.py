@@ -44,11 +44,8 @@ from twitcher.execute import (
     EXECUTE_MODE_AUTO,
     EXECUTE_MODE_ASYNC,
     EXECUTE_MODE_SYNC,
-    execute_mode_options,
     EXECUTE_RESPONSE_DOCUMENT,
-    execute_response_options,
     EXECUTE_TRANSMISSION_MODE_REFERENCE,
-    execute_transmission_mode_options,
 )
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference
 from owslib.util import clean_ows_url
@@ -302,54 +299,50 @@ def execute_process(self, job_id, url, headers=None):
     return job.status
 
 
-def submit_job_handler(request, service_url, is_workflow=False):
-    # type: (Request, AnyStr, bool) -> HTTPSuccessful
+def validate_supported_submit_job_handler_parameters(json_body):
+    """
+    Tests supported parameters not automatically validated by colander deserialize.
+    """
 
-    # TODO Validate param somehow
-    provider_id = request.matchdict.get('provider_id')  # None OK if local
-    process_id = request.matchdict.get('process_id')
-    tags = request.params.get('tags', '').split(',')
-
-    try:
-        if 'application/json' not in request.content_type:
-            raise ValueError("Request 'Content-Type' header is not 'application/json'.")
-        json_body = request.json_body
-    except Exception as ex:
-        raise HTTPBadRequest("Invalid JSON body cannot be decoded for job submission. [{}]".format(ex))
-
-    required_params = ['inputs', 'outputs', 'mode', 'response']
-    if not all(k in json_body for k in required_params):
-        raise HTTPBadRequest("Missing one of required parameters [{}].".format(', '.join(required_params)))
-
-    if json_body['mode'] not in execute_mode_options:
-        raise HTTPBadRequest(detail="Invalid execution mode `{0}` specified.".format(json_body['mode']))
     if json_body['mode'] not in [EXECUTE_MODE_ASYNC, EXECUTE_MODE_AUTO]:
         raise HTTPNotImplemented(detail="Execution mode `{0}` not supported.".format(json_body['mode']))
-    execute_async = json_body['mode'] != EXECUTE_MODE_SYNC
 
-    if json_body['response'] not in execute_response_options:
-        raise HTTPBadRequest(detail="Invalid execution response `{0}` specified.".format(json_body['response']))
     if json_body['response'] != EXECUTE_RESPONSE_DOCUMENT:
         raise HTTPNotImplemented(detail="Execution response type `{0}` not supported.".format(json_body['response']))
 
-    for job_input in json_body['inputs']:
-        if not ('id' in job_input and any(k in job_input for k in ('data', 'href'))):
-            raise HTTPBadRequest("Missing one of required output parameters [id, data|href].")
-
     for job_output in json_body['outputs']:
-        if not all(k in job_output for k in ('id', 'transmissionMode')):
-            raise HTTPBadRequest(detail="Missing one of required output parameters [id, transmissionMode].")
-        if job_output['transmissionMode'] not in execute_transmission_mode_options:
-            raise HTTPBadRequest(detail="Invalid execution transmissionMode `{0}` specified."
-                                 .format(job_output['transmissionMode']))
         if job_output['transmissionMode'] != EXECUTE_TRANSMISSION_MODE_REFERENCE:
             raise HTTPNotImplemented(detail="Execute transmissionMode `{0}` not supported."
                                      .format(job_output['transmissionMode']))
 
+
+def submit_job_handler(request, service_url, is_workflow=False):
+    # type: (Request, AnyStr, bool) -> HTTPSuccessful
+
+    # validate body with expected JSON content and schema
+    if 'application/json' not in request.content_type:
+        raise HTTPBadRequest("Request 'Content-Type' header other than 'application/json' not supported.")
+    try:
+        json_body = request.json_body
+    except Exception as ex:
+        raise HTTPBadRequest("Invalid JSON body cannot be decoded for job submission. [{}]".format(ex))
+    try:
+        json_body = sd.Execute().deserialize(json_body)
+    except colander.Invalid as ex:
+        raise HTTPBadRequest("Invalid schema: [{}]".format(str(ex)))
+
+    # TODO: remove when all parameter variations are supported
+    validate_supported_submit_job_handler_parameters(json_body)
+
+    provider_id = request.matchdict.get('provider_id')          # None OK if local
+    process_id = request.matchdict.get('process_id')
+    tags = request.params.get('tags', '').split(',')
+    is_execute_async = json_body['mode'] != EXECUTE_MODE_SYNC   # convert auto to async
+
     store = jobstore_factory(request.registry)
     job = store.save_job(task_id=STATUS_ACCEPTED, process=process_id, service=provider_id,
-                         inputs=json_body['inputs'], is_workflow=is_workflow,
-                         user_id=request.authenticated_userid, execute_async=execute_async, custom_tags=tags)
+                         inputs=json_body.get('inputs'), is_workflow=is_workflow,
+                         user_id=request.authenticated_userid, execute_async=is_execute_async, custom_tags=tags)
     result = execute_process.delay(
         job_id=job.id,
         url=clean_ows_url(service_url),
