@@ -305,43 +305,45 @@ def execute_process(self, job_id, url, headers=None):
 def submit_job_handler(request, service_url, is_workflow=False):
     # type: (Request, AnyStr, bool) -> HTTPSuccessful
 
-    # TODO Validate param somehow
+    # validate body with expected JSON content and schema
+    if 'application/json' not in request.content_type:
+        raise HTTPBadRequest("Request 'Content-Type' header other than 'application/json' not supported.")
+    try:
+        json_body = request.json_body
+    except Exception as ex:
+        raise HTTPBadRequest("Invalid JSON body cannot be decoded for job submission. [{}]".format(ex))
+    json_body = sd.Execute().deserialize(json_body)
+
     provider_id = request.matchdict.get('provider_id')  # None OK if local
     process_id = request.matchdict.get('process_id')
     tags = request.params.get('tags', '').split(',')
 
-    try:
-        if 'application/json' not in request.content_type:
-            raise ValueError("Request 'Content-Type' header is not 'application/json'.")
-        json_body = request.json_body
-    except Exception as ex:
-        raise HTTPBadRequest("Invalid JSON body cannot be decoded for job submission. [{}]".format(ex))
+    #required_params = ['inputs', 'outputs', 'mode', 'response']
+    #if not all(k in json_body for k in required_params):
+    #    raise HTTPBadRequest("Missing one of required parameters [{}].".format(', '.join(required_params)))
 
-    required_params = ['inputs', 'outputs', 'mode', 'response']
-    if not all(k in json_body for k in required_params):
-        raise HTTPBadRequest("Missing one of required parameters [{}].".format(', '.join(required_params)))
-
-    if json_body['mode'] not in execute_mode_options:
-        raise HTTPBadRequest(detail="Invalid execution mode `{0}` specified.".format(json_body['mode']))
+    #if json_body['mode'] not in execute_mode_options:
+    #    raise HTTPBadRequest(detail="Invalid execution mode `{0}` specified.".format(json_body['mode']))
     if json_body['mode'] not in [EXECUTE_MODE_ASYNC, EXECUTE_MODE_AUTO]:
         raise HTTPNotImplemented(detail="Execution mode `{0}` not supported.".format(json_body['mode']))
     execute_async = json_body['mode'] != EXECUTE_MODE_SYNC
 
-    if json_body['response'] not in execute_response_options:
-        raise HTTPBadRequest(detail="Invalid execution response `{0}` specified.".format(json_body['response']))
+    #if json_body['response'] not in execute_response_options:
+    #    raise HTTPBadRequest(detail="Invalid execution response `{0}` specified.".format(json_body['response']))
     if json_body['response'] != EXECUTE_RESPONSE_DOCUMENT:
         raise HTTPNotImplemented(detail="Execution response type `{0}` not supported.".format(json_body['response']))
 
-    for job_input in json_body['inputs']:
-        if not ('id' in job_input and any(k in job_input for k in ('data', 'href'))):
-            raise HTTPBadRequest("Missing one of required output parameters [id, data|href].")
+    #for job_input in json_body['inputs']:
+    #    if not ('id' in job_input and any(k in job_input for k in ('data', 'href'))):
+    #        raise HTTPBadRequest("Missing one of required output parameters [id, data|href].")
 
     for job_output in json_body['outputs']:
-        if not all(k in job_output for k in ('id', 'transmissionMode')):
-            raise HTTPBadRequest(detail="Missing one of required output parameters [id, transmissionMode].")
-        if job_output['transmissionMode'] not in execute_transmission_mode_options:
-            raise HTTPBadRequest(detail="Invalid execution transmissionMode `{0}` specified."
-                                 .format(job_output['transmissionMode']))
+        #if not all(k in job_output for k in ('id', 'transmissionMode')):
+        #    raise HTTPBadRequest(detail="Missing one of required output parameters [id, transmissionMode].")
+        #if job_output['transmissionMode'] not in execute_transmission_mode_options:
+            #job_output['transmissionMode'] = sd.TransmissionModeEnum.default
+            #raise HTTPBadRequest(detail="Invalid execution transmissionMode `{0}` specified."
+            #                     .format(job_output['transmissionMode']))
         if job_output['transmissionMode'] != EXECUTE_TRANSMISSION_MODE_REFERENCE:
             raise HTTPNotImplemented(detail="Execute transmissionMode `{0}` not supported."
                                      .format(job_output['transmissionMode']))
