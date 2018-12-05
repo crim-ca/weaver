@@ -8,8 +8,8 @@ execute_mode_options = frozenset([
     EXECUTE_MODE_SYNC,
 ])
 
-EXECUTE_CONTROL_OPTION_ASYNC = 'execute-async'
-EXECUTE_CONTROL_OPTION_SYNC = 'execute-sync'
+EXECUTE_CONTROL_OPTION_ASYNC = 'async-execute'
+EXECUTE_CONTROL_OPTION_SYNC = 'sync-execute'
 
 execute_control_options = frozenset([
     EXECUTE_CONTROL_OPTION_ASYNC,

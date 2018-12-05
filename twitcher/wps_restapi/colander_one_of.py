@@ -7,19 +7,17 @@ class OneOfMappingSchema(colander.MappingSchema):
 
     def __init__(self, *args, **kwargs):
         super(OneOfMappingSchema, self).__init__(*args, **kwargs)
-        if not hasattr(self, "_one_of"):
-            raise TypeError("Type {} must define '_one_of' element.".format(self))
+        if not hasattr(self, '_one_of'):
+            raise TypeError("Type '{}' must define '_one_of' element.".format(self))
         if not hasattr(self._one_of, '__iter__') or not len(self._one_of):
-            raise ValueError("Type {} '_one_of' element must be an iterable of at least 1 value.".format(self))
+            raise ValueError("Element '_one_of' of '{}' must be an iterable of at least 1 value.".format(self))
 
     def __str__(self):
         return self.__name__
 
     def deserialize_one_of(self, cstruct):
-        if not hasattr(self, "_one_of"):
-            return {}
-
-        # test each possible case, return all errors if none valid found
+        # test each possible case, return all corresponding errors if
+        # none of the '_one_of' possibilities is valid including all sub-dependencies
         invalid_one_of = dict()
         for c in self._one_of:
             try:
