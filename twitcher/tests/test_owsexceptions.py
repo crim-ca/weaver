@@ -15,6 +15,8 @@ def test_owsexceptions_json_formatter():
         ("With \'single quotes\' not escaped.", "With 'single quotes' not escaped."),
         ("With many spacing \\\\slashes not escaped.", "With many spacing slashes not escaped."),
         ("With combo of wrong \\\"\'u''escapes'\'\" not cleaned.", "With combo of wrong 'escapes' not cleaned."),
+        ("Commas within list [u'w', \'\'x', u''y', ''z''] fixed.", "Commas within list ['w', 'x', 'y', 'z'] fixed."),
+        ("Many \"\"double\"\"\" or '''''single'' commas 'cleaned'.", "Many 'double' or 'single' commas 'cleaned'."),
     ]
 
     test_code = "Test Exception 1337"

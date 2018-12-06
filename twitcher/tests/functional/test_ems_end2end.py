@@ -200,6 +200,11 @@ class End2EndEMSTestCase(TestCase):
         cls.log("{}End of End-2-End test: {}\n{}"
                 .format(cls.logger_separator_steps, now(), cls.logger_separator_tests))
 
+    def setUp(self):
+        # cleanup old processes as required
+        headers, cookies = self.user_headers_cookies(self.ADMIN_CREDENTIALS, force_magpie=True)
+        self.clear_test_processes(headers, cookies)
+
     @classmethod
     def settings(cls):
         # type: (...) -> Dict[AnyStr, AnyStr]
@@ -313,7 +318,7 @@ class End2EndEMSTestCase(TestCase):
                 with open(local_path, 'r') as f:
                     json_payload = json.load(f)
                     return json_payload
-            except (IOError, ValueError) as e:
+            except (IOError, ValueError):
                 # Will raise the original query exception
                 pass
 
@@ -543,9 +548,6 @@ class End2EndEMSTestCase(TestCase):
         # End to end test will log everything
         self.__class__.log_full_trace = True
 
-        headers, cookies = self.user_headers_cookies(self.ADMIN_CREDENTIALS, force_magpie=True)
-        self.clear_test_processes(headers, cookies)
-
         headers_a, cookies_a = self.user_headers_cookies(self.ALICE_CREDENTIALS)
         headers_b, cookies_b = self.user_headers_cookies(self.BOB_CREDENTIALS)
 
@@ -636,13 +638,8 @@ class End2EndEMSTestCase(TestCase):
         # Demo test will log basic information
         self.__class__.log_full_trace = False
 
-        # cleanup old processes
-        headers, cookies = self.user_headers_cookies(self.ADMIN_CREDENTIALS, force_magpie=True)
-        self.clear_test_processes(headers, cookies)
-
-        path_deploy = '{}/processes'.format(self.get_twitcher_ems_url())
-
         # deploy processes and make them visible for workflows
+        path_deploy = '{}/processes'.format(self.get_twitcher_ems_url())
         for process_id in [self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID]:
             path_visible = '{}/{}/visibility'.format(path_deploy, self.test_processes_info[process_id].test_id)
             data_visible = {'value': VISIBILITY_PUBLIC}

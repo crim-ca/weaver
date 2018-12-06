@@ -8,7 +8,7 @@ from celery.utils.log import get_task_logger
 from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import URLError
 from time import sleep
-from typing import AnyStr
+from typing import AnyStr, List, Tuple
 
 from twitcher.wps import load_pywps_cfg
 from twitcher.adapter import servicestore_factory, jobstore_factory, processstore_factory
@@ -453,6 +453,25 @@ def describe_provider_process(request):
     return HTTPOk(json=body_data)
 
 
+def get_processes_filtered_by_valid_schemas(request):
+    # type: (Request) -> Tuple[List[ProcessDB], List[AnyStr]]
+    """
+    Validates the processes summary schemas and returns them into valid/invalid lists.
+    :returns: list of valid processes and invalid processes IDs for manual cleanup.
+    """
+    store = processstore_factory(request.registry)
+    processes = store.list_processes(visibility=VISIBILITY_PUBLIC, request=request)
+    valid_processes = list()
+    invalid_processes_ids = list()
+    for process in processes:
+        try:
+            valid_processes.append(process.process_summary())
+        except colander.Invalid:
+            invalid_processes_ids.append(process.identifier)
+            pass
+    return valid_processes, invalid_processes_ids
+
+
 @sd.processes_service.get(schema=sd.GetProcessesRequest(), tags=[sd.processes_tag, sd.getcapabilities_tag],
                           response_schemas=sd.get_processes_responses)
 def get_processes(request):
@@ -460,10 +479,14 @@ def get_processes(request):
     List registered processes (GetCapabilities). Optionally list both local and provider processes.
     """
     try:
-        # get local processes
-        store = processstore_factory(request.registry)
-        processes = [process.process_summary() for process in
-                     store.list_processes(visibility=VISIBILITY_PUBLIC, request=request)]
+        # get local processes and filter according to schema validity
+        # (previously deployed process schemas can become invalid because of modified schema definitions
+        processes, invalid_processes = get_processes_filtered_by_valid_schemas(request)
+        if invalid_processes:
+            raise HTTPServiceUnavailable(
+                "Previously deployed processes are causing invalid schema integrity errors. " +
+                "Manual cleanup of following processes is required: {}".format(invalid_processes))
+
         response_body = {'processes': processes}
 
         # if EMS and ?providers=True, also fetch each provider's processes

@@ -133,6 +133,30 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert self.process_public.identifier in processes_id
         assert self.process_private.identifier not in processes_id
 
+    def test_get_processes_invalid_schemas_handled(self):
+        path = "/processes"
+        # deploy valid test process
+        process_name = self.fully_qualified_test_process_name()
+        process_data = self.get_process_deploy_template(process_name)
+        package_mock = self.get_process_package_mock()
+        # noinspection PyDeprecation
+        with nested(*package_mock):
+            resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=True)
+            # TODO: status should be 201 when properly modified to match API conformance
+            assert resp.status_code == 200
+            assert resp.json['processSummary']['id'] == process_name
+
+        # change value that will trigger schema error on check
+        process = self.process_store.fetch_by_id(process_name)
+        process['jobControlOptions'] = "random"     # invalid
+        process['visibility'] = VISIBILITY_PUBLIC
+        self.process_store.save_process(process, overwrite=True)
+
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 503
+        assert resp.content_type == self.json_app
+        assert process_name in resp.json.get('description')
+
     def test_describe_process_visibility_public(self):
         uri = "/processes/{}".format(self.process_public.identifier)
         resp = self.app.get(uri, headers=self.json_headers)
