@@ -3,7 +3,7 @@
         "process": {
             "id": "CustomWorkflow",
             "title": "Workflow",
-            "abstract": "",
+            "abstract": "Workflow that stacks images from different OpenSearch queries for each of the Sentinel2, ProbaV and Deimos data sources, then runs SFS on the stacked image.",
             "keywords": [],
             "additionalParameters": [
             {
