@@ -42,6 +42,9 @@ from contextlib import nested
 from twitcher.processes.sources import fetch_data_sources
 
 
+TestResponse = Union[WebTestResponse, Request]
+
+
 class ProcessInfo(object):
     def __init__(self, process_id, test_id=None, deploy_payload=None, execute_payload=None):
         # type: (AnyStr, Optional[AnyStr], Optional[Dict], Optional[Dict]) -> None
@@ -67,6 +70,7 @@ class End2EndEMSTestCase(TestCase):
     logger_separator_calls = None   # type: AnyStr
     logger_separator_steps = None   # type: AnyStr
     logger_separator_tests = None   # type: AnyStr
+    logger_separator_cases = None   # type: AnyStr
     logger_level = logging.INFO     # type: int
     logger = None                   # type: _loggerClass
     # setting indent to `None` disables pretty-printing of JSON payload
@@ -127,8 +131,8 @@ class End2EndEMSTestCase(TestCase):
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
         cls.setup_logger()
-        cls.log("{}Start of End-2-End test: {}\n{}"
-                .format(cls.logger_separator_tests, now(), cls.logger_separator_steps))
+        cls.log("{}Start of '{}': {}\n{}"
+                .format(cls.logger_separator_cases, cls.__name__, now(), cls.logger_separator_cases))
 
         # TODO: adjust environment variables accordingly to the server to be tested
         cls.TEST_SERVER_HOSTNAME = os.getenv('TEST_SERVER_HOSTNAME')
@@ -142,6 +146,7 @@ class End2EndEMSTestCase(TestCase):
         cls.logger_separator_calls = os.getenv('TEST_LOGGER_SEPARATOR_CALLS', cls.logger_separator_calls)
         cls.logger_separator_steps = os.getenv('TEST_LOGGER_SEPARATOR_STEPS', cls.logger_separator_steps)
         cls.logger_separator_tests = os.getenv('TEST_LOGGER_SEPARATOR_TESTS', cls.logger_separator_tests)
+        cls.logger_separator_cases = os.getenv('TEST_LOGGER_SEPARATOR_CASES', cls.logger_separator_cases)
 
         cls.MAGPIE_URL = cls.settings().get('magpie.url')
         cls.TWITCHER_URL = get_twitcher_url(cls.settings())
@@ -188,7 +193,7 @@ class End2EndEMSTestCase(TestCase):
             })
         for param in required_params:
             cls.assert_test(lambda: not isinstance(required_params[param], Null),
-                            message="Missing required parameter `{}` to run end-2-end EMS tests!".format(param))
+                            message="Missing required parameter `{}` to run '{}' tests!".format(param, cls.__name__))
 
         cls.validate_test_server()
         cls.setup_test_processes()
@@ -197,13 +202,20 @@ class End2EndEMSTestCase(TestCase):
     def tearDownClass(cls):
         cls.clear_test_processes()
         testing.tearDown()
-        cls.log("{}End of End-2-End test: {}\n{}"
-                .format(cls.logger_separator_steps, now(), cls.logger_separator_tests))
+        cls.log("{}End of '{}': {}\n{}"
+                .format(cls.logger_separator_cases, cls.__name__, now(), cls.logger_separator_cases))
 
     def setUp(self):
+        self.log("{}Start of '{}': {}\n{}"
+                 .format(self.logger_separator_tests, self.id(), now(), self.logger_separator_tests))
+
         # cleanup old processes as required
         headers, cookies = self.user_headers_cookies(self.ADMIN_CREDENTIALS, force_magpie=True)
         self.clear_test_processes(headers, cookies)
+
+    def tearDown(self):
+        self.log("{}End of '{}': {}\n{}"
+                 .format(self.logger_separator_tests, self.id(), now(), self.logger_separator_cases))
 
     @classmethod
     def settings(cls):
@@ -335,7 +347,7 @@ class End2EndEMSTestCase(TestCase):
         for process_id, process_info in cls.test_processes_info.items():
             path = '{}/processes/{}'.format(cls.get_twitcher_ems_url(), process_info.test_id)
 
-            resp = cls.request('DELETE', path, headers=headers, cookies=cookies, ignore_errors=True)
+            resp = cls.request('DELETE', path, headers=headers, cookies=cookies, ignore_errors=True, log_enabled=False)
             # unauthorized also would mean the process doesn't exist since Alice should have permissions on it
             cls.assert_response(resp, [HTTPOk.code, HTTPUnauthorized.code, HTTPNotFound.code],
                                 message="Failed cleanup of test processes!")
@@ -393,8 +405,8 @@ class End2EndEMSTestCase(TestCase):
         return headers, cookies
 
     @classmethod
-    def request(cls, method, url, ignore_errors=False, force_requests=False, **kw):
-        # type: (AnyStr, AnyStr, Optional[bool], Optional[bool], Optional[Any]) -> Union[WebTestResponse, Request]
+    def request(cls, method, url, ignore_errors=False, force_requests=False, log_enabled=True, **kw):
+        # type: (AnyStr, AnyStr, Optional[bool], Optional[bool], Optional[bool], Optional[Any]) -> TestResponse
         """
         Executes the request, but following any server prior redirects as needed.
         Also prepares JSON body and obvious error handling according to a given status code.
@@ -415,21 +427,22 @@ class End2EndEMSTestCase(TestCase):
         is_remote = hasattr(cls.app.app, 'net_loc') and cls.app.app.net_loc != 'localhost' and not is_localhost
         with_requests = is_localhost and has_port or is_remote or force_requests
 
-        if json_body or headers and 'application/json' in headers.get('Content-Type'):
-            payload = "\n" if cls.logger_json_indent else '' + json.dumps(json_body, indent=cls.logger_json_indent)
-        else:
-            payload = data_body
-        trace = ("{}Request Details:\n".format(cls.logger_separator_steps) +
-                 "  Request: {method} {url}\n".format(method=method, url=url) +
-                 "  Payload: {payload}".format(payload=payload))
-        if cls.log_full_trace:
-            trace += ("\n" +
-                      "  Headers: {headers}\n".format(headers=headers) +
-                      "  Cookies: {cookies}\n".format(cookies=cookies) +
-                      "  Status:  {status} (expected)\n".format(status=status) +
-                      "  Message: {message} (expected)\n".format(message=message) +
-                      "  Module:  {module}\n".format(module='requests' if with_requests else 'webtest.TestApp'))
-        cls.log(trace)
+        if log_enabled:
+            if json_body or headers and 'application/json' in headers.get('Content-Type'):
+                payload = "\n" if cls.logger_json_indent else '' + json.dumps(json_body, indent=cls.logger_json_indent)
+            else:
+                payload = data_body
+            trace = ("{}Request Details:\n".format(cls.logger_separator_steps) +
+                     "  Request: {method} {url}\n".format(method=method, url=url) +
+                     "  Payload: {payload}".format(payload=payload))
+            if cls.log_full_trace:
+                trace += ("\n" +
+                          "  Headers: {headers}\n".format(headers=headers) +
+                          "  Cookies: {cookies}\n".format(cookies=cookies) +
+                          "  Status:  {status} (expected)\n".format(status=status) +
+                          "  Message: {message} (expected)\n".format(message=message) +
+                          "  Module:  {module}\n".format(module='requests' if with_requests else 'webtest.TestApp'))
+            cls.log(trace)
 
         if with_requests:
             kw.update({'verify': False})
@@ -464,21 +477,22 @@ class End2EndEMSTestCase(TestCase):
         if not ignore_errors:
             cls.assert_response(resp, status, message)
 
-        if 'application/json' in resp.headers.get('Content-Type', []):
-            payload = "\n" if cls.logger_json_indent else '' + json.dumps(resp.json, indent=cls.logger_json_indent)
-        else:
-            payload = resp.body
-        if cls.log_full_trace:
-            headers = resp.headers
-        else:
-            header_filter = ['Location']
-            headers = {k: v for k, v in resp.headers.items() if k in header_filter}
+        if log_enabled:
+            if 'application/json' in resp.headers.get('Content-Type', []):
+                payload = "\n" if cls.logger_json_indent else '' + json.dumps(resp.json, indent=cls.logger_json_indent)
+            else:
+                payload = resp.body
+            if cls.log_full_trace:
+                headers = resp.headers
+            else:
+                header_filter = ['Location']
+                headers = {k: v for k, v in resp.headers.items() if k in header_filter}
 
-        cls.log("{}Response Details:\n".format(cls.logger_separator_calls) +
-                "  Status:  {status} (received)\n".format(status=resp.status_code) +
-                "  Content: {content}\n".format(content=resp.content_type) +
-                "  Payload: {payload}\n".format(payload=payload) +
-                "  Headers: {headers}\n".format(headers=headers))
+            cls.log("{}Response Details:\n".format(cls.logger_separator_calls) +
+                    "  Status:  {status} (received)\n".format(status=resp.status_code) +
+                    "  Content: {content}\n".format(content=resp.content_type) +
+                    "  Payload: {payload}\n".format(payload=payload) +
+                    "  Headers: {headers}\n".format(headers=headers))
         return resp
 
     @classmethod
@@ -525,7 +539,8 @@ class End2EndEMSTestCase(TestCase):
         log_path = os.path.abspath(os.path.join(root_dir, cls.__name__ + '.log'))
         cls.logger_separator_calls = '-' * 80 + '\n'   # used between function calls (of same request)
         cls.logger_separator_steps = '=' * 80 + '\n'   # used between overall test steps (between requests)
-        cls.logger_separator_tests = '*' * 80 + '\n'   # used between various test runs
+        cls.logger_separator_tests = '*' * 80 + '\n'   # used between various test runs (each test_* method)
+        cls.logger_separator_cases = '#' * 80 + '\n'   # used between various TestCase runs
         cls.logger = logging.getLogger(cls.__name__)
         cls.logger.setLevel(cls.logger_level)
         cls.logger.addHandler(logging.FileHandler(log_path))
