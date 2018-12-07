@@ -949,7 +949,7 @@ class VersionsList(SequenceSchema):
 
 
 class VersionsSchema(MappingSchema):
-    version = VersionsList()
+    versions = VersionsList()
 
 
 #################################

@@ -38,11 +38,15 @@ def get_test_twitcher_app(twitcher_settings_override=None):
     # parse settings from ini file to pass them to the application
     config = config_setup_from_ini()
     # create the test application
+    config.include('twitcher.wps')
+    config.include('twitcher.wps_restapi')
+    config.include('twitcher.tweens')
     config.registry.settings['twitcher.db_factory'] = get_test_store_type_from_env()
     config.registry.settings['twitcher.rpcinterface'] = False
     config.registry.settings['twitcher.url'] = 'https://localhost'
     twitcher_config = twitcher_settings_override.get('twitcher.configuration', TWITCHER_CONFIGURATION_DEFAULT)
     config.registry.settings.update({'twitcher.configuration': twitcher_config})
+    config.scan()
     return TestApp(main({}, **config.registry.settings))
 
 
