@@ -120,7 +120,8 @@ class End2EndEMSTestCase(TestCase):
     def get_collection_swapping():
         return [
             # Swap because Spacebel cannot retrieve probav images and Geomatys ADES is not ready
-            ('EOP:VITO:PROBAV_S1-TOA_1KM_V001', 'EOP:IPT:Sentinel2'),
+            # Geomatys ADES should be ready now!
+            #('EOP:VITO:PROBAV_S1-TOA_1KM_V001', 'EOP:IPT:Sentinel2'),
         ]
 
     @classmethod
