@@ -314,8 +314,8 @@ def validate_supported_submit_job_handler_parameters(json_body):
                                      .format(job_output['transmissionMode']))
 
 
-def submit_job_handler(request, service_url, is_workflow=False):
-    # type: (Request, AnyStr, bool) -> HTTPSuccessful
+def submit_job_handler(request, service_url, is_workflow=False, visibility=None):
+    # type: (Request, AnyStr, bool, Optional[AnyStr]) -> HTTPSuccessful
 
     # validate body with expected JSON content and schema
     if 'application/json' not in request.content_type:
@@ -339,7 +339,7 @@ def submit_job_handler(request, service_url, is_workflow=False):
 
     store = jobstore_factory(request.registry)
     job = store.save_job(task_id=STATUS_ACCEPTED, process=process_id, service=provider_id,
-                         inputs=json_body.get('inputs'), is_workflow=is_workflow,
+                         inputs=json_body.get('inputs'), is_workflow=is_workflow, access=visibility,
                          user_id=request.authenticated_userid, execute_async=is_execute_async, custom_tags=tags)
     result = execute_process.delay(
         job_id=job.id,

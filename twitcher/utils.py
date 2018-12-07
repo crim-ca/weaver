@@ -259,7 +259,7 @@ def convert_snake_case(name):
 
 
 def parse_request_query(request):
-    # type: (Request) -> Dict[Dict[Union[int, AnyStr], AnyStr]]
+    # type: (Request) -> Dict[AnyStr, Dict[Union[int, AnyStr], AnyStr]]
     """
     :param request:
     :return: dict of dict where k=v are accessible by d[k][0] == v and q=k=v are accessible by d[q][k] == v, lowercase
