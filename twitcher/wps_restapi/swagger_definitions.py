@@ -930,11 +930,6 @@ class FrontpageSchema(MappingSchema):
     parameters = FrontpageParameters()
 
 
-class AdapterDescriptionSchema(MappingSchema):
-    name = SchemaNode(String(), description="Name of the loaded Twitcher adapter.", missing=drop, example='default')
-    version = SchemaNode(String(), description="Version of the loaded Twitcher adapter.", missing=drop, example='0.3.0')
-
-
 class SwaggerJSONSpecSchema(MappingSchema):
     pass
 
@@ -944,12 +939,17 @@ class SwaggerUISpecSchema(MappingSchema):
 
 
 class VersionsSpecSchema(MappingSchema):
-    twitcher = SchemaNode(String(), description="Twitcher version string.", example='0.3.0')
-    adapter = AdapterDescriptionSchema()
+    name = SchemaNode(String(), description="Identification name of the current item.", example='default')
+    type = SchemaNode(String(), description="Identification type of the current item.", example='adapter')
+    version = SchemaNode(String(), description="Version of the current item.", example='0.3.0')
+
+
+class VersionsList(SequenceSchema):
+    item = VersionsSpecSchema()
 
 
 class VersionsSchema(MappingSchema):
-    version = VersionsSpecSchema()
+    version = VersionsList()
 
 
 #################################

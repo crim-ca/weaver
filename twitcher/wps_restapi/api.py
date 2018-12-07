@@ -51,7 +51,9 @@ def api_frontpage(request):
 def api_versions(request):
     """Twitcher versions information."""
     adapter_info = adapter_factory(request.registry.settings).describe_adapter()
-    return {'versions': {'twitcher': twitcher_version, 'adapter': adapter_info}}
+    adapter_info['type'] = 'adapter'
+    twitcher_info = {'name': 'Twitcher', 'version': twitcher_version, 'type': 'api'}
+    return {'versions': [twitcher_info, adapter_info]}
 
 
 @sd.api_swagger_json_service.get(tags=[sd.api_tag], renderer='json',
