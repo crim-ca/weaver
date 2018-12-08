@@ -8,12 +8,16 @@ import urllib
 import requests
 
 from pyramid.response import Response
+from pyramid.request import Request
 from pyramid.settings import asbool
+from typing import AnyStr, Optional
 
 from twitcher._compat import urlparse
-
-from twitcher.owsexceptions import OWSAccessForbidden, OWSAccessFailed, OWSException
+from twitcher.owsexceptions import OWSNotAcceptable, OWSNotFound, OWSException
+from twitcher.exceptions import ServiceNotFound
 from twitcher.utils import replace_caps_url, get_twitcher_url
+from twitcher.adapter import servicestore_factory
+from twitcher.datatype import Service
 
 import logging
 LOGGER = logging.getLogger(__name__)
@@ -46,8 +50,8 @@ allowed_hosts = (
 )
 
 
-# requests.models.Reponse defaults its chunk size to 128 bytes, which is very slow
-class BufferedResponse():
+# requests.models.Response defaults its chunk size to 128 bytes, which is very slow
+class BufferedResponse(object):
     def __init__(self, resp):
         self.resp = resp
 
@@ -56,6 +60,7 @@ class BufferedResponse():
 
 
 def _send_request(request, service, extra_path=None, request_params=None):
+    # type: (Request, Service, Optional[AnyStr], Optional[AnyStr]) -> Response
 
     # TODO: fix way to build url
     url = service.url
@@ -77,24 +82,24 @@ def _send_request(request, service, extra_path=None, request_params=None):
             resp_iter = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h,
                                          stream=True, verify=ssl_verify)
         except Exception as e:
-            return OWSAccessFailed("Request failed: {}".format(e.message))
+            return OWSNotAcceptable("Request failed: {}".format(e.message))
 
         # Headers meaningful only for a single transport-level connection
-        HopbyHop = ['Connection', 'Keep-Alive', 'Public', 'Proxy-Authenticate', 'Transfer-Encoding', 'Upgrade']
+        hob_by_hob = ['Connection', 'Keep-Alive', 'Public', 'Proxy-Authenticate', 'Transfer-Encoding', 'Upgrade']
         return Response(app_iter=BufferedResponse(resp_iter),
-                        headers={k: v for k, v in resp_iter.headers.items() if k not in HopbyHop})
+                        headers={k: v for k, v in resp_iter.headers.items() if k not in hob_by_hob})
     else:
         try:
             resp = requests.request(method=request.method.upper(), url=url, data=request.body, headers=h,
                                     verify=ssl_verify)
         except Exception as e:
-            return OWSAccessFailed("Request failed: {}".format(e.message))
+            return OWSNotAcceptable("Request failed: {}".format(e.message))
 
         if resp.ok is False:
             if 'ExceptionReport' in resp.content:
                 pass
             else:
-                return OWSAccessFailed("Response is not ok: {}".format(resp.reason))
+                return OWSNotAcceptable("Response is not ok: {}".format(resp.reason))
 
         # check for allowed content types
         ct = None
@@ -104,11 +109,12 @@ def _send_request(request, service, extra_path=None, request_params=None):
             if not ct.split(";")[0] in allowed_content_types:
                 msg = "Content type is not allowed: {}.".format(ct)
                 LOGGER.error(msg)
-                return OWSAccessForbidden(msg)
+                return OWSNotAcceptable(msg)
         else:
             # return OWSAccessFailed("Could not get content type from response.")
             LOGGER.warn("Could not get content type from response")
 
+        # noinspection PyBroadException
         try:
             if ct in ['text/xml', 'application/xml', 'text/xml;charset=ISO-8859-1']:
                 # replace urls in xml content
@@ -119,7 +125,7 @@ def _send_request(request, service, extra_path=None, request_params=None):
                 # raw content
                 content = resp.content
         except Exception:
-            return OWSAccessFailed("Could not decode content.")
+            return OWSNotAcceptable("Could not decode content.")
 
         headers = {}
         if ct:
@@ -140,31 +146,31 @@ def owsproxy_base_url(settings):
 def owsproxy_url(request):
     url = request.params.get("url")
     if url is None:
-        return OWSAccessFailed("URL param is missing.")
+        return OWSNotAcceptable("URL param is missing.")
 
     service_type = request.GET.get('service', 'wps') or request.GET.get('SERVICE', 'wps')
     # check for full url
     parsed_url = urlparse(url)
     if not parsed_url.netloc or parsed_url.scheme not in ("http", "https"):
-        return OWSAccessFailed("Not a valid URL.")
-    return _send_request(request, service=dict(url=url, name='external', service_type=service_type))
+        return OWSNotAcceptable("Not a valid URL.")
+    return _send_request(request, service=Service(url=url, name='external', service_type=service_type))
 
 
 def owsproxy(request):
-    """
-    TODO: use ows exceptions
-    """
+    # type: (Request) -> Response
+
+    service_name = request.matchdict.get('service_name')
+    if not service_name:
+        raise OWSNotAcceptable()
     try:
-        from twitcher.adapter import servicestore_factory
-        service_name = request.matchdict.get('service_name')
         extra_path = request.matchdict.get('extra_path')
         store = servicestore_factory(request.registry)
         service = store.fetch_by_name(service_name, request=request)
     except OWSException:
         # Store impl should raise appropriate exception like not authorized
         pass
-    except Exception as err:
-        return OWSAccessFailed("Could not find service {0} : {1}.".format(service_name, err.message))
+    except (Exception, ServiceNotFound) as err:
+        return OWSNotFound("Could not find service {0} : {1}.".format(service_name, err.message))
     else:
         return _send_request(request, service, extra_path, request_params=request.query_string)
 

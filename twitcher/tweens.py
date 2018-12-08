@@ -1,7 +1,7 @@
 from pyramid.settings import asbool
 from pyramid.tweens import EXCVIEW
-from pyramid.httpexceptions import HTTPException
-from twitcher.owsexceptions import OWSException, OWSNoApplicableCode
+from pyramid.httpexceptions import HTTPException, HTTPBadRequest
+from twitcher.owsexceptions import OWSException, OWSNoApplicableCode, OWSNotImplemented, OWSNotAcceptable
 from twitcher.adapter import owssecurity_factory
 
 import logging
@@ -10,10 +10,26 @@ logger = logging.getLogger(__name__)
 
 def includeme(config):
     settings = config.registry.settings
+    config.add_tween(OWS_RESPONSE, under=EXCVIEW)
 
     if asbool(settings.get('twitcher.ows_security', True)):
         logger.info('Add OWS security tween')
         config.add_tween(OWS_SECURITY, under=EXCVIEW)
+
+
+def ows_response_tween_factory(handler, registry):
+    """A tween factory which produces a tween which transforms common
+    exceptions into OWS specific exceptions."""
+
+    def ows_response_tween(request):
+        try:
+            return handler(request)
+        except NotImplementedError as err:
+            return OWSNotImplemented(err.message)
+        except OWSException as err:
+            return err
+
+    return ows_response_tween
 
 
 def ows_security_tween_factory(handler, registry):
@@ -41,4 +57,5 @@ def ows_security_tween_factory(handler, registry):
     return ows_security_tween
 
 
+OWS_RESPONSE = 'twitcher.tweens.ows_response_tween_factory'
 OWS_SECURITY = 'twitcher.tweens.ows_security_tween_factory'

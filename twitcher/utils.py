@@ -12,9 +12,11 @@ from pyramid.request import Request
 from requests import HTTPError as RequestsHTTPError
 
 from twitcher.exceptions import ServiceNotFound
+from twitcher.warning import TimeZoneInfoAlreadySetWarning
 from twitcher._compat import urlparse, parse_qs
 from twitcher.status import map_status
 
+import warnings
 import logging
 LOGGER = logging.getLogger(__name__)
 
@@ -133,7 +135,7 @@ def localize_datetime(dt, tz_name='UTC'):
         timezone = pytz.timezone(tz_name)
         tz_aware_dt = aware.astimezone(timezone)
     else:
-        LOGGER.warn('tzinfo already set')
+        warnings.warn("tzinfo already set", TimeZoneInfoAlreadySetWarning)
     return tz_aware_dt
 
 

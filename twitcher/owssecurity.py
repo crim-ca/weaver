@@ -78,7 +78,7 @@ class OWSSecurity(OWSSecurityInterface):
                 raise OWSAccessForbidden("Access token is expired.")
             # update request with data from access token
             # request.environ.update(access_token.data)
-            # TODO: is this realy the way we want to do this?
+            # TODO: is this really the way we want to do this?
             request = self.prepare_headers(request, access_token)
         except AccessTokenNotFound:
             raise OWSAccessForbidden("Access token is required to access this service.")

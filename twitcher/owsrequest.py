@@ -107,11 +107,12 @@ class Get(OWSParser):
                 if value in allowed_values:
                     self.params[param] = value
                 else:
-                    raise OWSInvalidParameterValue("%s %s is not supported" % (param, value), value=param)
+                    raise OWSInvalidParameterValue("Parameter '{!s}={!s}' is not supported."
+                                                   .format(param, value), value=param)
         elif optional:
             self.params[param] = None
         else:
-            raise OWSMissingParameterValue('Parameter "%s" is missing' % param, value=param)
+            raise OWSMissingParameterValue("Parameter '{!s}' is missing.".format(param), value=param)
         return self.params[param]
 
     def _get_service(self):
@@ -127,7 +128,7 @@ class Get(OWSParser):
         version = self._get_param(param="version", allowed_values=allowed_versions[self.params['service']],
                                   optional=True)
         if version is None and self._get_request_type() != "getcapabilities":
-            raise OWSMissingParameterValue('Parameter "version" is missing', value="version")
+            raise OWSMissingParameterValue("Parameter 'version' is missing.", value="version")
         else:
             return version
 
@@ -150,9 +151,9 @@ class Post(OWSParser):
             if value in allowed_service_types:
                 self.params["service"] = value
             else:
-                raise OWSInvalidParameterValue("Service %s is not supported" % value, value="service")
+                raise OWSInvalidParameterValue("Service '{!s}' is not supported.".format(value), value="service")
         else:
-            raise OWSMissingParameterValue('Parameter "service" is missing', value="service")
+            raise OWSMissingParameterValue("Parameter 'service' is missing.", value="service")
         return self.params["service"]
 
     def _get_request_type(self):
@@ -161,7 +162,7 @@ class Post(OWSParser):
         if value in allowed_request_types[self.params['service']]:
             self.params["request"] = value
         else:
-            raise OWSInvalidParameterValue("Request type %s is not supported" % value, value="request")
+            raise OWSInvalidParameterValue("Request type '{!s}' is not supported.".format(value), value="request")
         return self.params["request"]
 
     def _get_version(self):
@@ -171,9 +172,9 @@ class Post(OWSParser):
             if value in allowed_versions[self.params['service']]:
                 self.params["version"] = value
             else:
-                raise OWSInvalidParameterValue("Version %s is not supported" % value, value="version")
+                raise OWSInvalidParameterValue("Version '{!s}' is not supported.".format(value), value="version")
         elif self._get_request_type() == "getcapabilities":
             self.params["version"] = None
         else:
-            raise OWSMissingParameterValue('Parameter "version" is missing', value="version")
+            raise OWSMissingParameterValue("Parameter 'version' is missing.", value="version")
         return self.params["version"]

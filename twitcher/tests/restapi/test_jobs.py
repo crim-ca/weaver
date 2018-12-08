@@ -5,6 +5,7 @@ import mock
 # noinspection PyPackageRequirements
 import webtest
 import unittest
+import warnings
 import json
 import pyramid.testing
 import six
@@ -14,6 +15,7 @@ from twitcher.tests.utils import setup_config_with_mongodb, setup_mongodb_proces
 from twitcher.datatype import Job
 from twitcher.processes.wps_testing import WpsTestProcess
 from twitcher.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
+from twitcher.warning import TimeZoneInfoAlreadySetWarning
 from twitcher.status import (
     job_status_values,
     job_status_categories,
@@ -26,6 +28,7 @@ from twitcher.status import (
 class WpsRestApiJobsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        warnings.simplefilter('ignore', TimeZoneInfoAlreadySetWarning)
         cls.config = setup_config_with_mongodb()
         cls.config.include('twitcher.wps')
         cls.config.include('twitcher.wps_restapi')
