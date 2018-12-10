@@ -121,7 +121,7 @@ class End2EndEMSTestCase(TestCase):
         return [
             # Swap because Spacebel cannot retrieve probav images and Geomatys ADES is not ready
             # Geomatys ADES should be ready now!
-            #('EOP:VITO:PROBAV_S1-TOA_1KM_V001', 'EOP:IPT:Sentinel2'),
+            # ('EOP:VITO:PROBAV_S1-TOA_1KM_V001', 'EOP:IPT:Sentinel2'),
         ]
 
     @classmethod
@@ -133,7 +133,7 @@ class End2EndEMSTestCase(TestCase):
 
         cls.setup_logger()
         cls.log("{}Start of '{}': {}\n{}"
-                .format(cls.logger_separator_cases, cls.__name__, now(), cls.logger_separator_cases))
+                .format(cls.logger_separator_cases, cls.current_case_name(), now(), cls.logger_separator_cases))
 
         # TODO: adjust environment variables accordingly to the server to be tested
         cls.TEST_SERVER_HOSTNAME = os.getenv('TEST_SERVER_HOSTNAME')
@@ -194,7 +194,8 @@ class End2EndEMSTestCase(TestCase):
             })
         for param in required_params:
             cls.assert_test(lambda: not isinstance(required_params[param], Null),
-                            message="Missing required parameter `{}` to run '{}' tests!".format(param, cls.__name__))
+                            message="Missing required parameter `{}` to run '{}' tests!"
+                                    .format(param, cls.current_case_name()))
 
         cls.validate_test_server()
         cls.setup_test_processes()
@@ -204,11 +205,11 @@ class End2EndEMSTestCase(TestCase):
         cls.clear_test_processes()
         testing.tearDown()
         cls.log("{}End of '{}': {}\n{}"
-                .format(cls.logger_separator_cases, cls.__name__, now(), cls.logger_separator_cases))
+                .format(cls.logger_separator_cases, cls.current_case_name(), now(), cls.logger_separator_cases))
 
     def setUp(self):
         self.log("{}Start of '{}': {}\n{}"
-                 .format(self.logger_separator_tests, self.id(), now(), self.logger_separator_tests))
+                 .format(self.logger_separator_tests, self.current_test_name(), now(), self.logger_separator_tests))
 
         # cleanup old processes as required
         headers, cookies = self.user_headers_cookies(self.ADMIN_CREDENTIALS, force_magpie=True)
@@ -216,7 +217,14 @@ class End2EndEMSTestCase(TestCase):
 
     def tearDown(self):
         self.log("{}End of '{}': {}\n{}"
-                 .format(self.logger_separator_tests, self.id(), now(), self.logger_separator_cases))
+                 .format(self.logger_separator_tests, self.current_test_name(), now(), self.logger_separator_tests))
+
+    @classmethod
+    def current_case_name(cls):
+        return cls.__name__
+
+    def current_test_name(self):
+        return self.id().split('.')[-1]
 
     @classmethod
     def settings(cls):
@@ -349,7 +357,7 @@ class End2EndEMSTestCase(TestCase):
             path = '{}/processes/{}'.format(cls.get_twitcher_ems_url(), process_info.test_id)
 
             resp = cls.request('DELETE', path, headers=headers, cookies=cookies, ignore_errors=True, log_enabled=False)
-            # unauthorized also would mean the process doesn't exist since Alice should have permissions on it
+            # unauthorized also would mean the process doesn't exist if user from headers has permissions on it
             cls.assert_response(resp, [HTTPOk.code, HTTPUnauthorized.code, HTTPNotFound.code],
                                 message="Failed cleanup of test processes!")
 
@@ -538,13 +546,19 @@ class End2EndEMSTestCase(TestCase):
     def setup_logger(cls):
         root_dir = os.getenv('TEST_LOGGER_RESULT_DIR', os.path.join(TWITCHER_ROOT_DIR, 'tests'))
         log_path = os.path.abspath(os.path.join(root_dir, cls.__name__ + '.log'))
-        cls.logger_separator_calls = '-' * 80 + '\n'   # used between function calls (of same request)
-        cls.logger_separator_steps = '=' * 80 + '\n'   # used between overall test steps (between requests)
-        cls.logger_separator_tests = '*' * 80 + '\n'   # used between various test runs (each test_* method)
-        cls.logger_separator_cases = '#' * 80 + '\n'   # used between various TestCase runs
+        log_fmt = logging.Formatter("%(message)s")      # only message to avoid 'log-name INFO' offsetting outputs
+        log_file = logging.FileHandler(log_path)
+        log_file.setFormatter(log_fmt)
+        log_term = logging.StreamHandler()
+        log_term.setFormatter(log_fmt)
+        cls.logger_separator_calls = '-' * 80 + '\n'    # used between function calls (of same request)
+        cls.logger_separator_steps = '=' * 80 + '\n'    # used between overall test steps (between requests)
+        cls.logger_separator_tests = '*' * 80 + '\n'    # used between various test runs (each test_* method)
+        cls.logger_separator_cases = '#' * 80 + '\n'    # used between various TestCase runs
         cls.logger = logging.getLogger(cls.__name__)
         cls.logger.setLevel(cls.logger_level)
-        cls.logger.addHandler(logging.FileHandler(log_path))
+        cls.logger.addHandler(log_file)
+        cls.logger.addHandler(log_term)
 
     @classmethod
     def validate_test_server(cls):
