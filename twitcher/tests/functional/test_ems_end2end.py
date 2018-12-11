@@ -139,6 +139,7 @@ class End2EndEMSTestCase(TestCase):
         cls.TEST_SERVER_HOSTNAME = os.getenv('TEST_SERVER_HOSTNAME')
         cls.TEST_SERVER_MAGPIE_PATH = os.getenv('TEST_SERVER_MAGPIE_PATH', '/magpie')
         cls.TEST_SERVER_TWITCHER_PATH = os.getenv('TEST_SERVER_TWITCHER_PATH', '/twitcher')
+        cls.TEST_SERVER_TWITCHER_REST_API_PATH = os.getenv('TEST_SERVER_TWITCHER_REST_API_PATH', '/')
         cls.TEST_CONFIG_INI_PATH = os.getenv('TEST_CONFIG_INI_PATH')    # none uses default path
         cls.app = WebTestApp(cls.TEST_SERVER_HOSTNAME)
 
@@ -242,6 +243,7 @@ class End2EndEMSTestCase(TestCase):
                 'magpie.url': magpie_url,
                 'twitcher.url': twitcher_url,
                 'twitcher.configuration': TWITCHER_CONFIGURATION_EMS,
+                'twitcher.wps_restapi_path': cls.TEST_SERVER_TWITCHER_REST_API_PATH,
             })
         return cls.__settings__
 
