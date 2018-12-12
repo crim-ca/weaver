@@ -16,7 +16,14 @@ from twitcher.wps_restapi.swagger_definitions import (
 )
 from pyramid_celery import celery_app as app
 from pyramid.settings import asbool
-from pyramid.httpexceptions import HTTPOk, HTTPUnauthorized, HTTPNotFound, HTTPForbidden, HTTPInternalServerError
+from pyramid.httpexceptions import (
+    HTTPOk,
+    HTTPUnauthorized,
+    HTTPNotFound,
+    HTTPForbidden,
+    HTTPInternalServerError,
+    HTTPBadGateway
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -80,6 +87,21 @@ class WpsProcess(object):
             )
         return {'Authorization': 'Bearer {}'.format(access_token) if access_token else None}
 
+    def make_request(self, method, url, retry, status_code_mock=None, **kwargs):
+        response = requests.request(method,
+                                    url=url,
+                                    headers=self.headers,
+                                    cookies=self.cookies,
+                                    verify=self.verify,
+                                    **kwargs)
+        # TODO: Remove patch for Geomatys unreliable server
+        if response.status_code == HTTPBadGateway.code and retry:
+            sleep(10)
+            response = self.make_request(method, url, False, **kwargs)
+        if response.status_code == HTTPBadGateway.code and status_code_mock:
+            response.status_code = status_code_mock
+        return response
+
     def is_deployed(self):
         return self.describe_process() is not None
 
@@ -94,10 +116,10 @@ class WpsProcess(object):
             None if forbidden access.
         """
         LOGGER.debug("Get process WPS visibility request for {0}".format(self.process_id))
-        response = requests.get(self.url + process_visibility_uri.format(process_id=self.process_id),
-                                headers=self.headers,
-                                cookies=self.cookies,
-                                verify=self.verify)
+        response = self.make_request(method='GET',
+                                     url=self.url + process_visibility_uri.format(process_id=self.process_id),
+                                     retry=False,
+                                     status_code_mock=HTTPUnauthorized.code)
         if response.status_code in (HTTPUnauthorized.code, HTTPForbidden.code):
             return None
         elif response.status_code == HTTPNotFound.code:
@@ -118,20 +140,20 @@ class WpsProcess(object):
         user_headers.update(self.get_user_auth_header())
 
         LOGGER.debug("Update process WPS visibility request for {0} at {1}".format(self.process_id, path))
-        response = requests.put(path,
-                                json={'value': visibility},
-                                headers=user_headers,
-                                cookies=self.cookies,
-                                verify=self.verify)
+        response = self.make_request(method='PUT',
+                                     url=path,
+                                     json={'value': visibility},
+                                     retry=False,
+                                     status_code_mock=HTTPOk.code)
         response.raise_for_status()
 
     def describe_process(self):
         path = self.url + process_uri.format(process_id=self.process_id)
         LOGGER.debug("Describe process WPS request for {0} at {1}".format(self.process_id, path))
-        response = requests.get(path,
-                                headers=self.headers,
-                                cookies=self.cookies,
-                                verify=self.verify)
+        response = self.make_request(method='GET',
+                                     url=path,
+                                     retry=False,
+                                     status_code_mock=HTTPOk.code)
 
         if response.status_code == HTTPOk.code:
             # TODO Remove patch for Geomatys ADES (Missing process return a 200 InvalidParameterValue error !)
@@ -153,11 +175,11 @@ class WpsProcess(object):
         user_headers.update(self.get_user_auth_header())
 
         LOGGER.debug("Deploy process WPS request for {0} at {1}".format(self.process_id, path))
-        response = requests.post(path,
-                                 json=self.deploy_body,
-                                 headers=user_headers,
-                                 cookies=self.cookies,
-                                 verify=self.verify)
+        response = self.make_request(method='POST',
+                                     url=path,
+                                     json=self.deploy_body,
+                                     retry=True,
+                                     status_code_mock=HTTPOk.code)
         response.raise_for_status()
 
     def execute(self, workflow_inputs, out_dir, expected_outputs):
@@ -196,14 +218,13 @@ class WpsProcess(object):
                             inputs=execute_body_inputs,
                             outputs=execute_body_outputs)
         request_url = self.url + process_jobs_uri.format(process_id=self.process_id)
-        response = requests.post(request_url,
-                                 json=execute_body,
-                                 headers=self.headers,
-                                 cookies=self.cookies,
-                                 verify=self.verify)
-        response.raise_for_status()
+        response = self.make_request(method='POST',
+                                     url=request_url,
+                                     json=execute_body,
+                                     retry=True)
         if response.status_code != 201:
             raise Exception('Was expecting a 201 status code from the execute request : {0}'.format(request_url))
+
         job_status_uri = response.headers['Location']
         job_status = self.get_job_status(job_status_uri)
         job_status_value = status.map_status(job_status['status'])
@@ -261,11 +282,10 @@ class WpsProcess(object):
                            REMOTE_JOB_PROGRESS_COMPLETED, status.STATUS_SUCCEEDED)
 
     def get_job_status(self, job_status_uri, retry=True):
-        response = requests.get(job_status_uri,
-                                headers=self.headers,
-                                cookies=self.cookies,
-                                verify=self.verify)
-
+        response = self.make_request(method='GET',
+                                     url=job_status_uri,
+                                     retry=True,
+                                     status_code_mock=HTTPNotFound.code)
         # Retry on 404 since job may not be fully ready
         if retry and response.status_code == HTTPNotFound.code:
             sleep(5)
@@ -284,10 +304,10 @@ class WpsProcess(object):
         return job_status
 
     def get_job_results(self, job_id):
-        response = requests.get(self.url + process_results_uri.format(process_id=self.process_id, job_id=job_id),
-                                headers=self.headers,
-                                cookies=self.cookies,
-                                verify=self.verify)
+        result_url = self.url + process_results_uri.format(process_id=self.process_id, job_id=job_id)
+        response = self.make_request(method='GET',
+                                     url=result_url,
+                                     retry=True)
         response.raise_for_status()
         return response.json().get('outputs', {})
 
