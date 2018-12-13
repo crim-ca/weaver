@@ -6,50 +6,69 @@ for testing purposes.
 """
 
 import six
-from twitcher.store.base import AccessTokenStore
-from twitcher.exceptions import AccessTokenNotFound
+from twitcher.store.base import (
+    AccessTokenStore,
+    ServiceStore,
+    ProcessStore,
+    JobStore,
+    QuoteStore,
+    BillStore,
+)
+from twitcher.exceptions import (
+    AccessTokenNotFound,
+    ServiceRegistrationError,
+    ServiceNotFound,
+    ProcessNotAccessible,
+    ProcessNotFound,
+    JobNotFound,
+)
+from twitcher.datatype import Service, Process, Job
+from twitcher import namesgenerator
+from twitcher.utils import baseurl
+from twitcher.visibility import visibility_values
 
 
-class MemoryTokenStore(AccessTokenStore):
+class MemoryStore(object):
+    def __init__(self, *args, **kwargs):
+        self.store = {}
+
+
+class MemoryTokenStore(AccessTokenStore, MemoryStore):
     """
     Stores tokens in memory.
     Useful for testing purposes or APIs with a very limited set of clients.
 
     Use mongodb as storage to be able to scale.
     """
-    def __init__(self):
-        self.access_tokens = {}
+    def __init__(self, *args, **kwargs):
+        AccessTokenStore.__init__(self)
+        MemoryStore.__init__(self, *args, **kwargs)
 
     def save_token(self, access_token):
-        self.access_tokens[access_token.token] = access_token
+        self.store[access_token.token] = access_token
         return True
 
     def delete_token(self, token):
-        if token in self.access_tokens:
-            del self.access_tokens[token]
+        if token in self.store:
+            del self.store[token]
 
     def fetch_by_token(self, token):
-        if token not in self.access_tokens:
+        if token not in self.store:
             raise AccessTokenNotFound
 
-        return self.access_tokens[token]
+        return self.store[token]
 
     def clear_tokens(self):
-        self.access_tokens = {}
+        self.store = {}
 
 
-from twitcher.store.base import ServiceStore
-from twitcher.datatype import Service
-from twitcher.exceptions import ServiceRegistrationError, ServiceNotFound
-from twitcher import namesgenerator
-from twitcher.utils import baseurl
-
-
-class MemoryServiceStore(ServiceStore):
+class MemoryServiceStore(ServiceStore, MemoryStore):
     """
     Stores OWS services in memory. Useful for testing purposes.
     """
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        ServiceStore.__init__(self)
+        MemoryStore.__init__(self, *args, **kwargs)
         self.url_index = {}
         self.name_index = {}
         self.sane_name_config = {'assert_invalid': False, 'replace_invalid': True}
@@ -142,22 +161,18 @@ class MemoryServiceStore(ServiceStore):
         return True
 
 
-from twitcher.store.base import ProcessStore
-from twitcher.exceptions import ProcessNotAccessible, ProcessNotFound
-from twitcher.visibility import visibility_values
-from twitcher.datatype import Process
-
-
-class MemoryProcessStore(ProcessStore):
+class MemoryProcessStore(ProcessStore, MemoryStore):
     """
     Stores WPS processes in memory. Useful for testing purposes.
     """
 
-    def __init__(self, init_processes=None):
-        self.name_index = {}
+    def __init__(self, *args, **kwargs):
+        ProcessStore.__init__(self)
+        MemoryStore.__init__(self, *args, **kwargs)
+        default_processes = kwargs.get('default_processes')
         self.sane_name_config = {'assert_invalid': False, 'replace_invalid': True}
-        if isinstance(init_processes, list):
-            for process in init_processes:
+        if isinstance(default_processes, list):
+            for process in default_processes:
                 self.save_process(process)
 
     def save_process(self, process, overwrite=True, request=None):
@@ -169,10 +184,10 @@ class MemoryProcessStore(ProcessStore):
         :param request:
         """
         sane_name = namesgenerator.get_sane_name(process.identifier, **self.sane_name_config)
-        if not self.name_index.get(sane_name) or overwrite:
+        if not self.store.get(sane_name) or overwrite:
             if not process.title:
                 process['title'] = sane_name
-            self.name_index[sane_name] = Process(process)
+            self.store[sane_name] = Process(process)
         return self.fetch_by_id(sane_name)
 
     def delete_process(self, process_id, visibility=None, request=None):
@@ -181,7 +196,7 @@ class MemoryProcessStore(ProcessStore):
         """
         sane_name = namesgenerator.get_sane_name(process_id, **self.sane_name_config)
         if self.fetch_by_id(sane_name, visibility=visibility, request=request):
-            del self.name_index[sane_name]
+            del self.store[sane_name]
 
     def list_processes(self, visibility=None, request=None):
         """
@@ -198,7 +213,7 @@ class MemoryProcessStore(ProcessStore):
             if v not in visibility_values:
                 raise ValueError("Invalid visibility value `{0!s}` is not one of {1!s}"
                                  .format(v, list(visibility_values)))
-        return [process.identifier for process in self.name_index if process.visibility in visibility]
+        return [process.identifier for process in self.store if process.visibility in visibility]
 
     def fetch_by_id(self, process_id, visibility=None, request=None):
         """
@@ -207,7 +222,7 @@ class MemoryProcessStore(ProcessStore):
         :return: An instance of :class:`twitcher.datatype.Process`.
         """
         sane_name = namesgenerator.get_sane_name(process_id, **self.sane_name_config)
-        process = self.name_index.get(sane_name)
+        process = self.store.get(sane_name)
         if not process:
             raise ProcessNotFound("Process `{}` could not be found.".format(sane_name))
         process = Process(process)
@@ -241,23 +256,18 @@ class MemoryProcessStore(ProcessStore):
         """
         Clears all processes from the store.
         """
-        self.name_index = {}
+        self.store = {}
         return True
 
 
-from twitcher.datatype import Job
-from twitcher.store.base import JobStore
-from twitcher.exceptions import JobNotFound
-
-
-class MemoryJobStore(JobStore):
+class MemoryJobStore(JobStore, MemoryStore):
     """
     Stores job tracking in memory. Useful for testing purposes.
     """
-    store = None
 
-    def __init__(self):
-        self.store = {}
+    def __init__(self, *args, **kwargs):
+        JobStore.__init__(self)
+        MemoryStore.__init__(self, *args, **kwargs)
 
     def save_job(self, task_id, process, service=None, inputs=None,
                  is_workflow=False, user_id=None, execute_async=True, custom_tags=None):
@@ -318,10 +328,14 @@ class MemoryJobStore(JobStore):
         self.__init__()
 
 
-class MemoryQuoteStore(object):
+class MemoryQuoteStore(QuoteStore, MemoryStore):
     """
     Storage for quotes in memory.
     """
+
+    def __init__(self, *args, **kwargs):
+        QuoteStore.__init__(self)
+        MemoryStore.__init__(self, *args, **kwargs)
 
     def save_quote(self, quote):
         """
@@ -348,10 +362,14 @@ class MemoryQuoteStore(object):
         raise NotImplementedError
 
 
-class MemoryBillStore(object):
+class MemoryBillStore(BillStore, MemoryStore):
     """
     Storage for bills in memory.
     """
+
+    def __init__(self, *args, **kwargs):
+        BillStore.__init__(self)
+        MemoryStore.__init__(self, *args, **kwargs)
 
     def save_bill(self, bill):
         """

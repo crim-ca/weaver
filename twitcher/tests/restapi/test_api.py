@@ -1,5 +1,3 @@
-# noinspection PyPackageRequirements
-import pytest
 import unittest
 import colander
 from twitcher.wps_restapi.swagger_definitions import (
@@ -9,15 +7,18 @@ from twitcher.wps_restapi.swagger_definitions import (
     VersionsSchema,
 )
 from twitcher.tests.utils import get_test_twitcher_app
+from twitcher.database.memory import MemoryDatabase
+from twitcher.adapter import TWITCHER_ADAPTER_DEFAULT
 
 
 class GenericApiRoutesTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        settings = {'twitcher.adapter': TWITCHER_ADAPTER_DEFAULT, 'twitcher.db_factory': MemoryDatabase.type}
+        cls.testapp = get_test_twitcher_app(settings_override=settings)
         cls.json_app = 'application/json'
         cls.json_headers = {'Accept': cls.json_app, 'Content-Type': cls.json_app}
-        cls.testapp = get_test_twitcher_app({'twitcher.adapter': 'default'})
 
     def test_frontpage_format(self):
         resp = self.testapp.get(api_frontpage_uri, expect_errors=True, headers=self.json_headers)

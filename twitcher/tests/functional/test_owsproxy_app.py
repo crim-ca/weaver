@@ -1,9 +1,10 @@
+# noinspection PyPackageRequirements
 import pytest
-import unittest
+# noinspection PyPackageRequirements
 import webtest
+import unittest
 from pyramid import testing
-from .common import setup_with_mongodb
-
+from twitcher.tests.utils import setup_config_with_mongodb
 from twitcher.adapter import servicestore_factory
 
 
@@ -11,7 +12,7 @@ from twitcher.adapter import servicestore_factory
 class OWSProxyAppTest(unittest.TestCase):
 
     def setUp(self):
-        config = setup_with_mongodb()
+        config = setup_config_with_mongodb()
         self.ows_path = '/ows'
         self.proxy_path = '/proxy'
         self.service_name = 'twitcher'

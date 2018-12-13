@@ -1,11 +1,11 @@
 from pyramid.view import view_defaults
-from pyramid_rpc.xmlrpc import xmlrpc_method
 from pyramid.settings import asbool
 
 from twitcher.api import ITokenManager, TokenManager
 from twitcher.api import IRegistry, Registry
 from twitcher.tokengenerator import tokengenerator_factory
-from twitcher.store import tokenstore_factory
+from twitcher.database.base import get_database_factory
+from twitcher.store.base import AccessTokenStore
 from twitcher.adapter import servicestore_factory
 
 import logging
@@ -18,7 +18,7 @@ class RPCInterface(ITokenManager, IRegistry):
         self.request = request
         self.tokenmgr = TokenManager(
             tokengenerator_factory(request.registry),
-            tokenstore_factory(request.registry))
+            get_database_factory(request.registry).get_store(AccessTokenStore.type))
         self.srvreg = Registry(servicestore_factory(request.registry))
 
     def generate_token(self, valid_in_hours=1, environ=None):
@@ -101,7 +101,7 @@ def includeme(config):
         # pyramid xml-rpc
         # http://docs.pylonsproject.org/projects/pyramid-rpc/en/latest/xmlrpc.html
         config.include('pyramid_rpc.xmlrpc')
-        config.include('twitcher.db')
+        config.include('twitcher.database')
         config.add_xmlrpc_endpoint('api', '/RPC2')
 
         # register xmlrpc methods

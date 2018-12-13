@@ -5,7 +5,7 @@ import webtest
 import unittest
 import pyramid.testing
 import six
-from twitcher.tests.functional.common import setup_with_mongodb, setup_mongodb_jobstore
+from twitcher.tests.utils import setup_config_with_mongodb, setup_mongodb_jobstore
 from twitcher.status import job_status_values, STATUS_SUCCEEDED, STATUS_FAILED
 from twitcher.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_RAW
 
@@ -13,7 +13,7 @@ from twitcher.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_RAW
 class WpsRestApiJobsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.config = setup_with_mongodb()
+        cls.config = setup_config_with_mongodb()
         cls.config.include('twitcher.wps')
         cls.config.include('twitcher.wps_restapi')
         cls.config.include('twitcher.tweens')

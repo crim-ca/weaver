@@ -14,8 +14,6 @@ from twitcher._compat import urlparse
 
 from twitcher.owsexceptions import OWSAccessForbidden, OWSAccessFailed, OWSException
 from twitcher.utils import replace_caps_url, get_twitcher_url
-from twitcher.adapter import servicestore_factory
-from twitcher.adapter import adapter_factory
 
 import logging
 LOGGER = logging.getLogger(__name__)
@@ -157,6 +155,7 @@ def owsproxy(request):
     TODO: use ows exceptions
     """
     try:
+        from twitcher.adapter import servicestore_factory
         service_name = request.matchdict.get('service_name')
         extra_path = request.matchdict.get('extra_path')
         store = servicestore_factory(request.registry)
@@ -192,6 +191,7 @@ def owsproxy_delegate(request):
 
 
 def includeme(config):
+    from twitcher.adapter import adapter_factory
     settings = config.registry.settings
     adapter_factory(settings).owsproxy_config(settings, config)
 
@@ -215,7 +215,7 @@ def owsproxy_defaultconfig(settings, config):
             # include twitcher config
             config.include('twitcher.config')
             # include mongodb for services
-            config.include('twitcher.db')
+            config.include('twitcher.database')
             config.add_view(owsproxy, route_name='owsproxy')
             config.add_view(owsproxy, route_name='owsproxy_secured')
             config.add_view(owsproxy, route_name='owsproxy_extra')

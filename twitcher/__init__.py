@@ -1,4 +1,4 @@
-__version__ = 'ogc-0.3.26'
+__version__ = 'ogc-0.4.0'
 
 import os
 import sys
@@ -8,11 +8,11 @@ TWITCHER_ROOT_DIR = os.path.abspath(os.path.dirname(TWITCHER_MODULE_DIR))
 sys.path.insert(0, TWITCHER_ROOT_DIR)
 sys.path.insert(0, TWITCHER_MODULE_DIR)
 
-from twitcher import adapter
-from twitcher.config import get_twitcher_configuration
-from pyramid.exceptions import ConfigurationError
-from pyramid.view import exception_view_config, notfound_view_config, forbidden_view_config
-import logging
+
+from twitcher import adapter                                # noqa E402
+from twitcher.config import get_twitcher_configuration      # noqa E402
+from pyramid.exceptions import ConfigurationError           # noqa E402
+import logging                                              # noqa E402
 logger = logging.getLogger('TWITCHER')
 
 
@@ -65,6 +65,7 @@ def main(global_config, **settings):
 
     # include twitcher components
     local_config.include('twitcher.config')
+    local_config.include('twitcher.database')
     local_config.include('twitcher.rpcinterface')
     local_config.include('twitcher.owsproxy')
     local_config.include('twitcher.wps')
@@ -74,8 +75,6 @@ def main(global_config, **settings):
     # tweens/middleware
     # TODO: maybe add tween for exception handling or use unknown_failure view
     local_config.include('twitcher.tweens')
-
-    ##config.add_exception_view(exception_view)
 
     local_config.scan()
 

@@ -12,6 +12,7 @@ import pytest
 import mock
 from pyramid import testing
 from pyramid.testing import DummyRequest
+# noinspection PyPackageRequirements
 from pywps.inout.inputs import LiteralInput
 
 import twitcher
@@ -20,7 +21,7 @@ from twitcher.datatype import Process
 from twitcher.processes import opensearch
 # noinspection PyProtectedMember
 from twitcher.processes.opensearch import _make_specific_identifier
-from twitcher.store import DB_MEMORY, MemoryProcessStore
+from twitcher.database.memory import MemoryProcessStore
 from twitcher.utils import get_any_id
 from twitcher.wps_restapi.processes import processes
 
@@ -62,7 +63,6 @@ def make_request(**kw):
         request.registry.settings = {}
     request.registry.settings["twitcher.url"] = "localhost"
     request.registry.settings["twitcher.wps_path"] = "/ows/wps"
-    request.registry.settings["twitcher.db_factory"] = DB_MEMORY
     return request
 
 
@@ -197,6 +197,7 @@ def test_deploy_opensearch():
         assert_json_equals(process.payload, initial_payload)
 
 
+# noinspection PyPep8Naming
 def test_handle_EOI_unique_aoi_unique_toi():
     inputs = load_json_test_file("eoimage_inputs_example.json")
     expected = load_json_test_file("eoimage_unique_aoi_unique_toi.json")
@@ -206,6 +207,7 @@ def test_handle_EOI_unique_aoi_unique_toi():
     assert_json_equals(output, expected)
 
 
+# noinspection PyPep8Naming
 def test_handle_EOI_unique_aoi_non_unique_toi():
     inputs = load_json_test_file("eoimage_inputs_example.json")
     expected = load_json_test_file("eoimage_unique_aoi_non_unique_toi.json")
@@ -215,6 +217,7 @@ def test_handle_EOI_unique_aoi_non_unique_toi():
     assert_json_equals(output, expected)
 
 
+# noinspection PyPep8Naming
 def test_handle_EOI_non_unique_aoi_unique_toi():
     inputs = load_json_test_file("eoimage_inputs_example.json")
     expected = load_json_test_file("eoimage_non_unique_aoi_unique_toi.json")

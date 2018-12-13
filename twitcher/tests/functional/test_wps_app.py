@@ -7,24 +7,20 @@ Based on tests from:
 * http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/testing.html
 """
 # noinspection PyPackageRequirements
-import mock
-# noinspection PyPackageRequirements
 import pytest
-# noinspection PyPackageRequirements
-import webtest
 import unittest
 import pyramid.testing
-import pyramid_celery
 from xml.etree import ElementTree
 from twitcher.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
 from twitcher.processes.wps_default import Hello
 from twitcher.processes.wps_testing import WpsTestProcess
-from twitcher.tests.functional.common import (
-    setup_with_mongodb,
+from twitcher.tests.utils import (
+    setup_config_with_mongodb,
+    setup_config_with_pywps,
     setup_mongodb_processstore,
     setup_mongodb_tokenstore,
-    setup_with_pywps,
-    setup_celery,
+    setup_config_with_celery,
+    get_test_twitcher_app,
 )
 
 
@@ -32,21 +28,17 @@ from twitcher.tests.functional.common import (
 class WpsAppTest(unittest.TestCase):
     def setUp(self):
         self.wps_path = '/ows/wps'
-        config = setup_with_mongodb()
-        config.registry.settings['twitcher.url'] = ''
-        config.registry.settings['twitcher.wps'] = True
-        config.registry.settings['twitcher.wps_path'] = self.wps_path
-        config = setup_with_pywps(config)
-        config.include('twitcher.wps')
-        config.include('twitcher.tweens')
-
-        # override celery loader to specify configuration directly instead of ini file
-        pyramid_celery.loaders.INILoader.read_configuration = mock.MagicMock(return_value=setup_celery(config))
-        config.include('pyramid_celery')
-        config.configure_celery('')     # value doesn't matter because overloaded
+        settings = {
+            'twitcher.url': '',
+            'twitcher.wps': True,
+            'twitcher.wps_path': self.wps_path
+        }
+        config = setup_config_with_mongodb()
+        config = setup_config_with_pywps(config)
+        config = setup_config_with_celery(config)
         self.process_store = setup_mongodb_processstore(config)
         self.token = setup_mongodb_tokenstore(config)
-        self.app = webtest.TestApp(config.make_wsgi_app())
+        self.app = get_test_twitcher_app(config=config, settings_override=settings)
 
         self.process_public = WpsTestProcess(identifier='process_public')
         self.process_private = WpsTestProcess(identifier='process_private')

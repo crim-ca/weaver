@@ -5,6 +5,7 @@ pyramid_mako
 zope.sqlalchemy==1.0
 sqlalchemy
 transaction
+alembic
 webob
 requests
 requests_oauthlib

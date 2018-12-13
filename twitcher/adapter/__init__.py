@@ -56,14 +56,19 @@ def get_adapter_store_factory(adapter, store_name, registry):
         raise
 
 
-def processstore_factory(registry):
-    adapter = adapter_factory(registry.settings)
-    return get_adapter_store_factory(adapter, 'processstore_factory', registry)
-
-
 def servicestore_factory(registry):
     adapter = adapter_factory(registry.settings)
     return get_adapter_store_factory(adapter, 'servicestore_factory', registry)
+
+
+def tokenstore_factory(registry):
+    adapter = adapter_factory(registry.settings)
+    return get_adapter_store_factory(adapter, 'tokenstore_factory', registry)
+
+
+def processstore_factory(registry):
+    adapter = adapter_factory(registry.settings)
+    return get_adapter_store_factory(adapter, 'processstore_factory', registry)
 
 
 def jobstore_factory(registry):

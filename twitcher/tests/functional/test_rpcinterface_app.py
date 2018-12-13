@@ -1,28 +1,30 @@
 """
-Testing the Twithcer XML-RPC interface.
+Testing the Twitcher XML-RPC interface.
 """
+# noinspection PyPackageRequirements
 import pytest
 import unittest
-import webtest
 import pyramid.testing
 
 from twitcher._compat import PY2
 from twitcher._compat import xmlrpclib
 
-from twitcher.tests.functional.common import setup_with_mongodb
-from twitcher.tests. functional.common import setup_mongodb_tokenstore
-from twitcher.tests.functional.common import setup_mongodb_servicestore
+from twitcher.tests.utils import (
+    setup_config_with_mongodb,
+    setup_mongodb_tokenstore,
+    setup_mongodb_servicestore,
+    get_test_twitcher_app,
+)
 
 
 @pytest.mark.functional
 class XMLRPCInterfaceAppTest(unittest.TestCase):
 
     def setUp(self):
-        config = setup_with_mongodb()
+        config = setup_config_with_mongodb()
         self.token = setup_mongodb_tokenstore(config)
-        setup_mongodb_servicestore(config)
-        config.include('twitcher.rpcinterface')
-        self.app = webtest.TestApp(config.make_wsgi_app())
+        self.service_store = setup_mongodb_servicestore(config)
+        self.app = get_test_twitcher_app(config=config, settings_override={'twitcher.rpcinterface': True})
 
     def tearDown(self):
         pyramid.testing.tearDown()
@@ -32,11 +34,9 @@ class XMLRPCInterfaceAppTest(unittest.TestCase):
             xml = xmlrpclib.dumps(params, methodname=method)
         else:
             xml = xmlrpclib.dumps(params, methodname=method).encode('utf-8')
-        print xml
         resp = self.app.post('/RPC2', content_type='text/xml', params=xml)
         assert resp.status_int == 200
         assert resp.content_type == 'text/xml'
-        print resp.body
         return xmlrpclib.loads(resp.body)[0][0]
 
     @pytest.mark.online

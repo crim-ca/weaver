@@ -1,4 +1,20 @@
+"""
+Factories to create storage backends.
+"""
+
+# Factories
+from twitcher.database.base import get_database_factory
+# Interfaces
 from twitcher.adapter.base import AdapterInterface
+from twitcher.store.base import (
+    AccessTokenStore,
+    ServiceStore,
+    ProcessStore,
+    JobStore,
+    QuoteStore,
+    BillStore,
+)
+from twitcher.owssecurity import OWSSecurity
 
 
 class DefaultAdapter(AdapterInterface):
@@ -7,30 +23,41 @@ class DefaultAdapter(AdapterInterface):
         from twitcher import __version__
         return {"name": "default", "version": str(__version__)}
 
+    def tokenstore_factory(self, registry):
+        __doc__ = super(DefaultAdapter, self).__doc__
+        db = get_database_factory(registry)
+        return db.get_store(AccessTokenStore.type)
+
     def servicestore_factory(self, registry):
         __doc__ = super(DefaultAdapter, self).__doc__
-        from twitcher.store import servicestore_defaultfactory
-        return servicestore_defaultfactory(registry)
+        db = get_database_factory(registry)
+        return db.get_store(ServiceStore.type)
+
+    def processstore_factory(self, registry):
+        __doc__ = super(DefaultAdapter, self).__doc__
+        db = get_database_factory(registry)
+        return db.get_store(ProcessStore.type)
 
     def jobstore_factory(self, registry):
         __doc__ = super(DefaultAdapter, self).__doc__
-        from twitcher.store import jobstore_defaultfactory
-        return jobstore_defaultfactory(registry)
+        db = get_database_factory(registry)
+        return db.get_store(JobStore.type)
 
     def quotestore_factory(self, registry):
         __doc__ = super(DefaultAdapter, self).__doc__
-        from twitcher.store import quotestore_defaultfactory
-        return quotestore_defaultfactory(registry)
+        db = get_database_factory(registry)
+        return db.get_store(QuoteStore.type)
 
     def billstore_factory(self, registry):
         __doc__ = super(DefaultAdapter, self).__doc__
-        from twitcher.store import billstore_defaultfactory
-        return billstore_defaultfactory(registry)
+        db = get_database_factory(registry)
+        return db.get_store(BillStore.type)
 
     def owssecurity_factory(self, registry):
         __doc__ = super(DefaultAdapter, self).__doc__
-        from twitcher.owssecurity import owssecurity_defaultfactory
-        return owssecurity_defaultfactory(registry)
+        token_store = self.tokenstore_factory(registry)
+        service_store = self.servicestore_factory(registry)
+        return OWSSecurity(token_store, service_store)
 
     def configurator_factory(self, settings):
         __doc__ = super(DefaultAdapter, self).__doc__
@@ -41,7 +68,3 @@ class DefaultAdapter(AdapterInterface):
         __doc__ = super(DefaultAdapter, self).__doc__
         from twitcher.owsproxy import owsproxy_defaultconfig
         owsproxy_defaultconfig(settings, config)
-
-    def processstore_factory(self, registry):
-        from twitcher.store import processstore_defaultfactory
-        return processstore_defaultfactory(registry)
