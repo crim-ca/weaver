@@ -269,8 +269,6 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
     def fetch_by_id(self, process_id, visibility=None, request=None):
         """
         Get process for given ``name`` from storage, optionally filtered by visibility.
-
-        :return: An instance of :class:`twitcher.datatype.Process`.
         """
         sane_name = namesgenerator.get_sane_name(process_id, **self.sane_name_config)
         process = self.collection.find_one({'identifier': sane_name})

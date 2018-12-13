@@ -6,6 +6,7 @@ import unittest
 from pyramid import testing
 from twitcher.tests.utils import setup_config_with_mongodb
 from twitcher.adapter import servicestore_factory
+from twitcher.datatype import Service
 
 
 @pytest.mark.functional
@@ -29,7 +30,7 @@ class OWSProxyAppTest(unittest.TestCase):
         self.registry.clear_services()
         # TODO: testing against self ... not so good
         url = "https://localhost:5000/ows/wps"
-        self.registry.register_service(url=url, name=self.service_name)
+        self.registry.save_service(Service(url=url, name=self.service_name))
 
     def make_url(self, params):
         return '{}{}{}?{}'.format(self.ows_path, self.proxy_path, self.service_name, params)

@@ -22,6 +22,7 @@ from twitcher.store.mongodb import MongodbServiceStore, MongodbProcessStore, Mon
 from twitcher.config import TWITCHER_CONFIGURATION_DEFAULT
 from twitcher.wps import get_wps_url, get_wps_output_url, get_wps_output_path
 import pyramid_celery
+import warnings
 # noinspection PyPackageRequirements
 import mock
 import os
@@ -60,14 +61,28 @@ def setup_config_from_ini(config_ini_file_path=None):
 
 def setup_config_with_mongodb(config=None):
     # type: (Optional[Configurator]) -> Configurator
-    settings = {'mongodb.host': '127.0.0.1', 'mongodb.port': '27027', 'mongodb.db_name': 'twitcher_test'}
+    settings = {'mongodb.host': '127.0.0.1',
+                'mongodb.port': '27027',
+                'mongodb.db_name': 'twitcher_test',
+                'twitcher.db_factory': MongoDatabase.type}
     settings = settings or {}
     config = config or testing.setUp(settings=settings)
+
+    factory_setting = 'twitcher.db_factory'
+    factory_value = config.registry.settings.get(factory_setting)
+    if factory_value != MongoDatabase.type:
+        warnings.warn("Overriding value `{}` expected to be `{}`, was `{}`."
+                      .format(factory_setting, MongoDatabase.type, factory_value))
+
     return config
 
 
 def setup_mongodb_tokenstore(config):
     # type: (Configurator) -> AccessToken
+    """
+    Setup store using mongodb and get a token from it.
+    Database Will be enforced if not configured properly.
+    """
     store = tokenstore_factory(config.registry)
     generator = tokengenerator_factory(config.registry)
     store.clear_tokens()
@@ -78,24 +93,33 @@ def setup_mongodb_tokenstore(config):
 
 def setup_mongodb_servicestore(config):
     # type: (Configurator) -> MongodbServiceStore
+    """Setup store using mongodb, will be enforced if not configured properly."""
+    config = setup_config_with_mongodb(config)
     store = servicestore_factory(config.registry)
     store.clear_services()
+    # noinspection PyTypeChecker
     return store
 
 
 def setup_mongodb_processstore(config):
     # type: (Configurator) -> MongodbProcessStore
+    """Setup store using mongodb, will be enforced if not configured properly."""
+    config = setup_config_with_mongodb(config)
     store = processstore_factory(config.registry)
     store.clear_processes()
     # store must be recreated after clear because processes are added automatically on __init__
     store = processstore_factory(config.registry)
+    # noinspection PyTypeChecker
     return store
 
 
 def setup_mongodb_jobstore(config):
     # type: (Configurator) -> MongodbJobStore
+    """Setup store using mongodb, will be enforced if not configured properly."""
+    config = setup_config_with_mongodb(config)
     store = jobstore_factory(config.registry)
     store.clear_jobs()
+    # noinspection PyTypeChecker
     return store
 
 

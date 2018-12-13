@@ -7,7 +7,10 @@ from pyramid.settings import asbool
 from pyramid.registry import Registry
 from pyramid_celery import celery_app as app
 from pyramid.threadlocal import get_current_request
+# noinspection PyPackageRequirements
 from pywps import configuration as pywps_config
+# noinspection PyPackageRequirements
+from pywps.app.Service import Service
 from six.moves.configparser import SafeConfigParser
 from typing import AnyStr, Dict, Union, Optional
 from twitcher.owsexceptions import OWSNoApplicableCode
@@ -122,11 +125,6 @@ def load_pywps_cfg(registry, config=None):
         registry.settings['twitcher.wps_output_url'] = output_url
 
 
-def _processes(request):
-    from twitcher.store import processstore_defaultfactory
-    return processstore_defaultfactory(request.registry)
-
-
 # @app.task(bind=True)
 @wsgiapp2
 def pywps_view(environ, start_response):
@@ -134,7 +132,6 @@ def pywps_view(environ, start_response):
     * TODO: add xml response renderer
     * TODO: fix exceptions ... use OWSException (raise ...)
     """
-    from pywps.app.Service import Service
     LOGGER.debug('pywps env: %s', environ.keys())
 
     try:
@@ -173,4 +170,3 @@ def includeme(config):
         config.add_view(pywps_view, route_name='wps')
         config.add_view(pywps_view, route_name='wps_secured')
         config.add_request_method(lambda req: get_wps_cfg_path(req.registry.settings), 'wps_cfg', reify=True)
-        config.add_request_method(_processes, 'processes', reify=True)

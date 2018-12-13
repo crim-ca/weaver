@@ -15,6 +15,7 @@ from twitcher.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
 from twitcher.processes.wps_default import Hello
 from twitcher.processes.wps_testing import WpsTestProcess
 from twitcher.tests.utils import (
+    setup_config_from_settings,
     setup_config_with_mongodb,
     setup_config_with_pywps,
     setup_mongodb_processstore,
@@ -33,13 +34,15 @@ class WpsAppTest(unittest.TestCase):
             'twitcher.wps': True,
             'twitcher.wps_path': self.wps_path
         }
-        config = setup_config_with_mongodb()
+        config = setup_config_from_settings(settings)
+        config = setup_config_with_mongodb(config)
         config = setup_config_with_pywps(config)
         config = setup_config_with_celery(config)
         self.process_store = setup_mongodb_processstore(config)
         self.token = setup_mongodb_tokenstore(config)
         self.app = get_test_twitcher_app(config=config, settings_override=settings)
 
+        # add processes by database Process type
         self.process_public = WpsTestProcess(identifier='process_public')
         self.process_private = WpsTestProcess(identifier='process_private')
         self.process_store.save_process(self.process_public)
@@ -47,7 +50,8 @@ class WpsAppTest(unittest.TestCase):
         self.process_store.set_visibility(self.process_public.identifier, VISIBILITY_PUBLIC)
         self.process_store.set_visibility(self.process_private.identifier, VISIBILITY_PRIVATE)
 
-        # default process Hello needs visibility
+        # add processes by pywps Process type
+        self.process_store.save_process(Hello())
         self.process_store.set_visibility(Hello.identifier, VISIBILITY_PUBLIC)
 
     def tearDown(self):
