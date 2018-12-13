@@ -46,6 +46,8 @@ def get_test_twitcher_app(twitcher_settings_override=None):
     config.registry.settings['twitcher.url'] = 'https://localhost'
     config.registry.settings.update(twitcher_settings_override)
     # create the test application
+    config.include('cornice')
+    config.include('cornice_swagger')
     config.include('twitcher.wps')
     config.include('twitcher.wps_restapi')
     config.include('twitcher.tweens')
