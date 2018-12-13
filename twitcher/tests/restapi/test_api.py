@@ -17,7 +17,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
     def setUpClass(cls):
         cls.json_app = 'application/json'
         cls.json_headers = {'Accept': cls.json_app, 'Content-Type': cls.json_app}
-        cls.testapp = get_test_twitcher_app()
+        cls.testapp = get_test_twitcher_app({'twitcher.adapter': 'default'})
 
     def test_frontpage_format(self):
         resp = self.testapp.get(api_frontpage_uri, expect_errors=True, headers=self.json_headers)
