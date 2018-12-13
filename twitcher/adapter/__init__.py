@@ -4,6 +4,8 @@ from twitcher.adapter.default import DefaultAdapter, AdapterInterface
 
 LOGGER = logging.getLogger("TWITCHER")
 
+TWITCHER_ADAPTER_DEFAULT = 'default'
+
 
 def import_adapter(name):
     components = name.split('.')
@@ -26,7 +28,7 @@ def adapter_factory(settings):
 
     :return: An instance of :class:`twitcher.adapter.AdapterInterface`.
     """
-    if str(settings.get('twitcher.adapter', 'default')).lower() != 'default':
+    if str(settings.get('twitcher.adapter', TWITCHER_ADAPTER_DEFAULT)).lower() != TWITCHER_ADAPTER_DEFAULT:
         try:
             adapter_class = import_adapter(settings.get('twitcher.adapter'))
             LOGGER.info('Using adapter: {!r}'.format(adapter_class))

@@ -6,7 +6,7 @@ from typing import Any, Optional, Text, Dict
 from pyramid import testing
 # noinspection PyPackageRequirements
 from webtest import TestApp
-from twitcher.adapter import servicestore_factory
+from twitcher.adapter import servicestore_factory, TWITCHER_ADAPTER_DEFAULT
 from twitcher.datatype import Service
 from twitcher.store import SUPPORTED_DB_FACTORIES, DB_MEMORY
 from twitcher.config import TWITCHER_CONFIGURATION_DEFAULT
@@ -37,15 +37,18 @@ def get_test_twitcher_app(twitcher_settings_override=None):
     twitcher_settings_override = twitcher_settings_override or {}
     # parse settings from ini file to pass them to the application
     config = config_setup_from_ini()
+    if 'twitcher.adapter' not in config.registry.settings:
+        config.registry.settings['twitcher.adapter'] = TWITCHER_ADAPTER_DEFAULT
+    if 'twitcher.configuration' not in config.registry.settings:
+        config.registry.settings['twitcher.configuration'] = TWITCHER_CONFIGURATION_DEFAULT
+    config.registry.settings['twitcher.db_factory'] = get_test_store_type_from_env()
+    config.registry.settings['twitcher.rpcinterface'] = False
+    config.registry.settings['twitcher.url'] = 'https://localhost'
+    config.registry.settings.update(twitcher_settings_override)
     # create the test application
     config.include('twitcher.wps')
     config.include('twitcher.wps_restapi')
     config.include('twitcher.tweens')
-    config.registry.settings['twitcher.db_factory'] = get_test_store_type_from_env()
-    config.registry.settings['twitcher.rpcinterface'] = False
-    config.registry.settings['twitcher.url'] = 'https://localhost'
-    twitcher_config = twitcher_settings_override.get('twitcher.configuration', TWITCHER_CONFIGURATION_DEFAULT)
-    config.registry.settings.update({'twitcher.configuration': twitcher_config})
     config.scan()
     return TestApp(main({}, **config.registry.settings))
 
