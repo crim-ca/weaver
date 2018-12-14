@@ -1,6 +1,6 @@
 class AdapterInterface(object):
     """
-    Common interface allowing some functionalities overriding using an adapter
+    Common interface allowing some functionality overriding using an adapter
     """
 
     def describe_adapter(self):
@@ -9,9 +9,21 @@ class AdapterInterface(object):
         """
         raise NotImplementedError
 
+    def tokenstore_factory(self, registry):
+        """
+        Returns the 'tokenstore' implementation of the adapter.
+        """
+        raise NotImplementedError
+
     def servicestore_factory(self, registry):
         """
         Returns the 'servicestore' implementation of the adapter.
+        """
+        raise NotImplementedError
+
+    def processstore_factory(self, registry):
+        """
+        Returns the 'processstore' implementation of the adapter.
         """
         raise NotImplementedError
 
@@ -49,7 +61,4 @@ class AdapterInterface(object):
         """
         Returns the 'owsproxy' implementation of the adapter.
         """
-        raise NotImplementedError
-
-    def processstore_factory(self, registry):
         raise NotImplementedError

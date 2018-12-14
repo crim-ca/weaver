@@ -1,18 +1,28 @@
 """
 Store adapters to read/write data to from/to mongodb using pymongo.
 """
-import pymongo
-
-from twitcher.store.base import AccessTokenStore
-from twitcher.datatype import AccessToken
+from twitcher.store.base import AccessTokenStore, ServiceStore, ProcessStore, JobStore, QuoteStore, BillStore
+from twitcher.datatype import AccessToken, Service, Process as ProcessDB, Job, Quote, Bill
 from twitcher.exceptions import AccessTokenNotFound
-from twitcher.utils import islambda, now
+from twitcher.utils import islambda, now, baseurl
 from twitcher.sort import *
 from twitcher.status import STATUS_ACCEPTED, map_status, job_status_categories
+from twitcher.visibility import visibility_values
+from twitcher.exceptions import (
+    ServiceRegistrationError, ServiceNotFound,
+    ProcessNotAccessible, ProcessNotFound, ProcessRegistrationError, ProcessInstanceError,
+    JobRegistrationError, JobNotFound, JobUpdateError,
+    QuoteRegistrationError, QuoteNotFound, QuoteInstanceError,
+    BillRegistrationError, BillNotFound, BillInstanceError,
+)
+from twitcher import namesgenerator
+from twitcher.processes.types import PROCESS_WPS
+# noinspection PyPackageRequirements
+from pywps import Process as ProcessWPS
 from pyramid.security import authenticated_userid
 from pymongo import ASCENDING, DESCENDING
+import pymongo
 import six
-
 import logging
 LOGGER = logging.getLogger(__name__)
 
@@ -28,6 +38,14 @@ class MongodbStore(object):
 
 
 class MongodbTokenStore(AccessTokenStore, MongodbStore):
+    """
+    Registry for access tokens. Uses mongodb to store tokens and attributes.
+    """
+
+    def __init__(self, *args, **kwargs):
+        AccessTokenStore.__init__(self)
+        MongodbStore.__init__(self, *args, **kwargs)
+
     def save_token(self, access_token):
         self.collection.insert_one(access_token)
 
@@ -44,17 +62,14 @@ class MongodbTokenStore(AccessTokenStore, MongodbStore):
         self.collection.drop()
 
 
-from twitcher.store.base import ServiceStore
-from twitcher.datatype import Service
-from twitcher.exceptions import ServiceRegistrationError, ServiceNotFound
-from twitcher import namesgenerator
-from twitcher.utils import baseurl
-
-
 class MongodbServiceStore(ServiceStore, MongodbStore):
     """
     Registry for OWS services. Uses mongodb to store service url and attributes.
     """
+
+    def __init__(self, *args, **kwargs):
+        ServiceStore.__init__(self)
+        MongodbStore.__init__(self, *args, **kwargs)
 
     def save_service(self, service, overwrite=True, request=None):
         """
@@ -129,23 +144,19 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
         return True
 
 
-from twitcher.store.base import ProcessStore
-from twitcher.datatype import Process as ProcessDB
-from twitcher.exceptions import ProcessNotAccessible, ProcessNotFound, ProcessRegistrationError, ProcessInstanceError
-from twitcher.visibility import visibility_values
-from twitcher.processes.types import PROCESS_WPS
-from pywps import Process as ProcessWPS
-
-
 class MongodbProcessStore(ProcessStore, MongodbStore):
     """
     Registry for WPS processes. Uses mongodb to store processes and attributes.
     """
 
-    def __init__(self, collection, settings, default_processes=None):
-        super(MongodbProcessStore, self).__init__(collection=collection)
-        self.default_host = settings.get('twitcher.url')
-        self.default_wps_endpoint = '{host}{wps}'.format(host=self.default_host, wps=settings.get('twitcher.wps_path'))
+    def __init__(self, *args, **kwargs):
+        ProcessStore.__init__(self)
+        MongodbStore.__init__(self, *args, **kwargs)
+        settings = kwargs.get('settings', {})
+        default_processes = kwargs.get('default_processes')
+        self.default_host = settings.get('twitcher.url', '')
+        self.default_wps_endpoint = '{host}{wps}'.format(host=self.default_host,
+                                                         wps=settings.get('twitcher.wps_path', ''))
         if default_processes:
             registered_processes = [process.identifier for process in self.list_processes()]
             for process in default_processes:
@@ -258,8 +269,6 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
     def fetch_by_id(self, process_id, visibility=None, request=None):
         """
         Get process for given ``name`` from storage, optionally filtered by visibility.
-
-        :return: An instance of :class:`twitcher.datatype.Process`.
         """
         sane_name = namesgenerator.get_sane_name(process_id, **self.sane_name_config)
         process = self.collection.find_one({'identifier': sane_name})
@@ -300,15 +309,14 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         return True
 
 
-from twitcher.store.base import JobStore
-from twitcher.datatype import Job
-from twitcher.exceptions import JobRegistrationError, JobNotFound, JobUpdateError
-
-
 class MongodbJobStore(JobStore, MongodbStore):
     """
     Registry for OWS service process jobs tracking. Uses mongodb to store job attributes.
     """
+
+    def __init__(self, *args, **kwargs):
+        JobStore.__init__(self)
+        MongodbStore.__init__(self, *args, **kwargs)
 
     def save_job(self, task_id, process, service=None, inputs=None, is_workflow=False,
                  user_id=None, execute_async=True, custom_tags=None):
@@ -435,15 +443,14 @@ class MongodbJobStore(JobStore, MongodbStore):
         return True
 
 
-from twitcher.store.base import QuoteStore
-from twitcher.datatype import Quote
-from twitcher.exceptions import QuoteRegistrationError, QuoteNotFound, QuoteInstanceError
-
-
 class MongodbQuoteStore(QuoteStore, MongodbStore):
     """
     Registry for quotes. Uses mongodb to store quote attributes.
     """
+
+    def __init__(self, *args, **kwargs):
+        QuoteStore.__init__(self)
+        MongodbStore.__init__(self, *args, **kwargs)
 
     def save_quote(self, quote):
         """
@@ -500,15 +507,14 @@ class MongodbQuoteStore(QuoteStore, MongodbStore):
         return items, count
 
 
-from twitcher.store.base import BillStore
-from twitcher.datatype import Bill
-from twitcher.exceptions import BillRegistrationError, BillNotFound, BillInstanceError
-
-
 class MongodbBillStore(BillStore, MongodbStore):
     """
     Registry for bills. Uses mongodb to store bill attributes.
     """
+
+    def __init__(self, *args, **kwargs):
+        BillStore.__init__(self)
+        MongodbStore.__init__(self, *args, **kwargs)
 
     def save_bill(self, bill):
         """

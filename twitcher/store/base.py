@@ -10,10 +10,23 @@ The implementation is based on `python-oauth2 <http://python-oauth2.readthedocs.
 from pyramid.request import Request
 from typing import Any, Optional, List, Union, AnyStr
 from twitcher.datatype import Job, Service, Process, Quote, Bill, AccessToken
+# noinspection PyPackageRequirements
 from pywps import Process as ProcessWPS
 
 
-class AccessTokenStore(object):
+class StoreInterface(object):
+    type = None
+
+    def __init__(self):
+        if not self.type:
+            raise ValueError("Store 'type' must be overridden in inheriting class.")
+
+
+class AccessTokenStore(StoreInterface):
+    """
+    Storage for access tokens.
+    """
+    type = 'tokens'
 
     def save_token(self, access_token):
         # type: (AccessToken) -> None
@@ -45,10 +58,11 @@ class AccessTokenStore(object):
         raise NotImplementedError
 
 
-class ServiceStore(object):
+class ServiceStore(StoreInterface):
     """
     Storage for OWS services.
     """
+    type = 'services'
 
     def save_service(self, service, overwrite=True, request=None):
         # type: (Service, Optional[bool], Optional[Request]) -> Service
@@ -93,10 +107,11 @@ class ServiceStore(object):
         raise NotImplementedError
 
 
-class ProcessStore(object):
+class ProcessStore(StoreInterface):
     """
     Storage for local WPS processes.
     """
+    type = 'processes'
 
     def save_process(self, process, overwrite=True, request=None):
         # type: (Union[Process, ProcessWPS], Optional[bool], Optional[Request]) -> Process
@@ -167,10 +182,11 @@ class ProcessStore(object):
         raise NotImplementedError
 
 
-class JobStore(object):
+class JobStore(StoreInterface):
     """
     Storage for job tracking.
     """
+    type = 'jobs'
 
     def save_job(self,
                  task_id,               # type: AnyStr
@@ -239,10 +255,11 @@ class JobStore(object):
         raise NotImplementedError
 
 
-class QuoteStore(object):
+class QuoteStore(StoreInterface):
     """
     Storage for quotes.
     """
+    type = 'quotes'
 
     def save_quote(self, quote):
         # type: (Quote) -> Quote
@@ -273,10 +290,11 @@ class QuoteStore(object):
         raise NotImplementedError
 
 
-class BillStore(object):
+class BillStore(StoreInterface):
     """
     Storage for bills.
     """
+    type = 'bills'
 
     def save_bill(self, bill):
         # type: (Bill) -> List[Bill]

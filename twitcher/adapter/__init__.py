@@ -1,6 +1,9 @@
-import logging
-from typing import Dict, AnyStr
 from twitcher.adapter.default import DefaultAdapter, AdapterInterface
+from twitcher.store.base import AccessTokenStore, ServiceStore, ProcessStore, JobStore, QuoteStore, BillStore
+from twitcher.owssecurity import OWSSecurityInterface
+from pyramid.registry import Registry
+from typing import Dict, AnyStr
+import logging
 
 LOGGER = logging.getLogger("TWITCHER")
 
@@ -23,10 +26,8 @@ def import_adapter(name):
 def adapter_factory(settings):
     # type: (Dict[AnyStr, AnyStr]) -> AdapterInterface
     """
-    Creates an adapter with the interface of :class:`twitcher.adapter.AdapterInterface`.
-    By default the twitcher.adapter.DefaultAdapter implementation will be used.
-
-    :return: An instance of :class:`twitcher.adapter.AdapterInterface`.
+    Creates an adapter interface according to `twitcher.adapter` setting.
+    By default the `twitcher.adapter.default.DefaultAdapter` implementation will be used.
     """
     if str(settings.get('twitcher.adapter', TWITCHER_ADAPTER_DEFAULT)).lower() != TWITCHER_ADAPTER_DEFAULT:
         try:
@@ -56,31 +57,50 @@ def get_adapter_store_factory(adapter, store_name, registry):
         raise
 
 
-def processstore_factory(registry):
+def tokenstore_factory(registry):
+    # type: (Registry) -> AccessTokenStore
+    """Shortcut method to retrieve the AccessTokenStore from the selected AdapterInterface from settings."""
     adapter = adapter_factory(registry.settings)
-    return get_adapter_store_factory(adapter, 'processstore_factory', registry)
+    return get_adapter_store_factory(adapter, 'tokenstore_factory', registry)
 
 
 def servicestore_factory(registry):
+    # type: (Registry) -> ServiceStore
+    """Shortcut method to retrieve the ServiceStore from the selected AdapterInterface from settings."""
     adapter = adapter_factory(registry.settings)
     return get_adapter_store_factory(adapter, 'servicestore_factory', registry)
 
 
+def processstore_factory(registry):
+    # type: (Registry) -> ProcessStore
+    """Shortcut method to retrieve the ProcessStore from the selected AdapterInterface from settings."""
+    adapter = adapter_factory(registry.settings)
+    return get_adapter_store_factory(adapter, 'processstore_factory', registry)
+
+
 def jobstore_factory(registry):
+    # type: (Registry) -> JobStore
+    """Shortcut method to retrieve the JobStore from the selected AdapterInterface from settings."""
     adapter = adapter_factory(registry.settings)
     return get_adapter_store_factory(adapter, 'jobstore_factory', registry)
 
 
 def quotestore_factory(registry):
+    # type: (Registry) -> QuoteStore
+    """Shortcut method to retrieve the QuoteStore from the selected AdapterInterface from settings."""
     adapter = adapter_factory(registry.settings)
     return get_adapter_store_factory(adapter, 'quotestore_factory', registry)
 
 
 def billstore_factory(registry):
+    # type: (Registry) -> BillStore
+    """Shortcut method to retrieve the BillStore from the selected AdapterInterface from settings."""
     adapter = adapter_factory(registry.settings)
     return get_adapter_store_factory(adapter, 'billstore_factory', registry)
 
 
 def owssecurity_factory(registry):
+    # type: (Registry) -> OWSSecurityInterface
+    """Shortcut method to retrieve the OWSSecurityInterface from the selected AdapterInterface from settings."""
     adapter = adapter_factory(registry.settings)
     return get_adapter_store_factory(adapter, 'owssecurity_factory', registry)

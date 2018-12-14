@@ -916,7 +916,7 @@ class LogsOutputSchema(MappingSchema):
 class FrontpageParameterSchema(MappingSchema):
     name = SchemaNode(String(), example='api')
     enabled = SchemaNode(Boolean(), example=True)
-    url = SchemaNode(String(), example='https://localhost:5000')
+    url = SchemaNode(String(), example='https://localhost:5000', missing=drop)
     doc = SchemaNode(String(), example='https://localhost:5000/api', missing=drop)
 
 

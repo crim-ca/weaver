@@ -1,7 +1,12 @@
 Changes
 *******
 
-Current
+0.4.0
+=====
+
+* Database factories using interfaces.
+
+>=0.3.8
 =======
 
 Fixes:

@@ -10,7 +10,12 @@ import six
 from copy import deepcopy
 # noinspection PyDeprecation
 from contextlib import nested
-from twitcher.tests.functional.common import setup_with_mongodb, setup_mongodb_processstore, setup_mongodb_jobstore
+from twitcher.tests.utils import (
+    setup_config_with_mongodb,
+    setup_mongodb_processstore,
+    setup_mongodb_jobstore,
+    get_test_twitcher_app,
+)
 from twitcher.processes.wps_testing import WpsTestProcess
 from twitcher.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
 from twitcher.exceptions import ProcessNotFound, JobNotFound
@@ -29,7 +34,8 @@ from twitcher.execute import (
 class WpsRestApiProcessesTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.config = setup_with_mongodb()
+        cls.config = setup_config_with_mongodb()
+        cls.app = get_test_twitcher_app(config=cls.config)
         cls.config.registry.settings['twitcher.url'] = "https://localhost"
         cls.config.include('twitcher.wps')
         cls.config.include('twitcher.wps_restapi')

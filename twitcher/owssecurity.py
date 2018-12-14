@@ -1,11 +1,10 @@
 import tempfile
 
+from twitcher.store.base import AccessTokenStore, ServiceStore
 from twitcher.exceptions import AccessTokenNotFound
 from twitcher.exceptions import ServiceNotFound
 from twitcher.owsexceptions import OWSAccessForbidden, OWSInvalidParameterValue
 from twitcher.utils import path_elements
-from twitcher.store import tokenstore_factory
-from twitcher.adapter import servicestore_factory
 from twitcher.utils import parse_service_name
 from twitcher.owsrequest import OWSRequest
 from twitcher.esgf import fetch_certificate, ESGF_CREDENTIALS
@@ -13,10 +12,6 @@ from twitcher.datatype import Service
 
 import logging
 LOGGER = logging.getLogger("TWITCHER")
-
-
-def owssecurity_defaultfactory(registry):
-    return OWSSecurity(tokenstore_factory(registry), servicestore_factory(registry))
 
 
 def verify_cert(request):
@@ -58,6 +53,7 @@ class OWSSecurityInterface(object):
 class OWSSecurity(OWSSecurityInterface):
 
     def __init__(self, tokenstore, servicestore):
+        # type: (AccessTokenStore, ServiceStore) -> None
         super(OWSSecurity, self).__init__()
         self.tokenstore = tokenstore
         self.servicestore = servicestore

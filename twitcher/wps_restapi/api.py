@@ -6,7 +6,6 @@ from twitcher import __version__ as twitcher_version
 from twitcher.config import get_twitcher_configuration
 from twitcher.utils import get_twitcher_url
 from twitcher.wps import get_wps_path
-from twitcher.adapter import adapter_factory
 from twitcher.owsproxy import owsproxy_base_path
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.colander_one_of import CustomTypeConversionDispatcher
@@ -50,6 +49,7 @@ def api_frontpage(request):
                              schema=sd.VersionsEndpoint(), response_schemas=sd.get_api_versions_responses)
 def api_versions(request):
     """Twitcher versions information."""
+    from twitcher.adapter import adapter_factory
     adapter_info = adapter_factory(request.registry.settings).describe_adapter()
     adapter_info['type'] = 'adapter'
     twitcher_info = {'name': 'Twitcher', 'version': twitcher_version, 'type': 'api'}
