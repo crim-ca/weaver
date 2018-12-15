@@ -2,7 +2,8 @@ import os
 import sys
 from setuptools import setup, find_packages
 
-version = __import__('twitcher').__version__
+# don't use 'from' to avoid import errors on not yet installed packages
+import twitcher.__meta__ as meta
 
 here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README.rst')).read()
@@ -15,8 +16,8 @@ if PY2:
     reqs += [line.strip() for line in open('requirements-py2.txt')]
 
 setup(name='pyramid_twitcher',
-      version=version,
-      description='Security Proxy for OGC Services like WPS.',
+      version=meta.__version__,
+      description=meta.__description__,
       long_description=README + '\n\n' + CHANGES,
       classifiers=[
           "Programming Language :: Python",
@@ -25,11 +26,12 @@ setup(name='pyramid_twitcher',
           "Topic :: Internet :: WWW/HTTP :: WSGI :: Application",
           "Development Status :: 4 - Beta",
       ],
-      author='Birdhouse Developers',
-      author_email='wps-dev@lists.dkrz.de',
-      url='https://github.com/bird-house/twitcher.git',
-      license='Apache License 2.0',
-      keywords='buildout pyramid twitcher birdhouse wps pywps security proxy ows ogc',
+      author=', '.join(meta.__authors__),
+      author_email=', '.join(meta.__emails__),
+      url=meta.__source_repository__,
+      download_url=meta.__docker_repository__,
+      license=meta.__license__,
+      keywords=' '.join(meta.__keywords__),
       packages=find_packages(),
       include_package_data=True,
       zip_safe=False,

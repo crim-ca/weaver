@@ -20,7 +20,7 @@ from twitcher.owssecurity import OWSSecurity
 class DefaultAdapter(AdapterInterface):
     def describe_adapter(self):
         __doc__ = super(DefaultAdapter, self).__doc__
-        from twitcher import __version__
+        from twitcher.__meta__ import __version__
         return {"name": "default", "version": str(__version__)}
 
     def tokenstore_factory(self, registry):
