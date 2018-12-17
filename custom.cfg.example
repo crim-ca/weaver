@@ -10,6 +10,7 @@ timeout = 30
 # versions = noversions
 
 [settings]
+prefix = ${environment:HOME}/birdhouse
 configuration = default
 hostname = localhost
 https-port = 5000

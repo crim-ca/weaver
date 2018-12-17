@@ -1,6 +1,6 @@
 __name__ = 'pyramid_twitcher'
 __title__ = 'Twitcher'
-__version__ = 'ogc-0.4.1'
+__version__ = 'ogc-0.4.2'
 __description__ = 'Security Proxy for OGC Services like WPS.'
 __source_repository__ = 'https://www.crim.ca/stash/projects/OGC/repos/testbed14-twitcher'
 __docker_repository__ = 'https://docker-registry.crim.ca/repositories/3425'
