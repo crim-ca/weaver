@@ -1,5 +1,3 @@
-__version__ = 'ogc-0.4.0'
-
 import os
 import sys
 
@@ -8,8 +6,6 @@ TWITCHER_ROOT_DIR = os.path.abspath(os.path.dirname(TWITCHER_MODULE_DIR))
 sys.path.insert(0, TWITCHER_ROOT_DIR)
 sys.path.insert(0, TWITCHER_MODULE_DIR)
 
-
-from twitcher import adapter                                # noqa E402
 from twitcher.config import get_twitcher_configuration      # noqa E402
 from pyramid.exceptions import ConfigurationError           # noqa E402
 import logging                                              # noqa E402

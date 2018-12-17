@@ -2,7 +2,7 @@ from cornice_swagger import CorniceSwagger
 from cornice.service import get_services
 from pyramid.renderers import render_to_response
 from pyramid.settings import asbool
-from twitcher import __version__ as twitcher_version
+from twitcher.__meta__ import __version__ as twitcher_version
 from twitcher.config import get_twitcher_configuration
 from twitcher.utils import get_twitcher_url
 from twitcher.wps import get_wps_path
