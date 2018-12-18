@@ -38,6 +38,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         cls.config = setup_config_with_mongodb()
         cls.app = get_test_twitcher_app(config=cls.config)
         cls.config.registry.settings['twitcher.url'] = "https://localhost"
+        cls.config.registry.settings['twitcher.wps_path'] = "/ows/wps"
         cls.config.include('twitcher.wps')
         cls.config.include('twitcher.wps_restapi')
         cls.config.include('twitcher.tweens')
