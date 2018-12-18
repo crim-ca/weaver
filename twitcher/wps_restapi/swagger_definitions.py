@@ -17,13 +17,19 @@ from twitcher.execute import (
     EXECUTE_TRANSMISSION_MODE_REFERENCE,
     execute_transmission_mode_options,
 )
-from twitcher.visibility import visibility_values, VISIBILITY_PUBLIC
+from pyramid.security import NO_PERMISSION_REQUIRED
 from cornice import Service
 from colander import *
+from twitcher.visibility import visibility_values, VISIBILITY_PUBLIC
 from twitcher.wps_restapi.colander_one_of import OneOfMappingSchema
 from twitcher.wps_restapi.colander_defaults import SchemaNodeDefault as SchemaNode  # import after to override colander
+from twitcher import __meta__
 
 API_TITLE = 'Twitcher REST API'
+API_INFO = {
+    "description": __meta__.__description__,
+    "contact": {"name": __meta__.__authors__, "email": __meta__.__emails__, "url": __meta__.__source_repository__}
+}
 
 #########################################################################
 # API endpoints
