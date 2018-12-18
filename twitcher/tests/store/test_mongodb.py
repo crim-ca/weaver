@@ -6,9 +6,9 @@ import unittest
 # noinspection PyPackageRequirements
 import mock
 
-from twitcher.datatype import AccessToken
+from twitcher.datatype import AccessToken, Service, Process
 from twitcher.utils import expires_at
-from twitcher.store.mongodb import MongodbTokenStore
+from twitcher.store.mongodb import MongodbTokenStore, MongodbServiceStore
 
 
 class MongodbTokenStoreTestCase(unittest.TestCase):
@@ -32,10 +32,6 @@ class MongodbTokenStoreTestCase(unittest.TestCase):
         store.save_token(self.access_token)
 
         collection_mock.insert_one.assert_called_with(self.access_token)
-
-
-from twitcher.datatype import Service
-from twitcher.store.mongodb import MongodbServiceStore
 
 
 class MongodbServiceStoreTestCase(unittest.TestCase):

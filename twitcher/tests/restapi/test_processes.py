@@ -16,6 +16,7 @@ from twitcher.tests.utils import (
     setup_mongodb_jobstore,
     get_test_twitcher_app,
 )
+from twitcher.wps import get_wps_url
 from twitcher.processes.wps_testing import WpsTestProcess
 from twitcher.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
 from twitcher.exceptions import ProcessNotFound, JobNotFound
@@ -243,6 +244,24 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 msg = "Failed with test variation `{}` with value `{}`."
                 assert resp.status_code in [400, 422], msg.format(i, resp.status_code)
                 assert resp.content_type == self.json_app, msg.format(i, resp.content_type)
+
+    def test_deploy_process_default_endpoint_wps1(self):
+        """Validates that the default (localhost) endpoint to execute WPS requests are saved during deployment."""
+        process_name = self.fully_qualified_test_process_name()
+        process_data = self.get_process_deploy_template(process_name)
+        package_mock = self.get_process_package_mock()
+
+        # noinspection PyDeprecation
+        with nested(*package_mock):
+            uri = "/processes"
+            resp = self.app.post_json(uri, params=process_data, headers=self.json_headers, expect_errors=True)
+            # TODO: status should be 201 when properly modified to match API conformance
+            assert resp.status_code == 200
+
+        twitcher_wps_path = get_wps_url(self.config.registry.settings)
+        process_wps_endpoint = self.process_store.fetch_by_id(process_name).processEndpointWPS1
+        assert isinstance(process_wps_endpoint, six.string_types) and len(process_wps_endpoint)
+        assert process_wps_endpoint == twitcher_wps_path
 
     def test_delete_process_success(self):
         uri = "/processes/{}".format(self.process_public.identifier)

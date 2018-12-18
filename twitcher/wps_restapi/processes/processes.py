@@ -465,7 +465,7 @@ def get_processes_filtered_by_valid_schemas(request):
     invalid_processes_ids = list()
     for process in processes:
         try:
-            valid_processes.append(process.process_summary())
+            valid_processes.append(process)
         except colander.Invalid:
             invalid_processes_ids.append(process.identifier)
             pass
@@ -487,7 +487,7 @@ def get_processes(request):
                 "Previously deployed processes are causing invalid schema integrity errors. " +
                 "Manual cleanup of following processes is required: {}".format(invalid_processes))
 
-        response_body = {'processes': processes}
+        response_body = {'processes': [p.process_summary() for p in processes]}
 
         # if EMS and ?providers=True, also fetch each provider's processes
         if get_twitcher_configuration(request.registry.settings) == TWITCHER_CONFIGURATION_EMS:
@@ -506,6 +506,8 @@ def get_processes(request):
         return HTTPOk(json=response_body)
     except HTTPException:
         raise  # re-throw already handled HTTPException
+    except colander.Invalid as ex:
+        raise HTTPBadRequest("Invalid schema: [{}]".format(str(ex)))
     except Exception as ex:
         LOGGER.exception(ex.message, exc_info=True)
         raise HTTPInternalServerError(ex.message)
@@ -616,6 +618,7 @@ def add_local_process(request):
 
 
 def get_process(request):
+    # type: (Request) -> ProcessDB
     process_id = request.matchdict.get('process_id')
     if not isinstance(process_id, string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")

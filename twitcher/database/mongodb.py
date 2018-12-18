@@ -9,10 +9,19 @@ from twitcher.store.mongodb import (
     MongodbQuoteStore,
     MongodbBillStore,
 )
+from typing import Any, AnyStr, Union
 import pymongo
 import warnings
 
 MongoDB = None
+MongodbStores = Union[
+    MongodbTokenStore,
+    MongodbServiceStore,
+    MongodbProcessStore,
+    MongodbJobStore,
+    MongodbQuoteStore,
+    MongodbBillStore,
+]
 
 
 class MongoDatabase(DatabaseInterface):
@@ -31,11 +40,12 @@ class MongoDatabase(DatabaseInterface):
     def rollback(self):
         pass
 
-    def get_store(self, store_type, **store_kwargs):
+    def get_store(self, store_type, *store_args, **store_kwargs):
+        # type: (AnyStr, Any, Any) -> MongodbStores
         for store in [MongodbTokenStore, MongodbServiceStore, MongodbProcessStore,
                       MongodbJobStore, MongodbQuoteStore, MongodbBillStore]:
             if store.type == store_type:
-                return store(collection=getattr(self.get_session(), store_type), **store_kwargs)
+                return store(collection=getattr(self.get_session(), store_type), *store_args, **store_kwargs)
         raise NotImplementedError("Database `{}` cannot find matching store `{}`.".format(self.type, store_type))
 
     def get_session(self):
