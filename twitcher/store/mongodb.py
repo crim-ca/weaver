@@ -60,8 +60,9 @@ class MongodbTokenStore(AccessTokenStore, MongodbStore):
     """
 
     def __init__(self, *args, **kwargs):
+        db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         AccessTokenStore.__init__(self)
-        MongodbStore.__init__(self, *args, **kwargs)
+        MongodbStore.__init__(self, *db_args, **db_kwargs)
 
     def save_token(self, access_token):
         self.collection.insert_one(access_token)

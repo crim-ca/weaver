@@ -75,4 +75,7 @@ def get_mongodb_engine(registry):
     db.services.create_index("name", unique=True)
     db.services.create_index("url", unique=True)
     db.processes.create_index("identifier", unique=True)
+    db.jobs.create_index("id", unique=True)
+    db.quotes.create_index("id", unique=True)
+    db.bills.create_index("id", unique=True)
     return db
