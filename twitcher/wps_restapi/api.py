@@ -64,8 +64,13 @@ def api_swagger_json(request, use_docstring_summary=True):
     swagger = CorniceSwagger(get_services())
     # function docstrings are used to create the route's summary in Swagger-UI
     swagger.summary_docstrings = use_docstring_summary
+    swagger_base_spec = {
+        'host': request.host,
+        'schemes': [request.scheme]
+    }
+    swagger.swagger = swagger_base_spec
     return swagger.generate(title=sd.API_TITLE, version=twitcher_version,
-                            base_path=wps_restapi_base_url(request.registry.settings))
+                            base_path=wps_restapi_base_path(request.registry.settings))
 
 
 @sd.api_swagger_ui_service.get(tags=[sd.api_tag],
