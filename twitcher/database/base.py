@@ -1,8 +1,10 @@
-from typing import Any, AnyStr, Dict
+from typing import Any, AnyStr, Dict, Union, TYPE_CHECKING
 from pyramid.registry import Registry
-
 import logging
 logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from twitcher.store.base import AccessTokenStore, ServiceStore, ProcessStore, JobStore, QuoteStore, BillStore
+    AnyStoreType = Union[AccessTokenStore, ServiceStore, ProcessStore, JobStore, QuoteStore, BillStore]
 
 
 class DatabaseInterface(object):
@@ -27,13 +29,14 @@ class DatabaseInterface(object):
         """Rollback current database transaction."""
         raise NotImplementedError
 
-    def get_store(self, store_type, **store_kwargs):
-        # type: (AnyStr, Any) -> Any
+    def get_store(self, store_type, *store_args, **store_kwargs):
+        # type: (AnyStr, Any, Any) -> AnyStoreType
         """
         Retrieve a store from the database.
 
         :param store_type: type of the store to retrieve/create.
-        :param store_kwargs: additional arguments to pass down to the store.
+        :param store_args: additional arguments to pass down to the store.
+        :param store_kwargs: additional keyword arguments to pass down to the store.
         """
         raise NotImplementedError
 

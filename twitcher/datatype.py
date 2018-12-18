@@ -518,31 +518,37 @@ class Process(dict):
         # type: (...) -> Union[None, List[Dict[AnyStr, Any]]]
         return self.get('outputs')
 
+    # noinspection PyPep8Naming
     @property
     def jobControlOptions(self):
         # type: (...) -> Union[None, List[AnyStr]]
         return self.get('jobControlOptions')
 
+    # noinspection PyPep8Naming
     @property
     def outputTransmission(self):
         # type: (...) -> Union[None, List[AnyStr]]
         return self.get('outputTransmission')
 
+    # noinspection PyPep8Naming
     @property
     def processDescriptionURL(self):
         # type: (...) -> Union[None, AnyStr]
         return self.get('processDescriptionURL')
 
+    # noinspection PyPep8Naming
     @property
     def processEndpointWPS1(self):
         # type: (...) -> Optional[AnyStr]
         return self.get('processEndpointWPS1')
 
+    # noinspection PyPep8Naming
     @property
     def executeEndpoint(self):
         # type: (...) -> Union[None, AnyStr]
         return self.get('executeEndpoint')
 
+    # noinspection PyPep8Naming
     @property
     def owsContext(self):
         # type: (...) -> Union[None, Dict[AnyStr, Any]]
@@ -741,11 +747,13 @@ class Quote(dict):
         """WPS Process ID."""
         return self['process']
 
+    # noinspection PyPep8Naming
     @property
     def estimatedTime(self):
         """Process estimated time."""
         return self.get('estimatedTime')
 
+    # noinspection PyPep8Naming
     @property
     def processParameters(self):
         """Process execution parameters for quote."""

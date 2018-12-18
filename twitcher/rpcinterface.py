@@ -18,7 +18,7 @@ class RPCInterface(ITokenManager, IRegistry):
         self.request = request
         self.tokenmgr = TokenManager(
             tokengenerator_factory(request.registry),
-            get_database_factory(request.registry).get_store(AccessTokenStore.type))
+            get_database_factory(request.registry).get_store(AccessTokenStore.type, registry=request.registry))
         self.srvreg = Registry(servicestore_factory(request.registry))
 
     def generate_token(self, valid_in_hours=1, environ=None):

@@ -21,6 +21,7 @@ from twitcher.processes.types import PROCESS_WPS
 from pywps import Process as ProcessWPS
 from pyramid.security import authenticated_userid
 from pymongo import ASCENDING, DESCENDING
+from typing import Any, Dict, Tuple
 import pymongo
 import six
 import logging
@@ -33,8 +34,24 @@ class MongodbStore(object):
     """
 
     def __init__(self, collection, sane_name_config=None):
+        if not isinstance(collection, pymongo.collection.Collection):
+            raise TypeError("Collection not of expected type.")
         self.collection = collection
         self.sane_name_config = sane_name_config or {}
+
+    @classmethod
+    def get_args_kwargs(cls, *args, **kwargs):
+        # type: (Any, Any) -> Tuple[Tuple, Dict]
+        """
+        Filters MongodbStore-specific arguments to safely pass them down its __init__.
+        """
+        collection = None
+        if len(args):
+            collection = args[0]
+        elif 'collection' in kwargs:
+            collection = kwargs['collection']
+        sane_name_config = kwargs.get('sane_name_config', None)
+        return tuple([collection]), {'sane_name_config': sane_name_config}
 
 
 class MongodbTokenStore(AccessTokenStore, MongodbStore):
@@ -43,8 +60,9 @@ class MongodbTokenStore(AccessTokenStore, MongodbStore):
     """
 
     def __init__(self, *args, **kwargs):
+        db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         AccessTokenStore.__init__(self)
-        MongodbStore.__init__(self, *args, **kwargs)
+        MongodbStore.__init__(self, *db_args, **db_kwargs)
 
     def save_token(self, access_token):
         self.collection.insert_one(access_token)
@@ -68,8 +86,9 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
     """
 
     def __init__(self, *args, **kwargs):
+        db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         ServiceStore.__init__(self)
-        MongodbStore.__init__(self, *args, **kwargs)
+        MongodbStore.__init__(self, *db_args, **db_kwargs)
 
     def save_service(self, service, overwrite=True, request=None):
         """
@@ -150,9 +169,11 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
     """
 
     def __init__(self, *args, **kwargs):
+        db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         ProcessStore.__init__(self)
-        MongodbStore.__init__(self, *args, **kwargs)
-        settings = kwargs.get('settings', {})
+        MongodbStore.__init__(self, *db_args, **db_kwargs)
+        registry = kwargs.get('registry')
+        settings = kwargs.get('settings') if not registry else registry.settings
         default_processes = kwargs.get('default_processes')
         self.default_host = settings.get('twitcher.url', '')
         self.default_wps_endpoint = '{host}{wps}'.format(host=self.default_host,
@@ -315,8 +336,9 @@ class MongodbJobStore(JobStore, MongodbStore):
     """
 
     def __init__(self, *args, **kwargs):
+        db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         JobStore.__init__(self)
-        MongodbStore.__init__(self, *args, **kwargs)
+        MongodbStore.__init__(self, *db_args, **db_kwargs)
 
     def save_job(self, task_id, process, service=None, inputs=None, is_workflow=False,
                  user_id=None, execute_async=True, custom_tags=None):
@@ -449,8 +471,9 @@ class MongodbQuoteStore(QuoteStore, MongodbStore):
     """
 
     def __init__(self, *args, **kwargs):
+        db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         QuoteStore.__init__(self)
-        MongodbStore.__init__(self, *args, **kwargs)
+        MongodbStore.__init__(self, *db_args, **db_kwargs)
 
     def save_quote(self, quote):
         """
@@ -513,8 +536,9 @@ class MongodbBillStore(BillStore, MongodbStore):
     """
 
     def __init__(self, *args, **kwargs):
+        db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
         BillStore.__init__(self)
-        MongodbStore.__init__(self, *args, **kwargs)
+        MongodbStore.__init__(self, *db_args, **db_kwargs)
 
     def save_bill(self, bill):
         """

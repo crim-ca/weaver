@@ -6,9 +6,10 @@ import unittest
 # noinspection PyPackageRequirements
 import mock
 
-from twitcher.datatype import AccessToken
+from pymongo.collection import Collection
+from twitcher.datatype import AccessToken, Service
 from twitcher.utils import expires_at
-from twitcher.store.mongodb import MongodbTokenStore
+from twitcher.store.mongodb import MongodbTokenStore, MongodbServiceStore
 
 
 class MongodbTokenStoreTestCase(unittest.TestCase):
@@ -16,7 +17,7 @@ class MongodbTokenStoreTestCase(unittest.TestCase):
         self.access_token = AccessToken(token="abcdef", expires_at=expires_at(hours=1))
 
     def test_fetch_by_token(self):
-        collection_mock = mock.Mock(spec=["find_one"])
+        collection_mock = mock.Mock(spec=Collection)
         collection_mock.find_one.return_value = self.access_token
 
         store = MongodbTokenStore(collection=collection_mock)
@@ -26,16 +27,12 @@ class MongodbTokenStoreTestCase(unittest.TestCase):
         assert isinstance(access_token, AccessToken)
 
     def test_save_token(self):
-        collection_mock = mock.Mock(spec=["insert_one"])
+        collection_mock = mock.Mock(spec=Collection)
 
         store = MongodbTokenStore(collection=collection_mock)
         store.save_token(self.access_token)
 
         collection_mock.insert_one.assert_called_with(self.access_token)
-
-
-from twitcher.datatype import Service
-from twitcher.store.mongodb import MongodbServiceStore
 
 
 class MongodbServiceStoreTestCase(unittest.TestCase):
@@ -48,7 +45,7 @@ class MongodbServiceStoreTestCase(unittest.TestCase):
         self.sane_name_config = {'assert_invalid': False, 'replace_invalid': True}
 
     def test_fetch_by_name(self):
-        collection_mock = mock.Mock(spec=["find_one"])
+        collection_mock = mock.Mock(spec=Collection)
         collection_mock.find_one.return_value = self.service
         store = MongodbServiceStore(collection=collection_mock, sane_name_config=self.sane_name_config)
         service = store.fetch_by_name(name=self.service['name'])
@@ -57,7 +54,7 @@ class MongodbServiceStoreTestCase(unittest.TestCase):
         assert isinstance(service, dict)
 
     def test_save_service_default(self):
-        collection_mock = mock.Mock(spec=["insert_one", "find_one", "count"])
+        collection_mock = mock.Mock(spec=Collection)
         collection_mock.count.return_value = 0
         collection_mock.find_one.return_value = self.service
         store = MongodbServiceStore(collection=collection_mock, sane_name_config=self.sane_name_config)
@@ -66,7 +63,7 @@ class MongodbServiceStoreTestCase(unittest.TestCase):
         collection_mock.insert_one.assert_called_with(self.service)
 
     def test_save_service_with_special_name(self):
-        collection_mock = mock.Mock(spec=["insert_one", "find_one", "count"])
+        collection_mock = mock.Mock(spec=Collection)
         collection_mock.count.return_value = 0
         collection_mock.find_one.return_value = self.service_special
         store = MongodbServiceStore(collection=collection_mock, sane_name_config=self.sane_name_config)
@@ -76,7 +73,7 @@ class MongodbServiceStoreTestCase(unittest.TestCase):
             'url': 'http://wonderload', 'type': 'wps', 'name': 'a_special_name', 'public': False, 'auth': 'token'})
 
     def test_save_service_public(self):
-        collection_mock = mock.Mock(spec=["insert_one", "find_one", "count"])
+        collection_mock = mock.Mock(spec=Collection)
         collection_mock.count.return_value = 0
         collection_mock.find_one.return_value = self.service_public
         store = MongodbServiceStore(collection=collection_mock, sane_name_config=self.sane_name_config)

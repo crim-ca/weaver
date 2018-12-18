@@ -8,7 +8,7 @@ from celery.utils.log import get_task_logger
 from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import URLError
 from time import sleep
-from typing import AnyStr, List, Tuple
+from typing import Any, AnyStr, Dict, List, Tuple
 
 from twitcher.wps import load_pywps_cfg
 from twitcher.adapter import servicestore_factory, jobstore_factory, processstore_factory
@@ -454,10 +454,10 @@ def describe_provider_process(request):
 
 
 def get_processes_filtered_by_valid_schemas(request):
-    # type: (Request) -> Tuple[List[ProcessDB], List[AnyStr]]
+    # type: (Request) -> Tuple[List[Dict[AnyStr, Any]], List[AnyStr]]
     """
     Validates the processes summary schemas and returns them into valid/invalid lists.
-    :returns: list of valid processes and invalid processes IDs for manual cleanup.
+    :returns: list of valid process summaries and invalid processes IDs for manual cleanup.
     """
     store = processstore_factory(request.registry)
     processes = store.list_processes(visibility=VISIBILITY_PUBLIC, request=request)
@@ -486,7 +486,6 @@ def get_processes(request):
             raise HTTPServiceUnavailable(
                 "Previously deployed processes are causing invalid schema integrity errors. " +
                 "Manual cleanup of following processes is required: {}".format(invalid_processes))
-
         response_body = {'processes': processes}
 
         # if EMS and ?providers=True, also fetch each provider's processes
@@ -506,6 +505,8 @@ def get_processes(request):
         return HTTPOk(json=response_body)
     except HTTPException:
         raise  # re-throw already handled HTTPException
+    except colander.Invalid as ex:
+        raise HTTPBadRequest("Invalid schema: [{}]".format(str(ex)))
     except Exception as ex:
         LOGGER.exception(ex.message, exc_info=True)
         raise HTTPInternalServerError(ex.message)
@@ -616,6 +617,7 @@ def add_local_process(request):
 
 
 def get_process(request):
+    # type: (Request) -> ProcessDB
     process_id = request.matchdict.get('process_id')
     if not isinstance(process_id, string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
@@ -645,7 +647,7 @@ def get_local_process(request):
     """
     try:
         process = get_process(request)
-        process.inputs = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
+        process['inputs'] = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
         process_offering = process.process_offering()
         return HTTPOk(json=process_offering)
     except HTTPException:
