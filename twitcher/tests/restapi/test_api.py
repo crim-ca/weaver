@@ -1,5 +1,3 @@
-import unittest
-import colander
 from pyramid.httpexceptions import HTTPFound
 from twitcher.wps_restapi.swagger_definitions import (
     api_frontpage_uri,
@@ -14,6 +12,11 @@ from twitcher.wps_restapi.swagger_definitions import (
 from twitcher.tests.utils import get_test_twitcher_app, get_test_twitcher_config, get_settings_from_testapp
 from twitcher.database.memory import MemoryDatabase
 from twitcher.adapter import TWITCHER_ADAPTER_DEFAULT
+import colander
+import unittest
+# noinspection PyPackageRequirements
+import mock
+import os
 
 
 class GenericApiRoutesTestCase(unittest.TestCase):
@@ -65,7 +68,8 @@ class AlternativeProxyBaseUrlApiRoutesTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.proxy_api_base_path = '/twitcher/rest'    # derived path for test
+        # derived path for testing simulated server proxy pass
+        cls.proxy_api_base_path = '/twitcher/rest'
         cls.proxy_api_base_name = api_swagger_json_service.name + '_proxy'
 
         # create redirect view to simulate the server proxy pass
@@ -78,14 +82,45 @@ class AlternativeProxyBaseUrlApiRoutesTestCase(unittest.TestCase):
         cls.json_app = 'application/json'
         cls.json_headers = {'Accept': cls.json_app, 'Content-Type': cls.json_app}
 
-    def test_swagger_api_request_base_path(self):
+    def test_swagger_api_request_base_path_proxied(self):
+        """
+        Validates that Swagger JSON properly redefines the host/path to test live requests on Swagger UI
+        when the app's URI results from a proxy pass redirect under another route.
+        """
+        # setup environment that would define the new twitcher location for the proxy pass
+        twitcher_server_host = get_settings_from_testapp(self.testapp).get('twitcher.url')
+        twitcher_server_url = twitcher_server_host + self.proxy_api_base_path
+        with mock.patch.dict('os.environ', {'TWITCHER_URL': twitcher_server_url}):
+            resp = self.testapp.get(self.proxy_api_base_path, headers=self.json_headers)
+            resp = resp.follow()
+            assert 200 == resp.status_code
+            assert self.proxy_api_base_path not in resp.json['host']
+            assert resp.json['basePath'] == self.proxy_api_base_path
+
+            # validate that swagger UI still renders and has valid URL
+            resp = self.testapp.get(api_swagger_ui_uri)
+            assert 200 == resp.status_code
+            assert "<title>{}</title>".format(API_TITLE) in resp.body
+
+    def test_swagger_api_request_base_path_original(self):
+        """
+        Validates that Swagger JSON properly uses the original host/path to test live requests on Swagger UI
+        when the app's URI results direct route access.
+        """
         resp = self.testapp.get(api_swagger_ui_uri)
         assert 200 == resp.status_code
         assert "<title>{}</title>".format(API_TITLE) in resp.body
 
-        twitcher_server_url = get_settings_from_testapp(self.testapp).get('twitcher.url') + self.proxy_api_base_path
-        resp = self.testapp.get(self.proxy_api_base_path, headers=self.json_headers,
-                                extra_environ={'TWITCHER_URL': twitcher_server_url})
-        resp = resp.follow()
-        assert 200 == resp.status_code
-        assert resp.json['basePath'] == self.proxy_api_base_path
+        # ensure that environment that would define the twitcher location is not defined for local app
+        with mock.patch.dict('os.environ'):
+            os.environ.pop('TWITCHER_URL', None)
+            resp = self.testapp.get(self.proxy_api_base_path, headers=self.json_headers)
+            resp = resp.follow()
+            assert 200 == resp.status_code
+            assert self.proxy_api_base_path not in resp.json['host']
+            assert resp.json['basePath'] == api_frontpage_uri
+
+            # validate that swagger UI still renders and has valid URL
+            resp = self.testapp.get(api_swagger_ui_uri)
+            assert 200 == resp.status_code
+            assert "<title>{}</title>".format(API_TITLE) in resp.body

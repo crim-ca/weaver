@@ -78,8 +78,9 @@ def api_swagger_json(request, use_docstring_summary=True):
     LOGGER.debug("Request URL:  {}".format(request.url))
     LOGGER.debug("TWITCHER_URL: {}".format(twitcher_server_url))
     if twitcher_server_url:
-        swagger_base_spec['host'] = twitcher_server_url
-        swagger_base_path = twitcher_server_url
+        twitcher_parsed_url = urlparse(twitcher_server_url)
+        swagger_base_spec['host'] = twitcher_parsed_url.netloc
+        swagger_base_path = twitcher_parsed_url.path
     else:
         swagger_base_spec['host'] = request.host
         swagger_base_path = sd.api_frontpage_uri
