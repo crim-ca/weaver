@@ -49,10 +49,12 @@ class OWSException(Response, Exception):
 
     def __init__(self, detail=None, value=None, **kw):
         status = kw.pop('status', None)
-        if isinstance(status, HTTPException):
-            status = kw['status'].status
+        if issubclass(status, HTTPException):
+            status = status().status
+        elif isinstance(status, HTTPException):
+            status = status.status
         elif not status:
-            status = HTTPOk.status
+            status = HTTPOk().status
         Response.__init__(self, status=status, **kw)
         Exception.__init__(self, detail)
         self.message = detail or self.explanation

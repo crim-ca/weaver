@@ -161,7 +161,7 @@ def owsproxy(request):
 
     service_name = request.matchdict.get('service_name')
     if not service_name:
-        raise OWSNotAcceptable()
+        return OWSNotAcceptable("Could not retrieve 'service_name'.")
     try:
         extra_path = request.matchdict.get('extra_path')
         store = servicestore_factory(request.registry)
