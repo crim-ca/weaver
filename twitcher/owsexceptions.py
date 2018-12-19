@@ -4,6 +4,7 @@ OWSExceptions are based on pyramid.httpexceptions.
 See also: https://github.com/geopython/pywps/blob/master/pywps/exceptions.py
 """
 
+import six
 import json
 import warnings
 from string import Template
@@ -49,7 +50,7 @@ class OWSException(Response, Exception):
 
     def __init__(self, detail=None, value=None, **kw):
         status = kw.pop('status', None)
-        if issubclass(status, HTTPException):
+        if isinstance(status, (type, six.class_types)) and issubclass(status, HTTPException):
             status = status().status
         elif isinstance(status, HTTPException):
             status = status.status

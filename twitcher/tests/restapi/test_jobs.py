@@ -9,6 +9,7 @@ import warnings
 import json
 import pyramid.testing
 import six
+from collections import OrderedDict
 from contextlib import nested
 from typing import AnyStr, Tuple, List, Union
 from twitcher.tests.utils import setup_config_with_mongodb, setup_mongodb_processstore, setup_mongodb_jobstore
@@ -60,17 +61,17 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
         # create jobs accessible by index
         self.job_info = []  # type: List[Job]
-        self.make_job(task_id='1111-1111-1111-1111', process=self.process_public.identifier, service=None,
+        self.make_job(task_id='0000-0000-0000-0000', process=self.process_public.identifier, service=None,
                       user_id=self.user_editor1_id, status=STATUS_SUCCEEDED, progress=100, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id='2222-2222-2222-2222', process='process-unknown', service='service-A',
+        self.make_job(task_id='1111-1111-1111-1111', process='process-unknown', service='service-A',
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id='3333-3333-3333-3333', process=self.process_private.identifier, service=None,
+        self.make_job(task_id='2222-2222-2222-2222', process=self.process_private.identifier, service=None,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=55, access=VISIBILITY_PUBLIC)
         # same process as Job 1, but private (ex: job ran with private process, then process made public afterwards)
-        self.make_job(task_id='4444-4444-4444-4444', process=self.process_public.identifier, service=None,
+        self.make_job(task_id='3333-3333-3333-3333', process=self.process_public.identifier, service=None,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=55, access=VISIBILITY_PRIVATE)
         # job ran by admin
-        self.make_job(task_id='5555-5555-5555-5555', process=self.process_public.identifier, service=None,
+        self.make_job(task_id='4444-4444-4444-4444', process=self.process_public.identifier, service=None,
                       user_id=self.user_admin_id, status=STATUS_FAILED, progress=55, access=VISIBILITY_PRIVATE)
 
     def make_job(self, task_id, process, service, user_id, status, progress, access):
@@ -85,11 +86,12 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     def message_with_jobs_mapping(self, message="", indent=2):
         """For helping debugging of auto-generated job ids"""
-        return message + "\nMapping Job-ID/Task-ID:\n{}".format(
-            json.dumps(sorted(dict((j.id, j.task_id) for j in self.job_store.list_jobs())), indent=indent))
+        mapping = OrderedDict(sorted((j.task_id, j.id) for j in self.job_store.list_jobs()))
+        return message + "\nMapping Task-ID/Job-ID:\n{}".format(json.dumps(mapping, indent=indent))
 
-    def message_with_jobs_diffs(self, jobs_result, jobs_expect, test_values=None, message="", indent=2):
+    def message_with_jobs_diffs(self, jobs_result, jobs_expect, test_values=None, message="", indent=2, index=None):
         return (message if message else "Different jobs returned than expected") + \
+               (" (index: {})".format(index) if index is not None else "") + \
                ("\nResponse: {}".format(json.dumps(sorted(jobs_result), indent=indent))) + \
                ("\nExpected: {}".format(json.dumps(sorted(jobs_expect), indent=indent))) + \
                ("\nTesting: {}".format(test_values) if test_values else "") + \
@@ -260,4 +262,4 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 job_ids = [job.id for job in expected_jobs]
                 job_match = all(job in job_ids for job in resp.json['jobs'])
                 test_values = dict(path=path, query=query, user_id=user_id)
-                assert job_match, self.message_with_jobs_diffs(resp.json['jobs'], job_ids, test_values)
+                assert job_match, self.message_with_jobs_diffs(resp.json['jobs'], job_ids, test_values, index=i)

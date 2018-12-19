@@ -425,18 +425,22 @@ class MongodbJobStore(JobStore, MongodbStore):
         """
         Finds all jobs in mongodb storage matching search filters.
         """
-        search_filters = {}
-        user_id = None if request.has_permission('admin') else authenticated_userid(request)
+
         if any(v in tags for v in visibility_values):
             raise ValueError("Visibility values not acceptable in `tags`, use `access` instead.")
 
-        if access == VISIBILITY_PUBLIC:
-            search_filters['access'] = VISIBILITY_PUBLIC
-        else:
-            search_filters['access'] = {'$ne': VISIBILITY_PUBLIC}
+        search_filters = {}
 
-        if user_id:
-            search_filters['user_id'] = user_id
+        if request.has_permission('admin') and access in visibility_values:
+            search_filters['access'] = access
+        else:
+            user_id = authenticated_userid(request)
+            if user_id:
+                search_filters['user_id'] = user_id
+                if access in visibility_values:
+                    search_filters['access'] = access
+            else:
+                search_filters['access'] = VISIBILITY_PUBLIC
 
         if tags:
             search_filters['tags'] = {'$all': tags}
