@@ -1,6 +1,8 @@
+from six.moves.urllib.parse import urlparse
 from cornice_swagger import CorniceSwagger
 from cornice.service import get_services
 from pyramid.renderers import render_to_response
+from pyramid.request import Request
 from pyramid.settings import asbool
 from twitcher.__meta__ import __version__ as twitcher_version
 from twitcher.config import get_twitcher_configuration
@@ -10,6 +12,7 @@ from twitcher.owsproxy import owsproxy_base_path
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.colander_one_of import CustomTypeConversionDispatcher
 from twitcher.wps_restapi.utils import wps_restapi_base_url, wps_restapi_base_path
+import os
 
 
 @sd.api_frontpage_service.get(tags=[sd.api_tag], renderer='json',
@@ -59,18 +62,25 @@ def api_versions(request):
 @sd.api_swagger_json_service.get(tags=[sd.api_tag], renderer='json',
                                  schema=sd.SwaggerJSONEndpoint(), response_schemas=sd.get_api_swagger_json_responses)
 def api_swagger_json(request, use_docstring_summary=True):
+    # type: (Request, bool) -> dict
     """Twitcher REST API schema generation in JSON format."""
     CorniceSwagger.type_converter = CustomTypeConversionDispatcher
     swagger = CorniceSwagger(get_services())
     # function docstrings are used to create the route's summary in Swagger-UI
     swagger.summary_docstrings = use_docstring_summary
-    swagger_base_spec = {
-        'host': request.host,
-        'schemes': [request.scheme]
-    }
+    swagger_base_spec = {'schemes': [request.scheme]}
+
+    # obtain 'server' host and api-base-path, which doesn't correspond necessarily to the app's host and path
+    # ex: 'server' adds '/twitcher' with proxy redirect before API routes
+    twitcher_server_url = os.getenv('TWITCHER_URL')
+    if twitcher_server_url:
+        swagger_base_spec['host'] = twitcher_server_url
+        swagger_base_path = twitcher_server_url
+    else:
+        swagger_base_spec['host'] = request.host
+        swagger_base_path = sd.api_frontpage_uri
     swagger.swagger = swagger_base_spec
-    return swagger.generate(title=sd.API_TITLE, version=twitcher_version,
-                            base_path=wps_restapi_base_path(request.registry.settings))
+    return swagger.generate(title=sd.API_TITLE, version=twitcher_version, base_path=swagger_base_path)
 
 
 @sd.api_swagger_ui_service.get(tags=[sd.api_tag],
