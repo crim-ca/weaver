@@ -12,7 +12,9 @@ from twitcher.owsproxy import owsproxy_base_path
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.colander_one_of import CustomTypeConversionDispatcher
 from twitcher.wps_restapi.utils import wps_restapi_base_url, wps_restapi_base_path
+import logging
 import os
+LOGGER = logging.getLogger(__name__)
 
 
 @sd.api_frontpage_service.get(tags=[sd.api_tag], renderer='json',
@@ -73,6 +75,8 @@ def api_swagger_json(request, use_docstring_summary=True):
     # obtain 'server' host and api-base-path, which doesn't correspond necessarily to the app's host and path
     # ex: 'server' adds '/twitcher' with proxy redirect before API routes
     twitcher_server_url = os.getenv('TWITCHER_URL')
+    LOGGER.debug("Request URL:  {}".format(request.url))
+    LOGGER.debug("TWITCHER_URL: {}".format(twitcher_server_url))
     if twitcher_server_url:
         swagger_base_spec['host'] = twitcher_server_url
         swagger_base_path = twitcher_server_url
