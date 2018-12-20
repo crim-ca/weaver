@@ -88,6 +88,19 @@ class WpsRestApiJobsTest(unittest.TestCase):
         # job ran by admin
         self.make_job(task_id='4444-4444-4444-4444', process=self.process_public.identifier, service=None,
                       user_id=self.user_admin_id, status=STATUS_FAILED, progress=55, access=VISIBILITY_PRIVATE)
+        # job public/private service/process combinations
+        self.make_job(task_id='5555-5555-5555-5555',
+                      process=self.process_public.identifier, service=self.service_public.name,
+                      user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
+        self.make_job(task_id='6666-6666-6666-6666',
+                      process=self.process_private.identifier, service=self.service_public.name,
+                      user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
+        self.make_job(task_id='7777-7777-7777-7777',
+                      process=self.process_public.identifier, service=self.service_private.name,
+                      user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
+        self.make_job(task_id='8888-8888-8888-8888',
+                      process=self.process_private.identifier, service=self.service_private.name,
+                      user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
 
     def make_job(self, task_id, process, service, user_id, status, progress, access):
         job = self.job_store.save_job(task_id=task_id, process=process, service=service, is_workflow=False,
@@ -169,14 +182,14 @@ class WpsRestApiJobsTest(unittest.TestCase):
             for job in resp.json['jobs']:
                 self.check_job_format(job)
 
-    def test_get_process_jobs_in_query_normal(self):
+    def test_get_jobs_process_in_query_normal(self):
         path = self.add_params(jobs_short_uri, process=self.job_info[0].process)
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
         assert self.job_info[0].id in resp.json['jobs'], self.message_with_jobs_mapping("expected in")
         assert self.job_info[1].id not in resp.json['jobs'], self.message_with_jobs_mapping("expected not in")
 
-    def test_get_process_jobs_in_query_detail(self):
+    def test_get_jobs_process_in_query_detail(self):
         path = self.add_params(jobs_short_uri, process=self.job_info[0].process, detail='true')
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
@@ -184,14 +197,14 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert self.job_info[0].id in job_ids, self.message_with_jobs_mapping("expected in")
         assert self.job_info[1].id not in job_ids, self.message_with_jobs_mapping("expected not in")
 
-    def test_get_process_jobs_in_path_normal(self):
+    def test_get_jobs_process_in_path_normal(self):
         path = process_jobs_uri.format(process_id=self.job_info[0].process)
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
         assert self.job_info[0].id in resp.json['jobs'], self.message_with_jobs_mapping("expected in")
         assert self.job_info[1].id not in resp.json['jobs'], self.message_with_jobs_mapping("expected not in")
 
-    def test_get_process_jobs_in_path_detail(self):
+    def test_get_jobs_process_in_path_detail(self):
         path = process_jobs_uri.format(process_id=self.job_info[0].process) + "?detail=true"
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
@@ -199,57 +212,49 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert self.job_info[0].id in job_ids, self.message_with_jobs_mapping("expected in")
         assert self.job_info[1].id not in job_ids, self.message_with_jobs_mapping("expected not in")
 
-    def test_get_process_jobs_unknown_in_path(self):
-        # path must validate each object, so error on not found process
+    def test_get_jobs_process_unknown_in_path(self):
         path = process_jobs_uri.format(process_id='unknown-process-id')
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
         assert resp.content_type == 'application/json'
 
-    def test_get_process_jobs_unknown_in_query(self):
-        # query acts as a filter, so no error on not found process
+    def test_get_jobs_process_unknown_in_query(self):
         path = self.add_params(jobs_short_uri, process='unknown-process-id')
-        resp = self.app.get(path, headers=self.json_headers)
-        self.check_basic_jobs_info(resp)
-        assert len(resp.json['jobs']) == 0
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 404
+        assert resp.content_type == 'application/json'
 
-    def test_get_process_jobs_private_unauthorized_in_path(self):
-        # private process in path returns unauthorized access
+    def test_get_jobs_private_process_unauthorized_in_path(self):
         path = process_jobs_uri.format(process_id=self.process_private.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 401
         assert resp.content_type == 'application/json'
 
-    def test_get_process_jobs_private_unauthorized_in_query(self):
-        # private process in query returns unauthorized access
+    def test_get_jobs_private_process_not_returned_in_query(self):
         path = self.add_params(jobs_short_uri, process=self.process_private.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 401
         assert resp.content_type == 'application/json'
 
-    def test_get_service_and_process_jobs_unknown_in_path(self):
-        # path must validate each object, so error on not found process
+    def test_get_jobs_service_and_process_unknown_in_path(self):
         path = jobs_full_uri.format(provider_id='unknown-service-id', process_id='unknown-process-id')
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
         assert resp.content_type == 'application/json'
 
-    def test_get_service_and_process_jobs_unknown_in_query(self):
-        # query acts as a filter, so no error on not found process
+    def test_get_jobs_service_and_process_unknown_in_query(self):
         path = self.add_params(jobs_short_uri, service='unknown-service-id', process='unknown-process-id')
-        resp = self.app.get(path, headers=self.json_headers)
-        self.check_basic_jobs_info(resp)
-        assert len(resp.json['jobs']) == 0
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 404
+        assert resp.content_type == 'application/json'
 
-    def test_get_service_jobs_private_unauthorized_in_path(self):
-        # private process in path returns unauthorized access
+    def test_get_jobs_private_service_public_process_unauthorized_in_path(self):
         path = jobs_full_uri.format(provider_id=self.service_private.name, process_id=self.process_public.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 401
         assert resp.content_type == 'application/json'
 
-    def test_get_service_jobs_private_unauthorized_in_query(self):
-        # private process in query returns unauthorized access
+    def test_get_jobs_private_service_public_process_unauthorized_in_query(self):
         path = self.add_params(jobs_short_uri,
                                service=self.service_private.name,
                                process=self.process_public.identifier)
@@ -257,7 +262,16 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.status_code == 401
         assert resp.content_type == 'application/json'
 
+    def test_get_jobs_public_service_private_process_unauthorized_in_query(self):
+        path = self.add_params(jobs_short_uri,
+                               service=self.service_public.name,
+                               process=self.process_private.identifier)
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 401
+        assert resp.content_type == 'application/json'
+
     def test_get_jobs_public_with_access_and_request_user(self):
+        """Verifies that corresponding processes are returned when proper access/user-id are respected."""
         uri_direct_jobs = jobs_short_uri
         uri_process_jobs = process_jobs_uri.format(process_id=self.process_public.identifier)
         uri_provider_jobs = jobs_full_uri.format(

@@ -6,6 +6,7 @@ from twitcher.adapter import servicestore_factory, processstore_factory, jobstor
 from twitcher.exceptions import (
     InvalidIdentifierValue,
     ServiceNotFound,
+    ServiceNotAccessible,
     ProcessNotAccessible,
     ProcessNotFound,
     JobNotFound,
@@ -113,32 +114,32 @@ def get_job(request):
 def validate_service_process(request):
     # type: (Request) -> Tuple[Union[None, AnyStr], Union[None, AnyStr]]
     """
-    Verifies that service or process specified by path will raise the appropriate error if applicable.
+    Verifies that service or process specified by path or query will raise the appropriate error if applicable.
     """
-    path_service = request.matchdict.get('provider_id', None)
-    path_process = request.matchdict.get('process_id', None)
-    path_type = None
-    path_test = None
+    service_name = request.matchdict.get('provider_id', None) or request.params.get('service', None)
+    process_name = request.matchdict.get('process_id', None) or request.params.get('process', None)
+    item_test = None
+    item_type = None
 
     try:
-        if path_service:
-            path_type = 'Service'
-            path_test = path_service
+        if service_name:
+            item_type = 'Service'
+            item_test = service_name
             store = servicestore_factory(request.registry)
-            store.fetch_by_name(path_service, visibility=VISIBILITY_PUBLIC, request=request)
-        if path_process:
-            path_type = 'Process'
-            path_test = path_process
+            store.fetch_by_name(service_name, visibility=VISIBILITY_PUBLIC, request=request)
+        if process_name:
+            item_type = 'Process'
+            item_test = process_name
             store = processstore_factory(request.registry)
-            store.fetch_by_id(path_process, visibility=VISIBILITY_PUBLIC, request=request)
+            store.fetch_by_id(process_name, visibility=VISIBILITY_PUBLIC, request=request)
     except (ServiceNotFound, ProcessNotFound):
-        raise HTTPNotFound("{} of id `{}` cannot be found.".format(path_type, path_test))
-    except ProcessNotAccessible:
-        raise HTTPUnauthorized("{} of id `{}` is not accessible.".format(path_type, path_test))
+        raise HTTPNotFound("{} of id `{}` cannot be found.".format(item_type, item_test))
+    except (ServiceNotAccessible, ProcessNotAccessible):
+        raise HTTPUnauthorized("{} of id `{}` is not accessible.".format(item_type, item_test))
     except InvalidIdentifierValue as ex:
         raise HTTPBadRequest(ex.message)
 
-    return path_service, path_process
+    return service_name, process_name
 
 
 @sd.process_jobs_service.get(tags=[sd.processes_tag, sd.jobs_tag], renderer='json',
@@ -151,7 +152,7 @@ def get_jobs(request):
     """
     Retrieve the list of jobs which can be filtered/sorted using queries.
     """
-    path_service, path_process = validate_service_process(request)
+    service, process = validate_service_process(request)
     detail = asbool(request.params.get('detail', False))
     page = int(request.params.get('page', '0'))
     limit = int(request.params.get('limit', '10'))
@@ -164,8 +165,8 @@ def get_jobs(request):
         'status': request.params.get('status', None),
         'sort': request.params.get('sort', sort.SORT_CREATED),
         # service and process can be specified by query (short route) or by path (full route)
-        'process': path_process or request.params.get('process', None),
-        'service': path_service or request.params.get('provider', None),
+        'process': process,
+        'service': service,
     }
     store = jobstore_factory(request.registry)
     items, count = store.find_jobs(request, **filters)
