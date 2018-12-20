@@ -151,8 +151,8 @@ def setup_config_with_celery(config):
     return config
 
 
-def get_test_twitcher_app(config=None, settings_override=None):
-    # type: (Optional[Configurator], Optional[SettingsType]) -> TestApp
+def get_test_twitcher_config(config=None, settings_override=None):
+    # type: (Optional[Configurator], Optional[SettingsType]) -> Configurator
     if not config:
         # default db required if none specified by config
         config = setup_config_from_settings({'twitcher.db_factory': MongoDatabase.type})
@@ -169,6 +169,12 @@ def get_test_twitcher_app(config=None, settings_override=None):
     config.include('twitcher.wps_restapi')
     config.include('twitcher.rpcinterface')
     config.include('twitcher.tweens')
+    return config
+
+
+def get_test_twitcher_app(config=None, settings_override=None):
+    # type: (Optional[Configurator], Optional[SettingsType]) -> TestApp
+    config = get_test_twitcher_config(config=config, settings_override=settings_override)
     config.scan()
     return TestApp(config.make_wsgi_app())
 

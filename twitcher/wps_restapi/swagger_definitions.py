@@ -9,6 +9,7 @@ from twitcher.status import job_status_categories, STATUS_ACCEPTED, STATUS_COMPL
 from twitcher.sort import job_sort_values, quote_sort_values, SORT_CREATED, SORT_ID, SORT_PROCESS
 from twitcher.execute import (
     EXECUTE_MODE_AUTO,
+    EXECUTE_MODE_ASYNC,
     execute_mode_options,
     EXECUTE_CONTROL_OPTION_ASYNC,
     execute_control_options,
@@ -17,7 +18,6 @@ from twitcher.execute import (
     EXECUTE_TRANSMISSION_MODE_REFERENCE,
     execute_transmission_mode_options,
 )
-from pyramid.security import NO_PERMISSION_REQUIRED
 from cornice import Service
 from colander import *
 from twitcher.visibility import visibility_values, VISIBILITY_PUBLIC
@@ -103,7 +103,7 @@ exceptions_tag = 'Exceptions'
 logs_tag = 'Logs'
 
 ###############################################################################
-# These "services" are wrappers that allow Cornice to generate the api's json
+# These "services" are wrappers that allow Cornice to generate the JSON API
 ###############################################################################
 
 api_frontpage_service = Service(name='api_frontpage', path=api_frontpage_uri)
@@ -380,18 +380,80 @@ class OutputDescriptionList(SequenceSchema):
     item = OutputDescription()
 
 
-JobExecuteModeEnum = SchemaNode(String(), title='mode', missing=drop,
-                                default=EXECUTE_MODE_AUTO,
-                                validator=OneOf(list(execute_mode_options)))
-JobControlOptionsEnum = SchemaNode(String(), title='jobControlOptions', missing=drop,
-                                   default=EXECUTE_CONTROL_OPTION_ASYNC,
-                                   validator=OneOf(list(execute_control_options)))
-JobResponseOptionsEnum = SchemaNode(String(), title='response', missing=drop,
-                                    default=EXECUTE_RESPONSE_RAW,
-                                    validator=OneOf(list(execute_response_options)))
-TransmissionModeEnum = SchemaNode(String(), title='transmissionMode', missing=drop,
-                                  default=EXECUTE_TRANSMISSION_MODE_REFERENCE,
-                                  validator=OneOf(list(execute_transmission_mode_options)))
+class JobExecuteModeEnum(SchemaNode):
+    # noinspection PyUnusedLocal
+    def __init__(self, *args, **kwargs):
+        kwargs.pop('validator', None)   # ignore passed argument and enforce the validator
+        super(JobExecuteModeEnum, self).__init__(
+            String(),
+            title=kwargs.get('title', 'mode'),
+            default=kwargs.get('default', EXECUTE_MODE_AUTO),
+            example=kwargs.get('example', EXECUTE_MODE_ASYNC),
+            validator=OneOf(list(execute_mode_options)),
+            **kwargs)
+
+
+class JobControlOptionsEnum(SchemaNode):
+    # noinspection PyUnusedLocal
+    def __init__(self, *args, **kwargs):
+        kwargs.pop('validator', None)   # ignore passed argument and enforce the validator
+        super(JobControlOptionsEnum, self).__init__(
+            String(),
+            title='jobControlOptions',
+            default=kwargs.get('default', EXECUTE_CONTROL_OPTION_ASYNC),
+            example=kwargs.get('example', EXECUTE_CONTROL_OPTION_ASYNC),
+            validator=OneOf(list(execute_control_options)),
+            **kwargs)
+
+
+class JobResponseOptionsEnum(SchemaNode):
+    # noinspection PyUnusedLocal
+    def __init__(self, *args, **kwargs):
+        kwargs.pop('validator', None)   # ignore passed argument and enforce the validator
+        super(JobResponseOptionsEnum, self).__init__(
+            String(),
+            title=kwargs.get('title', 'response'),
+            default=kwargs.get('default', EXECUTE_RESPONSE_RAW),
+            example=kwargs.get('example', EXECUTE_RESPONSE_RAW),
+            validator=OneOf(list(execute_response_options)),
+            **kwargs)
+
+
+class TransmissionModeEnum(SchemaNode):
+    # noinspection PyUnusedLocal
+    def __init__(self, *args, **kwargs):
+        kwargs.pop('validator', None)   # ignore passed argument and enforce the validator
+        super(TransmissionModeEnum, self).__init__(
+            String(),
+            title=kwargs.get('title', 'transmissionMode'),
+            default=kwargs.get('default', EXECUTE_TRANSMISSION_MODE_REFERENCE),
+            example=kwargs.get('example', EXECUTE_TRANSMISSION_MODE_REFERENCE),
+            validator=OneOf(list(execute_transmission_mode_options)),
+            **kwargs)
+
+
+class JobStatusEnum(SchemaNode):
+    # noinspection PyUnusedLocal
+    def __init__(self, *args, **kwargs):
+        kwargs.pop('validator', None)   # ignore passed argument and enforce the validator
+        super(JobStatusEnum, self).__init__(
+            String(),
+            default=kwargs.get('default', None),
+            example=kwargs.get('example', STATUS_ACCEPTED),
+            validator=OneOf(list(job_status_categories[STATUS_COMPLIANT_OGC])),
+            **kwargs)
+
+
+class JobSortEnum(SchemaNode):
+    # noinspection PyUnusedLocal
+    def __init__(self, *args, **kwargs):
+        kwargs.pop('validator', None)   # ignore passed argument and enforce the validator
+        super(JobSortEnum, self).__init__(
+            String(),
+            default=kwargs.get('default', SORT_CREATED),
+            example=kwargs.get('example', SORT_CREATED),
+            validator=OneOf(list(job_sort_values)),
+            **kwargs)
 
 
 class LaunchJobQuerystring(MappingSchema):
@@ -551,7 +613,7 @@ class OutputDataType(MappingSchema):
 
 
 class Output(OutputDataType):
-    transmissionMode = TransmissionModeEnum
+    transmissionMode = TransmissionModeEnum(missing=drop)
 
 
 class OutputList(SequenceSchema):
@@ -578,11 +640,11 @@ class ProviderCapabilitiesSchema(MappingSchema):
 
 
 class TransmissionModeList(SequenceSchema):
-    item = TransmissionModeEnum
+    item = TransmissionModeEnum(missing=drop)
 
 
 class JobControlOptionsList(SequenceSchema):
-    item = JobControlOptionsEnum
+    item = JobControlOptionsEnum(missing=drop)
 
 
 class ExceptionReportType(MappingSchema):
@@ -629,27 +691,15 @@ class ProcessOutputDescriptionSchema(MappingSchema):
     title = SchemaNode(String())
 
 
-JobStatusEnum = SchemaNode(
-    String(),
-    default=None,
-    validator=OneOf(list(job_status_categories[STATUS_COMPLIANT_OGC])),
-    example=STATUS_ACCEPTED)
-JobSortEnum = SchemaNode(
-    String(),
-    missing=drop,
-    default=SORT_CREATED,
-    validator=OneOf(list(job_sort_values)),
-    example=SORT_CREATED)
-
-
 class GetJobsQueries(MappingSchema):
-    detail = SchemaNode(Boolean(), description="Provide job details instead of IDs.", default=False, example=True)
+    detail = SchemaNode(Boolean(), description="Provide job details instead of IDs.",
+                        default=False, example=True, missing=drop)
     page = SchemaNode(Integer(), missing=drop, default=0)
     limit = SchemaNode(Integer(), missing=drop, default=10)
-    status = JobStatusEnum
+    status = JobStatusEnum(missing=drop)
     process = SchemaNode(String(), missing=drop, default=None)
     provider = SchemaNode(String(), missing=drop, default=None)
-    sort = JobSortEnum
+    sort = JobSortEnum(missing=drop)
     tags = SchemaNode(String(), missing=drop, default=None,
                       description='Comma-separated values of tags assigned to jobs')
 
@@ -661,7 +711,7 @@ class GetJobsRequest(MappingSchema):
 
 class JobStatusInfo(MappingSchema):
     jobID = SchemaNode(String(), example='a9d14bf4-84e0-449a-bac8-16e598efe807', description="ID of the job.")
-    status = JobStatusEnum
+    status = JobStatusEnum()
     message = SchemaNode(String(), missing=drop)
     logs = SchemaNode(String(), missing=drop)
     expirationDate = SchemaNode(DateTime(), missing=drop)
@@ -697,7 +747,7 @@ class GetAllJobsSchema(MappingSchema):
 
 
 class DismissedJobSchema(MappingSchema):
-    status = JobStatusEnum
+    status = JobStatusEnum()
     jobID = SchemaNode(String(), example='a9d14bf4-84e0-449a-bac8-16e598efe807', description="ID of the job.")
     message = SchemaNode(String(), example='Job dismissed.')
     percentCompleted = SchemaNode(Integer(), example=0)
@@ -706,8 +756,8 @@ class DismissedJobSchema(MappingSchema):
 class QuoteProcessParametersSchema(MappingSchema):
     inputs = InputTypeList(missing=drop)
     outputs = OutputDescriptionList(missing=drop)
-    mode = JobExecuteModeEnum
-    response = JobResponseOptionsEnum
+    mode = JobExecuteModeEnum(missing=drop)
+    response = JobResponseOptionsEnum(missing=drop)
 
 
 class AlternateQuotation(MappingSchema):
@@ -1038,19 +1088,23 @@ class ProcessQuoteEndpoint(MappingSchema):
     header = AcceptHeader()
 
 
-QuoteSortEnum = SchemaNode(
-    String(),
-    missing=drop,
-    default=SORT_ID,
-    validator=OneOf(quote_sort_values),
-    example=SORT_PROCESS)
+class QuoteSortEnum(SchemaNode):
+    # noinspection PyUnusedLocal
+    def __init__(self, *args, **kwargs):
+        kwargs.pop('validator', None)   # ignore passed argument and enforce the validator
+        super(QuoteSortEnum, self).__init__(
+            String(),
+            default=kwargs.get('default', SORT_ID),
+            example=kwargs.get('example', SORT_PROCESS),
+            validator=OneOf(quote_sort_values),
+            **kwargs)
 
 
 class GetQuotesQueries(MappingSchema):
     page = SchemaNode(Integer(), missing=drop, default=0)
     limit = SchemaNode(Integer(), missing=drop, default=10)
     process = SchemaNode(String(), missing=drop, default=None)
-    sort = QuoteSortEnum
+    sort = QuoteSortEnum(missing=drop)
 
 
 class QuotesEndpoint(MappingSchema):
