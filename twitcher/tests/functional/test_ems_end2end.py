@@ -93,7 +93,7 @@ class End2EndEMSTestCase(TestCase):
     @staticmethod
     def mock_get_data_source_from_url(data_url):
         forbidden_data_source = ['probav-l1-ades.vgt.vito.be',
-                                 'probav - l2 - ades.vgt.vito.be',
+                                 'probav-l2-ades.vgt.vito.be',
                                  'deimos-cubewerx']
         data_sources = fetch_data_sources()
         # noinspection PyBroadException
