@@ -96,6 +96,7 @@ class End2EndEMSTestCase(TestCase):
                                  'probav - l2 - ades.vgt.vito.be',
                                  'deimos-cubewerx']
         data_sources = fetch_data_sources()
+        # noinspection PyBroadException
         try:
             parsed = urlparse(data_url)
             netloc, path, scheme = parsed.netloc, parsed.path, parsed.scheme
@@ -103,7 +104,6 @@ class End2EndEMSTestCase(TestCase):
                 for src, val in data_sources.items():
                     if src not in forbidden_data_source and val['netloc'] == netloc:
                         return src
-        # noinspection PyBroadException
         except Exception:
             pass
         # Default mocked data source
@@ -388,7 +388,7 @@ class End2EndEMSTestCase(TestCase):
             }
             headers = {'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'}
             path = '{}/oauth2/token'.format(cls.WSO2_HOSTNAME)
-            resp = cls.request('POST', path, json=data, headers=headers, force_requests=True)
+            resp = cls.request('POST', path, data=data, headers=headers, force_requests=True)
             if resp.status_code == HTTPOk.code:
                 access_token = resp.json().get('access_token')
                 cls.assert_test(lambda: access_token is not None, message="Failed login!")
@@ -575,7 +575,7 @@ class End2EndEMSTestCase(TestCase):
                         message="Twitcher must be configured as EMS.")
 
     def test_end2end(self):
-        """The actual test!"""
+        """Full workflow execution procedure with authentication enabled."""
         # End to end test will log everything
         self.__class__.log_full_trace = True
 
