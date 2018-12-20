@@ -265,20 +265,25 @@ class End2EndEMSTestCase(TestCase):
         # type: (...) -> None
         cls.PROCESS_STACKER_ID = 'Stacker'
         cls.PROCESS_SFS_ID = 'SFS'
+        cls.PROCESS_FLOOD_DETECTION_ID = 'FloodDetection'
         cls.PROCESS_WORKFLOW_ID = 'Workflow'
         cls.PROCESS_WORKFLOW_SC_ID = 'WorkflowSimpleChain'
         cls.PROCESS_WORKFLOW_S2P_ID = 'WorkflowS2ProbaV'
         cls.PROCESS_WORKFLOW_CUSTOM_ID = 'CustomWorkflow'
+        cls.PROCESS_WORKFLOW_FLOOD_DETECTION_ID = 'WorkflowFloodDetection'
         test_set = [cls.PROCESS_STACKER_ID,
                     cls.PROCESS_SFS_ID,
+                    cls.PROCESS_FLOOD_DETECTION_ID,
                     cls.PROCESS_WORKFLOW_ID,
                     cls.PROCESS_WORKFLOW_SC_ID,
                     cls.PROCESS_WORKFLOW_S2P_ID,
-                    cls.PROCESS_WORKFLOW_CUSTOM_ID]
+                    cls.PROCESS_WORKFLOW_CUSTOM_ID,
+                    cls.PROCESS_WORKFLOW_FLOOD_DETECTION_ID]
         workflow_set = [cls.PROCESS_WORKFLOW_ID,
                         cls.PROCESS_WORKFLOW_SC_ID,
                         cls.PROCESS_WORKFLOW_S2P_ID,
-                        cls.PROCESS_WORKFLOW_CUSTOM_ID]
+                        cls.PROCESS_WORKFLOW_CUSTOM_ID,
+                        cls.PROCESS_WORKFLOW_FLOOD_DETECTION_ID]
         for process in test_set:
             cls.test_processes_info.update({process: cls.retrieve_process_info(process)})
 
@@ -672,6 +677,10 @@ class End2EndEMSTestCase(TestCase):
     @pytest.mark.demo
     def test_demo_workflow_custom(self):
         self.workflow_demo_runner(self.PROCESS_WORKFLOW_CUSTOM_ID)
+
+    @pytest.mark.demo
+    def test_demo_workflow_flood_detection(self):
+        self.workflow_demo_runner(self.PROCESS_WORKFLOW_FLOOD_DETECTION_ID)
 
     # noinspection PyDeprecation
     def workflow_demo_runner(self, test_workflow_id):
