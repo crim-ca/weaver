@@ -267,7 +267,7 @@ class End2EndEMSTestCase(TestCase):
         cls.PROCESS_SFS_ID = 'SFS'
         cls.PROCESS_WORKFLOW_ID = 'Workflow'
         cls.PROCESS_WORKFLOW_SC_ID = 'WorkflowSimpleChain'
-        cls.PROCESS_WORKFLOW_S2P_ID = 'WorkflowS2Probav'
+        cls.PROCESS_WORKFLOW_S2P_ID = 'WorkflowS2ProbaV'
         cls.PROCESS_WORKFLOW_CUSTOM_ID = 'CustomWorkflow'
         test_set = [cls.PROCESS_STACKER_ID,
                     cls.PROCESS_SFS_ID,
