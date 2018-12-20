@@ -125,7 +125,7 @@ def validate_service_process(request):
             path_type = 'Service'
             path_test = path_service
             store = servicestore_factory(request.registry)
-            store.fetch_by_name(path_service, request=request)
+            store.fetch_by_name(path_service, visibility=VISIBILITY_PUBLIC, request=request)
         if path_process:
             path_type = 'Process'
             path_test = path_process

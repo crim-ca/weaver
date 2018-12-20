@@ -7,12 +7,13 @@ for testing purposes.
 
 import six
 from twitcher.store.base import AccessTokenStore, ServiceStore, ProcessStore, JobStore, QuoteStore, BillStore
-from twitcher.visibility import visibility_values, VISIBILITY_PUBLIC
+from twitcher.visibility import visibility_values, VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
 from twitcher.datatype import Service, Process, Job
 from twitcher.exceptions import (
     AccessTokenNotFound,
     ServiceRegistrationError,
     ServiceNotFound,
+    ServiceNotAccessible,
     ProcessNotAccessible,
     ProcessNotFound,
     JobNotFound,
@@ -127,14 +128,19 @@ class MemoryServiceStore(ServiceStore, MemoryStore):
             my_services.append(Service(service))
         return my_services
 
-    def fetch_by_name(self, name, request=None):
+    def fetch_by_name(self, name, visibility=None, request=None):
         """
         Get service for given ``name`` from memory storage.
         """
         service = self.name_index.get(name)
         if not service:
-            raise ServiceNotFound
-        return Service(service)
+            raise ServiceNotFound("Service `{}` could not be found.".format(name))
+        service = Service(service)
+        same_visibility = (service.public and visibility == VISIBILITY_PUBLIC) or \
+                          (not service.public and visibility == VISIBILITY_PRIVATE)
+        if visibility is not None and not same_visibility:
+            raise ServiceNotAccessible("Service `{}` cannot be accessed.".format(name))
+        return service
 
     def fetch_by_url(self, url, request=None):
         """

@@ -19,6 +19,14 @@ class AccessTokenNotFound(Exception):
     pass
 
 
+class ServiceNotAccessible(Exception):
+    """
+    Error indicating that a WPS service exists but is not visible to retrieve
+    from the storage backend of an instance of :class:`twitcher.store.ServiceStore`.
+    """
+    pass
+
+
 class ServiceNotFound(Exception):
     """
     Error indicating that an OWS service could not be read from the

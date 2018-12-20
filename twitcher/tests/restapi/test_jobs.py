@@ -1,6 +1,4 @@
 # noinspection PyPackageRequirements
-import pytest
-# noinspection PyPackageRequirements
 import mock
 # noinspection PyPackageRequirements
 import webtest
@@ -10,10 +8,21 @@ import json
 import pyramid.testing
 import six
 from collections import OrderedDict
+# noinspection PyDeprecation
 from contextlib import nested
 from typing import AnyStr, Tuple, List, Union
-from twitcher.tests.utils import setup_config_with_mongodb, setup_mongodb_processstore, setup_mongodb_jobstore
-from twitcher.datatype import Job
+from twitcher.wps_restapi.swagger_definitions import (
+    jobs_short_uri,
+    jobs_full_uri,
+    process_jobs_uri,
+)
+from twitcher.tests.utils import (
+    setup_config_with_mongodb,
+    setup_mongodb_servicestore,
+    setup_mongodb_processstore,
+    setup_mongodb_jobstore,
+)
+from twitcher.datatype import Service, Job
 from twitcher.processes.wps_testing import WpsTestProcess
 from twitcher.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
 from twitcher.warning import TimeZoneInfoAlreadySetWarning
@@ -47,6 +56,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         # rebuild clean db on each test
         self.job_store = setup_mongodb_jobstore(self.config)
         self.process_store = setup_mongodb_processstore(self.config)
+        self.service_store = setup_mongodb_servicestore(self.config)
 
         self.user_admin_id = 100
         self.user_editor1_id = 1
@@ -59,15 +69,20 @@ class WpsRestApiJobsTest(unittest.TestCase):
         self.process_store.save_process(self.process_private)
         self.process_store.set_visibility(self.process_private.identifier, VISIBILITY_PRIVATE)
 
+        self.service_public = Service(name='service-public', url='http://localhost/wps/service-public', public=True)
+        self.service_store.save_service(self.service_public)
+        self.service_private = Service(name='service-private', url='http://localhost/wps/service-private', public=False)
+        self.service_store.save_service(self.service_private)
+
         # create jobs accessible by index
         self.job_info = []  # type: List[Job]
         self.make_job(task_id='0000-0000-0000-0000', process=self.process_public.identifier, service=None,
                       user_id=self.user_editor1_id, status=STATUS_SUCCEEDED, progress=100, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id='1111-1111-1111-1111', process='process-unknown', service='service-A',
+        self.make_job(task_id='1111-1111-1111-1111', process='process-unknown', service=self.service_public.name,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
         self.make_job(task_id='2222-2222-2222-2222', process=self.process_private.identifier, service=None,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=55, access=VISIBILITY_PUBLIC)
-        # same process as Job 1, but private (ex: job ran with private process, then process made public afterwards)
+        # same process as job 0, but private (ex: job ran with private process, then process made public afterwards)
         self.make_job(task_id='3333-3333-3333-3333', process=self.process_public.identifier, service=None,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=55, access=VISIBILITY_PRIVATE)
         # job ran by admin
@@ -101,7 +116,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         is_admin = self.user_admin_id == user_id
         return (
             mock.patch('pyramid.security.AuthenticationAPIMixin.authenticated_userid', new_callable=lambda: user_id),
-            mock.patch('pyramid.request.AuthorizationAPIMixin.has_permission', return_value=lambda x: is_admin),
+            mock.patch('pyramid.request.AuthorizationAPIMixin.has_permission', return_value=is_admin),
         )
 
     @staticmethod
@@ -129,36 +144,40 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert len(response.json['jobs']) <= response.json['limit']
         assert response.json['page'] == response.json['count'] // response.json['limit']
 
+    @staticmethod
+    def add_params(path, **kwargs):
+        return path + "?" + "&".join("{}={}".format(k, v) for k, v in kwargs.items())
+
     def test_get_jobs_normal(self):
-        resp = self.app.get("/jobs", headers=self.json_headers)
+        resp = self.app.get(jobs_short_uri, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
         for job_id in resp.json['jobs']:
             assert isinstance(job_id, six.string_types)
 
-        for var in ('false', 0, 'False', 'no', 'None', 'null', None, ''):
-            path = "/jobs?detail={}".format(var)
+        for detail in ('false', 0, 'False', 'no', 'None', 'null', None, ''):
+            path = self.add_params(jobs_short_uri, detail=detail)
             resp = self.app.get(path, headers=self.json_headers)
             self.check_basic_jobs_info(resp)
             for job_id in resp.json['jobs']:
                 assert isinstance(job_id, six.string_types)
 
     def test_get_jobs_detail(self):
-        for var in ('true', 1, 'True', 'yes'):
-            path = "/jobs?detail={}".format(var)
+        for detail in ('true', 1, 'True', 'yes'):
+            path = self.add_params(jobs_short_uri, detail=detail)
             resp = self.app.get(path, headers=self.json_headers)
             self.check_basic_jobs_info(resp)
             for job in resp.json['jobs']:
                 self.check_job_format(job)
 
     def test_get_process_jobs_in_query_normal(self):
-        path = "/jobs?process={}".format(self.job_info[0].process)
+        path = self.add_params(jobs_short_uri, process=self.job_info[0].process)
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
         assert self.job_info[0].id in resp.json['jobs'], self.message_with_jobs_mapping("expected in")
         assert self.job_info[1].id not in resp.json['jobs'], self.message_with_jobs_mapping("expected not in")
 
     def test_get_process_jobs_in_query_detail(self):
-        path = "/jobs?process={}&detail=true".format(self.job_info[0].process)
+        path = self.add_params(jobs_short_uri, process=self.job_info[0].process, detail='true')
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
         job_ids = [j['jobID'] for j in resp.json['jobs']]
@@ -166,14 +185,14 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert self.job_info[1].id not in job_ids, self.message_with_jobs_mapping("expected not in")
 
     def test_get_process_jobs_in_path_normal(self):
-        path = "/processes/{}/jobs".format(self.job_info[0].process)
+        path = process_jobs_uri.format(process_id=self.job_info[0].process)
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
         assert self.job_info[0].id in resp.json['jobs'], self.message_with_jobs_mapping("expected in")
         assert self.job_info[1].id not in resp.json['jobs'], self.message_with_jobs_mapping("expected not in")
 
     def test_get_process_jobs_in_path_detail(self):
-        path = "/processes/{}/jobs?detail=true".format(self.job_info[0].process)
+        path = process_jobs_uri.format(process_id=self.job_info[0].process) + "?detail=true"
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
         job_ids = [j['jobID'] for j in resp.json['jobs']]
@@ -182,84 +201,123 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     def test_get_process_jobs_unknown_in_path(self):
         # path must validate each object, so error on not found process
-        path = "/processes/{}/jobs".format('unknown-process-id')
+        path = process_jobs_uri.format(process_id='unknown-process-id')
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
         assert resp.content_type == 'application/json'
 
     def test_get_process_jobs_unknown_in_query(self):
         # query acts as a filter, so no error on not found process
-        path = "/jobs?process={}".format('unknown-process-id')
+        path = self.add_params(jobs_short_uri, process='unknown-process-id')
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
         assert len(resp.json['jobs']) == 0
 
+    def test_get_process_jobs_private_unauthorized_in_path(self):
+        # private process in path returns unauthorized access
+        path = process_jobs_uri.format(process_id=self.process_private.identifier)
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 401
+        assert resp.content_type == 'application/json'
+
+    def test_get_process_jobs_private_unauthorized_in_query(self):
+        # private process in query returns unauthorized access
+        path = self.add_params(jobs_short_uri, process=self.process_private.identifier)
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 401
+        assert resp.content_type == 'application/json'
+
     def test_get_service_and_process_jobs_unknown_in_path(self):
         # path must validate each object, so error on not found process
-        path = "/service/{}/processes/{}/jobs".format('unknown-service-id', 'unknown-process-id')
+        path = jobs_full_uri.format(provider_id='unknown-service-id', process_id='unknown-process-id')
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
         assert resp.content_type == 'application/json'
 
     def test_get_service_and_process_jobs_unknown_in_query(self):
         # query acts as a filter, so no error on not found process
-        path = "/jobs?service={}&process={}".format('unknown-service-id', 'unknown-process-id')
+        path = self.add_params(jobs_short_uri, service='unknown-service-id', process='unknown-process-id')
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
         assert len(resp.json['jobs']) == 0
 
-    def test_get_jobs_with_access(self):
-        # Job 1 should have public visibility to all,
-        # Job 4 only with private access (same editor or any admin)
+    def test_get_service_jobs_private_unauthorized_in_path(self):
+        # private process in path returns unauthorized access
+        path = jobs_full_uri.format(provider_id=self.service_private.name, process_id=self.process_public.identifier)
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 401
+        assert resp.content_type == 'application/json'
 
-        uri_direct_jobs = "/jobs"
-        uri_process_job = "/processes/{}/jobs".format(self.process_private.identifier)
+    def test_get_service_jobs_private_unauthorized_in_query(self):
+        # private process in query returns unauthorized access
+        path = self.add_params(jobs_short_uri,
+                               service=self.service_private.name,
+                               process=self.process_public.identifier)
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 401
+        assert resp.content_type == 'application/json'
+
+    def test_get_jobs_public_with_access_and_request_user(self):
+        uri_direct_jobs = jobs_short_uri
+        uri_process_jobs = process_jobs_uri.format(process_id=self.process_public.identifier)
+        uri_provider_jobs = jobs_full_uri.format(
+            provider_id=self.service_public.name, process_id=self.process_public.identifier)
+
+        admin_public_jobs = filter(lambda j: VISIBILITY_PUBLIC in j.access, self.job_info)
+        admin_private_jobs = filter(lambda j: VISIBILITY_PRIVATE in j.access, self.job_info)
+        editor1_all_jobs = filter(lambda j: j.user_id == self.user_editor1_id, self.job_info)
+        editor1_public_jobs = filter(lambda j: VISIBILITY_PUBLIC in j.access, editor1_all_jobs)
+        editor1_private_jobs = filter(lambda j: VISIBILITY_PRIVATE in j.access, editor1_all_jobs)
+        public_jobs = filter(lambda j: VISIBILITY_PUBLIC in j.access, self.job_info)
 
         def filter_process(jobs):
-            return filter(lambda j: j.process == self.process_private.identifier, jobs)
+            return filter(lambda j: j.process == self.process_public.identifier, jobs)
 
-        access_none = ""
-        access_private = "?access={}".format(VISIBILITY_PRIVATE)
-        access_public = "?access={}".format(VISIBILITY_PUBLIC)
-
-        admin_public_jobs = filter(lambda j: VISIBILITY_PUBLIC in j.tags, self.job_info)
-        admin_private_jobs = filter(lambda j: VISIBILITY_PRIVATE in j.tags, self.job_info)
-        editor1_all_jobs = filter(lambda j: j.user_id == self.user_editor1_id, self.job_info)
-        editor1_public_jobs = filter(lambda j: VISIBILITY_PUBLIC in j.tags, editor1_all_jobs)
-        editor1_private_jobs = filter(lambda j: VISIBILITY_PRIVATE in j.tags, editor1_all_jobs)
-        public_jobs = filter(lambda j: VISIBILITY_PUBLIC in j.tags, self.job_info)
+        def filter_service(jobs):
+            return filter(lambda j: j.service == self.service_public.name, jobs)
 
         # test variations of [paths, query, user-id, expected-job-ids]
         path_jobs_user_req_tests = [
-            (uri_direct_jobs, access_none,      None,                   public_jobs),
-            (uri_direct_jobs, access_none,      self.user_editor1_id,   editor1_all_jobs),
-            (uri_direct_jobs, access_none,      self.user_admin_id,     self.job_info),
-            (uri_direct_jobs, access_private,   None,                   []),
-            (uri_direct_jobs, access_private,   self.user_editor1_id,   editor1_private_jobs),
-            (uri_direct_jobs, access_private,   self.user_admin_id,     admin_private_jobs),
-            (uri_direct_jobs, access_public,    None,                   public_jobs),
-            (uri_direct_jobs, access_public,    self.user_editor1_id,   editor1_public_jobs),
-            (uri_direct_jobs, access_public,    self.user_admin_id,     admin_public_jobs),
+            # URI               ACCESS              USER                    EXPECTED JOBS
+            (uri_direct_jobs,   None,               None,                   public_jobs),  # no user only can see public
+            (uri_direct_jobs,   None,               self.user_editor1_id,   editor1_all_jobs),
+            (uri_direct_jobs,   None,               self.user_admin_id,     self.job_info),
+            (uri_direct_jobs,   VISIBILITY_PRIVATE, None,                   public_jobs),  # no user overrides to public
+            (uri_direct_jobs,   VISIBILITY_PRIVATE, self.user_editor1_id,   editor1_private_jobs),
+            (uri_direct_jobs,   VISIBILITY_PRIVATE, self.user_admin_id,     admin_private_jobs),
+            (uri_direct_jobs,   VISIBILITY_PUBLIC,  None,                   public_jobs),
+            (uri_direct_jobs,   VISIBILITY_PUBLIC,  self.user_editor1_id,   editor1_public_jobs),
+            (uri_direct_jobs,   VISIBILITY_PUBLIC,  self.user_admin_id,     admin_public_jobs),
             # ---
-            (uri_process_job, access_none,      None,                   filter_process(public_jobs)),
-            (uri_process_job, access_none,      self.user_editor1_id,   filter_process(editor1_all_jobs)),
-            (uri_process_job, access_none,      self.user_admin_id,     filter_process(self.job_info)),
-            (uri_process_job, access_private,   None,                   filter_process([])),
-            (uri_process_job, access_private,   self.user_editor1_id,   filter_process(editor1_private_jobs)),
-            (uri_process_job, access_private,   self.user_admin_id,     filter_process(admin_private_jobs)),
-            (uri_process_job, access_public,    None,                   filter_process(public_jobs)),
-            (uri_process_job, access_public,    self.user_editor1_id,   filter_process(editor1_public_jobs)),
-            (uri_process_job, access_public,    self.user_admin_id,     filter_process(self.job_info)),
+            (uri_process_jobs,  None,               None,                   filter_process(public_jobs)),
+            (uri_process_jobs,  None,               self.user_editor1_id,   filter_process(editor1_all_jobs)),
+            (uri_process_jobs,  None,               self.user_admin_id,     filter_process(self.job_info)),
+            (uri_process_jobs,  VISIBILITY_PRIVATE, None,                   filter_process(public_jobs)),
+            (uri_process_jobs,  VISIBILITY_PRIVATE, self.user_editor1_id,   filter_process(editor1_private_jobs)),
+            (uri_process_jobs,  VISIBILITY_PRIVATE, self.user_admin_id,     filter_process(admin_private_jobs)),
+            (uri_process_jobs,  VISIBILITY_PUBLIC,  None,                   filter_process(public_jobs)),
+            (uri_process_jobs,  VISIBILITY_PUBLIC,  self.user_editor1_id,   filter_process(editor1_public_jobs)),
+            (uri_process_jobs,  VISIBILITY_PUBLIC,  self.user_admin_id,     filter_process(self.job_info)),
+            # ---
+            (uri_provider_jobs, None,               None,                   filter_service(public_jobs)),
+            (uri_provider_jobs, None,               self.user_editor1_id,   filter_service(editor1_all_jobs)),
+            (uri_provider_jobs, None,               self.user_admin_id,     filter_service(self.job_info)),
+            (uri_provider_jobs, VISIBILITY_PRIVATE, None,                   filter_service(public_jobs)),
+            (uri_provider_jobs, VISIBILITY_PRIVATE, self.user_editor1_id,   filter_service(editor1_private_jobs)),
+            (uri_provider_jobs, VISIBILITY_PRIVATE, self.user_admin_id,     filter_service(admin_private_jobs)),
+            (uri_provider_jobs, VISIBILITY_PUBLIC,  None,                   filter_service(public_jobs)),
+            (uri_provider_jobs, VISIBILITY_PUBLIC,  self.user_editor1_id,   filter_service(editor1_public_jobs)),
+            (uri_provider_jobs, VISIBILITY_PUBLIC,  self.user_admin_id,     filter_service(self.job_info)),
 
         ]   # type: List[Tuple[AnyStr, AnyStr, Union[None, int], List[AnyStr]]]
 
-        for i, (path, query, user_id, expected_jobs) in enumerate(path_jobs_user_req_tests):
+        for i, (path, access, user_id, expected_jobs) in enumerate(path_jobs_user_req_tests):
             # noinspection PyDeprecation
             with nested(*self.get_job_request_auth_mock(user_id)):
-                test = "{}{}".format(path, query)
+                test = self.add_params(path, access=access) if access else path
                 resp = self.app.get(test, headers=self.json_headers)
                 self.check_basic_jobs_info(resp)
                 job_ids = [job.id for job in expected_jobs]
                 job_match = all(job in job_ids for job in resp.json['jobs'])
-                test_values = dict(path=path, query=query, user_id=user_id)
+                test_values = dict(path=path, access=access, user_id=user_id)
                 assert job_match, self.message_with_jobs_diffs(resp.json['jobs'], job_ids, test_values, index=i)

@@ -6,8 +6,8 @@ from twitcher.store.base import AccessTokenStore, ServiceStore, ProcessStore, Jo
 from twitcher.datatype import AccessToken, Service, Process as ProcessDB, Job, Quote, Bill
 from twitcher.exceptions import (
     AccessTokenNotFound,
-    ServiceRegistrationError, ServiceNotFound,
-    ProcessNotAccessible, ProcessNotFound, ProcessRegistrationError, ProcessInstanceError,
+    ServiceRegistrationError, ServiceNotFound, ServiceNotAccessible,
+    ProcessRegistrationError, ProcessNotFound, ProcessNotAccessible, ProcessInstanceError,
     JobRegistrationError, JobNotFound, JobUpdateError,
     QuoteRegistrationError, QuoteNotFound, QuoteInstanceError,
     BillRegistrationError, BillNotFound, BillInstanceError,
@@ -139,14 +139,19 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
             my_services.append(Service(service))
         return my_services
 
-    def fetch_by_name(self, name, request=None):
+    def fetch_by_name(self, name, visibility=None, request=None):
         """
         Gets service for given ``name`` from mongodb storage.
         """
         service = self.collection.find_one({'name': name})
         if not service:
-            raise ServiceNotFound
-        return Service(service)
+            raise ServiceNotFound("Service `{}` could not be found.".format(name))
+        service = Service(service)
+        same_visibility = (service.public and visibility == VISIBILITY_PUBLIC) or \
+                          (not service.public and visibility == VISIBILITY_PRIVATE)
+        if visibility is not None and not same_visibility:
+            raise ServiceNotAccessible("Service `{}` cannot be accessed.".format(name))
+        return service
 
     def fetch_by_url(self, url, request=None):
         """
@@ -435,7 +440,7 @@ class MongodbJobStore(JobStore, MongodbStore):
             search_filters['access'] = access
         else:
             user_id = authenticated_userid(request)
-            if user_id:
+            if user_id is not None:
                 search_filters['user_id'] = user_id
                 if access in visibility_values:
                     search_filters['access'] = access

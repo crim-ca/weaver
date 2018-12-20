@@ -25,8 +25,9 @@ from twitcher.processes.types import PROCESS_WITH_MAPPING, PROCESS_WPS
 # noinspection PyProtectedMember
 from twitcher.processes.wps_package import _wps2json_io
 from twitcher.status import job_status_values, STATUS_UNKNOWN
-from twitcher.visibility import visibility_values, VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
+from twitcher.visibility import visibility_values, VISIBILITY_PRIVATE
 from owslib.wps import WPSException
+# noinspection PyPackageRequirements
 from pywps import Process as ProcessWPS
 
 import twitcher.wps_restapi.swagger_definitions as sd
@@ -39,8 +40,10 @@ class Service(dict):
 
     def __init__(self, *args, **kwargs):
         super(Service, self).__init__(*args, **kwargs)
+        if 'name' not in self:
+            raise TypeError("Service 'name' is required")
         if 'url' not in self:
-            raise TypeError("'url' is required")
+            raise TypeError("Service 'url' is required")
 
     @property
     def url(self):
@@ -50,7 +53,7 @@ class Service(dict):
     @property
     def name(self):
         """Service name."""
-        return self.get('name', STATUS_UNKNOWN)
+        return self['name']
 
     @property
     def type(self):

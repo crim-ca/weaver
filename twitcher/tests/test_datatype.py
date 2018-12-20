@@ -1,15 +1,14 @@
 """
-Based on unitests in https://github.com/wndhydrnt/python-oauth2/tree/master/oauth2/test
+Based on unittests in https://github.com/wndhydrnt/python-oauth2/tree/master/oauth2/test
 """
 
+# noinspection PyPackageRequirements
 import pytest
 import unittest
-import mock
 
 from twitcher.datatype import AccessToken
 from twitcher.datatype import Service
 from twitcher.utils import expires_at
-from twitcher.status import STATUS_UNKNOWN
 
 
 # noinspection PyMethodMayBeStatic
@@ -25,7 +24,7 @@ class AccessTokenTestCase(unittest.TestCase):
         assert 'expires_at' in access_token.params
 
     def test_missing_token(self):
-        with pytest.raises(TypeError) as e_info:
+        with pytest.raises(TypeError):
             AccessToken()
 
     def test_invalid_access_token(self):
@@ -42,12 +41,11 @@ class AccessTokenTestCase(unittest.TestCase):
 # noinspection PyMethodMayBeStatic
 class ServiceTestCase(unittest.TestCase):
     def test_service_with_url_only(self):
-        service = Service(url='http://nowhere/wps')
-        assert service.url == 'http://nowhere/wps'
-        assert service.name == STATUS_UNKNOWN
+        with pytest.raises(TypeError):
+            Service(url='http://nowhere/wps')
 
     def test_missing_url(self):
-        with pytest.raises(TypeError) as e_info:
+        with pytest.raises(TypeError):
             Service()
 
     def test_service_with_name(self):

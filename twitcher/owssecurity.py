@@ -94,7 +94,7 @@ class OWSSecurity(OWSSecurityInterface):
                     LOGGER.warn('public access for service %s', service_name)
             except ServiceNotFound:
                 # TODO: why not raising an exception?
-                service = Service(url='unregistered', public=False, auth='token')
+                service = Service(url='unregistered', name='unregistered', public=False, auth='token')
                 LOGGER.warn("Service not registered.")
             ows_request = OWSRequest(request)
             if not ows_request.service_allowed():

@@ -85,8 +85,8 @@ class ServiceStore(StoreInterface):
         """
         raise NotImplementedError
 
-    def fetch_by_name(self, name, request=None):
-        # type: (AnyStr, Optional[Request]) -> Service
+    def fetch_by_name(self, name, visibility=None, request=None):
+        # type: (AnyStr, Optional[AnyStr], Optional[Request]) -> Service
         """
         Get service for given ``name`` from storage.
         """
