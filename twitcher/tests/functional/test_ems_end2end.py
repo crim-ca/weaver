@@ -93,9 +93,10 @@ class End2EndEMSTestCase(TestCase):
     @staticmethod
     def mock_get_data_source_from_url(data_url):
         forbidden_data_source = ['probav-l1-ades.vgt.vito.be',
-                                 'probav - l2 - ades.vgt.vito.be',
+                                 'probav-l2-ades.vgt.vito.be',
                                  'deimos-cubewerx']
         data_sources = fetch_data_sources()
+        # noinspection PyBroadException
         try:
             parsed = urlparse(data_url)
             netloc, path, scheme = parsed.netloc, parsed.path, parsed.scheme
@@ -103,7 +104,6 @@ class End2EndEMSTestCase(TestCase):
                 for src, val in data_sources.items():
                     if src not in forbidden_data_source and val['netloc'] == netloc:
                         return src
-        # noinspection PyBroadException
         except Exception:
             pass
         # Default mocked data source
@@ -265,20 +265,25 @@ class End2EndEMSTestCase(TestCase):
         # type: (...) -> None
         cls.PROCESS_STACKER_ID = 'Stacker'
         cls.PROCESS_SFS_ID = 'SFS'
+        cls.PROCESS_FLOOD_DETECTION_ID = 'FloodDetection'
         cls.PROCESS_WORKFLOW_ID = 'Workflow'
         cls.PROCESS_WORKFLOW_SC_ID = 'WorkflowSimpleChain'
-        cls.PROCESS_WORKFLOW_S2P_ID = 'WorkflowS2Probav'
+        cls.PROCESS_WORKFLOW_S2P_ID = 'WorkflowS2ProbaV'
         cls.PROCESS_WORKFLOW_CUSTOM_ID = 'CustomWorkflow'
+        cls.PROCESS_WORKFLOW_FLOOD_DETECTION_ID = 'WorkflowFloodDetection'
         test_set = [cls.PROCESS_STACKER_ID,
                     cls.PROCESS_SFS_ID,
+                    cls.PROCESS_FLOOD_DETECTION_ID,
                     cls.PROCESS_WORKFLOW_ID,
                     cls.PROCESS_WORKFLOW_SC_ID,
                     cls.PROCESS_WORKFLOW_S2P_ID,
-                    cls.PROCESS_WORKFLOW_CUSTOM_ID]
+                    cls.PROCESS_WORKFLOW_CUSTOM_ID,
+                    cls.PROCESS_WORKFLOW_FLOOD_DETECTION_ID]
         workflow_set = [cls.PROCESS_WORKFLOW_ID,
                         cls.PROCESS_WORKFLOW_SC_ID,
                         cls.PROCESS_WORKFLOW_S2P_ID,
-                        cls.PROCESS_WORKFLOW_CUSTOM_ID]
+                        cls.PROCESS_WORKFLOW_CUSTOM_ID,
+                        cls.PROCESS_WORKFLOW_FLOOD_DETECTION_ID]
         for process in test_set:
             cls.test_processes_info.update({process: cls.retrieve_process_info(process)})
 
@@ -388,7 +393,7 @@ class End2EndEMSTestCase(TestCase):
             }
             headers = {'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'}
             path = '{}/oauth2/token'.format(cls.WSO2_HOSTNAME)
-            resp = cls.request('POST', path, json=data, headers=headers, force_requests=True)
+            resp = cls.request('POST', path, data=data, headers=headers, force_requests=True)
             if resp.status_code == HTTPOk.code:
                 access_token = resp.json().get('access_token')
                 cls.assert_test(lambda: access_token is not None, message="Failed login!")
@@ -575,7 +580,7 @@ class End2EndEMSTestCase(TestCase):
                         message="Twitcher must be configured as EMS.")
 
     def test_end2end(self):
-        """The actual test!"""
+        """Full workflow execution procedure with authentication enabled."""
         # End to end test will log everything
         self.__class__.log_full_trace = True
 
@@ -672,6 +677,10 @@ class End2EndEMSTestCase(TestCase):
     @pytest.mark.demo
     def test_demo_workflow_custom(self):
         self.workflow_demo_runner(self.PROCESS_WORKFLOW_CUSTOM_ID)
+
+    @pytest.mark.demo
+    def test_demo_workflow_flood_detection(self):
+        self.workflow_demo_runner(self.PROCESS_WORKFLOW_FLOOD_DETECTION_ID)
 
     # noinspection PyDeprecation
     def workflow_demo_runner(self, test_workflow_id):
