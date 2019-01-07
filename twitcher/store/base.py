@@ -8,7 +8,7 @@ solution specific to your needs.
 The implementation is based on `python-oauth2 <http://python-oauth2.readthedocs.io/en/latest/>`_.
 """
 from pyramid.request import Request
-from typing import Any, Optional, List, Union, AnyStr
+from typing import Any, Optional, List, Union, AnyStr, Tuple
 from twitcher.datatype import Job, Service, Process, Quote, Bill, AccessToken
 # noinspection PyPackageRequirements
 from pywps import Process as ProcessWPS
@@ -85,8 +85,8 @@ class ServiceStore(StoreInterface):
         """
         raise NotImplementedError
 
-    def fetch_by_name(self, name, request=None):
-        # type: (AnyStr, Optional[Request]) -> Service
+    def fetch_by_name(self, name, visibility=None, request=None):
+        # type: (AnyStr, Optional[AnyStr], Optional[Request]) -> Service
         """
         Get service for given ``name`` from storage.
         """
@@ -196,7 +196,8 @@ class JobStore(StoreInterface):
                  is_workflow=False,     # type: Optional[bool]
                  user_id=None,          # type: Optional[int]
                  execute_async=True,    # type: Optional[bool]
-                 custom_tags=None       # type: Optional[List[AnyStr]]
+                 custom_tags=None,      # type: Optional[List[AnyStr]]
+                 access=None,           # type: Optional[AnyStr]
                  ):                     # type: (...) -> Job
         """
         Stores a job in storage.
@@ -241,7 +242,7 @@ class JobStore(StoreInterface):
                   access=None,      # type: Optional[AnyStr]
                   status=None,      # type: Optional[AnyStr]
                   sort=None,        # type: Optional[AnyStr]
-                  ):                # type: (...) -> List[Job]
+                  ):                # type: (...) -> Tuple[List[Job], int]
         """
         Finds all jobs in database matching search filters.
         """

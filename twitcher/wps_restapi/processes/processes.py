@@ -9,7 +9,6 @@ from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import URLError
 from time import sleep
 from typing import Any, AnyStr, Dict, List, Tuple
-
 from twitcher.wps import load_pywps_cfg
 from twitcher.adapter import servicestore_factory, jobstore_factory, processstore_factory
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS
@@ -303,7 +302,6 @@ def validate_supported_submit_job_handler_parameters(json_body):
     """
     Tests supported parameters not automatically validated by colander deserialize.
     """
-
     if json_body['mode'] not in [EXECUTE_MODE_ASYNC, EXECUTE_MODE_AUTO]:
         raise HTTPNotImplemented(detail="Execution mode `{0}` not supported.".format(json_body['mode']))
 
@@ -316,8 +314,8 @@ def validate_supported_submit_job_handler_parameters(json_body):
                                      .format(job_output['transmissionMode']))
 
 
-def submit_job_handler(request, service_url, is_workflow=False):
-    # type: (Request, AnyStr, bool) -> HTTPSuccessful
+def submit_job_handler(request, service_url, is_workflow=False, visibility=None):
+    # type: (Request, AnyStr, bool, Optional[AnyStr]) -> HTTPSuccessful
 
     # validate body with expected JSON content and schema
     if 'application/json' not in request.content_type:
@@ -341,7 +339,7 @@ def submit_job_handler(request, service_url, is_workflow=False):
 
     store = jobstore_factory(request.registry)
     job = store.save_job(task_id=STATUS_ACCEPTED, process=process_id, service=provider_id,
-                         inputs=json_body.get('inputs'), is_workflow=is_workflow,
+                         inputs=json_body.get('inputs'), is_workflow=is_workflow, access=visibility,
                          user_id=request.authenticated_userid, execute_async=is_execute_async, custom_tags=tags)
     result = execute_process.delay(
         job_id=job.id,
@@ -772,7 +770,9 @@ def submit_local_job(request):
     try:
         store = processstore_factory(request.registry)
         process = store.fetch_by_id(process_id, visibility=VISIBILITY_PUBLIC, request=request)
-        resp = submit_job_handler(request, process.processEndpointWPS1, is_workflow=process.type == PROCESS_WORKFLOW)
+        resp = submit_job_handler(request, process.processEndpointWPS1,
+                                  is_workflow=process.type == PROCESS_WORKFLOW,
+                                  visibility=process.visibility)
         return resp
     except HTTPException:
         raise  # re-throw already handled HTTPException

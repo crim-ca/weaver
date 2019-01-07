@@ -5,7 +5,9 @@ import argcomplete
 import argparse
 
 from twitcher.client import TwitcherService
+from twitcher.warning import DisabledSSLCertificateVerificationWarning
 
+import warnings
 import logging
 LOGGER_LEVEL = os.getenv('TWITCHER_LOGGER_LEVEL', logging.WARN)
 logging.basicConfig(format='%(levelname)s:%(message)s', level=LOGGER_LEVEL)
@@ -100,7 +102,7 @@ class TwitcherCtl(object):
             LOGGER.setLevel(logging.DEBUG)
 
         if args.insecure:
-            LOGGER.warn('disabled certificate verification!')
+            warnings.warn("Disabled certificate verification!", DisabledSSLCertificateVerificationWarning)
 
         password = args.password
         if args.username:

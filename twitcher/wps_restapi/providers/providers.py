@@ -1,13 +1,15 @@
 from twitcher.wps_restapi import swagger_definitions as sd
 from owslib.wps import WebProcessingService
 from pyramid.httpexceptions import *
-from pyramid.response import Response
 from twitcher.adapter import servicestore_factory
 from twitcher.datatype import Service
 from twitcher.exceptions import ServiceNotFound
+from twitcher.warning import NonBreakingExceptionWarning
+from twitcher.owsexceptions import OWSMissingParameterValue, OWSNotImplemented
 from twitcher.utils import get_any_id
 from twitcher.wps_restapi.utils import wps_restapi_base_url, get_cookie_headers
 
+import warnings
 import logging
 logger = logging.getLogger('TWITCHER')
 
@@ -36,7 +38,8 @@ def get_providers(request):
                     provider_id=service.name),
                 public=service.public))
         except Exception as e:
-            logger.warn('Exception occurs while fetching wps {0} : {1!r}'.format(service.url, e))
+            warnings.warn("Exception occurs while fetching wps {0} : {1!r}".format(service.url, e),
+                          NonBreakingExceptionWarning)
             pass
 
     return HTTPOk(json=providers)
@@ -71,8 +74,7 @@ def get_service(request):
     try:
         service = store.fetch_by_name(provider_id, request=request)
     except ServiceNotFound:
-        logger.warn('Provider {0} cannot be found'.format(provider_id))
-        raise HTTPNotFound('Provider {0} cannot be found'.format(provider_id))
+        raise HTTPNotFound("Provider {0} cannot be found.".format(provider_id))
     return service, store
 
 
@@ -87,8 +89,7 @@ def add_provider(request):
     try:
         new_service = Service(url=request.json['url'], name=get_any_id(request.json))
     except KeyError as e:
-        logger.warn('Missing json parameter {0}'.format(e))
-        raise HTTPBadRequest(detail='Missing json parameter {0}'.format(e))
+        raise OWSMissingParameterValue("Missing json parameter '{!s}'.".format(e))
 
     if 'public' in request.json:
         new_service['public'] = request.json['public']
@@ -98,8 +99,7 @@ def add_provider(request):
     try:
         store.save_service(new_service, request=request)
     except NotImplementedError:
-        logger.warn('Add provider not supported')
-        raise HTTPNotImplemented(detail='Add provider not supported')
+        raise OWSNotImplemented("Add provider not supported.", value=new_service)
 
     return HTTPCreated(json=get_capabilities(new_service, request))
 
@@ -115,8 +115,7 @@ def remove_provider(request):
     try:
         store.delete_service(service.name, request=request)
     except NotImplementedError:
-        logger.warn('Delete provider not supported')
-        raise HTTPNotImplemented(detail='Delete provider not supported')
+        raise OWSNotImplemented("Delete provider not supported.")
 
     return HTTPNoContent(json={})
 

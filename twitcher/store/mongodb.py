@@ -1,27 +1,29 @@
 """
 Store adapters to read/write data to from/to mongodb using pymongo.
 """
+
 from twitcher.store.base import AccessTokenStore, ServiceStore, ProcessStore, JobStore, QuoteStore, BillStore
 from twitcher.datatype import AccessToken, Service, Process as ProcessDB, Job, Quote, Bill
-from twitcher.exceptions import AccessTokenNotFound
-from twitcher.utils import islambda, now, baseurl
-from twitcher.sort import *
-from twitcher.status import STATUS_ACCEPTED, map_status, job_status_categories
-from twitcher.visibility import visibility_values
 from twitcher.exceptions import (
-    ServiceRegistrationError, ServiceNotFound,
-    ProcessNotAccessible, ProcessNotFound, ProcessRegistrationError, ProcessInstanceError,
+    AccessTokenNotFound,
+    ServiceRegistrationError, ServiceNotFound, ServiceNotAccessible,
+    ProcessRegistrationError, ProcessNotFound, ProcessNotAccessible, ProcessInstanceError,
     JobRegistrationError, JobNotFound, JobUpdateError,
     QuoteRegistrationError, QuoteNotFound, QuoteInstanceError,
     BillRegistrationError, BillNotFound, BillInstanceError,
 )
 from twitcher import namesgenerator
-from twitcher.processes.types import PROCESS_WPS
+from twitcher.utils import baseurl, islambda, now
+from twitcher.execute import EXECUTE_MODE_ASYNC, EXECUTE_MODE_SYNC
+from twitcher.processes.types import PROCESS_WORKFLOW, PROCESS_APPLICATION, PROCESS_WPS
+from twitcher.status import STATUS_ACCEPTED, map_status, job_status_categories
+from twitcher.visibility import visibility_values, VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
+from twitcher.sort import *
 # noinspection PyPackageRequirements
 from pywps import Process as ProcessWPS
 from pyramid.security import authenticated_userid
-from pymongo import ASCENDING, DESCENDING
 from typing import Any, Dict, Tuple
+from pymongo import ASCENDING, DESCENDING
 import pymongo
 import six
 import logging
@@ -137,14 +139,19 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
             my_services.append(Service(service))
         return my_services
 
-    def fetch_by_name(self, name, request=None):
+    def fetch_by_name(self, name, visibility=None, request=None):
         """
         Gets service for given ``name`` from mongodb storage.
         """
         service = self.collection.find_one({'name': name})
         if not service:
-            raise ServiceNotFound
-        return Service(service)
+            raise ServiceNotFound("Service `{}` could not be found.".format(name))
+        service = Service(service)
+        same_visibility = (service.public and visibility == VISIBILITY_PUBLIC) or \
+                          (not service.public and visibility == VISIBILITY_PRIVATE)
+        if visibility is not None and not same_visibility:
+            raise ServiceNotAccessible("Service `{}` cannot be accessed.".format(name))
+        return service
 
     def fetch_by_url(self, url, request=None):
         """
@@ -341,21 +348,23 @@ class MongodbJobStore(JobStore, MongodbStore):
         MongodbStore.__init__(self, *db_args, **db_kwargs)
 
     def save_job(self, task_id, process, service=None, inputs=None, is_workflow=False,
-                 user_id=None, execute_async=True, custom_tags=None):
+                 user_id=None, execute_async=True, custom_tags=None, access=None):
         """
         Stores a job in mongodb.
         """
         try:
             tags = ['dev']
-            tags.extend(custom_tags or list())
+            tags.extend(filter(lambda t: t, custom_tags or list()))
             if is_workflow:
-                tags.append('workflow')
+                tags.append(PROCESS_WORKFLOW)
             else:
-                tags.append('single')
+                tags.append(PROCESS_APPLICATION)
             if execute_async:
-                tags.append('async')
+                tags.append(EXECUTE_MODE_ASYNC)
             else:
-                tags.append('sync')
+                tags.append(EXECUTE_MODE_SYNC)
+            if not access:
+                access = VISIBILITY_PRIVATE
             new_job = Job({
                 'task_id': task_id,
                 'user_id': user_id,
@@ -367,6 +376,7 @@ class MongodbJobStore(JobStore, MongodbStore):
                 'is_workflow': is_workflow,
                 'created': now(),
                 'tags': tags,
+                'access': access,
             })
             self.collection.insert_one(new_job)
             job = self.fetch_by_id(job_id=new_job.id)
@@ -408,6 +418,7 @@ class MongodbJobStore(JobStore, MongodbStore):
     def list_jobs(self, request=None):
         """
         Lists all jobs in mongodb storage.
+        For user-specific access to available jobs, use `find_jobs` instead.
         """
         jobs = []
         for job in self.collection.find().sort('id', ASCENDING):
@@ -419,18 +430,25 @@ class MongodbJobStore(JobStore, MongodbStore):
         """
         Finds all jobs in mongodb storage matching search filters.
         """
+
+        if any(v in tags for v in visibility_values):
+            raise ValueError("Visibility values not acceptable in `tags`, use `access` instead.")
+
         search_filters = {}
-        if access == 'public':
-            search_filters['tags'] = 'public'
-        elif access == 'private':
-            search_filters['tags'] = {'$ne': 'public'}
-            search_filters['user_id'] = authenticated_userid(request)
-        elif access == 'all' and request.has_permission('admin'):
-            pass
+
+        if request.has_permission('admin') and access in visibility_values:
+            search_filters['access'] = access
         else:
-            if tags is not None:
-                search_filters['tags'] = {'$all': tags}
-            search_filters['user_id'] = authenticated_userid(request)
+            user_id = authenticated_userid(request)
+            if user_id is not None:
+                search_filters['user_id'] = user_id
+                if access in visibility_values:
+                    search_filters['access'] = access
+            else:
+                search_filters['access'] = VISIBILITY_PUBLIC
+
+        if tags:
+            search_filters['tags'] = {'$all': tags}
 
         if status in job_status_categories.keys():
             search_filters['status'] = {'$in': job_status_categories[status]}

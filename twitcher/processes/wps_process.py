@@ -1,9 +1,11 @@
 import logging
+import warnings
 import requests
 from copy import deepcopy
 from time import sleep
 from typing import Union, AnyStr, Callable
 from twitcher import status
+from twitcher.warning import MissingParameterWarning
 from twitcher.visibility import VISIBILITY_PUBLIC
 from twitcher.utils import get_any_id, get_any_value, get_any_message, get_job_log_msg
 from twitcher.wps import get_wps_output_path, get_wps_output_url
@@ -79,11 +81,13 @@ class WpsProcess(object):
                 raise HTTPUnauthorized("Cannot retrieve valid access token using credential or ADES configurations.")
             access_token = cred_resp.json().get('access_token', None)
             if not access_token:
-                LOGGER.warn("Could not retrieve valid access token although response is expected to contain one.")
+                warnings.warn("Could not retrieve valid access token although response is expected to contain one.",
+                              MissingParameterWarning)
         else:
-            LOGGER.warn(
+            warnings.warn(
                 "Could not retrieve at least one of required login parameters: "
-                "[ades.username, ades.password, ades.wso2_hostname, ades.wso2_client_id, ades.wso2_client_secret]"
+                "[ades.username, ades.password, ades.wso2_hostname, ades.wso2_client_id, ades.wso2_client_secret]",
+                MissingParameterWarning
             )
         return {'Authorization': 'Bearer {}'.format(access_token) if access_token else None}
 

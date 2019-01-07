@@ -1,12 +1,21 @@
 from pyramid.httpexceptions import *
 from pyramid.settings import asbool
+from pyramid.request import Request
 from pyramid_celery import celery_app as app
-from twitcher.adapter import jobstore_factory
-from twitcher.exceptions import JobNotFound
+from twitcher.adapter import servicestore_factory, processstore_factory, jobstore_factory
+from twitcher.exceptions import (
+    InvalidIdentifierValue,
+    ServiceNotFound,
+    ServiceNotAccessible,
+    ProcessNotAccessible,
+    ProcessNotFound,
+    JobNotFound,
+)
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.utils import wps_restapi_base_url
+from twitcher.visibility import VISIBILITY_PUBLIC
 from twitcher import status, sort
-from typing import AnyStr, Optional
+from typing import AnyStr, Optional, Union, Tuple
 from owslib.wps import WPSExecution
 from lxml import etree
 from celery.utils.log import get_task_logger
@@ -88,7 +97,7 @@ def get_job(request):
     job_id = request.matchdict.get('job_id')
     store = jobstore_factory(request.registry)
     try:
-        job = store.fetch_by_id(job_id)
+        job = store.fetch_by_id(job_id, request=request)
     except JobNotFound:
         raise HTTPNotFound('Could not find job with specified `job_id`.')
 
@@ -102,6 +111,37 @@ def get_job(request):
     return job
 
 
+def validate_service_process(request):
+    # type: (Request) -> Tuple[Union[None, AnyStr], Union[None, AnyStr]]
+    """
+    Verifies that service or process specified by path or query will raise the appropriate error if applicable.
+    """
+    service_name = request.matchdict.get('provider_id', None) or request.params.get('service', None)
+    process_name = request.matchdict.get('process_id', None) or request.params.get('process', None)
+    item_test = None
+    item_type = None
+
+    try:
+        if service_name:
+            item_type = 'Service'
+            item_test = service_name
+            store = servicestore_factory(request.registry)
+            store.fetch_by_name(service_name, visibility=VISIBILITY_PUBLIC, request=request)
+        if process_name:
+            item_type = 'Process'
+            item_test = process_name
+            store = processstore_factory(request.registry)
+            store.fetch_by_id(process_name, visibility=VISIBILITY_PUBLIC, request=request)
+    except (ServiceNotFound, ProcessNotFound):
+        raise HTTPNotFound("{} of id `{}` cannot be found.".format(item_type, item_test))
+    except (ServiceNotAccessible, ProcessNotAccessible):
+        raise HTTPUnauthorized("{} of id `{}` is not accessible.".format(item_type, item_test))
+    except InvalidIdentifierValue as ex:
+        raise HTTPBadRequest(ex.message)
+
+    return service_name, process_name
+
+
 @sd.process_jobs_service.get(tags=[sd.processes_tag, sd.jobs_tag], renderer='json',
                              schema=sd.GetProcessJobsEndpoint(), response_schemas=sd.get_all_jobs_responses)
 @sd.jobs_full_service.get(tags=[sd.jobs_tag, sd.providers_tag], renderer='json',
@@ -112,20 +152,21 @@ def get_jobs(request):
     """
     Retrieve the list of jobs which can be filtered/sorted using queries.
     """
-
+    service, process = validate_service_process(request)
     detail = asbool(request.params.get('detail', False))
     page = int(request.params.get('page', '0'))
     limit = int(request.params.get('limit', '10'))
     filters = {
         'page': page,
         'limit': limit,
-        'tags': request.params.get('tags', '').split(','),
+        # split by comma and filter empty stings
+        'tags': filter(lambda s: s, request.params.get('tags', '').split(',')),
         'access': request.params.get('access', None),
         'status': request.params.get('status', None),
         'sort': request.params.get('sort', sort.SORT_CREATED),
         # service and process can be specified by query (short route) or by path (full route)
-        'process': request.params.get('process', None) or request.matchdict.get('process_id', None),
-        'service': request.params.get('provider', None) or request.matchdict.get('provider_id', None),
+        'process': process,
+        'service': service,
     }
     store = jobstore_factory(request.registry)
     items, count = store.find_jobs(request, **filters)

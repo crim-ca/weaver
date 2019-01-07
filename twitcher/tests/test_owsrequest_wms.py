@@ -1,3 +1,4 @@
+# noinspection PyPackageRequirements
 import pytest
 import unittest
 
@@ -8,6 +9,7 @@ from twitcher.owsrequest import OWSRequest
 from twitcher.owsexceptions import OWSInvalidParameterValue
 
 
+# noinspection PyMethodMayBeStatic
 class OWSRequestWmsTestCase(unittest.TestCase):
     def setUp(self):
         self.config = testing.setUp()
@@ -47,5 +49,3 @@ class OWSRequestWmsTestCase(unittest.TestCase):
         assert ows_req.request == 'getmetadata'
         assert ows_req.service == 'wms'
         assert ows_req.version == '1.3.0'
-
-

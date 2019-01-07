@@ -6,9 +6,9 @@ import six
 import uuid
 # noinspection PyPackageRequirements
 from dateutil.parser import parse as dt_parse
-from datetime import timedelta
+from datetime import datetime, timedelta
 # noinspection PyProtectedMember
-from logging import _levelNames, ERROR, INFO
+from logging import _levelNames, _loggerClass, ERROR, INFO
 from typing import Any, AnyStr, Dict, List, Optional, Union
 from twitcher.utils import (
     now,
@@ -26,6 +26,8 @@ from twitcher.processes.types import PROCESS_WITH_MAPPING, PROCESS_WPS
 from twitcher.processes.wps_package import _wps2json_io
 from twitcher.status import job_status_values, STATUS_UNKNOWN
 from twitcher.visibility import visibility_values, VISIBILITY_PRIVATE
+from owslib.wps import WPSException
+# noinspection PyPackageRequirements
 from pywps import Process as ProcessWPS
 
 import twitcher.wps_restapi.swagger_definitions as sd
@@ -38,8 +40,10 @@ class Service(dict):
 
     def __init__(self, *args, **kwargs):
         super(Service, self).__init__(*args, **kwargs)
+        if 'name' not in self:
+            raise TypeError("Service 'name' is required")
         if 'url' not in self:
-            raise TypeError("'url' is required")
+            raise TypeError("Service 'url' is required")
 
     @property
     def url(self):
@@ -49,7 +53,7 @@ class Service(dict):
     @property
     def name(self):
         """Service name."""
-        return self.get('name', STATUS_UNKNOWN)
+        return self['name']
 
     @property
     def type(self):
@@ -98,12 +102,13 @@ class Job(dict):
             raise TypeError("Type `str` is required for `{}.id`".format(type(self)))
 
     def _get_log_msg(self, msg=None):
+        # type: (Optional[AnyStr]) -> AnyStr
         if not msg:
             msg = self.status_message
         return get_job_log_msg(duration=self.duration, progress=self.progress, status=self.status, message=msg)
 
-    # noinspection PyUnusedLocal
-    def save_log(self, errors=None, logger=None, module=None):
+    def save_log(self, errors=None, logger=None):
+        # type: (Optional[Union[AnyStr, List[WPSException]]], Optional[_loggerClass]) -> None
         if isinstance(errors, six.string_types):
             log_msg = [(ERROR, self._get_log_msg())]
             self.exceptions.append(errors)
@@ -129,6 +134,7 @@ class Job(dict):
 
     @property
     def id(self):
+        # type: (...) -> AnyStr
         job_id = self.get('id')
         if not job_id:
             job_id = str(uuid.uuid4())
@@ -137,40 +143,48 @@ class Job(dict):
 
     @property
     def task_id(self):
+        # type: (...) -> AnyStr
         return self['task_id']
 
     @task_id.setter
     def task_id(self, task_id):
+        # type: (AnyStr) -> None
         if not isinstance(task_id, six.string_types):
             raise TypeError("Type `str` is required for `{}.task_id`".format(type(self)))
         self['task_id'] = task_id
 
     @property
     def service(self):
+        # type: (...) -> Union[None, AnyStr]
         return self.get('service', None)
 
     @service.setter
     def service(self, service):
-        if not isinstance(service, six.string_types):
+        # type: (Union[None, AnyStr]) -> None
+        if not isinstance(service, six.string_types) or service is None:
             raise TypeError("Type `str` is required for `{}.service`".format(type(self)))
         self['service'] = service
 
     @property
     def process(self):
+        # type: (...) -> Union[None, AnyStr]
         return self.get('process', None)
 
     @process.setter
     def process(self, process):
-        if not isinstance(process, six.string_types):
+        # type: (Union[None, AnyStr]) -> None
+        if not isinstance(process, six.string_types) or process is None:
             raise TypeError("Type `str` is required for `{}.process`".format(type(self)))
         self['process'] = process
 
     def _get_inputs(self):
+        # type: (...) -> List[Optional[Dict[AnyStr, Any]]]
         if self.get('inputs') is None:
             self['inputs'] = list()
         return self['inputs']
 
     def _set_inputs(self, inputs):
+        # type: (List[Optional[Dict[AnyStr, Any]]]) -> None
         if not isinstance(inputs, list):
             raise TypeError("Type `list` is required for `{}.inputs`".format(type(self)))
         self['inputs'] = inputs
@@ -180,20 +194,24 @@ class Job(dict):
 
     @property
     def user_id(self):
+        # type: (...) -> Union[None, AnyStr]
         return self.get('user_id', None)
 
     @user_id.setter
     def user_id(self, user_id):
-        if not isinstance(user_id, int):
+        # type: (Union[None, AnyStr]) -> None
+        if not isinstance(user_id, int) or user_id is None:
             raise TypeError("Type `int` is required for `{}.user_id`".format(type(self)))
         self['user_id'] = user_id
 
     @property
     def status(self):
+        # type: (...) -> AnyStr
         return self.get('status', STATUS_UNKNOWN)
 
     @status.setter
     def status(self, status):
+        # type: (AnyStr) -> None
         if not isinstance(status, six.string_types):
             raise TypeError("Type `str` is required for `{}.status`".format(type(self)))
         if status not in job_status_values:
@@ -203,10 +221,12 @@ class Job(dict):
 
     @property
     def status_message(self):
+        # type: (...) -> AnyStr
         return self.get('status_message', 'no message')
 
     @status_message.setter
     def status_message(self, message):
+        # type: (Union[None, AnyStr]) -> None
         if message is None:
             return
         if not isinstance(message, six.string_types):
@@ -215,36 +235,43 @@ class Job(dict):
 
     @property
     def status_location(self):
+        # type: (...) -> Union[None, AnyStr]
         return self.get('status_location', None)
 
     @status_location.setter
     def status_location(self, location_url):
-        if not isinstance(location_url, six.string_types):
+        # type: (Union[None, AnyStr]) -> None
+        if not isinstance(location_url, six.string_types) or location_url is None:
             raise TypeError("Type `str` is required for `{}.status_location`".format(type(self)))
         self['status_location'] = location_url
 
     @property
     def execute_async(self):
+        # type: (...) -> bool
         return self.get('execute_async', True)
 
     @execute_async.setter
     def execute_async(self, execute_async):
+        # type: (bool) -> None
         if not isinstance(execute_async, bool):
             raise TypeError("Type `bool` is required for `{}.execute_async`".format(type(self)))
         self['execute_async'] = execute_async
 
     @property
     def is_workflow(self):
+        # type: (...) -> bool
         return self.get('is_workflow', False)
 
     @is_workflow.setter
     def is_workflow(self, is_workflow):
+        # type: (bool) -> None
         if not isinstance(is_workflow, bool):
             raise TypeError("Type `bool` is required for `{}.is_workflow`".format(type(self)))
         self['is_workflow'] = is_workflow
 
     @property
     def created(self):
+        # type: (...) -> datetime
         created = self.get('created', None)
         if not created:
             self['created'] = now()
@@ -252,16 +279,20 @@ class Job(dict):
 
     @property
     def finished(self):
+        # type: (...) -> Union[None, AnyStr]
         return self.get('finished', None)
 
     def is_finished(self):
+        # type: (...) -> bool
         return self.finished is not None
 
     def mark_finished(self):
+        # type: (...) -> None
         self['finished'] = now()
 
     @property
     def duration(self):
+        # type: (...) -> AnyStr
         final_time = self.finished or now()
         duration = localize_datetime(final_time) - localize_datetime(self.created)
         self['duration'] = str(duration).split('.')[0]
@@ -269,10 +300,12 @@ class Job(dict):
 
     @property
     def progress(self):
+        # type: (...) -> Union[int, float]
         return self.get('progress', 0)
 
     @progress.setter
     def progress(self, progress):
+        # type: (Union[int, float]) -> None
         if not isinstance(progress, (int, float)):
             raise TypeError("Number is required for `{}.progress`".format(type(self)))
         if progress < 0 or progress > 100:
@@ -280,11 +313,13 @@ class Job(dict):
         self['progress'] = progress
 
     def _get_results(self):
+        # type: (...) -> List[Optional[Dict[AnyStr, Any]]]
         if self.get('results') is None:
             self['results'] = list()
         return self['results']
 
     def _set_results(self, results):
+        # type: (List[Optional[Dict[AnyStr, Any]]]) -> None
         if not isinstance(results, list):
             raise TypeError("Type `list` is required for `{}.results`".format(type(self)))
         self['results'] = results
@@ -293,11 +328,13 @@ class Job(dict):
     results = property(_get_results, _set_results)
 
     def _get_exceptions(self):
+        # type: (...) -> List[Optional[Dict[AnyStr, AnyStr]]]
         if self.get('exceptions') is None:
             self['exceptions'] = list()
         return self['exceptions']
 
     def _set_exceptions(self, exceptions):
+        # type: (List[Optional[Dict[AnyStr, AnyStr]]]) -> None
         if not isinstance(exceptions, list):
             raise TypeError("Type `list` is required for `{}.exceptions`".format(type(self)))
         self['exceptions'] = exceptions
@@ -306,11 +343,13 @@ class Job(dict):
     exceptions = property(_get_exceptions, _set_exceptions)
 
     def _get_logs(self):
+        # type: (...) -> List[Optional[Dict[AnyStr, AnyStr]]]
         if self.get('logs') is None:
             self['logs'] = list()
         return self['logs']
 
     def _set_logs(self, logs):
+        # type: (List[Optional[Dict[AnyStr, AnyStr]]]) -> None
         if not isinstance(logs, list):
             raise TypeError("Type `list` is required for `{}.logs`".format(type(self)))
         self['logs'] = logs
@@ -319,11 +358,13 @@ class Job(dict):
     logs = property(_get_logs, _set_logs)
 
     def _get_tags(self):
+        # type: (...) -> List[Optional[AnyStr]]
         if self.get('tags') is None:
             self['tags'] = list()
         return self['tags']
 
     def _set_tags(self, tags):
+        # type: (List[Optional[AnyStr]]) -> None
         if not isinstance(tags, list):
             raise TypeError("Type `list` is required for `{}.tags`".format(type(self)))
         self['tags'] = tags
@@ -332,23 +373,48 @@ class Job(dict):
     tags = property(_get_tags, _set_tags)
 
     @property
+    def access(self):
+        # type: (...) -> AnyStr
+        """Job visibility access from execution."""
+        return self.get('access', VISIBILITY_PRIVATE)
+
+    @access.setter
+    def access(self, visibility):
+        # type: (AnyStr) -> None
+        """Job visibility access from execution."""
+        if not isinstance(visibility, six.string_types):
+            raise TypeError("Type `str` is required for `{}.access`".format(type(self)))
+        if visibility not in visibility_values:
+            raise ValueError("Invalid `visibility` value specified for `{}.access`".format(type(self)))
+        self['access'] = visibility
+
+    @property
     def request(self):
+        # type: (...) -> Union[None, AnyStr]
+        """XML request for WPS execution submission as string."""
         return self.get('request', None)
 
     @request.setter
     def request(self, request):
+        # type: (Union[None, AnyStr]) -> None
+        """XML request for WPS execution submission as string."""
         self['request'] = request
 
     @property
     def response(self):
+        # type: (...) -> Union[None, AnyStr]
+        """XML status response from WPS execution submission as string."""
         return self.get('response', None)
 
     @response.setter
     def response(self, response):
+        # type: (Union[None, AnyStr]) -> None
+        """XML status response from WPS execution submission as string."""
         self['response'] = response
 
     @property
     def params(self):
+        # type: (...) -> Dict[AnyStr, Any]
         return {
             'id': self.id,
             'task_id': self.task_id,
@@ -369,14 +435,17 @@ class Job(dict):
             'exceptions': self.exceptions,
             'logs': self.logs,
             'tags': self.tags,
+            'access': self.access,
             'request': self.request,
             'response': self.response,
         }
 
     def __str__(self):
+        # type: (...) -> AnyStr
         return 'Job <{}>'.format(self.id)
 
     def __repr__(self):
+        # type: (...) -> AnyStr
         cls = type(self)
         repr_ = dict.__repr__(self)
         return '{0}.{1}({2})'.format(cls.__module__, cls.__name__, repr_)
@@ -668,6 +737,7 @@ class Process(dict):
         return Process(process)
 
     def wps(self):
+        # type: (...) -> ProcessWPS
         process_key = self.type
         if self.type == PROCESS_WPS:
             process_key = self.identifier

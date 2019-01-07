@@ -3,8 +3,11 @@ from twitcher.store.base import AccessTokenStore, ServiceStore, ProcessStore, Jo
 from twitcher.owssecurity import OWSSecurityInterface
 from pyramid.registry import Registry
 from typing import Dict, AnyStr
-import logging
+from twitcher.adapter.default import DefaultAdapter, AdapterInterface
+from twitcher.warning import UnsupportedOperationWarning
 
+import warnings
+import logging
 LOGGER = logging.getLogger("TWITCHER")
 
 TWITCHER_ADAPTER_DEFAULT = 'default'
@@ -48,8 +51,8 @@ def get_adapter_store_factory(adapter, store_name, registry):
         if isinstance(adapter, DefaultAdapter):
             LOGGER.exception("DefaultAdapter doesn't implement `{1!r}`, no way to recover.".format(adapter, store_name))
             raise
-        LOGGER.warn("Adapter `{0!r}` doesn't implement `{1!r}`, falling back to `DefaultAdapter` implementation."
-                    .format(adapter, store_name))
+        warnings.warn("Adapter `{0!r}` doesn't implement `{1!r}`, falling back to `DefaultAdapter` implementation."
+                      .format(adapter, store_name), UnsupportedOperationWarning)
         return get_adapter_store_factory(DefaultAdapter(), store_name, registry)
     except Exception as e:
         LOGGER.error("Adapter `{0!r}` raised an exception while instantiating `{1!r}` : `{2!r}`"

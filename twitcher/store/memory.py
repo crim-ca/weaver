@@ -6,26 +6,20 @@ for testing purposes.
 """
 
 import six
-from twitcher.store.base import (
-    AccessTokenStore,
-    ServiceStore,
-    ProcessStore,
-    JobStore,
-    QuoteStore,
-    BillStore,
-)
+from twitcher.store.base import AccessTokenStore, ServiceStore, ProcessStore, JobStore, QuoteStore, BillStore
+from twitcher.visibility import visibility_values, VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
+from twitcher.datatype import Service, Process, Job
 from twitcher.exceptions import (
     AccessTokenNotFound,
     ServiceRegistrationError,
     ServiceNotFound,
+    ServiceNotAccessible,
     ProcessNotAccessible,
     ProcessNotFound,
     JobNotFound,
 )
-from twitcher.datatype import Service, Process, Job
 from twitcher import namesgenerator
 from twitcher.utils import baseurl
-from twitcher.visibility import visibility_values
 
 
 class MemoryStore(object):
@@ -134,14 +128,19 @@ class MemoryServiceStore(ServiceStore, MemoryStore):
             my_services.append(Service(service))
         return my_services
 
-    def fetch_by_name(self, name, request=None):
+    def fetch_by_name(self, name, visibility=None, request=None):
         """
         Get service for given ``name`` from memory storage.
         """
         service = self.name_index.get(name)
         if not service:
-            raise ServiceNotFound
-        return Service(service)
+            raise ServiceNotFound("Service `{}` could not be found.".format(name))
+        service = Service(service)
+        same_visibility = (service.public and visibility == VISIBILITY_PUBLIC) or \
+                          (not service.public and visibility == VISIBILITY_PRIVATE)
+        if visibility is not None and not same_visibility:
+            raise ServiceNotAccessible("Service `{}` cannot be accessed.".format(name))
+        return service
 
     def fetch_by_url(self, url, request=None):
         """
@@ -270,10 +269,12 @@ class MemoryJobStore(JobStore, MemoryStore):
         MemoryStore.__init__(self, *args, **kwargs)
 
     def save_job(self, task_id, process, service=None, inputs=None,
-                 is_workflow=False, user_id=None, execute_async=True, custom_tags=None):
+                 is_workflow=False, user_id=None, execute_async=True,
+                 custom_tags=None, access=None):
         """
         Stores a job in memory.
         """
+        access = [access] if access in visibility_values else [VISIBILITY_PUBLIC]
         job = Job({
             'task_id': task_id,
             'process': process,
@@ -282,22 +283,26 @@ class MemoryJobStore(JobStore, MemoryStore):
             'is_workflow': is_workflow,
             'user_id': user_id,
             'execute_async': execute_async,
-            'custom_tags': [] if not custom_tags else custom_tags,
+            'tags': [] if not custom_tags else custom_tags + access,
         })
-        self.store[job.id] = job
+        return self.update_job(job)
 
     def update_job(self, job):
         """
         Updates a job parameters in mongodb storage.
         :param job: instance of ``twitcher.datatype.Job``.
         """
+        if not isinstance(job, Job):
+            raise TypeError("Not a valid `twitcher.datatype.Job`.")
         self.store[job.id] = job
+        return self.store[job.id]
 
     def delete_job(self, job_id, request=None):
         """
         Removes job from memory.
         """
-        del self.store[job_id]
+        job = self.fetch_by_id(job_id, request)
+        del self.store[job.id]
 
     def fetch_by_id(self, job_id, request=None):
         """
@@ -312,14 +317,24 @@ class MemoryJobStore(JobStore, MemoryStore):
         """
         Lists all jobs in memory.
         """
-        return self.store
+        jobs = self.store.values()
+        return jobs, len(jobs)
 
     def find_jobs(self, request, page=0, limit=10, process=None, service=None,
                   tags=None, access=None, status=None, sort=None):
         """
         Finds all jobs in memory matching search filters.
         """
-        return {}, 0
+        # FIXME: validate inputs before filtering, sorting and paging
+        jobs, count = self.list_jobs(request=request)
+        jobs = filter(lambda j: j.process == process or process is None, jobs)
+        jobs = filter(lambda j: j.service == service or service is None, jobs)
+        jobs = filter(lambda j: j.access == access or access is None, jobs)
+        jobs = filter(lambda j: j.status == status or status is None, jobs)
+        jobs = filter(lambda j: all(t in j.tags for t in tags) if tags else True, jobs)
+        jobs = sorted(jobs, key=lambda j: j.get(sort) if sort else j.id)
+        jobs = [jobs[i:i+limit] for i in range(0, len(jobs), limit)]
+        return jobs[page]
 
     def clear_jobs(self, request=None):
         """

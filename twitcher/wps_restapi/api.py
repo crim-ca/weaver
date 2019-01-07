@@ -5,10 +5,6 @@ from pyramid.renderers import render_to_response
 from pyramid.request import Request
 from pyramid.settings import asbool
 from twitcher.__meta__ import __version__ as twitcher_version
-from twitcher.config import get_twitcher_configuration
-from twitcher.utils import get_twitcher_url
-from twitcher.wps import get_wps_path
-from twitcher.owsproxy import owsproxy_base_path
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.colander_one_of import CustomTypeConversionDispatcher
 from twitcher.wps_restapi.utils import wps_restapi_base_url, wps_restapi_base_path
@@ -21,6 +17,13 @@ LOGGER = logging.getLogger(__name__)
                               schema=sd.FrontpageEndpoint(), response_schemas=sd.get_api_frontpage_responses)
 def api_frontpage(request):
     """Frontpage of Twitcher."""
+
+    # import here to avoid circular import errors
+    from twitcher.config import get_twitcher_configuration
+    from twitcher.owsproxy import owsproxy_base_path
+    from twitcher.utils import get_twitcher_url
+    from twitcher.wps import get_wps_path
+
     settings = request.registry.settings
     twitcher_url = get_twitcher_url(settings)
     twitcher_config = get_twitcher_configuration(settings)

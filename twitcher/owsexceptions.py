@@ -4,7 +4,9 @@ OWSExceptions are based on pyramid.httpexceptions.
 See also: https://github.com/geopython/pywps/blob/master/pywps/exceptions.py
 """
 
+import six
 import json
+import warnings
 from string import Template
 from typing import AnyStr, Dict
 # noinspection PyPackageRequirements
@@ -12,8 +14,19 @@ from zope.interface import implementer
 from webob import html_escape as _html_escape
 from webob.acceptparse import create_accept_header
 from pyramid.interfaces import IExceptionResponse
+from pyramid.httpexceptions import (
+    HTTPException,
+    HTTPOk,
+    HTTPBadRequest,
+    HTTPUnauthorized,
+    HTTPNotFound,
+    HTTPNotAcceptable,
+    HTTPInternalServerError,
+    HTTPNotImplemented,
+)
 from pyramid.response import Response
 from pyramid.compat import text_type
+from twitcher.warning import MissingParameterWarning, UnsupportedOperationWarning
 
 
 @implementer(IExceptionResponse)
@@ -36,7 +49,14 @@ class OWSException(Response, Exception):
 </ExceptionReport>''')
 
     def __init__(self, detail=None, value=None, **kw):
-        Response.__init__(self, status='200 OK', **kw)
+        status = kw.pop('status', None)
+        if isinstance(status, (type, six.class_types)) and issubclass(status, HTTPException):
+            status = status().status
+        elif isinstance(status, HTTPException):
+            status = status.status
+        elif not status:
+            status = HTTPOk().status
+        Response.__init__(self, status=status, **kw)
         Exception.__init__(self, detail)
         self.message = detail or self.explanation
         if value:
@@ -78,8 +98,8 @@ class OWSException(Response, Exception):
                 self.content_type = 'application/json'
 
                 # json exception response should not have status 200
-                if self.status_code == 200:
-                    self.status = 500
+                if self.status_code == HTTPOk.code:
+                    self.status = HTTPInternalServerError.code
 
                 class JsonPageTemplate(object):
                     def __init__(self, excobj):
@@ -127,30 +147,30 @@ class OWSException(Response, Exception):
 
 
 class OWSAccessForbidden(OWSException):
-    locator = "AccessForbidden"
-    explanation = "Access to this service is forbidden"
+    locator = "AccessUnauthorized"
+    explanation = "Access to this service is unauthorized."
 
-    def __init__(self, detail=None, value=None, **kw):
-        OWSException.__init__(self, detail=detail, value=value, **kw)
-        self.status = 401
+    def __init__(self, *args, **kwargs):
+        kwargs['status'] = HTTPUnauthorized
+        super(OWSAccessForbidden, self).__init__(*args, **kwargs)
 
 
 class OWSNotFound(OWSException):
     locator = "NotFound"
-    explanation = "This resource does not exist"
+    explanation = "This resource does not exist."
 
-    def __init__(self, detail=None, value=None, **kw):
-        OWSException.__init__(self, detail=detail, value=value, **kw)
-        self.status = 404
+    def __init__(self, *args, **kwargs):
+        kwargs['status'] = HTTPNotFound
+        super(OWSNotFound, self).__init__(*args, **kwargs)
 
 
-class OWSAccessFailed(OWSException):
+class OWSNotAcceptable(OWSException):
     locator = "NotAcceptable"
-    explanation = "Access to this service failed"
+    explanation = "Access to this service failed."
 
-    def __init__(self, detail=None, value=None, **kw):
-        OWSException.__init__(self, detail=detail, value=value, **kw)
-        self.status = 502
+    def __init__(self, *args, **kwargs):
+        kwargs['status'] = HTTPNotAcceptable
+        super(OWSNotAcceptable, self).__init__(*args, **kwargs)
 
 
 class OWSNoApplicableCode(OWSException):
@@ -163,9 +183,30 @@ class OWSMissingParameterValue(OWSException):
     locator = ""
     explanation = "Parameter value is missing"
 
+    def __init__(self, *args, **kwargs):
+        kwargs['status'] = HTTPBadRequest
+        super(OWSMissingParameterValue, self).__init__(args, kwargs)
+        warnings.warn(self.message, MissingParameterWarning)
+
 
 class OWSInvalidParameterValue(OWSException):
     """InvalidParameterValue WPS Exception"""
     code = "InvalidParameterValue"
     locator = ""
-    explanation = "Parameter value is invalid"
+    explanation = "Parameter value is not acceptable."
+
+    def __init__(self, *args, **kwargs):
+        kwargs['status'] = HTTPNotAcceptable
+        super(OWSInvalidParameterValue, self).__init__(args, kwargs)
+        warnings.warn(self.message, UnsupportedOperationWarning)
+
+
+class OWSNotImplemented(OWSException):
+    code = "NotImplemented"
+    locator = ""
+    explanation = "Operation is not implemented."
+
+    def __init__(self, *args, **kwargs):
+        kwargs['status'] = HTTPNotImplemented
+        super(OWSNotImplemented, self).__init__(args, kwargs)
+        warnings.warn(self.message, UnsupportedOperationWarning)
