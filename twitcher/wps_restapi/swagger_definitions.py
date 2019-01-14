@@ -816,6 +816,7 @@ class Execute(MappingSchema):
     inputs = InputList(missing=drop)
     outputs = OutputList()
     mode = SchemaNode(String(), validator=OneOf(list(execute_mode_options)))
+    notification_email = SchemaNode(String(), missing=drop, description="Optionally send a notification email when the job is done.")
     response = SchemaNode(String(), validator=OneOf(list(execute_response_options)))
 
 

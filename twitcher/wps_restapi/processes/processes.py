@@ -28,6 +28,7 @@ from twitcher.utils import get_any_id, get_any_value, raise_on_xml_exception
 from twitcher.namesgenerator import get_sane_name
 from twitcher.owsexceptions import OWSNoApplicableCode
 from twitcher.wps_restapi import swagger_definitions as sd
+from twitcher.wps_restapi.jobs.notify import notify_job
 from twitcher.wps_restapi.utils import *
 from twitcher.wps_restapi.jobs.jobs import check_status
 from twitcher.wps import get_wps_output_path
@@ -167,7 +168,7 @@ def retrieve_package_job_log(execution, job):
 
 
 @app.task(bind=True)
-def execute_process(self, job_id, url, headers=None):
+def execute_process(self, job_id, url, headers=None, notification_email=None):
     registry = app.conf['PYRAMID_REGISTRY']
     load_pywps_cfg(registry)
 
@@ -293,6 +294,19 @@ def execute_process(self, job_id, url, headers=None):
     finally:
         job.status_message = "Job {}.".format(job.status)
         job.save_log(logger=task_logger)
+
+        # Send email if requested
+        if notification_email is not None:
+            try:
+                notify_job(job, notification_email, registry.settings)
+                message = "Sent email to: {}".format(notification_email)
+                job.save_log(logger=task_logger, message=message)
+            except Exception as exc:
+                exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
+                exception = "{0}: {1}".format(exception_class, exc.message)
+                message = "Couldn't send email to: {} ({})".format(notification_email, exception)
+                job.save_log(errors=message, logger=task_logger, message=message)
+
         job = store.update_job(job)
 
     return job.status
@@ -337,6 +351,8 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
     tags = request.params.get('tags', '').split(',')
     is_execute_async = json_body['mode'] != EXECUTE_MODE_SYNC   # convert auto to async
 
+    notification_email = json_body.get('notification_email')
+
     store = jobstore_factory(request.registry)
     job = store.save_job(task_id=STATUS_ACCEPTED, process=process_id, service=provider_id,
                          inputs=json_body.get('inputs'), is_workflow=is_workflow, access=visibility,
@@ -345,7 +361,8 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
         job_id=job.id,
         url=clean_ows_url(service_url),
         # Convert EnvironHeaders to a simple dict (should cherrypick the required headers)
-        headers={k: v for k, v in request.headers.items()})
+        headers={k: v for k, v in request.headers.items()},
+        notification_email=notification_email)
     LOGGER.debug("Celery pending task `{}` for job `{}`.".format(result.id, job.id))
 
     # local/provider process location

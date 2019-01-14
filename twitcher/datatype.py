@@ -107,10 +107,10 @@ class Job(dict):
             msg = self.status_message
         return get_job_log_msg(duration=self.duration, progress=self.progress, status=self.status, message=msg)
 
-    def save_log(self, errors=None, logger=None):
+    def save_log(self, errors=None, logger=None, message=None):
         # type: (Optional[Union[AnyStr, List[WPSException]]], Optional[_loggerClass]) -> None
         if isinstance(errors, six.string_types):
-            log_msg = [(ERROR, self._get_log_msg())]
+            log_msg = [(ERROR, self._get_log_msg(message))]
             self.exceptions.append(errors)
         elif isinstance(errors, list):
             log_msg = [(ERROR, self._get_log_msg('{0.text} - code={0.code} - locator={0.locator}'.format(error)))
@@ -121,7 +121,7 @@ class Job(dict):
                 'Text': error.text
             } for error in errors])
         else:
-            log_msg = [(INFO, self._get_log_msg())]
+            log_msg = [(INFO, self._get_log_msg(message))]
         for level, msg in log_msg:
             fmt_msg = get_log_fmt() % dict(asctime=now().strftime(get_log_datefmt()),
                                            levelname=_levelNames[level],
