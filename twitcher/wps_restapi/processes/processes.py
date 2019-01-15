@@ -30,7 +30,7 @@ from twitcher.owsexceptions import OWSNoApplicableCode
 from twitcher.wps_restapi import swagger_definitions as sd
 from twitcher.wps_restapi.jobs.notify import notify_job
 from twitcher.wps_restapi.utils import *
-from twitcher.wps_restapi.jobs.jobs import check_status
+from twitcher.wps_restapi.jobs.jobs import check_status, job_format_json
 from twitcher.wps import get_wps_output_path
 from twitcher.visibility import VISIBILITY_PUBLIC, visibility_values
 from twitcher.status import (
@@ -298,7 +298,8 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
         # Send email if requested
         if notification_email is not None:
             try:
-                notify_job(job, notification_email, registry.settings)
+                job_json = job_format_json(registry.settings, job)
+                notify_job(job, job_json, notification_email, registry.settings)
                 message = "Sent email to: {}".format(notification_email)
                 job.save_log(logger=task_logger, message=message)
             except Exception as exc:
