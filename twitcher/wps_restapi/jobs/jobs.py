@@ -25,8 +25,8 @@ from requests_file import FileAdapter
 logger = get_task_logger(__name__)
 
 
-def job_url(request, job):
-    base_job_url = wps_restapi_base_url(request.registry.settings)
+def job_url(settings, job):
+    base_job_url = wps_restapi_base_url(settings)
     if job.service is not None:
         base_job_url += '/providers/{provider_id}'.format(provider_id=job.service)
     return '{base_job_url}/processes/{process_id}/jobs/{job_id}'.format(
@@ -35,7 +35,7 @@ def job_url(request, job):
         job_id=job.id)
 
 
-def job_format_json(request, job):
+def job_format_json(settings, job):
     job_json = {
         "jobID": job.id,
         "status": job.status,
@@ -49,9 +49,9 @@ def job_format_json(request, job):
             resource_type = 'result'
         else:
             resource_type = 'exceptions'
-        job_json[resource_type] = '{job_url}/{res}'.format(job_url=job_url(request, job), res=resource_type.lower())
+        job_json[resource_type] = '{job_url}/{res}'.format(job_url=job_url(settings, job), res=resource_type.lower())
 
-    job_json['logs'] = '{job_url}/logs'.format(job_url=job_url(request, job))
+    job_json['logs'] = '{job_url}/logs'.format(job_url=job_url(settings, job))
     return job_json
 
 
@@ -174,7 +174,7 @@ def get_jobs(request):
         'count': count,
         'page': page,
         'limit': limit,
-        'jobs': [job_format_json(request, job) if detail else job.id for job in items]
+        'jobs': [job_format_json(request.registry.settings, job) if detail else job.id for job in items]
     })
 
 
@@ -189,7 +189,7 @@ def get_job_status(request):
     Retrieve the status of a job.
     """
     job = get_job(request)
-    response = job_format_json(request, job)
+    response = job_format_json(request.registry.settings, job)
     return HTTPOk(json=response)
 
 

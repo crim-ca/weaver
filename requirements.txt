@@ -23,3 +23,4 @@ cornice_swagger>=0.7.0
 colander
 pytz
 pyyaml
+yagmail
