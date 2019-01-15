@@ -122,16 +122,25 @@ def validate_service_process(request):
     item_type = None
 
     try:
+        service = None
         if service_name:
             item_type = 'Service'
             item_test = service_name
             store = servicestore_factory(request.registry)
-            store.fetch_by_name(service_name, visibility=VISIBILITY_PUBLIC, request=request)
+            service = store.fetch_by_name(service_name, visibility=VISIBILITY_PUBLIC, request=request)
         if process_name:
             item_type = 'Process'
             item_test = process_name
-            store = processstore_factory(request.registry)
-            store.fetch_by_id(process_name, visibility=VISIBILITY_PUBLIC, request=request)
+            # local process
+            if not service:
+                store = processstore_factory(request.registry)
+                store.fetch_by_id(process_name, visibility=VISIBILITY_PUBLIC, request=request)
+            # remote process
+            else:
+                from twitcher.wps_restapi.processes.processes import list_remote_processes
+                processes = list_remote_processes(service, request=request)
+                if process_name not in [p.id for p in processes]:
+                    raise ProcessNotFound
     except (ServiceNotFound, ProcessNotFound):
         raise HTTPNotFound("{} of id `{}` cannot be found.".format(item_type, item_test))
     except (ServiceNotAccessible, ProcessNotAccessible):
