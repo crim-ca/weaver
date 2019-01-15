@@ -8,11 +8,11 @@ from celery.utils.log import get_task_logger
 from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import URLError
 from time import sleep
-from typing import Any, AnyStr, Dict, List, Tuple
+from typing import Any, AnyStr, Dict, List, Tuple, Optional, Union
 from twitcher.wps import load_pywps_cfg
 from twitcher.adapter import servicestore_factory, jobstore_factory, processstore_factory
 from twitcher.config import get_twitcher_configuration, TWITCHER_CONFIGURATION_EMS
-from twitcher.datatype import Process as ProcessDB
+from twitcher.datatype import Process as ProcessDB, Service
 from twitcher.exceptions import (
     InvalidIdentifierValue,
     ProcessRegistrationError,
@@ -47,7 +47,7 @@ from twitcher.execute import (
     EXECUTE_RESPONSE_DOCUMENT,
     EXECUTE_TRANSMISSION_MODE_REFERENCE,
 )
-from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference
+from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference, Process as ProcessWPS
 from owslib.util import clean_ows_url
 from lxml import etree
 from six import string_types
@@ -394,6 +394,67 @@ def submit_provider_job(request):
     return submit_job_handler(request, service.url)
 
 
+def convert_process_wps_to_db(service, process, settings):
+    # type: (Service, ProcessWPS, Dict[AnyStr, Union[int, float, bool, None]]) -> ProcessDB
+    """
+    Converts an owslib WPS Process to local storage Process.
+    """
+    describe_process_url = '{base_url}/providers/{provider_id}/processes/{process_id}'.format(
+        base_url=wps_restapi_base_url(settings),
+        provider_id=service.name,
+        process_id=process.identifier)
+    execute_process_url = '{describe_url}/jobs'.format(describe_url=describe_process_url)
+
+    default_format = {'mimeType': 'text/plain'}
+    inputs = [dict(
+        id=getattr(dataInput, 'identifier', ''),
+        title=getattr(dataInput, 'title', ''),
+        abstract=getattr(dataInput, 'abstract', ''),
+        minOccurs=str(getattr(dataInput, 'minOccurs', 0)),  # FIXME: str applied to match OGC REST-API definition
+        maxOccurs=str(getattr(dataInput, 'maxOccurs', 0)),  # FIXME: str applied to match OGC REST-API definition
+        dataType=dataInput.dataType,
+        defaultValue=jsonify(getattr(dataInput, 'defaultValue', None)),
+        allowedValues=[jsonify(dataValue) for dataValue in getattr(dataInput, 'allowedValues', [])],
+        supportedValues=[jsonify(dataValue) for dataValue in getattr(dataInput, 'supportedValues', [])],
+        formats=[jsonify(dataValue) for dataValue in getattr(dataInput, 'supportedValues', [default_format])],
+    ) for dataInput in getattr(process, 'dataInputs', [])]
+
+    outputs = [dict(
+        id=getattr(processOutput, 'identifier', ''),
+        title=getattr(processOutput, 'title', ''),
+        abstract=getattr(processOutput, 'abstract', ''),
+        dataType=processOutput.dataType,
+        defaultValue=jsonify(getattr(processOutput, 'defaultValue', None)),
+        formats=[jsonify(dataValue) for dataValue in getattr(processOutput, 'supportedValues', [default_format])],
+    ) for processOutput in getattr(process, 'processOutputs', [])]
+
+    return ProcessDB(
+        id=process.identifier,
+        label=getattr(process, 'title', ''),
+        title=getattr(process, 'title', ''),
+        abstract=getattr(process, 'abstract', ''),
+        inputs=inputs,
+        outputs=outputs,
+        url=describe_process_url,
+        processEndpointWPS1=service.url,
+        processDescriptionURL=describe_process_url,
+        executeEndpoint=execute_process_url,
+        package=None,
+    )
+
+
+def list_remote_processes(service, request):
+    # type: (Service, Request) -> List[ProcessDB]
+    """
+    Obtains a list of remote service processes in a compatible local process format.
+    Note: those processes won't be stored to the local process storage.
+    """
+    if not isinstance(service, Service):
+        return list()
+    wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
+    return [convert_process_wps_to_db(service, process, request.registry.settings) for process in wps.processes]
+
+
 @sd.provider_processes_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.getcapabilities_tag],
                                    renderer='json', schema=sd.ProviderEndpoint(),
                                    response_schemas=sd.get_provider_processes_responses)
@@ -401,25 +462,26 @@ def get_provider_processes(request):
     """
     Retrieve available provider processes (GetCapabilities).
     """
-    store = servicestore_factory(request.registry)
-
-    # TODO Validate param somehow
     provider_id = request.matchdict.get('provider_id')
+    store = servicestore_factory(request.registry)
+    service = store.fetch_by_name(provider_id, request=request)
+    processes = list_remote_processes(service, request=request)
+    return HTTPOk(json=[p.json() for p in processes])
 
+
+def get_provider_process(request):
+    # type: (Request) -> ProcessDB
+    """
+    Obtains a remote service process description in a compatible local process format.
+    Note: this processes won't be stored to the local process storage.
+    """
+    provider_id = request.matchdict.get('provider_id')
+    process_id = request.matchdict.get('process_id')
+    store = servicestore_factory(request.registry)
     service = store.fetch_by_name(provider_id, request=request)
     wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
-    processes = []
-    for process in wps.processes:
-        item = dict(
-            id=process.identifier,
-            title=getattr(process, 'title', ''),
-            abstract=getattr(process, 'abstract', ''),
-            url='{base_url}/providers/{provider_id}/processes/{process_id}'.format(
-                base_url=wps_restapi_base_url(request.registry.settings),
-                provider_id=provider_id,
-                process_id=process.identifier))
-        processes.append(item)
-    return HTTPOk(json=processes)
+    process = wps.describeprocess(process_id)
+    return convert_process_wps_to_db(service, process, request.registry.settings)
 
 
 @sd.provider_process_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.describeprocess_tag],
@@ -429,44 +491,16 @@ def describe_provider_process(request):
     """
     Retrieve a process description (DescribeProcess).
     """
-    store = servicestore_factory(request.registry)
-
-    # TODO Validate param somehow
-    provider_id = request.matchdict.get('provider_id')
-    process_id = request.matchdict.get('process_id')
-
-    service = store.fetch_by_name(provider_id, request=request)
-    wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
-    process = wps.describeprocess(process_id)
-
-    inputs = [dict(
-        id=getattr(dataInput, 'identifier', ''),
-        title=getattr(dataInput, 'title', ''),
-        abstract=getattr(dataInput, 'abstract', ''),
-        minOccurs=getattr(dataInput, 'minOccurs', 0),
-        maxOccurs=getattr(dataInput, 'maxOccurs', 0),
-        dataType=dataInput.dataType,
-        defaultValue=jsonify(getattr(dataInput, 'defaultValue', None)),
-        allowedValues=[jsonify(dataValue) for dataValue in getattr(dataInput, 'allowedValues', [])],
-        supportedValues=[jsonify(dataValue) for dataValue in getattr(dataInput, 'supportedValues', [])],
-    ) for dataInput in getattr(process, 'dataInputs', [])]
-
-    outputs = [dict(
-        id=getattr(processOutput, 'identifier', ''),
-        title=getattr(processOutput, 'title', ''),
-        abstract=getattr(processOutput, 'abstract', ''),
-        dataType=processOutput.dataType,
-        defaultValue=jsonify(getattr(processOutput, 'defaultValue', None))
-    ) for processOutput in getattr(process, 'processOutputs', [])]
-
-    body_data = dict(
-        id=process_id,
-        label=getattr(process, 'title', ''),
-        description=getattr(process, 'abstract', ''),
-        inputs=inputs,
-        outputs=outputs
-    )
-    return HTTPOk(json=body_data)
+    try:
+        process = get_provider_process(request)
+        process_offering = process.process_offering()
+        return HTTPOk(json=process_offering)
+    except HTTPException:
+        raise  # re-throw already handled HTTPException
+    except colander.Invalid as ex:
+        raise HTTPBadRequest("Invalid schema: [{}]".format(str(ex)))
+    except Exception as ex:
+        raise HTTPInternalServerError(str(ex))
 
 
 def get_processes_filtered_by_valid_schemas(request):

@@ -1,14 +1,17 @@
+# noinspection PyPackageRequirements
 import pytest
 import unittest
-import mock
 
 from pyramid import testing
 from pyramid.testing import DummyRequest
 
 from twitcher.owsrequest import OWSRequest
 from twitcher.owsexceptions import OWSInvalidParameterValue, OWSMissingParameterValue
+from twitcher.tests.utils import ignore_wps_warnings
 
 
+# noinspection PyMethodMayBeStatic
+@ignore_wps_warnings
 class OWSRequestWpsTestCase(unittest.TestCase):
     def setUp(self):
         self.config = testing.setUp()
@@ -42,26 +45,26 @@ class OWSRequestWpsTestCase(unittest.TestCase):
     def test_get_false_request(self):
         params = dict(request="tellmemore", service="Wps", version="1.0.0")
         request = DummyRequest(params=params)
-        with pytest.raises(OWSInvalidParameterValue) as e_info:
-            ows_req = OWSRequest(request)
+        with pytest.raises(OWSInvalidParameterValue):
+            OWSRequest(request)
 
     def test_get_missing_request(self):
         params = dict(service="wps", version="1.0.0")
         request = DummyRequest(params=params)
-        with pytest.raises(OWSMissingParameterValue) as e_info:
-            ows_req = OWSRequest(request)
+        with pytest.raises(OWSMissingParameterValue):
+            OWSRequest(request)
 
     def test_get_false_service(self):
         params = dict(request="execute", service="ATM", version="1.0.0")
         request = DummyRequest(params=params)
-        with pytest.raises(OWSInvalidParameterValue) as e_info:
-            ows_req = OWSRequest(request)
+        with pytest.raises(OWSInvalidParameterValue):
+            OWSRequest(request)
 
     def test_get_missing_service(self):
         params = dict(request="Execute", version="1.0.0")
         request = DummyRequest(params=params)
-        with pytest.raises(OWSMissingParameterValue) as e_info:
-            ows_req = OWSRequest(request)
+        with pytest.raises(OWSMissingParameterValue):
+            OWSRequest(request)
 
     def test_post_getcaps_request(self):
         request = DummyRequest(post={})
@@ -75,15 +78,15 @@ class OWSRequestWpsTestCase(unittest.TestCase):
         request = DummyRequest(post={})
         request.body = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
         <MyCaps service="WPS" acceptVersions="1.0.0" language="en-CA"/>"""
-        with pytest.raises(OWSInvalidParameterValue) as e_info:
-            ows_req = OWSRequest(request)
+        with pytest.raises(OWSInvalidParameterValue):
+            OWSRequest(request)
 
     def test_post_false_service(self):
         request = DummyRequest(post={})
         request.body = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
         <GetCapabilities service="ATM" acceptVersions="1.0.0" language="en-CA"/>"""
-        with pytest.raises(OWSInvalidParameterValue) as e_info:
-            ows_req = OWSRequest(request)
+        with pytest.raises(OWSInvalidParameterValue):
+            OWSRequest(request)
 
     def test_post_describeprocess_request(self):
         request = DummyRequest(post={})
