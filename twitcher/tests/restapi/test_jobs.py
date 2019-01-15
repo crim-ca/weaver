@@ -11,6 +11,9 @@ from collections import OrderedDict
 # noinspection PyDeprecation
 from contextlib import nested
 from typing import AnyStr, Tuple, List, Union
+from owslib.wps import WebProcessingService, Process as ProcessOWSWPS
+# noinspection PyPackageRequirements
+from pywps.app import Process as ProcessPyWPS
 from twitcher.wps_restapi.swagger_definitions import (
     jobs_short_uri,
     jobs_full_uri,
@@ -127,10 +130,21 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     def get_job_request_auth_mock(self, user_id):
         is_admin = self.user_admin_id == user_id
-        return (
+        return tuple([
             mock.patch('pyramid.security.AuthenticationAPIMixin.authenticated_userid', new_callable=lambda: user_id),
             mock.patch('pyramid.request.AuthorizationAPIMixin.has_permission', return_value=is_admin),
-        )
+        ])
+
+    # noinspection PyProtectedMember
+    @staticmethod
+    def get_job_remote_service_mock(processes):
+        # type: (List[Union[ProcessPyWPS, ProcessOWSWPS]]) -> Tuple[mock._patch]
+        mock_processes = mock.PropertyMock
+        mock_processes.return_value = processes
+        return tuple([
+            mock.patch.object(WebProcessingService, 'getcapabilities', new=lambda *args, **kwargs: None),
+            mock.patch.object(WebProcessingService, 'processes', new_callable=mock_processes, create=True),
+        ])
 
     @staticmethod
     def check_job_format(job):
@@ -263,12 +277,34 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.content_type == 'application/json'
 
     def test_get_jobs_public_service_private_process_unauthorized_in_query(self):
+        """
+        NOTE:
+            it is up to the remote service to hide private processes
+            if the process is visible, the a job can be executed and it is automatically considered public
+        """
         path = self.add_params(jobs_short_uri,
                                service=self.service_public.name,
                                process=self.process_private.identifier)
-        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 401
-        assert resp.content_type == 'application/json'
+        # noinspection PyDeprecation
+        with nested(*self.get_job_remote_service_mock([self.process_private])):     # process visible on remote
+            resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+            assert resp.status_code == 200
+            assert resp.content_type == 'application/json'
+
+    def test_get_jobs_public_service_no_processes(self):
+        """
+        NOTE:
+            it is up to the remote service to hide private processes
+            if the process is invisible, no job should have been executed nor can be fetched
+        """
+        path = self.add_params(jobs_short_uri,
+                               service=self.service_public.name,
+                               process=self.process_private.identifier)
+        # noinspection PyDeprecation
+        with nested(*self.get_job_remote_service_mock([])):         # process invisible (not returned by remote)
+            resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+            assert resp.status_code == 404
+            assert resp.content_type == 'application/json'
 
     def test_get_jobs_public_with_access_and_request_user(self):
         """Verifies that corresponding processes are returned when proper access/user-id are respected."""
@@ -326,8 +362,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
         ]   # type: List[Tuple[AnyStr, AnyStr, Union[None, int], List[AnyStr]]]
 
         for i, (path, access, user_id, expected_jobs) in enumerate(path_jobs_user_req_tests):
+            patches = self.get_job_request_auth_mock(user_id) + self.get_job_remote_service_mock([self.process_public])
             # noinspection PyDeprecation
-            with nested(*self.get_job_request_auth_mock(user_id)):
+            with nested(*patches):
                 test = self.add_params(path, access=access) if access else path
                 resp = self.app.get(test, headers=self.json_headers)
                 self.check_basic_jobs_info(resp)

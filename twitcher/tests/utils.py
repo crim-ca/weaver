@@ -21,6 +21,7 @@ from twitcher.database.mongodb import MongoDatabase
 from twitcher.store.mongodb import MongodbServiceStore, MongodbProcessStore, MongodbJobStore
 from twitcher.config import TWITCHER_CONFIGURATION_DEFAULT
 from twitcher.wps import get_wps_url, get_wps_output_url, get_wps_output_path
+from twitcher.warning import MissingParameterWarning, UnsupportedOperationWarning
 import pyramid_celery
 import warnings
 # noinspection PyPackageRequirements
@@ -28,6 +29,17 @@ import mock
 import os
 
 SettingsType = Dict[AnyStr, Union[AnyStr, float, int, bool]]
+
+
+def ignore_wps_warnings(func):
+    """Wrapper that eliminates WPS related warnings during testing logging."""
+    def do_test(self, *args, **kwargs):
+        with warnings.catch_warnings():
+            for warn in [MissingParameterWarning, UnsupportedOperationWarning]:
+                for msg in ["Parameter 'request*", "Parameter 'service*"]:
+                    warnings.filterwarnings(action="ignore", message=msg, category=warn)
+            func(self, *args, **kwargs)
+    return do_test
 
 
 def get_settings_from_config_ini(config_ini_path=None, ini_section_name='app:main'):
