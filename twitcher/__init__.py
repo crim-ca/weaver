@@ -37,6 +37,9 @@ def main(global_config, **settings):
 
     # mako used by swagger-ui
     local_config.include('pyramid_mako')
+    # cornice used by swagger-ui, swagger json and route definitions
+    local_config.include('cornice')
+    local_config.include('cornice_swagger')
 
     # include twitcher components
     local_config.include('twitcher.config')
