@@ -1,5 +1,6 @@
 # test
 pytest
+pluggy>=0.7
 mock
 WebTest
 wsgiproxy
