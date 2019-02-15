@@ -1,4 +1,3 @@
-VERSION := 0.3.15
 RELEASE := master
 
 # Include custom config if it is available
@@ -13,9 +12,9 @@ OS_NAME := $(shell uname -s 2>/dev/null || echo "unknown")
 CPU_ARCH := $(shell uname -m 2>/dev/null || uname -p 2>/dev/null || echo "unknown")
 
 # Python
-SETUPTOOLS_VERSION := 36.5.0
-CONDA_VERSION := 4.4
-BUILDOUT_VERSION := 2.10.0
+SETUPTOOLS_VERSION := 40.8.0
+CONDA_VERSION := 4.6
+BUILDOUT_VERSION := 2.13.1
 
 # Anaconda
 ANACONDA_HOME ?= $(HOME)/anaconda
@@ -32,9 +31,9 @@ OUTPUT_PORT ?= 8090
 # choose anaconda installer depending on your OS
 ANACONDA_URL = https://repo.continuum.io/miniconda
 ifeq "$(OS_NAME)" "Linux"
-FN := Miniconda2-latest-Linux-x86_64.sh
+FN := Miniconda3-latest-Linux-x86_64.sh
 else ifeq "$(OS_NAME)" "Darwin"
-FN := Miniconda2-latest-MacOSX-x86_64.sh
+FN := Miniconda3-latest-MacOSX-x86_64.sh
 else
 FN := unknown
 endif
@@ -88,7 +87,8 @@ help:
 
 .PHONY: version
 version:
-	@echo "Version: $(VERSION)"
+	@echo "Weaver version:"
+	@python -c 'from weaver.__meta__ import __version__; print(__version__)'
 
 .PHONY: info
 info:
@@ -276,7 +276,7 @@ testfunc:
 .PHONY: coverage
 coverage:
 	@echo "Running coverage analysis..."
-	@bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); coverage run --source twitcher setup.py test"
+	@bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); coverage run --source weaver setup.py test"
 	@bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); coverage report -m"
 	@bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); coverage html -d coverage"
 	$(BROWSER) coverage/index.html

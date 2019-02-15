@@ -1,4 +1,4 @@
-name: twitcher
+name: weaver
 channels:
 - birdhouse
 - defaults
@@ -19,7 +19,7 @@ dependencies:
 - webtest
 # sphinx
 - sphinx
-# twitcher
+# weaver
 - argcomplete
 - lxml=3.7
 - libxslt=1.1.29

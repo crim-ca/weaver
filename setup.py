@@ -6,10 +6,10 @@ CUR_DIR = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(CUR_DIR, 'README.rst')).read()
 CHANGES = open(os.path.join(CUR_DIR, 'CHANGES.rst')).read()
 
-# ensure that 'twitcher' directory can be found for metadata import
+# ensure that 'weaver' directory can be found for metadata import
 sys.path.insert(0, CUR_DIR)
 # don't use 'from' to avoid import errors on not yet installed packages
-import twitcher.__meta__ as meta    # noqa E402
+import weaver.__meta__ as meta    # noqa E402
 
 PY2 = sys.version_info[0] == 2
 requirements = [line.strip() for line in open('requirements.txt')]
@@ -37,12 +37,12 @@ setup(name=meta.__name__,
       include_package_data=True,
       package_data={"": "*.mako"},
       zip_safe=False,
-      test_suite='twitcher',
+      test_suite='weaver',
       install_requires=requirements,
       entry_points="""\
       [paste.app_factory]
-      main = twitcher:main
+      main = weaver:main
       [console_scripts]
-      twitcherctl=twitcher.twitcherctl:main
+      weaverctl=weaver.weaverctl:main
       """,
       )

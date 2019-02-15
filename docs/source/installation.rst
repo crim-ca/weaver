@@ -15,32 +15,32 @@ The installation works on Linux 64 bit distributions (tested on Ubuntu 14.04) an
 From GitHub Sources
 ===================
 
-Install twitcher as normal user from GitHub sources:
+Install weaver as normal user from GitHub sources:
 
 .. code-block:: sh
 
-   $ git clone https://github.com/bird-house/twitcher.git
-   $ cd twitcher
+   $ git clone https://github.com/bird-house/weaver.git
+   $ cd weaver
    $ make clean install
    $ make test
 
-The installation process setups a conda environment named *twitcher* with all dependent conda (and pip) packages.
+The installation process setups a conda environment named *weaver* with all dependent conda (and pip) packages.
 The installation folder (for configuration files, database etc) is by default ``~/birdhouse``.
 Configuration options can be overridden in the buildout ``custom.cfg`` file.
 
-Starting Twitcher Service
+Starting weaver Service
 =========================
 
-Twitcher is run as `Gunicorn`_ WSGI application server behind the `Nginx`_ HTTP server. Starting/Stopping the
+weaver is run as `Gunicorn`_ WSGI application server behind the `Nginx`_ HTTP server. Starting/Stopping the
 services is controlled by `Supervisor`_. This is described in the `Birdhouse documentation`_.
 
-Start the twitcher service (using supervisor):
+Start the weaver service (using supervisor):
 
 .. code-block:: sh
 
    $ make start  # or make restart
 
-Check the status of the twitcher service:
+Check the status of the weaver service:
 
 .. code-block:: sh
 
@@ -48,7 +48,7 @@ Check the status of the twitcher service:
     Supervisor status ...
     mongodb                          RUNNING   pid 6863, uptime 0:00:19
     nginx                            RUNNING   pid 6865, uptime 0:00:19
-    twitcher                         RUNNING   pid 6864, uptime 0:00:19
+    weaver                         RUNNING   pid 6864, uptime 0:00:19
 
 
 You will find more information about the installation in the `Makefile documentation`_.

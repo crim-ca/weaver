@@ -9,23 +9,23 @@ Tutorial
     :depth: 2
 
 
-Using the WPS application included in Twitcher
+Using the WPS application included in weaver
 ==============================================
 
-Install twitcher (see: :ref:`installation`) and make sure it is started with ``make status``:
+Install weaver (see: :ref:`installation`) and make sure it is started with ``make status``:
 
 .. code-block:: sh
 
-    $ cd twitcher  # cd into the installation folder
+    $ cd weaver  # cd into the installation folder
     $ make status
     Supervisor status ...
     mongodb                          RUNNING   pid 6863, uptime 0:00:19
     nginx                            RUNNING   pid 6865, uptime 0:00:19
-    twitcher                         RUNNING   pid 6864, uptime 0:00:19
+    weaver                         RUNNING   pid 6864, uptime 0:00:19
 
-If twitcher (or nginx, mongodb) is not running then start it with ``make start``.
+If weaver (or nginx, mongodb) is not running then start it with ``make start``.
 
-By default the twitcher WPS application is available at the URL https://localhost:5000/ows/wps.
+By default the weaver WPS application is available at the URL https://localhost:5000/ows/wps.
 
 Run a ``GetCapabilities`` request:
 
@@ -61,11 +61,11 @@ Now you should get an XML error response with a message that you need to provide
         </Exception>
     </ExceptionReport>
 
-First we need to generate an access token with ``twitcherctl``:
+First we need to generate an access token with ``weaverctl``:
 
 .. code-block:: sh
 
-    $ bin/twitcherctl -k gentoken
+    $ bin/weaverctl -k gentoken
     abc123
 
 There are three ways how you can provide the access token:
@@ -101,7 +101,7 @@ To change the default WPS configuration edit the ``custom.cfg`` and set the ``wp
    wps-cfg = /path/to/my/default/pywps.cfg
 
 
-After you have changed the configuration file you must update the installation and restart the twitcher service:
+After you have changed the configuration file you must update the installation and restart the weaver service:
 
 .. code-block:: sh
 
@@ -121,7 +121,7 @@ In the following we set a PyWPS configuration:
 
 .. code-block:: sh
 
-   $ bin/twitcherctl -k gentoken -e PYWPS_CFG=/path/to/my/pywps.cfg
+   $ bin/weaverctl -k gentoken -e PYWPS_CFG=/path/to/my/pywps.cfg
    321bca
 
 
@@ -156,22 +156,22 @@ The Emu WPS service is available by default at the URL:
 http://localhost:8094/wps?service=WPS&version=1.0.0&request=GetCapabilities
 
 
-Make sure Twitcher is installed and running:
+Make sure weaver is installed and running:
 
 .. code-block:: sh
 
-   $ cd ../twitcher  # cd into the twitcher installation folder
+   $ cd ../weaver  # cd into the weaver installation folder
    $ make restart
    $ make status
 
 Register a WPS service
 ----------------------
 
-Register the Emu WPS service at the Twitcher ``OWSProxy``:
+Register the Emu WPS service at the weaver ``OWSProxy``:
 
 .. code-block:: sh
 
-   $ bin/twitcherctl -k register --name emu http://localhost:8094/wps
+   $ bin/weaverctl -k register --name emu http://localhost:8094/wps
 
 If you don't provide a name with ``--name`` option then a nice name will be generated, for example ``sleepy_flamingo``.
 
@@ -179,7 +179,7 @@ Use the ``list`` command to see which WPS services are registered with OWSProxy:
 
 .. code-block:: sh
 
-   $ bin/twitcherctl -k list
+   $ bin/weaverctl -k list
    [{'url': 'http://localhost:8094/wps', 'proxy_url': 'https://localhost:5000/ows/proxy/emu', 'type': 'wps', 'name': 'emu'}]
 
 
@@ -215,11 +215,11 @@ Run an ``Exceute`` request:
 
 Now you should get an XML error response with a message that you need to provide an access token (see section above).
 
-We need to generate an access token with ``twitcherctl``:
+We need to generate an access token with ``weaverctl``:
 
 .. code-block:: sh
 
-    $ bin/twitcherctl -k gentoken -H 24
+    $ bin/weaverctl -k gentoken -H 24
     def456
 
 By default the token has a limited life time of one hour. With the option ``-H`` you can extend the life time in hours (24 hours in this example).
@@ -244,14 +244,14 @@ In the following example we provide the token as HTTP parameter:
 Use x509 certificates to control client access
 ==================================================
 
-Since version 0.3.6 Twitcher is prepared to use x509 certificates for control client access.
+Since version 0.3.6 weaver is prepared to use x509 certificates for control client access.
 By default it is configured to accept x509 proxy certificates from `ESGF`_.
 
-Register the Emu WPS service at the Twitcher ``OWSProxy`` with ``auth`` option ``cert``:
+Register the Emu WPS service at the weaver ``OWSProxy`` with ``auth`` option ``cert``:
 
 .. code-block:: sh
 
-   $ bin/twitcherctl -k register --name emu --auth cert http://localhost:8094/wps
+   $ bin/weaverctl -k register --name emu --auth cert http://localhost:8094/wps
 
 The ``GetCapabilities``  and ``DescribeProcess`` requests are not blocked:
 
@@ -286,21 +286,21 @@ Install the `birdy <http://birdy.readthedocs.io/en/latest/>`_ WPS command line c
 
    $ conda install -c birdhouse birdhouse-birdy
 
-If ``conda`` is not in your path ... it was installed by the twitcher installer and is by default in ``~/anaconda/bin``.
+If ``conda`` is not in your path ... it was installed by the weaver installer and is by default in ``~/anaconda/bin``.
 
 Generate a new access token:
 
 .. code-block:: sh
 
-   $ cd twitcher # cd into twitcher installation folder
-   $ bin/twitcherctl -k gentoken
+   $ cd weaver # cd into weaver installation folder
+   $ bin/weaverctl -k gentoken
    98765
 
 Check which WPS is registered (or register one as described above):
 
 .. code-block:: sh
 
-   $ bin/twitcherctl -k list
+   $ bin/weaverctl -k list
    [{'url': 'http://localhost:8094/wps', 'proxy_url': 'https://localhost:5000/ows/proxy/emu', 'type': 'wps', 'name': 'emu'}]
 
 

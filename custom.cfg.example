@@ -19,7 +19,7 @@ log-level = WARN
 db-factory = mongodb
 mongodb-host = localhost
 mongodb-port = 27017
-mongodb-dbname = twitcher_db
+mongodb-dbname = weaver_db
 
 ows-security = true|false
 ows-proxy = true|false
@@ -42,7 +42,7 @@ wps-email-notify-template = /path/to/mako/template.mako
 adapter = package.path.to.AdapterImpl
 extra-options = adapter_impl.opt1=value1,adapter_impl.opt2=value2
 
-# See twitcher.processes.sources.py for schema
+# See weaver.processes.sources.py for schema
 data_sources = ./data_sources.cfg.example
 
 [adapter_impl]
