@@ -94,6 +94,9 @@ testdata.json
 esa-snap_sentinel_unix_6_0.sh
 response.varfile
 
+# conda
+environment.yml
+
 # process results
 *.tif
 *.zip

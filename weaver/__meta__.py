@@ -2,7 +2,8 @@ __name__ = 'weaver'
 __title__ = 'weaver'
 __version__ = '0.1.0'
 __description__ = 'Workflow Execution Management Service (EMS).'
-__repository__ = 'https://www.crim.ca/stash/projects/OGC/repos/weaver'
+__source_repository__ = 'https://www.crim.ca/stash/projects/OGC/repos/weaver'
+__docker_repository__ = 'docker-registry.crim.ca/ogc/weaver:latest'
 __license__ = 'Apache License 2.0'
 __authors__ = [
     'Birdhouse Developers',

@@ -12,9 +12,10 @@ OS_NAME := $(shell uname -s 2>/dev/null || echo "unknown")
 CPU_ARCH := $(shell uname -m 2>/dev/null || uname -p 2>/dev/null || echo "unknown")
 
 # Python
-SETUPTOOLS_VERSION := 40.8.0
+SETUPTOOLS_VERSION := 36.5.0
 CONDA_VERSION := 4.6
 BUILDOUT_VERSION := 2.13.1
+PYTHON_VERSION := 2.7
 
 # Anaconda
 ANACONDA_HOME ?= $(HOME)/anaconda
@@ -161,7 +162,7 @@ conda_config: anaconda
 .PHONY: conda_env
 conda_env: anaconda conda_config
 	@echo "Update conda environment $(CONDA_ENV) ..."
-	@test -d $(CONDA_ENV_PATH) || "$(ANACONDA_HOME)/bin/conda" env create -n $(CONDA_ENV) -f environment.yml
+	@test -d $(CONDA_ENV_PATH) || "$(ANACONDA_HOME)/bin/conda" env create -n $(CONDA_ENV) python=$(PYTHON_VERSION)
 	"$(ANACONDA_HOME)/bin/conda" install -y -n $(CONDA_ENV) setuptools=$(SETUPTOOLS_VERSION)
 
 .PHONY: conda_pinned
@@ -243,6 +244,7 @@ envclean: stop
 srcclean:
 	@echo "Removing *.pyc files ..."
 	@-find $(APP_ROOT) -type f -name "*.pyc" -print | xargs rm
+	rm -rf "./src"
 
 .PHONY: distclean
 distclean: backup clean
