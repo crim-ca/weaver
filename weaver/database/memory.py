@@ -1,12 +1,20 @@
 from weaver.database.base import DatabaseInterface
 from weaver.store.memory import (
-    MemoryTokenStore,
     MemoryServiceStore,
     MemoryProcessStore,
     MemoryJobStore,
     MemoryQuoteStore,
     MemoryBillStore,
 )
+from typing import Union
+
+MemoryStores = Union[
+    MemoryServiceStore,
+    MemoryProcessStore,
+    MemoryJobStore,
+    MemoryQuoteStore,
+    MemoryBillStore,
+]
 
 
 class MemoryDatabase(DatabaseInterface):
@@ -31,8 +39,7 @@ class MemoryDatabase(DatabaseInterface):
         return self._database
 
     def get_store(self, store_type, **store_kwargs):
-        for store in [MemoryTokenStore, MemoryServiceStore, MemoryProcessStore,
-                      MemoryJobStore, MemoryQuoteStore, MemoryBillStore]:
+        for store in MemoryStores:
             if store.type == store_type:
                 if store_type not in self._database:
                     self._database[store_type] = store(**store_kwargs)

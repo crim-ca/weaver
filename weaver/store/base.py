@@ -9,7 +9,7 @@ The implementation is based on `python-oauth2 <http://python-oauth2.readthedocs.
 """
 from pyramid.request import Request
 from typing import Any, Optional, List, Union, AnyStr, Tuple
-from weaver.datatype import Job, Service, Process, Quote, Bill, AccessToken
+from weaver.datatype import Job, Service, Process, Quote, Bill
 # noinspection PyPackageRequirements
 from pywps import Process as ProcessWPS
 
@@ -20,42 +20,6 @@ class StoreInterface(object):
     def __init__(self):
         if not self.type:
             raise ValueError("Store 'type' must be overridden in inheriting class.")
-
-
-class AccessTokenStore(StoreInterface):
-    """
-    Storage for access tokens.
-    """
-    type = 'tokens'
-
-    def save_token(self, access_token):
-        # type: (AccessToken) -> None
-        """
-        Stores an access token with additional data.
-        """
-        raise NotImplementedError
-
-    def delete_token(self, token):
-        # type: (AnyStr) -> None
-        """
-        Deletes an access token from the store using its token string to identify it.
-        This invalidates both the access token and the token.
-        """
-        raise NotImplementedError
-
-    def fetch_by_token(self, token):
-        # type: (AnyStr) -> AccessToken
-        """
-        Fetches an access token from the store using its token string to identify it.
-        """
-        raise NotImplementedError
-
-    def clear_tokens(self):
-        # type: (...) -> None
-        """
-        Removes all tokens from database.
-        """
-        raise NotImplementedError
 
 
 class ServiceStore(StoreInterface):

@@ -11,14 +11,6 @@ class InvalidIdentifierValue(ValueError):
     pass
 
 
-class AccessTokenNotFound(Exception):
-    """
-    Error indicating that an access token could not be read from the
-    storage backend by an instance of :class:`weaver.store.AccessTokenStore`.
-    """
-    pass
-
-
 class ServiceNotAccessible(Exception):
     """
     Error indicating that a WPS service exists but is not visible to retrieve

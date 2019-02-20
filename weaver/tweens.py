@@ -1,8 +1,5 @@
-from pyramid.settings import asbool
 from pyramid.tweens import EXCVIEW
-from pyramid.httpexceptions import HTTPException, HTTPBadRequest
-from weaver.owsexceptions import OWSException, OWSNoApplicableCode, OWSNotImplemented, OWSNotAcceptable
-from weaver.adapter import owssecurity_factory
+from weaver.owsexceptions import OWSException, OWSNoApplicableCode, OWSNotImplemented, OWSNotAcceptable  # noqa: F401
 
 import logging
 logger = logging.getLogger(__name__)

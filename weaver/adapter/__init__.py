@@ -1,5 +1,5 @@
 from weaver.adapter.default import DefaultAdapter, AdapterInterface
-from weaver.store.base import AccessTokenStore, ServiceStore, ProcessStore, JobStore, QuoteStore, BillStore
+from weaver.store.base import ServiceStore, ProcessStore, JobStore, QuoteStore, BillStore
 from pyramid.registry import Registry
 from typing import Dict, AnyStr
 from weaver.adapter.default import DefaultAdapter, AdapterInterface
@@ -57,13 +57,6 @@ def get_adapter_store_factory(adapter, store_name, registry):
         LOGGER.error("Adapter `{0!r}` raised an exception while instantiating `{1!r}` : `{2!r}`"
                      .format(adapter, store_name, e))
         raise
-
-
-def tokenstore_factory(registry):
-    # type: (Registry) -> AccessTokenStore
-    """Shortcut method to retrieve the AccessTokenStore from the selected AdapterInterface from settings."""
-    adapter = adapter_factory(registry.settings)
-    return get_adapter_store_factory(adapter, 'tokenstore_factory', registry)
 
 
 def servicestore_factory(registry):

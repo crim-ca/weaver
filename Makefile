@@ -204,7 +204,7 @@ sysinstall:
 .PHONY: pipinstall
 pipinstall: install
 	@echo "Installing package with pip ..."
-	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);pip install ."
+	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);pip install $(CURDIR)"
 	@echo "\nInstall with pip complete."
 
 .PHONY: install

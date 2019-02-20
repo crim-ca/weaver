@@ -2,7 +2,6 @@
 # http://docs.pylonsproject.org/projects/pyramid-cookbook/en/latest/database/mongodb.html
 from weaver.database.base import DatabaseInterface
 from weaver.store.mongodb import (
-    MongodbTokenStore,
     MongodbServiceStore,
     MongodbProcessStore,
     MongodbJobStore,
@@ -15,7 +14,6 @@ import warnings
 
 MongoDB = None
 MongodbStores = Union[
-    MongodbTokenStore,
     MongodbServiceStore,
     MongodbProcessStore,
     MongodbJobStore,
@@ -42,8 +40,7 @@ class MongoDatabase(DatabaseInterface):
 
     def get_store(self, store_type, *store_args, **store_kwargs):
         # type: (AnyStr, Any, Any) -> MongodbStores
-        for store in [MongodbTokenStore, MongodbServiceStore, MongodbProcessStore,
-                      MongodbJobStore, MongodbQuoteStore, MongodbBillStore]:
+        for store in MongodbStores:
             if store.type == store_type:
                 return store(collection=getattr(self.get_session(), store_type), *store_args, **store_kwargs)
         raise NotImplementedError("Database `{}` cannot find matching store `{}`.".format(self.type, store_type))

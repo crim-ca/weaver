@@ -6,6 +6,7 @@ cornice
 cornice_swagger>=0.7.0
 cwltool==1.0.20180820141117
 duration
+gunicorn
 lxml
 owslib
 pymongo

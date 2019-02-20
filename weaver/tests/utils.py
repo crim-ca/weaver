@@ -88,20 +88,6 @@ def setup_config_with_mongodb(config=None):
     return config
 
 
-def setup_mongodb_tokenstore(config):
-    # type: (Configurator) -> AccessToken
-    """
-    Setup store using mongodb and get a token from it.
-    Database Will be enforced if not configured properly.
-    """
-    store = tokenstore_factory(config.registry)
-    generator = tokengenerator_factory(config.registry)
-    store.clear_tokens()
-    access_token = generator.create_access_token()
-    store.save_token(access_token)
-    return access_token.token
-
-
 def setup_mongodb_servicestore(config):
     # type: (Configurator) -> MongodbServiceStore
     """Setup store using mongodb, will be enforced if not configured properly."""

@@ -44,8 +44,6 @@ def main(global_config, **settings):
     # include weaver components
     local_config.include('weaver.config')
     local_config.include('weaver.database')
-    local_config.include('weaver.rpcinterface')
-    local_config.include('weaver.owsproxy')
     local_config.include('weaver.wps')
     local_config.include('weaver.wps_restapi')
     local_config.include('weaver.processes')
@@ -54,6 +52,7 @@ def main(global_config, **settings):
     # TODO: maybe add tween for exception handling or use unknown_failure view
     local_config.include('weaver.tweens')
 
-    local_config.scan()
+    # don't scan to avoid finding random sub-packages like 'tests' if '__init__' are added
+    # local_config.scan()
 
     return local_config.make_wsgi_app()

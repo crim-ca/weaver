@@ -7,7 +7,6 @@ from weaver.database.base import get_database_factory
 # Interfaces
 from weaver.adapter.base import AdapterInterface
 from weaver.store.base import (
-    AccessTokenStore,
     ServiceStore,
     ProcessStore,
     JobStore,
@@ -25,12 +24,6 @@ class DefaultAdapter(AdapterInterface):
         __doc__ = super(DefaultAdapter, self).__doc__
         from weaver.__meta__ import __version__
         return {"name": "default", "version": str(__version__)}
-
-    def tokenstore_factory(self, registry):
-        # type: (Registry) -> AccessTokenStore
-        __doc__ = super(DefaultAdapter, self).__doc__
-        db = get_database_factory(registry)
-        return db.get_store(AccessTokenStore.type, registry=registry)
 
     def servicestore_factory(self, registry):
         # type: (Registry) -> ServiceStore

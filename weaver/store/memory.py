@@ -6,11 +6,10 @@ for testing purposes.
 """
 
 import six
-from weaver.store.base import AccessTokenStore, ServiceStore, ProcessStore, JobStore, QuoteStore, BillStore
+from weaver.store.base import ServiceStore, ProcessStore, JobStore, QuoteStore, BillStore
 from weaver.visibility import visibility_values, VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
 from weaver.datatype import Service, Process, Job
 from weaver.exceptions import (
-    AccessTokenNotFound,
     ServiceRegistrationError,
     ServiceNotFound,
     ServiceNotAccessible,
@@ -24,35 +23,6 @@ from weaver.utils import baseurl
 
 class MemoryStore(object):
     def __init__(self, *args, **kwargs):
-        self.store = {}
-
-
-class MemoryTokenStore(AccessTokenStore, MemoryStore):
-    """
-    Stores tokens in memory.
-    Useful for testing purposes or APIs with a very limited set of clients.
-
-    Use mongodb as storage to be able to scale.
-    """
-    def __init__(self, *args, **kwargs):
-        AccessTokenStore.__init__(self)
-        MemoryStore.__init__(self, *args, **kwargs)
-
-    def save_token(self, access_token):
-        self.store[access_token.token] = access_token
-        return True
-
-    def delete_token(self, token):
-        if token in self.store:
-            del self.store[token]
-
-    def fetch_by_token(self, token):
-        if token not in self.store:
-            raise AccessTokenNotFound
-
-        return self.store[token]
-
-    def clear_tokens(self):
         self.store = {}
 
 

@@ -3,8 +3,8 @@ from pyramid.registry import Registry
 import logging
 logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from weaver.store.base import AccessTokenStore, ServiceStore, ProcessStore, JobStore, QuoteStore, BillStore
-    AnyStoreType = Union[AccessTokenStore, ServiceStore, ProcessStore, JobStore, QuoteStore, BillStore]
+    from weaver.store.base import ServiceStore, ProcessStore, JobStore, QuoteStore, BillStore
+    AnyStoreType = Union[ServiceStore, ProcessStore, JobStore, QuoteStore, BillStore]
 
 
 class DatabaseInterface(object):

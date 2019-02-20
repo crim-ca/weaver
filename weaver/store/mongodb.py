@@ -2,10 +2,9 @@
 Store adapters to read/write data to from/to mongodb using pymongo.
 """
 
-from weaver.store.base import AccessTokenStore, ServiceStore, ProcessStore, JobStore, QuoteStore, BillStore
-from weaver.datatype import AccessToken, Service, Process as ProcessDB, Job, Quote, Bill
+from weaver.store.base import ServiceStore, ProcessStore, JobStore, QuoteStore, BillStore
+from weaver.datatype import Service, Process as ProcessDB, Job, Quote, Bill
 from weaver.exceptions import (
-    AccessTokenNotFound,
     ServiceRegistrationError, ServiceNotFound, ServiceNotAccessible,
     ProcessRegistrationError, ProcessNotFound, ProcessNotAccessible, ProcessInstanceError,
     JobRegistrationError, JobNotFound, JobUpdateError,
@@ -56,32 +55,6 @@ class MongodbStore(object):
         return tuple([collection]), {'sane_name_config': sane_name_config}
 
 
-class MongodbTokenStore(AccessTokenStore, MongodbStore):
-    """
-    Registry for access tokens. Uses mongodb to store tokens and attributes.
-    """
-
-    def __init__(self, *args, **kwargs):
-        db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
-        AccessTokenStore.__init__(self)
-        MongodbStore.__init__(self, *db_args, **db_kwargs)
-
-    def save_token(self, access_token):
-        self.collection.insert_one(access_token)
-
-    def delete_token(self, token):
-        self.collection.delete_one({'token': token})
-
-    def fetch_by_token(self, token):
-        token = self.collection.find_one({'token': token})
-        if not token:
-            raise AccessTokenNotFound
-        return AccessToken(token)
-
-    def clear_tokens(self):
-        self.collection.drop()
-
-
 class MongodbServiceStore(ServiceStore, MongodbStore):
     """
     Registry for OWS services. Uses mongodb to store service url and attributes.
@@ -99,7 +72,7 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
 
         service_url = baseurl(service.url)
         # check if service is already registered
-        if self.collection.count({'url': service_url}) > 0:
+        if self.collection.count_documents({'url': service_url}) > 0:
             if overwrite:
                 self.collection.delete_one({'url': service_url})
             else:
@@ -108,9 +81,9 @@ class MongodbServiceStore(ServiceStore, MongodbStore):
         name = namesgenerator.get_sane_name(service.name, **self.sane_name_config)
         if not name:
             name = namesgenerator.get_random_name()
-            if self.collection.count({'name': name}) > 0:
+            if self.collection.count_documents({'name': name}) > 0:
                 name = namesgenerator.get_random_name(retry=True)
-        if self.collection.count({'name': name}) > 0:
+        if self.collection.count_documents({'name': name}) > 0:
             if overwrite:
                 self.collection.delete_one({'name': name})
             else:
