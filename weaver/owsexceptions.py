@@ -71,20 +71,20 @@ class OWSException(Response, Exception):
         # type: (AnyStr, AnyStr, AnyStr, Dict[AnyStr, AnyStr]) -> Dict[AnyStr, AnyStr]
 
         # cleanup various escape characters and u'' stings
-        while any(('\"' in body, '\\' in body, 'u\'' in body, 'u\"' in body, '\'\'' in body, '  ' in body)):
-            body = body\
-                .replace('\"', '\'')\
-                .replace('\\', '')\
-                .replace('u\'', '\'')\
-                .replace('u\"', '\'')\
-                .replace('\'\'', '\'')\
+        while any(['\"' in body, '\\' in body, 'u\'' in body, 'u\"' in body, '\'\'' in body, '  ' in body]):
+            body = body                 \
+                .replace('\"', '\'')    \
+                .replace('\\', '')      \
+                .replace('u\'', '\'')   \
+                .replace('u\"', '\'')   \
+                .replace('\'\'', '\'')  \
                 .replace('  ', ' ')
 
         body_parts = [p.strip() for p in body.split('\n') if p != '']               # remove new line and extra spaces
         body_parts = [p + '.' if not p.endswith('.') else p for p in body_parts]    # add terminating dot per sentence
         body_parts = [p[0].upper() + p[1:] for p in body_parts if len(p)]           # capitalize first word
         body_parts = ' '.join(p for p in body_parts if p)
-        return {'description': body_parts, 'code': status}
+        return {'description': body_parts, 'code': int(status[:3]), 'status': status, 'title': title}
 
     def prepare(self, environ):
         if not self.body:

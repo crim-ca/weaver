@@ -1,4 +1,4 @@
-from pyramid.tweens import EXCVIEW
+from pyramid.tweens import INGRESS
 from pyramid.httpexceptions import HTTPException
 from weaver.owsexceptions import OWSException, OWSNoApplicableCode, OWSNotImplemented  # noqa: F401
 
@@ -7,7 +7,9 @@ LOGGER = logging.getLogger(__name__)
 
 
 def includeme(config):
-    config.add_tween(OWS_RESPONSE, under=EXCVIEW)
+    # using 'INGRESS' to run `weaver.wps_restapi.api` views that fix HTTP code before OWS response,
+    # using 'EXCVIEW' does the other way around
+    config.add_tween(OWS_RESPONSE, under=INGRESS)
 
 
 # noinspection PyUnusedLocal
@@ -30,7 +32,7 @@ def ows_response_tween_factory(handler, registry):
             LOGGER.debug('direct ows exception response')
             return err
         except Exception as err:
-            LOGGER.debug("unhandled {!s} exception -> ows exception response".format(type(err)))
+            LOGGER.debug("unhandled {!s} exception -> ows exception response".format(type(err).__name__))
             return OWSNoApplicableCode(str(err))
 
     return ows_response_tween

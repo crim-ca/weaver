@@ -1,6 +1,8 @@
 from owslib.wps import ComplexData
 from weaver.utils import parse_request_query, get_weaver_url
 from distutils.version import LooseVersion
+from webob.headers import ResponseHeaders, EnvironHeaders
+from requests.structures import CaseInsensitiveDict
 from pyramid.httpexceptions import HTTPSuccessful, HTTPError, HTTPInternalServerError
 from lxml import etree
 import requests
@@ -35,9 +37,26 @@ def wps_restapi_base_url(settings):
 
 def get_cookie_headers(headers):
     try:
-        return dict(Cookie=headers['Cookie'])
+        return dict(Cookie=get_header('Cookie', headers))
     except KeyError:  # No cookie
         return {}
+
+
+def get_header(header_name, header_container):
+    # type: (Str, AnyHeaders) -> Union[Str, None]
+    """Searches for the specified header by case/dash/underscore-insensitive name."""
+    if header_container is None:
+        return None
+    headers = header_container
+    if isinstance(headers, (ResponseHeaders, EnvironHeaders, CaseInsensitiveDict)):
+        headers = dict(headers)
+    if isinstance(headers, dict):
+        headers = header_container.items()
+    header_name = header_name.lower().replace('-', '_')
+    for h, v in headers:
+        if h.lower().replace('-', '_') == header_name:
+            return v
+    return None
 
 
 def jsonify(value):
