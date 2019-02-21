@@ -71,13 +71,14 @@ class OWSException(Response, Exception):
         # type: (AnyStr, AnyStr, AnyStr, Dict[AnyStr, AnyStr]) -> Dict[AnyStr, AnyStr]
 
         # cleanup various escape characters and u'' stings
-        while any(('\"' in body, '\\' in body, 'u\'' in body, 'u\"' in body, '\'\'' in body)):
+        while any(('\"' in body, '\\' in body, 'u\'' in body, 'u\"' in body, '\'\'' in body, '  ' in body)):
             body = body\
                 .replace('\"', '\'')\
                 .replace('\\', '')\
                 .replace('u\'', '\'')\
                 .replace('u\"', '\'')\
-                .replace('\'\'', '\'')
+                .replace('\'\'', '\'')\
+                .replace('  ', ' ')
 
         body_parts = [p.strip() for p in body.split('\n') if p != '']               # remove new line and extra spaces
         body_parts = [p + '.' if not p.endswith('.') else p for p in body_parts]    # add terminating dot per sentence

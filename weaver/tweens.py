@@ -1,8 +1,9 @@
 from pyramid.tweens import EXCVIEW
-from weaver.owsexceptions import OWSException, OWSNoApplicableCode, OWSNotImplemented, OWSNotAcceptable  # noqa: F401
+from pyramid.httpexceptions import HTTPException
+from weaver.owsexceptions import OWSException, OWSNoApplicableCode, OWSNotImplemented  # noqa: F401
 
 import logging
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 def includeme(config):
@@ -18,9 +19,19 @@ def ows_response_tween_factory(handler, registry):
         try:
             return handler(request)
         except NotImplementedError as err:
+            LOGGER.debug('not implemented error -> ows exception response')
             return OWSNotImplemented(str(err))
-        except OWSException as err:
+        except HTTPException as err:
+            LOGGER.debug("http exception -> ows exception response.")
+            # Use the same json formatter than OWSException
+            err._json_formatter = OWSException.json_formatter
             return err
+        except OWSException as err:
+            LOGGER.debug('direct ows exception response')
+            return err
+        except Exception as err:
+            LOGGER.debug("unhandled {!s} exception -> ows exception response".format(type(err)))
+            return OWSNoApplicableCode(str(err))
 
     return ows_response_tween
 
