@@ -19,7 +19,6 @@ from weaver.tests.utils import (
     setup_config_with_mongodb,
     setup_config_with_pywps,
     setup_mongodb_processstore,
-    setup_mongodb_tokenstore,
     setup_config_with_celery,
     get_test_weaver_app,
 )
@@ -39,7 +38,6 @@ class WpsAppTest(unittest.TestCase):
         config = setup_config_with_pywps(config)
         config = setup_config_with_celery(config)
         self.process_store = setup_mongodb_processstore(config)
-        self.token = setup_mongodb_tokenstore(config)
         self.app = get_test_weaver_app(config=config, settings_override=settings)
 
         # add processes by database Process type
@@ -57,8 +55,8 @@ class WpsAppTest(unittest.TestCase):
     def tearDown(self):
         pyramid.testing.tearDown()
 
-    def make_url(self, params, token=None):
-        return '{}?{}&access_token={}'.format(self.wps_path, params, token or self.token)
+    def make_url(self, params):
+        return '{}?{}'.format(self.wps_path, params)
 
     @pytest.mark.online
     def test_getcaps(self):
@@ -82,25 +80,9 @@ class WpsAppTest(unittest.TestCase):
         assert self.process_public.identifier in identifiers
 
     @pytest.mark.online
-    def test_getcaps_with_invalid_token(self):
-        resp = self.app.get(self.make_url("service=wps&request=getcapabilities", token='invalid'))
-        assert resp.status_code == 200
-        assert resp.content_type == 'text/xml'
-        resp.mustcontain('<wps:ProcessOfferings>')
-
-    @pytest.mark.online
     def test_describeprocess(self):
         params = "service=wps&request=describeprocess&version=1.0.0&identifier={}".format(Hello.identifier)
         resp = self.app.get(self.make_url(params))
-        assert resp.status_code == 200
-        assert resp.content_type == 'text/xml'
-        resp.mustcontain('</wps:ProcessDescriptions>')
-
-    @pytest.mark.online
-    def test_describeprocess_with_invalid_token(self):
-        params = "service=wps&request=describeprocess&version=1.0.0&identifier={}".format(Hello.identifier)
-        url = self.make_url(params, token='invalid')
-        resp = self.app.get(url)
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
         resp.mustcontain('</wps:ProcessDescriptions>')
@@ -121,21 +103,10 @@ class WpsAppTest(unittest.TestCase):
         assert resp.content_type == 'text/xml'
         resp.mustcontain('<ows:ExceptionText>Unknown process')
 
-    @pytest.mark.xfail(reason="Access token validation not implemented.")
-    @unittest.expectedFailure
-    @pytest.mark.online
-    def test_execute_not_allowed(self):
-        params = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=name=tux".format(Hello.identifier)
-        url = self.make_url(params)
-        resp = self.app.get(url)
-        assert resp.status_code == 200
-        assert resp.content_type == 'text/xml'
-        resp.mustcontain('<Exception exceptionCode="NoApplicableCode" locator="AccessForbidden">')
-
     @pytest.mark.online
     def test_execute_allowed(self):
         params = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=name=tux".format(Hello.identifier)
-        url = self.make_url(params, token=self.token)
+        url = self.make_url(params)
         resp = self.app.get(url)
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
@@ -144,14 +115,14 @@ class WpsAppTest(unittest.TestCase):
     @pytest.mark.online
     def test_execute_with_visibility(self):
         params_template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=test_input=test"
-        url = self.make_url(params_template.format(self.process_public.identifier, ), token=self.token)
+        url = self.make_url(params_template.format(self.process_public.identifier, ))
         resp = self.app.get(url)
         assert resp.status_code == 200
         assert resp.content_type == 'text/xml'
         resp.mustcontain('<wps:ProcessSucceeded>PyWPS Process {} finished</wps:ProcessSucceeded>'
                          .format(self.process_public.title))
 
-        url = self.make_url(params_template.format(self.process_private.identifier), token=self.token)
+        url = self.make_url(params_template.format(self.process_private.identifier))
         resp = self.app.get(url, expect_errors=True)
         assert resp.status_code == 400
         assert resp.content_type == 'text/xml'

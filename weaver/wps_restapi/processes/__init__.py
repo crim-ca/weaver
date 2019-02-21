@@ -9,13 +9,14 @@ def includeme(config):
     settings = config.registry.settings
     config.add_route(**sd.service_api_route_info(sd.processes_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_service, settings))
-    # config.add_route(**sd.service_api_route_info(sd.process_jobs_service, settings))  # added within jobs
     config.add_route(**sd.service_api_route_info(sd.process_package_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_payload_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_visibility_service, settings))
     config.add_route(**sd.service_api_route_info(sd.provider_processes_service, settings))
     config.add_route(**sd.service_api_route_info(sd.provider_process_service, settings))
-    # config.add_route(**sd.service_api_route_info(sd.jobs_full_service, settings))  # added within jobs
+    # added within jobs (conflict)
+    # config.add_route(**sd.service_api_route_info(sd.process_jobs_service, settings))
+    # config.add_route(**sd.service_api_route_info(sd.jobs_full_service, settings))
     config.add_view(p.get_processes, route_name=sd.processes_service.name,
                     request_method='GET', renderer='json')
     config.add_view(p.add_local_process, route_name=sd.processes_service.name,

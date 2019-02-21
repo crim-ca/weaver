@@ -1,4 +1,4 @@
-from pyramid.httpexceptions import HTTPFound
+from pyramid.httpexceptions import HTTPFound, HTTPUnauthorized, HTTPForbidden
 from weaver.wps_restapi.swagger_definitions import (
     api_frontpage_uri,
     api_versions_uri,
@@ -11,7 +11,7 @@ from weaver.wps_restapi.swagger_definitions import (
 )
 from weaver.tests.utils import get_test_weaver_app, get_test_weaver_config, get_settings_from_testapp
 from weaver.database.memory import MemoryDatabase
-from weaver.adapter import weaver_ADAPTER_DEFAULT
+from weaver.adapter import WEAVER_ADAPTER_DEFAULT
 import colander
 import unittest
 # noinspection PyPackageRequirements
@@ -23,7 +23,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        settings = {'weaver.adapter': weaver_ADAPTER_DEFAULT, 'weaver.db_factory': MemoryDatabase.type}
+        settings = {'weaver.adapter': WEAVER_ADAPTER_DEFAULT, 'weaver.db_factory': MemoryDatabase.type}
         cls.testapp = get_test_weaver_app(settings_override=settings)
         cls.json_app = 'application/json'
         cls.json_headers = {'Accept': cls.json_app, 'Content-Type': cls.json_app}
@@ -58,6 +58,23 @@ class GenericApiRoutesTestCase(unittest.TestCase):
         assert 'swagger' in resp.json
         assert 'basePath' in resp.json
 
+    def test_status_unauthorized_and_forbidden(self):
+        # methods should return corresponding status codes, shouldn't be the default '403' on both cases
+        with mock.patch('weaver.wps_restapi.api.api_frontpage', side_effect=HTTPUnauthorized()):
+            resp = self.testapp.post('/random', headers=self.json_headers, expect_errors=True)
+            assert 401 == resp.status_code
+        with mock.patch('weaver.wps_restapi.api.api_frontpage', side_effect=HTTPForbidden()):
+            resp = self.testapp.post('/random', headers=self.json_headers, expect_errors=True)
+            assert 403 == resp.status_code
+
+    def test_status_not_found_and_method_not_allowed(self):
+        resp = self.testapp.post('/random', headers=self.json_headers, expect_errors=True)
+        assert 404 == resp.status_code
+
+        # test an existing route with wrong method, shouldn't be the default '404' on both cases
+        resp = self.testapp.post(api_frontpage_uri, headers=self.json_headers, expect_errors=True)
+        assert 405 == resp.status_code
+
 
 class AlternativeProxyBaseUrlApiRoutesTestCase(unittest.TestCase):
 
@@ -73,7 +90,7 @@ class AlternativeProxyBaseUrlApiRoutesTestCase(unittest.TestCase):
         cls.proxy_api_base_name = api_swagger_json_service.name + '_proxy'
 
         # create redirect view to simulate the server proxy pass
-        settings = {'weaver.adapter': weaver_ADAPTER_DEFAULT, 'weaver.db_factory': MemoryDatabase.type}
+        settings = {'weaver.adapter': WEAVER_ADAPTER_DEFAULT, 'weaver.db_factory': MemoryDatabase.type}
         config = get_test_weaver_config(settings_override=settings)
         config.add_route(name=cls.proxy_api_base_name, path=cls.proxy_api_base_path)
         config.add_view(cls.redirect_api_view, route_name=cls.proxy_api_base_name)
@@ -90,7 +107,7 @@ class AlternativeProxyBaseUrlApiRoutesTestCase(unittest.TestCase):
         # setup environment that would define the new weaver location for the proxy pass
         weaver_server_host = get_settings_from_testapp(self.testapp).get('weaver.url')
         weaver_server_url = weaver_server_host + self.proxy_api_base_path
-        with mock.patch.dict('os.environ', {'weaver_URL': weaver_server_url}):
+        with mock.patch.dict('os.environ', {'WEAVER_URL': weaver_server_url}):
             resp = self.testapp.get(self.proxy_api_base_path, headers=self.json_headers)
             resp = resp.follow()
             assert 200 == resp.status_code
@@ -113,7 +130,7 @@ class AlternativeProxyBaseUrlApiRoutesTestCase(unittest.TestCase):
 
         # ensure that environment that would define the weaver location is not defined for local app
         with mock.patch.dict('os.environ'):
-            os.environ.pop('weaver_URL', None)
+            os.environ.pop('WEAVER_URL', None)
             resp = self.testapp.get(self.proxy_api_base_path, headers=self.json_headers)
             resp = resp.follow()
             assert 200 == resp.status_code

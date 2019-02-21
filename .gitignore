@@ -51,13 +51,13 @@ unit_tests/testdata.json
 *.sublime*
 
 # buildout
-bin
-develop-eggs
-eggs
-parts
-build
-dist
-downloads
+bin/
+develop-eggs/
+eggs/
+parts/
+build/
+dist/
+downloads/
 .installed.cfg
 .mr.developer.cfg
 bootstrap-buildout.py

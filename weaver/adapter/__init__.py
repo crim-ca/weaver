@@ -9,7 +9,7 @@ import warnings
 import logging
 LOGGER = logging.getLogger("weaver")
 
-weaver_ADAPTER_DEFAULT = 'default'
+WEAVER_ADAPTER_DEFAULT = 'default'
 
 
 def import_adapter(name):
@@ -31,7 +31,7 @@ def adapter_factory(settings):
     Creates an adapter interface according to `weaver.adapter` setting.
     By default the `weaver.adapter.default.DefaultAdapter` implementation will be used.
     """
-    if str(settings.get('weaver.adapter', weaver_ADAPTER_DEFAULT)).lower() != weaver_ADAPTER_DEFAULT:
+    if str(settings.get('weaver.adapter', WEAVER_ADAPTER_DEFAULT)).lower() != WEAVER_ADAPTER_DEFAULT:
         try:
             adapter_class = import_adapter(settings.get('weaver.adapter'))
             LOGGER.info('Using adapter: {!r}'.format(adapter_class))

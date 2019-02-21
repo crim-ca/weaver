@@ -457,7 +457,5 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         # bad method POST
         data = {'value': VISIBILITY_PUBLIC}
         resp = self.app.post_json(uri, params=data, headers=self.json_headers, expect_errors=True)
-        # FIXME: actually returns a 405 (method not allowed) as expected, but TestApp somehow transforms it into 404...
-        assert resp.status_code == 405 or \
-            (resp.status_code == 404 and resp.json['description'] == 'The resource could not be found.')
+        assert resp.status_code == 405
         assert resp.content_type == self.json_app

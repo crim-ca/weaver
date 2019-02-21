@@ -21,6 +21,7 @@ requests
 requests_file
 requests_oauthlib
 six
+simplejson
 sqlalchemy
 transaction
 webob

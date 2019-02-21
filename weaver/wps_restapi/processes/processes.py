@@ -558,8 +558,8 @@ def get_processes(request):
     except colander.Invalid as ex:
         raise HTTPBadRequest("Invalid schema: [{}]".format(str(ex)))
     except Exception as ex:
-        LOGGER.exception(ex.message, exc_info=True)
-        raise HTTPInternalServerError(ex.message)
+        LOGGER.exception(str(ex), exc_info=True)
+        raise HTTPInternalServerError(str(ex))
 
 
 @sd.processes_service.post(tags=[sd.processes_tag, sd.deploy_tag], renderer='json',
@@ -587,7 +587,7 @@ def add_local_process(request):
     try:
         process_info['identifier'] = get_sane_name(get_any_id(process_info))
     except InvalidIdentifierValue as ex:
-        raise HTTPBadRequest(ex.message)
+        raise HTTPBadRequest(str(ex))
 
     # retrieve CWL package definition, either via owsContext or executionUnit package/reference
     deployment_profile_name = body.get('deploymentProfileName', '').lower()
@@ -624,9 +624,9 @@ def add_local_process(request):
         process_info = wps_package.get_process_from_wps_request(process_info, reference, package, data_source=None)
     except PackageNotFound as ex:
         # raised when a workflow sub-process is not found (not deployed locally)
-        raise HTTPNotFound(detail=ex.message)
+        raise HTTPNotFound(detail=str(ex))
     except (PackageRegistrationError, PackageTypeError) as ex:
-        raise HTTPUnprocessableEntity(detail=ex.message)
+        raise HTTPUnprocessableEntity(detail=str(ex))
     except Exception as ex:
         raise HTTPBadRequest("Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex)))
 
@@ -657,10 +657,10 @@ def add_local_process(request):
         store = processstore_factory(request.registry)
         saved_process = store.save_process(ProcessDB(process_info), overwrite=False, request=request)
     except ProcessRegistrationError as ex:
-        raise HTTPConflict(detail=ex.message)
+        raise HTTPConflict(detail=str(ex))
     except ValueError as ex:
         # raised on invalid process name
-        raise HTTPBadRequest(detail=ex.message)
+        raise HTTPBadRequest(detail=str(ex))
 
     json_response = {'processSummary': saved_process.process_summary(), 'deploymentDone': True}
     return HTTPOk(json=json_response)
@@ -678,7 +678,7 @@ def get_process(request):
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except InvalidIdentifierValue as ex:
-        raise HTTPBadRequest(ex.message)
+        raise HTTPBadRequest(str(ex))
     except ProcessNotAccessible:
         raise HTTPUnauthorized("Process with id `{}` is not accessible.".format(str(process_id)))
     except ProcessNotFound:
@@ -745,9 +745,9 @@ def get_process_visibility(request):
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except ProcessNotFound as ex:
-        raise HTTPNotFound(ex.message)
+        raise HTTPNotFound(str(ex))
     except Exception as ex:
-        raise HTTPInternalServerError(ex.message)
+        raise HTTPInternalServerError(str(ex))
 
 
 @sd.process_visibility_service.put(tags=[sd.processes_tag, sd.visibility_tag], renderer='json',
@@ -778,9 +778,9 @@ def set_process_visibility(request):
         raise HTTPUnprocessableEntity('Value of visibility must be one of : {!s}'
                                       .format(list(visibility_values)))
     except ProcessNotFound as ex:
-        raise HTTPNotFound(ex.message)
+        raise HTTPNotFound(str(ex))
     except Exception as ex:
-        raise HTTPInternalServerError(ex.message)
+        raise HTTPInternalServerError(str(ex))
 
 
 @sd.process_service.delete(tags=[sd.processes_tag, sd.deploy_tag], renderer='json',
@@ -800,14 +800,14 @@ def delete_local_process(request):
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except InvalidIdentifierValue as ex:
-        raise HTTPBadRequest(ex.message)
+        raise HTTPBadRequest(str(ex))
     except ProcessNotAccessible:
         raise HTTPUnauthorized("Process with id `{}` is not accessible.".format(str(process_id)))
     except ProcessNotFound:
         description = "Process with id `{}` does not exist.".format(str(process_id))
         raise HTTPNotFound(description)
     except Exception as ex:
-        raise HTTPInternalServerError(ex.message)
+        raise HTTPInternalServerError(str(ex))
 
 
 @sd.process_jobs_service.post(tags=[sd.processes_tag, sd.execute_tag, sd.jobs_tag], renderer='json',
@@ -829,10 +829,10 @@ def submit_local_job(request):
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except InvalidIdentifierValue as ex:
-        raise HTTPBadRequest(ex.message)
+        raise HTTPBadRequest(str(ex))
     except ProcessNotAccessible:
         raise HTTPUnauthorized("Process with id `{}` is not accessible.".format(str(process_id)))
     except ProcessNotFound:
         raise HTTPNotFound("The process with id `{}` does not exist.".format(str(process_id)))
     except Exception as ex:
-        raise HTTPInternalServerError(ex.message)
+        raise HTTPInternalServerError(str(ex))

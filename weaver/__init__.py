@@ -35,12 +35,6 @@ def main(global_config, **settings):
         local_config.include('pyramid_celery')
         local_config.configure_celery(global_config['__file__'])
 
-    # mako used by swagger-ui
-    local_config.include('pyramid_mako')
-    # cornice used by swagger-ui, swagger json and route definitions
-    local_config.include('cornice')
-    local_config.include('cornice_swagger')
-
     # include weaver components
     local_config.include('weaver.config')
     local_config.include('weaver.database')

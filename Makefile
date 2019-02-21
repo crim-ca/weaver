@@ -22,7 +22,7 @@ ANACONDA_HOME ?= $(HOME)/anaconda
 CONDA_ENV ?= $(APP_NAME)
 CONDA_ENVS_DIR ?= $(HOME)/.conda/envs
 CONDA_ENV_PATH := $(CONDA_ENVS_DIR)/$(CONDA_ENV)
-CONDA_PINNED := $(APP_ROOT)/requirements/conda_pinned
+CONDA_PINNED := $(APP_ROOT)/env/conda-pinned
 
 # Configuration used by update-config
 HOSTNAME ?= localhost
@@ -53,38 +53,40 @@ all: help
 .PHONY: help
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
-	@echo "  help        to print this help message. (Default)"
-	@echo "  version     to print version number of this Makefile."
-	@echo "  info        to print information about $(APP_NAME)."
-	@echo "  install     to install $(APP_NAME) by running 'bin/buildout -c custom.cfg'."
-	@echo "  baseinstall to install base packages using pip."
-	@echo "  devinstall  to install test packages using pip (also installs $(APP_NAME) with buildout)."
-	@echo "  pipinstall  to install as a package to allow import in another python code."
-	@echo "  sysinstall  to install system packages from requirements.sh. You can also call 'bash requirements.sh' directly."
-	@echo "  update      to update your application by running 'bin/buildout -o -c custom.cfg' (buildout offline mode)."
-	@echo "  clean       to delete all files that are created by running buildout."
+	@echo "  help               print this help message. (Default)"
+	@echo "  version            print version number of this Makefile."
+	@echo "  info               print information about $(APP_NAME)."
+	@echo "  install            install $(APP_NAME) by running 'bin/buildout -c custom.cfg'."
+	@echo "  install-base       install base packages using pip."
+	@echo "  install-dev        install test packages using pip (also installs $(APP_NAME) with buildout)."
+	@echo "  install-pip        install as a package to allow import in another python code."
+	@echo "  install-sys        install system packages from requirements.sh."
+	@echo "  update             update application by running 'bin/buildout -o -c custom.cfg' (buildout offline mode)."
+	@echo "  clean              delete all files that are created by running buildout."
 	@echo "\nTesting targets:"
-	@echo "  test        to run tests (but skip long running and online tests)."
-	@echo "  testfunc    to run funtional tests (online and usage specific)."
-	@echo "  testall     to run all tests (including long running tests)."
-	@echo "  coverage    to run all tests using coverage analysis."
-	@echo "  pep8        to run pep8 code style checks."
+	@echo "  test               run tests (but skip long running and online tests)."
+	@echo "  test-func          run funtional tests (online and usage specific)."
+	@echo "  test-all           run all tests (including long running tests)."
+	@echo "  coverage           run all tests using coverage analysis."
+	@echo "  pep8               run pep8 code style checks."
 	@echo "\nSphinx targets:"
-	@echo "  docs        to generate HTML documentation with Sphinx."
-	@echo "  linkcheck   to check all external links in documentation for integrity."
-	@echo "  doc8        to run doc8 documentation style checks."
+	@echo "  docs               generate HTML documentation with Sphinx."
+	@echo "  linkcheck          check all external links in documentation for integrity."
+	@echo "  doc8               run doc8 documentation style checks."
 	@echo "\nSupporting targets:"
-	@echo "  envclean    to remove the conda enviroment $(CONDA_ENV)."
-	@echo "  srcclean    to remove all *.pyc files."
-	@echo "  distclean   to remove *all* files that are not controlled by 'git'. WARNING: use it *only* if you know what you do!"
-	@echo "  passwd      to generate password for 'phoenix-password' in custom.cfg."
-	@echo "  envexport   to export the conda environment. Caution! You always need to check it the enviroment.yml is working."
-	@echo "  selfupdate  to update this Makefile."
+	@echo "  clean-env          remove the conda enviroment $(CONDA_ENV)."
+	@echo "  clean-src          remove all *.pyc files."
+	@echo "  clean-dist         remove *all* files that are not controlled by 'git'."
+	@echo "                     [WARNING: use it *only* if you know what you do!"]"
+	@echo "  passwd             generate password for 'phoenix-password' in custom.cfg."
+	@echo "  conda-env-export   export the conda environment."
+	@echo "                     [CAUTION! You always need to check it the enviroment.yml is working.]"
+	@echo "  selfupdate         update this Makefile."
 	@echo "\nSupervisor targets:"
-	@echo "  start       to start supervisor service."
-	@echo "  stop        to stop supervisor service."
-	@echo "  restart     to restart supervisor service."
-	@echo "  status      to show supervisor status"
+	@echo "  start              start supervisor service."
+	@echo "  stop               stop supervisor service."
+	@echo "  restart            restart supervisor service."
+	@echo "  status             show supervisor status"
 
 .PHONY: version
 version:
@@ -113,12 +115,15 @@ backup:
 .PHONY: .gitignore
 .gitignore:
 	@echo "Setup default .gitignore ..."
-	@curl "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/dot_gitignore" --silent --insecure --output .gitignore
+	@curl "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/dot_gitignore" \
+		--silent --insecure --output .gitignore
 
 .PHONY: bootstrap.sh
 bootstrap.sh:
 	@echo "Update bootstrap.sh ..."
-	@curl "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/bootstrap.sh" --silent --insecure --output bootstrap.sh "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/bootstrap.sh"
+	@curl "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/bootstrap.sh" \
+		--silent --insecure --output \
+		bootstrap.sh "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/bootstrap.sh"
 	@chmod 755 bootstrap.sh
 
 custom.cfg:
@@ -135,7 +140,8 @@ init: custom.cfg downloads
 
 bootstrap-buildout.py:
 	@echo "Update buildout bootstrap-buildout.py ..."
-	@test -f boostrap-buildout.py || curl https://bootstrap.pypa.io/bootstrap-buildout.py --insecure --silent --output bootstrap-buildout.py
+	@test -f boostrap-buildout.py || curl https://bootstrap.pypa.io/bootstrap-buildout.py \
+		--insecure --silent --output bootstrap-buildout.py
 
 ## Anaconda targets
 
@@ -146,8 +152,8 @@ anaconda:
 	@test -f $(ANACONDA_HOME)/bin/conda || bash "$(DOWNLOAD_CACHE)/$(FN)" -b -u -p $(ANACONDA_HOME)
 	@echo "Add '$(ANACONDA_HOME)/bin' to your PATH variable in '.bashrc'."
 
-.PHONY: conda_config
-conda_config: anaconda
+.PHONY: conda-config
+conda-config: anaconda
 	@echo "Update ~/.condarc"
 	@-"$(ANACONDA_HOME)/bin/conda" install -y conda=$(CONDA_VERSION) requests
 	@"$(ANACONDA_HOME)/bin/conda" config --add envs_dirs $(CONDA_ENVS_DIR)
@@ -159,50 +165,57 @@ conda_config: anaconda
 	@"$(ANACONDA_HOME)/bin/conda" config --append channels birdhouse
 	@"$(ANACONDA_HOME)/bin/conda" config --append channels conda-forge
 
-.PHONY: conda_env
-conda_env: anaconda conda_config
+.PHONY: conda-env
+conda-env: anaconda conda-config
 	@echo "Update conda environment $(CONDA_ENV) ..."
 	@test -d $(CONDA_ENV_PATH) || "$(ANACONDA_HOME)/bin/conda" env create -n $(CONDA_ENV) python=$(PYTHON_VERSION)
 	"$(ANACONDA_HOME)/bin/conda" install -y -n $(CONDA_ENV) setuptools=$(SETUPTOOLS_VERSION)
 
-.PHONY: conda_pinned
-conda_pinned: conda_env
+.PHONY: conda-pinned
+conda-pinned: conda-env
 	@echo "Update pinned conda packages ..."
-	@-test -d $(CONDA_ENV_PATH) && test -f $(CONDA_PINNED) && cp -f "$(CONDA_PINNED)" "$(CONDA_ENV_PATH)/conda-meta/pinned"
+	@-test -d $(CONDA_ENV_PATH) && test -f $(CONDA_PINNED) && \
+		cp -f "$(CONDA_PINNED)" "$(CONDA_ENV_PATH)/conda-meta/pinned"
 
-.PHONY: envexport
-envexport:
+.PHONY: conda-env-export
+conda-env-export:
 	@echo "Exporting conda enviroment ..."
 	@test -d $(CONDA_ENV_PATH) && "$(ANACONDA_HOME)/bin/conda" env export -n $(CONDA_ENV) -f environment.yml
 
 ## Build targets
 
 .PHONY: bootstrap
-bootstrap: init conda_env conda_pinned bootstrap-buildout.py
+bootstrap: init conda-env conda-pinned bootstrap-buildout.py
 	@echo "Bootstrap buildout ..."
-	@test -f bin/buildout || bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);python bootstrap-buildout.py -c custom.cfg --allow-site-packages --setuptools-version=$(SETUPTOOLS_VERSION) --buildout-version=$(BUILDOUT_VERSION)"
+	@test -f bin/buildout || bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); \
+		python bootstrap-buildout.py -c custom.cfg \
+			--allow-site-packages \
+			--setuptools-version=$(SETUPTOOLS_VERSION) \
+			--buildout-version=$(BUILDOUT_VERSION)"
 
-.PHONY: devinstall
-devinstall: pipinstall
+.PHONY: install-dev
+install-dev: install-pip
 	@echo "Installing development packages with pip ..."
 	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);pip install -r $(APP_ROOT)/requirements-dev.txt"
 	@echo "\nInstall with pip complete. Test service with \`make test*' variations."
 
-.PHONY: baseinstall
-baseinstall:
+.PHONY: install-base
+install-base:
 	@echo "Installing base packages with pip ..."
-	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);pip install -r $(APP_ROOT)/requirements.txt"
+	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); pip install -r $(APP_ROOT)/requirements.txt"
 	@echo "\nInstall with pip complete."
 
-.PHONY: sysinstall
-sysinstall:
+.PHONY: install-sys
+install-sys:
 	@echo "\nInstalling system packages for bootstrap ..."
 	@bash bootstrap.sh -i
 	@echo "\nInstalling system packages for your application ..."
 	@-test -f requirements.sh && bash requirements.sh
+	@echo "Updating pip ..."
+	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); pip install -upgrade pip"
 
-.PHONY: pipinstall
-pipinstall: install
+.PHONY: install-pip
+install-pip: install
 	@echo "Installing package with pip ..."
 	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);pip install $(CURDIR)"
 	@echo "\nInstall with pip complete."
@@ -210,44 +223,51 @@ pipinstall: install
 .PHONY: install
 install: bootstrap
 	@echo "Installing application with buildout ..."
-	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);bin/buildout buildout:anaconda-home=$(ANACONDA_HOME) -c custom.cfg"
+	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); \
+		bin/buildout buildout:anaconda-home=$(ANACONDA_HOME) -c custom.cfg"
 	@echo "\nStart service with \`make start'"
 
 .PHONY: update
 update:
 	@echo "Update application config with buildout (offline mode) ..."
-	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);bin/buildout buildout:anaconda-home=$(ANACONDA_HOME) -o -c custom.cfg"
+	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); \
+		bin/buildout buildout:anaconda-home=$(ANACONDA_HOME) -o -c custom.cfg"
 
 .PHONY: update-config
 update-config:
 	@echo "Update application config with buildout (offline mode) and environment variables..."
-	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);bin/buildout buildout:anaconda-home=$(ANACONDA_HOME) settings:hostname=$(HOSTNAME) settings:output-port=$(OUTPUT_PORT) settings:http-port=$(HTTP_PORT) -o -c custom.cfg"
+	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); \
+		bin/buildout buildout:anaconda-home=$(ANACONDA_HOME) settings:hostname=$(HOSTNAME) \
+			settings:output-port=$(OUTPUT_PORT) settings:http-port=$(HTTP_PORT) -o -c custom.cfg"
 
 .PHONY: online-update-config
 online-update-config:
 	@echo "Update application config with buildout (online but non-newest mode) and environment variables..."
-	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);bin/buildout buildout:anaconda-home=$(ANACONDA_HOME) settings:hostname=$(HOSTNAME) settings:output-port=$(OUTPUT_PORT) settings:http-port=$(HTTP_PORT) -N -c custom.cfg"
+	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); \
+		bin/buildout buildout:anaconda-home=$(ANACONDA_HOME) \
+			settings:hostname=$(HOSTNAME) settings:output-port=$(OUTPUT_PORT) \
+			settings:http-port=$(HTTP_PORT) -N -c custom.cfg"
 
 .PHONY: clean
-clean: srcclean envclean
+clean: clean-src clean-env
 	@echo "Cleaning buildout files ..."
 	@-for i in $(BUILDOUT_FILES); do \
             test -e $$i && rm -v -rf $$i; \
         done
 
-.PHONY: envclean
-envclean: stop
+.PHONY: clean-env
+clean-env: stop
 	@echo "Removing conda env $(CONDA_ENV)"
 	@-test -d $(CONDA_ENV_PATH) && "$(ANACONDA_HOME)/bin/conda" remove -n $(CONDA_ENV) --yes --all
 
-.PHONY: srcclean
-srcclean:
+.PHONY: clean-src
+clean-src:
 	@echo "Removing *.pyc files ..."
 	@-find $(APP_ROOT) -type f -name "*.pyc" -print | xargs rm
 	rm -rf "./src"
 
-.PHONY: distclean
-distclean: backup clean
+.PHONY: clean-dist
+clean-dist: backup clean
 	@echo "Cleaning distribution ..."
 	@git diff --quiet HEAD || echo "There are uncommited changes! Not doing 'git clean' ..."
 	@-git clean -dfx -e *.bak -e custom.cfg -e Makefile.config
@@ -256,24 +276,31 @@ distclean: backup clean
 passwd: custom.cfg
 	@echo "Generate Phoenix password ..."
 	@echo "Enter a password with at least 8 characters."
-	@bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); python -c 'from IPython.lib import passwd; pw = passwd(algorithm=\"sha256\"); lines = [\"phoenix-password = \" + pw + \"\\n\" if line.startswith(\"phoenix-password\") else line for line in open(\"custom.cfg\", \"r\")]; file = open(\"custom.cfg\", \"w\"); file.writelines(lines); file.close()'"
+	@bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); \
+		python -c 'from IPython.lib import passwd; pw = passwd(algorithm=\"sha256\"); \
+		lines = [\"phoenix-password = \" + pw + \"\\n\" if line.startswith(\"phoenix-password\") \
+			else line for line in open(\"custom.cfg\", \"r\")]; file = open(\"custom.cfg\", \"w\"); \
+		file.writelines(lines); file.close()'"
 	@echo ""
 	@echo "Run \`make install restart' to activate this password."
 
 .PHONY: test
 test:
 	@echo "Running tests (skip slow and online tests) ..."
-	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); py.test -v -m 'not slow and not online' --junitxml $(CURDIR)/tests/results.xml"
+	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); \
+		py.test -v -m 'not slow and not online' --junitxml $(CURDIR)/tests/results.xml"
 
-.PHONY: testall
-testall:
+.PHONY: test-all
+test-all:
 	@echo "Running all tests (including slow and online tests) ..."
-	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); pytest -v --junitxml $(CURDIR)/tests/results.xml"
+	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); \
+		pytest -v --junitxml $(CURDIR)/tests/results.xml"
 
-.PHONY: testfunc
-testfunc:
+.PHONY: test-func
+test-func:
 	@echo "Running functional tests ..."
-	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); pytest -v -m 'functional' --junitxml $(CURDIR)/tests/results.xml"
+	bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); \
+		pytest -v -m 'functional' --junitxml $(CURDIR)/tests/results.xml"
 
 .PHONY: coverage
 coverage:
@@ -306,7 +333,8 @@ doc8:
 
 .PHONY: selfupdate
 selfupdate: bootstrap.sh .gitignore
-	@curl "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/Makefile" --silent --insecure --output Makefile
+	@curl "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/Makefile" \
+		--silent --insecure --output Makefile
 
 ## Supervisor targets
 

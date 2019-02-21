@@ -20,7 +20,6 @@ from weaver.visibility import visibility_values, VISIBILITY_PRIVATE, VISIBILITY_
 from weaver.sort import *
 # noinspection PyPackageRequirements
 from pywps import Process as ProcessWPS
-from pyramid.security import authenticated_userid
 from typing import Any, Dict, Tuple
 from pymongo import ASCENDING, DESCENDING
 import pymongo
@@ -226,7 +225,7 @@ class MongodbProcessStore(ProcessStore, MongodbStore):
         """
         process_id = self._get_process_id(process)
         sane_name = namesgenerator.get_sane_name(process_id, **self.sane_name_config)
-        if self.collection.count({'identifier': sane_name}) > 0:
+        if self.collection.count_documents({'identifier': sane_name}) > 0:
             if overwrite:
                 self.collection.delete_one({'identifier': sane_name})
             else:
@@ -412,7 +411,7 @@ class MongodbJobStore(JobStore, MongodbStore):
         if request.has_permission('admin') and access in visibility_values:
             search_filters['access'] = access
         else:
-            user_id = authenticated_userid(request)
+            user_id = request.authenticated_userid
             if user_id is not None:
                 search_filters['user_id'] = user_id
                 if access in visibility_values:

@@ -9,7 +9,6 @@ from weaver.processes.types import *
 from weaver.processes.wps_package import get_process_location, get_package_workflow_steps
 from weaver.utils import get_weaver_url
 from pyramid.httpexceptions import *
-from pyramid.security import authenticated_userid
 from datetime import timedelta
 from duration import to_iso8601
 import logging
@@ -61,7 +60,7 @@ def request_quote(request):
         'process': process_id,
         'processParameters': process_params,
         'location': process_url,
-        'user': str(authenticated_userid(request))
+        'user': str(request.authenticated_userid)
     })
 
     # loop workflow sub-process steps to get individual quotes
@@ -156,7 +155,7 @@ def execute_quote(request):
     job_resp = submit_local_job(request)
     job_json = job_resp.json
     job_id = job_json.get('jobID')
-    user_id = str(authenticated_userid(request))
+    user_id = str(request.authenticated_userid)
     store = billstore_factory(request.registry)
     bill = store.save_bill(Bill(user=user_id, job=job_id, **quote_bill_info))
     job_json.update({"bill": bill.id})

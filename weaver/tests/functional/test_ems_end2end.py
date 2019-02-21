@@ -3,7 +3,7 @@ from weaver.tests.utils import get_settings_from_config_ini, get_settings_from_t
 from weaver.config import WEAVER_CONFIGURATION_EMS
 from weaver.wps_restapi.utils import wps_restapi_base_url
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
-from weaver.utils import get_weaver_url, now
+from weaver.utils import get_weaver_url, now, make_dirs
 from weaver.status import (
     STATUS_ACCEPTED,
     STATUS_RUNNING,
@@ -76,18 +76,8 @@ class End2EndEMSTestCase(TestCase):
     logger_json_indent = None       # type: Union[int, None]
     log_full_trace = True           # type: bool
 
-    weaver_URL = None
-    weaver_RESTAPI_URL = None
-    weaver_PROTECTED_URL = None
-    WSO2_HOSTNAME = None
-    WSO2_CLIENT_ID = None
-    WSO2_CLIENT_SECRET = None
-    ADMIN_USERNAME = None
-    ADMIN_PASSWORD = None
-    ALICE_USERNAME = None
-    ALICE_PASSWORD = None
-    BOB_USERNAME = None
-    BOB_PASSWORD = None
+    WEAVER_URL = None
+    WEAVER_RESTAPI_URL = None
 
     @staticmethod
     def mock_get_data_source_from_url(data_url):
@@ -136,9 +126,8 @@ class End2EndEMSTestCase(TestCase):
 
         # TODO: adjust environment variables accordingly to the server to be tested
         cls.TEST_SERVER_HOSTNAME = os.getenv('TEST_SERVER_HOSTNAME')
-        cls.TEST_SERVER_MAGPIE_PATH = os.getenv('TEST_SERVER_MAGPIE_PATH', '/magpie')
-        cls.TEST_SERVER_weaver_PATH = os.getenv('TEST_SERVER_weaver_PATH', '/weaver')
-        cls.TEST_SERVER_weaver_REST_API_PATH = os.getenv('TEST_SERVER_weaver_REST_API_PATH', '/')
+        cls.TEST_SERVER_WEAVER_PATH = os.getenv('TEST_SERVER_WEAVER_PATH', '/weaver')
+        cls.TEST_SERVER_WEAVER_REST_API_PATH = os.getenv('TEST_SERVER_WEAVER_REST_API_PATH', '/')
         cls.TEST_CONFIG_INI_PATH = os.getenv('TEST_CONFIG_INI_PATH')    # none uses default path
         cls.app = WebTestApp(cls.TEST_SERVER_HOSTNAME)
 
@@ -150,49 +139,12 @@ class End2EndEMSTestCase(TestCase):
         cls.logger_separator_tests = os.getenv('TEST_LOGGER_SEPARATOR_TESTS', cls.logger_separator_tests)
         cls.logger_separator_cases = os.getenv('TEST_LOGGER_SEPARATOR_CASES', cls.logger_separator_cases)
 
-        cls.MAGPIE_URL = cls.settings().get('magpie.url')
         cls.WEAVER_URL = get_weaver_url(cls.settings())
         cls.WEAVER_RESTAPI_URL = wps_restapi_base_url(cls.settings())
-        cls.WEAVER_PROTECTED_URL = owsproxy_base_url(cls.settings())
-        cls.WEAVER_PROTECTED_EMS_URL = os.getenv('WEAVER_PROTECTED_EMS_URL',
-                                                   '{}/ems'.format(cls.WEAVER_PROTECTED_URL))
-        cls.WEAVER_PROTECTED_ENABLED = asbool(os.getenv('WEAVER_PROTECTED_ENABLED', True))
-
-        # if enabled, login uses WSO2 external provider, otherwise use Magpie with same credentials
-        # NOTE: this will correspond to two different users (WSO2 external user will have `_wso2` appended)
-        cls.WSO2_ENABLED = asbool(os.getenv('WSO2_ENABLED', True))
-
-        cls.WSO2_HOSTNAME = get_setting('WSO2_HOSTNAME', cls.app)
-        cls.WSO2_CLIENT_ID = get_setting('WSO2_CLIENT_ID', cls.app)
-        cls.WSO2_CLIENT_SECRET = get_setting('WSO2_CLIENT_SECRET', cls.app)
-        cls.ADMIN_USERNAME = get_setting('ADMIN_USERNAME', cls.app)
-        cls.ADMIN_PASSWORD = get_setting('ADMIN_PASSWORD', cls.app)
-        cls.ADMIN_CREDENTIALS = {'username': cls.ADMIN_USERNAME, 'password': cls.ADMIN_PASSWORD}
-        cls.ALICE_USERNAME = get_setting('ALICE_USERNAME', cls.app)
-        cls.ALICE_PASSWORD = get_setting('ALICE_PASSWORD', cls.app)
-        cls.ALICE_CREDENTIALS = {'username': cls.ALICE_USERNAME, 'password': cls.ALICE_PASSWORD}
-        cls.BOB_USERNAME = get_setting('BOB_USERNAME', cls.app)
-        cls.BOB_PASSWORD = get_setting('BOB_PASSWORD', cls.app)
-        cls.BOB_CREDENTIALS = {'username': cls.BOB_USERNAME, 'password': cls.BOB_PASSWORD}
-
         required_params = {
-            'MAGPIE_URL':               cls.MAGPIE_URL,
-            'WEAVER_URL':             cls.WEAVER_URL,
-            'WEAVER_RESTAPI_URL':     cls.WEAVER_RESTAPI_URL,
-            'WEAVER_PROTECTED_URL':   cls.WEAVER_PROTECTED_URL,
-            'ADMIN_USERNAME':           cls.ADMIN_USERNAME,
-            'ADMIN_PASSWORD':           cls.ADMIN_PASSWORD,
-            'ALICE_USERNAME':           cls.ALICE_USERNAME,
-            'ALICE_PASSWORD':           cls.ALICE_PASSWORD,
-            'BOB_USERNAME':             cls.BOB_USERNAME,
-            'BOB_PASSWORD':             cls.BOB_PASSWORD,
+            'WEAVER_URL':         cls.WEAVER_URL,
+            'WEAVER_RESTAPI_URL': cls.WEAVER_RESTAPI_URL,
         }
-        if cls.WSO2_ENABLED:
-            required_params.update({
-                'WSO2_HOSTNAME':        cls.WSO2_HOSTNAME,
-                'WSO2_CLIENT_ID':       cls.WSO2_CLIENT_ID,
-                'WSO2_CLIENT_SECRET':   cls.WSO2_CLIENT_SECRET,
-            })
         for param in required_params:
             cls.assert_test(lambda: not isinstance(required_params[param], Null),
                             message="Missing required parameter `{}` to run '{}' tests!"
@@ -232,24 +184,15 @@ class End2EndEMSTestCase(TestCase):
         # type: (...) -> Dict[AnyStr, AnyStr]
         """Provide basic settings that must be defined to use various weaver utility functions."""
         if not cls.__settings__:
-            magpie_url = os.getenv('MAGPIE_URL',
-                                   '{}{}'.format(cls.TEST_SERVER_HOSTNAME, cls.TEST_SERVER_MAGPIE_PATH))
-            weaver_url = os.getenv('WEAVER_URL',
-                                     '{}{}'.format(cls.TEST_SERVER_HOSTNAME, cls.TEST_SERVER_WEAVER_PATH))
+            weaver_url = os.getenv('WEAVER_URL', '{}{}'.format(cls.TEST_SERVER_HOSTNAME, cls.TEST_SERVER_WEAVER_PATH))
             cls.__settings__ = get_settings_from_testapp(cls.app)
             cls.__settings__.update(get_settings_from_config_ini(cls.TEST_CONFIG_INI_PATH))
             cls.__settings__.update({
-                'magpie.url': magpie_url,
                 'weaver.url': weaver_url,
                 'weaver.configuration': WEAVER_CONFIGURATION_EMS,
                 'weaver.wps_restapi_path': cls.TEST_SERVER_WEAVER_REST_API_PATH,
             })
         return cls.__settings__
-
-    @classmethod
-    def get_weaver_ems_url(cls):
-        # type: (...) -> str
-        return cls.WEAVER_PROTECTED_EMS_URL if cls.WEAVER_PROTECTED_ENABLED else cls.WEAVER_URL
 
     @classmethod
     def get_http_auth_code(cls, unprotected_code=HTTPOk.code):
@@ -361,7 +304,7 @@ class End2EndEMSTestCase(TestCase):
     @classmethod
     def clear_test_processes(cls, headers=None, cookies=None):
         for process_id, process_info in cls.test_processes_info.items():
-            path = '{}/processes/{}'.format(cls.get_weaver_ems_url(), process_info.test_id)
+            path = '{}/processes/{}'.format(cls.WEAVER_URL, process_info.test_id)
 
             resp = cls.request('DELETE', path, headers=headers, cookies=cookies, ignore_errors=True, log_enabled=False)
             # unauthorized also would mean the process doesn't exist if user from headers has permissions on it
@@ -551,7 +494,8 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def setup_logger(cls):
-        root_dir = os.getenv('TEST_LOGGER_RESULT_DIR', os.path.join(WEAVER_ROOT_DIR, 'tests'))
+        root_dir = os.getenv('TEST_LOGGER_RESULT_DIR', os.path.join(WEAVER_ROOT_DIR))
+        make_dirs(root_dir, exist_ok=True)
         log_path = os.path.abspath(os.path.join(root_dir, cls.__name__ + '.log'))
         log_fmt = logging.Formatter("%(message)s")      # only message to avoid 'log-name INFO' offsetting outputs
         log_file = logging.FileHandler(log_path)
@@ -593,7 +537,7 @@ class End2EndEMSTestCase(TestCase):
                                    (self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID, self.PROCESS_WORKFLOW_ID)]
 
         # list processes (none of tests)
-        path = '{}/processes'.format(self.get_weaver_ems_url())
+        path = '{}/processes'.format(self.WEAVER_URL)
         resp = self.request('GET', path, headers=headers_a, cookies=cookies_a, status=HTTPOk.code)
         proc = resp.json.get('processes')
         test_processes = filter(lambda p: p['id'] in [tp.test_id for tp in end2_end_test_processes], proc)
@@ -629,7 +573,7 @@ class End2EndEMSTestCase(TestCase):
         visible = {'value': VISIBILITY_PUBLIC}
         for process_id, process_info in self.test_processes_info.items():
             # get private visibility initially
-            process_path = '{}/processes/{}'.format(self.get_weaver_ems_url(), process_info.test_id)
+            process_path = '{}/processes/{}'.format(self.WEAVER_URL, process_info.test_id)
             visible_path = '{}/visibility'.format(process_path)
             execute_path = '{}/jobs'.format(process_path)
             execute_body = process_info.execute_payload
@@ -691,7 +635,7 @@ class End2EndEMSTestCase(TestCase):
         self.__class__.log_full_trace = False
 
         # deploy processes and make them visible for workflows
-        path_deploy = '{}/processes'.format(self.get_weaver_ems_url())
+        path_deploy = '{}/processes'.format(self.WEAVER_URL)
         for process_id in [self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID]:
             path_visible = '{}/{}/visibility'.format(path_deploy, self.test_processes_info[process_id].test_id)
             data_visible = {'value': VISIBILITY_PUBLIC}

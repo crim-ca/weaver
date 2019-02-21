@@ -4,39 +4,10 @@ import logging
 LOGGER = logging.getLogger("weaver")
 
 
-class ITokenManager(object):
-    def generate_token(self, valid_in_hours=1, data=None):
-        """
-        Generates an access token which is valid for ``valid_in_hours``.
-
-        Arguments:
-
-        * :param valid_in_hours: an int with number of hours the token is valid.
-        * :param data: a dict with extra data used with this token.
-
-        Possible keys: ``esgf_access_token``, ``esgf_slcs_service_url`` or ``esgf_credentials``.
-        """
-        raise NotImplementedError
-
-    def revoke_token(self, token):
-        """
-        Remove token from tokenstore.
-        """
-        raise NotImplementedError
-
-    def revoke_all_tokens(self):
-        """
-        Removes all tokens from tokenstore.
-        """
-        raise NotImplementedError
-
-
 class IRegistry(object):
     def register_service(self, url, data, overwrite):
         """
         Adds an OWS service with the given ``url`` to the service store.
-
-        :param data: a dict with additional information like ``name``.
         """
         raise NotImplementedError
 
@@ -60,7 +31,7 @@ class IRegistry(object):
 
     def list_services(self):
         """
-        Lists all registred OWS services.
+        Lists all registered OWS services.
         """
         raise NotImplementedError
 
@@ -71,52 +42,7 @@ class IRegistry(object):
         raise NotImplementedError
 
 
-class TokenManager(ITokenManager):
-    """
-    Implementation of :class:`weaver.api.ITokenManager`.
-    """
-
-    def __init__(self, tokengenerator, tokenstore):
-        self.tokengenerator = tokengenerator
-        self.store = tokenstore
-
-    def generate_token(self, valid_in_hours=1, data=None):
-        """
-        Implementation of :meth:`weaver.api.ITokenManager.generate_token`.
-        """
-        data = data or {}
-        access_token = self.tokengenerator.create_access_token(
-            valid_in_hours=valid_in_hours,
-            data=data,
-        )
-        self.store.save_token(access_token)
-        return access_token.params
-
-    def revoke_token(self, token):
-        """
-        Implementation of :meth:`weaver.api.ITokenManager.revoke_token`.
-        """
-        try:
-            self.store.delete_token(token)
-        except Exception:
-            LOGGER.exception('Failed to remove token.')
-            return False
-        else:
-            return True
-
-    def revoke_all_tokens(self):
-        """
-        Implementation of :meth:`weaver.api.ITokenManager.revoke_all_tokens`.
-        """
-        try:
-            self.store.clear_tokens()
-        except Exception:
-            LOGGER.exception('Failed to remove tokens.')
-            return False
-        else:
-            return True
-
-
+# noinspection PyBroadException
 class Registry(IRegistry):
     """
     Implementation of :class:`weaver.api.IRegistry`.

@@ -816,7 +816,10 @@ class Execute(MappingSchema):
     inputs = InputList(missing=drop)
     outputs = OutputList()
     mode = SchemaNode(String(), validator=OneOf(list(execute_mode_options)))
-    notification_email = SchemaNode(String(), missing=drop, description="Optionally send a notification email when the job is done.")
+    notification_email = SchemaNode(
+        String(),
+        missing=drop,
+        description="Optionally send a notification email when the job is done.")
     response = SchemaNode(String(), validator=OneOf(list(execute_response_options)))
 
 
@@ -973,8 +976,8 @@ class LogsOutputSchema(MappingSchema):
 class FrontpageParameterSchema(MappingSchema):
     name = SchemaNode(String(), example='api')
     enabled = SchemaNode(Boolean(), example=True)
-    url = SchemaNode(String(), example='https://localhost:5000', missing=drop)
-    doc = SchemaNode(String(), example='https://localhost:5000/api', missing=drop)
+    url = SchemaNode(String(), example='https://weaver-host', missing=drop)
+    doc = SchemaNode(String(), example='https://weaver-host/api', missing=drop)
 
 
 class FrontpageParameters(SequenceSchema):
@@ -982,7 +985,7 @@ class FrontpageParameters(SequenceSchema):
 
 
 class FrontpageSchema(MappingSchema):
-    message = SchemaNode(String(), default='weaver Information', example='weaver Information')
+    message = SchemaNode(String(), default='Weaver Information', example='Weaver Information')
     configuration = SchemaNode(String(), default='default', example='default')
     parameters = FrontpageParameters()
 

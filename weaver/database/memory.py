@@ -1,4 +1,5 @@
 from weaver.database.base import DatabaseInterface
+from weaver.store.base import StoreInterface
 from weaver.store.memory import (
     MemoryServiceStore,
     MemoryProcessStore,
@@ -6,15 +7,15 @@ from weaver.store.memory import (
     MemoryQuoteStore,
     MemoryBillStore,
 )
-from typing import Union
+from typing import Any, AnyStr
 
-MemoryStores = Union[
+MemoryStores = frozenset([
     MemoryServiceStore,
     MemoryProcessStore,
     MemoryJobStore,
     MemoryQuoteStore,
     MemoryBillStore,
-]
+])
 
 
 class MemoryDatabase(DatabaseInterface):
@@ -38,11 +39,12 @@ class MemoryDatabase(DatabaseInterface):
     def get_session(self):
         return self._database
 
-    def get_store(self, store_type, **store_kwargs):
+    def get_store(self, store_type, *store_args, **store_kwargs):
+        # type: (AnyStr, Any, Any) -> StoreInterface
         for store in MemoryStores:
             if store.type == store_type:
                 if store_type not in self._database:
-                    self._database[store_type] = store(**store_kwargs)
+                    self._database[store_type] = store(*store_args, **store_kwargs)
                 return self._database[store_type]
         raise NotImplementedError("Database `{}` cannot find matching store `{}`.".format(self.type, store_type))
 

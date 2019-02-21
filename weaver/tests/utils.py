@@ -10,11 +10,10 @@ from pyramid.config import Configurator
 from webtest import TestApp
 from weaver.datatype import Service
 from weaver.adapter import (
-    weaver_ADAPTER_DEFAULT,
+    WEAVER_ADAPTER_DEFAULT,
     servicestore_factory,
     processstore_factory,
     jobstore_factory,
-    tokenstore_factory,
 )
 from weaver.database.mongodb import MongoDatabase
 from weaver.store.mongodb import MongodbServiceStore, MongodbProcessStore, MongodbJobStore
@@ -77,7 +76,10 @@ def setup_config_with_mongodb(config=None):
                 'mongodb.db_name': 'weaver_test',
                 'weaver.db_factory': MongoDatabase.type}
     settings = settings or {}
-    config = config or testing.setUp(settings=settings)
+    if config:
+        config.registry.settings.update(settings)
+    else:
+        config = testing.setUp(settings=settings)
 
     factory_setting = 'weaver.db_factory'
     factory_value = config.registry.settings.get(factory_setting)
@@ -154,17 +156,15 @@ def get_test_weaver_config(config=None, settings_override=None):
         # default db required if none specified by config
         config = setup_config_from_settings({'weaver.db_factory': MongoDatabase.type})
     if 'weaver.adapter' not in config.registry.settings:
-        config.registry.settings['weaver.adapter'] = weaver_ADAPTER_DEFAULT
+        config.registry.settings['weaver.adapter'] = WEAVER_ADAPTER_DEFAULT
     if 'weaver.configuration' not in config.registry.settings:
         config.registry.settings['weaver.configuration'] = WEAVER_CONFIGURATION_DEFAULT
     config.registry.settings['weaver.url'] = "https://localhost"
-    config.registry.settings['weaver.rpcinterface'] = False
     if settings_override:
         config.registry.settings.update(settings_override)
     # create the test application
     config.include('weaver.wps')
     config.include('weaver.wps_restapi')
-    config.include('weaver.rpcinterface')
     config.include('weaver.tweens')
     return config
 

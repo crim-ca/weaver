@@ -1,6 +1,7 @@
 # MongoDB
 # http://docs.pylonsproject.org/projects/pyramid-cookbook/en/latest/database/mongodb.html
 from weaver.database.base import DatabaseInterface
+from weaver.store.base import StoreInterface
 from weaver.store.mongodb import (
     MongodbServiceStore,
     MongodbProcessStore,
@@ -8,18 +9,18 @@ from weaver.store.mongodb import (
     MongodbQuoteStore,
     MongodbBillStore,
 )
-from typing import Any, AnyStr, Union
+from typing import Any, AnyStr
 import pymongo
 import warnings
 
 MongoDB = None
-MongodbStores = Union[
+MongodbStores = frozenset([
     MongodbServiceStore,
     MongodbProcessStore,
     MongodbJobStore,
     MongodbQuoteStore,
     MongodbBillStore,
-]
+])
 
 
 class MongoDatabase(DatabaseInterface):
@@ -39,7 +40,7 @@ class MongoDatabase(DatabaseInterface):
         pass
 
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (AnyStr, Any, Any) -> MongodbStores
+        # type: (AnyStr, Any, Any) -> StoreInterface
         for store in MongodbStores:
             if store.type == store_type:
                 return store(collection=getattr(self.get_session(), store_type), *store_args, **store_kwargs)

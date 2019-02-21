@@ -10,10 +10,14 @@ from pyramid.httpexceptions import HTTPError as PyramidHTTPError
 from pyramid.request import Request
 from requests import HTTPError as RequestsHTTPError
 from six.moves.urllib.parse import urlparse, parse_qs
+from distutils.dir_util import mkpath
+from distutils.version import LooseVersion
+import os
 import time
 import pytz
 import types
 import re
+import platform
 import warnings
 import logging
 LOGGER = logging.getLogger(__name__)
@@ -290,3 +294,15 @@ def get_log_datefmt():
 def get_job_log_msg(status, message, progress=0, duration=None):
     # type: (AnyStr, AnyStr, int, AnyStr) -> AnyStr
     return '{d} {p:3d}% {s:10} {m}'.format(d=duration or '', p=int(progress or 0), s=map_status(status), m=message)
+
+
+def make_dirs(path, mode=0o755, exist_ok=True):
+    """Alternative to 'makedirs' with 'exists_ok' parameter only available for python>3.5"""
+    if LooseVersion(platform.python_version()) >= LooseVersion('3.5'):
+        os.makedirs(path, mode=mode, exist_ok=exist_ok)
+        return
+    dir_path = os.path.dirname(path)
+    if not os.path.isfile(path) or not os.path.isdir(dir_path):
+        for subdir in mkpath(dir_path):
+            if not os.path.isdir(subdir):
+                os.mkdir(subdir, mode)

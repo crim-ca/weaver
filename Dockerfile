@@ -2,7 +2,7 @@
 FROM birdhouse/bird-base:latest
 MAINTAINER https://github.com/bird-house/weaver
 
-LABEL Description="weaver application" Vendor="Birdhouse"
+LABEL Description="Weaver" Vendor="Birdhouse"
 
 # Configure hostname and ports for services
 ENV HTTP_PORT 8080
@@ -10,16 +10,13 @@ ENV HTTPS_PORT 8443
 ENV OUTPUT_PORT 8000
 ENV HOSTNAME localhost
 
-ENV POSTGRES_USER user
-ENV POSTGRES_PASSWORD password
-ENV POSTGRES_HOST postgres
-ENV POSTGRES_DB default
-ENV POSTGRES_PORT 5432
-ENV MAGPIE_URL magpie
-ENV weaver_URL weaver
-ENV MAGPIE_SECRET to_be_override
-ENV weaver_PROTECTED_PATH /ows/proxy
-ENV weaver_WPS_RESTAPI_PATH /
+#ENV POSTGRES_USER user
+#ENV POSTGRES_PASSWORD password
+#ENV POSTGRES_HOST postgres
+#ENV POSTGRES_DB default
+#ENV POSTGRES_PORT 5432
+ENV WEAVER_URL weaver
+ENV WEAVER_WPS_RESTAPI_PATH /
 
 # Set current home
 ENV HOME /root

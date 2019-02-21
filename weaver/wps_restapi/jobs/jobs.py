@@ -146,7 +146,7 @@ def validate_service_process(request):
     except (ServiceNotAccessible, ProcessNotAccessible):
         raise HTTPUnauthorized("{} of id `{}` is not accessible.".format(item_type, item_test))
     except InvalidIdentifierValue as ex:
-        raise HTTPBadRequest(ex.message)
+        raise HTTPBadRequest(str(ex))
 
     return service_name, process_name
 
