@@ -1,6 +1,6 @@
 from pyramid.tweens import INGRESS
-from pyramid.httpexceptions import HTTPException
-from weaver.owsexceptions import OWSException, OWSNoApplicableCode, OWSNotImplemented  # noqa: F401
+from pyramid.httpexceptions import HTTPException, HTTPInternalServerError
+from weaver.owsexceptions import OWSException, OWSNotImplemented  # noqa: F401
 
 import logging
 LOGGER = logging.getLogger(__name__)
@@ -20,9 +20,6 @@ def ows_response_tween_factory(handler, registry):
     def ows_response_tween(request):
         try:
             return handler(request)
-        except NotImplementedError as err:
-            LOGGER.debug('not implemented error -> ows exception response')
-            return OWSNotImplemented(str(err))
         except HTTPException as err:
             LOGGER.debug("http exception -> ows exception response.")
             # Use the same json formatter than OWSException
@@ -31,9 +28,12 @@ def ows_response_tween_factory(handler, registry):
         except OWSException as err:
             LOGGER.debug('direct ows exception response')
             return err
+        except NotImplementedError as err:
+            LOGGER.debug('not implemented error -> ows exception response')
+            return OWSNotImplemented(str(err))
         except Exception as err:
             LOGGER.debug("unhandled {!s} exception -> ows exception response".format(type(err).__name__))
-            return OWSNoApplicableCode(str(err))
+            return OWSException(detail=str(err), status=HTTPInternalServerError)
 
     return ows_response_tween
 

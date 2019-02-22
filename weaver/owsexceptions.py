@@ -50,8 +50,13 @@ class OWSException(Response, Exception):
 
     def __init__(self, detail=None, value=None, **kw):
         status = kw.pop('status', None)
-        if isinstance(status, (type, six.class_types)) and issubclass(status, HTTPException):
+        if isinstance(status, type) and issubclass(status, HTTPException):
             status = status().status
+        elif isinstance(status, six.class_types):
+            try:
+                int(status.split()[0])
+            except Exception:
+                raise ValueError("status specified as string must be of format '<code> <title>'")
         elif isinstance(status, HTTPException):
             status = status.status
         elif not status:
@@ -84,7 +89,7 @@ class OWSException(Response, Exception):
         body_parts = [p + '.' if not p.endswith('.') else p for p in body_parts]    # add terminating dot per sentence
         body_parts = [p[0].upper() + p[1:] for p in body_parts if len(p)]           # capitalize first word
         body_parts = ' '.join(p for p in body_parts if p)
-        return {'description': body_parts, 'code': int(status[:3]), 'status': status, 'title': title}
+        return {'description': body_parts, 'code': int(status.split()[0]), 'status': status, 'title': title}
 
     def prepare(self, environ):
         if not self.body:
@@ -109,7 +114,7 @@ class OWSException(Response, Exception):
                     # noinspection PyUnusedLocal
                     def substitute(self, code, locator, message):
                         return json.dumps(self.excobj.json_formatter(
-                            status=code, body=message, title=None, environ=environ))
+                            status=self.excobj.status, body=message, title=None, environ=environ))
 
                 page_template = JsonPageTemplate(self)
 
@@ -175,7 +180,15 @@ class OWSNotAcceptable(OWSException):
 
 
 class OWSNoApplicableCode(OWSException):
-    pass
+    """WPS Bad Request Exception"""
+    code = "NoApplicableCode"
+    locator = ""
+    explanation = "Parameter value is missing"
+
+    def __init__(self, *args, **kwargs):
+        kwargs['status'] = HTTPBadRequest
+        super(OWSNoApplicableCode, self).__init__(args, kwargs)
+        warnings.warn(self.message, "OWS WPS NoApplicableCode (BadRequest)")
 
 
 class OWSMissingParameterValue(OWSException):

@@ -63,24 +63,9 @@ def xmlrpc_error_handler(wrapped):
     return _handle_error
 
 
-class weaverService(object):
+class WeaverService(object):
     def __init__(self, url, username=None, password=None, verify=True):
         self.server = _create_server(url, username=username, password=password, verify=verify)
-
-    # tokens
-
-    @xmlrpc_error_handler
-    def generate_token(self, valid_in_hours=1, data=None):
-        data = data or {}
-        return self.server.generate_token(valid_in_hours, data)
-
-    @xmlrpc_error_handler
-    def revoke_token(self, token):
-        return self.server.revoke_token(token)
-
-    @xmlrpc_error_handler
-    def revoke_all_tokens(self):
-        return self.server.revoke_all_tokens()
 
     # service registry
 

@@ -89,7 +89,7 @@ def add_provider(request):
     try:
         new_service = Service(url=request.json['url'], name=get_any_id(request.json))
     except KeyError as e:
-        raise OWSMissingParameterValue("Missing json parameter '{!s}'.".format(e))
+        raise OWSMissingParameterValue("Missing json parameter '{!s}'.".format(e), value=str(e))
 
     if 'public' in request.json:
         new_service['public'] = request.json['public']

@@ -4,7 +4,7 @@ import getpass
 import argcomplete
 import argparse
 
-from weaver.client import weaverService
+from weaver.client import WeaverService
 from weaver.warning import DisabledSSLCertificateVerificationWarning
 
 import warnings
@@ -46,28 +46,6 @@ class weaverCtl(object):
             title='command',
             description='List of available commands',
         )
-
-        # token management
-        # ---------------
-
-        # gentoken
-        subparser = subparsers.add_parser('gentoken', help="Generates an access token.")
-        subparser.add_argument('-H', '--valid-in-hours', type=int, default=1,
-                               help="Set how long the token is valid in hours (default: 1 hour).")
-        subparser.add_argument('-S', '--esgf-slcs-service-url', default="https://172.28.128.3",
-                               help="URL of ESGF SLCS service (default: https://172.28.128.3).")
-        subparser.add_argument('-T', '--esgf-access-token',
-                               help="ESGF access token to retrieve a certificate from ESGF SLCS service.")
-        subparser.add_argument('-C', '--esgf-credentials',
-                               help="URL pointing to ESGF credentials.")
-        subparser.add_argument('-e', '--env', nargs='*', default=[],
-                               help="Set environment variable (key=value).")
-
-        # revoke
-        subparser = subparsers.add_parser('revoke', help="Remove given access token.")
-        subparser.add_argument('token', nargs="?", help="access token")
-        subparser.add_argument('-A', '--all', action="store_true",
-                               help="Remove all access tokens.")
 
         # service registry
         # ----------------
@@ -111,10 +89,7 @@ class weaverCtl(object):
                 password = getpass.getpass(prompt='Password:')
 
         verify_ssl = args.insecure is False
-        service = weaverService(url=args.serverurl,
-                                  username=args.username,
-                                  password=password,
-                                  verify=verify_ssl)
+        service = WeaverService(url=args.serverurl, username=args.username, password=password, verify=verify_ssl)
         result = None
         try:
             if args.cmd == 'list':
@@ -127,19 +102,6 @@ class weaverCtl(object):
                 result = service.unregister_service(name=args.name)
             elif args.cmd == 'clear':
                 result = service.clear_services()
-            elif args.cmd == 'gentoken':
-                data = {k: v for k, v in (x.split('=') for x in args.env)}
-                if args.esgf_access_token:
-                    data['esgf_access_token'] = args.esgf_access_token
-                    data['esgf_slcs_service_url'] = args.esgf_slcs_service_url
-                if args.esgf_credentials:
-                    data['esgf_credentials'] = args.esgf_credentials
-                result = service.generate_token(valid_in_hours=args.valid_in_hours, data=data)
-            elif args.cmd == 'revoke':
-                if args.all is True:
-                    result = service.revoke_all_tokens()
-                else:
-                    result = service.revoke_token(token=args.token)
         except Exception as e:
             LOGGER.error("Error: %s", e.message)
         else:

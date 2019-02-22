@@ -60,11 +60,11 @@ class GenericApiRoutesTestCase(unittest.TestCase):
 
     def test_status_unauthorized_and_forbidden(self):
         # methods should return corresponding status codes, shouldn't be the default '403' on both cases
-        with mock.patch('weaver.wps_restapi.api.api_frontpage', side_effect=HTTPUnauthorized()):
-            resp = self.testapp.post('/random', headers=self.json_headers, expect_errors=True)
+        with mock.patch('weaver.utils.get_weaver_url', side_effect=HTTPUnauthorized):
+            resp = self.testapp.get(api_frontpage_uri, headers=self.json_headers, expect_errors=True)
             assert 401 == resp.status_code
-        with mock.patch('weaver.wps_restapi.api.api_frontpage', side_effect=HTTPForbidden()):
-            resp = self.testapp.post('/random', headers=self.json_headers, expect_errors=True)
+        with mock.patch('weaver.utils.get_weaver_url', side_effect=HTTPForbidden):
+            resp = self.testapp.get(api_frontpage_uri, headers=self.json_headers, expect_errors=True)
             assert 403 == resp.status_code
 
     def test_status_not_found_and_method_not_allowed(self):

@@ -12,7 +12,6 @@ from logging import _levelNames, _loggerClass, ERROR, INFO
 from typing import Any, AnyStr, Dict, List, Optional, Union
 from weaver.utils import (
     now,
-    now_secs,
     localize_datetime,  # for backward compatibility of previously saved jobs not time-locale-aware
     get_job_log_msg,
     get_log_fmt,
@@ -108,7 +107,7 @@ class Job(dict):
         return get_job_log_msg(duration=self.duration, progress=self.progress, status=self.status, message=msg)
 
     def save_log(self, errors=None, logger=None, message=None):
-        # type: (Optional[Union[AnyStr, List[WPSException]]], Optional[_loggerClass]) -> None
+        # type: (Optional[Union[AnyStr, List[WPSException]]], Optional[_loggerClass], Optional[AnyStr]) -> None
         if isinstance(errors, six.string_types):
             log_msg = [(ERROR, self._get_log_msg(message))]
             self.exceptions.append(errors)

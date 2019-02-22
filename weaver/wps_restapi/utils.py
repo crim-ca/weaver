@@ -43,7 +43,6 @@ def get_cookie_headers(headers):
 
 
 def get_header(header_name, header_container):
-    # type: (Str, AnyHeaders) -> Union[Str, None]
     """Searches for the specified header by case/dash/underscore-insensitive name."""
     if header_container is None:
         return None

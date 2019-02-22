@@ -11,7 +11,6 @@ from pyramid.httpexceptions import (
     HTTPForbidden,
     HTTPNotFound,
     HTTPMethodNotAllowed,
-    HTTPInternalServerError,
     HTTPServerError,
 )
 from weaver.__meta__ import __version__ as weaver_version
@@ -48,7 +47,7 @@ def api_frontpage(request):
     weaver_wps_url = weaver_url + get_wps_path(settings) if weaver_wps else None
 
     return {
-        'message': 'weaver Information',
+        'message': 'Weaver Information',
         'configuration': weaver_config,
         'parameters': [
             {'name': 'api', 'enabled': weaver_api,
@@ -115,9 +114,9 @@ def ows_json_format(function):
         http_response = function(request)
         if any([CONTENT_TYPE_JSON in get_header('Content-Type', http_response.headers),
                 CONTENT_TYPE_JSON in get_header('Accept', request.headers)]):
-            body = OWSException.json_formatter(http_response.status, http_response.message,
+            body = OWSException.json_formatter(http_response.status, response.message or '',
                                                http_response.title, request.environ)
-            body.update({'detail': get_request_info(request)})
+            body['detail'] = get_request_info(request)
             http_response._json = body
         if http_response.status_code != response.status_code:
             raise http_response  # re-raise if code was fixed
@@ -161,22 +160,11 @@ def unauthorized_or_forbidden(request):
         http://www.restapitutorial.com/httpstatuscodes.html
     """
     authn_policy = request.registry.queryUtility(IAuthenticationPolicy)
-    principals = authn_policy.effective_principals(request)
-    if Authenticated not in principals:
-        http_err = HTTPUnauthorized
-        http_msg = "Unauthorized access to this resource."
-    else:
-        http_err = HTTPForbidden
-        http_msg = "Forbidden operation under this resource."
-    return http_err(http_msg)
-
-
-@ows_json_format
-def internal_server_error(request):
-    """
-    Adds additional details about the cause of the internal server error.
-    """
-    return HTTPInternalServerError()
+    if authn_policy:
+        principals = authn_policy.effective_principals(request)
+        if Authenticated not in principals:
+            return HTTPUnauthorized("Unauthorized access to this resource.")
+    return HTTPForbidden("Forbidden operation under this resource.")
 
 
 def get_request_info(request, detail=None):

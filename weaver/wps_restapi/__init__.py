@@ -32,5 +32,4 @@ def includeme(config):
                         request_method='GET', renderer='json')
         config.add_notfound_view(api.not_found_or_method_not_allowed)
         config.add_forbidden_view(api.unauthorized_or_forbidden)
-        config.add_exception_view(api.internal_server_error)
         config.registry.celerydb = get_database_factory(config.registry)

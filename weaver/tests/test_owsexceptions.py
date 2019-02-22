@@ -19,10 +19,12 @@ def test_owsexceptions_json_formatter():
         ("Many \"\"double\"\"\" or '''''single'' commas 'cleaned'.", "Many 'double' or 'single' commas 'cleaned'."),
     ]
 
-    test_code = "Test Exception 1337"
+    test_code = 418
+    test_status = "{} I'm a teapot".format(test_code)
     for test, expect in test_cases:
-        json_body = OWSException.json_formatter(status=test_code, body=test, title="", environ={})
+        json_body = OWSException.json_formatter(status=test_status, body=test, title="", environ={})
         assert json_body['code'] == test_code
+        assert json_body['status'] == test_status
         assert json_body['description'] == expect, \
             "Result does not match expected value" + \
             "\n  Result: `{}`".format(json_body['description']) + \
