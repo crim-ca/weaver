@@ -50,7 +50,7 @@ class WpsProcess(object):
 
         registry = app.conf['PYRAMID_REGISTRY']
         self.settings = registry.settings
-        self.verify = asbool(self.settings.get('weaver.ows_proxy_ssl_verify', True))
+        self.verify = asbool(self.settings.get('weaver.ssl_verify', True))
         self.update_status = update_status  # type: Callable[[AnyStr, int, AnyStr], None]
 
     def get_user_auth_header(self):

@@ -1,6 +1,7 @@
 from weaver.exceptions import ServiceNotFound
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.status import map_status
+from weaver.typedefs import Settings
 from datetime import datetime
 from lxml import etree
 # noinspection PyProtectedMember
@@ -24,7 +25,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 def get_weaver_url(settings):
-    # type: (Dict[AnyStr, AnyStr]) -> AnyStr
+    # type: (Settings) -> AnyStr
     return settings.get('weaver.url').rstrip('/').strip()
 
 
@@ -141,10 +142,10 @@ def localize_datetime(dt, tz_name='UTC'):
     return tz_aware_dt
 
 
-def baseurl(url):
+def get_base_url(url):
     # type: (AnyStr) -> AnyStr
     """
-    return baseurl of given url
+    Obtains the base URL from the given `url`.
     """
     parsed_url = urlparse(url)
     if not parsed_url.netloc or parsed_url.scheme not in ("http", "https"):

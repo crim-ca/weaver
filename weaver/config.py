@@ -3,7 +3,7 @@ import tempfile
 from pyramid.exceptions import ConfigurationError
 
 import logging
-LOGGER = logging.getLogger("weaver")
+LOGGER = logging.getLogger(__name__)
 
 
 WEAVER_CONFIGURATION_DEFAULT = 'DEFAULT'

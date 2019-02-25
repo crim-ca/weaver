@@ -1,14 +1,14 @@
-from weaver.wps_restapi import swagger_definitions as sd
-from owslib.wps import WebProcessingService
-from pyramid.httpexceptions import *
-from weaver.adapter import servicestore_factory
+from weaver.database import get_db
 from weaver.datatype import Service
 from weaver.exceptions import ServiceNotFound
 from weaver.warning import NonBreakingExceptionWarning
 from weaver.owsexceptions import OWSMissingParameterValue, OWSNotImplemented
+from weaver.store.base import StoreServices
 from weaver.utils import get_any_id
 from weaver.wps_restapi.utils import wps_restapi_base_url, get_cookie_headers
-
+from weaver.wps_restapi import swagger_definitions as sd
+from owslib.wps import WebProcessingService
+from pyramid.httpexceptions import *
 import warnings
 import logging
 logger = logging.getLogger('weaver')
@@ -20,7 +20,7 @@ def get_providers(request):
     """
     Lists registered providers.
     """
-    store = servicestore_factory(request.registry)
+    store = get_db(request).get_store(StoreServices)
     providers = []
 
     for service in store.list_services(request=request):
@@ -69,7 +69,7 @@ def get_service(request):
     """
     Get the request service using provider_id from the service store.
     """
-    store = servicestore_factory(request.registry)
+    store = get_db(request).get_store(StoreServices)
     provider_id = request.matchdict.get('provider_id')
     try:
         service = store.fetch_by_name(provider_id, request=request)
@@ -84,7 +84,7 @@ def add_provider(request):
     """
     Add a provider.
     """
-    store = servicestore_factory(request.registry)
+    store = get_db(request).get_store(StoreServices)
 
     try:
         new_service = Service(url=request.json['url'], name=get_any_id(request.json))

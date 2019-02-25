@@ -3,21 +3,26 @@ from cornice_swagger import CorniceSwagger
 from cornice.service import get_services
 from pyramid.renderers import render_to_response
 from pyramid.request import Request
+from pyramid.response import Response
 from pyramid.settings import asbool
 from pyramid.authentication import IAuthenticationPolicy, Authenticated
 from pyramid.exceptions import PredicateMismatch
 from pyramid.httpexceptions import (
+    HTTPOk,
     HTTPUnauthorized,
     HTTPForbidden,
     HTTPNotFound,
     HTTPMethodNotAllowed,
     HTTPServerError,
+    HTTPException,
 )
 from weaver.__meta__ import __version__ as weaver_version
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.colander_one_of import CustomTypeConversionDispatcher
 from weaver.wps_restapi.utils import wps_restapi_base_url, wps_restapi_base_path, get_header, CONTENT_TYPE_JSON
 from weaver.owsexceptions import OWSException
+from weaver.typedefs import JsonBody
+from typing import AnyStr, Optional
 from simplejson import JSONDecodeError
 import logging
 import six
@@ -60,15 +65,14 @@ def api_frontpage(request):
     }
 
 
+# noinspection PyUnusedLocal
 @sd.api_versions_service.get(tags=[sd.api_tag], renderer='json',
                              schema=sd.VersionsEndpoint(), response_schemas=sd.get_api_versions_responses)
 def api_versions(request):
+    # type: (Request) -> HTTPException
     """weaver versions information."""
-    from weaver.adapter import adapter_factory
-    adapter_info = adapter_factory(request.registry.settings).describe_adapter()
-    adapter_info['type'] = 'adapter'
     weaver_info = {'name': 'weaver', 'version': weaver_version, 'type': 'api'}
-    return {'versions': [weaver_info, adapter_info]}
+    return HTTPOk(json={'versions': [weaver_info]})
 
 
 @sd.api_swagger_json_service.get(tags=[sd.api_tag], renderer='json',
@@ -111,6 +115,7 @@ def api_swagger_ui(request):
 def ows_json_format(function):
     """Decorator that adds additional detail in the response's JSON body if this is the returned content-type."""
     def format_response_details(response, request):
+        # type: (Response, Request) -> HTTPException
         http_response = function(request)
         if any([CONTENT_TYPE_JSON in get_header('Content-Type', http_response.headers),
                 CONTENT_TYPE_JSON in get_header('Accept', request.headers)]):
@@ -168,6 +173,8 @@ def unauthorized_or_forbidden(request):
 
 
 def get_request_info(request, detail=None):
+    # type: (Request, Optional[AnyStr]) -> JsonBody
+    """Provided additional response details based on the request and execution stack on failure."""
     content = {u'route': str(request.upath_info), u'url': str(request.url), u'method': request.method}
     if isinstance(detail, six.string_types):
         content.update({'detail': detail})

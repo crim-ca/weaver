@@ -32,13 +32,14 @@ def test_parse_service_name():
         assert 'emu' == utils.parse_service_name("/ows/nowhere/emu", protected_path)
 
 
-def test_baseurl():
-    assert utils.baseurl('http://localhost:8094/wps') == 'http://localhost:8094/wps'
-    assert utils.baseurl('http://localhost:8094/wps?service=wps&request=getcapabilities') == 'http://localhost:8094/wps'
-    assert utils.baseurl('https://localhost:8094/wps?service=wps&request=getcapabilities') ==\
+def test_get_base_url():
+    assert utils.get_base_url('http://localhost:8094/wps') == 'http://localhost:8094/wps'
+    assert utils.get_base_url('http://localhost:8094/wps?service=wps&request=getcapabilities') == \
+        'http://localhost:8094/wps'
+    assert utils.get_base_url('https://localhost:8094/wps?service=wps&request=getcapabilities') == \
         'https://localhost:8094/wps'
     with pytest.raises(ValueError):
-        utils.baseurl('ftp://localhost:8094/wps')
+        utils.get_base_url('ftp://localhost:8094/wps')
 
 
 def test_path_elements():
@@ -49,7 +50,7 @@ def test_path_elements():
 
 def test_lxml_strip_ns():
     import lxml.etree
-    wpsxml = """
+    wps_xml = """
 <wps100:Execute
 xmlns:wps100="http://www.opengis.net/wps/1.0.0"
 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -57,7 +58,7 @@ service="WPS"
 version="1.0.0"
 xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/wps/1.0.0/wpsExecute_request.xsd"/>"""
 
-    doc = lxml.etree.fromstring(wpsxml)
+    doc = lxml.etree.fromstring(wps_xml)
     assert doc.tag == '{http://www.opengis.net/wps/1.0.0}Execute'
     utils.lxml_strip_ns(doc)
     assert doc.tag == 'Execute'
@@ -101,6 +102,7 @@ class MockRequest(object):
 
 def test_parse_request_query_basic():
     req = MockRequest('http://localhost:5000/ows/wps?service=wps&request=GetCapabilities&version=1.0.0')
+    # noinspection PyTypeChecker
     queries = utils.parse_request_query(req)
     assert 'service' in queries
     assert isinstance(queries['service'], dict)
@@ -113,9 +115,10 @@ def test_parse_request_query_basic():
     assert queries['version'][0] == '1.0.0'
 
 
-def test_parse_request_query_many_datainputs_multicase():
+def test_parse_request_query_many_datainputs_multi_case():
     req = MockRequest('http://localhost:5000/ows/wps?service=wps&request=GetCapabilities&version=1.0.0&' +
                       'datainputs=data1=value1&dataInputs=data2=value2&DataInputs=data3=value3')
+    # noinspection PyTypeChecker
     queries = utils.parse_request_query(req)
     assert 'datainputs' in queries
     assert isinstance(queries['datainputs'], dict)

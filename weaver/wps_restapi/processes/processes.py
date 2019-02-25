@@ -10,8 +10,8 @@ from six.moves.urllib.error import URLError
 from time import sleep
 from typing import Any, AnyStr, Dict, List, Tuple, Optional, Union
 from weaver.wps import load_pywps_cfg
-from weaver.adapter import servicestore_factory, jobstore_factory, processstore_factory
 from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS
+from weaver.database import get_db
 from weaver.datatype import Process as ProcessDB, Service
 from weaver.exceptions import (
     InvalidIdentifierValue,
@@ -24,9 +24,10 @@ from weaver.exceptions import (
 )
 from weaver.processes import wps_package, opensearch
 from weaver.processes.types import PROCESS_WORKFLOW
-from weaver.utils import get_any_id, get_any_value, raise_on_xml_exception
 from weaver.namesgenerator import get_sane_name
 from weaver.owsexceptions import OWSNoApplicableCode
+from weaver.store.base import StoreServices, StoreProcesses, StoreJobs
+from weaver.utils import get_any_id, get_any_value, raise_on_xml_exception
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.notify import notify_job
 from weaver.wps_restapi.utils import *
@@ -172,8 +173,8 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
     registry = app.conf['PYRAMID_REGISTRY']
     load_pywps_cfg(registry)
 
-    ssl_verify = asbool(registry.settings.get('weaver.ows_proxy_ssl_verify', True))
-    store = jobstore_factory(registry)
+    ssl_verify = asbool(registry.settings.get('weaver.ssl_verify', True))
+    store = get_db(registry).get_store(StoreJobs)
     job = store.fetch_by_id(job_id)
     job.task_id = self.request.id
     job = store.update_job(job)
@@ -354,7 +355,7 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
 
     notification_email = json_body.get('notification_email')
 
-    store = jobstore_factory(request.registry)
+    store = get_db(request).get_store(StoreJobs)
     job = store.save_job(task_id=STATUS_ACCEPTED, process=process_id, service=provider_id,
                          inputs=json_body.get('inputs'), is_workflow=is_workflow, access=visibility,
                          user_id=request.authenticated_userid, execute_async=is_execute_async, custom_tags=tags)
@@ -388,7 +389,7 @@ def submit_provider_job(request):
     """
     Execute a provider process.
     """
-    store = servicestore_factory(request.registry)
+    store = get_db(request).get_store(StoreServices)
     provider_id = request.matchdict.get('provider_id')
     service = store.fetch_by_name(provider_id, request=request)
     return submit_job_handler(request, service.url)
@@ -463,7 +464,7 @@ def get_provider_processes(request):
     Retrieve available provider processes (GetCapabilities).
     """
     provider_id = request.matchdict.get('provider_id')
-    store = servicestore_factory(request.registry)
+    store = get_db(request).get_store(StoreServices)
     service = store.fetch_by_name(provider_id, request=request)
     processes = list_remote_processes(service, request=request)
     return HTTPOk(json=[p.json() for p in processes])
@@ -477,7 +478,7 @@ def get_provider_process(request):
     """
     provider_id = request.matchdict.get('provider_id')
     process_id = request.matchdict.get('process_id')
-    store = servicestore_factory(request.registry)
+    store = get_db(request).get_store(StoreServices)
     service = store.fetch_by_name(provider_id, request=request)
     wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
     process = wps.describeprocess(process_id)
@@ -509,7 +510,7 @@ def get_processes_filtered_by_valid_schemas(request):
     Validates the processes summary schemas and returns them into valid/invalid lists.
     :returns: list of valid process summaries and invalid processes IDs for manual cleanup.
     """
-    store = processstore_factory(request.registry)
+    store = get_db(request).get_store(StoreProcesses)
     processes = store.list_processes(visibility=VISIBILITY_PUBLIC, request=request)
     valid_processes = list()
     invalid_processes_ids = list()
@@ -654,7 +655,7 @@ def add_local_process(request):
     process_info['processDescriptionURL'] = description_url
 
     try:
-        store = processstore_factory(request.registry)
+        store = get_db(request).get_store(StoreProcesses)
         saved_process = store.save_process(ProcessDB(process_info), overwrite=False, request=request)
     except ProcessRegistrationError as ex:
         raise HTTPConflict(detail=str(ex))
@@ -672,7 +673,7 @@ def get_process(request):
     if not isinstance(process_id, string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
-        store = processstore_factory(request.registry)
+        store = get_db(request).get_store(StoreProcesses)
         process = store.fetch_by_id(process_id, visibility=VISIBILITY_PUBLIC, request=request)
         return process
     except HTTPException:
@@ -739,7 +740,7 @@ def get_process_visibility(request):
     if not isinstance(process_id, string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
-        store = processstore_factory(request.registry)
+        store = get_db(request).get_store(StoreProcesses)
         visibility_value = store.get_visibility(process_id, request=request)
         return HTTPOk(json={u'value': visibility_value})
     except HTTPException:
@@ -767,7 +768,7 @@ def set_process_visibility(request):
         raise HTTPBadRequest("Invalid visibility value specified.")
 
     try:
-        store = processstore_factory(request.registry)
+        store = get_db(request).get_store(StoreProcesses)
         store.set_visibility(process_id, visibility_value, request=request)
         return HTTPOk(json={u'value': visibility_value})
     except HTTPException:
@@ -793,7 +794,7 @@ def delete_local_process(request):
     if not isinstance(process_id, string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
-        store = processstore_factory(request.registry)
+        store = get_db(request).get_store(StoreProcesses)
         if store.delete_process(process_id, visibility=VISIBILITY_PUBLIC, request=request):
             return HTTPOk(json={'undeploymentDone': True, 'identifier': process_id})
         raise HTTPInternalServerError("Delete process failed for unhandled reason.")
@@ -820,7 +821,7 @@ def submit_local_job(request):
     if not isinstance(process_id, string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
-        store = processstore_factory(request.registry)
+        store = get_db(request).get_store(StoreProcesses)
         process = store.fetch_by_id(process_id, visibility=VISIBILITY_PUBLIC, request=request)
         resp = submit_job_handler(request, process.processEndpointWPS1,
                                   is_workflow=process.type == PROCESS_WORKFLOW,

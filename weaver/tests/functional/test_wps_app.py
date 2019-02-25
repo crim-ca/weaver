@@ -38,7 +38,7 @@ class WpsAppTest(unittest.TestCase):
         config = setup_config_with_pywps(config)
         config = setup_config_with_celery(config)
         self.process_store = setup_mongodb_processstore(config)
-        self.app = get_test_weaver_app(config=config, settings_override=settings)
+        self.app = get_test_weaver_app(config=config, settings=settings)
 
         # add processes by database Process type
         self.process_public = WpsTestProcess(identifier='process_public')

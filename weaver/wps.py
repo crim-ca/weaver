@@ -13,6 +13,8 @@ from pywps import configuration as pywps_config
 from pywps.app.Service import Service
 from six.moves.configparser import SafeConfigParser
 from typing import AnyStr, Dict, Union, Optional
+from weaver.database import get_db
+from weaver.store.base import StoreProcesses
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.utils import get_weaver_url
@@ -28,7 +30,7 @@ PYWPS_CFG = None
 
 def _get_settings_or_wps_config(
         settings,                   # type: Dict[AnyStr, AnyStr]
-        weaver_setting_name,      # type: AnyStr
+        weaver_setting_name,        # type: AnyStr
         config_setting_section,     # type: AnyStr
         config_setting_name,        # type: AnyStr
         default_not_found,          # type: AnyStr
@@ -144,10 +146,9 @@ def pywps_view(environ, start_response):
         load_pywps_cfg(registry, config=pywps_cfg)
 
         # call pywps application with processes filtered according to the adapter's definition
-        from weaver.adapter import adapter_factory
-        processstore = adapter_factory(registry.settings).processstore_factory(registry)
+        process_store = get_db(registry).get_store(StoreProcesses)
         processes_wps = [process.wps() for process in
-                         processstore.list_processes(visibility=VISIBILITY_PUBLIC, request=get_current_request())]
+                         process_store.list_processes(visibility=VISIBILITY_PUBLIC, request=get_current_request())]
         service = Service(processes_wps)
     except Exception as ex:
         raise OWSNoApplicableCode("Failed setup of PyWPS Service and/or Processes. Error [{}]".format(ex))

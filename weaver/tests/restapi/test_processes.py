@@ -35,14 +35,12 @@ from weaver.execute import (
 class WpsRestApiProcessesTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.config = setup_config_with_mongodb()
+        settings = {
+            'weaver.url': "https://localhost",
+            'weaver.wps_path': "/ows/wps",
+        }
+        cls.config = setup_config_with_mongodb(settings=settings)
         cls.app = get_test_weaver_app(config=cls.config)
-        cls.config.registry.settings['weaver.url'] = "https://localhost"
-        cls.config.registry.settings['weaver.wps_path'] = "/ows/wps"
-        cls.config.include('weaver.wps')
-        cls.config.include('weaver.wps_restapi')
-        cls.config.include('weaver.tweens')
-        cls.config.scan()
         cls.json_app = 'application/json'
         cls.json_headers = {'Accept': cls.json_app, 'Content-Type': cls.json_app}
         cls.app = webtest.TestApp(cls.config.make_wsgi_app())

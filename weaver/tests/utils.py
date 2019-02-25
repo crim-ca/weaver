@@ -2,22 +2,16 @@
 Utility methods for various TestCase setup operations.
 """
 from six.moves.configparser import ConfigParser
-from typing import Any, AnyStr, Dict, Optional, Union
+from typing import Any, AnyStr, Optional
 from pyramid import testing
 from pyramid.registry import Registry
 from pyramid.config import Configurator
 # noinspection PyPackageRequirements
 from webtest import TestApp
 from weaver.datatype import Service
-from weaver.adapter import (
-    WEAVER_ADAPTER_DEFAULT,
-    servicestore_factory,
-    processstore_factory,
-    jobstore_factory,
-)
-from weaver.database.mongodb import MongoDatabase
 from weaver.store.mongodb import MongodbServiceStore, MongodbProcessStore, MongodbJobStore
 from weaver.config import WEAVER_CONFIGURATION_DEFAULT
+from weaver.typedefs import Settings
 from weaver.wps import get_wps_url, get_wps_output_url, get_wps_output_path
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 import pyramid_celery
@@ -25,8 +19,6 @@ import warnings
 # noinspection PyPackageRequirements
 import mock
 import os
-
-SettingsType = Dict[AnyStr, Union[AnyStr, float, int, bool]]
 
 
 def ignore_wps_warnings(func):
@@ -41,7 +33,7 @@ def ignore_wps_warnings(func):
 
 
 def get_settings_from_config_ini(config_ini_path=None, ini_section_name='app:main'):
-    # type: (Optional[AnyStr], Optional[AnyStr]) -> SettingsType
+    # type: (Optional[AnyStr], Optional[AnyStr]) -> Settings
     parser = ConfigParser()
     parser.read([config_ini_path or get_default_config_ini_path()])
     settings = dict(parser.items(ini_section_name))
@@ -54,7 +46,7 @@ def get_default_config_ini_path():
 
 
 def setup_config_from_settings(settings=None):
-    # type: (Optional[SettingsType]) -> Configurator
+    # type: (Optional[Settings]) -> Configurator
     settings = settings or {}
     config = testing.setUp(settings=settings)
     return config
@@ -69,54 +61,50 @@ def setup_config_from_ini(config_ini_file_path=None):
     return config
 
 
-def setup_config_with_mongodb(config=None):
-    # type: (Optional[Configurator]) -> Configurator
-    settings = {'mongodb.host': '127.0.0.1',
-                'mongodb.port': '27027',
-                'mongodb.db_name': 'weaver_test',
-                'weaver.db_factory': MongoDatabase.type}
+def setup_config_with_mongodb(config=None, settings=None):
+    # type: (Optional[Configurator], Optional[Settings]) -> Configurator
     settings = settings or {}
+    settings.update({
+        'mongodb.host': '127.0.0.1',
+        'mongodb.port': '27027',
+        'mongodb.db_name': 'weaver_test'
+    })
     if config:
         config.registry.settings.update(settings)
     else:
-        config = testing.setUp(settings=settings)
-
-    factory_setting = 'weaver.db_factory'
-    factory_value = config.registry.settings.get(factory_setting)
-    if factory_value != MongoDatabase.type:
-        warnings.warn("Overriding value `{}` expected to be `{}`, was `{}`."
-                      .format(factory_setting, MongoDatabase.type, factory_value))
-
+        config = get_test_weaver_config(settings=settings)
     return config
 
 
-def setup_mongodb_servicestore(config):
-    # type: (Configurator) -> MongodbServiceStore
+def setup_mongodb_servicestore(config=None):
+    # type: (Optional[Configurator]) -> MongodbServiceStore
     """Setup store using mongodb, will be enforced if not configured properly."""
     config = setup_config_with_mongodb(config)
-    store = servicestore_factory(config.registry)
+    store = config.registry.db.get_store(MongodbServiceStore)
     store.clear_services()
     # noinspection PyTypeChecker
     return store
 
 
-def setup_mongodb_processstore(config):
-    # type: (Configurator) -> MongodbProcessStore
+def setup_mongodb_processstore(config=None):
+    # type: (Optional[Configurator]) -> MongodbProcessStore
     """Setup store using mongodb, will be enforced if not configured properly."""
     config = setup_config_with_mongodb(config)
-    store = processstore_factory(config.registry)
+    store = config.registry.db.get_store(MongodbProcessStore)
     store.clear_processes()
     # store must be recreated after clear because processes are added automatically on __init__
-    store = processstore_factory(config.registry)
+    # noinspection PyProtectedMember
+    config.registry.db._stores.pop(MongodbProcessStore.type)
+    store = config.registry.db.get_store(MongodbProcessStore)
     # noinspection PyTypeChecker
     return store
 
 
-def setup_mongodb_jobstore(config):
-    # type: (Configurator) -> MongodbJobStore
+def setup_mongodb_jobstore(config=None):
+    # type: (Optional[Configurator]) -> MongodbJobStore
     """Setup store using mongodb, will be enforced if not configured properly."""
     config = setup_config_with_mongodb(config)
-    store = jobstore_factory(config.registry)
+    store = config.registry.db.get_store(MongodbJobStore)
     store.clear_jobs()
     # noinspection PyTypeChecker
     return store
@@ -150,34 +138,31 @@ def setup_config_with_celery(config):
     return config
 
 
-def get_test_weaver_config(config=None, settings_override=None):
-    # type: (Optional[Configurator], Optional[SettingsType]) -> Configurator
+def get_test_weaver_config(config=None, settings=None):
+    # type: (Optional[Configurator], Optional[Settings]) -> Configurator
     if not config:
         # default db required if none specified by config
-        config = setup_config_from_settings({'weaver.db_factory': MongoDatabase.type})
-    if 'weaver.adapter' not in config.registry.settings:
-        config.registry.settings['weaver.adapter'] = WEAVER_ADAPTER_DEFAULT
+        config = setup_config_from_settings(settings=settings)
     if 'weaver.configuration' not in config.registry.settings:
         config.registry.settings['weaver.configuration'] = WEAVER_CONFIGURATION_DEFAULT
-    config.registry.settings['weaver.url'] = "https://localhost"
-    if settings_override:
-        config.registry.settings.update(settings_override)
+    if 'weaver.url' not in config.registry.settings:
+        config.registry.settings['weaver.url'] = "https://localhost"
+    if settings:
+        config.registry.settings.update(settings)
     # create the test application
-    config.include('weaver.wps')
-    config.include('weaver.wps_restapi')
-    config.include('weaver.tweens')
+    config.include('weaver')
     return config
 
 
-def get_test_weaver_app(config=None, settings_override=None):
-    # type: (Optional[Configurator], Optional[SettingsType]) -> TestApp
-    config = get_test_weaver_config(config=config, settings_override=settings_override)
+def get_test_weaver_app(config=None, settings=None):
+    # type: (Optional[Configurator], Optional[Settings]) -> TestApp
+    config = get_test_weaver_config(config=config, settings=settings)
     config.scan()
     return TestApp(config.make_wsgi_app())
 
 
 def get_settings_from_testapp(testapp):
-    # type: (TestApp) -> Dict
+    # type: (TestApp) -> Settings
     settings = {}
     if hasattr(testapp.app, 'registry'):
         settings = testapp.app.registry.settings or {}
@@ -211,7 +196,7 @@ def get_setting(env_var_name, app=None, setting_name=None):
 
 def init_weaver_service(registry):
     # type: (Registry) -> None
-    service_store = servicestore_factory(registry)
+    service_store = registry.db.get_store(MongodbServiceStore)
     service_store.save_service(Service({
         'type': '',
         'name': 'weaver',

@@ -5,7 +5,6 @@ import unittest
 import os
 from pprint import pformat
 from six.moves.urllib.parse import urlparse, parse_qsl
-
 # noinspection PyPackageRequirements
 import pytest
 # noinspection PyPackageRequirements
@@ -14,16 +13,16 @@ from pyramid import testing
 from pyramid.testing import DummyRequest
 # noinspection PyPackageRequirements
 from pywps.inout.inputs import LiteralInput
-
-import weaver
 from weaver.processes.constants import START_DATE, END_DATE, AOI
 from weaver.datatype import Process
 from weaver.processes import opensearch
 # noinspection PyProtectedMember
 from weaver.processes.opensearch import _make_specific_identifier
-from weaver.database.memory import MemoryProcessStore
+from weaver.database.mongodb import MongodbProcessStore
 from weaver.utils import get_any_id
 from weaver.wps_restapi.processes import processes
+from weaver.tests.utils import setup_mongodb_processstore
+import weaver
 
 OSDD_URL = "http://geo.spacebel.be/opensearch/description.xml"
 
@@ -76,7 +75,7 @@ class WpsHandleEOITestCase(unittest.TestCase):
 
 def get_memory_store():
     hello = weaver.processes.wps_default.Hello()
-    store = MemoryProcessStore([hello])
+    store = MongodbProcessStore([hello])
     return store
 
 
@@ -176,8 +175,17 @@ def test_load_wkt():
 
 
 def test_deploy_opensearch():
-    store = MemoryProcessStore()
-    with mock.patch("weaver.wps_restapi.processes.processes.processstore_factory", return_value=store):
+    store = setup_mongodb_processstore()
+
+    # noinspection PyMethodMayBeStatic, PyUnusedLocal
+    class MockDB(object):
+        def __init__(self, *args):
+            pass
+
+        def get_store(*args):
+            return store
+
+    with mock.patch('weaver.wps_restapi.processes.processes.get_db', side_effect=MockDB):
         # given
         opensearch_payload = get_opensearch_payload()
         initial_payload = deepcopy(opensearch_payload)

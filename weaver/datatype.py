@@ -1,9 +1,6 @@
 """
 Definitions of types used by tokens.
 """
-
-import six
-import uuid
 # noinspection PyPackageRequirements
 from dateutil.parser import parse as dt_parse
 from datetime import datetime, timedelta
@@ -28,8 +25,9 @@ from weaver.visibility import visibility_values, VISIBILITY_PRIVATE
 from owslib.wps import WPSException
 # noinspection PyPackageRequirements
 from pywps import Process as ProcessWPS
-
 import weaver.wps_restapi.swagger_definitions as sd
+import six
+import uuid
 
 
 class Service(dict):

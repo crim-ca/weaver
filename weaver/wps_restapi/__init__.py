@@ -1,6 +1,5 @@
 from pyramid.settings import asbool
 from weaver.wps_restapi import api
-from weaver.database.base import get_database_factory
 import logging
 logger = logging.getLogger(__name__)
 
@@ -32,4 +31,3 @@ def includeme(config):
                         request_method='GET', renderer='json')
         config.add_notfound_view(api.not_found_or_method_not_allowed)
         config.add_forbidden_view(api.unauthorized_or_forbidden)
-        config.registry.celerydb = get_database_factory(config.registry)

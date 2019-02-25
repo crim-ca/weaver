@@ -10,8 +10,6 @@ from weaver.wps_restapi.swagger_definitions import (
     VersionsSchema,
 )
 from weaver.tests.utils import get_test_weaver_app, get_test_weaver_config, get_settings_from_testapp
-from weaver.database.memory import MemoryDatabase
-from weaver.adapter import WEAVER_ADAPTER_DEFAULT
 import colander
 import unittest
 # noinspection PyPackageRequirements
@@ -23,8 +21,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        settings = {'weaver.adapter': WEAVER_ADAPTER_DEFAULT, 'weaver.db_factory': MemoryDatabase.type}
-        cls.testapp = get_test_weaver_app(settings_override=settings)
+        cls.testapp = get_test_weaver_app(settings=None)
         cls.json_app = 'application/json'
         cls.json_headers = {'Accept': cls.json_app, 'Content-Type': cls.json_app}
 
@@ -76,7 +73,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
         assert 405 == resp.status_code
 
 
-class AlternativeProxyBaseUrlApiRoutesTestCase(unittest.TestCase):
+class RebasedApiRoutesTestCase(unittest.TestCase):
 
     # noinspection PyUnusedLocal
     @staticmethod
@@ -86,14 +83,13 @@ class AlternativeProxyBaseUrlApiRoutesTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # derived path for testing simulated server proxy pass
-        cls.proxy_api_base_path = '/weaver/rest'
-        cls.proxy_api_base_name = api_swagger_json_service.name + '_proxy'
+        cls.api_base_path = '/weaver/rest'
+        cls.api_base_name = api_swagger_json_service.name + '_rebased'
 
         # create redirect view to simulate the server proxy pass
-        settings = {'weaver.adapter': WEAVER_ADAPTER_DEFAULT, 'weaver.db_factory': MemoryDatabase.type}
-        config = get_test_weaver_config(settings_override=settings)
-        config.add_route(name=cls.proxy_api_base_name, path=cls.proxy_api_base_path)
-        config.add_view(cls.redirect_api_view, route_name=cls.proxy_api_base_name)
+        config = get_test_weaver_config(settings=None)
+        config.add_route(name=cls.api_base_name, path=cls.api_base_path)
+        config.add_view(cls.redirect_api_view, route_name=cls.api_base_name)
 
         cls.testapp = get_test_weaver_app(config)
         cls.json_app = 'application/json'
@@ -106,13 +102,13 @@ class AlternativeProxyBaseUrlApiRoutesTestCase(unittest.TestCase):
         """
         # setup environment that would define the new weaver location for the proxy pass
         weaver_server_host = get_settings_from_testapp(self.testapp).get('weaver.url')
-        weaver_server_url = weaver_server_host + self.proxy_api_base_path
+        weaver_server_url = weaver_server_host + self.api_base_path
         with mock.patch.dict('os.environ', {'WEAVER_URL': weaver_server_url}):
-            resp = self.testapp.get(self.proxy_api_base_path, headers=self.json_headers)
+            resp = self.testapp.get(self.api_base_path, headers=self.json_headers)
             resp = resp.follow()
             assert 200 == resp.status_code
-            assert self.proxy_api_base_path not in resp.json['host']
-            assert resp.json['basePath'] == self.proxy_api_base_path
+            assert self.api_base_path not in resp.json['host']
+            assert resp.json['basePath'] == self.api_base_path
 
             # validate that swagger UI still renders and has valid URL
             resp = self.testapp.get(api_swagger_ui_uri)
@@ -131,10 +127,10 @@ class AlternativeProxyBaseUrlApiRoutesTestCase(unittest.TestCase):
         # ensure that environment that would define the weaver location is not defined for local app
         with mock.patch.dict('os.environ'):
             os.environ.pop('WEAVER_URL', None)
-            resp = self.testapp.get(self.proxy_api_base_path, headers=self.json_headers)
+            resp = self.testapp.get(self.api_base_path, headers=self.json_headers)
             resp = resp.follow()
             assert 200 == resp.status_code
-            assert self.proxy_api_base_path not in resp.json['host']
+            assert self.api_base_path not in resp.json['host']
             assert resp.json['basePath'] == api_frontpage_uri
 
             # validate that swagger UI still renders and has valid URL

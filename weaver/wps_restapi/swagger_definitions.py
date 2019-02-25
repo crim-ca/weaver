@@ -999,9 +999,9 @@ class SwaggerUISpecSchema(MappingSchema):
 
 
 class VersionsSpecSchema(MappingSchema):
-    name = SchemaNode(String(), description="Identification name of the current item.", example='default')
-    type = SchemaNode(String(), description="Identification type of the current item.", example='adapter')
-    version = SchemaNode(String(), description="Version of the current item.", example='0.3.0')
+    name = SchemaNode(String(), description="Identification name of the current item.", example='weaver')
+    type = SchemaNode(String(), description="Identification type of the current item.", example='api')
+    version = SchemaNode(String(), description="Version of the current item.", example='0.1.0')
 
 
 class VersionsList(SequenceSchema):

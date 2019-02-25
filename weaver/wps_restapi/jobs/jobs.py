@@ -2,7 +2,7 @@ from pyramid.httpexceptions import *
 from pyramid.settings import asbool
 from pyramid.request import Request
 from pyramid_celery import celery_app as app
-from weaver.adapter import servicestore_factory, processstore_factory, jobstore_factory
+from weaver.database import get_db
 from weaver.exceptions import (
     InvalidIdentifierValue,
     ServiceNotFound,
@@ -11,6 +11,7 @@ from weaver.exceptions import (
     ProcessNotFound,
     JobNotFound,
 )
+from weaver.store.base import StoreServices, StoreProcesses, StoreJobs
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import wps_restapi_base_url
 from weaver.visibility import VISIBILITY_PUBLIC
@@ -19,10 +20,10 @@ from typing import AnyStr, Optional, Union, Tuple
 from owslib.wps import WPSExecution
 from lxml import etree
 from celery.utils.log import get_task_logger
-import requests
 from requests_file import FileAdapter
+import requests
 
-logger = get_task_logger(__name__)
+LOGGER = get_task_logger(__name__)
 
 
 def job_url(settings, job):
@@ -68,10 +69,10 @@ def check_status(url=None, response=None, sleep_secs=2, verify=False):
     """
     execution = WPSExecution()
     if response:
-        logger.debug("using response document ...")
+        LOGGER.debug("using response document ...")
         xml = response
     elif url:
-        logger.debug('using status_location url ...')
+        LOGGER.debug('using status_location url ...')
         request_session = requests.Session()
         request_session.mount('file://', FileAdapter())
         xml = request_session.get(url, verify=verify).content
@@ -95,7 +96,7 @@ def get_job(request):
     :raises: HTTPNotFound with JSON body details on missing/non-matching job, process, provider IDs.
     """
     job_id = request.matchdict.get('job_id')
-    store = jobstore_factory(request.registry)
+    store = get_db(request).get_store(StoreJobs)
     try:
         job = store.fetch_by_id(job_id, request=request)
     except JobNotFound:
@@ -126,14 +127,14 @@ def validate_service_process(request):
         if service_name:
             item_type = 'Service'
             item_test = service_name
-            store = servicestore_factory(request.registry)
+            store = get_db(request).get_store(StoreServices)
             service = store.fetch_by_name(service_name, visibility=VISIBILITY_PUBLIC, request=request)
         if process_name:
             item_type = 'Process'
             item_test = process_name
             # local process
             if not service:
-                store = processstore_factory(request.registry)
+                store = get_db(request).get_store(StoreProcesses)
                 store.fetch_by_id(process_name, visibility=VISIBILITY_PUBLIC, request=request)
             # remote process
             else:
@@ -177,7 +178,7 @@ def get_jobs(request):
         'process': process,
         'service': service,
     }
-    store = jobstore_factory(request.registry)
+    store = get_db(request).get_store(StoreJobs)
     items, count = store.find_jobs(request, **filters)
     return HTTPOk(json={
         'count': count,
@@ -215,7 +216,7 @@ def cancel_job(request):
     """
     job = get_job(request)
     app.control.revoke(job.task_id, terminate=True)
-    store = jobstore_factory(request.registry)
+    store = get_db(request).get_store(StoreJobs)
     job.status_message = 'Job dismissed.'
     job.status = status.map_status(status.STATUS_DISMISSED)
     store.update_job(job)

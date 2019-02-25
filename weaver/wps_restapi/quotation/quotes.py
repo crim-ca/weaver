@@ -1,13 +1,13 @@
-from weaver.wps_restapi import swagger_definitions as sd
-from weaver import sort
-from weaver.wps_restapi.processes.processes import submit_local_job
 from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS, WEAVER_CONFIGURATION_ADES
+from weaver.database import get_db
 from weaver.exceptions import QuoteNotFound, ProcessNotFound
-from weaver.adapter import billstore_factory, quotestore_factory, processstore_factory
 from weaver.datatype import Bill, Quote
 from weaver.processes.types import *
 from weaver.processes.wps_package import get_process_location, get_package_workflow_steps
 from weaver.utils import get_weaver_url
+from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.processes.processes import submit_local_job
+from weaver import sort
 from pyramid.httpexceptions import *
 from datetime import timedelta
 from duration import to_iso8601
@@ -42,7 +42,7 @@ def request_quote(request):
         raise HTTPBadRequest("Unsupported request for configuration `{}`.".format(weaver_config))
 
     process_id = request.matchdict.get('process_id')
-    process_store = processstore_factory(request.registry)
+    process_store = get_db(request).get_store('processes')
     try:
         process = process_store.fetch_by_id(process_id, request=request)
     except ProcessNotFound:

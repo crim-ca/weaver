@@ -1,6 +1,8 @@
+from pyramid.config import Configurator
 import os
 import sys
 import logging
+logging.captureWarnings(True)
 LOGGER = logging.getLogger('weaver')
 
 WEAVER_MODULE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -13,11 +15,20 @@ sys.path.insert(0, WEAVER_MODULE_DIR)
 # ===============================================================================================
 
 
+def includeme(config):
+    LOGGER.info("Adding weaver...")
+    config.include('weaver.config')
+    config.include('weaver.database')
+    config.include('weaver.wps')
+    config.include('weaver.wps_restapi')
+    config.include('weaver.processes')
+    config.include('weaver.tweens')
+
+
 def main(global_config, **settings):
     """
-    This function returns a Pyramid WSGI application.
+    Creates a Pyramid WSGI application for Weaver.
     """
-    from weaver.adapter import adapter_factory
     from weaver.config import get_weaver_configuration
     from weaver.utils import parse_extra_options
 
@@ -28,25 +39,12 @@ def main(global_config, **settings):
     # Parse extra_options and add each of them in the settings dict
     settings.update(parse_extra_options(settings.get('weaver.extra_options', '')))
 
-    local_config = adapter_factory(settings).configurator_factory(settings)
+    local_config = Configurator(settings=settings)
 
-    # celery
     if global_config.get('__file__') is not None:
         local_config.include('pyramid_celery')
         local_config.configure_celery(global_config['__file__'])
 
-    # include weaver components
-    local_config.include('weaver.config')
-    local_config.include('weaver.database')
-    local_config.include('weaver.wps')
-    local_config.include('weaver.wps_restapi')
-    local_config.include('weaver.processes')
-
-    # tweens/middleware
-    # TODO: maybe add tween for exception handling or use unknown_failure view
-    local_config.include('weaver.tweens')
-
-    # don't scan to avoid finding random sub-packages like 'tests' if '__init__' are added
-    # local_config.scan()
+    local_config.include('weaver')
 
     return local_config.make_wsgi_app()

@@ -4,11 +4,6 @@ OWSExceptions are based on pyramid.httpexceptions.
 See also: https://github.com/geopython/pywps/blob/master/pywps/exceptions.py
 """
 
-import six
-import json
-import warnings
-from string import Template
-from typing import AnyStr, Dict
 # noinspection PyPackageRequirements
 from zope.interface import implementer
 from webob import html_escape as _html_escape
@@ -27,6 +22,12 @@ from pyramid.httpexceptions import (
 from pyramid.response import Response
 from pyramid.compat import text_type
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
+from weaver.typedefs import JsonBody, Settings
+from string import Template
+from typing import AnyStr
+import warnings
+import json
+import six
 
 
 @implementer(IExceptionResponse)
@@ -73,7 +74,7 @@ class OWSException(Response, Exception):
     # noinspection PyUnusedLocal
     @staticmethod
     def json_formatter(status, body, title, environ):
-        # type: (AnyStr, AnyStr, AnyStr, Dict[AnyStr, AnyStr]) -> Dict[AnyStr, AnyStr]
+        # type: (AnyStr, AnyStr, AnyStr, Settings) -> JsonBody
 
         # cleanup various escape characters and u'' stings
         while any(['\"' in body, '\\' in body, 'u\'' in body, 'u\"' in body, '\'\'' in body, '  ' in body]):

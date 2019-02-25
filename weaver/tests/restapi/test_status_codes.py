@@ -12,10 +12,9 @@ from weaver.wps_restapi.swagger_definitions import (
     jobs_short_uri,
     jobs_full_uri,
 )
-from pyramid import testing
 from weaver import main
 from weaver.config import WEAVER_CONFIGURATION_DEFAULT
-from weaver.tests.utils import get_test_weaver_app
+from weaver.tests.utils import get_test_weaver_app, setup_config_with_mongodb
 
 public_routes = [
     api_frontpage_uri,
@@ -57,7 +56,7 @@ class StatusCodeTestCase(unittest.TestCase):
         self.app = get_test_weaver_app()
 
     def setUp(self):
-        config = testing.setUp()
+        config = setup_config_with_mongodb()
         config.registry.settings['weaver.configuration'] = WEAVER_CONFIGURATION_DEFAULT
         config.registry.settings['weaver.url'] = 'https://localhost'
         app = main({}, **config.registry.settings)
