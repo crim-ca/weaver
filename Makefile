@@ -13,7 +13,7 @@ CPU_ARCH := $(shell uname -m 2>/dev/null || uname -p 2>/dev/null || echo "unknow
 
 # Python
 SETUPTOOLS_VERSION := 36.5.0
-CONDA_VERSION := 4.6
+CONDA_VERSION := 4.4
 BUILDOUT_VERSION := 2.13.1
 PYTHON_VERSION := 2.7
 
@@ -56,13 +56,21 @@ help:
 	@echo "  help               print this help message. (Default)"
 	@echo "  version            print version number of this Makefile."
 	@echo "  info               print information about $(APP_NAME)."
+	@echo "\Installation:"
 	@echo "  install            install $(APP_NAME) by running 'bin/buildout -c custom.cfg'."
 	@echo "  install-base       install base packages using pip."
 	@echo "  install-dev        install test packages using pip (also installs $(APP_NAME) with buildout)."
 	@echo "  install-pip        install as a package to allow import in another python code."
 	@echo "  install-sys        install system packages from requirements.sh."
 	@echo "  update             update application by running 'bin/buildout -o -c custom.cfg' (buildout offline mode)."
+	@echo "\nCleaning:"
 	@echo "  clean              delete all files that are created by running buildout."
+	@echo "  clean-bld          remove the temporary build files."
+	@echo "  clean-cache        remove caches such as DOWNLOAD_CACHE."
+	@echo "  clean-env          remove the conda enviroment $(CONDA_ENV)."
+	@echo "  clean-src          remove all *.pyc files."
+	@echo "  clean-dist         remove *all* files that are not controlled by 'git'."
+	@echo "                     [WARNING: use it *only* if you know what you do!"]"
 	@echo "\nTesting targets:"
 	@echo "  test               run tests (but skip long running and online tests)."
 	@echo "  test-func          run funtional tests (online and usage specific)."
@@ -74,13 +82,9 @@ help:
 	@echo "  linkcheck          check all external links in documentation for integrity."
 	@echo "  doc8               run doc8 documentation style checks."
 	@echo "\nSupporting targets:"
-	@echo "  clean-env          remove the conda enviroment $(CONDA_ENV)."
-	@echo "  clean-src          remove all *.pyc files."
-	@echo "  clean-dist         remove *all* files that are not controlled by 'git'."
-	@echo "                     [WARNING: use it *only* if you know what you do!"]"
 	@echo "  passwd             generate password for 'phoenix-password' in custom.cfg."
 	@echo "  conda-env-export   export the conda environment."
-	@echo "                     [CAUTION! You always need to check it the enviroment.yml is working.]"
+	@echo "                     [CAUTION! You always need to check if the enviroment.yml is working.]"
 	@echo "  selfupdate         update this Makefile."
 	@echo "\nSupervisor targets:"
 	@echo "  start              start supervisor service."
@@ -149,7 +153,7 @@ bootstrap-buildout.py:
 anaconda:
 	@echo "Installing Anaconda ..."
 	@test -f $(ANACONDA_HOME)/bin/conda || curl $(ANACONDA_URL)/$(FN) --silent --insecure --output "$(DOWNLOAD_CACHE)/$(FN)"
-	@test -f $(ANACONDA_HOME)/bin/conda || bash "$(DOWNLOAD_CACHE)/$(FN)" -b -u -p $(ANACONDA_HOME)
+	@test -f $(ANACONDA_HOME)/bin/conda || bash "$(DOWNLOAD_CACHE)/$(FN)" -b -p $(ANACONDA_HOME)
 	@echo "Add '$(ANACONDA_HOME)/bin' to your PATH variable in '.bashrc'."
 
 .PHONY: conda-config
@@ -187,6 +191,8 @@ conda-env-export:
 .PHONY: bootstrap
 bootstrap: init conda-env conda-pinned bootstrap-buildout.py
 	@echo "Bootstrap buildout ..."
+	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); \
+		python -c 'import zc.buildout' || pip install zc.buildout==$(BUILDOUT_VERSION)"
 	@test -f bin/buildout || bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); \
 		python bootstrap-buildout.py -c custom.cfg \
 			--allow-site-packages \
@@ -212,7 +218,7 @@ install-sys:
 	@echo "\nInstalling system packages for your application ..."
 	@-test -f requirements.sh && bash requirements.sh
 	@echo "Updating pip ..."
-	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); pip install -upgrade pip"
+	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); pip install --upgrade pip"
 
 .PHONY: install-pip
 install-pip: install
@@ -249,21 +255,35 @@ online-update-config:
 			settings:http-port=$(HTTP_PORT) -N -c custom.cfg"
 
 .PHONY: clean
-clean: clean-src clean-env
+clean: clean-bld clean-cache clean-src clean-env
 	@echo "Cleaning buildout files ..."
 	@-for i in $(BUILDOUT_FILES); do \
             test -e $$i && rm -v -rf $$i; \
         done
 
+.PHONY: clean-bld
+clean-bld:
+	@echo "Removing build files ..."
+	@-test -d "$(CURDIR)/eggs" || rm -fr "$(CURDIR)/eggs"
+	@-test -d "$(CURDIR)/develop-eggs" || rm -fr "$(CURDIR)/develop-eggs"
+	@-test -d "$(CURDIR)/$(APP_NAME).egg-info" || rm -fr "$(CURDIR)/$(APP_NAME).egg-info"
+	@-test -d "$(CURDIR)/parts" || rm -fr "$(CURDIR)/parts"
+
+.PHONY: clean-cache
+clean-cache:
+	@echo "Removing caches ..."
+	@-test -d "$(CURDIR)/.pytest_cache" || rm -fr "$(CURDIR)/.pytest_cache"
+	@-test -d "$(DOWNLOAD_CACHE)" || rm -fr "$(DOWNLOAD_CACHE)"
+
 .PHONY: clean-env
 clean-env: stop
 	@echo "Removing conda env $(CONDA_ENV)"
-	@-test -d $(CONDA_ENV_PATH) && "$(ANACONDA_HOME)/bin/conda" remove -n $(CONDA_ENV) --yes --all
+	@-test -d "$(CONDA_ENV_PATH)" && "$(ANACONDA_HOME)/bin/conda" remove -n $(CONDA_ENV) --yes --all
 
 .PHONY: clean-src
 clean-src:
 	@echo "Removing *.pyc files ..."
-	@-find $(APP_ROOT) -type f -name "*.pyc" -print | xargs rm
+	@-find "$(APP_ROOT)" -type f -name "*.pyc" -print | xargs rm
 	rm -rf "./src"
 
 .PHONY: clean-dist
