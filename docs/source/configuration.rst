@@ -8,7 +8,7 @@ Configuration File
     :local:
     :depth: 2
 
-After you have installed twitcher you can customize the default twitcher configuration by editing the ``custom.cfg`` configuration file. This configuration file overwrites the default settings in the ``buildout.cfg``:
+After you have installed weaver you can customize the default weaver configuration by editing the ``custom.cfg`` configuration file. This configuration file overwrites the default settings in the ``buildout.cfg``:
 
 .. code-block:: cfg
 
@@ -31,7 +31,7 @@ After you have installed twitcher you can customize the default twitcher configu
    wps = true
    wps-cfg = /path/to/my/default/pywps.cfg
 
-After your have made a change in ``custom.cfg`` you *need to update* the installation and restart the twitcher service:
+After your have made a change in ``custom.cfg`` you *need to update* the installation and restart the weaver service:
 
 .. code-block:: sh
 
@@ -57,10 +57,10 @@ Configure the default WPS configuration
 Edit the ``wps-cfg`` option to set the default PyWPS configuration for the capabilities of the internal WPS (PyWPS) application.
 
 
-Deactivate twitcher components
+Deactivate weaver components
 ==============================
 
-Twitcher has four components which by default are activated:
+weaver has four components which by default are activated:
 
 ows-security
    The OWS security wsgi middleware

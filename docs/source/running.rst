@@ -1,7 +1,7 @@
 .. _running:
 
 ****************
-Running Twitcher
+Running weaver
 ****************
 
 .. contents::
@@ -9,39 +9,39 @@ Running Twitcher
     :depth: 2
 
 
-Running twitcher service
+Running weaver service
 ========================
 
-The twitcher service is controlled by `supervisor <http://supervisord.org/>`_. The twitcher installation comes with a Makefile which provides shortcut commands for supervisor:
+The weaver service is controlled by `supervisor <http://supervisord.org/>`_. The weaver installation comes with a Makefile which provides shortcut commands for supervisor:
 
 .. code-block:: sh
 
-    $ cd twitcher   # cd into twitcher installation directory
-    $ make status   # show running supervisor services (incl. twitcher)
-    $ make start    # start all supervisor services (incl. twitcher)
+    $ cd weaver   # cd into weaver installation directory
+    $ make status   # show running supervisor services (incl. weaver)
+    $ make start    # start all supervisor services (incl. weaver)
     $ make stop    # stop ...
     $ make restart    # restart ...
 
 
 
-Running `twitcherctl`
+Running `weaverctl`
 =====================
 
 
-The ``twitcherctl`` is a command line tool to control the twitcher service. It uses the XML-RPC api of twitcher to generate access tokens and to register OWS services.
+The ``weaverctl`` is a command line tool to control the weaver service. It uses the XML-RPC api of weaver to generate access tokens and to register OWS services.
 
-``twitcherctl`` is part of the twitcher installation. When you have installed twitcher from GitHub then start ``twitcherctl`` with:
+``weaverctl`` is part of the weaver installation. When you have installed weaver from GitHub then start ``weaverctl`` with:
 
 .. code-block:: sh
 
-   $ cd twitcher   # cd into twitcher installation directory
-   $ bin/twitcherctl -h
+   $ cd weaver   # cd into weaver installation directory
+   $ bin/weaverctl -h
 
 
-`twitcherctl` Commands and Options
+`weaverctl` Commands and Options
 ------------------------------------------
 
-``twitcherctl`` has the following command line options:
+``weaverctl`` has the following command line options:
 
 -h, --help
 
@@ -49,7 +49,7 @@ The ``twitcherctl`` is a command line tool to control the twitcher service. It u
 
 -s, --serverurl
 
-   URL on which twitcher server is listening (default "https://localhost:38083/").
+   URL on which weaver server is listening (default "https://localhost:38083/").
 
 -u, --username
 
@@ -86,20 +86,20 @@ See the available options:
 
 .. code-block:: sh
 
-   $ bin/twitcherctl -k gentoken -h
+   $ bin/weaverctl -k gentoken -h
 
 Generate an access token valid for 24 hours (use ``-k`` to avoid validation of HTTPS server certificate):
 
 .. code-block:: sh
 
-   $ bin/twitcherctl -k gentoken -H 24
+   $ bin/weaverctl -k gentoken -H 24
 
 
 Generate an access token and set the ``PYWPS_CFG`` environment variable used by the PyWPS implementation via the *wsgi environ*:
 
 .. code-block:: sh
 
-   $ bin/twitcherctl -k gentoken -H 12 -e PYWPS_CFG=/path/to/my/pywps.cfg
+   $ bin/weaverctl -k gentoken -H 12 -e PYWPS_CFG=/path/to/my/pywps.cfg
 
 
 Register an OWS Service for the OWS Proxy
@@ -109,26 +109,26 @@ See the available options:
 
 .. code-block:: sh
 
-   bin/twitcherctl -k register -h
+   bin/weaverctl -k register -h
 
 Register a local WPS service:
 
 .. code-block:: sh
 
-   $ bin/twitcherctl -k register http://localhost:8094/wps
+   $ bin/weaverctl -k register http://localhost:8094/wps
    tiny_buzzard
 
 You can use the ``--name`` option to provide a name (used by the OWS proxy). Otherwise a nice name will be generated.
 
 
-Show Status of Twitcher
+Show Status of weaver
 -----------------------
 
 Currently the ``status`` command shows only the registered OWS services:
 
 .. code-block:: sh
 
-   $ bin/twitcherctl -k list
+   $ bin/weaverctl -k list
    [{'url': 'http://localhost:8094/wps', 'proxy_url': 'https://localhost:38083/ows/proxy/tiny_buzzard', 'type': 'wps', 'name': 'tiny_buzzard'}]
 
 Using OWSProxy
@@ -142,18 +142,18 @@ Using WPS Application
 
 See the :ref:`tutorial`.
 
-Use Twitcher components in your Pyramid Application
+Use weaver components in your Pyramid Application
 ===================================================
 
-Instead of running twitcher as a service you can also include twitcher components (OWS Security Middleware, OWS Proxy) in a Pyramid application.
+Instead of running weaver as a service you can also include weaver components (OWS Security Middleware, OWS Proxy) in a Pyramid application.
 
 Include OWS Security Middleware
 -------------------------------
 
-Use the Pyramid ``include`` statement. See the ``twitcher/__init__py`` as an example. [..]
+Use the Pyramid ``include`` statement. See the ``weaver/__init__py`` as an example. [..]
 
 
 Include OWS Proxy
 -----------------
 
-Use the Pyramid ``include`` statement. See the ``twitcher/__init__py`` as an example. [..]
+Use the Pyramid ``include`` statement. See the ``weaver/__init__py`` as an example. [..]

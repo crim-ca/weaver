@@ -4,7 +4,7 @@
 Useful Links
 ************
 
-Twitcher alike projects:
+weaver alike projects:
 
 * `Climate4Impact OWS token api <https://dev.knmi.nl/projects/impactportal/wiki/API>`_
 

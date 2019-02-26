@@ -1,8 +1,8 @@
 # vim:set ft=dockerfile:
 FROM birdhouse/bird-base:latest
-MAINTAINER https://github.com/bird-house/twitcher
+MAINTAINER https://github.com/bird-house/weaver
 
-LABEL Description="twitcher application" Vendor="Birdhouse"
+LABEL Description="Weaver" Vendor="Birdhouse"
 
 # Configure hostname and ports for services
 ENV HTTP_PORT 8080
@@ -10,29 +10,26 @@ ENV HTTPS_PORT 8443
 ENV OUTPUT_PORT 8000
 ENV HOSTNAME localhost
 
-ENV POSTGRES_USER user
-ENV POSTGRES_PASSWORD password
-ENV POSTGRES_HOST postgres
-ENV POSTGRES_DB default
-ENV POSTGRES_PORT 5432
-ENV MAGPIE_URL magpie
-ENV TWITCHER_URL twitcher
-ENV MAGPIE_SECRET to_be_override
-ENV TWITCHER_PROTECTED_PATH /ows/proxy
-ENV TWITCHER_WPS_RESTAPI_PATH /
+#ENV POSTGRES_USER user
+#ENV POSTGRES_PASSWORD password
+#ENV POSTGRES_HOST postgres
+#ENV POSTGRES_DB default
+#ENV POSTGRES_PORT 5432
+ENV WEAVER_URL weaver
+ENV WEAVER_WPS_RESTAPI_PATH /
 
 # Set current home
 ENV HOME /root
 
 # cd into application
-WORKDIR /opt/birdhouse/src/twitcher
+WORKDIR /opt/birdhouse/src/weaver
 
 # Provide custom.cfg with settings for docker image
 RUN printf "[buildout]\nextends=buildout.cfg profiles/docker.cfg" > custom.cfg
 
 # Set conda enviroment
 ENV ANACONDA_HOME /opt/conda
-ENV CONDA_ENV twitcher
+ENV CONDA_ENV weaver
 ENV CONDA_ENVS_DIR /opt/conda/envs
 
 COPY Makefile requirements.sh bootstrap.sh ./
@@ -65,7 +62,7 @@ EXPOSE 9001 $HTTP_PORT $HTTPS_PORT $OUTPUT_PORT
 ENV DAEMON_OPTS --nodaemon
 
 # Copy application sources
-COPY . /opt/birdhouse/src/twitcher
+COPY . /opt/birdhouse/src/weaver
 
 # Create folders required for installation
 RUN mkdir -p /opt/birdhouse/etc && mkdir -p /opt/birdhouse/var/run

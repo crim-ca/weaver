@@ -1,0 +1,55 @@
+{
+	"processOffering": {
+		"process": {
+			"identifier": "workflow_stacker_sfs_url",
+			"title": "Application StackCreation followed by SFS dynamically added by POST /processes"
+		}
+	},
+	"deploymentProfile": {
+		"deploymentProfileName": "workflow_stacker_sfs_deploy_post",
+		"executionUnit": {
+			"package": {
+				"cwlVersion": "v1.0",
+				"class": "Workflow",
+				"requirements": [
+					{
+						"class": "StepInputExpressionRequirement"
+					}
+				],
+				"inputs": {
+					"input_files": "File[]",
+					"output_type": "string",
+					"output_name": "string"
+				},
+				"outputs": {
+					"classout": {
+						"type": "File",
+						"outputSource": "sfs/output"
+					}
+				},
+				"steps": {
+					"stack_creation": {
+						"run": "{{PROTOCOL}}://{{HOSTNAME}}:{{weaver_PORT}}{{weaver_WPS_RESTAPI_PATH}}/processes/sfs_graph_str",
+						"in": {
+							"files": "input_files",
+							"output_file_type": "output_type",
+							"output_name": {
+								"valueFrom": "stack_result.tif"
+							}
+						},
+						"out": ["output"]
+					},
+					"sfs": {
+						"run": "{{PROTOCOL}}://{{HOSTNAME}}:{{weaver_PORT}}{{weaver_WPS_RESTAPI_PATH}}/processes/sfs_creation_graph_str",
+						"in": {
+							"source_product": "stack_creation/output",
+							"output_file_type": "output_type",
+							"output_name": "output_name"
+						},
+						"out": ["output"]
+					}
+				}
+			}
+		}
+	}
+}

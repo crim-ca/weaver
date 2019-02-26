@@ -1,6 +1,5 @@
 [buildout]
 extends = buildout.cfg
-parts += adapter_impl
 
 [config]
 workers = 5
@@ -16,17 +15,11 @@ hostname = localhost
 https-port = 5000
 log-level = WARN
 
-db-factory = mongodb
 mongodb-host = localhost
 mongodb-port = 27017
-mongodb-dbname = twitcher_db
+mongodb-dbname = weaver_db
 
-ows-security = true|false
-ows-proxy = true|false
-ows-proxy-delegate = true|false
-ows-proxy-url = true|false
-ows-proxy-ssl-verify = true|false
-ows-proxy-protected-path = /proxy/path/to/use
+ssl-verify = true|false
 
 wps = true|false
 wps-cfg = /path/to/custom/wps.cfg
@@ -39,14 +32,6 @@ wps-email-notify-from-addr = example@email.com
 wps-email-notify-password = 123456
 wps-email-notify-template = /path/to/mako/template.mako
 
-adapter = package.path.to.AdapterImpl
-extra-options = adapter_impl.opt1=value1,adapter_impl.opt2=value2
-
-# See twitcher.processes.sources.py for schema
+# See weaver.processes.sources.py for schema
 data_sources = ./data_sources.cfg.example
-
-[adapter_impl]
-recipe = collective.recipe.cmd
-on_update=true
-on_install=true
-cmds=pip install git+https://github.com/provider/adapter_impl.git#egg=adapter_impl
+extra-options = part.option1=value1,part.option2=value2

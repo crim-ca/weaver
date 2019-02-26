@@ -1,17 +1,19 @@
-=====================================
-Twitcher: A simple OWS Security Proxy
-=====================================
+=============================================
+Weaver: workflow execution management service
+=============================================
+
+.. # TODO: adjust references
 
 .. image:: https://img.shields.io/badge/docs-latest-brightgreen.svg
-   :target: http://twitcher.readthedocs.io/en/latest/?badge=latest
+   :target: http://weaver.readthedocs.io/en/latest/?badge=latest
    :alt: Documentation Status
 
-.. image:: https://travis-ci.org/bird-house/twitcher.svg?branch=master
-   :target: https://travis-ci.org/bird-house/twitcher
+.. image:: https://travis-ci.org/bird-house/weaver.svg?branch=master
+   :target: https://travis-ci.org/bird-house/weaver
    :alt: Travis Build
 
-.. image:: https://img.shields.io/github/license/bird-house/twitcher.svg
-   :target: https://github.com/bird-house/twitcher/blob/master/LICENSE.txt
+.. image:: https://img.shields.io/github/license/bird-house/weaver.svg
+   :target: https://github.com/bird-house/weaver/blob/master/LICENSE.txt
    :alt: GitHub license
 
 .. image:: https://badges.gitter.im/bird-house/birdhouse.svg
@@ -19,28 +21,34 @@ Twitcher: A simple OWS Security Proxy
    :alt: Join the chat at https://gitter.im/bird-house/birdhouse
 
 
-Twitcher (the bird-watcher)
-  *a birdwatcher mainly interested in catching sight of rare birds.* (`Leo <https://dict.leo.org/ende/index_en.html>`_).
+Weaver (the nest-builder)
+  *Weaver birds build exquisite and elaborate nest structures that are a rival to any human feat of engineering.
+  Some of these nests are the largest structures to be built by birds.*
+  (`Eden <https://eden.uktv.co.uk/animals/birds/article/weaver-birds/>`_).
 
-Twitcher is a security proxy for Web Processing Services (WPS). The execution of a WPS process is blocked by the proxy.
-The proxy service provides access tokens (uuid, Macaroons) which needs to be used to run a WPS process.
-The access tokens are valid only for a short period of time.
-In addition one can also use X.509 certificates for WPS client authentication.
+  *Although weavers are named for their elaborately woven nests, some are notable for their selective parasitic nesting habits instead.*
+  (`Wikipedia <https://en.wikipedia.org/wiki/Ploceidae>`_)
 
-The implementation is not restricted to WPS services.
-It will be extended to more OWS services like WMS (Web Map Service) and CSW (Catalogue Service for the Web)
-and might also be used for Thredds catalog services.
+`Weaver` is an `Execution Management Service (EMS)` that allows the execution of workflows chaining various
+application and `Web Processing Services (WPS)` inputs and outputs. It allows using remote
+`Application Deployment and Execution Services (ADES)` to dispatch application executions as defined by
+`Common Workflow Language (CWL)` configuration.
 
-Twitcher extensions:
+The project is developed and based of `OGC Testbed-14 – ESA Sponsored Threads – Exploitation Platform` findings and
+following improvements.
+
+.. # TODO: update as needed (magpie?)
+
+`Weaver` extensions:
 
 * `Magpie`_ is an AuthN/AuthZ service provided by the `PAVICS`_ project.
 
-Twitcher is a **prototype** implemented in Python with the `Pyramid`_ web framework.
+`Weaver` is a **prototype** implemented in Python with the `Pyramid`_ web framework.
 
-Twitcher is part of the `Birdhouse`_ project. The documentation is on `ReadTheDocs`_.
+`Weaver` is part of the `Birdhouse`_ project. The documentation is on `ReadTheDocs`_.
 
 .. _Birdhouse: http://birdhouse.readthedocs.io/en/latest/
 .. _Pyramid: http://www.pylonsproject.org
-.. _ReadTheDocs: http://twitcher.readthedocs.io/en/latest/
+.. _ReadTheDocs: http://weaver.readthedocs.io/en/latest/
 .. _Magpie: https://github.com/Ouranosinc/Magpie
 .. _PAVICS: https://ouranosinc.github.io/pavics-sdi/index.html

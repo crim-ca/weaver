@@ -85,9 +85,9 @@ qthelp:
 	$(SPHINXBUILD) -b qthelp $(ALLSPHINXOPTS) $(BUILDDIR)/qthelp
 	@echo
 	@echo "Build finished; now you can run "qcollectiongenerator" with the" 	      ".qhcp project file in $(BUILDDIR)/qthelp, like this:"
-	@echo "# qcollectiongenerator $(BUILDDIR)/qthelp/twitcher.qhcp"
+	@echo "# qcollectiongenerator $(BUILDDIR)/qthelp/weaver.qhcp"
 	@echo "To view the help file:"
-	@echo "# assistant -collectionFile $(BUILDDIR)/qthelp/twitcher.qhc"
+	@echo "# assistant -collectionFile $(BUILDDIR)/qthelp/weaver.qhc"
 
 applehelp:
 	$(SPHINXBUILD) -b applehelp $(ALLSPHINXOPTS) $(BUILDDIR)/applehelp
@@ -100,8 +100,8 @@ devhelp:
 	@echo
 	@echo "Build finished."
 	@echo "To view the help file:"
-	@echo "# mkdir -p $$HOME/.local/share/devhelp/twitcher"
-	@echo "# ln -s $(BUILDDIR)/devhelp $$HOME/.local/share/devhelp/twitcher"
+	@echo "# mkdir -p $$HOME/.local/share/devhelp/weaver"
+	@echo "# ln -s $(BUILDDIR)/devhelp $$HOME/.local/share/devhelp/weaver"
 	@echo "# devhelp"
 
 epub:

@@ -1,0 +1,29 @@
+{
+    "processOffering": {
+        "process": {
+            "identifier": "sfs_graph_ows",
+            "title": "Application SFS dynamically added by POST /processes with owsContext reference.",
+			"inputs": [
+				{
+					"identifier": "output_file_type",
+					"allowed_values": [
+						"GeoTIFF",
+						"NetCDF-CF"
+					]
+				}
+			],
+			"owsContext": {
+				"offering": {
+					"code": "http://www.opengis.net/eoc/applicationContext/cwl",
+					"content": {
+						"href": "https://ogc-ems.crim.ca/weaver/wpsoutputs/sfs_graph_ows.cwl"
+					}
+				}
+			}
+        }
+    },
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
+    "executionUnit": {
+        "href": "docker-registry.crim.ca/ogc-public/snap6-sfs:v2.1"
+    }
+}

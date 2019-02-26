@@ -1,7 +1,7 @@
 {
     "crim": {
         "netloc":"ogc-ades.crim.ca",
-        "ades":"https://ogc-ades.crim.ca/twitcher"
+        "ades":"https://ogc-ades.crim.ca/weaver"
     },
     "localhost": {
         "netloc":"localhost",

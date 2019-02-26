@@ -1,5 +1,5 @@
 include *.rst *.txt
-graft twitcher
+graft weaver
 global-exclude *.*~
 global-exclude __pycache__
 global-exclude *.py[co]

@@ -51,13 +51,13 @@ unit_tests/testdata.json
 *.sublime*
 
 # buildout
-bin
-develop-eggs
-eggs
-parts
-build
-dist
-downloads
+bin/
+develop-eggs/
+eggs/
+parts/
+build/
+dist/
+downloads/
 .installed.cfg
 .mr.developer.cfg
 bootstrap-buildout.py
@@ -93,6 +93,9 @@ testdata.json
 # snappy
 esa-snap_sentinel_unix_6_0.sh
 response.varfile
+
+# conda
+environment.yml
 
 # process results
 *.tif
