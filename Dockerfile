@@ -38,7 +38,7 @@ COPY Makefile requirements.sh bootstrap.sh ./
 RUN make install-sys anaconda
 
 # Copy files for buildout setup and requirements
-COPY buildout.cfg environment.yml requirements.txt ./
+COPY buildout.cfg requirements.txt ./
 COPY profiles ./profiles/
 
 # setup Anaconda environment and setup buildout
