@@ -171,9 +171,11 @@ conda-config: anaconda
 
 .PHONY: conda-env
 conda-env: anaconda conda-config
-	@echo "Update conda environment $(CONDA_ENV) ..."
-	@test -d $(CONDA_ENV_PATH) || "$(ANACONDA_HOME)/bin/conda" env create -n $(CONDA_ENV) python=$(PYTHON_VERSION)
-	"$(ANACONDA_HOME)/bin/conda" install -y -n $(CONDA_ENV) setuptools=$(SETUPTOOLS_VERSION)
+	@test -d "$(CONDA_ENV_PATH)" || echo "Creating conda environment: $(CONDA_ENV) ..."
+	@echo '"$(ANACONDA_HOME)/bin/conda" env create -n "$(CONDA_ENV)" "python=$(PYTHON_VERSION)"'
+	@test -d "$(CONDA_ENV_PATH)" || "$(ANACONDA_HOME)/bin/conda" create -n "$(CONDA_ENV)" "python=$(PYTHON_VERSION)"
+	@echo "Update conda environment: $(CONDA_ENV) ..."
+	"$(ANACONDA_HOME)/bin/conda" install -y -n "$(CONDA_ENV)" "setuptools=$(SETUPTOOLS_VERSION)"
 
 .PHONY: conda-pinned
 conda-pinned: conda-env
