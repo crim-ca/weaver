@@ -1,6 +1,7 @@
 alembic
 argcomplete
 celery
+cffi
 colander
 cornice
 cornice_swagger>=0.7.0

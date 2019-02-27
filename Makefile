@@ -61,6 +61,7 @@ help:
 	@echo "  install-base       install base packages using pip."
 	@echo "  install-dev        install test packages using pip (also installs $(APP_NAME) with buildout)."
 	@echo "  install-pip        install as a package to allow import in another python code."
+	@echo "  install-raw        install without any requirements or dependencies (suppose everything is setup)."
 	@echo "  install-sys        install system packages from requirements.sh."
 	@echo "  update             update application by running 'bin/buildout -o -c custom.cfg' (buildout offline mode)."
 	@echo "\nCleaning:"
@@ -228,6 +229,12 @@ install-pip: install
 	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV);pip install $(CURDIR)"
 	@echo "\nInstall with pip complete."
 
+.PHONY: install-raw
+install-raw:
+	@echo "Installing package without dependencies ..."
+	@-bash -c "source $(ANACONDA_HOME)/bin/activate $(CONDA_ENV); pip install -e $(CURDIR) --no-deps"
+	@echo "\nInstall package complete."
+
 .PHONY: install
 install: bootstrap
 	@echo "Installing application with buildout ..."
@@ -285,8 +292,8 @@ clean-env: stop
 .PHONY: clean-src
 clean-src:
 	@echo "Removing *.pyc files ..."
-	@-find "$(APP_ROOT)" -type f -name "*.pyc" -print | xargs rm
-	rm -rf "./src"
+	@-find "$(APP_ROOT)" -type f -name "*.pyc" -exec rm {} \;
+	@-test -d ./src || rm -rf ./src
 
 .PHONY: clean-dist
 clean-dist: backup clean
