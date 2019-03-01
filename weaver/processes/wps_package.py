@@ -19,15 +19,15 @@ from pywps.inout.basic import BasicIO
 from pywps.inout.literaltypes import AnyValue, AllowedValue, ALLOWEDVALUETYPE
 from pywps.validator.mode import MODE
 from pywps.app.Common import Metadata
-
 from weaver.processes import opensearch
 from weaver import namesgenerator, status as ts
 from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS
 from weaver.processes.constants import WPS_INPUT, WPS_OUTPUT, WPS_COMPLEX, WPS_BOUNDINGBOX, WPS_LITERAL, WPS_REFERENCE
-from weaver.processes.wps_process import WpsProcess
+from weaver.processes.wps1_process import Wps1Process
+from weaver.processes.wps3_process import Wps3Process
 from weaver.processes.wps_workflow import default_make_tool
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
-from weaver.processes.sources import retrieve_data_source_url, get_data_source_from_url
+from weaver.processes.sources import retrieve_data_source_url
 from weaver.exceptions import (
     PackageTypeError, PackageRegistrationError, PackageExecutionError,
     PackageNotFound, PayloadNotFound
@@ -999,10 +999,10 @@ class WpsPackage(Process):
         self.log_message(status=status, message=message, progress=progress)
 
     def step_update_status(self, message, progress, start_step_progress, end_step_progress, step_name,
-                           data_source, status):
+                           target_host, status):
         # type: (AnyStr, int, int, int, AnyStr, AnyValue, AnyStr) -> None
         self.update_status(
-            message="{0} [{1}] - {2}".format(data_source, step_name, str(message).strip()),
+            message="{0} [{1}] - {2}".format(target_host, step_name, str(message).strip()),
             progress=self.map_progress(progress, start_step_progress, end_step_progress),
             status=status,
         )
@@ -1145,7 +1145,7 @@ class WpsPackage(Process):
     def make_tool(self, toolpath_object, loadingContext):
         return default_make_tool(toolpath_object, loadingContext, self.get_job_process_definition)
 
-    def get_job_process_definition(self, jobname, joborder):
+    def get_job_process_definition(self, jobname, joborder, tool):
         """
         This function is called before running an ADES job (either from a workflow step or a simple EMS dispatch).
         It must return a WpsProcess instance configured with the proper package, ADES target and cookies.
@@ -1155,11 +1155,12 @@ class WpsPackage(Process):
                          input_value is one of `input_object` or `array [input_object]`
                          input_object is one of `string` or `dict {class: File, location: string}`
                          in our case input are expected to be File object
+        :param tool: Whole cwl config including hints requirement
         """
 
         if jobname == self.package_id:
             # A step is the package itself only for non-workflow package being executed on the EMS
-            # and needing ADES dispatching
+            # default action requires ADES dispatching but hints can indicate also WPS1 or ESGF-CWT provider
             step_payload = self.payload
             process_id = self.package_id
             jobtype = 'package'
@@ -1170,49 +1171,35 @@ class WpsPackage(Process):
             process_id = self.step_packages[jobname]
             jobtype = 'step'
 
-        try:
-            # Presume that all EOImage given as input can be resolved to the same ADES
-            # So if we got multiple inputs or multiple values for an input, we take the first one as reference
-            eodata_inputs = opensearch.get_eo_images_ids_from_payload(step_payload)
-
-            data_url = ""  # data_source will be set to the default ADES if no EOImages
-
-            if eodata_inputs:
-                step_payload = opensearch.alter_payload_after_query(step_payload)
-                value = joborder[eodata_inputs[0]]
-
-                if isinstance(value, list):
-                    # Use the first value to determine the data source
-                    value = value[0]
-
-                data_url = value['location']
-                data_source_reason = '(ADES based on {0})'.format(data_url)
-            else:
-                data_source_reason = '(No EOImage -> Default ADES)'
-
-            data_source = get_data_source_from_url(data_url)
-
-            # Progress made with steps presumes that they are done sequentially and have the same progress weight
-            start_step_progress = self.map_step_progress(len(self.step_launched), max(1, len(self.step_packages)))
-            end_step_progress = self.map_step_progress(len(self.step_launched) + 1, max(1, len(self.step_packages)))
-            url = retrieve_data_source_url(data_source)
-
-            self.update_status("Launching {type} {name} on {src} {reason}.".format(
-                type=jobtype,
-                name=jobname,
-                src=data_source,
-                reason=data_source_reason),
-                               start_step_progress, ts.STATUS_RUNNING)
-
-        except (IndexError, KeyError) as exc:
-            raise self.exception_message(PackageExecutionError, exc, "Failed to save package outputs.")
+        # Progress made with steps presumes that they are done sequentially and have the same progress weight
+        start_step_progress = self.map_step_progress(len(self.step_launched), max(1, len(self.step_packages)))
+        end_step_progress = self.map_step_progress(len(self.step_launched) + 1, max(1, len(self.step_packages)))
 
         self.step_launched.append(jobname)
+        self.update_status("Preparing to launch {type} {name}.".format(
+            type=jobtype,
+            name=jobname),
+            start_step_progress, ts.STATUS_RUNNING)
 
-        return WpsProcess(url=url,
-                          process_id=process_id,
-                          deploy_body=step_payload,
-                          cookies=self.request.http_request.cookies,
-                          update_status=lambda message, progress, status: self.step_update_status(
-                              message, progress, start_step_progress, end_step_progress, jobname, data_source, status
-                          ))
+        if 'WPS1Requirement' in tool['hints']:
+            provider = tool['hints']['WPS1Requirement']['provider']
+            # The process id of the provider isn't required to be the same as the one use in the EMS
+            process_id = tool['hints']['WPS1Requirement']['process_id']
+            return Wps1Process(provider=provider,
+                               process_id=process_id,
+                               cookies=self.request.http_request.cookies,
+                               update_status=lambda message, progress, status: self.step_update_status(
+                                  message, progress, start_step_progress, end_step_progress, jobname, provider,
+                                  status
+                               ))
+        elif 'ESGF-CWTRequirement' in tool['hints']:
+            raise NotImplementedError('ESGF-CWTRequirement not implemented')
+        else:
+            return Wps3Process(step_payload=step_payload,
+                               joborder=joborder,
+                               process_id=process_id,
+                               cookies=self.request.http_request.cookies,
+                               update_status=lambda provider, message, progress, status: self.step_update_status(
+                                   message, progress, start_step_progress, end_step_progress,
+                                   jobname, provider, status
+                               ))

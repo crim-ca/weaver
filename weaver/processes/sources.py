@@ -8,7 +8,7 @@ from weaver import WEAVER_ROOT_DIR
 from weaver.wps_restapi.utils import wps_restapi_base_url
 
 # Data source cache
-from weaver.processes.wps_process import OPENSEARCH_LOCAL_FILE_SCHEME
+from weaver.processes.wps3_process import OPENSEARCH_LOCAL_FILE_SCHEME
 
 """
 Schema

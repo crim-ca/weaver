@@ -1,3 +1,8 @@
+from weaver.processes.sources import fetch_data_sources
+from weaver.processes.constants import WPS_LITERAL
+from weaver.processes.wps3_process import OPENSEARCH_LOCAL_FILE_SCHEME
+from weaver.processes.constants import START_DATE, END_DATE, AOI, COLLECTION
+from weaver.utils import get_any_id
 from collections import deque
 from copy import deepcopy
 from itertools import ifilterfalse
@@ -5,11 +10,7 @@ from pyramid.httpexceptions import HTTPGatewayTimeout, HTTPOk
 from pyramid.settings import asbool
 from six.moves.urllib.parse import urlparse, parse_qsl
 from typing import Iterable, Dict, Tuple, List, Deque, AnyStr
-from weaver.processes.sources import fetch_data_sources
-from weaver.processes.constants import WPS_LITERAL
-from weaver.utils import get_any_id
-from weaver.processes.wps_process import OPENSEARCH_LOCAL_FILE_SCHEME
-from weaver.processes.constants import START_DATE, END_DATE, AOI, COLLECTION
+import shapely.wkt
 import lxml.etree
 import requests
 import logging
@@ -155,7 +156,6 @@ def load_wkt(wkt):
     :type wkt: string
 
     """
-    import shapely.wkt
     bounds = shapely.wkt.loads(wkt).bounds
     bbox_str = ",".join(map(str, bounds))
     return bbox_str

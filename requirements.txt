@@ -19,6 +19,7 @@ pywps
 pyyaml
 requests
 requests_file
+shapely
 six
 simplejson
 webob

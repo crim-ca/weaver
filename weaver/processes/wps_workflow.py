@@ -19,16 +19,15 @@ from cwltool.builder import (CONTENT_LIMIT, Builder, substitute)
 from cwltool.errors import WorkflowException
 from cwltool.job import JobBase, relink_initialworkdir
 from cwltool.pathmapper import (adjustDirObjs, adjustFileObjs, get_listing, trim_listing, visit_class)
-from cwltool.process import (Process, compute_checksums, normalizeFilesDirs, shortname, uniquename)
+from cwltool.process import (Process, compute_checksums, normalizeFilesDirs,
+                             shortname, uniquename, supportedProcessRequirements)
 from cwltool.stdfsaccess import StdFsAccess
 from cwltool.utils import (aslist, json_dumps, onWindows, bytes2str_in_dicts)
 from cwltool.context import (LoadingContext, RuntimeContext, getdefault)
 from cwltool.workflow import Workflow
 from pyramid_celery import celery_app as app
-from pyramid.httpexceptions import HTTPNotFound, HTTPConflict, HTTPInternalServerError
-
 from weaver.visibility import VISIBILITY_PUBLIC
-from weaver.processes.wps_process import WpsProcess
+from weaver.processes.wps3_process import Wps3Process
 from weaver.utils import pass_http_error, now
 from weaver.wps import get_wps_output_path, get_wps_output_url
 
@@ -38,10 +37,14 @@ DEFAULT_TMP_PREFIX = "tmp"
 # TODO: The code started as a copy of the class cwltool/command_line_tool.py,
 #       and still has useless code in the context of a WPS workflow
 
+# Extend the supported process requirements
+supportedProcessRequirements += ["WPS1Requirement",
+                                 "ESGF-CWTRequirement"]
+
 
 def default_make_tool(toolpath_object,              # type: Dict[Text, Any]
                       loadingContext,               # type: LoadingContext
-                      get_job_process_definition,   # type: Callable[[Text, int], WpsProcess]
+                      get_job_process_definition,   # type: Callable[[Text,Dict[Text,Text],Dict[Text, Any]],WpsProcess]
                       ):                            # type: (...) -> Process
     if not isinstance(toolpath_object, MutableMapping):
         raise WorkflowException(u"Not a dict: '%s'" % toolpath_object)
@@ -78,7 +81,7 @@ class CallbackJob(object):
 
 class WpsWorkflow(Process):
     def __init__(self, toolpath_object, loadingContext, get_job_process_definition):
-        # type: (Dict[Text, Any], LoadingContext, Callable[[Text, int], WpsProcess]) -> None
+        # type: (Dict[Text, Any], LoadingContext, Callable[[Text,Dict[Text,Text],Dict[Text, Any]],WpsProcess]) -> None
         super(WpsWorkflow, self).__init__(toolpath_object, loadingContext)
         self.prov_obj = loadingContext.prov_obj
         self.get_job_process_definition = get_job_process_definition
@@ -112,7 +115,8 @@ class WpsWorkflow(Process):
 
         # job_name is the step name and job_order is the actual step inputs
         wps_workflow_job = WpsWorkflowJob(builder, builder.job, self.requirements,
-                                          self.hints, jobname, self.get_job_process_definition(jobname, job_order),
+                                          self.hints, jobname,
+                                          self.get_job_process_definition(jobname, job_order, self.tool),
                                           self.tool['outputs'])
         wps_workflow_job.prov_obj = self.prov_obj
         wps_workflow_job.successCodes = self.tool.get("successCodes")
@@ -416,29 +420,6 @@ class WpsWorkflowJob(JobBase):
                 env,            # type: MutableMapping[Text, Text]
                 runtimeContext  # type: RuntimeContext
                 ):              # type: (...) -> None
-
-        visible = self.wps_process.is_visible()
-        if not visible:     # includes private visibility and non-existing cases
-            if visible is None:
-                LOGGER.info(u"Process {} access is unauthorized on {} - deploying as admin.".format(
-                            self.wps_process.process_id, self.wps_process.url))
-            elif visible is False:
-                LOGGER.info(u"Process {} is not deployed on {} - deploying.".format(
-                            self.wps_process.process_id, self.wps_process.url))
-            # TODO: Maybe always redeploy? What about cases of outdated deployed process?
-            try:
-                self.wps_process.deploy()
-            except Exception as e:
-                # TODO: support for Spacebel, avoid conflict error incorrectly handled, remove 500 when fixed
-                pass_http_error(e, [HTTPConflict, HTTPInternalServerError])
-
-        LOGGER.info(u"Process {} enforced to public visibility.".format(
-                    self.wps_process.process_id, self.wps_process.url))
-        try:
-            self.wps_process.set_visibility(visibility=VISIBILITY_PUBLIC)
-        # TODO: support for Spacebel, remove when visibility route properly implemented on ADES
-        except Exception as e:
-            pass_http_error(e, HTTPNotFound)
 
         self.results = self.wps_process.execute(self.builder.job, self.outdir, self.expected_outputs)
 
