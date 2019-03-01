@@ -31,6 +31,7 @@ class Wps1Process(WpsProcessInterface):
         self.update_status = update_status
 
     def execute(self, workflow_inputs, out_dir, expected_outputs):
+        # TODO Toute cette fonction est inspiree de la job celery du rest_api mais n'a pas ete testee
 
         self.update_status("Preparing execute request for remote WPS1 provider.",
                            REMOTE_JOB_PROGRESS_REQ_PREP, status.STATUS_RUNNING)

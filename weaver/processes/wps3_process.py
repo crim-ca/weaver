@@ -56,6 +56,7 @@ class Wps3Process(WpsProcessInterface):
         self.process_id = process_id
 
     def resolve_data_source(self, step_payload, joborder):
+        # TODO Ce code provient de wps_package et n'a pas ete teste ici-meme
         try:
             # Presume that all EOImage given as input can be resolved to the same ADES
             # So if we got multiple inputs or multiple values for an input, we take the first one as reference
@@ -209,6 +210,8 @@ class Wps3Process(WpsProcessInterface):
         response.raise_for_status()
 
     def execute(self, workflow_inputs, out_dir, expected_outputs):
+        # TODO La section de code 'visibility' provient de la fct execute de la classe WpsWorkflowJob_
+        # et n'a pas ete teste ici-meme
         visible = self.is_visible()
         if not visible:  # includes private visibility and non-existing cases
             if visible is None:

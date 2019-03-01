@@ -37,6 +37,10 @@ DEFAULT_TMP_PREFIX = "tmp"
 # TODO: The code started as a copy of the class cwltool/command_line_tool.py,
 #       and still has useless code in the context of a WPS workflow
 
+# TODO: Ce code est tentatif, j'ai vu que supportedProcessRequirements de cwltools.process.py
+#  causerait possiblement un probleme.
+#  Sinon le plan B serait de retirer les hints non supportes dans le __init__ de WpsWorkflow
+#  apres avoir pris une copie dans une variable custom genre hints_ext
 # Extend the supported process requirements
 supportedProcessRequirements += ["WPS1Requirement",
                                  "ESGF-CWTRequirement"]

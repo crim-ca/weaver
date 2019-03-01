@@ -998,6 +998,7 @@ class WpsPackage(Process):
         self.response._update_status(pywps_status_id, message, self.percent)
         self.log_message(status=status, message=message, progress=progress)
 
+    # TODO Les callback d'update status ont ete brassees pas mal dans wps1/wps3 process ca se peut que les arguments passent tous croche
     def step_update_status(self, message, progress, start_step_progress, end_step_progress, step_name,
                            target_host, status):
         # type: (AnyStr, int, int, int, AnyStr, AnyValue, AnyStr) -> None
@@ -1181,6 +1182,8 @@ class WpsPackage(Process):
             name=jobname),
             start_step_progress, ts.STATUS_RUNNING)
 
+        # TODO: Le parametre 'tool' devrait contenir la structure hint du cwl (reste a valider)
+        # TODO: La structure tool['hints']['WPS1Requirement']['provider'] n'est donc que pure invention a l'heure actuelle
         if 'WPS1Requirement' in tool['hints']:
             provider = tool['hints']['WPS1Requirement']['provider']
             # The process id of the provider isn't required to be the same as the one use in the EMS
