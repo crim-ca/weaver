@@ -37,8 +37,9 @@ RUN mkdir -p /opt/birdhouse/etc && \
 RUN printf "[buildout]\nextends=buildout.cfg profiles/docker.cfg" > custom.cfg
 
 # Copy files for buildout setup and requirements
-COPY Makefile buildout.cfg requirements*.txt ./
+COPY Makefile buildout.cfg requirements*.txt setup.py weaver/__meta__.py ./
 COPY profiles ./profiles/
+COPY templates ./templates/
 
 # ====TMP
 #RUN apk update && apk add make bash curl wget python-dev ca-certificates openssl
@@ -57,7 +58,14 @@ RUN apk update && \
     # install dependencies to run scripts
     apk add --no-cache make bash py-pip && \
     # install temporary build dependencies
-    apk add --no-cache --virtual .build-deps gcc musl-dev python-dev wget curl ca-certificates openssl && \
+    wget --no-check-certificate "https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.21-r2/glibc-2.21-r2.apk" && \
+    apk add --allow-untrusted glibc-2.21-r2.apk && \
+    ln -s /lib/libc.musl-x86_64.so.1 /usr/lib/libc.musl-x86_64.so.1 && \
+    ln -s /lib/libz.so.1 /usr/lib/libz.so.1 && \
+    apk add --no-cache --virtual .build-deps gcc musl musl-dev python-dev libffi-dev wget curl ca-certificates openssl-dev && \
+    #ln -s /lib/libc.musl-x86_64.so.1 /usr/lib/libc.musl-x86_64.so.1 && \
+    #ln -s /lib/libc.musl-x86_64.so.1 ldd && \
+    #ln -s /lib /lib64 && \
     # install dependencies that allow to install conda on alpine with glibc
     # (see: https://github.com/sgerrand/alpine-pkg-glibc)
     wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub && \

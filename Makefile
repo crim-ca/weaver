@@ -267,7 +267,7 @@ online-update-config:
 			settings:http-port=$(HTTP_PORT) -N -c custom.cfg"
 
 .PHONY: clean
-clean: clean-bld clean-cache clean-src clean-env
+clean: clean-bld clean-cache clean-src
 	@echo "Cleaning buildout files ..."
 	@-for i in $(BUILDOUT_FILES); do \
             test -e $$i && rm -v -rf $$i; \
