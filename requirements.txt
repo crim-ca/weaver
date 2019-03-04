@@ -14,17 +14,14 @@ pymongo
 pyramid>=1.7.3
 pyramid_celery
 pyramid_mako
-pyramid_rpc
 pytz
-pywps
+#pywps
 pyyaml
 requests
 requests_file
-requests_oauthlib
 six
 simplejson
-sqlalchemy
-transaction
 webob
+# TODO: remove if unused for parsing WPS1
+xmlrpclib
 yagmail
-zope.sqlalchemy==1.1
