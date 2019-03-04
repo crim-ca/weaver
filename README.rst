@@ -37,18 +37,10 @@ application and `Web Processing Services (WPS)` inputs and outputs. It allows us
 The project is developed and based of `OGC Testbed-14 – ESA Sponsored Threads – Exploitation Platform` findings and
 following improvements.
 
-.. # TODO: update as needed (magpie?)
-
-`Weaver` extensions:
-
-* `Magpie`_ is an AuthN/AuthZ service provided by the `PAVICS`_ project.
-
 `Weaver` is a **prototype** implemented in Python with the `Pyramid`_ web framework.
 
-`Weaver` is part of the `Birdhouse`_ project. The documentation is on `ReadTheDocs`_.
+`Weaver` is part of the `Birdhouse`_ project.
 
 .. _Birdhouse: http://birdhouse.readthedocs.io/en/latest/
 .. _Pyramid: http://www.pylonsproject.org
-.. _ReadTheDocs: http://weaver.readthedocs.io/en/latest/
-.. _Magpie: https://github.com/Ouranosinc/Magpie
 .. _PAVICS: https://ouranosinc.github.io/pavics-sdi/index.html

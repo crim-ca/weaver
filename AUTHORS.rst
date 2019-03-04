@@ -1,9 +1,8 @@
-Carsten Ehbrecht <ehbrecht@dkrz.de>
-Eric Lemoine <eric.lemoine@gmail.com> (http://github.com/elemoine/papyrus_ogcproxy)
+* Francis Charette-Migneault <francis.charette-migneault@crim.ca>
+* David Byrns <david.byrns@crim.ca>
+* David Caron <david.caron@crim.ca>
 
 Contributors
 ------------
 
-* David Byrns <david.byrns@crim.ca>
-* Francis Charette-Migneault <francis.charette-migneault@crim.ca>
-* Francois-Xavier Derue <francois-xavier.derue@crim.ca>
+*
