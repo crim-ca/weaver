@@ -3,23 +3,27 @@ import sys
 from setuptools import setup, find_packages
 
 CUR_DIR = os.path.abspath(os.path.dirname(__file__))
-README = open(os.path.join(CUR_DIR, 'README.rst')).read()
-CHANGES = open(os.path.join(CUR_DIR, 'CHANGES.rst')).read()
+LONG_DESCRIPTION = None
+if all(os.path.isfile(os.path.join(CUR_DIR, f)) for f in ['README.rst', 'CHANGES.rst']):
+    README = open(os.path.join(CUR_DIR, 'README.rst')).read()
+    CHANGES = open(os.path.join(CUR_DIR, 'CHANGES.rst')).read()
+    LONG_DESCRIPTION = README + '\n\n' + CHANGES
 
 # ensure that 'weaver' directory can be found for metadata import
 sys.path.insert(0, CUR_DIR)
+sys.path.insert(0, os.path.join(CUR_DIR, 'weaver'))
 # don't use 'from' to avoid import errors on not yet installed packages
-import weaver.__meta__ as meta    # noqa E402
+import __meta__  # noqa E402
 
 PY2 = sys.version_info[0] == 2
 requirements = [line.strip() for line in open('requirements.txt')]
 if PY2:
     requirements += [line.strip() for line in open('requirements-py2.txt')]
 
-setup(name=meta.__name__,
-      version=meta.__version__,
-      description=meta.__description__,
-      long_description=README + '\n\n' + CHANGES,
+setup(name=__meta__.__name__,
+      version=__meta__.__version__,
+      description=__meta__.__description__,
+      long_description=LONG_DESCRIPTION,
       classifiers=[
           "Programming Language :: Python",
           "Framework :: Pyramid",
@@ -27,12 +31,12 @@ setup(name=meta.__name__,
           "Topic :: Internet :: WWW/HTTP :: WSGI :: Application",
           "Development Status :: 4 - Beta",
       ],
-      author=', '.join(meta.__authors__),
-      author_email=', '.join(meta.__emails__),
-      url=meta.__source_repository__,
-      download_url=meta.__docker_repository__,
-      license=meta.__license__,
-      keywords=' '.join(meta.__keywords__),
+      author=', '.join(__meta__.__authors__),
+      author_email=', '.join(__meta__.__emails__),
+      url=__meta__.__source_repository__,
+      download_url=__meta__.__docker_repository__,
+      license=__meta__.__license__,
+      keywords=' '.join(__meta__.__keywords__),
       packages=find_packages(),
       include_package_data=True,
       package_data={"": "*.mako"},

@@ -14,17 +14,12 @@ pymongo
 pyramid>=1.7.3
 pyramid_celery
 pyramid_mako
-pyramid_rpc
 pytz
 pywps
 pyyaml
 requests
 requests_file
-requests_oauthlib
 six
 simplejson
-sqlalchemy
-transaction
 webob
 yagmail
-zope.sqlalchemy==1.1
