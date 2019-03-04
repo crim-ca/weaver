@@ -178,7 +178,7 @@ conda-env: conda conda-config
 	@echo '"$(CONDA_HOME)/bin/conda" env create -n "$(CONDA_ENV)" "python=$(PYTHON_VERSION)"'
 	@test -d "$(CONDA_ENV_PATH)" || "$(CONDA_HOME)/bin/conda" create -y -n "$(CONDA_ENV)" "python=$(PYTHON_VERSION)"
 	@echo "Update conda environment: $(CONDA_ENV) ..."
-	"$(CONDA_HOME)/bin/conda" install -y -n "$(CONDA_ENV)" "setuptools=$(SETUPTOOLS_VERSION)"
+	"$(CONDA_HOME)/bin/conda" install -y -n "$(CONDA_ENV)" "setuptools=$(SETUPTOOLS_VERSION)" supervisor
 	@echo "Updating pip ..."
 	@-bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); pip install --upgrade pip"
 
@@ -242,7 +242,7 @@ install-raw:
 install: bootstrap
 	@echo "Installing application with buildout ..."
 	@-bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
-		bin/buildout buildout:anaconda-home=$(CONDA_HOME) -c custom.cfg"
+		bin/buildout buildout:anaconda-home=$(CONDA_HOME) -c custom.cfg;"
 	@echo "Start service with \`make start'"
 
 .PHONY: update

@@ -38,7 +38,6 @@ RUN apt-get update --fix-missing && \
     # install dependencies to run scripts
     apt-get install -y \
         ca-certificates \
-        supervisor \
         bzip2 \
         gcc \
         make \
