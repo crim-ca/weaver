@@ -25,9 +25,9 @@ import logging
 import os
 import shutil
 import tempfile
-from typing import TYPE_CHECKING
+from typing import MutableMapping, cast, TYPE_CHECKING
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Generator, List, Optional, Set, MutableMapping, Union, cast, Text
+    from typing import Any, Callable, Dict, Generator, List, Optional, Set, Union, Text
     from weaver.typedefs import ExpectedOutputType, GetJobProcessDefinitionFunction, ToolPathObjectType
     from weaver.processes.wps_process_base import WpsProcessInterface
     from cwltool.command_line_tool import OutputPorts
@@ -99,7 +99,7 @@ class WpsWorkflow(ProcessCWL):
     def job(self,
             job_order,          # type: Dict[Text, Text]
             output_callbacks,   # type: Callable[[Any, Any], Any]
-            runtimeContext,    # type: RuntimeContext
+            runtimeContext,     # type: RuntimeContext
             ):                  # type: (...) -> Generator[Union[JobBase, CallbackJob], None, None]
 
         require_prefix = ""

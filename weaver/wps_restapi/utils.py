@@ -3,9 +3,14 @@ from distutils.version import LooseVersion
 from requests.structures import CaseInsensitiveDict
 from pyramid.httpexceptions import HTTPSuccessful
 from webob.headers import ResponseHeaders, EnvironHeaders
+from typing import AnyStr, Optional, Union, TYPE_CHECKING
 from lxml import etree
 import requests
 import logging
+if TYPE_CHECKING:
+    from pyramid.request import Request
+    from weaver.typedefs import SettingsType, CookiesType, HeadersType, AnyCookiesContainer, AnyHeadersContainer
+
 LOGGER = logging.getLogger("weaver")
 
 VERSION_100 = '1.0.0'
@@ -23,25 +28,23 @@ OUTPUT_FORMATS = {
 
 
 def wps_restapi_base_path(settings):
+    # type: (SettingsType) -> AnyStr
     restapi_path = settings.get('weaver.wps_restapi_path', '').rstrip('/').strip()
     return restapi_path
 
 
 def wps_restapi_base_url(settings):
+    # type: (SettingsType) -> AnyStr
     weaver_url = get_weaver_url(settings)
     restapi_path = wps_restapi_base_path(settings)
     return weaver_url + restapi_path
 
 
-def get_cookie_headers(headers):
-    try:
-        return dict(Cookie=get_header('Cookie', headers))
-    except KeyError:  # No cookie
-        return {}
-
-
 def get_header(header_name, header_container):
-    """Searches for the specified header by case/dash/underscore-insensitive name."""
+    # type: (AnyStr, AnyHeadersContainer) -> Union[AnyStr, None]
+    """
+    Searches for the specified header by case/dash/underscore-insensitive ``header_name`` inside ``header_container``.
+    """
     if header_container is None:
         return None
     headers = header_container
@@ -56,7 +59,29 @@ def get_header(header_name, header_container):
     return None
 
 
+def get_cookies(cookies_container, cookies_header_name='Cookies'):
+    """
+    Searches for cookies inside ``cookies_container`` first.
+    Then, if ``cookies_container`` is some kind of variation of a request with
+    a `headers` container, searches inside them also for with ``cookies_header_name``.
+    """
+    # type: (AnyCookiesContainer, Optional[AnyStr]) -> CookiesType
+    try:
+        return dict(Cookie=get_header(cookies_header_name, cookies_container))
+    except KeyError:  # No cookie
+        return {}
+
+
+def get_cookie_headers(cookies_container):
+    # type: (AnyCookiesContainer) -> HeadersType
+    try:
+        return dict(Cookie=get_header('Cookie', cookies_container))
+    except KeyError:  # No cookie
+        return {}
+
+
 def get_wps_output_format(request, service_url=None):
+    # type: (Request, AnyStr) -> AnyStr
     """
     Get the preferred output format from WPS after checking various hints:
         - 'version' in query string

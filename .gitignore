@@ -7,6 +7,7 @@
 # custom configs
 custom.cfg
 data_sources.cfg
+data_sources.json
 custom_wps.cfg
 Makefile.config
 

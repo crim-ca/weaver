@@ -7,7 +7,7 @@
             "keywords": [],
             "inputs": [{
 				"id": "url",
-				"title": "URL",
+				"title": "URL of the Catalog",
 				"formats": [{
 					"mimeType": "application/netcdf",
 					"default": true
@@ -18,7 +18,7 @@
             "outputs": [
                 {
                     "id": "output",
-                    "title": "Catalog file urls",
+                    "title": "JSON file with Catalog URLs",
                     "formats": [
                         {
                             "mimeType": "application/json",
@@ -41,5 +41,5 @@
             "href": "catalog_search.cwl"
         }
     ],
-    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow"
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
 }

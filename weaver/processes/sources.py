@@ -1,11 +1,12 @@
-import os
-import json
+from weaver import WEAVER_ROOT_DIR
+from weaver.utils import get_settings
+from weaver.wps_restapi.utils import wps_restapi_base_url
 from typing import Union, Text
 from six.moves.urllib.parse import urlparse
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
-from weaver import WEAVER_ROOT_DIR
-from weaver.wps_restapi.utils import wps_restapi_base_url
+import json
+import os
 
 # Data source cache
 OPENSEARCH_LOCAL_FILE_SCHEME = 'opensearchfile'  # must be a valid url scheme parsable by urlparse
@@ -51,18 +52,18 @@ def fetch_data_sources():
         return DATA_SOURCES
 
     registry = app.conf['PYRAMID_REGISTRY']
-    data_source_cfg = registry.settings.get('weaver.data_sources', None)
-    if data_source_cfg:
-        if not os.path.isabs(data_source_cfg):
-            data_source_cfg = os.path.normpath(os.path.join(WEAVER_ROOT_DIR, data_source_cfg))
+    data_source_config = get_settings(registry).get('weaver.data_sources', None)
+    if data_source_config:
+        if not os.path.isabs(data_source_config):
+            data_source_config = os.path.normpath(os.path.join(WEAVER_ROOT_DIR, data_source_config))
         try:
-            with open(data_source_cfg) as f:
+            with open(data_source_config) as f:
                 DATA_SOURCES = json.load(f)
         except Exception as exc:
-            raise ValueError("Data sources file {0} cannot be loaded properly : {1}".format(data_source_cfg,
-                                                                                            exc.message))
+            raise ValueError("Data sources file [{0}] cannot be loaded properly : [{1}]."
+                             .format(data_source_config, exc.message))
     if not DATA_SOURCES:
-        raise ValueError("No data sources found in setting 'weaver.data_sources'")
+        raise ValueError("No data sources found in setting 'weaver.data_sources'.")
     return DATA_SOURCES
 
 

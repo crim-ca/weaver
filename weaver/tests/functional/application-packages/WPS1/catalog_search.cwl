@@ -4,7 +4,7 @@
     "requirements": {
         "WPS1Requirement": {
             "provider": "https://pavics.ouranos.ca/twitcher/ows/proxy/malleefowl/wps",
-            "process_id": "thredds_urls"
+            "process": "thredds_urls"
         }
     },
     "inputs": {

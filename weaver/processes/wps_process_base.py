@@ -1,13 +1,16 @@
 from weaver.wps import get_wps_output_path, get_wps_output_url
+from weaver.wps_restapi.utils import get_cookies
 from pyramid_celery import celery_app as app
 from pyramid.settings import asbool
 from pyramid.httpexceptions import HTTPBadGateway
 from time import sleep
 from typing import TYPE_CHECKING
+from abc import abstractmethod
 import requests
 if TYPE_CHECKING:
     from weaver.typedefs import ExpectedOutputType
     from typing import Any, AnyStr, Dict, List, Union
+    from pywps.app import WPSRequest
 
 
 class WpsProcessInterface(object):
@@ -15,6 +18,7 @@ class WpsProcessInterface(object):
     Common interface for WpsProcess to be used is cwl jobs
     """
 
+    @abstractmethod
     def execute(self,
                 workflow_inputs,        # type: Union[Dict[AnyStr, Any], List[Dict[AnyStr, Any]]]
                 out_dir,                # type: AnyStr
@@ -31,8 +35,10 @@ class WpsProcessInterface(object):
         """
         raise NotImplementedError
 
-    def __init__(self, cookies):
-        self.cookies = cookies
+    def __init__(self, request):
+        # type: (WPSRequest) -> None
+        self.request = request
+        self.cookies = get_cookies(self.request)
         self.headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
 
         registry = app.conf['PYRAMID_REGISTRY']

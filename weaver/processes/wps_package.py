@@ -13,7 +13,7 @@ from weaver.exceptions import (
 from weaver.status import (STATUS_RUNNING, STATUS_SUCCEEDED, STATUS_EXCEPTION, STATUS_FAILED,
                            map_status, STATUS_COMPLIANT_PYWPS, STATUS_PYWPS_IDS)
 from weaver.wps_restapi.swagger_definitions import process_uri
-from weaver.utils import get_job_log_msg, get_log_fmt, get_log_datefmt, get_sane_name
+from weaver.utils import get_job_log_msg, get_log_fmt, get_log_datefmt, get_sane_name, get_settings
 from pywps.inout.basic import BasicIO
 from pywps.inout.literaltypes import AnyValue, AllowedValue, ALLOWEDVALUETYPE
 from pywps.validator.mode import MODE
@@ -47,8 +47,11 @@ from pywps import (
     Format,
 )
 if TYPE_CHECKING:
-    from weaver.status import AnyStatusType, ToolPathObjectType
+    from weaver.status import AnyStatusType
+    from weaver.typedefs import ToolPathObjectType
     from cwltool.process import Process as ProcessCWL
+    from pywps.app import WPSRequest
+    from pywps.response.execute import ExecuteResponse
 
 LOGGER = logging.getLogger("PACKAGE")
 
@@ -1032,6 +1035,7 @@ class WpsPackage(Process):
         return cls.map_progress(100 * step_index / steps_total, PACKAGE_PROGRESS_RUN_CWL, PACKAGE_PROGRESS_CWL_DONE)
 
     def _handler(self, request, response):
+        # type: (WPSRequest, ExecuteResponse) -> ExecuteResponse
         LOGGER.debug("HOME=%s, Current Dir=%s", os.environ.get('HOME'), os.path.abspath(os.curdir))
         self.request = request
         self.response = response
@@ -1049,7 +1053,7 @@ class WpsPackage(Process):
             self.update_status("Launching package ...", PACKAGE_PROGRESS_LAUNCHING, STATUS_RUNNING)
 
             registry = app.conf['PYRAMID_REGISTRY']
-            if get_weaver_configuration(registry.settings) == WEAVER_CONFIGURATION_EMS:
+            if get_weaver_configuration(get_settings(registry)) == WEAVER_CONFIGURATION_EMS:
                 # EMS dispatch the execution to the ADES
                 loading_context = LoadingContext()
                 loading_context.construct_tool_object = self.make_tool
@@ -1196,7 +1200,7 @@ class WpsPackage(Process):
             process = tool['hints']['WPS1Requirement']['process']
             return Wps1Process(provider=provider,
                                process=process,
-                               cookies=self.request.http_request.cookies,
+                               request=self.request,
                                update_status=lambda _provider, _message, _progress, _status: self.step_update_status(
                                    _message, _progress, start_step_progress, end_step_progress, jobname,
                                    _provider, _status
@@ -1207,7 +1211,7 @@ class WpsPackage(Process):
             return Wps3Process(step_payload=step_payload,
                                joborder=joborder,
                                process=process,
-                               cookies=self.request.http_request.cookies,
+                               request=self.request,
                                update_status=lambda _provider, _message, _progress, _status: self.step_update_status(
                                    _message, _progress, start_step_progress, end_step_progress, jobname,
                                    _provider, _status

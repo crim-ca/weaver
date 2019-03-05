@@ -13,6 +13,7 @@ import logging
 import requests
 if TYPE_CHECKING:
     from weaver.typedefs import JsonBody, CookiesType, ExpectedOutputType, UpdateStatusPartialFunction
+    from pywps.app import WPSRequest
 
 LOGGER = logging.getLogger(__name__)
 
@@ -27,10 +28,10 @@ class Wps1Process(WpsProcessInterface):
     def __init__(self,
                  provider,          # type: AnyStr
                  process,           # type: AnyStr
-                 cookies,           # type: CookiesType
+                 request,           # type: WPSRequest
                  update_status,     # type: UpdateStatusPartialFunction
                  ):
-        super(Wps1Process, self).__init__(cookies)
+        super(Wps1Process, self).__init__(request)
         self.provider = provider
         self.process = process
         self.update_status = lambda _message, _progress, _status: update_status(

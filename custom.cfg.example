@@ -33,5 +33,5 @@ wps-email-notify-password = 123456
 wps-email-notify-template = /path/to/mako/template.mako
 
 # See weaver.processes.sources.py for schema
-data_sources = ./data_sources.cfg.example
+data-sources = ./data_sources.json.example
 extra-options = part.option1=value1,part.option2=value2

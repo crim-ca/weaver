@@ -30,8 +30,9 @@ import logging
 import warnings
 import requests
 if TYPE_CHECKING:
+    from weaver.typedefs import JsonBody, UpdateStatusPartialFunction
     from typing import Union, AnyStr
-    from weaver.typedefs import JsonBody, CookiesType, UpdateStatusPartialFunction
+    from pywps.app import WPSRequest
 
 LOGGER = logging.getLogger(__name__)
 
@@ -50,10 +51,10 @@ class Wps3Process(WpsProcessInterface):
                  step_payload,      # type: JsonBody
                  joborder,          # type: int
                  process,           # type: AnyStr
-                 cookies,           # type: CookiesType
+                 request,           # type: WPSRequest
                  update_status,     # type: UpdateStatusPartialFunction
                  ):
-        super(Wps3Process, self).__init__(cookies)
+        super(Wps3Process, self).__init__(request)
         self.provider, self.url, self.deploy_body = self.resolve_data_source(step_payload, joborder)
         self.process = process
         self.update_status = lambda _message, _progress, _status: update_status(

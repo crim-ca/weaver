@@ -28,7 +28,7 @@ import warnings
 import json
 import six
 if TYPE_CHECKING:
-    from weaver.typedefs import JsonBody, Settings
+    from weaver.typedefs import JsonBody, SettingsType
 
 
 @implementer(IExceptionResponse)
@@ -75,7 +75,7 @@ class OWSException(Response, Exception):
     # noinspection PyUnusedLocal
     @staticmethod
     def json_formatter(status, body, title, environ):
-        # type: (AnyStr, AnyStr, AnyStr, Settings) -> JsonBody
+        # type: (AnyStr, AnyStr, AnyStr, SettingsType) -> JsonBody
 
         # cleanup various escape characters and u'' stings
         while any(['\"' in body, '\\' in body, 'u\'' in body, 'u\"' in body, '\'\'' in body, '  ' in body]):

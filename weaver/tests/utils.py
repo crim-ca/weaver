@@ -19,7 +19,7 @@ import warnings
 import mock
 import os
 if TYPE_CHECKING:
-    from weaver.typedefs import Settings
+    from weaver.typedefs import SettingsType
 
 
 def ignore_wps_warnings(func):
@@ -34,7 +34,7 @@ def ignore_wps_warnings(func):
 
 
 def get_settings_from_config_ini(config_ini_path=None, ini_section_name='app:main'):
-    # type: (Optional[AnyStr], Optional[AnyStr]) -> Settings
+    # type: (Optional[AnyStr], Optional[AnyStr]) -> SettingsType
     parser = ConfigParser()
     parser.read([config_ini_path or get_default_config_ini_path()])
     settings = dict(parser.items(ini_section_name))
@@ -47,7 +47,7 @@ def get_default_config_ini_path():
 
 
 def setup_config_from_settings(settings=None):
-    # type: (Optional[Settings]) -> Configurator
+    # type: (Optional[SettingsType]) -> Configurator
     settings = settings or {}
     config = testing.setUp(settings=settings)
     return config
@@ -63,7 +63,7 @@ def setup_config_from_ini(config_ini_file_path=None):
 
 
 def setup_config_with_mongodb(config=None, settings=None):
-    # type: (Optional[Configurator], Optional[Settings]) -> Configurator
+    # type: (Optional[Configurator], Optional[SettingsType]) -> Configurator
     settings = settings or {}
     settings.update({
         'mongodb.host': '127.0.0.1',
@@ -140,7 +140,7 @@ def setup_config_with_celery(config):
 
 
 def get_test_weaver_config(config=None, settings=None):
-    # type: (Optional[Configurator], Optional[Settings]) -> Configurator
+    # type: (Optional[Configurator], Optional[SettingsType]) -> Configurator
     if not config:
         # default db required if none specified by config
         config = setup_config_from_settings(settings=settings)
@@ -156,14 +156,14 @@ def get_test_weaver_config(config=None, settings=None):
 
 
 def get_test_weaver_app(config=None, settings=None):
-    # type: (Optional[Configurator], Optional[Settings]) -> TestApp
+    # type: (Optional[Configurator], Optional[SettingsType]) -> TestApp
     config = get_test_weaver_config(config=config, settings=settings)
     config.scan()
     return TestApp(config.make_wsgi_app())
 
 
 def get_settings_from_testapp(testapp):
-    # type: (TestApp) -> Settings
+    # type: (TestApp) -> SettingsType
     settings = {}
     if hasattr(testapp.app, 'registry'):
         settings = testapp.app.registry.settings or {}
