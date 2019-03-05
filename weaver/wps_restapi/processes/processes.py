@@ -17,7 +17,6 @@ from weaver.execute import (
     EXECUTE_RESPONSE_DOCUMENT,
     EXECUTE_TRANSMISSION_MODE_REFERENCE,
 )
-from weaver.namesgenerator import get_sane_name
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes import wps_package, opensearch
 from weaver.processes.types import PROCESS_WORKFLOW
@@ -29,7 +28,7 @@ from weaver.status import (
     STATUS_SUCCEEDED,
 )
 from weaver.store.base import StoreServices, StoreProcesses, StoreJobs
-from weaver.utils import get_any_id, get_any_value, raise_on_xml_exception
+from weaver.utils import get_any_id, get_any_value, raise_on_xml_exception, get_sane_name
 from weaver.visibility import VISIBILITY_PUBLIC, visibility_values
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.notify import notify_job
@@ -70,7 +69,6 @@ import json
 import os
 
 LOGGER = logging.getLogger(__name__)
-task_logger = get_task_logger(__name__)
 
 
 def wait_secs(run_step=-1):
@@ -186,6 +184,7 @@ def retrieve_package_job_log(execution, job):
 @app.task(bind=True)
 def execute_process(self, job_id, url, headers=None, notification_email=None):
     registry = app.conf['PYRAMID_REGISTRY']
+    task_logger = get_task_logger(__name__)
     load_pywps_cfg(registry)
 
     ssl_verify = asbool(registry.settings.get('weaver.ssl_verify', True))

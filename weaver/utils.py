@@ -1,4 +1,4 @@
-from weaver.exceptions import ServiceNotFound
+from weaver.exceptions import ServiceNotFound, InvalidIdentifierValue
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.status import map_status
 from weaver.typedefs import Settings
@@ -307,3 +307,30 @@ def make_dirs(path, mode=0o755, exist_ok=True):
         for subdir in mkpath(dir_path):
             if not os.path.isdir(subdir):
                 os.mkdir(subdir, mode)
+
+
+def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_invalid=False):
+    if assert_invalid:
+        assert_sane_name(name, min_len, max_len)
+    if name is None:
+        return None
+    name = name.strip()
+    if len(name) < min_len:
+        return None
+    if replace_invalid:
+        max_len = max_len or 25
+        name = re.sub("[^a-z]", "_", name.lower()[:max_len])
+    return name
+
+
+def assert_sane_name(name, min_len=3, max_len=None):
+    if name is None:
+        raise InvalidIdentifierValue('Invalid process name : {0}'.format(name))
+    name = name.strip()
+    if '--' in name \
+       or name.startswith('-') \
+       or name.endswith('-') \
+       or len(name) < min_len \
+       or (max_len is not None and len(name) > max_len) \
+       or not re.match(r"^[a-zA-Z0-9_\-]+$", name):
+        raise InvalidIdentifierValue('Invalid process name : {0}'.format(name))

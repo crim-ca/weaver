@@ -1,16 +1,15 @@
-# noinspection PyPackageRequirements
-import pytest
-from lxml import etree
-from typing import Type
 from weaver import utils
 from weaver import status
 from weaver.exceptions import ServiceNotFound
 from weaver.tests.common import WPS_CAPS_EMU_XML, WMS_CAPS_NCWMS2_111_XML, WMS_CAPS_NCWMS2_130_XML
 from pyramid.httpexceptions import HTTPError as PyramidHTTPError, HTTPInternalServerError, HTTPNotFound, HTTPConflict
-# noinspection PyPackageRequirements
 from pywps.response.status import WPS_STATUS
 from requests.exceptions import HTTPError as RequestsHTTPError
 from six.moves.urllib.parse import urlparse
+from lxml import etree
+from typing import Type
+# noinspection PyPackageRequirements
+import pytest
 
 
 def test_is_url_valid():
@@ -275,3 +274,43 @@ def test_map_status_pywps_compliant_as_int_statuses():
 def test_map_status_pywps_back_and_forth():
     for s, i in status.STATUS_PYWPS_MAP.items():
         assert status.STATUS_PYWPS_IDS[i] == s
+
+
+def test_get_sane_name_replace():
+    kw = {'assert_invalid': False, 'replace_invalid': True}
+    assert utils.get_sane_name("Hummingbird", **kw) == "hummingbird"
+    assert utils.get_sane_name("MapMint Demo Instance", **kw) == "mapmint_demo_instance"
+    assert utils.get_sane_name(None, **kw) is None
+    assert utils.get_sane_name("12", **kw) is None
+    assert utils.get_sane_name(" ab c ", **kw) == "ab_c"
+    assert utils.get_sane_name("a_much_to_long_name_for_this_test", **kw) == "a_much_to_long_name_for_t"
+
+
+def test_assert_sane_name():
+    test_cases_invalid = [
+        None,
+        "12",   # too short
+        " ab c ",
+        "MapMint Demo Instance",
+        "double--dashes_not_ok",
+        "-start_dash_not_ok",
+        "end_dash_not_ok-",
+        "no_exclamation!point",
+        "no_interrogation?point",
+        "no_slashes/allowed",
+        "no_slashes\\allowed",
+    ]
+    for test in test_cases_invalid:
+        with pytest.raises(ValueError):
+            utils.assert_sane_name(test)
+
+    test_cases_valid = [
+        "Hummingbird",
+        "short",
+        "a_very_long_name_for_this_test_is_ok_if_maxlen_is_none",
+        "AlTeRnAtInG_cApS"
+        "middle-dashes-are-ok",
+        "underscores_also_ok",
+    ]
+    for test in test_cases_valid:
+        utils.assert_sane_name(test)

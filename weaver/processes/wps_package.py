@@ -1,5 +1,4 @@
 from weaver.processes import opensearch
-from weaver import namesgenerator
 from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS
 from weaver.processes.constants import WPS_INPUT, WPS_OUTPUT, WPS_COMPLEX, WPS_BOUNDINGBOX, WPS_LITERAL, WPS_REFERENCE
 from weaver.processes.wps1_process import Wps1Process
@@ -14,7 +13,7 @@ from weaver.exceptions import (
 from weaver.status import (STATUS_RUNNING, STATUS_SUCCEEDED, STATUS_EXCEPTION, STATUS_FAILED,
                            map_status, STATUS_COMPLIANT_PYWPS, STATUS_PYWPS_IDS)
 from weaver.wps_restapi.swagger_definitions import process_uri
-from weaver.utils import get_job_log_msg, get_log_fmt, get_log_datefmt
+from weaver.utils import get_job_log_msg, get_log_fmt, get_log_datefmt, get_sane_name
 from pywps.inout.basic import BasicIO
 from pywps.inout.literaltypes import AnyValue, AllowedValue, ALLOWEDVALUETYPE
 from pywps.validator.mode import MODE
@@ -132,7 +131,7 @@ def get_process_location(process_id_or_url, data_source=None):
     if urlparse(process_id_or_url).scheme != "":
         return process_id_or_url
     data_source_url = retrieve_data_source_url(data_source)
-    process_id = namesgenerator.get_sane_name(process_id_or_url)
+    process_id = get_sane_name(process_id_or_url)
     process_url = process_uri.format(process_id=process_id)
     return '{host}{path}'.format(host=data_source_url, path=process_url)
 
