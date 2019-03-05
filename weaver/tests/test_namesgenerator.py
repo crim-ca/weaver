@@ -1,4 +1,5 @@
 from weaver.namesgenerator import get_random_name, get_sane_name, assert_sane_name
+# noinspection PyPackageRequirements
 import pytest
 
 

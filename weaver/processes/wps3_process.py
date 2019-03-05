@@ -1,9 +1,3 @@
-import logging
-import warnings
-import requests
-from copy import deepcopy
-from time import sleep
-from typing import Union, AnyStr, Callable
 from weaver import status
 from weaver.warning import MissingParameterWarning
 from weaver.visibility import VISIBILITY_PUBLIC
@@ -28,7 +22,16 @@ from pyramid.httpexceptions import (
     HTTPInternalServerError,
     HTTPConflict
 )
-
+from copy import deepcopy
+from time import sleep
+from typing import TYPE_CHECKING
+import logging
+import warnings
+import requests
+if TYPE_CHECKING:
+    from typing import Union, AnyStr, Callable, Dict
+    from weaver.typedefs import JsonBody
+    UpdateStatusFunction = Callable[[AnyStr, AnyStr, int, AnyStr], None]
 
 LOGGER = logging.getLogger(__name__)
 
@@ -45,10 +48,15 @@ REMOTE_JOB_PROGRESS_COMPLETED = 100
 
 
 class Wps3Process(WpsProcessInterface):
-    def __init__(self, step_payload, joborder, process_id, cookies, update_status=None):
+    def __init__(self,
+                 step_payload,          # type: JsonBody
+                 joborder,              # type: int
+                 process_id,            # type: AnyStr
+                 cookies,               # type: Dict[AnyStr, AnyStr]
+                 update_status=None,    # type: UpdateStatusFunction
+                 ):
         super(Wps3Process, self).__init__(cookies)
         self.provider = ''
-        # type: Callable[[AnyStr, int, AnyStr], None]
         self.update_status = lambda message, progress, _status: update_status(
             self.provider, message, progress, _status)
 
@@ -210,8 +218,9 @@ class Wps3Process(WpsProcessInterface):
         response.raise_for_status()
 
     def execute(self, workflow_inputs, out_dir, expected_outputs):
-        # TODO La section de code 'visibility' provient de la fct execute de la classe WpsWorkflowJob_
-        # et n'a pas ete teste ici-meme
+        # TODO
+        #   La section de code 'visibility' provient de la fct execute de la classe WpsWorkflowJob_
+        #   et n'a pas ete teste ici-meme
         visible = self.is_visible()
         if not visible:  # includes private visibility and non-existing cases
             if visible is None:
@@ -241,25 +250,25 @@ class Wps3Process(WpsProcessInterface):
 
         execute_body_inputs = []
         execute_req_id = 'id'
-        execute_req_inpt_val = 'href'
+        execute_req_input_val = 'href'
         execute_req_out_trans_mode = 'transmissionMode'
         for workflow_input_key, workflow_input_value in workflow_inputs.items():
             if isinstance(workflow_input_value, list):
                 for workflow_input_value_item in workflow_input_value:
                     execute_body_inputs.append({execute_req_id: workflow_input_key,
-                                                execute_req_inpt_val: workflow_input_value_item['location']})
+                                                execute_req_input_val: workflow_input_value_item['location']})
             else:
                 execute_body_inputs.append({execute_req_id: workflow_input_key,
-                                            execute_req_inpt_val: workflow_input_value['location']})
+                                            execute_req_input_val: workflow_input_value['location']})
         for exec_input in execute_body_inputs:
-            if exec_input[execute_req_inpt_val].startswith('{0}://'.format(OPENSEARCH_LOCAL_FILE_SCHEME)):
-                exec_input[execute_req_inpt_val] = 'file{0}'.format(
-                    exec_input[execute_req_inpt_val][len(OPENSEARCH_LOCAL_FILE_SCHEME):])
-            elif exec_input[execute_req_inpt_val].startswith('file://'):
-                exec_input[execute_req_inpt_val] = self.host_file(exec_input[execute_req_inpt_val])
+            if exec_input[execute_req_input_val].startswith('{0}://'.format(OPENSEARCH_LOCAL_FILE_SCHEME)):
+                exec_input[execute_req_input_val] = 'file{0}'.format(
+                    exec_input[execute_req_input_val][len(OPENSEARCH_LOCAL_FILE_SCHEME):])
+            elif exec_input[execute_req_input_val].startswith('file://'):
+                exec_input[execute_req_input_val] = self.host_file(exec_input[execute_req_input_val])
                 LOGGER.debug("Hosting intermediate input {0} : {1}".format(
                     exec_input[execute_req_id],
-                    exec_input[execute_req_inpt_val]))
+                    exec_input[execute_req_input_val]))
 
         execute_body_outputs = [{execute_req_id: output,
                                  execute_req_out_trans_mode: 'reference'} for output in expected_outputs]

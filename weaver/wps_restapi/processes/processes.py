@@ -1,15 +1,3 @@
-import os
-import colander
-from pyramid.httpexceptions import *
-from pyramid.settings import asbool
-from pyramid_celery import celery_app as app
-from pyramid.request import Request
-from celery.utils.log import get_task_logger
-from six.moves.urllib.request import urlopen
-from six.moves.urllib.error import URLError
-from time import sleep
-from typing import Any, AnyStr, Dict, List, Tuple, Optional, Union
-from weaver.wps import load_pywps_cfg
 from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS
 from weaver.database import get_db
 from weaver.datatype import Process as ProcessDB, Service
@@ -22,25 +10,6 @@ from weaver.exceptions import (
     PackageTypeError,
     PackageNotFound,
 )
-from weaver.processes import wps_package, opensearch
-from weaver.processes.types import PROCESS_WORKFLOW
-from weaver.namesgenerator import get_sane_name
-from weaver.owsexceptions import OWSNoApplicableCode
-from weaver.store.base import StoreServices, StoreProcesses, StoreJobs
-from weaver.utils import get_any_id, get_any_value, raise_on_xml_exception
-from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.jobs.notify import notify_job
-from weaver.wps_restapi.utils import *
-from weaver.wps_restapi.jobs.jobs import check_status, job_format_json
-from weaver.wps import get_wps_output_path
-from weaver.visibility import VISIBILITY_PUBLIC, visibility_values
-from weaver.status import (
-    map_status,
-    STATUS_ACCEPTED,
-    STATUS_STARTED,
-    STATUS_FAILED,
-    STATUS_SUCCEEDED,
-)
 from weaver.execute import (
     EXECUTE_MODE_AUTO,
     EXECUTE_MODE_ASYNC,
@@ -48,13 +17,59 @@ from weaver.execute import (
     EXECUTE_RESPONSE_DOCUMENT,
     EXECUTE_TRANSMISSION_MODE_REFERENCE,
 )
+from weaver.namesgenerator import get_sane_name
+from weaver.owsexceptions import OWSNoApplicableCode
+from weaver.processes import wps_package, opensearch
+from weaver.processes.types import PROCESS_WORKFLOW
+from weaver.status import (
+    map_status,
+    STATUS_ACCEPTED,
+    STATUS_STARTED,
+    STATUS_FAILED,
+    STATUS_SUCCEEDED,
+)
+from weaver.store.base import StoreServices, StoreProcesses, StoreJobs
+from weaver.utils import get_any_id, get_any_value, raise_on_xml_exception
+from weaver.visibility import VISIBILITY_PUBLIC, visibility_values
+from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.jobs.notify import notify_job
+from weaver.wps_restapi.utils import get_cookie_headers, wps_restapi_base_url, jsonify_value, parse_request_query
+from weaver.wps_restapi.jobs.jobs import check_status, job_format_json
+from weaver.wps import get_wps_output_path, load_pywps_cfg
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference, Process as ProcessWPS
 from owslib.util import clean_ows_url
+from pyramid.httpexceptions import (
+    HTTPOk,
+    HTTPCreated,
+    HTTPUnauthorized,
+    HTTPNotFound,
+    HTTPBadRequest,
+    HTTPConflict,
+    HTTPUnprocessableEntity,
+    HTTPInternalServerError,
+    HTTPNotImplemented,
+    HTTPServiceUnavailable,
+    HTTPSuccessful,
+    HTTPException,
+)
+from six.moves.urllib.request import urlopen
+from six.moves.urllib.error import URLError
+from time import sleep
+from typing import Any, AnyStr, Dict, List, Tuple, Optional, Union
+from celery.utils.log import get_task_logger
+from pyramid.settings import asbool
+from pyramid_celery import celery_app as app
+from pyramid.request import Request
 from lxml import etree
 from six import string_types
 from copy import deepcopy
 import requests
+import colander
+import logging
+import json
+import os
 
+LOGGER = logging.getLogger(__name__)
 task_logger = get_task_logger(__name__)
 
 
@@ -414,10 +429,10 @@ def convert_process_wps_to_db(service, process, settings):
         minOccurs=str(getattr(dataInput, 'minOccurs', 0)),  # FIXME: str applied to match OGC REST-API definition
         maxOccurs=str(getattr(dataInput, 'maxOccurs', 0)),  # FIXME: str applied to match OGC REST-API definition
         dataType=dataInput.dataType,
-        defaultValue=jsonify(getattr(dataInput, 'defaultValue', None)),
-        allowedValues=[jsonify(dataValue) for dataValue in getattr(dataInput, 'allowedValues', [])],
-        supportedValues=[jsonify(dataValue) for dataValue in getattr(dataInput, 'supportedValues', [])],
-        formats=[jsonify(dataValue) for dataValue in getattr(dataInput, 'supportedValues', [default_format])],
+        defaultValue=jsonify_value(getattr(dataInput, 'defaultValue', None)),
+        allowedValues=[jsonify_value(dataValue) for dataValue in getattr(dataInput, 'allowedValues', [])],
+        supportedValues=[jsonify_value(dataValue) for dataValue in getattr(dataInput, 'supportedValues', [])],
+        formats=[jsonify_value(dataValue) for dataValue in getattr(dataInput, 'supportedValues', [default_format])],
     ) for dataInput in getattr(process, 'dataInputs', [])]
 
     outputs = [dict(
@@ -425,8 +440,8 @@ def convert_process_wps_to_db(service, process, settings):
         title=getattr(processOutput, 'title', ''),
         abstract=getattr(processOutput, 'abstract', ''),
         dataType=processOutput.dataType,
-        defaultValue=jsonify(getattr(processOutput, 'defaultValue', None)),
-        formats=[jsonify(dataValue) for dataValue in getattr(processOutput, 'supportedValues', [default_format])],
+        defaultValue=jsonify_value(getattr(processOutput, 'defaultValue', None)),
+        formats=[jsonify_value(dataValue) for dataValue in getattr(processOutput, 'supportedValues', [default_format])],
     ) for processOutput in getattr(process, 'processOutputs', [])]
 
     return ProcessDB(
@@ -535,7 +550,7 @@ def get_processes(request):
         processes, invalid_processes = get_processes_filtered_by_valid_schemas(request)
         if invalid_processes:
             raise HTTPServiceUnavailable(
-                "Previously deployed processes are causing invalid schema integrity errors. " +
+                "Previously deployed processes are causing invalid schema integrity errors. "
                 "Manual cleanup of following processes is required: {}".format(invalid_processes))
         response_body = {'processes': processes}
 

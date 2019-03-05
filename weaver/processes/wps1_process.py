@@ -38,7 +38,8 @@ class Wps1Process(WpsProcessInterface):
         LOGGER.debug("Execute process WPS request for {0}".format(self.process_id))
         try:
             try:
-                wps = WebProcessingService(url=self.provider, headers=get_cookie_headers(self.headers), verify=self.verify)
+                wps = WebProcessingService(url=self.provider, headers=get_cookie_headers(self.headers),
+                                           verify=self.verify)
                 # noinspection PyProtectedMember
                 raise_on_xml_exception(wps._capabilities)
             except Exception as ex:

@@ -204,7 +204,7 @@ class OpenSearchQuery(object):
         """
 
         :param template_url: url containing query parameters
-        :param params: parameters to insert in formated url
+        :param params: parameters to insert in formatted url
 
         """
         base_url, query = template_url.split("?", 1)
@@ -231,7 +231,8 @@ class OpenSearchQuery(object):
 
         return base_url, query_params
 
-    def _fetch_datatsets_from_alternates_links(self, alternate_links):
+    @staticmethod
+    def _fetch_datatsets_from_alternates_links(alternate_links):
         # Try loading from atom alternate link
         for link in alternate_links:
             if link["type"] == "application/atom+xml":
@@ -282,20 +283,20 @@ class OpenSearchQuery(object):
             for feature in features:
                 yield feature, response.url
             n_received_features = len(features)
-            n_recieved_so_far = start_index + n_received_features - 1  # index starts at 1
+            n_received_so_far = start_index + n_received_features - 1  # index starts at 1
             total_results = json_body["totalResults"]
             if not n_received_features:
                 break
-            if n_recieved_so_far >= total_results:
+            if n_received_so_far >= total_results:
                 break
-            if maximum_records and n_recieved_so_far >= maximum_records:
+            if maximum_records and n_received_so_far >= maximum_records:
                 break
             start_index += n_received_features
 
     def query_datasets(self, params, accept_schemes, accept_mime_types):
         # type: (Dict, Tuple, List) -> Iterable[AnyStr]
         """
-        Loop on every opensearch result feature and yield url mathching required mimetype and scheme.
+        Loop on every opensearch result feature and yield url matching required mimetype and scheme.
         Log a warning if a feature cannot yield a valid url (either no compatible mimetype or scheme)
 
         :param params: query parameters
@@ -396,6 +397,7 @@ class EOImageDescribeProcessHandler(object):
         }
         return data
 
+    # noinspection PyUnusedLocal
     @staticmethod
     def make_collection(identifier, allowed_values):
         description = u"Collection of the data."
@@ -645,10 +647,10 @@ def replace_inputs_describe_process(inputs, payload):
     process = payload["processDescription"]["process"]
     payload_inputs = {get_any_id(i): i for i in process.get("inputs", {})}
     for i in inputs:
+        # noinspection PyBroadException
         try:
             ap = payload_inputs[get_any_id(i)]["additionalParameters"]
             i["additionalParameters"] = ap
-        # noinspection PyBroadException
         except Exception:
             pass
 

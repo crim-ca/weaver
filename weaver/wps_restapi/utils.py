@@ -58,7 +58,7 @@ def get_header(header_name, header_container):
     return None
 
 
-def jsonify(value):
+def jsonify_value(value):
     # ComplexData type
     if isinstance(value, ComplexData):
         return {'mimeType': value.mimeType, 'encoding': value.encoding, 'schema': value.schema}

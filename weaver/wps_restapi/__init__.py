@@ -8,7 +8,7 @@ def includeme(config):
     from weaver.wps_restapi import swagger_definitions as sd
     settings = config.registry.settings
     if asbool(settings.get('weaver.wps_restapi', True)):
-        logger.info('Adding WPS REST API ...')
+        logger.info('Adding WPS REST API...')
         config.registry.settings['handle_exceptions'] = False  # avoid cornice conflicting views
         config.include('cornice')
         config.include('cornice_swagger')

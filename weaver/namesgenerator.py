@@ -154,28 +154,28 @@ def get_random_name(retry=False):
     return name
 
 
-def get_sane_name(name, minlen=3, maxlen=None, assert_invalid=True, replace_invalid=False):
+def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_invalid=False):
     if assert_invalid:
-        assert_sane_name(name, minlen, maxlen)
+        assert_sane_name(name, min_len, max_len)
     if name is None:
         return None
     name = name.strip()
-    if len(name) < minlen:
+    if len(name) < min_len:
         return None
     if replace_invalid:
-        maxlen = maxlen or 25
-        name = re.sub("[^a-z]", "_", name.lower()[:maxlen])
+        max_len = max_len or 25
+        name = re.sub("[^a-z]", "_", name.lower()[:max_len])
     return name
 
 
-def assert_sane_name(name, minlen=3, maxlen=None):
+def assert_sane_name(name, min_len=3, max_len=None):
     if name is None:
         raise InvalidIdentifierValue('Invalid process name : {0}'.format(name))
     name = name.strip()
     if '--' in name \
        or name.startswith('-') \
        or name.endswith('-') \
-       or len(name) < minlen \
-       or (maxlen is not None and len(name) > maxlen) \
-       or not re.match("^[a-zA-Z0-9_\-]+$", name):
+       or len(name) < min_len \
+       or (max_len is not None and len(name) > max_len) \
+       or not re.match(r"^[a-zA-Z0-9_\-]+$", name):
         raise InvalidIdentifierValue('Invalid process name : {0}'.format(name))

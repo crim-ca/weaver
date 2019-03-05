@@ -18,12 +18,12 @@ from weaver.execute import (
     EXECUTE_TRANSMISSION_MODE_REFERENCE,
     execute_transmission_mode_options,
 )
-from cornice import Service
-from colander import *
 from weaver.visibility import visibility_values, VISIBILITY_PUBLIC
 from weaver.wps_restapi.colander_one_of import OneOfMappingSchema
 from weaver.wps_restapi.colander_defaults import SchemaNodeDefault as SchemaNode  # import after to override colander
 from weaver import __meta__
+from cornice import Service
+from colander import String, Boolean, Integer, Float, DateTime, MappingSchema, SequenceSchema, drop, OneOf
 
 API_TITLE = 'weaver REST API'
 API_INFO = {
@@ -685,7 +685,7 @@ class Process(DescriptionType):
 class ProcessOutputDescriptionSchema(MappingSchema):
     """WPS process output definition."""
     dataType = SchemaNode(String())
-    defaultValue = SchemaNode(Mapping())
+    defaultValue = MappingSchema()
     id = SchemaNode(String())
     abstract = SchemaNode(String())
     title = SchemaNode(String())
@@ -1228,7 +1228,7 @@ class OkGetProviderProcessesSchema(MappingSchema):
 class GetProcessesQuery(MappingSchema):
     providers = SchemaNode(
         Boolean(), example=True, default=False, missing=drop,
-        description="List local processes as well as all sub-processes of all registered providers. " +
+        description="List local processes as well as all sub-processes of all registered providers. "
                     "Applicable only for weaver in {} mode, false otherwise.".format(WEAVER_CONFIGURATION_EMS))
 
 

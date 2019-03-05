@@ -1,9 +1,13 @@
-import requests
-from time import sleep
+from weaver.wps import get_wps_output_path, get_wps_output_url
 from pyramid_celery import celery_app as app
 from pyramid.settings import asbool
 from pyramid.httpexceptions import HTTPBadGateway
-from weaver.wps import get_wps_output_path, get_wps_output_url
+from time import sleep
+from typing import TYPE_CHECKING
+import requests
+if TYPE_CHECKING:
+    from weaver.typedefs import ExpectedOutputType
+    from typing import Any, AnyStr, Dict, List, Union
 
 
 class WpsProcessInterface(object):
@@ -11,7 +15,11 @@ class WpsProcessInterface(object):
     Common interface for WpsProcess to be used is cwl jobs
     """
 
-    def execute(self, workflow_inputs, out_dir, expected_outputs):
+    def execute(self,
+                workflow_inputs,        # type: Union[Dict[AnyStr, Any], List[Dict[AnyStr, Any]]]
+                out_dir,                # type: AnyStr
+                expected_outputs,       # type: List[ExpectedOutputType]
+                ):
         """
         Execute a remote process using the given inputs.
         The function is expected to monitor the process and update the status.
