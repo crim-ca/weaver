@@ -1,16 +1,18 @@
 from weaver import status
-from weaver.utils import get_any_id, get_any_value, get_job_log_msg, raise_on_xml_exception
-from weaver.wps_restapi.utils import get_cookie_headers
 from weaver.execute import EXECUTE_MODE_ASYNC
 from weaver.owsexceptions import OWSNoApplicableCode
+from weaver.processes.utils import jsonify_output
 from weaver.processes.wps_process_base import WpsProcessInterface
-from weaver.wps_restapi.processes.processes import wait_secs, _jsonify_output
+from weaver.utils import get_any_id, get_any_value, get_job_log_msg, raise_on_xml_exception, wait_secs
 from weaver.wps_restapi.jobs.jobs import check_status
+from weaver.wps_restapi.utils import get_cookie_headers
 from owslib.wps import WebProcessingService, ComplexDataInput, WPSException
-from typing import AnyStr, Callable
+from typing import AnyStr, List, TYPE_CHECKING
 from time import sleep
 import logging
 import requests
+if TYPE_CHECKING:
+    from weaver.typedefs import JsonBody, CookiesType, ExpectedOutputType, UpdateStatusPartialFunction
 
 LOGGER = logging.getLogger(__name__)
 
@@ -22,20 +24,26 @@ REMOTE_JOB_PROGRESS_COMPLETED = 100
 
 
 class Wps1Process(WpsProcessInterface):
-    def __init__(self, provider, process_id, cookies, update_status=None):
+    def __init__(self,
+                 provider,          # type: AnyStr
+                 process,           # type: AnyStr
+                 cookies,           # type: CookiesType
+                 update_status,     # type: UpdateStatusPartialFunction
+                 ):
         super(Wps1Process, self).__init__(cookies)
         self.provider = provider
-        self.process_id = process_id
-
-        # type: Callable[[AnyStr, int, AnyStr], None]
-        self.update_status = update_status
+        self.process = process
+        self.update_status = lambda _message, _progress, _status: update_status(
+            self.provider, _message, _progress, _status)
 
     def execute(self, workflow_inputs, out_dir, expected_outputs):
+        # type: (JsonBody, AnyStr, List[ExpectedOutputType]) -> None
+
         # TODO Toute cette fonction est inspiree de la job celery du rest_api mais n'a pas ete testee
 
         self.update_status("Preparing execute request for remote WPS1 provider.",
                            REMOTE_JOB_PROGRESS_REQ_PREP, status.STATUS_RUNNING)
-        LOGGER.debug("Execute process WPS request for {0}".format(self.process_id))
+        LOGGER.debug("Execute process WPS request for {0}".format(self.process))
         try:
             try:
                 wps = WebProcessingService(url=self.provider, headers=get_cookie_headers(self.headers),
@@ -45,7 +53,7 @@ class Wps1Process(WpsProcessInterface):
             except Exception as ex:
                 raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
             try:
-                process = wps.describeprocess(self.process_id)
+                process = wps.describeprocess(self.process)
             except Exception as ex:
                 raise OWSNoApplicableCode("Failed to retrieve WPS process description. Error: [{}].".format(str(ex)))
 
@@ -84,7 +92,7 @@ class Wps1Process(WpsProcessInterface):
                                REMOTE_JOB_PROGRESS_EXECUTION, status.STATUS_RUNNING)
 
             mode = EXECUTE_MODE_ASYNC
-            execution = wps.execute(self.process_id, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
+            execution = wps.execute(self.process, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
             if not execution.process and execution.errors:
                 raise execution.errors[0]
 
@@ -102,7 +110,9 @@ class Wps1Process(WpsProcessInterface):
                                              sleep_secs=wait_secs(run_step))
 
                     LOGGER.debug("Monitoring job {jobID} : [{status}] {percentCompleted}  {message}".format(
-                        jobID=execution.jobID,
+                        # TODO: find job id alternative, non-existing in 'WPSExecution' object
+                        # jobID=execution.jobID,
+                        jobID='<undefined>',
                         status=status.map_status(execution.getStatus()),
                         percentCompleted=execution.percentCompleted,
                         message=execution.statusMessage
@@ -134,13 +144,7 @@ class Wps1Process(WpsProcessInterface):
             self.update_status('Fetching job outputs from remote WPS1 provider.',
                                REMOTE_JOB_PROGRESS_FETCH_OUT, status.STATUS_RUNNING)
 
-            process = wps.describeprocess(self.process_id)
-            output_datatype = {
-                getattr(processOutput, 'identifier', ''): processOutput.dataType
-                for processOutput in getattr(process, 'processOutputs', [])
-            }
-            results = [_jsonify_output(output, output_datatype[output.identifier])
-                       for output in execution.processOutputs]
+            results = [jsonify_output(output, process) for output in execution.processOutputs]
             for result in results:
                 if get_any_id(result) in expected_outputs:
                     # This is where cwl expect the output file to be written

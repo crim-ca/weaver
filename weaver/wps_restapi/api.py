@@ -1,3 +1,8 @@
+from weaver.__meta__ import __version__ as weaver_version
+from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.colander_one_of import CustomTypeConversionDispatcher
+from weaver.wps_restapi.utils import wps_restapi_base_url, wps_restapi_base_path, get_header, CONTENT_TYPE_JSON
+from weaver.owsexceptions import OWSException
 from six.moves.urllib.parse import urlparse
 from cornice_swagger import CorniceSwagger
 from cornice.service import get_services
@@ -16,17 +21,14 @@ from pyramid.httpexceptions import (
     HTTPServerError,
     HTTPException,
 )
-from weaver.__meta__ import __version__ as weaver_version
-from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.colander_one_of import CustomTypeConversionDispatcher
-from weaver.wps_restapi.utils import wps_restapi_base_url, wps_restapi_base_path, get_header, CONTENT_TYPE_JSON
-from weaver.owsexceptions import OWSException
-from weaver.typedefs import JsonBody
-from typing import AnyStr, Optional
+from typing import AnyStr, Optional, TYPE_CHECKING
 from simplejson import JSONDecodeError
 import logging
 import six
 import os
+if TYPE_CHECKING:
+    from weaver.typedefs import JsonBody
+
 LOGGER = logging.getLogger(__name__)
 
 

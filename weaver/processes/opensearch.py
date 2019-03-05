@@ -1,6 +1,5 @@
-from weaver.processes.sources import fetch_data_sources
+from weaver.processes.sources import fetch_data_sources, OPENSEARCH_LOCAL_FILE_SCHEME
 from weaver.processes.constants import WPS_LITERAL
-from weaver.processes.wps3_process import OPENSEARCH_LOCAL_FILE_SCHEME
 from weaver.processes.constants import START_DATE, END_DATE, AOI, COLLECTION
 from weaver.utils import get_any_id
 from collections import deque

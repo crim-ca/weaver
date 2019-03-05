@@ -47,7 +47,8 @@ from pywps import (
     Format,
 )
 if TYPE_CHECKING:
-    from weaver.status import AnyStatusType
+    from weaver.status import AnyStatusType, ToolPathObjectType
+    from cwltool.process import Process as ProcessCWL
 
 LOGGER = logging.getLogger("PACKAGE")
 
@@ -1146,8 +1147,9 @@ class WpsPackage(Process):
             self.update_status("Package complete.", PACKAGE_PROGRESS_DONE, STATUS_SUCCEEDED)
         return self.response
 
-    def make_tool(self, toolpath_object, loadingContext):
-        return default_make_tool(toolpath_object, loadingContext, self.get_job_process_definition)
+    def make_tool(self, toolpath_object, loading_context):
+        # type: (ToolPathObjectType, LoadingContext) -> ProcessCWL
+        return default_make_tool(toolpath_object, loading_context, self.get_job_process_definition)
 
     def get_job_process_definition(self, jobname, joborder, tool):
         """
@@ -1166,13 +1168,13 @@ class WpsPackage(Process):
             # A step is the package itself only for non-workflow package being executed on the EMS
             # default action requires ADES dispatching but hints can indicate also WPS1 or ESGF-CWT provider
             step_payload = self.payload
-            process_id = self.package_id
+            process = self.package_id
             jobtype = 'package'
         else:
             # Here we got a step part of a workflow (self is the workflow package)
             step_process_url = get_process_location(self.step_packages[jobname])
             step_payload = _get_process_payload(step_process_url)
-            process_id = self.step_packages[jobname]
+            process = self.step_packages[jobname]
             jobtype = 'step'
 
         # Progress made with steps presumes that they are done sequentially and have the same progress weight
@@ -1191,21 +1193,22 @@ class WpsPackage(Process):
         if 'WPS1Requirement' in tool['hints']:
             provider = tool['hints']['WPS1Requirement']['provider']
             # The process id of the provider isn't required to be the same as the one use in the EMS
-            process_id = tool['hints']['WPS1Requirement']['process_id']
+            process = tool['hints']['WPS1Requirement']['process']
             return Wps1Process(provider=provider,
-                               process_id=process_id,
+                               process=process,
                                cookies=self.request.http_request.cookies,
-                               update_status=lambda message, progress, status: self.step_update_status(
-                                   message, progress, start_step_progress, end_step_progress, jobname, provider, status
+                               update_status=lambda _provider, _message, _progress, _status: self.step_update_status(
+                                   _message, _progress, start_step_progress, end_step_progress, jobname,
+                                   _provider, _status
                                ))
         elif 'ESGF-CWTRequirement' in tool['hints']:
             raise NotImplementedError('ESGF-CWTRequirement not implemented')
         else:
             return Wps3Process(step_payload=step_payload,
                                joborder=joborder,
-                               process_id=process_id,
+                               process=process,
                                cookies=self.request.http_request.cookies,
-                               update_status=lambda provider, message, progress, status: self.step_update_status(
-                                   message, progress, start_step_progress, end_step_progress,
-                                   jobname, provider, status
+                               update_status=lambda _provider, _message, _progress, _status: self.step_update_status(
+                                   _message, _progress, start_step_progress, end_step_progress, jobname,
+                                   _provider, _status
                                ))

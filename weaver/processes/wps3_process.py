@@ -11,6 +11,7 @@ from weaver.wps_restapi.swagger_definitions import (
 )
 from weaver.exceptions import PackageExecutionError
 from weaver.processes import opensearch
+from weaver.processes.sources import OPENSEARCH_LOCAL_FILE_SCHEME
 from weaver.processes.wps_process_base import WpsProcessInterface
 from weaver.processes.sources import retrieve_data_source_url, get_data_source_from_url
 from pyramid.settings import asbool
@@ -29,13 +30,10 @@ import logging
 import warnings
 import requests
 if TYPE_CHECKING:
-    from typing import Union, AnyStr, Callable, Dict
-    from weaver.typedefs import JsonBody
-    UpdateStatusFunction = Callable[[AnyStr, AnyStr, int, AnyStr], None]
+    from typing import Union, AnyStr
+    from weaver.typedefs import JsonBody, CookiesType, UpdateStatusPartialFunction
 
 LOGGER = logging.getLogger(__name__)
-
-OPENSEARCH_LOCAL_FILE_SCHEME = 'opensearchfile'  # must be a valid url scheme parsable by urlparse
 
 REMOTE_JOB_PROGRESS_PROVIDER = 1
 REMOTE_JOB_PROGRESS_DEPLOY = 2
@@ -49,19 +47,17 @@ REMOTE_JOB_PROGRESS_COMPLETED = 100
 
 class Wps3Process(WpsProcessInterface):
     def __init__(self,
-                 step_payload,          # type: JsonBody
-                 joborder,              # type: int
-                 process_id,            # type: AnyStr
-                 cookies,               # type: Dict[AnyStr, AnyStr]
-                 update_status=None,    # type: UpdateStatusFunction
+                 step_payload,      # type: JsonBody
+                 joborder,          # type: int
+                 process,           # type: AnyStr
+                 cookies,           # type: CookiesType
+                 update_status,     # type: UpdateStatusPartialFunction
                  ):
         super(Wps3Process, self).__init__(cookies)
-        self.provider = ''
-        self.update_status = lambda message, progress, _status: update_status(
-            self.provider, message, progress, _status)
-
         self.provider, self.url, self.deploy_body = self.resolve_data_source(step_payload, joborder)
-        self.process_id = process_id
+        self.process = process
+        self.update_status = lambda _message, _progress, _status: update_status(
+            self.provider, _message, _progress, _status)
 
     def resolve_data_source(self, step_payload, joborder):
         # TODO Ce code provient de wps_package et n'a pas ete teste ici-meme
@@ -90,7 +86,7 @@ class Wps3Process(WpsProcessInterface):
             url = retrieve_data_source_url(data_source)
             deploy_body = step_payload
         except (IndexError, KeyError) as exc:
-            raise self.exception_message(PackageExecutionError, exc, "Failed to save package outputs.")
+            raise PackageExecutionError("Failed to save package outputs. [{}]".format(repr(exc)))
 
         self.update_status("{provider} is selected {reason}.".format(
             provider=provider,
@@ -150,9 +146,9 @@ class Wps3Process(WpsProcessInterface):
             False if authorized access but process cannot be found,
             None if forbidden access.
         """
-        LOGGER.debug("Get process WPS visibility request for {0}".format(self.process_id))
+        LOGGER.debug("Get process WPS visibility request for {0}".format(self.process))
         response = self.make_request(method='GET',
-                                     url=self.url + process_visibility_uri.format(process_id=self.process_id),
+                                     url=self.url + process_visibility_uri.format(process_id=self.process),
                                      retry=False,
                                      status_code_mock=HTTPUnauthorized.code)
         if response.status_code in (HTTPUnauthorized.code, HTTPForbidden.code):
@@ -170,11 +166,11 @@ class Wps3Process(WpsProcessInterface):
     def set_visibility(self, visibility):
         self.update_status("Updating process visibility on remote ADES.",
                            REMOTE_JOB_PROGRESS_VISIBLE, status.STATUS_RUNNING)
-        path = self.url + process_visibility_uri.format(process_id=self.process_id)
+        path = self.url + process_visibility_uri.format(process_id=self.process)
         user_headers = deepcopy(self.headers)
         user_headers.update(self.get_user_auth_header())
 
-        LOGGER.debug("Update process WPS visibility request for {0} at {1}".format(self.process_id, path))
+        LOGGER.debug("Update process WPS visibility request for {0} at {1}".format(self.process, path))
         response = self.make_request(method='PUT',
                                      url=path,
                                      json={'value': visibility},
@@ -183,8 +179,8 @@ class Wps3Process(WpsProcessInterface):
         response.raise_for_status()
 
     def describe_process(self):
-        path = self.url + process_uri.format(process_id=self.process_id)
-        LOGGER.debug("Describe process WPS request for {0} at {1}".format(self.process_id, path))
+        path = self.url + process_uri.format(process_id=self.process)
+        LOGGER.debug("Describe process WPS request for {0} at {1}".format(self.process, path))
         response = self.make_request(method='GET',
                                      url=path,
                                      retry=False,
@@ -209,7 +205,7 @@ class Wps3Process(WpsProcessInterface):
         user_headers = deepcopy(self.headers)
         user_headers.update(self.get_user_auth_header())
 
-        LOGGER.debug("Deploy process WPS request for {0} at {1}".format(self.process_id, path))
+        LOGGER.debug("Deploy process WPS request for {0} at {1}".format(self.process, path))
         response = self.make_request(method='POST',
                                      url=path,
                                      json=self.deploy_body,
@@ -225,10 +221,10 @@ class Wps3Process(WpsProcessInterface):
         if not visible:  # includes private visibility and non-existing cases
             if visible is None:
                 LOGGER.info(u"Process {} access is unauthorized on {} - deploying as admin.".format(
-                    self.process_id, self.url))
+                    self.process, self.url))
             elif visible is False:
                 LOGGER.info(u"Process {} is not deployed on {} - deploying.".format(
-                    self.process_id, self.url))
+                    self.process, self.url))
             # TODO: Maybe always redeploy? What about cases of outdated deployed process?
             try:
                 self.deploy()
@@ -237,7 +233,7 @@ class Wps3Process(WpsProcessInterface):
                 pass_http_error(e, [HTTPConflict, HTTPInternalServerError])
 
         LOGGER.info(u"Process {} enforced to public visibility.".format(
-            self.process_id, self.url))
+            self.process, self.url))
         try:
             self.set_visibility(visibility=VISIBILITY_PUBLIC)
         # TODO: support for Spacebel, remove when visibility route properly implemented on ADES
@@ -246,7 +242,7 @@ class Wps3Process(WpsProcessInterface):
 
         self.update_status("Preparing execute request for remote ADES.",
                            REMOTE_JOB_PROGRESS_REQ_PREP, status.STATUS_RUNNING)
-        LOGGER.debug("Execute process WPS request for {0}".format(self.process_id))
+        LOGGER.debug("Execute process WPS request for {0}".format(self.process))
 
         execute_body_inputs = []
         execute_req_id = 'id'
@@ -278,7 +274,7 @@ class Wps3Process(WpsProcessInterface):
                             response='document',
                             inputs=execute_body_inputs,
                             outputs=execute_body_outputs)
-        request_url = self.url + process_jobs_uri.format(process_id=self.process_id)
+        request_url = self.url + process_jobs_uri.format(process_id=self.process)
         response = self.make_request(method='POST',
                                      url=request_url,
                                      json=execute_body,
@@ -365,7 +361,7 @@ class Wps3Process(WpsProcessInterface):
         return job_status
 
     def get_job_results(self, job_id):
-        result_url = self.url + process_results_uri.format(process_id=self.process_id, job_id=job_id)
+        result_url = self.url + process_results_uri.format(process_id=self.process, job_id=job_id)
         response = self.make_request(method='GET',
                                      url=result_url,
                                      retry=True)

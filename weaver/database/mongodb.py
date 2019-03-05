@@ -9,7 +9,6 @@ from weaver.store.mongodb import (
     MongodbQuoteStore,
     MongodbBillStore,
 )
-from weaver.typedefs import JsonBody
 from typing import Any, AnyStr, Union, TYPE_CHECKING
 import warnings
 import pymongo
@@ -22,8 +21,10 @@ MongodbStores = frozenset([
     MongodbQuoteStore,
     MongodbBillStore,
 ])
+
 if TYPE_CHECKING:
     AnyStoreType = Union[MongodbStores]
+    from weaver.typedefs import JsonBody
 
 
 class MongoDatabase(DatabaseInterface):

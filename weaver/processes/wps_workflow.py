@@ -5,7 +5,7 @@ from cwltool.builder import (CONTENT_LIMIT, Builder, substitute)
 from cwltool.errors import WorkflowException
 from cwltool.job import JobBase, relink_initialworkdir
 from cwltool.pathmapper import adjustDirObjs, adjustFileObjs, get_listing, trim_listing, visit_class
-from cwltool.process import (Process, compute_checksums, normalizeFilesDirs,
+from cwltool.process import (Process as ProcessCWL, compute_checksums, normalizeFilesDirs,
                              shortname, uniquename, supportedProcessRequirements)
 from cwltool.stdfsaccess import StdFsAccess
 from cwltool.utils import (aslist, json_dumps, onWindows, bytes2str_in_dicts)
@@ -50,7 +50,7 @@ supportedProcessRequirements += ["WPS1Requirement",
 def default_make_tool(toolpath_object,              # type: ToolPathObjectType
                       loading_context,              # type: LoadingContext
                       get_job_process_definition,   # type: GetJobProcessDefinitionFunction
-                      ):                            # type: (...) -> Process
+                      ):                            # type: (...) -> ProcessCWL
     if not isinstance(toolpath_object, MutableMapping):
         raise WorkflowException(u"Not a dict: '%s'" % toolpath_object)
     if "class" in toolpath_object:
@@ -85,7 +85,7 @@ class CallbackJob(object):
 
 
 # noinspection PyPep8Naming
-class WpsWorkflow(Process):
+class WpsWorkflow(ProcessCWL):
     def __init__(self, toolpath_object, loading_context, get_job_process_definition):
         # type: (Dict[Text, Any], LoadingContext, GetJobProcessDefinitionFunction) -> None
         super(WpsWorkflow, self).__init__(toolpath_object, loading_context)

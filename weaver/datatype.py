@@ -16,10 +16,7 @@ from weaver.utils import (
     fully_qualified_name,
 )
 from weaver.exceptions import ProcessInstanceError
-from weaver.processes import process_mapping
 from weaver.processes.types import PROCESS_WITH_MAPPING, PROCESS_WPS
-# noinspection PyProtectedMember
-from weaver.processes.wps_package import _wps2json_io
 from weaver.status import job_status_values, STATUS_UNKNOWN
 from weaver.visibility import visibility_values, VISIBILITY_PRIVATE
 from owslib.wps import WPSException
@@ -662,6 +659,10 @@ class Process(dict):
         """
         Converts a PyWPS Process into a `weaver.datatype.Process` using provided parameters.
         """
+        # import here to avoid circular dependencies
+        # noinspection PyProtectedMember
+        from weaver.processes.wps_package import _wps2json_io
+
         assert isinstance(wps_process, ProcessWPS)
         process = wps_process.json
         process_type = getattr(wps_process, 'type', wps_process.identifier)
@@ -673,6 +674,10 @@ class Process(dict):
 
     def wps(self):
         # type: (...) -> ProcessWPS
+
+        # import here to avoid circular dependencies
+        from weaver.processes import process_mapping
+
         process_key = self.type
         if self.type == PROCESS_WPS:
             process_key = self.identifier

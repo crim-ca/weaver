@@ -19,6 +19,7 @@ from weaver.execute import (
 )
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes import wps_package, opensearch
+from weaver.processes.utils import jsonify_value, jsonify_output
 from weaver.processes.types import PROCESS_WORKFLOW
 from weaver.status import (
     map_status,
@@ -28,14 +29,14 @@ from weaver.status import (
     STATUS_SUCCEEDED,
 )
 from weaver.store.base import StoreServices, StoreProcesses, StoreJobs
-from weaver.utils import get_any_id, get_any_value, raise_on_xml_exception, get_sane_name
+from weaver.utils import get_any_id, get_any_value, raise_on_xml_exception, get_sane_name, wait_secs
 from weaver.visibility import VISIBILITY_PUBLIC, visibility_values
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.notify import notify_job
-from weaver.wps_restapi.utils import get_cookie_headers, wps_restapi_base_url, jsonify_value, parse_request_query
+from weaver.wps_restapi.utils import get_cookie_headers, wps_restapi_base_url, parse_request_query
 from weaver.wps_restapi.jobs.jobs import check_status, job_format_json
 from weaver.wps import get_wps_output_path, load_pywps_cfg
-from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, is_reference, Process as ProcessWPS
+from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, Process as ProcessWPS
 from owslib.util import clean_ows_url
 from pyramid.httpexceptions import (
     HTTPOk,
@@ -51,8 +52,6 @@ from pyramid.httpexceptions import (
     HTTPSuccessful,
     HTTPException,
 )
-from six.moves.urllib.request import urlopen
-from six.moves.urllib.error import URLError
 from time import sleep
 from typing import Any, AnyStr, Dict, List, Tuple, Optional, Union
 from celery.utils.log import get_task_logger
@@ -65,101 +64,9 @@ from copy import deepcopy
 import requests
 import colander
 import logging
-import json
 import os
 
 LOGGER = logging.getLogger(__name__)
-
-
-def wait_secs(run_step=-1):
-    secs_list = (2, 2, 2, 2, 2, 5, 5, 5, 5, 5, 10, 10, 10, 10, 10, 20, 20, 20, 20, 20, 30)
-    if run_step >= len(secs_list):
-        run_step = -1
-    return secs_list[run_step]
-
-
-def _get_data(input_value):
-    """
-    Extract the data from the input value
-    """
-    # process output data are append into a list and
-    # WPS standard v1.0.0 specify that Output data field has zero or one value
-    if input_value.data:
-        return input_value.data[0]
-    else:
-        return None
-
-
-def _read_reference(input_value):
-    """
-    Read a WPS reference and return the content
-    """
-    try:
-        return urlopen(input_value.reference).read()
-    except URLError:
-        # Don't raise exceptions coming from that.
-        return None
-
-
-def _get_json_multiple_inputs(input_value):
-    """
-    Since WPS standard does not allow to return multiple values for a single output,
-    a lot of process actually return a json array containing references to these outputs.
-    This function goal is to detect this particular format
-    :return: An array of references if the input_value is effectively a json containing that,
-             None otherwise
-    """
-
-    # Check for the json datatype and mimetype
-    if input_value.dataType == 'ComplexData' and input_value.mimeType == 'application/json':
-
-        # If the json data is referenced read it's content
-        if input_value.reference:
-            json_data_str = _read_reference(input_value)
-        # Else get the data directly
-        else:
-            json_data_str = _get_data(input_value)
-
-        # Load the actual json dict
-        json_data = json.loads(json_data_str)
-
-        if isinstance(json_data, list):
-            for data_value in json_data:
-                if not is_reference(data_value):
-                    return None
-            return json_data
-    return None
-
-
-def _jsonify_output(output, datatype):
-    """
-    Utility method to jsonify an output element.
-    :param output An owslib.wps.Output to jsonify
-    """
-    json_output = dict(identifier=output.identifier,
-                       title=output.title,
-                       dataType=output.dataType or datatype)
-
-    if not output.dataType:
-        output.dataType = datatype
-
-    # WPS standard v1.0.0 specify that either a reference or a data field has to be provided
-    if output.reference:
-        json_output['reference'] = output.reference
-
-        # Handle special case where we have a reference to a json array containing dataset reference
-        # Avoid reference to reference by fetching directly the dataset references
-        json_array = _get_json_multiple_inputs(output)
-        if json_array and all(str(ref).startswith('http') for ref in json_array):
-            json_output['data'] = json_array
-    else:
-        # WPS standard v1.0.0 specify that Output data field has Zero or one value
-        json_output['data'] = output.data[0] if output.data else None
-
-    if json_output['dataType'] == 'ComplexData':
-        json_output['mimeType'] = output.mimeType
-
-    return json_output
 
 
 def retrieve_package_job_log(execution, job):
@@ -269,14 +176,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
                         job.status_message = execution.statusMessage or "Job succeeded."
                         retrieve_package_job_log(execution, job)
                         job.save_log(logger=task_logger)
-
-                        process = wps.describeprocess(job.process)
-                        output_datatype = {
-                            getattr(processOutput, 'identifier', ''): processOutput.dataType
-                            for processOutput in getattr(process, 'processOutputs', [])
-                        }
-                        job.results = [_jsonify_output(output, output_datatype[output.identifier])
-                                       for output in execution.processOutputs]
+                        job.results = [jsonify_output(output, process) for output in execution.processOutputs]
                     else:
                         task_logger.debug("Job failed.")
                         job.status_message = execution.statusMessage or "Job failed."
