@@ -1,0 +1,45 @@
+{
+    "processDescription": {
+        "process": {
+            "id": "thredds_urls",
+            "title": "thredds_urls",
+            "abstract": "Get files url from Thredds Catalog and provides file list as JSON Document.",
+            "keywords": [],
+            "inputs": [{
+				"id": "url",
+				"title": "URL",
+				"formats": [{
+					"mimeType": "application/netcdf",
+					"default": true
+				}],
+				"minOccurs": "1",
+				"maxOccurs": "1"
+			}],
+            "outputs": [
+                {
+                    "id": "output",
+                    "title": "Catalog file urls",
+                    "formats": [
+                        {
+                            "mimeType": "application/json",
+                            "default": true
+                        }
+                    ]
+                }
+            ]
+        },
+        "processVersion": "1.0.0",
+        "jobControlOptions": [
+            "async-execute"
+        ],
+        "outputTransmission": [
+            "reference"
+        ]
+    },
+    "executionUnit": [
+        {
+            "href": "catalog_search.cwl"
+        }
+    ],
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow"
+}

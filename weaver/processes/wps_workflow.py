@@ -1,3 +1,23 @@
+from cwltool import command_line_tool
+from cwltool.process import stageFiles
+from cwltool.provenance import CreateProvProfile
+from cwltool.builder import (CONTENT_LIMIT, Builder, substitute)
+from cwltool.errors import WorkflowException
+from cwltool.job import JobBase, relink_initialworkdir
+from cwltool.pathmapper import adjustDirObjs, adjustFileObjs, get_listing, trim_listing, visit_class
+from cwltool.process import (Process as ProcessCWL, compute_checksums, normalizeFilesDirs,
+                             shortname, uniquename, supportedProcessRequirements)
+from cwltool.stdfsaccess import StdFsAccess
+from cwltool.utils import (aslist, json_dumps, onWindows, bytes2str_in_dicts)
+from cwltool.context import (LoadingContext, RuntimeContext, getdefault)
+from cwltool.workflow import Workflow
+from pyramid_celery import celery_app as app
+from weaver.utils import now
+from weaver.wps import get_wps_output_path
+from functools import cmp_to_key, partial
+from schema_salad import validate
+from schema_salad.sourceline import SourceLine
+from six import string_types
 import hashlib
 import json
 import locale
@@ -5,32 +25,12 @@ import logging
 import os
 import shutil
 import tempfile
-from functools import cmp_to_key, partial
-from typing import Any, Callable, Dict, Generator, List, Optional, Set, MutableMapping, Union, cast, Text
-from schema_salad import validate
-from schema_salad.sourceline import SourceLine
-from six import string_types
-
-from cwltool.process import stageFiles
-from cwltool import command_line_tool
-from cwltool.command_line_tool import OutputPorts
-from cwltool.provenance import CreateProvProfile
-from cwltool.builder import (CONTENT_LIMIT, Builder, substitute)
-from cwltool.errors import WorkflowException
-from cwltool.job import JobBase, relink_initialworkdir
-from cwltool.pathmapper import (adjustDirObjs, adjustFileObjs, get_listing, trim_listing, visit_class)
-from cwltool.process import (Process, compute_checksums, normalizeFilesDirs, shortname, uniquename)
-from cwltool.stdfsaccess import StdFsAccess
-from cwltool.utils import (aslist, json_dumps, onWindows, bytes2str_in_dicts)
-from cwltool.context import (LoadingContext, RuntimeContext, getdefault)
-from cwltool.workflow import Workflow
-from pyramid_celery import celery_app as app
-from pyramid.httpexceptions import HTTPNotFound, HTTPConflict, HTTPInternalServerError
-
-from weaver.visibility import VISIBILITY_PUBLIC
-from weaver.processes.wps_process import WpsProcess
-from weaver.utils import pass_http_error, now
-from weaver.wps import get_wps_output_path, get_wps_output_url
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from typing import Any, Callable, Dict, Generator, List, Optional, Set, MutableMapping, Union, cast, Text
+    from weaver.typedefs import ExpectedOutputType, GetJobProcessDefinitionFunction, ToolPathObjectType
+    from weaver.processes.wps_process_base import WpsProcessInterface
+    from cwltool.command_line_tool import OutputPorts
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_TMP_PREFIX = "tmp"
@@ -38,20 +38,28 @@ DEFAULT_TMP_PREFIX = "tmp"
 # TODO: The code started as a copy of the class cwltool/command_line_tool.py,
 #       and still has useless code in the context of a WPS workflow
 
+# TODO: Ce code est tentatif, j'ai vu que supportedProcessRequirements de cwltools.process.py
+#  causerait possiblement un probleme.
+#  Sinon le plan B serait de retirer les hints non supportes dans le __init__ de WpsWorkflow
+#  apres avoir pris une copie dans une variable custom genre hints_ext
+# Extend the supported process requirements
+supportedProcessRequirements += ["WPS1Requirement",
+                                 "ESGF-CWTRequirement"]
 
-def default_make_tool(toolpath_object,              # type: Dict[Text, Any]
-                      loadingContext,               # type: LoadingContext
-                      get_job_process_definition,   # type: Callable[[Text, int], WpsProcess]
-                      ):                            # type: (...) -> Process
+
+def default_make_tool(toolpath_object,              # type: ToolPathObjectType
+                      loading_context,              # type: LoadingContext
+                      get_job_process_definition,   # type: GetJobProcessDefinitionFunction
+                      ):                            # type: (...) -> ProcessCWL
     if not isinstance(toolpath_object, MutableMapping):
         raise WorkflowException(u"Not a dict: '%s'" % toolpath_object)
     if "class" in toolpath_object:
         if toolpath_object["class"] == "CommandLineTool":
-            return WpsWorkflow(toolpath_object, loadingContext, get_job_process_definition)
+            return WpsWorkflow(toolpath_object, loading_context, get_job_process_definition)
         if toolpath_object["class"] == "ExpressionTool":
-            return command_line_tool.ExpressionTool(toolpath_object, loadingContext)
+            return command_line_tool.ExpressionTool(toolpath_object, loading_context)
         if toolpath_object["class"] == "Workflow":
-            return Workflow(toolpath_object, loadingContext)
+            return Workflow(toolpath_object, loading_context)
 
     raise WorkflowException(
         u"Missing or invalid 'class' field in %s, expecting one of: CommandLineTool, ExpressionTool, Workflow" %
@@ -63,24 +71,25 @@ class CallbackJob(object):
         # type: (WpsWorkflow, Callable[[Any, Any], Any], Builder, Text) -> None
         self.job = job
         self.output_callback = output_callback
-        self.cachebuilder = cachebuilder
-        self.outdir = jobcache
+        self.cache_builder = cachebuilder
+        self.output_dir = jobcache
         self.prov_obj = None  # type: Optional[CreateProvProfile]
 
-    def run(self, runtimeContext):
+    def run(self, loading_context):
         # type: (RuntimeContext) -> None
         self.output_callback(self.job.collect_output_ports(
             self.job.tool["outputs"],
-            self.cachebuilder,
-            self.outdir,
-            getdefault(runtimeContext.compute_checksum, True)), "success")
+            self.cache_builder,
+            self.output_dir,
+            getdefault(loading_context.compute_checksum, True)), "success")
 
 
-class WpsWorkflow(Process):
-    def __init__(self, toolpath_object, loadingContext, get_job_process_definition):
-        # type: (Dict[Text, Any], LoadingContext, Callable[[Text, int], WpsProcess]) -> None
-        super(WpsWorkflow, self).__init__(toolpath_object, loadingContext)
-        self.prov_obj = loadingContext.prov_obj
+# noinspection PyPep8Naming
+class WpsWorkflow(ProcessCWL):
+    def __init__(self, toolpath_object, loading_context, get_job_process_definition):
+        # type: (Dict[Text, Any], LoadingContext, GetJobProcessDefinitionFunction) -> None
+        super(WpsWorkflow, self).__init__(toolpath_object, loading_context)
+        self.prov_obj = loading_context.prov_obj
         self.get_job_process_definition = get_job_process_definition
 
         # DockerRequirement is removed because we use our custom job which dispatch the processing to an ADES instead
@@ -88,11 +97,10 @@ class WpsWorkflow(Process):
         self.hints = list(filter(lambda req: req['class'] != 'DockerRequirement', self.hints))
 
     def job(self,
-            job_order,         # type: Dict[Text, Text]
-            output_callbacks,  # type: Callable[[Any, Any], Any]
-            runtimeContext     # RuntimeContext
-            ):
-        # type: (...) -> Generator[Union[JobBase, CallbackJob], None, None]
+            job_order,          # type: Dict[Text, Text]
+            output_callbacks,   # type: Callable[[Any, Any], Any]
+            runtimeContext,    # type: RuntimeContext
+            ):                  # type: (...) -> Generator[Union[JobBase, CallbackJob], None, None]
 
         require_prefix = ""
         if self.metadata["cwlVersion"] == "v1.0":
@@ -112,7 +120,8 @@ class WpsWorkflow(Process):
 
         # job_name is the step name and job_order is the actual step inputs
         wps_workflow_job = WpsWorkflowJob(builder, builder.job, self.requirements,
-                                          self.hints, jobname, self.get_job_process_definition(jobname, job_order),
+                                          self.hints, jobname,
+                                          self.get_job_process_definition(jobname, job_order, self.tool),
                                           self.tool['outputs'])
         wps_workflow_job.prov_obj = self.prov_obj
         wps_workflow_job.successCodes = self.tool.get("successCodes")
@@ -176,10 +185,10 @@ class WpsWorkflow(Process):
                         ret[fragment] = self.collect_output(port, builder, outdir, fs_access,
                                                             compute_checksum=compute_checksum)
             if ret:
-                revmap = partial(command_line_tool.revmap_file, builder, outdir)
+                # revmap = partial(command_line_tool.revmap_file, builder, outdir)
                 adjustDirObjs(ret, trim_listing)
 
-                # TODO: Attempt to avoid a crash because the revmap fct is not functionnal
+                # TODO: Attempt to avoid a crash because the revmap fct is not functional
                 #       (intend for a docker usage only?)
                 # visit_class(ret, ("File", "Directory"), cast(Callable[[Any], Any], revmap))
                 visit_class(ret, ("File", "Directory"), command_line_tool.remove_path)
@@ -258,7 +267,7 @@ class WpsWorkflow(Process):
                 for files in r:
                     rfile = files.copy()
                     # TODO This function raise an exception and seems to be related to docker (which is not used here)
-                    #revmap(rfile)
+                    # revmap(rfile)
                     if files["class"] == "Directory":
                         ll = builder.loadListing or (binding and binding.get("loadListing"))
                         if ll and ll != "no_listing":
@@ -277,8 +286,8 @@ class WpsWorkflow(Process):
                                     contents = f.read(1024 * 1024)
                                 files["checksum"] = "sha1$%s" % checksum.hexdigest()
                             f.seek(0, 2)
-                            filesize = f.tell()
-                        files["size"] = filesize
+                            file_size = f.tell()
+                        files["size"] = file_size
 
             optional = False
             single = False
@@ -340,7 +349,7 @@ class WpsWorkflow(Process):
 
             # Ensure files point to local references outside of the run environment
             # TODO: Again removing revmap....
-            #adjustFileObjs(r, revmap)
+            # adjustFileObjs(r, revmap)
 
             if not r and optional:
                 return None
@@ -355,6 +364,7 @@ class WpsWorkflow(Process):
         return r
 
 
+# noinspection PyPep8Naming
 class WpsWorkflowJob(JobBase):
     def __init__(self,
                  builder,           # type: Builder
@@ -362,8 +372,8 @@ class WpsWorkflowJob(JobBase):
                  requirements,      # type: List[Dict[Text, Text]]
                  hints,             # type: List[Dict[Text, Text]]
                  name,              # type: Text
-                 wps_process,       # type: WpsProcess
-                 expected_outputs,  # type: List[Dict[{'type': Text, 'id': Text, 'outputBinding': Dict['glob': Text]}]]
+                 wps_process,       # type: WpsProcessInterface
+                 expected_outputs,  # type: List[ExpectedOutputType]
                  ):                 # type: (...) -> None
         super(WpsWorkflowJob, self).__init__(builder, joborder, None, requirements, hints, name)
         self.wps_process = wps_process
@@ -381,7 +391,7 @@ class WpsWorkflowJob(JobBase):
                 self.expected_outputs[output_id] = output['outputBinding']['glob']
 
     def run(self,
-            runtimeContext      # type: RuntimeContext
+            runtimeContext,     # type: RuntimeContext
             ):                  # type: (...) -> None
 
         if not os.path.exists(self.tmpdir):
@@ -411,34 +421,12 @@ class WpsWorkflowJob(JobBase):
 
         self.execute([], env, runtimeContext)
 
+    # noinspection PyUnusedLocal
     def execute(self,
                 runtime,        # type: List[Text]
                 env,            # type: MutableMapping[Text, Text]
                 runtimeContext  # type: RuntimeContext
                 ):              # type: (...) -> None
-
-        visible = self.wps_process.is_visible()
-        if not visible:     # includes private visibility and non-existing cases
-            if visible is None:
-                LOGGER.info(u"Process {} access is unauthorized on {} - deploying as admin.".format(
-                            self.wps_process.process_id, self.wps_process.url))
-            elif visible is False:
-                LOGGER.info(u"Process {} is not deployed on {} - deploying.".format(
-                            self.wps_process.process_id, self.wps_process.url))
-            # TODO: Maybe always redeploy? What about cases of outdated deployed process?
-            try:
-                self.wps_process.deploy()
-            except Exception as e:
-                # TODO: support for Spacebel, avoid conflict error incorrectly handled, remove 500 when fixed
-                pass_http_error(e, [HTTPConflict, HTTPInternalServerError])
-
-        LOGGER.info(u"Process {} enforced to public visibility.".format(
-                    self.wps_process.process_id, self.wps_process.url))
-        try:
-            self.wps_process.set_visibility(visibility=VISIBILITY_PUBLIC)
-        # TODO: support for Spacebel, remove when visibility route properly implemented on ADES
-        except Exception as e:
-            pass_http_error(e, HTTPNotFound)
 
         self.results = self.wps_process.execute(self.builder.job, self.outdir, self.expected_outputs)
 
@@ -449,6 +437,7 @@ class WpsWorkflowJob(JobBase):
             runtimeContext.prov_obj.used_artefacts(
                 job_order, runtimeContext.process_run_id, str(self.name))
         outputs = {}  # type: Dict[Text, Text]
+        # noinspection PyBroadException
         try:
             rcode = 0
 

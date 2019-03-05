@@ -2,7 +2,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.store.base import StoreBills
 from weaver.exceptions import BillNotFound
 from weaver.database import get_db
-from pyramid.httpexceptions import *
+from pyramid.httpexceptions import HTTPOk, HTTPNotFound
 import logging
 logger = logging.getLogger('weaver')
 

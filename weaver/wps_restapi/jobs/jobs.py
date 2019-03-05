@@ -1,7 +1,3 @@
-from pyramid.httpexceptions import *
-from pyramid.settings import asbool
-from pyramid.request import Request
-from pyramid_celery import celery_app as app
 from weaver.database import get_db
 from weaver.exceptions import (
     InvalidIdentifierValue,
@@ -16,6 +12,15 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import wps_restapi_base_url
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver import status, sort
+from pyramid.httpexceptions import (
+    HTTPOk,
+    HTTPBadRequest,
+    HTTPUnauthorized,
+    HTTPNotFound,
+)
+from pyramid.settings import asbool
+from pyramid.request import Request
+from pyramid_celery import celery_app as app
 from typing import AnyStr, Optional, Union, Tuple
 from owslib.wps import WPSExecution
 from lxml import etree
@@ -72,7 +77,7 @@ def check_status(url=None, response=None, sleep_secs=2, verify=False):
         LOGGER.debug("using response document ...")
         xml = response
     elif url:
-        LOGGER.debug('using status_location url ...')
+        LOGGER.debug('using status_location url...')
         request_session = requests.Session()
         request_session.mount('file://', FileAdapter())
         xml = request_session.get(url, verify=verify).content

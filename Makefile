@@ -56,7 +56,7 @@ help:
 	@echo "  help               print this help message. (Default)"
 	@echo "  version            print version number of this Makefile."
 	@echo "  info               print information about $(APP_NAME)."
-	@echo "\Installation:"
+	@echo "\nInstallation:"
 	@echo "  install            install $(APP_NAME) by running 'bin/buildout -c custom.cfg'."
 	@echo "  install-base       install base packages using pip."
 	@echo "  install-dev        install test packages using pip (also installs $(APP_NAME) with buildout)."
@@ -71,7 +71,7 @@ help:
 	@echo "  clean-env          remove the conda enviroment $(CONDA_ENV)."
 	@echo "  clean-src          remove all *.pyc files."
 	@echo "  clean-dist         remove *all* files that are not controlled by 'git'."
-	@echo "                     [WARNING: use it *only* if you know what you do!"]"
+	@echo "                     [WARNING: use it *only* if you know what you do!]"
 	@echo "\nTesting targets:"
 	@echo "  test               run tests (but skip long running and online tests)."
 	@echo "  test-func          run funtional tests (online and usage specific)."
@@ -178,7 +178,7 @@ conda-env: conda conda-config
 	@echo '"$(CONDA_HOME)/bin/conda" env create -n "$(CONDA_ENV)" "python=$(PYTHON_VERSION)"'
 	@test -d "$(CONDA_ENV_PATH)" || "$(CONDA_HOME)/bin/conda" create -y -n "$(CONDA_ENV)" "python=$(PYTHON_VERSION)"
 	@echo "Update conda environment: $(CONDA_ENV) ..."
-	"$(CONDA_HOME)/bin/conda" install -y -n "$(CONDA_ENV)" "setuptools=$(SETUPTOOLS_VERSION)" supervisor nginx mongodb
+	"$(CONDA_HOME)/bin/conda" install -y -n "$(CONDA_ENV)" "setuptools=$(SETUPTOOLS_VERSION)" supervisor nginx
 	@echo "Updating pip ..."
 	@-bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); pip install --upgrade pip"
 

@@ -13,7 +13,6 @@ weaver_CONFIGURATIONS = frozenset([
     WEAVER_CONFIGURATION_DEFAULT,
     WEAVER_CONFIGURATION_ADES,
     WEAVER_CONFIGURATION_EMS,
-    # TODO: add other configurations here
 ])
 
 

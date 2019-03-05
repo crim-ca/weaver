@@ -8,7 +8,7 @@ from weaver import WEAVER_ROOT_DIR
 from weaver.wps_restapi.utils import wps_restapi_base_url
 
 # Data source cache
-from weaver.processes.wps_process import OPENSEARCH_LOCAL_FILE_SCHEME
+OPENSEARCH_LOCAL_FILE_SCHEME = 'opensearchfile'  # must be a valid url scheme parsable by urlparse
 
 """
 Schema
@@ -93,6 +93,7 @@ def retrieve_data_source_url(data_source):
 
 def get_data_source_from_url(data_url):
     data_sources = fetch_data_sources()
+    # noinspection PyBroadException
     try:
         parsed = urlparse(data_url)
         netloc, path, scheme = parsed.netloc, parsed.path, parsed.scheme
@@ -105,8 +106,6 @@ def get_data_source_from_url(data_url):
             for src, val in data_sources.items():
                 if path.startswith(val['rootdir']):
                     return src
-
-    # noinspection PyBroadException
     except Exception:
         pass
     return get_default_data_source(data_sources)

@@ -28,14 +28,13 @@ DEFAULT_PYWPS_CFG = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'wp
 PYWPS_CFG = None
 
 
-def _get_settings_or_wps_config(
-        settings,                   # type: Dict[AnyStr, AnyStr]
-        weaver_setting_name,        # type: AnyStr
-        config_setting_section,     # type: AnyStr
-        config_setting_name,        # type: AnyStr
-        default_not_found,          # type: AnyStr
-        message_not_found,          # type: AnyStr
-        ):                          # type: (...) -> AnyStr
+def _get_settings_or_wps_config(settings,                   # type: Dict[AnyStr, AnyStr]
+                                weaver_setting_name,        # type: AnyStr
+                                config_setting_section,     # type: AnyStr
+                                config_setting_name,        # type: AnyStr
+                                default_not_found,          # type: AnyStr
+                                message_not_found,          # type: AnyStr
+                                ):                          # type: (...) -> AnyStr
     wps_path = settings.get(weaver_setting_name)
     if not wps_path:
         wps_cfg = get_wps_cfg_path(settings)

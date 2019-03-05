@@ -1,0 +1,16 @@
+{
+  "mode": "async",
+  "response": "document",
+  "inputs": [
+    {
+      "id": "url",
+      "data": "https://pavics.ouranos.ca/thredds/catalog/birdhouse/cmip5/NASA-GISS/GISS-E2-R-CC/rcp85/mon/atmos/r1i1p1/tasmin/catalog.xml"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "output",
+      "transmissionMode": "reference"
+    }
+  ]
+}

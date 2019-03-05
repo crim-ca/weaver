@@ -1,14 +1,7 @@
-import logging
-import warnings
-import requests
-from copy import deepcopy
-from time import sleep
-from typing import Union, AnyStr, Callable
 from weaver import status
 from weaver.warning import MissingParameterWarning
 from weaver.visibility import VISIBILITY_PUBLIC
-from weaver.utils import get_any_id, get_any_value, get_any_message, get_job_log_msg
-from weaver.wps import get_wps_output_path, get_wps_output_url
+from weaver.utils import get_any_id, get_any_value, get_any_message, get_job_log_msg, pass_http_error
 from weaver.wps_restapi.swagger_definitions import (
     processes_uri,
     process_uri,
@@ -16,7 +9,11 @@ from weaver.wps_restapi.swagger_definitions import (
     process_results_uri,
     process_visibility_uri,
 )
-from pyramid_celery import celery_app as app
+from weaver.exceptions import PackageExecutionError
+from weaver.processes import opensearch
+from weaver.processes.sources import OPENSEARCH_LOCAL_FILE_SCHEME
+from weaver.processes.wps_process_base import WpsProcessInterface
+from weaver.processes.sources import retrieve_data_source_url, get_data_source_from_url
 from pyramid.settings import asbool
 from pyramid.httpexceptions import (
     HTTPOk,
@@ -24,14 +21,22 @@ from pyramid.httpexceptions import (
     HTTPNotFound,
     HTTPForbidden,
     HTTPInternalServerError,
-    HTTPBadGateway
+    HTTPConflict
 )
+from copy import deepcopy
+from time import sleep
+from typing import TYPE_CHECKING
+import logging
+import warnings
+import requests
+if TYPE_CHECKING:
+    from typing import Union, AnyStr
+    from weaver.typedefs import JsonBody, CookiesType, UpdateStatusPartialFunction
 
 LOGGER = logging.getLogger(__name__)
 
-OPENSEARCH_LOCAL_FILE_SCHEME = 'opensearchfile'  # must be a valid url scheme parsable by urlparse
-
-REMOTE_JOB_PROGRESS_DEPLOY = 1
+REMOTE_JOB_PROGRESS_PROVIDER = 1
+REMOTE_JOB_PROGRESS_DEPLOY = 2
 REMOTE_JOB_PROGRESS_VISIBLE = 3
 REMOTE_JOB_PROGRESS_REQ_PREP = 5
 REMOTE_JOB_PROGRESS_EXECUTION = 9
@@ -40,18 +45,55 @@ REMOTE_JOB_PROGRESS_FETCH_OUT = 90
 REMOTE_JOB_PROGRESS_COMPLETED = 100
 
 
-class WpsProcess(object):
-    def __init__(self, url, process_id, deploy_body, cookies, update_status=None):
-        self.url = url.rstrip('/')
-        self.process_id = process_id
-        self.deploy_body = deploy_body
-        self.cookies = cookies
-        self.headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
+class Wps3Process(WpsProcessInterface):
+    def __init__(self,
+                 step_payload,      # type: JsonBody
+                 joborder,          # type: int
+                 process,           # type: AnyStr
+                 cookies,           # type: CookiesType
+                 update_status,     # type: UpdateStatusPartialFunction
+                 ):
+        super(Wps3Process, self).__init__(cookies)
+        self.provider, self.url, self.deploy_body = self.resolve_data_source(step_payload, joborder)
+        self.process = process
+        self.update_status = lambda _message, _progress, _status: update_status(
+            self.provider, _message, _progress, _status)
 
-        registry = app.conf['PYRAMID_REGISTRY']
-        self.settings = registry.settings
-        self.verify = asbool(self.settings.get('weaver.ssl_verify', True))
-        self.update_status = update_status  # type: Callable[[AnyStr, int, AnyStr], None]
+    def resolve_data_source(self, step_payload, joborder):
+        # TODO Ce code provient de wps_package et n'a pas ete teste ici-meme
+        try:
+            # Presume that all EOImage given as input can be resolved to the same ADES
+            # So if we got multiple inputs or multiple values for an input, we take the first one as reference
+            eodata_inputs = opensearch.get_eo_images_ids_from_payload(step_payload)
+
+            data_url = ""  # data_source will be set to the default ADES if no EOImages
+
+            if eodata_inputs:
+                step_payload = opensearch.alter_payload_after_query(step_payload)
+                value = joborder[eodata_inputs[0]]
+
+                if isinstance(value, list):
+                    # Use the first value to determine the data source
+                    value = value[0]
+
+                data_url = value['location']
+                reason = '(ADES based on {0})'.format(data_url)
+            else:
+                reason = '(No EOImage -> Default ADES)'
+
+            data_source = get_data_source_from_url(data_url)
+            provider = data_source
+            url = retrieve_data_source_url(data_source)
+            deploy_body = step_payload
+        except (IndexError, KeyError) as exc:
+            raise PackageExecutionError("Failed to save package outputs. [{}]".format(repr(exc)))
+
+        self.update_status("{provider} is selected {reason}.".format(
+            provider=provider,
+            reason=reason),
+            REMOTE_JOB_PROGRESS_PROVIDER, status.STATUS_RUNNING)
+
+        return provider, url, deploy_body
 
     def get_user_auth_header(self):
         # TODO: find a better way to generalize this to Magpie credentials?
@@ -91,21 +133,6 @@ class WpsProcess(object):
             )
         return {'Authorization': 'Bearer {}'.format(access_token) if access_token else None}
 
-    def make_request(self, method, url, retry, status_code_mock=None, **kwargs):
-        response = requests.request(method,
-                                    url=url,
-                                    headers=self.headers,
-                                    cookies=self.cookies,
-                                    verify=self.verify,
-                                    **kwargs)
-        # TODO: Remove patch for Geomatys unreliable server
-        if response.status_code == HTTPBadGateway.code and retry:
-            sleep(10)
-            response = self.make_request(method, url, False, **kwargs)
-        if response.status_code == HTTPBadGateway.code and status_code_mock:
-            response.status_code = status_code_mock
-        return response
-
     def is_deployed(self):
         return self.describe_process() is not None
 
@@ -119,9 +146,9 @@ class WpsProcess(object):
             False if authorized access but process cannot be found,
             None if forbidden access.
         """
-        LOGGER.debug("Get process WPS visibility request for {0}".format(self.process_id))
+        LOGGER.debug("Get process WPS visibility request for {0}".format(self.process))
         response = self.make_request(method='GET',
-                                     url=self.url + process_visibility_uri.format(process_id=self.process_id),
+                                     url=self.url + process_visibility_uri.format(process_id=self.process),
                                      retry=False,
                                      status_code_mock=HTTPUnauthorized.code)
         if response.status_code in (HTTPUnauthorized.code, HTTPForbidden.code):
@@ -139,11 +166,11 @@ class WpsProcess(object):
     def set_visibility(self, visibility):
         self.update_status("Updating process visibility on remote ADES.",
                            REMOTE_JOB_PROGRESS_VISIBLE, status.STATUS_RUNNING)
-        path = self.url + process_visibility_uri.format(process_id=self.process_id)
+        path = self.url + process_visibility_uri.format(process_id=self.process)
         user_headers = deepcopy(self.headers)
         user_headers.update(self.get_user_auth_header())
 
-        LOGGER.debug("Update process WPS visibility request for {0} at {1}".format(self.process_id, path))
+        LOGGER.debug("Update process WPS visibility request for {0} at {1}".format(self.process, path))
         response = self.make_request(method='PUT',
                                      url=path,
                                      json={'value': visibility},
@@ -152,8 +179,8 @@ class WpsProcess(object):
         response.raise_for_status()
 
     def describe_process(self):
-        path = self.url + process_uri.format(process_id=self.process_id)
-        LOGGER.debug("Describe process WPS request for {0} at {1}".format(self.process_id, path))
+        path = self.url + process_uri.format(process_id=self.process)
+        LOGGER.debug("Describe process WPS request for {0} at {1}".format(self.process, path))
         response = self.make_request(method='GET',
                                      url=path,
                                      retry=False,
@@ -178,7 +205,7 @@ class WpsProcess(object):
         user_headers = deepcopy(self.headers)
         user_headers.update(self.get_user_auth_header())
 
-        LOGGER.debug("Deploy process WPS request for {0} at {1}".format(self.process_id, path))
+        LOGGER.debug("Deploy process WPS request for {0} at {1}".format(self.process, path))
         response = self.make_request(method='POST',
                                      url=path,
                                      json=self.deploy_body,
@@ -187,31 +214,57 @@ class WpsProcess(object):
         response.raise_for_status()
 
     def execute(self, workflow_inputs, out_dir, expected_outputs):
+        # TODO
+        #   La section de code 'visibility' provient de la fct execute de la classe WpsWorkflowJob_
+        #   et n'a pas ete teste ici-meme
+        visible = self.is_visible()
+        if not visible:  # includes private visibility and non-existing cases
+            if visible is None:
+                LOGGER.info(u"Process {} access is unauthorized on {} - deploying as admin.".format(
+                    self.process, self.url))
+            elif visible is False:
+                LOGGER.info(u"Process {} is not deployed on {} - deploying.".format(
+                    self.process, self.url))
+            # TODO: Maybe always redeploy? What about cases of outdated deployed process?
+            try:
+                self.deploy()
+            except Exception as e:
+                # TODO: support for Spacebel, avoid conflict error incorrectly handled, remove 500 when fixed
+                pass_http_error(e, [HTTPConflict, HTTPInternalServerError])
+
+        LOGGER.info(u"Process {} enforced to public visibility.".format(
+            self.process, self.url))
+        try:
+            self.set_visibility(visibility=VISIBILITY_PUBLIC)
+        # TODO: support for Spacebel, remove when visibility route properly implemented on ADES
+        except Exception as e:
+            pass_http_error(e, HTTPNotFound)
+
         self.update_status("Preparing execute request for remote ADES.",
                            REMOTE_JOB_PROGRESS_REQ_PREP, status.STATUS_RUNNING)
-        LOGGER.debug("Execute process WPS request for {0}".format(self.process_id))
+        LOGGER.debug("Execute process WPS request for {0}".format(self.process))
 
         execute_body_inputs = []
         execute_req_id = 'id'
-        execute_req_inpt_val = 'href'
+        execute_req_input_val = 'href'
         execute_req_out_trans_mode = 'transmissionMode'
         for workflow_input_key, workflow_input_value in workflow_inputs.items():
             if isinstance(workflow_input_value, list):
                 for workflow_input_value_item in workflow_input_value:
                     execute_body_inputs.append({execute_req_id: workflow_input_key,
-                                                execute_req_inpt_val: workflow_input_value_item['location']})
+                                                execute_req_input_val: workflow_input_value_item['location']})
             else:
                 execute_body_inputs.append({execute_req_id: workflow_input_key,
-                                            execute_req_inpt_val: workflow_input_value['location']})
+                                            execute_req_input_val: workflow_input_value['location']})
         for exec_input in execute_body_inputs:
-            if exec_input[execute_req_inpt_val].startswith('{0}://'.format(OPENSEARCH_LOCAL_FILE_SCHEME)):
-                exec_input[execute_req_inpt_val] = 'file{0}'.format(
-                    exec_input[execute_req_inpt_val][len(OPENSEARCH_LOCAL_FILE_SCHEME):])
-            elif exec_input[execute_req_inpt_val].startswith('file://'):
-                exec_input[execute_req_inpt_val] = self.host_file(exec_input[execute_req_inpt_val])
+            if exec_input[execute_req_input_val].startswith('{0}://'.format(OPENSEARCH_LOCAL_FILE_SCHEME)):
+                exec_input[execute_req_input_val] = 'file{0}'.format(
+                    exec_input[execute_req_input_val][len(OPENSEARCH_LOCAL_FILE_SCHEME):])
+            elif exec_input[execute_req_input_val].startswith('file://'):
+                exec_input[execute_req_input_val] = self.host_file(exec_input[execute_req_input_val])
                 LOGGER.debug("Hosting intermediate input {0} : {1}".format(
                     exec_input[execute_req_id],
-                    exec_input[execute_req_inpt_val]))
+                    exec_input[execute_req_input_val]))
 
         execute_body_outputs = [{execute_req_id: output,
                                  execute_req_out_trans_mode: 'reference'} for output in expected_outputs]
@@ -221,7 +274,7 @@ class WpsProcess(object):
                             response='document',
                             inputs=execute_body_inputs,
                             outputs=execute_body_outputs)
-        request_url = self.url + process_jobs_uri.format(process_id=self.process_id)
+        request_url = self.url + process_jobs_uri.format(process_id=self.process)
         response = self.make_request(method='POST',
                                      url=request_url,
                                      json=execute_body,
@@ -308,24 +361,9 @@ class WpsProcess(object):
         return job_status
 
     def get_job_results(self, job_id):
-        result_url = self.url + process_results_uri.format(process_id=self.process_id, job_id=job_id)
+        result_url = self.url + process_results_uri.format(process_id=self.process, job_id=job_id)
         response = self.make_request(method='GET',
                                      url=result_url,
                                      retry=True)
         response.raise_for_status()
         return response.json().get('outputs', {})
-
-    @staticmethod
-    def host_file(fn):
-        registry = app.conf['PYRAMID_REGISTRY']
-        weaver_output_url = get_wps_output_url(registry.settings)
-        weaver_output_path = get_wps_output_path(registry.settings)
-        fn = fn.replace('file://', '')
-
-        if not fn.startswith(weaver_output_path):
-            raise Exception('Cannot host files outside of the output path : {0}'.format(fn))
-        return fn.replace(weaver_output_path, weaver_output_url)
-
-    @staticmethod
-    def map_progress(progress, range_min, range_max):
-        return range_min + (progress * (range_max - range_min)) / 100

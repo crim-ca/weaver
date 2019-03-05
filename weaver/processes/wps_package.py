@@ -1,10 +1,41 @@
-import os
-
-import six
-import cwltool
-import cwltool.factory
+from weaver.processes import opensearch
+from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS
+from weaver.processes.constants import WPS_INPUT, WPS_OUTPUT, WPS_COMPLEX, WPS_BOUNDINGBOX, WPS_LITERAL, WPS_REFERENCE
+from weaver.processes.wps1_process import Wps1Process
+from weaver.processes.wps3_process import Wps3Process
+from weaver.processes.wps_workflow import default_make_tool
+from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
+from weaver.processes.sources import retrieve_data_source_url
+from weaver.exceptions import (
+    PackageTypeError, PackageRegistrationError, PackageExecutionError,
+    PackageNotFound, PayloadNotFound
+)
+from weaver.status import (STATUS_RUNNING, STATUS_SUCCEEDED, STATUS_EXCEPTION, STATUS_FAILED,
+                           map_status, STATUS_COMPLIANT_PYWPS, STATUS_PYWPS_IDS)
+from weaver.wps_restapi.swagger_definitions import process_uri
+from weaver.utils import get_job_log_msg, get_log_fmt, get_log_datefmt, get_sane_name
+from pywps.inout.basic import BasicIO
+from pywps.inout.literaltypes import AnyValue, AllowedValue, ALLOWEDVALUETYPE
+from pywps.validator.mode import MODE
+from pywps.app.Common import Metadata
+from pyramid.httpexceptions import HTTPOk
+from pyramid_celery import celery_app as app
+from collections import OrderedDict, Hashable
+from six.moves.urllib.parse import urlparse
+from typing import Dict, Tuple, Union, Any, Optional, AnyStr, List, Callable, TYPE_CHECKING
+from yaml import safe_load
+from yaml.scanner import ScannerError
 from cwltool.context import LoadingContext
 from cwltool.context import RuntimeContext
+import cwltool.factory
+import cwltool
+import json
+import tempfile
+import shutil
+import requests
+import logging
+import os
+import six
 from pywps import (
     Process,
     LiteralInput,
@@ -15,37 +46,9 @@ from pywps import (
     BoundingBoxOutput,
     Format,
 )
-from pywps.inout.basic import BasicIO
-from pywps.inout.literaltypes import AnyValue, AllowedValue, ALLOWEDVALUETYPE
-from pywps.validator.mode import MODE
-from pywps.app.Common import Metadata
-
-from weaver.processes import opensearch
-from weaver import namesgenerator, status as ts
-from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS
-from weaver.processes.constants import WPS_INPUT, WPS_OUTPUT, WPS_COMPLEX, WPS_BOUNDINGBOX, WPS_LITERAL, WPS_REFERENCE
-from weaver.processes.wps_process import WpsProcess
-from weaver.processes.wps_workflow import default_make_tool
-from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
-from weaver.processes.sources import retrieve_data_source_url, get_data_source_from_url
-from weaver.exceptions import (
-    PackageTypeError, PackageRegistrationError, PackageExecutionError,
-    PackageNotFound, PayloadNotFound
-)
-from weaver.wps_restapi.swagger_definitions import process_uri
-from weaver.utils import get_job_log_msg, get_log_fmt, get_log_datefmt
-from pyramid.httpexceptions import HTTPOk
-from pyramid_celery import celery_app as app
-from collections import OrderedDict, Hashable
-from six.moves.urllib.parse import urlparse
-from typing import Dict, Tuple, Union, Any, Optional, AnyStr, List, Callable
-from yaml import safe_load
-from yaml.scanner import ScannerError
-import json
-import tempfile
-import shutil
-import requests
-import logging
+if TYPE_CHECKING:
+    from weaver.status import AnyStatusType, ToolPathObjectType
+    from cwltool.process import Process as ProcessCWL
 
 LOGGER = logging.getLogger("PACKAGE")
 
@@ -71,8 +74,8 @@ PACKAGE_LOG_FILE = 'package_log_file'
 PACKAGE_PROGRESS_PREP_LOG = 1
 PACKAGE_PROGRESS_LAUNCHING = 2
 PACKAGE_PROGRESS_LOADING = 5
-PACKAGE_PROGRESS_GET_INPT = 6
-PACKAGE_PROGRESS_CONV_INPT = 8
+PACKAGE_PROGRESS_GET_INPUT = 6
+PACKAGE_PROGRESS_CONVERT_INPUT = 8
 PACKAGE_PROGRESS_RUN_CWL = 10
 PACKAGE_PROGRESS_CWL_DONE = 95
 PACKAGE_PROGRESS_PREP_OUT = 98
@@ -129,7 +132,7 @@ def get_process_location(process_id_or_url, data_source=None):
     if urlparse(process_id_or_url).scheme != "":
         return process_id_or_url
     data_source_url = retrieve_data_source_url(data_source)
-    process_id = namesgenerator.get_sane_name(process_id_or_url)
+    process_id = get_sane_name(process_id_or_url)
     process_url = process_uri.format(process_id=process_id)
     return '{host}{path}'.format(host=data_source_url, path=process_url)
 
@@ -386,10 +389,10 @@ def _cwl2wps_io(io_info, io_select):
     :param io_select: ``WPS_INPUT`` or ``WPS_OUTPUT`` to specify desired WPS type conversion.
     :returns: corresponding IO in WPS format
     """
-    is_input = False
+    is_input = False                    # noqa: F841
     is_output = False
     if io_select == WPS_INPUT:
-        is_input = True
+        is_input = True                 # noqa: F841
         io_literal = LiteralInput
         io_complex = ComplexInput
         io_bbox = BoundingBoxInput
@@ -397,7 +400,7 @@ def _cwl2wps_io(io_info, io_select):
         is_output = True
         io_literal = LiteralOutput
         io_complex = ComplexOutput
-        io_bbox = BoundingBoxOutput
+        io_bbox = BoundingBoxOutput     # noqa: F841
     else:
         raise PackageTypeError("Unsupported I/O info definition: `{0}` with `{1}`.".format(repr(io_info), io_select))
 
@@ -868,8 +871,7 @@ def get_process_from_wps_request(process_offering, reference=None, package=None,
             exc_type = type(exc) if isinstance(exc, package_errors) else PackageRegistrationError
             LOGGER.exception(exc.message)
             raise exc_type(
-                "Invalid package/reference definition. " +
-                "{0} generated error: [{1}].".format(reason, repr(exc))
+                "Invalid package/reference definition. {0} generated error: [{1}].".format(reason, repr(exc))
             )
 
     if not (isinstance(package, dict) or isinstance(reference, six.string_types)):
@@ -984,13 +986,13 @@ class WpsPackage(Process):
         weaver_tweens_logger.setLevel(self.log_level)
 
     def update_status(self, message, progress, status):
-        # type: (AnyStr, int, AnyStr) -> None
+        # type: (AnyStr, int, AnyStatusType) -> None
         """Updates the PyWPS real job status from a specified parameters."""
         self.percent = progress or self.percent or 0
 
         # find the enum PyWPS status matching the given one as string
-        pywps_status = ts.map_status(status, ts.STATUS_COMPLIANT_PYWPS)
-        pywps_status_id = ts.STATUS_PYWPS_IDS[pywps_status]
+        pywps_status = map_status(status, STATUS_COMPLIANT_PYWPS)
+        pywps_status_id = STATUS_PYWPS_IDS[pywps_status]
 
         # pywps overrides 'status' by 'accepted' in 'update_status', so use the '_update_status' to enforce the status
         # using protected method also avoids weird overrides of progress percent on failure and final 'success' status
@@ -998,22 +1000,25 @@ class WpsPackage(Process):
         self.response._update_status(pywps_status_id, message, self.percent)
         self.log_message(status=status, message=message, progress=progress)
 
+    # TODO
+    #  Les callback d'update status ont ete brassees pas mal dans wps1/wps3 process
+    #  ca se peut que les arguments passent tous croche
     def step_update_status(self, message, progress, start_step_progress, end_step_progress, step_name,
-                           data_source, status):
+                           target_host, status):
         # type: (AnyStr, int, int, int, AnyStr, AnyValue, AnyStr) -> None
         self.update_status(
-            message="{0} [{1}] - {2}".format(data_source, step_name, str(message).strip()),
+            message="{0} [{1}] - {2}".format(target_host, step_name, str(message).strip()),
             progress=self.map_progress(progress, start_step_progress, end_step_progress),
             status=status,
         )
 
     def log_message(self, status, message, progress=None, level=logging.INFO):
-        message = get_job_log_msg(status=ts.map_status(status), message=message, progress=progress)
+        message = get_job_log_msg(status=map_status(status), message=message, progress=progress)
         self.logger.log(level, message, exc_info=level > logging.INFO)
 
     def exception_message(self, exception_type, exception=None, message='no message'):
         exception_msg = ' [{}]'.format(repr(exception)) if isinstance(exception, Exception) else ''
-        self.log_message(status=ts.STATUS_EXCEPTION,
+        self.log_message(status=STATUS_EXCEPTION,
                          message='{0}: {1}{2}'.format(exception_type.__name__, message, exception_msg),
                          level=logging.ERROR)
         return exception_type('{0}{1}'.format(message, exception_msg))
@@ -1037,11 +1042,11 @@ class WpsPackage(Process):
                 self.setup_logger()
                 # self.response.outputs[PACKAGE_LOG_FILE].file = self.log_file
                 # self.response.outputs[PACKAGE_LOG_FILE].as_reference = True
-                self.update_status("Preparing package logs done.", PACKAGE_PROGRESS_PREP_LOG, ts.STATUS_RUNNING)
+                self.update_status("Preparing package logs done.", PACKAGE_PROGRESS_PREP_LOG, STATUS_RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed preparing package logging.")
 
-            self.update_status("Launching package ...", PACKAGE_PROGRESS_LAUNCHING, ts.STATUS_RUNNING)
+            self.update_status("Launching package ...", PACKAGE_PROGRESS_LAUNCHING, STATUS_RUNNING)
 
             registry = app.conf['PYRAMID_REGISTRY']
             if get_weaver_configuration(registry.settings) == WEAVER_CONFIGURATION_EMS:
@@ -1064,11 +1069,11 @@ class WpsPackage(Process):
 
             except Exception as ex:
                 raise PackageRegistrationError("Exception occurred on package instantiation: `{}`".format(repr(ex)))
-            self.update_status("Loading package content done.", PACKAGE_PROGRESS_LOADING, ts.STATUS_RUNNING)
+            self.update_status("Loading package content done.", PACKAGE_PROGRESS_LOADING, STATUS_RUNNING)
 
             try:
                 cwl_input_info = dict([(i['name'], i) for i in self.package_inst.t.inputs_record_schema['fields']])
-                self.update_status("Retrieve package inputs done.", PACKAGE_PROGRESS_GET_INPT, ts.STATUS_RUNNING)
+                self.update_status("Retrieve package inputs done.", PACKAGE_PROGRESS_GET_INPUT, STATUS_RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed retrieving package input types.")
             try:
@@ -1108,18 +1113,18 @@ class WpsPackage(Process):
                     else:
                         raise self.exception_message(PackageTypeError, None,
                                                      "Undefined package input for execution: {}.".format(type(input_i)))
-                self.update_status("Convert package inputs done.", PACKAGE_PROGRESS_CONV_INPT, ts.STATUS_RUNNING)
+                self.update_status("Convert package inputs done.", PACKAGE_PROGRESS_CONVERT_INPUT, STATUS_RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed to load package inputs.")
 
             try:
-                self.update_status("Running package ...", PACKAGE_PROGRESS_RUN_CWL, ts.STATUS_RUNNING)
+                self.update_status("Running package ...", PACKAGE_PROGRESS_RUN_CWL, STATUS_RUNNING)
 
                 # Inputs starting with file:// will be interpreted as ems local files
                 # If OpenSearch obtain file:// references that must be passed to the ADES use an uri starting
                 # with OPENSEARCH_LOCAL_FILE_SCHEME://
                 result = self.package_inst(**cwl_inputs)
-                self.update_status("Package execution done.", PACKAGE_PROGRESS_CWL_DONE, ts.STATUS_RUNNING)
+                self.update_status("Package execution done.", PACKAGE_PROGRESS_CWL_DONE, STATUS_RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed package execution.")
             try:
@@ -1129,23 +1134,24 @@ class WpsPackage(Process):
                         self.response.outputs[output].file = result[output]['location'].replace('file://', '')
                     else:
                         self.response.outputs[output].data = result[output]
-                self.update_status("Generate package outputs done.", PACKAGE_PROGRESS_PREP_OUT, ts.STATUS_RUNNING)
+                self.update_status("Generate package outputs done.", PACKAGE_PROGRESS_PREP_OUT, STATUS_RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed to save package outputs.")
         # noinspection PyBroadException
         except Exception:
             # return log file location by status message since outputs are not obtained by WPS failed process
             error_msg = "Package completed with errors. Server logs: {}".format(self.log_file)
-            self.update_status(error_msg, self.percent, ts.STATUS_FAILED)
+            self.update_status(error_msg, self.percent, STATUS_FAILED)
             raise
         else:
-            self.update_status("Package complete.", PACKAGE_PROGRESS_DONE, ts.STATUS_SUCCEEDED)
+            self.update_status("Package complete.", PACKAGE_PROGRESS_DONE, STATUS_SUCCEEDED)
         return self.response
 
-    def make_tool(self, toolpath_object, loadingContext):
-        return default_make_tool(toolpath_object, loadingContext, self.get_job_process_definition)
+    def make_tool(self, toolpath_object, loading_context):
+        # type: (ToolPathObjectType, LoadingContext) -> ProcessCWL
+        return default_make_tool(toolpath_object, loading_context, self.get_job_process_definition)
 
-    def get_job_process_definition(self, jobname, joborder):
+    def get_job_process_definition(self, jobname, joborder, tool):
         """
         This function is called before running an ADES job (either from a workflow step or a simple EMS dispatch).
         It must return a WpsProcess instance configured with the proper package, ADES target and cookies.
@@ -1155,64 +1161,54 @@ class WpsPackage(Process):
                          input_value is one of `input_object` or `array [input_object]`
                          input_object is one of `string` or `dict {class: File, location: string}`
                          in our case input are expected to be File object
+        :param tool: Whole cwl config including hints requirement
         """
 
         if jobname == self.package_id:
             # A step is the package itself only for non-workflow package being executed on the EMS
-            # and needing ADES dispatching
+            # default action requires ADES dispatching but hints can indicate also WPS1 or ESGF-CWT provider
             step_payload = self.payload
-            process_id = self.package_id
+            process = self.package_id
             jobtype = 'package'
         else:
             # Here we got a step part of a workflow (self is the workflow package)
             step_process_url = get_process_location(self.step_packages[jobname])
             step_payload = _get_process_payload(step_process_url)
-            process_id = self.step_packages[jobname]
+            process = self.step_packages[jobname]
             jobtype = 'step'
 
-        try:
-            # Presume that all EOImage given as input can be resolved to the same ADES
-            # So if we got multiple inputs or multiple values for an input, we take the first one as reference
-            eodata_inputs = opensearch.get_eo_images_ids_from_payload(step_payload)
-
-            data_url = ""  # data_source will be set to the default ADES if no EOImages
-
-            if eodata_inputs:
-                step_payload = opensearch.alter_payload_after_query(step_payload)
-                value = joborder[eodata_inputs[0]]
-
-                if isinstance(value, list):
-                    # Use the first value to determine the data source
-                    value = value[0]
-
-                data_url = value['location']
-                data_source_reason = '(ADES based on {0})'.format(data_url)
-            else:
-                data_source_reason = '(No EOImage -> Default ADES)'
-
-            data_source = get_data_source_from_url(data_url)
-
-            # Progress made with steps presumes that they are done sequentially and have the same progress weight
-            start_step_progress = self.map_step_progress(len(self.step_launched), max(1, len(self.step_packages)))
-            end_step_progress = self.map_step_progress(len(self.step_launched) + 1, max(1, len(self.step_packages)))
-            url = retrieve_data_source_url(data_source)
-
-            self.update_status("Launching {type} {name} on {src} {reason}.".format(
-                type=jobtype,
-                name=jobname,
-                src=data_source,
-                reason=data_source_reason),
-                               start_step_progress, ts.STATUS_RUNNING)
-
-        except (IndexError, KeyError) as exc:
-            raise self.exception_message(PackageExecutionError, exc, "Failed to save package outputs.")
+        # Progress made with steps presumes that they are done sequentially and have the same progress weight
+        start_step_progress = self.map_step_progress(len(self.step_launched), max(1, len(self.step_packages)))
+        end_step_progress = self.map_step_progress(len(self.step_launched) + 1, max(1, len(self.step_packages)))
 
         self.step_launched.append(jobname)
+        self.update_status("Preparing to launch {type} {name}.".format(
+            type=jobtype,
+            name=jobname),
+            start_step_progress, STATUS_RUNNING)
 
-        return WpsProcess(url=url,
-                          process_id=process_id,
-                          deploy_body=step_payload,
-                          cookies=self.request.http_request.cookies,
-                          update_status=lambda message, progress, status: self.step_update_status(
-                              message, progress, start_step_progress, end_step_progress, jobname, data_source, status
-                          ))
+        # TODO:
+        #   Le parametre 'tool' devrait contenir la structure hint du cwl (reste a valider)
+        #   La structure tool['hints']['WPS1Requirement']['provider'] n'est donc que pure invention a l'heure actuelle
+        if 'WPS1Requirement' in tool['hints']:
+            provider = tool['hints']['WPS1Requirement']['provider']
+            # The process id of the provider isn't required to be the same as the one use in the EMS
+            process = tool['hints']['WPS1Requirement']['process']
+            return Wps1Process(provider=provider,
+                               process=process,
+                               cookies=self.request.http_request.cookies,
+                               update_status=lambda _provider, _message, _progress, _status: self.step_update_status(
+                                   _message, _progress, start_step_progress, end_step_progress, jobname,
+                                   _provider, _status
+                               ))
+        elif 'ESGF-CWTRequirement' in tool['hints']:
+            raise NotImplementedError('ESGF-CWTRequirement not implemented')
+        else:
+            return Wps3Process(step_payload=step_payload,
+                               joborder=joborder,
+                               process=process,
+                               cookies=self.request.http_request.cookies,
+                               update_status=lambda _provider, _message, _progress, _status: self.step_update_status(
+                                   _message, _progress, start_step_progress, end_step_progress, jobname,
+                                   _provider, _status
+                               ))

@@ -9,10 +9,10 @@ default_processes = [
 ]
 
 process_mapping = {
-    'hello': Hello,
-    PROCESS_TEST:        WpsTestProcess,
-    PROCESS_APPLICATION: WpsPackage,
-    PROCESS_WORKFLOW:    WpsPackage,
+    Hello.identifier:    Hello,             # noqa: E241
+    PROCESS_TEST:        WpsTestProcess,    # noqa: E241
+    PROCESS_APPLICATION: WpsPackage,        # noqa: E241
+    PROCESS_WORKFLOW:    WpsPackage,        # noqa: E241
 }
 
 

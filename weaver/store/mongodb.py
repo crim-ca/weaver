@@ -11,8 +11,7 @@ from weaver.exceptions import (
     QuoteRegistrationError, QuoteNotFound, QuoteInstanceError,
     BillRegistrationError, BillNotFound, BillInstanceError,
 )
-from weaver import namesgenerator
-from weaver.utils import get_base_url, islambda, now
+from weaver.utils import get_base_url, islambda, now, get_sane_name
 from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_MODE_SYNC
 from weaver.processes.types import PROCESS_WORKFLOW, PROCESS_APPLICATION, PROCESS_WPS
 from weaver.status import STATUS_ACCEPTED, map_status, job_status_categories
@@ -86,20 +85,15 @@ class MongodbServiceStore(StoreServices, MongodbStore):
                 self.collection.delete_one({'url': service_url})
             else:
                 raise ServiceRegistrationError("service url already registered.")
-
-        name = namesgenerator.get_sane_name(service.name, **self.sane_name_config)
-        if not name:
-            name = namesgenerator.get_random_name()
-            if self.collection.count_documents({'name': name}) > 0:
-                name = namesgenerator.get_random_name(retry=True)
-        if self.collection.count_documents({'name': name}) > 0:
+        service_name = get_sane_name(service.name, **self.sane_name_config)
+        if self.collection.count_documents({'name': service_name}) > 0:
             if overwrite:
-                self.collection.delete_one({'name': name})
+                self.collection.delete_one({'name': service_name})
             else:
-                raise Exception("service name already registered.")
+                raise ServiceRegistrationError("service name already registered.")
         self.collection.insert_one(Service(
             url=service_url,
-            name=name,
+            name=service_name,
             type=service.type,
             public=service.public,
             auth=service.auth))
@@ -240,7 +234,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         :param request: <unused>
         """
         process_id = self._get_process_id(process)
-        sane_name = namesgenerator.get_sane_name(process_id, **self.sane_name_config)
+        sane_name = get_sane_name(process_id, **self.sane_name_config)
         if self.collection.count_documents({'identifier': sane_name}) > 0:
             if overwrite:
                 self.collection.delete_one({'identifier': sane_name})
@@ -256,7 +250,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         Removes process from database, optionally filtered by visibility.
         If ``visibility=None``, the process is deleted (if existing) regardless of its visibility value.
         """
-        sane_name = namesgenerator.get_sane_name(process_id, **self.sane_name_config)
+        sane_name = get_sane_name(process_id, **self.sane_name_config)
         process = self.fetch_by_id(sane_name, visibility=visibility, request=request)
         if not process:
             raise ProcessNotFound("Process `{}` could not be found.".format(sane_name))
@@ -296,7 +290,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         :param request:
         :return: An instance of :class:`weaver.datatype.Process`.
         """
-        sane_name = namesgenerator.get_sane_name(process_id, **self.sane_name_config)
+        sane_name = get_sane_name(process_id, **self.sane_name_config)
         process = self.collection.find_one({'identifier': sane_name})
         if not process:
             raise ProcessNotFound("Process `{}` could not be found.".format(sane_name))

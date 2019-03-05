@@ -2,13 +2,19 @@ from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS, WE
 from weaver.database import get_db
 from weaver.exceptions import QuoteNotFound, ProcessNotFound
 from weaver.datatype import Bill, Quote
-from weaver.processes.types import *
+from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from weaver.processes.wps_package import get_process_location, get_package_workflow_steps
+from weaver.store.base import StoreBills, StoreQuotes
 from weaver.utils import get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.processes import submit_local_job
 from weaver import sort
-from pyramid.httpexceptions import *
+from pyramid.httpexceptions import (
+    HTTPOk,
+    HTTPCreated,
+    HTTPBadRequest,
+    HTTPNotFound,
+)
 from datetime import timedelta
 from duration import to_iso8601
 import logging
@@ -17,6 +23,7 @@ import random
 logger = logging.getLogger('weaver')
 
 
+# noinspection PyUnusedLocal
 def process_quote_estimator(process):
     """
     :param process: instance of :class:`weaver.datatype.Process` for which to evaluate the quote.
@@ -48,7 +55,7 @@ def request_quote(request):
     except ProcessNotFound:
         raise HTTPNotFound("Could not find process with specified `process_id`.")
 
-    store = quotestore_factory(request.registry)
+    store = get_db(request).get_store(StoreQuotes)
     process_url = get_process_location(process_id, data_source=get_weaver_url(request.registry.settings))
     process_type = process.type
     process_params = dict()
@@ -111,7 +118,7 @@ def get_quote_list(request):
         'limit': limit,
         'sort': request.params.get('sort', sort.SORT_CREATED),
     }
-    store = quotestore_factory(request.registry)
+    store = get_db(request).get_store(StoreQuotes)
     items, count = store.find_quotes(**filters)
     return HTTPOk(json={
         'count': count,
@@ -130,7 +137,7 @@ def get_quote_info(request):
     Get quote information.
     """
     quote_id = request.matchdict.get('quote_id')
-    store = quotestore_factory(request.registry)
+    store = get_db(request).get_store(StoreQuotes)
     try:
         quote = store.fetch_by_id(quote_id)
     except QuoteNotFound:
@@ -156,7 +163,7 @@ def execute_quote(request):
     job_json = job_resp.json
     job_id = job_json.get('jobID')
     user_id = str(request.authenticated_userid)
-    store = billstore_factory(request.registry)
+    store = get_db(request).get_store(StoreBills)
     bill = store.save_bill(Bill(user=user_id, job=job_id, **quote_bill_info))
     job_json.update({"bill": bill.id})
     return HTTPCreated(json=job_json)

@@ -1,12 +1,10 @@
-from owslib.wps import ComplexData
 from weaver.utils import parse_request_query, get_weaver_url
 from distutils.version import LooseVersion
-from webob.headers import ResponseHeaders, EnvironHeaders
 from requests.structures import CaseInsensitiveDict
-from pyramid.httpexceptions import HTTPSuccessful, HTTPError, HTTPInternalServerError
+from pyramid.httpexceptions import HTTPSuccessful
+from webob.headers import ResponseHeaders, EnvironHeaders
 from lxml import etree
 import requests
-
 import logging
 LOGGER = logging.getLogger("weaver")
 
@@ -56,15 +54,6 @@ def get_header(header_name, header_container):
         if h.lower().replace('-', '_') == header_name:
             return v
     return None
-
-
-def jsonify(value):
-    # ComplexData type
-    if isinstance(value, ComplexData):
-        return {'mimeType': value.mimeType, 'encoding': value.encoding, 'schema': value.schema}
-    # other type
-    else:
-        return value
 
 
 def get_wps_output_format(request, service_url=None):

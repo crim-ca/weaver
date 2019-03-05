@@ -1,6 +1,9 @@
-from typing import AnyStr, Optional, Union
 # noinspection PyProtectedMember
 from pywps.response.status import _WPS_STATUS, WPS_STATUS
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from typing import AnyStr, Optional, Union
+    AnyStatusType = Union[AnyStr, int]
 
 STATUS_COMPLIANT_OGC = 'STATUS_COMPLIANT_OGC'
 STATUS_COMPLIANT_PYWPS = 'STATUS_COMPLIANT_PYWPS'
@@ -37,13 +40,13 @@ job_status_categories = {
     #   OWSLib users:   [Accepted, Running, Succeeded, Failed, Paused] (with 'Process' in front)
     # http://docs.opengeospatial.org/is/14-065/14-065.html#17
     # corresponding statuses are aligned vertically for 'COMPLIANT' groups
-    STATUS_COMPLIANT_OGC:       frozenset([STATUS_ACCEPTED, STATUS_RUNNING, STATUS_SUCCEEDED, STATUS_FAILED]),                                   # noqa: F401
-    STATUS_COMPLIANT_PYWPS:     frozenset([STATUS_ACCEPTED, STATUS_STARTED, STATUS_SUCCEEDED, STATUS_FAILED, STATUS_PAUSED, STATUS_EXCEPTION]),  # noqa: F401
-    STATUS_COMPLIANT_OWSLIB:    frozenset([STATUS_ACCEPTED, STATUS_RUNNING, STATUS_SUCCEEDED, STATUS_FAILED, STATUS_PAUSED]),                    # noqa: F401
+    STATUS_COMPLIANT_OGC:       frozenset([STATUS_ACCEPTED, STATUS_RUNNING, STATUS_SUCCEEDED, STATUS_FAILED]),                                   # noqa: E241, E501
+    STATUS_COMPLIANT_PYWPS:     frozenset([STATUS_ACCEPTED, STATUS_STARTED, STATUS_SUCCEEDED, STATUS_FAILED, STATUS_PAUSED, STATUS_EXCEPTION]),  # noqa: E241, E501
+    STATUS_COMPLIANT_OWSLIB:    frozenset([STATUS_ACCEPTED, STATUS_RUNNING, STATUS_SUCCEEDED, STATUS_FAILED, STATUS_PAUSED]),                    # noqa: E241, E501
     # utility categories
-    STATUS_CATEGORY_RUNNING:    frozenset([STATUS_ACCEPTED, STATUS_RUNNING, STATUS_STARTED,   STATUS_PAUSED]),
-    STATUS_CATEGORY_FINISHED:   frozenset([STATUS_FAILED, STATUS_DISMISSED, STATUS_EXCEPTION, STATUS_SUCCEEDED]),
-    STATUS_CATEGORY_FAILED:     frozenset([STATUS_FAILED, STATUS_DISMISSED, STATUS_EXCEPTION])
+    STATUS_CATEGORY_RUNNING:    frozenset([STATUS_ACCEPTED, STATUS_RUNNING, STATUS_STARTED,   STATUS_PAUSED]),                                   # noqa: E241, E501
+    STATUS_CATEGORY_FINISHED:   frozenset([STATUS_FAILED, STATUS_DISMISSED, STATUS_EXCEPTION, STATUS_SUCCEEDED]),                                # noqa: E241, E501
+    STATUS_CATEGORY_FAILED:     frozenset([STATUS_FAILED, STATUS_DISMISSED, STATUS_EXCEPTION]),                                                  # noqa: E241, E501
 }
 
 
@@ -53,7 +56,7 @@ STATUS_PYWPS_IDS = {k.lower(): v for v, k in STATUS_PYWPS_MAP.items()}          
 
 
 def map_status(wps_status, compliant=STATUS_COMPLIANT_OGC):
-    # type: (Union[AnyStr, int], Optional[AnyStr]) -> AnyStr
+    # type: (AnyStatusType, Optional[AnyStr]) -> AnyStr
     """
     Maps WPS statuses (weaver.status, OWSLib or PyWPS) to OWSLib/PyWPS compatible values.
     For each compliant combination, unsupported statuses are changed to corresponding ones (with closest logical match).

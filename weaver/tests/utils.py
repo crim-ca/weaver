@@ -1,24 +1,25 @@
 """
 Utility methods for various TestCase setup operations.
 """
+from weaver.datatype import Service
+from weaver.store.mongodb import MongodbServiceStore, MongodbProcessStore, MongodbJobStore
+from weaver.config import WEAVER_CONFIGURATION_DEFAULT
+from weaver.wps import get_wps_url, get_wps_output_url, get_wps_output_path
+from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 from six.moves.configparser import ConfigParser
-from typing import Any, AnyStr, Optional
+from typing import Any, AnyStr, Optional, TYPE_CHECKING
 from pyramid import testing
 from pyramid.registry import Registry
 from pyramid.config import Configurator
 # noinspection PyPackageRequirements
 from webtest import TestApp
-from weaver.datatype import Service
-from weaver.store.mongodb import MongodbServiceStore, MongodbProcessStore, MongodbJobStore
-from weaver.config import WEAVER_CONFIGURATION_DEFAULT
-from weaver.typedefs import Settings
-from weaver.wps import get_wps_url, get_wps_output_url, get_wps_output_path
-from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 import pyramid_celery
 import warnings
 # noinspection PyPackageRequirements
 import mock
 import os
+if TYPE_CHECKING:
+    from weaver.typedefs import Settings
 
 
 def ignore_wps_warnings(func):
