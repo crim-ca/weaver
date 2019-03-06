@@ -9,7 +9,7 @@ import requests
 import logging
 if TYPE_CHECKING:
     from pyramid.request import Request
-    from weaver.typedefs import SettingsType, CookiesType, HeadersType, AnyCookiesContainer, AnyHeadersContainer
+    from weaver.typedefs import SettingsType, HeadersType, AnyHeadersContainer
 
 LOGGER = logging.getLogger("weaver")
 
@@ -59,23 +59,14 @@ def get_header(header_name, header_container):
     return None
 
 
-def get_cookies(cookies_container, cookies_header_name='Cookies'):
+def get_cookie_headers(header_container, cookie_header_name='Cookie'):
+    # type: (AnyHeadersContainer, Optional[AnyStr]) -> HeadersType
     """
-    Searches for cookies inside ``cookies_container`` first.
-    Then, if ``cookies_container`` is some kind of variation of a request with
-    a `headers` container, searches inside them also for with ``cookies_header_name``.
+    Looks for ``cookie_header_name`` header within ``header_container``.
+    :returns: new header container in the form ``{'Cookie': <found_cookie>}`` if it was matched, or empty otherwise.
     """
-    # type: (AnyCookiesContainer, Optional[AnyStr]) -> CookiesType
     try:
-        return dict(Cookie=get_header(cookies_header_name, cookies_container))
-    except KeyError:  # No cookie
-        return {}
-
-
-def get_cookie_headers(cookies_container):
-    # type: (AnyCookiesContainer) -> HeadersType
-    try:
-        return dict(Cookie=get_header('Cookie', cookies_container))
+        return dict(Cookie=get_header(cookie_header_name, header_container))
     except KeyError:  # No cookie
         return {}
 

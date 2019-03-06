@@ -3,6 +3,7 @@ This module should contain any and every definitions in use to build the swagger
 so that one can update the swagger without touching any other files after the initial integration
 """
 
+from weaver import __meta__
 from weaver.config import WEAVER_CONFIGURATION_EMS
 from weaver.wps_restapi.utils import wps_restapi_base_path
 from weaver.status import job_status_categories, STATUS_ACCEPTED, STATUS_COMPLIANT_OGC
@@ -20,10 +21,9 @@ from weaver.execute import (
 )
 from weaver.visibility import visibility_values, VISIBILITY_PUBLIC
 from weaver.wps_restapi.colander_one_of import OneOfMappingSchema
-from weaver.wps_restapi.colander_defaults import SchemaNodeDefault as SchemaNode  # import after to override colander
-from weaver import __meta__
-from cornice import Service
+from weaver.wps_restapi.colander_defaults import SchemaNodeDefault as SchemaNode
 from colander import String, Boolean, Integer, Float, DateTime, MappingSchema, SequenceSchema, drop, OneOf
+from cornice import Service
 
 API_TITLE = 'weaver REST API'
 API_INFO = {

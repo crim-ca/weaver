@@ -40,7 +40,7 @@ class OneOfMappingSchema(colander.MappingSchema):
 
 class CustomTypeConversionDispatcher(object):
 
-    def __init__(self, custom_converters={}, default_converter=None):
+    def __init__(self, custom_converters=None, default_converter=None):
 
         self.converters = {
             colander.Boolean: schema.BooleanTypeConverter,
@@ -58,7 +58,7 @@ class CustomTypeConversionDispatcher(object):
             OneOfMappingSchema: schema.ObjectTypeConverter,
         }
 
-        self.converters.update(custom_converters)
+        self.converters.update(custom_converters or {})
         self.default_converter = default_converter
 
     def __call__(self, schema_node):

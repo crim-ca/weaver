@@ -1,5 +1,5 @@
 from weaver.wps import get_wps_output_path, get_wps_output_url
-from weaver.wps_restapi.utils import get_cookies
+from weaver.wps_restapi.utils import get_cookie_headers
 from pyramid_celery import celery_app as app
 from pyramid.settings import asbool
 from pyramid.httpexceptions import HTTPBadGateway
@@ -38,7 +38,7 @@ class WpsProcessInterface(object):
     def __init__(self, request):
         # type: (WPSRequest) -> None
         self.request = request
-        self.cookies = get_cookies(self.request)
+        self.cookies = get_cookie_headers(self.request.http_request.headers)
         self.headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
 
         registry = app.conf['PYRAMID_REGISTRY']

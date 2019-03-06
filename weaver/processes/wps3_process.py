@@ -55,10 +55,11 @@ class Wps3Process(WpsProcessInterface):
                  update_status,     # type: UpdateStatusPartialFunction
                  ):
         super(Wps3Process, self).__init__(request)
-        self.provider, self.url, self.deploy_body = self.resolve_data_source(step_payload, joborder)
-        self.process = process
+        self.provider = None    # overridden if data source properly resolved
         self.update_status = lambda _message, _progress, _status: update_status(
             self.provider, _message, _progress, _status)
+        self.provider, self.url, self.deploy_body = self.resolve_data_source(step_payload, joborder)
+        self.process = process
 
     def resolve_data_source(self, step_payload, joborder):
         # TODO Ce code provient de wps_package et n'a pas ete teste ici-meme
@@ -89,6 +90,7 @@ class Wps3Process(WpsProcessInterface):
         except (IndexError, KeyError) as exc:
             raise PackageExecutionError("Failed to save package outputs. [{}]".format(repr(exc)))
 
+        self.provider = provider  # fix immediately for `update_status`
         self.update_status("{provider} is selected {reason}.".format(
             provider=provider,
             reason=reason),

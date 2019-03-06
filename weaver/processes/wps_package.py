@@ -74,6 +74,16 @@ PACKAGE_CUSTOM_TYPES = frozenset(['enum'])  # can be anything, but support 'enum
 PACKAGE_DEFAULT_FILE_NAME = 'package'
 PACKAGE_LOG_FILE = 'package_log_file'
 
+# package (requirements/hints) corresponding to `PROCESS_APPLICATION`
+PACKAGE_REQUIREMENTS_APP_DOCKER = "DockerRequirement"
+PACKAGE_REQUIREMENTS_APP_ESGF_CWT = "ESGF-CWTRequirement"
+PACKAGE_REQUIREMENTS_APP_WPS1 = "WPS1Requirement"
+PACKAGE_REQUIREMENTS_APP_TYPES = frozenset([
+    PACKAGE_REQUIREMENTS_APP_DOCKER,
+    PACKAGE_REQUIREMENTS_APP_ESGF_CWT,
+    PACKAGE_REQUIREMENTS_APP_WPS1,
+])
+
 PACKAGE_PROGRESS_PREP_LOG = 1
 PACKAGE_PROGRESS_LAUNCHING = 2
 PACKAGE_PROGRESS_LOADING = 5
@@ -276,21 +286,21 @@ def _load_package_content(package_dict,                             # type: Dict
                           ):  # type: (...) -> Union[Tuple[cwltool.factory.Factory, AnyStr, Dict], None]
     """
     Loads the package content to file in a temporary directory.
-    Recursively processes sub-packages steps if the parent is of 'workflow' type (CWL class).
+    Recursively processes sub-packages steps if the parent is a `Workflow` (CWL class).
 
     :param package_dict: package content representation as a json dictionary.
     :param package_name: name to use to create the package file.
     :param data_source: identifier of the data source to map to specific ADES, or map to localhost if ``None``.
     :param only_dump_file: specify if the :class:`cwltool.factory.Factory` should be validated and returned.
     :param tmp_dir: location of the temporary directory to dump files (warning: will be deleted on exit).
-    :param loading_context: cwltool context use to make the cwl package
-    :param runtime_context: cwltool context use to make the cwl package
+    :param loading_context: cwltool context used to create the cwl package
+    :param runtime_context: cwltool context used to execute the cwl package
     :return:
         tuple of
         - instance of :class:`cwltool.factory.Factory`
         - package type (PROCESS_WORKFLOW or PROCESS_APPLICATION)
         - dict of each step with their package name that must be run
-        if :param:`only_dump_file` is ``False``, ``None`` otherwise.
+        if ``only_dump_file`` is ``False``, ``None`` otherwise.
     """
 
     tmp_dir = tmp_dir or tempfile.mkdtemp()
@@ -312,6 +322,10 @@ def _load_package_content(package_dict,                             # type: Dict
         json.dump(package_dict, f)
     if only_dump_file:
         return
+
+    #if loading_context is None:
+    #    from schema_salad.ref_resolver import Loader
+     #   loading_context = LoadingContext({'loader': Loader(foreign_properties=set(PACKAGE_REQUIREMENTS_APP_WPS1))})
 
     cwl_factory = cwltool.factory.Factory(loading_context=loading_context, runtime_context=runtime_context)
     package = cwl_factory.make(tmp_json_cwl)
@@ -1191,13 +1205,22 @@ class WpsPackage(Process):
             name=jobname),
             start_step_progress, STATUS_RUNNING)
 
-        # TODO:
-        #   Le parametre 'tool' devrait contenir la structure hint du cwl (reste a valider)
-        #   La structure tool['hints']['WPS1Requirement']['provider'] n'est donc que pure invention a l'heure actuelle
-        if 'WPS1Requirement' in tool['hints']:
-            provider = tool['hints']['WPS1Requirement']['provider']
+        # package can define requirements and/or hints, if it's an application, only one is allowed, workflow can have
+        # multiple, but they are not explicitly handled
+        all_hints = list(dict(req) for req in tool.get('requirements', {}))
+        all_hints.extend(dict(req) for req in tool.get('hints', {}))
+        app_hints = list(filter(lambda h: h['class'] in PACKAGE_REQUIREMENTS_APP_TYPES, all_hints))
+        if len(app_hints) > 1:
+            raise ValueError("Package 'requirements' and/or 'hints' define too many conflicting values: {}, "
+                             "only one is permitted amongst {}.".format(app_hints, PACKAGE_REQUIREMENTS_APP_TYPES))
+        requirement = app_hints[0] if app_hints else {'class': None}
+        if requirement['class'] == PACKAGE_REQUIREMENTS_APP_WPS1:
+            req_params = ['provider', 'process']
+            if not all(r in requirement for r in ['provider', 'process']):
+                raise ValueError("Missing requirement [{}] details amongst {}".format(requirement['class'], req_params))
+            provider = requirement['provider']
             # The process id of the provider isn't required to be the same as the one use in the EMS
-            process = tool['hints']['WPS1Requirement']['process']
+            process = requirement['process']
             return Wps1Process(provider=provider,
                                process=process,
                                request=self.request,
@@ -1205,9 +1228,11 @@ class WpsPackage(Process):
                                    _message, _progress, start_step_progress, end_step_progress, jobname,
                                    _provider, _status
                                ))
-        elif 'ESGF-CWTRequirement' in tool['hints']:
+        elif requirement['class'] == PACKAGE_REQUIREMENTS_APP_ESGF_CWT:
+            # TODO: implement
             raise NotImplementedError('ESGF-CWTRequirement not implemented')
         else:
+            # implements both PROCESS_APPLICATION` with `PACKAGE_REQUIREMENTS_APP_DOCKER` and `PROCESS_WORKFLOW`
             return Wps3Process(step_payload=step_payload,
                                joborder=joborder,
                                process=process,
