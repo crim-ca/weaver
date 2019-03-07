@@ -28,7 +28,10 @@ __pycache__
 .coverage
 .pytest_cache
 .tox
+coverage.xml
+coverage/
 nosetests.xml
+tests/
 unit_tests/testdata.json
 
 # R

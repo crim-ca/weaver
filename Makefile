@@ -7,7 +7,7 @@ RELEASE := master
 APP_ROOT := $(CURDIR)
 APP_NAME := $(shell basename $(APP_ROOT))
 
-# guess OS (Linux, Darwin, ...)
+# guess OS (Linux, Darwin,...)
 OS_NAME := $(shell uname -s 2>/dev/null || echo "unknown")
 CPU_ARCH := $(shell uname -m 2>/dev/null || uname -p 2>/dev/null || echo "unknown")
 
@@ -80,13 +80,14 @@ help:
 	@echo "  clean-cache        remove caches such as DOWNLOAD_CACHE."
 	@echo "  clean-env          remove the conda enviroment $(CONDA_ENV)."
 	@echo "  clean-src          remove all *.pyc files."
+	@echo "  clean-test         remove files created by tests or coverage."
 	@echo "  clean-dist         remove *all* files that are not controlled by 'git'."
 	@echo "                     [WARNING: use it *only* if you know what you do!]"
 	@echo "Testing targets:"
-	@echo "  test               run tests (but skip long running and online tests)."
+	@echo "  test-unit          run unit tests (skip long running and online tests)."
 	@echo "  test-func          run funtional tests (online and usage specific)."
 	@echo "  test-all           run all tests (including long running tests)."
-	@echo "  coverage           run all tests using coverage analysis."
+	@echo "  coverage       	run all tests using coverage analysis."
 	@echo "  pep8               run pep8 code style checks."
 	@echo "Sphinx targets:"
 	@echo "  docs               generate HTML documentation with Sphinx."
@@ -119,29 +120,29 @@ info:
 	@echo "  DOWNLOAD_CACHE      $(DOWNLOAD_CACHE)"
 	@echo "  DOCKER_REPO         $(DOCKER_REPO)"
 
-## Helper targets ... ensure that Makefile etc are in place
+## Helper targets... ensure that Makefile etc are in place
 
 .PHONY: backup
 backup:
-	@echo "Backup custom config ..."
+	@echo "Backup custom config..."
 	@-test -f custom.cfg && cp -v --update --backup=numbered --suffix=.bak custom.cfg custom.cfg.bak
 
 .PHONY: .gitignore
 .gitignore:
-	@echo "Setup default .gitignore ..."
+	@echo "Setup default .gitignore..."
 	@curl "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/dot_gitignore" \
 		--silent --insecure --output .gitignore
 
 .PHONY: bootstrap.sh
 bootstrap.sh:
-	@echo "Update bootstrap.sh ..."
+	@echo "Update bootstrap.sh..."
 	@curl "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/bootstrap.sh" \
 		--silent --insecure --output \
 		bootstrap.sh "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/bootstrap.sh"
 	@chmod 755 bootstrap.sh
 
 custom.cfg:
-	@echo "Using custom.cfg for buildout ..."
+	@echo "Using custom.cfg for buildout..."
 	@test -f custom.cfg || cp -v custom.cfg.example custom.cfg
 
 .PHONY: downloads
@@ -153,7 +154,7 @@ downloads:
 init: custom.cfg downloads
 
 bootstrap-buildout.py:
-	@echo "Update buildout bootstrap-buildout.py ..."
+	@echo "Update buildout bootstrap-buildout.py..."
 	@test -f boostrap-buildout.py || curl https://bootstrap.pypa.io/bootstrap-buildout.py \
 		--insecure --silent --output bootstrap-buildout.py
 
@@ -161,7 +162,7 @@ bootstrap-buildout.py:
 
 .PHONY: conda
 conda:
-	@echo "Installing conda ..."
+	@echo "Installing conda..."
 	@test -f "$(CONDA_HOME)/bin/conda" || ( \
 		echo "Downloading: [$(CONDA_URL)/$(FN)], saved to: [$(DOWNLOAD_CACHE)/$(FN)]." && \
 		mkdir -p "$(DOWNLOAD_CACHE)" && mkdir -p "$(CONDA_HOME)" && \
@@ -183,30 +184,30 @@ conda-config: conda
 
 .PHONY: conda-env
 conda-env: conda conda-config
-	@test -d "$(CONDA_ENV_PATH)" || echo "Creating conda environment: $(CONDA_ENV) ..."
+	@test -d "$(CONDA_ENV_PATH)" || echo "Creating conda environment: $(CONDA_ENV)..."
 	@echo '"$(CONDA_HOME)/bin/conda" env create -n "$(CONDA_ENV)" "python=$(PYTHON_VERSION)"'
 	@test -d "$(CONDA_ENV_PATH)" || "$(CONDA_HOME)/bin/conda" create -y -n "$(CONDA_ENV)" "python=$(PYTHON_VERSION)"
-	@echo "Update conda environment: $(CONDA_ENV) ..."
+	@echo "Update conda environment: $(CONDA_ENV)..."
 	"$(CONDA_HOME)/bin/conda" install -y -n "$(CONDA_ENV)" "setuptools=$(SETUPTOOLS_VERSION)" supervisor nginx
-	@echo "Updating pip ..."
+	@echo "Updating pip..."
 	@-bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); pip install --upgrade pip"
 
 .PHONY: conda-pinned
 conda-pinned: conda-env
-	@echo "Update pinned conda packages ..."
+	@echo "Update pinned conda packages..."
 	@-test -d $(CONDA_ENV_PATH) && test -f $(CONDA_PINNED) && \
 		cp -f "$(CONDA_PINNED)" "$(CONDA_ENV_PATH)/conda-meta/pinned"
 
 .PHONY: conda-env-export
 conda-env-export:
-	@echo "Exporting conda enviroment ..."
+	@echo "Exporting conda enviroment..."
 	@test -d $(CONDA_ENV_PATH) && "$(CONDA_HOME)/bin/conda" env export -n $(CONDA_ENV) -f environment.yml
 
 ## Build targets
 
 .PHONY: bootstrap
 bootstrap: init conda-env conda-pinned bootstrap-buildout.py
-	@echo "Bootstrap buildout ..."
+	@echo "Bootstrap buildout..."
 	@-bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
 		python -c 'import zc.buildout' || pip install zc.buildout==$(BUILDOUT_VERSION)"
 	@test -f bin/buildout || bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
@@ -217,46 +218,46 @@ bootstrap: init conda-env conda-pinned bootstrap-buildout.py
 
 .PHONY: install-dev
 install-dev: install-pip
-	@echo "Installing development packages with pip ..."
+	@echo "Installing development packages with pip..."
 	@-bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV);pip install -r $(APP_ROOT)/requirements-dev.txt"
 	@echo "Install with pip complete. Test service with \`make test*' variations."
 
 .PHONY: install-base
 install-base:
-	@echo "Installing base packages with pip ..."
+	@echo "Installing base packages with pip..."
 	@-bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
 		pip install -r $(APP_ROOT)/requirements.txt --no-cache-dir"
 	@echo "Install with pip complete."
 
 .PHONY: install-sys
 install-sys:
-	@echo "Installing system packages for bootstrap ..."
+	@echo "Installing system packages for bootstrap..."
 	@bash bootstrap.sh -i
-	@echo "Installing system packages for your application ..."
+	@echo "Installing system packages for your application..."
 	@-test -f requirements.sh && bash requirements.sh
 
 .PHONY: install-pip
 install-pip: install
-	@echo "Installing package with pip ..."
+	@echo "Installing package with pip..."
 	@-bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV);pip install $(CURDIR)"
 	@echo "Install with pip complete."
 
 .PHONY: install-raw
 install-raw:
-	@echo "Installing package without dependencies ..."
+	@echo "Installing package without dependencies..."
 	@-bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; pip install -e "$(CURDIR)" --no-deps'
 	@echo "Install package complete."
 
 .PHONY: install
 install: bootstrap install-base
-	@echo "Installing application with buildout ..."
+	@echo "Installing application with buildout..."
 	@-bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
 		bin/buildout buildout:anaconda-home=$(CONDA_HOME) -c custom.cfg;"
 	@echo "Start service with \`make start'"
 
 .PHONY: update
 update:
-	@echo "Update application config with buildout (offline mode) ..."
+	@echo "Update application config with buildout (offline mode)..."
 	@-bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
 		bin/buildout buildout:anaconda-home=$(CONDA_HOME) -o -c custom.cfg"
 
@@ -278,81 +279,89 @@ online-update-config:
 ## Cleanup targets
 
 .PHONY: clean
-clean: clean-bld clean-cache clean-src
-	@echo "Cleaning buildout files ..."
+clean: clean-bld clean-cache clean-src clean-test
+	@echo "Cleaning buildout files..."
 	@-for i in $(BUILDOUT_FILES); do \
             test -e $$i && rm -v -rf $$i; \
         done
 
 .PHONY: clean-bld
 clean-bld:
-	@echo "Removing build files ..."
-	@-test -d "$(CURDIR)/eggs" || rm -fr "$(CURDIR)/eggs"
-	@-test -d "$(CURDIR)/develop-eggs" || rm -fr "$(CURDIR)/develop-eggs"
-	@-test -d "$(CURDIR)/$(APP_NAME).egg-info" || rm -fr "$(CURDIR)/$(APP_NAME).egg-info"
-	@-test -d "$(CURDIR)/parts" || rm -fr "$(CURDIR)/parts"
+	@echo "Removing build files..."
+	@-rm -fr "$(CURDIR)/eggs"
+	@-rm -fr "$(CURDIR)/develop-eggs"
+	@-rm -fr "$(CURDIR)/$(APP_NAME).egg-info"
+	@-rm -fr "$(CURDIR)/parts"
 
 .PHONY: clean-cache
 clean-cache:
-	@echo "Removing caches ..."
-	@-test -d "$(CURDIR)/.pytest_cache" || rm -fr "$(CURDIR)/.pytest_cache"
-	@-test -d "$(DOWNLOAD_CACHE)" || rm -fr "$(DOWNLOAD_CACHE)"
+	@echo "Removing caches..."
+	@-rm -fr "$(CURDIR)/.pytest_cache"
+	@-rm -fr "$(DOWNLOAD_CACHE)"
 
 .PHONY: clean-env
 clean-env: stop
-	@echo "Removing conda env $(CONDA_ENV)"
+	@echo "Removing conda env '$(CONDA_ENV)'"
 	@-test -d "$(CONDA_ENV_PATH)" && "$(CONDA_HOME)/bin/conda" remove -n $(CONDA_ENV) --yes --all
 
 .PHONY: clean-src
 clean-src:
-	@echo "Removing *.pyc files ..."
+	@echo "Removing *.pyc files..."
 	@-find "$(APP_ROOT)" -type f -name "*.pyc" -exec rm {} \;
-	@-test -d ./src || rm -rf ./src
+	@-rm -rf ./src
+
+.PHONY: clean-test
+clean-test:
+	@echo "Removing test/coverage files..."
+	@-rm "$(CURDIR)/coverage.xml"
+	@-rm -fr "$(CURDIR)/coverage"
+	@-rm -fr "$(CURDIR)/tests"
 
 .PHONY: clean-dist
 clean-dist: backup clean
-	@echo "Cleaning distribution ..."
-	@git diff --quiet HEAD || echo "There are uncommited changes! Not doing 'git clean' ..."
+	@echo "Cleaning distribution..."
+	@git diff --quiet HEAD || echo "There are uncommited changes! Not doing 'git clean'..."
 	@-git clean -dfx -e *.bak -e custom.cfg -e Makefile.config
 
 ## Testing targets
 
-.PHONY: test
-test:
-	@echo "Running tests (skip slow and online tests) ..."
+.PHONY: test-unit
+test-unit:
+	@echo "Running tests (skip slow and online tests)..."
 	bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
 		py.test -v -m 'not slow and not online' --junitxml $(CURDIR)/tests/results.xml"
 
-.PHONY: test-all
-test-all:
-	@echo "Running all tests (including slow and online tests) ..."
-	bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
-		pytest -v --junitxml $(CURDIR)/tests/results.xml"
-
 .PHONY: test-func
 test-func:
-	@echo "Running functional tests ..."
+	@echo "Running functional tests..."
 	bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
 		pytest -v -m 'functional' --junitxml $(CURDIR)/tests/results.xml"
+
+.PHONY: test-all
+test-all:
+	@echo "Running all tests (including slow and online tests)..."
+	bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
+		pytest -v --junitxml $(CURDIR)/tests/results.xml"
 
 .PHONY: coverage
 coverage:
 	@echo "Running coverage analysis..."
-	@bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); coverage run --source weaver setup.py test"
-	@bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); coverage report -m"
-	@bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); coverage html -d coverage"
-	$(BROWSER) coverage/index.html
+	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
+		coverage run --source weaver --omit="weaver/tests/*" setup.py test || true'
+	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; coverage xml -i --omit="weaver/tests/*"'
+	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; coverage report -m --omit="weaver/tests/*"'
+	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; coverage html -d coverage'
 
 .PHONY: pep8
 pep8:
-	@echo "Running pep8 code style checks ..."
+	@echo "Running pep8 code style checks..."
 	$(CONDA_ENV_PATH)/bin/flake8
 
 ## Documentation targets
 
 .PHONY: docs
 docs:
-	@echo "Generating docs with Sphinx ..."
+	@echo "Generating docs with Sphinx..."
 	$(MAKE) -C $@ clean html
 	@echo "open your browser: firefox docs/build/html/index.html"
 
@@ -363,7 +372,7 @@ linkcheck:
 
 .PHONY: doc8
 doc8:
-	@echo "Running doc8 doc style checks ..."
+	@echo "Running doc8 doc style checks..."
 	$(CONDA_ENV_PATH)/bin/doc8 docs/
 
 ## Bumpversion targets
@@ -412,20 +421,20 @@ docker-push: docker-build
 
 .PHONY: start
 start:
-	@echo "Starting supervisor service ..."
+	@echo "Starting supervisor service..."
 	bin/supervisord start
 
 .PHONY: stop
 stop:
-	@echo "Stopping supervisor service ..."
+	@echo "Stopping supervisor service..."
 	-bin/supervisord stop
 
 .PHONY: restart
 restart:
-	@echo "Restarting supervisor service ..."
+	@echo "Restarting supervisor service..."
 	bin/supervisord restart
 
 .PHONY: status
 status:
-	@echo "Supervisor status ..."
+	@echo "Supervisor status..."
 	bin/supervisorctl status

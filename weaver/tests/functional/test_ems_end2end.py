@@ -1,5 +1,5 @@
 from weaver import WEAVER_ROOT_DIR
-from weaver.tests.utils import get_settings_from_config_ini, get_settings_from_testapp, get_setting, Null
+from weaver.tests.utils import get_settings_from_config_ini, get_settings_from_testapp, Null
 from weaver.config import WEAVER_CONFIGURATION_EMS
 from weaver.wps_restapi.utils import wps_restapi_base_url
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
@@ -17,7 +17,6 @@ from six.moves.urllib.parse import urlparse
 from typing import AnyStr, Dict, Optional, Any, Tuple, Iterable, Callable, Union
 from unittest import TestCase
 from pyramid import testing
-from pyramid.settings import asbool
 from pyramid.httpexceptions import HTTPOk, HTTPCreated, HTTPUnauthorized, HTTPNotFound
 # use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
 # noinspection PyPackageRequirements
@@ -55,8 +54,8 @@ class ProcessInfo(object):
 
 @pytest.mark.slow
 @pytest.mark.functional
-@pytest.mark.skipif(not len(str(os.getenv('TEST_SERVER_HOSTNAME', ''))), reason="Test server not defined!")
-@unittest.skipIf(not len(str(os.getenv('TEST_SERVER_HOSTNAME', ''))), reason="Test server not defined!")
+@pytest.mark.skipif(not len(str(os.getenv('WEAVER_TEST_SERVER_HOSTNAME', ''))), reason="Test server not defined!")
+@unittest.skipIf(not len(str(os.getenv('WEAVER_TEST_SERVER_HOSTNAME', ''))), reason="Test server not defined!")
 class End2EndEMSTestCase(TestCase):
     """
     Runs an end-2-end test procedure on weaver configured as EMS located on specified `TEST_SERVER_HOSTNAME`.
@@ -494,7 +493,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def setup_logger(cls):
-        root_dir = os.getenv('TEST_LOGGER_RESULT_DIR', os.path.join(WEAVER_ROOT_DIR))
+        root_dir = os.getenv('WEAVER_TEST_LOGGER_RESULT_DIR', os.path.join(WEAVER_ROOT_DIR))
         make_dirs(root_dir, exist_ok=True)
         log_path = os.path.abspath(os.path.join(root_dir, cls.__name__ + '.log'))
         log_fmt = logging.Formatter("%(message)s")      # only message to avoid 'log-name INFO' offsetting outputs

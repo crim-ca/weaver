@@ -2,6 +2,7 @@
 Utility methods for various TestCase setup operations.
 """
 from weaver.datatype import Service
+from weaver.database import get_db
 from weaver.store.mongodb import MongodbServiceStore, MongodbProcessStore, MongodbJobStore
 from weaver.config import WEAVER_CONFIGURATION_DEFAULT
 from weaver.wps import get_wps_url, get_wps_output_url, get_wps_output_path
@@ -66,9 +67,9 @@ def setup_config_with_mongodb(config=None, settings=None):
     # type: (Optional[Configurator], Optional[SettingsType]) -> Configurator
     settings = settings or {}
     settings.update({
-        'mongodb.host': '127.0.0.1',
-        'mongodb.port': '27027',
-        'mongodb.db_name': 'weaver_test'
+        'mongodb.host':     os.getenv('WEAVER_TEST_DB_HOST', '127.0.0.1'),
+        'mongodb.port':     os.getenv('WEAVER_TEST_DB_PORT', '27017'),
+        'mongodb.db_name':  os.getenv('WEAVER_TEST_DB_NAME', 'weaver-test'),
     })
     if config:
         config.registry.settings.update(settings)
@@ -81,7 +82,7 @@ def setup_mongodb_servicestore(config=None):
     # type: (Optional[Configurator]) -> MongodbServiceStore
     """Setup store using mongodb, will be enforced if not configured properly."""
     config = setup_config_with_mongodb(config)
-    store = config.registry.db.get_store(MongodbServiceStore)
+    store = get_db(config).get_store(MongodbServiceStore)
     store.clear_services()
     # noinspection PyTypeChecker
     return store
@@ -91,12 +92,12 @@ def setup_mongodb_processstore(config=None):
     # type: (Optional[Configurator]) -> MongodbProcessStore
     """Setup store using mongodb, will be enforced if not configured properly."""
     config = setup_config_with_mongodb(config)
-    store = config.registry.db.get_store(MongodbProcessStore)
+    store = get_db(config).get_store(MongodbProcessStore)
     store.clear_processes()
     # store must be recreated after clear because processes are added automatically on __init__
     # noinspection PyProtectedMember
-    config.registry.db._stores.pop(MongodbProcessStore.type)
-    store = config.registry.db.get_store(MongodbProcessStore)
+    get_db(config)._stores.pop(MongodbProcessStore.type)
+    store = get_db(config).get_store(MongodbProcessStore)
     # noinspection PyTypeChecker
     return store
 
@@ -105,7 +106,7 @@ def setup_mongodb_jobstore(config=None):
     # type: (Optional[Configurator]) -> MongodbJobStore
     """Setup store using mongodb, will be enforced if not configured properly."""
     config = setup_config_with_mongodb(config)
-    store = config.registry.db.get_store(MongodbJobStore)
+    store = get_db(config).get_store(MongodbJobStore)
     store.clear_jobs()
     # noinspection PyTypeChecker
     return store

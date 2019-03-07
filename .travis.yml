@@ -8,17 +8,25 @@ os:
 python:
   - "2.7"
 sudo: false
+services:
+  - mongodb
+before_install:
+  - source .travis.env
 install:
   - make install
   - make start
 before_script:
   - sleep 5
 script:
-  - make testall
   - make pep8
   - make docs
-#after_success:
-# - coveralls
+  - make test-all
+  - make coverage
 matrix:
   allow_failures:
     - os: osx
+notifications:
+  email: false
+after_success:
+  # - coveralls
+  - bash <(curl -s https://codecov.io/bash) || echo "Codecov did not collect coverage reports"

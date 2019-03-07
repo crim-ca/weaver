@@ -15,11 +15,11 @@ from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
 from weaver.processes.wps_default import Hello
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.tests.utils import (
-    setup_config_from_settings,
     setup_config_with_mongodb,
     setup_config_with_pywps,
     setup_mongodb_processstore,
     setup_config_with_celery,
+    get_test_weaver_config,
     get_test_weaver_app,
 )
 
@@ -33,7 +33,7 @@ class WpsAppTest(unittest.TestCase):
             'weaver.wps': True,
             'weaver.wps_path': self.wps_path
         }
-        config = setup_config_from_settings(settings)
+        config = get_test_weaver_config(settings=settings)
         config = setup_config_with_mongodb(config)
         config = setup_config_with_pywps(config)
         config = setup_config_with_celery(config)
