@@ -25,9 +25,9 @@ import logging
 import os
 import shutil
 import tempfile
-from typing import TYPE_CHECKING
+from typing import MutableMapping, Callable, cast, Text, TYPE_CHECKING  # these are actually used in the code
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Generator, List, Optional, Set, MutableMapping, Union, cast, Text
+    from typing import Any, Dict, Generator, List, Optional, Set, Union
     from weaver.typedefs import ExpectedOutputType, GetJobProcessDefinitionFunction, ToolPathObjectType
     from weaver.processes.wps_process_base import WpsProcessInterface
     from cwltool.command_line_tool import OutputPorts
@@ -38,10 +38,6 @@ DEFAULT_TMP_PREFIX = "tmp"
 # TODO: The code started as a copy of the class cwltool/command_line_tool.py,
 #       and still has useless code in the context of a WPS workflow
 
-# TODO: Ce code est tentatif, j'ai vu que supportedProcessRequirements de cwltools.process.py
-#  causerait possiblement un probleme.
-#  Sinon le plan B serait de retirer les hints non supportes dans le __init__ de WpsWorkflow
-#  apres avoir pris une copie dans une variable custom genre hints_ext
 # Extend the supported process requirements
 supportedProcessRequirements += ["WPS1Requirement",
                                  "ESGF-CWTRequirement"]
@@ -99,7 +95,7 @@ class WpsWorkflow(ProcessCWL):
     def job(self,
             job_order,          # type: Dict[Text, Text]
             output_callbacks,   # type: Callable[[Any, Any], Any]
-            runtimeContext,    # type: RuntimeContext
+            runtimeContext,     # type: RuntimeContext
             ):                  # type: (...) -> Generator[Union[JobBase, CallbackJob], None, None]
 
         require_prefix = ""
@@ -378,7 +374,7 @@ class WpsWorkflowJob(JobBase):
         super(WpsWorkflowJob, self).__init__(builder, joborder, None, requirements, hints, name)
         self.wps_process = wps_process
         self.results = None
-        self.expected_outputs = {}
+        self.expected_outputs = {}  # type: ExpectedOutputType
         for output in expected_outputs:
             # TODO Should we support something else?
             if output['type'] == 'File':

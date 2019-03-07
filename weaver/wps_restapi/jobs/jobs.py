@@ -8,6 +8,7 @@ from weaver.exceptions import (
     JobNotFound,
 )
 from weaver.store.base import StoreServices, StoreProcesses, StoreJobs
+from weaver.utils import get_settings
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import wps_restapi_base_url
 from weaver.visibility import VISIBILITY_PUBLIC
@@ -88,7 +89,6 @@ def check_status(url=None, response=None, sleep_secs=2, verify=False):
     execution.checkStatus(response=xml, sleepSecs=sleep_secs)
     if execution.response is None:
         raise Exception("check_status failed!")
-    # TODO: workaround for owslib type change of response
     # noinspection PyProtectedMember
     if not isinstance(execution.response, etree._Element):
         execution.response = etree.fromstring(execution.response)
@@ -189,7 +189,7 @@ def get_jobs(request):
         'count': count,
         'page': page,
         'limit': limit,
-        'jobs': [job_format_json(request.registry.settings, job) if detail else job.id for job in items]
+        'jobs': [job_format_json(get_settings(request), job) if detail else job.id for job in items]
     })
 
 
@@ -204,7 +204,7 @@ def get_job_status(request):
     Retrieve the status of a job.
     """
     job = get_job(request)
-    response = job_format_json(request.registry.settings, job)
+    response = job_format_json(get_settings(request), job)
     return HTTPOk(json=response)
 
 

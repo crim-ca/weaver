@@ -5,7 +5,7 @@ from weaver.datatype import Bill, Quote
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from weaver.processes.wps_package import get_process_location, get_package_workflow_steps
 from weaver.store.base import StoreBills, StoreQuotes
-from weaver.utils import get_weaver_url
+from weaver.utils import get_weaver_url, get_settings
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.processes import submit_local_job
 from weaver import sort
@@ -42,7 +42,7 @@ def request_quote(request):
     """
     Request a quotation for a process.
     """
-    settings = request.registry.settings
+    settings = get_settings(request)
     weaver_config = get_weaver_configuration(settings)
 
     if weaver_config not in [WEAVER_CONFIGURATION_ADES, WEAVER_CONFIGURATION_EMS]:
@@ -56,7 +56,7 @@ def request_quote(request):
         raise HTTPNotFound("Could not find process with specified `process_id`.")
 
     store = get_db(request).get_store(StoreQuotes)
-    process_url = get_process_location(process_id, data_source=get_weaver_url(request.registry.settings))
+    process_url = get_process_location(process_id, data_source=get_weaver_url(settings))
     process_type = process.type
     process_params = dict()
     for param in ['inputs', 'outputs', 'mode', 'response']:

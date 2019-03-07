@@ -13,7 +13,7 @@ from weaver.exceptions import (
 from weaver.status import (STATUS_RUNNING, STATUS_SUCCEEDED, STATUS_EXCEPTION, STATUS_FAILED,
                            map_status, STATUS_COMPLIANT_PYWPS, STATUS_PYWPS_IDS)
 from weaver.wps_restapi.swagger_definitions import process_uri
-from weaver.utils import get_job_log_msg, get_log_fmt, get_log_datefmt, get_sane_name
+from weaver.utils import get_job_log_msg, get_log_fmt, get_log_datefmt, get_sane_name, get_settings
 from pywps.inout.basic import BasicIO
 from pywps.inout.literaltypes import AnyValue, AllowedValue, ALLOWEDVALUETYPE
 from pywps.validator.mode import MODE
@@ -47,8 +47,11 @@ from pywps import (
     Format,
 )
 if TYPE_CHECKING:
-    from weaver.status import AnyStatusType, ToolPathObjectType
+    from weaver.status import AnyStatusType
+    from weaver.typedefs import ToolPathObjectType
     from cwltool.process import Process as ProcessCWL
+    from pywps.app import WPSRequest
+    from pywps.response.execute import ExecuteResponse
 
 LOGGER = logging.getLogger("PACKAGE")
 
@@ -70,6 +73,16 @@ PACKAGE_ARRAY_TYPES = frozenset(['{}[]'.format(item) for item in PACKAGE_ARRAY_I
 PACKAGE_CUSTOM_TYPES = frozenset(['enum'])  # can be anything, but support 'enum' which is more common
 PACKAGE_DEFAULT_FILE_NAME = 'package'
 PACKAGE_LOG_FILE = 'package_log_file'
+
+# package (requirements/hints) corresponding to `PROCESS_APPLICATION`
+PACKAGE_REQUIREMENTS_APP_DOCKER = "DockerRequirement"
+PACKAGE_REQUIREMENTS_APP_ESGF_CWT = "ESGF-CWTRequirement"
+PACKAGE_REQUIREMENTS_APP_WPS1 = "WPS1Requirement"
+PACKAGE_REQUIREMENTS_APP_TYPES = frozenset([
+    PACKAGE_REQUIREMENTS_APP_DOCKER,
+    PACKAGE_REQUIREMENTS_APP_ESGF_CWT,
+    PACKAGE_REQUIREMENTS_APP_WPS1,
+])
 
 PACKAGE_PROGRESS_PREP_LOG = 1
 PACKAGE_PROGRESS_LAUNCHING = 2
@@ -273,21 +286,21 @@ def _load_package_content(package_dict,                             # type: Dict
                           ):  # type: (...) -> Union[Tuple[cwltool.factory.Factory, AnyStr, Dict], None]
     """
     Loads the package content to file in a temporary directory.
-    Recursively processes sub-packages steps if the parent is of 'workflow' type (CWL class).
+    Recursively processes sub-packages steps if the parent is a `Workflow` (CWL class).
 
     :param package_dict: package content representation as a json dictionary.
     :param package_name: name to use to create the package file.
     :param data_source: identifier of the data source to map to specific ADES, or map to localhost if ``None``.
     :param only_dump_file: specify if the :class:`cwltool.factory.Factory` should be validated and returned.
     :param tmp_dir: location of the temporary directory to dump files (warning: will be deleted on exit).
-    :param loading_context: cwltool context use to make the cwl package
-    :param runtime_context: cwltool context use to make the cwl package
+    :param loading_context: cwltool context used to create the cwl package
+    :param runtime_context: cwltool context used to execute the cwl package
     :return:
         tuple of
         - instance of :class:`cwltool.factory.Factory`
         - package type (PROCESS_WORKFLOW or PROCESS_APPLICATION)
         - dict of each step with their package name that must be run
-        if :param:`only_dump_file` is ``False``, ``None`` otherwise.
+        if ``only_dump_file`` is ``False``, ``None`` otherwise.
     """
 
     tmp_dir = tmp_dir or tempfile.mkdtemp()
@@ -854,7 +867,7 @@ def get_process_from_wps_request(process_offering, reference=None, package=None,
     The returned process information can be used later on to load an instance of :class:`weaver.wps_package.Package`.
 
     :param process_offering: WPS REST-API process offering as JSON.
-    :param reference: URL to an existing package definition.
+    :param reference: URL to an existing package definition (CWL) or .
     :param package: literal package definition as JSON.
     :param data_source: where to resolve process IDs (default: localhost if ``None``).
     :return: process information dictionary ready for saving to data store.
@@ -1032,6 +1045,7 @@ class WpsPackage(Process):
         return cls.map_progress(100 * step_index / steps_total, PACKAGE_PROGRESS_RUN_CWL, PACKAGE_PROGRESS_CWL_DONE)
 
     def _handler(self, request, response):
+        # type: (WPSRequest, ExecuteResponse) -> ExecuteResponse
         LOGGER.debug("HOME=%s, Current Dir=%s", os.environ.get('HOME'), os.path.abspath(os.curdir))
         self.request = request
         self.response = response
@@ -1049,7 +1063,7 @@ class WpsPackage(Process):
             self.update_status("Launching package ...", PACKAGE_PROGRESS_LAUNCHING, STATUS_RUNNING)
 
             registry = app.conf['PYRAMID_REGISTRY']
-            if get_weaver_configuration(registry.settings) == WEAVER_CONFIGURATION_EMS:
+            if get_weaver_configuration(get_settings(registry)) == WEAVER_CONFIGURATION_EMS:
                 # EMS dispatch the execution to the ADES
                 loading_context = LoadingContext()
                 loading_context.construct_tool_object = self.make_tool
@@ -1187,27 +1201,38 @@ class WpsPackage(Process):
             name=jobname),
             start_step_progress, STATUS_RUNNING)
 
-        # TODO:
-        #   Le parametre 'tool' devrait contenir la structure hint du cwl (reste a valider)
-        #   La structure tool['hints']['WPS1Requirement']['provider'] n'est donc que pure invention a l'heure actuelle
-        if 'WPS1Requirement' in tool['hints']:
-            provider = tool['hints']['WPS1Requirement']['provider']
+        # package can define requirements and/or hints, if it's an application, only one is allowed, workflow can have
+        # multiple, but they are not explicitly handled
+        all_hints = list(dict(req) for req in tool.get('requirements', {}))
+        all_hints.extend(dict(req) for req in tool.get('hints', {}))
+        app_hints = filter(lambda h: any(h['class'].endswith(t) for t in PACKAGE_REQUIREMENTS_APP_TYPES), all_hints)
+        if len(app_hints) > 1:
+            raise ValueError("Package 'requirements' and/or 'hints' define too many conflicting values: {}, "
+                             "only one permitted amongst {}.".format(list(app_hints), PACKAGE_REQUIREMENTS_APP_TYPES))
+        requirement = app_hints[0] if app_hints else {'class': None}
+        if requirement['class'].endswith(PACKAGE_REQUIREMENTS_APP_WPS1):
+            req_params = ['provider', 'process']
+            if not all(r in requirement for r in ['provider', 'process']):
+                raise ValueError("Missing requirement [{}] details amongst {}".format(requirement['class'], req_params))
+            provider = requirement['provider']
             # The process id of the provider isn't required to be the same as the one use in the EMS
-            process = tool['hints']['WPS1Requirement']['process']
+            process = requirement['process']
             return Wps1Process(provider=provider,
                                process=process,
-                               cookies=self.request.http_request.cookies,
+                               request=self.request,
                                update_status=lambda _provider, _message, _progress, _status: self.step_update_status(
                                    _message, _progress, start_step_progress, end_step_progress, jobname,
                                    _provider, _status
                                ))
-        elif 'ESGF-CWTRequirement' in tool['hints']:
+        elif requirement['class'].endswith(PACKAGE_REQUIREMENTS_APP_ESGF_CWT):
+            # TODO: implement
             raise NotImplementedError('ESGF-CWTRequirement not implemented')
         else:
+            # implements both PROCESS_APPLICATION` with `PACKAGE_REQUIREMENTS_APP_DOCKER` and `PROCESS_WORKFLOW`
             return Wps3Process(step_payload=step_payload,
                                joborder=joborder,
                                process=process,
-                               cookies=self.request.http_request.cookies,
+                               request=self.request,
                                update_status=lambda _provider, _message, _progress, _status: self.step_update_status(
                                    _message, _progress, start_step_progress, end_step_progress, jobname,
                                    _provider, _status

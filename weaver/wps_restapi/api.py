@@ -1,4 +1,5 @@
 from weaver.__meta__ import __version__ as weaver_version
+from weaver.utils import get_settings
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.colander_one_of import CustomTypeConversionDispatcher
 from weaver.wps_restapi.utils import wps_restapi_base_url, wps_restapi_base_path, get_header, CONTENT_TYPE_JSON
@@ -42,7 +43,7 @@ def api_frontpage(request):
     from weaver.utils import get_weaver_url
     from weaver.wps import get_wps_path
 
-    settings = request.registry.settings
+    settings = get_settings(request)
     weaver_url = get_weaver_url(settings)
     weaver_config = get_weaver_configuration(settings)
 

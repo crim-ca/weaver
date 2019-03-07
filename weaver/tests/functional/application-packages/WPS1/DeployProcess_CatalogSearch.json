@@ -1,24 +1,30 @@
 {
     "processDescription": {
         "process": {
-            "id": "thredds_urls",
-            "title": "thredds_urls",
+            "id": "CatalogSearch",
+            "title": "Catalog Search for Thredds URLs",
             "abstract": "Get files url from Thredds Catalog and provides file list as JSON Document.",
             "keywords": [],
             "inputs": [{
 				"id": "url",
-				"title": "URL",
-				"formats": [{
-					"mimeType": "application/netcdf",
-					"default": true
-				}],
+				"title": "URL of the Catalog",
+				"formats": [
+                    {
+                        "mimeType": "application/netcdf",
+                        "default": true
+				    },
+                    {
+                        "mimeType": "application/xml",
+                        "default": true
+				    }
+                ],
 				"minOccurs": "1",
 				"maxOccurs": "1"
 			}],
             "outputs": [
                 {
                     "id": "output",
-                    "title": "Catalog file urls",
+                    "title": "JSON file with Catalog URLs",
                     "formats": [
                         {
                             "mimeType": "application/json",
@@ -38,8 +44,8 @@
     },
     "executionUnit": [
         {
-            "href": "catalog_search.cwl"
+            "href": "weaver/tests/functional/application-packages/WPS1/catalog_search.cwl"
         }
     ],
-    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow"
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
 }

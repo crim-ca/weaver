@@ -30,8 +30,9 @@ import logging
 import warnings
 import requests
 if TYPE_CHECKING:
+    from weaver.typedefs import JsonBody, UpdateStatusPartialFunction
     from typing import Union, AnyStr
-    from weaver.typedefs import JsonBody, CookiesType, UpdateStatusPartialFunction
+    from pywps.app import WPSRequest
 
 LOGGER = logging.getLogger(__name__)
 
@@ -50,14 +51,15 @@ class Wps3Process(WpsProcessInterface):
                  step_payload,      # type: JsonBody
                  joborder,          # type: int
                  process,           # type: AnyStr
-                 cookies,           # type: CookiesType
+                 request,           # type: WPSRequest
                  update_status,     # type: UpdateStatusPartialFunction
                  ):
-        super(Wps3Process, self).__init__(cookies)
-        self.provider, self.url, self.deploy_body = self.resolve_data_source(step_payload, joborder)
-        self.process = process
+        super(Wps3Process, self).__init__(request)
+        self.provider = None    # overridden if data source properly resolved
         self.update_status = lambda _message, _progress, _status: update_status(
             self.provider, _message, _progress, _status)
+        self.provider, self.url, self.deploy_body = self.resolve_data_source(step_payload, joborder)
+        self.process = process
 
     def resolve_data_source(self, step_payload, joborder):
         # TODO Ce code provient de wps_package et n'a pas ete teste ici-meme
@@ -88,6 +90,7 @@ class Wps3Process(WpsProcessInterface):
         except (IndexError, KeyError) as exc:
             raise PackageExecutionError("Failed to save package outputs. [{}]".format(repr(exc)))
 
+        self.provider = provider  # fix immediately for `update_status`
         self.update_status("{provider} is selected {reason}.".format(
             provider=provider,
             reason=reason),

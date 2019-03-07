@@ -1,13 +1,16 @@
 from weaver.wps import get_wps_output_path, get_wps_output_url
+from weaver.wps_restapi.utils import get_cookie_headers
 from pyramid_celery import celery_app as app
 from pyramid.settings import asbool
 from pyramid.httpexceptions import HTTPBadGateway
 from time import sleep
 from typing import TYPE_CHECKING
+from abc import abstractmethod
 import requests
 if TYPE_CHECKING:
-    from weaver.typedefs import ExpectedOutputType
-    from typing import Any, AnyStr, Dict, List, Union
+    from weaver.typedefs import JsonBody
+    from typing import AnyStr, Dict
+    from pywps.app import WPSRequest
 
 
 class WpsProcessInterface(object):
@@ -15,24 +18,27 @@ class WpsProcessInterface(object):
     Common interface for WpsProcess to be used is cwl jobs
     """
 
+    @abstractmethod
     def execute(self,
-                workflow_inputs,        # type: Union[Dict[AnyStr, Any], List[Dict[AnyStr, Any]]]
+                workflow_inputs,        # type: JsonBody
                 out_dir,                # type: AnyStr
-                expected_outputs,       # type: List[ExpectedOutputType]
+                expected_outputs,       # type: Dict[AnyStr, AnyStr]
                 ):
         """
         Execute a remote process using the given inputs.
         The function is expected to monitor the process and update the status.
-        Retrieve the expected outputs and store them in the out_dir.
+        Retrieve the expected outputs and store them in the ``out_dir``.
 
         :param workflow_inputs: cwl job dict
-        :param out_dir: [string] directory where the outputs must be written
-        :param expected_outputs: array of expected output ids
+        :param out_dir: directory where the outputs must be written
+        :param expected_outputs: expected value outputs as `{'id': 'value'}`
         """
         raise NotImplementedError
 
-    def __init__(self, cookies):
-        self.cookies = cookies
+    def __init__(self, request):
+        # type: (WPSRequest) -> None
+        self.request = request
+        self.cookies = get_cookie_headers(self.request.http_request.headers)
         self.headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
 
         registry = app.conf['PYRAMID_REGISTRY']

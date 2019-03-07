@@ -1,21 +1,22 @@
 {
     "cwlVersion": "v1.0",
     "class": "CommandLineTool",
-    "requirements": {
+    "hints": {
         "WPS1Requirement": {
             "provider": "https://pavics.ouranos.ca/twitcher/ows/proxy/malleefowl/wps",
-            "process_id": "thredds_urls"
+            "process": "thredds_urls"
         }
     },
     "inputs": {
       "url": {
-        "type": {
-          "type": "File"
-        }
+        "type": "string"
       }
     },
     "outputs": {
       "output": {
+        "outputBinding": {
+          "glob": "output.json"
+        },
         "type": "File"
       }
     }

@@ -7,6 +7,8 @@ from lxml import etree
 from lxml.etree import _Element as xmlElement
 from typing import Union, Any, Dict, List, AnyStr, Iterable, Optional, TYPE_CHECKING
 from pyramid.httpexceptions import HTTPError as PyramidHTTPError
+from pyramid.config import Configurator
+from pyramid.registry import Registry
 from pyramid.request import Request
 from requests import HTTPError as RequestsHTTPError
 from six.moves.urllib.parse import urlparse, parse_qs
@@ -21,13 +23,13 @@ import platform
 import warnings
 import logging
 if TYPE_CHECKING:
-    from weaver.typedefs import Settings
+    from weaver.typedefs import SettingsType, AnySettingsContainer
 
 LOGGER = logging.getLogger(__name__)
 
 
 def get_weaver_url(settings):
-    # type: (Settings) -> AnyStr
+    # type: (SettingsType) -> AnyStr
     return settings.get('weaver.url').rstrip('/').strip()
 
 
@@ -53,6 +55,17 @@ def get_any_message(info):
     :param info: dictionary that potentially contains a 'message'-like key.
     :returns: value of the matched 'message'-like key or an empty string if not found. """
     return info.get('message', '').strip()
+
+
+def get_settings(container):
+    # type: (AnySettingsContainer) -> SettingsType
+    if isinstance(container, (Configurator, Request)):
+        return container.registry.settings
+    if isinstance(container, Registry):
+        return container.settings
+    if isinstance(container, dict):
+        return container
+    raise TypeError("Could not retrieve settings from container object [{}]".format(type(container)))
 
 
 def is_valid_url(url):

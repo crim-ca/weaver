@@ -24,16 +24,19 @@ def ows_response_tween_factory(handler, registry):
             LOGGER.debug("http exception -> ows exception response.")
             # Use the same json formatter than OWSException
             err._json_formatter = OWSException.json_formatter
-            return err
+            r_err = err
         except OWSException as err:
             LOGGER.debug('direct ows exception response')
-            return err
+            LOGGER.exception("Raised exception: [{!r}]\nReturned exception: {!r}".format(err, err))
+            r_err = err
         except NotImplementedError as err:
             LOGGER.debug('not implemented error -> ows exception response')
-            return OWSNotImplemented(str(err))
+            r_err = OWSNotImplemented(str(err))
         except Exception as err:
             LOGGER.debug("unhandled {!s} exception -> ows exception response".format(type(err).__name__))
-            return OWSException(detail=str(err), status=HTTPInternalServerError)
+            r_err = OWSException(detail=str(err), status=HTTPInternalServerError)
+        LOGGER.exception("Raised exception: [{!r}]\nReturned exception: {!r}".format(err, r_err))
+        return r_err
 
     return ows_response_tween
 

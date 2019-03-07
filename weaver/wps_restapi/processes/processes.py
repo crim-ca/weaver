@@ -20,7 +20,7 @@ from weaver.execute import (
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes import wps_package, opensearch
 from weaver.processes.utils import jsonify_value, jsonify_output
-from weaver.processes.types import PROCESS_WORKFLOW
+from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from weaver.status import (
     map_status,
     STATUS_ACCEPTED,
@@ -29,7 +29,7 @@ from weaver.status import (
     STATUS_SUCCEEDED,
 )
 from weaver.store.base import StoreServices, StoreProcesses, StoreJobs
-from weaver.utils import get_any_id, get_any_value, raise_on_xml_exception, get_sane_name, wait_secs
+from weaver.utils import get_any_id, get_any_value, get_settings, raise_on_xml_exception, get_sane_name, wait_secs
 from weaver.visibility import VISIBILITY_PUBLIC, visibility_values
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.notify import notify_job
@@ -53,18 +53,20 @@ from pyramid.httpexceptions import (
     HTTPException,
 )
 from time import sleep
-from typing import Any, AnyStr, Dict, List, Tuple, Optional, Union
 from celery.utils.log import get_task_logger
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
 from pyramid.request import Request
 from lxml import etree
-from six import string_types
 from copy import deepcopy
+from typing import TYPE_CHECKING
 import requests
 import colander
 import logging
+import six
 import os
+if TYPE_CHECKING:
+    from typing import Any, AnyStr, Dict, List, Tuple, Optional, Union
 
 LOGGER = logging.getLogger(__name__)
 
@@ -130,9 +132,9 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
                 input_values = [val[7:] if val.startswith('file://') else val for val in input_values]
 
                 # need to use ComplexDataInput structure for complex input
-                wps_inputs.extend([(input_id,
-                                    ComplexDataInput(input_value) if input_id in complex_inputs else input_value)
-                                   for input_value in input_values])
+                wps_inputs.extend([
+                    (input_id, ComplexDataInput(input_value) if input_id in complex_inputs else input_value)
+                    for input_value in input_values])
         except KeyError:
             wps_inputs = []
 
@@ -284,7 +286,7 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
     # local/provider process location
     location_base = '/providers/{provider_id}'.format(provider_id=provider_id) if provider_id else ''
     location = '{base_url}{location_base}/processes/{process_id}/jobs/{job_id}'.format(
-        base_url=wps_restapi_base_url(request.registry.settings),
+        base_url=wps_restapi_base_url(get_settings(request)),
         location_base=location_base,
         process_id=process_id,
         job_id=job.id)
@@ -361,13 +363,13 @@ def convert_process_wps_to_db(service, process, settings):
 def list_remote_processes(service, request):
     # type: (Service, Request) -> List[ProcessDB]
     """
-    Obtains a list of remote service processes in a compatible local process format.
+    Obtains a list of remote service processes in a compatible :class:`weaver.datatype.Process` format.
     Note: those processes won't be stored to the local process storage.
     """
     if not isinstance(service, Service):
         return list()
     wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
-    return [convert_process_wps_to_db(service, process, request.registry.settings) for process in wps.processes]
+    return [convert_process_wps_to_db(service, process, get_settings(request)) for process in wps.processes]
 
 
 @sd.provider_processes_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.getcapabilities_tag],
@@ -396,7 +398,7 @@ def get_provider_process(request):
     service = store.fetch_by_name(provider_id, request=request)
     wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
     process = wps.describeprocess(process_id)
-    return convert_process_wps_to_db(service, process, request.registry.settings)
+    return convert_process_wps_to_db(service, process, get_settings(request))
 
 
 @sd.provider_process_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.describeprocess_tag],
@@ -454,7 +456,7 @@ def get_processes(request):
         response_body = {'processes': processes}
 
         # if EMS and ?providers=True, also fetch each provider's processes
-        if get_weaver_configuration(request.registry.settings) == WEAVER_CONFIGURATION_EMS:
+        if get_weaver_configuration(get_settings(request)) == WEAVER_CONFIGURATION_EMS:
             queries = parse_request_query(request)
             if 'providers' in queries and asbool(queries['providers'][0]) is True:
                 providers_response = requests.request('GET', '{host}/providers'.format(host=request.host_url),
@@ -518,7 +520,9 @@ def add_local_process(request):
             raise HTTPUnprocessableEntity("Invalid parameter 'processDescription.process.owsContext.offering.content'.")
         package = None
         reference = content.get('href')
-    elif deployment_profile_name.endswith('workflow') or deployment_profile_name.endswith('application'):
+    elif deployment_profile_name:
+        if not any(deployment_profile_name.endswith(typ) for typ in [PROCESS_APPLICATION, PROCESS_WORKFLOW]):
+            raise HTTPBadRequest("Invalid value for parameter 'deploymentProfileName'.")
         execution_units = body.get('executionUnit')
         if not isinstance(execution_units, list):
             raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
@@ -533,6 +537,16 @@ def add_local_process(request):
     else:
         raise HTTPBadRequest("Missing one of required parameters [owsContext, deploymentProfileName].")
 
+    # TODO: check 'reference' for any of:
+    #   - .cwl leave it as is, already handled by 'wps_package.get_process_from_wps_request'
+    #   ------
+    #   - WPS2 process endpoint: JSON + 'process' description in body /w => generate process_info
+    #   - WPS1 service endpoint: urlparse(reference) + 'convert_process_wps_to_db' => generate process_info
+
+    # add 'owsContext' if missing (details retrieved from 'executionUnit')
+    if 'owsContext' not in process_info and reference:
+        process_info['owsContext'] = {'offering': {'content': {'href': reference}}}
+
     # obtain updated process information using WPS process offering and CWL package definition
     try:
         # data_source `None` forces workflow process to search locally for deployed step applications
@@ -546,7 +560,7 @@ def add_local_process(request):
         raise HTTPBadRequest("Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex)))
 
     # validate process type against weaver configuration
-    settings = request.registry.settings
+    settings = get_settings(request)
     process_type = process_info['type']
     if process_type == PROCESS_WORKFLOW:
         weaver_config = get_weaver_configuration(settings)
@@ -584,7 +598,7 @@ def add_local_process(request):
 def get_process(request):
     # type: (Request) -> ProcessDB
     process_id = request.matchdict.get('process_id')
-    if not isinstance(process_id, string_types):
+    if not isinstance(process_id, six.string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
         store = get_db(request).get_store(StoreProcesses)
@@ -651,7 +665,7 @@ def get_process_visibility(request):
     Get the visibility of a registered local process.
     """
     process_id = request.matchdict.get('process_id')
-    if not isinstance(process_id, string_types):
+    if not isinstance(process_id, six.string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
         store = get_db(request).get_store(StoreProcesses)
@@ -674,9 +688,9 @@ def set_process_visibility(request):
     """
     visibility_value = request.json.get('value')
     process_id = request.matchdict.get('process_id')
-    if not isinstance(process_id, string_types):
+    if not isinstance(process_id, six.string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
-    if not isinstance(visibility_value, string_types):
+    if not isinstance(visibility_value, six.string_types):
         raise HTTPUnprocessableEntity("Invalid visibility value specified.")
     if visibility_value not in visibility_values:
         raise HTTPBadRequest("Invalid visibility value specified.")
@@ -705,7 +719,7 @@ def delete_local_process(request):
     Unregister a local process.
     """
     process_id = request.matchdict.get('process_id')
-    if not isinstance(process_id, string_types):
+    if not isinstance(process_id, six.string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
         store = get_db(request).get_store(StoreProcesses)
@@ -732,7 +746,7 @@ def submit_local_job(request):
     Execute a local process.
     """
     process_id = request.matchdict.get('process_id')
-    if not isinstance(process_id, string_types):
+    if not isinstance(process_id, six.string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
         store = get_db(request).get_store(StoreProcesses)

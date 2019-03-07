@@ -1,6 +1,7 @@
+from weaver.utils import get_settings
+from pyramid.exceptions import ConfigurationError
 import os
 import tempfile
-from pyramid.exceptions import ConfigurationError
 
 import logging
 LOGGER = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ def get_weaver_configuration(settings):
 
 
 def _workdir(request):
-    settings = request.registry.settings
+    settings = get_settings(request)
     workdir = settings.get('weaver.workdir')
     workdir = workdir or tempfile.gettempdir()
     if not os.path.exists(workdir):
@@ -38,7 +39,7 @@ def _workdir(request):
 
 
 def _prefix(request):
-    settings = request.registry.settings
+    settings = get_settings(request)
     prefix = settings.get('weaver.prefix')
     prefix = prefix or 'weaver_'
     return prefix
