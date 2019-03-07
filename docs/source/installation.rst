@@ -48,7 +48,7 @@ Check the status of the weaver service:
     Supervisor status ...
     mongodb                          RUNNING   pid 6863, uptime 0:00:19
     nginx                            RUNNING   pid 6865, uptime 0:00:19
-    weaver                         RUNNING   pid 6864, uptime 0:00:19
+    weaver                           RUNNING   pid 6864, uptime 0:00:19
 
 
 You will find more information about the installation in the `Makefile documentation`_.

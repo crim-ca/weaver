@@ -83,4 +83,4 @@ following improvements.
 `Weaver` is a **prototype** implemented in Python with the `Pyramid`_ web framework.
 
 .. _Pyramid: http://www.pylonsproject.org
-.. _PAVICS: https://crim-ca.github.io/pavics-sdi/index.html
+.. _PAVICS: https://ouranosinc.github.io/pavics-sdi/index.html
