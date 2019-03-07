@@ -7,12 +7,12 @@ from weaver.utils import get_any_id, get_any_value, get_job_log_msg, raise_on_xm
 from weaver.wps_restapi.jobs.jobs import check_status
 from weaver.wps_restapi.utils import get_cookie_headers
 from owslib.wps import WebProcessingService, ComplexDataInput, WPSException
-from typing import AnyStr, List, TYPE_CHECKING
+from typing import AnyStr, TYPE_CHECKING
 from time import sleep
 import logging
 import requests
 if TYPE_CHECKING:
-    from weaver.typedefs import JsonBody, CookiesType, ExpectedOutputType, UpdateStatusPartialFunction
+    from weaver.typedefs import UpdateStatusPartialFunction
     from pywps.app import WPSRequest
 
 LOGGER = logging.getLogger(__name__)
@@ -38,10 +38,6 @@ class Wps1Process(WpsProcessInterface):
             self.provider, _message, _progress, _status)
 
     def execute(self, workflow_inputs, out_dir, expected_outputs):
-        # type: (JsonBody, AnyStr, List[ExpectedOutputType]) -> None
-
-        # TODO Toute cette fonction est inspiree de la job celery du rest_api mais n'a pas ete testee
-
         self.update_status("Preparing execute request for remote WPS1 provider.",
                            REMOTE_JOB_PROGRESS_REQ_PREP, status.STATUS_RUNNING)
         LOGGER.debug("Execute process WPS request for {0}".format(self.process))
@@ -66,22 +62,23 @@ class Wps1Process(WpsProcessInterface):
 
             try:
                 wps_inputs = list()
-                for workflow_input_key, workflow_input_value in workflow_inputs.items():
-                    # TODO limited to file type right now (location key, hosting file based on scheme, etc.)!!!
+                for workflow_input_key, workflow_input_val in workflow_inputs.items():
                     # in case of array inputs, must repeat (id,value)
-                    input_values = [val['location'] for val in workflow_input_value] \
-                        if isinstance(workflow_input_value, list) \
-                        else [workflow_input_value['location']]
+                    # in case of complex input (File), obtain location, otherwise get data value
+                    input_values = [val['location'] if isinstance(val, dict) else val
+                                    for val in (workflow_input_val
+                                                if isinstance(workflow_input_val, list)
+                                                else [workflow_input_val])]
 
                     # we need to host file starting with file:// scheme
-                    input_values = [self.host_file(val)
-                                    if val.startswith('file://')
-                                    else val for val in input_values]
+                    input_values = [self.host_file(val) if val.startswith('file://') else val
+                                    for val in input_values]
 
                     # need to use ComplexDataInput structure for complex input
-                    wps_inputs.extend([(workflow_input_key,
-                                        ComplexDataInput(input_value) if workflow_input_key in complex_inputs
-                                        else input_value) for input_value in input_values])
+                    wps_inputs.extend([
+                        (workflow_input_key,
+                         ComplexDataInput(input_value) if workflow_input_key in complex_inputs else input_value)
+                        for input_value in input_values])
             except KeyError:
                 wps_inputs = []
 
@@ -103,17 +100,16 @@ class Wps1Process(WpsProcessInterface):
             max_retries = 5
             num_retries = 0
             run_step = 0
+            job_id = '<undefined>'
             while execution.isNotComplete() or run_step == 0:
                 if num_retries >= max_retries:
                     raise Exception("Could not read status document after {} retries. Giving up.".format(max_retries))
                 try:
                     execution = check_status(url=execution.statusLocation, verify=self.verify,
                                              sleep_secs=wait_secs(run_step))
-
+                    job_id = execution.statusLocation.replace(".xml", "").split('/')[-1]
                     LOGGER.debug("Monitoring job {jobID} : [{status}] {percentCompleted}  {message}".format(
-                        # TODO: find job id alternative, non-existing in 'WPSExecution' object
-                        # jobID=execution.jobID,
-                        jobID='<undefined>',
+                        jobID=job_id,
                         status=status.map_status(execution.getStatus()),
                         percentCompleted=execution.percentCompleted,
                         message=execution.statusMessage
@@ -135,7 +131,7 @@ class Wps1Process(WpsProcessInterface):
 
             if not execution.isSucceded():
                 LOGGER.debug("Monitoring job {jobID} : [{status}] {percentCompleted}  {message}".format(
-                    jobID=execution.jobID,
+                    jobID=job_id,
                     status=status.map_status(execution.getStatus()),
                     percentCompleted=execution.percentCompleted,
                     message=execution.statusMessage or "Job failed."
@@ -147,17 +143,17 @@ class Wps1Process(WpsProcessInterface):
 
             results = [jsonify_output(output, process) for output in execution.processOutputs]
             for result in results:
-                if get_any_id(result) in expected_outputs:
+                result_id = get_any_id(result)
+                result_val = get_any_value(result)
+                if result_id in expected_outputs:
                     # This is where cwl expect the output file to be written
                     # TODO We will probably need to handle multiple output value...
-                    dst_fn = '/'.join([out_dir.rstrip('/'), expected_outputs[get_any_id(result)]])
+                    dst_fn = '/'.join([out_dir.rstrip('/'), expected_outputs[result_id]])
 
                     # TODO Should we handle other type than File reference?
-                    r = requests.get(get_any_value(result), allow_redirects=True)
-                    LOGGER.debug('Fetching result output from {0} to cwl output destination : {1}'.format(
-                        get_any_value(result),
-                        dst_fn
-                    ))
+                    r = requests.get(result_val, allow_redirects=True)
+                    LOGGER.debug('Fetching result output from {0} to cwl output destination : {1}'
+                                 .format(result_val, dst_fn))
                     with open(dst_fn, mode='wb') as dst_fh:
                         dst_fh.write(r.content)
 

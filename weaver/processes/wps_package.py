@@ -323,10 +323,6 @@ def _load_package_content(package_dict,                             # type: Dict
     if only_dump_file:
         return
 
-    #if loading_context is None:
-    #    from schema_salad.ref_resolver import Loader
-     #   loading_context = LoadingContext({'loader': Loader(foreign_properties=set(PACKAGE_REQUIREMENTS_APP_WPS1))})
-
     cwl_factory = cwltool.factory.Factory(loading_context=loading_context, runtime_context=runtime_context)
     package = cwl_factory.make(tmp_json_cwl)
     shutil.rmtree(tmp_dir)
@@ -871,7 +867,7 @@ def get_process_from_wps_request(process_offering, reference=None, package=None,
     The returned process information can be used later on to load an instance of :class:`weaver.wps_package.Package`.
 
     :param process_offering: WPS REST-API process offering as JSON.
-    :param reference: URL to an existing package definition.
+    :param reference: URL to an existing package definition (CWL) or .
     :param package: literal package definition as JSON.
     :param data_source: where to resolve process IDs (default: localhost if ``None``).
     :return: process information dictionary ready for saving to data store.
@@ -1209,12 +1205,12 @@ class WpsPackage(Process):
         # multiple, but they are not explicitly handled
         all_hints = list(dict(req) for req in tool.get('requirements', {}))
         all_hints.extend(dict(req) for req in tool.get('hints', {}))
-        app_hints = list(filter(lambda h: h['class'] in PACKAGE_REQUIREMENTS_APP_TYPES, all_hints))
+        app_hints = filter(lambda h: any(h['class'].endswith(t) for t in PACKAGE_REQUIREMENTS_APP_TYPES), all_hints)
         if len(app_hints) > 1:
             raise ValueError("Package 'requirements' and/or 'hints' define too many conflicting values: {}, "
-                             "only one is permitted amongst {}.".format(app_hints, PACKAGE_REQUIREMENTS_APP_TYPES))
+                             "only one permitted amongst {}.".format(list(app_hints), PACKAGE_REQUIREMENTS_APP_TYPES))
         requirement = app_hints[0] if app_hints else {'class': None}
-        if requirement['class'] == PACKAGE_REQUIREMENTS_APP_WPS1:
+        if requirement['class'].endswith(PACKAGE_REQUIREMENTS_APP_WPS1):
             req_params = ['provider', 'process']
             if not all(r in requirement for r in ['provider', 'process']):
                 raise ValueError("Missing requirement [{}] details amongst {}".format(requirement['class'], req_params))
@@ -1228,7 +1224,7 @@ class WpsPackage(Process):
                                    _message, _progress, start_step_progress, end_step_progress, jobname,
                                    _provider, _status
                                ))
-        elif requirement['class'] == PACKAGE_REQUIREMENTS_APP_ESGF_CWT:
+        elif requirement['class'].endswith(PACKAGE_REQUIREMENTS_APP_ESGF_CWT):
             # TODO: implement
             raise NotImplementedError('ESGF-CWTRequirement not implemented')
         else:

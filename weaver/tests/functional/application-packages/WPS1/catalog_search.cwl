@@ -14,6 +14,9 @@
     },
     "outputs": {
       "output": {
+        "outputBinding": {
+          "glob": "output.json"
+        },
         "type": "File"
       }
     }

@@ -261,7 +261,7 @@ class Content(MappingSchema):
 
 
 class Offering(MappingSchema):
-    code = SchemaNode(String(), missing=drop)
+    code = SchemaNode(String(), missing=drop, description="Descriptor of represented information in 'content'.")
     content = Content(title='content', missing=drop)
 
 
@@ -274,10 +274,10 @@ class DescriptionType(MappingSchema):
     title = SchemaNode(String(), missing=drop)
     abstract = SchemaNode(String(), missing=drop)
     keywords = KeywordList(missing=drop)
-    owsContext = OWSContext(missing=drop)
+    owsContext = OWSContext(missing=drop, title='owsContext')
     metadata = MetadataList(missing=drop)
     additionalParameters = AdditionalParametersList(missing=drop, title='additionalParameters')
-    links = JsonLinkList(missing=drop)
+    links = JsonLinkList(missing=drop, title='links')
 
 
 class DataDescriptionType(DescriptionType):

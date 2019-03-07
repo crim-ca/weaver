@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import json
 if TYPE_CHECKING:
     from weaver.typedefs import JsonBody
+    import owslib.wps
 
 
 def _get_data(input_value):
@@ -61,7 +62,7 @@ def _get_json_multiple_inputs(input_value):
 
 
 def jsonify_output(output, process_description):
-    # type: (owslib.wps.Output, owslib.wps.) -> JsonBody
+    # type: (owslib.wps.Output, owslib.wps.Process) -> JsonBody
     """
     Utility method to jsonify an output element from a WPS1 process description.
     """
