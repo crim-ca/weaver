@@ -16,7 +16,7 @@ pyramid_celery
 pyramid_mako
 pytz
 pywps
-pyyaml
+pyyaml>=4.2b4
 requests
 requests_file
 shapely
