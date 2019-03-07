@@ -24,6 +24,9 @@ CONDA_ENVS_DIR ?= $(HOME)/.conda/envs
 CONDA_ENV_PATH := $(CONDA_ENVS_DIR)/$(CONDA_ENV)
 CONDA_PINNED := $(APP_ROOT)/env/conda-pinned
 
+# Docker
+DOCKER_REPO := docker-registry.crim.ca/ogc/weaver
+
 # Configuration used by update-config
 HOSTNAME ?= localhost
 HTTP_PORT ?= 8094
@@ -54,9 +57,9 @@ all: help
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
 	@echo "  help               print this help message. (Default)"
-	@echo "  version            print version number of this Makefile."
+	@echo "  version            print current project version number."
 	@echo "  info               print information about $(APP_NAME)."
-	@echo "\nInstallation:"
+	@echo "Installation:"
 	@echo "  install            install $(APP_NAME) by running 'bin/buildout -c custom.cfg'."
 	@echo "  install-base       install base packages using pip."
 	@echo "  install-dev        install test packages using pip (also installs $(APP_NAME) with buildout)."
@@ -64,7 +67,14 @@ help:
 	@echo "  install-raw        install without any requirements or dependencies (suppose everything is setup)."
 	@echo "  install-sys        install system packages from requirements.sh."
 	@echo "  update             update application by running 'bin/buildout -o -c custom.cfg' (buildout offline mode)."
-	@echo "\nCleaning:"
+	@echo "Build and deploy:"
+	@echo "  bump               bump version using version specified as user input"
+	@echo "  bump-dry           bump version using version specified as user input (dry-run)"
+	@echo "  bump-tag           bump version using version specified as user input, tags it and commits change in git"
+	@echo "  docker-info        detail about version of docker image to be tagged for build/push"
+	@echo "  docker-build       build docker image"
+	@echo "  docker-push        push built docker image"
+	@echo "Cleaning:"
 	@echo "  clean              delete all files that are created by running buildout."
 	@echo "  clean-bld          remove the temporary build files."
 	@echo "  clean-cache        remove caches such as DOWNLOAD_CACHE."
@@ -72,22 +82,20 @@ help:
 	@echo "  clean-src          remove all *.pyc files."
 	@echo "  clean-dist         remove *all* files that are not controlled by 'git'."
 	@echo "                     [WARNING: use it *only* if you know what you do!]"
-	@echo "\nTesting targets:"
+	@echo "Testing targets:"
 	@echo "  test               run tests (but skip long running and online tests)."
 	@echo "  test-func          run funtional tests (online and usage specific)."
 	@echo "  test-all           run all tests (including long running tests)."
 	@echo "  coverage           run all tests using coverage analysis."
 	@echo "  pep8               run pep8 code style checks."
-	@echo "\nSphinx targets:"
+	@echo "Sphinx targets:"
 	@echo "  docs               generate HTML documentation with Sphinx."
 	@echo "  linkcheck          check all external links in documentation for integrity."
 	@echo "  doc8               run doc8 documentation style checks."
-	@echo "\nSupporting targets:"
-	@echo "  passwd             generate password for 'phoenix-password' in custom.cfg."
+	@echo "Supporting targets:"
 	@echo "  conda-env-export   export the conda environment."
 	@echo "                     [CAUTION! You always need to check if the enviroment.yml is working.]"
-	@echo "  selfupdate         update this Makefile."
-	@echo "\nSupervisor targets:"
+	@echo "Supervisor targets:"
 	@echo "  start              start supervisor service."
 	@echo "  stop               stop supervisor service."
 	@echo "  restart            restart supervisor service."
@@ -103,12 +111,13 @@ info:
 	@echo "Informations about your Bird:"
 	@echo "  OS_NAME             $(OS_NAME)"
 	@echo "  CPU_ARCH            $(CPU_ARCH)"
-	@echo "  Anaconda Home       $(CONDA_HOME)"
-	@echo "  Conda Environment   $(CONDA_ENV). Use \`source activate $(CONDA_ENV)' to activate it."
+	@echo "  Conda Home          $(CONDA_HOME)"
+	@echo "  Conda Environment   $(CONDA_ENV)."
 	@echo "  Conda Prefix        $(CONDA_ENV_PATH)"
 	@echo "  APP_NAME            $(APP_NAME)"
 	@echo "  APP_ROOT            $(APP_ROOT)"
 	@echo "  DOWNLOAD_CACHE      $(DOWNLOAD_CACHE)"
+	@echo "  DOCKER_REPO         $(DOCKER_REPO)"
 
 ## Helper targets ... ensure that Makefile etc are in place
 
@@ -266,6 +275,8 @@ online-update-config:
 			settings:hostname=$(HOSTNAME) settings:output-port=$(OUTPUT_PORT) \
 			settings:http-port=$(HTTP_PORT) -N -c custom.cfg"
 
+## Cleanup targets
+
 .PHONY: clean
 clean: clean-bld clean-cache clean-src
 	@echo "Cleaning buildout files ..."
@@ -304,17 +315,7 @@ clean-dist: backup clean
 	@git diff --quiet HEAD || echo "There are uncommited changes! Not doing 'git clean' ..."
 	@-git clean -dfx -e *.bak -e custom.cfg -e Makefile.config
 
-.PHONY: passwd
-passwd: custom.cfg
-	@echo "Generate Phoenix password ..."
-	@echo "Enter a password with at least 8 characters."
-	@bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
-		python -c 'from IPython.lib import passwd; pw = passwd(algorithm=\"sha256\"); \
-		lines = [\"phoenix-password = \" + pw + \"\\n\" if line.startswith(\"phoenix-password\") \
-			else line for line in open(\"custom.cfg\", \"r\")]; file = open(\"custom.cfg\", \"w\"); \
-		file.writelines(lines); file.close()'"
-	@echo ""
-	@echo "Run \`make install restart' to activate this password."
+## Testing targets
 
 .PHONY: test
 test:
@@ -347,6 +348,8 @@ pep8:
 	@echo "Running pep8 code style checks ..."
 	$(CONDA_ENV_PATH)/bin/flake8
 
+## Documentation targets
+
 .PHONY: docs
 docs:
 	@echo "Generating docs with Sphinx ..."
@@ -363,10 +366,47 @@ doc8:
 	@echo "Running doc8 doc style checks ..."
 	$(CONDA_ENV_PATH)/bin/doc8 docs/
 
-.PHONY: selfupdate
-selfupdate: bootstrap.sh .gitignore
-	@curl "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/Makefile" \
-		--silent --insecure --output Makefile
+## Bumpversion targets
+
+.PHONY: bump
+bump:
+	$(shell bash -c 'read -p "Version: " VERSION_PART; \
+		source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
+		test -f "$(CONDA_ENV_PATH)/bin/bumpversion" || pip install bumpversion; \
+		"$(CONDA_ENV_PATH)/bin/bumpversion" --config-file "$(CUR_DIR)/.bumpversion.cfg" \
+			--verbose --allow-dirty --no-tag --new-version $$VERSION_PART patch;')
+
+.PHONY: bump-dry
+bump-dry:
+	$(shell bash -c 'read -p "Version: " VERSION_PART; \
+		source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
+		test -f "$(CONDA_ENV_PATH)/bin/bumpversion" || pip install bumpversion; \
+		"$(CONDA_ENV_PATH)/bin/bumpversion" --config-file "$(CUR_DIR)/.bumpversion.cfg" \
+			--verbose --allow-dirty --dry-run --tag --tag-name "{new_version}" --new-version $$VERSION_PART patch;')
+
+.PHONY: bump-tag
+bump-tag:
+	$(shell bash -c 'read -p "Version: " VERSION_PART; \
+		source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
+		test -f $(CONDA_ENV_PATH)/bin/bumpversion || pip install bumpversion; \
+		"$(CONDA_ENV_PATH)/bin/bumpversion" --config-file "$(CUR_DIR)/.bumpversion.cfg" \
+			--verbose --allow-dirty --tag --tag-name "{new_version}" --new-version $$VERSION_PART patch;')
+
+## Docker targets
+
+.PHONY: docker-info
+docker-info:
+	@echo "Will be built, tagged and pushed as:"
+	@echo "$(DOCKER_REPO):`python -c 'from magpie.__meta__ import __version__; print(__version__)'`"
+
+.PHONY: docker-build
+docker-build:
+	@bash -c "docker build $(CUR_DIR) \
+		-t $(DOCKER_REPO):`python -c 'from magpie.__meta__ import __version__; print(__version__)'`"
+
+.PHONY: docker-push
+docker-push: docker-build
+	@bash -c "docker push $(DOCKER_REPO):`python -c 'from magpie.__meta__ import __version__; print(__version__)'`"
 
 ## Supervisor targets
 
