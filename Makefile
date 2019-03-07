@@ -373,7 +373,7 @@ bump:
 	$(shell bash -c 'read -p "Version: " VERSION_PART; \
 		source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
 		test -f "$(CONDA_ENV_PATH)/bin/bumpversion" || pip install bumpversion; \
-		"$(CONDA_ENV_PATH)/bin/bumpversion" --config-file "$(CUR_DIR)/.bumpversion.cfg" \
+		"$(CONDA_ENV_PATH)/bin/bumpversion" --config-file "$(CURDIR)/.bumpversion.cfg" \
 			--verbose --allow-dirty --no-tag --new-version $$VERSION_PART patch;')
 
 .PHONY: bump-dry
@@ -381,16 +381,16 @@ bump-dry:
 	$(shell bash -c 'read -p "Version: " VERSION_PART; \
 		source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
 		test -f "$(CONDA_ENV_PATH)/bin/bumpversion" || pip install bumpversion; \
-		"$(CONDA_ENV_PATH)/bin/bumpversion" --config-file "$(CUR_DIR)/.bumpversion.cfg" \
-			--verbose --allow-dirty --dry-run --tag --tag-name "{new_version}" --new-version $$VERSION_PART patch;')
+		"$(CONDA_ENV_PATH)/bin/bumpversion" --config-file "$(CURDIR)/.bumpversion.cfg" \
+			--verbose --allow-dirty --dry-run --tag --new-version $$VERSION_PART patch;')
 
 .PHONY: bump-tag
 bump-tag:
 	$(shell bash -c 'read -p "Version: " VERSION_PART; \
 		source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
 		test -f $(CONDA_ENV_PATH)/bin/bumpversion || pip install bumpversion; \
-		"$(CONDA_ENV_PATH)/bin/bumpversion" --config-file "$(CUR_DIR)/.bumpversion.cfg" \
-			--verbose --allow-dirty --tag --tag-name "{new_version}" --new-version $$VERSION_PART patch;')
+		"$(CONDA_ENV_PATH)/bin/bumpversion" --config-file "$(CURDIR)/.bumpversion.cfg" \
+			--verbose --allow-dirty --tag --new-version $$VERSION_PART patch;')
 
 ## Docker targets
 
@@ -401,7 +401,7 @@ docker-info:
 
 .PHONY: docker-build
 docker-build:
-	@bash -c "docker build $(CUR_DIR) \
+	@bash -c "docker build $(CURDIR) \
 		-t $(DOCKER_REPO):`python -c 'from magpie.__meta__ import __version__; print(__version__)'`"
 
 .PHONY: docker-push

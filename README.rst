@@ -31,13 +31,13 @@ application and `Web Processing Services (WPS)` inputs and outputs. It allows us
     :alt: Requires Python 2.7, 3.5+
     :target: https://www.python.org/getit
 
-.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/0.1.2.svg
+.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/0.1.3.svg
     :alt: Commits since latest release
-    :target: https://github.com/crim-ca/weaver/compare/v0.1.2...master
+    :target: https://github.com/crim-ca/weaver/compare/v0.1.3...master
 
 .. |version| image:: https://img.shields.io/github/tag/crim-ca/weaver.svg?style=flat
     :alt: Latest Tag
-    :target: https://github.com/crim-ca/weaver/tree/0.1.2
+    :target: https://github.com/crim-ca/weaver/tree/0.1.3
 
 .. |requires| image:: https://requires.io/github/crim-ca/weaver/requirements.svg?branch=master
     :alt: Requirements Status
@@ -47,9 +47,9 @@ application and `Web Processing Services (WPS)` inputs and outputs. It allows us
     :alt: Travis-CI Build Status (master branch)
     :target: https://travis-ci.com/crim-ca/weaver
 
-.. |travis_tag| image:: https://img.shields.io/travis/com/crim-ca/weaver/0.1.2.svg?label=0.1.2
+.. |travis_tag| image:: https://img.shields.io/travis/com/crim-ca/weaver/0.1.3.svg?label=0.1.3
     :alt: Travis-CI Build Status (latest tag)
-    :target: https://github.com/crim-ca/weaver/tree/0.1.2
+    :target: https://github.com/crim-ca/weaver/tree/0.1.3
 
 .. |coverage| image:: https://img.shields.io/codecov/c/gh/crim-ca/weaver.svg?label=coverage
     :alt: Travis-CI CodeCov Coverage
@@ -69,7 +69,7 @@ Docker image `repository <https://docker-registry.crim.ca/repositories/3463>`_.
 
 ::
 
-    $ docker pull docker-registry.crim.ca/ogc/weaver:0.1.2
+    $ docker pull docker-registry.crim.ca/ogc/weaver:0.1.3
 
 Test server: https://ogc-ems.crim.ca/weaver/
 
