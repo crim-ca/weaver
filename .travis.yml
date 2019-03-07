@@ -1,13 +1,17 @@
 language: python
-# branches:
-#  only:
-#    - master
 os:
   - linux
 #  - osx
 python:
   - "2.7"
 sudo: false
+cache:
+  - pip
+  - directories:
+      - $HOME/conda
+      - $HOME/downloads
+# includes PR when base branch = master
+if: branch = master OR tag IS present
 services:
   - mongodb
 before_install:
