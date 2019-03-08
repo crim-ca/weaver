@@ -1,12 +1,16 @@
 """
 Definitions of types used by tokens.
 """
+from weaver.exceptions import ProcessInstanceError
+from weaver.processes.types import PROCESS_WITH_MAPPING, PROCESS_WPS
+from weaver.status import job_status_values, STATUS_UNKNOWN
+from weaver.visibility import visibility_values, VISIBILITY_PRIVATE
+from weaver.wps_restapi import swagger_definitions as sd
 # noinspection PyPackageRequirements
 from dateutil.parser import parse as dt_parse
 from datetime import datetime, timedelta
 # noinspection PyProtectedMember
 from logging import _levelNames, _loggerClass, ERROR, INFO
-from typing import Any, AnyStr, Dict, List, Optional, Union
 from weaver.utils import (
     now,
     localize_datetime,  # for backward compatibility of previously saved jobs not time-locale-aware
@@ -15,16 +19,15 @@ from weaver.utils import (
     get_log_datefmt,
     fully_qualified_name,
 )
-from weaver.exceptions import ProcessInstanceError
-from weaver.processes.types import PROCESS_WITH_MAPPING, PROCESS_WPS
-from weaver.status import job_status_values, STATUS_UNKNOWN
-from weaver.visibility import visibility_values, VISIBILITY_PRIVATE
 from owslib.wps import WPSException
 # noinspection PyPackageRequirements
 from pywps import Process as ProcessWPS
-import weaver.wps_restapi.swagger_definitions as sd
+from typing import TYPE_CHECKING
 import six
 import uuid
+if TYPE_CHECKING:
+    from weaver.typedefs import Number
+    from typing import Any, AnyStr, Dict, List, Optional, Union
 
 
 class Service(dict):
@@ -294,12 +297,12 @@ class Job(dict):
 
     @property
     def progress(self):
-        # type: (...) -> Union[int, float]
+        # type: (...) -> Number
         return self.get('progress', 0)
 
     @progress.setter
     def progress(self, progress):
-        # type: (Union[int, float]) -> None
+        # type: (Number) -> None
         if not isinstance(progress, (int, float)):
             raise TypeError("Number is required for `{}.progress`".format(type(self)))
         if progress < 0 or progress > 100:

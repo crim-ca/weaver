@@ -1,5 +1,5 @@
 from weaver.wps import get_wps_output_path, get_wps_output_url
-from utils import get_cookie_headers
+from weaver.utils import get_cookie_headers
 from pyramid_celery import celery_app as app
 from pyramid.settings import asbool
 from pyramid.httpexceptions import HTTPBadGateway
@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from abc import abstractmethod
 import requests
 if TYPE_CHECKING:
-    from weaver.typedefs import JsonBody
+    from weaver.typedefs import JSON
     from typing import AnyStr, Dict
     from pywps.app import WPSRequest
 
@@ -20,7 +20,7 @@ class WpsProcessInterface(object):
 
     @abstractmethod
     def execute(self,
-                workflow_inputs,        # type: JsonBody
+                workflow_inputs,        # type: JSON
                 out_dir,                # type: AnyStr
                 expected_outputs,       # type: Dict[AnyStr, AnyStr]
                 ):

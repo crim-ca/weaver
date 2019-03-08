@@ -24,7 +24,7 @@ MongodbStores = frozenset([
 
 if TYPE_CHECKING:
     AnyStoreType = Union[MongodbStores]
-    from weaver.typedefs import JsonBody
+    from weaver.typedefs import JSON
 
 
 class MongoDatabase(DatabaseInterface):
@@ -72,7 +72,7 @@ class MongoDatabase(DatabaseInterface):
         return self._database
 
     def get_information(self):
-        # type: (...) -> JsonBody
+        # type: (...) -> JSON
         """
         :returns: {'version': version, 'type': db_type}
         """

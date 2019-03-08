@@ -28,7 +28,7 @@ import logging
 import six
 import os
 if TYPE_CHECKING:
-    from weaver.typedefs import JsonBody
+    from weaver.typedefs import JSON
 
 LOGGER = logging.getLogger(__name__)
 
@@ -176,7 +176,7 @@ def unauthorized_or_forbidden(request):
 
 
 def get_request_info(request, detail=None):
-    # type: (Request, Optional[AnyStr]) -> JsonBody
+    # type: (Request, Optional[AnyStr]) -> JSON
     """Provided additional response details based on the request and execution stack on failure."""
     content = {u'route': str(request.upath_info), u'url': str(request.url), u'method': request.method}
     if isinstance(detail, six.string_types):

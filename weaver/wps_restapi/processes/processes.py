@@ -11,7 +11,7 @@ from weaver.execute import (
 )
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes import wps_package, opensearch
-from weaver.processes.utils import jsonify_output, convert_process_wps_to_db, add_process_from_payload
+from weaver.processes.utils import jsonify_output, convert_process_wps_to_db, deploy_process_from_payload
 from weaver.processes.types import PROCESS_WORKFLOW
 from weaver.status import (
     map_status,
@@ -409,7 +409,7 @@ def add_local_process(request):
     # use deepcopy of body payload to avoid circular dependencies when writing to mongodb
     # and before parsing it because the body is altered by some pop operations
     payload = deepcopy(request.json)
-    return add_process_from_payload(payload, request)
+    return deploy_process_from_payload(payload, request)
 
 
 def get_process(request):

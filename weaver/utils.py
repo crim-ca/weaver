@@ -3,9 +3,6 @@ from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.status import map_status
 from datetime import datetime
 from lxml import etree
-# noinspection PyProtectedMember
-from lxml.etree import _Element as xmlElement
-from typing import Union, Any, Dict, List, AnyStr, Iterable, Optional, TYPE_CHECKING
 from pyramid.httpexceptions import HTTPError as PyramidHTTPError
 from pyramid.config import Configurator
 from pyramid.registry import Registry
@@ -16,6 +13,7 @@ from distutils.dir_util import mkpath
 from distutils.version import LooseVersion
 from requests.structures import CaseInsensitiveDict
 from webob.headers import ResponseHeaders, EnvironHeaders
+from typing import TYPE_CHECKING
 import os
 import time
 import pytz
@@ -25,7 +23,8 @@ import platform
 import warnings
 import logging
 if TYPE_CHECKING:
-    from weaver.typedefs import SettingsType, AnySettingsContainer, AnyHeadersContainer, HeadersType
+    from weaver.typedefs import SettingsType, AnySettingsContainer, AnyHeadersContainer, HeadersType, XML
+    from typing import Union, Any, Dict, List, AnyStr, Iterable, Optional
 
 LOGGER = logging.getLogger(__name__)
 
@@ -217,7 +216,7 @@ def path_elements(path):
 
 
 def lxml_strip_ns(tree):
-    # type: (xmlElement) -> None
+    # type: (XML) -> None
     for node in tree.iter():
         try:
             has_namespace = node.tag.startswith('{')
@@ -374,7 +373,7 @@ def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_in
         return None
     if replace_invalid:
         max_len = max_len or 25
-        name = re.sub("[^a-z]", "_", name.lower()[:max_len])
+        name = re.sub(r"[^a-zA-Z0-9_\-]", "_", name.lower()[:max_len])
     return name
 
 

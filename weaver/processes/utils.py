@@ -25,6 +25,7 @@ from pyramid.httpexceptions import (
     HTTPInternalServerError,
     HTTPException,
 )
+from distutils.version import LooseVersion
 from six.moves.urllib.request import urlopen
 from six.moves.urllib.parse import urlparse, urlunsplit, parse_qs
 from six.moves.urllib.error import URLError
@@ -37,7 +38,7 @@ import json
 import six
 import os
 if TYPE_CHECKING:
-    from weaver.typedefs import JsonBody, AnyContainer, AnySettingsContainer, FileSystemPathType
+    from weaver.typedefs import JSON, AnyContainer, AnySettingsContainer, FileSystemPathType
     from typing import AnyStr, Dict, Union
     from pywps import Process as ProcessWPS
     import owslib.wps
@@ -98,7 +99,7 @@ def _get_json_multiple_inputs(input_value):
 
 
 def jsonify_output(output, process_description):
-    # type: (owslib.wps.Output, owslib.wps.Process) -> JsonBody
+    # type: (owslib.wps.Output, owslib.wps.Process) -> JSON
     """
     Utility method to jsonify an output element from a WPS1 process description.
     """
@@ -190,17 +191,15 @@ def convert_process_wps_to_db(service, process, container):
     )
 
 
-def convert_process_ems_to_db():
-    pass
-
-
-def add_process_from_payload(payload, container):
-    # type: (JsonBody, AnyContainer) -> HTTPException
+def deploy_process_from_payload(payload, container):
+    # type: (JSON, AnyContainer) -> HTTPException
     """
     Adds a :class:`weaver.datatype.Process` instance to storage using the provided JSON ``payload`` matching
     :class:`weaver.wps_restapi.swagger_definitions.ProcessDescription`.
-    """
 
+    :returns: HTTPOk if the process registration was successful
+    :raises HTTPException: otherwise
+    """
     # validate minimum field requirements
     try:
         sd.Deploy().deserialize(payload)
@@ -245,7 +244,7 @@ def add_process_from_payload(payload, container):
             if package or reference:
                 break
     else:
-        raise HTTPBadRequest("Missing one of required parameters [owsContext, deploymentProfileName].")
+        raise HTTPBadRequest("Missing one of required parameters [href, owsContext, deploymentProfileName].")
 
     # obtain updated process information using WPS process offering, CWL/WPS reference or CWL package definition
     try:
@@ -303,14 +302,14 @@ def add_process_from_payload(payload, container):
 def register_wps_provider_processes(wps_providers_file_path, container):
     # type: (FileSystemPathType, AnySettingsContainer) -> None
     """
-    Loads a `wps_provider.yml` file and registers WPS-1 providers processes to the
-    current `Weaver` instance as equivalent WPS-2 processes.
+    Loads a `wps_provider.yml` file and registers `WPS-1` providers processes to the
+    current `Weaver` instance as equivalent `WPS-2` processes.
 
     .. seealso::
         - `weaver.wps_providers.yml.example`
     """
     if not os.path.isfile(wps_providers_file_path):
-        warnings.warn("No file specified for WPS providers registration.", RuntimeWarning)
+        warnings.warn("No file specified for WPS-1 providers registration.", RuntimeWarning)
         return
     try:
         with open(wps_providers_file_path, 'r') as f:
@@ -342,25 +341,30 @@ def register_wps_provider_processes(wps_providers_file_path, container):
             # fetch data
             LOGGER.info("Fetching WPS-1: [{}]".format(svc_url))
             wps = WebProcessingService(url=svc_url)
+            if LooseVersion(wps.version) >= LooseVersion('2.0'):
+                LOGGER.warning("Invalid WPS-1 provider, version was [{}]".format(wps.version))
+                continue
             wps_processes = [wps.describeprocess(p) for p in svc_proc] or wps.processes
             for wps_process in wps_processes:
                 proc_id = '{}_{}'.format(svc_name, get_sane_name(wps_process.identifier))
+                proc_url = '{}?service=WPS&request=DescribeProcess&identifier={}&version={}' \
+                           .format(svc_url, proc_id, wps.version)
                 payload = {
                     'processDescription': {
                         'process': {
                             'identifier': proc_id,
-                            'owsContext': {'offering': {'content': {'href': '{}'.format(svc_url)}}},
+                            'owsContext': {'offering': {'content': {'href': '{}'.format(proc_url)}}},
                         }
                     }
                 }
                 try:
-                    add_process_from_payload(payload, container)
+                    deploy_process_from_payload(payload, container)
                 except HTTPConflict:
                     LOGGER.warning("Process already registered: [{}]".format(proc_id))
                     continue
                 LOGGER.info("Process registered: []".format(proc_id))
 
     except Exception as exc:
-        msg = "Invalid WPS providers configuration file [{!r}].".format(exc)
+        msg = "Invalid WPS-1 providers configuration file [{!r}].".format(exc)
         LOGGER.exception(msg)
         raise RuntimeError(msg)

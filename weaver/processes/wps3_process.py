@@ -30,7 +30,7 @@ import logging
 import warnings
 import requests
 if TYPE_CHECKING:
-    from weaver.typedefs import JsonBody, UpdateStatusPartialFunction
+    from weaver.typedefs import JSON, UpdateStatusPartialFunction
     from typing import Union, AnyStr
     from pywps.app import WPSRequest
 
@@ -48,7 +48,7 @@ REMOTE_JOB_PROGRESS_COMPLETED = 100
 
 class Wps3Process(WpsProcessInterface):
     def __init__(self,
-                 step_payload,      # type: JsonBody
+                 step_payload,      # type: JSON
                  joborder,          # type: int
                  process,           # type: AnyStr
                  request,           # type: WPSRequest

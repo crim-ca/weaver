@@ -8,12 +8,15 @@ from itertools import ifilterfalse
 from pyramid.httpexceptions import HTTPGatewayTimeout, HTTPOk
 from pyramid.settings import asbool
 from six.moves.urllib.parse import urlparse, parse_qsl
-from typing import Iterable, Dict, Tuple, List, Deque, AnyStr
+from typing import TYPE_CHECKING
 import shapely.wkt
 import lxml.etree
 import requests
 import logging
 import time
+if TYPE_CHECKING:
+    from weaver.typedefs import XML
+    from typing import AnyStr, Deque, Dict, Iterable, List, Tuple
 
 LOGGER = logging.getLogger("PACKAGE")
 
@@ -192,8 +195,7 @@ class OpenSearchQuery(object):
 
         et = lxml.etree.fromstring(r.content)
         xpath = "//*[local-name() = 'Url'][@rel='results']"
-        # noinspection PyProtectedMember
-        url = et.xpath(xpath)[0]  # type: lxml.etree._Element
+        url = et.xpath(xpath)[0]  # type: XML
         return url.attrib["template"]
 
     def _prepare_query_url(self, template_url, params):
@@ -238,9 +240,7 @@ class OpenSearchQuery(object):
 
                 et = lxml.etree.fromstring(r.content)
                 xpath = "//*[local-name() = 'entry']/*[local-name() = 'link']"
-
-                # noinspection PyProtectedMember
-                links = et.xpath(xpath)  # type: List[lxml.etree._Element]
+                links = et.xpath(xpath)  # type: List[XML]
                 return [link.attrib for link in links]
         return []
 

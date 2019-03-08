@@ -14,7 +14,10 @@ from weaver.status import (STATUS_RUNNING, STATUS_SUCCEEDED, STATUS_EXCEPTION, S
                            map_status, STATUS_COMPLIANT_PYWPS, STATUS_PYWPS_IDS)
 from weaver.wps_restapi.swagger_definitions import process_uri
 from weaver.wps import get_wps_output_path
-from weaver.utils import get_job_log_msg, get_log_fmt, get_log_datefmt, get_sane_name, get_settings, get_any_id
+from weaver.utils import (
+    get_job_log_msg, get_log_fmt, get_log_datefmt, get_sane_name, get_settings, get_any_id, get_header
+)
+from owslib.wps import WebProcessingService, ComplexData
 from pywps.inout.basic import BasicIO
 from pywps.inout.literaltypes import AnyValue, AllowedValue, ALLOWEDVALUETYPE
 from pywps.validator.mode import MODE
@@ -29,7 +32,7 @@ from pywps import (
     BoundingBoxOutput,
     Format,
 )
-from pyramid.httpexceptions import HTTPOk
+from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
 from pyramid_celery import celery_app as app
 from collections import OrderedDict, Hashable
 from six.moves.urllib.parse import urlparse
@@ -39,6 +42,7 @@ from cwltool.context import LoadingContext
 from cwltool.context import RuntimeContext
 import cwltool.factory
 import cwltool
+import lxml.etree
 import yaml
 import json
 import tempfile
@@ -49,10 +53,26 @@ import os
 import six
 if TYPE_CHECKING:
     from weaver.status import AnyStatusType
-    from weaver.typedefs import ToolPathObjectType, JsonBody
+    from weaver.typedefs import ToolPathObjectType, CWLFactoryCallable, CWL, JSON, XML, Number
     from cwltool.process import Process as ProcessCWL
     from pywps.app import WPSRequest
     from pywps.response.execute import ExecuteResponse
+    from owslib.wps import Input, Output
+
+    # typing shortcuts
+    wps_input_type = Union[LiteralInput, ComplexInput, BoundingBoxInput]
+    wps_output_type = Union[LiteralOutput, ComplexOutput, BoundingBoxOutput]
+    wps_io_type = Union[wps_input_type, wps_output_type]
+    ows_input_type = Union[Input, ComplexData]
+    ows_output_type = Output
+    ows_io_type = Union[ows_input_type, ows_output_type]
+    json_io_type = JSON
+    cwl_input_type = CWL
+    cwl_output_type = CWL
+    cwl_io_type = Union[cwl_input_type, cwl_output_type]
+    any_key_type = Union[AnyStr, int]
+    any_io_type = Union[cwl_io_type, json_io_type, wps_io_type, ows_io_type]
+
 
 LOGGER = logging.getLogger("PACKAGE")
 
@@ -106,21 +126,15 @@ WPS_FIELD_MAPPING = {
     'allowed_values': ['AllowedValues', 'allowedValues', 'allowedvalues', 'Allowed_Values', 'Allowedvalues'],
     'allowed_collections': ['AllowedCollections', 'allowedCollections', 'allowedcollections', 'Allowed_Collections',
                             'Allowedcollections'],
+    'default': ['default_value', 'defaultValue', 'DefaultValue', 'Default'],
+    'supported_values': ['SupportedValues', 'supportedValues', 'supportedvalues', 'Supported_Values'],
     'supported_formats': ['SupportedFormats', 'supportedFormats', 'supportedformats', 'Supported_Formats'],
     'additional_parameters': ['AdditionalParameters', 'additionalParameters', 'additionalparameters',
                               'Additional_Parameters'],
+    'type': ['Type', 'data_type', 'dataType', 'DataType', 'Data_Type'],
+    'min_occurs': ['minOccurs', 'MinOccurs', 'Min_Occurs', 'minoccurs'],
+    'max_occurs': ['maxOccurs', 'MaxOccurs', 'Max_Occurs', 'maxoccurs']
 }
-
-
-# typing shortcuts
-wps_input_type = Union[LiteralInput, ComplexInput, BoundingBoxInput]
-wps_output_type = Union[LiteralOutput, ComplexOutput, BoundingBoxOutput]
-wps_io_type = Union[wps_input_type, wps_output_type]
-any_key_type = Union[AnyStr, int]
-any_io_type = Dict[any_key_type, Any]
-cwl_input_type = any_io_type
-cwl_output_type = any_io_type
-cwl_io_type = Union[cwl_input_type, cwl_output_type]
 
 # default format if missing (minimal requirement of one)
 DefaultFormat = Format(mime_type='text/plain')
@@ -187,8 +201,9 @@ def get_package_workflow_steps(package_dict_or_url):
         for step in workflow_steps:
             step_package_ref = workflow_steps[step].get('run')
             # if a local file reference was specified, convert it to process id
-            if urlparse(step_package_ref).scheme == "" and step_package_ref.endswith('.cwl'):
-                step_package_ref = step_package_ref[:-4]
+            package_ref_name, package_ref_ext = os.path.splitext(step_package_ref)
+            if urlparse(step_package_ref).scheme == "" and package_ref_ext.replace('.', '') in PACKAGE_EXTENSIONS:
+                step_package_ref = package_ref_name
 
             workflow_steps_ids.append({'name': step, 'reference': step_package_ref})
     return workflow_steps_ids
@@ -281,7 +296,7 @@ def _check_package_file(cwl_file_path_or_url):
 
 
 def _load_package_file(file_path):
-    # type: (AnyStr) -> Dict[AnyStr, Any]
+    # type: (AnyStr) -> CWL
     """Loads the package in YAML/JSON format specified by the file path."""
 
     file_path, is_url = _check_package_file(file_path)
@@ -304,7 +319,7 @@ def _load_package_content(package_dict,                             # type: Dict
                           tmp_dir=None,                             # type: Optional[AnyStr]
                           loading_context=None,                     # type: Optional[LoadingContext]
                           runtime_context=None,                     # type: Optional[RuntimeContext]
-                          ):  # type: (...) -> Union[Tuple[cwltool.factory.Factory, AnyStr, Dict], None]
+                          ):  # type: (...) -> Union[Tuple[CWLFactoryCallable, AnyStr, Dict], None]
     """
     Loads the package content to file in a temporary directory.
     Recursively processes sub-packages steps if the parent is a `Workflow` (CWL class).
@@ -312,16 +327,16 @@ def _load_package_content(package_dict,                             # type: Dict
     :param package_dict: package content representation as a json dictionary.
     :param package_name: name to use to create the package file.
     :param data_source: identifier of the data source to map to specific ADES, or map to localhost if ``None``.
-    :param only_dump_file: specify if the :class:`cwltool.factory.Factory` should be validated and returned.
+    :param only_dump_file: specify if the ``CWLFactoryCallable`` should be validated and returned.
     :param tmp_dir: location of the temporary directory to dump files (warning: will be deleted on exit).
     :param loading_context: cwltool context used to create the cwl package
     :param runtime_context: cwltool context used to execute the cwl package
     :return:
-        tuple of
-        - instance of :class:`cwltool.factory.Factory`
-        - package type (PROCESS_WORKFLOW or PROCESS_APPLICATION)
-        - dict of each step with their package name that must be run
-        if ``only_dump_file`` is ``False``, ``None`` otherwise.
+        if ``only_dump_file`` is ``True``: ``None``
+        otherwise, tuple of:
+            - instance of ``CWLFactoryCallable``
+            - package type (``PROCESS_WORKFLOW`` or ``PROCESS_APPLICATION``)
+            - dict of each step with their package name that must be run
     """
 
     tmp_dir = tmp_dir or tempfile.mkdtemp()
@@ -345,13 +360,13 @@ def _load_package_content(package_dict,                             # type: Dict
         return
 
     cwl_factory = cwltool.factory.Factory(loading_context=loading_context, runtime_context=runtime_context)
-    package = cwl_factory.make(tmp_json_cwl)
+    package = cwl_factory.make(tmp_json_cwl)    # type: CWLFactoryCallable
     shutil.rmtree(tmp_dir)
     return package, package_type, step_packages
 
 
 def _is_cwl_array_type(io_info):
-    # type: (any_io_type) -> Tuple[bool, AnyStr]
+    # type: (cwl_io_type) -> Tuple[bool, AnyStr]
     """Verifies if the specified input/output corresponds to one of various CWL array type definitions.
 
     :return is_array: specifies if the input/output is of array type
@@ -379,7 +394,7 @@ def _is_cwl_array_type(io_info):
 
 
 def _is_cwl_enum_type(io_info):
-    # type: (any_io_type) -> Tuple[bool, AnyStr, Union[List[AnyStr], None]]
+    # type: (cwl_io_type) -> Tuple[bool, AnyStr, Union[List[AnyStr], None]]
     """Verifies if the specified input/output corresponds to a CWL enum definition.
 
     :return is_enum: specifies if the input/output is of enum type
@@ -417,7 +432,7 @@ def _is_cwl_enum_type(io_info):
 
 # noinspection PyUnusedLocal
 def _cwl2wps_io(io_info, io_select):
-    # type:(any_io_type, AnyStr) -> wps_io_type
+    # type:(cwl_io_type, AnyStr) -> wps_io_type
     """Converts input/output parameters from CWL types to WPS types.
     :param io_info: parsed IO of a CWL file
     :param io_select: ``WPS_INPUT`` or ``WPS_OUTPUT`` to specify desired WPS type conversion.
@@ -520,7 +535,7 @@ def _cwl2wps_io(io_info, io_select):
 
 
 def _json2wps_type(type_info, type_category):
-    # type: (any_io_type, AnyStr) -> Any
+    # type: (json_io_type, AnyStr) -> Any
     if type_category == 'allowed_values' and isinstance(type_info, dict):
         type_info.pop('type', None)
         return AllowedValue(**type_info)
@@ -544,7 +559,7 @@ def _json2wps_type(type_info, type_category):
 
 
 def _json2wps_io(io_info, io_select):
-    # type: (any_io_type, Union[WPS_INPUT, WPS_OUTPUT]) -> wps_io_type
+    # type: (json_io_type, Union[WPS_INPUT, WPS_OUTPUT]) -> wps_io_type
     """Converts input/output parameters from a JSON dict to WPS types.
     :param io_info: IO in JSON dict format.
     :param io_select: ``WPS_INPUT`` or ``WPS_OUTPUT`` to specify desired WPS type conversion.
@@ -637,7 +652,7 @@ def _json2wps_io(io_info, io_select):
 
 
 def _wps2json_io(io_wps):
-    # type: (wps_io_type) -> any_io_type
+    # type: (wps_io_type) -> json_io_type
     """Converts a PyWPS I/O into a dictionary based version with keys corresponding to standard names (WPS 2.0)."""
 
     if not isinstance(io_wps, BasicIO):
@@ -677,8 +692,12 @@ def _wps2json_io(io_wps):
 
 
 def _get_field(io_object, field, search_variations=False, pop_found=False):
-    # type: (Union[BasicIO, Dict[str, Any]], str, bool, bool) -> Any
-    """Gets a field by name from various I/O object types."""
+    # type: (any_io_type, str, bool, bool) -> Any
+    """
+    Gets a field by name from various I/O object types.
+
+    :returns: matched value (including search variations if enabled), or ``null``.
+    """
     if isinstance(io_object, dict):
         value = io_object.get(field, null)
         if value is not null:
@@ -822,46 +841,58 @@ def _merge_package_inputs_outputs(wps_inputs_list,      # type: List[any_io_type
                                   cwl_inputs_list,      # type: List[cwl_input_type]
                                   wps_outputs_list,     # type: List[any_io_type]
                                   cwl_outputs_list      # type: List[cwl_output_type]
-                                  ):                    # type: (...) -> Tuple[List[any_io_type], List[any_io_type]]
-    """Merges I/O definitions to use for process creation and returned by GetCapabilities, DescribeProcess
-    using the WPS specifications (from request POST) and CWL specifications (extracted from file)."""
+                                  ):                    # type: (...) -> Tuple[List[json_io_type], List[json_io_type]]
+    """
+    Merges I/O definitions to use for process creation and returned by ``GetCapabilities``, ``DescribeProcess``
+    using the `WPS` specifications (from request ``POST``) and `CWL` specifications (extracted from file).
+    """
     wps_inputs_merged = _merge_package_io(wps_inputs_list, cwl_inputs_list, WPS_INPUT)
     wps_outputs_merged = _merge_package_io(wps_outputs_list, cwl_outputs_list, WPS_OUTPUT)
     return [_wps2json_io(i) for i in wps_inputs_merged], [_wps2json_io(o) for o in wps_outputs_merged]
 
 
-def _get_package_io(package, io_select, as_json):
+def _get_package_io(package_factory, io_select, as_json):
+    # type: (CWLFactoryCallable, AnyStr, bool) -> List[Union[json_io_type, wps_io_type]]
+    """
+    Retrieves I/O definitions from a validated ``CWLFactoryCallable``. Returned I/O format depends on value ``as_json``.
+    """
     if io_select == WPS_OUTPUT:
         io_attrib = 'outputs_record_schema'
     elif io_select == WPS_INPUT:
         io_attrib = 'inputs_record_schema'
     else:
         raise PackageTypeError("Unknown I/O selection: `{}`.".format(io_select))
-    cwl_package_io = getattr(package.t, io_attrib)
+    cwl_package_io = getattr(package_factory.t, io_attrib)
     wps_package_io = [_cwl2wps_io(io, io_select) for io in cwl_package_io['fields']]
     if as_json:
         return [_wps2json_io(io) for io in wps_package_io]
     return wps_package_io
 
 
-def _get_package_inputs(package, as_json=False):
-    """Generates WPS-like inputs using parsed CWL package input definitions."""
-    return _get_package_io(package, io_select=WPS_INPUT, as_json=as_json)
+def _get_package_inputs(package_factory, as_json=False):
+    # type: (CWLFactoryCallable, Optional[bool]) -> List[Union[json_io_type, wps_io_type]]
+    """Generates `WPS-like` ``inputs`` using parsed CWL package input definitions."""
+    return _get_package_io(package_factory, io_select=WPS_INPUT, as_json=as_json)
 
 
-def _get_package_outputs(package, as_json=False):
-    """Generates WPS-like outputs using parsed CWL package output definitions."""
-    return _get_package_io(package, io_select=WPS_OUTPUT, as_json=as_json)
+def _get_package_outputs(package_factory, as_json=False):
+    # type: (CWLFactoryCallable, Optional[bool]) -> List[Union[json_io_type, wps_io_type]]
+    """Generates `WPS-like` ``outputs`` using parsed CWL package output definitions."""
+    return _get_package_io(package_factory, io_select=WPS_OUTPUT, as_json=as_json)
 
 
-def _get_package_inputs_outputs(package, as_json=False):
-    """Generates WPS-like (inputs,outputs) tuple using parsed CWL package output definitions."""
-    return (_get_package_io(package, io_select=WPS_INPUT, as_json=as_json),
-            _get_package_io(package, io_select=WPS_OUTPUT, as_json=as_json))
+def _get_package_inputs_outputs(package_factory,    # type: CWLFactoryCallable
+                                as_json=False,      # type: Optional[bool]
+                                ):
+    # type: (...) -> Tuple[Union[json_io_type, wps_io_type], Union[json_io_type, wps_io_type]]
+    """Generates `WPS-like` ``(inputs, outputs)`` tuple using parsed CWL package definitions."""
+    return (_get_package_io(package_factory, io_select=WPS_INPUT, as_json=as_json),
+            _get_package_io(package_factory, io_select=WPS_OUTPUT, as_json=as_json))
 
 
 def _update_package_metadata(wps_package_metadata, cwl_package_package):
-    """Updates the package WPS metadata dictionary from extractable CWL package definition."""
+    # type: (JSON, CWL) -> None
+    """Updates the package `WPS` metadata dictionary from extractable `CWL` package definition."""
     wps_package_metadata['title'] = wps_package_metadata.get('title', cwl_package_package.get('label', ''))
     wps_package_metadata['abstract'] = wps_package_metadata.get('abstract', cwl_package_package.get('doc', ''))
 
@@ -880,34 +911,169 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
                                                 set(cwl_package_package.get('s:keywords')))
 
 
-def _generate_process_with_cwl_from_reference(reference):
-    # type: (AnyStr) -> Tuple[AnyStr, JsonBody]
-    """
-    Resolves the ``reference`` type (CWL, WPS-1, WPS-2) and generates a CWL ``package`` from it.
-    Provides the resolved process ID according to case encountered.
-    """
+def _ows2json(ows_io, io_select):
+    # type: (ows_io_type, AnyStr) -> json_io_type
+    """Converts I/O from :module:`OWSLib.WPS` to JSON."""
+    json_io = dict()
+    for field in WPS_FIELD_MAPPING:
+        value = _get_field(ows_io, field, search_variations=True)
+        if value:
+            if isinstance(value, list):
+                for sub_val in value:
+                    if isinstance(sub_val, ComplexData):
+                        if "formats" not in json_io[io_select][-1]:
+                            json_io[io_select][-1]["formats"] = []
+                        json_io[io_select][-1]["formats"].append({
+                            "mimeType": sub_val.mimeType,
+                            "encoding": sub_val.encoding,
+                            "schema": sub_val.schema,
+                        })
+            else:
+                json_io[io_select][-1][field] = value
+    return json_io
 
-    # TODO: check 'reference' for any of:
-    #   - .cwl leave it as is, already handled by 'wps_package.get_process_definition'
-    #   ------
-    #   - WPS2 process endpoint: JSON + 'process' description in body /w => generate process_info
-    #   - WPS1 service endpoint: urlparse(reference) + 'convert_process_wps_to_db' => generate process_info
-    _load_package_file(reference)
-    return process_id, cwl_package
+
+def _xml_wps2cwl(wps_process_response):
+    # type: (requests.models.Response) -> Tuple[CWL, JSON]
+    """
+    Converts a `WPS-1 ProcessDescription XML` tree structure to an equivalent `WPS-2 Process JSON` and builds the
+    associated `CWL` package in conformance to :ref:`weaver.processes.wps_package.PACKAGE_REQUIREMENTS_APP_WPS1`.
+
+    :param wps_process_response: valid response (XML, 200) from a `WPS-1 ProcessDescription`.
+    """
+    def _tag_name(_xml):
+        # type: (Union[XML, AnyStr]) -> AnyStr
+        """Obtains ``tag`` from a ``{namespace}Tag`` `XML` element."""
+        if hasattr(_xml, 'tag'):
+            _xml = _xml.tag
+        return _xml.split('}')[-1].lower()
+
+    # look for `XML` structure starting at `ProcessDescription` (WPS-1)
+    xml_resp = lxml.etree.fromstring(wps_process_response.content)
+    xml_wps_process = xml_resp.xpath('//ProcessDescription')  # type: List[XML]
+    if not len(xml_wps_process) == 1:
+        raise ValueError("Could not retrieve a valid 'ProcessDescription' from WPS-1 response.")
+    process_id = None
+    for sub_xml in xml_wps_process[0]:
+        tn = _tag_name(sub_xml)
+        if tn == "identifier":
+            process_id = sub_xml.text
+            break
+    if not process_id:
+        raise ValueError("Could not find a match for 'ProcessDescription.identifier' from WPS-1 response.")
+
+    # transform WPS-1 -> WPS-2
+    wps = WebProcessingService(wps_process_response.url)
+    process_info = {
+        "identifier": '{}_{}'.format(wps.provider.name, process_id),
+        "keywords": [wps.provider.name],
+    }
+    wps_process = wps.describeprocess(process_id, xml=wps_process_response.content)
+    for field in ["title", "abstract"]:
+        process_info[field] = _get_field(wps_process, field, search_variations=True)
+    if wps_process.metadata:
+        process_info["metadata"] = []
+    for meta in wps_process.metadata:
+        process_info["metadata"].append({"href": meta.url, "title": meta.title, "role": meta.role})
+    process_info["inputs"] = []
+    process_info["outputs"] = []
+    for wps_in in wps_process.dataInputs:
+        process_info["inputs"].append(_ows2json(wps_in, WPS_INPUT))
+    for wps_out in wps_process.processOutputs:
+        process_info["outputs"].append(_ows2json(wps_out, WPS_OUTPUT))
+
+    # generate CWL for WPS-1 using parsed WPS-2
+    wps_service_url = urlparse(wps_process_response.url)
+    cwl_package = {
+        "cwlVersion": "v1.0",
+        "class": "CommandLineTool",
+        "hints": {
+            PACKAGE_REQUIREMENTS_APP_WPS1: {
+                "provider": wps_service_url,
+                "process": process_info["identifier"],
+            }
+        },
+        "inputs": {},
+        "outputs": {},
+    }
+    for wps_in in process_info["inputs"]:
+        wps_in_type = _get_field(wps_in, "type", search_variations=True)
+        if wps_in_type == "ComplexData":
+            # TODO: how to support complex format for inputs?
+            raise NotImplementedError()
+        else:
+            cwl_package["inputs"][_get_field(wps_in, "identifier")] = {"type": wps_in_type}
+    for wps_out in process_info["outputs"]:
+        wps_out_type = _get_field(wps_out, "type", search_variations=True)
+        if wps_out_type == "ComplexData":
+            # TODO:
+            #   - better way to obtain extension from format? (will work for 'application/{ext}' variations)
+            #   - what about if there are multiple formats?
+            wps_out_ext = wps_out["formats"][0]["mimeType"].split('/')[-1]
+            cwl_package["outputs"][_get_field(wps_out, "identifier")] = {
+                "type": "File",
+                "outputBinding": {"glob": "output.{}".format(wps_out_ext)}
+            }
+        else:
+            cwl_package["outputs"][_get_field(wps_out, "identifier")] = {"type": wps_out_type}
+    return cwl_package, process_info
+
+
+def _generate_process_with_cwl_from_reference(reference):
+    # type: (AnyStr) -> Tuple[CWL, JSON]
+    """
+    Resolves the ``reference`` type (`CWL`, `WPS-1`, `WPS-2`) and generates a `CWL` ``package`` from it.
+    Additionally provides minimal process details retrieved from the ``reference``.
+    """
+    cwl_package = None
+    process_info = dict()
+
+    # match against direct CWL reference
+    reference_path, reference_ext = os.path.splitext(reference)
+    reference_name = os.path.split(reference_path)[-1]
+    if reference_ext.replace('.', '') in PACKAGE_EXTENSIONS:
+        cwl_package = _load_package_file(reference)
+        process_info = {'identifier': reference_name}
+
+    # match against WPS-1/2 reference
+    else:
+        response = requests.get(reference)
+        if response.status_code != HTTPOk.code:
+            raise HTTPServiceUnavailable("Couldn't obtain a valid response from [{}]. Service response: [{} {}]"
+                                         .format(reference, response.status_code, response.reason))
+        content_type = get_header('Content-Type', response.headers)
+        if any(ct in content_type for ct in ['application/xml', 'text/xml']):
+            # attempt to retrieve a WPS-1 ProcessDescription definition
+            cwl_package, process_info = _xml_wps2cwl(reference)
+
+        elif any(ct in content_type for ct in ['application/json']):
+            payload = response.json()
+            # attempt to retrieve a WPS-2 Process definition, owsContext is expected in body
+            if 'process' in payload:
+                process_info = payload['process']
+                ows_ref = process_info.get('owsContext', {}).get('offering', {}).get('content', {}).get('href')
+                cwl_package = _load_package_file(ows_ref)
+            # if somehow the CWL was referenced without an extension, handle it here
+            # also handle parsed WPS-2 process description also with a reference
+            elif 'cwlVersion' in payload:
+                cwl_package = _load_package_file(reference)
+                process_info = {'identifier': reference_name}
+
+    return cwl_package, process_info
 
 
 def get_process_definition(process_offering, reference=None, package=None, data_source=None):
-    # type: (JsonBody, Optional[AnyStr], Optional[JsonBody], Optional[AnyStr]) -> JsonBody
+    # type: (JSON, Optional[AnyStr], Optional[CWL], Optional[AnyStr]) -> JSON
     """
-    Returns an updated process information dictionary ready for storage using provided WPS ``process_offering``
-    and a package definition passed by ``reference`` or ``package`` JSON content.
+    Returns an updated process information dictionary ready for storage using provided `WPS` ``process_offering``
+    and a package definition passed by ``reference`` or ``package`` `CWL` content.
     The returned process information can be used later on to load an instance of :class:`weaver.wps_package.Package`.
 
-    :param process_offering: WPS REST-API (WPS-2) process offering as JSON.
-    :param reference: URL to an existing CWL package definition, a WPS-1 DescribeProcess or WPS-2 Process endpoint.
-    :param package: literal CWL package definition as JSON.
+    :param process_offering: `WPS REST-API` (`WPS-2`) process offering as `JSON`.
+    :param reference: URL to `CWL` package definition, `WPS-1 DescribeProcess` endpoint or `WPS-2 Process` endpoint.
+    :param package: literal `CWL` package definition (`YAML` or `JSON` format).
     :param data_source: where to resolve process IDs (default: localhost if ``None``).
-    :return: updated process definition with resolved/merged information from package/reference.
+    :return: updated process definition with resolved/merged information from ``package``/``reference``.
     """
 
     def try_or_raise_package_error(call, reason):
@@ -932,9 +1098,8 @@ def get_process_definition(process_offering, reference=None, package=None, data_
             "Simultaneous parameters [package, reference] not allowed.")
 
     if reference:
-        process_id, package = _generate_process_with_cwl_from_reference(reference)
-        if not get_any_id(process_offering):
-            process_offering['identifier'] = process_id
+        package, process_info = _generate_process_with_cwl_from_reference(reference)
+        process_info.update(process_offering)   # override upstream details
     if not isinstance(package, dict):
         raise PackageRegistrationError("Cannot decode process package contents.")
     if 'class' not in package:
@@ -960,8 +1125,13 @@ def get_process_definition(process_offering, reference=None, package=None, data_
                                               process_outputs, package_outputs),
         reason="Merging of inputs/outputs")
 
+    # obtain any retrieved process id if not already provided from upstream process offering, and clean it
+    process_id = get_sane_name(get_any_id(process_offering), assert_invalid=False, replace_invalid=True)
+    if not process_id:
+        raise PackageRegistrationError("Could not retrieve any process identifier.")
+
     process_offering.update({
-        'identifier': get_sane_name(get_any_id(process_offering)),  # raises if invalid
+        'identifier': process_id,
         'package': package,
         'type': process_type,
         'inputs': package_inputs,
@@ -981,11 +1151,12 @@ class WpsPackage(Process):
 
     def __init__(self, **kw):
         """
-        Creates a WPS Process instance to execute a CWL package definition.
+        Creates a `WPS-2 Process` instance to execute a `CWL` package definition.
+
         Process parameters should be loaded from an existing :class:`weaver.datatype.Process`
         instance generated using :function:`weaver.wps_package.get_process_definition`.
 
-        :param kw: dictionary corresponding to method :class:`weaver.datatype.Process.params_wps`
+        Provided ``kw`` should correspond to :method:`weaver.datatype.Process.params_wps`
         """
         self.payload = kw.pop("payload")
         self.package = kw.pop('package')
@@ -1040,7 +1211,7 @@ class WpsPackage(Process):
 
     def update_status(self, message, progress, status):
         # type: (AnyStr, int, AnyStatusType) -> None
-        """Updates the PyWPS real job status from a specified parameters."""
+        """Updates the `PyWPS` real job status from a specified parameters."""
         self.percent = progress or self.percent or 0
 
         # find the enum PyWPS status matching the given one as string
@@ -1053,9 +1224,6 @@ class WpsPackage(Process):
         self.response._update_status(pywps_status_id, message, self.percent)
         self.log_message(status=status, message=message, progress=progress)
 
-    # TODO
-    #  Les callback d'update status ont ete brassees pas mal dans wps1/wps3 process
-    #  ca se peut que les arguments passent tous croche
     def step_update_status(self, message, progress, start_step_progress, end_step_progress, step_name,
                            target_host, status):
         # type: (AnyStr, int, int, int, AnyStr, AnyValue, AnyStr) -> None
@@ -1078,6 +1246,7 @@ class WpsPackage(Process):
 
     @staticmethod
     def map_progress(progress, range_min, range_max):
+        # type: (Number, int, int) -> Number
         return range_min + (progress * (range_max - range_min)) / 100
 
     @classmethod
