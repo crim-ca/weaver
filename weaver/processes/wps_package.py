@@ -1,5 +1,5 @@
-from weaver.processes import opensearch
 from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS
+from weaver.processes import opensearch
 from weaver.processes.constants import WPS_INPUT, WPS_OUTPUT, WPS_COMPLEX, WPS_BOUNDINGBOX, WPS_LITERAL, WPS_REFERENCE
 from weaver.processes.wps1_process import Wps1Process
 from weaver.processes.wps3_process import Wps3Process
@@ -13,29 +13,12 @@ from weaver.exceptions import (
 from weaver.status import (STATUS_RUNNING, STATUS_SUCCEEDED, STATUS_EXCEPTION, STATUS_FAILED,
                            map_status, STATUS_COMPLIANT_PYWPS, STATUS_PYWPS_IDS)
 from weaver.wps_restapi.swagger_definitions import process_uri
-from weaver.utils import get_job_log_msg, get_log_fmt, get_log_datefmt, get_sane_name, get_settings
+from weaver.wps import get_wps_output_path
+from weaver.utils import get_job_log_msg, get_log_fmt, get_log_datefmt, get_sane_name, get_settings, get_any_id
 from pywps.inout.basic import BasicIO
 from pywps.inout.literaltypes import AnyValue, AllowedValue, ALLOWEDVALUETYPE
 from pywps.validator.mode import MODE
 from pywps.app.Common import Metadata
-from pyramid.httpexceptions import HTTPOk
-from pyramid_celery import celery_app as app
-from collections import OrderedDict, Hashable
-from six.moves.urllib.parse import urlparse
-from typing import Dict, Tuple, Union, Any, Optional, AnyStr, List, Callable, TYPE_CHECKING
-from yaml import safe_load
-from yaml.scanner import ScannerError
-from cwltool.context import LoadingContext
-from cwltool.context import RuntimeContext
-import cwltool.factory
-import cwltool
-import json
-import tempfile
-import shutil
-import requests
-import logging
-import os
-import six
 from pywps import (
     Process,
     LiteralInput,
@@ -46,9 +29,27 @@ from pywps import (
     BoundingBoxOutput,
     Format,
 )
+from pyramid.httpexceptions import HTTPOk
+from pyramid_celery import celery_app as app
+from collections import OrderedDict, Hashable
+from six.moves.urllib.parse import urlparse
+from typing import Dict, Tuple, Union, Any, Optional, AnyStr, List, Callable, TYPE_CHECKING
+from yaml.scanner import ScannerError
+from cwltool.context import LoadingContext
+from cwltool.context import RuntimeContext
+import cwltool.factory
+import cwltool
+import yaml
+import json
+import tempfile
+import shutil
+import requests
+import logging
+import os
+import six
 if TYPE_CHECKING:
     from weaver.status import AnyStatusType
-    from weaver.typedefs import ToolPathObjectType
+    from weaver.typedefs import ToolPathObjectType, JsonBody
     from cwltool.process import Process as ProcessCWL
     from pywps.app import WPSRequest
     from pywps.response.execute import ExecuteResponse
@@ -57,9 +58,10 @@ LOGGER = logging.getLogger("PACKAGE")
 
 __all__ = [
     'WpsPackage',
-    'get_process_from_wps_request',
+    'get_process_definition',
     'get_process_location',
     'get_package_workflow_steps',
+    'retrieve_package_job_log',
 ]
 
 PACKAGE_EXTENSIONS = frozenset(['yaml', 'yml', 'json', 'cwl', 'job'])
@@ -130,6 +132,25 @@ class NullType:
 
 
 null = NullType()
+
+
+def retrieve_package_job_log(execution, job):
+    # If the process is a weaver package this status xml should be available in the process output dir
+    status_xml_fn = execution.statusLocation.split('/')[-1]
+    try:
+        registry = app.conf['PYRAMID_REGISTRY']
+        output_path = get_wps_output_path(registry.settings)
+
+        # weaver package log every status update into this file (we no longer rely on the http monitoring)
+        log_fn = os.path.join(output_path, '{0}.log'.format(status_xml_fn))
+        with open(log_fn, 'r') as log_file:
+            # Keep the first log entry which is the real start time and replace the following ones with the file content
+            job.logs = job.logs[:1]
+            for line in log_file:
+                job.logs.append(line.rstrip('\n'))
+        os.remove(log_fn)
+    except (KeyError, IOError):
+        pass
 
 
 def get_process_location(process_id_or_url, data_source=None):
@@ -269,9 +290,9 @@ def _load_package_file(file_path):
     try:
         if is_url:
             cwl_resp = requests.get(file_path, headers={'Accept': 'text/plain'})
-            return safe_load(cwl_resp.content)
+            return yaml.safe_load(cwl_resp.content)
         with open(file_path, 'r') as f:
-            return safe_load(f)
+            return yaml.safe_load(f)
     except ScannerError as ex:
         raise PackageRegistrationError("Package parsing generated an error: [{!s}]".format(ex))
 
@@ -859,18 +880,34 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
                                                 set(cwl_package_package.get('s:keywords')))
 
 
-def get_process_from_wps_request(process_offering, reference=None, package=None, data_source=None):
-    # type: (Dict, Optional[AnyStr], Optional[AnyStr], Optional[AnyStr]) -> Dict
+def _generate_process_with_cwl_from_reference(reference):
+    # type: (AnyStr) -> Tuple[AnyStr, JsonBody]
+    """
+    Resolves the ``reference`` type (CWL, WPS-1, WPS-2) and generates a CWL ``package`` from it.
+    Provides the resolved process ID according to case encountered.
+    """
+
+    # TODO: check 'reference' for any of:
+    #   - .cwl leave it as is, already handled by 'wps_package.get_process_definition'
+    #   ------
+    #   - WPS2 process endpoint: JSON + 'process' description in body /w => generate process_info
+    #   - WPS1 service endpoint: urlparse(reference) + 'convert_process_wps_to_db' => generate process_info
+    _load_package_file(reference)
+    return process_id, cwl_package
+
+
+def get_process_definition(process_offering, reference=None, package=None, data_source=None):
+    # type: (JsonBody, Optional[AnyStr], Optional[JsonBody], Optional[AnyStr]) -> JsonBody
     """
     Returns an updated process information dictionary ready for storage using provided WPS ``process_offering``
     and a package definition passed by ``reference`` or ``package`` JSON content.
     The returned process information can be used later on to load an instance of :class:`weaver.wps_package.Package`.
 
-    :param process_offering: WPS REST-API process offering as JSON.
-    :param reference: URL to an existing package definition (CWL) or .
-    :param package: literal package definition as JSON.
+    :param process_offering: WPS REST-API (WPS-2) process offering as JSON.
+    :param reference: URL to an existing CWL package definition, a WPS-1 DescribeProcess or WPS-2 Process endpoint.
+    :param package: literal CWL package definition as JSON.
     :param data_source: where to resolve process IDs (default: localhost if ``None``).
-    :return: process information dictionary ready for saving to data store.
+    :return: updated process definition with resolved/merged information from package/reference.
     """
 
     def try_or_raise_package_error(call, reason):
@@ -895,7 +932,9 @@ def get_process_from_wps_request(process_offering, reference=None, package=None,
             "Simultaneous parameters [package, reference] not allowed.")
 
     if reference:
-        package = _load_package_file(reference)
+        process_id, package = _generate_process_with_cwl_from_reference(reference)
+        if not get_any_id(process_offering):
+            process_offering['identifier'] = process_id
     if not isinstance(package, dict):
         raise PackageRegistrationError("Cannot decode process package contents.")
     if 'class' not in package:
@@ -922,6 +961,7 @@ def get_process_from_wps_request(process_offering, reference=None, package=None,
         reason="Merging of inputs/outputs")
 
     process_offering.update({
+        'identifier': get_sane_name(get_any_id(process_offering)),  # raises if invalid
         'package': package,
         'type': process_type,
         'inputs': package_inputs,
@@ -943,7 +983,7 @@ class WpsPackage(Process):
         """
         Creates a WPS Process instance to execute a CWL package definition.
         Process parameters should be loaded from an existing :class:`weaver.datatype.Process`
-        instance generated using method `get_process_from_wps_request`.
+        instance generated using :function:`weaver.wps_package.get_process_definition`.
 
         :param kw: dictionary corresponding to method :class:`weaver.datatype.Process.params_wps`
         """

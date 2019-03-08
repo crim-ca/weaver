@@ -1047,6 +1047,7 @@ class Deploy(MappingSchema):
     immediateDeployment = SchemaNode(Boolean(), missing=drop, default=True)
     executionUnit = ExecutionUnitList()
     deploymentProfileName = SchemaNode(String(), missing=drop)
+    owsContext = OWSContext(missing=drop)
 
 
 class PostProcessEndpoint(MappingSchema):

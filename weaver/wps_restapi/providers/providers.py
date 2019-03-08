@@ -5,7 +5,8 @@ from weaver.warning import NonBreakingExceptionWarning
 from weaver.owsexceptions import OWSMissingParameterValue, OWSNotImplemented
 from weaver.store.base import StoreServices
 from weaver.utils import get_any_id, get_settings
-from weaver.wps_restapi.utils import wps_restapi_base_url, get_cookie_headers
+from weaver.wps_restapi.utils import wps_restapi_base_url
+from utils import get_cookie_headers
 from weaver.wps_restapi import swagger_definitions as sd
 from owslib.wps import WebProcessingService
 from pyramid.httpexceptions import (

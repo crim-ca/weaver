@@ -14,6 +14,8 @@ from requests import HTTPError as RequestsHTTPError
 from six.moves.urllib.parse import urlparse, parse_qs
 from distutils.dir_util import mkpath
 from distutils.version import LooseVersion
+from requests.structures import CaseInsensitiveDict
+from webob.headers import ResponseHeaders, EnvironHeaders
 import os
 import time
 import pytz
@@ -23,7 +25,7 @@ import platform
 import warnings
 import logging
 if TYPE_CHECKING:
-    from weaver.typedefs import SettingsType, AnySettingsContainer
+    from weaver.typedefs import SettingsType, AnySettingsContainer, AnyHeadersContainer, HeadersType
 
 LOGGER = logging.getLogger(__name__)
 
@@ -34,18 +36,18 @@ def get_weaver_url(settings):
 
 
 def get_any_id(info):
-    # type: (Dict[AnyStr, AnyStr]) -> AnyStr
-    """Retrieves a dictionary 'id'-like key using multiple common variations [id, identifier, _id].
-    :param info: dictionary that potentially contains an 'id'-like key.
-    :returns: value of the matched 'id'-like key."""
+    # type: (Dict[AnyStr, AnyStr]) -> Union[AnyStr, None]
+    """Retrieves a dictionary `id-like` key using multiple common variations ``[id, identifier, _id]``.
+    :param info: dictionary that potentially contains an `id-like` key.
+    :returns: value of the matched `id-like` key or ``None`` if not found."""
     return info.get('id', info.get('identifier', info.get('_id')))
 
 
 def get_any_value(info):
     # type: (Dict[AnyStr, AnyStr]) -> Union[AnyStr, None]
-    """Retrieves a dictionary 'value'-like key using multiple common variations [href, value, reference].
-    :param info: dictionary that potentially contains a 'value'-like key.
-    :returns: value of the matched 'id'-like key."""
+    """Retrieves a dictionary `value-like` key using multiple common variations ``[href, value, reference]``.
+    :param info: dictionary that potentially contains a `value-like` key.
+    :returns: value of the matched `value-like` key or ``None`` if not found."""
     return info.get('href', info.get('value', info.get('reference', info.get('data'))))
 
 
@@ -66,6 +68,37 @@ def get_settings(container):
     if isinstance(container, dict):
         return container
     raise TypeError("Could not retrieve settings from container object [{}]".format(type(container)))
+
+
+def get_header(header_name, header_container):
+    # type: (AnyStr, AnyHeadersContainer) -> Union[AnyStr, None]
+    """
+    Searches for the specified header by case/dash/underscore-insensitive ``header_name`` inside ``header_container``.
+    """
+    if header_container is None:
+        return None
+    headers = header_container
+    if isinstance(headers, (ResponseHeaders, EnvironHeaders, CaseInsensitiveDict)):
+        headers = dict(headers)
+    if isinstance(headers, dict):
+        headers = header_container.items()
+    header_name = header_name.lower().replace('-', '_')
+    for h, v in headers:
+        if h.lower().replace('-', '_') == header_name:
+            return v
+    return None
+
+
+def get_cookie_headers(header_container, cookie_header_name='Cookie'):
+    # type: (AnyHeadersContainer, Optional[AnyStr]) -> HeadersType
+    """
+    Looks for ``cookie_header_name`` header within ``header_container``.
+    :returns: new header container in the form ``{'Cookie': <found_cookie>}`` if it was matched, or empty otherwise.
+    """
+    try:
+        return dict(Cookie=get_header(cookie_header_name, header_container))
+    except KeyError:  # No cookie
+        return {}
 
 
 def is_valid_url(url):
@@ -347,7 +380,7 @@ def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_in
 
 def assert_sane_name(name, min_len=3, max_len=None):
     if name is None:
-        raise InvalidIdentifierValue('Invalid process name : {0}'.format(name))
+        raise InvalidIdentifierValue('Invalid name : {0}'.format(name))
     name = name.strip()
     if '--' in name \
        or name.startswith('-') \
@@ -355,4 +388,4 @@ def assert_sane_name(name, min_len=3, max_len=None):
        or len(name) < min_len \
        or (max_len is not None and len(name) > max_len) \
        or not re.match(r"^[a-zA-Z0-9_\-]+$", name):
-        raise InvalidIdentifierValue('Invalid process name : {0}'.format(name))
+        raise InvalidIdentifierValue('Invalid name : {0}'.format(name))

@@ -31,6 +31,7 @@ wps-restapi-ref = https://rest-api-reference.com/conformance-path
 wps-email-notify-from-addr = example@email.com
 wps-email-notify-password = 123456
 wps-email-notify-template = /path/to/mako/template.mako
+wps-providers-file = /path/to/wps_providers.yml
 
 # See weaver.processes.sources.py for schema
 data-sources = ./data_sources.json.example

@@ -1,15 +1,7 @@
 from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS
 from weaver.database import get_db
 from weaver.datatype import Process as ProcessDB, Service
-from weaver.exceptions import (
-    InvalidIdentifierValue,
-    ProcessRegistrationError,
-    ProcessNotFound,
-    ProcessNotAccessible,
-    PackageRegistrationError,
-    PackageTypeError,
-    PackageNotFound,
-)
+from weaver.exceptions import InvalidIdentifierValue, ProcessNotFound, ProcessNotAccessible
 from weaver.execute import (
     EXECUTE_MODE_AUTO,
     EXECUTE_MODE_ASYNC,
@@ -19,8 +11,8 @@ from weaver.execute import (
 )
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes import wps_package, opensearch
-from weaver.processes.utils import jsonify_value, jsonify_output
-from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
+from weaver.processes.utils import jsonify_output, convert_process_wps_to_db, add_process_from_payload
+from weaver.processes.types import PROCESS_WORKFLOW
 from weaver.status import (
     map_status,
     STATUS_ACCEPTED,
@@ -29,14 +21,14 @@ from weaver.status import (
     STATUS_SUCCEEDED,
 )
 from weaver.store.base import StoreServices, StoreProcesses, StoreJobs
-from weaver.utils import get_any_id, get_any_value, get_settings, raise_on_xml_exception, get_sane_name, wait_secs
+from weaver.utils import get_any_id, get_any_value, get_settings, raise_on_xml_exception, wait_secs, get_cookie_headers
 from weaver.visibility import VISIBILITY_PUBLIC, visibility_values
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.notify import notify_job
-from weaver.wps_restapi.utils import get_cookie_headers, wps_restapi_base_url, parse_request_query
+from weaver.wps_restapi.utils import wps_restapi_base_url, parse_request_query
 from weaver.wps_restapi.jobs.jobs import check_status, job_format_json
-from weaver.wps import get_wps_output_path, load_pywps_cfg
-from owslib.wps import WebProcessingService, WPSException, ComplexDataInput, Process as ProcessWPS
+from weaver.wps import load_pywps_cfg
+from owslib.wps import WebProcessingService, WPSException, ComplexDataInput
 from owslib.util import clean_ows_url
 from pyramid.httpexceptions import (
     HTTPOk,
@@ -44,7 +36,6 @@ from pyramid.httpexceptions import (
     HTTPUnauthorized,
     HTTPNotFound,
     HTTPBadRequest,
-    HTTPConflict,
     HTTPUnprocessableEntity,
     HTTPInternalServerError,
     HTTPNotImplemented,
@@ -64,30 +55,10 @@ import requests
 import colander
 import logging
 import six
-import os
 if TYPE_CHECKING:
-    from typing import Any, AnyStr, Dict, List, Tuple, Optional, Union
+    from typing import Any, AnyStr, Dict, List, Tuple, Optional
 
 LOGGER = logging.getLogger(__name__)
-
-
-def retrieve_package_job_log(execution, job):
-    # If the process is a weaver package this status xml should be available in the process output dir
-    status_xml_fn = execution.statusLocation.split('/')[-1]
-    try:
-        registry = app.conf['PYRAMID_REGISTRY']
-        output_path = get_wps_output_path(registry.settings)
-
-        # weaver package log every status update into this file (we no longer rely on the http monitoring)
-        log_fn = os.path.join(output_path, '{0}.log'.format(status_xml_fn))
-        with open(log_fn, 'r') as log_file:
-            # Keep the first log entry which is the real start time and replace the following ones with the file content
-            job.logs = job.logs[:1]
-            for line in log_file:
-                job.logs.append(line.rstrip('\n'))
-        os.remove(log_fn)
-    except (KeyError, IOError):
-        pass
 
 
 @app.task(bind=True)
@@ -176,13 +147,13 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
                         job.progress = 100
                         job.status = map_status(STATUS_SUCCEEDED)
                         job.status_message = execution.statusMessage or "Job succeeded."
-                        retrieve_package_job_log(execution, job)
+                        wps_package.retrieve_package_job_log(execution, job)
                         job.save_log(logger=task_logger)
                         job.results = [jsonify_output(output, process) for output in execution.processOutputs]
                     else:
                         task_logger.debug("Job failed.")
                         job.status_message = execution.statusMessage or "Job failed."
-                        retrieve_package_job_log(execution, job)
+                        wps_package.retrieve_package_job_log(execution, job)
                         job.save_log(errors=execution.errors, logger=task_logger)
 
             except Exception as exc:
@@ -311,65 +282,15 @@ def submit_provider_job(request):
     return submit_job_handler(request, service.url)
 
 
-def convert_process_wps_to_db(service, process, settings):
-    # type: (Service, ProcessWPS, Dict[AnyStr, Union[int, float, bool, None]]) -> ProcessDB
-    """
-    Converts an owslib WPS Process to local storage Process.
-    """
-    describe_process_url = '{base_url}/providers/{provider_id}/processes/{process_id}'.format(
-        base_url=wps_restapi_base_url(settings),
-        provider_id=service.name,
-        process_id=process.identifier)
-    execute_process_url = '{describe_url}/jobs'.format(describe_url=describe_process_url)
-
-    default_format = {'mimeType': 'text/plain'}
-    inputs = [dict(
-        id=getattr(dataInput, 'identifier', ''),
-        title=getattr(dataInput, 'title', ''),
-        abstract=getattr(dataInput, 'abstract', ''),
-        minOccurs=str(getattr(dataInput, 'minOccurs', 0)),  # FIXME: str applied to match OGC REST-API definition
-        maxOccurs=str(getattr(dataInput, 'maxOccurs', 0)),  # FIXME: str applied to match OGC REST-API definition
-        dataType=dataInput.dataType,
-        defaultValue=jsonify_value(getattr(dataInput, 'defaultValue', None)),
-        allowedValues=[jsonify_value(dataValue) for dataValue in getattr(dataInput, 'allowedValues', [])],
-        supportedValues=[jsonify_value(dataValue) for dataValue in getattr(dataInput, 'supportedValues', [])],
-        formats=[jsonify_value(dataValue) for dataValue in getattr(dataInput, 'supportedValues', [default_format])],
-    ) for dataInput in getattr(process, 'dataInputs', [])]
-
-    outputs = [dict(
-        id=getattr(processOutput, 'identifier', ''),
-        title=getattr(processOutput, 'title', ''),
-        abstract=getattr(processOutput, 'abstract', ''),
-        dataType=processOutput.dataType,
-        defaultValue=jsonify_value(getattr(processOutput, 'defaultValue', None)),
-        formats=[jsonify_value(dataValue) for dataValue in getattr(processOutput, 'supportedValues', [default_format])],
-    ) for processOutput in getattr(process, 'processOutputs', [])]
-
-    return ProcessDB(
-        id=process.identifier,
-        label=getattr(process, 'title', ''),
-        title=getattr(process, 'title', ''),
-        abstract=getattr(process, 'abstract', ''),
-        inputs=inputs,
-        outputs=outputs,
-        url=describe_process_url,
-        processEndpointWPS1=service.url,
-        processDescriptionURL=describe_process_url,
-        executeEndpoint=execute_process_url,
-        package=None,
-    )
-
-
 def list_remote_processes(service, request):
     # type: (Service, Request) -> List[ProcessDB]
     """
     Obtains a list of remote service processes in a compatible :class:`weaver.datatype.Process` format.
     Note: those processes won't be stored to the local process storage.
     """
-    if not isinstance(service, Service):
-        return list()
     wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
-    return [convert_process_wps_to_db(service, process, get_settings(request)) for process in wps.processes]
+    settings = get_settings(request)
+    return [convert_process_wps_to_db(service, process, settings) for process in wps.processes]
 
 
 @sd.provider_processes_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.getcapabilities_tag],
@@ -487,112 +408,8 @@ def add_local_process(request):
     """
     # use deepcopy of body payload to avoid circular dependencies when writing to mongodb
     # and before parsing it because the body is altered by some pop operations
-    body = request.json
-    payload = deepcopy(body)
-
-    # validate minimum field requirements
-    try:
-        sd.Deploy().deserialize(body)
-    except colander.Invalid as ex:
-        raise HTTPBadRequest("Invalid schema: [{}]".format(str(ex)))
-    except Exception as ex:
-        raise HTTPInternalServerError("Unhandled error when parsing 'processDescription': [{}]".format(str(ex)))
-
-    # validate identifier naming for unsupported characters
-    process_description = body.get('processDescription')
-    process_info = process_description.get('process')
-    try:
-        process_info['identifier'] = get_sane_name(get_any_id(process_info))
-    except InvalidIdentifierValue as ex:
-        raise HTTPBadRequest(str(ex))
-
-    # retrieve CWL package definition, either via owsContext or executionUnit package/reference
-    deployment_profile_name = body.get('deploymentProfileName', '').lower()
-    ows_context = process_info.pop('owsContext', None)
-    reference = None
-    package = None
-    if isinstance(ows_context, dict):
-        offering = ows_context.get('offering')
-        if not isinstance(offering, dict):
-            raise HTTPUnprocessableEntity("Invalid parameter 'processDescription.process.owsContext.offering'.")
-        content = offering.get('content')
-        if not isinstance(content, dict):
-            raise HTTPUnprocessableEntity("Invalid parameter 'processDescription.process.owsContext.offering.content'.")
-        package = None
-        reference = content.get('href')
-    elif deployment_profile_name:
-        if not any(deployment_profile_name.endswith(typ) for typ in [PROCESS_APPLICATION, PROCESS_WORKFLOW]):
-            raise HTTPBadRequest("Invalid value for parameter 'deploymentProfileName'.")
-        execution_units = body.get('executionUnit')
-        if not isinstance(execution_units, list):
-            raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
-        for execution_unit in execution_units:
-            if not isinstance(execution_unit, dict):
-                raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
-            package = execution_unit.get('unit')
-            reference = execution_unit.get('href')
-            # stop on first package/reference found, simultaneous usage will raise during package retrieval
-            if package or reference:
-                break
-    else:
-        raise HTTPBadRequest("Missing one of required parameters [owsContext, deploymentProfileName].")
-
-    # TODO: check 'reference' for any of:
-    #   - .cwl leave it as is, already handled by 'wps_package.get_process_from_wps_request'
-    #   ------
-    #   - WPS2 process endpoint: JSON + 'process' description in body /w => generate process_info
-    #   - WPS1 service endpoint: urlparse(reference) + 'convert_process_wps_to_db' => generate process_info
-
-    # add 'owsContext' if missing (details retrieved from 'executionUnit')
-    if 'owsContext' not in process_info and reference:
-        process_info['owsContext'] = {'offering': {'content': {'href': reference}}}
-
-    # obtain updated process information using WPS process offering and CWL package definition
-    try:
-        # data_source `None` forces workflow process to search locally for deployed step applications
-        process_info = wps_package.get_process_from_wps_request(process_info, reference, package, data_source=None)
-    except PackageNotFound as ex:
-        # raised when a workflow sub-process is not found (not deployed locally)
-        raise HTTPNotFound(detail=str(ex))
-    except (PackageRegistrationError, PackageTypeError) as ex:
-        raise HTTPUnprocessableEntity(detail=str(ex))
-    except Exception as ex:
-        raise HTTPBadRequest("Invalid package/reference definition. Loading generated error: `{}`".format(repr(ex)))
-
-    # validate process type against weaver configuration
-    settings = get_settings(request)
-    process_type = process_info['type']
-    if process_type == PROCESS_WORKFLOW:
-        weaver_config = get_weaver_configuration(settings)
-        if weaver_config != WEAVER_CONFIGURATION_EMS:
-            raise HTTPBadRequest("Invalid `{0}` package deployment on `{1}`.".format(process_type, weaver_config))
-
-    restapi_url = wps_restapi_base_url(settings)
-    description_url = "/".join([restapi_url, 'processes', process_info['identifier']])
-    execute_endpoint = "/".join([description_url, "jobs"])
-
-    # ensure that required 'processEndpointWPS1' in db is added,
-    # will be auto-fixed to localhost if not specified in body
-    process_info['processEndpointWPS1'] = process_description.get('processEndpointWPS1')
-    process_info['executeEndpoint'] = execute_endpoint
-    process_info['payload'] = payload
-    process_info['jobControlOptions'] = process_description.get('jobControlOptions', [])
-    process_info['outputTransmission'] = process_description.get('outputTransmission', [])
-    if ows_context:
-        process_info['owsContext'] = ows_context
-    process_info['processDescriptionURL'] = description_url
-
-    try:
-        store = get_db(request).get_store(StoreProcesses)
-        saved_process = store.save_process(ProcessDB(process_info), overwrite=False, request=request)
-    except ProcessRegistrationError as ex:
-        raise HTTPConflict(detail=str(ex))
-    except ValueError as ex:
-        # raised on invalid process name
-        raise HTTPBadRequest(detail=str(ex))
-
-    json_response = {'processSummary': saved_process.process_summary(), 'deploymentDone': True}
-    return HTTPOk(json=json_response)
+    payload = deepcopy(request.json)
+    return add_process_from_payload(payload, request)
 
 
 def get_process(request):

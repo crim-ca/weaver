@@ -1,7 +1,11 @@
 """
 pywps 4.x wrapper
 """
-
+from weaver.database import get_db
+from weaver.store.base import StoreProcesses
+from weaver.owsexceptions import OWSNoApplicableCode
+from weaver.visibility import VISIBILITY_PUBLIC
+from weaver.utils import get_weaver_url
 from pyramid.wsgi import wsgiapp2
 from pyramid.settings import asbool
 from pyramid.registry import Registry
@@ -13,11 +17,6 @@ from pywps import configuration as pywps_config
 from pywps.app.Service import Service
 from six.moves.configparser import SafeConfigParser
 from typing import AnyStr, Dict, Union, Optional
-from weaver.database import get_db
-from weaver.store.base import StoreProcesses
-from weaver.owsexceptions import OWSNoApplicableCode
-from weaver.visibility import VISIBILITY_PUBLIC
-from weaver.utils import get_weaver_url
 import os
 import six
 import logging

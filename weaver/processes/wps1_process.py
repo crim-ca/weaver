@@ -5,7 +5,7 @@ from weaver.processes.utils import jsonify_output
 from weaver.processes.wps_process_base import WpsProcessInterface
 from weaver.utils import get_any_id, get_any_value, get_job_log_msg, raise_on_xml_exception, wait_secs
 from weaver.wps_restapi.jobs.jobs import check_status
-from weaver.wps_restapi.utils import get_cookie_headers
+from utils import get_cookie_headers
 from owslib.wps import WebProcessingService, ComplexDataInput, WPSException
 from typing import AnyStr, TYPE_CHECKING
 from time import sleep

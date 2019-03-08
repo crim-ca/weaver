@@ -1,15 +1,13 @@
-from weaver.utils import parse_request_query, get_weaver_url
+from weaver.utils import parse_request_query, get_weaver_url, get_settings
 from distutils.version import LooseVersion
-from requests.structures import CaseInsensitiveDict
 from pyramid.httpexceptions import HTTPSuccessful
-from webob.headers import ResponseHeaders, EnvironHeaders
-from typing import AnyStr, Optional, Union, TYPE_CHECKING
+from typing import AnyStr, TYPE_CHECKING
 from lxml import etree
 import requests
 import logging
 if TYPE_CHECKING:
     from pyramid.request import Request
-    from weaver.typedefs import SettingsType, HeadersType, AnyHeadersContainer
+    from weaver.typedefs import AnySettingsContainer
 
 LOGGER = logging.getLogger("weaver")
 
@@ -27,48 +25,19 @@ OUTPUT_FORMATS = {
 }
 
 
-def wps_restapi_base_path(settings):
-    # type: (SettingsType) -> AnyStr
+def wps_restapi_base_path(container):
+    # type: (AnySettingsContainer) -> AnyStr
+    settings = get_settings(container)
     restapi_path = settings.get('weaver.wps_restapi_path', '').rstrip('/').strip()
     return restapi_path
 
 
-def wps_restapi_base_url(settings):
-    # type: (SettingsType) -> AnyStr
+def wps_restapi_base_url(container):
+    # type: (AnySettingsContainer) -> AnyStr
+    settings = get_settings(container)
     weaver_url = get_weaver_url(settings)
     restapi_path = wps_restapi_base_path(settings)
     return weaver_url + restapi_path
-
-
-def get_header(header_name, header_container):
-    # type: (AnyStr, AnyHeadersContainer) -> Union[AnyStr, None]
-    """
-    Searches for the specified header by case/dash/underscore-insensitive ``header_name`` inside ``header_container``.
-    """
-    if header_container is None:
-        return None
-    headers = header_container
-    if isinstance(headers, (ResponseHeaders, EnvironHeaders, CaseInsensitiveDict)):
-        headers = dict(headers)
-    if isinstance(headers, dict):
-        headers = header_container.items()
-    header_name = header_name.lower().replace('-', '_')
-    for h, v in headers:
-        if h.lower().replace('-', '_') == header_name:
-            return v
-    return None
-
-
-def get_cookie_headers(header_container, cookie_header_name='Cookie'):
-    # type: (AnyHeadersContainer, Optional[AnyStr]) -> HeadersType
-    """
-    Looks for ``cookie_header_name`` header within ``header_container``.
-    :returns: new header container in the form ``{'Cookie': <found_cookie>}`` if it was matched, or empty otherwise.
-    """
-    try:
-        return dict(Cookie=get_header(cookie_header_name, header_container))
-    except KeyError:  # No cookie
-        return {}
 
 
 def get_wps_output_format(request, service_url=None):

@@ -13,13 +13,19 @@ if TYPE_CHECKING:
     from webtest.response import TestResponse
     from pywps.app import WPSRequest
     from typing import Any, AnyStr, Callable, Dict, List, Tuple, Union
+    import os
+    if hasattr(os, 'PathLike'):
+        FileSystemPathType = Union[os.PathLike, AnyStr]
+    else:
+        FileSystemPathType = AnyStr
 
     JsonField = Union[AnyStr, int, float, bool, None]
     JsonBody = Dict[AnyStr, Union[JsonField, Dict[AnyStr, Any], List[Any]]]
 
+    AnyContainer = Union[Configurator, Registry, PyramidRequest]
     SettingValue = Union[AnyStr, int, float, bool, None]
     SettingsType = Dict[AnyStr, SettingValue]
-    AnySettingsContainer = Union[Configurator, Registry, PyramidRequest, SettingsType]
+    AnySettingsContainer = Union[AnyContainer, SettingsType]
 
     CookiesType = Dict[AnyStr, AnyStr]
     HeadersType = Dict[AnyStr, AnyStr]

@@ -1,8 +1,4 @@
-from weaver.utils import get_settings
 from pyramid.exceptions import ConfigurationError
-import os
-import tempfile
-
 import logging
 LOGGER = logging.getLogger(__name__)
 
@@ -28,27 +24,6 @@ def get_weaver_configuration(settings):
     return weaver_config_up
 
 
-def _workdir(request):
-    settings = get_settings(request)
-    workdir = settings.get('weaver.workdir')
-    workdir = workdir or tempfile.gettempdir()
-    if not os.path.exists(workdir):
-        os.makedirs(workdir)
-    LOGGER.debug('using workdir %s', workdir)
-    return workdir
-
-
-def _prefix(request):
-    settings = get_settings(request)
-    prefix = settings.get('weaver.prefix')
-    prefix = prefix or 'weaver_'
-    return prefix
-
-
+# noinspection PyUnusedLocal
 def includeme(config):
-    # settings = config.registry.settings
-
     LOGGER.debug("Loading weaver configuration.")
-
-    config.add_request_method(_workdir, 'workdir', reify=True)
-    config.add_request_method(_prefix, 'prefix', reify=True)

@@ -1,5 +1,5 @@
 from weaver.wps import get_wps_output_path, get_wps_output_url
-from weaver.wps_restapi.utils import get_cookie_headers
+from utils import get_cookie_headers
 from pyramid_celery import celery_app as app
 from pyramid.settings import asbool
 from pyramid.httpexceptions import HTTPBadGateway
