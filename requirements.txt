@@ -8,6 +8,8 @@ cornice_swagger>=0.7.0
 cwltool==1.0.20180820141117
 duration
 gunicorn
+# TODO: this avoids buildout install error, should be removable after issue #5
+jsonschema>=3.0.1
 lxml
 owslib
 pymongo

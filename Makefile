@@ -248,7 +248,7 @@ install-raw:
 	@echo "Install package complete."
 
 .PHONY: install
-install: bootstrap
+install: bootstrap install-base
 	@echo "Installing application with buildout ..."
 	@-bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
 		bin/buildout buildout:anaconda-home=$(CONDA_HOME) -c custom.cfg;"
