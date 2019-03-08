@@ -46,7 +46,5 @@ setup(name=__meta__.__name__,
       entry_points="""\
       [paste.app_factory]
       main = weaver:main
-      [console_scripts]
-      weaverctl=weaver.weaverctl:main
       """,
       )
