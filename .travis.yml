@@ -18,6 +18,7 @@ before_install:
   - source .travis.env
 install:
   - make install
+  - make install-dev
   - make start
 before_script:
   - sleep 5
