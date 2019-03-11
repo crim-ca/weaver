@@ -41,17 +41,17 @@ notifications:
 after_success:
   - bash <(curl -s https://codecov.io/bash) || echo "Codecov did not collect coverage reports"
   - |
-    if [[ "$TRAVIS_BRANCH" == "master" ]]; then
-      export TAG_VERSION=latest ;
-    else;
-      export TAG_VERSION=$TRAVIS_TAG ;
-    fi;
+    if [ "$TRAVIS_BRANCH" == "master" ] then
+      export TAG_VERSION=latest
+    else
+      export TAG_VERSION=$TRAVIS_TAG
+    fi
   - |
-    if [[ -z "${TAG_VERSION}" ]] || [[ "$TRAVIS_PULL_REQUEST" = "false" ]]; then
-      echo "Nothing to build for '$TRAVIS_BRANCH' (PR: $TRAVIS_PULL_REQUEST)" ;
-    else;
+    if [ -z "${TAG_VERSION}" ] || [ "$TRAVIS_PULL_REQUEST" = "false" ] then
+      echo "Nothing to build for '$TRAVIS_BRANCH' (PR: $TRAVIS_PULL_REQUEST)"
+    else
       echo "Building: 'docker-registry.crim.ca/ogc/weaver:$TAG_VERSION'"
       docker login docker-registry.crim.ca -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
       docker build . -t docker-registry.crim.ca/ogc/weaver:$TAG_VERSION
-      docker push docker-registry.crim.ca/ogc/weaver:$TAG_VERSION ;
-    fi;
+      docker push docker-registry.crim.ca/ogc/weaver:$TAG_VERSION
+    fi
