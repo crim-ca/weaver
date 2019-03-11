@@ -355,25 +355,25 @@ coverage:
 .PHONY: pep8
 pep8:
 	@echo "Running pep8 code style checks..."
-	$(CONDA_ENV_PATH)/bin/flake8
+	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; flake8'
 
 ## Documentation targets
 
 .PHONY: docs
 docs:
 	@echo "Generating docs with Sphinx..."
-	$(MAKE) -C $@ clean html
+	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; $(MAKE) -C $@ clean html'
 	@echo "open your browser: firefox docs/build/html/index.html"
 
 .PHONY: linkcheck
 linkcheck:
 	@echo "Run link checker on docs..."
-	$(MAKE) -C docs linkcheck
+	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; (MAKE) -C docs linkcheck'
 
 .PHONY: doc8
 doc8:
 	@echo "Running doc8 doc style checks..."
-	$(CONDA_ENV_PATH)/bin/doc8 docs/
+	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; doc8 docs/'
 
 ## Bumpversion targets
 
