@@ -400,6 +400,7 @@ def test_query_sentinel2():
     assert len(data["image-sentinel2"]) == inputs["image-sentinel2"][0].max_occurs
 
 
+@pytest.mark.xfail(reason="Cannot login to protected 'probav' opensearch endpoint.")
 @pytest.mark.online
 def test_query_probav():
     inputs, eo_image_source_info = probav_inputs()
@@ -419,6 +420,7 @@ def test_query_deimos():
     assert len(data["image-deimos"]) == inputs["image-deimos"][0].max_occurs
 
 
+@pytest.mark.xfail(reason="Cannot login to protected 'probav' opensearch endpoint.")
 @pytest.mark.online
 def test_query_non_unique():
     inputs_s2, eo_image_source_info_s2 = sentinel2_inputs(unique_aoi_toi=False)

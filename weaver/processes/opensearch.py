@@ -124,10 +124,8 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info, accept_mime
                     if len(eoimages_queue) >= max_occurs:
                         break
                 if len(eoimages_queue) < queue[0].min_occurs:
-                    message = "Could not find enough images ({}/{}) matching accepted mimetype ({})"
-                    message = message.format(len(eoimages_queue),
-                                             queue[0].min_occurs,
-                                             ", ".join(mime_types))
+                    message = "Could not find enough images [{}/{}] matching accepted mimetype [{}]"
+                    message = message.format(len(eoimages_queue), queue[0].min_occurs, ", ".join(mime_types))
                     raise ValueError(message)
                 new_inputs[input_id] = eoimages_queue
 
@@ -327,10 +325,8 @@ class OpenSearchQuery(object):
                     yield good_links[0]
                     break
             else:
-                message = "Could not match any accepted mimetype {} to received mimetype {} using params {}"
-                message = message.format(", ".join(accept_mime_types),
-                                         ", ".join(data_links_mime_types),
-                                         params)
+                message = "Could not match any accepted mimetype [{}] to received mimetype [{}] using params {}"
+                message = message.format(", ".join(accept_mime_types), ", ".join(data_links_mime_types), params)
                 # Do not raise an error right now, just loop until we reach the number of inputs we want
                 # Raise only if that number isn't reach
                 LOGGER.warning(message)
