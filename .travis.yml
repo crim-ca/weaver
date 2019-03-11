@@ -40,11 +40,18 @@ notifications:
   email: false
 after_success:
   - bash <(curl -s https://codecov.io/bash) || echo "Codecov did not collect coverage reports"
-  - if [[ "$TRAVIS_BRANCH" == "master" ]]; then
+  - |
+    if [[ "$TRAVIS_BRANCH" == "master" ]]; then
       export TAG_VERSION=latest ;
     else;
       export TAG_VERSION=$TRAVIS_TAG ;
     fi;
-  - docker login docker-registry.crim.ca -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-  - docker build . -t docker-registry.crim.ca/ogc/weaver:$TAG_VERSION
-  - docker push docker-registry.crim.ca/ogc/weaver:$TAG_VERSION
+  - |
+    if [[ -z "${TAG_VERSION}" ]]; then
+      echo "Nothing to build for '$TRAVIS_BRANCH'" ;
+    else;
+      echo "Building: 'docker-registry.crim.ca/ogc/weaver:$TAG_VERSION'" ;
+      docker login docker-registry.crim.ca -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+      docker build . -t docker-registry.crim.ca/ogc/weaver:$TAG_VERSION
+      docker push docker-registry.crim.ca/ogc/weaver:$TAG_VERSION ;
+    fi;
