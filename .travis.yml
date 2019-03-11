@@ -5,6 +5,10 @@ os:
 python:
   - "2.7"
 sudo: false
+env:
+  global:
+  - secure: j7fuAPDXdl0SF1My1f0e3hr8mq4idP41jsz98Y1hN30GGOmIputScxIwSjIBi8zFCJ+K4RleMIoWLhnFsMeMD4DapRqDe5YnJJFOyfiyplzEcn4yONYRJf1nzfXBrpoGSEibgr/e3uYK62bkantI+b0pBPNAKbRjbRKKwTKEAxWb1pfaAMEQMB8/Wmvo0XYAZRB96H4q/7Dtd4CaIqh99Fs/9TjaGdNNtDtjwL0AWPXNfamsA8oNW0frNp1lEYpJpRE+PHFiKWZWyrRqjDA/UNU2UE/2H1O53I6tUXGJjORrUGRp1M9Xq/NhC8C4l7KrdpYH7YkYdvRDts3+XmJZ5kCsGB35YLP8DF1yUXIL4ZMskegBsBKqKKgnXGo4uYkaHp0QR2r8v2tdO8q3JWGYLSCgGVu5YkHU6Nlqf98W5LQLYSuZEkLplrk9vISHNS6TI4G3m7huToY1HwOu01hTZHAEhr/ouUxOfu6pQs8ZYVCyj98o65KFlFCRa7qKHc2/lXVbFPaOeQmFYqCGfFMTB0G0DHlsyOJk3QzoTr0HxJlbEwh9XLJOAnGO/TwcOUZndlj0+lTuCTpeBhjHywr+b00HnYtJ3cVnUVjT8TZydG2ATogeKRvOe0m58ug36EUGwbjr0JoN2hHjeFNSdvTUzFFFmRBY9rps47rzEDyRBGc=
+  - secure: jtK2GwC2Z97r1LdZpqDoj7UGVbTq9Dk+CdXXRbrWuSFCc/SA/TFFeEaHJHm1V0oVFeC5YVpu2B7Z/Di71SmqF/tafArLuDF5LCFegddZBlG372xaKn/ilfLRriA9dyb/yopmnRInqh9ynd1/CokNFjMAKuj4bZYJZImL7nsY9iCdAfuv51thQg2Nd4oj50SiR9MSgEhxOsdos5CncJqSbJrw9KEJGpz69ZtOD6p6UVfd8PgCaDSRuU/RaTAZLLFznRW4+OcUyOy1KXkmEyo7YoF6D/OJvS5INYvACk3/5o5qNYA7YJh6MfQbHd0Y9qvjGO6jvPRikNWhbo4pvCDNx37A5B9BdvUQFpP1T1SdBGCWdfF9qDvskw95kryh/fbs5YTd6rjQUGlQ9Qzt7eJFUd3SpasZRviqcHHyGCJtTqOw0ow6rMYmk2dSDoAi+/H6DDxuZc/a0K+s9U/fCDGCUCee2IyD8zz1CoG+BKO66rVHN1eeuOKlaDzmG6gPLcTbOCcP/jlM/KlBTQO2vzUvc7k0tBb9NunLXSV2eu5zXPyyVbCsKkc2wCNKO40Hsmx9+lALmS4LVlxNBHcNmdHWYiSIOVH2yhM7Ud1/Wsj2NVjzd2KJ5WAuO85cegn3r1o+VtsFNr8YeFdiNCyYETgfxs3OoLnhG/wN++oxXGeXXpQ=
 cache:
   - pip
   - directories:
@@ -35,5 +39,12 @@ matrix:
 notifications:
   email: false
 after_success:
-  # - coveralls
   - bash <(curl -s https://codecov.io/bash) || echo "Codecov did not collect coverage reports"
+  - if [[ "$TRAVIS_BRANCH" == "master" ]]; then
+      export TAG_VERSION=latest ;
+    else;
+      export TAG_VERSION=$TRAVIS_TAG ;
+    fi;
+  - docker login docker-registry.crim.ca -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+  - docker build . -t docker-registry.crim.ca/ogc/weaver:$TAG_VERSION
+  - docker push docker-registry.crim.ca/ogc/weaver:$TAG_VERSION
