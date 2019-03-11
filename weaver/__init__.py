@@ -29,7 +29,8 @@ def main(global_config, **settings):
     Creates a Pyramid WSGI application for Weaver.
     """
     from weaver.config import get_weaver_configuration
-    from weaver.utils import parse_extra_options, get_settings, register_wps_providers
+    from weaver.processes.utils import register_wps_provider_processes
+    from weaver.utils import parse_extra_options, get_settings
     from pyramid.config import Configurator
 
     # validate and fix configuration
@@ -48,6 +49,6 @@ def main(global_config, **settings):
     local_config.include('weaver')
 
     wps_provider_file = get_settings(local_config).get('weaver.wps_providers_file', '')
-    register_wps_providers(wps_provider_file)
+    register_wps_provider_processes(wps_provider_file, local_config)
 
     return local_config.make_wsgi_app()
