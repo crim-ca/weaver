@@ -5,11 +5,11 @@
 #Dockerfile
 
 # custom configs
-custom.cfg
-data_sources.cfg
-data_sources.json
-custom_wps.cfg
-Makefile.config
+/custom.cfg
+/data_sources.cfg
+/data_sources.json
+/custom_wps.cfg
+/Makefile.config
 
 # Python / Extensions etc.
 *~
@@ -28,7 +28,10 @@ __pycache__
 .coverage
 .pytest_cache
 .tox
+coverage.xml
+coverage/
 nosetests.xml
+/tests/
 unit_tests/testdata.json
 
 # R

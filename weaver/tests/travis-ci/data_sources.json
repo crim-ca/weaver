@@ -1,0 +1,18 @@
+{
+    "probav-l1-ades.vgt.vito.be": {
+        "collection_id": "EOP:VITO:PROBAV_P_V001",
+        "accept_schemes": ["http", "https"],
+        "rootdir": "",
+        "netloc":"www.vito-eodata.be",
+        "ades":"http://ades.vgt.vito.be/WS/wps/default",
+        "osdd_url": "http://geo.spacebel.be/opensearch/description.xml"
+    },
+    "sentinel2-spacebel": {
+        "collection_id": "EOP:IPT:Sentinel2",
+        "accept_schemes": ["http", "https"],
+        "rootdir": "/eodata/Sentinel-2",
+        "netloc":"35.187.26.24",
+        "ades":"http://35.187.26.24/wps-proxy",
+        "osdd_url": "http://geo.spacebel.be/opensearch/description.xml"
+    }
+}
