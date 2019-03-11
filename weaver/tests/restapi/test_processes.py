@@ -262,6 +262,51 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert isinstance(process_wps_endpoint, six.string_types) and len(process_wps_endpoint)
         assert process_wps_endpoint == weaver_wps_path
 
+    def test_deploy_process_CWL_DockerRequirement_href(self):
+        raise NotImplementedError
+
+    def test_deploy_process_CWL_DockerRequirement_owsContext(self):
+        raise NotImplementedError
+
+    def test_deploy_process_CWL_DockerRequirement_executionUnit(self):
+        raise NotImplementedError
+
+    def test_deploy_process_CWL_WPS1Requirement_href(self):
+        raise NotImplementedError
+
+    def test_deploy_process_CWL_WPS1Requirement_owsContext(self):
+        raise NotImplementedError
+
+    def test_deploy_process_CWL_WPS1Requirement_executionUnit(self):
+        raise NotImplementedError
+
+    def test_deploy_process_WPS1_DescribeProcess_href(self):
+        raise NotImplementedError
+
+    def test_deploy_process_WPS1_DescribeProcess_owsContext(self):
+        raise NotImplementedError
+
+    def test_deploy_process_WPS1_DescribeProcess_executionUnit(self):
+        raise NotImplementedError
+
+    def test_deploy_process_WPS1_GetCapabilities_href(self):
+        raise NotImplementedError
+
+    def test_deploy_process_WPS1_GetCapabilities_owsContext(self):
+        raise NotImplementedError
+
+    def test_deploy_process_WPS1_GetCapabilities_executionUnit(self):
+        raise NotImplementedError
+
+    def test_deploy_process_WPS2_DescribeProcess_href(self):
+        raise NotImplementedError
+
+    def test_deploy_process_WPS2_DescribeProcess_owsContext(self):
+        raise NotImplementedError
+
+    def test_deploy_process_WPS2_DescribeProcess_executionUnit(self):
+        raise NotImplementedError
+
     def test_delete_process_success(self):
         uri = "/processes/{}".format(self.process_public.identifier)
         resp = self.app.delete_json(uri, headers=self.json_headers)
