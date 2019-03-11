@@ -1,28 +1,28 @@
-import json
-from collections import deque
-from copy import deepcopy
-import unittest
-import os
-from pprint import pformat
-from six.moves.urllib.parse import urlparse, parse_qsl
-# noinspection PyPackageRequirements
-import pytest
-# noinspection PyPackageRequirements
-import mock
+# noinspection PyProtectedMember
+from weaver.processes.opensearch import _make_specific_identifier
+from weaver.processes.wps_default import Hello
+from weaver.processes.constants import START_DATE, END_DATE, AOI
+from weaver.processes import opensearch
+from weaver.database.mongodb import MongodbProcessStore
+from weaver.datatype import Process
+from weaver.utils import get_any_id
+from weaver.wps_restapi.processes import processes
 from pyramid import testing
 from pyramid.testing import DummyRequest
 # noinspection PyPackageRequirements
 from pywps.inout.inputs import LiteralInput
-from weaver.processes.constants import START_DATE, END_DATE, AOI
-from weaver.datatype import Process
-from weaver.processes import opensearch
-# noinspection PyProtectedMember
-from weaver.processes.opensearch import _make_specific_identifier
-from weaver.database.mongodb import MongodbProcessStore
-from weaver.utils import get_any_id
-from weaver.wps_restapi.processes import processes
-from weaver.tests.utils import setup_mongodb_processstore
-import weaver
+from collections import deque
+from copy import deepcopy
+from pprint import pformat
+from six.moves.urllib.parse import urlparse, parse_qsl
+from tests.utils import setup_mongodb_processstore
+import unittest
+import json
+import os
+# noinspection PyPackageRequirements
+import pytest
+# noinspection PyPackageRequirements
+import mock
 
 OSDD_URL = "http://geo.spacebel.be/opensearch/description.xml"
 
@@ -65,6 +65,10 @@ def make_request(**kw):
     return request
 
 
+def get_dummy_settings(r):
+    return r.registry.settings
+
+
 class WpsHandleEOITestCase(unittest.TestCase):
     def setUp(self):
         self.config = testing.setUp()
@@ -74,8 +78,7 @@ class WpsHandleEOITestCase(unittest.TestCase):
 
 
 def get_memory_store():
-    hello = weaver.processes.wps_default.Hello()
-    store = MongodbProcessStore([hello])
+    store = MongodbProcessStore([Hello()])
     return store
 
 
@@ -185,7 +188,8 @@ def test_deploy_opensearch():
         def get_store(*args):
             return store
 
-    with mock.patch('weaver.wps_restapi.processes.processes.get_db', side_effect=MockDB):
+    with mock.patch('weaver.wps_restapi.processes.processes.get_db', side_effect=MockDB), \
+         mock.patch('weaver.wps_restapi.processes.processes.get_settings', side_effect=get_dummy_settings):  # noqa
         # given
         opensearch_payload = get_opensearch_payload()
         initial_payload = deepcopy(opensearch_payload)
@@ -209,7 +213,7 @@ def test_deploy_opensearch():
 def test_handle_EOI_unique_aoi_unique_toi():
     inputs = load_json_test_file("eoimage_inputs_example.json")
     expected = load_json_test_file("eoimage_unique_aoi_unique_toi.json")
-    output = weaver.processes.opensearch.EOImageDescribeProcessHandler(
+    output = opensearch.EOImageDescribeProcessHandler(
         inputs
     ).to_opensearch(unique_aoi=True, unique_toi=True)
     assert_json_equals(output, expected)
@@ -219,7 +223,7 @@ def test_handle_EOI_unique_aoi_unique_toi():
 def test_handle_EOI_unique_aoi_non_unique_toi():
     inputs = load_json_test_file("eoimage_inputs_example.json")
     expected = load_json_test_file("eoimage_unique_aoi_non_unique_toi.json")
-    output = weaver.processes.opensearch.EOImageDescribeProcessHandler(
+    output = opensearch.EOImageDescribeProcessHandler(
         inputs
     ).to_opensearch(unique_aoi=True, unique_toi=False)
     assert_json_equals(output, expected)
@@ -229,7 +233,7 @@ def test_handle_EOI_unique_aoi_non_unique_toi():
 def test_handle_EOI_non_unique_aoi_unique_toi():
     inputs = load_json_test_file("eoimage_inputs_example.json")
     expected = load_json_test_file("eoimage_non_unique_aoi_unique_toi.json")
-    output = weaver.processes.opensearch.EOImageDescribeProcessHandler(
+    output = opensearch.EOImageDescribeProcessHandler(
         inputs
     ).to_opensearch(unique_aoi=False, unique_toi=True)
     assert_json_equals(output, expected)
@@ -247,7 +251,7 @@ def test_get_additional_parameters():
             }
         ]
     }
-    params = weaver.processes.opensearch.get_additional_parameters(data)
+    params = opensearch.get_additional_parameters(data)
     assert ("UniqueAOI", ["true"]) in params
     assert ("UniqueTOI", ["true"]) in params
 

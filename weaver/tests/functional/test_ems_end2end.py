@@ -1,6 +1,7 @@
 from weaver import WEAVER_ROOT_DIR
-from weaver.tests.utils import get_settings_from_config_ini, get_settings_from_testapp, Null
+from weaver.tests.utils import get_settings_from_config_ini, get_settings_from_testapp, get_setting, Null
 from weaver.config import WEAVER_CONFIGURATION_EMS
+from weaver.processes.sources import fetch_data_sources
 from weaver.wps_restapi.utils import wps_restapi_base_url
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 from weaver.utils import get_weaver_url, now, make_dirs
@@ -14,13 +15,15 @@ from weaver.status import (
     job_status_categories,
 )
 from six.moves.urllib.parse import urlparse
-from typing import AnyStr, Dict, Optional, Any, Tuple, Iterable, Callable, Union
 from unittest import TestCase
 from pyramid import testing
+from pyramid.settings import asbool
 from pyramid.httpexceptions import HTTPOk, HTTPCreated, HTTPUnauthorized, HTTPNotFound
 # use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
 # noinspection PyPackageRequirements
 from webtest import TestApp as WebTestApp, TestResponse as WebTestResponse
+from requests import Response
+from typing import TYPE_CHECKING
 from copy import deepcopy
 import unittest
 # noinspection PyPackageRequirements
@@ -28,19 +31,15 @@ import pytest
 # noinspection PyPackageRequirements
 import mock
 import requests
-from requests import Request, Response
 import logging
 # noinspection PyProtectedMember
 from logging import _loggerClass
 import time
 import json
 import os
-# noinspection PyDeprecation
-from contextlib import nested
-from weaver.processes.sources import fetch_data_sources
-
-
-TestResponse = Union[WebTestResponse, Request]
+if TYPE_CHECKING:
+    from weaver.typedefs import HeadersType, CookiesType, SettingsType, AnyResponseType
+    from typing import AnyStr, Dict, Optional, Any, Tuple, Iterable, Callable, Union
 
 
 class ProcessInfo(object):
@@ -58,12 +57,12 @@ class ProcessInfo(object):
 @unittest.skipIf(not len(str(os.getenv('WEAVER_TEST_SERVER_HOSTNAME', ''))), reason="Test server not defined!")
 class End2EndEMSTestCase(TestCase):
     """
-    Runs an end-2-end test procedure on weaver configured as EMS located on specified `TEST_SERVER_HOSTNAME`.
+    Runs an end-2-end test procedure on weaver configured as EMS located on specified `WEAVER_TEST_SERVER_HOSTNAME`.
     """
     __settings__ = None
     test_processes_info = dict()
     headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
-    cookies = dict()                # type: Dict[AnyStr, AnyStr]
+    cookies = dict()                # type: CookiesType
     app = None                      # type: WebTestApp
     logger_separator_calls = None   # type: AnyStr
     logger_separator_steps = None   # type: AnyStr
@@ -98,13 +97,6 @@ class End2EndEMSTestCase(TestCase):
         return "ipt-poland"
 
     @staticmethod
-    def get_process_package_mock():
-        return (
-            mock.patch('weaver.processes.sources.get_data_source_from_url',
-                       side_effect=End2EndEMSTestCase.mock_get_data_source_from_url),
-        )
-
-    @staticmethod
     def get_collection_swapping():
         return [
             # Swap because Spacebel cannot retrieve probav images and Geomatys ADES is not ready
@@ -123,20 +115,32 @@ class End2EndEMSTestCase(TestCase):
         cls.log("{}Start of '{}': {}\n{}"
                 .format(cls.logger_separator_cases, cls.current_case_name(), now(), cls.logger_separator_cases))
 
-        # TODO: adjust environment variables accordingly to the server to be tested
-        cls.TEST_SERVER_HOSTNAME = os.getenv('TEST_SERVER_HOSTNAME')
-        cls.TEST_SERVER_WEAVER_PATH = os.getenv('TEST_SERVER_WEAVER_PATH', '/weaver')
-        cls.TEST_SERVER_WEAVER_REST_API_PATH = os.getenv('TEST_SERVER_WEAVER_REST_API_PATH', '/')
-        cls.TEST_CONFIG_INI_PATH = os.getenv('TEST_CONFIG_INI_PATH')    # none uses default path
-        cls.app = WebTestApp(cls.TEST_SERVER_HOSTNAME)
+        cls.WEAVER_TEST_SERVER_HOSTNAME = os.getenv('WEAVER_TEST_SERVER_HOSTNAME')
+        cls.WEAVER_TEST_SERVER_BASE_PATH = os.getenv('WEAVER_TEST_SERVER_BASE_PATH', '/weaver')
+        cls.WEAVER_TEST_SERVER_API_PATH = os.getenv('WEAVER_TEST_SERVER_API_PATH', '/')
+        cls.WEAVER_TEST_CONFIG_INI_PATH = os.getenv('WEAVER_TEST_CONFIG_INI_PATH')    # none uses default path
+        cls.app = WebTestApp(cls.WEAVER_TEST_SERVER_HOSTNAME)
+
+        # security configs if enabled
+        cls.WEAVER_TEST_PROTECTED_ENABLED = asbool(os.getenv('WEAVER_TEST_PROTECTED_ENABLED', False))
+        cls.WEAVER_TEST_WSO2_CLIENT_HOSTNAME = os.getenv('WEAVER_TEST_WSO2_CLIENT_HOSTNAME', '')
+        cls.WEAVER_TEST_WSO2_CLIENT_ID = os.getenv('WEAVER_TEST_WSO2_CLIENT_ID', '')
+        cls.WEAVER_TEST_WSO2_CLIENT_SECRET = os.getenv('WEAVER_TEST_WSO2_CLIENT_SECRET', '')
+        cls.WEAVER_TEST_MAGPIE_URL = os.getenv('WEAVER_TEST_MAGPIE_URL', '')
+        cls.WEAVER_TEST_ADMIN_CREDENTIALS = {"username": get_setting('ADMIN_USERNAME', cls.app),
+                                             "password": get_setting('ADMIN_PASSWORD', cls.app)}
+        cls.WEAVER_TEST_ALICE_CREDENTIALS = {"username": get_setting('ALICE_USERNAME', cls.app),
+                                             "password": get_setting('ALICE_PASSWORD', cls.app)}
+        cls.WEAVER_TEST_BOB_CREDENTIALS = {"username": get_setting('BOD_USERNAME', cls.app),
+                                           "password": get_setting('BOB_PASSWORD', cls.app)}
 
         # logging parameter overrides
-        cls.logger_level = os.getenv('TEST_LOGGER_LEVEL', cls.logger_level)
-        cls.logger_json_indent = os.getenv('TEST_LOGGER_JSON_INDENT', cls.logger_json_indent)
-        cls.logger_separator_calls = os.getenv('TEST_LOGGER_SEPARATOR_CALLS', cls.logger_separator_calls)
-        cls.logger_separator_steps = os.getenv('TEST_LOGGER_SEPARATOR_STEPS', cls.logger_separator_steps)
-        cls.logger_separator_tests = os.getenv('TEST_LOGGER_SEPARATOR_TESTS', cls.logger_separator_tests)
-        cls.logger_separator_cases = os.getenv('TEST_LOGGER_SEPARATOR_CASES', cls.logger_separator_cases)
+        cls.logger_level = os.getenv('WEAVER_TEST_LOGGER_LEVEL', cls.logger_level)
+        cls.logger_json_indent = os.getenv('WEAVER_TEST_LOGGER_JSON_INDENT', cls.logger_json_indent)
+        cls.logger_separator_calls = os.getenv('WEAVER_TEST_LOGGER_SEPARATOR_CALLS', cls.logger_separator_calls)
+        cls.logger_separator_steps = os.getenv('WEAVER_TEST_LOGGER_SEPARATOR_STEPS', cls.logger_separator_steps)
+        cls.logger_separator_tests = os.getenv('WEAVER_TEST_LOGGER_SEPARATOR_TESTS', cls.logger_separator_tests)
+        cls.logger_separator_cases = os.getenv('WEAVER_TEST_LOGGER_SEPARATOR_CASES', cls.logger_separator_cases)
 
         cls.WEAVER_URL = get_weaver_url(cls.settings())
         cls.WEAVER_RESTAPI_URL = wps_restapi_base_url(cls.settings())
@@ -164,7 +168,7 @@ class End2EndEMSTestCase(TestCase):
                  .format(self.logger_separator_tests, self.current_test_name(), now(), self.logger_separator_tests))
 
         # cleanup old processes as required
-        headers, cookies = self.user_headers_cookies(self.ADMIN_CREDENTIALS, force_magpie=True)
+        headers, cookies = self.user_headers_cookies(self.WEAVER_TEST_ADMIN_CREDENTIALS, force_magpie=True)
         self.clear_test_processes(headers, cookies)
 
     def tearDown(self):
@@ -180,27 +184,28 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def settings(cls):
-        # type: (...) -> Dict[AnyStr, AnyStr]
+        # type: (...) -> SettingsType
         """Provide basic settings that must be defined to use various weaver utility functions."""
         if not cls.__settings__:
-            weaver_url = os.getenv('WEAVER_URL', '{}{}'.format(cls.TEST_SERVER_HOSTNAME, cls.TEST_SERVER_WEAVER_PATH))
+            weaver_url = os.getenv('WEAVER_URL', '{}{}'.format(cls.WEAVER_TEST_SERVER_HOSTNAME,
+                                                               cls.WEAVER_TEST_SERVER_BASE_PATH))
             cls.__settings__ = get_settings_from_testapp(cls.app)
-            cls.__settings__.update(get_settings_from_config_ini(cls.TEST_CONFIG_INI_PATH))
+            cls.__settings__.update(get_settings_from_config_ini(cls.WEAVER_TEST_CONFIG_INI_PATH))
             cls.__settings__.update({
                 'weaver.url': weaver_url,
                 'weaver.configuration': WEAVER_CONFIGURATION_EMS,
-                'weaver.wps_restapi_path': cls.TEST_SERVER_WEAVER_REST_API_PATH,
+                'weaver.wps_restapi_path': cls.WEAVER_TEST_SERVER_API_PATH,
             })
         return cls.__settings__
 
     @classmethod
     def get_http_auth_code(cls, unprotected_code=HTTPOk.code):
         # type: (Optional[int]) -> int
-        return HTTPUnauthorized.code if cls.WEAVER_PROTECTED_ENABLED else unprotected_code
+        return HTTPUnauthorized.code if cls.WEAVER_TEST_PROTECTED_ENABLED else unprotected_code
 
     @classmethod
     def get_test_process(cls, process_id):
-        # type: (str) -> ProcessInfo
+        # type: (AnyStr) -> ProcessInfo
         return cls.test_processes_info.get(process_id)
 
     @classmethod
@@ -236,7 +241,7 @@ class End2EndEMSTestCase(TestCase):
             process_deploy_inputs = process_deploy['processDescription']['process']['inputs']
             for i_input, proc_input in enumerate(process_deploy_inputs):
                 if proc_input.get('maxOccurs') == 'unbounded':
-                    process_deploy_inputs[i_input]['maxOccurs'] = str(2)
+                    process_deploy_inputs[i_input]['maxOccurs'] = str(2)    # TODO: adjust to int according to EMS spec
 
         # update workflows to use 'test_id' instead of originals
         for workflow_id in workflow_set:
@@ -312,9 +317,9 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def login(cls, username, password, force_magpie=False):
-        # type: (AnyStr, AnyStr, Optional[bool]) -> Tuple[Dict[str, str], Dict[str, str]]
+        # type: (AnyStr, AnyStr, Optional[bool]) -> Tuple[HeadersType, CookiesType]
         """
-        Login using WSO2 or Magpie according to `WSO2_ENABLED` to retrieve session cookies.
+        Login using WSO2 or Magpie according to ``WEAVER_TEST_PROTECTED_ENABLED`` to retrieve session cookies.
 
         WSO2:
             Retrieves the cookie packaged as `{'Authorization': 'Bearer <access_token>'}` header, and lets the
@@ -325,37 +330,38 @@ class End2EndEMSTestCase(TestCase):
 
         :returns: (Headers, Cookies) respectively to WSO2/Magpie login procedures.
         """
-        if cls.WSO2_ENABLED and not force_magpie:
-            data = {
-                'grant_type': 'password',
-                'scope': 'openid',
-                'client_id': cls.WSO2_CLIENT_ID,
-                'client_secret': cls.WSO2_CLIENT_SECRET,
-                'username': username,
-                'password': password
-            }
-            headers = {'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'}
-            path = '{}/oauth2/token'.format(cls.WSO2_HOSTNAME)
-            resp = cls.request('POST', path, data=data, headers=headers, force_requests=True)
-            if resp.status_code == HTTPOk.code:
-                access_token = resp.json().get('access_token')
-                cls.assert_test(lambda: access_token is not None, message="Failed login!")
-                return {'Authorization': 'Bearer {}'.format(access_token)}, {}
-            cls.assert_response(resp, status=HTTPOk.code, message="Failed token retrieval from login!")
-        else:
-            data = {'user_name': username, 'password': password}
-            headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
-            path = '{}/signin'.format(cls.MAGPIE_URL)
-            resp = cls.request('POST', path, json=data, headers=headers, force_requests=True)
-            if resp.status_code == HTTPOk.code:
-                return {}, dict(resp.cookies)
-            cls.assert_response(resp, status=HTTPOk.code, message="Failed token retrieval from login!")
+        if cls.WEAVER_TEST_PROTECTED_ENABLED:
+            if force_magpie:
+                data = {
+                    'grant_type': 'password',
+                    'scope': 'openid',
+                    'client_id': cls.WEAVER_TEST_WSO2_CLIENT_ID,
+                    'client_secret': cls.WEAVER_TEST_WSO2_CLIENT_SECRET,
+                    'username': username,
+                    'password': password
+                }
+                headers = {'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'}
+                path = '{}/oauth2/token'.format(cls.WEAVER_TEST_WSO2_URL)
+                resp = cls.request('POST', path, data=data, headers=headers, force_requests=True)
+                if resp.status_code == HTTPOk.code:
+                    access_token = resp.json().get('access_token')
+                    cls.assert_test(lambda: access_token is not None, message="Failed login!")
+                    return {'Authorization': 'Bearer {}'.format(access_token)}, {}
+                cls.assert_response(resp, status=HTTPOk.code, message="Failed token retrieval from login!")
+            else:
+                data = {'user_name': username, 'password': password}
+                headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
+                path = '{}/signin'.format(cls.WEAVER_TEST_MAGPIE_URL)
+                resp = cls.request('POST', path, json=data, headers=headers, force_requests=True)
+                if resp.status_code == HTTPOk.code:
+                    return {}, dict(resp.cookies)
+                cls.assert_response(resp, status=HTTPOk.code, message="Failed token retrieval from login!")
+        return {}, {}
 
     @classmethod
     def user_headers_cookies(cls, credentials, force_magpie=False):
-        # type: (Dict[AnyStr, Union[AnyStr, bool]], Optional[bool]) -> Tuple[Dict[AnyStr, AnyStr], Dict[AnyStr, AnyStr]]
-        credentials.update({'force_magpie': force_magpie})
-        header_tokens, cookie_tokens = cls.login(**credentials)
+        # type: (SettingsType, Optional[bool]) -> Tuple[HeadersType, CookiesType]
+        header_tokens, cookie_tokens = cls.login(force_magpie=force_magpie, **credentials)
         headers = deepcopy(cls.headers)
         cookies = deepcopy(cls.cookies)
         headers.update(header_tokens)
@@ -364,7 +370,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def request(cls, method, url, ignore_errors=False, force_requests=False, log_enabled=True, **kw):
-        # type: (AnyStr, AnyStr, Optional[bool], Optional[bool], Optional[bool], Optional[Any]) -> TestResponse
+        # type: (AnyStr, AnyStr, Optional[bool], Optional[bool], Optional[bool], Optional[Any]) -> AnyResponseType
         """
         Executes the request, but following any server prior redirects as needed.
         Also prepares JSON body and obvious error handling according to a given status code.
@@ -455,7 +461,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def assert_response(cls, response, status=None, message=''):
-        # type: (Union[WebTestResponse, Response], Optional[int, Iterable[int]], Optional[str]) -> None
+        # type: (Union[WebTestResponse, Response], Optional[int, Iterable[int]], Optional[AnyStr]) -> None
         """Tests a response for expected status and raises an error if not matching."""
         rs = response.status_code
         reason = getattr(response, 'reason', '')
@@ -513,9 +519,10 @@ class End2EndEMSTestCase(TestCase):
     @classmethod
     def validate_test_server(cls):
         # verify that servers are up and ready
-        servers = [cls.MAGPIE_URL, cls.WEAVER_URL]
-        if cls.WSO2_ENABLED:
-            servers.append(cls.WSO2_HOSTNAME)
+        servers = [cls.WEAVER_URL]
+        if cls.WEAVER_TEST_PROTECTED_ENABLED:
+            servers.append(cls.WEAVER_TEST_WSO2_URL)
+            servers.append(cls.WEAVER_TEST_MAGPIE_URL)
         for server_url in servers:
             cls.request('GET', server_url, headers=cls.headers, status=HTTPOk.code, timeout=10)
         # verify that EMS configuration requirement is met
@@ -528,8 +535,8 @@ class End2EndEMSTestCase(TestCase):
         # End to end test will log everything
         self.__class__.log_full_trace = True
 
-        headers_a, cookies_a = self.user_headers_cookies(self.ALICE_CREDENTIALS)
-        headers_b, cookies_b = self.user_headers_cookies(self.BOB_CREDENTIALS)
+        headers_a, cookies_a = self.user_headers_cookies(self.WEAVER_TEST_ALICE_CREDENTIALS)
+        headers_b, cookies_b = self.user_headers_cookies(self.WEAVER_TEST_BOB_CREDENTIALS)
 
         # this test's set of processes
         end2_end_test_processes = [self.get_test_process(process_id) for process_id in
@@ -644,8 +651,8 @@ class End2EndEMSTestCase(TestCase):
             self.request('PUT', path_visible, status=HTTPOk.code, headers=self.headers, json=data_visible,
                          message="Expect visible application process.")
 
-        package_mock = self.get_process_package_mock()
-        with nested(*package_mock):
+        with mock.patch('weaver.processes.sources.get_data_source_from_url',
+                        side_effect=End2EndEMSTestCase.mock_get_data_source_from_url):
             workflow_info = self.test_processes_info[test_workflow_id]
 
             self.request('POST', path_deploy, status=HTTPOk.code, headers=self.headers,
