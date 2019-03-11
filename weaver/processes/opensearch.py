@@ -327,9 +327,10 @@ class OpenSearchQuery(object):
                     yield good_links[0]
                     break
             else:
-                message = "Could not match any accepted mimetype ({}) to received mimetype ({})"
+                message = "Could not match any accepted mimetype {} to received mimetype {} using params {}"
                 message = message.format(", ".join(accept_mime_types),
-                                         ", ".join(data_links_mime_types))
+                                         ", ".join(data_links_mime_types),
+                                         params)
                 # Do not raise an error right now, just loop until we reach the number of inputs we want
                 # Raise only if that number isn't reach
                 LOGGER.warning(message)
