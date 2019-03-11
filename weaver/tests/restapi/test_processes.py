@@ -1,15 +1,3 @@
-# noinspection PyPackageRequirements
-import pytest
-# noinspection PyPackageRequirements
-import mock
-# noinspection PyPackageRequirements
-import webtest
-import unittest
-import pyramid.testing
-import six
-from copy import deepcopy
-# noinspection PyDeprecation
-from contextlib import nested
 from weaver.tests.utils import (
     setup_config_with_mongodb,
     setup_mongodb_processstore,
@@ -17,6 +5,7 @@ from weaver.tests.utils import (
     get_test_weaver_app,
 )
 from weaver.wps import get_wps_url
+from weaver.wps_restapi.utils import CONTENT_TYPE_JSON, CONTENT_TYPE_XML
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
 from weaver.exceptions import ProcessNotFound, JobNotFound
@@ -30,6 +19,20 @@ from weaver.execute import (
     EXECUTE_TRANSMISSION_MODE_VALUE,
     EXECUTE_TRANSMISSION_MODE_REFERENCE,
 )
+from wsgiref.simple_server import make_server
+from wsgiref.util import setup_testing_defaults
+from copy import deepcopy
+# noinspection PyDeprecation
+from contextlib import nested
+# noinspection PyPackageRequirements
+import pytest
+# noinspection PyPackageRequirements
+import mock
+# noinspection PyPackageRequirements
+import webtest
+import unittest
+import pyramid.testing
+import six
 
 
 class WpsRestApiProcessesTest(unittest.TestCase):
@@ -57,6 +60,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.process_store = setup_mongodb_processstore(self.config)
         self.job_store = setup_mongodb_jobstore(self.config)
 
+        self.process_remote_WPS1 = "process_remote_wps1"
+        self.process_remote_WPS2 = "process_remote_wps2"
         self.process_public = WpsTestProcess(identifier='process_public')
         self.process_private = WpsTestProcess(identifier='process_private')
         self.process_store.save_process(self.process_public)
@@ -122,6 +127,75 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             mock.patch('weaver.wps_restapi.processes.processes.execute_process.delay', return_value=result),
         )
 
+    def get_process_mock_server(self, settings):
+        # noinspection PyUnusedLocal
+        def mock_server_app(env, start_response):
+            setup_testing_defaults(settings)
+            content_type = CONTENT_TYPE_JSON
+            path = settings.get("PATH_INFO")
+            code = "404 Not Found"
+            body = []
+            if path == "/processes":
+                code = "200 OK"
+                body = []
+            elif path.startswith("/wps") and \
+                    "identifier={}".format(self.process_remote_WPS1) in path and \
+                    "request=describeprocess" in path.lower():
+                code = "200 OK"
+                body = """
+                <wps:ProcessDescriptions service="WPS" version="1.0.0" xml:lang="en-US">
+                    <ProcessDescription wps:processVersion="0.5" storeSupported="true" statusSupported="true">
+                        <ows:Identifier>{}</ows:Identifier>
+                        <ows:Title>Test Remote Process WPS1</ows:Title>
+                        <ows:Abstract>Test Remote Process WPS1</ows:Abstract>
+                        <ows:Metadata 
+                            xlink:href="https://github.com/crim-ca/weaver" 
+                            xlink:title="Weaver" 
+                            xlink:type="simple"/>
+                        <ows:Metadata 
+                            xlink:href="https://ogc-ems.crim.ca/weaver/" 
+                            xlink:title="Server" 
+                            xlink:type="simple" />
+                        <DataInputs>                        
+                            <Input minOccurs="1" maxOccurs="1">
+                                <ows:Identifier>input-1</ows:Identifier>
+                                <ows:Title>Input 1</ows:Title>
+                                <ows:Abstract>Input 1!</ows:Abstract>
+                                <LiteralData>
+                                    <ows:DataType ows:reference="urn:ogc:def:dataType:OGC:1.1:string">string</ows:DataType>
+                                    <ows:AnyValue />
+                                </LiteralData></Input>
+                            </DataInputs>
+                        <ProcessOutputs>
+                            <Output>
+                                <ows:Identifier>output</ows:Identifier>
+                                <ows:Title>The output</ows:Title>
+                                <ows:Abstract>Process file output.</ows:Abstract>
+                                <ComplexOutput>
+                                    <Default>
+                                        <Format>
+                                            <MimeType>application/json</MimeType>
+                                        </Format>
+                                    </Default>
+                                    <Supported>
+                                        <Format>
+                                            <MimeType>application/json</MimeType>
+                                        </Format>
+                                    </Supported>
+                                </ComplexOutput>
+                            </Output>
+                        </ProcessOutputs>
+                    </ProcessDescription>
+                </wps:ProcessDescriptions>
+                """.format(self.process_remote_WPS1)
+                content_type = CONTENT_TYPE_XML
+            elif path == "/processes/{}".format(self.process_remote_WPS2):
+                code = "200 OK"
+                body = []
+            start_response(code, [("Content-Type", content_type)])
+            return body
+        return make_server("", 8000, mock_server_app).serve_forever()
+
     def test_get_processes(self):
         uri = '/processes'
         resp = self.app.get(uri, headers=self.json_headers)
@@ -154,7 +228,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
         # change value that will trigger schema error on check
         process = self.process_store.fetch_by_id(process_name)
-        process['jobControlOptions'] = "random"     # invalid
+        process['jobControlOptions'] = "random"  # invalid
         process['visibility'] = VISIBILITY_PUBLIC
         self.process_store.save_process(process, overwrite=True)
 
@@ -231,9 +305,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process_data_tests[6].pop('executionUnit')
         process_data_tests[7]['executionUnit'] = {}
         process_data_tests[8]['executionUnit'] = list()
-        process_data_tests[9]['executionUnit'][0] = {"unit": "something"}       # unit as string instead of package
-        process_data_tests[10]['executionUnit'][0] = {"href": {}}               # href as package instead of url
-        process_data_tests[11]['executionUnit'][0] = {"unit": {}, "href": ""}   # can't have both unit/href together
+        process_data_tests[9]['executionUnit'][0] = {"unit": "something"}  # unit as string instead of package
+        process_data_tests[10]['executionUnit'][0] = {"href": {}}  # href as package instead of url
+        process_data_tests[11]['executionUnit'][0] = {"unit": {}, "href": ""}  # can't have both unit/href together
 
         # noinspection PyDeprecation
         with nested(*package_mock):
@@ -264,6 +338,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     def test_deploy_process_CWL_DockerRequirement_href(self):
         raise NotImplementedError
+        process_name = self.fully_qualified_test_process_name()
+        body = {"processDescription": {"href": ""}}
 
     def test_deploy_process_CWL_DockerRequirement_owsContext(self):
         raise NotImplementedError
@@ -281,7 +357,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         raise NotImplementedError
 
     def test_deploy_process_WPS1_DescribeProcess_href(self):
-        raise NotImplementedError
+        body = {"processDescription": {"href": ""}}
 
     def test_deploy_process_WPS1_DescribeProcess_owsContext(self):
         raise NotImplementedError
@@ -353,7 +429,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             except JobNotFound:
                 self.fail("Job should have been created and be retrievable.")
             assert job.id == resp.json['jobID']
-            assert job.task_id == STATUS_ACCEPTED   # temporary value until processed by celery
+            assert job.task_id == STATUS_ACCEPTED  # temporary value until processed by celery
 
     def test_execute_process_no_json_body(self):
         uri = "/processes/{}/jobs".format(self.process_public.identifier)
@@ -371,7 +447,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         execute_data_tests[2].pop('response')
         execute_data_tests[3]['mode'] = "random"
         execute_data_tests[4]['response'] = "random"
-        execute_data_tests[5]['inputs'] = [{"test_input": "test_value"}]    # bad format
+        execute_data_tests[5]['inputs'] = [{"test_input": "test_value"}]  # bad format
         execute_data_tests[6]['outputs'] = [{"id": "test_output", "transmissionMode": "random"}]
 
         uri = "/processes/{}/jobs".format(self.process_public.identifier)
@@ -395,8 +471,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             execute_mock_data_tests.append((mock_execute, data_execute))
 
         # apply modifications for testing
-        execute_mock_data_tests[0][1].pop('inputs')     # no inputs is valid (although can be required for WPS process)
-        execute_mock_data_tests[0][1]['outputs'][0].pop('transmissionMode')     # should resolve to default value
+        execute_mock_data_tests[0][1].pop('inputs')  # no inputs is valid (although can be required for WPS process)
+        execute_mock_data_tests[0][1]['outputs'][0].pop('transmissionMode')  # should resolve to default value
 
         for mock_execute, data_execute in execute_mock_data_tests:
             # noinspection PyDeprecation
