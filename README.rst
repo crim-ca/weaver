@@ -33,7 +33,7 @@ application and `Web Processing Services (WPS)` inputs and outputs. It allows us
 
 .. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/0.1.3.svg
     :alt: Commits since latest release
-    :target: https://github.com/crim-ca/weaver/compare/v0.1.3...master
+    :target: https://github.com/crim-ca/weaver/compare/0.1.3...master
 
 .. |version| image:: https://img.shields.io/github/tag/crim-ca/weaver.svg?style=flat
     :alt: Latest Tag
