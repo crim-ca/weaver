@@ -1,6 +1,7 @@
 from weaver.processes.sources import fetch_data_sources, OPENSEARCH_LOCAL_FILE_SCHEME
 from weaver.processes.constants import WPS_LITERAL
 from weaver.processes.constants import START_DATE, END_DATE, AOI, COLLECTION
+from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
 from weaver.utils import get_any_id
 from collections import deque
 from copy import deepcopy
@@ -401,7 +402,7 @@ class EOImageDescribeProcessHandler(object):
             u"id": u"{}".format(identifier),
             u"title": description,
             u"abstract": description,
-            u"formats": [{u"mimeType": u"text/plain", u"default": True}],
+            u"formats": [{u"mimeType": CONTENT_TYPE_TEXT_PLAIN, u"default": True}],
             u"minOccurs": u"1",
             u"maxOccurs": u"unbounded",
             u"literalDataDomains": [{u"dataType": {u"name": u"String"}}],
@@ -433,7 +434,7 @@ class EOImageDescribeProcessHandler(object):
             u"id": id_,
             u"title": u"Time of Interest",
             u"abstract": u"Time of Interest (defined as Start date - End date)",
-            u"formats": [{u"mimeType": u"text/plain", u"default": True}],
+            u"formats": [{u"mimeType": CONTENT_TYPE_TEXT_PLAIN, u"default": True}],
             u"minOccurs": u"1",
             u"maxOccurs": u"1",
             u"literalDataDomains": [{u"dataType": {u"name": u"String"}}],

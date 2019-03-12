@@ -1,0 +1,51 @@
+{
+    "process": {
+        "inputs": [
+            {
+                "keywords": [],
+                "maxOccurs": "1",
+                "id": "url",
+                "minOccurs": "1",
+                "formats": [
+                    {
+                        "mimeType": "text/plain",
+                        "default": false
+                    }
+                ]
+            }
+        ],
+        "title": "Catalog Search for Thredds URLs",
+        "outputs": [
+            {
+                "minOccurs": "1",
+                "title": "JSON file with Catalog URLs",
+                "maxOccurs": "1",
+                "formats": [
+                    {
+                        "mimeType": "application/json",
+                        "default": false
+                    }
+                ],
+                "keywords": [],
+                "id": "output"
+            }
+        ],
+        "abstract": "Get files url from Thredds Catalog and provides file list as JSON Document.",
+        "owsContext": {
+            "offering": {
+                "content": {
+                    "href": "catalog_search.cwl"
+                }
+            }
+        },
+        "keywords": [],
+        "executeEndpoint": "https://localhost:4000/processes/CatalogSearch/jobs",
+        "id": "CatalogSearch"
+    },
+    "outputTransmission": [
+        "reference"
+    ],
+    "jobControlOptions": [
+        "async-execute"
+    ]
+}

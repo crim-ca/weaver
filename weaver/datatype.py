@@ -10,7 +10,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 from dateutil.parser import parse as dt_parse
 from datetime import datetime, timedelta
 # noinspection PyProtectedMember
-from logging import _levelNames, _loggerClass, ERROR, INFO
+from logging import _levelNames, ERROR, INFO
 from weaver.utils import (
     now,
     localize_datetime,  # for backward compatibility of previously saved jobs not time-locale-aware
@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING
 import six
 import uuid
 if TYPE_CHECKING:
-    from weaver.typedefs import Number
+    from weaver.typedefs import Number, LoggerType
     from typing import Any, AnyStr, Dict, List, Optional, Union
 
 
@@ -105,7 +105,7 @@ class Job(dict):
         return get_job_log_msg(duration=self.duration, progress=self.progress, status=self.status, message=msg)
 
     def save_log(self, errors=None, logger=None, message=None):
-        # type: (Optional[Union[AnyStr, List[WPSException]]], Optional[_loggerClass], Optional[AnyStr]) -> None
+        # type: (Optional[Union[AnyStr, List[WPSException]]], Optional[LoggerType], Optional[AnyStr]) -> None
         if isinstance(errors, six.string_types):
             log_msg = [(ERROR, self._get_log_msg(message))]
             self.exceptions.append(errors)

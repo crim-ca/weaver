@@ -1,6 +1,7 @@
 from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS
 from weaver.datatype import Service, Process as ProcessDB
 from weaver.database import get_db
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN
 from weaver.store.base import StoreProcesses
 from weaver.utils import get_sane_name, get_settings
 from weaver.processes import wps_package
@@ -25,6 +26,7 @@ from pyramid.httpexceptions import (
     HTTPInternalServerError,
     HTTPException,
 )
+from copy import deepcopy
 from distutils.version import LooseVersion
 from six.moves.urllib.request import urlopen
 from six.moves.urllib.parse import urlparse, urlunsplit, parse_qs
@@ -78,7 +80,7 @@ def _get_json_multiple_inputs(input_value):
     """
 
     # Check for the json datatype and mimetype
-    if input_value.dataType == 'ComplexData' and input_value.mimeType == 'application/json':
+    if input_value.dataType == "ComplexData" and input_value.mimeType == CONTENT_TYPE_APP_JSON:
 
         # If the json data is referenced read it's content
         if input_value.reference:
@@ -105,8 +107,8 @@ def jsonify_output(output, process_description):
     """
 
     if not output.dataType:
-        for process_output in getattr(process_description, 'processOutputs', []):
-            if getattr(process_output, 'identifier', '') == output.identifier:
+        for process_output in getattr(process_description, "processOutputs", []):
+            if getattr(process_output, "identifier", '') == output.identifier:
                 output.dataType = process_output.dataType
                 break
 
@@ -116,19 +118,19 @@ def jsonify_output(output, process_description):
 
     # WPS standard v1.0.0 specify that either a reference or a data field has to be provided
     if output.reference:
-        json_output['reference'] = output.reference
+        json_output["reference"] = output.reference
 
         # Handle special case where we have a reference to a json array containing dataset reference
         # Avoid reference to reference by fetching directly the dataset references
         json_array = _get_json_multiple_inputs(output)
-        if json_array and all(str(ref).startswith('http') for ref in json_array):
-            json_output['data'] = json_array
+        if json_array and all(str(ref).startswith("http") for ref in json_array):
+            json_output["data"] = json_array
     else:
         # WPS standard v1.0.0 specify that Output data field has Zero or one value
-        json_output['data'] = output.data[0] if output.data else None
+        json_output["data"] = output.data[0] if output.data else None
 
-    if json_output['dataType'] == 'ComplexData':
-        json_output['mimeType'] = output.mimeType
+    if json_output["dataType"] == "ComplexData":
+        json_output["mimeType"] = output.mimeType
 
     return json_output
 
@@ -136,55 +138,55 @@ def jsonify_output(output, process_description):
 def jsonify_value(value):
     # ComplexData type
     if isinstance(value, ComplexData):
-        return {'mimeType': value.mimeType, 'encoding': value.encoding, 'schema': value.schema}
+        return {"mimeType": value.mimeType, 'encoding': value.encoding, 'schema': value.schema}
     # other type
     else:
         return value
 
 
 def convert_process_wps_to_db(service, process, container):
-    # type: (Union[Service, Dict[{'url': AnyStr, 'name': AnyStr}]], ProcessWPS, AnySettingsContainer) -> ProcessDB
+    # type: (Union[Service, Dict[{"url": AnyStr, "name": AnyStr}]], ProcessWPS, AnySettingsContainer) -> ProcessDB
     """
     Converts an owslib WPS Process to local storage Process.
     """
-    describe_process_url = '{base_url}/providers/{provider_id}/processes/{process_id}'.format(
+    describe_process_url = "{base_url}/providers/{provider_id}/processes/{process_id}".format(
         base_url=wps_restapi_base_url(container),
-        provider_id=service.get('name'),
+        provider_id=service.get("name"),
         process_id=process.identifier)
-    execute_process_url = '{describe_url}/jobs'.format(describe_url=describe_process_url)
+    execute_process_url = "{describe_url}/jobs".format(describe_url=describe_process_url)
 
-    default_format = {'mimeType': 'text/plain'}
+    default_format = {"mimeType": CONTENT_TYPE_TEXT_PLAIN}
     inputs = [dict(
-        id=getattr(dataInput, 'identifier', ''),
-        title=getattr(dataInput, 'title', ''),
-        abstract=getattr(dataInput, 'abstract', ''),
-        minOccurs=str(getattr(dataInput, 'minOccurs', 0)),  # FIXME: str applied to match OGC REST-API definition
-        maxOccurs=str(getattr(dataInput, 'maxOccurs', 0)),  # FIXME: str applied to match OGC REST-API definition
+        id=getattr(dataInput, "identifier", ""),
+        title=getattr(dataInput, "title", ""),
+        abstract=getattr(dataInput, "abstract", ""),
+        minOccurs=str(getattr(dataInput, "minOccurs", 0)),  # FIXME: str applied to match OGC REST-API definition
+        maxOccurs=str(getattr(dataInput, "maxOccurs", 0)),  # FIXME: str applied to match OGC REST-API definition
         dataType=dataInput.dataType,
-        defaultValue=jsonify_value(getattr(dataInput, 'defaultValue', None)),
+        defaultValue=jsonify_value(getattr(dataInput, "defaultValue", None)),
         allowedValues=[jsonify_value(dataValue) for dataValue in getattr(dataInput, 'allowedValues', [])],
-        supportedValues=[jsonify_value(dataValue) for dataValue in getattr(dataInput, 'supportedValues', [])],
-        formats=[jsonify_value(dataValue) for dataValue in getattr(dataInput, 'supportedValues', [default_format])],
-    ) for dataInput in getattr(process, 'dataInputs', [])]
+        supportedValues=[jsonify_value(dataValue) for dataValue in getattr(dataInput, "supportedValues", [])],
+        formats=[jsonify_value(dataValue) for dataValue in getattr(dataInput, "supportedValues", [default_format])],
+    ) for dataInput in getattr(process, "dataInputs", [])]
 
     outputs = [dict(
-        id=getattr(processOutput, 'identifier', ''),
-        title=getattr(processOutput, 'title', ''),
-        abstract=getattr(processOutput, 'abstract', ''),
+        id=getattr(processOutput, "identifier", ''),
+        title=getattr(processOutput, "title", ''),
+        abstract=getattr(processOutput, "abstract", ''),
         dataType=processOutput.dataType,
-        defaultValue=jsonify_value(getattr(processOutput, 'defaultValue', None)),
-        formats=[jsonify_value(dataValue) for dataValue in getattr(processOutput, 'supportedValues', [default_format])],
-    ) for processOutput in getattr(process, 'processOutputs', [])]
+        defaultValue=jsonify_value(getattr(processOutput, "defaultValue", None)),
+        formats=[jsonify_value(dataValue) for dataValue in getattr(processOutput, "supportedValues", [default_format])],
+    ) for processOutput in getattr(process, "processOutputs", [])]
 
     return ProcessDB(
         id=process.identifier,
-        label=getattr(process, 'title', ''),
-        title=getattr(process, 'title', ''),
-        abstract=getattr(process, 'abstract', ''),
+        label=getattr(process, "title", ''),
+        title=getattr(process, "title", ''),
+        abstract=getattr(process, "abstract", ""),
         inputs=inputs,
         outputs=outputs,
         url=describe_process_url,
-        processEndpointWPS1=service.get('url'),
+        processEndpointWPS1=service.get("url"),
         processDescriptionURL=describe_process_url,
         executeEndpoint=execute_process_url,
         package=None,
@@ -208,38 +210,41 @@ def deploy_process_from_payload(payload, container):
     except Exception as ex:
         raise HTTPInternalServerError("Unhandled error when parsing 'processDescription': [{}]".format(str(ex)))
 
-    # validate identifier naming for unsupported characters
-    process_description = payload.get('processDescription')
-    process_info = process_description.get('process')
-    process_href = process_description.pop('href', None)
+    # use deepcopy of to remove any circular dependencies before writing to mongodb or any updates to the payload
+    payload_copy = deepcopy(payload)
 
-    # retrieve CWL package definition, either via 'href' (WPS-1/2), 'owsContext' or 'executionUnit' (package/reference)
-    deployment_profile_name = payload.get('deploymentProfileName', '').lower()
-    ows_context = process_info.pop('owsContext', None)
+    # validate identifier naming for unsupported characters
+    process_description = payload.get("processDescription")
+    process_info = process_description.get("process", {})
+    process_href = process_description.pop("href", None)
+
+    # retrieve CWL package definition, either via "href" (WPS-1/2), "owsContext" or "executionUnit" (package/reference)
+    deployment_profile_name = payload.get("deploymentProfileName", "").lower()
+    ows_context = process_info.pop("owsContext", None)
     reference = None
     package = None
     if process_href:
         reference = process_href  # reference type handled downstream
     elif isinstance(ows_context, dict):
-        offering = ows_context.get('offering')
+        offering = ows_context.get("offering")
         if not isinstance(offering, dict):
             raise HTTPUnprocessableEntity("Invalid parameter 'processDescription.process.owsContext.offering'.")
-        content = offering.get('content')
+        content = offering.get("content")
         if not isinstance(content, dict):
             raise HTTPUnprocessableEntity("Invalid parameter 'processDescription.process.owsContext.offering.content'.")
         package = None
-        reference = content.get('href')
+        reference = content.get("href")
     elif deployment_profile_name:
         if not any(deployment_profile_name.endswith(typ) for typ in [PROCESS_APPLICATION, PROCESS_WORKFLOW]):
             raise HTTPBadRequest("Invalid value for parameter 'deploymentProfileName'.")
-        execution_units = payload.get('executionUnit')
+        execution_units = payload.get("executionUnit")
         if not isinstance(execution_units, list):
             raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
         for execution_unit in execution_units:
             if not isinstance(execution_unit, dict):
                 raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
-            package = execution_unit.get('unit')
-            reference = execution_unit.get('href')
+            package = execution_unit.get("unit")
+            reference = execution_unit.get("href")
             # stop on first package/reference found, simultaneous usage will raise during package retrieval
             if package or reference:
                 break
@@ -262,29 +267,29 @@ def deploy_process_from_payload(payload, container):
 
     # validate process type against weaver configuration
     settings = get_settings(container)
-    process_type = process_info['type']
+    process_type = process_info["type"]
     if process_type == PROCESS_WORKFLOW:
         weaver_config = get_weaver_configuration(settings)
         if weaver_config != WEAVER_CONFIGURATION_EMS:
             raise HTTPBadRequest("Invalid [{0}] package deployment on [{1}].".format(process_type, weaver_config))
 
     restapi_url = wps_restapi_base_url(settings)
-    description_url = "/".join([restapi_url, 'processes', process_info['identifier']])
+    description_url = "/".join([restapi_url, 'processes', process_info["identifier"]])
     execute_endpoint = "/".join([description_url, "jobs"])
 
-    # ensure that required 'processEndpointWPS1' in db is added,
+    # ensure that required "processEndpointWPS1" in db is added,
     # will be auto-fixed to localhost if not specified in body
-    process_info['processEndpointWPS1'] = process_description.get('processEndpointWPS1')
-    process_info['executeEndpoint'] = execute_endpoint
-    process_info['payload'] = payload
-    process_info['jobControlOptions'] = process_description.get('jobControlOptions', [])
-    process_info['outputTransmission'] = process_description.get('outputTransmission', [])
-    process_info['processDescriptionURL'] = description_url
-    # insert the "resolved" context using details retrieved from 'executionUnit'/'href' or directly with 'owsContext'
-    if 'owsContext' not in process_info and reference:
-        process_info['owsContext'] = {'offering': {'content': {'href': reference}}}
+    process_info["processEndpointWPS1"] = process_description.get("processEndpointWPS1")
+    process_info["executeEndpoint"] = execute_endpoint
+    process_info["payload"] = payload_copy
+    process_info["jobControlOptions"] = process_description.get("jobControlOptions", [])
+    process_info["outputTransmission"] = process_description.get("outputTransmission", [])
+    process_info["processDescriptionURL"] = description_url
+    # insert the "resolved" context using details retrieved from "executionUnit"/"href" or directly with "owsContext"
+    if "owsContext" not in process_info and reference:
+        process_info["owsContext"] = {"offering": {"content": {"href": str(reference)}}}
     elif isinstance(ows_context, dict):
-        process_info['owsContext'] = ows_context
+        process_info["owsContext"] = ows_context
 
     try:
         store = get_db(container).get_store(StoreProcesses)
@@ -295,7 +300,7 @@ def deploy_process_from_payload(payload, container):
         # raised on invalid process name
         raise HTTPBadRequest(detail=str(ex))
 
-    json_response = {'processSummary': saved_process.process_summary(), 'deploymentDone': True}
+    json_response = {"processSummary": saved_process.process_summary(), "deploymentDone": True}
     return HTTPOk(json=json_response)
 
 
@@ -314,13 +319,17 @@ def register_wps_provider_processes(wps_providers_file_path, container):
     try:
         with open(wps_providers_file_path, 'r') as f:
             providers_config = yaml.safe_load(f)
-        providers = providers_config['providers']
+        providers = providers_config.get('providers')
+        if not providers:
+            LOGGER.warning("Nothing to process from file: [{}]".format(wps_providers_file_path))
+            return
+
         from weaver.wps_restapi.processes.processes import list_remote_processes
         for cfg_service in providers:
             # parse info
             if isinstance(cfg_service, dict):
-                svc_url = cfg_service['url']
-                svc_name = cfg_service.get('name')
+                svc_url = cfg_service["url"]
+                svc_name = cfg_service.get("name")
                 svc_proc = cfg_service.get('processes', [])
             elif isinstance(cfg_service, six.string_types):
                 svc_url = cfg_service
@@ -332,7 +341,7 @@ def register_wps_provider_processes(wps_providers_file_path, container):
             qs_p = parse_qs(url_p.query)
             svc_url = urlunsplit(url_p[:4] + tuple(['']))  # remove any query in url
             svc_name = svc_name or get_sane_name(url_p.hostname)
-            svc_proc = svc_proc or qs_p.get('identifier', [])
+            svc_proc = svc_proc or qs_p.get("identifier", [])
             if not isinstance(svc_name, six.string_types):
                 raise ValueError("Invalid service value: [{!s}].".format(svc_name))
             if not isinstance(svc_proc, list):
@@ -350,10 +359,10 @@ def register_wps_provider_processes(wps_providers_file_path, container):
                 proc_url = '{}?service=WPS&request=DescribeProcess&identifier={}&version={}' \
                            .format(svc_url, proc_id, wps.version)
                 payload = {
-                    'processDescription': {
-                        'process': {
-                            'identifier': proc_id,
-                            'owsContext': {'offering': {'content': {'href': '{}'.format(proc_url)}}},
+                    "processDescription": {
+                        "process": {
+                            "identifier": proc_id,
+                            "owsContext": {"offering": {"content": {"href": '{}'.format(proc_url)}}},
                         }
                     }
                 }

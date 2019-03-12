@@ -11,7 +11,6 @@ from weaver.tests.utils import ignore_wps_warnings
 
 
 # noinspection PyMethodMayBeStatic
-@ignore_wps_warnings
 class OWSRequestWpsTestCase(unittest.TestCase):
     def setUp(self):
         self.config = testing.setUp()
@@ -42,24 +41,28 @@ class OWSRequestWpsTestCase(unittest.TestCase):
         assert ows_req.service == 'wps'
         assert ows_req.version == '1.0.0'
 
+    @ignore_wps_warnings
     def test_get_false_request(self):
         params = dict(request="tellmemore", service="Wps", version="1.0.0")
         request = DummyRequest(params=params)
         with pytest.raises(OWSInvalidParameterValue):
             OWSRequest(request)
 
+    @ignore_wps_warnings
     def test_get_missing_request(self):
         params = dict(service="wps", version="1.0.0")
         request = DummyRequest(params=params)
         with pytest.raises(OWSMissingParameterValue):
             OWSRequest(request)
 
+    @ignore_wps_warnings
     def test_get_false_service(self):
         params = dict(request="execute", service="ATM", version="1.0.0")
         request = DummyRequest(params=params)
         with pytest.raises(OWSInvalidParameterValue):
             OWSRequest(request)
 
+    @ignore_wps_warnings
     def test_get_missing_service(self):
         params = dict(request="Execute", version="1.0.0")
         request = DummyRequest(params=params)
@@ -74,6 +77,7 @@ class OWSRequestWpsTestCase(unittest.TestCase):
         assert ows_req.request == 'getcapabilities'
         assert ows_req.service == 'wps'
 
+    @ignore_wps_warnings
     def test_post_false_request(self):
         request = DummyRequest(post={})
         request.body = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -81,6 +85,7 @@ class OWSRequestWpsTestCase(unittest.TestCase):
         with pytest.raises(OWSInvalidParameterValue):
             OWSRequest(request)
 
+    @ignore_wps_warnings
     def test_post_false_service(self):
         request = DummyRequest(post={})
         request.body = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>

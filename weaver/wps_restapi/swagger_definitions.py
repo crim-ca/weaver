@@ -8,6 +8,7 @@ from weaver.config import WEAVER_CONFIGURATION_EMS
 from weaver.wps_restapi.utils import wps_restapi_base_path
 from weaver.status import job_status_categories, STATUS_ACCEPTED, STATUS_COMPLIANT_OGC
 from weaver.sort import job_sort_values, quote_sort_values, SORT_CREATED, SORT_ID, SORT_PROCESS
+from weaver.formats import CONTENT_TYPE_TEXT_HTML, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
 from weaver.execute import (
     EXECUTE_MODE_AUTO,
     EXECUTE_MODE_ASYNC,
@@ -167,25 +168,25 @@ result_id = SchemaNode(String(), description='The result id')
 
 
 class JsonHeader(MappingSchema):
-    content_type = SchemaNode(String(), example='application/json', default='application/json')
-    content_type.name = 'Content-Type'
+    content_type = SchemaNode(String(), example=CONTENT_TYPE_APP_JSON, default=CONTENT_TYPE_APP_JSON)
+    content_type.name = "Content-Type"
 
 
 class HtmlHeader(MappingSchema):
-    content_type = SchemaNode(String(), example='text/html', default='text/html')
-    content_type.name = 'Content-Type'
+    content_type = SchemaNode(String(), example=CONTENT_TYPE_TEXT_HTML, default=CONTENT_TYPE_TEXT_HTML)
+    content_type.name = "Content-Type"
 
 
 class XmlHeader(MappingSchema):
-    content_type = SchemaNode(String(), example='application/xml', default='application/xml')
-    content_type.name = 'Content-Type'
+    content_type = SchemaNode(String(), example=CONTENT_TYPE_APP_XML, default=CONTENT_TYPE_APP_XML)
+    content_type.name = "Content-Type"
 
 
 class AcceptHeader(MappingSchema):
-    Accept = SchemaNode(String(), missing=drop, default='application/json', validator=OneOf([
-        'application/json',
-        'application/xml',
-        'text/html'
+    Accept = SchemaNode(String(), missing=drop, default=CONTENT_TYPE_APP_JSON, validator=OneOf([
+        CONTENT_TYPE_APP_JSON,
+        CONTENT_TYPE_APP_XML,
+        CONTENT_TYPE_TEXT_HTML,
     ]))
 
 

@@ -1,3 +1,4 @@
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
 from weaver.utils import parse_request_query, get_weaver_url, get_settings
 from distutils.version import LooseVersion
 from pyramid.httpexceptions import HTTPSuccessful
@@ -11,17 +12,15 @@ if TYPE_CHECKING:
 
 LOGGER = logging.getLogger("weaver")
 
-VERSION_100 = '1.0.0'
-VERSION_200 = '2.0.0'
-CONTENT_TYPE_XML = 'application/xml'
-CONTENT_TYPE_JSON = 'application/json'
-OUTPUT_FORMAT_JSON = 'json'
-OUTPUT_FORMAT_XML = 'xml'
+WPS_VERSION_100 = '1.0.0'
+WPS_VERSION_200 = '2.0.0'
+OUTPUT_FORMAT_JSON = "json"
+OUTPUT_FORMAT_XML = "xml"
 OUTPUT_FORMATS = {
-    VERSION_100: OUTPUT_FORMAT_XML,
-    VERSION_200: OUTPUT_FORMAT_JSON,
-    CONTENT_TYPE_XML: OUTPUT_FORMAT_XML,
-    CONTENT_TYPE_JSON: OUTPUT_FORMAT_JSON,
+    WPS_VERSION_100: OUTPUT_FORMAT_XML,
+    WPS_VERSION_200: OUTPUT_FORMAT_JSON,
+    CONTENT_TYPE_APP_XML: OUTPUT_FORMAT_XML,
+    CONTENT_TYPE_APP_JSON: OUTPUT_FORMAT_JSON,
 }
 
 
@@ -50,14 +49,14 @@ def get_wps_output_format(request, service_url=None):
 
     :param request: request for which a response of WPS version-specific format must be generated.
     :param service_url: endpoint URL of the service to request 'GetCapabilities' if version not found by previous hints.
-    :return: one of OUTPUT_FORMAT (default: 1.0.0 => 'xml' if no direct hint matched)
+    :return: one of ``OUTPUT_FORMAT`` (default: 1.0.0 => 'xml' if no direct hint matched)
     """
     # return specific type if requested by 'version' query
     queries = parse_request_query(request)
     if 'version' in queries and len(queries['version']) > 0:
         out_version = min([LooseVersion(v) for v in queries['version']])
         out_format = OUTPUT_FORMATS.pop(out_version.version, None)
-        return out_format or OUTPUT_FORMATS[VERSION_100]
+        return out_format or OUTPUT_FORMATS[WPS_VERSION_100]
 
     # version not specified as query, check accept headers for specific and unique case
     accepts = [accept[0] for accept in request.accept.parsed]
@@ -78,7 +77,7 @@ def get_wps_output_format(request, service_url=None):
                 # TODO: update get version if it is ever added to 'GetCapabilities' from WPS REST response
                 # for now, suppose that a valid list in json body means that the service is WPS 2.0.0
                 if isinstance(getcap_resp_200.json()['processes'], list):
-                    return OUTPUT_FORMATS[VERSION_200]
+                    return OUTPUT_FORMATS[WPS_VERSION_200]
             except Exception as ex:
                 LOGGER.error('Got exception in `get_wps_output_format` JSON parsing: {}'.format(repr(ex)))
 
@@ -87,10 +86,10 @@ def get_wps_output_format(request, service_url=None):
             try:
                 # TODO XML implementation
                 etree.fromstring(getcap_resp_100.content)
-                return OUTPUT_FORMATS[VERSION_100]
+                return OUTPUT_FORMATS[WPS_VERSION_100]
             except Exception as ex:
                 LOGGER.error('Got exception in `get_wps_output_format` XML parsing: {}'.format(repr(ex)))
 
     # still not found, default to older version
     # for most probable format supported by services
-    return OUTPUT_FORMATS[VERSION_100]
+    return OUTPUT_FORMATS[WPS_VERSION_100]

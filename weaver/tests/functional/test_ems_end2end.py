@@ -1,4 +1,5 @@
 from weaver import WEAVER_ROOT_DIR
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_FORM
 from weaver.tests.utils import get_settings_from_config_ini, get_settings_from_testapp, get_setting, Null
 from weaver.config import WEAVER_CONFIGURATION_EMS
 from weaver.processes.sources import fetch_data_sources
@@ -32,13 +33,11 @@ import pytest
 import mock
 import requests
 import logging
-# noinspection PyProtectedMember
-from logging import _loggerClass
 import time
 import json
 import os
 if TYPE_CHECKING:
-    from weaver.typedefs import HeadersType, CookiesType, SettingsType, AnyResponseType
+    from weaver.typedefs import HeadersType, CookiesType, SettingsType, AnyResponseType, LoggerType
     from typing import AnyStr, Dict, Optional, Any, Tuple, Iterable, Callable, Union
 
 
@@ -61,15 +60,17 @@ class End2EndEMSTestCase(TestCase):
     """
     __settings__ = None
     test_processes_info = dict()
-    headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
+    headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
     cookies = dict()                # type: CookiesType
     app = None                      # type: WebTestApp
+    logger_result_dir = None        # type: AnyStr
     logger_separator_calls = None   # type: AnyStr
     logger_separator_steps = None   # type: AnyStr
     logger_separator_tests = None   # type: AnyStr
     logger_separator_cases = None   # type: AnyStr
     logger_level = logging.INFO     # type: int
-    logger = None                   # type: _loggerClass
+    logger_enabled = True           # type: bool
+    logger = None                   # type: LoggerType
     # setting indent to `None` disables pretty-printing of JSON payload
     logger_json_indent = None       # type: Union[int, None]
     log_full_trace = True           # type: bool
@@ -111,6 +112,16 @@ class End2EndEMSTestCase(TestCase):
         import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+        # logging parameter overrides
+        cls.logger_level = os.getenv('WEAVER_TEST_LOGGER_LEVEL', cls.logger_level)
+        cls.logger_enabled = asbool(os.getenv('WEAVER_TEST_LOGGER_ENABLED', cls.logger_enabled))
+        cls.logger_result_dir = os.getenv('WEAVER_TEST_LOGGER_RESULT_DIR', os.path.join(WEAVER_ROOT_DIR))
+        cls.logger_json_indent = os.getenv('WEAVER_TEST_LOGGER_JSON_INDENT', cls.logger_json_indent)
+        cls.logger_separator_calls = os.getenv('WEAVER_TEST_LOGGER_SEPARATOR_CALLS', cls.logger_separator_calls)
+        cls.logger_separator_steps = os.getenv('WEAVER_TEST_LOGGER_SEPARATOR_STEPS', cls.logger_separator_steps)
+        cls.logger_separator_tests = os.getenv('WEAVER_TEST_LOGGER_SEPARATOR_TESTS', cls.logger_separator_tests)
+        cls.logger_separator_cases = os.getenv('WEAVER_TEST_LOGGER_SEPARATOR_CASES', cls.logger_separator_cases)
+
         cls.setup_logger()
         cls.log("{}Start of '{}': {}\n{}"
                 .format(cls.logger_separator_cases, cls.current_case_name(), now(), cls.logger_separator_cases))
@@ -133,14 +144,6 @@ class End2EndEMSTestCase(TestCase):
                                              "password": get_setting('ALICE_PASSWORD', cls.app)}
         cls.WEAVER_TEST_BOB_CREDENTIALS = {"username": get_setting('BOD_USERNAME', cls.app),
                                            "password": get_setting('BOB_PASSWORD', cls.app)}
-
-        # logging parameter overrides
-        cls.logger_level = os.getenv('WEAVER_TEST_LOGGER_LEVEL', cls.logger_level)
-        cls.logger_json_indent = os.getenv('WEAVER_TEST_LOGGER_JSON_INDENT', cls.logger_json_indent)
-        cls.logger_separator_calls = os.getenv('WEAVER_TEST_LOGGER_SEPARATOR_CALLS', cls.logger_separator_calls)
-        cls.logger_separator_steps = os.getenv('WEAVER_TEST_LOGGER_SEPARATOR_STEPS', cls.logger_separator_steps)
-        cls.logger_separator_tests = os.getenv('WEAVER_TEST_LOGGER_SEPARATOR_TESTS', cls.logger_separator_tests)
-        cls.logger_separator_cases = os.getenv('WEAVER_TEST_LOGGER_SEPARATOR_CASES', cls.logger_separator_cases)
 
         cls.WEAVER_URL = get_weaver_url(cls.settings())
         cls.WEAVER_RESTAPI_URL = wps_restapi_base_url(cls.settings())
@@ -310,10 +313,26 @@ class End2EndEMSTestCase(TestCase):
         for process_id, process_info in cls.test_processes_info.items():
             path = '{}/processes/{}'.format(cls.WEAVER_URL, process_info.test_id)
 
+            # unauthorized when using 'Weaver' directly means visibility is not public, but process definitively exists
+            # update it to allow following delete
+            if not cls.WEAVER_TEST_PROTECTED_ENABLED:
+                resp = cls.request('GET', path, headers=headers, cookies=cookies, ignore_errors=True, log_enabled=False)
+                if resp.status_code == HTTPUnauthorized.code:
+                    visibility_path = '{}/visibility'.format(path)
+                    visibility_body = {'value': VISIBILITY_PUBLIC}
+                    resp = cls.request('PUT', visibility_path, json=visibility_body, headers=headers, cookies=cookies,
+                                       ignore_errors=True, log_enabled=False)
+                    cls.assert_response(resp, HTTPOk.code, message="Failed cleanup of test processes!")
+
             resp = cls.request('DELETE', path, headers=headers, cookies=cookies, ignore_errors=True, log_enabled=False)
-            # unauthorized also would mean the process doesn't exist if user from headers has permissions on it
-            cls.assert_response(resp, [HTTPOk.code, HTTPUnauthorized.code, HTTPNotFound.code],
-                                message="Failed cleanup of test processes!")
+
+            # unauthorized can mean the process doesn't exist if user from headers doesn't have permissions on it
+            # to even know if it exists (only if protected server it employed)
+            codes = [HTTPOk.code, HTTPNotFound.code]
+            if cls.WEAVER_TEST_PROTECTED_ENABLED:
+                codes.append(HTTPUnauthorized.code)
+
+            cls.assert_response(resp, codes, message="Failed cleanup of test processes!")
 
     @classmethod
     def login(cls, username, password, force_magpie=False):
@@ -322,7 +341,7 @@ class End2EndEMSTestCase(TestCase):
         Login using WSO2 or Magpie according to ``WEAVER_TEST_PROTECTED_ENABLED`` to retrieve session cookies.
 
         WSO2:
-            Retrieves the cookie packaged as `{'Authorization': 'Bearer <access_token>'}` header, and lets the
+            Retrieves the cookie packaged as `{"Authorization": "Bearer <access_token>"}` header, and lets the
             Magpie external provider login procedure complete the Authorization header => Cookie conversion.
 
         Magpie:
@@ -340,17 +359,17 @@ class End2EndEMSTestCase(TestCase):
                     'username': username,
                     'password': password
                 }
-                headers = {'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'}
+                headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_FORM}
                 path = '{}/oauth2/token'.format(cls.WEAVER_TEST_WSO2_URL)
                 resp = cls.request('POST', path, data=data, headers=headers, force_requests=True)
                 if resp.status_code == HTTPOk.code:
                     access_token = resp.json().get('access_token')
                     cls.assert_test(lambda: access_token is not None, message="Failed login!")
-                    return {'Authorization': 'Bearer {}'.format(access_token)}, {}
+                    return {"Authorization": "Bearer {}".format(access_token)}, {}
                 cls.assert_response(resp, status=HTTPOk.code, message="Failed token retrieval from login!")
             else:
                 data = {'user_name': username, 'password': password}
-                headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
+                headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
                 path = '{}/signin'.format(cls.WEAVER_TEST_MAGPIE_URL)
                 resp = cls.request('POST', path, json=data, headers=headers, force_requests=True)
                 if resp.status_code == HTTPOk.code:
@@ -392,7 +411,7 @@ class End2EndEMSTestCase(TestCase):
         with_requests = is_localhost and has_port or is_remote or force_requests
 
         if log_enabled:
-            if json_body or headers and 'application/json' in headers.get('Content-Type'):
+            if json_body or headers and CONTENT_TYPE_APP_JSON in headers.get("Content-Type"):
                 payload = "\n" if cls.logger_json_indent else '' + json.dumps(json_body, indent=cls.logger_json_indent)
             else:
                 payload = data_body
@@ -413,14 +432,14 @@ class End2EndEMSTestCase(TestCase):
             resp = requests.request(method, url, json=json_body, data=data_body, **kw)
 
             # add some properties similar to `webtest.TestApp`
-            if 'application/json' in resp.headers.get('Content-Type', []):
+            if CONTENT_TYPE_APP_JSON in resp.headers.get("Content-Type", []):
                 setattr(resp, 'json', resp.json())
                 setattr(resp, 'body', resp.json)
-                setattr(resp, 'content_type', 'application/json')
+                setattr(resp, 'content_type', CONTENT_TYPE_APP_JSON)
             else:
                 setattr(resp, 'body', None)
                 setattr(resp, 'body', resp.text)
-                setattr(resp, 'content_type', resp.headers.get('Content-Type'))
+                setattr(resp, 'content_type', resp.headers.get("Content-Type"))
 
         else:
             max_redirects = kw.pop('max_redirects', 5)
@@ -442,7 +461,7 @@ class End2EndEMSTestCase(TestCase):
             cls.assert_response(resp, status, message)
 
         if log_enabled:
-            if 'application/json' in resp.headers.get('Content-Type', []):
+            if CONTENT_TYPE_APP_JSON in resp.headers.get("Content-Type", []):
                 payload = "\n" if cls.logger_json_indent else '' + json.dumps(resp.json, indent=cls.logger_json_indent)
             else:
                 payload = resp.body
@@ -491,30 +510,31 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def log(cls, message, exception=False):
-        if exception:
-            # also prints traceback of the exception
-            cls.logger.exception(message)
-        else:
-            cls.logger.log(cls.logger_level, message)
+        if cls.logger_enabled:
+            if exception:
+                # also prints traceback of the exception
+                cls.logger.exception(message)
+            else:
+                cls.logger.log(cls.logger_level, message)
 
     @classmethod
     def setup_logger(cls):
-        root_dir = os.getenv('WEAVER_TEST_LOGGER_RESULT_DIR', os.path.join(WEAVER_ROOT_DIR))
-        make_dirs(root_dir, exist_ok=True)
-        log_path = os.path.abspath(os.path.join(root_dir, cls.__name__ + '.log'))
-        log_fmt = logging.Formatter("%(message)s")      # only message to avoid 'log-name INFO' offsetting outputs
-        log_file = logging.FileHandler(log_path)
-        log_file.setFormatter(log_fmt)
-        log_term = logging.StreamHandler()
-        log_term.setFormatter(log_fmt)
-        cls.logger_separator_calls = '-' * 80 + '\n'    # used between function calls (of same request)
-        cls.logger_separator_steps = '=' * 80 + '\n'    # used between overall test steps (between requests)
-        cls.logger_separator_tests = '*' * 80 + '\n'    # used between various test runs (each test_* method)
-        cls.logger_separator_cases = '#' * 80 + '\n'    # used between various TestCase runs
-        cls.logger = logging.getLogger(cls.__name__)
-        cls.logger.setLevel(cls.logger_level)
-        cls.logger.addHandler(log_file)
-        cls.logger.addHandler(log_term)
+        if cls.logger_enabled:
+            make_dirs(cls.logger_result_dir, exist_ok=True)
+            log_path = os.path.abspath(os.path.join(cls.logger_result_dir, cls.__name__ + '.log'))
+            log_fmt = logging.Formatter("%(message)s")      # only message to avoid 'log-name INFO' offsetting outputs
+            log_file = logging.FileHandler(log_path)
+            log_file.setFormatter(log_fmt)
+            log_term = logging.StreamHandler()
+            log_term.setFormatter(log_fmt)
+            cls.logger_separator_calls = '-' * 80 + '\n'    # used between function calls (of same request)
+            cls.logger_separator_steps = '=' * 80 + '\n'    # used between overall test steps (between requests)
+            cls.logger_separator_tests = '*' * 80 + '\n'    # used between various test runs (each test_* method)
+            cls.logger_separator_cases = '#' * 80 + '\n'    # used between various TestCase runs
+            cls.logger = logging.getLogger(cls.__name__)
+            cls.logger.setLevel(cls.logger_level)
+            cls.logger.addHandler(log_file)
+            cls.logger.addHandler(log_term)
 
     @classmethod
     def validate_test_server(cls):

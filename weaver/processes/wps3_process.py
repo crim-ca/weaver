@@ -1,4 +1,5 @@
 from weaver import status
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_FORM
 from weaver.warning import MissingParameterWarning
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.utils import get_any_id, get_any_value, get_any_message, get_job_log_msg, pass_http_error
@@ -118,13 +119,13 @@ class Wps3Process(WpsProcessInterface):
                 'password': ades_pwd,
                 'scope': 'openid',
             }
-            ades_headers = {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'}
-            ades_access_token_url = '{}/oauth2/token'.format(ades_url)
+            ades_headers = {"Content-Type": CONTENT_TYPE_APP_FORM, "Accept": CONTENT_TYPE_APP_JSON}
+            ades_access_token_url = "{}/oauth2/token".format(ades_url)
             cred_resp = requests.post(ades_access_token_url, data=ades_body, headers=ades_headers)
             cred_resp.raise_for_status()
-            if 'application/json' not in cred_resp.headers.get('Content-Type'):
+            if CONTENT_TYPE_APP_JSON not in cred_resp.headers.get("Content-Type"):
                 raise HTTPUnauthorized("Cannot retrieve valid access token using credential or ADES configurations.")
-            access_token = cred_resp.json().get('access_token', None)
+            access_token = cred_resp.json().get("access_token", None)
             if not access_token:
                 warnings.warn("Could not retrieve valid access token although response is expected to contain one.",
                               MissingParameterWarning)
@@ -134,7 +135,7 @@ class Wps3Process(WpsProcessInterface):
                 "[ades.username, ades.password, ades.wso2_hostname, ades.wso2_client_id, ades.wso2_client_secret]",
                 MissingParameterWarning
             )
-        return {'Authorization': 'Bearer {}'.format(access_token) if access_token else None}
+        return {"Authorization": "Bearer {}".format(access_token) if access_token else None}
 
     def is_deployed(self):
         return self.describe_process() is not None

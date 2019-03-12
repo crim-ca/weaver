@@ -14,6 +14,8 @@ if TYPE_CHECKING:
     # noinspection PyPackageRequirements
     from webtest.response import TestResponse
     from pywps.app import WPSRequest
+    # noinspection PyProtectedMember, PyUnresolvedReferences
+    from logging import _loggerClass as LoggerType
     from typing import Any, AnyStr, Callable, Dict, List, Tuple, Union
     import lxml.etree
     import os

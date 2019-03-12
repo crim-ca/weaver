@@ -11,6 +11,7 @@ import pytest
 import unittest
 import pyramid.testing
 from xml.etree import ElementTree
+from weaver.formats import CONTENT_TYPE_ANY_XML
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
 from weaver.processes.wps_default import Hello
 from weaver.processes.wps_testing import WpsTestProcess
@@ -62,14 +63,14 @@ class WpsAppTest(unittest.TestCase):
     def test_getcaps(self):
         resp = self.app.get(self.make_url("service=wps&request=getcapabilities"))
         assert resp.status_code == 200
-        assert resp.content_type == 'text/xml'
+        assert resp.content_type in CONTENT_TYPE_ANY_XML
         resp.mustcontain('</wps:Capabilities>')
 
     @pytest.mark.online
     def test_getcaps_filtered_processes_by_visibility(self):
         resp = self.app.get(self.make_url("service=wps&request=getcapabilities"))
         assert resp.status_code == 200
-        assert resp.content_type == 'text/xml'
+        assert resp.content_type in CONTENT_TYPE_ANY_XML
         resp.mustcontain('<wps:ProcessOfferings>')
         root = ElementTree.fromstring(resp.text)
         process_offerings = list(filter(lambda e: 'ProcessOfferings' in e.tag, list(root)))
@@ -84,7 +85,7 @@ class WpsAppTest(unittest.TestCase):
         params = "service=wps&request=describeprocess&version=1.0.0&identifier={}".format(Hello.identifier)
         resp = self.app.get(self.make_url(params))
         assert resp.status_code == 200
-        assert resp.content_type == 'text/xml'
+        assert resp.content_type in CONTENT_TYPE_ANY_XML
         resp.mustcontain('</wps:ProcessDescriptions>')
 
     @pytest.mark.online
@@ -94,13 +95,13 @@ class WpsAppTest(unittest.TestCase):
         url = self.make_url(param_template.format(self.process_public.identifier))
         resp = self.app.get(url)
         assert resp.status_code == 200
-        assert resp.content_type == 'text/xml'
+        assert resp.content_type in CONTENT_TYPE_ANY_XML
         resp.mustcontain('</wps:ProcessDescriptions>')
 
         url = self.make_url(param_template.format(self.process_private.identifier))
         resp = self.app.get(url, expect_errors=True)
         assert resp.status_code == 400
-        assert resp.content_type == 'text/xml'
+        assert resp.content_type in CONTENT_TYPE_ANY_XML
         resp.mustcontain('<ows:ExceptionText>Unknown process')
 
     @pytest.mark.online
@@ -109,7 +110,7 @@ class WpsAppTest(unittest.TestCase):
         url = self.make_url(params)
         resp = self.app.get(url)
         assert resp.status_code == 200
-        assert resp.content_type == 'text/xml'
+        assert resp.content_type in CONTENT_TYPE_ANY_XML
         resp.mustcontain('<wps:ProcessSucceeded>PyWPS Process {} finished</wps:ProcessSucceeded>'.format(Hello.title))
 
     @pytest.mark.online
@@ -118,12 +119,12 @@ class WpsAppTest(unittest.TestCase):
         url = self.make_url(params_template.format(self.process_public.identifier, ))
         resp = self.app.get(url)
         assert resp.status_code == 200
-        assert resp.content_type == 'text/xml'
+        assert resp.content_type in CONTENT_TYPE_ANY_XML
         resp.mustcontain('<wps:ProcessSucceeded>PyWPS Process {} finished</wps:ProcessSucceeded>'
                          .format(self.process_public.title))
 
         url = self.make_url(params_template.format(self.process_private.identifier))
         resp = self.app.get(url, expect_errors=True)
         assert resp.status_code == 400
-        assert resp.content_type == 'text/xml'
+        assert resp.content_type in CONTENT_TYPE_ANY_XML
         resp.mustcontain('<ows:ExceptionText>Unknown process')

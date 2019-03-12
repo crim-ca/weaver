@@ -189,7 +189,9 @@ def test_deploy_opensearch():
             return store
 
     with mock.patch('weaver.wps_restapi.processes.processes.get_db', side_effect=MockDB), \
-         mock.patch('weaver.wps_restapi.processes.processes.get_settings', side_effect=get_dummy_settings):  # noqa
+         mock.patch('weaver.wps_restapi.processes.processes.get_settings', side_effect=get_dummy_settings), \
+         mock.patch('weaver.processes.utils.get_db', side_effect=MockDB), \
+         mock.patch('weaver.processes.utils.get_settings', side_effect=get_dummy_settings):  # noqa
         # given
         opensearch_payload = get_opensearch_payload()
         initial_payload = deepcopy(opensearch_payload)
@@ -265,6 +267,7 @@ def test_get_template_urls():
         params = parse_qsl(urlparse(template).query)
         param_names = list(sorted(p[0] for p in params))
         if all_fields:
+            # noinspection PyUnresolvedReferences
             all_fields = all_fields.intersection(param_names)
         else:
             all_fields.update(param_names)

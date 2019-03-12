@@ -1,9 +1,7 @@
-# noinspection PyPackageRequirements
-import pytest
-import unittest
-# use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
-# noinspection PyPackageRequirements
-from webtest import TestApp as WebTestApp
+from weaver import main
+from weaver.config import WEAVER_CONFIGURATION_DEFAULT
+from weaver.formats import CONTENT_TYPE_APP_JSON
+from weaver.tests.utils import get_test_weaver_app, setup_config_with_mongodb
 from weaver.wps_restapi.swagger_definitions import (
     api_frontpage_uri,
     api_swagger_ui_uri,
@@ -12,9 +10,12 @@ from weaver.wps_restapi.swagger_definitions import (
     jobs_short_uri,
     jobs_full_uri,
 )
-from weaver import main
-from weaver.config import WEAVER_CONFIGURATION_DEFAULT
-from weaver.tests.utils import get_test_weaver_app, setup_config_with_mongodb
+# use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
+# noinspection PyPackageRequirements
+from webtest import TestApp as WebTestApp
+# noinspection PyPackageRequirements
+import pytest
+import unittest
 
 public_routes = [
     api_frontpage_uri,
@@ -50,7 +51,7 @@ class StatusCodeTestCase(unittest.TestCase):
     #   search features
     # receive response and assert that status codes match
 
-    headers = {'accept': 'application/json'}
+    headers = {"Accept": CONTENT_TYPE_APP_JSON}
 
     def setUp_old(self):
         self.app = get_test_weaver_app()

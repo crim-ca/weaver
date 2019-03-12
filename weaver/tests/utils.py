@@ -24,12 +24,32 @@ if TYPE_CHECKING:
 
 
 def ignore_wps_warnings(func):
-    """Wrapper that eliminates WPS related warnings during testing logging."""
+    """Wrapper that eliminates WPS related warnings during testing logging.
+
+    **NOTE**:
+        Wrapper should be applied on method (not directly on :class:`unittest.TestCase`
+        as it can disable the whole test suite.
+    """
     def do_test(self, *args, **kwargs):
         with warnings.catch_warnings():
             for warn in [MissingParameterWarning, UnsupportedOperationWarning]:
-                for msg in ["Parameter 'request*", "Parameter 'service*"]:
+                for msg in ["Parameter 'request*", "Parameter 'service*", "Request type '*", "Service '*"]:
                     warnings.filterwarnings(action="ignore", message=msg, category=warn)
+            func(self, *args, **kwargs)
+    return do_test
+
+
+def ignore_deprecated_nested_warnings(func):
+    """Wrapper that eliminates :function:`contextlib.nested` related warnings during testing logging.
+
+    **NOTE**:
+        Wrapper should be applied on method (not directly on :class:`unittest.TestCase`
+        as it can disable the whole test suite.
+    """
+    def do_test(self, *args, **kwargs):
+        with warnings.catch_warnings():
+            warnings.filterwarnings(action="ignore", category=DeprecationWarning,
+                                    message="With-statements now directly support multiple context managers")
             func(self, *args, **kwargs)
     return do_test
 

@@ -1,16 +1,4 @@
-from weaver.tests.utils import (
-    setup_config_with_mongodb,
-    setup_mongodb_processstore,
-    setup_mongodb_jobstore,
-    get_test_weaver_app,
-)
-from weaver.wps import get_wps_url
-from weaver.wps_restapi.utils import CONTENT_TYPE_JSON, CONTENT_TYPE_XML
-from weaver.processes.wps_testing import WpsTestProcess
-from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
 from weaver.exceptions import ProcessNotFound, JobNotFound
-from weaver.status import STATUS_ACCEPTED
-from weaver.utils import fully_qualified_name
 from weaver.execute import (
     EXECUTE_MODE_SYNC,
     EXECUTE_MODE_ASYNC,
@@ -19,8 +7,20 @@ from weaver.execute import (
     EXECUTE_TRANSMISSION_MODE_VALUE,
     EXECUTE_TRANSMISSION_MODE_REFERENCE,
 )
-from wsgiref.simple_server import make_server
-from wsgiref.util import setup_testing_defaults
+from weaver.formats import CONTENT_TYPE_APP_XML, CONTENT_TYPE_APP_JSON
+from weaver.processes.wps_testing import WpsTestProcess
+from weaver.status import STATUS_ACCEPTED
+from weaver.tests.utils import (
+    ignore_deprecated_nested_warnings,
+    setup_config_with_mongodb,
+    setup_mongodb_processstore,
+    setup_mongodb_jobstore,
+    get_test_weaver_app,
+)
+from weaver.utils import fully_qualified_name
+from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
+from weaver.wps import get_wps_url
+from six.moves.urllib.parse import urlparse
 from copy import deepcopy
 # noinspection PyDeprecation
 from contextlib import nested
@@ -31,11 +31,47 @@ import mock
 # noinspection PyPackageRequirements
 import webtest
 import unittest
+# noinspection PyPackageRequirements
+import responses
 import pyramid.testing
 import six
+import os
+
+MOCK_REMOTE_SERVER_URL = "https://remote-server.com"
+TEST_REMOTE_PROCESS_WPS1 = "test-remote-process-wps1"
+TEST_REMOTE_PROCESS_WPS2 = "test-remote-process-wps2"
+TEST_REMOTE_PROCESS_ROOT = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources")
+TEST_REMOTE_PROCESS_GETCAP_WPS1_FILE = os.path.join(TEST_REMOTE_PROCESS_ROOT, "test_describe_process_wps1.xml")
+TEST_REMOTE_PROCESS_GETCAP_WPS1_URL = "{}/wps?service=WPS&request=GetCapabilities&version=1.0.0" \
+                                      .format(MOCK_REMOTE_SERVER_URL)
+TEST_REMOTE_PROCESS_DESCRIBE_WPS1_FILE = os.path.join(TEST_REMOTE_PROCESS_ROOT, "test_describe_process_wps1.xml")
+TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL = "{}/wps?service=WPS&request=DescribeProcess&identifier={}&version=1.0.0" \
+                                        .format(MOCK_REMOTE_SERVER_URL, TEST_REMOTE_PROCESS_WPS1)
+TEST_REMOTE_PROCESS_WPS2_FILE = os.path.join(TEST_REMOTE_PROCESS_ROOT, "test_describe_process_wps2.json")
+
+
+def mock_remote_server_requests_wp1(test):
+    # noinspection PyUnresolvedReferences, PyUnusedLocal
+    def mock_requests_wps1(*args, **kwargs):
+        """Mock ``requests`` responses fetching ``MOCK_REMOTE_SERVER_URL`` WPS reference."""
+        xml_header = {"Content-Type": CONTENT_TYPE_APP_XML}
+        with responses.RequestsMock(assert_all_requests_are_fired=False) as mock_resp:
+            with open(TEST_REMOTE_PROCESS_DESCRIBE_WPS1_FILE, 'r') as f:
+                describe_xml = f.read()
+            with open(TEST_REMOTE_PROCESS_GETCAP_WPS1_FILE, 'r') as f:
+                get_cap_xml = f.read()
+            mock_resp.add(responses.GET, TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL, body=describe_xml, headers=xml_header)
+            mock_resp.add(responses.GET, TEST_REMOTE_PROCESS_GETCAP_WPS1_URL, body=get_cap_xml, headers=xml_header)
+            # special case where 'identifier' gets added to 'GetCapabilities', but is simply ignored
+            mock_resp.add(responses.GET, body=get_cap_xml, headers=xml_header,
+                          url=TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL.replace('DescribeProcess', 'GetCapabilities'))
+            return test(*args, **kwargs)
+    return mock_requests_wps1
 
 
 class WpsRestApiProcessesTest(unittest.TestCase):
+    remote_server = None
+
     @classmethod
     def setUpClass(cls):
         settings = {
@@ -44,8 +80,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         }
         cls.config = setup_config_with_mongodb(settings=settings)
         cls.app = get_test_weaver_app(config=cls.config)
-        cls.json_app = 'application/json'
-        cls.json_headers = {'Accept': cls.json_app, 'Content-Type': cls.json_app}
+        cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
         cls.app = webtest.TestApp(cls.config.make_wsgi_app())
 
     @classmethod
@@ -60,6 +95,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.process_store = setup_mongodb_processstore(self.config)
         self.job_store = setup_mongodb_jobstore(self.config)
 
+        self.remote_server = "local"
         self.process_remote_WPS1 = "process_remote_wps1"
         self.process_remote_WPS2 = "process_remote_wps2"
         self.process_public = WpsTestProcess(identifier='process_public')
@@ -127,80 +163,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             mock.patch('weaver.wps_restapi.processes.processes.execute_process.delay', return_value=result),
         )
 
-    def get_process_mock_server(self, settings):
-        # noinspection PyUnusedLocal
-        def mock_server_app(env, start_response):
-            setup_testing_defaults(settings)
-            content_type = CONTENT_TYPE_JSON
-            path = settings.get("PATH_INFO")
-            code = "404 Not Found"
-            body = []
-            if path == "/processes":
-                code = "200 OK"
-                body = []
-            elif path.startswith("/wps") and \
-                    "identifier={}".format(self.process_remote_WPS1) in path and \
-                    "request=describeprocess" in path.lower():
-                code = "200 OK"
-                body = """
-                <wps:ProcessDescriptions service="WPS" version="1.0.0" xml:lang="en-US">
-                    <ProcessDescription wps:processVersion="0.5" storeSupported="true" statusSupported="true">
-                        <ows:Identifier>{}</ows:Identifier>
-                        <ows:Title>Test Remote Process WPS1</ows:Title>
-                        <ows:Abstract>Test Remote Process WPS1</ows:Abstract>
-                        <ows:Metadata 
-                            xlink:href="https://github.com/crim-ca/weaver" 
-                            xlink:title="Weaver" 
-                            xlink:type="simple"/>
-                        <ows:Metadata 
-                            xlink:href="https://ogc-ems.crim.ca/weaver/" 
-                            xlink:title="Server" 
-                            xlink:type="simple" />
-                        <DataInputs>                        
-                            <Input minOccurs="1" maxOccurs="1">
-                                <ows:Identifier>input-1</ows:Identifier>
-                                <ows:Title>Input 1</ows:Title>
-                                <ows:Abstract>Input 1!</ows:Abstract>
-                                <LiteralData>
-                                    <ows:DataType ows:reference="urn:ogc:def:dataType:OGC:1.1:string">string</ows:DataType>
-                                    <ows:AnyValue />
-                                </LiteralData></Input>
-                            </DataInputs>
-                        <ProcessOutputs>
-                            <Output>
-                                <ows:Identifier>output</ows:Identifier>
-                                <ows:Title>The output</ows:Title>
-                                <ows:Abstract>Process file output.</ows:Abstract>
-                                <ComplexOutput>
-                                    <Default>
-                                        <Format>
-                                            <MimeType>application/json</MimeType>
-                                        </Format>
-                                    </Default>
-                                    <Supported>
-                                        <Format>
-                                            <MimeType>application/json</MimeType>
-                                        </Format>
-                                    </Supported>
-                                </ComplexOutput>
-                            </Output>
-                        </ProcessOutputs>
-                    </ProcessDescription>
-                </wps:ProcessDescriptions>
-                """.format(self.process_remote_WPS1)
-                content_type = CONTENT_TYPE_XML
-            elif path == "/processes/{}".format(self.process_remote_WPS2):
-                code = "200 OK"
-                body = []
-            start_response(code, [("Content-Type", content_type)])
-            return body
-        return make_server("", 8000, mock_server_app).serve_forever()
-
     def test_get_processes(self):
         uri = '/processes'
         resp = self.app.get(uri, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == self.json_app
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
         assert 'processes' in resp.json and isinstance(resp.json['processes'], list) and len(resp.json['processes']) > 0
         for process in resp.json['processes']:
             assert 'id' in process and isinstance(process['id'], six.string_types)
@@ -213,6 +180,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert self.process_public.identifier in processes_id
         assert self.process_private.identifier not in processes_id
 
+    @ignore_deprecated_nested_warnings
     def test_get_processes_invalid_schemas_handled(self):
         path = "/processes"
         # deploy valid test process
@@ -234,21 +202,22 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 503
-        assert resp.content_type == self.json_app
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
         assert process_name in resp.json.get('description')
 
     def test_describe_process_visibility_public(self):
         uri = "/processes/{}".format(self.process_public.identifier)
         resp = self.app.get(uri, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == self.json_app
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_describe_process_visibility_private(self):
         uri = "/processes/{}".format(self.process_private.identifier)
         resp = self.app.get(uri, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 401
-        assert resp.content_type == self.json_app
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
 
+    @ignore_deprecated_nested_warnings
     def test_deploy_process_success(self):
         process_name = self.fully_qualified_test_process_name()
         process_data = self.get_process_deploy_template(process_name)
@@ -260,10 +229,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             resp = self.app.post_json(uri, params=process_data, headers=self.json_headers, expect_errors=True)
             # TODO: status should be 201 when properly modified to match API conformance
             assert resp.status_code == 200
-            assert resp.content_type == self.json_app
+            assert resp.content_type == CONTENT_TYPE_APP_JSON
             assert resp.json['processSummary']['id'] == process_name
             assert isinstance(resp.json["deploymentDone"], bool) and resp.json["deploymentDone"]
 
+    @ignore_deprecated_nested_warnings
     def test_deploy_process_bad_name(self):
         process_name = self.fully_qualified_test_process_name() + "..."
         process_data = self.get_process_deploy_template(process_name)
@@ -274,8 +244,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             uri = "/processes"
             resp = self.app.post_json(uri, params=process_data, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 400
-            assert resp.content_type == self.json_app
+            assert resp.content_type == CONTENT_TYPE_APP_JSON
 
+    @ignore_deprecated_nested_warnings
     def test_deploy_process_conflict(self):
         process_name = self.process_private.identifier
         process_data = self.get_process_deploy_template(process_name)
@@ -286,9 +257,10 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             uri = "/processes"
             resp = self.app.post_json(uri, params=process_data, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 409
-            assert resp.content_type == self.json_app
+            assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     # noinspection PyTypeChecker
+    @ignore_deprecated_nested_warnings
     def test_deploy_process_missing_or_invalid_components(self):
         process_name = self.fully_qualified_test_process_name()
         process_data = self.get_process_deploy_template(process_name)
@@ -316,8 +288,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 resp = self.app.post_json(uri, params=data, headers=self.json_headers, expect_errors=True)
                 msg = "Failed with test variation `{}` with value `{}`."
                 assert resp.status_code in [400, 422], msg.format(i, resp.status_code)
-                assert resp.content_type == self.json_app, msg.format(i, resp.content_type)
+                assert resp.content_type == CONTENT_TYPE_APP_JSON, msg.format(i, resp.content_type)
 
+    @ignore_deprecated_nested_warnings
     def test_deploy_process_default_endpoint_wps1(self):
         """Validates that the default (localhost) endpoint to execute WPS requests are saved during deployment."""
         process_name = self.fully_qualified_test_process_name()
@@ -336,50 +309,84 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert isinstance(process_wps_endpoint, six.string_types) and len(process_wps_endpoint)
         assert process_wps_endpoint == weaver_wps_path
 
+    @staticmethod
+    def assert_deployed_wps2(response_json):
+        wps2_process = "{}_{}".format(urlparse(MOCK_REMOTE_SERVER_URL).hostname, TEST_REMOTE_PROCESS_WPS2)
+        assert response_json["process"]["id"] == wps2_process
+        assert len(response_json["process"]["inputs"]) == 1
+
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_DockerRequirement_href(self):
         raise NotImplementedError
-        process_name = self.fully_qualified_test_process_name()
         body = {"processDescription": {"href": ""}}
 
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_DockerRequirement_owsContext(self):
         raise NotImplementedError
 
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_DockerRequirement_executionUnit(self):
         raise NotImplementedError
 
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_WPS1Requirement_href(self):
         raise NotImplementedError
 
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_WPS1Requirement_owsContext(self):
         raise NotImplementedError
 
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_WPS1Requirement_executionUnit(self):
         raise NotImplementedError
 
+    @mock_remote_server_requests_wp1
     def test_deploy_process_WPS1_DescribeProcess_href(self):
-        body = {"processDescription": {"href": ""}}
+        body = {
+            "processDescription": {
+                "href": TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL  # this one should be used
+            },
+            "executionUnit": [
+                {"href": MOCK_REMOTE_SERVER_URL}  # another URL just to ensure WPS-1 DescribeProcess is used
+            ]
+        }
+        resp = self.app.post_json("/processes", params=body, headers=self.json_headers)
+        assert resp.status_code == 201
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
 
+        resp = self.app.get("/processes/{}".format(TEST_REMOTE_PROCESS_WPS1), headers=self.json_headers)
+        assert resp.status_code == 200
+        self.assert_deployed_wps2(resp.json)
+
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_WPS1_DescribeProcess_owsContext(self):
         raise NotImplementedError
 
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_WPS1_DescribeProcess_executionUnit(self):
         raise NotImplementedError
 
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_WPS1_GetCapabilities_href(self):
         raise NotImplementedError
 
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_WPS1_GetCapabilities_owsContext(self):
         raise NotImplementedError
 
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_WPS1_GetCapabilities_executionUnit(self):
         raise NotImplementedError
 
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_WPS2_DescribeProcess_href(self):
         raise NotImplementedError
 
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_WPS2_DescribeProcess_owsContext(self):
         raise NotImplementedError
 
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_WPS2_DescribeProcess_executionUnit(self):
         raise NotImplementedError
 
@@ -387,7 +394,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         uri = "/processes/{}".format(self.process_public.identifier)
         resp = self.app.delete_json(uri, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == self.json_app
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
         assert resp.json['identifier'] == self.process_public.identifier
         assert isinstance(resp.json['undeploymentDone'], bool) and resp.json['undeploymentDone']
         with pytest.raises(ProcessNotFound):
@@ -397,20 +404,21 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         uri = "/processes/{}".format(self.process_private.identifier)
         resp = self.app.delete_json(uri, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 401
-        assert resp.content_type == self.json_app
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_delete_process_not_found(self):
         uri = "/processes/{}".format(self.fully_qualified_test_process_name())
         resp = self.app.delete_json(uri, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
-        assert resp.content_type == self.json_app
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_delete_process_bad_name(self):
         uri = "/processes/{}".format(self.fully_qualified_test_process_name() + "...")
         resp = self.app.delete_json(uri, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400
-        assert resp.content_type == self.json_app
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
 
+    @ignore_deprecated_nested_warnings
     def test_execute_process_success(self):
         uri = "/processes/{}/jobs".format(self.process_public.identifier)
         data = self.get_process_execute_template()
@@ -421,7 +429,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         with nested(*mock_execute):
             resp = self.app.post_json(uri, params=data, headers=self.json_headers)
             assert resp.status_code == 201
-            assert resp.content_type == self.json_app
+            assert resp.content_type == CONTENT_TYPE_APP_JSON
             assert resp.json['location'].endswith(resp.json['jobID'])
             assert resp.headers['Location'] == resp.json['location']
             try:
@@ -435,7 +443,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         uri = "/processes/{}/jobs".format(self.process_public.identifier)
         resp = self.app.post_json(uri, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400
-        assert resp.content_type == self.json_app
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_execute_process_missing_required_params(self):
         execute_data = self.get_process_execute_template(fully_qualified_name(self))
@@ -455,8 +463,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             resp = self.app.post_json(uri, params=exec_data, headers=self.json_headers, expect_errors=True)
             msg = "Failed with test variation `{}` with value `{}`."
             assert resp.status_code in [400, 422], msg.format(i, resp.status_code)
-            assert resp.content_type == self.json_app, msg.format(i, resp.content_type)
+            assert resp.content_type == CONTENT_TYPE_APP_JSON, msg.format(i, resp.content_type)
 
+    @ignore_deprecated_nested_warnings
     def test_execute_process_no_error_not_required_params(self):
         """
         Optional parameters for execute job shouldn't raise an error if omitted,
@@ -489,7 +498,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         uri = "/processes/{}/jobs".format(self.process_public.identifier)
         resp = self.app.post_json(uri, params=execute_data, headers=self.json_headers, expect_errors=True)
         assert resp.status_code in 501
-        assert resp.content_type == self.json_app
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     @pytest.mark.xfail(reason="Mode '{}' not supported for job execution.".format(EXECUTE_TRANSMISSION_MODE_VALUE))
     @unittest.expectedFailure
@@ -499,14 +508,14 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         uri = "/processes/{}/jobs".format(self.process_public.identifier)
         resp = self.app.post_json(uri, params=execute_data, headers=self.json_headers, expect_errors=True)
         assert resp.status_code in 501
-        assert resp.content_type == self.json_app
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_execute_process_not_visible(self):
         uri = "/processes/{}/jobs".format(self.process_private.identifier)
         data = self.get_process_execute_template()
         resp = self.app.post_json(uri, params=data, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 401
-        assert resp.content_type == self.json_app
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_get_process_visibility_success(self):
         for wps_process in [self.process_private, self.process_public]:
@@ -514,14 +523,14 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             uri = "/processes/{}/visibility".format(process.identifier)
             resp = self.app.get(uri, headers=self.json_headers)
             assert resp.status_code == 200
-            assert resp.content_type == self.json_app
+            assert resp.content_type == CONTENT_TYPE_APP_JSON
             assert resp.json['value'] == process.visibility
 
     def test_get_process_visibility_not_found(self):
         uri = "/processes/{}/visibility".format(self.fully_qualified_test_process_name())
         resp = self.app.get(uri, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
-        assert resp.content_type == self.json_app
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_set_process_visibility_success(self):
         test_process = self.process_private.identifier
@@ -536,7 +545,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         data = {'value': VISIBILITY_PUBLIC}
         resp = self.app.put_json(uri_visibility, params=data, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == self.json_app
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
         assert resp.json['value'] == VISIBILITY_PUBLIC
 
         # validate now visible and found
@@ -548,7 +557,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         data = {'value': VISIBILITY_PRIVATE}
         resp = self.app.put_json(uri_visibility, params=data, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.content_type == self.json_app
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
         assert resp.json['value'] == VISIBILITY_PRIVATE
 
         # validate cannot be found anymore
@@ -571,10 +580,10 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         for data in test_data:
             resp = self.app.put_json(uri, params=data, headers=self.json_headers, expect_errors=True)
             assert resp.status_code in [400, 422]
-            assert resp.content_type == self.json_app
+            assert resp.content_type == CONTENT_TYPE_APP_JSON
 
         # bad method POST
         data = {'value': VISIBILITY_PUBLIC}
         resp = self.app.post_json(uri, params=data, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 405
-        assert resp.content_type == self.json_app
+        assert resp.content_type == CONTENT_TYPE_APP_JSON

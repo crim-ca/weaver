@@ -3,7 +3,7 @@ OWSExceptions are based on pyramid.httpexceptions.
 
 See also: https://github.com/geopython/pywps/blob/master/pywps/exceptions.py
 """
-
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_XML
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 # noinspection PyPackageRequirements
 from zope.interface import implementer
@@ -98,12 +98,11 @@ class OWSException(Response, Exception):
             accept_value = environ.get('HTTP_ACCEPT', '')
             accept = create_accept_header(accept_value)
 
-            # Attempt to match text/xml or application/json, if those don't
-            # match, we will fall through to defaulting to text/xml
-            match = accept.best_match(['text/xml', 'application/json'])
+            # Attempt to match xml or json, if those don't match, we will fall through to defaulting to xml
+            match = accept.best_match([CONTENT_TYPE_TEXT_XML, CONTENT_TYPE_APP_JSON])
 
-            if match == 'application/json':
-                self.content_type = 'application/json'
+            if match == CONTENT_TYPE_APP_JSON:
+                self.content_type = CONTENT_TYPE_APP_JSON
 
                 # json exception response should not have status 200
                 if self.status_code == HTTPOk.code:
@@ -121,7 +120,7 @@ class OWSException(Response, Exception):
                 page_template = JsonPageTemplate(self)
 
             else:
-                self.content_type = 'text/xml'
+                self.content_type = CONTENT_TYPE_TEXT_XML
                 page_template = self.page_template
 
             args = {

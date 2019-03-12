@@ -1,0 +1,60 @@
+<wps:Capabilities
+        xmlns:gml="http://www.opengis.net/gml"
+        xmlns:ows="http://www.opengis.net/ows/1.1"
+        xmlns:wps="http://www.opengis.net/wps/1.0.0"
+        xmlns:xlink="http://www.w3.org/1999/xlink"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/wps/1.0.0/wpsGetCapabilities_response.xsd"
+        service="WPS" version="1.0.0" xml:lang="en-US"
+        updateSequence="1">
+    <ows:ServiceIdentification>
+        <ows:Title>Mock Remote Server</ows:Title>
+        <ows:Abstract>Testing</ows:Abstract>
+        <ows:Keywords>
+            <ows:Keyword>Testing</ows:Keyword>
+            <ows:Keyword>Mock</ows:Keyword>
+        </ows:Keywords>
+        <ows:ServiceType>WPS</ows:ServiceType>
+        <ows:ServiceTypeVersion>1.0.0</ows:ServiceTypeVersion>
+        <ows:Fees>NONE</ows:Fees>
+        <ows:AccessConstraints>NONE</ows:AccessConstraints>
+    </ows:ServiceIdentification>
+    <ows:ServiceProvider>
+        <ows:ProviderName>Testing</ows:ProviderName>
+        <ows:ProviderSite xlink:href="https://remote-server.com" />
+        <ows:ServiceContact>
+            <ows:IndividualName>Test, Mock</ows:IndividualName>
+            <ows:PositionName>Mock Testing</ows:PositionName>
+            <ows:ContactInfo>
+                <ows:Phone><ows:Voice>+xx-xxx-xxx-xxxx</ows:Voice></ows:Phone>
+                <ows:Address>
+                    <ows:AdministrativeArea>Administrative Area</ows:AdministrativeArea>
+                    <ows:PostalCode>Zip or Postal Code</ows:PostalCode>
+                    <ows:ElectronicMailAddress>Email Address</ows:ElectronicMailAddress>
+                </ows:Address>
+                <ows:OnlineResource xlink:href="Contact URL" />
+                <ows:HoursOfService>0:00-24:00</ows:HoursOfService>
+                <ows:ContactInstructions>During hours of service. Off on weekends.</ows:ContactInstructions>
+            </ows:ContactInfo>
+            <ows:Role>pointOfContact</ows:Role>
+        </ows:ServiceContact>
+    </ows:ServiceProvider>
+    <ows:OperationsMetadata>
+        <ows:Operation name="GetCapabilities"><ows:DCP></ows:Operation>
+        <ows:Operation name="DescribeProcess"><ows:DCP></ows:Operation>
+        <ows:Operation name="Execute"><ows:DCP></ows:Operation>
+    </ows:OperationsMetadata>
+    <wps:ProcessOfferings>
+        <wps:Process wps:processVersion="0.5">
+            <ows:Identifier>test-remote-process-wps1</ows:Identifier>
+        </wps:Process>
+    </wps:ProcessOfferings>
+    <wps:Languages>
+        <wps:Default>
+            <ows:Language>en-US</ows:Language>
+        </wps:Default>
+        <wps:Supported>
+            <ows:Language>en-US</ows:Language>
+        </wps:Supported>
+    </wps:Languages>
+</wps:Capabilities>

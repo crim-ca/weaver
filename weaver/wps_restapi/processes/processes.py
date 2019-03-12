@@ -9,6 +9,7 @@ from weaver.execute import (
     EXECUTE_RESPONSE_DOCUMENT,
     EXECUTE_TRANSMISSION_MODE_REFERENCE,
 )
+from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes import wps_package, opensearch
 from weaver.processes.utils import jsonify_output, convert_process_wps_to_db, deploy_process_from_payload
@@ -49,7 +50,6 @@ from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
 from pyramid.request import Request
 from lxml import etree
-from copy import deepcopy
 from typing import TYPE_CHECKING
 import requests
 import colander
@@ -221,8 +221,8 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
     # type: (Request, AnyStr, bool, Optional[AnyStr]) -> HTTPSuccessful
 
     # validate body with expected JSON content and schema
-    if 'application/json' not in request.content_type:
-        raise HTTPBadRequest("Request 'Content-Type' header other than 'application/json' not supported.")
+    if CONTENT_TYPE_APP_JSON not in request.content_type:
+        raise HTTPBadRequest("Request 'Content-Type' header other than '{}' not supported.".format(CONTENT_TYPE_APP_JSON))
     try:
         json_body = request.json_body
     except Exception as ex:
@@ -406,10 +406,7 @@ def add_local_process(request):
     """
     Register a local process.
     """
-    # use deepcopy of body payload to avoid circular dependencies when writing to mongodb
-    # and before parsing it because the body is altered by some pop operations
-    payload = deepcopy(request.json)
-    return deploy_process_from_payload(payload, request)
+    return deploy_process_from_payload(request.json, request)
 
 
 def get_process(request):

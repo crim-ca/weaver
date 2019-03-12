@@ -1,4 +1,5 @@
 from weaver.wps import get_wps_output_path, get_wps_output_url
+from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.utils import get_cookie_headers
 from pyramid_celery import celery_app as app
 from pyramid.settings import asbool
@@ -39,7 +40,7 @@ class WpsProcessInterface(object):
         # type: (WPSRequest) -> None
         self.request = request
         self.cookies = get_cookie_headers(self.request.http_request.headers)
-        self.headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
+        self.headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
 
         registry = app.conf['PYRAMID_REGISTRY']
         self.settings = registry.settings

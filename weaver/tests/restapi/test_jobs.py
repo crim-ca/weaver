@@ -1,19 +1,3 @@
-# noinspection PyPackageRequirements
-import mock
-# noinspection PyPackageRequirements
-import webtest
-import unittest
-import warnings
-import json
-import pyramid.testing
-import six
-from collections import OrderedDict
-# noinspection PyDeprecation
-from contextlib import nested
-from typing import AnyStr, Tuple, List, Union
-from owslib.wps import WebProcessingService, Process as ProcessOWSWPS
-# noinspection PyPackageRequirements
-from pywps.app import Process as ProcessPyWPS
 from weaver.wps_restapi.swagger_definitions import (
     jobs_short_uri,
     jobs_full_uri,
@@ -26,6 +10,7 @@ from weaver.tests.utils import (
     setup_mongodb_jobstore,
 )
 from weaver.datatype import Service, Job
+from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
 from weaver.warning import TimeZoneInfoAlreadySetWarning
@@ -36,6 +21,23 @@ from weaver.status import (
     STATUS_FAILED,
     STATUS_CATEGORY_FINISHED,
 )
+from weaver.tests.utils import ignore_deprecated_nested_warnings
+from collections import OrderedDict
+# noinspection PyDeprecation
+from contextlib import nested
+from typing import AnyStr, Tuple, List, Union
+from owslib.wps import WebProcessingService, Process as ProcessOWSWPS
+# noinspection PyPackageRequirements
+from pywps.app import Process as ProcessPyWPS
+# noinspection PyPackageRequirements
+import mock
+# noinspection PyPackageRequirements
+import webtest
+import unittest
+import warnings
+import json
+import pyramid.testing
+import six
 
 
 class WpsRestApiJobsTest(unittest.TestCase):
@@ -48,7 +50,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         cls.config.include('weaver.tweens')
         cls.config.registry.settings['weaver.url'] = "localhost"
         cls.config.scan()
-        cls.json_headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
+        cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
         cls.app = webtest.TestApp(cls.config.make_wsgi_app())
 
     @classmethod
@@ -163,7 +165,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
     @staticmethod
     def check_basic_jobs_info(response):
         assert response.status_code == 200
-        assert response.content_type == 'application/json'
+        assert response.content_type == CONTENT_TYPE_APP_JSON
         assert 'jobs' in response.json and isinstance(response.json['jobs'], list)
         assert 'page' in response.json and isinstance(response.json['page'], int)
         assert 'count' in response.json and isinstance(response.json['count'], int)
@@ -230,43 +232,43 @@ class WpsRestApiJobsTest(unittest.TestCase):
         path = process_jobs_uri.format(process_id='unknown-process-id')
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
-        assert resp.content_type == 'application/json'
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_get_jobs_process_unknown_in_query(self):
         path = self.add_params(jobs_short_uri, process='unknown-process-id')
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
-        assert resp.content_type == 'application/json'
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_get_jobs_private_process_unauthorized_in_path(self):
         path = process_jobs_uri.format(process_id=self.process_private.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 401
-        assert resp.content_type == 'application/json'
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_get_jobs_private_process_not_returned_in_query(self):
         path = self.add_params(jobs_short_uri, process=self.process_private.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 401
-        assert resp.content_type == 'application/json'
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_get_jobs_service_and_process_unknown_in_path(self):
         path = jobs_full_uri.format(provider_id='unknown-service-id', process_id='unknown-process-id')
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
-        assert resp.content_type == 'application/json'
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_get_jobs_service_and_process_unknown_in_query(self):
         path = self.add_params(jobs_short_uri, service='unknown-service-id', process='unknown-process-id')
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
-        assert resp.content_type == 'application/json'
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_get_jobs_private_service_public_process_unauthorized_in_path(self):
         path = jobs_full_uri.format(provider_id=self.service_private.name, process_id=self.process_public.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 401
-        assert resp.content_type == 'application/json'
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_get_jobs_private_service_public_process_unauthorized_in_query(self):
         path = self.add_params(jobs_short_uri,
@@ -274,8 +276,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
                                process=self.process_public.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 401
-        assert resp.content_type == 'application/json'
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
 
+    @ignore_deprecated_nested_warnings
     def test_get_jobs_public_service_private_process_unauthorized_in_query(self):
         """
         NOTE:
@@ -289,8 +292,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
         with nested(*self.get_job_remote_service_mock([self.process_private])):     # process visible on remote
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 200
-            assert resp.content_type == 'application/json'
+            assert resp.content_type == CONTENT_TYPE_APP_JSON
 
+    @ignore_deprecated_nested_warnings
     def test_get_jobs_public_service_no_processes(self):
         """
         NOTE:
@@ -304,8 +308,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
         with nested(*self.get_job_remote_service_mock([])):         # process invisible (not returned by remote)
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 404
-            assert resp.content_type == 'application/json'
+            assert resp.content_type == CONTENT_TYPE_APP_JSON
 
+    @ignore_deprecated_nested_warnings
     def test_get_jobs_public_with_access_and_request_user(self):
         """Verifies that corresponding processes are returned when proper access/user-id are respected."""
         uri_direct_jobs = jobs_short_uri

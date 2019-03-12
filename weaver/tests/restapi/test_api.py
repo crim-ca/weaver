@@ -1,4 +1,4 @@
-from pyramid.httpexceptions import HTTPFound, HTTPUnauthorized, HTTPForbidden
+from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.wps_restapi.swagger_definitions import (
     api_frontpage_uri,
     api_versions_uri,
@@ -10,6 +10,7 @@ from weaver.wps_restapi.swagger_definitions import (
     VersionsSchema,
 )
 from weaver.tests.utils import get_test_weaver_app, get_test_weaver_config, get_settings_from_testapp
+from pyramid.httpexceptions import HTTPFound, HTTPUnauthorized, HTTPForbidden
 import colander
 import unittest
 # noinspection PyPackageRequirements
@@ -22,8 +23,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.testapp = get_test_weaver_app(settings=None)
-        cls.json_app = 'application/json'
-        cls.json_headers = {'Accept': cls.json_app, 'Content-Type': cls.json_app}
+        cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
 
     def test_frontpage_format(self):
         resp = self.testapp.get(api_frontpage_uri, headers=self.json_headers)
@@ -92,8 +92,7 @@ class RebasedApiRoutesTestCase(unittest.TestCase):
         config.add_view(cls.redirect_api_view, route_name=cls.api_base_name)
 
         cls.testapp = get_test_weaver_app(config)
-        cls.json_app = 'application/json'
-        cls.json_headers = {'Accept': cls.json_app, 'Content-Type': cls.json_app}
+        cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
 
     def test_swagger_api_request_base_path_proxied(self):
         """
@@ -101,7 +100,7 @@ class RebasedApiRoutesTestCase(unittest.TestCase):
         when the app's URI results from a proxy pass redirect under another route.
         """
         # setup environment that would define the new weaver location for the proxy pass
-        weaver_server_host = get_settings_from_testapp(self.testapp).get('weaver.url')
+        weaver_server_host = get_settings_from_testapp(self.testapp).get('weaver.url', '')
         weaver_server_url = weaver_server_host + self.api_base_path
         with mock.patch.dict('os.environ', {'WEAVER_URL': weaver_server_url}):
             resp = self.testapp.get(self.api_base_path, headers=self.json_headers)

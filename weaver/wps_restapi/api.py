@@ -2,7 +2,8 @@ from weaver.__meta__ import __version__ as weaver_version
 from weaver.utils import get_settings, get_header
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.colander_one_of import CustomTypeConversionDispatcher
-from weaver.wps_restapi.utils import wps_restapi_base_url, wps_restapi_base_path, CONTENT_TYPE_JSON
+from weaver.wps_restapi.utils import wps_restapi_base_url, wps_restapi_base_path
+from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.owsexceptions import OWSException
 from six.moves.urllib.parse import urlparse
 from cornice_swagger import CorniceSwagger
@@ -120,8 +121,8 @@ def ows_json_format(function):
     def format_response_details(response, request):
         # type: (Response, Request) -> HTTPException
         http_response = function(request)
-        if any([CONTENT_TYPE_JSON in get_header('Content-Type', http_response.headers),
-                CONTENT_TYPE_JSON in get_header('Accept', request.headers)]):
+        if any([CONTENT_TYPE_APP_JSON in get_header("Content-Type", http_response.headers),
+                CONTENT_TYPE_APP_JSON in get_header("Accept", request.headers)]):
             body = OWSException.json_formatter(http_response.status, response.message or '',
                                                http_response.title, request.environ)
             body['detail'] = get_request_info(request)

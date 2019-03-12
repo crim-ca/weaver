@@ -488,7 +488,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         sort_order = DESCENDING if sort == SORT_FINISHED or sort == SORT_CREATED else ASCENDING
         sort_criteria = [(sort, sort_order)]
         found = self.collection.find(search_filters)
-        count = found.count()
+        count = self.collection.count_documents(search_filters)
         items = [Job(item) for item in list(found.skip(page * limit).limit(limit).sort(sort_criteria))]
         return items, count
 
