@@ -1,11 +1,15 @@
 {
     "process": {
+        "id": "test-remote-process-wps2",
+        "keywords": [],
+        "title": "Test Remote Process WPS2",
+        "abstract": "Testing WPS-2 dummy remote process description.",
         "inputs": [
             {
-                "keywords": [],
+                "id": "input-1",
                 "maxOccurs": "1",
-                "id": "url",
                 "minOccurs": "1",
+                "keywords": [],
                 "formats": [
                     {
                         "mimeType": "text/plain",
@@ -14,33 +18,29 @@
                 ]
             }
         ],
-        "title": "Catalog Search for Thredds URLs",
         "outputs": [
             {
+                "id": "output",
+                "title": "The output",
                 "minOccurs": "1",
-                "title": "JSON file with Catalog URLs",
                 "maxOccurs": "1",
+                "keywords": [],
                 "formats": [
                     {
                         "mimeType": "application/json",
-                        "default": false
+                        "default": true
                     }
-                ],
-                "keywords": [],
-                "id": "output"
+                ]
             }
         ],
-        "abstract": "Get files url from Thredds Catalog and provides file list as JSON Document.",
         "owsContext": {
             "offering": {
                 "content": {
-                    "href": "catalog_search.cwl"
+                    "href": "test-remote-process.cwl"
                 }
             }
         },
-        "keywords": [],
-        "executeEndpoint": "https://localhost:4000/processes/CatalogSearch/jobs",
-        "id": "CatalogSearch"
+        "executeEndpoint": "https://remote-server.com/processes/test-remote-process-wps2/jobs"
     },
     "outputTransmission": [
         "reference"

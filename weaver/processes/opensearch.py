@@ -599,11 +599,6 @@ def modified_collection_identifiers(eo_image_identifiers):
 
 
 def get_data_source(collection_id):
-    """
-
-    :param collection_id:
-
-    """
     data_sources = fetch_data_sources()
     for source_data in data_sources.values():
         try:
@@ -615,34 +610,26 @@ def get_data_source(collection_id):
     try:
         return data_sources["opensearchdefault"]
     except KeyError:
-        message = "No osdd url found in data sources for collection id:" + collection_id
-        raise ValueError(message)
+        raise ValueError("No OSDD URL found in data sources for collection ID '{}'".format(collection_id))
 
 
 def get_eo_images_ids_from_payload(payload):
-    """
-
-    :param payload:
-
-    """
     return [get_any_id(i) for i in get_eo_images_inputs_from_payload(payload)]
 
 
 def replace_inputs_describe_process(inputs, payload):
     # type: (List[Dict], Dict) -> List[Dict]
     """
-    Replace EOImage inputs (additionalParameter -> EOImage -> true) with
-    OpenSearch query parameters
-
-    :param inputs:
-    :param payload:
+    Replace ``EOImage`` inputs (if ``additionalParameter -> EOImage -> true``) with `OpenSearch` query parameters.
     """
-    if not payload:
+    if not isinstance(payload, dict):
         return inputs
 
+    payload_process = payload.get("processDescription", {}).get("process", {})
+    process_inputs = payload_process.get("inputs", {})
+
     # add "additionalParameters" property from the payload
-    process = payload["processDescription"]["process"]
-    payload_inputs = {get_any_id(i): i for i in process.get("inputs", {})}
+    payload_inputs = {get_any_id(i): i for i in process_inputs}
     for i in inputs:
         # noinspection PyBroadException
         try:
@@ -651,7 +638,7 @@ def replace_inputs_describe_process(inputs, payload):
         except Exception:
             pass
 
-    additional_parameters = get_additional_parameters(process)
+    additional_parameters = get_additional_parameters(payload_process)
 
     unique_toi, unique_aoi = True, True  # by default
     if additional_parameters:
@@ -669,9 +656,5 @@ def replace_inputs_describe_process(inputs, payload):
 
 
 def _make_specific_identifier(param_name, identifier):
-    """
-    Only adds an underscore between the parameters
-    :param param_name:
-    :param identifier:
-    """
+    """Only adds an underscore between the parameters."""
     return "{}_{}".format(param_name, identifier)

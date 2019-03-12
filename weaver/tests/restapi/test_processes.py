@@ -7,7 +7,7 @@ from weaver.execute import (
     EXECUTE_TRANSMISSION_MODE_VALUE,
     EXECUTE_TRANSMISSION_MODE_REFERENCE,
 )
-from weaver.formats import CONTENT_TYPE_APP_XML, CONTENT_TYPE_APP_JSON
+from weaver.formats import CONTENT_TYPE_APP_XML, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import STATUS_ACCEPTED
 from weaver.tests.utils import (
@@ -20,7 +20,6 @@ from weaver.tests.utils import (
 from weaver.utils import fully_qualified_name
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
 from weaver.wps import get_wps_url
-from six.moves.urllib.parse import urlparse
 from copy import deepcopy
 # noinspection PyDeprecation
 from contextlib import nested
@@ -37,23 +36,24 @@ import pyramid.testing
 import six
 import os
 
-MOCK_REMOTE_SERVER_URL = "https://remote-server.com"
-TEST_REMOTE_PROCESS_WPS1 = "test-remote-process-wps1"
-TEST_REMOTE_PROCESS_WPS2 = "test-remote-process-wps2"
+# simulated remote server with remote processes (mocked with `responses` package)
+TEST_REMOTE_SERVER_URL = "https://remote-server.com"
+TEST_REMOTE_PROCESS_WPS1_ID = "test-remote-process-wps1"
+TEST_REMOTE_PROCESS_WPS2_ID = "test-remote-process-wps2"
 TEST_REMOTE_PROCESS_ROOT = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources")
 TEST_REMOTE_PROCESS_GETCAP_WPS1_FILE = os.path.join(TEST_REMOTE_PROCESS_ROOT, "test_describe_process_wps1.xml")
 TEST_REMOTE_PROCESS_GETCAP_WPS1_URL = "{}/wps?service=WPS&request=GetCapabilities&version=1.0.0" \
-                                      .format(MOCK_REMOTE_SERVER_URL)
+                                      .format(TEST_REMOTE_SERVER_URL)
 TEST_REMOTE_PROCESS_DESCRIBE_WPS1_FILE = os.path.join(TEST_REMOTE_PROCESS_ROOT, "test_describe_process_wps1.xml")
 TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL = "{}/wps?service=WPS&request=DescribeProcess&identifier={}&version=1.0.0" \
-                                        .format(MOCK_REMOTE_SERVER_URL, TEST_REMOTE_PROCESS_WPS1)
+                                        .format(TEST_REMOTE_SERVER_URL, TEST_REMOTE_PROCESS_WPS1_ID)
 TEST_REMOTE_PROCESS_WPS2_FILE = os.path.join(TEST_REMOTE_PROCESS_ROOT, "test_describe_process_wps2.json")
 
 
 def mock_remote_server_requests_wp1(test):
     # noinspection PyUnresolvedReferences, PyUnusedLocal
     def mock_requests_wps1(*args, **kwargs):
-        """Mock ``requests`` responses fetching ``MOCK_REMOTE_SERVER_URL`` WPS reference."""
+        """Mock ``requests`` responses fetching ``TEST_REMOTE_SERVER_URL`` WPS reference."""
         xml_header = {"Content-Type": CONTENT_TYPE_APP_XML}
         with responses.RequestsMock(assert_all_requests_are_fired=False) as mock_resp:
             with open(TEST_REMOTE_PROCESS_DESCRIBE_WPS1_FILE, 'r') as f:
@@ -310,10 +310,22 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert process_wps_endpoint == weaver_wps_path
 
     @staticmethod
-    def assert_deployed_wps2(response_json):
-        wps2_process = "{}_{}".format(urlparse(MOCK_REMOTE_SERVER_URL).hostname, TEST_REMOTE_PROCESS_WPS2)
-        assert response_json["process"]["id"] == wps2_process
+    def assert_deployed_wps2(response_json, expected_process_id):
+        assert expected_process_id in response_json["process"]["id"]
         assert len(response_json["process"]["inputs"]) == 1
+        assert response_json["process"]["inputs"][0]["id"] == "input-1"
+        assert response_json["process"]["inputs"][0]["minOccurs"] == "1"    # TODO: adjust `int` according to spec
+        assert response_json["process"]["inputs"][0]["maxOccurs"] == "1"    # TODO: adjust `int` according to spec
+        assert isinstance(response_json["process"]["inputs"][0]["formats"], list)
+        assert len(response_json["process"]["inputs"][0]["formats"]) == 1
+        assert response_json["process"]["inputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert len(response_json["process"]["outputs"]) == 1
+        assert response_json["process"]["outputs"][0]["id"] == "output"
+        assert response_json["process"]["outputs"][0]["minOccurs"] == "1"  # TODO: adjust `int` according to spec
+        assert response_json["process"]["outputs"][0]["maxOccurs"] == "1"  # TODO: adjust `int` according to spec
+        assert isinstance(response_json["process"]["outputs"][0]["formats"], list)
+        assert len(response_json["process"]["outputs"][0]["formats"]) == 1
+        assert response_json["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
 
     @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_DockerRequirement_href(self):
@@ -347,16 +359,23 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 "href": TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL  # this one should be used
             },
             "executionUnit": [
-                {"href": MOCK_REMOTE_SERVER_URL}  # another URL just to ensure WPS-1 DescribeProcess is used
+                {"href": TEST_REMOTE_SERVER_URL}  # another URL just to ensure WPS-1 DescribeProcess is used
             ]
         }
         resp = self.app.post_json("/processes", params=body, headers=self.json_headers)
-        assert resp.status_code == 201
+        assert resp.status_code == 200  # TODO: status should be 201 when properly modified to match API conformance
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
-        resp = self.app.get("/processes/{}".format(TEST_REMOTE_PROCESS_WPS1), headers=self.json_headers)
+        # apply visibility to allow retrieval
+        proc_id = resp.json["processSummary"]["id"]  # process id could have been cleaned up
+        proc_url = "/processes/{}".format(proc_id)
+        body = {"value": VISIBILITY_PUBLIC}
+        resp = self.app.put_json("{}/visibility".format(proc_url), params=body, headers=self.json_headers)
         assert resp.status_code == 200
-        self.assert_deployed_wps2(resp.json)
+
+        resp = self.app.get(proc_url, headers=self.json_headers)
+        assert resp.status_code == 200
+        self.assert_deployed_wps2(resp.json, TEST_REMOTE_PROCESS_WPS1_ID)
 
     @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_WPS1_DescribeProcess_owsContext(self):

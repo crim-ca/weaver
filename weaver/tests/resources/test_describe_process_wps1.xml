@@ -9,7 +9,7 @@
     <ProcessDescription wps:processVersion="0.5" storeSupported="true" statusSupported="true">
         <ows:Identifier>test-remote-process-wps1</ows:Identifier>
         <ows:Title>Test Remote Process WPS1</ows:Title>
-        <ows:Abstract>Test Remote Process WPS1</ows:Abstract>
+        <ows:Abstract>Testing WPS-1 dummy remote process description.</ows:Abstract>
         <ows:Metadata
             xlink:href="https://github.com/crim-ca/weaver"
             xlink:title="Weaver"

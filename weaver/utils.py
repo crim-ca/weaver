@@ -372,7 +372,7 @@ def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_in
     if len(name) < min_len:
         return None
     if replace_invalid:
-        max_len = max_len or 25
+        max_len = max_len or 64
         name = re.sub(r"[^a-zA-Z0-9_\-]", "_", name.lower()[:max_len])
     return name
 

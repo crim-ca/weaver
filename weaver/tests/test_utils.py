@@ -277,7 +277,7 @@ def test_map_status_pywps_back_and_forth():
 
 
 def test_get_sane_name_replace():
-    kw = {'assert_invalid': False, 'replace_invalid': True}
+    kw = {'assert_invalid': False, 'replace_invalid': True, 'max_len': 25}
     assert utils.get_sane_name("Hummingbird", **kw) == "hummingbird"
     assert utils.get_sane_name("MapMint Demo Instance", **kw) == "mapmint_demo_instance"
     assert utils.get_sane_name(None, **kw) is None
@@ -307,7 +307,7 @@ def test_assert_sane_name():
     test_cases_valid = [
         "Hummingbird",
         "short",
-        "a_very_long_name_for_this_test_is_ok_if_maxlen_is_none",
+        "a_very_long_name_for_this_test_is_ok_if_max_len_is_none",
         "AlTeRnAtInG_cApS"
         "middle-dashes-are-ok",
         "underscores_also_ok",

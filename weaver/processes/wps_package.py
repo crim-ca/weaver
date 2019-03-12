@@ -1120,6 +1120,7 @@ def get_process_definition(process_offering, reference=None, package=None, data_
         raise PackageRegistrationError(
             "Simultaneous parameters [package, reference] not allowed.")
 
+    process_info = process_offering
     if reference:
         package, process_info = _generate_process_with_cwl_from_reference(reference)
         process_info.update(process_offering)   # override upstream details
@@ -1148,7 +1149,7 @@ def get_process_definition(process_offering, reference=None, package=None, data_
         reason="Merging of inputs/outputs")
 
     # obtain any retrieved process id if not already provided from upstream process offering, and clean it
-    process_id = get_sane_name(get_any_id(process_offering), assert_invalid=False, replace_invalid=True)
+    process_id = get_sane_name(get_any_id(process_info), assert_invalid=False, replace_invalid=True)
     if not process_id:
         raise PackageRegistrationError("Could not retrieve any process identifier.")
 

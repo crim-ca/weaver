@@ -30,7 +30,50 @@ if TYPE_CHECKING:
     from typing import Any, AnyStr, Dict, List, Optional, Union
 
 
-class Service(dict):
+class Base(dict):
+    """
+    Dictionary with extended attributes auto-``getter``/``setter`` for convenience.
+    Explicitly overridden ``getter``/``setter`` attributes are called instead of ``dict``-key ``get``/``set``-item
+    to ensure corresponding checks and/or value adjustments are executed before applying it to the sub-``dict``.
+    """
+    def __setattr__(self, item, value):
+        # use the existing property setter if defined
+        prop = getattr(type(self), item)
+        if isinstance(prop, property) and prop.fset is not None:
+            # noinspection PyArgumentList
+            prop.fset(self, value)
+        elif item in self:
+            self[item] = value
+        else:
+            raise AttributeError("Can't set attribute '{}'.".format(item))
+
+    def __getattr__(self, item):
+        # use existing property getter if defined
+        prop = getattr(type(self), item)
+        if isinstance(prop, property) and prop.fget is not None:
+            # noinspection PyArgumentList
+            return prop.fget(self, item)
+        elif item in self:
+            return self[item]
+        else:
+            raise AttributeError("Can't get attribute '{}'.".format(item))
+
+    def __str__(self):
+        # type: (...) -> AnyStr
+        return "{0} <{1}>".format(type(self).__name__, self.id)
+
+    def __repr__(self):
+        # type: (...) -> AnyStr
+        cls = type(self)
+        repr_ = dict.__repr__(self)
+        return '{0}.{1} ({2})'.format(cls.__module__, cls.__name__, repr_)
+
+    @property
+    def id(self):
+        raise NotImplementedError()
+
+
+class Service(Base):
     """
     Dictionary that contains OWS services. It always has ``'url'`` key.
     """
@@ -41,6 +84,10 @@ class Service(dict):
             raise TypeError("Service 'name' is required")
         if 'url' not in self:
             raise TypeError("Service 'url' is required")
+
+    @property
+    def id(self):
+        return self.name
 
     @property
     def url(self):
@@ -77,16 +124,8 @@ class Service(dict):
             'public': self.public,
             'auth': self.auth}
 
-    def __str__(self):
-        return self.name
 
-    def __repr__(self):
-        cls = type(self)
-        repr_ = dict.__repr__(self)
-        return '{0}.{1}({2})'.format(cls.__module__, cls.__name__, repr_)
-
-
-class Job(dict):
+class Job(Base):
     """
     Dictionary that contains OWS service jobs. It always has ``'id'`` and ``task_id`` keys.
     """
@@ -437,18 +476,8 @@ class Job(dict):
             'response': self.response,
         }
 
-    def __str__(self):
-        # type: (...) -> AnyStr
-        return 'Job <{}>'.format(self.id)
 
-    def __repr__(self):
-        # type: (...) -> AnyStr
-        cls = type(self)
-        repr_ = dict.__repr__(self)
-        return '{0}.{1}({2})'.format(cls.__module__, cls.__name__, repr_)
-
-
-class Process(dict):
+class Process(Base):
     """
     Dictionary that contains a process description for db storage.
     It always has ``'identifier'`` and ``processEndpointWPS1`` keys.
@@ -465,12 +494,6 @@ class Process(dict):
             raise TypeError("'processEndpointWPS1' is required")
         if 'package' not in self:
             raise TypeError("'package' is required")
-
-    def __setattr__(self, item, value):
-        if item in self:
-            self[item] = value
-        else:
-            raise AttributeError("Can't set attribute")
 
     @property
     def id(self):
@@ -589,16 +612,6 @@ class Process(dict):
                              .format(visibility, type(self), list(visibility_values)))
         self['visibility'] = visibility
 
-    def __str__(self):
-        # type: (...) -> AnyStr
-        return "Process <{0}> ({1})".format(self.identifier, self.title)
-
-    def __repr__(self):
-        # type: (...) -> AnyStr
-        cls = type(self)
-        repr_ = dict.__repr__(self)
-        return '{0}.{1}({2})'.format(cls.__module__, cls.__name__, repr_)
-
     @property
     def params(self):
         # type: (...) -> Dict[AnyStr, Any]
@@ -691,7 +704,7 @@ class Process(dict):
         return process_mapping[process_key]()
 
 
-class Quote(dict):
+class Quote(Base):
     """
     Dictionary that contains quote information.
     It always has ``'id'`` and ``process`` key.
@@ -833,7 +846,7 @@ class Quote(dict):
         return '{0}.{1}({2})'.format(cls.__module__, cls.__name__, repr_)
 
 
-class Bill(dict):
+class Bill(Base):
     """
     Dictionary that contains bill information.
     It always has ``'id'``, ``user``, ``quote`` and ``job`` keys.
