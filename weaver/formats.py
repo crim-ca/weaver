@@ -3,17 +3,15 @@ from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import HTTPError
 if TYPE_CHECKING:
     from weaver.typedefs import JSON
-    from typing import AnyStr, Dict, Union, Tuple
+    from typing import AnyStr, Union, Tuple
 
 # Content-Types
 CONTENT_TYPE_APP_FORM = "application/x-www-form-urlencoded"
-
+CONTENT_TYPE_APP_NETCDF = "application/x-netcdf"
+CONTENT_TYPE_APP_HDF5 = "application/x-hdf5"
 CONTENT_TYPE_TEXT_HTML = "text/html"
-
 CONTENT_TYPE_TEXT_PLAIN = "text/plain"
-
 CONTENT_TYPE_APP_JSON = "application/json"
-
 CONTENT_TYPE_APP_XML = "application/xml"
 CONTENT_TYPE_TEXT_XML = "text/xml"
 CONTENT_TYPE_ANY_XML = {CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_XML}
@@ -25,9 +23,11 @@ CONTENT_TYPE_ANY_XML = {CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_XML}
 # IANA contains most standard MIME-types, but might not include special (application/x-hdf5, application/x-netcdf, etc.)
 IANA_NAMESPACE = {"iana": "https://www.iana.org/assignments/media-types/"}
 EDAM_NAMESPACE = {"edam": "http://edamontology.org/"}
-EDAM_SCHEMA = "http://edamontology.org/EDAM_1.18.owl"
+EDAM_SCHEMA = "http://edamontology.org/EDAM_1.21.owl"
 EDAM_MAPPING = {
-    CONTENT_TYPE_APP_JSON: "edam:format_3464"
+    CONTENT_TYPE_APP_HDF5: "edam:format_3590",
+    CONTENT_TYPE_APP_JSON: "edam:format_3464",
+    CONTENT_TYPE_APP_NETCDF: "edam:format_3650",
 }
 
 

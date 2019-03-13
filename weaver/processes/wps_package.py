@@ -1042,6 +1042,13 @@ def _xml_wps2cwl(wps_process_response):
             wps_io_type = _get_field(wps_io, "type", search_variations=True)
             wps_io_id = _get_field(wps_io, "identifier", search_variations=True)
             if wps_io_type != "ComplexData":
+                # special OWS-WPS types conversion to match ones allowed by CWL
+                if wps_io_type in ["date", "time", "dateTime", "anyURI"]:
+                    wps_io_type = "string"
+                if wps_io_type in ["scale", "angle"]:
+                    wps_io_type = "float"
+                if wps_io_type in ["integer", "positiveInteger", "nonNegativeInteger"]:
+                    wps_io_type = "int"
                 cwl_package[io_process][wps_io_id] = {"type": wps_io_type}
             else:
                 # TODO:
