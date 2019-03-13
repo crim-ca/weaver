@@ -420,15 +420,45 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_WPS1_GetCapabilities_href(self):
-        raise NotImplementedError
+        body = {
+            "processDescription": {
+                "href": TEST_REMOTE_PROCESS_GETCAP_WPS1_URL  # this one should be used
+            },
+            "executionUnit": [
+                {"href": TEST_REMOTE_SERVER_URL}  # some URL just to fulfill schema validation
+            ]
+        }
+        self.deploy_process_make_visible_and_fetch_deployed(body, TEST_REMOTE_PROCESS_WPS1_ID)
 
     @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_WPS1_GetCapabilities_owsContext(self):
-        raise NotImplementedError
+        body = {
+            "processDescription": {
+                "process": {
+                    "id": TEST_REMOTE_PROCESS_WPS1_ID,
+                    "owsContext": {"offering": {"content": {"href": TEST_REMOTE_PROCESS_GETCAP_WPS1_URL}}},
+                }
+            },
+            "executionUnit": [
+                {"href": TEST_REMOTE_SERVER_URL}  # some URL just to fulfill schema validation
+            ]
+        }
+        self.deploy_process_make_visible_and_fetch_deployed(body, TEST_REMOTE_PROCESS_WPS1_ID)
 
     @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_WPS1_GetCapabilities_executionUnit(self):
-        raise NotImplementedError
+        body = {
+            "processDescription": {
+                "process": {
+                    "id": TEST_REMOTE_PROCESS_WPS1_ID,
+                }
+            },
+            "executionUnit": [
+                {"href": TEST_REMOTE_PROCESS_GETCAP_WPS1_URL}
+            ],
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+        }
+        self.deploy_process_make_visible_and_fetch_deployed(body, TEST_REMOTE_PROCESS_WPS1_ID)
 
     @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_WPS2_DescribeProcess_href(self):
