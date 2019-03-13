@@ -413,7 +413,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             },
             "executionUnit": [
                 {"href": TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL}
-            ]
+            ],
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, TEST_REMOTE_PROCESS_WPS1_ID)
 

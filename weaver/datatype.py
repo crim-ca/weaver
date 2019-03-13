@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING
 import six
 import uuid
 if TYPE_CHECKING:
-    from weaver.typedefs import Number, LoggerType
+    from weaver.typedefs import Number, LoggerType, CWL
     from typing import Any, AnyStr, Dict, List, Optional, Union
 
 
@@ -494,6 +494,7 @@ class Process(Base):
             raise TypeError("'processEndpointWPS1' is required")
         if 'package' not in self:
             raise TypeError("'package' is required")
+        self.package = self.pop('package')  # force encode
 
     @property
     def id(self):
@@ -589,8 +590,38 @@ class Process(Base):
 
     @property
     def package(self):
-        # type: (...) -> Union[None, Dict[AnyStr, Any]]
-        return self.get('package')
+        # type: (...) -> Union[None, CWL]
+        pkg = self.get('package')
+        return self._package_decode(pkg) if isinstance(pkg, dict) else pkg
+
+    @package.setter
+    def package(self, pkg):
+        self['package'] = self._package_encode(pkg) if isinstance(pkg, dict) else pkg
+
+    # encode/decode characters that cannot be in a key during save to db
+    _package_codes = [("\uFF04", "$"), ("\uFF0E", ".")]
+
+    def _package_encode(self, pkg):
+        # type: (CWL) -> CWL
+        for k in pkg:
+            if isinstance(pkg[k], dict):
+                pkg[k] = self._package_encode(pkg[k])
+            for c_e, c_d in self._package_codes:
+                if c_d in k:
+                    c_k = k.replace(c_d, c_e)
+                    pkg[c_k] = pkg.pop(k)
+        return pkg
+
+    def _package_decode(self, pkg):
+        # type: (CWL) -> CWL
+        for k in pkg:
+            if isinstance(pkg[k], dict):
+                pkg[k] = self._package_encode(pkg[k])
+            for c_e, c_d in self._package_codes:
+                if c_e in k:
+                    c_k = k.replace(c_e, c_d)
+                    pkg[c_k] = pkg.pop(k)
+        return pkg
 
     @property
     def payload(self):

@@ -1,3 +1,11 @@
+from typing import TYPE_CHECKING
+from six.moves.urllib.request import urlopen
+from six.moves.urllib.error import HTTPError
+if TYPE_CHECKING:
+    from weaver.typedefs import JSON
+    from typing import AnyStr, Dict, Union, Tuple
+
+# Content-Types
 CONTENT_TYPE_APP_FORM = "application/x-www-form-urlencoded"
 
 CONTENT_TYPE_TEXT_HTML = "text/html"
@@ -9,3 +17,51 @@ CONTENT_TYPE_APP_JSON = "application/json"
 CONTENT_TYPE_APP_XML = "application/xml"
 CONTENT_TYPE_TEXT_XML = "text/xml"
 CONTENT_TYPE_ANY_XML = {CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_XML}
+
+# Mappings for "CWL->File->Format" (IANA corresponding Content-Type)
+# search:
+#   - IANA: https://www.iana.org/assignments/media-types/media-types.xhtml
+#   - EDAM: https://www.ebi.ac.uk/ols/search
+# IANA contains most standard MIME-types, but might not include special (application/x-hdf5, application/x-netcdf, etc.)
+IANA_NAMESPACE = {"iana": "https://www.iana.org/assignments/media-types/"}
+EDAM_NAMESPACE = {"edam": "http://edamontology.org/"}
+EDAM_SCHEMA = "http://edamontology.org/EDAM_1.18.owl"
+EDAM_MAPPING = {
+    CONTENT_TYPE_APP_JSON: "edam:format_3464"
+}
+
+
+def get_cwl_file_format(mime_type):
+    # type: (AnyStr) -> Tuple[Union[JSON, None], Union[AnyStr, None]]
+    """
+    Obtains the corresponding IANA/EDAM ``format`` value to be applied under a CWL I/O ``File`` from the
+    ``mime_type`` (`Content-Type` header) using the first matched one.
+
+    If there is a match, returns:
+        - corresponding namespace reference to be applied under ``$namespaces`` in the CWL.
+        - value of ``format`` adjusted according to the namespace to be applied to ``File`` in the CWL.
+    Otherwise, returns ``(None, None)``
+    """
+    mime_type_url = "{}{}".format(IANA_NAMESPACE["iana"], mime_type)
+    # FIXME: ConnectionRefused with `requests.get`, using `urllib` instead
+    try:
+        resp = urlopen(mime_type_url)   # 404 on not implemented/referenced mime-type
+        if resp.code == 200:
+            return IANA_NAMESPACE, "iana:{}".format(mime_type)
+    except HTTPError:
+        pass
+    if mime_type in EDAM_MAPPING:
+        return EDAM_NAMESPACE, EDAM_MAPPING[mime_type]
+    return None, None
+
+
+def clean_mime_type_format(mime_type):
+    # type: (AnyStr) -> AnyStr
+    """
+    Removes any additional namespace key or URL from ``mime_type`` so that it corresponds to the generic
+    representation (ex: `application/json`) instead of the `CWL->File->format` variant.
+    """
+    for v in IANA_NAMESPACE.values() + IANA_NAMESPACE.keys() + EDAM_NAMESPACE.values() + EDAM_MAPPING.values():
+        if v in mime_type:
+            return mime_type.replace(v, "")
+    return mime_type

@@ -7,9 +7,13 @@ from weaver.exceptions import (
     PackageTypeError, PackageRegistrationError, PackageExecutionError,
     PackageNotFound, PayloadNotFound
 )
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_ANY_XML, CONTENT_TYPE_TEXT_PLAIN
-from weaver.status import (STATUS_RUNNING, STATUS_SUCCEEDED, STATUS_EXCEPTION, STATUS_FAILED,
-                           map_status, STATUS_COMPLIANT_PYWPS, STATUS_PYWPS_IDS)
+from weaver.formats import (
+    CONTENT_TYPE_APP_JSON, CONTENT_TYPE_ANY_XML, CONTENT_TYPE_TEXT_PLAIN, get_cwl_file_format, clean_mime_type_format)
+
+from weaver.status import (
+    STATUS_RUNNING, STATUS_SUCCEEDED, STATUS_EXCEPTION, STATUS_FAILED, STATUS_COMPLIANT_PYWPS, STATUS_PYWPS_IDS,
+    map_status,
+)
 from weaver.wps_restapi.swagger_definitions import process_uri
 from weaver.wps import get_wps_output_path
 from weaver.utils import (
@@ -523,7 +527,7 @@ def _cwl2wps_io(io_info, io_select):
             "abstract": io_info.get("doc", ""),
         }
         if "format" in io_info:
-            kw["supported_formats"] = [Format(io_info["format"])]
+            kw["supported_formats"] = [Format(clean_mime_type_format(io_info["format"]))]
             kw["mode"] = MODE.SIMPLE
         else:
             # we need to minimally add 1 format, otherwise empty list is evaluated as None by pywps
@@ -737,7 +741,7 @@ def _set_field(io_object, field, value):
 
 
 def _merge_package_io(wps_io_list, cwl_io_list, io_select):
-    # type: (List[ANY_IO_Type], List[CWL_IO_Type], Union[WPS_INPUT, WPS_OUTPUT]) -> List
+    # type: (List[ANY_IO_Type], List[CWL_IO_Type], Union[WPS_INPUT, WPS_OUTPUT]) -> List[JSON_IO_Type]
     """
     Update I/O definitions to use for process creation and returned by GetCapabilities, DescribeProcess.
     If WPS I/O definitions where provided during deployment, update them with CWL-to-WPS converted I/O and
@@ -1053,10 +1057,15 @@ def _xml_wps2cwl(wps_process_response):
                         break
                 cwl_package[io_process][wps_io_id] = {
                     "type": "File",
-                    "format": wps_io_fmt,
                     # TODO: how to specify the 'name' part of the glob (using the "id" value for now)
                     io_binding: {"glob": "{}.{}".format(wps_io_id, wps_io_ext)}
                 }
+                cwl_io_ref, cwl_io_fmt = get_cwl_file_format(wps_io_fmt)
+                if cwl_io_ref and cwl_io_fmt:
+                    cwl_package[io_process][wps_io_id]["format"] = cwl_io_fmt
+                    if "$namespaces" not in cwl_package:
+                        cwl_package["$namespaces"] = dict()
+                    cwl_package["$namespaces"].update(cwl_io_ref)
     return cwl_package, process_info
 
 

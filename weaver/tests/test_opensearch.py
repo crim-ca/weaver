@@ -111,13 +111,6 @@ def get_opensearch_process():
     return opensearch_process
 
 
-def get_memory_store_with_opensearch_process():
-    memory_store = get_memory_store()
-    opensearch_process = get_opensearch_process()
-    memory_store.save_process(opensearch_process)
-    return memory_store
-
-
 def test_transform_execute_parameters_wps():
     def make_input(id_, value):
         input_ = LiteralInput(id_, "", data_type="string")
