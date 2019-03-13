@@ -8,13 +8,14 @@ from pyramid.config import Configurator
 from pyramid.registry import Registry
 from pyramid.request import Request
 from requests import HTTPError as RequestsHTTPError
-from six.moves.urllib.parse import urlparse, parse_qs
+from six.moves.urllib.parse import urlparse, parse_qs, urlunsplit, ParseResult
 from distutils.dir_util import mkpath
 from distutils.version import LooseVersion
 from requests.structures import CaseInsensitiveDict
 from webob.headers import ResponseHeaders, EnvironHeaders
 from typing import TYPE_CHECKING
 import os
+import six
 import time
 import pytz
 import types
@@ -98,6 +99,16 @@ def get_cookie_headers(header_container, cookie_header_name='Cookie'):
         return dict(Cookie=get_header(cookie_header_name, header_container))
     except KeyError:  # No cookie
         return {}
+
+
+def get_url_without_query(url):
+    # type: (Union[AnyStr, ParseResult]) -> AnyStr
+    """Removes the query string part of an URL."""
+    if isinstance(url, six.string_types):
+        url = urlparse(url)
+    if not isinstance(url, ParseResult):
+        raise TypeError("Expected a parsed URL.")
+    return urlunsplit(url[:4] + tuple(['']))
 
 
 def is_valid_url(url):

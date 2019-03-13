@@ -16,6 +16,19 @@ CONTENT_TYPE_APP_XML = "application/xml"
 CONTENT_TYPE_TEXT_XML = "text/xml"
 CONTENT_TYPE_ANY_XML = {CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_XML}
 
+CONTENT_TYPE_EXTENSION_MAPPING = {
+    CONTENT_TYPE_APP_NETCDF: "nc",
+    CONTENT_TYPE_APP_HDF5: "hdf5",
+    CONTENT_TYPE_TEXT_PLAIN: "*",   # any for glob
+}
+
+
+def get_extension(mime_type):
+    # type: (AnyStr) -> AnyStr
+    """Retrieves the extension corresponding to ``mime_type`` if explicitly defined, or bt simple parsing otherwise."""
+    return CONTENT_TYPE_EXTENSION_MAPPING.get(mime_type, mime_type.split('/')[-1])
+
+
 # Mappings for "CWL->File->Format" (IANA corresponding Content-Type)
 # search:
 #   - IANA: https://www.iana.org/assignments/media-types/media-types.xhtml

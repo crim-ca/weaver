@@ -8,8 +8,9 @@ from weaver.exceptions import (
     PackageNotFound, PayloadNotFound
 )
 from weaver.formats import (
-    CONTENT_TYPE_APP_JSON, CONTENT_TYPE_ANY_XML, CONTENT_TYPE_TEXT_PLAIN, get_cwl_file_format, clean_mime_type_format)
-
+    CONTENT_TYPE_APP_JSON, CONTENT_TYPE_ANY_XML, CONTENT_TYPE_TEXT_PLAIN, get_cwl_file_format, clean_mime_type_format,
+    get_extension,
+)
 from weaver.status import (
     STATUS_RUNNING, STATUS_SUCCEEDED, STATUS_EXCEPTION, STATUS_FAILED, STATUS_COMPLIANT_PYWPS, STATUS_PYWPS_IDS,
     map_status,
@@ -17,7 +18,8 @@ from weaver.status import (
 from weaver.wps_restapi.swagger_definitions import process_uri
 from weaver.wps import get_wps_output_path
 from weaver.utils import (
-    get_job_log_msg, get_log_fmt, get_log_datefmt, get_sane_name, get_settings, get_any_id, get_header
+    get_job_log_msg, get_log_fmt, get_log_datefmt, get_sane_name, get_settings, get_any_id, get_header,
+    get_url_without_query
 )
 from owslib.wps import WebProcessingService, ComplexData
 from pywps.inout.basic import BasicIO
@@ -1028,16 +1030,15 @@ def _xml_wps2cwl(wps_process_response):
         "class": "CommandLineTool",
         "hints": {
             PACKAGE_REQUIREMENTS_APP_WPS1: {
-                "provider": wps_service_url,
-                "process": process_info["identifier"],
+                "provider": get_url_without_query(wps_service_url),
+                "process": process_id,
             }
         },
         "inputs": {},
         "outputs": {},
     }
-    for io_select in ["input", "output"]:
+    for io_select in [WPS_INPUT, WPS_OUTPUT]:
         io_process = "{}s".format(io_select)
-        io_binding = "{}Binding".format(io_select)
         for wps_io in process_info[io_process]:    # type: JSON
             wps_io_type = _get_field(wps_io, "type", search_variations=True)
             wps_io_id = _get_field(wps_io, "identifier", search_variations=True)
@@ -1051,28 +1052,28 @@ def _xml_wps2cwl(wps_process_response):
                     wps_io_type = "int"
                 cwl_package[io_process][wps_io_id] = {"type": wps_io_type}
             else:
-                # TODO:
-                #   - better way to obtain extension from format? (will work for '*/{ext}' variations)
-                #   - what about if there are multiple formats? (currently get the first & best match in priority order)
                 wps_io_ext = "*"
                 wps_io_fmt = DefaultFormat.mime_type
                 for field in WPS_FIELD_FORMAT:
                     fmt = _get_field(wps_io, field, search_variations=True)
                     if isinstance(fmt, list) and len(fmt):
                         wps_io_fmt = wps_io[field][0]["mimeType"]
-                        wps_io_ext = wps_io_fmt.split('/')[-1]
+                        wps_io_ext = get_extension(wps_io_fmt)
                         break
-                cwl_package[io_process][wps_io_id] = {
-                    "type": "File",
-                    # TODO: how to specify the 'name' part of the glob (using the "id" value for now)
-                    io_binding: {"glob": "{}.{}".format(wps_io_id, wps_io_ext)}
-                }
+                cwl_package[io_process][wps_io_id] = {"type": "File"}
                 cwl_io_ref, cwl_io_fmt = get_cwl_file_format(wps_io_fmt)
                 if cwl_io_ref and cwl_io_fmt:
                     cwl_package[io_process][wps_io_id]["format"] = cwl_io_fmt
                     if "$namespaces" not in cwl_package:
                         cwl_package["$namespaces"] = dict()
                     cwl_package["$namespaces"].update(cwl_io_ref)
+                if io_select == WPS_OUTPUT:
+                    # TODO:
+                    #   - how to specify the 'name' part of the glob (using the "id" value for now)
+                    #   - how to choose extension if there are multiple formats? (currently get first)
+                    cwl_package[io_process][wps_io_id]["outputBinding"] = {
+                        "glob": "{}.{}".format(wps_io_id, wps_io_ext)
+                    }
     return cwl_package, process_info
 
 

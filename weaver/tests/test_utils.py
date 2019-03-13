@@ -31,6 +31,15 @@ def test_parse_service_name():
         assert 'emu' == utils.parse_service_name("/ows/nowhere/emu", protected_path)
 
 
+def test_get_url_without_query():
+    url_h = "http://some-host.com/wps"
+    url_q = "{}?service=WPS".format(url_h)
+    url_p = urlparse(url_q)
+    assert utils.get_url_without_query(url_q) == url_h
+    assert utils.get_url_without_query(url_p) == url_h
+    assert utils.get_url_without_query(url_h) == url_h
+
+
 def test_get_base_url():
     assert utils.get_base_url('http://localhost:8094/wps') == 'http://localhost:8094/wps'
     assert utils.get_base_url('http://localhost:8094/wps?service=wps&request=getcapabilities') == \

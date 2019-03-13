@@ -3,7 +3,7 @@ from weaver.datatype import Service, Process as ProcessDB
 from weaver.database import get_db
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN
 from weaver.store.base import StoreProcesses
-from weaver.utils import get_sane_name, get_settings
+from weaver.utils import get_sane_name, get_settings, get_url_without_query
 from weaver.processes import wps_package
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from weaver.wps_restapi import swagger_definitions as sd
@@ -29,7 +29,7 @@ from pyramid.httpexceptions import (
 from copy import deepcopy
 from distutils.version import LooseVersion
 from six.moves.urllib.request import urlopen
-from six.moves.urllib.parse import urlparse, urlunsplit, parse_qs
+from six.moves.urllib.parse import urlparse, parse_qs
 from six.moves.urllib.error import URLError
 from typing import TYPE_CHECKING
 import colander
@@ -339,7 +339,7 @@ def register_wps_provider_processes(wps_providers_file_path, container):
                 raise ValueError("Invalid service value: [{!s}].".format(cfg_service))
             url_p = urlparse(svc_url)
             qs_p = parse_qs(url_p.query)
-            svc_url = urlunsplit(url_p[:4] + tuple(['']))  # remove any query in url
+            svc_url = get_url_without_query(url_p)
             svc_name = svc_name or get_sane_name(url_p.hostname)
             svc_proc = svc_proc or qs_p.get("identifier", [])
             if not isinstance(svc_name, six.string_types):
