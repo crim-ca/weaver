@@ -321,11 +321,35 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert response_json["process"]["inputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
         assert len(response_json["process"]["outputs"]) == 1
         assert response_json["process"]["outputs"][0]["id"] == "output"
-        assert response_json["process"]["outputs"][0]["minOccurs"] == "1"  # TODO: adjust `int` according to spec
-        assert response_json["process"]["outputs"][0]["maxOccurs"] == "1"  # TODO: adjust `int` according to spec
+        assert response_json["process"]["outputs"][0]["minOccurs"] == "1"   # TODO: adjust `int` according to spec
+        assert response_json["process"]["outputs"][0]["maxOccurs"] == "1"   # TODO: adjust `int` according to spec
         assert isinstance(response_json["process"]["outputs"][0]["formats"], list)
         assert len(response_json["process"]["outputs"][0]["formats"]) == 1
         assert response_json["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
+
+    def deploy_process_make_visible_and_fetch_deployed(self, deploy_payload, expected_process_id):
+        """
+        **Note:** This is a shortcut method for all ``test_deploy_process_<>`` cases.
+
+        Attempts to deploy the process using the provided deployment payload, then makes it visible and finally
+        fetches the deployed process to validate the resulting WPS-2 description.
+
+        Any failure along the way is raised.
+        """
+        resp = self.app.post_json("/processes", params=deploy_payload, headers=self.json_headers)
+        assert resp.status_code == 200  # TODO: status should be 201 when properly modified to match API conformance
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
+
+        # apply visibility to allow retrieval
+        proc_id = resp.json["processSummary"]["id"]  # process id could have been cleaned up
+        proc_url = "/processes/{}".format(proc_id)
+        body = {"value": VISIBILITY_PUBLIC}
+        resp = self.app.put_json("{}/visibility".format(proc_url), params=body, headers=self.json_headers)
+        assert resp.status_code == 200
+
+        resp = self.app.get(proc_url, headers=self.json_headers)
+        assert resp.status_code == 200
+        self.assert_deployed_wps2(resp.json, expected_process_id)
 
     @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_DockerRequirement_href(self):
@@ -359,31 +383,39 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 "href": TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL  # this one should be used
             },
             "executionUnit": [
-                {"href": TEST_REMOTE_SERVER_URL}  # another URL just to ensure WPS-1 DescribeProcess is used
+                {"href": TEST_REMOTE_SERVER_URL}  # some URL just to fulfill schema validation
             ]
         }
-        resp = self.app.post_json("/processes", params=body, headers=self.json_headers)
-        assert resp.status_code == 200  # TODO: status should be 201 when properly modified to match API conformance
-        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        self.deploy_process_make_visible_and_fetch_deployed(body, TEST_REMOTE_PROCESS_WPS1_ID)
 
-        # apply visibility to allow retrieval
-        proc_id = resp.json["processSummary"]["id"]  # process id could have been cleaned up
-        proc_url = "/processes/{}".format(proc_id)
-        body = {"value": VISIBILITY_PUBLIC}
-        resp = self.app.put_json("{}/visibility".format(proc_url), params=body, headers=self.json_headers)
-        assert resp.status_code == 200
-
-        resp = self.app.get(proc_url, headers=self.json_headers)
-        assert resp.status_code == 200
-        self.assert_deployed_wps2(resp.json, TEST_REMOTE_PROCESS_WPS1_ID)
-
-    @pytest.mark.skip(reason="not implemented")
+    @mock_remote_server_requests_wp1
     def test_deploy_process_WPS1_DescribeProcess_owsContext(self):
-        raise NotImplementedError
+        body = {
+            "processDescription": {
+                "process": {
+                    "id": TEST_REMOTE_PROCESS_WPS1_ID,
+                    "owsContext": {"offering": {"content": {"href": TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL}}},
+                }
+            },
+            "executionUnit": [
+                {"href": TEST_REMOTE_SERVER_URL}  # some URL just to fulfill schema validation
+            ]
+        }
+        self.deploy_process_make_visible_and_fetch_deployed(body, TEST_REMOTE_PROCESS_WPS1_ID)
 
-    @pytest.mark.skip(reason="not implemented")
+    @mock_remote_server_requests_wp1
     def test_deploy_process_WPS1_DescribeProcess_executionUnit(self):
-        raise NotImplementedError
+        body = {
+            "processDescription": {
+                "process": {
+                    "id": TEST_REMOTE_PROCESS_WPS1_ID,
+                }
+            },
+            "executionUnit": [
+                {"href": TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL}
+            ]
+        }
+        self.deploy_process_make_visible_and_fetch_deployed(body, TEST_REMOTE_PROCESS_WPS1_ID)
 
     @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_WPS1_GetCapabilities_href(self):

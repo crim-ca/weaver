@@ -33,6 +33,7 @@ from pywps import (
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
 from pyramid_celery import celery_app as app
 from collections import OrderedDict, Hashable
+from inspect import isclass
 from six.moves.urllib.parse import urlparse
 from typing import Dict, Tuple, Union, Any, Optional, AnyStr, List, Callable, TYPE_CHECKING
 from yaml.scanner import ScannerError
@@ -51,25 +52,24 @@ import os
 import six
 if TYPE_CHECKING:
     from weaver.status import AnyStatusType
-    from weaver.typedefs import ToolPathObjectType, CWLFactoryCallable, CWL, JSON, XML, Number
+    from weaver.typedefs import ToolPathObjectType, CWLFactoryCallable, CWL, JsonKey, JSON, XML, Number
     from cwltool.process import Process as ProcessCWL
     from pywps.app import WPSRequest
     from pywps.response.execute import ExecuteResponse
     from owslib.wps import Input, Output
 
     # typing shortcuts
-    wps_input_type = Union[LiteralInput, ComplexInput, BoundingBoxInput]
-    wps_output_type = Union[LiteralOutput, ComplexOutput, BoundingBoxOutput]
-    wps_io_type = Union[wps_input_type, wps_output_type]
-    ows_input_type = Input
-    ows_output_type = Output
-    ows_io_type = Union[ows_input_type, ows_output_type]
-    json_io_type = JSON
-    cwl_input_type = CWL
-    cwl_output_type = CWL
-    cwl_io_type = Union[cwl_input_type, cwl_output_type]
-    any_key_type = Union[AnyStr, int]
-    any_io_type = Union[cwl_io_type, json_io_type, wps_io_type, ows_io_type]
+    WPS_Input_Type = Union[LiteralInput, ComplexInput, BoundingBoxInput]
+    WPS_Output_Type = Union[LiteralOutput, ComplexOutput, BoundingBoxOutput]
+    WPS_IO_Type = Union[WPS_Input_Type, WPS_Output_Type]
+    OWS_Input_Type = Input
+    OWS_Output_Type = Output
+    OWS_IO_Type = Union[OWS_Input_Type, OWS_Output_Type]
+    JSON_IO_Type = JSON
+    CWL_Input_Type = CWL
+    CWL_Output_Type = CWL
+    CWL_IO_Type = Union[CWL_Input_Type, CWL_Output_Type]
+    ANY_IO_Type = Union[CWL_IO_Type, JSON_IO_Type, WPS_IO_Type, OWS_IO_Type]
 
 
 LOGGER = logging.getLogger("PACKAGE")
@@ -142,12 +142,20 @@ WPS_FIELD_FORMAT = {"formats", "supported_formats", "supported_values", "default
 DefaultFormat = Format(mime_type=CONTENT_TYPE_TEXT_PLAIN)
 
 
-# noinspection PyClassHasNoInit
-class NullType:
-    pass
+# noinspection PyClassHasNoInit, PyPep8Coding, PyUnusuedLocal, PyMethodMayBeStatic
+class _NullType:
+    """Represents a ``null`` value to differentiate from ``None``."""
+    def __eq__(self, other):
+        return isinstance(other, _NullType) \
+               or other is null \
+               or (isclass(other) and issubclass(other, _NullType))
+    def __nonzero__(self):
+        return False
+    __bool__ = __nonzero__
+    __len__ = __nonzero__
 
 
-null = NullType()
+null = _NullType()
 
 
 def retrieve_package_job_log(execution, job):
@@ -368,7 +376,7 @@ def _load_package_content(package_dict,                             # type: Dict
 
 
 def _is_cwl_array_type(io_info):
-    # type: (cwl_io_type) -> Tuple[bool, AnyStr]
+    # type: (CWL_IO_Type) -> Tuple[bool, AnyStr]
     """Verifies if the specified input/output corresponds to one of various CWL array type definitions.
 
     :return is_array: specifies if the input/output is of array type
@@ -396,7 +404,7 @@ def _is_cwl_array_type(io_info):
 
 
 def _is_cwl_enum_type(io_info):
-    # type: (cwl_io_type) -> Tuple[bool, AnyStr, Union[List[AnyStr], None]]
+    # type: (CWL_IO_Type) -> Tuple[bool, AnyStr, Union[List[AnyStr], None]]
     """Verifies if the specified input/output corresponds to a CWL enum definition.
 
     :return is_enum: specifies if the input/output is of enum type
@@ -434,7 +442,7 @@ def _is_cwl_enum_type(io_info):
 
 # noinspection PyUnusedLocal
 def _cwl2wps_io(io_info, io_select):
-    # type:(cwl_io_type, AnyStr) -> wps_io_type
+    # type:(CWL_IO_Type, AnyStr) -> WPS_IO_Type
     """Converts input/output parameters from CWL types to WPS types.
     :param io_info: parsed IO of a CWL file
     :param io_select: ``WPS_INPUT`` or ``WPS_OUTPUT`` to specify desired WPS type conversion.
@@ -537,7 +545,7 @@ def _cwl2wps_io(io_info, io_select):
 
 
 def _json2wps_type(type_info, type_category):
-    # type: (json_io_type, AnyStr) -> Any
+    # type: (JSON_IO_Type, AnyStr) -> Any
     if type_category == "allowed_values" and isinstance(type_info, dict):
         type_info.pop("type", None)
         return AllowedValue(**type_info)
@@ -561,7 +569,7 @@ def _json2wps_type(type_info, type_category):
 
 
 def _json2wps_io(io_info, io_select):
-    # type: (json_io_type, Union[WPS_INPUT, WPS_OUTPUT]) -> wps_io_type
+    # type: (JSON_IO_Type, Union[WPS_INPUT, WPS_OUTPUT]) -> WPS_IO_Type
     """Converts input/output parameters from a JSON dict to WPS types.
     :param io_info: IO in JSON dict format.
     :param io_select: ``WPS_INPUT`` or ``WPS_OUTPUT`` to specify desired WPS type conversion.
@@ -654,7 +662,7 @@ def _json2wps_io(io_info, io_select):
 
 
 def _wps2json_io(io_wps):
-    # type: (wps_io_type) -> json_io_type
+    # type: (WPS_IO_Type) -> JSON_IO_Type
     """Converts a PyWPS I/O into a dictionary based version with keys corresponding to standard names (WPS 2.0)."""
 
     if not isinstance(io_wps, BasicIO):
@@ -694,7 +702,7 @@ def _wps2json_io(io_wps):
 
 
 def _get_field(io_object, field, search_variations=False, pop_found=False):
-    # type: (any_io_type, str, bool, bool) -> Any
+    # type: (ANY_IO_Type, str, bool, bool) -> Any
     """
     Gets a field by name from various I/O object types.
 
@@ -721,7 +729,7 @@ def _get_field(io_object, field, search_variations=False, pop_found=False):
 def _set_field(io_object, field, value):
     # type: (Union[BasicIO, Dict[str, Any]], str, Any) -> None
     """Sets a field by name into various I/O object types."""
-    if not isinstance(value, NullType):
+    if value is not null:
         if isinstance(io_object, dict):
             io_object[field] = value
             return
@@ -729,7 +737,7 @@ def _set_field(io_object, field, value):
 
 
 def _merge_package_io(wps_io_list, cwl_io_list, io_select):
-    # type: (List[any_io_type], List[cwl_io_type], Union[WPS_INPUT, WPS_OUTPUT]) -> List
+    # type: (List[ANY_IO_Type], List[CWL_IO_Type], Union[WPS_INPUT, WPS_OUTPUT]) -> List
     """
     Update I/O definitions to use for process creation and returned by GetCapabilities, DescribeProcess.
     If WPS I/O definitions where provided during deployment, update them with CWL-to-WPS converted I/O and
@@ -784,13 +792,13 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
     return updated_io_list
 
 
-def transform_json(json_data,               # type: any_io_type
-                   rename=None,             # type: Optional[Dict[any_key_type, Any]]
-                   remove=None,             # type: Optional[List[any_key_type]]
-                   add=None,                # type: Optional[Dict[any_key_type, Any]]
-                   replace_values=None,     # type: Optional[Dict[any_key_type, Any]]
-                   replace_func=None,       # type: Optional[Dict[AnyStr, Callable[[Any], Any]]]
-                   ):                       # type: (...) -> any_io_type
+def transform_json(json_data,               # type: ANY_IO_Type
+                   rename=None,             # type: Optional[Dict[JsonKey, Any]]
+                   remove=None,             # type: Optional[List[JsonKey]]
+                   add=None,                # type: Optional[Dict[JsonKey, Any]]
+                   replace_values=None,     # type: Optional[Dict[JsonKey, Any]]
+                   replace_func=None,       # type: Optional[Dict[JsonKey, Callable[[Any], Any]]]
+                   ):                       # type: (...) -> ANY_IO_Type
     """
     Transforms the input json_data with different methods.
     The transformations are applied in the same order as the arguments.
@@ -839,11 +847,11 @@ def transform_json(json_data,               # type: any_io_type
     return json_data
 
 
-def _merge_package_inputs_outputs(wps_inputs_list,      # type: List[any_io_type]
-                                  cwl_inputs_list,      # type: List[cwl_input_type]
-                                  wps_outputs_list,     # type: List[any_io_type]
-                                  cwl_outputs_list      # type: List[cwl_output_type]
-                                  ):                    # type: (...) -> Tuple[List[json_io_type], List[json_io_type]]
+def _merge_package_inputs_outputs(wps_inputs_list,      # type: List[ANY_IO_Type]
+                                  cwl_inputs_list,      # type: List[CWL_Input_Type]
+                                  wps_outputs_list,     # type: List[ANY_IO_Type]
+                                  cwl_outputs_list      # type: List[CWL_Output_Type]
+                                  ):                    # type: (...) -> Tuple[List[JSON_IO_Type], List[JSON_IO_Type]]
     """
     Merges I/O definitions to use for process creation and returned by ``GetCapabilities``, ``DescribeProcess``
     using the `WPS` specifications (from request ``POST``) and `CWL` specifications (extracted from file).
@@ -854,7 +862,7 @@ def _merge_package_inputs_outputs(wps_inputs_list,      # type: List[any_io_type
 
 
 def _get_package_io(package_factory, io_select, as_json):
-    # type: (CWLFactoryCallable, AnyStr, bool) -> List[Union[json_io_type, wps_io_type]]
+    # type: (CWLFactoryCallable, AnyStr, bool) -> List[Union[JSON_IO_Type, WPS_IO_Type]]
     """
     Retrieves I/O definitions from a validated ``CWLFactoryCallable``. Returned I/O format depends on value ``as_json``.
     """
@@ -872,13 +880,13 @@ def _get_package_io(package_factory, io_select, as_json):
 
 
 def _get_package_inputs(package_factory, as_json=False):
-    # type: (CWLFactoryCallable, Optional[bool]) -> List[Union[json_io_type, wps_io_type]]
+    # type: (CWLFactoryCallable, Optional[bool]) -> List[Union[JSON_IO_Type, WPS_IO_Type]]
     """Generates `WPS-like` ``inputs`` using parsed CWL package input definitions."""
     return _get_package_io(package_factory, io_select=WPS_INPUT, as_json=as_json)
 
 
 def _get_package_outputs(package_factory, as_json=False):
-    # type: (CWLFactoryCallable, Optional[bool]) -> List[Union[json_io_type, wps_io_type]]
+    # type: (CWLFactoryCallable, Optional[bool]) -> List[Union[JSON_IO_Type, WPS_IO_Type]]
     """Generates `WPS-like` ``outputs`` using parsed CWL package output definitions."""
     return _get_package_io(package_factory, io_select=WPS_OUTPUT, as_json=as_json)
 
@@ -886,7 +894,7 @@ def _get_package_outputs(package_factory, as_json=False):
 def _get_package_inputs_outputs(package_factory,    # type: CWLFactoryCallable
                                 as_json=False,      # type: Optional[bool]
                                 ):
-    # type: (...) -> Tuple[Union[json_io_type, wps_io_type], Union[json_io_type, wps_io_type]]
+    # type: (...) -> Tuple[Union[JSON_IO_Type, WPS_IO_Type], Union[JSON_IO_Type, WPS_IO_Type]]
     """Generates `WPS-like` ``(inputs, outputs)`` tuple using parsed CWL package definitions."""
     return (_get_package_io(package_factory, io_select=WPS_INPUT, as_json=as_json),
             _get_package_io(package_factory, io_select=WPS_OUTPUT, as_json=as_json))
@@ -914,7 +922,7 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
 
 
 def _ows2json_io(ows_io):
-    # type: (ows_io_type) -> json_io_type
+    # type: (OWS_IO_Type) -> JSON_IO_Type
     """Converts I/O from :module:`owslib.wps` to JSON."""
     def _complex2format(data):
         # type: (ComplexData) -> JSON
@@ -927,7 +935,7 @@ def _ows2json_io(ows_io):
     json_io = dict()
     for field in WPS_FIELD_MAPPING:
         value = _get_field(ows_io, field, search_variations=True)
-        if value is not null:
+        if value:
             if isinstance(value, list):
                 json_io[field] = [_complex2format(v) for v in value if isinstance(v, ComplexData)]
             elif isinstance(value, ComplexData):
@@ -935,13 +943,23 @@ def _ows2json_io(ows_io):
             else:
                 json_io[field] = value
 
+    # add 'format' if missing, derived from other variants
     if "formats" not in json_io:
         for field in WPS_FIELD_FORMAT:
             fmt = _get_field(json_io, field, search_variations=True)
+            if not fmt:
+                continue
             if isinstance(fmt, dict):
-                if not isinstance(json_io.get("formats"), list):
-                    json_io["formats"] = list()
-                json_io["formats"].append(fmt)
+                fmt = [fmt]
+            fmt = filter(lambda f: isinstance(f, dict), fmt)
+            if not isinstance(json_io.get("formats"), list):
+                json_io["formats"] = list()
+            for var_fmt in fmt:
+                # add it only if not exclusively provided by a previous variant
+                json_fmt_items = [j_fmt.items() for j_fmt in json_io["formats"]]
+                if any(all(var_item in items for var_item in var_fmt.items()) for items in json_fmt_items):
+                    continue
+                json_io["formats"].append(var_fmt)
 
     return json_io
 
@@ -995,9 +1013,9 @@ def _xml_wps2cwl(wps_process_response):
         process_info["metadata"].append({"href": meta.url, "title": meta.title, "role": meta.role})
     process_info["inputs"] = []     # type: List[JSON]
     process_info["outputs"] = []    # type: List[JSON]
-    for wps_in in wps_process.dataInputs:       # type: ows_input_type
+    for wps_in in wps_process.dataInputs:       # type: OWS_Input_Type
         process_info["inputs"].append(_ows2json_io(wps_in))
-    for wps_out in wps_process.processOutputs:  # type: ows_output_type
+    for wps_out in wps_process.processOutputs:  # type: OWS_Output_Type
         process_info["outputs"].append(_ows2json_io(wps_out))
 
     # generate CWL for WPS-1 using parsed WPS-2
@@ -1013,32 +1031,32 @@ def _xml_wps2cwl(wps_process_response):
         "inputs": {},
         "outputs": {},
     }
-    for wps_in in process_info["inputs"]:       # type: JSON
-        wps_in_type = _get_field(wps_in, "type", search_variations=True)
-        if wps_in_type == "ComplexData":
-            # TODO: how to support complex format for inputs?
-            raise NotImplementedError()
-        else:
-            cwl_package["inputs"][_get_field(wps_in, "identifier")] = {"type": wps_in_type}
-    for wps_out in process_info["outputs"]:     # type: JSON
-        wps_out_type = _get_field(wps_out, "type", search_variations=True)
-        wps_out_id = _get_field(wps_out, "identifier", search_variations=True)
-        if wps_out_type == "ComplexData":
-            # TODO:
-            #   - better way to obtain extension from format? (will work for 'application/{ext}' variations)
-            #   - what about if there are multiple formats? (currently get the first & best match in priority order)
-            wps_out_ext = "*"
-            for field in WPS_FIELD_FORMAT:
-                fmt = _get_field(wps_out, field, search_variations=True)
-                if isinstance(fmt, list) and len(fmt):
-                    wps_out_ext = wps_out[field][0]["mimeType"].split('/')[-1]
-                    break
-            cwl_package["outputs"][wps_out_id] = {
-                "type": "File",
-                "outputBinding": {"glob": "output.{}".format(wps_out_ext)}
-            }
-        else:
-            cwl_package["outputs"][wps_out_id] = {"type": wps_out_type}
+    for io_select in ["input", "output"]:
+        io_process = "{}s".format(io_select)
+        io_binding = "{}Binding".format(io_select)
+        for wps_io in process_info[io_process]:    # type: JSON
+            wps_io_type = _get_field(wps_io, "type", search_variations=True)
+            wps_io_id = _get_field(wps_io, "identifier", search_variations=True)
+            if wps_io_type != "ComplexData":
+                cwl_package[io_process][wps_io_id] = {"type": wps_io_type}
+            else:
+                # TODO:
+                #   - better way to obtain extension from format? (will work for '*/{ext}' variations)
+                #   - what about if there are multiple formats? (currently get the first & best match in priority order)
+                wps_io_ext = "*"
+                wps_io_fmt = DefaultFormat.mime_type
+                for field in WPS_FIELD_FORMAT:
+                    fmt = _get_field(wps_io, field, search_variations=True)
+                    if isinstance(fmt, list) and len(fmt):
+                        wps_io_fmt = wps_io[field][0]["mimeType"]
+                        wps_io_ext = wps_io_fmt.split('/')[-1]
+                        break
+                cwl_package[io_process][wps_io_id] = {
+                    "type": "File",
+                    "format": wps_io_fmt,
+                    # TODO: how to specify the 'name' part of the glob (using the "id" value for now)
+                    io_binding: {"glob": "{}.{}".format(wps_io_id, wps_io_ext)}
+                }
     return cwl_package, process_info
 
 
