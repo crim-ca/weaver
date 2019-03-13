@@ -6,7 +6,6 @@
 # Result:
 #   - for each process, `DescribeProcess` request will indicate how to generate and register a WPS-2 equivalent
 #   - each process name will combine the service `name` and process `identifier` to reduce chances of conflicts
-
 providers:
   - https://service-endpoint/wps
   - https://another-endpoint/wps?service=wps&request=describeprocess&identifier=some-process

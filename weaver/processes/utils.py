@@ -274,7 +274,7 @@ def deploy_process_from_payload(payload, container):
             raise HTTPBadRequest("Invalid [{0}] package deployment on [{1}].".format(process_type, weaver_config))
 
     restapi_url = wps_restapi_base_url(settings)
-    description_url = "/".join([restapi_url, 'processes', process_info["identifier"]])
+    description_url = "/".join([restapi_url, "processes", process_info["identifier"]])
     execute_endpoint = "/".join([description_url, "jobs"])
 
     # ensure that required "processEndpointWPS1" in db is added,
@@ -330,7 +330,7 @@ def register_wps_provider_processes(wps_providers_file_path, container):
             if isinstance(cfg_service, dict):
                 svc_url = cfg_service["url"]
                 svc_name = cfg_service.get("name")
-                svc_proc = cfg_service.get('processes', [])
+                svc_proc = cfg_service.get("processes", [])
             elif isinstance(cfg_service, six.string_types):
                 svc_url = cfg_service
                 svc_name = None
@@ -355,16 +355,13 @@ def register_wps_provider_processes(wps_providers_file_path, container):
                 continue
             wps_processes = [wps.describeprocess(p) for p in svc_proc] or wps.processes
             for wps_process in wps_processes:
-                proc_id = '{}_{}'.format(svc_name, get_sane_name(wps_process.identifier))
-                proc_url = '{}?service=WPS&request=DescribeProcess&identifier={}&version={}' \
-                           .format(svc_url, proc_id, wps.version)
+                proc_id = "{}_{}".format(svc_name, get_sane_name(wps_process.identifier))
+                proc_url = "{}?service=WPS&request=DescribeProcess&identifier={}&version={}" \
+                           .format(svc_url, wps_process.identifier, wps.version)
                 payload = {
-                    "processDescription": {
-                        "process": {
-                            "identifier": proc_id,
-                            "owsContext": {"offering": {"content": {"href": '{}'.format(proc_url)}}},
-                        }
-                    }
+                    "processDescription": {"process": {"id": proc_id}},
+                    "executionUnit": [{"href": proc_url}],
+                    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
                 }
                 try:
                     deploy_process_from_payload(payload, container)
