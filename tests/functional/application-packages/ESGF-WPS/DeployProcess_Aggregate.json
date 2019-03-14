@@ -1,0 +1,74 @@
+{
+  "processDescription": {
+    "process": {
+      "id": "CDAT.aggregate",
+      "title": "ESGF CDAT Aggregate",
+      "abstract": "Aggregate a variable over multiple files.",
+      "keywords": [
+        "ESGF"
+      ],
+      "owsContext": {
+        "offering": {
+          "code": "http://www.opengis.net/eoc/applicationContext/cwl",
+          "content": {
+            "href": "https://raw.githubusercontent.com/crim-ca/weaver/master/weaver/tests/functional/application-packages/ESGF-WPS/Aggregate.cwl"
+          }
+        }
+      },
+      "inputs": [
+        {
+          "id": "files",
+          "title": "Input Netcdf files",
+          "formats": [
+            {
+              "mimeType": "application/x-netcdf",
+              "default": true
+            },
+            {
+              "mimeType": "application/x-ogc-dods"
+            }
+          ],
+          "minOccurs": "1",
+          "maxOccurs": "unbounded"
+        },
+        {
+          "id": "variable",
+          "title": "Input Netcdf files",
+          "formats": [
+            {
+              "mimeType": "text/plain",
+              "default": true
+            }
+          ],
+          "minOccurs": "1",
+          "maxOccurs": "1"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "output_netcdf",
+          "title": "Aggregated netcdf file",
+          "formats": [
+            {
+              "mimeType": "application/x-netcdf",
+              "default": true
+            }
+          ]
+        }
+      ]
+    },
+    "processVersion": "1.0.0",
+    "jobControlOptions": [
+      "async-execute"
+    ],
+    "outputTransmission": [
+      "reference"
+    ]
+  },
+  "executionUnit": [
+    {
+      "href": "https://raw.githubusercontent.com/crim-ca/weaver/master/weaver/tests/functional/application-packages/ESGF-WPS/Aggregate.cwl"
+    }
+  ],
+  "deploymentProfileName": "http://www.opengis.net/profiles/eoc/"
+}
