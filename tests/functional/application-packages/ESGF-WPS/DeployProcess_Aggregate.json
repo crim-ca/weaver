@@ -42,6 +42,18 @@
           ],
           "minOccurs": "1",
           "maxOccurs": "1"
+        },
+        {
+          "id": "api_key",
+          "title": "Api key for ESGF CWT",
+          "formats": [
+            {
+              "mimeType": "text/plain",
+              "default": true
+            }
+          ],
+          "minOccurs": "1",
+          "maxOccurs": "1"
         }
       ],
       "outputs": [

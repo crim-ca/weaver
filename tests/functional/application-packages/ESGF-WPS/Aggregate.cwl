@@ -16,6 +16,9 @@
         },
         "variable": {
             "type": "string"
+        },
+        "api_key": {
+            "type": "string"
         }
     },
     "outputs": {
