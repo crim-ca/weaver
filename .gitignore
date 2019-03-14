@@ -10,7 +10,7 @@
 /data_sources.json
 /custom_wps.cfg
 /Makefile.config
-/wps_providers.yml
+/wps_processes.yml
 
 # Python / Extensions etc.
 *~

@@ -1,6 +1,7 @@
 from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS
 from weaver.datatype import Service, Process as ProcessDB
 from weaver.database import get_db
+from weaver.exceptions import ProcessNotFound
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN
 from weaver.store.base import StoreProcesses
 from weaver.utils import get_sane_name, get_settings, get_url_without_query
@@ -41,6 +42,7 @@ import six
 import os
 if TYPE_CHECKING:
     from weaver.typedefs import JSON, AnyContainer, AnySettingsContainer, FileSystemPathType
+    from weaver.store.mongodb import MongodbProcessStore
     from typing import AnyStr, Dict, Union
     from pywps import Process as ProcessWPS
     import owslib.wps
@@ -304,33 +306,35 @@ def deploy_process_from_payload(payload, container):
     return HTTPOk(json=json_response)
 
 
-def register_wps_provider_processes(wps_providers_file_path, container):
+def register_wps_processes_processes(wps_processes_file_path, container):
     # type: (FileSystemPathType, AnySettingsContainer) -> None
     """
-    Loads a `wps_provider.yml` file and registers `WPS-1` providers processes to the
+    Loads a `wps_processes.yml` file and registers `WPS-1` providers processes to the
     current `Weaver` instance as equivalent `WPS-2` processes.
 
     .. seealso::
-        - `weaver.wps_providers.yml.example`
+        - `weaver.wps_processes.yml.example` for additional file format details
     """
-    if not os.path.isfile(wps_providers_file_path):
+    if not os.path.isfile(wps_processes_file_path):
         warnings.warn("No file specified for WPS-1 providers registration.", RuntimeWarning)
         return
     try:
-        with open(wps_providers_file_path, 'r') as f:
-            providers_config = yaml.safe_load(f)
-        providers = providers_config.get('providers')
-        if not providers:
-            LOGGER.warning("Nothing to process from file: [{}]".format(wps_providers_file_path))
+        with open(wps_processes_file_path, 'r') as f:
+            processes_config = yaml.safe_load(f)
+        processes = processes_config.get("processes")
+        if not processes:
+            LOGGER.warning("Nothing to process from file: [{}]".format(wps_processes_file_path))
             return
 
+        process_store = get_db(container).get_store(StoreProcesses)  # type: MongodbProcessStore
+
         from weaver.wps_restapi.processes.processes import list_remote_processes
-        for cfg_service in providers:
+        for cfg_service in processes:
             # parse info
             if isinstance(cfg_service, dict):
                 svc_url = cfg_service["url"]
                 svc_name = cfg_service.get("name")
-                svc_proc = cfg_service.get("processes", [])
+                svc_proc = cfg_service.get("id", [])
             elif isinstance(cfg_service, six.string_types):
                 svc_url = cfg_service
                 svc_name = None
@@ -350,12 +354,19 @@ def register_wps_provider_processes(wps_providers_file_path, container):
             # fetch data
             LOGGER.info("Fetching WPS-1: [{}]".format(svc_url))
             wps = WebProcessingService(url=svc_url)
-            if LooseVersion(wps.version) >= LooseVersion('2.0'):
+            if LooseVersion(wps.version) >= LooseVersion("2.0"):
                 LOGGER.warning("Invalid WPS-1 provider, version was [{}]".format(wps.version))
                 continue
             wps_processes = [wps.describeprocess(p) for p in svc_proc] or wps.processes
             for wps_process in wps_processes:
                 proc_id = "{}_{}".format(svc_name, get_sane_name(wps_process.identifier))
+                try:
+                    process_store.fetch_by_id(proc_id)
+                except ProcessNotFound:
+                    pass
+                else:
+                    LOGGER.warning("Process already registered: [{}]. Skipping...".format(proc_id))
+                    continue
                 proc_url = "{}?service=WPS&request=DescribeProcess&identifier={}&version={}" \
                            .format(svc_url, wps_process.identifier, wps.version)
                 payload = {
@@ -363,12 +374,16 @@ def register_wps_provider_processes(wps_providers_file_path, container):
                     "executionUnit": [{"href": proc_url}],
                     "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
                 }
+                # noinspection PyBroadException
                 try:
-                    deploy_process_from_payload(payload, container)
-                except HTTPConflict:
-                    LOGGER.warning("Process already registered: [{}]".format(proc_id))
+                    resp = deploy_process_from_payload(payload, container)
+                    if resp.status_code == HTTPOk.status_code:
+                        LOGGER.info("Process registered: []".format(proc_id))
+                    else:
+                        raise RuntimeError("Process registration failed: []".format(proc_id))
+                except Exception as ex:
+                    LOGGER.error("Exception during process registration: [{!r}]".format(ex))
                     continue
-                LOGGER.info("Process registered: []".format(proc_id))
 
     except Exception as exc:
         msg = "Invalid WPS-1 providers configuration file [{!r}].".format(exc)
