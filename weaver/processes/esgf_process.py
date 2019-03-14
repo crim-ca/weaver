@@ -154,7 +154,7 @@ class ESGFProcess(Wps1Process):
             self.update_status(message, Percent.FINISHED, STATUS_FAILED)
             raise
 
-    def _write_outputs(self, uri, output_dir, expected_outputs):
+    def _write_outputs(self, url, output_dir, expected_outputs):
         """Write the output netcdf url to a local drive"""
         message = "Downloading outputs."
         LOGGER.debug(message)
@@ -164,12 +164,15 @@ class ESGFProcess(Wps1Process):
         if len(nc_outputs) > 1:
             raise NotImplemented("Multiple outputs are not implemented")
 
-        LOGGER.debug("Downloading file: {}".format(uri))
-        r = requests.get(uri, allow_redirects=True, stream=True)
-        output_file = nc_outputs[0]
+        LOGGER.debug("Downloading file: {}".format(url))
 
-        # Fixme: This won't download a netcdf file...
-        with open(join(output_dir, output_file), "wb") as f:
+        # Standrad Thredds naming convention?
+        url = url.replace("/dodsC/", "/fileServer/")
+
+        r = requests.get(url, allow_redirects=True, stream=True)
+        output_file_name = nc_outputs[0]
+
+        with open(join(output_dir, output_file_name), "wb") as f:
             for chunk in r.iter_content(chunk_size=1024):
                 if chunk:
                     f.write(chunk)
