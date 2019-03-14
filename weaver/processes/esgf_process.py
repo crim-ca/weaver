@@ -24,6 +24,12 @@ class Percent:
     FINISHED = 100
 
 
+class InputNames:
+    files = "files"
+    variable = "variable"
+    api_key = "api_key"
+
+
 class ESGFProcess(Wps1Process):
     required_inputs = ("api_key", "variable")
 
@@ -32,8 +38,10 @@ class ESGFProcess(Wps1Process):
         """Execute an ESGF process from cwl inputs"""
         LOGGER.debug("Executing ESGF process {}".format(self.process))
 
+        self._check_required_inputs(workflow_inputs)
+
         inputs = self._prepare_inputs(workflow_inputs)
-        api_key = self._get_api_key(workflow_inputs)
+        api_key = workflow_inputs[InputNames.api_key]
         esgf_process = self._run_process(inputs, api_key)
         self._process_results(esgf_process, output_dir, expected_outputs)
 
@@ -45,8 +53,7 @@ class ESGFProcess(Wps1Process):
 
         LOGGER.debug("Parsing inputs")
 
-        self._check_required_inputs(workflow_inputs)
-        files = self._get_files(workflow_inputs)
+        files = self._get_files_urls(workflow_inputs)
 
         LOGGER.debug("Creating esgf-compute-api inputs")
 
@@ -59,15 +66,18 @@ class ESGFProcess(Wps1Process):
             if required_input not in workflow_inputs:
                 raise ValueError("Missing required input: {}".format(required_input))
 
-    def _get_files(self, workflow_inputs):
+    def _get_files_urls(self, workflow_inputs):
         # type: (JsonBody) -> List[Tuple[str, str]]
         """Get all netcdf files from the cwl inputs"""
-        return [("url", "tas")]
-
-    def _get_api_key(self, workflow_inputs):
-        # type: (JsonBody) -> str
-        """Get the ESGF api key from the cwl inputs"""
-        return "jfiep2319jfeipoq93021j9"
+        urls = []
+        for cwl_file in workflow_inputs[InputNames.files]:
+            if not cwl_file["class"] == "File":
+                raise ValueError("'{}' inputs must have a class named 'File'".format(InputNames.files))
+            location = cwl_file["location"]
+            if not location.startswith("http"):
+                raise ValueError("ESGF processes only support urls for files inputs.")
+            urls.append(location)
+        return urls
 
     def _run_process(self, inputs, api_key):
         # type: (List[cwt.Variable], str) -> cwt.Process
