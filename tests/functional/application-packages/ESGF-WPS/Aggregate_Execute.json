@@ -1,0 +1,14 @@
+{
+  "files": [
+    {
+      "class": "File",
+      "location": "http://some_url.com/file1.nc"
+    },
+    {
+      "class": "File",
+      "location": "http://some_url.com/file2.nc"
+    }
+  ],
+  "variable": "tasmax",
+  "api_key": "qwerty"
+}
