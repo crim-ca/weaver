@@ -164,9 +164,6 @@ class ESGFProcess(Wps1Process):
         if len(nc_outputs) > 1:
             raise NotImplemented("Multiple outputs are not implemented")
 
-        # Todo: We should return the url instead of downloading...
-        #       Maybe downloading could be a workflow step?
-
         LOGGER.debug("Downloading file: {}".format(uri))
         r = requests.get(uri, allow_redirects=True, stream=True)
         output_file = nc_outputs[0]
