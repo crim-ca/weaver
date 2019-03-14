@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 from setuptools import setup, find_packages
 
 CUR_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -19,6 +20,13 @@ PY2 = sys.version_info[0] == 2
 requirements = [line.strip() for line in open('requirements.txt')]
 if PY2:
     requirements += [line.strip() for line in open('requirements-py2.txt')]
+
+# handle git urls in requirements.txt
+egg_regex = re.compile(r"#egg=(\w+)")
+for n, req in enumerate(requirements):
+    git_url_match = egg_regex.search(req)
+    if git_url_match:
+        requirements[n] = git_url_match.group(1)
 
 setup(name=__meta__.__name__,
       version=__meta__.__version__,
