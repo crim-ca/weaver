@@ -164,6 +164,9 @@ class End2EndEMSTestCase(TestCase):
                 .format(cls.logger_separator_cases, cls.current_case_name(), now(), cls.logger_separator_cases))
 
     def setUp(self):
+        # reset in case it was modified during another test
+        self.__class__.log_full_trace = True
+
         self.log("{}Start of '{}': {}\n{}"
                  .format(self.logger_separator_tests, self.current_test_name(), now(), self.logger_separator_tests))
 
@@ -257,7 +260,7 @@ class End2EndEMSTestCase(TestCase):
                     workflow_cwl_raw = workflow_deploy["executionUnit"][exec_unit].pop("unit")
                 for step in workflow_cwl_raw.get("steps"):
                     step_id = workflow_cwl_raw["steps"][step]["run"].strip(".cwl")
-                    for app_id in [cls.PROCESS_STACKER_ID, cls.PROCESS_SFS_ID]:
+                    for app_id in application_set:
                         if app_id == step_id:
                             test_id = cls.test_processes_info[app_id].test_id
                             real_id = workflow_cwl_raw["steps"][step]["run"]
@@ -287,21 +290,20 @@ class End2EndEMSTestCase(TestCase):
     @classmethod
     def retrieve_payload(cls, url):
         # type: (AnyStr) -> Dict
-        resp = cls.request("GET", url, force_requests=True, ignore_errors=True)
-        if resp.status_code == requests.codes.not_found:
+        local_path = os.path.join(os.path.dirname(__file__), "application-packages", url.split('/')[-1])
+        try:
+            if urlparse(url).scheme != "":
+                resp = cls.request("GET", url, force_requests=True, ignore_errors=True)
+                if resp.status_code == HTTPOk.code:
+                    return resp.json()
             # Try to find it locally
-            local_path = os.path.join(os.path.dirname(__file__), "application-packages", url.split('/')[-1])
-            try:
-                with open(local_path, 'r') as f:
-                    json_payload = json.load(f)
-                    return json_payload
-            except (IOError, ValueError):
-                cls.log("{}Cannot find payload from either references:\n[{} {}]\n[{}]\n"
-                        .format(cls.logger_separator_calls, resp.request.method, url, local_path), exception=True)
-                raise
-
-        cls.assert_response(resp, message="Invalid payload not retrieved.")
-        return resp.json()
+            with open(local_path, 'r') as f:
+                json_payload = json.load(f)
+                return json_payload
+        except (IOError, ValueError):
+            pass
+        cls.log("{}Cannot find payload from either references:\n[{}]\n[{}]\n"
+                .format(cls.logger_separator_calls, url, local_path), exception=True)
 
     @classmethod
     def get_test_process_id(cls, real_process_id):
@@ -506,7 +508,6 @@ class End2EndEMSTestCase(TestCase):
             assert assert_test(), message
         except AssertionError:
             cls.log("{}{}:\n{}\n".format(cls.logger_separator_calls, title, message), exception=True)
-            raise
 
     @classmethod
     def log(cls, message, exception=False):
@@ -516,6 +517,8 @@ class End2EndEMSTestCase(TestCase):
                 cls.logger.exception(message)
             else:
                 cls.logger.log(cls.logger_level, message)
+        if exception:
+            raise RuntimeError(message)
 
     @classmethod
     def setup_logger(cls):
@@ -638,33 +641,44 @@ class End2EndEMSTestCase(TestCase):
             self.validate_test_job_execution(job_location, headers_b, cookies_b)
 
     def test_workflow_wps1_requirements(self):
-        self.workflow_runner(self.PROCESS_WORKFLOW_SUBSET_ICE_DAYS)
+        self.workflow_runner(self.PROCESS_WORKFLOW_SUBSET_ICE_DAYS,
+                             [self.PROCESS_SUBSET_BBOX_ID, self.PROCESS_ICE_DAYS_ID],
+                             log_full_trace=True)
 
-    @pytest.mark.demo
-    def test_demo_workflow_simple_chain(self):
-        self.workflow_runner(self.PROCESS_WORKFLOW_SC_ID)
+    @pytest.mark.xfail(reason="Interoperability of remote servers not guaranteed.")
+    @pytest.mark.testbed14
+    def test_workflow_simple_chain(self):
+        self.workflow_runner(self.PROCESS_WORKFLOW_SC_ID,
+                             [self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID])
 
-    @pytest.mark.demo
-    def test_demo_workflow_S2_and_ProbaV(self):
-        self.workflow_runner(self.PROCESS_WORKFLOW_S2P_ID)
+    @pytest.mark.xfail(reason="Interoperability of remote servers not guaranteed.")
+    @pytest.mark.testbed14
+    def test_workflow_S2_and_ProbaV(self):
+        self.workflow_runner(self.PROCESS_WORKFLOW_S2P_ID,
+                             [self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID])
 
-    @pytest.mark.demo
-    def test_demo_workflow_custom(self):
-        self.workflow_runner(self.PROCESS_WORKFLOW_CUSTOM_ID)
+    @pytest.mark.xfail(reason="Interoperability of remote servers not guaranteed.")
+    @pytest.mark.testbed14
+    def test_workflow_custom(self):
+        self.workflow_runner(self.PROCESS_WORKFLOW_CUSTOM_ID,
+                             [self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID])
 
-    @pytest.mark.demo
-    def test_demo_workflow_flood_detection(self):
-        self.workflow_runner(self.PROCESS_WORKFLOW_FLOOD_DETECTION_ID)
+    @pytest.mark.xfail(reason="Interoperability of remote servers not guaranteed.")
+    @pytest.mark.testbed14
+    def test_workflow_flood_detection(self):
+        self.workflow_runner(self.PROCESS_WORKFLOW_FLOOD_DETECTION_ID,
+                             [self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID])
 
-    def workflow_runner(self, test_workflow_id):
+    def workflow_runner(self, test_workflow_id, test_application_ids, log_full_trace=False):
+        # type: (AnyStr, Iterable[AnyStr], Optional[bool]) -> None
         """Simplify test for demonstration purpose"""
 
-        # Demo test will log basic information
-        self.__class__.log_full_trace = False
+        # test will log basic information
+        self.__class__.log_full_trace = log_full_trace
 
         # deploy processes and make them visible for workflows
         path_deploy = "{}/processes".format(self.WEAVER_URL)
-        for process_id in [self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID]:
+        for process_id in test_application_ids:
             path_visible = "{}/{}/visibility".format(path_deploy, self.test_processes_info[process_id].test_id)
             data_visible = {"value": VISIBILITY_PUBLIC}
             self.request("POST", path_deploy, status=HTTPOk.code, headers=self.headers,

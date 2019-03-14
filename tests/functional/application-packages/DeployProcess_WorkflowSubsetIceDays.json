@@ -8,7 +8,7 @@
     },
     "executionUnit": [
         {
-            "href": "weaver/tests/functional/application-packages/WPS1/workflow_subset_ice_days.cwl"
+            "href": "tests/functional/application-packages/workflow_subset_ice_days.cwl"
         }
     ],
     "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow"
