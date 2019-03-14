@@ -1649,8 +1649,17 @@ class WpsPackage(Process):
                                request=self.request,
                                update_status=_update_status_dispatch)
         elif requirement["class"].endswith(CWL_REQUIREMENT_APP_ESGF_CWT):
-            # TODO: implement
-            raise NotImplementedError("ESGF-CWTRequirement not implemented")
+            req_params = ["provider", "process"]
+            if not all(r in requirement for r in ["provider", "process"]):
+                raise ValueError("Missing requirement [{}] details amongst {}".format(requirement["class"], req_params))
+            provider = requirement["provider"]
+            # The process id of the provider isn't required to be the same as the one use in the EMS
+            process = requirement["process"]
+            from weaver.processes.esgf_process import ESGFProcess
+            return ESGFProcess(provider=provider,
+                               process=process,
+                               request=self.request,
+                               update_status=_update_status_dispatch)
         else:
             # implements both `PROCESS_APPLICATION` with `CWL_REQUIREMENT_APP_DOCKER` and `PROCESS_WORKFLOW`
             from weaver.processes.wps3_process import Wps3Process
