@@ -5,6 +5,7 @@ from weaver.datatype import Service
 from weaver.database import get_db
 from weaver.store.mongodb import MongodbServiceStore, MongodbProcessStore, MongodbJobStore
 from weaver.config import WEAVER_CONFIGURATION_DEFAULT
+from weaver.utils import null
 from weaver.wps import get_wps_url, get_wps_output_url, get_wps_output_path
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 from six.moves.configparser import ConfigParser
@@ -191,29 +192,25 @@ def get_settings_from_testapp(testapp):
     return settings
 
 
-class Null(object):
-    pass
-
-
 def get_setting(env_var_name, app=None, setting_name=None):
     # type: (AnyStr, Optional[TestApp], Optional[AnyStr]) -> Any
-    val = os.getenv(env_var_name, Null())
-    if not isinstance(val, Null):
+    val = os.getenv(env_var_name, null)
+    if val != null:
         return val
     if app:
-        val = app.extra_environ.get(env_var_name, Null())
-        if not isinstance(val, Null):
+        val = app.extra_environ.get(env_var_name, null)
+        if val != null:
             return val
         if setting_name:
-            val = app.extra_environ.get(setting_name, Null())
-            if not isinstance(val, Null):
+            val = app.extra_environ.get(setting_name, null)
+            if val != null:
                 return val
             settings = get_settings_from_testapp(app)
             if settings:
-                val = settings.get(setting_name, Null())
-                if not isinstance(val, Null):
+                val = settings.get(setting_name, null)
+                if val != null:
                     return val
-    return Null()
+    return null
 
 
 def init_weaver_service(registry):

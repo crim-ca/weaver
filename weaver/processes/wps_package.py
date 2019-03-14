@@ -19,7 +19,7 @@ from weaver.wps_restapi.swagger_definitions import process_uri
 from weaver.wps import get_wps_output_path
 from weaver.utils import (
     get_job_log_msg, get_log_fmt, get_log_datefmt, get_sane_name, get_settings, get_any_id, get_header,
-    get_url_without_query
+    get_url_without_query, null
 )
 from owslib.wps import WebProcessingService, ComplexData
 from pywps.inout.basic import BasicIO
@@ -39,7 +39,6 @@ from pywps import (
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
 from pyramid_celery import celery_app as app
 from collections import OrderedDict, Hashable
-from inspect import isclass
 from six.moves.urllib.parse import urlparse
 from typing import Dict, Tuple, Union, Any, Optional, AnyStr, List, Callable, TYPE_CHECKING
 from yaml.scanner import ScannerError
@@ -146,22 +145,6 @@ WPS_FIELD_FORMAT = {"formats", "supported_formats", "supported_values", "default
 
 # default format if missing (minimal requirement of one)
 DefaultFormat = Format(mime_type=CONTENT_TYPE_TEXT_PLAIN)
-
-
-# noinspection PyClassHasNoInit, PyPep8Coding, PyUnusuedLocal, PyMethodMayBeStatic
-class _NullType:
-    """Represents a ``null`` value to differentiate from ``None``."""
-    def __eq__(self, other):
-        return isinstance(other, _NullType) \
-               or other is null \
-               or (isclass(other) and issubclass(other, _NullType))
-    def __nonzero__(self):
-        return False
-    __bool__ = __nonzero__
-    __len__ = __nonzero__
-
-
-null = _NullType()
 
 
 def retrieve_package_job_log(execution, job):

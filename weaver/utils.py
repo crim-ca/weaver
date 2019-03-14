@@ -13,6 +13,7 @@ from distutils.dir_util import mkpath
 from distutils.version import LooseVersion
 from requests.structures import CaseInsensitiveDict
 from webob.headers import ResponseHeaders, EnvironHeaders
+from inspect import isclass
 from typing import TYPE_CHECKING
 import os
 import six
@@ -28,6 +29,22 @@ if TYPE_CHECKING:
     from typing import Union, Any, Dict, List, AnyStr, Iterable, Optional
 
 LOGGER = logging.getLogger(__name__)
+
+
+# noinspection PyClassHasNoInit, PyPep8Coding, PyUnusuedLocal, PyMethodMayBeStatic
+class _NullType:
+    """Represents a ``null`` value to differentiate from ``None``."""
+    def __eq__(self, other):
+        return isinstance(other, _NullType) \
+               or other is null \
+               or (isclass(other) and issubclass(other, _NullType))
+    def __nonzero__(self):
+        return False
+    __bool__ = __nonzero__
+    __len__ = __nonzero__
+
+
+null = _NullType()
 
 
 def get_weaver_url(settings):
