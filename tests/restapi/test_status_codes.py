@@ -1,7 +1,6 @@
 from weaver import main
 from weaver.config import WEAVER_CONFIGURATION_DEFAULT
 from weaver.formats import CONTENT_TYPE_APP_JSON
-from weaver.tests.utils import get_test_weaver_app, setup_config_with_mongodb
 from weaver.wps_restapi.swagger_definitions import (
     api_frontpage_uri,
     api_swagger_ui_uri,
@@ -10,6 +9,7 @@ from weaver.wps_restapi.swagger_definitions import (
     jobs_short_uri,
     jobs_full_uri,
 )
+from tests.utils import get_test_weaver_app, setup_config_with_mongodb
 # use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
 # noinspection PyPackageRequirements
 from webtest import TestApp as WebTestApp

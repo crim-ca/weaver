@@ -1,7 +1,7 @@
 from weaver import utils
 from weaver import status
 from weaver.exceptions import ServiceNotFound
-from weaver.tests.common import WPS_CAPS_EMU_XML, WMS_CAPS_NCWMS2_111_XML, WMS_CAPS_NCWMS2_130_XML
+from tests.resources import WPS_CAPS_EMU_XML, WMS_CAPS_NCWMS2_111_XML, WMS_CAPS_NCWMS2_130_XML
 from pyramid.httpexceptions import HTTPError as PyramidHTTPError, HTTPInternalServerError, HTTPNotFound, HTTPConflict
 from pywps.response.status import WPS_STATUS
 from requests.exceptions import HTTPError as RequestsHTTPError

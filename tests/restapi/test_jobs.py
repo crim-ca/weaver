@@ -3,12 +3,6 @@ from weaver.wps_restapi.swagger_definitions import (
     jobs_full_uri,
     process_jobs_uri,
 )
-from weaver.tests.utils import (
-    setup_config_with_mongodb,
-    setup_mongodb_servicestore,
-    setup_mongodb_processstore,
-    setup_mongodb_jobstore,
-)
 from weaver.datatype import Service, Job
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.processes.wps_testing import WpsTestProcess
@@ -21,7 +15,13 @@ from weaver.status import (
     STATUS_FAILED,
     STATUS_CATEGORY_FINISHED,
 )
-from weaver.tests.utils import ignore_deprecated_nested_warnings
+from tests.utils import (
+    ignore_deprecated_nested_warnings,
+    setup_config_with_mongodb,
+    setup_mongodb_servicestore,
+    setup_mongodb_processstore,
+    setup_mongodb_jobstore,
+)
 from collections import OrderedDict
 # noinspection PyDeprecation
 from contextlib import nested

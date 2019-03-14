@@ -1,6 +1,5 @@
 from weaver import WEAVER_ROOT_DIR
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_FORM
-from weaver.tests.utils import get_settings_from_config_ini, get_settings_from_testapp, get_setting
 from weaver.config import WEAVER_CONFIGURATION_EMS
 from weaver.processes.sources import fetch_data_sources
 from weaver.wps_restapi.utils import wps_restapi_base_url
@@ -15,6 +14,7 @@ from weaver.status import (
     job_status_values,
     job_status_categories,
 )
+from tests.utils import get_settings_from_config_ini, get_settings_from_testapp, get_setting
 from six.moves.urllib.parse import urlparse
 from unittest import TestCase
 from pyramid import testing

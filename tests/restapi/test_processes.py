@@ -10,16 +10,16 @@ from weaver.execute import (
 from weaver.formats import CONTENT_TYPE_APP_XML, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import STATUS_ACCEPTED
-from weaver.tests.utils import (
+from weaver.utils import fully_qualified_name
+from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
+from weaver.wps import get_wps_url
+from tests.utils import (
     ignore_deprecated_nested_warnings,
     setup_config_with_mongodb,
     setup_mongodb_processstore,
     setup_mongodb_jobstore,
     get_test_weaver_app,
 )
-from weaver.utils import fully_qualified_name
-from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
-from weaver.wps import get_wps_url
 from copy import deepcopy
 # noinspection PyDeprecation
 from contextlib import nested

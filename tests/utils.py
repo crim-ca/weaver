@@ -55,7 +55,7 @@ def ignore_deprecated_nested_warnings(func):
     return do_test
 
 
-def get_settings_from_config_ini(config_ini_path=None, ini_section_name='app:main'):
+def get_settings_from_config_ini(config_ini_path=None, ini_section_name="app:main"):
     # type: (Optional[AnyStr], Optional[AnyStr]) -> SettingsType
     parser = ConfigParser()
     parser.read([config_ini_path or get_default_config_ini_path()])
@@ -65,7 +65,7 @@ def get_settings_from_config_ini(config_ini_path=None, ini_section_name='app:mai
 
 def get_default_config_ini_path():
     # type: (...) -> AnyStr
-    return os.path.expanduser('~/birdhouse/etc/weaver/weaver.ini')
+    return os.path.expanduser("~/birdhouse/etc/weaver/weaver.ini")
 
 
 def setup_config_from_settings(settings=None):
@@ -78,8 +78,8 @@ def setup_config_from_settings(settings=None):
 def setup_config_from_ini(config_ini_file_path=None):
     # type: (Optional[AnyStr]) -> Configurator
     config_ini_file_path = config_ini_file_path or get_default_config_ini_path()
-    settings = get_settings_from_config_ini(config_ini_file_path, 'app:main')
-    settings.update(get_settings_from_config_ini(config_ini_file_path, 'celery'))
+    settings = get_settings_from_config_ini(config_ini_file_path, "app:main")
+    settings.update(get_settings_from_config_ini(config_ini_file_path, "celery"))
     config = testing.setUp(settings=settings)
     return config
 
@@ -88,9 +88,9 @@ def setup_config_with_mongodb(config=None, settings=None):
     # type: (Optional[Configurator], Optional[SettingsType]) -> Configurator
     settings = settings or {}
     settings.update({
-        'mongodb.host':     os.getenv('WEAVER_TEST_DB_HOST', '127.0.0.1'),
-        'mongodb.port':     os.getenv('WEAVER_TEST_DB_PORT', '27017'),
-        'mongodb.db_name':  os.getenv('WEAVER_TEST_DB_NAME', 'weaver-test'),
+        "mongodb.host":     os.getenv("WEAVER_TEST_DB_HOST", "127.0.0.1"),
+        "mongodb.port":     os.getenv("WEAVER_TEST_DB_PORT", "27017"),
+        "mongodb.db_name":  os.getenv("WEAVER_TEST_DB_NAME", "weaver-test"),
     })
     if config:
         config.registry.settings.update(settings)
@@ -137,10 +137,10 @@ def setup_config_with_pywps(config):
     # type: (Configurator) -> Configurator
     settings = config.get_settings()
     settings.update({
-        'PYWPS_CFG': {
-            'server.url': get_wps_url(settings),
-            'server.outputurl': get_wps_output_url(settings),
-            'server.outputpath': get_wps_output_path(settings),
+        "PYWPS_CFG": {
+            "server.url": get_wps_url(settings),
+            "server.outputurl": get_wps_output_url(settings),
+            "server.outputpath": get_wps_output_path(settings),
         },
     })
     config.registry.settings.update(settings)
@@ -153,11 +153,11 @@ def setup_config_with_celery(config):
 
     # override celery loader to specify configuration directly instead of ini file
     celery_settings = {
-        'CELERY_BROKER_URL': 'mongodb://{}:{}/celery'.format(settings.get('mongodb.host'), settings.get('mongodb.port'))
+        "CELERY_BROKER_URL": "mongodb://{}:{}/celery".format(settings.get("mongodb.host"), settings.get("mongodb.port"))
     }
     pyramid_celery.loaders.INILoader.read_configuration = mock.MagicMock(return_value=celery_settings)
-    config.include('pyramid_celery')
-    config.configure_celery('')  # value doesn't matter because overloaded
+    config.include("pyramid_celery")
+    config.configure_celery("")  # value doesn't matter because overloaded
     return config
 
 
@@ -166,14 +166,14 @@ def get_test_weaver_config(config=None, settings=None):
     if not config:
         # default db required if none specified by config
         config = setup_config_from_settings(settings=settings)
-    if 'weaver.configuration' not in config.registry.settings:
-        config.registry.settings['weaver.configuration'] = WEAVER_CONFIGURATION_DEFAULT
-    if 'weaver.url' not in config.registry.settings:
-        config.registry.settings['weaver.url'] = "https://localhost"
+    if "weaver.configuration" not in config.registry.settings:
+        config.registry.settings["weaver.configuration"] = WEAVER_CONFIGURATION_DEFAULT
+    if "weaver.url" not in config.registry.settings:
+        config.registry.settings["weaver.url"] = "https://localhost"
     if settings:
         config.registry.settings.update(settings)
     # create the test application
-    config.include('weaver')
+    config.include("weaver")
     return config
 
 
@@ -187,7 +187,7 @@ def get_test_weaver_app(config=None, settings=None):
 def get_settings_from_testapp(testapp):
     # type: (TestApp) -> SettingsType
     settings = {}
-    if hasattr(testapp.app, 'registry'):
+    if hasattr(testapp.app, "registry"):
         settings = testapp.app.registry.settings or {}
     return settings
 
@@ -217,8 +217,8 @@ def init_weaver_service(registry):
     # type: (Registry) -> None
     service_store = registry.db.get_store(MongodbServiceStore)
     service_store.save_service(Service({
-        'type': '',
-        'name': 'weaver',
-        'url': 'http://localhost/ows/proxy/weaver',
-        'public': True
+        "type": "",
+        "name": "weaver",
+        "url": "http://localhost/ows/proxy/weaver",
+        "public": True
     }))

@@ -32,7 +32,6 @@ __pycache__
 coverage.xml
 coverage/
 nosetests.xml
-/tests/
 unit_tests/testdata.json
 
 # R

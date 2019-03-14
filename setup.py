@@ -41,7 +41,7 @@ setup(name=__meta__.__name__,
       include_package_data=True,
       package_data={"": "*.mako"},
       zip_safe=False,
-      test_suite='weaver',
+      test_suite="tests",
       install_requires=requirements,
       entry_points="""\
       [paste.app_factory]

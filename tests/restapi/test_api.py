@@ -9,7 +9,7 @@ from weaver.wps_restapi.swagger_definitions import (
     FrontpageSchema,
     VersionsSchema,
 )
-from weaver.tests.utils import get_test_weaver_app, get_test_weaver_config, get_settings_from_testapp
+from tests.utils import get_test_weaver_app, get_test_weaver_config, get_settings_from_testapp
 from pyramid.httpexceptions import HTTPFound, HTTPUnauthorized, HTTPForbidden
 import colander
 import unittest

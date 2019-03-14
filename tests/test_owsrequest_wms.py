@@ -7,7 +7,7 @@ from pyramid.testing import DummyRequest
 
 from weaver.owsrequest import OWSRequest
 from weaver.owsexceptions import OWSInvalidParameterValue
-from weaver.tests.utils import ignore_wps_warnings
+from tests.utils import ignore_wps_warnings
 
 
 # noinspection PyMethodMayBeStatic
