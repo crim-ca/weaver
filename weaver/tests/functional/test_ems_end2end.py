@@ -290,7 +290,7 @@ class End2EndEMSTestCase(TestCase):
         if resp.status_code == requests.codes.not_found:
             # Try to find it locally
             try:
-                fn = url[url.find("application-package"):]
+                fn = url[url.find("application-package"):].split('/')[-1]
                 local_path = os.path.join(os.path.dirname(__file__), fn)
                 with open(local_path, 'r') as f:
                     json_payload = json.load(f)
