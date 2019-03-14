@@ -104,3 +104,6 @@ environment.yml
 # process results
 *.tif
 *.zip
+
+# project
+/workflows/

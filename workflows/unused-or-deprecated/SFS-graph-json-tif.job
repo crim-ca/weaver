@@ -1,8 +1,0 @@
-{
-    "source_product": {
-        "location": "./stack_result.tif",
-        "class": "File"
-    },
-    "output_file_type": "GeoTIFF",
-    "output_name": "sfs_result.tif"
-}
