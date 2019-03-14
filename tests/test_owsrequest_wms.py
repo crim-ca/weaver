@@ -1,13 +1,11 @@
-# noinspection PyPackageRequirements
-import pytest
-import unittest
-
-from pyramid import testing
-from pyramid.testing import DummyRequest
-
 from weaver.owsrequest import OWSRequest
 from weaver.owsexceptions import OWSInvalidParameterValue
 from tests.utils import ignore_wps_warnings
+from pyramid import testing
+from pyramid.testing import DummyRequest
+# noinspection PyPackageRequirements
+import pytest
+import unittest
 
 
 # noinspection PyMethodMayBeStatic

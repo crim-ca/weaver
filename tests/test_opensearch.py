@@ -7,6 +7,7 @@ from weaver.database.mongodb import MongodbProcessStore
 from weaver.datatype import Process
 from weaver.utils import get_any_id
 from weaver.wps_restapi.processes import processes
+from tests.utils import setup_mongodb_processstore
 from pyramid import testing
 from pyramid.testing import DummyRequest
 # noinspection PyPackageRequirements
@@ -15,7 +16,6 @@ from collections import deque
 from copy import deepcopy
 from pprint import pformat
 from six.moves.urllib.parse import urlparse, parse_qsl
-from tests.utils import setup_mongodb_processstore
 import unittest
 import json
 import os

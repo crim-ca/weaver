@@ -240,10 +240,11 @@ class End2EndEMSTestCase(TestCase):
         # replace max occur of processes to minimize data size during tests
         for process_id in test_set:
             process_deploy = cls.test_processes_info[process_id].deploy_payload
-            process_deploy_inputs = process_deploy["processDescription"]["process"]["inputs"]
-            for i_input, proc_input in enumerate(process_deploy_inputs):
-                if proc_input.get("maxOccurs") == "unbounded":
-                    process_deploy_inputs[i_input]["maxOccurs"] = str(2)    # TODO: adjust to int according to EMS spec
+            process_deploy_inputs = process_deploy["processDescription"].get("process", {}).get("inputs")
+            if process_deploy_inputs:
+                for i_input, proc_input in enumerate(process_deploy_inputs):
+                    if proc_input.get("maxOccurs") == "unbounded":
+                        process_deploy_inputs[i_input]["maxOccurs"] = str(2)
 
         # update workflows to use "test_id" instead of originals
         for workflow_id in workflow_set:
@@ -289,15 +290,15 @@ class End2EndEMSTestCase(TestCase):
         resp = cls.request("GET", url, force_requests=True, ignore_errors=True)
         if resp.status_code == requests.codes.not_found:
             # Try to find it locally
+            local_path = os.path.join(os.path.dirname(__file__), "application-packages", url.split('/')[-1])
             try:
-                fn = url[url.find("application-package"):].split('/')[-1]
-                local_path = os.path.join(os.path.dirname(__file__), fn)
                 with open(local_path, 'r') as f:
                     json_payload = json.load(f)
                     return json_payload
             except (IOError, ValueError):
-                # Will raise the original query exception
-                pass
+                cls.log("{}Cannot find payload from either references:\n[{} {}]\n[{}]\n"
+                        .format(cls.logger_separator_calls, resp.request.method, url, local_path), exception=True)
+                raise
 
         cls.assert_response(resp, message="Invalid payload not retrieved.")
         return resp.json()
@@ -499,7 +500,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def assert_test(cls, assert_test, message=None, title="Test Assertion Failed"):
-        # type: (Callable, Optional[AnyStr], Optional[AnyStr]) -> None
+        # type: (Callable[[], bool], Optional[AnyStr], Optional[AnyStr]) -> None
         """Tests a callable for assertion and logs the message if it fails, then re-raises to terminate execution."""
         try:
             assert assert_test(), message

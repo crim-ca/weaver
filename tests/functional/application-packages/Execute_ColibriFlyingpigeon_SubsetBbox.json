@@ -3,7 +3,7 @@
   "response": "document",
   "inputs": [
     {
-      "id": "resource",
+      "id": "tasmax",
       "href": "https://pavics.ouranos.ca/twitcher/ows/proxy/thredds/fileServer/birdhouse/nrcan/nrcan_canada_daily_v2/tasmax/nrcan_canada_daily_tasmax_2017.nc"
     },
     {
@@ -21,10 +21,6 @@
     {
       "id": "lon1",
       "data": -65
-    },
-    {
-      "id": "freq",
-      "data": "MS"
     }
   ],
   "outputs": [

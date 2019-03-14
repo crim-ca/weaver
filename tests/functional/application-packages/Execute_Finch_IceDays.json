@@ -1,0 +1,20 @@
+{
+  "mode": "async",
+  "response": "document",
+  "inputs": [
+    {
+      "id": "tasmax",
+      "href": "https://github.com/Ouranosinc/xclim/raw/master/tests/testdata/NRCANdaily/nrcan_canada_daily_tasmax_1990.nc"
+    },
+    {
+      "id": "freq",
+      "data": "MS"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "output_netcdf",
+      "transmissionMode": "reference"
+    }
+  ]
+}
