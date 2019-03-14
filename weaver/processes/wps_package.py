@@ -80,24 +80,24 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger("PACKAGE")
 
 __all__ = [
-    'WpsPackage',
-    'get_process_definition',
-    'get_process_location',
-    'get_package_workflow_steps',
-    'retrieve_package_job_log',
+    "WpsPackage",
+    "get_process_definition",
+    "get_process_location",
+    "get_package_workflow_steps",
+    "retrieve_package_job_log",
 ]
 
-PACKAGE_EXTENSIONS = frozenset(['yaml', 'yml', 'json', 'cwl', 'job'])
-PACKAGE_BASE_TYPES = frozenset(["string", 'boolean', "float", 'int', "integer", 'long', 'double'])
-PACKAGE_LITERAL_TYPES = frozenset(list(PACKAGE_BASE_TYPES) + ['null', 'Any'])
-PACKAGE_COMPLEX_TYPES = frozenset(['File', 'Directory'])
-PACKAGE_ARRAY_BASE = 'array'
+PACKAGE_EXTENSIONS = frozenset(["yaml", "yml", "json", "cwl", "job"])
+PACKAGE_BASE_TYPES = frozenset(["string", "boolean", "float", "int", "integer", "long", "double"])
+PACKAGE_LITERAL_TYPES = frozenset(list(PACKAGE_BASE_TYPES) + ["null", "Any"])
+PACKAGE_COMPLEX_TYPES = frozenset(["File", "Directory"])
+PACKAGE_ARRAY_BASE = "array"
 PACKAGE_ARRAY_MAX_SIZE = six.MAXSIZE  # pywps doesn't allow None, so use max size
 PACKAGE_ARRAY_ITEMS = frozenset(list(PACKAGE_BASE_TYPES) + list(PACKAGE_COMPLEX_TYPES))
-PACKAGE_ARRAY_TYPES = frozenset(['{}[]'.format(item) for item in PACKAGE_ARRAY_ITEMS])
-PACKAGE_CUSTOM_TYPES = frozenset(['enum'])  # can be anything, but support 'enum' which is more common
+PACKAGE_ARRAY_TYPES = frozenset(["{}[]".format(item) for item in PACKAGE_ARRAY_ITEMS])
+PACKAGE_CUSTOM_TYPES = frozenset(["enum"])  # can be anything, but support "enum" which is more common
 PACKAGE_DEFAULT_FILE_NAME = "package"
-PACKAGE_LOG_FILE = 'package_log_file'
+PACKAGE_LOG_FILE = "package_log_file"
 
 # package (requirements/hints) corresponding to `PROCESS_APPLICATION`
 PACKAGE_REQUIREMENTS_APP_DOCKER = "DockerRequirement"
@@ -407,7 +407,7 @@ def _is_cwl_enum_type(io_info):
 
     if "symbols" not in io_type:
         raise PackageTypeError("Unsupported I/O 'enum' definition: `{}`.".format(repr(io_info)))
-    io_allow = io_type['symbols']
+    io_allow = io_type["symbols"]
     if not isinstance(io_allow, list) or len(io_allow) < 1:
         raise PackageTypeError("Invalid I/O 'enum.symbols' definition: `{}`.".format(repr(io_info)))
 
@@ -420,8 +420,8 @@ def _is_cwl_enum_type(io_info):
         io_type = "string"
     elif isinstance(first_allow, float):
         io_type = "float"
-    elif isinstance(first_allow, six.integer_types):
-        io_type = 'int'
+    elif isinstance(first_allow, int):
+        io_type = "int"
     else:
         raise PackageTypeError("Unsupported I/O 'enum' base type: `{0}`, from definition: `{1}`."
                                .format(str(type(first_allow)), repr(io_info)))
@@ -459,29 +459,40 @@ def _cwl2wps_io(io_info, io_select):
     io_allow = AnyValue
     io_mode = MODE.NONE
 
+    # obtain real type if "default" or shorthand "<type>?" was in CWL, which defines "type" as `["null", <type>]`
+    if isinstance(io_type, list) and "null" in io_type:
+        if not len(io_type) == 2:
+            raise PackageTypeError("Unsupported I/O type parsing for info: `{0}` with `{1}`."
+                                   .format(repr(io_info), io_select))
+        LOGGER.debug("I/O parsed for 'default'")
+        io_type = io_type[1] if io_type[0] == "null" else io_type[0]
+        io_info["type"] = io_type
+
     # convert array types
     is_array, array_elem = _is_cwl_array_type(io_info)
     if is_array:
+        LOGGER.debug("I/O parsed for 'array'")
         io_type = array_elem
         io_max_occurs = PACKAGE_ARRAY_MAX_SIZE
 
     # convert enum types
     is_enum, enum_type, enum_allow = _is_cwl_enum_type(io_info)
     if is_enum:
+        LOGGER.debug("I/O parsed for 'enum'")
         io_type = enum_type
         io_allow = enum_allow
         io_mode = MODE.SIMPLE  # allowed value validator must be set for input
 
     # debug info for unhandled types conversion
     if not isinstance(io_type, six.string_types):
-        LOGGER.debug('is_array:      `{}`'.format(repr(is_array)))
-        LOGGER.debug('array_elem:    `{}`'.format(repr(array_elem)))
-        LOGGER.debug('is_enum:       `{}`'.format(repr(is_enum)))
-        LOGGER.debug('enum_type:     `{}`'.format(repr(enum_type)))
-        LOGGER.debug('enum_allow:    `{}`'.format(repr(enum_allow)))
-        LOGGER.debug('io_info:       `{}`'.format(repr(io_info)))
-        LOGGER.debug('io_type:       `{}`'.format(repr(io_type)))
-        LOGGER.debug('type(io_type): `{}`'.format(type(io_type)))
+        LOGGER.debug("is_array:      `{}`".format(repr(is_array)))
+        LOGGER.debug("array_elem:    `{}`".format(repr(array_elem)))
+        LOGGER.debug("is_enum:       `{}`".format(repr(is_enum)))
+        LOGGER.debug("enum_type:     `{}`".format(repr(enum_type)))
+        LOGGER.debug("enum_allow:    `{}`".format(repr(enum_allow)))
+        LOGGER.debug("io_info:       `{}`".format(repr(io_info)))
+        LOGGER.debug("io_type:       `{}`".format(repr(io_type)))
+        LOGGER.debug("type(io_type): `{}`".format(type(io_type)))
         raise TypeError("I/O type has not been properly decoded. Should be a string, got:`{!r}`".format(io_type))
 
     # literal types
@@ -926,7 +937,7 @@ def _ows2json_io(ows_io):
         value = _get_field(ows_io, field, search_variations=True)
         if value:
             if isinstance(value, list):
-                json_io[field] = [_complex2format(v) for v in value if isinstance(v, ComplexData)]
+                json_io[field] = [_complex2format(v) if isinstance(v, ComplexData) else v for v in value]
             elif isinstance(value, ComplexData):
                 json_io[field] = _complex2format(value)
             else:
@@ -1033,7 +1044,11 @@ def _xml_wps2cwl(wps_process_response):
                     wps_io_type = "float"
                 if wps_io_type in ["integer", "positiveInteger", "nonNegativeInteger"]:
                     wps_io_type = "int"
-                cwl_package[io_process][wps_io_id] = {"type": wps_io_type}
+                wps_allow = _get_field(wps_io, "allowed_values", search_variations=True)
+                if isinstance(wps_allow, list) and len(wps_allow) > 0:
+                    cwl_package[io_process][wps_io_id] = {"type": {"type": "enum", "symbols": wps_allow}}
+                else:
+                    cwl_package[io_process][wps_io_id] = {"type": wps_io_type}
             else:
                 wps_io_ext = "*"
                 wps_io_fmt = DefaultFormat.mime_type
@@ -1057,6 +1072,14 @@ def _xml_wps2cwl(wps_process_response):
                     cwl_package[io_process][wps_io_id]["outputBinding"] = {
                         "glob": "{}.{}".format(wps_io_id, wps_io_ext)
                     }
+            if io_select == WPS_INPUT:
+                wps_default = _get_field(wps_io, "default", search_variations=True)
+                wps_min_occ = _get_field(wps_io, "minOccurs", search_variations=True)
+                if wps_default != null:
+                    cwl_package[io_process][wps_io_id]["default"] = wps_default
+                if wps_min_occ in [0, "0"]:
+                    cwl_package[io_process][wps_io_id]["type"] = cwl_package[io_process][wps_io_id]["type"] + "?"
+
     return cwl_package, process_info
 
 
