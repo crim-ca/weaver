@@ -135,7 +135,7 @@ class ESGFProcess(Wps1Process):
         return esgf_process.succeeded
 
     def _process_results(self, esgf_process, output_dir, expected_outputs):
-        # type: (cwt.Process, AnyStr, Dict[AnyStr, AnyStr])
+        # type: (cwt.Process, AnyStr, Dict[AnyStr, AnyStr]) -> None
         """Process the result of the execution"""
         if not esgf_process.succeeded:
             message = "Process failed."
