@@ -25,13 +25,15 @@ class Percent:
 
 
 class ESGFProcess(Wps1Process):
+    required_inputs = ("api_key", "variable")
+
     def execute(self, workflow_inputs, output_dir, expected_outputs):
         # type: (JsonBody, AnyStr, Dict[AnyStr, AnyStr]) -> None
         """Execute an ESGF process from cwl inputs"""
         LOGGER.debug("Executing ESGF process {}".format(self.process))
 
-        api_key = self._get_api_key(workflow_inputs)
         inputs = self._prepare_inputs(workflow_inputs)
+        api_key = self._get_api_key(workflow_inputs)
         esgf_process = self._run_process(inputs, api_key)
         self._process_results(esgf_process, output_dir, expected_outputs)
 
@@ -43,6 +45,7 @@ class ESGFProcess(Wps1Process):
 
         LOGGER.debug("Parsing inputs")
 
+        self._check_required_inputs(workflow_inputs)
         files = self._get_files(workflow_inputs)
 
         LOGGER.debug("Creating esgf-compute-api inputs")
@@ -50,6 +53,11 @@ class ESGFProcess(Wps1Process):
         inputs = [cwt.Variable(url, varname) for url, varname in files]
 
         return inputs
+
+    def _check_required_inputs(self, workflow_inputs):
+        for required_input in self.required_inputs:
+            if required_input not in workflow_inputs:
+                raise ValueError("Missing required input: {}".format(required_input))
 
     def _get_files(self, workflow_inputs):
         # type: (JsonBody) -> List[Tuple[str, str]]
