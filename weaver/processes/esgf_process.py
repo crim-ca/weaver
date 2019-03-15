@@ -54,10 +54,11 @@ class ESGFProcess(Wps1Process):
         LOGGER.debug("Parsing inputs")
 
         files = self._get_files_urls(workflow_inputs)
+        varname = self._get_variable(workflow_inputs)
 
         LOGGER.debug("Creating esgf-compute-api inputs")
 
-        inputs = [cwt.Variable(url, varname) for url, varname in files]
+        inputs = [cwt.Variable(url, varname) for url in files]
 
         return inputs
 
@@ -78,6 +79,13 @@ class ESGFProcess(Wps1Process):
                 raise ValueError("ESGF processes only support urls for files inputs.")
             urls.append(location)
         return urls
+
+    def _get_variable(self, workflow_inputs):
+        # type: (JsonBody) -> str
+        """Get all netcdf files from the cwl inputs"""
+        if InputNames.variable not in workflow_inputs:
+            raise ValueError("Missing required input: variable")
+        return workflow_inputs[InputNames.variable]
 
     def _run_process(self, inputs, api_key):
         # type: (List[cwt.Variable], str) -> cwt.Process
