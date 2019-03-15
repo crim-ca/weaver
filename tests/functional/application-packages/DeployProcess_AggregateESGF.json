@@ -11,7 +11,7 @@
         "offering": {
           "code": "http://www.opengis.net/eoc/applicationContext/cwl",
           "content": {
-            "href": "https://raw.githubusercontent.com/crim-ca/weaver/master/weaver/tests/functional/application-packages/Aggregate.cwl"
+            "href": "https://raw.githubusercontent.com/crim-ca/weaver/esgf-cwt-process/tests/functional/application-packages/AggregateESGF.cwl"
           }
         }
       },
