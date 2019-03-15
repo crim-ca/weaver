@@ -1,14 +1,32 @@
 {
-  "files": [
-    {
-      "class": "File",
-      "location": "http://some_url.com/file1.nc"
-    },
-    {
-      "class": "File",
-      "location": "http://some_url.com/file2.nc"
-    }
+  "mode": "async",
+  "response": "document",
+  "inputs": [
+		{
+			"id": "files",
+			"href": "{{ esgf_url_aggregate_1  }}"
+		},
+		{
+			"id": "files",
+			"href": "{{ esgf_url_aggregate_2 }}"
+		},
+		{
+			"id": "files",
+			"href": "{{ esgf_url_aggregate_3 }}"
+		},
+		{
+			"id": "variable",
+			"data": "tasmax"
+		},
+		{
+			"id": "api_key",
+			"data": "qwerty"
+		}
   ],
-  "variable": "tasmax",
-  "api_key": "qwerty"
+  "outputs": [
+    {
+      "id": "output",
+      "transmissionMode": "reference"
+    }
+  ]
 }

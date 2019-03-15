@@ -1,7 +1,8 @@
 {
   "processDescription": {
+    "processEndpointWPS1": "https://aims2.llnl.gov/wps/",
     "process": {
-      "id": "CDAT_aggregate",
+      "id": "ESGF_aggregate",
       "title": "ESGF CDAT Aggregate",
       "abstract": "Aggregate a variable over multiple files.",
       "keywords": [
