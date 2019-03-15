@@ -1,5 +1,6 @@
 from weaver import utils
 from weaver import status
+from weaver.utils import null
 from weaver.exceptions import ServiceNotFound
 from tests.resources import WPS_CAPS_EMU_XML, WMS_CAPS_NCWMS2_111_XML, WMS_CAPS_NCWMS2_130_XML
 from pyramid.httpexceptions import HTTPError as PyramidHTTPError, HTTPInternalServerError, HTTPNotFound, HTTPConflict
@@ -10,6 +11,21 @@ from lxml import etree
 from typing import Type
 # noinspection PyPackageRequirements
 import pytest
+
+
+# noinspection PyComparisonWithNone
+def test_null():
+    if null:
+        raise AssertionError("null should not pass if clause")
+    n = null.__class__
+    assert null == n
+    assert null == n()
+    assert null.__class__ == n
+    assert null.__class__ == n()
+    assert null != None  # noqa
+    assert null is not None
+    assert bool(null) is False
+    assert null or "not-null" == "not-null"
 
 
 def test_is_url_valid():

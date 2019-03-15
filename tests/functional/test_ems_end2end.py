@@ -553,7 +553,7 @@ class End2EndEMSTestCase(TestCase):
         cls.assert_test(lambda: resp.json.get("configuration") == WEAVER_CONFIGURATION_EMS,
                         message="weaver must be configured as EMS.")
 
-    def test_end2end(self):
+    def test_workflow_end2end(self):
         """Full workflow execution procedure with authentication enabled."""
         # End to end test will log everything
         self.__class__.log_full_trace = True

@@ -41,6 +41,7 @@ EDAM_MAPPING = {
     CONTENT_TYPE_APP_HDF5: "edam:format_3590",
     CONTENT_TYPE_APP_JSON: "edam:format_3464",
     CONTENT_TYPE_APP_NETCDF: "edam:format_3650",
+    CONTENT_TYPE_TEXT_PLAIN: "edam:format_1964",
 }
 
 

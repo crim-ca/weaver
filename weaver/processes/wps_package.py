@@ -141,7 +141,7 @@ WPS_FIELD_MAPPING = {
 # WPS fields that contain a structure corresponding to `Format` object
 #   - keys must match `WPS_FIELD_MAPPING` keys
 #   - fields are placed in order of relevance (prefer explicit format, then supported, and defaults as last resort)
-WPS_FIELD_FORMAT = {"formats", "supported_formats", "supported_values", "default"}
+WPS_FIELD_FORMAT = ["formats", "supported_formats", "supported_values", "default"]
 
 # default format if missing (minimal requirement of one)
 DefaultFormat = Format(mime_type=CONTENT_TYPE_TEXT_PLAIN)
@@ -935,7 +935,9 @@ def _ows2json_io(ows_io):
     json_io = dict()
     for field in WPS_FIELD_MAPPING:
         value = _get_field(ows_io, field, search_variations=True)
-        if value:
+        # preserve numeric values (ex: "minOccurs"=0) as actual parameters
+        # ignore undefined values represented by `null`, empty list, or empty string
+        if value or value in [0, 0.0]:
             if isinstance(value, list):
                 json_io[field] = [_complex2format(v) if isinstance(v, ComplexData) else v for v in value]
             elif isinstance(value, ComplexData):
@@ -1072,13 +1074,19 @@ def _xml_wps2cwl(wps_process_response):
                     cwl_package[io_process][wps_io_id]["outputBinding"] = {
                         "glob": "{}.{}".format(wps_io_id, wps_io_ext)
                     }
+
             if io_select == WPS_INPUT:
                 wps_default = _get_field(wps_io, "default", search_variations=True)
-                wps_min_occ = _get_field(wps_io, "minOccurs", search_variations=True)
-                if wps_default != null:
-                    cwl_package[io_process][wps_io_id]["default"] = wps_default
-                if wps_min_occ in [0, "0"]:
-                    cwl_package[io_process][wps_io_id]["type"] = cwl_package[io_process][wps_io_id]["type"] + "?"
+                wps_min_occ = _get_field(wps_io, "min_occurs", search_variations=True)
+                if wps_default != null or wps_min_occ in [0, "0"]:
+                    cwl_package[io_process][wps_io_id]["default"] = wps_default or "null"
+
+            wps_max_occ = _get_field(wps_io, "max_occurs", search_variations=True)
+            if wps_max_occ != null and wps_max_occ > 1:
+                cwl_package[io_process][wps_io_id]["type"] = {
+                    "type": "array",
+                    "items": cwl_package[io_process][wps_io_id]["type"]
+                }
 
     return cwl_package, process_info
 

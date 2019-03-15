@@ -7,12 +7,23 @@
         }
     ],
     "inputs": {
-        "tasmax": "File",
+        "tasmax": {
+            "type": {
+                "type": "array",
+                "items": "File"
+            }
+        },
         "lat0": "float",
         "lat1": "float",
         "lon0": "float",
         "lon1": "float",
-        "freq": "string"
+        "freq": {
+            "default": "YS",
+            "type": {
+                "type": "enum",
+                "symbols": ["YS", "MS", "QS-DEC", "AS-JUL"]
+            }
+        }
     },
     "outputs": {
         "output": {
