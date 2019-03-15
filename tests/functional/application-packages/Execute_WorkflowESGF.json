@@ -1,0 +1,24 @@
+{
+  "mode": "async",
+  "response": "document",
+  "inputs": [
+    {
+      "id": "files",
+      "href": "http://aims3.llnl.gov/thredds/dodsC/cmip5_css02_data/cmip5/output1/CMCC/CMCC-CM/decadal2005/mon/atmos/Amon/r1i2p1/tas/1/tas_Amon_CMCC-CM_decadal2005_r1i2p1_200511-201512.nc"
+    },
+    {
+      "id": "variable",
+      "data": "tas"
+    },
+    {
+      "id": "api_key",
+      "data": "DYaAMkRIxhr3TJ2ro1cb120oJuSp3fCVZ8QxDiLUQCLfgkrs5xNa66OXb4sUYoyg"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "output_netcdf",
+      "transmissionMode": "reference"
+    }
+  ]
+}

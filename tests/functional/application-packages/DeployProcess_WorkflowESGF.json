@@ -1,0 +1,15 @@
+{
+    "processDescription": {
+        "process": {
+            "id": "WorkflowESGF",
+            "title": "Workflow of single ESGF aggregate",
+            "abstract": "Workflow that aggregates using the ESGF 'CDAT.Aggregate' WPS process"
+        }
+    },
+    "executionUnit": [
+        {
+            "href": "tests/functional/application-packages/workflow_esgf.cwl"
+        }
+    ],
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow"
+}

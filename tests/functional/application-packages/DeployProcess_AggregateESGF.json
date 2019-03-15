@@ -1,7 +1,7 @@
 {
   "processDescription": {
     "process": {
-      "id": "CDAT.aggregate",
+      "id": "CDAT_aggregate",
       "title": "ESGF CDAT Aggregate",
       "abstract": "Aggregate a variable over multiple files.",
       "keywords": [
@@ -11,7 +11,7 @@
         "offering": {
           "code": "http://www.opengis.net/eoc/applicationContext/cwl",
           "content": {
-            "href": "https://raw.githubusercontent.com/crim-ca/weaver/master/weaver/tests/functional/application-packages/ESGF-WPS/Aggregate.cwl"
+            "href": "https://raw.githubusercontent.com/crim-ca/weaver/master/weaver/tests/functional/application-packages/Aggregate.cwl"
           }
         }
       },

@@ -219,23 +219,27 @@ class End2EndEMSTestCase(TestCase):
         cls.PROCESS_FLOOD_DETECTION_ID = "FloodDetection"
         cls.PROCESS_ICE_DAYS_ID = "Finch_IceDays"
         cls.PROCESS_SUBSET_BBOX_ID = "ColibriFlyingpigeon_SubsetBbox"
+        cls.PROCESS_AGGREGATE_ESGF = "AggregateESGF"
         cls.PROCESS_WORKFLOW_ID = "Workflow"
         cls.PROCESS_WORKFLOW_SC_ID = "WorkflowSimpleChain"
         cls.PROCESS_WORKFLOW_S2P_ID = "WorkflowS2ProbaV"
         cls.PROCESS_WORKFLOW_CUSTOM_ID = "CustomWorkflow"
         cls.PROCESS_WORKFLOW_FLOOD_DETECTION_ID = "WorkflowFloodDetection"
         cls.PROCESS_WORKFLOW_SUBSET_ICE_DAYS = "WorkflowSubsetIceDays"
+        cls.PROCESS_WORKFLOW_ESGF = "WorkflowESGF"
         application_set = {cls.PROCESS_STACKER_ID,
                            cls.PROCESS_SFS_ID,
                            cls.PROCESS_FLOOD_DETECTION_ID,
                            cls.PROCESS_ICE_DAYS_ID,
-                           cls.PROCESS_SUBSET_BBOX_ID}
+                           cls.PROCESS_SUBSET_BBOX_ID,
+                           cls.PROCESS_AGGREGATE_ESGF}
         workflow_set = {cls.PROCESS_WORKFLOW_ID,
                         cls.PROCESS_WORKFLOW_SC_ID,
                         cls.PROCESS_WORKFLOW_S2P_ID,
                         cls.PROCESS_WORKFLOW_CUSTOM_ID,
                         cls.PROCESS_WORKFLOW_FLOOD_DETECTION_ID,
-                        cls.PROCESS_WORKFLOW_SUBSET_ICE_DAYS}
+                        cls.PROCESS_WORKFLOW_SUBSET_ICE_DAYS,
+                        cls.PROCESS_WORKFLOW_ESGF}
         test_set = application_set | workflow_set
         for process in test_set:
             cls.test_processes_info.update({process: cls.retrieve_process_info(process)})
