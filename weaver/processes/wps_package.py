@@ -1529,10 +1529,10 @@ class WpsPackage(Process):
                     is_array, elem_type = _is_cwl_array_type(cwl_input_info[input_id])
                     if is_array:
                         # extend array data that allow max_occur > 1
-                        input_data = [i.url if i.as_reference else i.data for i in input_occurs]
+                        input_data = [i.url if input_i.prop == 'url' else i.data for i in input_occurs]
                         input_type = elem_type
                     else:
-                        input_data = input_i.url if input_i.as_reference else input_i.data
+                        input_data = input_i.url if input_i.prop == 'url' else input_i.data
                         input_type = cwl_input_info[input_id]["type"]
                     if isinstance(input_i, ComplexInput) or elem_type == "File":
                         if isinstance(input_data, list):
