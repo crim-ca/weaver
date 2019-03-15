@@ -27,4 +27,5 @@ six
 simplejson
 webob
 yagmail
--e git://github.com/ESGF/esgf-compute-api.git#egg=esgf_compute_api
+-e git://github.com/ESGF/esgf-compute-api.git@v2.1.0#egg=esgf_compute_api
+pyxb
