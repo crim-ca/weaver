@@ -584,7 +584,8 @@ def submit_local_job(request):
     try:
         store = get_db(request).get_store(StoreProcesses)
         process = store.fetch_by_id(process_id, visibility=VISIBILITY_PUBLIC, request=request)
-        resp = submit_job_handler(request, process.processEndpointWPS1,
+        resp = submit_job_handler(request,
+                                  process.processEndpointWPS1,
                                   is_workflow=process.type == PROCESS_WORKFLOW,
                                   visibility=process.visibility)
         return resp
