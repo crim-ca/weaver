@@ -1634,32 +1634,37 @@ class WpsPackage(Process):
         app_hints = filter(lambda h: any(h["class"].endswith(t) for t in CWL_REQUIREMENT_APP_TYPES), all_hints)
         if len(app_hints) > 1:
             raise ValueError("Package 'requirements' and/or 'hints' define too many conflicting values: {}, "
-                             "only one permitted amongst {}.".format(list(app_hints), list(CWL_REQUIREMENT_APP_TYPES)))
-        requirement = app_hints[0] if app_hints else {"class": ""}
-        if requirement["class"].endswith(CWL_REQUIREMENT_APP_WPS1):
-            req_params = ["provider", "process"]
-            if not all(r in requirement for r in ["provider", "process"]):
-                raise ValueError("Missing requirement [{}] details amongst {}".format(requirement["class"], req_params))
-            provider = requirement["provider"]
-            # The process id of the provider isn't required to be the same as the one use in the EMS
-            process = requirement["process"]
+                             "only one permitted amongst {}.".format(list(app_hints), PACKAGE_REQUIREMENTS_APP_TYPES))
+        requirement = app_hints[0] if app_hints else {'class': ""}
+
+        def _get_wps1_params(_requirement):
+            params = {}
+
+            required_params = ['provider', 'process']
+            for param in required_params:
+                if param not in _requirement:
+                    raise ValueError("Missing requirement detail [{}]: {}".format(_requirement['class'], param))
+                params[param] = _requirement[param]
+            return params
+
+        if requirement['class'].endswith(CWL_REQUIREMENT_APP_WPS1):
             from weaver.processes.wps1_process import Wps1Process
-            return Wps1Process(provider=provider,
-                               process=process,
-                               request=self.request,
-                               update_status=_update_status_dispatch)
-        elif requirement["class"].endswith(CWL_REQUIREMENT_APP_ESGF_CWT):
-            req_params = ["provider", "process"]
-            if not all(r in requirement for r in ["provider", "process"]):
-                raise ValueError("Missing requirement [{}] details amongst {}".format(requirement["class"], req_params))
-            provider = requirement["provider"]
-            # The process id of the provider isn't required to be the same as the one use in the EMS
-            process = requirement["process"]
+            params = _get_wps1_params(requirement)
+            return Wps1Process(
+                provider=params['provider'],
+                process=params['process'],
+                request=self.request,
+                update_status=update_status,
+            )
+        elif requirement['class'].endswith(CWL_REQUIREMENT_APP_ESGF_CWT):
             from weaver.processes.esgf_process import ESGFProcess
-            return ESGFProcess(provider=provider,
-                               process=process,
-                               request=self.request,
-                               update_status=_update_status_dispatch)
+            params = _get_wps1_params(requirement)
+            return ESGFProcess(
+                provider=params['provider'],
+                process=params['process'],
+                request=self.request,
+                update_status=update_status,
+            )
         else:
             # implements both `PROCESS_APPLICATION` with `CWL_REQUIREMENT_APP_DOCKER` and `PROCESS_WORKFLOW`
             from weaver.processes.wps3_process import Wps3Process
