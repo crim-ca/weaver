@@ -10,7 +10,7 @@
         "tasmax": {
             "type": {
                 "type": "array",
-                "items": "File"
+                "items": "string"
             }
         },
         "lat0": "float",
@@ -43,10 +43,17 @@
             },
             "out": ["output"]
         },
+        "json2nc": {
+            "run": "weaver/processes/builtin/jsonarray2netcdf.cwl",
+            "in": {
+                "input": "subset/output"
+            },
+            "out": ["output"]
+        },
         "ice_days": {
             "run": "Finch_IceDays.cwl",
             "in": {
-                "tasmax": "subset/output",
+                "tasmax": "json2nc/output",
                 "freq": "freq"
             },
             "out": ["output_netcdf"]

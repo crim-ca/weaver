@@ -63,12 +63,12 @@ LOGGER = logging.getLogger(__name__)
 
 @app.task(bind=True)
 def execute_process(self, job_id, url, headers=None, notification_email=None):
-    registry = app.conf['PYRAMID_REGISTRY']
+    settings = get_settings(app)
     task_logger = get_task_logger(__name__)
-    load_pywps_cfg(registry)
+    load_pywps_cfg(settings)
 
-    ssl_verify = asbool(registry.settings.get('weaver.ssl_verify', True))
-    store = get_db(registry).get_store(StoreJobs)
+    ssl_verify = asbool(settings.get('weaver.ssl_verify', True))
+    store = get_db(settings).get_store(StoreJobs)
     job = store.fetch_by_id(job_id)
     job.task_id = self.request.id
     job = store.update_job(job)
@@ -186,8 +186,8 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
         # Send email if requested
         if notification_email is not None:
             try:
-                job_json = job_format_json(registry.settings, job)
-                notify_job(job, job_json, notification_email, registry.settings)
+                job_json = job_format_json(settings, job)
+                notify_job(job, job_json, notification_email, settings)
                 message = "Sent email to: {}".format(notification_email)
                 job.save_log(logger=task_logger, message=message)
             except Exception as exc:

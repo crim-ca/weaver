@@ -6,7 +6,9 @@ WPS_LITERAL = "literal"
 WPS_REFERENCE = "reference"
 
 # opensearch
-START_DATE = "StartDate"
-END_DATE = "EndDate"
-AOI = "aoi"
-COLLECTION = "collection"
+OPENSEARCH_START_DATE = "StartDate"
+OPENSEARCH_END_DATE = "EndDate"
+OPENSEARCH_AOI = "aoi"
+OPENSEARCH_COLLECTION = "collection"
+# data source cache
+OPENSEARCH_LOCAL_FILE_SCHEME = "opensearchfile"  # must be a valid url scheme parsable by urlparse

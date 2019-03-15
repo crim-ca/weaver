@@ -1,20 +1,16 @@
-from pyramid.config import Configurator
-from pyramid.registry import Registry
-from pyramid.request import Request
-from typing import Union, TYPE_CHECKING
+from weaver.utils import get_registry
+from typing import TYPE_CHECKING
 import logging
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from weaver.database.mongodb import MongoDatabase
+    from weaver.typedefs import AnyDatabaseContainer
 
 
 def get_db(container):
-    # type: (Union[Configurator, Registry, Request]) -> MongoDatabase
-    if isinstance(container, (Configurator, Request)):
-        return container.registry.db
-    if isinstance(container, Registry):
-        return container.db
-    raise NotImplementedError("Could not obtain database from [{}].".format(type(container)))
+    # type: (AnyDatabaseContainer) -> MongoDatabase
+    registry = get_registry(container)
+    return registry.db
 
 
 def includeme(config):

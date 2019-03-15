@@ -12,7 +12,7 @@ from cwltool.utils import (aslist, json_dumps, onWindows, bytes2str_in_dicts)
 from cwltool.context import (LoadingContext, RuntimeContext, getdefault)
 from cwltool.workflow import Workflow
 from pyramid_celery import celery_app as app
-from weaver.utils import now
+from weaver.utils import now, get_settings
 from weaver.wps import get_wps_output_path
 from functools import cmp_to_key, partial
 from schema_salad import validate
@@ -104,8 +104,7 @@ class WpsWorkflow(ProcessCWL):
 
         jobname = uniquename(runtimeContext.name or shortname(self.tool.get("id", "job")))
 
-        registry = app.conf['PYRAMID_REGISTRY']
-        weaver_output_path = get_wps_output_path(registry.settings)
+        weaver_output_path = get_wps_output_path(get_settings(app))
 
         # outdir must be served by the EMS because downstream step will need access to upstream steps output
         runtimeContext.outdir = tempfile.mkdtemp(

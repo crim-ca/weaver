@@ -1,7 +1,7 @@
 Changes
 *******
 
-0.1.4
+0.2.0
 =====
 
 - Fixes to handle invalid key characters ``"$"`` and ``"."`` during `CWL` package read/write operations to database
@@ -11,6 +11,7 @@ Changes
 - Add file format validation to generated `CWL` package from `WPS-1` `MIME-types`
 - Allow auto-deployment of `WPS-REST` processes from `WPS-1` references specified by configuration
 - Add many deployment and execution validation tests for ``WPS1Requirement``
+- Add builtin application packages support for common operations
 
 0.1.3
 =====

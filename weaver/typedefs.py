@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from pyramid.registry import Registry
     from pyramid.request import Request as PyramidRequest
     from pyramid.config import Configurator
+    from celery import Celery
     from requests.structures import CaseInsensitiveDict
     # noinspection PyUnresolvedReferences
     from cwltool.factory import Callable as CWLFactoryCallable
@@ -29,14 +30,16 @@ if TYPE_CHECKING:
     JsonKey = Union[AnyStr, int]
     JsonField = Union[AnyStr, Number, bool, None]
     JSON = Dict[JsonKey, Union[JsonField, Dict[JsonKey, 'JSON'], List['JSON']]]
-    CWL = JSON
+    CWL = Dict[{"class": AnyStr, }]
     # noinspection PyProtectedMember
     XML = lxml.etree._Element
 
-    AnyContainer = Union[Configurator, Registry, PyramidRequest]
+    AnyContainer = Union[Configurator, Registry, PyramidRequest, Celery]
     SettingValue = Union[AnyStr, Number, bool, None]
     SettingsType = Dict[AnyStr, SettingValue]
     AnySettingsContainer = Union[AnyContainer, SettingsType]
+    AnyRegistryContainer = AnyContainer
+    AnyDatabaseContainer = AnyContainer
 
     CookiesType = Dict[AnyStr, AnyStr]
     HeadersType = Dict[AnyStr, AnyStr]

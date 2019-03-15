@@ -1,4 +1,5 @@
 from weaver import WEAVER_ROOT_DIR
+from weaver.processes.constants import OPENSEARCH_LOCAL_FILE_SCHEME
 from weaver.utils import get_settings
 from weaver.wps_restapi.utils import wps_restapi_base_url
 from typing import Union, Text
@@ -7,9 +8,6 @@ from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
 import json
 import os
-
-# Data source cache
-OPENSEARCH_LOCAL_FILE_SCHEME = 'opensearchfile'  # must be a valid url scheme parsable by urlparse
 
 """
 Schema
@@ -51,8 +49,7 @@ def fetch_data_sources():
     if DATA_SOURCES:
         return DATA_SOURCES
 
-    registry = app.conf['PYRAMID_REGISTRY']
-    data_source_config = get_settings(registry).get('weaver.data_sources', None)
+    data_source_config = get_settings(app).get('weaver.data_sources', None)
     if data_source_config:
         if not os.path.isabs(data_source_config):
             data_source_config = os.path.normpath(os.path.join(WEAVER_ROOT_DIR, data_source_config))
@@ -77,17 +74,13 @@ def get_default_data_source(data_sources):
     return next(iter(data_sources))
 
 
-def get_local_data_source():
-    registry = app.conf['PYRAMID_REGISTRY']
-    return wps_restapi_base_url(registry.settings)
-
-
 def retrieve_data_source_url(data_source):
     # type: (Union[Text, None]) -> Text
     """Finds the data source URL using the provided data source identifier.
     :returns: found URL, 'default' data source if not found, or current weaver WPS Rest API base URL if `None`."""
     if data_source is None:
-        return get_local_data_source()
+        # get local data source
+        return wps_restapi_base_url(get_settings(app))
     data_sources = fetch_data_sources()
     return data_sources[data_source if data_source in data_sources else get_default_data_source(data_sources)]['ades']
 

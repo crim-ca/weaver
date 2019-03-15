@@ -5,10 +5,9 @@ from weaver.database import get_db
 from weaver.store.base import StoreProcesses
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.visibility import VISIBILITY_PUBLIC
-from weaver.utils import get_weaver_url
+from weaver.utils import get_weaver_url, get_settings
 from pyramid.wsgi import wsgiapp2
 from pyramid.settings import asbool
-from pyramid.registry import Registry
 from pyramid_celery import celery_app as app
 from pyramid.threadlocal import get_current_request
 # noinspection PyPackageRequirements
@@ -16,11 +15,14 @@ from pywps import configuration as pywps_config
 # noinspection PyPackageRequirements
 from pywps.app.Service import Service
 from six.moves.configparser import SafeConfigParser
-from typing import AnyStr, Dict, Union, Optional
+from typing import TYPE_CHECKING
 import os
 import six
 import logging
 LOGGER = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from weaver.typedefs import AnySettingsContainer
+    from typing import AnyStr, Dict, Union, Optional
 
 # can be overridden with 'settings.wps-cfg'
 DEFAULT_PYWPS_CFG = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'wps.cfg')
@@ -94,14 +96,15 @@ def get_wps_output_url(settings):
         settings, 'weaver.wps_output_url', 'server', 'outputurl', wps_output_default, 'WPS output url')
 
 
-def load_pywps_cfg(registry, config=None):
-    # type: (Registry, Optional[Union[AnyStr, Dict[AnyStr, AnyStr]]]) -> None
+def load_pywps_cfg(container, config=None):
+    # type: (AnySettingsContainer, Optional[Union[AnyStr, Dict[AnyStr, AnyStr]]]) -> None
     global PYWPS_CFG
 
+    settings = get_settings(container)
     if PYWPS_CFG is None:
         # get PyWPS config
         file_config = config if isinstance(config, six.string_types) or isinstance(config, list) else None
-        pywps_config.load_configuration(file_config or get_wps_cfg_path(registry.settings))
+        pywps_config.load_configuration(file_config or get_wps_cfg_path(settings))
         PYWPS_CFG = pywps_config
 
     # add additional config passed as dictionary of {'section.key': 'value'}
@@ -110,19 +113,19 @@ def load_pywps_cfg(registry, config=None):
             section, key = key.split('.')
             PYWPS_CFG.CONFIG.set(section, key, value)
         # cleanup alternative dict 'PYWPS_CFG' which is not expected elsewhere
-        if isinstance(registry.settings.get('PYWPS_CFG'), dict):
-            del registry.settings['PYWPS_CFG']
+        if isinstance(settings.get('PYWPS_CFG'), dict):
+            del settings['PYWPS_CFG']
 
-    if 'weaver.wps_output_path' not in registry.settings:
+    if 'weaver.wps_output_path' not in settings:
         # ensure the output dir exists if specified
         out_dir_path = PYWPS_CFG.get_config_value('server', 'outputpath')
         if not os.path.isdir(out_dir_path):
             os.makedirs(out_dir_path)
-        registry.settings['weaver.wps_output_path'] = out_dir_path
+        settings['weaver.wps_output_path'] = out_dir_path
 
-    if 'weaver.wps_output_url' not in registry.settings:
+    if 'weaver.wps_output_url' not in settings:
         output_url = PYWPS_CFG.get_config_value('server', 'outputurl')
-        registry.settings['weaver.wps_output_url'] = output_url
+        settings['weaver.wps_output_url'] = output_url
 
 
 # @app.task(bind=True)
@@ -135,16 +138,15 @@ def pywps_view(environ, start_response):
     LOGGER.debug('pywps env: %s', environ.keys())
 
     try:
-        registry = app.conf['PYRAMID_REGISTRY']
-
         # get config file
-        pywps_cfg = environ.get('PYWPS_CFG') or registry.settings.get('PYWPS_CFG')
+        settings = get_settings(app)
+        pywps_cfg = environ.get('PYWPS_CFG') or settings.get('PYWPS_CFG')
         if not pywps_cfg:
-            environ['PYWPS_CFG'] = os.getenv('PYWPS_CFG') or get_wps_cfg_path(registry.settings)
-        load_pywps_cfg(registry, config=pywps_cfg)
+            environ['PYWPS_CFG'] = os.getenv('PYWPS_CFG') or get_wps_cfg_path(settings)
+        load_pywps_cfg(app, config=pywps_cfg)
 
         # call pywps application with processes filtered according to the adapter's definition
-        process_store = get_db(registry).get_store(StoreProcesses)
+        process_store = get_db(app).get_store(StoreProcesses)
         processes_wps = [process.wps() for process in
                          process_store.list_processes(visibility=VISIBILITY_PUBLIC, request=get_current_request())]
         service = Service(processes_wps)

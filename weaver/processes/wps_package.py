@@ -1,5 +1,5 @@
 from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS
-from weaver.processes import opensearch
+from weaver.processes import opensearch, builtin
 from weaver.processes.constants import WPS_INPUT, WPS_OUTPUT, WPS_COMPLEX, WPS_BOUNDINGBOX, WPS_LITERAL, WPS_REFERENCE
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from weaver.processes.sources import retrieve_data_source_url
@@ -87,6 +87,7 @@ __all__ = [
     "retrieve_package_job_log",
 ]
 
+# package types and extensions
 PACKAGE_EXTENSIONS = frozenset(["yaml", "yml", "json", "cwl", "job"])
 PACKAGE_BASE_TYPES = frozenset(["string", "boolean", "float", "int", "integer", "long", "double"])
 PACKAGE_LITERAL_TYPES = frozenset(list(PACKAGE_BASE_TYPES) + ["null", "Any"])
@@ -109,6 +110,19 @@ PACKAGE_REQUIREMENTS_APP_TYPES = frozenset([
     PACKAGE_REQUIREMENTS_APP_WPS1,
 ])
 
+# builtin package apps
+PACKAGE_BUILTIN_ROOT = builtin.__path__[0]
+PACKAGE_BUILTIN_REFERENCE = builtin.__name__.replace('.', '/')  # "weaver/<...>/builtin"
+PACKAGE_BUILTIN_APP_NAMES = [      # real CWL file paths
+    _pkg for _pkg in os.listdir(PACKAGE_BUILTIN_ROOT)
+    if os.path.splitext(_pkg)[-1].replace('.', '') in PACKAGE_EXTENSIONS
+]
+PACKAGE_BUILTIN_APPLICATIONS = {    # reference->path CWL files
+    os.path.join(PACKAGE_BUILTIN_REFERENCE, _pkg): os.path.join(PACKAGE_BUILTIN_ROOT, _pkg)
+    for _pkg in PACKAGE_BUILTIN_APP_NAMES
+}
+
+# process execution progress
 PACKAGE_PROGRESS_PREP_LOG = 1
 PACKAGE_PROGRESS_LAUNCHING = 2
 PACKAGE_PROGRESS_LOADING = 5
@@ -151,8 +165,7 @@ def retrieve_package_job_log(execution, job):
     # If the process is a weaver package this status xml should be available in the process output dir
     status_xml_fn = execution.statusLocation.split('/')[-1]
     try:
-        registry = app.conf["PYRAMID_REGISTRY"]
-        output_path = get_wps_output_path(registry.settings)
+        output_path = get_wps_output_path(get_settings(app))
 
         # weaver package log every status update into this file (we no longer rely on the http monitoring)
         log_fn = os.path.join(output_path, "{0}.log".format(status_xml_fn))
@@ -199,17 +212,21 @@ def get_package_workflow_steps(package_dict_or_url):
         workflow_steps = package_dict_or_url.get("steps")
         for step in workflow_steps:
             step_package_ref = workflow_steps[step].get("run")
-            # if a local file reference was specified, convert it to process id
-            package_ref_name, package_ref_ext = os.path.splitext(step_package_ref)
-            if urlparse(step_package_ref).scheme == "" and package_ref_ext.replace('.', '') in PACKAGE_EXTENSIONS:
-                step_package_ref = package_ref_name
+            # resolve builtin package references
+            if step_package_ref in PACKAGE_BUILTIN_APPLICATIONS:
+                step_package_ref = PACKAGE_BUILTIN_APPLICATIONS[step_package_ref]
+            else:
+                # if a local file reference was specified, convert it to process id
+                package_ref_name, package_ref_ext = os.path.splitext(step_package_ref)
+                if urlparse(step_package_ref).scheme == "" and package_ref_ext.replace('.', '') in PACKAGE_EXTENSIONS:
+                    step_package_ref = package_ref_name
 
             workflow_steps_ids.append({"name": step, "reference": step_package_ref})
     return workflow_steps_ids
 
 
 def _get_process_package(process_url):
-    # type: (AnyStr) -> Tuple[Dict[AnyStr, Any], AnyStr]
+    # type: (AnyStr) -> Tuple[CWL, AnyStr]
     """
     Retrieves the WPS process package content from given process ID or literal URL.
 
@@ -237,7 +254,7 @@ def _get_process_package(process_url):
 
 
 def _get_process_payload(process_url):
-    # type: (AnyStr) -> Dict[AnyStr, Any]
+    # type: (AnyStr) -> JSON
     """
     Retrieves the WPS process payload content from given process ID or literal URL.
 
@@ -264,7 +281,7 @@ def _get_process_payload(process_url):
 
 
 def _get_package_type(package_dict):
-    # type: (Dict[AnyStr, AnyStr]) -> Union[PROCESS_APPLICATION, PROCESS_WORKFLOW]
+    # type: (CWL) -> Union[PROCESS_APPLICATION, PROCESS_WORKFLOW]
     return PROCESS_WORKFLOW if package_dict.get("class").lower() == "workflow" else PROCESS_APPLICATION
 
 
@@ -346,10 +363,15 @@ def _load_package_content(package_dict,                             # type: Dict
     workflow_steps = get_package_workflow_steps(package_dict)
     step_packages = {}
     for step in workflow_steps:
-        # generate sub-package file and update workflow step to point to created sub-package file
-        step_process_url = get_process_location(step["reference"], data_source)
-        package_body, package_name = _get_process_package(step_process_url)
-        _load_package_content(package_body, package_name, data_source=data_source, only_dump_file=True, tmp_dir=tmp_dir)
+        if os.path.isfile(step["reference"]):
+            # package is a resolved builtin file path, simply reference to it
+            package_name = step["reference"]
+        else:
+            # generate sub-package file and update workflow step to point to it
+            step_process_url = get_process_location(step["reference"], data_source)
+            package_body, package_name = _get_process_package(step_process_url)
+            _load_package_content(package_body, package_name, tmp_dir=tmp_dir,
+                                  data_source=data_source, only_dump_file=True)
         package_dict["steps"][step["name"]]["run"] = package_name
         step_packages[step["name"]] = package_name
 
@@ -1343,8 +1365,7 @@ class WpsPackage(Process):
 
             self.update_status("Launching package ...", PACKAGE_PROGRESS_LAUNCHING, STATUS_RUNNING)
 
-            registry = app.conf["PYRAMID_REGISTRY"]
-            if get_weaver_configuration(get_settings(registry)) == WEAVER_CONFIGURATION_EMS:
+            if get_weaver_configuration(get_settings(app)) == WEAVER_CONFIGURATION_EMS:
                 # EMS dispatch the execution to the ADES
                 loading_context = LoadingContext()
                 loading_context.construct_tool_object = self.make_tool

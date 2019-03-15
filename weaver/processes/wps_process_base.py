@@ -1,6 +1,6 @@
 from weaver.wps import get_wps_output_path, get_wps_output_url
 from weaver.formats import CONTENT_TYPE_APP_JSON
-from weaver.utils import get_cookie_headers
+from weaver.utils import get_cookie_headers, get_settings
 from pyramid_celery import celery_app as app
 from pyramid.settings import asbool
 from pyramid.httpexceptions import HTTPBadGateway
@@ -41,9 +41,7 @@ class WpsProcessInterface(object):
         self.request = request
         self.cookies = get_cookie_headers(self.request.http_request.headers)
         self.headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
-
-        registry = app.conf['PYRAMID_REGISTRY']
-        self.settings = registry.settings
+        self.settings = get_settings(app)
         self.verify = asbool(self.settings.get('weaver.ows_proxy_ssl_verify', True))
 
     def make_request(self, method, url, retry, status_code_mock=None, **kwargs):
@@ -63,9 +61,9 @@ class WpsProcessInterface(object):
 
     @staticmethod
     def host_file(fn):
-        registry = app.conf['PYRAMID_REGISTRY']
-        weaver_output_url = get_wps_output_url(registry.settings)
-        weaver_output_path = get_wps_output_path(registry.settings)
+        settings = get_settings(app)
+        weaver_output_url = get_wps_output_url(settings)
+        weaver_output_path = get_wps_output_path(settings)
         fn = fn.replace('file://', '')
 
         if not fn.startswith(weaver_output_path):

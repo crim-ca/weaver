@@ -1,6 +1,8 @@
-from weaver.processes.sources import fetch_data_sources, OPENSEARCH_LOCAL_FILE_SCHEME
+from weaver.processes.sources import fetch_data_sources
 from weaver.processes.constants import WPS_LITERAL
-from weaver.processes.constants import START_DATE, END_DATE, AOI, COLLECTION
+from weaver.processes.constants import (
+    OPENSEARCH_START_DATE, OPENSEARCH_END_DATE, OPENSEARCH_AOI, OPENSEARCH_COLLECTION, OPENSEARCH_LOCAL_FILE_SCHEME
+)
 from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
 from weaver.utils import get_any_id
 from collections import deque
@@ -78,9 +80,9 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info, accept_mime
         # type: (str) -> bool
         """Return True if the name of this parameter is a query parameter"""
         parameters = [
-            AOI,
-            START_DATE,
-            END_DATE
+            OPENSEARCH_AOI,
+            OPENSEARCH_START_DATE,
+            OPENSEARCH_END_DATE
         ]
         return any(param.startswith(p) for p in parameters)
 
@@ -97,12 +99,9 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info, accept_mime
                 collection_id = queue[0].data
                 max_occurs = min(queue[0].max_occurs, 100000)
 
-                aoi_ids = _make_specific_identifier(AOI, input_id), AOI
-                startdate_ids = (
-                    _make_specific_identifier(START_DATE, input_id),
-                    START_DATE,
-                )
-                enddate_ids = _make_specific_identifier(END_DATE, input_id), END_DATE
+                aoi_ids = _make_specific_identifier(OPENSEARCH_AOI, input_id), OPENSEARCH_AOI
+                startdate_ids = (_make_specific_identifier(OPENSEARCH_START_DATE, input_id), OPENSEARCH_START_DATE)
+                enddate_ids = _make_specific_identifier(OPENSEARCH_END_DATE, input_id), OPENSEARCH_END_DATE
 
                 bbox_str = get_input_data(aoi_ids)
                 validate_bbox(bbox_str)
@@ -428,7 +427,7 @@ class EOImageDescribeProcessHandler(object):
         :param start_date:  (Default value = True)
 
         """
-        date = START_DATE if start_date else END_DATE
+        date = OPENSEARCH_START_DATE if start_date else OPENSEARCH_END_DATE
         search_field = "{}{}".format(date[0].lower(), date[1:])
         data = {
             u"id": id_,
@@ -470,26 +469,26 @@ class EOImageDescribeProcessHandler(object):
         collections = []
 
         if unique_toi:
-            toi.append(self.make_toi(START_DATE, start_date=True))
-            toi.append(self.make_toi(END_DATE, start_date=False))
+            toi.append(self.make_toi(OPENSEARCH_START_DATE, start_date=True))
+            toi.append(self.make_toi(OPENSEARCH_END_DATE, start_date=False))
         else:
             for name in eoimage_names:
                 toi.append(
                     self.make_toi(
-                        _make_specific_identifier(START_DATE, name), start_date=True
+                        _make_specific_identifier(OPENSEARCH_START_DATE, name), start_date=True
                     )
                 )
                 toi.append(
                     self.make_toi(
-                        _make_specific_identifier(END_DATE, name), start_date=False
+                        _make_specific_identifier(OPENSEARCH_END_DATE, name), start_date=False
                     )
                 )
 
         if unique_aoi:
-            aoi.append(self.make_aoi(AOI))
+            aoi.append(self.make_aoi(OPENSEARCH_AOI))
         else:
             for name in eoimage_names:
-                aoi.append(self.make_aoi(_make_specific_identifier(AOI, name)))
+                aoi.append(self.make_aoi(_make_specific_identifier(OPENSEARCH_AOI, name)))
 
         eoimage_names = modified_collection_identifiers(eoimage_names)
         for name, allowed_col in zip(eoimage_names, allowed_collections):
@@ -593,7 +592,7 @@ def modified_collection_identifiers(eo_image_identifiers):
     unique_eoimage = len(eo_image_identifiers) == 1
     new_identifiers = []
     for identifier in eo_image_identifiers:
-        new = COLLECTION if unique_eoimage else identifier + "_" + COLLECTION
+        new = OPENSEARCH_COLLECTION if unique_eoimage else identifier + "_" + OPENSEARCH_COLLECTION
         new_identifiers.append(new)
     return new_identifiers
 

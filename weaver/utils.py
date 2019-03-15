@@ -3,6 +3,7 @@ from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.status import map_status
 from datetime import datetime
 from lxml import etree
+from celery import Celery
 from pyramid.httpexceptions import HTTPError as PyramidHTTPError
 from pyramid.config import Configurator
 from pyramid.registry import Registry
@@ -25,7 +26,9 @@ import platform
 import warnings
 import logging
 if TYPE_CHECKING:
-    from weaver.typedefs import SettingsType, AnySettingsContainer, AnyHeadersContainer, HeadersType, XML
+    from weaver.typedefs import (
+        SettingsType, AnySettingsContainer, AnyRegistryContainer, AnyHeadersContainer, HeadersType, XML
+    )
     from typing import Union, Any, Dict, List, AnyStr, Iterable, Optional
 
 LOGGER = logging.getLogger(__name__)
@@ -76,15 +79,28 @@ def get_any_message(info):
     return info.get('message', '').strip()
 
 
+def get_registry(container):
+    # type: (AnyRegistryContainer) -> Registry
+    """Retrieves the application ``registry`` from various containers referencing to it."""
+    if isinstance(container, Celery):
+        return container.conf["PYRAMID_REGISTRY"]
+    if isinstance(container, (Configurator, Request)):
+        return container.registry
+    if isinstance(container, Registry):
+        return container
+    raise TypeError("Could not retrieve registry from container object of type [{}].".format(type(container)))
+
+
 def get_settings(container):
     # type: (AnySettingsContainer) -> SettingsType
-    if isinstance(container, (Configurator, Request)):
-        return container.registry.settings
+    """Retrieves the application ``settings`` from various containers referencing to it."""
+    if isinstance(container, (Celery, Configurator, Request)):
+        container = get_registry(container)
     if isinstance(container, Registry):
         return container.settings
     if isinstance(container, dict):
         return container
-    raise TypeError("Could not retrieve settings from container object [{}]".format(type(container)))
+    raise TypeError("Could not retrieve settings from container object of type [{}]".format(type(container)))
 
 
 def get_header(header_name, header_container):
@@ -401,13 +417,13 @@ def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_in
         return None
     if replace_invalid:
         max_len = max_len or 64
-        name = re.sub(r"[^a-zA-Z0-9_\-]", "_", name.lower()[:max_len])
+        name = re.sub(r"[^a-zA-Z0-9_\-]", '_', name.lower()[:max_len])
     return name
 
 
 def assert_sane_name(name, min_len=3, max_len=None):
     if name is None:
-        raise InvalidIdentifierValue('Invalid name : {0}'.format(name))
+        raise InvalidIdentifierValue("Invalid name : {0}".format(name))
     name = name.strip()
     if '--' in name \
        or name.startswith('-') \
@@ -415,4 +431,4 @@ def assert_sane_name(name, min_len=3, max_len=None):
        or len(name) < min_len \
        or (max_len is not None and len(name) > max_len) \
        or not re.match(r"^[a-zA-Z0-9_\-]+$", name):
-        raise InvalidIdentifierValue('Invalid name : {0}'.format(name))
+        raise InvalidIdentifierValue("Invalid name : {0}".format(name))

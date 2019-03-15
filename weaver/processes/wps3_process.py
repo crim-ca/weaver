@@ -12,9 +12,9 @@ from weaver.wps_restapi.swagger_definitions import (
 )
 from weaver.exceptions import PackageExecutionError
 from weaver.processes import opensearch
-from weaver.processes.sources import OPENSEARCH_LOCAL_FILE_SCHEME
-from weaver.processes.wps_process_base import WpsProcessInterface
+from weaver.processes.constants import OPENSEARCH_LOCAL_FILE_SCHEME
 from weaver.processes.sources import retrieve_data_source_url, get_data_source_from_url
+from weaver.processes.wps_process_base import WpsProcessInterface
 from pyramid.settings import asbool
 from pyramid.httpexceptions import (
     HTTPOk,
