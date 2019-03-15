@@ -38,9 +38,9 @@ class MongoDatabase(DatabaseInterface):
     _stores = None
     type = "mongodb"
 
-    def __init__(self, registry):
+    def __init__(self, registry, reset_connection=False):
         super(MongoDatabase, self).__init__(registry)
-        self._database = get_mongodb_engine(registry)
+        self._database = get_mongodb_engine(registry, reset_connection)
         self._settings = registry.settings
         self._stores = dict()
 
@@ -91,10 +91,12 @@ class MongoDatabase(DatabaseInterface):
         pass
 
 
-def get_mongodb_connection(container):
-    # type: (AnySettingsContainer) -> Database
+def get_mongodb_connection(container, reset_connection=False):
+    # type: (AnySettingsContainer, bool) -> Database
     """Obtains the basic database connection from settings."""
     global MongoDB
+    if reset_connection:
+        MongoDB = None
     if not MongoDB:
         settings = get_settings(container)
         settings_default = [("mongodb.host", "localhost"), ("mongodb.port", 27017), ("mongodb.db_name", "weaver")]
@@ -107,10 +109,10 @@ def get_mongodb_connection(container):
     return MongoDB
 
 
-def get_mongodb_engine(container):
-    # type: (AnySettingsContainer) -> Database
+def get_mongodb_engine(container, reset_connection=False):
+    # type: (AnySettingsContainer, bool) -> Database
     """Obtains the database with configuration ready for usage."""
-    db = get_mongodb_connection(container)
+    db = get_mongodb_connection(container, reset_connection)
     db.services.create_index("name", unique=True)
     db.services.create_index("url", unique=True)
     db.processes.create_index("identifier", unique=True)
