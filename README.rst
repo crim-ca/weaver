@@ -84,3 +84,8 @@ following improvements.
 
 .. _Pyramid: http://www.pylonsproject.org
 .. _PAVICS: https://ouranosinc.github.io/pavics-sdi/index.html
+
+
+.. image:: https://api.codacy.com/project/badge/Grade/4f29419c9c91458ea3f0aa6aff11692c
+   :alt: Codacy Badge
+   :target: https://app.codacy.com/app/fmigneault/weaver?utm_source=github.com&utm_medium=referral&utm_content=crim-ca/weaver&utm_campaign=Badge_Grade_Dashboard
