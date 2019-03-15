@@ -104,25 +104,23 @@ class ESGFProcess(Wps1Process):
         """Wait for an ESGF process to finish, while reporting its status"""
         status_history = set()
 
-        status_percent = None
+        status_percent = [0]  # python 2 can't mutate nonlocal
         last_percent_regex = re.compile(r".+ (\d{1,3})$")
 
         def update_history():
-            global status_percent
-
             status = esgf_process.status
 
             if status not in status_history:
                 match = last_percent_regex.match(status)
                 if match:
-                    status_percent = int(match.group(1))
-                status_percent = max(Percent.SENDING, status_percent)
+                    status_percent[0] = int(match.group(1))
+                status_percent[0] = max(Percent.SENDING, status_percent[0])
 
                 status_history.add(status)
 
                 message = "ESGF status: " + status
                 LOGGER.debug(message)
-                self.update_status(message, status_percent, STATUS_RUNNING)
+                self.update_status(message, status_percent[0], STATUS_RUNNING)
 
         update_history()
 
