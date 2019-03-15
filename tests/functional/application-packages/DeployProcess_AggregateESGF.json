@@ -1,87 +1,44 @@
 {
-  "processDescription": {
-    "processEndpointWPS1": "https://aims2.llnl.gov/wps/",
-    "process": {
-      "id": "ESGF_aggregate",
-      "title": "ESGF CDAT Aggregate",
-      "abstract": "Aggregate a variable over multiple files.",
-      "keywords": [
-        "ESGF"
-      ],
-      "owsContext": {
-        "offering": {
-          "code": "http://www.opengis.net/eoc/applicationContext/cwl",
-          "content": {
-            "href": "https://raw.githubusercontent.com/crim-ca/weaver/esgf-cwt-process/tests/functional/application-packages/AggregateESGF.cwl"
-          }
+    "processDescription": {
+        "process": {
+            "id": "esgf_aggregate"
         }
-      },
-      "inputs": [
-        {
-          "id": "files",
-          "title": "Input Netcdf files",
-          "formats": [
-            {
-              "mimeType": "application/x-netcdf",
-              "default": true
-            },
-            {
-              "mimeType": "application/x-ogc-dods"
-            }
-          ],
-          "minOccurs": "1",
-          "maxOccurs": "unbounded"
-        },
-        {
-          "id": "variable",
-          "title": "Input Netcdf files",
-          "formats": [
-            {
-              "mimeType": "text/plain",
-              "default": true
-            }
-          ],
-          "minOccurs": "1",
-          "maxOccurs": "1"
-        },
-        {
-          "id": "api_key",
-          "title": "Api key for ESGF CWT",
-          "formats": [
-            {
-              "mimeType": "text/plain",
-              "default": true
-            }
-          ],
-          "minOccurs": "1",
-          "maxOccurs": "1"
-        }
-      ],
-      "outputs": [
-        {
-          "id": "output_netcdf",
-          "title": "Aggregated netcdf file",
-          "formats": [
-            {
-              "mimeType": "application/x-netcdf",
-              "default": true
-            }
-          ]
-        }
-      ]
     },
-    "processVersion": "1.0.0",
-    "jobControlOptions": [
-      "async-execute"
+    "executionUnit": [
+        {
+            "unit": {
+                "cwlVersion": "v1.0",
+                "class": "CommandLineTool",
+                "hints": {
+                    "ESGF-CWTRequirement": {
+                        "provider": "https://aims2.llnl.gov/wps/",
+                        "process": "CDAT.aggregate"
+                    }
+                },
+                "inputs": {
+                    "files": {
+                        "type": {
+                            "type": "array",
+                            "items": "File"
+                        }
+                    },
+                    "variable": {
+                        "type": "string"
+                    },
+                    "api_key": {
+                        "type": "string"
+                    }
+                },
+                "outputs": {
+                    "output_netcdf": {
+                        "outputBinding": {
+                            "glob": "output_netcdf.nc"
+                        },
+                        "type": "File"
+                    }
+                }
+            }
+        }
     ],
-    "outputTransmission": [
-      "reference"
-    ]
-  },
-  "executionUnit": [
-    {
-      "href": "https://raw.githubusercontent.com/crim-ca/weaver/master/weaver/tests/functional/application-packages/ESGF-WPS/Aggregate.cwl"
-    }
-  ],
-  "deploymentProfileName": "http://www.opengis.net/profiles/eoc/"
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/ESGFWpsApplication"
 }

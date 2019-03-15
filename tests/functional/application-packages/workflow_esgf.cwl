@@ -28,7 +28,7 @@
   },
   "steps": {
     "aggregate": {
-      "run": "AggregateESGF.cwl",
+      "run": "esgf_aggregate.cwl",
       "in": {
         "files": "files",
         "variable": "variable",
