@@ -157,12 +157,12 @@ def validate_service_process(request):
     return service_name, process_name
 
 
-@sd.process_jobs_service.get(tags=[sd.processes_tag, sd.jobs_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.process_jobs_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_JOBS], renderer=OUTPUT_FORMAT_JSON,
                              schema=sd.GetProcessJobsEndpoint(), response_schemas=sd.get_all_jobs_responses)
-@sd.jobs_full_service.get(tags=[sd.jobs_tag, sd.providers_tag], renderer=OUTPUT_FORMAT_JSON,
-                          schema=sd.GetJobsRequest(), response_schemas=sd.get_all_jobs_responses)
-@sd.jobs_short_service.get(tags=[sd.jobs_tag], renderer=OUTPUT_FORMAT_JSON,
-                           schema=sd.GetJobsRequest(), response_schemas=sd.get_all_jobs_responses)
+@sd.jobs_full_service.get(tags=[sd.TAG_JOBS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
+                          schema=sd.GetProviderJobsEndpoint(), response_schemas=sd.get_all_jobs_responses)
+@sd.jobs_short_service.get(tags=[sd.TAG_JOBS], renderer=OUTPUT_FORMAT_JSON,
+                           schema=sd.GetJobsEndpoint(), response_schemas=sd.get_all_jobs_responses)
 def get_jobs(request):
     """
     Retrieve the list of jobs which can be filtered/sorted using queries.
@@ -193,11 +193,11 @@ def get_jobs(request):
     })
 
 
-@sd.job_full_service.get(tags=[sd.jobs_tag, sd.status_tag, sd.providers_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.job_full_service.get(tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
                          schema=sd.FullJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
-@sd.job_short_service.get(tags=[sd.jobs_tag, sd.status_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.job_short_service.get(tags=[sd.TAG_JOBS, sd.TAG_STATUS], renderer=OUTPUT_FORMAT_JSON,
                           schema=sd.ShortJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
-@sd.process_job_service.get(tags=[sd.processes_tag, sd.jobs_tag, sd.status_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.process_job_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_JOBS, sd.TAG_STATUS], renderer=OUTPUT_FORMAT_JSON,
                             schema=sd.GetProcessJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
 def get_job_status(request):
     """
@@ -208,11 +208,11 @@ def get_job_status(request):
     return HTTPOk(json=response)
 
 
-@sd.job_full_service.delete(tags=[sd.jobs_tag, sd.dismiss_tag, sd.providers_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.job_full_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
                             schema=sd.FullJobEndpoint(), response_schemas=sd.delete_job_responses)
-@sd.job_short_service.delete(tags=[sd.jobs_tag, sd.dismiss_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.job_short_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS], renderer=OUTPUT_FORMAT_JSON,
                              schema=sd.ShortJobEndpoint(), response_schemas=sd.delete_job_responses)
-@sd.process_job_service.delete(tags=[sd.processes_tag, sd.jobs_tag, sd.dismiss_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.process_job_service.delete(tags=[sd.TAG_PROCESSES, sd.TAG_JOBS, sd.TAG_DISMISS], renderer=OUTPUT_FORMAT_JSON,
                                schema=sd.DeleteProcessJobEndpoint(), response_schemas=sd.delete_job_responses)
 def cancel_job(request):
     """
@@ -234,11 +234,11 @@ def cancel_job(request):
     })
 
 
-@sd.results_full_service.get(tags=[sd.jobs_tag, sd.results_tag, sd.providers_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.results_full_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
                              schema=sd.FullResultsEndpoint(), response_schemas=sd.get_job_results_responses)
-@sd.results_short_service.get(tags=[sd.jobs_tag, sd.results_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.results_short_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS], renderer=OUTPUT_FORMAT_JSON,
                               schema=sd.ShortResultsEndpoint(), response_schemas=sd.get_job_results_responses)
-@sd.process_results_service.get(tags=[sd.jobs_tag, sd.results_tag, sd.processes_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.process_results_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.ProcessResultsEndpoint(), response_schemas=sd.get_job_results_responses)
 def get_job_results(request):
     """
@@ -249,11 +249,11 @@ def get_job_results(request):
     return HTTPOk(json=results)
 
 
-@sd.exceptions_full_service.get(tags=[sd.jobs_tag, sd.exceptions_tag, sd.providers_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.exceptions_full_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.FullExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
-@sd.exceptions_short_service.get(tags=[sd.jobs_tag, sd.exceptions_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.exceptions_short_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS], renderer=OUTPUT_FORMAT_JSON,
                                  schema=sd.ShortExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
-@sd.process_exceptions_service.get(tags=[sd.jobs_tag, sd.exceptions_tag, sd.processes_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.process_exceptions_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                                    schema=sd.ProcessExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
 def get_job_exceptions(request):
     """
@@ -263,11 +263,11 @@ def get_job_exceptions(request):
     return HTTPOk(json=job.exceptions)
 
 
-@sd.logs_full_service.get(tags=[sd.jobs_tag, sd.logs_tag, sd.providers_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.logs_full_service.get(tags=[sd.TAG_JOBS, sd.TAG_LOGS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
                           schema=sd.FullLogsEndpoint(), response_schemas=sd.get_logs_responses)
-@sd.logs_short_service.get(tags=[sd.jobs_tag, sd.logs_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.logs_short_service.get(tags=[sd.TAG_JOBS, sd.TAG_LOGS], renderer=OUTPUT_FORMAT_JSON,
                            schema=sd.ShortLogsEndpoint(), response_schemas=sd.get_logs_responses)
-@sd.process_logs_service.get(tags=[sd.jobs_tag, sd.logs_tag, sd.processes_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.process_logs_service.get(tags=[sd.TAG_JOBS, sd.TAG_LOGS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                              schema=sd.ProcessLogsEndpoint(), response_schemas=sd.get_logs_responses)
 def get_job_logs(request):
     """

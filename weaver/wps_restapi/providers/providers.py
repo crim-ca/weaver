@@ -20,7 +20,7 @@ import logging
 logger = logging.getLogger('weaver')
 
 
-@sd.providers_service.get(tags=[sd.providers_tag], renderer='json',
+@sd.providers_service.get(tags=[sd.TAG_PROVIDERS], renderer='json',
                           schema=sd.GetProviders(), response_schemas=sd.get_all_providers_responses)
 def get_providers(request):
     """
@@ -84,7 +84,7 @@ def get_service(request):
     return service, store
 
 
-@sd.providers_service.post(tags=[sd.providers_tag], renderer='json',
+@sd.providers_service.post(tags=[sd.TAG_PROVIDERS], renderer='json',
                            schema=sd.PostProvider(), response_schemas=sd.post_provider_responses)
 def add_provider(request):
     """
@@ -110,7 +110,7 @@ def add_provider(request):
     return HTTPCreated(json=get_capabilities(new_service, request))
 
 
-@sd.provider_service.delete(tags=[sd.providers_tag], renderer='json',
+@sd.provider_service.delete(tags=[sd.TAG_PROVIDERS], renderer='json',
                             schema=sd.ProviderEndpoint(), response_schemas=sd.delete_provider_responses)
 def remove_provider(request):
     """
@@ -126,7 +126,7 @@ def remove_provider(request):
     return HTTPNoContent(json={})
 
 
-@sd.provider_service.get(tags=[sd.providers_tag], renderer='json',
+@sd.provider_service.get(tags=[sd.TAG_PROVIDERS], renderer='json',
                          schema=sd.ProviderEndpoint(), response_schemas=sd.get_one_provider_responses)
 def get_provider(request):
     """

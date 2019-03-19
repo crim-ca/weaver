@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
-@sd.api_frontpage_service.get(tags=[sd.api_tag], renderer='json',
+@sd.api_frontpage_service.get(tags=[sd.TAG_API], renderer='json',
                               schema=sd.FrontpageEndpoint(), response_schemas=sd.get_api_frontpage_responses)
 def api_frontpage(request):
     """Frontpage of weaver."""
@@ -70,7 +70,7 @@ def api_frontpage(request):
 
 
 # noinspection PyUnusedLocal
-@sd.api_versions_service.get(tags=[sd.api_tag], renderer='json',
+@sd.api_versions_service.get(tags=[sd.TAG_API], renderer='json',
                              schema=sd.VersionsEndpoint(), response_schemas=sd.get_api_versions_responses)
 def api_versions(request):
     # type: (Request) -> HTTPException
@@ -79,7 +79,7 @@ def api_versions(request):
     return HTTPOk(json={'versions': [weaver_info]})
 
 
-@sd.api_swagger_json_service.get(tags=[sd.api_tag], renderer='json',
+@sd.api_swagger_json_service.get(tags=[sd.TAG_API], renderer='json',
                                  schema=sd.SwaggerJSONEndpoint(), response_schemas=sd.get_api_swagger_json_responses)
 def api_swagger_json(request, use_docstring_summary=True):
     # type: (Request, bool) -> dict
@@ -106,7 +106,7 @@ def api_swagger_json(request, use_docstring_summary=True):
     return swagger.generate(title=sd.API_TITLE, version=weaver_version, base_path=swagger_base_path)
 
 
-@sd.api_swagger_ui_service.get(tags=[sd.api_tag],
+@sd.api_swagger_ui_service.get(tags=[sd.TAG_API],
                                schema=sd.SwaggerUIEndpoint(), response_schemas=sd.get_api_swagger_ui_responses)
 def api_swagger_ui(request):
     """weaver REST API swagger-ui schema documentation (this page)."""

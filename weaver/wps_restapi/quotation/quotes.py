@@ -36,7 +36,7 @@ def process_quote_estimator(process):
     return {'price': price, 'currency': currency, 'estimatedTime': estimated_time}
 
 
-@sd.process_quotes_service.post(tags=[sd.bill_quote_tag, sd.processes_tag], renderer='json',
+@sd.process_quotes_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer='json',
                                 schema=sd.PostProcessQuoteRequestEndpoint(), response_schemas=sd.post_quotes_responses)
 def request_quote(request):
     """
@@ -101,9 +101,9 @@ def request_quote(request):
     raise HTTPBadRequest("Unsupported quoting process type `{0}` on `{1}`.".format(process_type, weaver_config))
 
 
-@sd.process_quotes_service.get(tags=[sd.bill_quote_tag, sd.processes_tag], renderer='json',
+@sd.process_quotes_service.get(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer='json',
                                schema=sd.ProcessQuotesEndpoint(), response_schemas=sd.get_quote_list_responses)
-@sd.quotes_service.get(tags=[sd.bill_quote_tag], renderer='json',
+@sd.quotes_service.get(tags=[sd.TAG_BILL_QUOTE], renderer='json',
                        schema=sd.QuotesEndpoint(), response_schemas=sd.get_quote_list_responses)
 def get_quote_list(request):
     """
@@ -128,9 +128,9 @@ def get_quote_list(request):
     })
 
 
-@sd.process_quote_service.get(tags=[sd.bill_quote_tag, sd.processes_tag], renderer='json',
+@sd.process_quote_service.get(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer='json',
                               schema=sd.ProcessQuoteEndpoint(), response_schemas=sd.get_quote_responses)
-@sd.quote_service.get(tags=[sd.bill_quote_tag], renderer='json',
+@sd.quote_service.get(tags=[sd.TAG_BILL_QUOTE], renderer='json',
                       schema=sd.QuoteEndpoint(), response_schemas=sd.get_quote_responses)
 def get_quote_info(request):
     """
@@ -145,9 +145,9 @@ def get_quote_info(request):
     return HTTPOk(json={'quote': quote.json()})
 
 
-@sd.process_quote_service.post(tags=[sd.bill_quote_tag, sd.execute_tag, sd.processes_tag], renderer='json',
+@sd.process_quote_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_EXECUTE, sd.TAG_PROCESSES], renderer='json',
                                schema=sd.PostProcessQuote(), response_schemas=sd.post_quote_responses)
-@sd.quote_service.post(tags=[sd.bill_quote_tag, sd.execute_tag], renderer='json',
+@sd.quote_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_EXECUTE], renderer='json',
                        schema=sd.PostQuote(), response_schemas=sd.post_quote_responses)
 def execute_quote(request):
     """

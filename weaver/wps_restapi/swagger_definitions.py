@@ -26,140 +26,158 @@ from weaver.wps_restapi.colander_defaults import SchemaNodeDefault as SchemaNode
 from colander import String, Boolean, Integer, Float, DateTime, MappingSchema, SequenceSchema, drop, OneOf
 from cornice import Service
 
-API_TITLE = 'weaver REST API'
+API_TITLE = "weaver REST API"
 API_INFO = {
     "description": __meta__.__description__,
     "contact": {"name": __meta__.__authors__, "email": __meta__.__emails__, "url": __meta__.__source_repository__}
 }
+URL = "url"
 
 #########################################################################
 # API endpoints
 #########################################################################
 
-api_frontpage_uri = '/'
-api_swagger_ui_uri = '/api'
-api_swagger_json_uri = '/json'
-api_versions_uri = '/versions'
+api_frontpage_uri = "/"
+api_swagger_ui_uri = "/api"
+api_swagger_json_uri = "/json"
+api_versions_uri = "/versions"
 
-processes_uri = '/processes'
-process_uri = '/processes/{process_id}'
-process_package_uri = '/processes/{process_id}/package'
-process_payload_uri = '/processes/{process_id}/payload'
-process_visibility_uri = '/processes/{process_id}/visibility'
-process_jobs_uri = '/processes/{process_id}/jobs'
-process_job_uri = '/processes/{process_id}/jobs/{job_id}'
-process_quotes_uri = '/processes/{process_id}/quotations'
-process_quote_uri = '/processes/{process_id}/quotations/{quote_id}'
-process_results_uri = '/processes/{process_id}/jobs/{job_id}/result'
-process_exceptions_uri = '/processes/{process_id}/jobs/{job_id}/exceptions'
-process_logs_uri = '/processes/{process_id}/jobs/{job_id}/logs'
+processes_uri = "/processes"
+process_uri = "/processes/{process_id}"
+process_package_uri = "/processes/{process_id}/package"
+process_payload_uri = "/processes/{process_id}/payload"
+process_visibility_uri = "/processes/{process_id}/visibility"
+process_jobs_uri = "/processes/{process_id}/jobs"
+process_job_uri = "/processes/{process_id}/jobs/{job_id}"
+process_quotes_uri = "/processes/{process_id}/quotations"
+process_quote_uri = "/processes/{process_id}/quotations/{quote_id}"
+process_results_uri = "/processes/{process_id}/jobs/{job_id}/result"
+process_exceptions_uri = "/processes/{process_id}/jobs/{job_id}/exceptions"
+process_logs_uri = "/processes/{process_id}/jobs/{job_id}/logs"
 
-providers_uri = '/providers'
-provider_uri = '/providers/{provider_id}'
+providers_uri = "/providers"
+provider_uri = "/providers/{provider_id}"
 
-provider_processes_uri = '/providers/{provider_id}/processes'
-provider_process_uri = '/providers/{provider_id}/processes/{process_id}'
+provider_processes_uri = "/providers/{provider_id}/processes"
+provider_process_uri = "/providers/{provider_id}/processes/{process_id}"
 
-jobs_short_uri = '/jobs'
-jobs_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs'
-job_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}'
-job_exceptions_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/exceptions'
-job_short_uri = '/jobs/{job_id}'
+jobs_short_uri = "/jobs"
+jobs_full_uri = "/providers/{provider_id}/processes/{process_id}/jobs"
+job_full_uri = "/providers/{provider_id}/processes/{process_id}/jobs/{job_id}"
+job_exceptions_uri = "/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/exceptions"
+job_short_uri = "/jobs/{job_id}"
 
-quotes_uri = '/quotations'
-quote_uri = '/quotations/{quote_id}'
-bills_uri = '/bills'
-bill_uri = '/bill/{bill_id}'
+quotes_uri = "/quotations"
+quote_uri = "/quotations/{quote_id}"
+bills_uri = "/bills"
+bill_uri = "/bill/{bill_id}"
 
-results_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/result'
-results_short_uri = '/jobs/{job_id}/result'
-result_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/result/{result_id}'
-result_short_uri = '/jobs/{job_id}/result/{result_id}'
+results_full_uri = "/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/result"
+results_short_uri = "/jobs/{job_id}/result"
+result_full_uri = "/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/result/{result_id}"
+result_short_uri = "/jobs/{job_id}/result/{result_id}"
 
-exceptions_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/exceptions'
-exceptions_short_uri = '/jobs/{job_id}/exceptions'
+exceptions_full_uri = "/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/exceptions"
+exceptions_short_uri = "/jobs/{job_id}/exceptions"
 
-logs_full_uri = '/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/logs'
-logs_short_uri = '/jobs/{job_id}/logs'
+logs_full_uri = "/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/logs"
+logs_short_uri = "/jobs/{job_id}/logs"
 
 #########################################################
 # API tags
 #########################################################
 
-api_tag = 'API'
-jobs_tag = 'Jobs'
-visibility_tag = 'Visibility'
-bill_quote_tag = 'Billing & Quoting'
-provider_processes_tag = 'Provider Processes'
-providers_tag = 'Providers'
-processes_tag = 'Local Processes'
-getcapabilities_tag = 'GetCapabilities'
-describeprocess_tag = 'DescribeProcess'
-execute_tag = 'Execute'
-dismiss_tag = 'Dismiss'
-status_tag = 'Status'
-deploy_tag = 'Deploy'
-results_tag = 'Results'
-exceptions_tag = 'Exceptions'
-logs_tag = 'Logs'
+TAG_API = "API"
+TAG_JOBS = "Jobs"
+TAG_VISIBILITY = "Visibility"
+TAG_BILL_QUOTE = "Billing & Quoting"
+TAG_PROVIDER_PROCESS = "Provider Processes"
+TAG_PROVIDERS = "Providers"
+TAG_PROCESSES = "Processes"
+TAG_GETCAPABILITIES = "GetCapabilities"
+TAG_DESCRIBEPROCESS = "DescribeProcess"
+TAG_EXECUTE = "Execute"
+TAG_DISMISS = "Dismiss"
+TAG_STATUS = "Status"
+TAG_DEPLOY = "Deploy"
+TAG_RESULTS = "Results"
+TAG_EXCEPTIONS = "Exceptions"
+TAG_LOGS = "Logs"
 
 ###############################################################################
 # These "services" are wrappers that allow Cornice to generate the JSON API
 ###############################################################################
 
-api_frontpage_service = Service(name='api_frontpage', path=api_frontpage_uri)
-api_swagger_ui_service = Service(name='api_swagger_ui', path=api_swagger_ui_uri)
-api_swagger_json_service = Service(name='api_swagger_json', path=api_swagger_json_uri)
-api_versions_service = Service(name='api_versions', path=api_versions_uri)
+api_frontpage_service = Service(name="api_frontpage", path=api_frontpage_uri)
+api_swagger_ui_service = Service(name="api_swagger_ui", path=api_swagger_ui_uri)
+api_swagger_json_service = Service(name="api_swagger_json", path=api_swagger_json_uri)
+api_versions_service = Service(name="api_versions", path=api_versions_uri)
 
-processes_service = Service(name='processes', path=processes_uri)
-process_service = Service(name='process', path=process_uri)
-process_package_service = Service(name='process_package', path=process_package_uri)
-process_payload_service = Service(name='process_payload', path=process_payload_uri)
-process_visibility_service = Service(name='process_visibility', path=process_visibility_uri)
-process_jobs_service = Service(name='process_jobs', path=process_jobs_uri)
-process_job_service = Service(name='process_job', path=process_job_uri)
-process_quotes_service = Service(name='process_quotes', path=process_quotes_uri)
-process_quote_service = Service(name='process_quote', path=process_quote_uri)
-process_results_service = Service(name='process_results', path=process_results_uri)
-process_exceptions_service = Service(name='process_exceptions', path=process_exceptions_uri)
-process_logs_service = Service(name='process_logs', path=process_logs_uri)
+processes_service = Service(name="processes", path=processes_uri)
+process_service = Service(name="process", path=process_uri)
+process_package_service = Service(name="process_package", path=process_package_uri)
+process_payload_service = Service(name="process_payload", path=process_payload_uri)
+process_visibility_service = Service(name="process_visibility", path=process_visibility_uri)
+process_jobs_service = Service(name="process_jobs", path=process_jobs_uri)
+process_job_service = Service(name="process_job", path=process_job_uri)
+process_quotes_service = Service(name="process_quotes", path=process_quotes_uri)
+process_quote_service = Service(name="process_quote", path=process_quote_uri)
+process_results_service = Service(name="process_results", path=process_results_uri)
+process_exceptions_service = Service(name="process_exceptions", path=process_exceptions_uri)
+process_logs_service = Service(name="process_logs", path=process_logs_uri)
 
-providers_service = Service(name='providers', path=providers_uri)
-provider_service = Service(name='provider', path=provider_uri)
+providers_service = Service(name="providers", path=providers_uri)
+provider_service = Service(name="provider", path=provider_uri)
 
-provider_processes_service = Service(name='provider_processes', path=provider_processes_uri)
-provider_process_service = Service(name='provider_process', path=provider_process_uri)
+provider_processes_service = Service(name="provider_processes", path=provider_processes_uri)
+provider_process_service = Service(name="provider_process", path=provider_process_uri)
 
-jobs_short_service = Service(name='jobs_short', path=jobs_short_uri)
-jobs_full_service = Service(name='jobs_full', path=jobs_full_uri)
-job_full_service = Service(name='job_full', path=job_full_uri)
-job_short_service = Service(name='job_short', path=job_short_uri)
+jobs_short_service = Service(name="jobs_short", path=jobs_short_uri)
+jobs_full_service = Service(name="jobs_full", path=jobs_full_uri)
+job_full_service = Service(name="job_full", path=job_full_uri)
+job_short_service = Service(name="job_short", path=job_short_uri)
 
-quotes_service = Service(name='quotes', path=quotes_uri)
-quote_service = Service(name='quote', path=quote_uri)
-bills_service = Service(name='bills', path=bills_uri)
-bill_service = Service(name='bill', path=bill_uri)
+quotes_service = Service(name="quotes", path=quotes_uri)
+quote_service = Service(name="quote", path=quote_uri)
+bills_service = Service(name="bills", path=bills_uri)
+bill_service = Service(name="bill", path=bill_uri)
 
-results_full_service = Service(name='results_full', path=results_full_uri)
-results_short_service = Service(name='results_short', path=results_short_uri)
+results_full_service = Service(name="results_full", path=results_full_uri)
+results_short_service = Service(name="results_short", path=results_short_uri)
 
-exceptions_full_service = Service(name='exceptions_full', path=exceptions_full_uri)
-exceptions_short_service = Service(name='exceptions_short', path=exceptions_short_uri)
+exceptions_full_service = Service(name="exceptions_full", path=exceptions_full_uri)
+exceptions_short_service = Service(name="exceptions_short", path=exceptions_short_uri)
 
-logs_full_service = Service(name='logs_full', path=logs_full_uri)
-logs_short_service = Service(name='logs_short', path=logs_short_uri)
+logs_full_service = Service(name="logs_full", path=logs_full_uri)
+logs_short_service = Service(name="logs_short", path=logs_short_uri)
 
 #########################################################
 # Path parameter definitions
 #########################################################
 
-provider_id = SchemaNode(String(), description='The provider id')
-process_id = SchemaNode(String(), description='The process id')
-job_id = SchemaNode(String(), description='The job id')
-bill_id = SchemaNode(String(), description='The bill id')
-quote_id = SchemaNode(String(), description='The quote id')
-result_id = SchemaNode(String(), description='The result id')
+
+class ProcessPath(MappingSchema):
+    process_id = SchemaNode(String(), description="The process id")
+
+
+class ProviderPath(MappingSchema):
+    provider_id = SchemaNode(String(), description="The provider id")
+
+
+class JobPath(MappingSchema):
+    job_id = SchemaNode(String(), description="The job id")
+
+
+class BillPath(MappingSchema):
+    bill_id = SchemaNode(String(), description="The bill id")
+
+
+class QuotePath(MappingSchema):
+    quote_id = SchemaNode(String(), description="The quote id")
+
+
+class ResultPath(MappingSchema):
+    result_id = SchemaNode(String(), description="The result id")
 
 
 #########################################################
@@ -195,7 +213,7 @@ class KeywordList(SequenceSchema):
 
 
 class JsonLink(MappingSchema):
-    href = SchemaNode(String(), format='url')
+    href = SchemaNode(String(), format=URL)
     rel = SchemaNode(String(), missing=drop)
     type = SchemaNode(String(), missing=drop)
     hreflang = SchemaNode(String(), missing=drop)
@@ -203,7 +221,7 @@ class JsonLink(MappingSchema):
 
 
 class Metadata(JsonLink):
-    role = SchemaNode(String(), format='url', missing=drop)
+    role = SchemaNode(String(), format=URL, missing=drop)
     value = SchemaNode(String(), missing=drop)
 
 
@@ -257,17 +275,17 @@ class AdditionalParametersList(SequenceSchema):
 
 
 class Content(MappingSchema):
-    href = SchemaNode(String(), format='url', description="URL to CWL file.", title='href',
+    href = SchemaNode(String(), format=URL, description="URL to CWL file.", title="href",
                       example="http://some.host/applications/cwl/multisensor_ndvi.cwl")
 
 
 class Offering(MappingSchema):
     code = SchemaNode(String(), missing=drop, description="Descriptor of represented information in 'content'.")
-    content = Content(title='content', missing=drop)
+    content = Content(title="content", missing=drop)
 
 
 class OWSContext(MappingSchema):
-    offering = Offering(title='offering')
+    offering = Offering(title="offering")
 
 
 class DescriptionType(MappingSchema):
@@ -275,10 +293,10 @@ class DescriptionType(MappingSchema):
     title = SchemaNode(String(), missing=drop)
     abstract = SchemaNode(String(), missing=drop)
     keywords = KeywordList(missing=drop)
-    owsContext = OWSContext(missing=drop, title='owsContext')
+    owsContext = OWSContext(missing=drop, title="owsContext")
     metadata = MetadataList(missing=drop)
-    additionalParameters = AdditionalParametersList(missing=drop, title='additionalParameters')
-    links = JsonLinkList(missing=drop, title='links')
+    additionalParameters = AdditionalParametersList(missing=drop, title="additionalParameters")
+    links = JsonLinkList(missing=drop, title="links")
 
 
 class DataDescriptionType(DescriptionType):
@@ -292,7 +310,7 @@ class ComplexInputType(MappingSchema):
 
 
 class SupportedCrs(MappingSchema):
-    crs = SchemaNode(String(), format='url')
+    crs = SchemaNode(String(), format=URL)
     default = SchemaNode(Boolean(), missing=drop)
 
 
@@ -306,7 +324,7 @@ class BoundingBoxInputType(MappingSchema):
 
 class DataTypeSchema(MappingSchema):
     name = SchemaNode(String())
-    reference = SchemaNode(String(), format='url', missing=drop)
+    reference = SchemaNode(String(), format=URL, missing=drop)
 
 
 class UomSchema(DataTypeSchema):
@@ -342,7 +360,7 @@ class AnyValue(MappingSchema):
 
 
 class ValuesReference(MappingSchema):
-    valueReference = SchemaNode(String(), format='url', )
+    valueReference = SchemaNode(String(), format=URL, )
 
 
 class LiteralDataDomainType(OneOfMappingSchema):
@@ -488,109 +506,77 @@ class SwaggerUIEndpoint(MappingSchema):
     pass
 
 
-class ProviderEndpoint(MappingSchema):
+class ProviderEndpoint(ProviderPath):
     header = AcceptHeader()
-    provider_id = provider_id
 
 
-class ProviderProcessEndpoint(MappingSchema):
+class ProviderProcessEndpoint(ProviderPath, ProcessPath):
     header = AcceptHeader()
-    provider_id = provider_id
-    process_id = process_id
 
 
-class ProcessEndpoint(MappingSchema):
+class ProcessEndpoint(ProcessPath):
     header = AcceptHeader()
-    process_id = process_id
 
 
-class ProcessPackageEndpoint(MappingSchema):
+class ProcessPackageEndpoint(ProcessPath):
     header = AcceptHeader()
-    process_id = process_id
 
 
-class ProcessPayloadEndpoint(MappingSchema):
+class ProcessPayloadEndpoint(ProcessPath):
     header = AcceptHeader()
-    process_id = process_id
 
 
-class ProcessVisibilityGetEndpoint(MappingSchema):
+class ProcessVisibilityGetEndpoint(ProcessPath):
     header = AcceptHeader()
-    process_id = process_id
 
 
-class ProcessVisibilityPutEndpoint(MappingSchema):
+class ProcessVisibilityPutEndpoint(ProcessPath):
     header = AcceptHeader()
-    process_id = process_id
     body = Visibility()
 
 
-class FullJobEndpoint(MappingSchema):
+class FullJobEndpoint(ProviderPath, ProcessPath, JobPath):
     header = AcceptHeader()
-    provider_id = provider_id
-    process_id = process_id
-    job_id = job_id
 
 
-class ShortJobEndpoint(MappingSchema):
+class ShortJobEndpoint(JobPath):
     header = AcceptHeader()
-    job_id = job_id
 
 
-class ProcessResultsEndpoint(MappingSchema):
+class ProcessResultsEndpoint(ProcessPath, JobPath):
     header = AcceptHeader()
-    process_id = process_id
-    job_id = job_id
 
 
-class FullResultsEndpoint(MappingSchema):
+class FullResultsEndpoint(ProviderPath, ProcessPath, JobPath):
     header = AcceptHeader()
-    provider_id = provider_id
-    process_id = process_id
-    job_id = job_id
 
 
-class ShortResultsEndpoint(MappingSchema):
+class ShortResultsEndpoint(ProviderPath, ProcessPath, JobPath):
     header = AcceptHeader()
-    provider_id = provider_id
-    process_id = process_id
-    job_id = job_id
 
 
-class FullExceptionsEndpoint(MappingSchema):
+class FullExceptionsEndpoint(ProviderPath, ProcessPath, JobPath):
     header = AcceptHeader()
-    provider_id = provider_id
-    process_id = process_id
-    job_id = job_id
 
 
-class ShortExceptionsEndpoint(MappingSchema):
+class ShortExceptionsEndpoint(JobPath):
     header = AcceptHeader()
-    job_id = job_id
 
 
-class ProcessExceptionsEndpoint(MappingSchema):
+class ProcessExceptionsEndpoint(ProcessPath, JobPath):
     header = AcceptHeader()
-    process_id = process_id
-    job_id = job_id
 
 
-class FullLogsEndpoint(MappingSchema):
+class FullLogsEndpoint(ProviderPath, ProcessPath, JobPath):
     header = AcceptHeader()
-    provider_id = provider_id
-    process_id = process_id
-    job_id = job_id
 
 
-class ShortLogsEndpoint(MappingSchema):
+class ShortLogsEndpoint(JobPath):
     header = AcceptHeader()
-    job_id = job_id
 
 
-class ProcessLogsEndpoint(MappingSchema):
+class ProcessLogsEndpoint(ProcessPath, JobPath):
     header = AcceptHeader()
-    process_id = process_id
-    job_id = job_id
 
 
 ##################################################################
@@ -666,7 +652,7 @@ class ProcessSummary(DescriptionType):
     version = SchemaNode(String(), missing=drop)
     jobControlOptions = JobControlOptionsList(missing=drop)
     outputTransmission = TransmissionModeList(missing=drop)
-    processDescriptionURL = SchemaNode(String(), format='url', missing=drop)
+    processDescriptionURL = SchemaNode(String(), format=URL, missing=drop)
 
 
 class ProcessSummaryList(SequenceSchema):
@@ -680,7 +666,7 @@ class ProcessCollection(MappingSchema):
 class Process(DescriptionType):
     inputs = InputTypeList(missing=drop)
     outputs = OutputDescriptionList(missing=drop)
-    executeEndpoint = SchemaNode(String(), format='url', missing=drop)
+    executeEndpoint = SchemaNode(String(), format=URL, missing=drop)
 
 
 class ProcessOutputDescriptionSchema(MappingSchema):
@@ -690,24 +676,6 @@ class ProcessOutputDescriptionSchema(MappingSchema):
     id = SchemaNode(String())
     abstract = SchemaNode(String())
     title = SchemaNode(String())
-
-
-class GetJobsQueries(MappingSchema):
-    detail = SchemaNode(Boolean(), description="Provide job details instead of IDs.",
-                        default=False, example=True, missing=drop)
-    page = SchemaNode(Integer(), missing=drop, default=0)
-    limit = SchemaNode(Integer(), missing=drop, default=10)
-    status = JobStatusEnum(missing=drop)
-    process = SchemaNode(String(), missing=drop, default=None)
-    provider = SchemaNode(String(), missing=drop, default=None)
-    sort = JobSortEnum(missing=drop)
-    tags = SchemaNode(String(), missing=drop, default=None,
-                      description='Comma-separated values of tags assigned to jobs')
-
-
-class GetJobsRequest(MappingSchema):
-    header = AcceptHeader()
-    querystring = GetJobsQueries()
 
 
 class JobStatusInfo(MappingSchema):
@@ -783,7 +751,7 @@ class Reference(MappingSchema):
     schema = SchemaNode(String(), missing=drop)
     encoding = SchemaNode(String(), missing=drop)
     body = SchemaNode(String(), missing=drop)
-    bodyReference = SchemaNode(String(), missing=drop, format='url')
+    bodyReference = SchemaNode(String(), missing=drop, format=URL)
 
 
 class DataEncodingAttributes(MappingSchema):
@@ -947,7 +915,7 @@ class ProcessesSchema(SequenceSchema):
 class JobOutputSchema(MappingSchema):
     id = SchemaNode(String(), description="Job output id corresponding to process description outputs.")
     data = SchemaNode(String(), missing=drop)
-    href = SchemaNode(String(), format='url', missing=drop)
+    href = SchemaNode(String(), format=URL, missing=drop)
     mimeType = SchemaNode(String(), missing=drop)
     schema = SchemaNode(String(), missing=drop)
     encoding = SchemaNode(String(), missing=drop)
@@ -1069,21 +1037,46 @@ class PostProcessEndpoint(MappingSchema):
     body = Deploy(title='Deploy')
 
 
-class PostProcessJobsEndpoint(MappingSchema):
-    process_id = process_id
+class PostProcessJobsEndpoint(ProcessPath):
     header = AcceptHeader()
     body = Execute()
 
 
-class GetProcessJobsEndpoint(MappingSchema):
+class GetJobsQueries(MappingSchema):
+    detail = SchemaNode(Boolean(), description="Provide job details instead of IDs.",
+                        default=False, example=True, missing=drop)
+    page = SchemaNode(Integer(), missing=drop, default=0)
+    limit = SchemaNode(Integer(), missing=drop, default=10)
+    status = JobStatusEnum(missing=drop)
+    process = SchemaNode(String(), missing=drop, default=None)
+    provider = SchemaNode(String(), missing=drop, default=None)
+    sort = JobSortEnum(missing=drop)
+    tags = SchemaNode(String(), missing=drop, default=None,
+                      description='Comma-separated values of tags assigned to jobs')
+
+
+class GetJobsRequest(MappingSchema):
+    header = AcceptHeader()
+    querystring = GetJobsQueries()
+
+
+class GetJobsEndpoint(GetJobsRequest):
+    pass
+
+
+class GetProcessJobsEndpoint(GetJobsRequest, ProcessPath):
+    pass
+
+
+class GetProviderJobsEndpoint(GetJobsRequest, ProviderPath, ProcessPath):
+    pass
+
+
+class GetProcessJobEndpoint(ProcessPath):
     header = AcceptHeader()
 
 
-class GetProcessJobEndpoint(MappingSchema):
-    header = AcceptHeader()
-
-
-class DeleteProcessJobEndpoint(MappingSchema):
+class DeleteProcessJobEndpoint(ProcessPath):
     header = AcceptHeader()
 
 
@@ -1091,19 +1084,15 @@ class BillsEndpoint(MappingSchema):
     header = AcceptHeader()
 
 
-class BillEndpoint(MappingSchema):
-    bill_id = bill_id
+class BillEndpoint(BillPath):
     header = AcceptHeader()
 
 
-class ProcessQuotesEndpoint(MappingSchema):
-    process_id = process_id
+class ProcessQuotesEndpoint(ProcessPath):
     header = AcceptHeader()
 
 
-class ProcessQuoteEndpoint(MappingSchema):
-    process_id = process_id
-    quote_id = quote_id
+class ProcessQuoteEndpoint(ProcessPath, QuotePath):
     header = AcceptHeader()
 
 
@@ -1131,27 +1120,21 @@ class QuotesEndpoint(MappingSchema):
     querystring = GetQuotesQueries()
 
 
-class QuoteEndpoint(MappingSchema):
-    quote_id = quote_id
+class QuoteEndpoint(QuotePath):
     header = AcceptHeader()
 
 
-class PostProcessQuote(MappingSchema):
-    process_id = process_id
-    quote_id = quote_id
+class PostProcessQuote(ProcessPath, QuotePath):
     header = AcceptHeader()
     body = MappingSchema(default={})
 
 
-class PostQuote(MappingSchema):
-    quote_id = quote_id
+class PostQuote(QuotePath):
     header = AcceptHeader()
     body = MappingSchema(default={})
 
 
-class PostProcessQuoteRequestEndpoint(MappingSchema):
-    process_id = process_id
-    quote_id = quote_id
+class PostProcessQuoteRequestEndpoint(ProcessPath, QuotePath):
     header = AcceptHeader()
     body = QuoteProcessParametersSchema()
 
@@ -1245,9 +1228,13 @@ class GetProcessesQuery(MappingSchema):
         Boolean(), example=True, default=False, missing=drop,
         description="List local processes as well as all sub-processes of all registered providers. "
                     "Applicable only for weaver in {} mode, false otherwise.".format(WEAVER_CONFIGURATION_EMS))
+    detail = SchemaNode(
+        Boolean(), example=True, default=True, missing=drop,
+        description="Return summary details about each process, or simply their IDs."
+    )
 
 
-class GetProcessesRequest(MappingSchema):
+class GetProcessesEndpoint(MappingSchema):
     querystring = GetProcessesQuery()
 
 

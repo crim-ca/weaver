@@ -27,7 +27,8 @@ import warnings
 import logging
 if TYPE_CHECKING:
     from weaver.typedefs import (
-        AnyValue, AnySettingsContainer, AnyRegistryContainer, AnyHeadersContainer, HeadersType, SettingsType, XML
+        AnyValue, AnyKey, AnySettingsContainer, AnyRegistryContainer, AnyHeadersContainer,
+        HeadersType, SettingsType, XML
     )
     from typing import Union, Any, Dict, List, AnyStr, Iterable, Optional
 
@@ -365,7 +366,7 @@ def convert_snake_case(name):
 
 
 def parse_request_query(request):
-    # type: (Request) -> Dict[AnyStr, Dict[Union[int, AnyStr], AnyStr]]
+    # type: (Request) -> Dict[AnyStr, Dict[AnyKey, AnyStr]]
     """
     :param request:
     :return: dict of dict where k=v are accessible by d[k][0] == v and q=k=v are accessible by d[q][k] == v, lowercase

@@ -40,7 +40,7 @@ from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
 from pyramid_celery import celery_app as app
 from collections import OrderedDict, Hashable
 from six.moves.urllib.parse import urlparse
-from typing import Dict, Tuple, Union, Any, Optional, AnyStr, List, Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING
 from yaml.scanner import ScannerError
 from cwltool.context import LoadingContext
 from cwltool.context import RuntimeContext
@@ -58,6 +58,7 @@ import six
 if TYPE_CHECKING:
     from weaver.status import AnyStatusType
     from weaver.typedefs import ToolPathObjectType, CWLFactoryCallable, CWL, AnyKey, JSON, XML, Number
+    from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, Type, Union
     from cwltool.process import Process as ProcessCWL
     from pywps.app import WPSRequest
     from pywps.response.execute import ExecuteResponse
@@ -444,18 +445,18 @@ def _cwl2wps_io(io_info, io_select):
     :param io_select: ``WPS_INPUT`` or ``WPS_OUTPUT`` to specify desired WPS type conversion.
     :returns: corresponding IO in WPS format
     """
-    is_input = False                    # noqa: F841
+    is_input = False
     is_output = False
     if io_select == WPS_INPUT:
-        is_input = True                 # noqa: F841
-        io_literal = LiteralInput
-        io_complex = ComplexInput
-        io_bbox = BoundingBoxInput
+        is_input = True
+        io_literal = LiteralInput       # type: Union[Type[LiteralInput], Type[LiteralOutput]]
+        io_complex = ComplexInput       # type: Union[Type[ComplexInput], Type[ComplexOutput]]
+        io_bbox = BoundingBoxInput      # type: Union[Type[BoundingBoxInput], Type[BoundingBoxOutput]]
     elif io_select == WPS_OUTPUT:
         is_output = True
-        io_literal = LiteralOutput
-        io_complex = ComplexOutput
-        io_bbox = BoundingBoxOutput     # noqa: F841
+        io_literal = LiteralOutput      # type: Union[Type[LiteralInput], Type[LiteralOutput]]
+        io_complex = ComplexOutput      # type: Union[Type[ComplexInput], Type[ComplexOutput]]
+        io_bbox = BoundingBoxOutput     # type: Union[Type[BoundingBoxInput], Type[BoundingBoxOutput]]
     else:
         raise PackageTypeError("Unsupported I/O info definition: `{0}` with `{1}`.".format(repr(io_info), io_select))
 
@@ -512,18 +513,24 @@ def _cwl2wps_io(io_info, io_select):
             io_type = "integer"
         if io_type in ["float", "double"]:
             io_type = "float"
-        return io_literal(identifier=io_name,
-                          title=io_info.get("label", ""),
-                          abstract=io_info.get("doc", ""),
-                          data_type=io_type,
-                          default=io_info.get("default", None),
-                          min_occurs=io_min_occurs,
-                          max_occurs=io_max_occurs,
-                          # unless extended by custom types, no value validation for literals
-                          mode=io_mode,
-                          allowed_values=io_allow)
+        # keywords commonly used by I/O
+        kw = {
+            "identifier": io_name,
+            "title": io_info.get("label", ""),
+            "abstract": io_info.get("doc", ""),
+            "data_type": io_type,
+            # unless extended by custom types, no value validation for literals
+            "mode": io_mode,
+        }
+        if is_input:
+            kw["default"] = io_info.get("default", None)
+            kw["allowed_values"] = io_allow
+            kw["min_occurs"] = io_min_occurs
+            kw["max_occurs"] = io_max_occurs
+        return io_literal(**kw)
     # complex types
     else:
+        # keywords commonly used by I/O
         kw = {
             "identifier": io_name,
             "title": io_info.get("label", io_name),

@@ -693,11 +693,11 @@ class Process(Base):
         }
 
     def json(self):
-        # type: (...) -> Dict[AnyStr, Any]
+        # type: (...) -> JSON
         return sd.Process().deserialize(self)
 
     def process_offering(self):
-        # type: (...) -> Dict[AnyStr, Any]
+        # type: (...) -> JSON
         process_offering = {"process": self}
         if self.version:
             process_offering.update({"processVersion": self.version})
@@ -708,7 +708,7 @@ class Process(Base):
         return sd.ProcessOffering().deserialize(process_offering)
 
     def process_summary(self):
-        # type: (...) -> Dict[AnyStr, Any]
+        # type: (...) -> JSON
         return sd.ProcessSummary().deserialize(self)
 
     @staticmethod

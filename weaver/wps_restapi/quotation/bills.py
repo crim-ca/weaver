@@ -7,7 +7,7 @@ import logging
 logger = logging.getLogger('weaver')
 
 
-@sd.bills_service.get(tags=[sd.bill_quote_tag], renderer='json',
+@sd.bills_service.get(tags=[sd.TAG_BILL_QUOTE], renderer='json',
                       schema=sd.BillsEndpoint(), response_schemas=sd.get_bill_list_responses)
 def get_bill_list(request):
     """
@@ -18,7 +18,7 @@ def get_bill_list(request):
     return HTTPOk(json={'bills': [b.id for b in bills]})
 
 
-@sd.bill_service.get(tags=[sd.bill_quote_tag], renderer='json',
+@sd.bill_service.get(tags=[sd.TAG_BILL_QUOTE], renderer='json',
                      schema=sd.BillEndpoint(), response_schemas=sd.get_bill_responses)
 def get_bill_info(request):
     """

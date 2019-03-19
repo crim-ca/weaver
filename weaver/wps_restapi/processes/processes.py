@@ -57,7 +57,8 @@ import colander
 import logging
 import six
 if TYPE_CHECKING:
-    from typing import Any, AnyStr, Dict, List, Tuple, Optional
+    from weaver.typedefs import JSON
+    from typing import AnyStr, List, Tuple, Optional
 
 LOGGER = logging.getLogger(__name__)
 
@@ -273,7 +274,7 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
     return HTTPCreated(location=location, json=body_data)
 
 
-@sd.jobs_full_service.post(tags=[sd.provider_processes_tag, sd.providers_tag, sd.execute_tag, sd.jobs_tag],
+@sd.jobs_full_service.post(tags=[sd.TAG_PROVIDER_PROCESS, sd.TAG_PROVIDERS, sd.TAG_EXECUTE, sd.TAG_JOBS],
                            renderer=OUTPUT_FORMAT_JSON, schema=sd.PostProviderProcessJobRequest(),
                            response_schemas=sd.post_provider_process_job_responses)
 def submit_provider_job(request):
@@ -297,7 +298,7 @@ def list_remote_processes(service, request):
     return [convert_process_wps_to_db(service, process, settings) for process in wps.processes]
 
 
-@sd.provider_processes_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.getcapabilities_tag],
+@sd.provider_processes_service.get(tags=[sd.TAG_PROVIDER_PROCESS, sd.TAG_PROVIDERS, sd.TAG_GETCAPABILITIES],
                                    renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderEndpoint(),
                                    response_schemas=sd.get_provider_processes_responses)
 def get_provider_processes(request):
@@ -326,7 +327,7 @@ def get_provider_process(request):
     return convert_process_wps_to_db(service, process, get_settings(request))
 
 
-@sd.provider_process_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.describeprocess_tag],
+@sd.provider_process_service.get(tags=[sd.TAG_PROVIDER_PROCESS, sd.TAG_PROVIDERS, sd.TAG_DESCRIBEPROCESS],
                                  renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderProcessEndpoint(),
                                  response_schemas=sd.get_provider_process_description_responses)
 def describe_provider_process(request):
@@ -346,7 +347,7 @@ def describe_provider_process(request):
 
 
 def get_processes_filtered_by_valid_schemas(request):
-    # type: (Request) -> Tuple[List[Dict[AnyStr, Any]], List[AnyStr]]
+    # type: (Request) -> Tuple[List[JSON], List[AnyStr]]
     """
     Validates the processes summary schemas and returns them into valid/invalid lists.
     :returns: list of valid process summaries and invalid processes IDs for manual cleanup.
@@ -364,12 +365,13 @@ def get_processes_filtered_by_valid_schemas(request):
     return valid_processes, invalid_processes_ids
 
 
-@sd.processes_service.get(schema=sd.GetProcessesRequest(), tags=[sd.processes_tag, sd.getcapabilities_tag],
+@sd.processes_service.get(schema=sd.GetProcessesEndpoint(), tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
                           response_schemas=sd.get_processes_responses)
 def get_processes(request):
     """
     List registered processes (GetCapabilities). Optionally list both local and provider processes.
     """
+    detail = asbool(request.params.get("detail", True))
     try:
         # get local processes and filter according to schema validity
         # (previously deployed process schemas can become invalid because of modified schema definitions
@@ -378,9 +380,9 @@ def get_processes(request):
             raise HTTPServiceUnavailable(
                 "Previously deployed processes are causing invalid schema integrity errors. "
                 "Manual cleanup of following processes is required: {}".format(invalid_processes))
-        response_body = {"processes": processes}
+        response_body = {"processes": processes if detail else [get_any_id(p) for p in processes]}
 
-        # if EMS and ?providers=True, also fetch each provider's processes
+        # if 'EMS' and '?providers=True', also fetch each provider's processes
         if get_weaver_configuration(get_settings(request)) == WEAVER_CONFIGURATION_EMS:
             queries = parse_request_query(request)
             if "providers" in queries and asbool(queries["providers"][0]) is True:
@@ -393,7 +395,9 @@ def get_processes(request):
                     processes = requests.request("GET", "{host}/providers/{provider_id}/processes"
                                                  .format(host=request.host_url, provider_id=provider_id),
                                                  headers=request.headers, cookies=request.cookies)
-                    response_body["providers"][i].update({"processes": processes})
+                    response_body["providers"][i].update({
+                        "processes": processes if detail else [get_any_id(p) for p in processes]
+                    })
         return HTTPOk(json=response_body)
     except HTTPException:
         raise  # re-throw already handled HTTPException
@@ -404,7 +408,7 @@ def get_processes(request):
         raise HTTPInternalServerError(str(ex))
 
 
-@sd.processes_service.post(tags=[sd.processes_tag, sd.deploy_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.processes_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OUTPUT_FORMAT_JSON,
                            schema=sd.PostProcessEndpoint(), response_schemas=sd.post_processes_responses)
 def add_local_process(request):
     """
@@ -436,7 +440,7 @@ def get_process(request):
         raise HTTPInternalServerError(str(ex))
 
 
-@sd.process_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.process_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OUTPUT_FORMAT_JSON,
                         schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_responses)
 def get_local_process(request):
     """
@@ -455,7 +459,7 @@ def get_local_process(request):
         raise HTTPInternalServerError(str(ex))
 
 
-@sd.process_package_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.process_package_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.ProcessPackageEndpoint(), response_schemas=sd.get_process_package_responses)
 def get_local_process_package(request):
     """
@@ -465,7 +469,7 @@ def get_local_process_package(request):
     return HTTPOk(json=process.package or {})
 
 
-@sd.process_payload_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.process_payload_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.ProcessPayloadEndpoint(), response_schemas=sd.get_process_payload_responses)
 def get_local_process_payload(request):
     """
@@ -475,7 +479,7 @@ def get_local_process_payload(request):
     return HTTPOk(json=process.payload or {})
 
 
-@sd.process_visibility_service.get(tags=[sd.processes_tag, sd.visibility_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.process_visibility_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_VISIBILITY], renderer=OUTPUT_FORMAT_JSON,
                                    schema=sd.ProcessVisibilityGetEndpoint(),
                                    response_schemas=sd.get_process_visibility_responses)
 def get_process_visibility(request):
@@ -497,7 +501,7 @@ def get_process_visibility(request):
         raise HTTPInternalServerError(str(ex))
 
 
-@sd.process_visibility_service.put(tags=[sd.processes_tag, sd.visibility_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.process_visibility_service.put(tags=[sd.TAG_PROCESSES, sd.TAG_VISIBILITY], renderer=OUTPUT_FORMAT_JSON,
                                    schema=sd.ProcessVisibilityPutEndpoint(),
                                    response_schemas=sd.put_process_visibility_responses)
 def set_process_visibility(request):
@@ -533,7 +537,7 @@ def set_process_visibility(request):
         raise HTTPInternalServerError(str(ex))
 
 
-@sd.process_service.delete(tags=[sd.processes_tag, sd.deploy_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.process_service.delete(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OUTPUT_FORMAT_JSON,
                            schema=sd.ProcessEndpoint(), response_schemas=sd.delete_process_responses)
 def delete_local_process(request):
     """
@@ -563,7 +567,7 @@ def delete_local_process(request):
         raise HTTPInternalServerError(str(ex))
 
 
-@sd.process_jobs_service.post(tags=[sd.processes_tag, sd.execute_tag, sd.jobs_tag], renderer=OUTPUT_FORMAT_JSON,
+@sd.process_jobs_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS], renderer=OUTPUT_FORMAT_JSON,
                               schema=sd.PostProcessJobsEndpoint(), response_schemas=sd.post_process_jobs_responses)
 def submit_local_job(request):
     """
