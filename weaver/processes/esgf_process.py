@@ -119,7 +119,12 @@ class ESGFProcess(Wps1Process):
         # type: (JsonBody) -> List[Tuple[str, str]]
         """Get all netcdf files from the cwl inputs"""
         urls = []
-        for cwl_file in workflow_inputs[InputNames.files]:
+
+        files = workflow_inputs[InputNames.files]
+        if not isinstance(files, list):
+            files = [files]
+
+        for cwl_file in files:
             if not cwl_file["class"] == "File":
                 raise ValueError("'{}' inputs must have a class named 'File'".format(InputNames.files))
             location = cwl_file["location"]
