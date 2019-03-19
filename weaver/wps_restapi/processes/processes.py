@@ -26,7 +26,7 @@ from weaver.utils import get_any_id, get_any_value, get_settings, raise_on_xml_e
 from weaver.visibility import VISIBILITY_PUBLIC, visibility_values
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.notify import notify_job
-from weaver.wps_restapi.utils import get_wps_restapi_base_url, parse_request_query
+from weaver.wps_restapi.utils import get_wps_restapi_base_url, parse_request_query, OUTPUT_FORMAT_JSON
 from weaver.wps_restapi.jobs.jobs import check_status, job_format_json
 from weaver.wps import load_pywps_cfg
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput
@@ -274,7 +274,7 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
 
 
 @sd.jobs_full_service.post(tags=[sd.provider_processes_tag, sd.providers_tag, sd.execute_tag, sd.jobs_tag],
-                           renderer="json", schema=sd.PostProviderProcessJobRequest(),
+                           renderer=OUTPUT_FORMAT_JSON, schema=sd.PostProviderProcessJobRequest(),
                            response_schemas=sd.post_provider_process_job_responses)
 def submit_provider_job(request):
     """
@@ -298,7 +298,7 @@ def list_remote_processes(service, request):
 
 
 @sd.provider_processes_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.getcapabilities_tag],
-                                   renderer="json", schema=sd.ProviderEndpoint(),
+                                   renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderEndpoint(),
                                    response_schemas=sd.get_provider_processes_responses)
 def get_provider_processes(request):
     """
@@ -327,7 +327,7 @@ def get_provider_process(request):
 
 
 @sd.provider_process_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.describeprocess_tag],
-                                 renderer="json", schema=sd.ProviderProcessEndpoint(),
+                                 renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderProcessEndpoint(),
                                  response_schemas=sd.get_provider_process_description_responses)
 def describe_provider_process(request):
     """
@@ -404,7 +404,7 @@ def get_processes(request):
         raise HTTPInternalServerError(str(ex))
 
 
-@sd.processes_service.post(tags=[sd.processes_tag, sd.deploy_tag], renderer="json",
+@sd.processes_service.post(tags=[sd.processes_tag, sd.deploy_tag], renderer=OUTPUT_FORMAT_JSON,
                            schema=sd.PostProcessEndpoint(), response_schemas=sd.post_processes_responses)
 def add_local_process(request):
     """
@@ -436,7 +436,7 @@ def get_process(request):
         raise HTTPInternalServerError(str(ex))
 
 
-@sd.process_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer="json",
+@sd.process_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer=OUTPUT_FORMAT_JSON,
                         schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_responses)
 def get_local_process(request):
     """
@@ -455,7 +455,7 @@ def get_local_process(request):
         raise HTTPInternalServerError(str(ex))
 
 
-@sd.process_package_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer="json",
+@sd.process_package_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.ProcessPackageEndpoint(), response_schemas=sd.get_process_package_responses)
 def get_local_process_package(request):
     """
@@ -465,7 +465,7 @@ def get_local_process_package(request):
     return HTTPOk(json=process.package or {})
 
 
-@sd.process_payload_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer="json",
+@sd.process_payload_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.ProcessPayloadEndpoint(), response_schemas=sd.get_process_payload_responses)
 def get_local_process_payload(request):
     """
@@ -475,7 +475,7 @@ def get_local_process_payload(request):
     return HTTPOk(json=process.payload or {})
 
 
-@sd.process_visibility_service.get(tags=[sd.processes_tag, sd.visibility_tag], renderer="json",
+@sd.process_visibility_service.get(tags=[sd.processes_tag, sd.visibility_tag], renderer=OUTPUT_FORMAT_JSON,
                                    schema=sd.ProcessVisibilityGetEndpoint(),
                                    response_schemas=sd.get_process_visibility_responses)
 def get_process_visibility(request):
@@ -497,7 +497,7 @@ def get_process_visibility(request):
         raise HTTPInternalServerError(str(ex))
 
 
-@sd.process_visibility_service.put(tags=[sd.processes_tag, sd.visibility_tag], renderer="json",
+@sd.process_visibility_service.put(tags=[sd.processes_tag, sd.visibility_tag], renderer=OUTPUT_FORMAT_JSON,
                                    schema=sd.ProcessVisibilityPutEndpoint(),
                                    response_schemas=sd.put_process_visibility_responses)
 def set_process_visibility(request):
@@ -533,7 +533,7 @@ def set_process_visibility(request):
         raise HTTPInternalServerError(str(ex))
 
 
-@sd.process_service.delete(tags=[sd.processes_tag, sd.deploy_tag], renderer="json",
+@sd.process_service.delete(tags=[sd.processes_tag, sd.deploy_tag], renderer=OUTPUT_FORMAT_JSON,
                            schema=sd.ProcessEndpoint(), response_schemas=sd.delete_process_responses)
 def delete_local_process(request):
     """
@@ -563,7 +563,7 @@ def delete_local_process(request):
         raise HTTPInternalServerError(str(ex))
 
 
-@sd.process_jobs_service.post(tags=[sd.processes_tag, sd.execute_tag, sd.jobs_tag], renderer="json",
+@sd.process_jobs_service.post(tags=[sd.processes_tag, sd.execute_tag, sd.jobs_tag], renderer=OUTPUT_FORMAT_JSON,
                               schema=sd.PostProcessJobsEndpoint(), response_schemas=sd.post_process_jobs_responses)
 def submit_local_job(request):
     """

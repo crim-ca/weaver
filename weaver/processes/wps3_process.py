@@ -258,59 +258,59 @@ class Wps3Process(WpsProcessInterface):
                     exec_input[execute_req_input_val]))
 
         execute_body_outputs = [{execute_req_id: output,
-                                 execute_req_out_trans_mode: 'reference'} for output in expected_outputs]
-        self.update_status('Executing job on remote ADES.', REMOTE_JOB_PROGRESS_EXECUTION, status.STATUS_RUNNING)
+                                 execute_req_out_trans_mode: "reference"} for output in expected_outputs]
+        self.update_status("Executing job on remote ADES.", REMOTE_JOB_PROGRESS_EXECUTION, status.STATUS_RUNNING)
 
-        execute_body = dict(mode='async',
-                            response='document',
+        execute_body = dict(mode="async",
+                            response="document",
                             inputs=execute_body_inputs,
                             outputs=execute_body_outputs)
         request_url = self.url + process_jobs_uri.format(process_id=self.process)
-        response = self.make_request(method='POST',
+        response = self.make_request(method="POST",
                                      url=request_url,
                                      json=execute_body,
                                      retry=True)
         if response.status_code != 201:
-            raise Exception('Was expecting a 201 status code from the execute request : {0}'.format(request_url))
+            raise Exception("Was expecting a 201 status code from the execute request : {0}".format(request_url))
 
-        job_status_uri = response.headers['Location']
+        job_status_uri = response.headers["Location"]
         job_status = self.get_job_status(job_status_uri)
-        job_status_value = status.map_status(job_status['status'])
+        job_status_value = status.map_status(job_status["status"])
 
-        self.update_status('Monitoring job on remote ADES : {0}'.format(job_status_uri),
+        self.update_status("Monitoring job on remote ADES : {0}".format(job_status_uri),
                            REMOTE_JOB_PROGRESS_MONITORING, status.STATUS_RUNNING)
 
         while job_status_value not in status.job_status_categories[status.STATUS_CATEGORY_FINISHED]:
             sleep(5)
             job_status = self.get_job_status(job_status_uri)
-            job_status_value = status.map_status(job_status['status'])
+            job_status_value = status.map_status(job_status["status"])
 
             LOGGER.debug("Monitoring job {jobID} : [{status}] {percentCompleted}  {message}".format(
-                jobID=job_status['jobID'],
+                jobID=job_status["jobID"],
                 status=job_status_value,
-                percentCompleted=job_status.get('percentCompleted', ''),
+                percentCompleted=job_status.get("percentCompleted", ""),
                 message=get_any_message(job_status)
             ))
             self.update_status(get_job_log_msg(status=job_status_value,
                                                message=get_any_message(job_status),
-                                               progress=job_status.get('percentCompleted', 0),
-                                               duration=job_status.get('duration', None)),  # get if available
-                               self.map_progress(job_status.get('percentCompleted', 0),
+                                               progress=job_status.get("percentCompleted", 0),
+                                               duration=job_status.get("duration", None)),  # get if available
+                               self.map_progress(job_status.get("percentCompleted", 0),
                                                  REMOTE_JOB_PROGRESS_MONITORING, REMOTE_JOB_PROGRESS_FETCH_OUT),
                                status.STATUS_RUNNING)
 
         if job_status_value != status.STATUS_SUCCEEDED:
             LOGGER.debug("Monitoring job {jobID} : [{status}] {percentCompleted}  {message}".format(
-                jobID=job_status['jobID'],
+                jobID=job_status["jobID"],
                 status=job_status_value,
-                percentCompleted=job_status.get('percentCompleted', ''),
+                percentCompleted=job_status.get("percentCompleted", ""),
                 message=get_any_message(job_status)
             ))
             raise Exception(job_status)
 
-        self.update_status('Fetching job outputs from remote ADES.',
+        self.update_status("Fetching job outputs from remote ADES.",
                            REMOTE_JOB_PROGRESS_FETCH_OUT, status.STATUS_RUNNING)
-        results = self.get_job_results(job_status['jobID'])
+        results = self.get_job_results(job_status["jobID"])
         for result in results:
             if get_any_id(result) in expected_outputs:
                 # This is where cwl expect the output file to be written
@@ -319,18 +319,18 @@ class Wps3Process(WpsProcessInterface):
 
                 # TODO Should we handle other type than File reference?
                 r = requests.get(get_any_value(result), allow_redirects=True)
-                LOGGER.debug('Fetching result output from {0} to cwl output destination : {1}'.format(
+                LOGGER.debug("Fetching result output from {0} to cwl output destination : {1}".format(
                     get_any_value(result),
                     dst_fn
                 ))
                 with open(dst_fn, mode='wb') as dst_fh:
                     dst_fh.write(r.content)
 
-        self.update_status('Execution on remote ADES completed.',
+        self.update_status("Execution on remote ADES completed.",
                            REMOTE_JOB_PROGRESS_COMPLETED, status.STATUS_SUCCEEDED)
 
     def get_job_status(self, job_status_uri, retry=True):
-        response = self.make_request(method='GET',
+        response = self.make_request(method="GET",
                                      url=job_status_uri,
                                      retry=True,
                                      status_code_mock=HTTPNotFound.code)
@@ -346,15 +346,15 @@ class Wps3Process(WpsProcessInterface):
         #  - jobID is missing
         #  - handled by 'map_status': status are upper cases and succeeded process are indicated as successful
         job_id = job_status_uri.split('/')[-1]
-        if 'jobID' not in job_status:
-            job_status['jobID'] = job_id
-        job_status['status'] = status.map_status(job_status['status'])
+        if "jobID" not in job_status:
+            job_status["jobID"] = job_id
+        job_status["status"] = status.map_status(job_status["status"])
         return job_status
 
     def get_job_results(self, job_id):
         result_url = self.url + process_results_uri.format(process_id=self.process, job_id=job_id)
-        response = self.make_request(method='GET',
+        response = self.make_request(method="GET",
                                      url=result_url,
                                      retry=True)
         response.raise_for_status()
-        return response.json().get('outputs', {})
+        return response.json().get("outputs", {})

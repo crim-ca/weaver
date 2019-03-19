@@ -587,49 +587,54 @@ class Process(Base):
         # type: (...) -> AnyStr
         return self.get("type", PROCESS_WPS)
 
-    # TODO:
-    #   load from local file link (for builtin packages)
     @property
     def package(self):
         # type: (...) -> Union[None, CWL]
         pkg = self.get("package")
-        return self._package_decode(pkg) if isinstance(pkg, dict) else pkg
+        return self._decode(pkg) if isinstance(pkg, dict) else pkg
 
-    # TODO:
-    #   allow link to local file (for builtin packages)
     @package.setter
     def package(self, pkg):
-        self["package"] = self._package_encode(pkg) if isinstance(pkg, dict) else pkg
-
-    # encode/decode characters that cannot be in a key during save to db
-    _package_codes = [("\uFF04", '$'), ("\uFF0E", '.')]
-
-    def _package_encode(self, pkg):
-        # type: (CWL) -> CWL
-        for k in pkg:
-            if isinstance(pkg[k], dict):
-                pkg[k] = self._package_encode(pkg[k])
-            for c_e, c_d in self._package_codes:
-                if c_d in k:
-                    c_k = k.replace(c_d, c_e)
-                    pkg[c_k] = pkg.pop(k)
-        return pkg
-
-    def _package_decode(self, pkg):
-        # type: (CWL) -> CWL
-        for k in pkg:
-            if isinstance(pkg[k], dict):
-                pkg[k] = self._package_encode(pkg[k])
-            for c_e, c_d in self._package_codes:
-                if c_e in k:
-                    c_k = k.replace(c_e, c_d)
-                    pkg[c_k] = pkg.pop(k)
-        return pkg
+        self["package"] = self._encode(pkg) if isinstance(pkg, dict) else pkg
 
     @property
     def payload(self):
         # type: (...) -> JSON
-        return self.get("payload", dict())
+        body = self.get("payload", dict())
+        return self._decode(body) if isinstance(body, dict) else body
+
+    @payload.setter
+    def payload(self, body):
+        # type: (JSON) -> None
+        self["payload"] = self._encode(body) if isinstance(body, dict) else dict()
+
+    # encode(->)/decode(<-) characters that cannot be in a key during save to db
+    _character_codes = [('$', "\uFF04"), ('.', "\uFF0E")]
+
+    def _recursive_replace(self, pkg, index_from, index_to):
+        # type: (CWL, int, int) -> CWL
+        for k in pkg:
+            if isinstance(pkg[k], dict):
+                pkg[k] = self._recursive_replace(pkg[k], index_from, index_to)
+            if isinstance(pkg[k], list):
+                for i, pkg_i in enumerate(pkg[k]):
+                    if isinstance(pkg_i, dict):
+                        pkg[k][i] = self._recursive_replace(pkg[k][i], index_from, index_to)
+            for c in self._character_codes:
+                c_f = c[index_from]
+                c_t = c[index_to]
+                if c_f in k:
+                    c_k = k.replace(c_f, c_t)
+                    pkg[c_k] = pkg.pop(k)
+        return pkg
+
+    def _encode(self, pkg):
+        # type: (CWL) -> CWL
+        return self._recursive_replace(pkg, 0, 1)
+
+    def _decode(self, pkg):
+        # type: (CWL) -> CWL
+        return self._recursive_replace(pkg, 1, 0)
 
     @property
     def visibility(self):

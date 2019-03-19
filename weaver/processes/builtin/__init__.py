@@ -50,11 +50,23 @@ def register_builtin_processes(container):
     for process_id, process_path in builtin_apps_mapping.items():
         process_info = get_process_definition({}, package=None, reference=process_path)
         process_url = "/".join([restapi_url, "processes", process_id])
+        process_abstract = _get_builtin_abstract(process_id, process_path)
+        process_payload = {
+            "processDescription": {
+                "process": {
+                    "id": process_id,
+                    "type": PROCESS_BUILTIN,
+                    "abstract": process_abstract,
+                },
+                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/builtinApplication",
+                "executionUnit": [{"unit": process_info["package"]}],
+            }
+        }
         builtin_processes.append(Process(
             id=process_id,
             type=PROCESS_BUILTIN,
-            abstract=_get_builtin_abstract(process_id, process_path),
-            payload={"type": PROCESS_BUILTIN},
+            abstract=process_abstract,
+            payload=process_payload,
             package=process_info["package"],
             inputs=process_info["inputs"],
             outputs=process_info["outputs"],

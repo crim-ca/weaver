@@ -1,7 +1,7 @@
 from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS
 from weaver.processes import opensearch
 from weaver.processes.constants import WPS_INPUT, WPS_OUTPUT, WPS_COMPLEX, WPS_BOUNDINGBOX, WPS_LITERAL, WPS_REFERENCE
-from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW, PROCESS_BUILTIN
+from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from weaver.processes.sources import retrieve_data_source_url
 from weaver.exceptions import (
     PackageTypeError, PackageRegistrationError, PackageExecutionError,
@@ -1490,12 +1490,6 @@ class WpsPackage(Process):
             self.step_update_status(
                 _message, _progress, start_step_progress, end_step_progress, jobname, _provider, _status
             )
-
-        # directly resolve builtin processes
-        if step_payload.get("type") == PROCESS_BUILTIN:
-            from weaver.processes.wps_builtin import WpsBuiltinProcess
-            return WpsBuiltinProcess(process=process,
-                                     update_status=_update_status_dispatch)
 
         # package can define requirements and/or hints, if it's an application, only one is allowed, workflow can have
         # multiple, but they are not explicitly handled

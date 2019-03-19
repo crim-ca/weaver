@@ -23,4 +23,4 @@ def includeme(config):
         # if db_url.username and db_url.password:
         #     db.authenticate(db_url.username, db_url.password)
         return db
-    config.add_request_method(_add_db, 'db', reify=True)
+    config.add_request_method(_add_db, "db", reify=True)
