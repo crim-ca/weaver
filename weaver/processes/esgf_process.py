@@ -172,7 +172,7 @@ class ESGFProcess(Wps1Process):
 
         LOGGER.debug("Downloading file: {}".format(url))
 
-        # Standrad Thredds naming convention?
+        # Standard Thredds naming convention?
         url = url.replace("/dodsC/", "/fileServer/")
 
         r = requests.get(url, allow_redirects=True, stream=True)
