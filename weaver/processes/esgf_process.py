@@ -88,6 +88,12 @@ class ESGFProcess(Wps1Process):
         # grouped_inputs is of the form:
         # {"lat": {"start": 1, "end": 3, "crs": "values"}}
 
+        # ensure data is casted properly
+        for dim_name, values in grouped_inputs.items():
+            for value_name, value in values.items():
+                if value_name in ["start", "end"]:
+                    values[value_name] = float(value)
+
         allowed_crs = {c.name: c for c in [cwt.VALUES, cwt.INDICES, cwt.TIMESTAMPS]}
 
         dimensions = []
