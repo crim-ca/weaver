@@ -12,7 +12,7 @@
     },
     {
       "id": "api_key",
-      "data": "DYaAMkRIxhr3TJ2ro1cb120oJuSp3fCVZ8QxDiLUQCLfgkrs5xNa66OXb4sUYoyg"
+      "data": "{{ api_key }}"
     }
   ],
   "outputs": [

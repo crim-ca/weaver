@@ -4,15 +4,11 @@
   "inputs": [
 		{
 			"id": "files",
-			"href": "{{ esgf_url_aggregate_1  }}"
+			"href": "https://boreas.ouranos.ca/twitcher/ows/proxy/thredds/dodsC/birdhouse/nrcan/nrcan_northamerica_monthly/tasmin/nrcan_northamerica_monthly_2015_tasmin.nc"
 		},
 		{
 			"id": "files",
-			"href": "{{ esgf_url_aggregate_2 }}"
-		},
-		{
-			"id": "files",
-			"href": "{{ esgf_url_aggregate_3 }}"
+			"href": "https://boreas.ouranos.ca/twitcher/ows/proxy/thredds/dodsC/birdhouse/nrcan/nrcan_northamerica_monthly/tasmin/nrcan_northamerica_monthly_2014_tasmin.nc"
 		},
 		{
 			"id": "variable",
@@ -20,7 +16,7 @@
 		},
 		{
 			"id": "api_key",
-			"data": "qwerty"
+			"data": "{{ api_key }}"
 		}
   ],
   "outputs": [
