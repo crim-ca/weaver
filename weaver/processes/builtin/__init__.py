@@ -3,7 +3,7 @@ from weaver.datatype import Process
 from weaver.store.base import StoreProcesses
 from weaver.processes.types import PROCESS_BUILTIN
 from weaver.processes.wps_package import PACKAGE_EXTENSIONS, get_process_definition
-from weaver.utils import clean_json_text_body
+from weaver.utils import clean_json_text_body, ows_context_href
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 from typing import TYPE_CHECKING
@@ -57,11 +57,12 @@ def register_builtin_processes(container):
                     "id": process_id,
                     "type": PROCESS_BUILTIN,
                     "abstract": process_abstract,
-                },
-                "deploymentProfileName": "http://www.opengis.net/profiles/eoc/builtinApplication",
-                "executionUnit": [{"unit": process_info["package"]}],
-            }
+                }
+            },
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/builtinApplication",
+            "executionUnit": [{"unit": process_info["package"]}],
         }
+        process_payload["processDescription"]["process"].update(ows_context_href(process_url))
         builtin_processes.append(Process(
             id=process_id,
             type=PROCESS_BUILTIN,

@@ -578,7 +578,7 @@ class Process(Base):
     # noinspection PyPep8Naming
     @property
     def owsContext(self):
-        # type: (...) -> Union[None, Dict[AnyStr, Any]]
+        # type: (...) -> Union[None, JSON]
         return self.get("owsContext")
 
     # wps, workflow, etc.

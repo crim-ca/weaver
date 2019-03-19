@@ -28,7 +28,7 @@ import logging
 if TYPE_CHECKING:
     from weaver.typedefs import (
         AnyValue, AnyKey, AnySettingsContainer, AnyRegistryContainer, AnyHeadersContainer,
-        HeadersType, SettingsType, XML
+        HeadersType, SettingsType, JSON, XML
     )
     from typing import Union, Any, Dict, List, AnyStr, Iterable, Optional
 
@@ -123,7 +123,7 @@ def get_header(header_name, header_container):
     return None
 
 
-def get_cookie_headers(header_container, cookie_header_name='Cookie'):
+def get_cookie_headers(header_container, cookie_header_name="Cookie"):
     # type: (AnyHeadersContainer, Optional[AnyStr]) -> HeadersType
     """
     Looks for ``cookie_header_name`` header within ``header_container``.
@@ -189,8 +189,8 @@ def parse_service_name(url, protected_path):
     service_name = None
     if parsed_url.path.startswith(protected_path):
         parts_without_protected_path = parsed_url.path[len(protected_path)::].strip('/').split('/')
-        if 'proxy' in parts_without_protected_path:
-            parts_without_protected_path.remove('proxy')
+        if "proxy" in parts_without_protected_path:
+            parts_without_protected_path.remove("proxy")
         if len(parts_without_protected_path) > 0:
             service_name = parts_without_protected_path[0]
     if not service_name:
@@ -228,14 +228,14 @@ def expires_at(hours=1):
     return now_secs() + hours * 3600
 
 
-def localize_datetime(dt, tz_name='UTC'):
+def localize_datetime(dt, tz_name="UTC"):
     # type: (datetime, Optional[AnyStr]) -> datetime
     """
     Provide a timezone-aware object for a given datetime and timezone name
     """
     tz_aware_dt = dt
     if dt.tzinfo is None:
-        utc = pytz.timezone('UTC')
+        utc = pytz.timezone("UTC")
         aware = utc.localize(dt)
         timezone = pytz.timezone(tz_name)
         tz_aware_dt = aware.astimezone(timezone)
@@ -251,7 +251,7 @@ def get_base_url(url):
     """
     parsed_url = urlparse(url)
     if not parsed_url.netloc or parsed_url.scheme not in ("http", "https"):
-        raise ValueError('bad url')
+        raise ValueError("bad url")
     service_url = "%s://%s%s" % (parsed_url.scheme, parsed_url.netloc, parsed_url.path.strip())
     return service_url
 
@@ -274,6 +274,15 @@ def lxml_strip_ns(tree):
             node.tag = node.tag.split('}', 1)[1]
 
 
+def ows_context_href(href, partial=False):
+    # type: (AnyStr, Optional[bool]) -> JSON
+    """Returns the complete or partial dictionary defining an ``OWSContext`` from a reference."""
+    context = {"offering": {"content": {"href": href}}}
+    if partial:
+        return context
+    return {"owsContext": context}
+
+
 def pass_http_error(exception, expected_http_error):
     # type: (Exception, Union[PyramidHTTPError, Iterable[PyramidHTTPError]]) -> None
     """
@@ -284,7 +293,7 @@ def pass_http_error(exception, expected_http_error):
     :param expected_http_error: single or list of specific pyramid `HTTPError` to handle and ignore.
     :raise exception: if it doesn't match the status code or is not an `HTTPError` of any module.
     """
-    if not hasattr(expected_http_error, '__iter__'):
+    if not hasattr(expected_http_error, "__iter__"):
         expected_http_error = [expected_http_error]
     if isinstance(exception, (PyramidHTTPError, RequestsHTTPError)):
         try:
@@ -307,7 +316,7 @@ def raise_on_xml_exception(xml_node):
     # noinspection PyProtectedMember
     if not isinstance(xml_node, etree._Element):
         raise TypeError("Invalid input, expecting XML element node.")
-    if 'ExceptionReport' in xml_node.tag:
+    if "ExceptionReport" in xml_node.tag:
         node = xml_node
         while len(node.getchildren()):
             node = node.getchildren()[0]
@@ -316,36 +325,36 @@ def raise_on_xml_exception(xml_node):
 
 def replace_caps_url(xml, url, prev_url=None):
     ns = {
-        'ows': 'http://www.opengis.net/ows/1.1',
-        'xlink': 'http://www.w3.org/1999/xlink'}
+        "ows": "http://www.opengis.net/ows/1.1",
+        "xlink": "http://www.w3.org/1999/xlink"}
     doc = etree.fromstring(xml)
     # wms 1.1.1 onlineResource
-    if 'WMT_MS_Capabilities' in doc.tag:
+    if "WMT_MS_Capabilities" in doc.tag:
         LOGGER.debug("replace proxy urls in wms 1.1.1")
-        for element in doc.findall('.//OnlineResource[@xlink:href]', namespaces=ns):
-            parsed_url = urlparse(element.get('{http://www.w3.org/1999/xlink}href'))
+        for element in doc.findall(".//OnlineResource[@xlink:href]", namespaces=ns):
+            parsed_url = urlparse(element.get("{http://www.w3.org/1999/xlink}href"))
             new_url = url
             if parsed_url.query:
-                new_url += '?' + parsed_url.query
-            element.set('{http://www.w3.org/1999/xlink}href', new_url)
+                new_url += "?" + parsed_url.query
+            element.set("{http://www.w3.org/1999/xlink}href", new_url)
         xml = etree.tostring(doc)
     # wms 1.3.0 onlineResource
-    elif 'WMS_Capabilities' in doc.tag:
+    elif "WMS_Capabilities" in doc.tag:
         LOGGER.debug("replace proxy urls in wms 1.3.0")
-        for element in doc.findall('.//{http://www.opengis.net/wms}OnlineResource[@xlink:href]', namespaces=ns):
-            parsed_url = urlparse(element.get('{http://www.w3.org/1999/xlink}href'))
+        for element in doc.findall(".//{http://www.opengis.net/wms}OnlineResource[@xlink:href]", namespaces=ns):
+            parsed_url = urlparse(element.get("{http://www.w3.org/1999/xlink}href"))
             new_url = url
             if parsed_url.query:
-                new_url += '?' + parsed_url.query
-            element.set('{http://www.w3.org/1999/xlink}href', new_url)
+                new_url += "?" + parsed_url.query
+            element.set("{http://www.w3.org/1999/xlink}href", new_url)
         xml = etree.tostring(doc)
     # wps operations
-    elif 'Capabilities' in doc.tag:
-        for element in doc.findall('ows:OperationsMetadata//*[@xlink:href]', namespaces=ns):
-            element.set('{http://www.w3.org/1999/xlink}href', url)
+    elif "Capabilities" in doc.tag:
+        for element in doc.findall("ows:OperationsMetadata//*[@xlink:href]", namespaces=ns):
+            element.set("{http://www.w3.org/1999/xlink}href", url)
         xml = etree.tostring(doc)
     elif prev_url:
-        xml = xml.decode('utf-8', 'ignore')
+        xml = xml.decode("utf-8", "ignore")
         xml = xml.replace(prev_url, url)
     return xml
 
@@ -355,14 +364,14 @@ def islambda(func):
     return isinstance(func, types.LambdaType) and func.__name__ == (lambda: None).__name__
 
 
-first_cap_re = re.compile('(.)([A-Z][a-z]+)')
-all_cap_re = re.compile('([a-z0-9])([A-Z])')
+first_cap_re = re.compile(r"(.)([A-Z][a-z]+)")
+all_cap_re = re.compile(r"([a-z0-9])([A-Z])")
 
 
 def convert_snake_case(name):
     # type: (AnyStr) -> AnyStr
-    s1 = first_cap_re.sub(r'\1_\2', name)
-    return all_cap_re.sub(r'\1_\2', s1).lower()
+    s1 = first_cap_re.sub(r"\1_\2", name)
+    return all_cap_re.sub(r"\1_\2", s1).lower()
 
 
 def parse_request_query(request):
@@ -386,17 +395,17 @@ def parse_request_query(request):
 
 def get_log_fmt():
     # type: (...) -> AnyStr
-    return '[%(asctime)s] %(levelname)-8s [%(name)s] %(message)s'
+    return "[%(asctime)s] %(levelname)-8s [%(name)s] %(message)s"
 
 
 def get_log_datefmt():
     # type: (...) -> AnyStr
-    return '%Y-%m-%d %H:%M:%S'
+    return "%Y-%m-%d %H:%M:%S"
 
 
 def get_job_log_msg(status, message, progress=0, duration=None):
     # type: (AnyStr, AnyStr, Optional[int], Optional[AnyStr]) -> AnyStr
-    return '{d} {p:3d}% {s:10} {m}'.format(d=duration or '', p=int(progress or 0), s=map_status(status), m=message)
+    return "{d} {p:3d}% {s:10} {m}".format(d=duration or "", p=int(progress or 0), s=map_status(status), m=message)
 
 
 def make_dirs(path, mode=0o755, exist_ok=True):

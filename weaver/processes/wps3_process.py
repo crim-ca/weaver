@@ -141,7 +141,7 @@ class Wps3Process(WpsProcessInterface):
             None if forbidden access.
         """
         LOGGER.debug("Get process WPS visibility request for {0}".format(self.process))
-        response = self.make_request(method='GET',
+        response = self.make_request(method="GET",
                                      url=self.url + process_visibility_uri.format(process_id=self.process),
                                      retry=False,
                                      status_code_mock=HTTPUnauthorized.code)

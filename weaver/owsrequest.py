@@ -16,17 +16,17 @@ from weaver.utils import lxml_strip_ns
 import logging
 logger = logging.getLogger(__name__)
 
-allowed_service_types = ('wps', 'wms')
-allowed_request_types = {'wps': ('getcapabilities', 'describeprocess', 'execute'),
-                         'wms': ('getcapabilities',
-                                 'getmap',
-                                 'getfeatureinfo',
-                                 'getlegendgraphic',
+allowed_service_types = ("wps", "wms")
+allowed_request_types = {"wps": ("getcapabilities", "describeprocess", "execute"),
+                         "wms": ("getcapabilities",
+                                 "getmap",
+                                 "getfeatureinfo",
+                                 "getlegendgraphic",
                                  # ncwms extras,
-                                 'getmetadata')}
-public_request_types = {'wps': ('getcapabilities', 'describeprocess'),
-                        'wms': ('getcapabilities', )}
-allowed_versions = {'wps': ('1.0.0',), 'wms': ('1.1.1', '1.3.0',)}
+                                 "getmetadata")}
+public_request_types = {"wps": ("getcapabilities", "describeprocess"),
+                        "wms": ("getcapabilities", )}
+allowed_versions = {"wps": ("1.0.0",), "wms": ("1.1.1", "1.3.0",)}
 
 
 class OWSRequest(object):
@@ -40,16 +40,16 @@ class OWSRequest(object):
 
     @property
     def service(self):
-        return self.parser.params['service']
+        return self.parser.params["service"]
 
     @property
     def request(self):
         # TODO: same name for service request and HTTP request is confusing.
-        return self.parser.params['request']
+        return self.parser.params["request"]
 
     @property
     def version(self):
-        return self.parser.params['version']
+        return self.parser.params["version"]
 
     def service_allowed(self):
         return self.service in allowed_service_types
@@ -59,9 +59,9 @@ class OWSRequest(object):
 
 
 def ows_parser_factory(request):
-    if request.method == 'GET':
+    if request.method == "GET":
         return Get(request)
-    elif request.method == 'POST':
+    elif request.method == "POST":
         return Post(request)
     else:
         raise HTTPBadRequest()
@@ -121,11 +121,11 @@ class Get(OWSParser):
 
     def _get_request_type(self):
         """Find requested request type in GET request."""
-        return self._get_param(param="request", allowed_values=allowed_request_types[self.params['service']])
+        return self._get_param(param="request", allowed_values=allowed_request_types[self.params["service"]])
 
     def _get_version(self):
         """Find requested version in GET request."""
-        version = self._get_param(param="version", allowed_values=allowed_versions[self.params['service']],
+        version = self._get_param(param="version", allowed_values=allowed_versions[self.params["service"]],
                                   optional=True)
         if version is None and self._get_request_type() != "getcapabilities":
             raise OWSMissingParameterValue("Parameter 'version' is missing.", value="version")
@@ -169,7 +169,7 @@ class Post(OWSParser):
         """Find requested version in POST request."""
         if "version" in self.document.attrib:
             value = self.document.attrib["version"].lower()
-            if value in allowed_versions[self.params['service']]:
+            if value in allowed_versions[self.params["service"]]:
                 self.params["version"] = value
             else:
                 raise OWSInvalidParameterValue("Version '{!s}' is not supported.".format(value), value="version")
