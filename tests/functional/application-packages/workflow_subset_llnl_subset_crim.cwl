@@ -7,7 +7,9 @@
         }
     ],
     "inputs": {
-        "tas": "File",
+        "files": "File",
+        "variable": "string",
+        "esgf_api_key": "string",
         "llnl_lat0": "float",
         "llnl_lat1": "float",
         "llnl_lon0": "float",
@@ -25,13 +27,15 @@
     },
     "steps": {
         "llnl_subset": {
-            "run": "esgf_subset.cwl",
+            "run": "SubsetESGF.cwl",
             "in": {
-                "resource": "tas",
-                "lat0": "llnl_lat0",
-                "lat1": "llnl_lat1",
-                "lon0": "llnl_lon0",
-                "lon1": "llnl_lon1"
+                "files": "files",
+                "variable": "variable",
+                "api_key": "esgf_api_key",
+                "lat_start": "llnl_lat0",
+                "lat_end": "llnl_lat1",
+                "lon_start": "llnl_lon0",
+                "lon_end": "llnl_lon1"
             },
             "out": ["output"]
         },

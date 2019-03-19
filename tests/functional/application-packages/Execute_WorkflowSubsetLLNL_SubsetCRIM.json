@@ -3,28 +3,36 @@
   "response": "document",
   "inputs": [
     {
-      "id": "tas",
-      "href": "https://aims3.llnl.gov/thredds/fileServer/css03_data/CMIP6/CMIP/NASA-GISS/GISS-E2-1-G/historical/r1i1p1f1/Amon/tas/gn/v20180827/tas_Amon_GISS-E2-1-G_historical_r1i1p1f1_gn_185001-190012.nc"
+      "id": "files",
+      "href": "https://boreas.ouranos.ca/twitcher/ows/proxy/thredds/dodsC/birdhouse/nrcan/nrcan_northamerica_monthly/tasmin/nrcan_northamerica_monthly_2015_tasmin.nc"
     },
     {
       "id": "llnl_lat0",
-      "data": "33"
-    },
-    {
-      "id": "llnl_lat1",
       "data": "60"
     },
     {
+      "id": "variable",
+      "data": "tasmin"
+    },
+    {
+      "id": "esgf_api_key",
+      "data": "{{ api_key }}"
+    },
+    {
+      "id": "llnl_lat1",
+      "data": "40"
+    },
+    {
       "id": "llnl_lon0",
-      "data": "-128"
+      "data": "-80"
     },
     {
       "id": "llnl_lon1",
-      "data": "-48"
+      "data": "-60"
     },
     {
       "id": "crim_lat0",
-      "data": "43"
+      "data": "45"
     },
     {
       "id": "crim_lat1",
@@ -32,11 +40,11 @@
     },
     {
       "id": "crim_lon0",
-      "data": "-80"
+      "data": "-75"
     },
     {
       "id": "crim_lon1",
-      "data": "-65"
+      "data": "-70"
     }
   ],
   "outputs": [

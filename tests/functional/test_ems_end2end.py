@@ -219,20 +219,21 @@ class End2EndEMSTestCase(TestCase):
         cls.PROCESS_FLOOD_DETECTION_ID = "FloodDetection"
         cls.PROCESS_ICE_DAYS_ID = "Finch_IceDays"
         cls.PROCESS_SUBSET_BBOX_ID = "ColibriFlyingpigeon_SubsetBbox"
-        cls.PROCESS_AGGREGATE_ESGF = "AggregateESGF"
+        cls.PROCESS_SUBSET_ESGF = "SubsetESGF"
         cls.PROCESS_WORKFLOW_ID = "Workflow"
         cls.PROCESS_WORKFLOW_SC_ID = "WorkflowSimpleChain"
         cls.PROCESS_WORKFLOW_S2P_ID = "WorkflowS2ProbaV"
         cls.PROCESS_WORKFLOW_CUSTOM_ID = "CustomWorkflow"
         cls.PROCESS_WORKFLOW_FLOOD_DETECTION_ID = "WorkflowFloodDetection"
         cls.PROCESS_WORKFLOW_SUBSET_ICE_DAYS = "WorkflowSubsetIceDays"
-        cls.PROCESS_WORKFLOW_ESGF = "WorkflowESGF"
+        cls.PROCESS_WORKFLOW_SubsetLLNL_SubsetCRIM = "WorkflowSubsetLLNL_SubsetCRIM"
         application_set = {cls.PROCESS_STACKER_ID,
                            cls.PROCESS_SFS_ID,
                            cls.PROCESS_FLOOD_DETECTION_ID,
                            cls.PROCESS_ICE_DAYS_ID,
                            cls.PROCESS_SUBSET_BBOX_ID,
-                           cls.PROCESS_AGGREGATE_ESGF}
+                           cls.PROCESS_SUBSET_ESGF,
+                           }
         workflow_set = {cls.PROCESS_WORKFLOW_ID,
                         cls.PROCESS_WORKFLOW_SC_ID,
                         cls.PROCESS_WORKFLOW_S2P_ID,
