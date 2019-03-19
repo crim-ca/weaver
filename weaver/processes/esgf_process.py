@@ -175,7 +175,7 @@ class ESGFProcess(Wps1Process):
         # Standard Thredds naming convention?
         url = url.replace("/dodsC/", "/fileServer/")
 
-        r = requests.get(url, allow_redirects=True, stream=True)
+        r = requests.get(url, allow_redirects=True, stream=True, verify=False)
         output_file_name = nc_outputs[0]
 
         with open(join(output_dir, output_file_name), "wb") as f:
