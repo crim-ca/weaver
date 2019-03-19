@@ -12,6 +12,7 @@ from cwltool.utils import (aslist, json_dumps, onWindows, bytes2str_in_dicts)
 from cwltool.context import (LoadingContext, RuntimeContext, getdefault)
 from cwltool.workflow import Workflow
 from pyramid_celery import celery_app as app
+from weaver.processes.wps_package import PACKAGE_REQUIREMENTS_APP_WPS1, PACKAGE_REQUIREMENTS_APP_ESGF_CWT
 from weaver.utils import now, get_settings
 from weaver.wps import get_wps_output_path
 from functools import cmp_to_key, partial
@@ -39,8 +40,10 @@ DEFAULT_TMP_PREFIX = "tmp"
 #       and still has useless code in the context of a WPS workflow
 
 # Extend the supported process requirements
-supportedProcessRequirements += ["WPS1Requirement",
-                                 "ESGF-CWTRequirement"]
+supportedProcessRequirements += [
+    PACKAGE_REQUIREMENTS_APP_WPS1,
+    PACKAGE_REQUIREMENTS_APP_ESGF_CWT
+]
 
 
 def default_make_tool(toolpath_object,              # type: ToolPathObjectType

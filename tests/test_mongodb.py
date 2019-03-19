@@ -16,16 +16,16 @@ class MongodbServiceStoreTestCase(unittest.TestCase):
                             public=False, auth='token')
         self.service_public = dict(name="open_pingu", url="http://somewhere.in.the/deep_ocean", type="wps",
                                    public=True, auth='token')
-        self.service_special = dict(url="http://wonderload", name="A special Name", type='wps', auth='token')
-        self.sane_name_config = {'assert_invalid': False, 'replace_invalid': True}
+        self.service_special = dict(url="http://wonderload", name="A special Name", type="wps", auth="token")
+        self.sane_name_config = {"assert_invalid": False}
 
     def test_fetch_by_name(self):
         collection_mock = mock.Mock(spec=Collection)
         collection_mock.find_one.return_value = self.service
         store = MongodbServiceStore(collection=collection_mock, sane_name_config=self.sane_name_config)
-        service = store.fetch_by_name(name=self.service['name'])
+        service = store.fetch_by_name(name=self.service["name"])
 
-        collection_mock.find_one.assert_called_with({"name": self.service['name']})
+        collection_mock.find_one.assert_called_with({"name": self.service["name"]})
         assert isinstance(service, dict)
 
     def test_save_service_default(self):
@@ -45,7 +45,7 @@ class MongodbServiceStoreTestCase(unittest.TestCase):
         store.save_service(Service(self.service_special))
 
         collection_mock.insert_one.assert_called_with({
-            'url': 'http://wonderload', 'type': 'wps', 'name': 'a_special_name', 'public': False, 'auth': 'token'})
+            "url": "http://wonderload", "type": "wps", "name": "A_special_Name", "public": False, "auth": "token"})
 
     def test_save_service_public(self):
         collection_mock = mock.Mock(spec=Collection)

@@ -792,16 +792,27 @@ class DataEncodingAttributes(MappingSchema):
     encoding = SchemaNode(String(), missing=drop)
 
 
-class OutputValue(DataEncodingAttributes):
+class DataFloat(DataEncodingAttributes):
+    data = SchemaNode(Float())
+
+
+class DataInteger(DataEncodingAttributes):
+    data = SchemaNode(Integer())
+
+
+class DataString(DataEncodingAttributes):
     data = SchemaNode(String())
 
 
-class InlineValue(DataEncodingAttributes):
-    data = SchemaNode(String())
+class DataBoolean(DataEncodingAttributes):
+    data = SchemaNode(Boolean())
 
 
 class ValueType(OneOfMappingSchema):
-    _one_of = (InlineValue,
+    _one_of = (DataFloat,
+               DataInteger,
+               DataString,
+               DataBoolean,
                Reference)
 
 
@@ -946,10 +957,12 @@ class JobOutputsSchema(SequenceSchema):
     output = JobOutputSchema()
 
 
-class OutputInfo(OneOfMappingSchema):
-    _one_of = (OutputValue,
+class OutputInfo(OutputDataType, OneOfMappingSchema):
+    _one_of = (DataFloat,
+               DataInteger,
+               DataString,
+               DataBoolean,
                Reference)
-    id = SchemaNode(String())
 
 
 class OutputInfoList(SequenceSchema):

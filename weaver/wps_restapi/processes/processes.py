@@ -13,7 +13,7 @@ from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes import wps_package, opensearch
 from weaver.processes.utils import jsonify_output, convert_process_wps_to_db, deploy_process_from_payload
-from weaver.processes.types import PROCESS_WORKFLOW
+from weaver.processes.types import PROCESS_WORKFLOW, PROCESS_BUILTIN
 from weaver.status import (
     map_status,
     STATUS_ACCEPTED,
@@ -26,7 +26,7 @@ from weaver.utils import get_any_id, get_any_value, get_settings, raise_on_xml_e
 from weaver.visibility import VISIBILITY_PUBLIC, visibility_values
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.notify import notify_job
-from weaver.wps_restapi.utils import wps_restapi_base_url, parse_request_query
+from weaver.wps_restapi.utils import get_wps_restapi_base_url, parse_request_query
 from weaver.wps_restapi.jobs.jobs import check_status, job_format_json
 from weaver.wps import load_pywps_cfg
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput
@@ -35,6 +35,7 @@ from pyramid.httpexceptions import (
     HTTPOk,
     HTTPCreated,
     HTTPUnauthorized,
+    HTTPForbidden,
     HTTPNotFound,
     HTTPBadRequest,
     HTTPUnprocessableEntity,
@@ -67,14 +68,15 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
     task_logger = get_task_logger(__name__)
     load_pywps_cfg(settings)
 
-    ssl_verify = asbool(settings.get('weaver.ssl_verify', True))
-    store = get_db(settings).get_store(StoreJobs)
+    ssl_verify = asbool(settings.get("weaver.ssl_verify", True))
+    store = get_db(app).get_store(StoreJobs)
     job = store.fetch_by_id(job_id)
     job.task_id = self.request.id
     job = store.update_job(job)
 
     try:
         try:
+            LOGGER.debug("Execute process WPS request for {0}".format(job.process))
             wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), verify=ssl_verify)
             # noinspection PyProtectedMember
             raise_on_xml_exception(wps._capabilities)
@@ -100,11 +102,13 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
                 input_values = process_value if isinstance(process_value, list) else [process_value]
 
                 # we need to support file:// scheme but PyWPS doesn't like them so remove the scheme file://
-                input_values = [val[7:] if val.startswith('file://') else val for val in input_values]
+                input_values = [val[7:] if str(val).startswith('file://') else val for val in input_values]
 
                 # need to use ComplexDataInput structure for complex input
+                # need to use literal String for anything else than complex
+                # TODO: BoundingBox not supported
                 wps_inputs.extend([
-                    (input_id, ComplexDataInput(input_value) if input_id in complex_inputs else input_value)
+                    (input_id, ComplexDataInput(input_value) if input_id in complex_inputs else str(input_value))
                     for input_value in input_values])
         except KeyError:
             wps_inputs = []
@@ -205,16 +209,16 @@ def validate_supported_submit_job_handler_parameters(json_body):
     """
     Tests supported parameters not automatically validated by colander deserialize.
     """
-    if json_body['mode'] not in [EXECUTE_MODE_ASYNC, EXECUTE_MODE_AUTO]:
-        raise HTTPNotImplemented(detail="Execution mode `{0}` not supported.".format(json_body['mode']))
+    if json_body["mode"] not in [EXECUTE_MODE_ASYNC, EXECUTE_MODE_AUTO]:
+        raise HTTPNotImplemented(detail="Execution mode `{0}` not supported.".format(json_body["mode"]))
 
-    if json_body['response'] != EXECUTE_RESPONSE_DOCUMENT:
-        raise HTTPNotImplemented(detail="Execution response type `{0}` not supported.".format(json_body['response']))
+    if json_body["response"] != EXECUTE_RESPONSE_DOCUMENT:
+        raise HTTPNotImplemented(detail="Execution response type `{0}` not supported.".format(json_body["response"]))
 
-    for job_output in json_body['outputs']:
-        if job_output['transmissionMode'] != EXECUTE_TRANSMISSION_MODE_REFERENCE:
+    for job_output in json_body["outputs"]:
+        if job_output["transmissionMode"] != EXECUTE_TRANSMISSION_MODE_REFERENCE:
             raise HTTPNotImplemented(detail="Execute transmissionMode `{0}` not supported."
-                                     .format(job_output['transmissionMode']))
+                                     .format(job_output["transmissionMode"]))
 
 
 def submit_job_handler(request, service_url, is_workflow=False, visibility=None):
@@ -222,7 +226,8 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
 
     # validate body with expected JSON content and schema
     if CONTENT_TYPE_APP_JSON not in request.content_type:
-        raise HTTPBadRequest("Request 'Content-Type' header other than '{}' not supported.".format(CONTENT_TYPE_APP_JSON))
+        raise HTTPBadRequest("Request 'Content-Type' header other than '{}' not supported."
+                             .format(CONTENT_TYPE_APP_JSON))
     try:
         json_body = request.json_body
     except Exception as ex:
@@ -235,16 +240,15 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
     # TODO: remove when all parameter variations are supported
     validate_supported_submit_job_handler_parameters(json_body)
 
-    provider_id = request.matchdict.get('provider_id')          # None OK if local
-    process_id = request.matchdict.get('process_id')
-    tags = request.params.get('tags', '').split(',')
-    is_execute_async = json_body['mode'] != EXECUTE_MODE_SYNC   # convert auto to async
-
-    notification_email = json_body.get('notification_email')
+    provider_id = request.matchdict.get("provider_id")          # None OK if local
+    process_id = request.matchdict.get("process_id")
+    tags = request.params.get("tags", "").split(",")
+    is_execute_async = json_body["mode"] != EXECUTE_MODE_SYNC   # convert auto to async
+    notification_email = json_body.get("notification_email")
 
     store = get_db(request).get_store(StoreJobs)
     job = store.save_job(task_id=STATUS_ACCEPTED, process=process_id, service=provider_id,
-                         inputs=json_body.get('inputs'), is_workflow=is_workflow, access=visibility,
+                         inputs=json_body.get("inputs"), is_workflow=is_workflow, access=visibility,
                          user_id=request.authenticated_userid, execute_async=is_execute_async, custom_tags=tags)
     result = execute_process.delay(
         job_id=job.id,
@@ -252,32 +256,32 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
         # Convert EnvironHeaders to a simple dict (should cherrypick the required headers)
         headers={k: v for k, v in request.headers.items()},
         notification_email=notification_email)
-    LOGGER.debug("Celery pending task `{}` for job `{}`.".format(result.id, job.id))
+    LOGGER.debug("Celery pending task '{}' for job '{}'.".format(result.id, job.id))
 
     # local/provider process location
-    location_base = '/providers/{provider_id}'.format(provider_id=provider_id) if provider_id else ''
-    location = '{base_url}{location_base}/processes/{process_id}/jobs/{job_id}'.format(
-        base_url=wps_restapi_base_url(get_settings(request)),
+    location_base = "/providers/{provider_id}".format(provider_id=provider_id) if provider_id else ""
+    location = "{base_url}{location_base}/processes/{process_id}/jobs/{job_id}".format(
+        base_url=get_wps_restapi_base_url(get_settings(request)),
         location_base=location_base,
         process_id=process_id,
         job_id=job.id)
     body_data = {
-        'jobID': job.id,
-        'status': map_status(STATUS_ACCEPTED),
-        'location': location
+        "jobID": job.id,
+        "status": map_status(STATUS_ACCEPTED),
+        "location": location
     }
     return HTTPCreated(location=location, json=body_data)
 
 
 @sd.jobs_full_service.post(tags=[sd.provider_processes_tag, sd.providers_tag, sd.execute_tag, sd.jobs_tag],
-                           renderer='json', schema=sd.PostProviderProcessJobRequest(),
+                           renderer="json", schema=sd.PostProviderProcessJobRequest(),
                            response_schemas=sd.post_provider_process_job_responses)
 def submit_provider_job(request):
     """
     Execute a provider process.
     """
     store = get_db(request).get_store(StoreServices)
-    provider_id = request.matchdict.get('provider_id')
+    provider_id = request.matchdict.get("provider_id")
     service = store.fetch_by_name(provider_id, request=request)
     return submit_job_handler(request, service.url)
 
@@ -294,13 +298,13 @@ def list_remote_processes(service, request):
 
 
 @sd.provider_processes_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.getcapabilities_tag],
-                                   renderer='json', schema=sd.ProviderEndpoint(),
+                                   renderer="json", schema=sd.ProviderEndpoint(),
                                    response_schemas=sd.get_provider_processes_responses)
 def get_provider_processes(request):
     """
     Retrieve available provider processes (GetCapabilities).
     """
-    provider_id = request.matchdict.get('provider_id')
+    provider_id = request.matchdict.get("provider_id")
     store = get_db(request).get_store(StoreServices)
     service = store.fetch_by_name(provider_id, request=request)
     processes = list_remote_processes(service, request=request)
@@ -313,8 +317,8 @@ def get_provider_process(request):
     Obtains a remote service process description in a compatible local process format.
     Note: this processes won't be stored to the local process storage.
     """
-    provider_id = request.matchdict.get('provider_id')
-    process_id = request.matchdict.get('process_id')
+    provider_id = request.matchdict.get("provider_id")
+    process_id = request.matchdict.get("process_id")
     store = get_db(request).get_store(StoreServices)
     service = store.fetch_by_name(provider_id, request=request)
     wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
@@ -323,7 +327,7 @@ def get_provider_process(request):
 
 
 @sd.provider_process_service.get(tags=[sd.provider_processes_tag, sd.providers_tag, sd.describeprocess_tag],
-                                 renderer='json', schema=sd.ProviderProcessEndpoint(),
+                                 renderer="json", schema=sd.ProviderProcessEndpoint(),
                                  response_schemas=sd.get_provider_process_description_responses)
 def describe_provider_process(request):
     """
@@ -374,22 +378,22 @@ def get_processes(request):
             raise HTTPServiceUnavailable(
                 "Previously deployed processes are causing invalid schema integrity errors. "
                 "Manual cleanup of following processes is required: {}".format(invalid_processes))
-        response_body = {'processes': processes}
+        response_body = {"processes": processes}
 
         # if EMS and ?providers=True, also fetch each provider's processes
         if get_weaver_configuration(get_settings(request)) == WEAVER_CONFIGURATION_EMS:
             queries = parse_request_query(request)
-            if 'providers' in queries and asbool(queries['providers'][0]) is True:
-                providers_response = requests.request('GET', '{host}/providers'.format(host=request.host_url),
+            if "providers" in queries and asbool(queries["providers"][0]) is True:
+                providers_response = requests.request("GET", "{host}/providers".format(host=request.host_url),
                                                       headers=request.headers, cookies=request.cookies)
                 providers = providers_response.json()
-                response_body.update({'providers': providers})
+                response_body.update({"providers": providers})
                 for i, provider in enumerate(providers):
                     provider_id = get_any_id(provider)
-                    processes = requests.request('GET', '{host}/providers/{provider_id}/processes'
+                    processes = requests.request("GET", "{host}/providers/{provider_id}/processes"
                                                  .format(host=request.host_url, provider_id=provider_id),
                                                  headers=request.headers, cookies=request.cookies)
-                    response_body['providers'][i].update({'processes': processes})
+                    response_body["providers"][i].update({"processes": processes})
         return HTTPOk(json=response_body)
     except HTTPException:
         raise  # re-throw already handled HTTPException
@@ -400,7 +404,7 @@ def get_processes(request):
         raise HTTPInternalServerError(str(ex))
 
 
-@sd.processes_service.post(tags=[sd.processes_tag, sd.deploy_tag], renderer='json',
+@sd.processes_service.post(tags=[sd.processes_tag, sd.deploy_tag], renderer="json",
                            schema=sd.PostProcessEndpoint(), response_schemas=sd.post_processes_responses)
 def add_local_process(request):
     """
@@ -411,7 +415,7 @@ def add_local_process(request):
 
 def get_process(request):
     # type: (Request) -> ProcessDB
-    process_id = request.matchdict.get('process_id')
+    process_id = request.matchdict.get("process_id")
     if not isinstance(process_id, six.string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
@@ -423,16 +427,16 @@ def get_process(request):
     except InvalidIdentifierValue as ex:
         raise HTTPBadRequest(str(ex))
     except ProcessNotAccessible:
-        raise HTTPUnauthorized("Process with id `{}` is not accessible.".format(str(process_id)))
+        raise HTTPUnauthorized("Process with id '{}' is not accessible.".format(str(process_id)))
     except ProcessNotFound:
-        raise HTTPNotFound("Process with id `{}` does not exist.".format(str(process_id)))
+        raise HTTPNotFound("Process with id '{}' does not exist.".format(str(process_id)))
     except colander.Invalid as ex:
         raise HTTPBadRequest("Invalid schema:\n[{0!r}]\n[{0!s}].".format(ex))
     except Exception as ex:
         raise HTTPInternalServerError(str(ex))
 
 
-@sd.process_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer='json',
+@sd.process_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer="json",
                         schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_responses)
 def get_local_process(request):
     """
@@ -440,7 +444,7 @@ def get_local_process(request):
     """
     try:
         process = get_process(request)
-        process['inputs'] = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
+        process["inputs"] = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
         process_offering = process.process_offering()
         return HTTPOk(json=process_offering)
     except HTTPException:
@@ -451,7 +455,7 @@ def get_local_process(request):
         raise HTTPInternalServerError(str(ex))
 
 
-@sd.process_package_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer='json',
+@sd.process_package_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer="json",
                                 schema=sd.ProcessPackageEndpoint(), response_schemas=sd.get_process_package_responses)
 def get_local_process_package(request):
     """
@@ -461,7 +465,7 @@ def get_local_process_package(request):
     return HTTPOk(json=process.package or {})
 
 
-@sd.process_payload_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer='json',
+@sd.process_payload_service.get(tags=[sd.processes_tag, sd.describeprocess_tag], renderer="json",
                                 schema=sd.ProcessPayloadEndpoint(), response_schemas=sd.get_process_payload_responses)
 def get_local_process_payload(request):
     """
@@ -471,14 +475,14 @@ def get_local_process_payload(request):
     return HTTPOk(json=process.payload or {})
 
 
-@sd.process_visibility_service.get(tags=[sd.processes_tag, sd.visibility_tag], renderer='json',
+@sd.process_visibility_service.get(tags=[sd.processes_tag, sd.visibility_tag], renderer="json",
                                    schema=sd.ProcessVisibilityGetEndpoint(),
                                    response_schemas=sd.get_process_visibility_responses)
 def get_process_visibility(request):
     """
     Get the visibility of a registered local process.
     """
-    process_id = request.matchdict.get('process_id')
+    process_id = request.matchdict.get("process_id")
     if not isinstance(process_id, six.string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
@@ -493,15 +497,15 @@ def get_process_visibility(request):
         raise HTTPInternalServerError(str(ex))
 
 
-@sd.process_visibility_service.put(tags=[sd.processes_tag, sd.visibility_tag], renderer='json',
+@sd.process_visibility_service.put(tags=[sd.processes_tag, sd.visibility_tag], renderer="json",
                                    schema=sd.ProcessVisibilityPutEndpoint(),
                                    response_schemas=sd.put_process_visibility_responses)
 def set_process_visibility(request):
     """
     Set the visibility of a registered local process.
     """
-    visibility_value = request.json.get('value')
-    process_id = request.matchdict.get('process_id')
+    visibility_value = request.json.get("value")
+    process_id = request.matchdict.get("process_id")
     if not isinstance(process_id, six.string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     if not isinstance(visibility_value, six.string_types):
@@ -511,14 +515,17 @@ def set_process_visibility(request):
 
     try:
         store = get_db(request).get_store(StoreProcesses)
+        process = store.fetch_by_id(process_id)
+        if process.type == PROCESS_BUILTIN:
+            raise HTTPForbidden("Cannot change the visibility of builtin process.")
         store.set_visibility(process_id, visibility_value, request=request)
-        return HTTPOk(json={u'value': visibility_value})
+        return HTTPOk(json={u"value": visibility_value})
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except TypeError:
-        raise HTTPBadRequest('Value of visibility must be a string.')
+        raise HTTPBadRequest("Value of visibility must be a string.")
     except ValueError:
-        raise HTTPUnprocessableEntity('Value of visibility must be one of : {!s}'
+        raise HTTPUnprocessableEntity("Value of visibility must be one of : {!s}"
                                       .format(list(visibility_values)))
     except ProcessNotFound as ex:
         raise HTTPNotFound(str(ex))
@@ -526,40 +533,43 @@ def set_process_visibility(request):
         raise HTTPInternalServerError(str(ex))
 
 
-@sd.process_service.delete(tags=[sd.processes_tag, sd.deploy_tag], renderer='json',
+@sd.process_service.delete(tags=[sd.processes_tag, sd.deploy_tag], renderer="json",
                            schema=sd.ProcessEndpoint(), response_schemas=sd.delete_process_responses)
 def delete_local_process(request):
     """
     Unregister a local process.
     """
-    process_id = request.matchdict.get('process_id')
+    process_id = request.matchdict.get("process_id")
     if not isinstance(process_id, six.string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
         store = get_db(request).get_store(StoreProcesses)
+        process = store.fetch_by_id(process_id)
+        if process.type == PROCESS_BUILTIN:
+            raise HTTPForbidden("Cannot delete a builtin process.")
         if store.delete_process(process_id, visibility=VISIBILITY_PUBLIC, request=request):
-            return HTTPOk(json={'undeploymentDone': True, 'identifier': process_id})
+            return HTTPOk(json={"undeploymentDone": True, "identifier": process_id})
         raise HTTPInternalServerError("Delete process failed for unhandled reason.")
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except InvalidIdentifierValue as ex:
         raise HTTPBadRequest(str(ex))
     except ProcessNotAccessible:
-        raise HTTPUnauthorized("Process with id `{}` is not accessible.".format(str(process_id)))
+        raise HTTPUnauthorized("Process with id '{}' is not accessible.".format(str(process_id)))
     except ProcessNotFound:
-        description = "Process with id `{}` does not exist.".format(str(process_id))
+        description = "Process with id '{}' does not exist.".format(str(process_id))
         raise HTTPNotFound(description)
     except Exception as ex:
         raise HTTPInternalServerError(str(ex))
 
 
-@sd.process_jobs_service.post(tags=[sd.processes_tag, sd.execute_tag, sd.jobs_tag], renderer='json',
+@sd.process_jobs_service.post(tags=[sd.processes_tag, sd.execute_tag, sd.jobs_tag], renderer="json",
                               schema=sd.PostProcessJobsEndpoint(), response_schemas=sd.post_process_jobs_responses)
 def submit_local_job(request):
     """
     Execute a local process.
     """
-    process_id = request.matchdict.get('process_id')
+    process_id = request.matchdict.get("process_id")
     if not isinstance(process_id, six.string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     try:
@@ -574,8 +584,8 @@ def submit_local_job(request):
     except InvalidIdentifierValue as ex:
         raise HTTPBadRequest(str(ex))
     except ProcessNotAccessible:
-        raise HTTPUnauthorized("Process with id `{}` is not accessible.".format(str(process_id)))
+        raise HTTPUnauthorized("Process with id '{}' is not accessible.".format(str(process_id)))
     except ProcessNotFound:
-        raise HTTPNotFound("The process with id `{}` does not exist.".format(str(process_id)))
+        raise HTTPNotFound("The process with id '{}' does not exist.".format(str(process_id)))
     except Exception as ex:
         raise HTTPInternalServerError(str(ex))

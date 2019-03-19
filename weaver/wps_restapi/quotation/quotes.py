@@ -46,7 +46,7 @@ def request_quote(request):
     weaver_config = get_weaver_configuration(settings)
 
     if weaver_config not in [WEAVER_CONFIGURATION_ADES, WEAVER_CONFIGURATION_EMS]:
-        raise HTTPBadRequest("Unsupported request for configuration `{}`.".format(weaver_config))
+        raise HTTPBadRequest("Unsupported request for configuration '{}'.".format(weaver_config))
 
     process_id = request.matchdict.get('process_id')
     process_store = get_db(request).get_store('processes')

@@ -1,7 +1,7 @@
 from weaver import WEAVER_ROOT_DIR
 from weaver.processes.constants import OPENSEARCH_LOCAL_FILE_SCHEME
 from weaver.utils import get_settings
-from weaver.wps_restapi.utils import wps_restapi_base_url
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
 from typing import Union, Text
 from six.moves.urllib.parse import urlparse
 from pyramid.settings import asbool
@@ -80,9 +80,9 @@ def retrieve_data_source_url(data_source):
     :returns: found URL, 'default' data source if not found, or current weaver WPS Rest API base URL if `None`."""
     if data_source is None:
         # get local data source
-        return wps_restapi_base_url(get_settings(app))
+        return get_wps_restapi_base_url(get_settings(app))
     data_sources = fetch_data_sources()
-    return data_sources[data_source if data_source in data_sources else get_default_data_source(data_sources)]['ades']
+    return data_sources[data_source if data_source in data_sources else get_default_data_source(data_sources)]["ades"]
 
 
 def get_data_source_from_url(data_url):

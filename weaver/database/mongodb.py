@@ -65,7 +65,7 @@ class MongoDatabase(DatabaseInterface):
                         *store_args, **store_kwargs
                     )
                 return self._stores[store_type]
-        raise NotImplementedError("Database `{}` cannot find matching store `{}`.".format(self.type, store_type))
+        raise NotImplementedError("Database '{}' cannot find matching store '{}'.".format(self.type, store_type))
 
     def get_session(self):
         # type: (...) -> Any

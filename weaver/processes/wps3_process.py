@@ -50,7 +50,7 @@ REMOTE_JOB_PROGRESS_COMPLETED = 100
 class Wps3Process(WpsProcessInterface):
     def __init__(self,
                  step_payload,      # type: JSON
-                 joborder,          # type: int
+                 joborder,          # type: JSON
                  process,           # type: AnyStr
                  request,           # type: WPSRequest
                  update_status,     # type: UpdateStatusPartialFunction
@@ -63,61 +63,51 @@ class Wps3Process(WpsProcessInterface):
         self.process = process
 
     def resolve_data_source(self, step_payload, joborder):
-        # TODO Ce code provient de wps_package et n'a pas ete teste ici-meme
         try:
             # Presume that all EOImage given as input can be resolved to the same ADES
             # So if we got multiple inputs or multiple values for an input, we take the first one as reference
             eodata_inputs = opensearch.get_eo_images_ids_from_payload(step_payload)
-
-            data_url = ""  # data_source will be set to the default ADES if no EOImages
-
+            data_url = ""  # data_source will be set to the default ADES if no EOImages (anything but `None`)
             if eodata_inputs:
                 step_payload = opensearch.alter_payload_after_query(step_payload)
                 value = joborder[eodata_inputs[0]]
-
                 if isinstance(value, list):
-                    # Use the first value to determine the data source
-                    value = value[0]
-
-                data_url = value['location']
-                reason = '(ADES based on {0})'.format(data_url)
+                    value = value[0]  # Use the first value to determine the data source
+                data_url = value["location"]
+                reason = "(ADES based on {0})".format(data_url)
             else:
-                reason = '(No EOImage -> Default ADES)'
-
+                reason = "(No EOImage -> Default ADES)"
             data_source = get_data_source_from_url(data_url)
-            provider = data_source
-            url = retrieve_data_source_url(data_source)
             deploy_body = step_payload
+            url = retrieve_data_source_url(data_source)
         except (IndexError, KeyError) as exc:
             raise PackageExecutionError("Failed to save package outputs. [{}]".format(repr(exc)))
 
-        self.provider = provider  # fix immediately for `update_status`
-        self.update_status("{provider} is selected {reason}.".format(
-            provider=provider,
-            reason=reason),
-            REMOTE_JOB_PROGRESS_PROVIDER, status.STATUS_RUNNING)
+        self.provider = data_source  # fix immediately for `update_status`
+        self.update_status("{provider} is selected {reason}.".format(provider=data_source, reason=reason),
+                           REMOTE_JOB_PROGRESS_PROVIDER, status.STATUS_RUNNING)
 
-        return provider, url, deploy_body
+        return data_source, url, deploy_body
 
     def get_user_auth_header(self):
         # TODO: find a better way to generalize this to Magpie credentials?
-        if not asbool(self.settings.get('ades.use_auth_token', True)):
+        if not asbool(self.settings.get("ades.use_auth_token", True)):
             return {}
 
-        ades_usr = self.settings.get('ades.username', None)
-        ades_pwd = self.settings.get('ades.password', None)
-        ades_url = self.settings.get('ades.wso2_hostname', None)
-        ades_client = self.settings.get('ades.wso2_client_id', None)
-        ades_secret = self.settings.get('ades.wso2_client_secret', None)
+        ades_usr = self.settings.get("ades.username", None)
+        ades_pwd = self.settings.get("ades.password", None)
+        ades_url = self.settings.get("ades.wso2_hostname", None)
+        ades_client = self.settings.get("ades.wso2_client_id", None)
+        ades_secret = self.settings.get("ades.wso2_client_secret", None)
         access_token = None
         if ades_usr and ades_pwd and ades_url and ades_client and ades_secret:
             ades_body = {
-                'grant_type': 'password',
-                'client_id': ades_client,
-                'client_secret': ades_secret,
-                'username': ades_usr,
-                'password': ades_pwd,
-                'scope': 'openid',
+                "grant_type": "password",
+                "client_id": ades_client,
+                "client_secret": ades_secret,
+                "username": ades_usr,
+                "password": ades_pwd,
+                "scope": "openid",
             }
             ades_headers = {"Content-Type": CONTENT_TYPE_APP_FORM, "Accept": CONTENT_TYPE_APP_JSON}
             ades_access_token_url = "{}/oauth2/token".format(ades_url)
@@ -161,10 +151,10 @@ class Wps3Process(WpsProcessInterface):
             return False
         elif response.status_code == HTTPOk.code:
             json_body = response.json()
-            # TODO: support for Spacebel, always returns dummy visibility response, enforce deploy with `False`
-            if json_body.get('message') == "magic!" or json_body.get('type') == "ok" or json_body.get('code') == 4:
+            # FIXME: support for Spacebel, always returns dummy visibility response, enforce deploy with `False`
+            if json_body.get("message") == "magic!" or json_body.get("type") == "ok" or json_body.get("code") == 4:
                 return False
-            return json_body.get('value') == VISIBILITY_PUBLIC
+            return json_body.get("value") == VISIBILITY_PUBLIC
         response.raise_for_status()
 
     def set_visibility(self, visibility):
@@ -175,9 +165,9 @@ class Wps3Process(WpsProcessInterface):
         user_headers.update(self.get_user_auth_header())
 
         LOGGER.debug("Update process WPS visibility request for {0} at {1}".format(self.process, path))
-        response = self.make_request(method='PUT',
+        response = self.make_request(method="PUT",
                                      url=path,
-                                     json={'value': visibility},
+                                     json={"value": visibility},
                                      retry=False,
                                      status_code_mock=HTTPOk.code)
         response.raise_for_status()
@@ -185,19 +175,19 @@ class Wps3Process(WpsProcessInterface):
     def describe_process(self):
         path = self.url + process_uri.format(process_id=self.process)
         LOGGER.debug("Describe process WPS request for {0} at {1}".format(self.process, path))
-        response = self.make_request(method='GET',
+        response = self.make_request(method="GET",
                                      url=path,
                                      retry=False,
                                      status_code_mock=HTTPOk.code)
 
         if response.status_code == HTTPOk.code:
-            # TODO Remove patch for Geomatys ADES (Missing process return a 200 InvalidParameterValue error !)
-            if response.content.lower().find('InvalidParameterValue') >= 0:
+            # FIXME: Remove patch for Geomatys ADES (Missing process return a 200 InvalidParameterValue error !)
+            if response.content.lower().find("InvalidParameterValue") >= 0:
                 return None
             return response.json()
         elif response.status_code == HTTPNotFound.code:
             return None
-        # TODO Remove patch for Spacebel ADES (Missing process return a 500 error)
+        # FIXME: Remove patch for Spacebel ADES (Missing process return a 500 error)
         elif response.status_code == HTTPInternalServerError.code:
             return None
         response.raise_for_status()
@@ -210,10 +200,7 @@ class Wps3Process(WpsProcessInterface):
         user_headers.update(self.get_user_auth_header())
 
         LOGGER.debug("Deploy process WPS request for {0} at {1}".format(self.process, path))
-        response = self.make_request(method='POST',
-                                     url=path,
-                                     json=self.deploy_body,
-                                     retry=True,
+        response = self.make_request(method="POST", url=path, json=self.deploy_body, retry=True,
                                      status_code_mock=HTTPOk.code)
         response.raise_for_status()
 
@@ -233,7 +220,7 @@ class Wps3Process(WpsProcessInterface):
             try:
                 self.deploy()
             except Exception as e:
-                # TODO: support for Spacebel, avoid conflict error incorrectly handled, remove 500 when fixed
+                # FIXME: support for Spacebel, avoid conflict error incorrectly handled, remove 500 when fixed
                 pass_http_error(e, [HTTPConflict, HTTPInternalServerError])
 
         LOGGER.info(u"Process {} enforced to public visibility.".format(
@@ -249,20 +236,20 @@ class Wps3Process(WpsProcessInterface):
         LOGGER.debug("Execute process WPS request for {0}".format(self.process))
 
         execute_body_inputs = []
-        execute_req_id = 'id'
-        execute_req_input_val = 'href'
-        execute_req_out_trans_mode = 'transmissionMode'
+        execute_req_id = "id"
+        execute_req_input_val = "href"
+        execute_req_out_trans_mode = "transmissionMode"
         for workflow_input_key, workflow_input_value in workflow_inputs.items():
             if isinstance(workflow_input_value, list):
                 for workflow_input_value_item in workflow_input_value:
                     execute_body_inputs.append({execute_req_id: workflow_input_key,
-                                                execute_req_input_val: workflow_input_value_item['location']})
+                                                execute_req_input_val: workflow_input_value_item["location"]})
             else:
                 execute_body_inputs.append({execute_req_id: workflow_input_key,
-                                            execute_req_input_val: workflow_input_value['location']})
+                                            execute_req_input_val: workflow_input_value["location"]})
         for exec_input in execute_body_inputs:
-            if exec_input[execute_req_input_val].startswith('{0}://'.format(OPENSEARCH_LOCAL_FILE_SCHEME)):
-                exec_input[execute_req_input_val] = 'file{0}'.format(
+            if exec_input[execute_req_input_val].startswith("{0}://".format(OPENSEARCH_LOCAL_FILE_SCHEME)):
+                exec_input[execute_req_input_val] = "file{0}".format(
                     exec_input[execute_req_input_val][len(OPENSEARCH_LOCAL_FILE_SCHEME):])
             elif exec_input[execute_req_input_val].startswith('file://'):
                 exec_input[execute_req_input_val] = self.host_file(exec_input[execute_req_input_val])

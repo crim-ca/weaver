@@ -27,7 +27,7 @@ import warnings
 import logging
 if TYPE_CHECKING:
     from weaver.typedefs import (
-        SettingsType, AnySettingsContainer, AnyRegistryContainer, AnyHeadersContainer, HeadersType, XML
+        AnyValue, AnySettingsContainer, AnyRegistryContainer, AnyHeadersContainer, HeadersType, SettingsType, XML
     )
     from typing import Union, Any, Dict, List, AnyStr, Iterable, Optional
 
@@ -52,7 +52,7 @@ null = _NullType()
 
 def get_weaver_url(settings):
     # type: (SettingsType) -> AnyStr
-    return settings.get('weaver.url').rstrip('/').strip()
+    return settings.get("weaver.url").rstrip('/').strip()
 
 
 def get_any_id(info):
@@ -60,15 +60,15 @@ def get_any_id(info):
     """Retrieves a dictionary `id-like` key using multiple common variations ``[id, identifier, _id]``.
     :param info: dictionary that potentially contains an `id-like` key.
     :returns: value of the matched `id-like` key or ``None`` if not found."""
-    return info.get('id', info.get('identifier', info.get('_id')))
+    return info.get("id", info.get("identifier", info.get("_id")))
 
 
 def get_any_value(info):
-    # type: (Dict[AnyStr, AnyStr]) -> Union[AnyStr, None]
+    # type: (Dict[AnyStr, AnyStr]) -> AnyValue
     """Retrieves a dictionary `value-like` key using multiple common variations ``[href, value, reference]``.
     :param info: dictionary that potentially contains a `value-like` key.
     :returns: value of the matched `value-like` key or ``None`` if not found."""
-    return info.get('href', info.get('value', info.get('reference', info.get('data'))))
+    return info.get("href", info.get("value", info.get("reference", info.get("data"))))
 
 
 def get_any_message(info):
@@ -76,7 +76,7 @@ def get_any_message(info):
     """Retrieves a dictionary 'value'-like key using multiple common variations [message].
     :param info: dictionary that potentially contains a 'message'-like key.
     :returns: value of the matched 'message'-like key or an empty string if not found. """
-    return info.get('message', '').strip()
+    return info.get("message", "").strip()
 
 
 def get_registry(container):
@@ -129,7 +129,10 @@ def get_cookie_headers(header_container, cookie_header_name='Cookie'):
     :returns: new header container in the form ``{'Cookie': <found_cookie>}`` if it was matched, or empty otherwise.
     """
     try:
-        return dict(Cookie=get_header(cookie_header_name, header_container))
+        cookie = get_header(cookie_header_name, header_container)
+        if cookie:
+            return dict(Cookie=get_header(cookie_header_name, header_container))
+        return {}
     except KeyError:  # No cookie
         return {}
 
@@ -407,7 +410,28 @@ def make_dirs(path, mode=0o755, exist_ok=True):
                 os.mkdir(subdir, mode)
 
 
-def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_invalid=False):
+REGEX_SEARCH_INVALID_CHARACTERS = re.compile(r"[^a-zA-Z0-9_\-]")
+REGEX_ASSERT_INVALID_CHARACTERS = re.compile(r"^[a-zA-Z0-9_\-]+$")
+
+
+def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_character='_'):
+    # type: (AnyStr, Optional[int], Optional[Union[int, None]], Optional[bool], Optional[AnyStr]) -> Union[AnyStr, None]
+    """
+    Returns a cleaned-up version of the input name, replacing invalid characters matched with
+    ``REGEX_SEARCH_INVALID_CHARACTERS`` by ``replace_character``.
+
+    :param name: value to clean
+    :param min_len:
+        Minimal length of ``name`` to be respected, raises or returns ``None`` on fail according to ``assert_invalid``.
+    :param max_len:
+        Maximum length of ``name`` to be respected, raises or returns trimmed ``name`` on fail according to
+        ``assert_invalid``. If ``None``, condition is ignored for assertion or full ``name`` is returned respectively.
+    :param assert_invalid: If ``True``, fail conditions or invalid characters will raise an error instead of replacing.
+    :param replace_character: Single character to use for replacement of invalid ones if ``assert_invalid=False``.
+    """
+    if not isinstance(replace_character, six.string_types) and not len(replace_character) == 1:
+        raise ValueError("Single replace character is expected, got invalid [{!s}]".format(replace_character))
+    max_len = max_len or len(name)
     if assert_invalid:
         assert_sane_name(name, min_len, max_len)
     if name is None:
@@ -415,13 +439,16 @@ def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_in
     name = name.strip()
     if len(name) < min_len:
         return None
-    if replace_invalid:
-        max_len = max_len or 64
-        name = re.sub(r"[^a-zA-Z0-9_\-]", '_', name.lower()[:max_len])
+    name = re.sub(REGEX_SEARCH_INVALID_CHARACTERS, replace_character, name[:max_len])
     return name
 
 
 def assert_sane_name(name, min_len=3, max_len=None):
+    """Asserts that the sane name respects conditions.
+
+    .. seealso::
+        - argument details in :function:`get_sane_name`
+    """
     if name is None:
         raise InvalidIdentifierValue("Invalid name : {0}".format(name))
     name = name.strip()
@@ -430,5 +457,25 @@ def assert_sane_name(name, min_len=3, max_len=None):
        or name.endswith('-') \
        or len(name) < min_len \
        or (max_len is not None and len(name) > max_len) \
-       or not re.match(r"^[a-zA-Z0-9_\-]+$", name):
+       or not re.match(REGEX_ASSERT_INVALID_CHARACTERS, name):
         raise InvalidIdentifierValue("Invalid name : {0}".format(name))
+
+
+def clean_json_text_body(body):
+    # type: (AnyStr) -> AnyStr
+    """
+    Cleans a textual body field of superfluous characters to provide a better human-readable text in a JSON response.
+    """
+    # cleanup various escape characters and u'' stings
+    replaces = [(',\n', ', '), (' \n', ' '), ('\"', '\''), ('\\', ''),
+                ('u\'', '\''), ('u\"', '\''), ('\'\'', '\''), ('  ', ' ')]
+    replaces_from = [r[0] for r in replaces]
+    while any(rf in body for rf in replaces_from):
+        for _from, _to in replaces:
+            body = body.replace(_from, _to)
+
+    body_parts = [p.strip() for p in body.split('\n') if p != '']               # remove new line and extra spaces
+    body_parts = [p + '.' if not p.endswith('.') else p for p in body_parts]    # add terminating dot per sentence
+    body_parts = [p[0].upper() + p[1:] for p in body_parts if len(p)]           # capitalize first word
+    body_parts = ' '.join(p for p in body_parts if p)
+    return body_parts

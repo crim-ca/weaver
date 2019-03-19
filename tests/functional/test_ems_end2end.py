@@ -2,7 +2,7 @@ from weaver import WEAVER_ROOT_DIR
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_FORM
 from weaver.config import WEAVER_CONFIGURATION_EMS
 from weaver.processes.sources import fetch_data_sources
-from weaver.wps_restapi.utils import wps_restapi_base_url
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 from weaver.utils import get_weaver_url, now, make_dirs
 from weaver.status import (
@@ -150,7 +150,7 @@ class End2EndEMSTestCase(TestCase):
         cls.WEAVER_TEST_CONFIG_INI_PATH = os.getenv("WEAVER_TEST_CONFIG_INI_PATH")    # none uses default path
         cls.app = WebTestApp(cls.WEAVER_TEST_SERVER_HOSTNAME)
         cls.WEAVER_URL = get_weaver_url(cls.settings())
-        cls.WEAVER_RESTAPI_URL = wps_restapi_base_url(cls.settings())
+        cls.WEAVER_RESTAPI_URL = get_wps_restapi_base_url(cls.settings())
 
         # validation
         cls.validate_test_server()
@@ -749,8 +749,8 @@ class End2EndEMSTestCase(TestCase):
                 continue
             elif status in job_status_categories[STATUS_CATEGORY_FINISHED]:
                 self.assert_test(lambda: status == STATUS_SUCCEEDED,
-                                 message="Job execution `{}` failed, but expected to succeed.".format(job_location_url))
+                                 message="Job execution '{}' failed, but expected to succeed.".format(job_location_url))
                 break
-            self.assert_test(lambda: False, message="Unknown job execution status: `{}`.".format(status))
+            self.assert_test(lambda: False, message="Unknown job execution status: '{}'.".format(status))
         self.request("GET", "{}/result".format(job_location_url),
                      headers=user_headers, cookies=user_cookies, status=HTTPOk.code)

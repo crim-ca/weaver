@@ -5,7 +5,7 @@ from weaver.warning import NonBreakingExceptionWarning
 from weaver.owsexceptions import OWSMissingParameterValue, OWSNotImplemented
 from weaver.store.base import StoreServices
 from weaver.utils import get_any_id, get_settings
-from weaver.wps_restapi.utils import wps_restapi_base_url
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
 from utils import get_cookie_headers
 from weaver.wps_restapi import swagger_definitions as sd
 from owslib.wps import WebProcessingService
@@ -40,7 +40,7 @@ def get_providers(request):
                 title=getattr(wps.identification, 'title', ''),
                 abstract=getattr(wps.identification, 'abstract', ''),
                 url='{base_url}/providers/{provider_id}'.format(
-                    base_url=wps_restapi_base_url(get_settings(request)),
+                    base_url=get_wps_restapi_base_url(get_settings(request)),
                     provider_id=service.name),
                 public=service.public))
         except Exception as e:
@@ -62,10 +62,10 @@ def get_capabilities(service, request):
         title=wps.identification.title,
         abstract=wps.identification.abstract,
         url='{base_url}/providers/{provider_id}'.format(
-            base_url=wps_restapi_base_url(settings),
+            base_url=get_wps_restapi_base_url(settings),
             provider_id=service.name),
         processes='{base_url}/providers/{provider_id}/processes'.format(
-            base_url=wps_restapi_base_url(settings),
+            base_url=get_wps_restapi_base_url(settings),
             provider_id=service.name),
         type='WPS',
         contact=wps.provider.contact.name)

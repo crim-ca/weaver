@@ -44,7 +44,7 @@
             "out": ["output"]
         },
         "json2nc": {
-            "run": "weaver/processes/builtin/jsonarray2netcdf.cwl",
+            "run": "jsonarray2netcdf",
             "in": {
                 "input": "subset/output"
             },

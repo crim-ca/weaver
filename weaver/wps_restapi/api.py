@@ -2,7 +2,7 @@ from weaver.__meta__ import __version__ as weaver_version
 from weaver.utils import get_settings, get_header
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.colander_one_of import CustomTypeConversionDispatcher
-from weaver.wps_restapi.utils import wps_restapi_base_url, wps_restapi_base_path
+from weaver.wps_restapi.utils import get_wps_restapi_base_url, wps_restapi_base_path
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.owsexceptions import OWSException
 from six.moves.urllib.parse import urlparse
@@ -49,7 +49,7 @@ def api_frontpage(request):
     weaver_config = get_weaver_configuration(settings)
 
     weaver_api = asbool(settings.get('weaver.wps_restapi'))
-    weaver_api_url = wps_restapi_base_url(settings) if weaver_api else None
+    weaver_api_url = get_wps_restapi_base_url(settings) if weaver_api else None
     weaver_api_doc = weaver_api_url + sd.api_swagger_ui_uri if weaver_api else None
     weaver_api_ref = settings.get('weaver.wps_restapi_ref', None) if weaver_api else None
     weaver_wps = asbool(settings.get('weaver.wps'))

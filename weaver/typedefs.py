@@ -26,10 +26,9 @@ if TYPE_CHECKING:
         FileSystemPathType = AnyStr
 
     Number = Union[int, float]
-
-    JsonKey = Union[AnyStr, int]
-    JsonField = Union[AnyStr, Number, bool, None]
-    JSON = Dict[JsonKey, Union[JsonField, Dict[JsonKey, 'JSON'], List['JSON']]]
+    AnyValue = Union[AnyStr, Number, bool, None]
+    AnyKey = Union[AnyStr, int]
+    JSON = Dict[AnyKey, Union[AnyValue, Dict[AnyKey, 'JSON'], List['JSON']]]
     CWL = Dict[{"class": AnyStr, }]
     # noinspection PyProtectedMember
     XML = lxml.etree._Element

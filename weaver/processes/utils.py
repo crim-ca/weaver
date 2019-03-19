@@ -8,7 +8,7 @@ from weaver.utils import get_sane_name, get_settings, get_url_without_query
 from weaver.processes import wps_package
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.utils import wps_restapi_base_url
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
 from weaver.exceptions import (
     InvalidIdentifierValue,
     ProcessRegistrationError,
@@ -140,7 +140,7 @@ def jsonify_output(output, process_description):
 def jsonify_value(value):
     # ComplexData type
     if isinstance(value, ComplexData):
-        return {"mimeType": value.mimeType, 'encoding': value.encoding, 'schema': value.schema}
+        return {"mimeType": value.mimeType, "encoding": value.encoding, "schema": value.schema}
     # other type
     else:
         return value
@@ -152,7 +152,7 @@ def convert_process_wps_to_db(service, process, container):
     Converts an owslib WPS Process to local storage Process.
     """
     describe_process_url = "{base_url}/providers/{provider_id}/processes/{process_id}".format(
-        base_url=wps_restapi_base_url(container),
+        base_url=get_wps_restapi_base_url(container),
         provider_id=service.get("name"),
         process_id=process.identifier)
     execute_process_url = "{describe_url}/jobs".format(describe_url=describe_process_url)
@@ -275,7 +275,7 @@ def deploy_process_from_payload(payload, container):
         if weaver_config != WEAVER_CONFIGURATION_EMS:
             raise HTTPBadRequest("Invalid [{0}] package deployment on [{1}].".format(process_type, weaver_config))
 
-    restapi_url = wps_restapi_base_url(settings)
+    restapi_url = get_wps_restapi_base_url(settings)
     description_url = "/".join([restapi_url, "processes", process_info["identifier"]])
     execute_endpoint = "/".join([description_url, "jobs"])
 
@@ -306,7 +306,7 @@ def deploy_process_from_payload(payload, container):
     return HTTPOk(json=json_response)
 
 
-def register_wps_processes_processes(wps_processes_file_path, container):
+def register_wps_processes_from_config(wps_processes_file_path, container):
     # type: (FileSystemPathType, AnySettingsContainer) -> None
     """
     Loads a `wps_processes.yml` file and registers `WPS-1` providers processes to the

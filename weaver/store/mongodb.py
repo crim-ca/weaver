@@ -124,12 +124,12 @@ class MongodbServiceStore(StoreServices, MongodbStore):
         """
         service = self.collection.find_one({'name': name})
         if not service:
-            raise ServiceNotFound("Service `{}` could not be found.".format(name))
+            raise ServiceNotFound("Service '{}' could not be found.".format(name))
         service = Service(service)
         same_visibility = (service.public and visibility == VISIBILITY_PUBLIC) or \
                           (not service.public and visibility == VISIBILITY_PRIVATE)
         if visibility is not None and not same_visibility:
-            raise ServiceNotAccessible("Service `{}` cannot be accessed.".format(name))
+            raise ServiceNotAccessible("Service '{}' cannot be accessed.".format(name))
         return service
 
     def fetch_by_url(self, url, request=None):
@@ -179,7 +179,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         else:
             new_process = process
         if not isinstance(new_process, Process):
-            raise ProcessInstanceError("Unsupported process type `{}`".format(type(process)))
+            raise ProcessInstanceError("Unsupported process type '{}'".format(type(process)))
 
         # apply defaults if not specified
         new_process['type'] = self._get_process_type(process)
@@ -208,7 +208,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
                 return function_dict()
             return function_dict[ProcessWPS]()
         else:
-            raise ProcessInstanceError("Unsupported process type `{}`".format(type(process)))
+            raise ProcessInstanceError("Unsupported process type '{}'".format(type(process)))
 
     def _get_process_id(self, process):
         return self._get_process_field(process, lambda: process.identifier)
@@ -239,7 +239,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
             if overwrite:
                 self.collection.delete_one({'identifier': sane_name})
             else:
-                raise ProcessRegistrationError("Process `{}` already registered.".format(sane_name))
+                raise ProcessRegistrationError("Process '{}' already registered.".format(sane_name))
         process.identifier = sane_name  # must use property getter/setter to match both 'Process' types
         self._add_process(process)
         return self.fetch_by_id(sane_name)
@@ -253,7 +253,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         sane_name = get_sane_name(process_id, **self.sane_name_config)
         process = self.fetch_by_id(sane_name, visibility=visibility, request=request)
         if not process:
-            raise ProcessNotFound("Process `{}` could not be found.".format(sane_name))
+            raise ProcessNotFound("Process '{}' could not be found.".format(sane_name))
         return bool(self.collection.delete_one({'identifier': sane_name}).deleted_count)
 
     def list_processes(self, visibility=None, request=None):
@@ -293,10 +293,10 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         sane_name = get_sane_name(process_id, **self.sane_name_config)
         process = self.collection.find_one({'identifier': sane_name})
         if not process:
-            raise ProcessNotFound("Process `{}` could not be found.".format(sane_name))
+            raise ProcessNotFound("Process '{}' could not be found.".format(sane_name))
         process = Process(process)
         if visibility is not None and process.visibility != visibility:
-            raise ProcessNotAccessible("Process `{}` cannot be accessed.".format(sane_name))
+            raise ProcessNotAccessible("Process '{}' cannot be accessed.".format(sane_name))
         return process
 
     def get_visibility(self, process_id, request=None):
@@ -357,7 +357,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         Stores a job in mongodb.
         """
         try:
-            tags = ['dev']
+            tags = ["dev"]
             tags.extend(filter(lambda t: t, custom_tags or list()))
             if is_workflow:
                 tags.append(PROCESS_WORKFLOW)
@@ -370,17 +370,17 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             if not access:
                 access = VISIBILITY_PRIVATE
             new_job = Job({
-                'task_id': task_id,
-                'user_id': user_id,
-                'service': service,     # provider identifier (WPS service)
-                'process': process,     # process identifier (WPS request)
-                'inputs': inputs,
-                'status': map_status(STATUS_ACCEPTED),
-                'execute_async': execute_async,
-                'is_workflow': is_workflow,
-                'created': now(),
-                'tags': tags,
-                'access': access,
+                "task_id": task_id,
+                "user_id": user_id,
+                "service": service,     # provider identifier (WPS service)
+                "process": process,     # process identifier (WPS request)
+                "inputs": inputs,
+                "status": map_status(STATUS_ACCEPTED),
+                "execute_async": execute_async,
+                "is_workflow": is_workflow,
+                "created": now(),
+                "tags": tags,
+                "access": access,
             })
             self.collection.insert_one(new_job)
             job = self.fetch_by_id(job_id=new_job.id)
@@ -402,7 +402,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                 return self.fetch_by_id(job.id)
         except Exception as ex:
             raise JobUpdateError("Error occurred during job update: [{}]".format(repr(ex)))
-        raise JobUpdateError("Failed to update specified job: `{}`".format(str(job)))
+        raise JobUpdateError("Failed to update specified job: '{}'".format(str(job)))
 
     def delete_job(self, job_id, request=None):
         # type: (AnyStr, Optional[Request]) -> bool
@@ -419,7 +419,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         """
         job = self.collection.find_one({'id': job_id})
         if not job:
-            raise JobNotFound("Could not find job matching: `{}`".format(job_id))
+            raise JobNotFound("Could not find job matching: '{}'".format(job_id))
         return Job(job)
 
     def list_jobs(self, request=None):
@@ -483,7 +483,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         elif sort == SORT_USER:
             sort = 'user_id'
         if sort not in job_sort_values:
-            raise JobNotFound("Invalid sorting method: `{}`".format(repr(sort)))
+            raise JobNotFound("Invalid sorting method: '{}'".format(repr(sort)))
 
         sort_order = DESCENDING if sort == SORT_FINISHED or sort == SORT_CREATED else ASCENDING
         sort_criteria = [(sort, sort_order)]
@@ -516,7 +516,7 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
         Stores a quote in mongodb.
         """
         if not isinstance(quote, Quote):
-            raise QuoteInstanceError("Invalid quote object: `{}`".format(repr(quote)))
+            raise QuoteInstanceError("Invalid quote object: '{}'".format(repr(quote)))
         try:
             self.collection.insert_one(quote)
             quote = self.fetch_by_id(quote_id=quote.id)
@@ -533,7 +533,7 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
         """
         quote = self.collection.find_one({'id': quote_id})
         if not quote:
-            raise QuoteNotFound("Could not find quote matching: `{}`".format(quote_id))
+            raise QuoteNotFound("Could not find quote matching: '{}'".format(quote_id))
         return Quote(quote)
 
     def list_quotes(self):
@@ -584,7 +584,7 @@ class MongodbBillStore(StoreBills, MongodbStore):
         Stores a bill in mongodb.
         """
         if not isinstance(bill, Bill):
-            raise BillInstanceError("Invalid bill object: `{}`".format(repr(bill)))
+            raise BillInstanceError("Invalid bill object: '{}'".format(repr(bill)))
         try:
             self.collection.insert_one(bill)
             bill = self.fetch_by_id(bill_id=bill.id)
@@ -601,7 +601,7 @@ class MongodbBillStore(StoreBills, MongodbStore):
         """
         bill = self.collection.find_one({'id': bill_id})
         if not bill:
-            raise BillNotFound("Could not find bill matching: `{}`".format(bill_id))
+            raise BillNotFound("Could not find bill matching: '{}'".format(bill_id))
         return Bill(bill)
 
     def list_bills(self):
@@ -627,7 +627,7 @@ class MongodbBillStore(StoreBills, MongodbStore):
         if sort is None:
             sort = SORT_ID
         if sort not in bill_sort_values:
-            raise BillNotFound("Invalid sorting method: `{}`".format(repr(sort)))
+            raise BillNotFound("Invalid sorting method: '{}'".format(repr(sort)))
 
         sort_order = ASCENDING
         sort_criteria = [(sort, sort_order)]

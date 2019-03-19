@@ -286,7 +286,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             uri = "/processes"
             for i, data in enumerate(process_data_tests):
                 resp = self.app.post_json(uri, params=data, headers=self.json_headers, expect_errors=True)
-                msg = "Failed with test variation `{}` with value `{}`."
+                msg = "Failed with test variation '{}' with value '{}'."
                 assert resp.status_code in [400, 422], msg.format(i, resp.status_code)
                 assert resp.content_type == CONTENT_TYPE_APP_JSON, msg.format(i, resp.content_type)
 
@@ -543,7 +543,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         uri = "/processes/{}/jobs".format(self.process_public.identifier)
         for i, exec_data in enumerate(execute_data_tests):
             resp = self.app.post_json(uri, params=exec_data, headers=self.json_headers, expect_errors=True)
-            msg = "Failed with test variation `{}` with value `{}`."
+            msg = "Failed with test variation '{}' with value '{}'."
             assert resp.status_code in [400, 422], msg.format(i, resp.status_code)
             assert resp.content_type == CONTENT_TYPE_APP_JSON, msg.format(i, resp.content_type)
 

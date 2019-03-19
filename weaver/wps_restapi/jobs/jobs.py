@@ -8,9 +8,9 @@ from weaver.exceptions import (
     JobNotFound,
 )
 from weaver.store.base import StoreServices, StoreProcesses, StoreJobs
-from weaver.utils import get_settings
+from weaver.utils import get_settings, get_any_id, get_any_value
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.utils import wps_restapi_base_url
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver import status, sort
 from pyramid.httpexceptions import (
@@ -33,7 +33,7 @@ LOGGER = get_task_logger(__name__)
 
 
 def job_url(settings, job):
-    base_job_url = wps_restapi_base_url(settings)
+    base_job_url = get_wps_restapi_base_url(settings)
     if job.service is not None:
         base_job_url += '/providers/{provider_id}'.format(provider_id=job.service)
     return '{base_job_url}/processes/{process_id}/jobs/{job_id}'.format(
@@ -148,9 +148,9 @@ def validate_service_process(request):
                 if process_name not in [p.id for p in processes]:
                     raise ProcessNotFound
     except (ServiceNotFound, ProcessNotFound):
-        raise HTTPNotFound("{} of id `{}` cannot be found.".format(item_type, item_test))
+        raise HTTPNotFound("{} of id '{}' cannot be found.".format(item_type, item_test))
     except (ServiceNotAccessible, ProcessNotAccessible):
-        raise HTTPUnauthorized("{} of id `{}` is not accessible.".format(item_type, item_test))
+        raise HTTPUnauthorized("{} of id '{}' is not accessible.".format(item_type, item_test))
     except InvalidIdentifierValue as ex:
         raise HTTPBadRequest(str(ex))
 
@@ -245,7 +245,7 @@ def get_job_results(request):
     Retrieve the results of a job.
     """
     job = get_job(request)
-    results = dict(outputs=[dict(id=result['identifier'], href=result['reference']) for result in job.results])
+    results = dict(outputs=[dict(id=get_any_id(result), href=get_any_value(result)) for result in job.results])
     return HTTPOk(json=results)
 
 

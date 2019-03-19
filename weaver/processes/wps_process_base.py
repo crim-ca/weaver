@@ -42,7 +42,7 @@ class WpsProcessInterface(object):
         self.cookies = get_cookie_headers(self.request.http_request.headers)
         self.headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
         self.settings = get_settings(app)
-        self.verify = asbool(self.settings.get('weaver.ows_proxy_ssl_verify', True))
+        self.verify = asbool(self.settings.get("weaver.ows_proxy_ssl_verify", True))
 
     def make_request(self, method, url, retry, status_code_mock=None, **kwargs):
         response = requests.request(method,
@@ -64,10 +64,10 @@ class WpsProcessInterface(object):
         settings = get_settings(app)
         weaver_output_url = get_wps_output_url(settings)
         weaver_output_path = get_wps_output_path(settings)
-        fn = fn.replace('file://', '')
+        fn = fn.replace("file://", "")
 
         if not fn.startswith(weaver_output_path):
-            raise Exception('Cannot host files outside of the output path : {0}'.format(fn))
+            raise Exception("Cannot host files outside of the output path : {0}".format(fn))
         return fn.replace(weaver_output_path, weaver_output_url)
 
     @staticmethod

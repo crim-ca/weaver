@@ -75,7 +75,12 @@ def clean_mime_type_format(mime_type):
     Removes any additional namespace key or URL from ``mime_type`` so that it corresponds to the generic
     representation (ex: `application/json`) instead of the `CWL->File->format` variant.
     """
-    for v in IANA_NAMESPACE.values() + IANA_NAMESPACE.keys() + EDAM_NAMESPACE.values() + EDAM_MAPPING.values():
+    for v in IANA_NAMESPACE.values() + IANA_NAMESPACE.keys() + EDAM_NAMESPACE.values():
         if v in mime_type:
-            return mime_type.replace(v, "")
+            mime_type = mime_type.replace(v, "")
+            break
+    for v in EDAM_MAPPING.values():
+        if v.endswith(mime_type):
+            mime_type = [k for k in EDAM_MAPPING if v.endswith(EDAM_MAPPING[k])][0]
+            break
     return mime_type

@@ -1,7 +1,7 @@
 from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS
-from weaver.processes import opensearch, builtin
+from weaver.processes import opensearch
 from weaver.processes.constants import WPS_INPUT, WPS_OUTPUT, WPS_COMPLEX, WPS_BOUNDINGBOX, WPS_LITERAL, WPS_REFERENCE
-from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
+from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW, PROCESS_BUILTIN
 from weaver.processes.sources import retrieve_data_source_url
 from weaver.exceptions import (
     PackageTypeError, PackageRegistrationError, PackageExecutionError,
@@ -57,7 +57,7 @@ import os
 import six
 if TYPE_CHECKING:
     from weaver.status import AnyStatusType
-    from weaver.typedefs import ToolPathObjectType, CWLFactoryCallable, CWL, JsonKey, JSON, XML, Number
+    from weaver.typedefs import ToolPathObjectType, CWLFactoryCallable, CWL, AnyKey, JSON, XML, Number
     from cwltool.process import Process as ProcessCWL
     from pywps.app import WPSRequest
     from pywps.response.execute import ExecuteResponse
@@ -80,6 +80,11 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger("PACKAGE")
 
 __all__ = [
+    "PACKAGE_EXTENSIONS",
+    "PACKAGE_REQUIREMENTS_APP_DOCKER",
+    "PACKAGE_REQUIREMENTS_APP_ESGF_CWT",
+    "PACKAGE_REQUIREMENTS_APP_WPS1",
+    "PACKAGE_REQUIREMENTS_APP_TYPES",
     "WpsPackage",
     "get_process_definition",
     "get_process_location",
@@ -109,18 +114,6 @@ PACKAGE_REQUIREMENTS_APP_TYPES = frozenset([
     PACKAGE_REQUIREMENTS_APP_ESGF_CWT,
     PACKAGE_REQUIREMENTS_APP_WPS1,
 ])
-
-# builtin package apps
-PACKAGE_BUILTIN_ROOT = builtin.__path__[0]
-PACKAGE_BUILTIN_REFERENCE = builtin.__name__.replace('.', '/')  # "weaver/<...>/builtin"
-PACKAGE_BUILTIN_APP_NAMES = [      # real CWL file paths
-    _pkg for _pkg in os.listdir(PACKAGE_BUILTIN_ROOT)
-    if os.path.splitext(_pkg)[-1].replace('.', '') in PACKAGE_EXTENSIONS
-]
-PACKAGE_BUILTIN_APPLICATIONS = {    # reference->path CWL files
-    os.path.join(PACKAGE_BUILTIN_REFERENCE, _pkg): os.path.join(PACKAGE_BUILTIN_ROOT, _pkg)
-    for _pkg in PACKAGE_BUILTIN_APP_NAMES
-}
 
 # process execution progress
 PACKAGE_PROGRESS_PREP_LOG = 1
@@ -212,15 +205,10 @@ def get_package_workflow_steps(package_dict_or_url):
         workflow_steps = package_dict_or_url.get("steps")
         for step in workflow_steps:
             step_package_ref = workflow_steps[step].get("run")
-            # resolve builtin package references
-            if step_package_ref in PACKAGE_BUILTIN_APPLICATIONS:
-                step_package_ref = PACKAGE_BUILTIN_APPLICATIONS[step_package_ref]
-            else:
-                # if a local file reference was specified, convert it to process id
-                package_ref_name, package_ref_ext = os.path.splitext(step_package_ref)
-                if urlparse(step_package_ref).scheme == "" and package_ref_ext.replace('.', '') in PACKAGE_EXTENSIONS:
-                    step_package_ref = package_ref_name
-
+            # if a local file reference was specified, convert it to process id
+            package_ref_name, package_ref_ext = os.path.splitext(step_package_ref)
+            if urlparse(step_package_ref).scheme == "" and package_ref_ext.replace('.', '') in PACKAGE_EXTENSIONS:
+                step_package_ref = package_ref_name
             workflow_steps_ids.append({"name": step, "reference": step_package_ref})
     return workflow_steps_ids
 
@@ -235,7 +223,7 @@ def _get_process_package(process_url):
     """
 
     def _package_not_found_error(ref):
-        return PackageNotFound("Could not find workflow step reference: `{}`".format(ref))
+        return PackageNotFound("Could not find workflow step reference: '{}'".format(ref))
 
     if not isinstance(process_url, six.string_types):
         raise _package_not_found_error(str(process_url))
@@ -263,11 +251,12 @@ def _get_process_payload(process_url):
     """
 
     def _payload_not_found_error(ref):
-        return PayloadNotFound("Could not find workflow step reference: `{}`".format(ref))
+        return PayloadNotFound("Could not find workflow step reference: '{}'".format(ref))
 
     if not isinstance(process_url, six.string_types):
         raise _payload_not_found_error(str(process_url))
 
+    process_url = get_process_location(process_url)
     payload_url = "{}/payload".format(process_url)
     payload_resp = requests.get(payload_url, headers={"Accept": CONTENT_TYPE_APP_JSON}, verify=False)
     if payload_resp.status_code != HTTPOk.code:
@@ -299,15 +288,15 @@ def _check_package_file(cwl_file_path_or_url):
         cwl_resp = requests.head(cwl_path)
         is_url = True
         if cwl_resp.status_code != HTTPOk.code:
-            raise PackageRegistrationError("Cannot find CWL file at: `{}`.".format(cwl_path))
+            raise PackageRegistrationError("Cannot find CWL file at: '{}'.".format(cwl_path))
     else:
         cwl_path = os.path.abspath(cwl_file_path_or_url)
         if not os.path.isfile(cwl_path):
-            raise PackageRegistrationError("Cannot find CWL file at: `{}`.".format(cwl_path))
+            raise PackageRegistrationError("Cannot find CWL file at: '{}'.".format(cwl_path))
 
     file_ext = os.path.splitext(cwl_path)[1].replace('.', '')
     if file_ext not in PACKAGE_EXTENSIONS:
-        raise PackageRegistrationError("Not a valid CWL file type: `{}`.".format(file_ext))
+        raise PackageRegistrationError("Not a valid CWL file type: '{}'.".format(file_ext))
     return cwl_path, is_url
 
 
@@ -363,15 +352,11 @@ def _load_package_content(package_dict,                             # type: Dict
     workflow_steps = get_package_workflow_steps(package_dict)
     step_packages = {}
     for step in workflow_steps:
-        if os.path.isfile(step["reference"]):
-            # package is a resolved builtin file path, simply reference to it
-            package_name = step["reference"]
-        else:
-            # generate sub-package file and update workflow step to point to it
-            step_process_url = get_process_location(step["reference"], data_source)
-            package_body, package_name = _get_process_package(step_process_url)
-            _load_package_content(package_body, package_name, tmp_dir=tmp_dir,
-                                  data_source=data_source, only_dump_file=True)
+        # generate sub-package file and update workflow step to point to it
+        step_process_url = get_process_location(step["reference"], data_source)
+        package_body, package_name = _get_process_package(step_process_url)
+        _load_package_content(package_body, package_name, tmp_dir=tmp_dir,
+                              data_source=data_source, only_dump_file=True)
         package_dict["steps"][step["name"]]["run"] = package_name
         step_packages[step["name"]] = package_name
 
@@ -402,14 +387,14 @@ def _is_cwl_array_type(io_info):
     if not isinstance(io_type, six.string_types) and not isinstance(io_type, Hashable) \
             and "items" in io_type and "type" in io_type:
         if not io_type["type"] == PACKAGE_ARRAY_BASE or io_type["items"] not in PACKAGE_ARRAY_ITEMS:
-            raise PackageTypeError("Unsupported I/O 'array' definition: `{}`.".format(repr(io_info)))
+            raise PackageTypeError("Unsupported I/O 'array' definition: '{}'.".format(repr(io_info)))
         io_type = io_type["items"]
         is_array = True
     # array type conversion when defined as string '<type>[]'
     elif isinstance(io_type, six.string_types) and io_type in PACKAGE_ARRAY_TYPES:
         io_type = io_type[:-2]  # remove []
         if io_type not in PACKAGE_ARRAY_ITEMS:
-            raise PackageTypeError("Unsupported I/O 'array' definition: `{}`.".format(repr(io_info)))
+            raise PackageTypeError("Unsupported I/O 'array' definition: '{}'.".format(repr(io_info)))
         is_array = True
     return is_array, io_type
 
@@ -428,16 +413,16 @@ def _is_cwl_enum_type(io_info):
         return False, io_type, None
 
     if "symbols" not in io_type:
-        raise PackageTypeError("Unsupported I/O 'enum' definition: `{}`.".format(repr(io_info)))
+        raise PackageTypeError("Unsupported I/O 'enum' definition: '{}'.".format(repr(io_info)))
     io_allow = io_type["symbols"]
     if not isinstance(io_allow, list) or len(io_allow) < 1:
-        raise PackageTypeError("Invalid I/O 'enum.symbols' definition: `{}`.".format(repr(io_info)))
+        raise PackageTypeError("Invalid I/O 'enum.symbols' definition: '{}'.".format(repr(io_info)))
 
     # validate matching types in allowed symbols and convert to supported CWL type
     first_allow = io_allow[0]
     for e in io_allow:
         if type(e) is not type(first_allow):
-            raise PackageTypeError("Ambiguous types in I/O 'enum.symbols' definition: `{}`.".format(repr(io_info)))
+            raise PackageTypeError("Ambiguous types in I/O 'enum.symbols' definition: '{}'.".format(repr(io_info)))
     if isinstance(first_allow, six.string_types):
         io_type = "string"
     elif isinstance(first_allow, float):
@@ -507,14 +492,14 @@ def _cwl2wps_io(io_info, io_select):
 
     # debug info for unhandled types conversion
     if not isinstance(io_type, six.string_types):
-        LOGGER.debug("is_array:      `{}`".format(repr(is_array)))
-        LOGGER.debug("array_elem:    `{}`".format(repr(array_elem)))
-        LOGGER.debug("is_enum:       `{}`".format(repr(is_enum)))
-        LOGGER.debug("enum_type:     `{}`".format(repr(enum_type)))
-        LOGGER.debug("enum_allow:    `{}`".format(repr(enum_allow)))
-        LOGGER.debug("io_info:       `{}`".format(repr(io_info)))
-        LOGGER.debug("io_type:       `{}`".format(repr(io_type)))
-        LOGGER.debug("type(io_type): `{}`".format(type(io_type)))
+        LOGGER.debug("is_array:      '{}'".format(repr(is_array)))
+        LOGGER.debug("array_elem:    '{}'".format(repr(array_elem)))
+        LOGGER.debug("is_enum:       '{}'".format(repr(is_enum)))
+        LOGGER.debug("enum_type:     '{}'".format(repr(enum_type)))
+        LOGGER.debug("enum_allow:    '{}'".format(repr(enum_allow)))
+        LOGGER.debug("io_info:       '{}'".format(repr(io_info)))
+        LOGGER.debug("io_type:       '{}'".format(repr(io_type)))
+        LOGGER.debug("type(io_type): '{}'".format(type(io_type)))
         raise TypeError("I/O type has not been properly decoded. Should be a string, got:`{!r}`".format(io_type))
 
     # literal types
@@ -815,11 +800,11 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
 
 
 def transform_json(json_data,               # type: ANY_IO_Type
-                   rename=None,             # type: Optional[Dict[JsonKey, Any]]
-                   remove=None,             # type: Optional[List[JsonKey]]
-                   add=None,                # type: Optional[Dict[JsonKey, Any]]
-                   replace_values=None,     # type: Optional[Dict[JsonKey, Any]]
-                   replace_func=None,       # type: Optional[Dict[JsonKey, Callable[[Any], Any]]]
+                   rename=None,             # type: Optional[Dict[AnyKey, Any]]
+                   remove=None,             # type: Optional[List[AnyKey]]
+                   add=None,                # type: Optional[Dict[AnyKey, Any]]
+                   replace_values=None,     # type: Optional[Dict[AnyKey, Any]]
+                   replace_func=None,       # type: Optional[Dict[AnyKey, Callable[[Any], Any]]]
                    ):                       # type: (...) -> ANY_IO_Type
     """
     Transforms the input json_data with different methods.
@@ -893,7 +878,7 @@ def _get_package_io(package_factory, io_select, as_json):
     elif io_select == WPS_INPUT:
         io_attrib = "inputs_record_schema"
     else:
-        raise PackageTypeError("Unknown I/O selection: `{}`.".format(io_select))
+        raise PackageTypeError("Unknown I/O selection: '{}'.".format(io_select))
     cwl_package_io = getattr(package_factory.t, io_attrib)
     wps_package_io = [_cwl2wps_io(io, io_select) for io in cwl_package_io["fields"]]
     if as_json:
@@ -1159,9 +1144,9 @@ def _generate_process_with_cwl_from_reference(reference):
 def get_process_definition(process_offering, reference=None, package=None, data_source=None):
     # type: (JSON, Optional[AnyStr], Optional[CWL], Optional[AnyStr]) -> JSON
     """
-    Returns an updated process information dictionary ready for storage using provided `WPS` ``process_offering``
+    Returns an updated process definition dictionary ready for storage using provided `WPS` ``process_offering``
     and a package definition passed by ``reference`` or ``package`` `CWL` content.
-    The returned process information can be used later on to load an instance of :class:`weaver.wps_package.Package`.
+    The returned process information can be used later on to load an instance of :class:`weaver.wps_package.WpsPackage`.
 
     :param process_offering: `WPS REST-API` (`WPS-2`) process offering as `JSON`.
     :param reference: URL to `CWL` package definition, `WPS-1 DescribeProcess` endpoint or `WPS-2 Process` endpoint.
@@ -1200,7 +1185,7 @@ def get_process_definition(process_offering, reference=None, package=None, data_
     if "class" not in package:
         raise PackageRegistrationError("Cannot obtain process type from package class.")
 
-    LOGGER.debug("Using data source: `{}`".format(data_source))
+    LOGGER.debug("Using data source: '{}'".format(data_source))
     package_factory, process_type, _ = try_or_raise_package_error(
         lambda: _load_package_content(package, data_source=data_source),
         reason="Loading package content")
@@ -1220,7 +1205,7 @@ def get_process_definition(process_offering, reference=None, package=None, data_
         reason="Merging of inputs/outputs")
 
     # obtain any retrieved process id if not already provided from upstream process offering, and clean it
-    process_id = get_sane_name(get_any_id(process_info), assert_invalid=False, replace_invalid=True)
+    process_id = get_sane_name(get_any_id(process_info), assert_invalid=False)
     if not process_id:
         raise PackageRegistrationError("Could not retrieve any process identifier.")
 
@@ -1384,7 +1369,7 @@ class WpsPackage(Process):
                 self.step_launched = []
 
             except Exception as ex:
-                raise PackageRegistrationError("Exception occurred on package instantiation: `{}`".format(repr(ex)))
+                raise PackageRegistrationError("Exception occurred on package instantiation: '{}'".format(repr(ex)))
             self.update_status("Loading package content done.", PACKAGE_PROGRESS_LOADING, STATUS_RUNNING)
 
             try:
@@ -1474,7 +1459,7 @@ class WpsPackage(Process):
         It must return a WpsProcess instance configured with the proper package, ADES target and cookies.
 
         :param jobname: The workflow step or the package id that must be launch on an ADES :class:`string`
-        :param joborder: The params for the job :class:`dict {input_name: input_value }`
+        :param joborder: The params for the job :class:`dict {input_name: input_value}`
                          input_value is one of `input_object` or `array [input_object]`
                          input_object is one of `string` or `dict {class: File, location: string}`
                          in our case input are expected to be File object
@@ -1489,8 +1474,7 @@ class WpsPackage(Process):
             jobtype = "package"
         else:
             # Here we got a step part of a workflow (self is the workflow package)
-            step_process_url = get_process_location(self.step_packages[jobname])
-            step_payload = _get_process_payload(step_process_url)
+            step_payload = _get_process_payload(self.step_packages[jobname])
             process = self.step_packages[jobname]
             jobtype = "step"
 
@@ -1499,10 +1483,19 @@ class WpsPackage(Process):
         end_step_progress = self.map_step_progress(len(self.step_launched) + 1, max(1, len(self.step_packages)))
 
         self.step_launched.append(jobname)
-        self.update_status("Preparing to launch {type} {name}.".format(
-            type=jobtype,
-            name=jobname),
-            start_step_progress, STATUS_RUNNING)
+        self.update_status("Preparing to launch {type} {name}.".format(type=jobtype, name=jobname),
+                           start_step_progress, STATUS_RUNNING)
+
+        def _update_status_dispatch(_provider, _message, _progress, _status):
+            self.step_update_status(
+                _message, _progress, start_step_progress, end_step_progress, jobname, _provider, _status
+            )
+
+        # directly resolve builtin processes
+        if step_payload.get("type") == PROCESS_BUILTIN:
+            from weaver.processes.wps_builtin import WpsBuiltinProcess
+            return WpsBuiltinProcess(process=process,
+                                     update_status=_update_status_dispatch)
 
         # package can define requirements and/or hints, if it's an application, only one is allowed, workflow can have
         # multiple, but they are not explicitly handled
@@ -1512,7 +1505,7 @@ class WpsPackage(Process):
         if len(app_hints) > 1:
             raise ValueError("Package 'requirements' and/or 'hints' define too many conflicting values: {}, "
                              "only one permitted amongst {}.".format(list(app_hints), PACKAGE_REQUIREMENTS_APP_TYPES))
-        requirement = app_hints[0] if app_hints else {"class": None}
+        requirement = app_hints[0] if app_hints else {"class": ""}
         if requirement["class"].endswith(PACKAGE_REQUIREMENTS_APP_WPS1):
             req_params = ["provider", "process"]
             if not all(r in requirement for r in ["provider", "process"]):
@@ -1524,10 +1517,7 @@ class WpsPackage(Process):
             return Wps1Process(provider=provider,
                                process=process,
                                request=self.request,
-                               update_status=lambda _provider, _message, _progress, _status: self.step_update_status(
-                                   _message, _progress, start_step_progress, end_step_progress, jobname,
-                                   _provider, _status
-                               ))
+                               update_status=_update_status_dispatch)
         elif requirement["class"].endswith(PACKAGE_REQUIREMENTS_APP_ESGF_CWT):
             # TODO: implement
             raise NotImplementedError("ESGF-CWTRequirement not implemented")
@@ -1538,7 +1528,4 @@ class WpsPackage(Process):
                                joborder=joborder,
                                process=process,
                                request=self.request,
-                               update_status=lambda _provider, _message, _progress, _status: self.step_update_status(
-                                   _message, _progress, start_step_progress, end_step_progress, jobname,
-                                   _provider, _status
-                               ))
+                               update_status=_update_status_dispatch)

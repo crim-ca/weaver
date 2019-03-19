@@ -510,7 +510,7 @@ def get_eo_images_inputs_from_payload(payload):
     :param payload:
 
     """
-    inputs = payload["processDescription"]["process"].get("inputs", {})
+    inputs = payload.get("processDescription", {}).get("process", {}).get("inputs", {})
     return list(filter(EOImageDescribeProcessHandler.is_eoimage_input, inputs))
 
 

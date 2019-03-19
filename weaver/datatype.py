@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING
 import six
 import uuid
 if TYPE_CHECKING:
-    from weaver.typedefs import Number, LoggerType, CWL
+    from weaver.typedefs import Number, LoggerType, CWL, JSON
     from typing import Any, AnyStr, Dict, List, Optional, Union
 
 
@@ -66,7 +66,7 @@ class Base(dict):
         # type: (...) -> AnyStr
         cls = type(self)
         repr_ = dict.__repr__(self)
-        return '{0}.{1} ({2})'.format(cls.__module__, cls.__name__, repr_)
+        return "{0}.{1} ({2})".format(cls.__module__, cls.__name__, repr_)
 
     @property
     def id(self):
@@ -75,14 +75,14 @@ class Base(dict):
 
 class Service(Base):
     """
-    Dictionary that contains OWS services. It always has ``'url'`` key.
+    Dictionary that contains OWS services. It always has ``url`` key.
     """
 
     def __init__(self, *args, **kwargs):
         super(Service, self).__init__(*args, **kwargs)
-        if 'name' not in self:
+        if "name" not in self:
             raise TypeError("Service 'name' is required")
-        if 'url' not in self:
+        if "url" not in self:
             raise TypeError("Service 'url' is required")
 
     @property
@@ -92,50 +92,51 @@ class Service(Base):
     @property
     def url(self):
         """Service URL."""
-        return self['url']
+        return self["url"]
 
     @property
     def name(self):
         """Service name."""
-        return self['name']
+        return self["name"]
 
     @property
     def type(self):
         """Service type."""
-        return self.get('type', 'WPS')
+        return self.get("type", "WPS")
 
     @property
     def public(self):
         """Flag if service has public access."""
         # TODO: public access can be set via auth parameter.
-        return self.get('public', False)
+        return self.get("public", False)
 
     @property
     def auth(self):
         """Authentication method: public, token, cert."""
-        return self.get('auth', 'token')
+        return self.get("auth", "token")
 
     @property
     def params(self):
         return {
-            'url': self.url,
-            'name': self.name,
-            'type': self.type,
-            'public': self.public,
-            'auth': self.auth}
+            "url": self.url,
+            "name": self.name,
+            "type": self.type,
+            "public": self.public,
+            "auth": self.auth
+        }
 
 
 class Job(Base):
     """
-    Dictionary that contains OWS service jobs. It always has ``'id'`` and ``task_id`` keys.
+    Dictionary that contains OWS service jobs. It always has ``id`` and ``task_id`` keys.
     """
 
     def __init__(self, *args, **kwargs):
         super(Job, self).__init__(*args, **kwargs)
-        if 'task_id' not in self:
-            raise TypeError("Parameter `task_id` is required for `{}` creation.".format(type(self)))
+        if "task_id" not in self:
+            raise TypeError("Parameter 'task_id' is required for '{}' creation.".format(type(self)))
         if not isinstance(self.id, six.string_types):
-            raise TypeError("Type `str` is required for `{}.id`".format(type(self)))
+            raise TypeError("Type 'str' is required for '{}.id'".format(type(self)))
 
     def _get_log_msg(self, msg=None):
         # type: (Optional[AnyStr]) -> AnyStr
@@ -149,12 +150,12 @@ class Job(Base):
             log_msg = [(ERROR, self._get_log_msg(message))]
             self.exceptions.append(errors)
         elif isinstance(errors, list):
-            log_msg = [(ERROR, self._get_log_msg('{0.text} - code={0.code} - locator={0.locator}'.format(error)))
+            log_msg = [(ERROR, self._get_log_msg("{0.text} - code={0.code} - locator={0.locator}".format(error)))
                        for error in errors]
             self.exceptions.extend([{
-                'Code': error.code,
-                'Locator': error.locator,
-                'Text': error.text
+                "Code": error.code,
+                "Locator": error.locator,
+                "Text": error.text
             } for error in errors])
         else:
             log_msg = [(INFO, self._get_log_msg(message))]
@@ -171,94 +172,94 @@ class Job(Base):
     @property
     def id(self):
         # type: (...) -> AnyStr
-        job_id = self.get('id')
+        job_id = self.get("id")
         if not job_id:
             job_id = str(uuid.uuid4())
-            self['id'] = job_id
+            self["id"] = job_id
         return job_id
 
     @property
     def task_id(self):
         # type: (...) -> AnyStr
-        return self['task_id']
+        return self["task_id"]
 
     @task_id.setter
     def task_id(self, task_id):
         # type: (AnyStr) -> None
         if not isinstance(task_id, six.string_types):
-            raise TypeError("Type `str` is required for `{}.task_id`".format(type(self)))
-        self['task_id'] = task_id
+            raise TypeError("Type 'str' is required for '{}.task_id'".format(type(self)))
+        self["task_id"] = task_id
 
     @property
     def service(self):
         # type: (...) -> Union[None, AnyStr]
-        return self.get('service', None)
+        return self.get("service", None)
 
     @service.setter
     def service(self, service):
         # type: (Union[None, AnyStr]) -> None
         if not isinstance(service, six.string_types) or service is None:
-            raise TypeError("Type `str` is required for `{}.service`".format(type(self)))
-        self['service'] = service
+            raise TypeError("Type 'str' is required for '{}.service'".format(type(self)))
+        self["service"] = service
 
     @property
     def process(self):
         # type: (...) -> Union[None, AnyStr]
-        return self.get('process', None)
+        return self.get("process", None)
 
     @process.setter
     def process(self, process):
         # type: (Union[None, AnyStr]) -> None
         if not isinstance(process, six.string_types) or process is None:
-            raise TypeError("Type `str` is required for `{}.process`".format(type(self)))
-        self['process'] = process
+            raise TypeError("Type 'str' is required for '{}.process'".format(type(self)))
+        self["process"] = process
 
     def _get_inputs(self):
         # type: (...) -> List[Optional[Dict[AnyStr, Any]]]
-        if self.get('inputs') is None:
-            self['inputs'] = list()
-        return self['inputs']
+        if self.get("inputs") is None:
+            self["inputs"] = list()
+        return self["inputs"]
 
     def _set_inputs(self, inputs):
         # type: (List[Optional[Dict[AnyStr, Any]]]) -> None
         if not isinstance(inputs, list):
-            raise TypeError("Type `list` is required for `{}.inputs`".format(type(self)))
-        self['inputs'] = inputs
+            raise TypeError("Type 'list' is required for '{}.inputs'".format(type(self)))
+        self["inputs"] = inputs
 
-    # allows to correctly update list by ref using `job.inputs.extend()`
+    # allows to correctly update list by ref using 'job.inputs.extend()'
     inputs = property(_get_inputs, _set_inputs)
 
     @property
     def user_id(self):
         # type: (...) -> Union[None, AnyStr]
-        return self.get('user_id', None)
+        return self.get("user_id", None)
 
     @user_id.setter
     def user_id(self, user_id):
         # type: (Union[None, AnyStr]) -> None
         if not isinstance(user_id, int) or user_id is None:
-            raise TypeError("Type `int` is required for `{}.user_id`".format(type(self)))
-        self['user_id'] = user_id
+            raise TypeError("Type 'int' is required for '{}.user_id'".format(type(self)))
+        self["user_id"] = user_id
 
     @property
     def status(self):
         # type: (...) -> AnyStr
-        return self.get('status', STATUS_UNKNOWN)
+        return self.get("status", STATUS_UNKNOWN)
 
     @status.setter
     def status(self, status):
         # type: (AnyStr) -> None
         if not isinstance(status, six.string_types):
-            raise TypeError("Type `str` is required for `{}.status`".format(type(self)))
+            raise TypeError("Type 'str' is required for '{}.status'".format(type(self)))
         if status not in job_status_values:
-            raise ValueError("Status `{0}` is not valid for `{1}.status`, must be one of {2!s}`"
+            raise ValueError("Status '{0}' is not valid for '{1}.status', must be one of {2!s}'"
                              .format(status, type(self), list(job_status_values)))
-        self['status'] = status
+        self["status"] = status
 
     @property
     def status_message(self):
         # type: (...) -> AnyStr
-        return self.get('status_message', 'no message')
+        return self.get("status_message", "no message")
 
     @status_message.setter
     def status_message(self, message):
@@ -266,57 +267,57 @@ class Job(Base):
         if message is None:
             return
         if not isinstance(message, six.string_types):
-            raise TypeError("Type `str` is required for `{}.status_message`".format(type(self)))
-        self['status_message'] = message
+            raise TypeError("Type 'str' is required for '{}.status_message'".format(type(self)))
+        self["status_message"] = message
 
     @property
     def status_location(self):
         # type: (...) -> Union[None, AnyStr]
-        return self.get('status_location', None)
+        return self.get("status_location", None)
 
     @status_location.setter
     def status_location(self, location_url):
         # type: (Union[None, AnyStr]) -> None
         if not isinstance(location_url, six.string_types) or location_url is None:
-            raise TypeError("Type `str` is required for `{}.status_location`".format(type(self)))
-        self['status_location'] = location_url
+            raise TypeError("Type 'str' is required for '{}.status_location'".format(type(self)))
+        self["status_location"] = location_url
 
     @property
     def execute_async(self):
         # type: (...) -> bool
-        return self.get('execute_async', True)
+        return self.get("execute_async", True)
 
     @execute_async.setter
     def execute_async(self, execute_async):
         # type: (bool) -> None
         if not isinstance(execute_async, bool):
-            raise TypeError("Type `bool` is required for `{}.execute_async`".format(type(self)))
-        self['execute_async'] = execute_async
+            raise TypeError("Type 'bool' is required for '{}.execute_async'".format(type(self)))
+        self["execute_async"] = execute_async
 
     @property
     def is_workflow(self):
         # type: (...) -> bool
-        return self.get('is_workflow', False)
+        return self.get("is_workflow", False)
 
     @is_workflow.setter
     def is_workflow(self, is_workflow):
         # type: (bool) -> None
         if not isinstance(is_workflow, bool):
-            raise TypeError("Type `bool` is required for `{}.is_workflow`".format(type(self)))
-        self['is_workflow'] = is_workflow
+            raise TypeError("Type 'bool' is required for '{}.is_workflow'".format(type(self)))
+        self["is_workflow"] = is_workflow
 
     @property
     def created(self):
         # type: (...) -> datetime
-        created = self.get('created', None)
+        created = self.get("created", None)
         if not created:
-            self['created'] = now()
-        return localize_datetime(self.get('created'))
+            self["created"] = now()
+        return localize_datetime(self.get("created"))
 
     @property
     def finished(self):
         # type: (...) -> Union[None, AnyStr]
-        return self.get('finished', None)
+        return self.get("finished", None)
 
     def is_finished(self):
         # type: (...) -> bool
@@ -324,182 +325,180 @@ class Job(Base):
 
     def mark_finished(self):
         # type: (...) -> None
-        self['finished'] = now()
+        self["finished"] = now()
 
     @property
     def duration(self):
         # type: (...) -> AnyStr
         final_time = self.finished or now()
         duration = localize_datetime(final_time) - localize_datetime(self.created)
-        self['duration'] = str(duration).split('.')[0]
-        return self['duration']
+        self["duration"] = str(duration).split('.')[0]
+        return self["duration"]
 
     @property
     def progress(self):
         # type: (...) -> Number
-        return self.get('progress', 0)
+        return self.get("progress", 0)
 
     @progress.setter
     def progress(self, progress):
         # type: (Number) -> None
         if not isinstance(progress, (int, float)):
-            raise TypeError("Number is required for `{}.progress`".format(type(self)))
+            raise TypeError("Number is required for '{}.progress'".format(type(self)))
         if progress < 0 or progress > 100:
-            raise ValueError("Value must be in range [0,100] for `{}.progress`".format(type(self)))
-        self['progress'] = progress
+            raise ValueError("Value must be in range [0,100] for '{}.progress'".format(type(self)))
+        self["progress"] = progress
 
     def _get_results(self):
         # type: (...) -> List[Optional[Dict[AnyStr, Any]]]
-        if self.get('results') is None:
-            self['results'] = list()
-        return self['results']
+        if self.get("results") is None:
+            self["results"] = list()
+        return self["results"]
 
     def _set_results(self, results):
         # type: (List[Optional[Dict[AnyStr, Any]]]) -> None
         if not isinstance(results, list):
-            raise TypeError("Type `list` is required for `{}.results`".format(type(self)))
-        self['results'] = results
+            raise TypeError("Type 'list' is required for '{}.results'".format(type(self)))
+        self["results"] = results
 
-    # allows to correctly update list by ref using `job.results.extend()`
+    # allows to correctly update list by ref using 'job.results.extend()'
     results = property(_get_results, _set_results)
 
     def _get_exceptions(self):
         # type: (...) -> List[Optional[Dict[AnyStr, AnyStr]]]
-        if self.get('exceptions') is None:
-            self['exceptions'] = list()
-        return self['exceptions']
+        if self.get("exceptions") is None:
+            self["exceptions"] = list()
+        return self["exceptions"]
 
     def _set_exceptions(self, exceptions):
         # type: (List[Optional[Dict[AnyStr, AnyStr]]]) -> None
         if not isinstance(exceptions, list):
-            raise TypeError("Type `list` is required for `{}.exceptions`".format(type(self)))
-        self['exceptions'] = exceptions
+            raise TypeError("Type 'list' is required for '{}.exceptions'".format(type(self)))
+        self["exceptions"] = exceptions
 
-    # allows to correctly update list by ref using `job.exceptions.extend()`
+    # allows to correctly update list by ref using 'job.exceptions.extend()'
     exceptions = property(_get_exceptions, _set_exceptions)
 
     def _get_logs(self):
         # type: (...) -> List[Optional[Dict[AnyStr, AnyStr]]]
-        if self.get('logs') is None:
-            self['logs'] = list()
-        return self['logs']
+        if self.get("logs") is None:
+            self["logs"] = list()
+        return self["logs"]
 
     def _set_logs(self, logs):
         # type: (List[Optional[Dict[AnyStr, AnyStr]]]) -> None
         if not isinstance(logs, list):
-            raise TypeError("Type `list` is required for `{}.logs`".format(type(self)))
-        self['logs'] = logs
+            raise TypeError("Type 'list' is required for '{}.logs'".format(type(self)))
+        self["logs"] = logs
 
-    # allows to correctly update list by ref using `job.logs.extend()`
+    # allows to correctly update list by ref using 'job.logs.extend()'
     logs = property(_get_logs, _set_logs)
 
     def _get_tags(self):
         # type: (...) -> List[Optional[AnyStr]]
-        if self.get('tags') is None:
-            self['tags'] = list()
-        return self['tags']
+        if self.get("tags") is None:
+            self["tags"] = list()
+        return self["tags"]
 
     def _set_tags(self, tags):
         # type: (List[Optional[AnyStr]]) -> None
         if not isinstance(tags, list):
-            raise TypeError("Type `list` is required for `{}.tags`".format(type(self)))
-        self['tags'] = tags
+            raise TypeError("Type 'list' is required for '{}.tags'".format(type(self)))
+        self["tags"] = tags
 
-    # allows to correctly update list by ref using `job.tags.extend()`
+    # allows to correctly update list by ref using 'job.tags.extend()'
     tags = property(_get_tags, _set_tags)
 
     @property
     def access(self):
         # type: (...) -> AnyStr
         """Job visibility access from execution."""
-        return self.get('access', VISIBILITY_PRIVATE)
+        return self.get("access", VISIBILITY_PRIVATE)
 
     @access.setter
     def access(self, visibility):
         # type: (AnyStr) -> None
         """Job visibility access from execution."""
         if not isinstance(visibility, six.string_types):
-            raise TypeError("Type `str` is required for `{}.access`".format(type(self)))
+            raise TypeError("Type 'str' is required for '{}.access'".format(type(self)))
         if visibility not in visibility_values:
-            raise ValueError("Invalid `visibility` value specified for `{}.access`".format(type(self)))
-        self['access'] = visibility
+            raise ValueError("Invalid 'visibility' value specified for '{}.access'".format(type(self)))
+        self["access"] = visibility
 
     @property
     def request(self):
         # type: (...) -> Union[None, AnyStr]
         """XML request for WPS execution submission as string."""
-        return self.get('request', None)
+        return self.get("request", None)
 
     @request.setter
     def request(self, request):
         # type: (Union[None, AnyStr]) -> None
         """XML request for WPS execution submission as string."""
-        self['request'] = request
+        self["request"] = request
 
     @property
     def response(self):
         # type: (...) -> Union[None, AnyStr]
         """XML status response from WPS execution submission as string."""
-        return self.get('response', None)
+        return self.get("response", None)
 
     @response.setter
     def response(self, response):
         # type: (Union[None, AnyStr]) -> None
         """XML status response from WPS execution submission as string."""
-        self['response'] = response
+        self["response"] = response
 
     @property
     def params(self):
         # type: (...) -> Dict[AnyStr, Any]
         return {
-            'id': self.id,
-            'task_id': self.task_id,
-            'service': self.service,
-            'process': self.process,
-            'inputs': self.inputs,
-            'user_id': self.user_id,
-            'status': self.status,
-            'status_message': self.status_message,
-            'status_location': self.status_location,
-            'execute_async': self.execute_async,
-            'is_workflow': self.is_workflow,
-            'created': self.created,
-            'finished': self.finished,
-            'duration': self.duration,
-            'progress': self.progress,
-            'results': self.results,
-            'exceptions': self.exceptions,
-            'logs': self.logs,
-            'tags': self.tags,
-            'access': self.access,
-            'request': self.request,
-            'response': self.response,
+            "id": self.id,
+            "task_id": self.task_id,
+            "service": self.service,
+            "process": self.process,
+            "inputs": self.inputs,
+            "user_id": self.user_id,
+            "status": self.status,
+            "status_message": self.status_message,
+            "status_location": self.status_location,
+            "execute_async": self.execute_async,
+            "is_workflow": self.is_workflow,
+            "created": self.created,
+            "finished": self.finished,
+            "duration": self.duration,
+            "progress": self.progress,
+            "results": self.results,
+            "exceptions": self.exceptions,
+            "logs": self.logs,
+            "tags": self.tags,
+            "access": self.access,
+            "request": self.request,
+            "response": self.response,
         }
 
 
 class Process(Base):
     """
     Dictionary that contains a process description for db storage.
-    It always has ``'identifier'`` and ``processEndpointWPS1`` keys.
+    It always has ``identifier`` and ``processEndpointWPS1`` keys.
     """
 
     def __init__(self, *args, **kwargs):
         super(Process, self).__init__(*args, **kwargs)
         # use both 'id' and 'identifier' to support any call (WPS and recurrent 'id')
-        if 'id' not in self and 'identifier' not in self:
+        if "id" not in self and "identifier" not in self:
             raise TypeError("'id' OR 'identifier' is required")
-        if 'id' not in self:
-            self['id'] = self.pop('identifier')
-        if 'processEndpointWPS1' not in self:
-            raise TypeError("'processEndpointWPS1' is required")
-        if 'package' not in self:
+        if "id" not in self:
+            self["id"] = self.pop("identifier")
+        if "package" not in self:
             raise TypeError("'package' is required")
-        self.package = self.pop('package')  # force encode
+        self.package = self.pop("package")  # force encode
 
     @property
     def id(self):
         # type: (...) -> AnyStr
-        return self['id']
+        return self["id"]
 
     @property
     def identifier(self):
@@ -509,97 +508,101 @@ class Process(Base):
     @identifier.setter
     def identifier(self, value):
         # type: (AnyStr) -> None
-        self['id'] = value
+        self["id"] = value
 
     @property
     def title(self):
         # type: (...) -> AnyStr
-        return self.get('title', self.id)
+        return self.get("title", self.id)
 
     @property
     def abstract(self):
         # type: (...) -> AnyStr
-        return self.get('abstract', '')
+        return self.get("abstract", "")
 
     @property
     def keywords(self):
         # type: (...) -> List[AnyStr]
-        return self.get('keywords', [])
+        return self.get("keywords", [])
 
     @property
     def metadata(self):
         # type: (...) -> List[AnyStr]
-        return self.get('metadata', [])
+        return self.get("metadata", [])
 
     @property
     def version(self):
         # type: (...) -> Union[None, AnyStr]
-        return self.get('version')
+        return self.get("version")
 
     @property
     def inputs(self):
         # type: (...) -> Union[None, List[Dict[AnyStr, Any]]]
-        return self.get('inputs')
+        return self.get("inputs")
 
     @property
     def outputs(self):
         # type: (...) -> Union[None, List[Dict[AnyStr, Any]]]
-        return self.get('outputs')
+        return self.get("outputs")
 
     # noinspection PyPep8Naming
     @property
     def jobControlOptions(self):
         # type: (...) -> Union[None, List[AnyStr]]
-        return self.get('jobControlOptions')
+        return self.get("jobControlOptions")
 
     # noinspection PyPep8Naming
     @property
     def outputTransmission(self):
         # type: (...) -> Union[None, List[AnyStr]]
-        return self.get('outputTransmission')
+        return self.get("outputTransmission")
 
     # noinspection PyPep8Naming
     @property
     def processDescriptionURL(self):
         # type: (...) -> Union[None, AnyStr]
-        return self.get('processDescriptionURL')
+        return self.get("processDescriptionURL")
 
     # noinspection PyPep8Naming
     @property
     def processEndpointWPS1(self):
         # type: (...) -> Optional[AnyStr]
-        return self.get('processEndpointWPS1')
+        return self.get("processEndpointWPS1")
 
     # noinspection PyPep8Naming
     @property
     def executeEndpoint(self):
         # type: (...) -> Union[None, AnyStr]
-        return self.get('executeEndpoint')
+        return self.get("executeEndpoint")
 
     # noinspection PyPep8Naming
     @property
     def owsContext(self):
         # type: (...) -> Union[None, Dict[AnyStr, Any]]
-        return self.get('owsContext')
+        return self.get("owsContext")
 
     # wps, workflow, etc.
     @property
     def type(self):
         # type: (...) -> AnyStr
-        return self.get('type', 'WPS')
+        return self.get("type", PROCESS_WPS)
 
+    # TODO:
+    #   load from local file link (for builtin packages)
     @property
     def package(self):
         # type: (...) -> Union[None, CWL]
-        pkg = self.get('package')
+        pkg = self.get("package")
         return self._package_decode(pkg) if isinstance(pkg, dict) else pkg
 
+    # TODO:
+    #   allow link to local file (for builtin packages)
     @package.setter
     def package(self, pkg):
-        self['package'] = self._package_encode(pkg) if isinstance(pkg, dict) else pkg
+        self["package"] = self._package_encode(pkg) if isinstance(pkg, dict) else pkg
 
     # encode/decode characters that cannot be in a key during save to db
-    _package_codes = [("\uFF04", "$"), ("\uFF0E", ".")]
+    _package_codes = [("\uFF04", '$'), ("\uFF0E", '.')]
 
     def _package_encode(self, pkg):
         # type: (CWL) -> CWL
@@ -625,60 +628,63 @@ class Process(Base):
 
     @property
     def payload(self):
-        # type: (...) -> Union[None, Dict[AnyStr, Any]]
-        return self.get('payload')
+        # type: (...) -> JSON
+        return self.get("payload", dict())
 
     @property
     def visibility(self):
         # type: (...) -> AnyStr
-        return self.get('visibility', VISIBILITY_PRIVATE)
+        return self.get("visibility", VISIBILITY_PRIVATE)
 
     @visibility.setter
     def visibility(self, visibility):
         # type: (AnyStr) -> None
         if not isinstance(visibility, six.string_types):
-            raise TypeError("Type `str` is required for `{}.visibility`".format(type(self)))
+            raise TypeError("Type 'str' is required for '{}.visibility'".format(type(self)))
         if visibility not in visibility_values:
-            raise ValueError("Status `{0}` is not valid for `{1}.visibility, must be one of {2!s}`"
+            raise ValueError("Status '{0}' is not valid for '{1}.visibility, must be one of {2!s}'"
                              .format(visibility, type(self), list(visibility_values)))
-        self['visibility'] = visibility
+        self["visibility"] = visibility
 
     @property
     def params(self):
         # type: (...) -> Dict[AnyStr, Any]
         return {
-            'identifier': self.identifier,
-            'title': self.title,
-            'abstract': self.abstract,
-            'keywords': self.keywords,
-            'metadata': self.metadata,
-            'version': self.version,
-            'inputs': self.inputs,
-            'outputs': self.outputs,
-            'jobControlOptions': self.jobControlOptions,
-            'outputTransmission': self.outputTransmission,
-            'processEndpointWPS1': self.processEndpointWPS1,
-            'type': self.type,
-            'package': self.package,  # deployment specification (json body)
-            'payload': self.payload,
-            'visibility': self.visibility,
+            "identifier": self.identifier,
+            "title": self.title,
+            "abstract": self.abstract,
+            "keywords": self.keywords,
+            "metadata": self.metadata,
+            "version": self.version,
+            "inputs": self.inputs,
+            "outputs": self.outputs,
+            "jobControlOptions": self.jobControlOptions,
+            "outputTransmission": self.outputTransmission,
+            "processEndpointWPS1": self.processEndpointWPS1,
+            "processDescriptionURL": self.processDescriptionURL,
+            "executeEndpoint": self.executeEndpoint,
+            "owsContext": self.owsContext,
+            "type": self.type,
+            "package": self.package,  # deployment specification (json body)
+            "payload": self.payload,
+            "visibility": self.visibility,
         }
 
     @property
     def params_wps(self):
         # type: (...) -> Dict[AnyStr, Any]
-        """Values applicable to PyWPS Process __init__"""
+        """Values applicable to PyWPS Process ``__init__``"""
         return {
-            'identifier': self.identifier,
-            'title': self.title,
-            'abstract': self.abstract,
-            'keywords': self.keywords,
-            'metadata': self.metadata,
-            'version': self.version,
-            'inputs': self.inputs,
-            'outputs': self.outputs,
-            'package': self.package,
-            'payload': self.payload,
+            "identifier": self.identifier,
+            "title": self.title,
+            "abstract": self.abstract,
+            "keywords": self.keywords,
+            "metadata": self.metadata,
+            "version": self.version,
+            "inputs": self.inputs,
+            "outputs": self.outputs,
+            "package": self.package,
+            "payload": self.payload,
         }
 
     def json(self):
@@ -704,7 +710,7 @@ class Process(Base):
     def from_wps(wps_process, **extra_params):
         # type: (ProcessWPS, Any) -> Process
         """
-        Converts a PyWPS Process into a `weaver.datatype.Process` using provided parameters.
+        Converts a PyWPS Process into a :class:`weaver.datatype.Process` using provided parameters.
         """
         # import here to avoid circular dependencies
         # noinspection PyProtectedMember
@@ -712,10 +718,10 @@ class Process(Base):
 
         assert isinstance(wps_process, ProcessWPS)
         process = wps_process.json
-        process_type = getattr(wps_process, 'type', wps_process.identifier)
-        process.update({'type': process_type, 'package': None, 'reference': None,
-                        'inputs': [_wps2json_io(i) for i in wps_process.inputs],
-                        'outputs': [_wps2json_io(o) for o in wps_process.outputs]})
+        process_type = getattr(wps_process, "type", wps_process.identifier)
+        process.update({"type": process_type, "package": None, "reference": None,
+                        "inputs": [_wps2json_io(i) for i in wps_process.inputs],
+                        "outputs": [_wps2json_io(o) for o in wps_process.outputs]})
         process.update(**extra_params)
         return Process(process)
 
@@ -729,7 +735,7 @@ class Process(Base):
         if self.type == PROCESS_WPS:
             process_key = self.identifier
         if process_key not in process_mapping:
-            ProcessInstanceError("Unknown process `{}` in mapping.".format(process_key))
+            ProcessInstanceError("Unknown process '{}' in mapping.".format(process_key))
         if process_key in PROCESS_WITH_MAPPING:
             return process_mapping[process_key](**self.params_wps)
         return process_mapping[process_key]()
@@ -738,248 +744,232 @@ class Process(Base):
 class Quote(Base):
     """
     Dictionary that contains quote information.
-    It always has ``'id'`` and ``process`` key.
+    It always has ``id`` and ``process`` keys.
     """
 
     def __init__(self, *args, **kwargs):
         super(Quote, self).__init__(*args, **kwargs)
-        if 'process' not in self:
-            raise TypeError("Field `Quote.process` is required")
-        elif not isinstance(self.get('process'), six.string_types):
-            raise ValueError("Field `Quote.process` must be a string.")
-        if 'user' not in self:
-            raise TypeError("Field `Quote.user` is required")
-        elif not isinstance(self.get('user'), six.string_types):
-            raise ValueError("Field `Quote.user` must be a string.")
-        if 'price' not in self:
-            raise TypeError("Field `Quote.price` is required")
-        elif not isinstance(self.get('price'), float):
-            raise ValueError("Field `Quote.price` must be a float number.")
-        if 'currency' not in self:
-            raise TypeError("Field `Quote.currency` is required")
-        elif not isinstance(self.get('currency'), six.string_types) or len(self.get('currency')) != 3:
-            raise ValueError("Field `Quote.currency` must be an ISO-4217 currency string code.")
-        if 'created' not in self:
-            self['created'] = now()
+        if "process" not in self:
+            raise TypeError("Field 'Quote.process' is required")
+        elif not isinstance(self.get("process"), six.string_types):
+            raise ValueError("Field 'Quote.process' must be a string.")
+        if "user" not in self:
+            raise TypeError("Field 'Quote.user' is required")
+        elif not isinstance(self.get("user"), six.string_types):
+            raise ValueError("Field 'Quote.user' must be a string.")
+        if "price" not in self:
+            raise TypeError("Field 'Quote.price' is required")
+        elif not isinstance(self.get("price"), float):
+            raise ValueError("Field 'Quote.price' must be a float number.")
+        if "currency" not in self:
+            raise TypeError("Field 'Quote.currency' is required")
+        elif not isinstance(self.get("currency"), six.string_types) or len(self.get("currency")) != 3:
+            raise ValueError("Field 'Quote.currency' must be an ISO-4217 currency string code.")
+        if "created" not in self:
+            self["created"] = now()
         try:
-            self['created'] = dt_parse(str(self.get('created'))).isoformat()
+            self["created"] = dt_parse(str(self.get("created"))).isoformat()
         except ValueError:
-            raise ValueError("Field `Quote.created` must be an ISO-8601 datetime string.")
-        if 'expire' not in self:
-            self['expire'] = now() + timedelta(days=1)
+            raise ValueError("Field 'Quote.created' must be an ISO-8601 datetime string.")
+        if "expire" not in self:
+            self["expire"] = now() + timedelta(days=1)
         try:
-            self['expire'] = dt_parse(str(self.get('expire'))).isoformat()
+            self["expire"] = dt_parse(str(self.get("expire"))).isoformat()
         except ValueError:
-            raise ValueError("Field `Quote.expire` must be an ISO-8601 datetime string.")
-        if 'id' not in self:
-            self['id'] = str(uuid.uuid4())
+            raise ValueError("Field 'Quote.expire' must be an ISO-8601 datetime string.")
+        if "id" not in self:
+            self["id"] = str(uuid.uuid4())
 
     @property
     def id(self):
         """Quote ID."""
-        return self['id']
+        return self["id"]
 
     @property
     def title(self):
         """Quote title."""
-        return self.get('title')
+        return self.get("title")
 
     @property
     def description(self):
         """Quote description."""
-        return self.get('description')
+        return self.get("description")
 
     @property
     def details(self):
         """Quote details."""
-        return self.get('details')
+        return self.get("details")
 
     @property
     def user(self):
         """User ID requesting the quote"""
-        return self['user']
+        return self["user"]
 
     @property
     def process(self):
         """WPS Process ID."""
-        return self['process']
+        return self["process"]
 
     # noinspection PyPep8Naming
     @property
     def estimatedTime(self):
         """Process estimated time."""
-        return self.get('estimatedTime')
+        return self.get("estimatedTime")
 
     # noinspection PyPep8Naming
     @property
     def processParameters(self):
         """Process execution parameters for quote."""
-        return self.get('processParameters')
+        return self.get("processParameters")
 
     @property
     def location(self):
         """WPS Process URL."""
-        return self.get('location', '')
+        return self.get("location", "")
 
     @property
     def price(self):
         """Price of the current quote"""
-        return self.get('price', 0.0)
+        return self.get("price", 0.0)
 
     @property
     def currency(self):
         """Currency of the quote price"""
-        return self.get('currency')
+        return self.get("currency")
 
     @property
     def expire(self):
         """Quote expiration datetime."""
-        return self.get('expire')
+        return self.get("expire")
 
     @property
     def created(self):
         """Quote creation datetime."""
-        return self.get('created')
+        return self.get("created")
 
     @property
     def steps(self):
         """Sub-quote IDs if applicable"""
-        return self.get('steps', [])
+        return self.get("steps", [])
 
     @property
     def params(self):
         return {
-            'id': self.id,
-            'price': self.price,
-            'currency': self.currency,
-            'user': self.user,
-            'process': self.process,
-            'location': self.location,
-            'steps': self.steps,
-            'title': self.title,
-            'description': self.description,
-            'details': self.details,
-            'created': self.created,
-            'expire': self.expire,
-            'estimatedTime': self.estimatedTime,
-            'processParameters': self.processParameters,
+            "id": self.id,
+            "price": self.price,
+            "currency": self.currency,
+            "user": self.user,
+            "process": self.process,
+            "location": self.location,
+            "steps": self.steps,
+            "title": self.title,
+            "description": self.description,
+            "details": self.details,
+            "created": self.created,
+            "expire": self.expire,
+            "estimatedTime": self.estimatedTime,
+            "processParameters": self.processParameters,
         }
 
     def json(self):
         return self.params
-
-    def __str__(self):
-        return "Quote <{0}>".format(self.id)
-
-    def __repr__(self):
-        cls = type(self)
-        repr_ = dict.__repr__(self)
-        return '{0}.{1}({2})'.format(cls.__module__, cls.__name__, repr_)
 
 
 class Bill(Base):
     """
     Dictionary that contains bill information.
-    It always has ``'id'``, ``user``, ``quote`` and ``job`` keys.
+    It always has ``id``, ``user``, ``quote`` and ``job`` keys.
     """
 
     def __init__(self, *args, **kwargs):
         super(Bill, self).__init__(*args, **kwargs)
-        if 'quote' not in self:
-            raise TypeError("Field `Bill.quote` is required")
-        elif not isinstance(self.get('quote'), six.string_types):
-            raise ValueError("Field `Bill.quote` must be a string.")
-        if 'job' not in self:
-            raise TypeError("Field `Bill.job` is required")
-        elif not isinstance(self.get('job'), six.string_types):
-            raise ValueError("Field `Bill.job` must be a string.")
-        if 'user' not in self:
-            raise TypeError("Field `Bill.user` is required")
-        elif not isinstance(self.get('user'), six.string_types):
-            raise ValueError("Field `Bill.user` must be a string.")
-        if 'price' not in self:
-            raise TypeError("Field `Bill.price` is required")
-        elif not isinstance(self.get('price'), float):
-            raise ValueError("Field `Bill.price` must be a float number.")
-        if 'currency' not in self:
-            raise TypeError("Field `Bill.currency` is required")
-        elif not isinstance(self.get('currency'), six.string_types) or len(self.get('currency')) != 3:
-            raise ValueError("Field `Bill.currency` must be an ISO-4217 currency string code.")
-        if 'created' not in self:
-            self['created'] = now()
+        if "quote" not in self:
+            raise TypeError("Field 'Bill.quote' is required")
+        elif not isinstance(self.get("quote"), six.string_types):
+            raise ValueError("Field 'Bill.quote' must be a string.")
+        if "job" not in self:
+            raise TypeError("Field 'Bill.job' is required")
+        elif not isinstance(self.get("job"), six.string_types):
+            raise ValueError("Field 'Bill.job' must be a string.")
+        if "user" not in self:
+            raise TypeError("Field 'Bill.user' is required")
+        elif not isinstance(self.get("user"), six.string_types):
+            raise ValueError("Field 'Bill.user' must be a string.")
+        if "price" not in self:
+            raise TypeError("Field 'Bill.price' is required")
+        elif not isinstance(self.get("price"), float):
+            raise ValueError("Field 'Bill.price' must be a float number.")
+        if "currency" not in self:
+            raise TypeError("Field 'Bill.currency' is required")
+        elif not isinstance(self.get("currency"), six.string_types) or len(self.get("currency")) != 3:
+            raise ValueError("Field 'Bill.currency' must be an ISO-4217 currency string code.")
+        if "created" not in self:
+            self["created"] = now()
         try:
-            self['created'] = dt_parse(str(self.get('created'))).isoformat()
+            self["created"] = dt_parse(str(self.get("created"))).isoformat()
         except ValueError:
-            raise ValueError("Field `Bill.created` must be an ISO-8601 datetime string.")
-        if 'id' not in self:
-            self['id'] = str(uuid.uuid4())
+            raise ValueError("Field 'Bill.created' must be an ISO-8601 datetime string.")
+        if "id" not in self:
+            self["id"] = str(uuid.uuid4())
 
     @property
     def id(self):
         """Bill ID."""
-        return self['id']
+        return self["id"]
 
     @property
     def user(self):
         """User ID"""
-        return self['user']
+        return self["user"]
 
     @property
     def quote(self):
         """Quote ID."""
-        return self['quote']
+        return self["quote"]
 
     @property
     def job(self):
         """Job ID."""
-        return self['job']
+        return self["job"]
 
     @property
     def price(self):
         """Price of the current quote"""
-        return self.get('price', 0.0)
+        return self.get("price", 0.0)
 
     @property
     def currency(self):
         """Currency of the quote price"""
-        return self.get('currency')
+        return self.get("currency")
 
     @property
     def created(self):
         """Quote creation datetime."""
-        return self.get('created')
+        return self.get("created")
 
     @property
     def title(self):
         """Quote title."""
-        return self.get('title')
+        return self.get("title")
 
     @property
     def description(self):
         """Quote description."""
-        return self.get('description')
+        return self.get("description")
 
     @property
     def params(self):
         return {
-            'id': self.id,
-            'user': self.user,
-            'quote': self.quote,
-            'job': self.job,
-            'price': self.price,
-            'currency': self.currency,
-            'created': self.created,
-            'title': self.title,
-            'description': self.description,
+            "id": self.id,
+            "user": self.user,
+            "quote": self.quote,
+            "job": self.job,
+            "price": self.price,
+            "currency": self.currency,
+            "created": self.created,
+            "title": self.title,
+            "description": self.description,
         }
 
     def json(self):
         return self.params
-
-    def __str__(self):
-        return "Bill <{0}>".format(self.id)
-
-    def __repr__(self):
-        cls = type(self)
-        repr_ = dict.__repr__(self)
-        return '{0}.{1}({2})'.format(cls.__module__, cls.__name__, repr_)

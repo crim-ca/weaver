@@ -6,11 +6,6 @@ Based on tests from:
 * http://webtest.pythonpaste.org/en/latest/
 * http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/testing.html
 """
-# noinspection PyPackageRequirements
-import pytest
-import unittest
-import pyramid.testing
-from xml.etree import ElementTree
 from weaver.formats import CONTENT_TYPE_ANY_XML
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
 from weaver.processes.wps_default import Hello
@@ -23,6 +18,11 @@ from tests.utils import (
     get_test_weaver_config,
     get_test_weaver_app,
 )
+from xml.etree import ElementTree
+# noinspection PyPackageRequirements
+import pytest
+import unittest
+import pyramid.testing
 
 
 @pytest.mark.functional
