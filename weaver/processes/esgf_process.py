@@ -1,8 +1,9 @@
 import re
 import time
+from collections import defaultdict
 from os.path import join
 
-from typing import AnyStr, TYPE_CHECKING
+from typing import AnyStr, TYPE_CHECKING, Optional
 import logging
 import requests
 import cwt
@@ -28,6 +29,9 @@ class InputNames:
     files = "files"
     variable = "variable"
     api_key = "api_key"
+    time = "time"
+    lat = "lat"
+    lon = "lon"
 
 
 class ESGFProcess(Wps1Process):
@@ -40,9 +44,11 @@ class ESGFProcess(Wps1Process):
 
         self._check_required_inputs(workflow_inputs)
 
-        inputs = self._prepare_inputs(workflow_inputs)
         api_key = workflow_inputs[InputNames.api_key]
-        esgf_process = self._run_process(inputs, api_key)
+        inputs = self._prepare_inputs(workflow_inputs)
+        domain = self._get_domain(workflow_inputs)
+
+        esgf_process = self._run_process(api_key, inputs, domain)
         self._process_results(esgf_process, output_dir, expected_outputs)
 
     def _prepare_inputs(self, workflow_inputs):
@@ -61,6 +67,48 @@ class ESGFProcess(Wps1Process):
         inputs = [cwt.Variable(url, varname) for url in files]
 
         return inputs
+
+    def _get_domain(self, workflow_inputs):
+        # type: (JsonBody) -> Optional[cwt.Domain]
+
+        dimensions_names = [
+            InputNames.time,
+            InputNames.lat,
+            InputNames.lon,
+        ]
+
+        grouped_inputs = defaultdict(dict)
+
+        for dim_name in dimensions_names:
+            for param, v in workflow_inputs.items():
+                if param.startswith(dim_name + "_"):
+                    param_splitted = param.split("_", 1)[1]
+                    grouped_inputs[dim_name][param_splitted] = v
+
+        # grouped_inputs is of the form:
+        # {"lat": {"start": 1, "end": 3, "crs": "values"}}
+
+        allowed_crs = {c.name: c for c in [cwt.VALUES, cwt.INDICES, cwt.TIMESTAMPS]}
+
+        dimensions = []
+        for param_name, values in grouped_inputs.items():
+            for start_end in ["start", "end"]:
+                if start_end not in values:
+                    raise ValueError("Missing required parameter: {}_{}".format(param_name, start_end))
+            crs = cwt.VALUES
+            if "crs" in values:
+                if values["crs"] not in allowed_crs:
+                    raise ValueError("CRS must be in {}".format(", ".join(allowed_crs)))
+                crs = allowed_crs[values["crs"]]
+
+            dimension = cwt.Dimension(param_name, values["start"], values["end"], crs=crs)
+            dimensions.append(dimension)
+
+        if dimensions:
+            domain = cwt.Domain(
+                dimensions
+            )
+            return domain
 
     def _check_required_inputs(self, workflow_inputs):
         for required_input in self.required_inputs:
@@ -87,8 +135,8 @@ class ESGFProcess(Wps1Process):
             raise ValueError("Missing required input: variable")
         return workflow_inputs[InputNames.variable]
 
-    def _run_process(self, inputs, api_key):
-        # type: (List[cwt.Variable], str) -> cwt.Process
+    def _run_process(self, api_key, inputs, domain=None):
+        # type: (str, List[cwt.Variable], Optional[cwt.Domain]) -> cwt.Process
         """Run an ESGF process"""
         LOGGER.debug("Connecting to ESGF WPS")
 
@@ -99,7 +147,7 @@ class ESGFProcess(Wps1Process):
         LOGGER.debug(message)
         self.update_status(message, Percent.SENDING, STATUS_RUNNING)
 
-        wps.execute(process, inputs=inputs)
+        wps.execute(process, inputs=inputs, domain=domain)
 
         LOGGER.debug("Waiting for result")
 

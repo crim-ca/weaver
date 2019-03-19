@@ -1,0 +1,71 @@
+{
+    "processDescription": {
+        "process": {
+            "id": "esgf_subset"
+        }
+    },
+    "executionUnit": [
+        {
+            "unit": {
+                "cwlVersion": "v1.0",
+                "class": "CommandLineTool",
+                "hints": {
+                    "ESGF-CWTRequirement": {
+                        "provider": "https://aims2.llnl.gov/wps/",
+                        "process": "CDAT.subset"
+                    }
+                },
+                "inputs": {
+                    "files": {
+                        "type": {
+                            "type": "array",
+                            "items": "File"
+                        }
+                    },
+                    "variable": {
+                        "type": "string"
+                    },
+                    "time_start": {
+                        "type": "float"
+                    },
+                    "time_end": {
+                        "type": "float"
+                    },
+                    "time_crs": {
+                        "type": "string"
+                    },
+                    "lat_start": {
+                        "type": "float"
+                    },
+                    "lat_end": {
+                        "type": "float"
+                    },
+                    "lat_crs": {
+                        "type": "string"
+                    },
+                    "lon_start": {
+                        "type": "float"
+                    },
+                    "lon_end": {
+                        "type": "float"
+                    },
+                    "lon_crs": {
+                        "type": "string"
+                    },
+                    "api_key": {
+                        "type": "string"
+                    }
+                },
+                "outputs": {
+                    "output_netcdf": {
+                        "outputBinding": {
+                            "glob": "output_netcdf.nc"
+                        },
+                        "type": "File"
+                    }
+                }
+            }
+        }
+    ],
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/ESGFWpsApplication"
+}
