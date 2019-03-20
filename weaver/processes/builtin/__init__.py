@@ -6,6 +6,7 @@ from weaver.processes.wps_package import PACKAGE_EXTENSIONS, get_process_definit
 from weaver.utils import clean_json_text_body, ows_context_href
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
+from cwltool.process import Process as ProcessCWL
 from typing import TYPE_CHECKING
 from importlib import import_module
 import six
@@ -78,3 +79,49 @@ def register_builtin_processes(container):
 
     # registration of missing apps automatically applied with 'default_processes'
     get_db(container).get_store(StoreProcesses, default_processes=builtin_processes)
+
+
+class BuiltinProcess(ProcessCWL):
+    class BuiltinProcessJob(object):
+        def __init__(self,
+                     builder,          # type: Builder
+                     script,           # type: Dict[Text, Text]
+                     output_callback,  # type: Callable[[Any, Any], Any]
+                     requirements,     # type: Dict[Text, Text]
+                     hints,            # type: Dict[Text, Text]
+                     outdir=None,      # type: Optional[Text]
+                     tmpdir=None,      # type: Optional[Text]
+                    ):  # type: (...) -> None
+            self.builder = builder
+            self.requirements = requirements
+            self.hints = hints
+            self.collect_outputs = None  # type: Optional[Callable[[Any], Any]]
+            self.output_callback = output_callback
+            self.outdir = outdir
+            self.tmpdir = tmpdir
+            self.script = script
+            self.prov_obj = None  # type: Optional[CreateProvProfile]
+
+        def run(self, runtimeContext):  # type: (RuntimeContext) -> None
+            try:
+                ev = self.builder.do_eval(self.script)
+                normalizeFilesDirs(ev)
+                self.output_callback(ev, "success")
+            except Exception as err:
+                _logger.warning(u"Failed to evaluate expression:\n%s",
+                                err, exc_info=runtimeContext.debug)
+                self.output_callback({}, "permanentFail")
+
+    def job(self,
+            job_order,         # type: Dict[Text, Text]
+            output_callbacks,  # type: Callable[[Any, Any], Any]
+            runtimeContext     # type: RuntimeContext
+           ):
+        # type: (...) -> Generator[ExpressionTool.ExpressionJob, None, None]
+        builder = self._init_job(job_order, runtimeContext)
+
+        job = ExpressionTool.ExpressionJob(
+            builder, self.tool["expression"], output_callbacks,
+            self.requirements, self.hints)
+        job.prov_obj = runtimeContext.prov_obj
+        yield job

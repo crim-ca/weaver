@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     AnyValue = Union[AnyStr, Number, bool, None]
     AnyKey = Union[AnyStr, int]
     JSON = Dict[AnyKey, Union[AnyValue, Dict[AnyKey, 'JSON'], List['JSON']]]
-    CWL = Dict[{"class": AnyStr, }]
+    CWL = Dict[{"cwlVersion": AnyStr, "class": AnyStr, "inputs": JSON, "outputs": JSON}]
     # noinspection PyProtectedMember
     XML = lxml.etree._Element
 

@@ -1,6 +1,9 @@
 from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS
 from weaver.processes import opensearch
-from weaver.processes.constants import WPS_INPUT, WPS_OUTPUT, WPS_COMPLEX, WPS_BOUNDINGBOX, WPS_LITERAL, WPS_REFERENCE
+from weaver.processes.constants import (
+    WPS_INPUT, WPS_OUTPUT, WPS_COMPLEX, WPS_BOUNDINGBOX, WPS_LITERAL, WPS_REFERENCE,
+    CWL_REQUIREMENT_APP_ESGF_CWT, CWL_REQUIREMENT_APP_WPS1, CWL_REQUIREMENT_APP_TYPES,
+)
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from weaver.processes.sources import retrieve_data_source_url
 from weaver.exceptions import (
@@ -82,10 +85,6 @@ LOGGER = logging.getLogger("PACKAGE")
 
 __all__ = [
     "PACKAGE_EXTENSIONS",
-    "PACKAGE_REQUIREMENTS_APP_DOCKER",
-    "PACKAGE_REQUIREMENTS_APP_ESGF_CWT",
-    "PACKAGE_REQUIREMENTS_APP_WPS1",
-    "PACKAGE_REQUIREMENTS_APP_TYPES",
     "WpsPackage",
     "get_process_definition",
     "get_process_location",
@@ -105,16 +104,6 @@ PACKAGE_ARRAY_TYPES = frozenset(["{}[]".format(item) for item in PACKAGE_ARRAY_I
 PACKAGE_CUSTOM_TYPES = frozenset(["enum"])  # can be anything, but support "enum" which is more common
 PACKAGE_DEFAULT_FILE_NAME = "package"
 PACKAGE_LOG_FILE = "package_log_file"
-
-# package (requirements/hints) corresponding to `PROCESS_APPLICATION`
-PACKAGE_REQUIREMENTS_APP_DOCKER = "DockerRequirement"
-PACKAGE_REQUIREMENTS_APP_ESGF_CWT = "ESGF-CWTRequirement"
-PACKAGE_REQUIREMENTS_APP_WPS1 = "WPS1Requirement"
-PACKAGE_REQUIREMENTS_APP_TYPES = frozenset([
-    PACKAGE_REQUIREMENTS_APP_DOCKER,
-    PACKAGE_REQUIREMENTS_APP_ESGF_CWT,
-    PACKAGE_REQUIREMENTS_APP_WPS1,
-])
 
 # process execution progress
 PACKAGE_PROGRESS_PREP_LOG = 1
@@ -984,7 +973,7 @@ def _xml_wps2cwl(wps_process_response):
     # type: (requests.models.Response) -> Tuple[CWL, JSON]
     """
     Converts a `WPS-1 ProcessDescription XML` tree structure to an equivalent `WPS-2 Process JSON` and builds the
-    associated `CWL` package in conformance to :ref:`weaver.processes.wps_package.PACKAGE_REQUIREMENTS_APP_WPS1`.
+    associated `CWL` package in conformance to :ref:`weaver.processes.wps_package.CWL_REQUIREMENT_APP_WPS1`.
 
     :param wps_process_response: valid response (XML, 200) from a `WPS-1 ProcessDescription`.
     """
@@ -1039,7 +1028,7 @@ def _xml_wps2cwl(wps_process_response):
         "cwlVersion": "v1.0",
         "class": "CommandLineTool",
         "hints": {
-            PACKAGE_REQUIREMENTS_APP_WPS1: {
+            CWL_REQUIREMENT_APP_WPS1: {
                 "provider": get_url_without_query(wps_service_url),
                 "process": process_id,
             }
@@ -1339,6 +1328,16 @@ class WpsPackage(Process):
     def map_step_progress(cls, step_index, steps_total):
         return cls.map_progress(100 * step_index / steps_total, PACKAGE_PROGRESS_RUN_CWL, PACKAGE_PROGRESS_CWL_DONE)
 
+    @staticmethod
+    def make_location_input(input_location, input_type, input_definition):
+        # type: (AnyStr, AnyStr, ComplexInput) -> JSON
+        location = {"location": input_location, "class": input_type}
+        if input_definition.data_format is not None and input_definition.data_format.mime_type:
+            fmt = get_cwl_file_format(input_definition.data_format.mime_type, make_reference=True)
+            if fmt is not None:
+                location["format"] = fmt
+        return location
+
     def _handler(self, request, response):
         # type: (WPSRequest, ExecuteResponse) -> ExecuteResponse
         LOGGER.debug("HOME=%s, Current Dir=%s", os.environ.get("HOME"), os.path.abspath(os.curdir))
@@ -1404,23 +1403,25 @@ class WpsPackage(Process):
                     # process single occurrences
                     input_i = input_occurs[0]
                     # handle as reference/data
-                    input_data = input_i.url if input_i.as_reference else input_i.data
-                    input_type = cwl_input_info[input_id]["type"]
                     is_array, elem_type = _is_cwl_array_type(cwl_input_info[input_id])
                     if is_array:
                         # extend array data that allow max_occur > 1
                         input_data = [i.url if i.as_reference else i.data for i in input_occurs]
                         input_type = elem_type
+                    else:
+                        input_data = input_i.url if input_i.as_reference else input_i.data
+                        input_type = cwl_input_info[input_id]["type"]
                     if isinstance(input_i, ComplexInput) or elem_type == "File":
                         if isinstance(input_data, list):
-                            cwl_inputs[input_id] = [{"location": data, "class": input_type} for data in input_data]
+                            cwl_inputs[input_id] = [self.make_location_input(data, input_type, input_def)
+                                                    for data, input_def in zip(input_data, input_occurs)]
                         else:
-                            cwl_inputs[input_id] = {"location": input_data, "class": input_type}
+                            cwl_inputs[input_id] = self.make_location_input(input_data, input_type, input_i)
                     elif isinstance(input_i, (LiteralInput, BoundingBoxInput)):
                         cwl_inputs[input_id] = input_data
                     else:
-                        raise self.exception_message(PackageTypeError, None,
-                                                     "Undefined package input for execution: {}.".format(type(input_i)))
+                        raise self.exception_message(
+                            PackageTypeError, None, "Undefined package input for execution: {}.".format(type(input_i)))
                 self.update_status("Convert package inputs done.", PACKAGE_PROGRESS_CONVERT_INPUT, STATUS_RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed to load package inputs.")
@@ -1461,6 +1462,7 @@ class WpsPackage(Process):
         return default_make_tool(toolpath_object, loading_context, self.get_job_process_definition)
 
     def get_job_process_definition(self, jobname, joborder, tool):
+        # type: (AnyStr, JSON, CWL) -> WpsPackage
         """
         This function is called before running an ADES job (either from a workflow step or a simple EMS dispatch).
         It must return a WpsProcess instance configured with the proper package, ADES target and cookies.
@@ -1470,7 +1472,7 @@ class WpsPackage(Process):
                          input_value is one of `input_object` or `array [input_object]`
                          input_object is one of `string` or `dict {class: File, location: string}`
                          in our case input are expected to be File object
-        :param tool: Whole cwl config including hints requirement
+        :param tool: Whole `CWL` config including hints requirement
         """
 
         if jobname == self.package_id:
@@ -1502,12 +1504,12 @@ class WpsPackage(Process):
         # multiple, but they are not explicitly handled
         all_hints = list(dict(req) for req in tool.get("requirements", {}))
         all_hints.extend(dict(req) for req in tool.get("hints", {}))
-        app_hints = filter(lambda h: any(h["class"].endswith(t) for t in PACKAGE_REQUIREMENTS_APP_TYPES), all_hints)
+        app_hints = filter(lambda h: any(h["class"].endswith(t) for t in CWL_REQUIREMENT_APP_TYPES), all_hints)
         if len(app_hints) > 1:
             raise ValueError("Package 'requirements' and/or 'hints' define too many conflicting values: {}, "
-                             "only one permitted amongst {}.".format(list(app_hints), PACKAGE_REQUIREMENTS_APP_TYPES))
+                             "only one permitted amongst {}.".format(list(app_hints), CWL_REQUIREMENT_APP_TYPES))
         requirement = app_hints[0] if app_hints else {"class": ""}
-        if requirement["class"].endswith(PACKAGE_REQUIREMENTS_APP_WPS1):
+        if requirement["class"].endswith(CWL_REQUIREMENT_APP_WPS1):
             req_params = ["provider", "process"]
             if not all(r in requirement for r in ["provider", "process"]):
                 raise ValueError("Missing requirement [{}] details amongst {}".format(requirement["class"], req_params))
@@ -1519,11 +1521,11 @@ class WpsPackage(Process):
                                process=process,
                                request=self.request,
                                update_status=_update_status_dispatch)
-        elif requirement["class"].endswith(PACKAGE_REQUIREMENTS_APP_ESGF_CWT):
+        elif requirement["class"].endswith(CWL_REQUIREMENT_APP_ESGF_CWT):
             # TODO: implement
             raise NotImplementedError("ESGF-CWTRequirement not implemented")
         else:
-            # implements both PROCESS_APPLICATION` with `PACKAGE_REQUIREMENTS_APP_DOCKER` and `PROCESS_WORKFLOW`
+            # implements both `PROCESS_APPLICATION` with `CWL_REQUIREMENT_APP_DOCKER` and `PROCESS_WORKFLOW`
             from weaver.processes.wps3_process import Wps3Process
             return Wps3Process(step_payload=step_payload,
                                joborder=joborder,

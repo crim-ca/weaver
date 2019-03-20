@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from abc import abstractmethod
 import requests
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON
+    from weaver.typedefs import CWL
     from typing import AnyStr, Dict
     from pywps.app import WPSRequest
 
@@ -21,7 +21,7 @@ class WpsProcessInterface(object):
 
     @abstractmethod
     def execute(self,
-                workflow_inputs,        # type: JSON
+                workflow_inputs,        # type: CWL
                 out_dir,                # type: AnyStr
                 expected_outputs,       # type: Dict[AnyStr, AnyStr]
                 ):
@@ -30,7 +30,7 @@ class WpsProcessInterface(object):
         The function is expected to monitor the process and update the status.
         Retrieve the expected outputs and store them in the ``out_dir``.
 
-        :param workflow_inputs: cwl job dict
+        :param workflow_inputs: `CWL` job dict
         :param out_dir: directory where the outputs must be written
         :param expected_outputs: expected value outputs as `{'id': 'value'}`
         """

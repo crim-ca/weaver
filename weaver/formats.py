@@ -1,9 +1,10 @@
 from typing import TYPE_CHECKING
 from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import HTTPError
+import os
 if TYPE_CHECKING:
     from weaver.typedefs import JSON
-    from typing import AnyStr, Union, Tuple
+    from typing import AnyStr, Optional, Tuple, Union
 
 # Content-Types
 CONTENT_TYPE_APP_FORM = "application/x-www-form-urlencoded"
@@ -34,53 +35,64 @@ def get_extension(mime_type):
 #   - IANA: https://www.iana.org/assignments/media-types/media-types.xhtml
 #   - EDAM: https://www.ebi.ac.uk/ols/search
 # IANA contains most standard MIME-types, but might not include special (application/x-hdf5, application/x-netcdf, etc.)
-IANA_NAMESPACE = {"iana": "https://www.iana.org/assignments/media-types/"}
-EDAM_NAMESPACE = {"edam": "http://edamontology.org/"}
+IANA_NAMESPACE = "iana"
+IANA_NAMESPACE_DEFINITION = {IANA_NAMESPACE: "https://www.iana.org/assignments/media-types/"}
+EDAM_NAMESPACE = "edam"
+EDAM_NAMESPACE_DEFINITION = {EDAM_NAMESPACE: "http://edamontology.org/"}
 EDAM_SCHEMA = "http://edamontology.org/EDAM_1.21.owl"
 EDAM_MAPPING = {
-    CONTENT_TYPE_APP_HDF5: "edam:format_3590",
-    CONTENT_TYPE_APP_JSON: "edam:format_3464",
-    CONTENT_TYPE_APP_NETCDF: "edam:format_3650",
-    CONTENT_TYPE_TEXT_PLAIN: "edam:format_1964",
+    CONTENT_TYPE_APP_HDF5: "format_3590",
+    CONTENT_TYPE_APP_JSON: "format_3464",
+    CONTENT_TYPE_APP_NETCDF: "format_3650",
+    CONTENT_TYPE_TEXT_PLAIN: "format_1964",
 }
+FORMAT_NAMESPACES = frozenset([IANA_NAMESPACE, EDAM_NAMESPACE])
 
 
-def get_cwl_file_format(mime_type):
-    # type: (AnyStr) -> Tuple[Union[JSON, None], Union[AnyStr, None]]
+def get_cwl_file_format(mime_type, make_reference=False):
+    # type: (AnyStr, Optional[bool]) -> Union[Tuple[Union[JSON, None], Union[AnyStr, None]], Union[AnyStr, None]]
     """
     Obtains the corresponding IANA/EDAM ``format`` value to be applied under a CWL I/O ``File`` from the
     ``mime_type`` (`Content-Type` header) using the first matched one.
 
-    If there is a match, returns:
-        - corresponding namespace reference to be applied under ``$namespaces`` in the CWL.
-        - value of ``format`` adjusted according to the namespace to be applied to ``File`` in the CWL.
+    If there is a match, returns ``tuple(dict<namespace-name: namespace-url>, <format>)``:
+        - corresponding namespace mapping to be applied under ``$namespaces`` in the `CWL`.
+        - value of ``format`` adjusted according to the namespace to be applied to ``File`` in the `CWL`.
     Otherwise, returns ``(None, None)``
+
+    If ``make_reference=True``, the explicit format reference as ``<namespace-url>/<format>`` is returned instead
+    of the ``tuple``. If ``make_reference=True`` and ``mime_type`` cannot be matched, a single ``None`` is returned.
     """
-    mime_type_url = "{}{}".format(IANA_NAMESPACE["iana"], mime_type)
+    def _make_if_ref(_map, _key, _fmt):
+        return os.path.join(_map[_key], _fmt) if make_reference else (_map, "{}:{}".format(_key, _fmt))
+
     # FIXME: ConnectionRefused with `requests.get`, using `urllib` instead
     try:
+        mime_type_url = "{}{}".format(IANA_NAMESPACE_DEFINITION[IANA_NAMESPACE], mime_type)
         resp = urlopen(mime_type_url)   # 404 on not implemented/referenced mime-type
         if resp.code == 200:
-            return IANA_NAMESPACE, "iana:{}".format(mime_type)
+            return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, mime_type)
     except HTTPError:
         pass
     if mime_type in EDAM_MAPPING:
-        return EDAM_NAMESPACE, EDAM_MAPPING[mime_type]
-    return None, None
+        return _make_if_ref(EDAM_NAMESPACE_DEFINITION, EDAM_NAMESPACE, EDAM_MAPPING[mime_type])
+    return None if make_reference else (None, None)
 
 
 def clean_mime_type_format(mime_type):
     # type: (AnyStr) -> AnyStr
     """
     Removes any additional namespace key or URL from ``mime_type`` so that it corresponds to the generic
-    representation (ex: `application/json`) instead of the `CWL->File->format` variant.
+    representation (ex: `application/json`) instead of the ``<namespace-name>:<format>`` variant used
+    in `CWL->inputs/outputs->File->format`.
     """
-    for v in IANA_NAMESPACE.values() + IANA_NAMESPACE.keys() + EDAM_NAMESPACE.values():
+    for v in IANA_NAMESPACE_DEFINITION.values() + EDAM_NAMESPACE_DEFINITION.values():
         if v in mime_type:
             mime_type = mime_type.replace(v, "")
-            break
+    for v in IANA_NAMESPACE_DEFINITION.keys() + EDAM_NAMESPACE_DEFINITION.keys():
+        if mime_type.startswith(v + ":"):
+            mime_type = mime_type.replace(v + ":", "")
     for v in EDAM_MAPPING.values():
         if v.endswith(mime_type):
             mime_type = [k for k in EDAM_MAPPING if v.endswith(EDAM_MAPPING[k])][0]
-            break
     return mime_type

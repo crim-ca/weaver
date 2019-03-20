@@ -12,7 +12,9 @@ from cwltool.utils import (aslist, json_dumps, onWindows, bytes2str_in_dicts)
 from cwltool.context import (LoadingContext, RuntimeContext, getdefault)
 from cwltool.workflow import Workflow
 from pyramid_celery import celery_app as app
-from weaver.processes.wps_package import PACKAGE_REQUIREMENTS_APP_WPS1, PACKAGE_REQUIREMENTS_APP_ESGF_CWT
+from weaver.processes.constants import (
+    CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_APP_WPS1, CWL_REQUIREMENT_APP_ESGF_CWT
+)
 from weaver.utils import now, get_settings
 from weaver.wps import get_wps_output_path
 from functools import cmp_to_key, partial
@@ -41,8 +43,8 @@ DEFAULT_TMP_PREFIX = "tmp"
 
 # Extend the supported process requirements
 supportedProcessRequirements += [
-    PACKAGE_REQUIREMENTS_APP_WPS1,
-    PACKAGE_REQUIREMENTS_APP_ESGF_CWT
+    CWL_REQUIREMENT_APP_WPS1,
+    CWL_REQUIREMENT_APP_ESGF_CWT
 ]
 
 
@@ -92,8 +94,8 @@ class WpsWorkflow(ProcessCWL):
         self.get_job_process_definition = get_job_process_definition
 
         # DockerRequirement is removed because we use our custom job which dispatch the processing to an ADES instead
-        self.requirements = list(filter(lambda req: req['class'] != 'DockerRequirement', self.requirements))
-        self.hints = list(filter(lambda req: req['class'] != 'DockerRequirement', self.hints))
+        self.requirements = list(filter(lambda req: req["class"] != CWL_REQUIREMENT_APP_DOCKER, self.requirements))
+        self.hints = list(filter(lambda req: req["class"] != CWL_REQUIREMENT_APP_DOCKER, self.hints))
 
     def job(self,
             job_order,          # type: Dict[Text, Text]
@@ -107,9 +109,8 @@ class WpsWorkflow(ProcessCWL):
 
         jobname = uniquename(runtimeContext.name or shortname(self.tool.get("id", "job")))
 
-        weaver_output_path = get_wps_output_path(get_settings(app))
-
         # outdir must be served by the EMS because downstream step will need access to upstream steps output
+        weaver_output_path = get_wps_output_path(get_settings(app))
         runtimeContext.outdir = tempfile.mkdtemp(
             prefix=getdefault(runtimeContext.tmp_outdir_prefix, DEFAULT_TMP_PREFIX),
             dir=weaver_output_path)
@@ -117,10 +118,9 @@ class WpsWorkflow(ProcessCWL):
         builder = self._init_job(job_order, runtimeContext)
 
         # job_name is the step name and job_order is the actual step inputs
-        wps_workflow_job = WpsWorkflowJob(builder, builder.job, self.requirements,
-                                          self.hints, jobname,
+        wps_workflow_job = WpsWorkflowJob(builder, builder.job, self.requirements, self.hints, jobname,
                                           self.get_job_process_definition(jobname, job_order, self.tool),
-                                          self.tool['outputs'])
+                                          self.tool["outputs"])
         wps_workflow_job.prov_obj = self.prov_obj
         wps_workflow_job.successCodes = self.tool.get("successCodes")
         wps_workflow_job.temporaryFailCodes = self.tool.get("temporaryFailCodes")
@@ -137,8 +137,7 @@ class WpsWorkflow(ProcessCWL):
         wps_workflow_job.stagedir = builder.stagedir
 
         readers = {}  # type: Dict[Text, Any]
-
-        timelimit = self.get_requirement(require_prefix+"TimeLimit")[0]
+        timelimit = self.get_requirement(require_prefix + "TimeLimit")[0]
         if timelimit:
             with SourceLine(timelimit, "timelimit", validate.ValidationException):
                 wps_workflow_job.timelimit = builder.do_eval(timelimit["timelimit"])
@@ -168,7 +167,7 @@ class WpsWorkflow(ProcessCWL):
             fs_access = builder.make_fs_access(outdir)
             custom_output = fs_access.join(outdir, "cwl.output.json")
             if fs_access.exists(custom_output):
-                with fs_access.open(custom_output, "r") as f:
+                with fs_access.open(custom_output, 'r') as f:
                     ret = json.load(f)
                 if debug:
                     LOGGER.debug(u"Raw output from %s: %s", custom_output, json_dumps(ret, indent=4))
@@ -237,24 +236,19 @@ class WpsWorkflow(ProcessCWL):
                     for gb in globpatterns:
                         if gb.startswith(outdir):
                             gb = gb[len(outdir) + 1:]
-                        elif gb == ".":
+                        elif gb == '.':
                             gb = outdir
-                        elif gb.startswith("/"):
-                            raise WorkflowException(
-                                "glob patterns must not start with '/'")
+                        elif gb.startswith('/'):
+                            raise WorkflowException("glob patterns must not start with '/'")
                         try:
                             prefix = fs_access.glob(outdir)
                             key = cmp_to_key(cast(Callable[[Text, Text], int], locale.strcoll))
                             r.extend([{"location": g,
-                                       "path": fs_access.join(builder.outdir,
-                                                              g[len(prefix[0])+1:]),
+                                       "path": fs_access.join(builder.outdir, g[len(prefix[0])+1:]),
                                        "basename": os.path.basename(g),
-                                       "nameroot": os.path.splitext(
-                                           os.path.basename(g))[0],
-                                       "nameext": os.path.splitext(
-                                           os.path.basename(g))[1],
-                                       "class": "File" if fs_access.isfile(g)
-                                       else "Directory"}
+                                       "nameroot": os.path.splitext(os.path.basename(g))[0],
+                                       "nameext": os.path.splitext(os.path.basename(g))[1],
+                                       "class": "File" if fs_access.isfile(g) else "Directory"}
                                       for g in sorted(fs_access.glob(fs_access.join(outdir, gb)), key=key)])
                         except (OSError, IOError) as e:
                             LOGGER.warning(Text(e))
@@ -271,7 +265,7 @@ class WpsWorkflow(ProcessCWL):
                         if ll and ll != "no_listing":
                             get_listing(fs_access, files, (ll == "deep_listing"))
                     else:
-                        with fs_access.open(rfile["location"], "rb") as f:
+                        with fs_access.open(rfile["location"], 'rb') as f:
                             contents = b""
                             if binding.get("loadContents") or compute_checksum:
                                 contents = f.read(CONTENT_LIMIT)
@@ -318,7 +312,7 @@ class WpsWorkflow(ProcessCWL):
                     for primary in aslist(r):
                         if isinstance(primary, dict):
                             primary.setdefault("secondaryFiles", [])
-                            pathprefix = primary["path"][0:primary["path"].rindex("/")+1]
+                            pathprefix = primary["path"][0:primary["path"].rindex('/')+1]
                             for sf in aslist(schema["secondaryFiles"]):
                                 if isinstance(sf, dict) or "$(" in sf or "${" in sf:
                                     sfpath = builder.do_eval(sf, context=primary)
@@ -381,12 +375,12 @@ class WpsWorkflowJob(JobBase):
             # TODO Should we support something else?
             if output['type'] == 'File':
                 # Expecting output to look like this
-                # output = {'id': 'file:///tmp/random_path/process_name#output_id,
-                #           'type': 'File',
-                #           'outputBinding': {'glob': output_name }
+                # output = {"id": "file:///tmp/random_path/process_name#output_id,
+                #           "type": "File",
+                #           "outputBinding": {"glob": output_name }
                 #          }
-                output_id = shortname(output['id'])
-                self.expected_outputs[output_id] = output['outputBinding']['glob']
+                output_id = shortname(output["id"])
+                self.expected_outputs[output_id] = output["outputBinding"]["glob"]
 
     def run(self,
             runtimeContext,     # type: RuntimeContext
@@ -497,7 +491,7 @@ class WpsWorkflowJob(JobBase):
                         host_outdir = self.outdir
                         container_outdir = self.builder.outdir
                         host_outdir_tgt = p.target
-                        if p.target.startswith(container_outdir+"/"):
+                        if p.target.startswith(container_outdir + '/'):
                             host_outdir_tgt = os.path.join(
                                 host_outdir, p.target[len(container_outdir)+1:])
                         os.remove(host_outdir_tgt)
