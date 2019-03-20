@@ -16,48 +16,52 @@
                     }
                 },
                 "inputs": {
-                    "files": {
-                        "type": {
-                            "type": "array",
-                            "items": "File"
-                        }
-                    },
+                    "files": "File",
                     "variable": {
-                        "type": "string"
-                    },
-                    "time_start": {
-                        "type": "float"
-                    },
-                    "time_end": {
-                        "type": "float"
-                    },
-                    "time_crs": {
-                        "type": "string"
-                    },
-                    "lat_start": {
-                        "type": "float"
-                    },
-                    "lat_end": {
-                        "type": "float"
-                    },
-                    "lat_crs": {
-                        "type": "string"
-                    },
-                    "lon_start": {
-                        "type": "float"
-                    },
-                    "lon_end": {
-                        "type": "float"
-                    },
-                    "lon_crs": {
                         "type": "string"
                     },
                     "api_key": {
                         "type": "string"
+                    },
+                    "time_start": {
+                        "type": "float",
+                        "default": null
+                    },
+                    "time_end": {
+                        "type": "float",
+                        "default": null
+                    },
+                    "time_crs": {
+                        "type": "string",
+                        "default": null
+                    },
+                    "lat_start": {
+                        "type": "float",
+                        "default": null
+                    },
+                    "lat_end": {
+                        "type": "float",
+                        "default": null
+                    },
+                    "lat_crs": {
+                        "type": "string",
+                        "default": null
+                    },
+                    "lon_start": {
+                        "type": "float",
+                        "default": null
+                    },
+                    "lon_end": {
+                        "type": "float",
+                        "default": null
+                    },
+                    "lon_crs": {
+                        "type": "string",
+                        "default": null
                     }
                 },
                 "outputs": {
-                    "output_netcdf": {
+                    "output": {
                         "outputBinding": {
                             "glob": "output_netcdf.nc"
                         },

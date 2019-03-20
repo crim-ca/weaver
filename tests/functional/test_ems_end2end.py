@@ -240,7 +240,7 @@ class End2EndEMSTestCase(TestCase):
                         cls.PROCESS_WORKFLOW_CUSTOM_ID,
                         cls.PROCESS_WORKFLOW_FLOOD_DETECTION_ID,
                         cls.PROCESS_WORKFLOW_SUBSET_ICE_DAYS,
-                        cls.PROCESS_WORKFLOW_ESGF}
+                        cls.PROCESS_WORKFLOW_SubsetLLNL_SubsetCRIM}
         test_set = application_set | workflow_set
         for process in test_set:
             cls.test_processes_info.update({process: cls.retrieve_process_info(process)})
