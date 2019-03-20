@@ -28,7 +28,7 @@ import logging
 if TYPE_CHECKING:
     from weaver.typedefs import (
         AnyValue, AnyKey, AnySettingsContainer, AnyRegistryContainer, AnyHeadersContainer,
-        HeadersType, SettingsType, JSON, XML
+        HeadersType, SettingsType, JSON, XML, Number
     )
     from typing import Union, Any, Dict, List, AnyStr, Iterable, Optional
 
@@ -398,13 +398,20 @@ def get_log_fmt():
     return "[%(asctime)s] %(levelname)-8s [%(name)s] %(message)s"
 
 
-def get_log_datefmt():
+def get_log_date_fmt():
     # type: (...) -> AnyStr
     return "%Y-%m-%d %H:%M:%S"
 
 
+def get_log_monitor_msg(job_id, status, percent, message, location):
+    # type: (AnyStr, AnyStr, Number, AnyStr, AnyStr) -> AnyStr
+    return "Monitoring job {jobID} : [{status}] {percent} - {message} [{location}]".format(
+        jobID=job_id, status=status, percent=percent, message=message, location=location
+    )
+
+
 def get_job_log_msg(status, message, progress=0, duration=None):
-    # type: (AnyStr, AnyStr, Optional[int], Optional[AnyStr]) -> AnyStr
+    # type: (AnyStr, AnyStr, Optional[Number], Optional[AnyStr]) -> AnyStr
     return "{d} {p:3d}% {s:10} {m}".format(d=duration or "", p=int(progress or 0), s=map_status(status), m=message)
 
 

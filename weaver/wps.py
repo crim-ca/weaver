@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from typing import AnyStr, Dict, Union, Optional
 
 # can be overridden with 'settings.wps-cfg'
-DEFAULT_PYWPS_CFG = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'wps.cfg')
+DEFAULT_PYWPS_CFG = os.path.join(os.path.abspath(os.path.dirname(__file__)), "wps.cfg")
 PYWPS_CFG = None
 
 
@@ -53,7 +53,7 @@ def get_wps_cfg_path(settings):
     """
     Retrieves the WPS configuration file (`wps.cfg` by default or `weaver.wps_cfg` if specified).
     """
-    return settings.get('weaver.wps_cfg', DEFAULT_PYWPS_CFG)
+    return settings.get("weaver.wps_cfg", DEFAULT_PYWPS_CFG)
 
 
 def get_wps_path(settings):
@@ -63,7 +63,7 @@ def get_wps_path(settings):
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
     """
     return _get_settings_or_wps_config(
-        settings, 'weaver.wps_path', 'server', 'url', '/ows/wps', 'WPS path')
+        settings, "weaver.wps_path", "server", "url", "/ows/wps", "WPS path")
 
 
 def get_wps_url(settings):
@@ -82,7 +82,7 @@ def get_wps_output_path(settings):
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
     """
     return _get_settings_or_wps_config(
-        settings, 'weaver.wps_output_path', 'server', 'outputpath', '/tmp', 'WPS output path')
+        settings, "weaver.wps_output_path", "server", "outputpath", "/tmp", "WPS output path")
 
 
 def get_wps_output_url(settings):
@@ -91,9 +91,9 @@ def get_wps_output_url(settings):
     Retrieves the WPS output URL that maps to WPS output path directory.
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
     """
-    wps_output_default = get_weaver_url(settings) + '/wpsoutputs'
+    wps_output_default = get_weaver_url(settings) + "/wpsoutputs"
     return _get_settings_or_wps_config(
-        settings, 'weaver.wps_output_url', 'server', 'outputurl', wps_output_default, 'WPS output url')
+        settings, "weaver.wps_output_url", "server", "outputurl", wps_output_default, "WPS output url")
 
 
 def load_pywps_cfg(container, config=None):
@@ -112,20 +112,20 @@ def load_pywps_cfg(container, config=None):
         for key, value in config.items():
             section, key = key.split('.')
             PYWPS_CFG.CONFIG.set(section, key, value)
-        # cleanup alternative dict 'PYWPS_CFG' which is not expected elsewhere
-        if isinstance(settings.get('PYWPS_CFG'), dict):
-            del settings['PYWPS_CFG']
+        # cleanup alternative dict "PYWPS_CFG" which is not expected elsewhere
+        if isinstance(settings.get("PYWPS_CFG"), dict):
+            del settings["PYWPS_CFG"]
 
-    if 'weaver.wps_output_path' not in settings:
+    if "weaver.wps_output_path" not in settings:
         # ensure the output dir exists if specified
-        out_dir_path = PYWPS_CFG.get_config_value('server', 'outputpath')
+        out_dir_path = PYWPS_CFG.get_config_value("server", "outputpath")
         if not os.path.isdir(out_dir_path):
             os.makedirs(out_dir_path)
-        settings['weaver.wps_output_path'] = out_dir_path
+        settings["weaver.wps_output_path"] = out_dir_path
 
-    if 'weaver.wps_output_url' not in settings:
-        output_url = PYWPS_CFG.get_config_value('server', 'outputurl')
-        settings['weaver.wps_output_url'] = output_url
+    if "weaver.wps_output_url" not in settings:
+        output_url = PYWPS_CFG.get_config_value("server", "outputurl")
+        settings["weaver.wps_output_url"] = output_url
 
 
 # @app.task(bind=True)
@@ -135,17 +135,17 @@ def pywps_view(environ, start_response):
     * TODO: add xml response renderer
     * TODO: fix exceptions ... use OWSException (raise ...)
     """
-    LOGGER.debug('pywps env: %s', environ.keys())
+    LOGGER.debug("pywps env: %s", environ.keys())
 
     try:
         # get config file
         settings = get_settings(app)
-        pywps_cfg = environ.get('PYWPS_CFG') or settings.get('PYWPS_CFG')
+        pywps_cfg = environ.get("PYWPS_CFG") or settings.get("PYWPS_CFG")
         if not pywps_cfg:
-            environ['PYWPS_CFG'] = os.getenv('PYWPS_CFG') or get_wps_cfg_path(settings)
+            environ["PYWPS_CFG"] = os.getenv("PYWPS_CFG") or get_wps_cfg_path(settings)
         load_pywps_cfg(app, config=pywps_cfg)
 
-        # call pywps application with processes filtered according to the adapter's definition
+        # call pywps application with processes filtered according to the adapter"s definition
         process_store = get_db(app).get_store(StoreProcesses)
         processes_wps = [process.wps() for process in
                          process_store.list_processes(visibility=VISIBILITY_PUBLIC, request=get_current_request())]
@@ -159,15 +159,13 @@ def pywps_view(environ, start_response):
 def includeme(config):
     settings = config.registry.settings
 
-    if asbool(settings.get('weaver.wps', True)):
-        LOGGER.debug("weaver WPS enabled.")
+    if asbool(settings.get("weaver.wps", True)):
+        LOGGER.debug("Weaver WPS enabled.")
 
         # include weaver config
-        config.include('weaver.config')
+        config.include("weaver.config")
 
         wps_path = get_wps_path(settings)
-        config.add_route('wps', wps_path)
-        config.add_route('wps_secured', wps_path + '/{access_token}')
-        config.add_view(pywps_view, route_name='wps')
-        config.add_view(pywps_view, route_name='wps_secured')
-        config.add_request_method(lambda req: get_wps_cfg_path(req.registry.settings), 'wps_cfg', reify=True)
+        config.add_route("wps", wps_path)
+        config.add_view(pywps_view, route_name="wps")
+        config.add_request_method(lambda req: get_wps_cfg_path(req.registry.settings), "wps_cfg", reify=True)

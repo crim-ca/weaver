@@ -16,7 +16,7 @@ from weaver.utils import (
     localize_datetime,  # for backward compatibility of previously saved jobs not time-locale-aware
     get_job_log_msg,
     get_log_fmt,
-    get_log_datefmt,
+    get_log_date_fmt,
     fully_qualified_name,
 )
 from owslib.wps import WPSException
@@ -160,7 +160,7 @@ class Job(Base):
         else:
             log_msg = [(INFO, self._get_log_msg(message))]
         for level, msg in log_msg:
-            fmt_msg = get_log_fmt() % dict(asctime=now().strftime(get_log_datefmt()),
+            fmt_msg = get_log_fmt() % dict(asctime=now().strftime(get_log_date_fmt()),
                                            levelname=_levelNames[level],
                                            name=fully_qualified_name(self),
                                            message=msg)

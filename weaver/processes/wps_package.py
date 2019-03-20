@@ -21,7 +21,7 @@ from weaver.status import (
 from weaver.wps_restapi.swagger_definitions import process_uri
 from weaver.wps import get_wps_output_path
 from weaver.utils import (
-    get_job_log_msg, get_log_fmt, get_log_datefmt, get_sane_name, get_settings, get_any_id, get_header,
+    get_job_log_msg, get_log_fmt, get_log_date_fmt, get_sane_name, get_settings, get_any_id, get_header,
     get_url_without_query, null
 )
 from owslib.wps import WebProcessingService, ComplexData
@@ -81,7 +81,7 @@ if TYPE_CHECKING:
     ANY_IO_Type = Union[CWL_IO_Type, JSON_IO_Type, WPS_IO_Type, OWS_IO_Type]
 
 
-LOGGER = logging.getLogger("PACKAGE")
+LOGGER = logging.getLogger(__name__)
 
 __all__ = [
     "PACKAGE_EXTENSIONS",
@@ -1263,7 +1263,7 @@ class WpsPackage(Process):
         # file logger for output
         self.log_file = self.status_location + ".log"
         log_file_handler = logging.FileHandler(self.log_file)
-        log_file_formatter = logging.Formatter(fmt=get_log_fmt(), datefmt=get_log_datefmt())
+        log_file_formatter = logging.Formatter(fmt=get_log_fmt(), datefmt=get_log_date_fmt())
         log_file_handler.setFormatter(log_file_formatter)
 
         # prepare package logger
@@ -1432,6 +1432,7 @@ class WpsPackage(Process):
                 # Inputs starting with file:// will be interpreted as ems local files
                 # If OpenSearch obtain file:// references that must be passed to the ADES use an uri starting
                 # with OPENSEARCH_LOCAL_FILE_SCHEME://
+                LOGGER.debug("Launching process package with inputs:\n{}".format(cwl_inputs))
                 result = self.package_inst(**cwl_inputs)
                 self.update_status("Package execution done.", PACKAGE_PROGRESS_CWL_DONE, STATUS_RUNNING)
             except Exception as exc:

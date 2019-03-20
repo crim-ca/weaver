@@ -4,7 +4,7 @@ from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes.utils import jsonify_output
 from weaver.processes.wps_process_base import WpsProcessInterface
 from weaver.utils import (
-    get_any_id, get_any_value, get_job_log_msg, raise_on_xml_exception, wait_secs, get_cookie_headers
+    get_any_id, get_any_value, get_job_log_msg, get_log_monitor_msg, raise_on_xml_exception, wait_secs,
 )
 from weaver.wps_restapi.jobs.jobs import check_status
 from owslib.wps import WebProcessingService, ComplexDataInput, WPSException
@@ -114,12 +114,9 @@ class Wps1Process(WpsProcessInterface):
                     execution = check_status(url=execution.statusLocation, verify=self.verify,
                                              sleep_secs=wait_secs(run_step))
                     job_id = execution.statusLocation.replace(".xml", "").split('/')[-1]
-                    LOGGER.debug("Monitoring job {jobID} : [{status}] {percentCompleted}  {message}".format(
-                        jobID=job_id,
-                        status=status.map_status(execution.getStatus()),
-                        percentCompleted=execution.percentCompleted,
-                        message=execution.statusMessage
-                    ))
+                    LOGGER.debug(get_log_monitor_msg(job_id, status.map_status(execution.getStatus()),
+                                                     execution.percentCompleted, execution.statusMessage,
+                                                     execution.statusLocation))
                     self.update_status(get_job_log_msg(status=status.map_status(execution.getStatus()),
                                                        message=execution.statusMessage,
                                                        progress=execution.percentCompleted,
@@ -136,12 +133,9 @@ class Wps1Process(WpsProcessInterface):
                     run_step += 1
 
             if not execution.isSucceded():
-                LOGGER.debug("Monitoring job {jobID} : [{status}] {percentCompleted}  {message}".format(
-                    jobID=job_id,
-                    status=status.map_status(execution.getStatus()),
-                    percentCompleted=execution.percentCompleted,
-                    message=execution.statusMessage or "Job failed."
-                ))
+                exec_msg = execution.statusMessage or "Job failed."
+                LOGGER.debug(get_log_monitor_msg(job_id, status.map_status(execution.getStatus()),
+                                                 execution.percentCompleted, exec_msg, execution.statusLocation))
                 raise Exception(execution.statusMessage or "Job failed.")
 
             self.update_status("Fetching job outputs from remote WPS1 provider.",

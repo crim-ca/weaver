@@ -2,7 +2,9 @@ from weaver import status
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_FORM
 from weaver.warning import MissingParameterWarning
 from weaver.visibility import VISIBILITY_PUBLIC
-from weaver.utils import get_any_id, get_any_value, get_any_message, get_job_log_msg, pass_http_error
+from weaver.utils import (
+    get_any_id, get_any_value, get_any_message, get_job_log_msg, get_log_monitor_msg, pass_http_error
+)
 from weaver.wps_restapi.swagger_definitions import (
     processes_uri,
     process_uri,
@@ -285,12 +287,9 @@ class Wps3Process(WpsProcessInterface):
             job_status = self.get_job_status(job_status_uri)
             job_status_value = status.map_status(job_status["status"])
 
-            LOGGER.debug("Monitoring job {jobID} : [{status}] {percentCompleted}  {message}".format(
-                jobID=job_status["jobID"],
-                status=job_status_value,
-                percentCompleted=job_status.get("percentCompleted", ""),
-                message=get_any_message(job_status)
-            ))
+            LOGGER.debug(get_log_monitor_msg(job_status["jobID"], job_status_value,
+                                             job_status.get("percentCompleted", 0),
+                                             get_any_message(job_status), job_status.get("statusLocation")))
             self.update_status(get_job_log_msg(status=job_status_value,
                                                message=get_any_message(job_status),
                                                progress=job_status.get("percentCompleted", 0),
@@ -300,12 +299,9 @@ class Wps3Process(WpsProcessInterface):
                                status.STATUS_RUNNING)
 
         if job_status_value != status.STATUS_SUCCEEDED:
-            LOGGER.debug("Monitoring job {jobID} : [{status}] {percentCompleted}  {message}".format(
-                jobID=job_status["jobID"],
-                status=job_status_value,
-                percentCompleted=job_status.get("percentCompleted", ""),
-                message=get_any_message(job_status)
-            ))
+            LOGGER.debug(get_log_monitor_msg(job_status["jobID"], job_status_value,
+                                             job_status.get("percentCompleted", 0),
+                                             get_any_message(job_status), job_status.get("statusLocation")))
             raise Exception(job_status)
 
         self.update_status("Fetching job outputs from remote ADES.",
