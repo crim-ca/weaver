@@ -633,7 +633,8 @@ def _json2wps_io(io_info, io_select):
         if value is not null:
             io_info[field] = _json2wps_type(value, field)
 
-    # convert by type
+    # convert by type, add missing required arguments and
+    # remove additional arguments according to each case
     io_type = io_info.pop("type", WPS_COMPLEX)  # only ComplexData doesn't have "type"
     if io_select == WPS_INPUT:
         if io_type in (WPS_REFERENCE, WPS_COMPLEX):
@@ -642,6 +643,7 @@ def _json2wps_io(io_info, io_select):
                 io_info["supported_formats"] = [DefaultFormat]
             if ("max_occurs", "unbounded") in io_info.items():
                 io_info["max_occurs"] = PACKAGE_ARRAY_MAX_SIZE
+            io_info.pop("supported_values", None)
             return ComplexInput(**io_info)
         if io_type == WPS_BOUNDINGBOX:
             io_info.pop("supported_formats", None)
@@ -652,14 +654,18 @@ def _json2wps_io(io_info, io_select):
             io_info.pop("literalDataDomains", None)
             return LiteralInput(**io_info)
     elif io_select == WPS_OUTPUT:
-        # extra params to remove for outputs
         io_info.pop("min_occurs", None)
         io_info.pop("max_occurs", None)
+        io_info.pop("allowed_values", None)
+        io_info.pop("default", None)
         if io_type in (WPS_REFERENCE, WPS_COMPLEX):
+            io_info.pop("supported_values", None)
             return ComplexOutput(**io_info)
         if io_type == WPS_BOUNDINGBOX:
+            io_info.pop("supported_formats", None)
             return BoundingBoxOutput(**io_info)
         if io_type == WPS_LITERAL:
+            io_info.pop("supported_formats", None)
             return LiteralOutput(**io_info)
     raise PackageTypeError("Unknown conversion from dict to WPS type (type={0}, mode={1}).".format(io_type, io_select))
 
@@ -1189,11 +1195,11 @@ def get_process_definition(process_offering, reference=None, package=None, data_
     package_inputs, package_outputs = try_or_raise_package_error(
         lambda: _get_package_inputs_outputs(package_factory),
         reason="Definition of package/process inputs/outputs")
-    process_inputs = process_offering.get("inputs", list())
-    process_outputs = process_offering.get("outputs", list())
+    process_inputs = process_info.get("inputs", list())
+    process_outputs = process_info.get("outputs", list())
 
     try_or_raise_package_error(
-        lambda: _update_package_metadata(process_offering, package),
+        lambda: _update_package_metadata(process_info, package),
         reason="Metadata update")
 
     package_inputs, package_outputs = try_or_raise_package_error(

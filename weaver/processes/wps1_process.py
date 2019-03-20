@@ -60,7 +60,7 @@ class Wps1Process(WpsProcessInterface):
                 if "ComplexData" in process_input.dataType:
                     complex_inputs.append(process_input.identifier)
 
-            # remove any 'null' input, which should empty the 'default' of the remote WPS process
+            # remove any 'null' input, should employ the 'default' of the remote WPS process
             workflow_inputs_provided_keys = filter(lambda i: workflow_inputs[i] != "null", workflow_inputs)
 
             try:
