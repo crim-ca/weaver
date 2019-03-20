@@ -1,22 +1,37 @@
+from weaver import WEAVER_ROOT_DIR
 from weaver.database import get_db
 from weaver.datatype import Process
+from weaver.exceptions import PackageExecutionError, PackageNotFound, ProcessNotAccessible, ProcessNotFound
 from weaver.store.base import StoreProcesses
+from weaver.processes.constants import CWL_REQUIREMENT_APP_BUILTIN
 from weaver.processes.types import PROCESS_BUILTIN
 from weaver.processes.wps_package import PACKAGE_EXTENSIONS, get_process_definition
 from weaver.utils import clean_json_text_body, ows_context_href
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
-from cwltool.process import Process as ProcessCWL
-from typing import TYPE_CHECKING
+from cwltool.command_line_tool import CommandLineTool
+from cwltool.docker import DockerCommandLineJob
+from cwltool.singularity import SingularityCommandLineJob
+from cwltool.job import CommandLineJob, JobBase
+from pyramid_celery import celery_app as app
 from importlib import import_module
+from string import Template
+from typing import TYPE_CHECKING
+import logging
 import six
 import os
 if TYPE_CHECKING:
-    from weaver.typedefs import AnyDatabaseContainer
-    from typing import AnyStr, Dict, Union
+    from weaver.typedefs import AnyDatabaseContainer, CWL
+    from cwltool.context import RuntimeContext
+    from typing import AnyStr, Dict, Type, Union
+
+LOGGER = logging.getLogger(__name__)
 
 
-__all__ = ["register_builtin_processes"]
+__all__ = [
+    "BuiltinProcess",
+    "register_builtin_processes"
+]
 
 
 def _get_builtin_reference_mapping(root):
@@ -42,6 +57,36 @@ def _get_builtin_abstract(process_id, process_path):
     return None
 
 
+def _replace_template(pkg, var, val):
+    # type: (CWL, AnyStr, AnyStr) -> CWL
+    if isinstance(pkg, six.string_types):
+        return Template(pkg).safe_substitute({var: val})
+    for k in pkg:
+        if isinstance(pkg[k], list):
+            for i, pkg_i in enumerate(pkg[k]):
+                pkg[k][i] = _replace_template(pkg[k][i], var, val)
+        elif isinstance(pkg[k], (dict, six.string_types)):
+            pkg[k] = _replace_template(pkg[k], var, val)
+    return pkg
+
+
+def _get_builtin_package(process_id, package):
+    # type: (AnyStr, CWL) -> CWL
+    """
+    Updates the `CWL` with following requirements to allow running a ``PROCESS_BUILTIN``:
+        - add `hints` section with ``CWL_REQUIREMENT_APP_BUILTIN``
+        - replace ``WEAVER_ROOT_DIR`` as needed
+    """
+    if "hints" not in package:
+        package["hints"] = dict()
+    package["hints"].update({CWL_REQUIREMENT_APP_BUILTIN: {"process": process_id}})
+
+    # FIXME:
+    #   fix base directory of command until bug fixed:
+    #   https://github.com/common-workflow-language/cwltool/issues/668
+    return _replace_template(package, "WEAVER_ROOT_DIR", WEAVER_ROOT_DIR)
+
+
 def register_builtin_processes(container):
     # type: (AnyDatabaseContainer) -> None
     """Registers every ``builtin`` package to the processes database."""
@@ -51,6 +96,7 @@ def register_builtin_processes(container):
     for process_id, process_path in builtin_apps_mapping.items():
         process_info = get_process_definition({}, package=None, reference=process_path)
         process_url = "/".join([restapi_url, "processes", process_id])
+        process_package = _get_builtin_package(process_id, process_info["package"])
         process_abstract = _get_builtin_abstract(process_id, process_path)
         process_payload = {
             "processDescription": {
@@ -61,7 +107,7 @@ def register_builtin_processes(container):
                 }
             },
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/builtinApplication",
-            "executionUnit": [{"unit": process_info["package"]}],
+            "executionUnit": [{"unit": process_package}],
         }
         process_payload["processDescription"]["process"].update(ows_context_href(process_url))
         builtin_processes.append(Process(
@@ -69,7 +115,7 @@ def register_builtin_processes(container):
             type=PROCESS_BUILTIN,
             abstract=process_abstract,
             payload=process_payload,
-            package=process_info["package"],
+            package=process_package,
             inputs=process_info["inputs"],
             outputs=process_info["outputs"],
             processDescriptionURL=process_url,
@@ -81,47 +127,44 @@ def register_builtin_processes(container):
     get_db(container).get_store(StoreProcesses, default_processes=builtin_processes)
 
 
-class BuiltinProcess(ProcessCWL):
-    class BuiltinProcessJob(object):
-        def __init__(self,
-                     builder,          # type: Builder
-                     script,           # type: Dict[Text, Text]
-                     output_callback,  # type: Callable[[Any, Any], Any]
-                     requirements,     # type: Dict[Text, Text]
-                     hints,            # type: Dict[Text, Text]
-                     outdir=None,      # type: Optional[Text]
-                     tmpdir=None,      # type: Optional[Text]
-                    ):  # type: (...) -> None
-            self.builder = builder
-            self.requirements = requirements
-            self.hints = hints
-            self.collect_outputs = None  # type: Optional[Callable[[Any], Any]]
-            self.output_callback = output_callback
-            self.outdir = outdir
-            self.tmpdir = tmpdir
-            self.script = script
-            self.prov_obj = None  # type: Optional[CreateProvProfile]
+class BuiltinProcessJobBase(CommandLineJob):
+    # noinspection PyUnusedLocal
+    def __init__(self, builder, joborder, make_path_mapper, requirements, hints, name):
+        self.process = [h.get("process") for h in hints][0]
+        super(BuiltinProcessJobBase, self).__init__(builder, joborder, make_path_mapper, requirements, hints, name)
 
-        def run(self, runtimeContext):  # type: (RuntimeContext) -> None
-            try:
-                ev = self.builder.do_eval(self.script)
-                normalizeFilesDirs(ev)
-                self.output_callback(ev, "success")
-            except Exception as err:
-                _logger.warning(u"Failed to evaluate expression:\n%s",
-                                err, exc_info=runtimeContext.debug)
-                self.output_callback({}, "permanentFail")
+    def _validate_process(self):
+        try:
+            store = get_db(app).get_store(StoreProcesses)
+            process = store.fetch_by_id(self.process)  # raise if not found
+        except (ProcessNotAccessible, ProcessNotFound):
+            raise PackageNotFound("Cannot find '{}' package for process '{}'".format(PROCESS_BUILTIN, self.process))
+        if process.type != PROCESS_BUILTIN:
+            raise PackageExecutionError("Invalid package is not of type '{}'".format(PROCESS_BUILTIN))
 
-    def job(self,
-            job_order,         # type: Dict[Text, Text]
-            output_callbacks,  # type: Callable[[Any, Any], Any]
-            runtimeContext     # type: RuntimeContext
-           ):
-        # type: (...) -> Generator[ExpressionTool.ExpressionJob, None, None]
-        builder = self._init_job(job_order, runtimeContext)
+    def run(self, runtime_context):  # type: (RuntimeContext) -> None
+        try:
+            self._validate_process()
+            super(BuiltinProcessJobBase, self).run(runtime_context)
+        except Exception as err:
+            LOGGER.warning(u"Failed to run process:\n%s", err, exc_info=runtime_context.debug)
+            self.output_callback({}, "permanentFail")
 
-        job = ExpressionTool.ExpressionJob(
-            builder, self.tool["expression"], output_callbacks,
-            self.requirements, self.hints)
-        job.prov_obj = runtimeContext.prov_obj
-        yield job
+
+class BuiltinProcessJobDocker(BuiltinProcessJobBase, DockerCommandLineJob):
+    pass
+
+
+class BuiltinProcessJobSingularity(BuiltinProcessJobBase, SingularityCommandLineJob):
+    pass
+
+
+class BuiltinProcess(CommandLineTool):
+    def make_job_runner(self, runtime_context):
+        # type: (RuntimeContext) -> Type[JobBase]
+        job = super(BuiltinProcess, self).make_job_runner(runtime_context)
+        if issubclass(job, DockerCommandLineJob):
+            return BuiltinProcessJobDocker
+        elif issubclass(job, SingularityCommandLineJob):
+            return BuiltinProcessJobSingularity
+        return BuiltinProcessJobBase

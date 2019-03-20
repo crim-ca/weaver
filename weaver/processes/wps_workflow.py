@@ -1,3 +1,9 @@
+from weaver.processes.builtin import BuiltinProcess
+from weaver.processes.constants import (
+    CWL_REQUIREMENT_APP_BUILTIN, CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_APP_WPS1, CWL_REQUIREMENT_APP_ESGF_CWT
+)
+from weaver.utils import now, get_settings
+from weaver.wps import get_wps_output_path
 from cwltool import command_line_tool
 from cwltool.process import stageFiles
 from cwltool.provenance import CreateProvProfile
@@ -12,11 +18,6 @@ from cwltool.utils import (aslist, json_dumps, onWindows, bytes2str_in_dicts)
 from cwltool.context import (LoadingContext, RuntimeContext, getdefault)
 from cwltool.workflow import Workflow
 from pyramid_celery import celery_app as app
-from weaver.processes.constants import (
-    CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_APP_WPS1, CWL_REQUIREMENT_APP_ESGF_CWT
-)
-from weaver.utils import now, get_settings
-from weaver.wps import get_wps_output_path
 from functools import cmp_to_key, partial
 from schema_salad import validate
 from schema_salad.sourceline import SourceLine
@@ -30,9 +31,9 @@ import shutil
 import tempfile
 from typing import MutableMapping, Callable, cast, Text, TYPE_CHECKING  # these are actually used in the code
 if TYPE_CHECKING:
-    from typing import Any, Dict, Generator, List, Optional, Set, Union
-    from weaver.typedefs import ExpectedOutputType, GetJobProcessDefinitionFunction, ToolPathObjectType
+    from weaver.typedefs import ExpectedOutputType, GetJobProcessDefinitionFunction, ToolPathObjectType, AnyValue
     from weaver.processes.wps_process_base import WpsProcessInterface
+    from typing import Any, Dict, Generator, List, Optional, Set, Union
     from cwltool.command_line_tool import OutputPorts
 
 LOGGER = logging.getLogger(__name__)
@@ -43,8 +44,9 @@ DEFAULT_TMP_PREFIX = "tmp"
 
 # Extend the supported process requirements
 supportedProcessRequirements += [
+    CWL_REQUIREMENT_APP_BUILTIN,
     CWL_REQUIREMENT_APP_WPS1,
-    CWL_REQUIREMENT_APP_ESGF_CWT
+    CWL_REQUIREMENT_APP_ESGF_CWT,
 ]
 
 
@@ -56,6 +58,10 @@ def default_make_tool(toolpath_object,              # type: ToolPathObjectType
         raise WorkflowException(u"Not a dict: '%s'" % toolpath_object)
     if "class" in toolpath_object:
         if toolpath_object["class"] == "CommandLineTool":
+            builtin_process_hints = [h.get("process") for h in toolpath_object.get("hints")
+                                     if h.get("class", "").endswith(CWL_REQUIREMENT_APP_BUILTIN)]
+            if len(builtin_process_hints) == 1:
+                return BuiltinProcess(toolpath_object, loading_context)
             return WpsWorkflow(toolpath_object, loading_context, get_job_process_definition)
         if toolpath_object["class"] == "ExpressionTool":
             return command_line_tool.ExpressionTool(toolpath_object, loading_context)
@@ -98,11 +104,18 @@ class WpsWorkflow(ProcessCWL):
         self.hints = list(filter(lambda req: req["class"] != CWL_REQUIREMENT_APP_DOCKER, self.hints))
 
     def job(self,
-            job_order,          # type: Dict[Text, Text]
+            joborder,           # type: Dict[Text, AnyValue]
             output_callbacks,   # type: Callable[[Any, Any], Any]
             runtimeContext,     # type: RuntimeContext
             ):                  # type: (...) -> Generator[Union[JobBase, CallbackJob], None, None]
+        """
+        Workflow job generator.
 
+        :param joborder: inputs of the job submission
+        :param output_callbacks: method to fetch step outputs and corresponding step details
+        :param runtimeContext: configs about execution environment
+        :return:
+        """
         require_prefix = ""
         if self.metadata["cwlVersion"] == "v1.0":
             require_prefix = "http://commonwl.org/cwltool#"
@@ -114,12 +127,11 @@ class WpsWorkflow(ProcessCWL):
         runtimeContext.outdir = tempfile.mkdtemp(
             prefix=getdefault(runtimeContext.tmp_outdir_prefix, DEFAULT_TMP_PREFIX),
             dir=weaver_output_path)
+        builder = self._init_job(joborder, runtimeContext)
 
-        builder = self._init_job(job_order, runtimeContext)
-
-        # job_name is the step name and job_order is the actual step inputs
+        # `jobname` is the step name and `joborder` is the actual step inputs
         wps_workflow_job = WpsWorkflowJob(builder, builder.job, self.requirements, self.hints, jobname,
-                                          self.get_job_process_definition(jobname, job_order, self.tool),
+                                          self.get_job_process_definition(jobname, joborder, self.tool),
                                           self.tool["outputs"])
         wps_workflow_job.prov_obj = self.prov_obj
         wps_workflow_job.successCodes = self.tool.get("successCodes")
@@ -373,7 +385,7 @@ class WpsWorkflowJob(JobBase):
         self.expected_outputs = {}  # type: ExpectedOutputType
         for output in expected_outputs:
             # TODO Should we support something else?
-            if output['type'] == 'File':
+            if output["type"] == "File":
                 # Expecting output to look like this
                 # output = {"id": "file:///tmp/random_path/process_name#output_id,
                 #           "type": "File",
