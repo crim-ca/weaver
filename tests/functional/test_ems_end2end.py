@@ -87,7 +87,7 @@ class End2EndEMSTestCase(TestCase):
         # noinspection PyBroadException
         try:
             parsed = urlparse(data_url)
-            netloc, path, scheme = parsed.netloc, parsed.path, parsed.scheme
+            netloc, _, _ = parsed.netloc, parsed.path, parsed.scheme
             if netloc:
                 for src, val in data_sources.items():
                     if src not in forbidden_data_source and val["netloc"] == netloc:
@@ -636,10 +636,9 @@ class End2EndEMSTestCase(TestCase):
             self.assert_test(lambda: resp.json.get("value") == VISIBILITY_PUBLIC, message="Process should be public.")
 
             # bob still cannot edit, but can now view and execute the process
-            self.request("PUT", visible_path,  json=visible,
+            self.request("PUT", visible_path, json=visible,
                          headers=headers_b, cookies=cookies_b, status=self.get_http_auth_code(HTTPOk.code))
-            resp = self.request("GET", process_path,
-                                headers=headers_b, cookies=cookies_b, status=HTTPOk.code)
+            resp = self.request("GET", process_path, headers=headers_b, cookies=cookies_b, status=HTTPOk.code)
             self.assert_test(lambda: resp.json.get("process").get("id") == process_info.test_id,
                              message="Response process ID should match specified test process id.")
             resp = self.request("POST", execute_path, json=execute_body,

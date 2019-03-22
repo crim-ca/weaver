@@ -90,9 +90,9 @@ def setup_config_with_mongodb(config=None, settings=None):
     # type: (Optional[Configurator], Optional[SettingsType]) -> Configurator
     settings = settings or {}
     settings.update({
-        "mongodb.host":     os.getenv("WEAVER_TEST_DB_HOST", "127.0.0.1"),
-        "mongodb.port":     os.getenv("WEAVER_TEST_DB_PORT", "27017"),
-        "mongodb.db_name":  os.getenv("WEAVER_TEST_DB_NAME", "weaver-test"),
+        "mongodb.host":     os.getenv("WEAVER_TEST_DB_HOST", "127.0.0.1"),      # noqa: E241
+        "mongodb.port":     os.getenv("WEAVER_TEST_DB_PORT", "27017"),          # noqa: E241
+        "mongodb.db_name":  os.getenv("WEAVER_TEST_DB_NAME", "weaver-test"),    # noqa: E241
     })
     if config:
         config.registry.settings.update(settings)

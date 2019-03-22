@@ -42,6 +42,7 @@ class _NullType:
         return isinstance(other, _NullType) \
                or other is null \
                or (isclass(other) and issubclass(other, _NullType))
+
     def __nonzero__(self):
         return False
     __bool__ = __nonzero__

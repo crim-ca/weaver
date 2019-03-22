@@ -22,7 +22,7 @@ def test_null():
     assert null == n()
     assert null.__class__ == n
     assert null.__class__ == n()
-    assert null != None  # noqa
+    assert null != None  # noqa: E711
     assert null is not None
     assert bool(null) is False
     assert null or "not-null" == "not-null"

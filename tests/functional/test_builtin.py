@@ -75,8 +75,6 @@ class BuiltinAppTest(unittest.TestCase):
         assert len(resp.json["process"]["outputs"][0]["formats"]) == 1
         assert resp.json["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF
 
-    # FIXME: fails with connection error...
-    #@pytest.mark.xfail(reason="process working on live server, but fails here")
     @ignore_deprecated_nested_warnings
     def test_jsonarray2netcdf_execute(self):
         dirname = "/tmp"

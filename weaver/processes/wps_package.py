@@ -435,16 +435,17 @@ def _cwl2wps_io(io_info, io_select):
     """
     is_input = False
     is_output = False
+    # TODO: BoundingBox not implemented
     if io_select == WPS_INPUT:
         is_input = True
         io_literal = LiteralInput       # type: Union[Type[LiteralInput], Type[LiteralOutput]]
         io_complex = ComplexInput       # type: Union[Type[ComplexInput], Type[ComplexOutput]]
-        io_bbox = BoundingBoxInput      # type: Union[Type[BoundingBoxInput], Type[BoundingBoxOutput]]
+        # io_bbox = BoundingBoxInput      # type: Union[Type[BoundingBoxInput], Type[BoundingBoxOutput]]
     elif io_select == WPS_OUTPUT:
         is_output = True
         io_literal = LiteralOutput      # type: Union[Type[LiteralInput], Type[LiteralOutput]]
         io_complex = ComplexOutput      # type: Union[Type[ComplexInput], Type[ComplexOutput]]
-        io_bbox = BoundingBoxOutput     # type: Union[Type[BoundingBoxInput], Type[BoundingBoxOutput]]
+        # io_bbox = BoundingBoxOutput     # type: Union[Type[BoundingBoxInput], Type[BoundingBoxOutput]]
     else:
         raise PackageTypeError("Unsupported I/O info definition: `{0}` with `{1}`.".format(repr(io_info), io_select))
 

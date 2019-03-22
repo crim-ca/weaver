@@ -334,35 +334,35 @@ class WpsRestApiJobsTest(unittest.TestCase):
         # test variations of [paths, query, user-id, expected-job-ids]
         path_jobs_user_req_tests = [
             # URI               ACCESS              USER                    EXPECTED JOBS
-            (uri_direct_jobs,   None,               None,                   public_jobs),  # no user only can see public
-            (uri_direct_jobs,   None,               self.user_editor1_id,   editor1_all_jobs),
-            (uri_direct_jobs,   None,               self.user_admin_id,     self.job_info),
-            (uri_direct_jobs,   VISIBILITY_PRIVATE, None,                   public_jobs),  # no user overrides to public
-            (uri_direct_jobs,   VISIBILITY_PRIVATE, self.user_editor1_id,   editor1_private_jobs),
-            (uri_direct_jobs,   VISIBILITY_PRIVATE, self.user_admin_id,     admin_private_jobs),
-            (uri_direct_jobs,   VISIBILITY_PUBLIC,  None,                   public_jobs),
-            (uri_direct_jobs,   VISIBILITY_PUBLIC,  self.user_editor1_id,   editor1_public_jobs),
-            (uri_direct_jobs,   VISIBILITY_PUBLIC,  self.user_admin_id,     admin_public_jobs),
+            (uri_direct_jobs,   None,               None,                   public_jobs),                               # noqa: E241, E501
+            (uri_direct_jobs,   None,               self.user_editor1_id,   editor1_all_jobs),                          # noqa: E241, E501
+            (uri_direct_jobs,   None,               self.user_admin_id,     self.job_info),                             # noqa: E241, E501
+            (uri_direct_jobs,   VISIBILITY_PRIVATE, None,                   public_jobs),                               # noqa: E241, E501
+            (uri_direct_jobs,   VISIBILITY_PRIVATE, self.user_editor1_id,   editor1_private_jobs),                      # noqa: E241, E501
+            (uri_direct_jobs,   VISIBILITY_PRIVATE, self.user_admin_id,     admin_private_jobs),                        # noqa: E241, E501
+            (uri_direct_jobs,   VISIBILITY_PUBLIC,  None,                   public_jobs),                               # noqa: E241, E501
+            (uri_direct_jobs,   VISIBILITY_PUBLIC,  self.user_editor1_id,   editor1_public_jobs),                       # noqa: E241, E501
+            (uri_direct_jobs,   VISIBILITY_PUBLIC,  self.user_admin_id,     admin_public_jobs),                         # noqa: E241, E501
             # ---
-            (uri_process_jobs,  None,               None,                   filter_process(public_jobs)),
-            (uri_process_jobs,  None,               self.user_editor1_id,   filter_process(editor1_all_jobs)),
-            (uri_process_jobs,  None,               self.user_admin_id,     filter_process(self.job_info)),
-            (uri_process_jobs,  VISIBILITY_PRIVATE, None,                   filter_process(public_jobs)),
-            (uri_process_jobs,  VISIBILITY_PRIVATE, self.user_editor1_id,   filter_process(editor1_private_jobs)),
-            (uri_process_jobs,  VISIBILITY_PRIVATE, self.user_admin_id,     filter_process(admin_private_jobs)),
-            (uri_process_jobs,  VISIBILITY_PUBLIC,  None,                   filter_process(public_jobs)),
-            (uri_process_jobs,  VISIBILITY_PUBLIC,  self.user_editor1_id,   filter_process(editor1_public_jobs)),
-            (uri_process_jobs,  VISIBILITY_PUBLIC,  self.user_admin_id,     filter_process(self.job_info)),
+            (uri_process_jobs,  None,               None,                   filter_process(public_jobs)),               # noqa: E241, E501
+            (uri_process_jobs,  None,               self.user_editor1_id,   filter_process(editor1_all_jobs)),          # noqa: E241, E501
+            (uri_process_jobs,  None,               self.user_admin_id,     filter_process(self.job_info)),             # noqa: E241, E501
+            (uri_process_jobs,  VISIBILITY_PRIVATE, None,                   filter_process(public_jobs)),               # noqa: E241, E501
+            (uri_process_jobs,  VISIBILITY_PRIVATE, self.user_editor1_id,   filter_process(editor1_private_jobs)),      # noqa: E241, E501
+            (uri_process_jobs,  VISIBILITY_PRIVATE, self.user_admin_id,     filter_process(admin_private_jobs)),        # noqa: E241, E501
+            (uri_process_jobs,  VISIBILITY_PUBLIC,  None,                   filter_process(public_jobs)),               # noqa: E241, E501
+            (uri_process_jobs,  VISIBILITY_PUBLIC,  self.user_editor1_id,   filter_process(editor1_public_jobs)),       # noqa: E241, E501
+            (uri_process_jobs,  VISIBILITY_PUBLIC,  self.user_admin_id,     filter_process(self.job_info)),             # noqa: E241, E501
             # ---
-            (uri_provider_jobs, None,               None,                   filter_service(public_jobs)),
-            (uri_provider_jobs, None,               self.user_editor1_id,   filter_service(editor1_all_jobs)),
-            (uri_provider_jobs, None,               self.user_admin_id,     filter_service(self.job_info)),
-            (uri_provider_jobs, VISIBILITY_PRIVATE, None,                   filter_service(public_jobs)),
-            (uri_provider_jobs, VISIBILITY_PRIVATE, self.user_editor1_id,   filter_service(editor1_private_jobs)),
-            (uri_provider_jobs, VISIBILITY_PRIVATE, self.user_admin_id,     filter_service(admin_private_jobs)),
-            (uri_provider_jobs, VISIBILITY_PUBLIC,  None,                   filter_service(public_jobs)),
-            (uri_provider_jobs, VISIBILITY_PUBLIC,  self.user_editor1_id,   filter_service(editor1_public_jobs)),
-            (uri_provider_jobs, VISIBILITY_PUBLIC,  self.user_admin_id,     filter_service(self.job_info)),
+            (uri_provider_jobs, None,               None,                   filter_service(public_jobs)),               # noqa: E241, E501
+            (uri_provider_jobs, None,               self.user_editor1_id,   filter_service(editor1_all_jobs)),          # noqa: E241, E501
+            (uri_provider_jobs, None,               self.user_admin_id,     filter_service(self.job_info)),             # noqa: E241, E501
+            (uri_provider_jobs, VISIBILITY_PRIVATE, None,                   filter_service(public_jobs)),               # noqa: E241, E501
+            (uri_provider_jobs, VISIBILITY_PRIVATE, self.user_editor1_id,   filter_service(editor1_private_jobs)),      # noqa: E241, E501
+            (uri_provider_jobs, VISIBILITY_PRIVATE, self.user_admin_id,     filter_service(admin_private_jobs)),        # noqa: E241, E501
+            (uri_provider_jobs, VISIBILITY_PUBLIC,  None,                   filter_service(public_jobs)),               # noqa: E241, E501
+            (uri_provider_jobs, VISIBILITY_PUBLIC,  self.user_editor1_id,   filter_service(editor1_public_jobs)),       # noqa: E241, E501
+            (uri_provider_jobs, VISIBILITY_PUBLIC,  self.user_admin_id,     filter_service(self.job_info)),             # noqa: E241, E501
 
         ]   # type: List[Tuple[AnyStr, AnyStr, Union[None, int], List[AnyStr]]]
 
