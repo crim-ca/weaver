@@ -51,13 +51,14 @@ class _NullType:
 null = _NullType()
 
 
-def get_weaver_url(settings):
-    # type: (SettingsType) -> AnyStr
-    return settings.get("weaver.url").rstrip('/').strip()
+def get_weaver_url(container):
+    # type: (AnySettingsContainer) -> AnyStr
+    """Retrieves the home URL of the `weaver` application."""
+    return get_settings(container).get("weaver.url").rstrip('/').strip()
 
 
 def get_any_id(info):
-    # type: (Dict[AnyStr, AnyStr]) -> Union[AnyStr, None]
+    # type: (JSON) -> Union[AnyStr, None]
     """Retrieves a dictionary `id-like` key using multiple common variations ``[id, identifier, _id]``.
     :param info: dictionary that potentially contains an `id-like` key.
     :returns: value of the matched `id-like` key or ``None`` if not found."""
@@ -65,7 +66,7 @@ def get_any_id(info):
 
 
 def get_any_value(info):
-    # type: (Dict[AnyStr, AnyStr]) -> AnyValue
+    # type: (JSON) -> AnyValue
     """Retrieves a dictionary `value-like` key using multiple common variations ``[href, value, reference]``.
     :param info: dictionary that potentially contains a `value-like` key.
     :returns: value of the matched `value-like` key or ``None`` if not found."""
@@ -73,7 +74,7 @@ def get_any_value(info):
 
 
 def get_any_message(info):
-    # type: (Dict[AnyStr, AnyStr]) -> AnyStr
+    # type: (JSON) -> AnyStr
     """Retrieves a dictionary 'value'-like key using multiple common variations [message].
     :param info: dictionary that potentially contains a 'message'-like key.
     :returns: value of the matched 'message'-like key or an empty string if not found. """
@@ -247,7 +248,7 @@ def localize_datetime(dt, tz_name="UTC"):
 def get_base_url(url):
     # type: (AnyStr) -> AnyStr
     """
-    Obtains the base URL from the given `url`.
+    Obtains the base URL from the given ``url``.
     """
     parsed_url = urlparse(url)
     if not parsed_url.netloc or parsed_url.scheme not in ("http", "https"):
@@ -416,7 +417,7 @@ def get_job_log_msg(status, message, progress=0, duration=None):
 
 
 def make_dirs(path, mode=0o755, exist_ok=True):
-    """Alternative to 'makedirs' with 'exists_ok' parameter only available for python>3.5"""
+    """Alternative to ``os.makedirs`` with ``exists_ok`` parameter only available for ``python>3.5``."""
     if LooseVersion(platform.python_version()) >= LooseVersion('3.5'):
         os.makedirs(path, mode=mode, exist_ok=exist_ok)
         return

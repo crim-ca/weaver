@@ -15,6 +15,7 @@ from pywps import configuration as pywps_config
 # noinspection PyPackageRequirements
 from pywps.app.Service import Service
 from six.moves.configparser import SafeConfigParser
+from six.moves.urllib.parse import urlparse
 from typing import TYPE_CHECKING
 import os
 import six
@@ -29,13 +30,14 @@ DEFAULT_PYWPS_CFG = os.path.join(os.path.abspath(os.path.dirname(__file__)), "wp
 PYWPS_CFG = None
 
 
-def _get_settings_or_wps_config(settings,                   # type: Dict[AnyStr, AnyStr]
+def _get_settings_or_wps_config(container,                  # type: AnySettingsContainer
                                 weaver_setting_name,        # type: AnyStr
                                 config_setting_section,     # type: AnyStr
                                 config_setting_name,        # type: AnyStr
                                 default_not_found,          # type: AnyStr
                                 message_not_found,          # type: AnyStr
                                 ):                          # type: (...) -> AnyStr
+    settings = get_settings(container)
     wps_path = settings.get(weaver_setting_name)
     if not wps_path:
         wps_cfg = get_wps_cfg_path(settings)
@@ -48,52 +50,61 @@ def _get_settings_or_wps_config(settings,                   # type: Dict[AnyStr,
     return wps_path.rstrip('/').strip()
 
 
-def get_wps_cfg_path(settings):
-    # type: (Dict[AnyStr, AnyStr]) -> AnyStr
+def get_wps_cfg_path(container):
+    # type: (AnySettingsContainer) -> AnyStr
     """
     Retrieves the WPS configuration file (`wps.cfg` by default or `weaver.wps_cfg` if specified).
     """
-    return settings.get("weaver.wps_cfg", DEFAULT_PYWPS_CFG)
+    return get_settings(container).get("weaver.wps_cfg", DEFAULT_PYWPS_CFG)
 
 
-def get_wps_path(settings):
-    # type: (Dict[AnyStr, AnyStr]) -> AnyStr
+def get_wps_path(container):
+    # type: (AnySettingsContainer) -> AnyStr
     """
     Retrieves the WPS path (without hostname).
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
     """
     return _get_settings_or_wps_config(
-        settings, "weaver.wps_path", "server", "url", "/ows/wps", "WPS path")
+        container, "weaver.wps_path", "server", "url", "/ows/wps", "WPS path")
 
 
-def get_wps_url(settings):
-    # type: (Dict[AnyStr, AnyStr]) -> AnyStr
+def get_wps_url(container):
+    # type: (AnySettingsContainer) -> AnyStr
     """
     Retrieves the full WPS URL (hostname + WPS path).
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
     """
-    return get_weaver_url(settings) + get_wps_path(settings)
+    return get_weaver_url(container) + get_wps_path(container)
 
 
-def get_wps_output_path(settings):
-    # type: (Dict[AnyStr, AnyStr]) -> AnyStr
+def get_wps_output_dir(container):
+    # type: (AnySettingsContainer) -> AnyStr
     """
-    Retrieves the WPS output path directory where to write XML and result files.
+    Retrieves the WPS output directory path where to write XML and result files.
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
     """
     return _get_settings_or_wps_config(
-        settings, "weaver.wps_output_path", "server", "outputpath", "/tmp", "WPS output path")
+        container, "weaver.wps_output_dir", "server", "outputpath", "/tmp", "WPS output directory")
 
 
-def get_wps_output_url(settings):
-    # type: (Dict[AnyStr, AnyStr]) -> AnyStr
+def get_wps_output_path(container):
+    # type: (AnySettingsContainer) -> AnyStr
     """
-    Retrieves the WPS output URL that maps to WPS output path directory.
+    Retrieves the WPS output path (without hostname) for staging XML status, logs and process outputs.
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
     """
-    wps_output_default = get_weaver_url(settings) + "/wpsoutputs"
+    return get_settings(container).get("weaver.wps_output_path") or urlparse(get_wps_output_url(container)).path
+
+
+def get_wps_output_url(container):
+    # type: (AnySettingsContainer) -> AnyStr
+    """
+    Retrieves the WPS output URL that maps to WPS output directory path.
+    Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
+    """
+    wps_output_default = get_weaver_url(container) + "/wpsoutputs"
     return _get_settings_or_wps_config(
-        settings, "weaver.wps_output_url", "server", "outputurl", wps_output_default, "WPS output url")
+        container, "weaver.wps_output_url", "server", "outputurl", wps_output_default, "WPS output url")
 
 
 def load_pywps_cfg(container, config=None):
@@ -116,16 +127,27 @@ def load_pywps_cfg(container, config=None):
         if isinstance(settings.get("PYWPS_CFG"), dict):
             del settings["PYWPS_CFG"]
 
-    if "weaver.wps_output_path" not in settings:
-        # ensure the output dir exists if specified
-        out_dir_path = PYWPS_CFG.get_config_value("server", "outputpath")
-        if not os.path.isdir(out_dir_path):
-            os.makedirs(out_dir_path)
-        settings["weaver.wps_output_path"] = out_dir_path
+    # find output directory from app config or wps config
+    if "weaver.wps_output_dir" not in settings:
+        output_dir = PYWPS_CFG.get_config_value("server", "outputpath")
+        settings["weaver.wps_output_dir"] = output_dir
+    # ensure the output dir exists if specified
+    output_dir = get_wps_output_dir(settings)
+    if not os.path.isdir(output_dir):
+        os.makedirs(output_dir)
 
+    # find output url from app config (path/url) or wps config (url only)
     if "weaver.wps_output_url" not in settings:
-        output_url = PYWPS_CFG.get_config_value("server", "outputurl")
+        output_path = settings.get("weaver.wps_output_path", "")
+        if output_path:
+            output_url = os.path.join(get_weaver_url(settings), output_path.strip('/'))
+        else:
+            output_url = PYWPS_CFG.get_config_value("server", "outputurl")
         settings["weaver.wps_output_url"] = output_url
+
+    # enforce back resolved values onto PyWPS config
+    PYWPS_CFG.CONFIG.set("server", "outputpath", settings["weaver.wps_output_dir"])
+    PYWPS_CFG.CONFIG.set("server", "outputurl", settings["weaver.wps_output_url"])
 
 
 # @app.task(bind=True)
@@ -157,14 +179,10 @@ def pywps_view(environ, start_response):
 
 
 def includeme(config):
-    settings = config.registry.settings
-
+    settings = get_settings(config)
     if asbool(settings.get("weaver.wps", True)):
         LOGGER.debug("Weaver WPS enabled.")
-
-        # include weaver config
         config.include("weaver.config")
-
         wps_path = get_wps_path(settings)
         config.add_route("wps", wps_path)
         config.add_view(pywps_view, route_name="wps")

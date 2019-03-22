@@ -59,7 +59,7 @@ class End2EndEMSTestCase(TestCase):
     Runs an end-2-end test procedure on weaver configured as EMS located on specified `WEAVER_TEST_SERVER_HOSTNAME`.
     """
     __settings__ = None
-    test_processes_info = dict()
+    test_processes_info = dict()    # type: Dict[AnyStr, ProcessInfo]
     headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
     cookies = dict()                # type: CookiesType
     app = None                      # type: WebTestApp
@@ -553,7 +553,19 @@ class End2EndEMSTestCase(TestCase):
         cls.assert_test(lambda: resp.json.get("configuration") == WEAVER_CONFIGURATION_EMS,
                         message="weaver must be configured as EMS.")
 
-    def test_workflow_end2end(self):
+    def test_workflow_wps1_requirements(self):
+        self.workflow_runner(self.PROCESS_WORKFLOW_SUBSET_ICE_DAYS,
+                             [self.PROCESS_SUBSET_BBOX_ID, self.PROCESS_ICE_DAYS_ID],
+                             log_full_trace=True)
+
+    def test_workflow_wps3_requirements(self):
+        self.workflow_runner(self.PROCESS_WORKFLOW_ID,
+                             [self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID],
+                             log_full_trace=True)
+
+    @pytest.mark.xfail(reason="Interoperability of remote servers not guaranteed.")
+    @pytest.mark.testbed14
+    def test_workflow_end2end_with_auth(self):
         """Full workflow execution procedure with authentication enabled."""
         # End to end test will log everything
         self.__class__.log_full_trace = True
@@ -639,11 +651,6 @@ class End2EndEMSTestCase(TestCase):
             self.assert_test(lambda: job_id and job_location and job_location.endswith(job_id),
                              message="Response process execution job ID must match expected value to validate results.")
             self.validate_test_job_execution(job_location, headers_b, cookies_b)
-
-    def test_workflow_wps1_requirements(self):
-        self.workflow_runner(self.PROCESS_WORKFLOW_SUBSET_ICE_DAYS,
-                             [self.PROCESS_SUBSET_BBOX_ID, self.PROCESS_ICE_DAYS_ID],
-                             log_full_trace=True)
 
     @pytest.mark.xfail(reason="Interoperability of remote servers not guaranteed.")
     @pytest.mark.testbed14

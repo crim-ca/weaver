@@ -8,9 +8,10 @@ from weaver.exceptions import (
     JobNotFound,
 )
 from weaver.store.base import StoreServices, StoreProcesses, StoreJobs
-from weaver.utils import get_settings, get_any_id, get_any_value
+from weaver.utils import get_settings, get_any_id, get_any_value, get_url_without_query
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url, OUTPUT_FORMAT_JSON
+from weaver.wps import get_wps_output_dir, get_wps_output_url
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver import status, sort
 from pyramid.httpexceptions import (
@@ -21,13 +22,16 @@ from pyramid.httpexceptions import (
 )
 from pyramid.settings import asbool
 from pyramid.request import Request
+from pyramid.httpexceptions import HTTPInternalServerError
 from pyramid_celery import celery_app as app
 from typing import AnyStr, Optional, Union, Tuple
 from owslib.wps import WPSExecution
+from six.moves.urllib.parse import urlparse
 from lxml import etree
 from celery.utils.log import get_task_logger
 from requests_file import FileAdapter
 import requests
+import os
 
 LOGGER = get_task_logger(__name__)
 
@@ -65,7 +69,7 @@ def job_format_json(settings, job):
 def check_status(url=None, response=None, sleep_secs=2, verify=False):
     # type: (Optional[AnyStr, None], Optional[etree.ElementBase], Optional[int], Optional[bool]) -> WPSExecution
     """
-    Run owslib.wps check_status with additional exception handling.
+    Run :function:`owslib.wps.WPSExecution.checkStatus` with additional exception handling.
 
     :param url: job URL where to look for job status.
     :param response: WPS response document of job status.
@@ -78,17 +82,31 @@ def check_status(url=None, response=None, sleep_secs=2, verify=False):
         LOGGER.debug("using response document ...")
         xml = response
     elif url:
-        LOGGER.debug("using status_location url...")
-        request_session = requests.Session()
-        request_session.mount("file://", FileAdapter())
-        xml = request_session.get(url, verify=verify).content
+        try:
+            LOGGER.debug("using status-location url...")
+            request_session = requests.Session()
+            request_session.mount("file://", FileAdapter())
+            xml = request_session.get(url, verify=verify).content
+        except Exception as ex:
+            LOGGER.debug("Got exception during get status: [{!r}]".format(ex))
+            LOGGER.warning("Failed retrieving status-location, attempting with local file.")
+            if url and not urlparse(url).scheme in ["", "file://"]:
+                dir_path = get_wps_output_dir(app)
+                wps_out_url = get_wps_output_url(app)
+                req_out_url = get_url_without_query(url)
+                out_path = os.path.join(dir_path, req_out_url.replace(wps_out_url, "").lstrip('/'))
+            else:
+                out_path = url.replace("file:://", "")
+            if not os.path.isfile(out_path):
+                raise HTTPNotFound("Could not find file resource from [{}].".format(url))
+            xml = open(out_path, 'r').read()
     else:
         raise Exception("you need to provide a status-location url or response object.")
     if type(xml) is unicode:
         xml = xml.encode("utf8", errors="ignore")
     execution.checkStatus(response=xml, sleepSecs=sleep_secs)
     if execution.response is None:
-        raise Exception("check_status failed!")
+        raise Exception("Missing response, cannot check status.")
     # noinspection PyProtectedMember
     if not isinstance(execution.response, etree._Element):
         execution.response = etree.fromstring(execution.response)

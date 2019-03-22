@@ -3,7 +3,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_BUILTIN, CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_APP_WPS1, CWL_REQUIREMENT_APP_ESGF_CWT
 )
 from weaver.utils import now, get_settings
-from weaver.wps import get_wps_output_path
+from weaver.wps import get_wps_output_dir
 from cwltool import command_line_tool
 from cwltool.process import stageFiles
 from cwltool.provenance import CreateProvProfile
@@ -123,10 +123,10 @@ class WpsWorkflow(ProcessCWL):
         jobname = uniquename(runtimeContext.name or shortname(self.tool.get("id", "job")))
 
         # outdir must be served by the EMS because downstream step will need access to upstream steps output
-        weaver_output_path = get_wps_output_path(get_settings(app))
+        weaver_out_dir = get_wps_output_dir(get_settings(app))
         runtimeContext.outdir = tempfile.mkdtemp(
             prefix=getdefault(runtimeContext.tmp_outdir_prefix, DEFAULT_TMP_PREFIX),
-            dir=weaver_output_path)
+            dir=weaver_out_dir)
         builder = self._init_job(joborder, runtimeContext)
 
         # `jobname` is the step name and `joborder` is the actual step inputs

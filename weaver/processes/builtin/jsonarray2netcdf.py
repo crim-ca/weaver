@@ -7,6 +7,7 @@ from typing import AnyStr
 import requests
 import argparse
 import logging
+import shutil
 import json
 import six
 import sys
@@ -20,7 +21,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(CUR_DIR))))
 from weaver.formats import CONTENT_TYPE_EXTENSION_MAPPING, CONTENT_TYPE_APP_NETCDF  # noqa
 
 PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]
+
+# setup logger since it is not run from the main 'weaver' app
 LOGGER = logging.getLogger(__name__)
+LOGGER.addHandler(logging.StreamHandler(sys.stdout))
+LOGGER.setLevel(logging.INFO)
 
 
 def _is_netcdf_url(url):
@@ -37,14 +42,18 @@ def j2n(json_file, output_dir):
     json_content = json.load(json_file)
     if not isinstance(json_content, list) or \
             any(not isinstance(f, six.string_types) or not _is_netcdf_url(f) for f in json_content):
+        LOGGER.error("Invalid JSON: [{!s}]".format(json_content))
         raise ValueError("Invalid JSON file format, expected a plain array of NetCDF file URL strings.")
     for file_url in json_content:
         file_name = os.path.split(file_url)[-1]
         file_path = os.path.join(output_dir, file_name)
-        with open(file_path, 'wb') as f:
-            r = requests.get(file_url)
-            r.raise_for_status()
-            f.write(r.content)
+        if file_url.startswith("file://"):
+            shutil.copyfile(file_url[7:], file_path)
+        else:
+            with open(file_path, 'wb') as f:
+                r = requests.get(file_url)
+                r.raise_for_status()
+                f.write(r.content)
     LOGGER.info("Process '{}' execution completed.".format(PACKAGE_NAME))
 
 

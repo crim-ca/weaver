@@ -91,7 +91,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
         # prepare inputs
         complex_inputs = []
         for process_input in process.dataInputs:
-            if 'ComplexData' in process_input.dataType:
+            if "ComplexData" in process_input.dataType:
                 complex_inputs.append(process_input.identifier)
 
         try:
@@ -103,7 +103,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
                 input_values = process_value if isinstance(process_value, list) else [process_value]
 
                 # we need to support file:// scheme but PyWPS doesn't like them so remove the scheme file://
-                input_values = [val[7:] if str(val).startswith('file://') else val for val in input_values]
+                input_values = [val[7:] if str(val).startswith("file://") else val for val in input_values]
 
                 # need to use ComplexDataInput structure for complex input
                 # need to use literal String for anything else than complex
@@ -115,7 +115,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
             wps_inputs = []
 
         # prepare outputs
-        outputs = [(o.identifier, o.dataType == 'ComplexData') for o in process.processOutputs]
+        outputs = [(o.identifier, o.dataType == "ComplexData") for o in process.processOutputs]
 
         mode = EXECUTE_MODE_ASYNC if job.execute_async else EXECUTE_MODE_SYNC
         execution = wps.execute(job.process, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
@@ -163,7 +163,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
 
             except Exception as exc:
                 num_retries += 1
-                task_logger.debug('Exception raised: {}'.format(repr(exc)))
+                task_logger.debug("Exception raised: {}".format(repr(exc)))
                 job.status_message = "Could not read status xml document for {}. Trying again ...".format(str(job))
                 job.save_log(errors=execution.errors, logger=task_logger)
                 sleep(1)
@@ -176,13 +176,14 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
                 job = store.update_job(job)
 
     except (WPSException, Exception) as exc:
+        LOGGER.exception("Failed running {}".format(str(job)))
         job.status = map_status(STATUS_FAILED)
         job.status_message = "Failed to run {}.".format(str(job))
         if isinstance(exc, WPSException):
             errors = "[{0}] {1}".format(exc.locator, exc.text)
         else:
             exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
-            errors = "{0}: {1}".format(exception_class, exc.message)
+            errors = "{0}: {1}".format(exception_class, str(exc))
         job.save_log(errors=errors, logger=task_logger)
     finally:
         job.status_message = "Job {}.".format(job.status)
@@ -211,14 +212,14 @@ def validate_supported_submit_job_handler_parameters(json_body):
     Tests supported parameters not automatically validated by colander deserialize.
     """
     if json_body["mode"] not in [EXECUTE_MODE_ASYNC, EXECUTE_MODE_AUTO]:
-        raise HTTPNotImplemented(detail="Execution mode `{0}` not supported.".format(json_body["mode"]))
+        raise HTTPNotImplemented(detail="Execution mode '{}' not supported.".format(json_body["mode"]))
 
     if json_body["response"] != EXECUTE_RESPONSE_DOCUMENT:
-        raise HTTPNotImplemented(detail="Execution response type `{0}` not supported.".format(json_body["response"]))
+        raise HTTPNotImplemented(detail="Execution response type '{}' not supported.".format(json_body["response"]))
 
     for job_output in json_body["outputs"]:
         if job_output["transmissionMode"] != EXECUTE_TRANSMISSION_MODE_REFERENCE:
-            raise HTTPNotImplemented(detail="Execute transmissionMode `{0}` not supported."
+            raise HTTPNotImplemented(detail="Execute transmissionMode '{}' not supported."
                                      .format(job_output["transmissionMode"]))
 
 

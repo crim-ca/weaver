@@ -4,9 +4,10 @@ Utility methods for various TestCase setup operations.
 from weaver.datatype import Service
 from weaver.database import get_db
 from weaver.store.mongodb import MongodbServiceStore, MongodbProcessStore, MongodbJobStore
+from weaver.wps_restapi.processes.processes import execute_process
 from weaver.config import WEAVER_CONFIGURATION_DEFAULT
 from weaver.utils import null
-from weaver.wps import get_wps_url, get_wps_output_url, get_wps_output_path
+from weaver.wps import get_wps_url, get_wps_output_url, get_wps_output_dir
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 from six.moves.configparser import ConfigParser
 from typing import Any, AnyStr, Optional, TYPE_CHECKING
@@ -19,6 +20,7 @@ import pyramid_celery
 import warnings
 # noinspection PyPackageRequirements
 import mock
+import uuid
 import os
 if TYPE_CHECKING:
     from weaver.typedefs import SettingsType
@@ -140,10 +142,11 @@ def setup_config_with_pywps(config):
         "PYWPS_CFG": {
             "server.url": get_wps_url(settings),
             "server.outputurl": get_wps_output_url(settings),
-            "server.outputpath": get_wps_output_path(settings),
+            "server.outputpath": get_wps_output_dir(settings),
         },
     })
     config.registry.settings.update(settings)
+    config.include("weaver.wps")
     return config
 
 
@@ -222,3 +225,63 @@ def init_weaver_service(registry):
         "url": "http://localhost/ows/proxy/weaver",
         "public": True
     }))
+
+
+def mocked_sub_requests(app, function="get", *args, **kwargs):
+    """
+    Executes ``app.function(*args, **kwargs)`` with a mock of every underlying :function:`requests.request` call
+    to relay their execution to the :class:`webTest.TestApp`.
+    """
+    # noinspection PyUnusedLocal
+    def mocked_request(method, url_base, headers=None, verify=None, cert=None, **req_kwargs):
+        """
+        Request corresponding to :function:`requests.request` that instead gets executed by :class:`webTest.TestApp`.
+        """
+        method = method.lower()
+        req = getattr(app, method)
+        url = url_base
+        qs = req_kwargs.get("params")
+        if qs:
+            url = url + "?" + qs
+        resp = req(url, params=req_kwargs.get("data"), headers=headers)
+        setattr(resp, "content", resp.body)
+        return resp
+
+    # noinspection PyDeprecation
+    with mock.patch("requests.request", side_effect=mocked_request), \
+         mock.patch("requests.sessions.Session.request", side_effect=mocked_request):   # noqa
+        request_func = getattr(app, function)
+        return request_func(*args, **kwargs)
+
+
+def mocked_execute_process():
+    """
+    Provides a mock to call :function:`weaver.wps_restapi.processes.processes.execute_process` safely within
+    a test employing a :class:`webTest.TestApp` without a running ``Celery`` app.
+    This avoids connection error from ``Celery`` during a job execution request.
+
+    Bypasses the ``execute_process.delay`` call by directly invoking the ``execute_process``.
+
+    **Note**: since ``delay`` and ``Celery`` are bypassed, the process execution becomes blocking (not asynchronous).
+    """
+    class MockTask(object):
+        """
+        Mocks call ``self.request.id`` in :function:`weaver.wps_restapi.processes.processes.execute_process` and
+        call ``result.id`` in :function:`weaver.wps_restapi.processes.processes.submit_job_handler`.
+        """
+        _id = str(uuid.uuid4())
+
+        @property
+        def id(self):
+            return self._id
+
+    task = MockTask()
+
+    def mock_execute_process(job_id, url, headers, notification_email):
+        execute_process(job_id, url, headers, notification_email)
+        return task
+
+    return (
+        mock.patch("weaver.wps_restapi.processes.processes.execute_process.delay", side_effect=mock_execute_process),
+        mock.patch("celery.app.task.Context", return_value=task)
+    )

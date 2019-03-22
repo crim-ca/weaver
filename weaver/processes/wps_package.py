@@ -19,7 +19,7 @@ from weaver.status import (
     map_status,
 )
 from weaver.wps_restapi.swagger_definitions import process_uri
-from weaver.wps import get_wps_output_path
+from weaver.wps import get_wps_output_dir
 from weaver.utils import (
     get_job_log_msg, get_log_fmt, get_log_date_fmt, get_sane_name, get_settings, get_any_id, get_header,
     get_url_without_query, null
@@ -148,10 +148,9 @@ def retrieve_package_job_log(execution, job):
     # If the process is a weaver package this status xml should be available in the process output dir
     status_xml_fn = execution.statusLocation.split('/')[-1]
     try:
-        output_path = get_wps_output_path(get_settings(app))
-
         # weaver package log every status update into this file (we no longer rely on the http monitoring)
-        log_fn = os.path.join(output_path, "{0}.log".format(status_xml_fn))
+        out_dir = get_wps_output_dir(get_settings(app))
+        log_fn = os.path.join(out_dir, "{0}.log".format(status_xml_fn))
         with open(log_fn, 'r') as log_file:
             # Keep the first log entry which is the real start time and replace the following ones with the file content
             job.logs = job.logs[:1]
@@ -508,7 +507,6 @@ def _cwl2wps_io(io_info, io_select):
             "title": io_info.get("label", ""),
             "abstract": io_info.get("doc", ""),
             "data_type": io_type,
-            # unless extended by custom types, no value validation for literals
             "mode": io_mode,
         }
         if is_input:
@@ -1445,6 +1443,9 @@ class WpsPackage(Process):
                 raise self.exception_message(PackageExecutionError, exc, "Failed package execution.")
             try:
                 for output in request.outputs:
+                    # TODO: adjust output for glob patterns (https://github.com/crim-ca/weaver/issues/24)
+                    if isinstance(result[output], list) and not isinstance(self.response.outputs[output], list):
+                        result[output] = result[output][0]  # expect only one output
                     if "location" in result[output]:
                         self.response.outputs[output].as_reference = True
                         self.response.outputs[output].file = result[output]["location"].replace("file://", "")

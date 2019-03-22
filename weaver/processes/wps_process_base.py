@@ -1,4 +1,4 @@
-from weaver.wps import get_wps_output_path, get_wps_output_url
+from weaver.wps import get_wps_output_dir, get_wps_output_url
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.utils import get_cookie_headers, get_settings
 from pyramid_celery import celery_app as app
@@ -63,12 +63,12 @@ class WpsProcessInterface(object):
     def host_file(fn):
         settings = get_settings(app)
         weaver_output_url = get_wps_output_url(settings)
-        weaver_output_path = get_wps_output_path(settings)
+        weaver_output_dir = get_wps_output_dir(settings)
         fn = fn.replace("file://", "")
 
-        if not fn.startswith(weaver_output_path):
+        if not fn.startswith(weaver_output_dir):
             raise Exception("Cannot host files outside of the output path : {0}".format(fn))
-        return fn.replace(weaver_output_path, weaver_output_url)
+        return fn.replace(weaver_output_dir, weaver_output_url)
 
     @staticmethod
     def map_progress(progress, range_min, range_max):

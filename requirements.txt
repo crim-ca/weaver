@@ -11,6 +11,7 @@ gunicorn
 # TODO: this avoids buildout install error, should be removable after issue #5
 jsonschema>=3.0.1
 lxml
+mako
 owslib
 pymongo
 pyramid>=1.7.3

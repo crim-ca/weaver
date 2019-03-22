@@ -121,8 +121,9 @@ def ows_json_format(function):
     def format_response_details(response, request):
         # type: (Response, Request) -> HTTPException
         http_response = function(request)
-        if any([CONTENT_TYPE_APP_JSON in get_header("Content-Type", http_response.headers),
-                CONTENT_TYPE_APP_JSON in get_header("Accept", request.headers)]):
+        http_headers = get_header("Content-Type", http_response.headers) or []
+        req_headers = get_header("Accept", request.headers) or []
+        if any([CONTENT_TYPE_APP_JSON in http_headers, CONTENT_TYPE_APP_JSON in req_headers]):
             body = OWSException.json_formatter(http_response.status, response.message or "",
                                                http_response.title, request.environ)
             body["detail"] = get_request_info(request)
