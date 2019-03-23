@@ -42,10 +42,10 @@ class BuiltinAppTest(unittest.TestCase):
             "weaver.wps_path": "/ows/wps",
             "weaver.wps_restapi_path": "/",
         }
-        config = get_test_weaver_config(settings=settings)
-        config = setup_config_with_mongodb(config)
+        config = setup_config_with_mongodb(settings=settings)
         config = setup_config_with_pywps(config)
         config = setup_config_with_celery(config)
+        config = get_test_weaver_config(config)
         self.app = get_test_weaver_app(config=config, settings=settings)
         db = get_db(config)
         with mock.patch("weaver.processes.builtin.get_db", return_value=db):

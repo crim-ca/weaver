@@ -3,16 +3,19 @@ Utility methods for various TestCase setup operations.
 """
 from weaver.datatype import Service
 from weaver.database import get_db
+from weaver.formats import CONTENT_TYPE_TEXT_XML, CONTENT_TYPE_APP_JSON
 from weaver.store.mongodb import MongodbServiceStore, MongodbProcessStore, MongodbJobStore
-from weaver.wps_restapi.processes.processes import execute_process
 from weaver.config import WEAVER_CONFIGURATION_DEFAULT
-from weaver.utils import null
+from weaver.utils import null, get_url_without_query
 from weaver.wps import get_wps_url, get_wps_output_url, get_wps_output_dir
+from weaver.wps_restapi.processes.processes import execute_process
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 from six.moves.configparser import ConfigParser
 from typing import Any, AnyStr, Optional, TYPE_CHECKING
 from pyramid import testing
+from pyramid.httpexceptions import HTTPNotFound, HTTPUnprocessableEntity, HTTPException
 from pyramid.registry import Registry
+from pyramid.response import Response
 from pyramid.config import Configurator
 # noinspection PyPackageRequirements
 from webtest import TestApp
@@ -231,20 +234,44 @@ def mocked_sub_requests(app, function="get", *args, **kwargs):
     """
     Executes ``app.function(*args, **kwargs)`` with a mock of every underlying :function:`requests.request` call
     to relay their execution to the :class:`webTest.TestApp`.
+    Generates a `fake` response from a file if the URL scheme is ``mock://``.
     """
+
     # noinspection PyUnusedLocal
-    def mocked_request(method, url_base, headers=None, verify=None, cert=None, **req_kwargs):
+    def mocked_raise_for_status(self, *_args, **_kwargs):
+        if self.status_code >= 400:
+            err = HTTPException()
+            err.code = self.status_code
+            err.title = "Mocked HTTPException"
+            raise err
+
+    # noinspection PyUnusedLocal
+    def mocked_request(method, url=None, headers=None, verify=None, cert=None, **req_kwargs):
         """
         Request corresponding to :function:`requests.request` that instead gets executed by :class:`webTest.TestApp`.
         """
         method = method.lower()
         req = getattr(app, method)
-        url = url_base
+        url = req_kwargs.get('base_url', url)
         qs = req_kwargs.get("params")
         if qs:
             url = url + "?" + qs
-        resp = req(url, params=req_kwargs.get("data"), headers=headers)
-        setattr(resp, "content", resp.body)
+        if not url.startswith("mock://"):
+            resp = req(url, params=req_kwargs.get("data"), headers=headers)
+            setattr(resp, "content", resp.body)
+        else:
+            path = get_url_without_query(url.replace("mock://", ""))
+            if not os.path.isfile(path):
+                raise HTTPNotFound("Could not find mock file: [{}]".format(url))
+            resp = Response()
+            ext = os.path.splitext(path)[-1]
+            typ = CONTENT_TYPE_APP_JSON if ext == ".json" else CONTENT_TYPE_TEXT_XML if ext == ".xml" else None
+            if not typ:
+                return HTTPUnprocessableEntity("Unknown Content-Type for mock file: [{}]".format(url))
+            resp.status_code = 200
+            resp.content_type = typ
+            resp.content = open(path, 'r').read()
+            resp.url = url
         return resp
 
     # noinspection PyDeprecation

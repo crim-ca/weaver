@@ -561,8 +561,7 @@ def _json2wps_datatype(io_info):
             return "float"
         return null
 
-    io_type = _get_field(io_info, "type", search_variations=False)
-    _set_field(io_info, "type", null, force=True)
+    io_type = _get_field(io_info, "type", search_variations=False, pop_found=True)
     io_dtype = _get_field(io_info, "type", search_variations=True)
     io_default = _get_field(io_info, "default", search_variations=True)
     io_allowed = _get_field(io_info, "allowed_values", search_variations=True)
