@@ -128,7 +128,7 @@ WPS_FIELD_MAPPING = {
                             "Allowedcollections"],
     "default": ["default_value", "defaultValue", "DefaultValue", "Default"],
     "supported_values": ["SupportedValues", "supportedValues", "supportedvalues", "Supported_Values"],
-    "supported_formats": ["SupportedFormats", "supportedFormats", "supportedformats", "Supported_Formats"],
+    "supported_formats": ["SupportedFormats", "supportedFormats", "supportedformats", "Supported_Formats", "formats"],
     "additional_parameters": ["AdditionalParameters", "additionalParameters", "additionalparameters",
                               "Additional_Parameters"],
     "type": ["Type", "data_type", "dataType", "DataType", "Data_Type"],
@@ -546,36 +546,81 @@ def _cwl2wps_io(io_info, io_select):
         return io_complex(**kw)
 
 
-def _json2wps_type(type_info, type_category):
+def _json2wps_datatype(io_info):
+    # type: (JSON_IO_Type) -> AnyStr
+    """
+    Guesses the literal data-type from I/O JSON information in order to allow creation of the corresponding I/O WPS.
+    Defaults to ``string`` if no suitable guess can be accomplished.
+    """
+    def _literal_to_str(t):
+        if isinstance(t, six.string_types):
+            return "string"
+        if isinstance(t, int):
+            return "integer"
+        if isinstance(t, float):
+            return "float"
+        return null
+
+    io_type = _get_field(io_info, "type", search_variations=False)
+    _set_field(io_info, "type", null, force=True)
+    io_dtype = _get_field(io_info, "type", search_variations=True)
+    io_default = _get_field(io_info, "default", search_variations=True)
+    io_allowed = _get_field(io_info, "allowed_values", search_variations=True)
+    io_support = _get_field(io_info, "supported_values", search_variations=True)
+    if str(io_type).lower() == "literal":
+        io_type = null
+    for io_guess in [io_type, io_dtype, io_default, io_allowed, io_support]:
+        if io_type:
+            break
+        if isinstance(io_guess, list) and len(io_guess):
+            io_guess = io_guess[0]
+        io_type = _literal_to_str(io_guess)
+    if not isinstance(io_type, six.string_types):
+        LOGGER.warning("Failed literal data-type guess, using default 'string' for [{}]".format(io_info))
+        io_type = "string"
+    return io_type
+
+
+def _json2wps_field(field_info, field_category):
     # type: (JSON_IO_Type, AnyStr) -> Any
-    if type_category == "allowed_values" and isinstance(type_info, dict):
-        type_info.pop("type", None)
-        return AllowedValue(**type_info)
-    if type_category == "allowed_values" and isinstance(type_info, six.string_types):
-        return AllowedValue(value=type_info, allowed_type=ALLOWEDVALUETYPE.VALUE)
-    if type_category == "allowed_values" and isinstance(type_info, list):
-        return AllowedValue(minval=min(type_info), maxval=max(type_info), allowed_type=ALLOWEDVALUETYPE.RANGE)
-    if type_category == "supported_formats" and isinstance(type_info, dict):
-        return Format(**type_info)
-    if type_category == "supported_formats" and isinstance(type_info, six.string_types):
-        return Format(type_info)
-    if type_category == "metadata" and isinstance(type_info, dict):
-        return Metadata(**type_info)
-    if type_category == "metadata" and isinstance(type_info, six.string_types):
-        return Metadata(type_info)
-    if type_category == "keywords" and isinstance(type_info, list):
-        return type_info
-    if type_category in ["identifier", "title", "abstract"] and isinstance(type_info, six.string_types):
-        return type_info
+    """
+    Converts an I/O field from a JSON literal data, list, or dictionary to corresponding WPS types.
+    :param field_info: literal data or information container describing the type to be generated.
+    :param field_category: one of ``WPS_FIELD_MAPPING`` keys to indicate how to parse ``field_info``.
+    """
+    if field_category == "allowed_values":
+        if isinstance(field_info, AllowedValue):
+            return field_info
+        if isinstance(field_info, dict):
+            field_info.pop("type", None)
+            return AllowedValue(**field_info)
+        if isinstance(field_info, six.string_types):
+            return AllowedValue(value=field_info, allowed_type=ALLOWEDVALUETYPE.VALUE)
+        if isinstance(field_info, list):
+            return AllowedValue(minval=min(field_info), maxval=max(field_info), allowed_type=ALLOWEDVALUETYPE.RANGE)
+    elif field_category == "supported_formats":
+        if isinstance(field_info, dict):
+            return Format(**field_info)
+        if isinstance(field_info, six.string_types):
+            return Format(field_info)
+    elif field_category == "metadata":
+        if isinstance(field_info, dict):
+            return Metadata(**field_info)
+        if isinstance(field_info, six.string_types):
+            return Metadata(field_info)
+    elif field_category == "keywords" and isinstance(field_info, list):
+        return field_info
+    elif field_category in ["identifier", "title", "abstract"] and isinstance(field_info, six.string_types):
+        return field_info
     return None
 
 
 def _json2wps_io(io_info, io_select):
     # type: (JSON_IO_Type, Union[WPS_INPUT, WPS_OUTPUT]) -> WPS_IO_Type
-    """Converts input/output parameters from a JSON dict to WPS types.
-    :param io_info: IO in JSON dict format.
+    """Converts an I/O from a JSON dict to WPS types.
+    :param io_info: I/O in JSON dict format.
     :param io_select: ``WPS_INPUT`` or ``WPS_OUTPUT`` to specify desired WPS type conversion.
-    :return: corresponding IO in WPS format.
+    :return: corresponding I/O in WPS format.
     """
 
     io_info["identifier"] = _get_field(io_info, "identifier", search_variations=True, pop_found=True)
@@ -608,7 +653,7 @@ def _json2wps_io(io_info, io_select):
         if isinstance(values, list) and len(values) > 0:
             io_info["allowed_values"] = list()
             for allow_value in values:
-                io_info["allowed_values"].append(_json2wps_type(allow_value, "allowed_values"))
+                io_info["allowed_values"].append(_json2wps_field(allow_value, "allowed_values"))
         else:
             io_info["allowed_values"] = AnyValue
 
@@ -619,18 +664,18 @@ def _json2wps_io(io_info, io_select):
             fmt["mime_type"] = fmt.pop("mimeType")
             fmt.pop("maximumMegabytes", None)
             fmt.pop("default", None)
-        io_info["supported_formats"] = [_json2wps_type(fmt, "supported_formats") for fmt in formats]
+        io_info["supported_formats"] = [_json2wps_field(fmt, "supported_formats") for fmt in formats]
 
     # convert metadata objects
     metadata = _get_field(io_info, "metadata", search_variations=True, pop_found=True)
     if metadata is not null:
-        io_info["metadata"] = [_json2wps_type(meta, "metadata") for meta in metadata]
+        io_info["metadata"] = [_json2wps_field(meta, "metadata") for meta in metadata]
 
     # convert literal fields specified as is
     for field in ["identifier", "title", "abstract", "keywords"]:
         value = _get_field(io_info, field, search_variations=True, pop_found=True)
         if value is not null:
-            io_info[field] = _json2wps_type(value, field)
+            io_info[field] = _json2wps_field(value, field)
 
     # convert by type, add missing required arguments and
     # remove additional arguments according to each case
@@ -651,6 +696,7 @@ def _json2wps_io(io_info, io_select):
         if io_type == WPS_LITERAL:
             io_info.pop("supported_formats", None)
             io_info.pop("literalDataDomains", None)
+            io_info["data_type"] = _json2wps_datatype(io_info)
             return LiteralInput(**io_info)
     elif io_select == WPS_OUTPUT:
         io_info.pop("min_occurs", None)
@@ -665,6 +711,7 @@ def _json2wps_io(io_info, io_select):
             return BoundingBoxOutput(**io_info)
         if io_type == WPS_LITERAL:
             io_info.pop("supported_formats", None)
+            io_info["data_type"] = _json2wps_datatype(io_info)
             return LiteralOutput(**io_info)
     raise PackageTypeError("Unknown conversion from dict to WPS type (type={0}, mode={1}).".format(io_type, io_select))
 
@@ -734,10 +781,14 @@ def _get_field(io_object, field, search_variations=False, pop_found=False):
     return null
 
 
-def _set_field(io_object, field, value):
-    # type: (Union[BasicIO, Dict[str, Any]], str, Any) -> None
-    """Sets a field by name into various I/O object types."""
-    if value is not null:
+def _set_field(io_object, field, value, force=False):
+    # type: (Union[BasicIO, Dict[str, Any]], str, Any, Optional[bool]) -> None
+    """
+    Sets a field by name into various I/O object types.
+    Field value is set only if not ``null`` to avoid inserting data considered `invalid`.
+    If ``force=True``, verification of ``null`` value is ignored.
+    """
+    if value is not null or force:
         if isinstance(io_object, dict):
             io_object[field] = value
             return
@@ -750,8 +801,8 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
     Update I/O definitions to use for process creation and returned by GetCapabilities, DescribeProcess.
     If WPS I/O definitions where provided during deployment, update them with CWL-to-WPS converted I/O and
     preserve their optional WPS fields. Otherwise, provide minimum field requirements from CWL.
-    Removes any deployment WPS I/O definitions that don't match any CWL I/O by id.
-    Adds missing deployment WPS I/O definitions using expected CWL I/O ids.
+    Removes any deployment WPS I/O definitions that don't match any CWL I/O by ID.
+    Adds missing deployment WPS I/O definitions using expected CWL I/O IDs.
 
     :param wps_io_list: list of WPS I/O (as json) passed during process deployment.
     :param cwl_io_list: list of CWL I/O converted to WPS-like I/O for counter-validation.
@@ -1252,7 +1303,7 @@ class WpsPackage(Process):
 
         inputs = [_json2wps_io(i, WPS_INPUT) for i in inputs]
         outputs = [_json2wps_io(o, WPS_OUTPUT) for o in kw.pop("outputs", list())]
-        metadata = [_json2wps_type(meta_kw, "metadata") for meta_kw in kw.pop("metadata", list())]
+        metadata = [_json2wps_field(meta_kw, "metadata") for meta_kw in kw.pop("metadata", list())]
 
         super(WpsPackage, self).__init__(
             self._handler,
