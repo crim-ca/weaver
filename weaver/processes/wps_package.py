@@ -1654,7 +1654,7 @@ class WpsPackage(Process):
                 provider=params['provider'],
                 process=params['process'],
                 request=self.request,
-                update_status=update_status,
+                update_status=_update_status_dispatch,
             )
         elif requirement['class'].endswith(CWL_REQUIREMENT_APP_ESGF_CWT):
             from weaver.processes.esgf_process import ESGFProcess
@@ -1663,7 +1663,7 @@ class WpsPackage(Process):
                 provider=params['provider'],
                 process=params['process'],
                 request=self.request,
-                update_status=update_status,
+                update_status=_update_status_dispatch,
             )
         else:
             # implements both `PROCESS_APPLICATION` with `CWL_REQUIREMENT_APP_DOCKER` and `PROCESS_WORKFLOW`
