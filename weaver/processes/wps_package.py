@@ -566,7 +566,7 @@ def _json2wps_datatype(io_info):
     io_default = _get_field(io_info, "default", search_variations=True)
     io_allowed = _get_field(io_info, "allowed_values", search_variations=True)
     io_support = _get_field(io_info, "supported_values", search_variations=True)
-    if str(io_type).lower() == "literal":
+    if str(io_type).lower() == WPS_LITERAL:
         io_type = null
     for io_guess in [io_type, io_dtype, io_default, io_allowed, io_support]:
         if io_type:
@@ -746,11 +746,11 @@ def _wps2json_io(io_wps):
         io_wps_json["type"] = WPS_COMPLEX
 
     # minimum requirement of 1 format object which defines mime-type
-    if "formats" not in io_wps_json or not len(io_wps_json["formats"]):
-        io_wps_json["formats"] = [DefaultFormat.json]
-
-    for io_format in io_wps_json["formats"]:
-        transform_json(io_format, rename=rename, replace_values=replace_values, replace_func=replace_func)
+    if io_wps_json["type"] == WPS_COMPLEX:
+        if "formats" not in io_wps_json or not len(io_wps_json["formats"]):
+            io_wps_json["formats"] = [DefaultFormat.json]
+        for io_format in io_wps_json["formats"]:
+            transform_json(io_format, rename=rename, replace_values=replace_values, replace_func=replace_func)
 
     return io_wps_json
 
@@ -798,8 +798,9 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
     # type: (List[ANY_IO_Type], List[CWL_IO_Type], Union[WPS_INPUT, WPS_OUTPUT]) -> List[JSON_IO_Type]
     """
     Update I/O definitions to use for process creation and returned by GetCapabilities, DescribeProcess.
-    If WPS I/O definitions where provided during deployment, update them with CWL-to-WPS converted I/O and
-    preserve their optional WPS fields. Otherwise, provide minimum field requirements from CWL.
+    If WPS I/O definitions where provided during deployment, update them instead of `CWL-to-WPS` converted I/O.
+    Otherwise, provide minimum field requirements that can be retrieved from CWL definitions.
+
     Removes any deployment WPS I/O definitions that don't match any CWL I/O by ID.
     Adds missing deployment WPS I/O definitions using expected CWL I/O IDs.
 
@@ -842,9 +843,7 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
             cwl_field = _get_field(cwl_io, field_type)
             wps_field = _get_field(wps_io, field_type)
             # override if CWL->WPS was missing but is provided by WPS
-            if cwl_field is null:
-                continue
-            if type(cwl_field) != type(wps_field) or (cwl_field is not None and wps_field is None):
+            if wps_field == null or cwl_field == null or type(cwl_field) != type(wps_field) or cwl_field == wps_field:
                 continue
             _set_field(updated_io_list[-1], field_type, wps_field)
     return updated_io_list
@@ -908,7 +907,7 @@ def transform_json(json_data,               # type: ANY_IO_Type
 def _merge_package_inputs_outputs(wps_inputs_list,      # type: List[ANY_IO_Type]
                                   cwl_inputs_list,      # type: List[CWL_Input_Type]
                                   wps_outputs_list,     # type: List[ANY_IO_Type]
-                                  cwl_outputs_list      # type: List[CWL_Output_Type]
+                                  cwl_outputs_list,     # type: List[CWL_Output_Type]
                                   ):                    # type: (...) -> Tuple[List[JSON_IO_Type], List[JSON_IO_Type]]
     """
     Merges I/O definitions to use for process creation and returned by ``GetCapabilities``, ``DescribeProcess``

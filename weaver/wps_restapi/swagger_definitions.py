@@ -299,14 +299,13 @@ class DescriptionType(MappingSchema):
     links = JsonLinkList(missing=drop, title="links")
 
 
-class DataDescriptionType(DescriptionType):
+class InputDataDescriptionType(DescriptionType):
     minOccurs = SchemaNode(String(), missing=drop)
     maxOccurs = SchemaNode(String(), missing=drop)
-    formats = FormatDescriptionList()
 
 
 class ComplexInputType(MappingSchema):
-    pass
+    formats = FormatDescriptionList()
 
 
 class SupportedCrs(MappingSchema):
@@ -378,20 +377,46 @@ class LiteralDataDomainTypeList(SequenceSchema):
 
 
 class LiteralInputType(MappingSchema):
-    literalDataDomains = LiteralDataDomainTypeList()
+    literalDataDomains = LiteralDataDomainTypeList(missing=drop)  # if missing, assumed 'AnyValue'
 
 
-class InputType(OneOfMappingSchema, DataDescriptionType):
-    _one_of = (LiteralInputType,
-               BoundingBoxInputType,
-               ComplexInputType)  # must be last because it's the most permissive
+class InputType(OneOfMappingSchema, InputDataDescriptionType):
+    _one_of = (
+        LiteralInputType,
+        BoundingBoxInputType,
+        ComplexInputType,  # must be last because it's the most permissive
+    )
 
 
 class InputTypeList(SequenceSchema):
     input = InputType()
 
 
-class OutputDescription(DataDescriptionType):
+class LiteralOutputType(MappingSchema):
+    literalDataDomains = LiteralDataDomainTypeList()
+
+
+class BoundingBoxOutputType(MappingSchema):
+    supportedCRS = SupportedCrsList()
+
+
+class ComplexOutputType(MappingSchema):
+    formats = FormatDescriptionList()
+
+
+class OutputDataDescriptionType(DescriptionType):
+    pass
+
+
+class OutputType(OneOfMappingSchema, OutputDataDescriptionType):
+    _one_of = (
+        LiteralOutputType,
+        BoundingBoxOutputType,
+        ComplexOutputType,  # must be last because it's the most permissive
+    )
+
+
+class OutputDescription(OutputDataDescriptionType):
     pass
 
 

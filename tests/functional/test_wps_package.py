@@ -55,7 +55,21 @@ class WpsPackageAppTest(unittest.TestCase):
 
     def test_literal_io_from_package(self):
         cwl = {
-
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "inputs": {
+                "url": {
+                    "type": "string"
+                }
+            },
+            "outputs": {
+                "values": {
+                    "type": {
+                        "type": "array",
+                        "items": "float",
+                    }
+                }
+            }
         }
         body = {
             "processDescription": {
@@ -69,14 +83,36 @@ class WpsPackageAppTest(unittest.TestCase):
             "executionUnit": [{"unit": cwl}],
         }
         desc, pkg = self.deploy_process(body)
-        assert False
+        assert desc["process"]["id"] == self.__name__
+        assert desc["process"]["title"] == "some title"
+        assert desc["process"]["abstract"] == "this is a test"
+        assert isinstance(desc["process"]["inputs"], list)
+        assert len(desc["process"]["inputs"]) == 1
+        assert desc["process"]["inputs"][0]["id"] == "url"
+        assert desc["process"]["inputs"][0]["minOccurs"] == "1"
+        assert desc["process"]["inputs"][0]["maxOccurs"] == "1"
+        assert "format" not in desc["process"]["inputs"][0]
+        assert isinstance(desc["process"]["outputs"], list)
+        assert len(desc["process"]["outputs"]) == 1
+        assert desc["process"]["outputs"][0]["id"] == "values"
+        assert "minOccurs" not in desc["process"]["outputs"][0]
+        assert "maxOccurs" not in desc["process"]["outputs"][0]
+        assert "format" not in desc["process"]["outputs"][0]
+        expected_fields = {"id", "title", "abstract", "inputs", "outputs", "executeEndpoint"}
+        assert len(set(desc["process"].keys()) - expected_fields) == 0
 
+    # FIXME: implement
+    @pytest.mark.xfail(reason="not implemented")
     def test_literal_io_from_package_and_offering(self):
         raise NotImplementedError
 
+    # FIXME: implement
+    @pytest.mark.xfail(reason="not implemented")
     def test_complex_io_from_package(self):
         raise NotImplementedError
 
+    # FIXME: implement
+    @pytest.mark.xfail(reason="not implemented")
     def test_complex_io_from_package_and_offering(self):
         raise NotImplementedError
 
