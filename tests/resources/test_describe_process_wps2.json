@@ -10,12 +10,6 @@
                 "maxOccurs": "1",
                 "minOccurs": "1",
                 "keywords": [],
-                "formats": [
-                    {
-                        "mimeType": "text/plain",
-                        "default": false
-                    }
-                ]
             }
         ],
         "outputs": [
@@ -25,12 +19,6 @@
                 "minOccurs": "1",
                 "maxOccurs": "1",
                 "keywords": [],
-                "formats": [
-                    {
-                        "mimeType": "application/json",
-                        "default": true
-                    }
-                ]
             }
         ],
         "owsContext": {

@@ -7,7 +7,7 @@ from weaver.execute import (
     EXECUTE_TRANSMISSION_MODE_VALUE,
     EXECUTE_TRANSMISSION_MODE_REFERENCE,
 )
-from weaver.formats import CONTENT_TYPE_APP_XML, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN
+from weaver.formats import CONTENT_TYPE_APP_XML, CONTENT_TYPE_APP_JSON
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import STATUS_ACCEPTED
 from weaver.utils import fully_qualified_name, ows_context_href
@@ -51,6 +51,7 @@ TEST_REMOTE_PROCESS_WPS2_FILE = os.path.join(TEST_REMOTE_PROCESS_ROOT, "test_des
 
 
 def mock_remote_server_requests_wp1(test):
+    """Mocks above `remote` references to local resources."""
     # noinspection PyUnresolvedReferences, PyUnusedLocal
     def mock_requests_wps1(*args, **kwargs):
         """Mock ``requests`` responses fetching ``TEST_REMOTE_SERVER_URL`` WPS reference."""
@@ -314,15 +315,16 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert expected_process_id in response_json["process"]["id"]
         assert len(response_json["process"]["inputs"]) == 1
         assert response_json["process"]["inputs"][0]["id"] == "input-1"
-        assert response_json["process"]["inputs"][0]["minOccurs"] == "1"    # TODO: adjust `int` according to spec
-        assert response_json["process"]["inputs"][0]["maxOccurs"] == "1"    # TODO: adjust `int` according to spec
-        assert isinstance(response_json["process"]["inputs"][0]["formats"], list)
-        assert len(response_json["process"]["inputs"][0]["formats"]) == 1
-        assert response_json["process"]["inputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert response_json["process"]["inputs"][0]["minOccurs"] == "1"
+        assert response_json["process"]["inputs"][0]["maxOccurs"] == "1"
+        assert "formats" not in response_json["process"]["inputs"][0]   # literal data doesn't have "formats"
         assert len(response_json["process"]["outputs"]) == 1
         assert response_json["process"]["outputs"][0]["id"] == "output"
-        assert response_json["process"]["outputs"][0]["minOccurs"] == "1"   # TODO: adjust `int` according to spec
-        assert response_json["process"]["outputs"][0]["maxOccurs"] == "1"   # TODO: adjust `int` according to spec
+        assert "minOccurs" not in response_json["process"]["outputs"][0]
+        assert "maxOccurs" not in response_json["process"]["outputs"][0]
+        # TODO: handling multiple outputs (https://github.com/crim-ca/weaver/issues/25)
+        # assert response_json["process"]["outputs"][0]["minOccurs"] == "1"
+        # assert response_json["process"]["outputs"][0]["maxOccurs"] == "1"
         assert isinstance(response_json["process"]["outputs"][0]["formats"], list)
         assert len(response_json["process"]["outputs"][0]["formats"]) == 1
         assert response_json["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
