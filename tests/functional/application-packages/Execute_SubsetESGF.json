@@ -7,6 +7,14 @@
 			"href": "https://boreas.ouranos.ca/twitcher/ows/proxy/thredds/dodsC/birdhouse/nrcan/nrcan_northamerica_monthly/tasmin/nrcan_northamerica_monthly_2015_tasmin.nc"
 		},
 		{
+			"id": "variable",
+			"data": "tasmin"
+		},
+		{
+			"id": "api_key",
+			"data": "{{ api_key }}"
+		},
+		{
 			"id": "time_start",
 			"data": "0"
 		},
@@ -41,14 +49,6 @@
 		{
 			"id": "lon_crs",
 			"data": "values"
-		},
-		{
-			"id": "variable",
-			"data": "tasmin"
-		},
-		{
-			"id": "api_key",
-			"data": "{{ api_key }}"
 		}
   ],
   "outputs": [
