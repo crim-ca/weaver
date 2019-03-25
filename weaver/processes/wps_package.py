@@ -60,7 +60,7 @@ import os
 import six
 if TYPE_CHECKING:
     from weaver.status import AnyStatusType
-    from weaver.typedefs import ToolPathObjectType, CWLFactoryCallable, CWL, AnyKey, JSON, XML, Number
+    from weaver.typedefs import ToolPathObjectType, CWLFactoryCallable, CWL, AnyKey, AnyValue, JSON, XML, Number
     from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, Type, Union
     from cwltool.process import Process as ProcessCWL
     from pywps.app import WPSRequest
@@ -548,37 +548,58 @@ def _cwl2wps_io(io_info, io_select):
         return io_complex(**kw)
 
 
+def _any2wps_literal_datatype(io_type, is_value):
+    # type: (AnyValue, bool) -> Union[AnyStr, Type[null]]
+    """
+    Solves common data-type names to supported ones.
+    Verification is accomplished by name when ``is_value=False``, otherwise with python ``type`` when ``is_value=True``.
+    """
+    if isinstance(io_type, six.string_types):
+        if not is_value:
+            if io_type in ["date", "time", "dateTime", "anyURI"]:
+                return "string"
+            if io_type in ["scale", "angle", "float", "double"]:
+                return "float"
+            if io_type in ["int", "integer", "positiveInteger", "nonNegativeInteger"]:
+                return "integer"
+            if io_type in ["bool", "boolean"]:
+                return "boolean"
+        return "string"
+    if is_value and isinstance(io_type, bool):
+        return "boolean"
+    if is_value and isinstance(io_type, int):
+        return "integer"
+    if is_value and isinstance(io_type, float):
+        return "float"
+    return null
+
+
 def _json2wps_datatype(io_info):
     # type: (JSON_IO_Type) -> AnyStr
     """
     Guesses the literal data-type from I/O JSON information in order to allow creation of the corresponding I/O WPS.
     Defaults to ``string`` if no suitable guess can be accomplished.
     """
-    def _literal_to_str(t):
-        if isinstance(t, six.string_types):
-            return "string"
-        if isinstance(t, int):
-            return "integer"
-        if isinstance(t, float):
-            return "float"
-        return null
-
     io_type = _get_field(io_info, "type", search_variations=False, pop_found=True)
-    io_dtype = _get_field(io_info, "type", search_variations=True)
-    io_default = _get_field(io_info, "default", search_variations=True)
-    io_allowed = _get_field(io_info, "allowed_values", search_variations=True)
-    io_support = _get_field(io_info, "supported_values", search_variations=True)
     if str(io_type).lower() == WPS_LITERAL:
         io_type = null
-    for io_guess in [io_type, io_dtype, io_default, io_allowed, io_support]:
+    io_guesses = [
+        (io_type, False),
+        (_get_field(io_info, "type", search_variations=True), False),
+        (_get_field(io_info, "default", search_variations=True), True),
+        (_get_field(io_info, "allowed_values", search_variations=True), True),
+        (_get_field(io_info, "supported_values", search_variations=True), True)
+    ]
+    for io_guess, is_value in io_guesses:
         if io_type:
             break
         if isinstance(io_guess, list) and len(io_guess):
             io_guess = io_guess[0]
-        io_type = _literal_to_str(io_guess)
+        io_type = _any2wps_literal_datatype(io_guess, is_value)
     if not isinstance(io_type, six.string_types):
-        LOGGER.warning("Failed literal data-type guess, using default 'string' for [{}]".format(io_info))
-        io_type = "string"
+        LOGGER.warning("Failed literal data-type guess, using default 'string' for I/O '{}'."
+                       .format(_get_field(io_info, "identifier", search_variations=True)))
+        return "string"
     return io_type
 
 
@@ -1446,7 +1467,7 @@ class WpsPackage(Process):
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed preparing package logging.")
 
-            self.update_status("Launching package ...", PACKAGE_PROGRESS_LAUNCHING, STATUS_RUNNING)
+            self.update_status("Launching package...", PACKAGE_PROGRESS_LAUNCHING, STATUS_RUNNING)
 
             if get_weaver_configuration(get_settings(app)) == WEAVER_CONFIGURATION_EMS:
                 # EMS dispatch the execution to the ADES
@@ -1519,7 +1540,7 @@ class WpsPackage(Process):
                 raise self.exception_message(PackageExecutionError, exc, "Failed to load package inputs.")
 
             try:
-                self.update_status("Running package ...", PACKAGE_PROGRESS_RUN_CWL, STATUS_RUNNING)
+                self.update_status("Running package...", PACKAGE_PROGRESS_RUN_CWL, STATUS_RUNNING)
 
                 # Inputs starting with file:// will be interpreted as ems local files
                 # If OpenSearch obtain file:// references that must be passed to the ADES use an uri starting

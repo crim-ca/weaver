@@ -79,7 +79,7 @@ def check_status(url=None, response=None, sleep_secs=2, verify=False):
     """
     execution = WPSExecution()
     if response:
-        LOGGER.debug("using response document ...")
+        LOGGER.debug("using response document...")
         xml = response
     elif url:
         try:

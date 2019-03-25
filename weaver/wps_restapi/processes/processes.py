@@ -164,11 +164,11 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
             except Exception as exc:
                 num_retries += 1
                 task_logger.debug("Exception raised: {}".format(repr(exc)))
-                job.status_message = "Could not read status xml document for {}. Trying again ...".format(str(job))
+                job.status_message = "Could not read status xml document for {}. Trying again...".format(str(job))
                 job.save_log(errors=execution.errors, logger=task_logger)
                 sleep(1)
             else:
-                # job.status_message = "Update {} ...".format(str(job))
+                # job.status_message = "Update {}...".format(str(job))
                 # job.save_log(logger=task_logger)
                 num_retries = 0
                 run_step += 1

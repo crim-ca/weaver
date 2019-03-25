@@ -155,7 +155,6 @@ def load_pywps_cfg(container, config=None):
 def pywps_view(environ, start_response):
     """
     * TODO: add xml response renderer
-    * TODO: fix exceptions ... use OWSException (raise ...)
     """
     LOGGER.debug("pywps env: %s", environ.keys())
 

@@ -10,7 +10,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 from dateutil.parser import parse as dt_parse
 from datetime import datetime, timedelta
 # noinspection PyProtectedMember
-from logging import _levelNames, ERROR, INFO
+from logging import _levelNames, ERROR, INFO, getLogger
 from weaver.utils import (
     now,
     localize_datetime,  # for backward compatibility of previously saved jobs not time-locale-aware
@@ -25,9 +25,12 @@ from pywps import Process as ProcessWPS
 from typing import TYPE_CHECKING
 import six
 import uuid
+import traceback
 if TYPE_CHECKING:
     from weaver.typedefs import Number, LoggerType, CWL, JSON
     from typing import Any, AnyStr, Dict, List, Optional, Union
+
+LOGGER = getLogger(__name__)
 
 
 class Base(dict):
@@ -249,6 +252,8 @@ class Job(Base):
     @status.setter
     def status(self, status):
         # type: (AnyStr) -> None
+        if status == "accepted" and self.status == "running":
+            LOGGER.debug(traceback.extract_stack())
         if not isinstance(status, six.string_types):
             raise TypeError("Type 'str' is required for '{}.status'".format(type(self)))
         if status not in job_status_values:
