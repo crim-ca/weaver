@@ -351,27 +351,33 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.status_code == 200
         self.assert_deployed_wps2(resp.json, expected_process_id)
 
-    @pytest.mark.skip(reason="not implemented")
+    # FIXME: implement
+    @pytest.mark.xfail(reason="not implemented")
     def test_deploy_process_CWL_DockerRequirement_href(self):
         raise NotImplementedError
 
-    @pytest.mark.skip(reason="not implemented")
+    # FIXME: implement
+    @pytest.mark.xfail(reason="not implemented")
     def test_deploy_process_CWL_DockerRequirement_owsContext(self):
         raise NotImplementedError
 
-    @pytest.mark.skip(reason="not implemented")
+    # FIXME: implement
+    @pytest.mark.xfail(reason="not implemented")
     def test_deploy_process_CWL_DockerRequirement_executionUnit(self):
         raise NotImplementedError
 
-    @pytest.mark.skip(reason="not implemented")
+    # FIXME: implement
+    @pytest.mark.xfail(reason="not implemented")
     def test_deploy_process_CWL_WPS1Requirement_href(self):
         raise NotImplementedError
 
-    @pytest.mark.skip(reason="not implemented")
+    # FIXME: implement
+    @pytest.mark.xfail(reason="not implemented")
     def test_deploy_process_CWL_WPS1Requirement_owsContext(self):
         raise NotImplementedError
 
-    @pytest.mark.skip(reason="not implemented")
+    # FIXME: implement
+    @pytest.mark.xfail(reason="not implemented")
     def test_deploy_process_CWL_WPS1Requirement_executionUnit(self):
         raise NotImplementedError
 
@@ -427,15 +433,18 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, TEST_REMOTE_PROCESS_WPS1_ID)
 
-    @pytest.mark.skip(reason="not implemented")
+    # FIXME: implement
+    @pytest.mark.xfail(reason="not implemented")
     def test_deploy_process_WPS2_DescribeProcess_href(self):
         raise NotImplementedError
 
-    @pytest.mark.skip(reason="not implemented")
+    # FIXME: implement
+    @pytest.mark.xfail(reason="not implemented")
     def test_deploy_process_WPS2_DescribeProcess_owsContext(self):
         raise NotImplementedError
 
-    @pytest.mark.skip(reason="not implemented")
+    # FIXME: implement
+    @pytest.mark.xfail(reason="not implemented")
     def test_deploy_process_WPS2_DescribeProcess_executionUnit(self):
         raise NotImplementedError
 
