@@ -108,6 +108,14 @@ class WpsPackageAppTest(unittest.TestCase):
 
     # FIXME: implement
     @pytest.mark.xfail(reason="not implemented")
+    def test_complex_io_with_multiple_formats(self):
+        # TODO:
+        #   test should validate that different format types are set on different I/O variations simultaneously
+        #   (1 input with 1 format, 1 input with many & no default, 1 input with many & 1 default, same for outputs)
+        raise NotImplementedError
+
+    # FIXME: implement
+    @pytest.mark.xfail(reason="not implemented")
     def test_complex_io_from_package(self):
         raise NotImplementedError
 
@@ -155,12 +163,12 @@ class WpsPackageAppTest(unittest.TestCase):
         # process description I/O validation
         assert len(desc["process"]["inputs"]) == 2
         assert desc["process"]["inputs"][0]["id"] == "tasmax"
-        assert desc["process"]["inputs"][0]["title"] == "Resource"  # FIXME: returns 'tasmax' should use <Title>='Resource' field value
+        assert desc["process"]["inputs"][0]["title"] == "Resource"
         assert desc["process"]["inputs"][0]["abstract"] == "NetCDF Files or archive (tar/zip) containing netCDF files."
         assert desc["process"]["inputs"][0]["keywords"] == []
         assert desc["process"]["inputs"][0]["minOccurs"] == "1"
         assert desc["process"]["inputs"][0]["maxOccurs"] == "1000"
-        assert desc["process"]["inputs"][0]["formats"][0]["default"] is True  # FIXME: returns false, should be true because has <Default> section
+        assert desc["process"]["inputs"][0]["formats"][0]["default"] is True
         assert desc["process"]["inputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF
         assert desc["process"]["inputs"][0]["formats"][0]["encoding"] == "base64"
         assert desc["process"]["inputs"][1]["id"] == "freq"
@@ -169,25 +177,22 @@ class WpsPackageAppTest(unittest.TestCase):
         assert desc["process"]["inputs"][1]["keywords"] == []
         assert desc["process"]["inputs"][1]["minOccurs"] == "0"
         assert desc["process"]["inputs"][1]["maxOccurs"] == "1"
-        # FIXME: we should probably not return 'formats' section for data literal
-        assert desc["process"]["inputs"][1]["formats"][0]["default"] is True  # FIXME: returns false, should be true because has <Default> section
-        assert desc["process"]["inputs"][1]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
-        assert "encoding" not in desc["process"]["inputs"][1]["formats"][0]
+        assert "formats" not in desc["process"]["inputs"][1]
         assert len(desc["process"]["outputs"]) == 2
         assert desc["process"]["outputs"][0]["id"] == "output_netcdf"
-        assert desc["process"]["outputs"][0]["title"] == "output_netcdf"
+        assert desc["process"]["outputs"][0]["title"] == "Function output in netCDF"
         assert desc["process"]["outputs"][0]["abstract"] == "The indicator values computed on the original input grid."
         assert desc["process"]["outputs"][0]["keywords"] == []
-        assert desc["process"]["outputs"][0]["minOccurs"] == "1"
-        assert desc["process"]["outputs"][0]["maxOccurs"] == "1"
-        assert desc["process"]["outputs"][0]["formats"][0]["default"] is True  # FIXME: returns false, should be true because has <Default> section
+        assert "minOccurs" not in desc["process"]["outputs"][0]
+        assert "maxOccurs" not in desc["process"]["outputs"][0]
+        assert desc["process"]["outputs"][0]["formats"][0]["default"] is True
         assert desc["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF
         assert desc["process"]["outputs"][0]["formats"][0]["encoding"] == "base64"
         assert desc["process"]["outputs"][1]["id"] == "output_log"
-        assert desc["process"]["outputs"][1]["title"] == "output_log"
+        assert desc["process"]["outputs"][1]["title"] == "Logging information"
         assert desc["process"]["outputs"][1]["abstract"] == "Collected logs during process run."
         assert desc["process"]["outputs"][1]["keywords"] == []
-        assert desc["process"]["outputs"][1]["minOccurs"] == "1"
-        assert desc["process"]["outputs"][1]["maxOccurs"] == "1"
-        assert desc["process"]["outputs"][1]["formats"][0]["default"] is True  # FIXME: returns false, should be true because has <Default> section
+        assert "minOccurs" not in desc["process"]["outputs"][1]
+        assert "maxOccurs" not in desc["process"]["outputs"][1]
+        assert desc["process"]["outputs"][1]["formats"][0]["default"] is True
         assert desc["process"]["outputs"][1]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN

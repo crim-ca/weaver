@@ -8,7 +8,7 @@ from weaver.config import WEAVER_CONFIGURATION_EMS
 from weaver.wps_restapi.utils import wps_restapi_base_path
 from weaver.status import job_status_categories, STATUS_ACCEPTED, STATUS_COMPLIANT_OGC
 from weaver.sort import job_sort_values, quote_sort_values, SORT_CREATED, SORT_ID, SORT_PROCESS
-from weaver.formats import CONTENT_TYPE_TEXT_HTML, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
+from weaver.formats import CONTENT_TYPE_TEXT_HTML, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
 from weaver.execute import (
     EXECUTE_MODE_AUTO,
     EXECUTE_MODE_ASYNC,
@@ -238,7 +238,7 @@ class LandingPage(MappingSchema):
 
 
 class Format(MappingSchema):
-    mimeType = SchemaNode(String())
+    mimeType = SchemaNode(String(), default=CONTENT_TYPE_TEXT_PLAIN)
     schema = SchemaNode(String(), missing=drop)
     encoding = SchemaNode(String(), missing=drop)
 
@@ -355,7 +355,7 @@ class AllowedRanges(MappingSchema):
 
 
 class AnyValue(MappingSchema):
-    anyValue = SchemaNode(Boolean(), missing=drop)
+    anyValue = SchemaNode(Boolean(), missing=drop, default=True)
 
 
 class ValuesReference(MappingSchema):
@@ -377,14 +377,14 @@ class LiteralDataDomainTypeList(SequenceSchema):
 
 
 class LiteralInputType(MappingSchema):
-    literalDataDomains = LiteralDataDomainTypeList(missing=drop)  # if missing, assumed 'AnyValue'
+    literalDataDomains = LiteralDataDomainTypeList(missing=drop)
 
 
 class InputType(OneOfMappingSchema, InputDataDescriptionType):
     _one_of = (
-        LiteralInputType,
         BoundingBoxInputType,
-        ComplexInputType,  # must be last because it's the most permissive
+        ComplexInputType,  # should be 2nd to last because very permission, but requires format at least
+        LiteralInputType,  # must be last because it's the most permissive (all can default if omitted)
     )
 
 
@@ -393,7 +393,7 @@ class InputTypeList(SequenceSchema):
 
 
 class LiteralOutputType(MappingSchema):
-    literalDataDomains = LiteralDataDomainTypeList()
+    literalDataDomains = LiteralDataDomainTypeList(missing=drop)
 
 
 class BoundingBoxOutputType(MappingSchema):
@@ -410,18 +410,14 @@ class OutputDataDescriptionType(DescriptionType):
 
 class OutputType(OneOfMappingSchema, OutputDataDescriptionType):
     _one_of = (
-        LiteralOutputType,
         BoundingBoxOutputType,
-        ComplexOutputType,  # must be last because it's the most permissive
+        ComplexOutputType,  # should be 2nd to last because very permission, but requires format at least
+        LiteralOutputType,  # must be last because it's the most permissive (all can default if omitted)
     )
 
 
-class OutputDescription(OutputDataDescriptionType):
-    pass
-
-
 class OutputDescriptionList(SequenceSchema):
-    item = OutputDescription()
+    item = OutputType()
 
 
 class JobExecuteModeEnum(SchemaNode):

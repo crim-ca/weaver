@@ -126,7 +126,7 @@ WPS_FIELD_MAPPING = {
     "allowed_values": ["AllowedValues", "allowedValues", "allowedvalues", "Allowed_Values", "Allowedvalues"],
     "allowed_collections": ["AllowedCollections", "allowedCollections", "allowedcollections", "Allowed_Collections",
                             "Allowedcollections"],
-    "default": ["default_value", "defaultValue", "DefaultValue", "Default"],
+    "default": ["default_value", "defaultValue", "DefaultValue", "Default", "data_format"],
     "supported_values": ["SupportedValues", "supportedValues", "supportedvalues", "Supported_Values"],
     "supported_formats": ["SupportedFormats", "supportedFormats", "supportedformats", "Supported_Formats", "formats"],
     "additional_parameters": ["AdditionalParameters", "additionalParameters", "additionalparameters",
@@ -134,6 +134,8 @@ WPS_FIELD_MAPPING = {
     "type": ["Type", "data_type", "dataType", "DataType", "Data_Type"],
     "min_occurs": ["minOccurs", "MinOccurs", "Min_Occurs", "minoccurs"],
     "max_occurs": ["maxOccurs", "MaxOccurs", "Max_Occurs", "maxoccurs"],
+    "mime_type": ["mimeType", "MimeType", "mime-type", "Mime-Type", "MIME-Type"],
+    "encoding": ["Encoding"],
 }
 # WPS fields that contain a structure corresponding to `Format` object
 #   - keys must match `WPS_FIELD_MAPPING` keys
@@ -660,7 +662,7 @@ def _json2wps_io(io_info, io_select):
     formats = _get_field(io_info, "supported_formats", search_variations=True, pop_found=True)
     if formats is not null:
         for fmt in formats:
-            fmt["mime_type"] = fmt.pop("mimeType")
+            fmt["mime_type"] = _get_field(fmt, "mime_type", search_variations=True, pop_found=True)
             fmt.pop("maximumMegabytes", None)
             fmt.pop("default", None)
         io_info["supported_formats"] = [_json2wps_field(fmt, "supported_formats") for fmt in formats]
@@ -752,6 +754,16 @@ def _wps2json_io(io_wps):
         for io_format in io_wps_json["formats"]:
             transform_json(io_format, rename=rename, replace_values=replace_values, replace_func=replace_func)
 
+        # set 'default' format if it matches perfectly, or if only mime-type matches and it is the only available one
+        # (this avoid 'encoding' possibly not matching due to CWL not providing this information)
+        io_default = _get_field(io_wps_json, "default", search_variations=True)
+        for io_format in io_wps_json["formats"]:
+            io_format["default"] = (io_default != null and _matching_formats(io_format, io_default))
+        if io_default and len(io_wps_json["formats"]) == 1 and not io_wps_json["formats"][0]["default"]:
+            io_default_mime_type = _get_field(io_default, "mime_type", search_variations=True)
+            io_single_fmt_mime_type = _get_field(io_wps_json["formats"][0], "mime_type", search_variations=True)
+            io_wps_json["formats"][0]["default"] = (io_default_mime_type == io_single_fmt_mime_type)
+
     return io_wps_json
 
 
@@ -792,6 +804,33 @@ def _set_field(io_object, field, value, force=False):
             io_object[field] = value
             return
         setattr(io_object, field, value)
+
+
+def _matching_formats(format1, format2):
+    # type: (Union[Format, JSON], Union[Format, JSON]) -> bool
+    """Verifies for matching formats."""
+    mime_type1 = _get_field(format1, "mime_type", search_variations=True)
+    mime_type2 = _get_field(format2, "mime_type", search_variations=True)
+    encoding1 = _get_field(format1, "encoding", search_variations=True)
+    encoding2 = _get_field(format2, "encoding", search_variations=True)
+    if mime_type1 == mime_type2 and encoding1 == encoding2 and \
+            all(f != null for f in [mime_type1, mime_type2, encoding1, encoding2]):
+        return True
+    return False
+
+
+def _are_different_and_set(value1, value2):
+    # type: (Any, Any) -> bool
+    """
+    Compares two values and returns ``True`` only if both are not ``null``, are of same ``type`` and of different value.
+    """
+    if (value1 == null and value2 == null) or value1 == value2:
+        return False
+    type1 = str if isinstance(value1, six.string_types) else type(value1)
+    type2 = str if isinstance(value2, six.string_types) else type(value2)
+    if type1 != type2:
+        return False
+    return True
 
 
 def _merge_package_io(wps_io_list, cwl_io_list, io_select):
@@ -842,10 +881,9 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
         for field_type in WPS_FIELD_MAPPING:
             cwl_field = _get_field(cwl_io, field_type)
             wps_field = _get_field(wps_io, field_type)
-            # override if CWL->WPS was missing but is provided by WPS
-            if wps_field == null or cwl_field == null or type(cwl_field) != type(wps_field) or cwl_field == wps_field:
-                continue
-            _set_field(updated_io_list[-1], field_type, wps_field)
+            # override if CWL->WPS was missing but is provided by WPS, or if both are provided but different (keep WPS)
+            if _are_different_and_set(wps_field, cwl_field) or (wps_field != null and cwl_field == null):
+                _set_field(updated_io_list[-1], field_type, wps_field)
     return updated_io_list
 
 
