@@ -37,6 +37,7 @@ def _is_netcdf_url(url):
 def j2n(json_file, output_dir):
     # type: (argparse.FileType, AnyStr) -> None
     LOGGER.info("Process '{}' execution starting...".format(PACKAGE_NAME))
+    LOGGER.debug("Process '{}' output directory: [{}].".format(PACKAGE_NAME, output_dir))
     if not os.path.isdir(output_dir):
         raise ValueError("Output dir [{}] does not exist.".format(output_dir))
     json_content = json.load(json_file)

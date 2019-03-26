@@ -1476,7 +1476,8 @@ class WpsPackage(Process):
 
             self.update_status("Launching package...", PACKAGE_PROGRESS_LAUNCHING, STATUS_RUNNING)
 
-            if get_weaver_configuration(get_settings(app)) == WEAVER_CONFIGURATION_EMS:
+            settings = get_settings(app)
+            if get_weaver_configuration(settings) == WEAVER_CONFIGURATION_EMS:
                 # EMS dispatch the execution to the ADES
                 loading_context = LoadingContext()
                 loading_context.construct_tool_object = self.make_tool
@@ -1484,7 +1485,9 @@ class WpsPackage(Process):
                 # ADES execute the cwl locally
                 loading_context = None
 
-            runtime_context = RuntimeContext(kwargs={"no_read_only": True, "outdir": self.workdir})
+            wps_out_dir_prefix = os.path.join(get_wps_output_dir(settings), "tmp")
+            runtime_context = RuntimeContext(kwargs={
+                "no_read_only": True, "outdir": self.workdir, "tmp_outdir_prefix": wps_out_dir_prefix})
             try:
                 self.package_inst, _, self.step_packages = _load_package_content(self.package,
                                                                                  package_name=self.package_id,
