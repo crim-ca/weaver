@@ -8,18 +8,37 @@ if TYPE_CHECKING:
     from pyramid.registry import Registry
     from pyramid.request import Request as PyramidRequest
     from pyramid.config import Configurator
+    from celery import Celery
     from requests.structures import CaseInsensitiveDict
+    # noinspection PyUnresolvedReferences
+    from cwltool.factory import Callable as CWLFactoryCallable
     # noinspection PyPackageRequirements
     from webtest.response import TestResponse
     from pywps.app import WPSRequest
+    # noinspection PyProtectedMember, PyUnresolvedReferences
+    from logging import _loggerClass as LoggerType
     from typing import Any, AnyStr, Callable, Dict, List, Tuple, Union
+    import lxml.etree
+    import os
+    if hasattr(os, 'PathLike'):
+        FileSystemPathType = Union[os.PathLike, AnyStr]
+    else:
+        FileSystemPathType = AnyStr
 
-    JsonField = Union[AnyStr, int, float, bool, None]
-    JsonBody = Dict[AnyStr, Union[JsonField, Dict[AnyStr, Any], List[Any]]]
+    Number = Union[int, float]
+    AnyValue = Union[AnyStr, Number, bool, None]
+    AnyKey = Union[AnyStr, int]
+    JSON = Dict[AnyKey, Union[AnyValue, Dict[AnyKey, 'JSON'], List['JSON']]]
+    CWL = Dict[{"cwlVersion": AnyStr, "class": AnyStr, "inputs": JSON, "outputs": JSON}]
+    # noinspection PyProtectedMember
+    XML = lxml.etree._Element
 
-    SettingValue = Union[AnyStr, int, float, bool, None]
+    AnyContainer = Union[Configurator, Registry, PyramidRequest, Celery]
+    SettingValue = Union[AnyStr, Number, bool, None]
     SettingsType = Dict[AnyStr, SettingValue]
-    AnySettingsContainer = Union[Configurator, Registry, PyramidRequest, SettingsType]
+    AnySettingsContainer = Union[AnyContainer, SettingsType]
+    AnyRegistryContainer = AnyContainer
+    AnyDatabaseContainer = AnyContainer
 
     CookiesType = Dict[AnyStr, AnyStr]
     HeadersType = Dict[AnyStr, AnyStr]

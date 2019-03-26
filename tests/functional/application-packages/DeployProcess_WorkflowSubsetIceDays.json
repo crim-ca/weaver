@@ -1,0 +1,15 @@
+{
+    "processDescription": {
+        "process": {
+            "id": "WorkflowSubsetIceDays",
+            "title": "Workflow of Subset and Ice Days",
+            "abstract": "Workflow that first executes a bounding box subset of a region and afterwards calculates days with ice within the obtained region."
+        }
+    },
+    "executionUnit": [
+        {
+            "href": "tests/functional/application-packages/workflow_subset_ice_days.cwl"
+        }
+    ],
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow"
+}

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- PyWPS 4.3.dev0 -->
+<wps:ProcessDescriptions xmlns:wps="http://www.opengis.net/wps/1.0.0" xmlns:ows="http://www.opengis.net/ows/1.1" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 ../wpsDescribeProcess_response.xsd" service="WPS" version="1.0.0" xml:lang="en-US">
+    <ProcessDescription wps:processVersion="0.1" storeSupported="true" statusSupported="true">
+        <ows:Identifier>ice_days</ows:Identifier>
+        <ows:Title>Number of Ice Days (Tmax &lt; 0C)</ows:Title>
+        <ows:Abstract>Number of days where daily maximum temperatures are below 0.</ows:Abstract>
+        <DataInputs>
+            <Input minOccurs="1" maxOccurs="1000">
+                <ows:Identifier>tasmax</ows:Identifier>
+                <ows:Title>Resource</ows:Title>
+                <ows:Abstract>NetCDF Files or archive (tar/zip) containing netCDF files.</ows:Abstract>
+                <ComplexData maximumMegabytes="200">
+                    <Default>
+                        <Format>
+                            <MimeType>application/x-netcdf</MimeType>
+                            <Encoding>base64</Encoding>
+                        </Format>
+                    </Default>
+                    <Supported>
+                        <Format>
+                            <MimeType>application/x-netcdf</MimeType>
+                            <Encoding>base64</Encoding>
+                        </Format>
+                    </Supported>
+                </ComplexData>
+            </Input>
+            <Input minOccurs="0" maxOccurs="1">
+                <ows:Identifier>freq</ows:Identifier>
+                <ows:Title>Frequency</ows:Title>
+                <ows:Abstract>Resampling frequency</ows:Abstract>
+                <LiteralData>
+                <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                <ows:AllowedValues>
+                    <ows:Value>YS</ows:Value>
+                    <ows:Value>MS</ows:Value>
+                    <ows:Value>QS-DEC</ows:Value>
+                    <ows:Value>AS-JUL</ows:Value>
+                </ows:AllowedValues>
+                <DefaultValue>YS</DefaultValue>
+                </LiteralData>
+            </Input>
+        </DataInputs>
+        <ProcessOutputs>
+            <Output>
+                <ows:Identifier>output_netcdf</ows:Identifier>
+                <ows:Title>Function output in netCDF</ows:Title>
+                <ows:Abstract>The indicator values computed on the original input grid.</ows:Abstract>
+                <ComplexOutput>
+                    <Default>
+                        <Format>
+                            <MimeType>application/x-netcdf</MimeType>
+                            <Encoding>base64</Encoding>
+                        </Format>
+                    </Default>
+                    <Supported>
+                        <Format>
+                            <MimeType>application/x-netcdf</MimeType>
+                            <Encoding>base64</Encoding>
+                        </Format>
+                    </Supported>
+                </ComplexOutput>
+            </Output>
+            <Output>
+                <ows:Identifier>output_log</ows:Identifier>
+                <ows:Title>Logging information</ows:Title>
+                <ows:Abstract>Collected logs during process run.</ows:Abstract>
+                <ComplexOutput>
+                    <Default>
+                        <Format>
+                            <MimeType>text/plain</MimeType>
+                        </Format>
+                    </Default>
+                    <Supported>
+                        <Format>
+                            <MimeType>text/plain</MimeType>
+                        </Format>
+                    </Supported>
+                </ComplexOutput>
+            </Output>
+        </ProcessOutputs>
+    </ProcessDescription>
+</wps:ProcessDescriptions>

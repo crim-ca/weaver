@@ -1,0 +1,13 @@
+{
+    "processDescription": {
+        "process": {
+            "id": "ColibriFlyingpigeon_SubsetBbox"
+        }
+    },
+    "executionUnit": [
+        {
+            "href": "https://colibri.crim.ca/twitcher/ows/proxy/flyingpigeon/wps?service=WPS&request=describeprocess&version=1.0.0&identifier=subset_bbox"
+        }
+    ],
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
+}

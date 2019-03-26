@@ -5,22 +5,22 @@ if TYPE_CHECKING:
     from typing import AnyStr, Optional, Union
     AnyStatusType = Union[AnyStr, int]
 
-STATUS_COMPLIANT_OGC = 'STATUS_COMPLIANT_OGC'
-STATUS_COMPLIANT_PYWPS = 'STATUS_COMPLIANT_PYWPS'
-STATUS_COMPLIANT_OWSLIB = 'STATUS_COMPLIANT_OWSLIB'
-STATUS_CATEGORY_FINISHED = 'STATUS_CATEGORY_FINISHED'
-STATUS_CATEGORY_RUNNING = 'STATUS_CATEGORY_RUNNING'
-STATUS_CATEGORY_FAILED = 'STATUS_CATEGORY_FAILED'
+STATUS_COMPLIANT_OGC = "STATUS_COMPLIANT_OGC"
+STATUS_COMPLIANT_PYWPS = "STATUS_COMPLIANT_PYWPS"
+STATUS_COMPLIANT_OWSLIB = "STATUS_COMPLIANT_OWSLIB"
+STATUS_CATEGORY_FINISHED = "STATUS_CATEGORY_FINISHED"
+STATUS_CATEGORY_RUNNING = "STATUS_CATEGORY_RUNNING"
+STATUS_CATEGORY_FAILED = "STATUS_CATEGORY_FAILED"
 
-STATUS_ACCEPTED = 'accepted'
-STATUS_STARTED = 'started'
-STATUS_PAUSED = 'paused'
-STATUS_SUCCEEDED = 'succeeded'
-STATUS_FAILED = 'failed'
-STATUS_RUNNING = 'running'
-STATUS_DISMISSED = 'dismissed'
-STATUS_EXCEPTION = 'exception'
-STATUS_UNKNOWN = 'unknown'  # don't include in any below collections
+STATUS_ACCEPTED = "accepted"
+STATUS_STARTED = "started"
+STATUS_PAUSED = "paused"
+STATUS_SUCCEEDED = "succeeded"
+STATUS_FAILED = "failed"
+STATUS_RUNNING = "running"
+STATUS_DISMISSED = "dismissed"
+STATUS_EXCEPTION = "exception"
+STATUS_UNKNOWN = "unknown"  # don't include in any below collections
 
 job_status_values = frozenset([
     STATUS_ACCEPTED,
@@ -72,7 +72,7 @@ def map_status(wps_status, compliant=STATUS_COMPLIANT_OGC):
         return map_status(STATUS_PYWPS_MAP[wps_status], compliant)
 
     # remove 'Process' from OWSLib statuses and lower for every compliant
-    job_status = wps_status.lower().replace('process', '')
+    job_status = wps_status.lower().replace("process", "")
 
     if compliant == STATUS_COMPLIANT_OGC:
         if job_status in job_status_categories[STATUS_CATEGORY_RUNNING]:
@@ -95,7 +95,7 @@ def map_status(wps_status, compliant=STATUS_COMPLIANT_OGC):
 
     # TODO: patch for Geomatys not conforming to the status schema
     #       (status are upper cases and succeeded process are indicated as 'successful')
-    if job_status == 'successful':
+    if job_status == "successful":
         job_status = STATUS_SUCCEEDED
 
     if job_status in job_status_values:

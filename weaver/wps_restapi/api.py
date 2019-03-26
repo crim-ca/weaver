@@ -1,8 +1,9 @@
 from weaver.__meta__ import __version__ as weaver_version
-from weaver.utils import get_settings
+from weaver.utils import get_settings, get_header
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.colander_one_of import CustomTypeConversionDispatcher
-from weaver.wps_restapi.utils import wps_restapi_base_url, wps_restapi_base_path, get_header, CONTENT_TYPE_JSON
+from weaver.wps_restapi.utils import get_wps_restapi_base_url, wps_restapi_base_path, OUTPUT_FORMAT_JSON
+from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.owsexceptions import OWSException
 from six.moves.urllib.parse import urlparse
 from cornice_swagger import CorniceSwagger
@@ -28,12 +29,12 @@ import logging
 import six
 import os
 if TYPE_CHECKING:
-    from weaver.typedefs import JsonBody
+    from weaver.typedefs import JSON
 
 LOGGER = logging.getLogger(__name__)
 
 
-@sd.api_frontpage_service.get(tags=[sd.api_tag], renderer='json',
+@sd.api_frontpage_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
                               schema=sd.FrontpageEndpoint(), response_schemas=sd.get_api_frontpage_responses)
 def api_frontpage(request):
     """Frontpage of weaver."""
@@ -47,38 +48,38 @@ def api_frontpage(request):
     weaver_url = get_weaver_url(settings)
     weaver_config = get_weaver_configuration(settings)
 
-    weaver_api = asbool(settings.get('weaver.wps_restapi'))
-    weaver_api_url = wps_restapi_base_url(settings) if weaver_api else None
+    weaver_api = asbool(settings.get("weaver.wps_restapi"))
+    weaver_api_url = get_wps_restapi_base_url(settings) if weaver_api else None
     weaver_api_doc = weaver_api_url + sd.api_swagger_ui_uri if weaver_api else None
-    weaver_api_ref = settings.get('weaver.wps_restapi_ref', None) if weaver_api else None
-    weaver_wps = asbool(settings.get('weaver.wps'))
+    weaver_api_ref = settings.get("weaver.wps_restapi_ref", None) if weaver_api else None
+    weaver_wps = asbool(settings.get("weaver.wps"))
     weaver_wps_url = weaver_url + get_wps_path(settings) if weaver_wps else None
 
     return {
-        'message': 'Weaver Information',
-        'configuration': weaver_config,
-        'parameters': [
-            {'name': 'api', 'enabled': weaver_api,
-             'url': weaver_api_url,
-             'doc': weaver_api_doc,
-             'ref': weaver_api_ref},
-            {'name': 'wps', 'enabled': weaver_wps,
-             'url': weaver_wps_url},
+        "message": "Weaver Information",
+        "configuration": weaver_config,
+        "parameters": [
+            {"name": "api", "enabled": weaver_api,
+             "url": weaver_api_url,
+             "doc": weaver_api_doc,
+             "ref": weaver_api_ref},
+            {"name": "wps", "enabled": weaver_wps,
+             "url": weaver_wps_url},
         ]
     }
 
 
 # noinspection PyUnusedLocal
-@sd.api_versions_service.get(tags=[sd.api_tag], renderer='json',
+@sd.api_versions_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
                              schema=sd.VersionsEndpoint(), response_schemas=sd.get_api_versions_responses)
 def api_versions(request):
     # type: (Request) -> HTTPException
     """weaver versions information."""
-    weaver_info = {'name': 'weaver', 'version': weaver_version, 'type': 'api'}
+    weaver_info = {'name': 'weaver', 'version': weaver_version, "type": "api"}
     return HTTPOk(json={'versions': [weaver_info]})
 
 
-@sd.api_swagger_json_service.get(tags=[sd.api_tag], renderer='json',
+@sd.api_swagger_json_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
                                  schema=sd.SwaggerJSONEndpoint(), response_schemas=sd.get_api_swagger_json_responses)
 def api_swagger_json(request, use_docstring_summary=True):
     # type: (Request, bool) -> dict
@@ -87,32 +88,32 @@ def api_swagger_json(request, use_docstring_summary=True):
     swagger = CorniceSwagger(get_services())
     # function docstrings are used to create the route's summary in Swagger-UI
     swagger.summary_docstrings = use_docstring_summary
-    swagger_base_spec = {'schemes': [request.scheme]}
+    swagger_base_spec = {"schemes": [request.scheme]}
 
     # obtain 'server' host and api-base-path, which doesn't correspond necessarily to the app's host and path
     # ex: 'server' adds '/weaver' with proxy redirect before API routes
-    weaver_server_url = os.getenv('WEAVER_URL')
+    weaver_server_url = os.getenv("WEAVER_URL")
     LOGGER.debug("Request URL:  {}".format(request.url))
     LOGGER.debug("WEAVER_URL: {}".format(weaver_server_url))
     if weaver_server_url:
         weaver_parsed_url = urlparse(weaver_server_url)
-        swagger_base_spec['host'] = weaver_parsed_url.netloc
+        swagger_base_spec["host"] = weaver_parsed_url.netloc
         swagger_base_path = weaver_parsed_url.path
     else:
-        swagger_base_spec['host'] = request.host
+        swagger_base_spec["host"] = request.host
         swagger_base_path = sd.api_frontpage_uri
     swagger.swagger = swagger_base_spec
     return swagger.generate(title=sd.API_TITLE, version=weaver_version, base_path=swagger_base_path)
 
 
-@sd.api_swagger_ui_service.get(tags=[sd.api_tag],
+@sd.api_swagger_ui_service.get(tags=[sd.TAG_API],
                                schema=sd.SwaggerUIEndpoint(), response_schemas=sd.get_api_swagger_ui_responses)
 def api_swagger_ui(request):
     """weaver REST API swagger-ui schema documentation (this page)."""
     json_path = wps_restapi_base_path(request.registry.settings) + sd.api_swagger_json_uri
     json_path = json_path.lstrip('/')   # if path starts by '/', swagger-ui doesn't find it on remote
-    data_mako = {'api_title': sd.API_TITLE, 'api_swagger_json_path': json_path}
-    return render_to_response('templates/swagger_ui.mako', data_mako, request=request)
+    data_mako = {"api_title": sd.API_TITLE, "api_swagger_json_path": json_path}
+    return render_to_response("templates/swagger_ui.mako", data_mako, request=request)
 
 
 def ows_json_format(function):
@@ -120,11 +121,12 @@ def ows_json_format(function):
     def format_response_details(response, request):
         # type: (Response, Request) -> HTTPException
         http_response = function(request)
-        if any([CONTENT_TYPE_JSON in get_header('Content-Type', http_response.headers),
-                CONTENT_TYPE_JSON in get_header('Accept', request.headers)]):
-            body = OWSException.json_formatter(http_response.status, response.message or '',
+        http_headers = get_header("Content-Type", http_response.headers) or []
+        req_headers = get_header("Accept", request.headers) or []
+        if any([CONTENT_TYPE_APP_JSON in http_headers, CONTENT_TYPE_APP_JSON in req_headers]):
+            body = OWSException.json_formatter(http_response.status, response.message or "",
                                                http_response.title, request.environ)
-            body['detail'] = get_request_info(request)
+            body["detail"] = get_request_info(request)
             http_response._json = body
         if http_response.status_code != response.status_code:
             raise http_response  # re-raise if code was fixed
@@ -147,7 +149,7 @@ def not_found_or_method_not_allowed(request):
     # noinspection PyProtectedMember
     if isinstance(request.exception, PredicateMismatch) and request.method not in request.exception._safe_methods:
         http_err = HTTPMethodNotAllowed
-        http_msg = ''  # auto-generated by HTTPMethodNotAllowed
+        http_msg = ""  # auto-generated by HTTPMethodNotAllowed
     else:
         http_err = HTTPNotFound
         http_msg = str(request.exception)
@@ -176,23 +178,23 @@ def unauthorized_or_forbidden(request):
 
 
 def get_request_info(request, detail=None):
-    # type: (Request, Optional[AnyStr]) -> JsonBody
+    # type: (Request, Optional[AnyStr]) -> JSON
     """Provided additional response details based on the request and execution stack on failure."""
     content = {u'route': str(request.upath_info), u'url': str(request.url), u'method': request.method}
     if isinstance(detail, six.string_types):
-        content.update({'detail': detail})
-    if hasattr(request, 'exception'):
+        content.update({"detail": detail})
+    if hasattr(request, "exception"):
         # handle error raised simply by checking for 'json' property in python 3 when body is invalid
         has_json = False
         try:
-            has_json = hasattr(request.exception, 'json')
+            has_json = hasattr(request.exception, "json")
         except JSONDecodeError:
             pass
         if has_json and isinstance(request.exception.json, dict):
             content.update(request.exception.json)
-        elif isinstance(request.exception, HTTPServerError) and hasattr(request.exception, 'message'):
-            content.update({u'exception': str(request.exception.message)})
-    elif hasattr(request, 'matchdict'):
-        if request.matchdict is not None and request.matchdict != '':
+        elif isinstance(request.exception, HTTPServerError) and hasattr(request.exception, "message"):
+            content.update({u"exception": str(request.exception.message)})
+    elif hasattr(request, "matchdict"):
+        if request.matchdict is not None and request.matchdict != "":
             content.update(request.matchdict)
     return content

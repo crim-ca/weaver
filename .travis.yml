@@ -19,9 +19,9 @@ if: branch = master OR tag IS present
 services:
   - mongodb
 before_install:
-  - source weaver/tests/travis-ci/weaver.env
-  - cp -f weaver/tests/travis-ci/custom.cfg ./
-  - cp -f weaver/tests/travis-ci/data_sources.json ./
+  - source tests/travis-ci/weaver.env
+  - cp -f tests/travis-ci/custom.cfg ./
+  - cp -f tests/travis-ci/data_sources.json ./
 install:
   - make install
   - make install-dev

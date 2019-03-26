@@ -1,0 +1,51 @@
+<wps:ProcessDescriptions
+        xmlns:gml="http://www.opengis.net/gml"
+        xmlns:ows="http://www.opengis.net/ows/1.1"
+        xmlns:wps="http://www.opengis.net/wps/1.0.0"
+        xmlns:xlink="http://www.w3.org/1999/xlink"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/wps/1.0.0/wpsDescribeProcess_response.xsd"
+        service="WPS" version="1.0.0" xml:lang="en-US">
+    <ProcessDescription wps:processVersion="0.5" storeSupported="true" statusSupported="true">
+        <ows:Identifier>test-remote-process-wps1</ows:Identifier>
+        <ows:Title>Test Remote Process WPS1</ows:Title>
+        <ows:Abstract>Testing WPS-1 dummy remote process description.</ows:Abstract>
+        <ows:Metadata
+            xlink:href="https://github.com/crim-ca/weaver"
+            xlink:title="Weaver"
+            xlink:type="simple"/>
+        <ows:Metadata
+            xlink:href="https://ogc-ems.crim.ca/weaver/"
+            xlink:title="Server"
+            xlink:type="simple" />
+        <DataInputs>
+            <Input minOccurs="1" maxOccurs="1">
+                <ows:Identifier>input-1</ows:Identifier>
+                <ows:Title>Input 1</ows:Title>
+                <ows:Abstract>Input 1!</ows:Abstract>
+                <LiteralData>
+                    <ows:DataType ows:reference="urn:ogc:def:dataType:OGC:1.1:string">string</ows:DataType>
+                    <ows:AnyValue />
+                </LiteralData></Input>
+            </DataInputs>
+        <ProcessOutputs>
+            <Output>
+                <ows:Identifier>output</ows:Identifier>
+                <ows:Title>The output</ows:Title>
+                <ows:Abstract>Process file output.</ows:Abstract>
+                <ComplexOutput>
+                    <Default>
+                        <Format>
+                            <MimeType>application/json</MimeType>
+                        </Format>
+                    </Default>
+                    <Supported>
+                        <Format>
+                            <MimeType>application/json</MimeType>
+                        </Format>
+                    </Supported>
+                </ComplexOutput>
+            </Output>
+        </ProcessOutputs>
+    </ProcessDescription>
+</wps:ProcessDescriptions>

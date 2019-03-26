@@ -9,11 +9,16 @@ from weaver.store.mongodb import (
     MongodbQuoteStore,
     MongodbBillStore,
 )
-from typing import Any, AnyStr, Union, TYPE_CHECKING
+from weaver.utils import get_settings
+from typing import TYPE_CHECKING
 import warnings
 import pymongo
+if TYPE_CHECKING:
+    from weaver.typedefs import AnySettingsContainer
+    from typing import Any, AnyStr, Union
+    from pymongo.database import Database
 
-MongoDB = None
+MongoDB = None  # type: Database
 MongodbStores = frozenset([
     MongodbServiceStore,
     MongodbProcessStore,
@@ -24,14 +29,14 @@ MongodbStores = frozenset([
 
 if TYPE_CHECKING:
     AnyStoreType = Union[MongodbStores]
-    from weaver.typedefs import JsonBody
+    from weaver.typedefs import JSON
 
 
 class MongoDatabase(DatabaseInterface):
     _database = None
     _settings = None
     _stores = None
-    type = 'mongodb'
+    type = "mongodb"
 
     def __init__(self, registry):
         super(MongoDatabase, self).__init__(registry)
@@ -58,27 +63,27 @@ class MongoDatabase(DatabaseInterface):
         for store in MongodbStores:
             if store.type == store_type:
                 if store_type not in self._stores:
-                    if 'settings' not in store_kwargs:
-                        store_kwargs['settings'] = self._settings
+                    if "settings" not in store_kwargs:
+                        store_kwargs["settings"] = self._settings
                     self._stores[store_type] = store(
                         collection=getattr(self.get_session(), store_type),
                         *store_args, **store_kwargs
                     )
                 return self._stores[store_type]
-        raise NotImplementedError("Database `{}` cannot find matching store `{}`.".format(self.type, store_type))
+        raise NotImplementedError("Database '{}' cannot find matching store '{}'.".format(self.type, store_type))
 
     def get_session(self):
         # type: (...) -> Any
         return self._database
 
     def get_information(self):
-        # type: (...) -> JsonBody
+        # type: (...) -> JSON
         """
         :returns: {'version': version, 'type': db_type}
         """
         result = list(self._database.version.find().limit(1))[0]
-        db_version = result['version_num']
-        return {'version': db_version, 'type': self.type}
+        db_version = result["version_num"]
+        return {"version": db_version, "type": self.type}
 
     def run_migration(self):
         # type: (...) -> None
@@ -86,22 +91,26 @@ class MongoDatabase(DatabaseInterface):
         pass
 
 
-def get_mongodb_client(registry):
+def get_mongodb_connection(container):
+    # type: (AnySettingsContainer) -> Database
+    """Obtains the basic database connection from settings."""
     global MongoDB
     if not MongoDB:
-        settings = registry.settings
-        settings_default = [('mongodb.host', 'localhost'), ('mongodb.port', 27017), ('mongodb.db_name', 'weaver')]
+        settings = get_settings(container)
+        settings_default = [("mongodb.host", "localhost"), ("mongodb.port", 27017), ("mongodb.db_name", "weaver")]
         for setting, default in settings_default:
             if settings.get(setting, None) is None:
                 warnings.warn("Setting '{}' not defined in registry, using default [{}].".format(setting, default))
                 settings[setting] = default
-        client = pymongo.MongoClient(settings['mongodb.host'], int(settings['mongodb.port']))
-        MongoDB = client[settings['mongodb.db_name']]
+        client = pymongo.MongoClient(settings["mongodb.host"], int(settings["mongodb.port"]))
+        MongoDB = client[settings["mongodb.db_name"]]
     return MongoDB
 
 
-def get_mongodb_engine(registry):
-    db = get_mongodb_client(registry)
+def get_mongodb_engine(container):
+    # type: (AnySettingsContainer) -> Database
+    """Obtains the database with configuration ready for usage."""
+    db = get_mongodb_connection(container)
     db.services.create_index("name", unique=True)
     db.services.create_index("url", unique=True)
     db.processes.create_index("identifier", unique=True)

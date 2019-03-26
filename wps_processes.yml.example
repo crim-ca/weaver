@@ -1,0 +1,17 @@
+# Details:
+#   - if only the WPS-1 URL endpoint is provided, all processes found by `GetCapabilities` will be added
+#   - if query `identifier=<process-id>` is provided, only matched process(es) will be added.
+#     alternatively, a list of processes can be specified with `id` sub-field of a given URL reference
+#   - if `name` is not provided, a "clean" variation of the hostname will be used
+# Result:
+#   - for each process, `DescribeProcess` request will indicate how to generate and register a WPS-2 equivalent
+#   - each process name will combine the service `name` and process `identifier` to reduce chances of conflicts
+processes:
+  - https://service-endpoint/wps
+  - https://another-endpoint/wps?service=wps&request=describeprocess&identifier=some-process
+  - url: https://named-endpoint/wps
+    name: named-endpoint
+  - url: https://named-processes/wps
+    id:
+      - process-1
+      - process-2

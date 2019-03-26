@@ -1,6 +1,6 @@
 class DatabaseInterface(object):
     """Return the unique identifier of db type matching settings."""
-    __slots__ = ['type']
+    __slots__ = ["type"]
 
     # noinspection PyUnusedLocal
     def __init__(self, registry):

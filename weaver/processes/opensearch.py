@@ -1,6 +1,9 @@
-from weaver.processes.sources import fetch_data_sources, OPENSEARCH_LOCAL_FILE_SCHEME
+from weaver.processes.sources import fetch_data_sources
 from weaver.processes.constants import WPS_LITERAL
-from weaver.processes.constants import START_DATE, END_DATE, AOI, COLLECTION
+from weaver.processes.constants import (
+    OPENSEARCH_START_DATE, OPENSEARCH_END_DATE, OPENSEARCH_AOI, OPENSEARCH_COLLECTION, OPENSEARCH_LOCAL_FILE_SCHEME
+)
+from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
 from weaver.utils import get_any_id
 from collections import deque
 from copy import deepcopy
@@ -8,12 +11,15 @@ from itertools import ifilterfalse
 from pyramid.httpexceptions import HTTPGatewayTimeout, HTTPOk
 from pyramid.settings import asbool
 from six.moves.urllib.parse import urlparse, parse_qsl
-from typing import Iterable, Dict, Tuple, List, Deque, AnyStr
+from typing import TYPE_CHECKING
 import shapely.wkt
 import lxml.etree
 import requests
 import logging
 import time
+if TYPE_CHECKING:
+    from weaver.typedefs import XML
+    from typing import AnyStr, Deque, Dict, Iterable, List, Tuple
 
 LOGGER = logging.getLogger("PACKAGE")
 
@@ -74,9 +80,9 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info, accept_mime
         # type: (str) -> bool
         """Return True if the name of this parameter is a query parameter"""
         parameters = [
-            AOI,
-            START_DATE,
-            END_DATE
+            OPENSEARCH_AOI,
+            OPENSEARCH_START_DATE,
+            OPENSEARCH_END_DATE
         ]
         return any(param.startswith(p) for p in parameters)
 
@@ -93,12 +99,9 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info, accept_mime
                 collection_id = queue[0].data
                 max_occurs = min(queue[0].max_occurs, 100000)
 
-                aoi_ids = _make_specific_identifier(AOI, input_id), AOI
-                startdate_ids = (
-                    _make_specific_identifier(START_DATE, input_id),
-                    START_DATE,
-                )
-                enddate_ids = _make_specific_identifier(END_DATE, input_id), END_DATE
+                aoi_ids = _make_specific_identifier(OPENSEARCH_AOI, input_id), OPENSEARCH_AOI
+                startdate_ids = (_make_specific_identifier(OPENSEARCH_START_DATE, input_id), OPENSEARCH_START_DATE)
+                enddate_ids = _make_specific_identifier(OPENSEARCH_END_DATE, input_id), OPENSEARCH_END_DATE
 
                 bbox_str = get_input_data(aoi_ids)
                 validate_bbox(bbox_str)
@@ -192,8 +195,7 @@ class OpenSearchQuery(object):
 
         et = lxml.etree.fromstring(r.content)
         xpath = "//*[local-name() = 'Url'][@rel='results']"
-        # noinspection PyProtectedMember
-        url = et.xpath(xpath)[0]  # type: lxml.etree._Element
+        url = et.xpath(xpath)[0]  # type: XML
         return url.attrib["template"]
 
     def _prepare_query_url(self, template_url, params):
@@ -238,9 +240,7 @@ class OpenSearchQuery(object):
 
                 et = lxml.etree.fromstring(r.content)
                 xpath = "//*[local-name() = 'entry']/*[local-name() = 'link']"
-
-                # noinspection PyProtectedMember
-                links = et.xpath(xpath)  # type: List[lxml.etree._Element]
+                links = et.xpath(xpath)  # type: List[XML]
                 return [link.attrib for link in links]
         return []
 
@@ -401,7 +401,7 @@ class EOImageDescribeProcessHandler(object):
             u"id": u"{}".format(identifier),
             u"title": description,
             u"abstract": description,
-            u"formats": [{u"mimeType": u"text/plain", u"default": True}],
+            u"formats": [{u"mimeType": CONTENT_TYPE_TEXT_PLAIN, u"default": True}],
             u"minOccurs": u"1",
             u"maxOccurs": u"unbounded",
             u"literalDataDomains": [{u"dataType": {u"name": u"String"}}],
@@ -427,13 +427,13 @@ class EOImageDescribeProcessHandler(object):
         :param start_date:  (Default value = True)
 
         """
-        date = START_DATE if start_date else END_DATE
+        date = OPENSEARCH_START_DATE if start_date else OPENSEARCH_END_DATE
         search_field = "{}{}".format(date[0].lower(), date[1:])
         data = {
             u"id": id_,
             u"title": u"Time of Interest",
             u"abstract": u"Time of Interest (defined as Start date - End date)",
-            u"formats": [{u"mimeType": u"text/plain", u"default": True}],
+            u"formats": [{u"mimeType": CONTENT_TYPE_TEXT_PLAIN, u"default": True}],
             u"minOccurs": u"1",
             u"maxOccurs": u"1",
             u"literalDataDomains": [{u"dataType": {u"name": u"String"}}],
@@ -469,26 +469,26 @@ class EOImageDescribeProcessHandler(object):
         collections = []
 
         if unique_toi:
-            toi.append(self.make_toi(START_DATE, start_date=True))
-            toi.append(self.make_toi(END_DATE, start_date=False))
+            toi.append(self.make_toi(OPENSEARCH_START_DATE, start_date=True))
+            toi.append(self.make_toi(OPENSEARCH_END_DATE, start_date=False))
         else:
             for name in eoimage_names:
                 toi.append(
                     self.make_toi(
-                        _make_specific_identifier(START_DATE, name), start_date=True
+                        _make_specific_identifier(OPENSEARCH_START_DATE, name), start_date=True
                     )
                 )
                 toi.append(
                     self.make_toi(
-                        _make_specific_identifier(END_DATE, name), start_date=False
+                        _make_specific_identifier(OPENSEARCH_END_DATE, name), start_date=False
                     )
                 )
 
         if unique_aoi:
-            aoi.append(self.make_aoi(AOI))
+            aoi.append(self.make_aoi(OPENSEARCH_AOI))
         else:
             for name in eoimage_names:
-                aoi.append(self.make_aoi(_make_specific_identifier(AOI, name)))
+                aoi.append(self.make_aoi(_make_specific_identifier(OPENSEARCH_AOI, name)))
 
         eoimage_names = modified_collection_identifiers(eoimage_names)
         for name, allowed_col in zip(eoimage_names, allowed_collections):
@@ -510,7 +510,7 @@ def get_eo_images_inputs_from_payload(payload):
     :param payload:
 
     """
-    inputs = payload["processDescription"]["process"].get("inputs", {})
+    inputs = payload.get("processDescription", {}).get("process", {}).get("inputs", {})
     return list(filter(EOImageDescribeProcessHandler.is_eoimage_input, inputs))
 
 
@@ -592,17 +592,12 @@ def modified_collection_identifiers(eo_image_identifiers):
     unique_eoimage = len(eo_image_identifiers) == 1
     new_identifiers = []
     for identifier in eo_image_identifiers:
-        new = COLLECTION if unique_eoimage else identifier + "_" + COLLECTION
+        new = OPENSEARCH_COLLECTION if unique_eoimage else identifier + "_" + OPENSEARCH_COLLECTION
         new_identifiers.append(new)
     return new_identifiers
 
 
 def get_data_source(collection_id):
-    """
-
-    :param collection_id:
-
-    """
     data_sources = fetch_data_sources()
     for source_data in data_sources.values():
         try:
@@ -614,34 +609,26 @@ def get_data_source(collection_id):
     try:
         return data_sources["opensearchdefault"]
     except KeyError:
-        message = "No osdd url found in data sources for collection id:" + collection_id
-        raise ValueError(message)
+        raise ValueError("No OSDD URL found in data sources for collection ID '{}'".format(collection_id))
 
 
 def get_eo_images_ids_from_payload(payload):
-    """
-
-    :param payload:
-
-    """
     return [get_any_id(i) for i in get_eo_images_inputs_from_payload(payload)]
 
 
 def replace_inputs_describe_process(inputs, payload):
     # type: (List[Dict], Dict) -> List[Dict]
     """
-    Replace EOImage inputs (additionalParameter -> EOImage -> true) with
-    OpenSearch query parameters
-
-    :param inputs:
-    :param payload:
+    Replace ``EOImage`` inputs (if ``additionalParameter -> EOImage -> true``) with `OpenSearch` query parameters.
     """
-    if not payload:
+    if not isinstance(payload, dict):
         return inputs
 
+    payload_process = payload.get("processDescription", {}).get("process", {})
+    process_inputs = payload_process.get("inputs", {})
+
     # add "additionalParameters" property from the payload
-    process = payload["processDescription"]["process"]
-    payload_inputs = {get_any_id(i): i for i in process.get("inputs", {})}
+    payload_inputs = {get_any_id(i): i for i in process_inputs}
     for i in inputs:
         # noinspection PyBroadException
         try:
@@ -650,7 +637,7 @@ def replace_inputs_describe_process(inputs, payload):
         except Exception:
             pass
 
-    additional_parameters = get_additional_parameters(process)
+    additional_parameters = get_additional_parameters(payload_process)
 
     unique_toi, unique_aoi = True, True  # by default
     if additional_parameters:
@@ -668,9 +655,5 @@ def replace_inputs_describe_process(inputs, payload):
 
 
 def _make_specific_identifier(param_name, identifier):
-    """
-    Only adds an underscore between the parameters
-    :param param_name:
-    :param identifier:
-    """
+    """Only adds an underscore between the parameters."""
     return "{}_{}".format(param_name, identifier)

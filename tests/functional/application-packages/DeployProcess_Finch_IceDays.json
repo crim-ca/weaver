@@ -1,0 +1,13 @@
+{
+    "processDescription": {
+        "process": {
+            "id": "Finch_IceDays"
+        }
+    },
+    "executionUnit": [
+        {
+            "href": "https://finch.crim.ca/wps?service=WPS&request=describeprocess&version=1.0.0&identifier=ice_days"
+        }
+    ],
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
+}

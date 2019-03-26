@@ -315,7 +315,6 @@ clean-test:
 	@echo "Removing test/coverage files..."
 	@-rm "$(CURDIR)/coverage.xml"
 	@-rm -fr "$(CURDIR)/coverage"
-	@-rm -fr "$(CURDIR)/tests"
 
 .PHONY: clean-dist
 clean-dist: backup clean
@@ -329,27 +328,27 @@ clean-dist: backup clean
 test-unit:
 	@echo "Running tests (skip slow and online tests)..."
 	bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
-		py.test -v -m 'not slow and not online' --junitxml $(CURDIR)/tests/results.xml"
+		pytest tests -v -m 'not slow and not online' --junitxml $(CURDIR)/tests/results.xml"
 
 .PHONY: test-func
 test-func:
 	@echo "Running functional tests..."
 	bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
-		pytest -v -m 'functional' --junitxml $(CURDIR)/tests/results.xml"
+		pytest tests -v -m 'functional' --junitxml $(CURDIR)/tests/results.xml"
 
 .PHONY: test-all
 test-all:
 	@echo "Running all tests (including slow and online tests)..."
 	bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
-		pytest -v --junitxml $(CURDIR)/tests/results.xml"
+		pytest tests -v --junitxml $(CURDIR)/tests/results.xml"
 
 .PHONY: coverage
 coverage:
 	@echo "Running coverage analysis..."
 	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
-		coverage run --source weaver --omit="weaver/tests/*" setup.py test || true'
-	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; coverage xml -i --omit="weaver/tests/*"'
-	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; coverage report -m --omit="weaver/tests/*"'
+		coverage run --source weaver setup.py test || true'
+	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; coverage xml -i'
+	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; coverage report -m'
 	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; coverage html -d coverage'
 
 .PHONY: pep8
@@ -406,16 +405,16 @@ bump-tag:
 .PHONY: docker-info
 docker-info:
 	@echo "Will be built, tagged and pushed as:"
-	@echo "$(DOCKER_REPO):`python -c 'from magpie.__meta__ import __version__; print(__version__)'`"
+	@echo "$(DOCKER_REPO):`python -c 'from weaver.__meta__ import __version__; print(__version__)'`"
 
 .PHONY: docker-build
 docker-build:
 	@bash -c "docker build $(CURDIR) \
-		-t $(DOCKER_REPO):`python -c 'from magpie.__meta__ import __version__; print(__version__)'`"
+		-t $(DOCKER_REPO):`python -c 'from weaver.__meta__ import __version__; print(__version__)'`"
 
 .PHONY: docker-push
 docker-push: docker-build
-	@bash -c "docker push $(DOCKER_REPO):`python -c 'from magpie.__meta__ import __version__; print(__version__)'`"
+	@bash -c "docker push $(DOCKER_REPO):`python -c 'from weaver.__meta__ import __version__; print(__version__)'`"
 
 ## Supervisor targets
 
