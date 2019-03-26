@@ -405,16 +405,16 @@ bump-tag:
 .PHONY: docker-info
 docker-info:
 	@echo "Will be built, tagged and pushed as:"
-	@echo "$(DOCKER_REPO):`python -c 'from magpie.__meta__ import __version__; print(__version__)'`"
+	@echo "$(DOCKER_REPO):`python -c 'from weaver.__meta__ import __version__; print(__version__)'`"
 
 .PHONY: docker-build
 docker-build:
 	@bash -c "docker build $(CURDIR) \
-		-t $(DOCKER_REPO):`python -c 'from magpie.__meta__ import __version__; print(__version__)'`"
+		-t $(DOCKER_REPO):`python -c 'from weaver.__meta__ import __version__; print(__version__)'`"
 
 .PHONY: docker-push
 docker-push: docker-build
-	@bash -c "docker push $(DOCKER_REPO):`python -c 'from magpie.__meta__ import __version__; print(__version__)'`"
+	@bash -c "docker push $(DOCKER_REPO):`python -c 'from weaver.__meta__ import __version__; print(__version__)'`"
 
 ## Supervisor targets
 
