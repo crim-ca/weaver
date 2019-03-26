@@ -35,7 +35,7 @@ class InputNames:
 
 
 class ESGFProcess(Wps1Process):
-    required_inputs = ("api_key", "variable")
+    required_inputs = ("variable", )
 
     def execute(self, workflow_inputs, output_dir, expected_outputs):
         # type: (JsonBody, AnyStr, Dict[AnyStr, AnyStr]) -> None
@@ -44,7 +44,7 @@ class ESGFProcess(Wps1Process):
 
         self._check_required_inputs(workflow_inputs)
 
-        api_key = workflow_inputs[InputNames.api_key]
+        api_key = workflow_inputs.get(InputNames.api_key)
         inputs = self._prepare_inputs(workflow_inputs)
         domain = self._get_domain(workflow_inputs)
 
