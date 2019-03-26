@@ -10,10 +10,10 @@ Weaver (the nest-builder)
   *Although weavers are named for their elaborately woven nests, some are notable for their selective parasitic nesting habits instead.*
   (`Wikipedia <https://en.wikipedia.org/wiki/Ploceidae>`_)
 
-`Weaver` is an `Execution Management Service (EMS)` that allows the execution of workflows chaining various
-application and `Web Processing Services (WPS)` inputs and outputs. It allows using remote
-`Application Deployment and Execution Services (ADES)` to dispatch application executions as defined by
-`Common Workflow Language (CWL)` configuration.
+`Weaver` is an implementation based on ESA Thematic Exploitation Platform (TEP) Open Architecture. It is an `Execution Management Service (EMS)` that allows the execution of workflows chaining various
+applications and `Web Processing Services (WPS)` inputs and outputs. Remote execution is deferred by the EMS to an
+`Application Deployment and Execution Service (ADES)`, as defined by
+`Common Workflow Language (CWL)` configurations.
 
 .. start-badges
 
@@ -77,10 +77,12 @@ Test server: https://ogc-ems.crim.ca/weaver/
 Extra Details
 ----------------
 
-The project is developed and based of `OGC Testbed-14 – ESA Sponsored Threads – Exploitation Platform` findings and
-following improvements.
+The project is developed upon `OGC Testbed-14 – ESA Sponsored Threads – Exploitation Platform` findings and
+following improvements. It is also advanced with sponsorship of U.S. Department of Energy to support common API of the Earth System Grid Federation (ESGF).
 
-`Weaver` is a **prototype** implemented in Python with the `Pyramid`_ web framework.
+`Weaver` is a **prototype** implemented in Python with the `Pyramid`_ web framework. It is part of **PAVICS** and **Birdhouse** ecosystems.
 
-.. _Pyramid: http://www.pylonsproject.org
 .. _PAVICS: https://ouranosinc.github.io/pavics-sdi/index.html
+.. _Birdhouse: http://bird-house.github.io/
+.. _ESGF: https://esgf.llnl.gov/
+.. _Pyramid: http://www.pylonsproject.org
