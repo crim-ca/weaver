@@ -1,0 +1,15 @@
+{
+    "processDescription": {
+        "process": {
+            "id": "WorkflowSubsetNASAESGFSubsetCRIM",
+            "title": "Workflow of subset at esgf followed by a subset by flying pigeon",
+            "abstract": "Workflow that executes the ESGF 'CDAT.Subset' WPS process and then flying pigeon bounding box subset"
+        }
+    },
+    "executionUnit": [
+        {
+            "href": "tests/functional/application-packages/workflow_subset_nasaesgf_subset_crim.cwl"
+        }
+    ],
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow"
+}
