@@ -30,5 +30,5 @@ def includeme(config):
                         request_method="GET", renderer="templates/swagger_ui.mako")
         config.add_view(api.api_versions, route_name=sd.api_versions_service.name,
                         request_method="GET", renderer=OUTPUT_FORMAT_JSON)
-        config.add_notfound_view(api.not_found_or_method_not_allowed)
+        config.add_notfound_view(api.not_found_or_method_not_allowed, append_slash=True)
         config.add_forbidden_view(api.unauthorized_or_forbidden)
