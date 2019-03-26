@@ -91,7 +91,7 @@ class ESGFProcess(Wps1Process):
         # ensure data is casted properly
         for dim_name, values in grouped_inputs.items():
             for value_name, value in values.items():
-                if value_name in ["start", "end"]:
+                if value_name in ["start", "end"] and value:
                     values[value_name] = float(value)
 
         allowed_crs = {c.name: c for c in [cwt.VALUES, cwt.INDICES, cwt.TIMESTAMPS]}
