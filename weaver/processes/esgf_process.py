@@ -95,9 +95,10 @@ class ESGFProcess(Wps1Process):
                     values[value_name] = float(value)
 
         allowed_crs = {c.name: c for c in [cwt.VALUES, cwt.INDICES, cwt.TIMESTAMPS]}
+        allowed_crs[None] = None
 
         # fix unintuitive latitude that must be given 'reversed' (start is larger than end)
-        if ['lat'] in grouped_inputs:
+        if 'lat' in grouped_inputs:
             values = grouped_inputs['lat']['start'], grouped_inputs['lat']['end']
             grouped_inputs['lat']['start'] = max(values)
             grouped_inputs['lat']['end'] = min(values)
@@ -110,7 +111,7 @@ class ESGFProcess(Wps1Process):
             crs = cwt.VALUES
             if "crs" in values:
                 if values["crs"] not in allowed_crs:
-                    raise ValueError("CRS must be in {}".format(", ".join(allowed_crs)))
+                    raise ValueError("CRS must be in {}".format(", ".join(map(str, allowed_crs))))
                 crs = allowed_crs[values["crs"]]
 
             dimension = cwt.Dimension(param_name, values["start"], values["end"], crs=crs)
