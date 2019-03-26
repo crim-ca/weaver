@@ -60,7 +60,9 @@ import os
 import six
 if TYPE_CHECKING:
     from weaver.status import AnyStatusType
-    from weaver.typedefs import ToolPathObjectType, CWLFactoryCallable, CWL, AnyKey, AnyValue, JSON, XML, Number
+    from weaver.typedefs import (
+        ToolPathObjectType, CWLFactoryCallable, CWL, AnyKey, AnyValue as AnyValueType, JSON, XML, Number
+    )
     from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, Type, Union
     from cwltool.process import Process as ProcessCWL
     from pywps.app import WPSRequest
@@ -549,7 +551,7 @@ def _cwl2wps_io(io_info, io_select):
 
 
 def _any2wps_literal_datatype(io_type, is_value):
-    # type: (AnyValue, bool) -> Union[AnyStr, Type[null]]
+    # type: (AnyValueType, bool) -> Union[AnyStr, Type[null]]
     """
     Solves common data-type names to supported ones.
     Verification is accomplished by name when ``is_value=False``, otherwise with python ``type`` when ``is_value=True``.
