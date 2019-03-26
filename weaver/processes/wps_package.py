@@ -148,19 +148,24 @@ WPS_FIELD_FORMAT = ["formats", "supported_formats", "supported_values", "default
 DefaultFormat = Format(mime_type=CONTENT_TYPE_TEXT_PLAIN)
 
 
+def get_status_location_log_path(status_location, out_dir=None):
+    # type: (AnyStr, Optional[AnyStr]) -> AnyStr
+    log_path = os.path.splitext(status_location)[0] + ".log"
+    return os.path.join(out_dir, os.path.split(log_path)[-1]) if out_dir else log_path
+
+
 def retrieve_package_job_log(execution, job):
-    # If the process is a weaver package this status xml should be available in the process output dir
-    status_xml_fn = execution.statusLocation.split('/')[-1]
     try:
         # weaver package log every status update into this file (we no longer rely on the http monitoring)
         out_dir = get_wps_output_dir(get_settings(app))
-        log_fn = os.path.join(out_dir, "{0}.log".format(status_xml_fn))
-        with open(log_fn, 'r') as log_file:
+        # if the process is a weaver package this status xml should be available in the process output dir
+        log_path = get_status_location_log_path(execution.statusLocation, out_dir=out_dir)
+        with open(log_path, 'r') as log_file:
             # Keep the first log entry which is the real start time and replace the following ones with the file content
             job.logs = job.logs[:1]
             for line in log_file:
                 job.logs.append(line.rstrip('\n'))
-        os.remove(log_fn)
+        os.remove(log_path)
     except (KeyError, IOError):
         pass
 
@@ -1376,7 +1381,7 @@ class WpsPackage(Process):
 
     def setup_logger(self):
         # file logger for output
-        self.log_file = self.status_location + ".log"
+        self.log_file = get_status_location_log_path(self.status_location)
         log_file_handler = logging.FileHandler(self.log_file)
         log_file_formatter = logging.Formatter(fmt=get_log_fmt(), datefmt=get_log_date_fmt())
         log_file_handler.setFormatter(log_file_formatter)
