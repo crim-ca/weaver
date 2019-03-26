@@ -23,7 +23,7 @@ applications and `Web Processing Services (WPS)` inputs and outputs. Remote exec
     * - dependencies
       - | |py_ver| |requires|
     * - build status
-      - | |travis_latest| |travis_tag| |coverage|
+      - | |travis_latest| |travis_tag| |coverage| |codacy|
     * - releases
       - | |version| |commits-since| |license|
 
@@ -55,9 +55,13 @@ applications and `Web Processing Services (WPS)` inputs and outputs. Remote exec
     :alt: Travis-CI CodeCov Coverage
     :target: https://codecov.io/gh/crim-ca/weaver
 
+.. |codacy| image:: https://api.codacy.com/project/badge/Grade/4f29419c9c91458ea3f0aa6aff11692c
+    :alt: Codacy Badge
+    :target: https://app.codacy.com/app/fmigneault/weaver?utm_source=github.com&utm_medium=referral&utm_content=crim-ca/weaver&utm_campaign=Badge_Grade_Dashboard
+
 .. |license| image:: https://img.shields.io/github/license/crim-ca/weaver.svg
-   :target: https://github.com/crim-ca/weaver/blob/master/LICENSE.txt
-   :alt: GitHub license
+    :target: https://github.com/crim-ca/weaver/blob/master/LICENSE.txt
+    :alt: GitHub License
 
 .. end-badges
 
