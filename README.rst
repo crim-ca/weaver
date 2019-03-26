@@ -10,7 +10,7 @@ Weaver (the nest-builder)
   *Although weavers are named for their elaborately woven nests, some are notable for their selective parasitic nesting habits instead.*
   (`Wikipedia <https://en.wikipedia.org/wiki/Ploceidae>`_)
 
-`Weaver` is an implementation based on ESA Thematic Exploitation Platform (TEP) Open Architecture. It is an `Execution Management Service (EMS)` that allows the execution of workflows chaining various
+`Weaver` is an `Execution Management Service (EMS)` that allows the execution of workflows chaining various
 applications and `Web Processing Services (WPS)` inputs and outputs. Remote execution is deferred by the EMS to an
 `Application Deployment and Execution Service (ADES)`, as defined by
 `Common Workflow Language (CWL)` configurations.
@@ -78,9 +78,9 @@ Extra Details
 ----------------
 
 The project is developed upon `OGC Testbed-14 – ESA Sponsored Threads – Exploitation Platform` findings and
-following improvements. It is also advanced with sponsorship of U.S. Department of Energy to support common API of the Earth System Grid Federation (ESGF).
+following improvements. It is also advanced with sponsorship of U.S. Department of Energy to support common API of the Earth System Grid Federation (`ESGF`_).
 
-`Weaver` is a **prototype** implemented in Python with the `Pyramid`_ web framework. It is part of **PAVICS** and **Birdhouse** ecosystems.
+`Weaver` is a **prototype** implemented in Python with the `Pyramid`_ web framework. It is part of `PAVICS`_ and `Birdhouse`_ ecosystems.
 
 .. _PAVICS: https://ouranosinc.github.io/pavics-sdi/index.html
 .. _Birdhouse: http://bird-house.github.io/
