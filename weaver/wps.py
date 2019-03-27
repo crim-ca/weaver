@@ -185,4 +185,7 @@ def includeme(config):
         wps_path = get_wps_path(settings)
         config.add_route("wps", wps_path)
         config.add_view(pywps_view, route_name="wps")
+
+        config.add_static_view(get_wps_output_path(config), get_wps_output_dir(config))
+
         config.add_request_method(lambda req: get_wps_cfg_path(req.registry.settings), "wps_cfg", reify=True)
