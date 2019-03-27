@@ -229,6 +229,7 @@ class End2EndEMSTestCase(TestCase):
         cls.PROCESS_WORKFLOW_SUBSET_ICE_DAYS = "WorkflowSubsetIceDays"
         cls.PROCESS_WORKFLOW_SubsetLLNL_SubsetCRIM = "WorkflowSubsetLLNL_SubsetCRIM"
         cls.PROCESS_WORKFLOW_SubsetNASAESGF_SubsetCRIM = "WorkflowSubsetNASAESGF_SubsetCRIM"
+        cls.PROCESS_WORKFLOW_File_To_SubsetCRIM = "WorkflowFile_To_SubsetCRIM"
         application_set = {cls.PROCESS_STACKER_ID,
                            cls.PROCESS_SFS_ID,
                            cls.PROCESS_FLOOD_DETECTION_ID,
@@ -245,6 +246,7 @@ class End2EndEMSTestCase(TestCase):
                         cls.PROCESS_WORKFLOW_SUBSET_ICE_DAYS,
                         cls.PROCESS_WORKFLOW_SubsetLLNL_SubsetCRIM,
                         cls.PROCESS_WORKFLOW_SubsetNASAESGF_SubsetCRIM,
+                        cls.PROCESS_WORKFLOW_File_To_SubsetCRIM,
                         }
         test_set = application_set | workflow_set
         for process in test_set:
@@ -566,6 +568,11 @@ class End2EndEMSTestCase(TestCase):
     def test_workflow_wps1_requirements(self):
         self.workflow_runner(self.PROCESS_WORKFLOW_SUBSET_ICE_DAYS,
                              [self.PROCESS_SUBSET_BBOX_ID, self.PROCESS_ICE_DAYS_ID],
+                             log_full_trace=True)
+
+    def test_workflow_file_to_string_array(self):
+        self.workflow_runner(self.PROCESS_WORKFLOW_File_To_SubsetCRIM,
+                             [self.PROCESS_SUBSET_BBOX_ID],
                              log_full_trace=True)
 
     def test_workflow_esgf_requirements(self):

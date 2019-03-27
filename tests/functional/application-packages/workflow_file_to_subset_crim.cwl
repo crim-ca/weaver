@@ -7,12 +7,7 @@
         }
     ],
     "inputs": {
-        "files": "File",
-        "variable": "string",
-        "nasa_lat0": "float",
-        "nasa_lat1": "float",
-        "nasa_lon0": "float",
-        "nasa_lon1": "float",
+        "file": "File",
         "crim_lat0": "float",
         "crim_lat1": "float",
         "crim_lon0": "float",
@@ -25,22 +20,10 @@
         }
     },
     "steps": {
-        "nasa_subset": {
-            "run": "SubsetNASAESGF.cwl",
-            "in": {
-                "files": "files",
-                "variable": "variable",
-                "lat_start": "nasa_lat0",
-                "lat_end": "nasa_lat1",
-                "lon_start": "nasa_lon0",
-                "lon_end": "nasa_lon1"
-            },
-            "out": ["output"]
-        },
         "file2string_array": {
             "run": "file2string_array",
             "in": {
-                "input": "nasa_subset/output"
+                "input": "file"
             },
             "out": ["output"]
         },

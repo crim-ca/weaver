@@ -11,4 +11,3 @@ inputs:
      prefix: "-i"
 outputs:
  output: string[]
-stdout: cwl.output.json

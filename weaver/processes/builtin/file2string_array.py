@@ -22,17 +22,17 @@ output_cwl_json = "cwl.output.json"
 
 def main(input_file, output_dir):
     # type: (argparse.FileType, AnyStr) -> None
-    LOGGER.info("Got arguments: input_file={} output_dir={}".format(input_file, output_dir))
-    output_data = {"output": input_file}
-    json.dump(output_data, output_cwl_json)
+    LOGGER.info(
+        "Got arguments: input_file={} output_dir={}".format(input_file, output_dir)
+    )
+    output_data = {"output": [input_file]}
+    json.dump(output_data, open(os.path.join(output_dir, output_cwl_json), "w"))
 
 
 if __name__ == "__main__":
     LOGGER.info("Parsing inputs of '{}' process.".format(PACKAGE_NAME))
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "-i", metavar="json", type=argparse.FileType("r"), help="CWL JSON file"
-    )
+    parser.add_argument("-i", help="CWL File")
     parser.add_argument(
         "-o",
         metavar="outdir",
