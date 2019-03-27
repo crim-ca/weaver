@@ -10,7 +10,7 @@ timeout = 30
 
 [settings]
 prefix = ${environment:HOME}/birdhouse
-configuration = default
+configuration = ems|ades|default
 hostname = localhost
 https-port = 5000
 log-level = WARN

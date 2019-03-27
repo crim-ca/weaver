@@ -3,9 +3,9 @@ import logging
 LOGGER = logging.getLogger(__name__)
 
 
-WEAVER_CONFIGURATION_DEFAULT = 'DEFAULT'
-WEAVER_CONFIGURATION_ADES = 'ADES'
-WEAVER_CONFIGURATION_EMS = 'EMS'
+WEAVER_CONFIGURATION_DEFAULT = "DEFAULT"
+WEAVER_CONFIGURATION_ADES = "ADES"
+WEAVER_CONFIGURATION_EMS = "EMS"
 weaver_CONFIGURATIONS = frozenset([
     WEAVER_CONFIGURATION_DEFAULT,
     WEAVER_CONFIGURATION_ADES,
@@ -14,7 +14,7 @@ weaver_CONFIGURATIONS = frozenset([
 
 
 def get_weaver_configuration(settings):
-    weaver_config = settings.get('weaver.configuration')
+    weaver_config = settings.get("weaver.configuration")
     if not weaver_config:
         LOGGER.warn("Setting 'weaver.configuration' not specified, using '{}'".format(WEAVER_CONFIGURATION_DEFAULT))
         weaver_config = WEAVER_CONFIGURATION_DEFAULT
