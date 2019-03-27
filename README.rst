@@ -7,13 +7,16 @@ Weaver (the nest-builder)
   Some of these nests are the largest structures to be built by birds.*
   (`Eden <https://eden.uktv.co.uk/animals/birds/article/weaver-birds/>`_).
 
-  *Although weavers are named for their elaborately woven nests, some are notable for their selective parasitic nesting habits instead.*
+  *Although weavers are named for their elaborately woven nests, some are notable for their selective parasitic
+  nesting habits instead.*
   (`Wikipedia <https://en.wikipedia.org/wiki/Ploceidae>`_)
 
 `Weaver` is an `Execution Management Service (EMS)` that allows the execution of workflows chaining various
-applications and `Web Processing Services (WPS)` inputs and outputs. Remote execution is deferred by the EMS to an
-`Application Deployment and Execution Service (ADES)`, as defined by
-`Common Workflow Language (CWL)` configurations.
+applications and `Web Processing Services (WPS)` inputs and outputs. Remote execution is deferred by the `EMS` to an
+`Application Deployment and Execution Service (ADES)`, as defined by `Common Workflow Language (CWL)` configurations.
+
+`Weaver` can be launched either as an `EMS` or an `ADES` according to configuration values it is deployed with.
+For more details, see `Configuration`_ section.
 
 .. start-badges
 
@@ -76,6 +79,15 @@ Docker image `repository <https://docker-registry.crim.ca/repositories/3463>`_.
     $ docker pull docker-registry.crim.ca/ogc/weaver:0.2.0
 
 Test server: https://ogc-ems.crim.ca/weaver/
+
+----------------
+Configuration
+----------------
+
+All configuration settings can be overridden using a ``custom.cfg`` file that will be picked up by `buildout` during installation.
+An example of such file is provided here: `custom.cfg.example <https://github.com/crim-ca/weaver/blob/master/custom.cfg.example>`_.
+
+Setting `Weaver`'s operational mode (`EMS`/`ADES`) is accomplished using the `configuration` field of ``custom.cfg``.
 
 ----------------
 Extra Details

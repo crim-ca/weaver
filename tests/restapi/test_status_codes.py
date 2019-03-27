@@ -28,8 +28,8 @@ forbidden_routes = [
     jobs_full_uri,  # could be 401
 ]
 not_found_routes = [
-    '/jobs/not-found',
-    '/providers/not-found',
+    "/jobs/not-found",
+    "/providers/not-found",
 ]
 
 
@@ -58,27 +58,27 @@ class StatusCodeTestCase(unittest.TestCase):
 
     def setUp(self):
         config = setup_config_with_mongodb()
-        config.registry.settings['weaver.configuration'] = WEAVER_CONFIGURATION_DEFAULT
-        config.registry.settings['weaver.url'] = 'https://localhost'
+        config.registry.settings["weaver.configuration"] = WEAVER_CONFIGURATION_DEFAULT
+        config.registry.settings["weaver.url"] = "https://localhost"
         app = main({}, **config.registry.settings)
         self.testapp = WebTestApp(app)
 
     def test_200(self):
         for uri in public_routes:
             resp = self.testapp.get(uri, expect_errors=True, headers=self.headers)
-            self.assertEqual(200, resp.status_code, 'route {} did not return 200'.format(uri))
+            self.assertEqual(200, resp.status_code, "route {} did not return 200".format(uri))
 
     @pytest.mark.xfail(reason="Not working if not behind proxy. Protected implementation to be done.")
     @unittest.expectedFailure
     def test_401(self):
         for uri in forbidden_routes:
             resp = self.app.get(uri, expect_errors=True, headers=self.headers)
-            self.assertEqual(401, resp.status_code, 'route {} did not return 401'.format(uri))
+            self.assertEqual(401, resp.status_code, "route {} did not return 401".format(uri))
 
     def test_404(self):
         for uri in not_found_routes:
             resp = self.testapp.get(uri, expect_errors=True, headers=self.headers)
-            self.assertEqual(404, resp.status_code, 'route {} did not return 404'.format(uri))
+            self.assertEqual(404, resp.status_code, "route {} did not return 404".format(uri))
 
 
 class CRUDTestCase(unittest.TestCase):
