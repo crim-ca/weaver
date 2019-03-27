@@ -9,5 +9,7 @@ inputs:
    type: File
    inputBinding:
      prefix: "-i"
+     loadContents: false
+     valueFrom: $(self.location)
 outputs:
  output: string[]
