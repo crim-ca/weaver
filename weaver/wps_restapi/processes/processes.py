@@ -1,6 +1,5 @@
 from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS
 from weaver.database import get_db
-from weaver.database.mongodb import MongoDatabase
 from weaver.datatype import Process as ProcessDB, Service
 from weaver.exceptions import InvalidIdentifierValue, ProcessNotFound, ProcessNotAccessible
 from weaver.execute import (
@@ -76,7 +75,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
     ssl_verify = asbool(settings.get("weaver.ssl_verify", True))
 
     # reset the connection because we are in a forked celery process
-    db = MongoDatabase(get_registry(app), reset_connection=True)
+    db = get_db(app, reset_connection=True)
     store = db.get_store(StoreJobs)
     job = store.fetch_by_id(job_id)
     job.task_id = self.request.id

@@ -7,9 +7,11 @@ if TYPE_CHECKING:
     from weaver.typedefs import AnyDatabaseContainer
 
 
-def get_db(container):
-    # type: (AnyDatabaseContainer) -> MongoDatabase
+def get_db(container, reset_connection=False):
+    # type: (AnyDatabaseContainer, bool) -> MongoDatabase
     registry = get_registry(container)
+    if reset_connection:
+        registry.db = MongoDatabase(registry, reset_connection=reset_connection)
     return registry.db
 
 
