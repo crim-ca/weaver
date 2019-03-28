@@ -23,8 +23,10 @@ from weaver.status import (
     STATUS_SUCCEEDED,
 )
 from weaver.store.base import StoreServices, StoreProcesses, StoreJobs
-from weaver.utils import get_any_id, get_any_value, get_settings, raise_on_xml_exception, wait_secs, get_cookie_headers, \
-    get_registry
+from weaver.utils import (
+    get_any_id, get_any_value, get_settings, raise_on_xml_exception,
+    wait_secs, get_cookie_headers, get_registry
+)
 from weaver.visibility import VISIBILITY_PUBLIC, visibility_values
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.notify import notify_job
