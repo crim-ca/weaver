@@ -1,9 +1,9 @@
 from weaver.utils import get_registry
 from typing import TYPE_CHECKING
+from weaver.database.mongodb import MongoDatabase
 import logging
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from weaver.database.mongodb import MongoDatabase
     from weaver.typedefs import AnyDatabaseContainer
 
 
