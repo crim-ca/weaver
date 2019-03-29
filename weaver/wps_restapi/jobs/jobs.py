@@ -72,7 +72,7 @@ def job_list_json(settings, jobs, detail=True):
 
 
 def check_status(url=None, response=None, sleep_secs=2, verify=False):
-    # type: (Optional[AnyStr, None], Optional[etree.ElementBase], Optional[int], Optional[bool]) -> WPSExecution
+    # type: (Optional[AnyStr], Optional[etree.ElementBase], int, bool) -> WPSExecution
     """
     Run :function:`owslib.wps.WPSExecution.checkStatus` with additional exception handling.
 

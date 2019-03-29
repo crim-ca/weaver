@@ -37,13 +37,13 @@ import time
 import json
 import os
 if TYPE_CHECKING:
-    from weaver.typedefs import HeadersType, CookiesType, SettingsType, AnyResponseType, LoggerType
+    from weaver.typedefs import HeadersType, CookiesType, SettingsType, AnyResponseType, LoggerType, JSON
     from typing import AnyStr, Dict, Optional, Any, Tuple, Iterable, Callable, Union
 
 
 class ProcessInfo(object):
     def __init__(self, process_id, test_id=None, deploy_payload=None, execute_payload=None):
-        # type: (AnyStr, Optional[AnyStr], Optional[Dict], Optional[Dict]) -> None
+        # type: (AnyStr, Optional[AnyStr], Optional[JSON], Optional[JSON]) -> None
         self.id = process_id
         self.test_id = test_id
         self.deploy_payload = deploy_payload
@@ -203,7 +203,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def get_http_auth_code(cls, unprotected_code=HTTPOk.code):
-        # type: (Optional[int]) -> int
+        # type: (int) -> int
         return HTTPUnauthorized.code if cls.WEAVER_TEST_PROTECTED_ENABLED else unprotected_code
 
     @classmethod
@@ -338,7 +338,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def login(cls, username, password, force_magpie=False):
-        # type: (AnyStr, AnyStr, Optional[bool]) -> Tuple[HeadersType, CookiesType]
+        # type: (AnyStr, AnyStr, bool) -> Tuple[HeadersType, CookiesType]
         """
         Login using WSO2 or Magpie according to ``WEAVER_TEST_PROTECTED_ENABLED`` to retrieve session cookies.
 
@@ -381,7 +381,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def user_headers_cookies(cls, credentials, force_magpie=False):
-        # type: (SettingsType, Optional[bool]) -> Tuple[HeadersType, CookiesType]
+        # type: (SettingsType, bool) -> Tuple[HeadersType, CookiesType]
         header_tokens, cookie_tokens = cls.login(force_magpie=force_magpie, **credentials)
         headers = deepcopy(cls.headers)
         cookies = deepcopy(cls.cookies)
@@ -391,7 +391,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def request(cls, method, url, ignore_errors=False, force_requests=False, log_enabled=True, **kw):
-        # type: (AnyStr, AnyStr, Optional[bool], Optional[bool], Optional[bool], Optional[Any]) -> AnyResponseType
+        # type: (AnyStr, AnyStr, bool, bool, bool, Optional[Any]) -> AnyResponseType
         """
         Executes the request, but following any server prior redirects as needed.
         Also prepares JSON body and obvious error handling according to a given status code.
@@ -482,7 +482,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def assert_response(cls, response, status=None, message=""):
-        # type: (Union[WebTestResponse, Response], Optional[int, Iterable[int]], Optional[AnyStr]) -> None
+        # type: (AnyResponseType, Optional[Union[int, Iterable[int]]], AnyStr) -> None
         """Tests a response for expected status and raises an error if not matching."""
         rs = response.status_code
         reason = getattr(response, "reason", "")
@@ -502,7 +502,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def assert_test(cls, assert_test, message=None, title="Test Assertion Failed"):
-        # type: (Callable[[], bool], Optional[AnyStr], Optional[AnyStr]) -> None
+        # type: (Callable[[], bool], Optional[AnyStr], AnyStr) -> None
         """Tests a callable for assertion and logs the message if it fails, then re-raises to terminate execution."""
         try:
             assert assert_test(), message
@@ -676,7 +676,7 @@ class End2EndEMSTestCase(TestCase):
                              [self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID])
 
     def workflow_runner(self, test_workflow_id, test_application_ids, log_full_trace=False):
-        # type: (AnyStr, Iterable[AnyStr], Optional[bool]) -> None
+        # type: (AnyStr, Iterable[AnyStr], bool) -> None
         """Simplify test for demonstration purpose"""
 
         # test will log basic information
@@ -723,7 +723,7 @@ class End2EndEMSTestCase(TestCase):
             self.validate_test_job_execution(job_location, None, None)
 
     def validate_test_job_execution(self, job_location_url, user_headers=None, user_cookies=None):
-        # type: (AnyStr, Optional[Dict[AnyStr, AnyStr]], Optional[Dict[AnyStr, AnyStr]]) -> None
+        # type: (AnyStr, Optional[HeadersType], Optional[CookiesType]) -> None
         """
         Validates that the job is stated, running, and polls it until completed successfully.
         Then validates that results are accessible (no data integrity check).

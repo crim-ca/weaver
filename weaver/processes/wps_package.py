@@ -45,6 +45,7 @@ from collections import OrderedDict, Hashable
 from six.moves.urllib.parse import urlparse
 from typing import TYPE_CHECKING
 from yaml.scanner import ScannerError
+from copy import deepcopy
 from cwltool.context import LoadingContext
 from cwltool.context import RuntimeContext
 import cwltool.factory
@@ -101,9 +102,9 @@ PACKAGE_LITERAL_TYPES = frozenset(list(PACKAGE_BASE_TYPES) + ["null", "Any"])
 PACKAGE_COMPLEX_TYPES = frozenset(["File", "Directory"])
 PACKAGE_ARRAY_BASE = "array"
 PACKAGE_ARRAY_MAX_SIZE = six.MAXSIZE  # pywps doesn't allow None, so use max size
-PACKAGE_ARRAY_ITEMS = frozenset(list(PACKAGE_BASE_TYPES) + list(PACKAGE_COMPLEX_TYPES))
-PACKAGE_ARRAY_TYPES = frozenset(["{}[]".format(item) for item in PACKAGE_ARRAY_ITEMS])
 PACKAGE_CUSTOM_TYPES = frozenset(["enum"])  # can be anything, but support "enum" which is more common
+PACKAGE_ARRAY_ITEMS = frozenset(list(PACKAGE_BASE_TYPES) + list(PACKAGE_COMPLEX_TYPES) + list(PACKAGE_CUSTOM_TYPES))
+PACKAGE_ARRAY_TYPES = frozenset(["{}[]".format(item) for item in PACKAGE_ARRAY_ITEMS])
 PACKAGE_DEFAULT_FILE_NAME = "package"
 PACKAGE_LOG_FILE = "package_log_file"
 
@@ -316,13 +317,13 @@ def _load_package_file(file_path):
 
 
 def _load_package_content(package_dict,                             # type: Dict
-                          package_name=PACKAGE_DEFAULT_FILE_NAME,   # type: Optional[AnyStr]
+                          package_name=PACKAGE_DEFAULT_FILE_NAME,   # type: AnyStr
                           data_source=None,                         # type: Optional[AnyStr]
-                          only_dump_file=False,                     # type: Optional[bool]
+                          only_dump_file=False,                     # type: bool
                           tmp_dir=None,                             # type: Optional[AnyStr]
                           loading_context=None,                     # type: Optional[LoadingContext]
                           runtime_context=None,                     # type: Optional[RuntimeContext]
-                          ):  # type: (...) -> Union[Tuple[CWLFactoryCallable, AnyStr, Dict], None]
+                          ):  # type: (...) -> Optional[Tuple[CWLFactoryCallable, AnyStr, Dict]]
     """
     Loads the package content to file in a temporary directory.
     Recursively processes sub-packages steps if the parent is a `Workflow` (CWL class).
@@ -370,45 +371,83 @@ def _load_package_content(package_dict,                             # type: Dict
 
 
 def _is_cwl_array_type(io_info):
-    # type: (CWL_IO_Type) -> Tuple[bool, AnyStr]
-    """Verifies if the specified input/output corresponds to one of various CWL array type definitions.
+    # type: (CWL_IO_Type) -> Tuple[bool, AnyStr, MODE, Union[AnyValue, List[Any]]]
+    """Verifies if the specified I/O corresponds to one of various CWL array type definitions.
 
-    :return is_array: specifies if the input/output is of array type
-    :return io_type: array element type if ``is_array`` is True, type of ``io_info`` otherwise.
-    :raises PackageTypeError: if the array element is not supported.
+    returns ``tuple(is_array, io_type, io_mode, io_allow)`` where:
+        - ``is_array``: specifies if the I/O is of array type.
+        - ``io_type``: array element type if ``is_array`` is True, type of ``io_info`` otherwise.
+        - ``io_mode``: validation mode to be applied if sub-element requires it, defaults to ``MODE.NONE``.
+        - ``io_allow``: validation values to be applied if sub-element requires it, defaults to ``AnyValue``.
+    :raises PackageTypeError: if the array element doesn't have the required values and valid format.
     """
-    is_array = False
-    io_type = io_info["type"]
+    # use mapping to allow sub-function updates
+    io_return = {
+        "array": False,
+        "allow": AnyValue,
+        "type": io_info["type"],
+        "mode": MODE.NONE,
+    }
 
-    # array type conversion when defined as dict of {"type": "array", "items": "<type>"}
-    # validate against Hashable instead of 'dict' since 'OrderedDict'/'CommentedMap' can result in `isinstance()==False`
-    if not isinstance(io_type, six.string_types) and not isinstance(io_type, Hashable) \
-            and "items" in io_type and "type" in io_type:
-        if not io_type["type"] == PACKAGE_ARRAY_BASE or io_type["items"] not in PACKAGE_ARRAY_ITEMS:
+    def _update_if_sub_enum(_io_item):
+        # type: (CWL_IO_Type) -> bool
+        """
+        Updates the ``io_return`` parameters if ``io_item`` evaluates to a valid ``enum`` type.
+        Parameter ``io_item`` should correspond to the ``items`` field of an array I/O definition.
+        Simple pass-through if the array item is not an ``enum``.
+        """
+        _is_enum, _enum_type, _enum_mode, _enum_allow = _is_cwl_enum_type({"type": _io_item})
+        if _is_enum:
+            LOGGER.debug("I/O '{}' parsed as 'array' with sub-item as 'enum'".format(io_info["name"]))
+            io_return["type"] = _enum_type
+            io_return["mode"] = _enum_mode
+            io_return["allow"] = _enum_allow
+        return _is_enum
+
+    # array type conversion when defined as '{"type": "array", "items": "<type>"}'
+    # validate against 'Hashable' instead of 'dict' since 'OrderedDict'/'CommentedMap' can fail 'isinstance()'
+    if not isinstance(io_return["type"], six.string_types) and not isinstance(io_return["type"], Hashable) \
+            and "items" in io_return["type"] and "type" in io_return["type"]:
+        io_type = dict(io_return["type"])  # make hashable to allow comparison
+        if io_type["type"] != PACKAGE_ARRAY_BASE:
             raise PackageTypeError("Unsupported I/O 'array' definition: '{}'.".format(repr(io_info)))
-        io_type = io_type["items"]
-        is_array = True
+        # parse enum in case we got an array of allowed symbols
+        is_enum = _update_if_sub_enum(io_info["type"]["items"])
+        if not is_enum:
+            io_return["type"] = io_type["items"]
+        if io_return["type"] not in PACKAGE_ARRAY_ITEMS:
+            raise PackageTypeError("Unsupported I/O 'array' definition: '{}'.".format(repr(io_info)))
+        LOGGER.debug("I/O '{}' parsed as 'array' with nested dict notation".format(io_info["name"]))
+        io_return["array"] = True
     # array type conversion when defined as string '<type>[]'
-    elif isinstance(io_type, six.string_types) and io_type in PACKAGE_ARRAY_TYPES:
-        io_type = io_type[:-2]  # remove []
-        if io_type not in PACKAGE_ARRAY_ITEMS:
+    elif isinstance(io_return["type"], six.string_types) and io_return["type"] in PACKAGE_ARRAY_TYPES:
+        io_return["type"] = io_return["type"][:-2]  # remove '[]'
+        if io_return["type"] in PACKAGE_CUSTOM_TYPES:
+            # parse 'enum[]' for array of allowed symbols, provide expected structure for sub-item parsing
+            io_item = deepcopy(io_info)
+            io_item["type"] = io_return["type"]  # override corrected type without '[]'
+            _update_if_sub_enum(io_item)
+        if io_return["type"] not in PACKAGE_ARRAY_ITEMS:
             raise PackageTypeError("Unsupported I/O 'array' definition: '{}'.".format(repr(io_info)))
-        is_array = True
-    return is_array, io_type
+        LOGGER.debug("I/O '{}' parsed as 'array' with shorthand '[]' notation".format(io_info["name"]))
+        io_return["array"] = True
+    return io_return["array"], io_return["type"], io_return["mode"], io_return["allow"]
 
 
 def _is_cwl_enum_type(io_info):
-    # type: (CWL_IO_Type) -> Tuple[bool, AnyStr, Union[List[AnyStr], None]]
-    """Verifies if the specified input/output corresponds to a CWL enum definition.
+    # type: (CWL_IO_Type) -> Tuple[bool, AnyStr, int, Union[List[AnyStr], None]]
+    """Verifies if the specified I/O corresponds to a CWL enum definition.
 
-    :return is_enum: specifies if the input/output is of enum type
-    :return io_type: enum base type if ``is_enum`` is True, type of ``io_info`` otherwise.
-    :return io_allow: permitted values of the enum
-    :raises PackageTypeError: if the enum doesn't have required parameters to be valid.
+    returns ``tuple(is_enum, io_type, io_allow)`` where:
+        - ``is_enum``: specifies if the I/O is of enum type.
+        - ``io_type``: enum base type if ``is_enum=True``, type of ``io_info`` otherwise.
+        - ``io_mode``: validation mode to be applied if input requires it, defaults to ``MODE.NONE``.
+        - ``io_allow``: validation values of the enum.
+    :raises PackageTypeError: if the enum doesn't have the required parameters and valid format.
     """
     io_type = io_info["type"]
     if not isinstance(io_type, dict) or "type" not in io_type or io_type["type"] not in PACKAGE_CUSTOM_TYPES:
-        return False, io_type, None
+        return False, io_type, MODE.NONE, None
 
     if "symbols" not in io_type:
         raise PackageTypeError("Unsupported I/O 'enum' definition: '{}'.".format(repr(io_info)))
@@ -431,7 +470,8 @@ def _is_cwl_enum_type(io_info):
         raise PackageTypeError("Unsupported I/O 'enum' base type: `{0}`, from definition: `{1}`."
                                .format(str(type(first_allow)), repr(io_info)))
 
-    return True, io_type, io_allow
+    # allowed value validator mode must be set for input
+    return True, io_type, MODE.SIMPLE, io_allow
 
 
 # noinspection PyUnusedLocal
@@ -475,19 +515,19 @@ def _cwl2wps_io(io_info, io_select):
         io_info["type"] = io_type
 
     # convert array types
-    is_array, array_elem = _is_cwl_array_type(io_info)
+    is_array, array_elem, io_mode, io_allow = _is_cwl_array_type(io_info)
     if is_array:
         LOGGER.debug("I/O parsed for 'array'")
         io_type = array_elem
         io_max_occurs = PACKAGE_ARRAY_MAX_SIZE
 
     # convert enum types
-    is_enum, enum_type, enum_allow = _is_cwl_enum_type(io_info)
+    is_enum, enum_type, enum_mode, enum_allow = _is_cwl_enum_type(io_info)
     if is_enum:
         LOGGER.debug("I/O parsed for 'enum'")
         io_type = enum_type
         io_allow = enum_allow
-        io_mode = MODE.SIMPLE  # allowed value validator must be set for input
+        io_mode = enum_mode
 
     # debug info for unhandled types conversion
     if not isinstance(io_type, six.string_types):
@@ -796,7 +836,7 @@ def _wps2json_io(io_wps):
 
 
 def _get_field(io_object, field, search_variations=False, pop_found=False):
-    # type: (ANY_IO_Type, str, bool, bool) -> Any
+    # type: (ANY_IO_Type, AnyStr, bool, bool) -> Any
     """
     Gets a field by name from various I/O object types.
 
@@ -821,7 +861,7 @@ def _get_field(io_object, field, search_variations=False, pop_found=False):
 
 
 def _set_field(io_object, field, value, force=False):
-    # type: (Union[BasicIO, Dict[str, Any]], str, Any, Optional[bool]) -> None
+    # type: (ANY_IO_Type, AnyStr, Any, bool) -> None
     """
     Sets a field by name into various I/O object types.
     Field value is set only if not ``null`` to avoid inserting data considered `invalid`.
@@ -1003,19 +1043,19 @@ def _get_package_io(package_factory, io_select, as_json):
 
 
 def _get_package_inputs(package_factory, as_json=False):
-    # type: (CWLFactoryCallable, Optional[bool]) -> List[Union[JSON_IO_Type, WPS_IO_Type]]
+    # type: (CWLFactoryCallable, bool) -> List[Union[JSON_IO_Type, WPS_IO_Type]]
     """Generates `WPS-like` ``inputs`` using parsed CWL package input definitions."""
     return _get_package_io(package_factory, io_select=WPS_INPUT, as_json=as_json)
 
 
 def _get_package_outputs(package_factory, as_json=False):
-    # type: (CWLFactoryCallable, Optional[bool]) -> List[Union[JSON_IO_Type, WPS_IO_Type]]
+    # type: (CWLFactoryCallable, bool) -> List[Union[JSON_IO_Type, WPS_IO_Type]]
     """Generates `WPS-like` ``outputs`` using parsed CWL package output definitions."""
     return _get_package_io(package_factory, io_select=WPS_OUTPUT, as_json=as_json)
 
 
 def _get_package_inputs_outputs(package_factory,    # type: CWLFactoryCallable
-                                as_json=False,      # type: Optional[bool]
+                                as_json=False,      # type: bool
                                 ):
     # type: (...) -> Tuple[Union[JSON_IO_Type, WPS_IO_Type], Union[JSON_IO_Type, WPS_IO_Type]]
     """Generates `WPS-like` ``(inputs, outputs)`` tuple using parsed CWL package definitions."""
@@ -1526,7 +1566,7 @@ class WpsPackage(Process):
                     # process single occurrences
                     input_i = input_occurs[0]
                     # handle as reference/data
-                    is_array, elem_type = _is_cwl_array_type(cwl_input_info[input_id])
+                    is_array, elem_type, _, _ = _is_cwl_array_type(cwl_input_info[input_id])
                     if is_array:
                         # extend array data that allow max_occur > 1
                         input_data = [i.url if i.as_reference else i.data for i in input_occurs]

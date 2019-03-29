@@ -4,6 +4,7 @@ from weaver.formats import (
     CONTENT_TYPE_TEXT_PLAIN,
     EDAM_NAMESPACE,
     EDAM_MAPPING,
+    get_cwl_file_format,
 )
 from weaver.visibility import VISIBILITY_PUBLIC
 from tests.utils import (
@@ -17,6 +18,10 @@ from tests.utils import (
 from tests import resources
 import pytest
 import unittest
+import six
+
+EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_TEXT_PLAIN]
+EDAM_NETCDF = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_APP_NETCDF]
 
 
 @pytest.mark.functional
@@ -105,13 +110,71 @@ class WpsPackageAppTest(unittest.TestCase):
     def test_literal_io_from_package_and_offering(self):
         raise NotImplementedError
 
-    # FIXME: implement
-    @pytest.mark.xfail(reason="not implemented")
     def test_complex_io_with_multiple_formats(self):
-        # TODO:
-        #   test should validate that different format types are set on different I/O variations simultaneously
-        #   (1 input with 1 format, 1 input with many & no default, 1 input with many & 1 default, same for outputs)
-        raise NotImplementedError
+        """
+        Test validates that different format types are set on different I/O variations simultaneously:
+            - 1 input with 1 format & no default
+            - 1 input with 1 format & 1 default
+            - 1 input with many formats & no default
+            - 1 input with many formats & 1 default
+            - 1 output with 1 format & no default
+            - 1 output with 1 format & 1 default
+            - 1 output with many formats & no default
+            - 1 output with many formats & 1 default
+        """
+        ns1, type1 = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
+        ns2, type2 = get_cwl_file_format(CONTENT_TYPE_TEXT_PLAIN)
+        ns3, type3 = get_cwl_file_format(CONTENT_TYPE_APP_NETCDF)
+        namespaces = dict(ns1.items() + ns2.items() + ns3.items())
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "inputs": {
+                "single": {
+                    "type": "File",
+                    "format": type1,
+                },
+                "multi": {
+                    "type": {
+                        "type": "array",
+                        "items": "File",
+                        "format": type2,
+                    }
+                },
+                "single_default": {
+                    "type": "File",
+                    "format": type1,
+                },
+                "multi_default": {
+                    "type": {
+                        "type": "array",
+                        "items": "File",
+                        "format": type2,
+                    }
+                },
+            },
+            "outputs": {
+                "values": {
+                    "type": {
+                        "type": "array",
+                        "items": "float",
+                    }
+                }
+            },
+            "$namespaces": namespaces
+        }
+        body = {
+            "processDescription": {
+                "process": {
+                    "id": self.__name__,
+                    "title": "some title",
+                    "abstract": "this is a test",
+                }
+            },
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        desc, pkg = self.deploy_process(body)
 
     # FIXME: implement
     @pytest.mark.xfail(reason="not implemented")
@@ -130,8 +193,6 @@ class WpsPackageAppTest(unittest.TestCase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
         }
         desc, pkg = self.deploy_process(body)
-        edam_plain = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_TEXT_PLAIN]
-        edam_netcdf = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_APP_NETCDF]
 
         # basic contents validation
         assert "cwlVersion" in pkg
@@ -144,7 +205,7 @@ class WpsPackageAppTest(unittest.TestCase):
         assert pkg["inputs"]["tasmax"]["default"]["mimeType"] == CONTENT_TYPE_APP_NETCDF
         assert pkg["inputs"]["tasmax"]["default"]["encoding"] == "base64"
         assert pkg["inputs"]["tasmax"]["default"]["schema"] is None
-        assert pkg["inputs"]["tasmax"]["format"] == edam_netcdf
+        assert pkg["inputs"]["tasmax"]["format"] == EDAM_NETCDF
         assert pkg["inputs"]["tasmax"]["type"]["type"] == "array"
         assert pkg["inputs"]["tasmax"]["type"]["items"] == "File"
         assert pkg["inputs"]["freq"]["default"] == "YS"
@@ -152,10 +213,10 @@ class WpsPackageAppTest(unittest.TestCase):
         assert pkg["inputs"]["freq"]["type"]["symbols"] == ["YS", "MS", "QS-DEC", "AS-JUL"]
         assert "outputs" in pkg
         assert len(pkg["outputs"]) == 2
-        assert pkg["outputs"]["output_netcdf"]["format"] == edam_netcdf
+        assert pkg["outputs"]["output_netcdf"]["format"] == EDAM_NETCDF
         assert pkg["outputs"]["output_netcdf"]["type"] == "File"
         assert pkg["outputs"]["output_netcdf"]["outputBinding"]["glob"] == "output_netcdf.nc"
-        assert pkg["outputs"]["output_log"]["format"] == edam_plain
+        assert pkg["outputs"]["output_log"]["format"] == EDAM_PLAIN
         assert pkg["outputs"]["output_log"]["type"] == "File"
         assert pkg["outputs"]["output_log"]["outputBinding"]["glob"] == "output_log.*"
 
@@ -167,6 +228,7 @@ class WpsPackageAppTest(unittest.TestCase):
         assert desc["process"]["inputs"][0]["keywords"] == []
         assert desc["process"]["inputs"][0]["minOccurs"] == "1"
         assert desc["process"]["inputs"][0]["maxOccurs"] == "1000"
+        assert len(desc["process"]["inputs"][0]["formats"]) == 1
         assert desc["process"]["inputs"][0]["formats"][0]["default"] is True
         assert desc["process"]["inputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF
         assert desc["process"]["inputs"][0]["formats"][0]["encoding"] == "base64"
@@ -184,6 +246,7 @@ class WpsPackageAppTest(unittest.TestCase):
         assert desc["process"]["outputs"][0]["keywords"] == []
         assert "minOccurs" not in desc["process"]["outputs"][0]
         assert "maxOccurs" not in desc["process"]["outputs"][0]
+        assert len(desc["process"]["outputs"][0]["formats"]) == 1
         assert desc["process"]["outputs"][0]["formats"][0]["default"] is True
         assert desc["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF
         assert desc["process"]["outputs"][0]["formats"][0]["encoding"] == "base64"
@@ -193,5 +256,82 @@ class WpsPackageAppTest(unittest.TestCase):
         assert desc["process"]["outputs"][1]["keywords"] == []
         assert "minOccurs" not in desc["process"]["outputs"][1]
         assert "maxOccurs" not in desc["process"]["outputs"][1]
+        assert len(desc["process"]["outputs"][1]["formats"]) == 1
         assert desc["process"]["outputs"][1]["formats"][0]["default"] is True
         assert desc["process"]["outputs"][1]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+
+    def test_enum_array_and_multi_format_inputs_from_wps_xml_reference(self):
+        body = {
+            "processDescription": {"process": {"id": self.__name__}},
+            "executionUnit": [{"href": "mock://{}".format(resources.WPS_ENUM_ARRAY_IO)}],
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
+        }
+        desc, pkg = self.deploy_process(body)
+
+        # basic contents validation
+        assert "cwlVersion" in pkg
+        assert "process" in desc
+        assert desc["process"]["id"] == self.__name__
+
+        # package I/O validation
+        assert "inputs" in pkg
+        assert len(pkg["inputs"]) == 3
+        assert pkg["inputs"]["region"]["default"] == "DEU"
+        assert pkg["inputs"]["region"]["type"]["type"] == "array"
+        assert pkg["inputs"]["region"]["type"]["items"]["type"] == "enum"
+        assert isinstance(pkg["inputs"]["region"]["type"]["items"]["symbols"], list)
+        assert len(pkg["inputs"]["region"]["type"]["items"]["symbols"]) == 220
+        assert all(isinstance(s, six.string_types) for s in pkg["inputs"]["region"]["type"]["items"]["symbols"])
+        assert pkg["inputs"]["mosaic"]["default"] == "null"
+        assert pkg["inputs"]["mosaic"]["type"] == "boolean"
+        assert pkg["inputs"]["resource"]["default"]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert pkg["inputs"]["resource"]["default"]["encoding"] is None
+        assert pkg["inputs"]["resource"]["default"]["schema"] is None
+        assert pkg["inputs"]["resource"]["format"]["schema"] is EDAM_NETCDF
+        assert pkg["inputs"]["resource"]["type"]["type"] == "array"
+        assert pkg["inputs"]["resource"]["type"]["items"] == "File"
+        # FIXME: implement (resource input had 3 possible formats)
+        #   figure out how to generate the CWL with multi input formats... is it possible?
+
+        # process description I/O validation
+        assert len(desc["process"]["inputs"]) == 3
+        assert desc["process"]["inputs"][0]["id"] == "region"
+        assert desc["process"]["inputs"][0]["title"] == "Region"
+        assert desc["process"]["inputs"][0]["abstract"] == "Country code, see ISO-3166-3"
+        assert desc["process"]["inputs"][0]["keywords"] == []
+        assert desc["process"]["inputs"][0]["minOccurs"] == "1"
+        assert desc["process"]["inputs"][0]["maxOccurs"] == "220"
+        assert "formats" not in desc["process"]["inputs"][0]
+        assert desc["process"]["inputs"][1]["id"] == "mosaic"
+        assert desc["process"]["inputs"][1]["title"] == "Union of multiple regions"
+        assert desc["process"]["inputs"][1]["abstract"] == \
+               "If True, selected regions will be merged into a single geometry."   # noqa
+        assert desc["process"]["inputs"][1]["keywords"] == []
+        assert desc["process"]["inputs"][1]["minOccurs"] == "0"
+        assert desc["process"]["inputs"][1]["maxOccurs"] == "1"
+        assert "formats" not in desc["process"]["inputs"][1]
+        assert desc["process"]["inputs"][2]["id"] == "resource"
+        assert desc["process"]["inputs"][2]["title"] == "Resource"
+        assert desc["process"]["inputs"][2]["abstract"] == "Resampling frequency"
+        assert desc["process"]["inputs"][2]["keywords"] == []
+        assert desc["process"]["inputs"][2]["minOccurs"] == "1"
+        assert desc["process"]["inputs"][2]["maxOccurs"] == "1"
+        assert len(desc["process"]["inputs"][2]["formats"]) == 3
+        # FIXME: should we store 'None' in db instead of empty string when missing "encoding", "schema", etc. ?
+        assert desc["process"]["inputs"][2]["formats"][0]["default"] is True
+        assert desc["process"]["inputs"][2]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert desc["process"]["inputs"][2]["formats"][0]["encoding"] == ""
+        assert desc["process"]["inputs"][2]["formats"][1]["default"] is False
+        assert desc["process"]["inputs"][2]["formats"][1]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert desc["process"]["inputs"][2]["formats"][1]["encoding"] == ""
+        assert desc["process"]["inputs"][2]["formats"][2]["default"] is False
+        assert desc["process"]["inputs"][2]["formats"][2]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert desc["process"]["inputs"][2]["formats"][2]["encoding"] == ""
+
+    # FIXME: implement,
+    #   need to find a existing WPS with some, or manually write XML
+    #   multi-output would be an indirect 1-output with ref to multi
+    #   (https://github.com/crim-ca/weaver/issues/25)
+    @pytest.mark.xfail(reason="not implemented")
+    def test_multi_format_outputs_from_wps_xml_reference(self):
+        raise NotImplementedError

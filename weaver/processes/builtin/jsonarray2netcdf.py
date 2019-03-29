@@ -18,7 +18,7 @@ sys.path.insert(0, CUR_DIR)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(CUR_DIR))))
 
 # place weaver specific imports after sys path fixing to ensure they are found from external call
-from weaver.formats import CONTENT_TYPE_EXTENSION_MAPPING, CONTENT_TYPE_APP_NETCDF  # noqa
+from weaver.formats import get_extension, CONTENT_TYPE_APP_NETCDF  # noqa
 
 PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]
 
@@ -31,7 +31,7 @@ LOGGER.setLevel(logging.INFO)
 def _is_netcdf_url(url):
     # type: (AnyStr) -> bool
     return urlparse(url).scheme != "" and \
-           os.path.splitext(url)[-1].replace('.', '') == CONTENT_TYPE_EXTENSION_MAPPING[CONTENT_TYPE_APP_NETCDF]
+           os.path.splitext(url)[-1].replace('.', '') == get_extension(CONTENT_TYPE_APP_NETCDF)
 
 
 def j2n(json_file, output_dir):

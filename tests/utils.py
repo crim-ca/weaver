@@ -59,7 +59,7 @@ def ignore_deprecated_nested_warnings(func):
 
 
 def get_settings_from_config_ini(config_ini_path=None, ini_section_name="app:main"):
-    # type: (Optional[AnyStr], Optional[AnyStr]) -> SettingsType
+    # type: (Optional[AnyStr], AnyStr) -> SettingsType
     parser = ConfigParser()
     parser.read([config_ini_path or get_default_config_ini_path()])
     settings = dict(parser.items(ini_section_name))

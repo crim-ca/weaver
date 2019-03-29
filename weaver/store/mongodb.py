@@ -83,7 +83,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
         MongodbStore.__init__(self, *db_args, **db_kwargs)
 
     def save_service(self, service, overwrite=True, request=None):
-        # type: (Service, Optional[bool], Optional[Request]) -> Service
+        # type: (Service, bool, Optional[Request]) -> Service
         """
         Stores an OWS service in mongodb.
         """
@@ -234,7 +234,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         return url
 
     def save_process(self, process, overwrite=True, request=None):
-        # type: (Union[Process, ProcessWPS], Optional[bool], Optional[Request]) -> Process
+        # type: (Union[Process, ProcessWPS], bool, Optional[Request]) -> Process
         """
         Stores a process in storage.
 
@@ -356,9 +356,9 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                  process,                   # type: AnyStr
                  service=None,              # type: Optional[AnyStr]
                  inputs=None,               # type: Optional[List[Any]]
-                 is_workflow=False,         # type: Optional[bool]
+                 is_workflow=False,         # type: bool
                  user_id=None,              # type: Optional[int]
-                 execute_async=True,        # type: Optional[bool]
+                 execute_async=True,        # type: bool
                  custom_tags=None,          # type: Optional[List[AnyStr]]
                  access=None,               # type: Optional[AnyStr]
                  notification_email=None,   # type: Optional[AnyStr]
@@ -453,8 +453,8 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                   notification_email=None,  # type: Optional[AnyStr]
                   status=None,              # type: Optional[AnyStr]
                   sort=None,                # type: Optional[AnyStr]
-                  page=0,                   # type: Optional[int]
-                  limit=10,                 # type: Optional[int]
+                  page=0,                   # type: int
+                  limit=10,                 # type: int
                   group_by=None,            # type: Optional[Union[AnyStr, List[AnyStr]]]
                   ):                        # type: (...) -> Union[JobListAndCount, JobCategoriesAndCount]
         """
@@ -499,7 +499,6 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             Where ``<total>`` will again indicate all matched jobs by every category combined, and ``<count>`` will
             indicate the amount of jobs matched for each individual category. Also, ``category`` will indicate values
             of specified fields (from ``group_by``) that compose corresponding jobs with matching values.
-
         """
 
         if any(v in tags for v in visibility_values):
@@ -633,7 +632,7 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
         return quotes
 
     def find_quotes(self, process_id=None, page=0, limit=10, sort=None):
-        # type: (Optional[AnyStr], Optional[int], Optional[int], Optional[AnyStr]) -> Tuple[List[Quote], int]
+        # type: (Optional[AnyStr], int, int, Optional[AnyStr]) -> Tuple[List[Quote], int]
         """
         Finds all quotes in mongodb storage matching search filters.
         """
@@ -701,7 +700,7 @@ class MongodbBillStore(StoreBills, MongodbStore):
         return bills
 
     def find_bills(self, quote_id=None, page=0, limit=10, sort=None):
-        # type: (Optional[AnyStr], Optional[int], Optional[int], Optional[AnyStr]) -> Tuple[List[Bill], int]
+        # type: (Optional[AnyStr], int, int, Optional[AnyStr]) -> Tuple[List[Bill], int]
         """
         Finds all bills in mongodb storage matching search filters.
         """

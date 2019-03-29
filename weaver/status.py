@@ -56,7 +56,7 @@ STATUS_PYWPS_IDS = {k.lower(): v for v, k in STATUS_PYWPS_MAP.items()}          
 
 
 def map_status(wps_status, compliant=STATUS_COMPLIANT_OGC):
-    # type: (AnyStatusType, Optional[AnyStr]) -> AnyStr
+    # type: (AnyStatusType, AnyStr) -> AnyStr
     """
     Maps WPS statuses (weaver.status, OWSLib or PyWPS) to OWSLib/PyWPS compatible values.
     For each compliant combination, unsupported statuses are changed to corresponding ones (with closest logical match).
