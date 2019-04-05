@@ -574,7 +574,7 @@ def _cwl2wps_io(io_info, io_select):
             "abstract": io_info.get("doc", ""),
         }
         if "format" in io_info:
-            kw["supported_formats"] = [Format(clean_mime_type_format(io_info["format"]))]
+            kw["supported_formats"] = [Format(clean_mime_type_format(str(io_info["format"])))]
             kw["mode"] = MODE.SIMPLE
         else:
             # we need to minimally add 1 format, otherwise empty list is evaluated as None by pywps
@@ -817,6 +817,7 @@ def _wps2json_io(io_wps):
 
     # minimum requirement of 1 format object which defines mime-type
     if io_wps_json["type"] == WPS_COMPLEX:
+        # FIXME: should we store 'None' in db instead of empty string when missing "encoding", "schema", etc. ?
         if "formats" not in io_wps_json or not len(io_wps_json["formats"]):
             io_wps_json["formats"] = [DefaultFormat.json]
         for io_format in io_wps_json["formats"]:
@@ -924,7 +925,7 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
                               for wps_io in wps_io_list)
     cwl_io_dict = OrderedDict((_get_field(cwl_io, "identifier", search_variations=True), cwl_io)
                               for cwl_io in cwl_io_list)
-    missing_io_list = set(cwl_io_dict) - set(wps_io_dict)
+    missing_io_list = [cwl_io for cwl_io in cwl_io_dict if cwl_io not in wps_io_dict]  # preserve ordering
     updated_io_list = list()
     # missing WPS I/O are inferred only using CWL->WPS definitions
     for cwl_id in missing_io_list:

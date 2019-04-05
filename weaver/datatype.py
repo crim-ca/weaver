@@ -509,7 +509,8 @@ class Process(Base):
             self["id"] = self.pop("identifier")
         if "package" not in self:
             raise TypeError("'package' is required")
-        self.package = self.pop("package")  # force encode
+        setattr(self, "package", self.pop("package"))           # force encode
+        setattr(self, "payload", self.pop("payload", None))     # force encode
 
     @property
     def id(self):

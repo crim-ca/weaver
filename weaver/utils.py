@@ -502,7 +502,7 @@ def clean_json_text_body(body):
     Cleans a textual body field of superfluous characters to provide a better human-readable text in a JSON response.
     """
     # cleanup various escape characters and u'' stings
-    replaces = [(',\n', ', '), (' \n', ' '), ('\"', '\''), ('\\', ''),
+    replaces = [(',\n', ', '), ('\\n', ' '), (' \n', ' '), ('\"', '\''), ('\\', ''),
                 ('u\'', '\''), ('u\"', '\''), ('\'\'', '\''), ('  ', ' ')]
     replaces_from = [r[0] for r in replaces]
     while any(rf in body for rf in replaces_from):

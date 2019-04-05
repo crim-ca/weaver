@@ -47,14 +47,14 @@ import six
 class WpsRestApiJobsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        warnings.simplefilter('ignore', TimeZoneInfoAlreadySetWarning)
+        warnings.simplefilter("ignore", TimeZoneInfoAlreadySetWarning)
         cls.config = setup_config_with_mongodb()
-        cls.config.include('weaver.wps')
-        cls.config.include('weaver.wps_restapi')
-        cls.config.include('weaver.tweens')
+        cls.config.include("weaver.wps")
+        cls.config.include("weaver.wps_restapi")
+        cls.config.include("weaver.tweens")
         cls.config.registry.settings.update({
-            'weaver.url': "localhost",
-            'weaver.wps_email_encrypt_salt': 'weaver-test',
+            "weaver.url": "localhost",
+            "weaver.wps_email_encrypt_salt": "weaver-test",
         })
         cls.config.scan()
         cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
@@ -74,44 +74,44 @@ class WpsRestApiJobsTest(unittest.TestCase):
         self.user_editor1_id = 1
         self.user_editor2_id = 2
 
-        self.process_public = WpsTestProcess(identifier='process-public')
+        self.process_public = WpsTestProcess(identifier="process-public")
         self.process_store.save_process(self.process_public)
         self.process_store.set_visibility(self.process_public.identifier, VISIBILITY_PUBLIC)
-        self.process_private = WpsTestProcess(identifier='process-private')
+        self.process_private = WpsTestProcess(identifier="process-private")
         self.process_store.save_process(self.process_private)
         self.process_store.set_visibility(self.process_private.identifier, VISIBILITY_PRIVATE)
-        self.process_unknown = 'process-unknown'
+        self.process_unknown = "process-unknown"
 
-        self.service_public = Service(name='service-public', url='http://localhost/wps/service-public', public=True)
+        self.service_public = Service(name="service-public", url="http://localhost/wps/service-public", public=True)
         self.service_store.save_service(self.service_public)
-        self.service_private = Service(name='service-private', url='http://localhost/wps/service-private', public=False)
+        self.service_private = Service(name="service-private", url="http://localhost/wps/service-private", public=False)
         self.service_store.save_service(self.service_private)
 
         # create jobs accessible by index
         self.job_info = []  # type: List[Job]
-        self.make_job(task_id='0000-0000-0000-0000', process=self.process_public.identifier, service=None,
+        self.make_job(task_id="0000-0000-0000-0000", process=self.process_public.identifier, service=None,
                       user_id=self.user_editor1_id, status=STATUS_SUCCEEDED, progress=100, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id='1111-1111-1111-1111', process=self.process_unknown, service=self.service_public.name,
+        self.make_job(task_id="1111-1111-1111-1111", process=self.process_unknown, service=self.service_public.name,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id='2222-2222-2222-2222', process=self.process_private.identifier, service=None,
+        self.make_job(task_id="2222-2222-2222-2222", process=self.process_private.identifier, service=None,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=55, access=VISIBILITY_PUBLIC)
         # same process as job 0, but private (ex: job ran with private process, then process made public afterwards)
-        self.make_job(task_id='3333-3333-3333-3333', process=self.process_public.identifier, service=None,
+        self.make_job(task_id="3333-3333-3333-3333", process=self.process_public.identifier, service=None,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=55, access=VISIBILITY_PRIVATE)
         # job ran by admin
-        self.make_job(task_id='4444-4444-4444-4444', process=self.process_public.identifier, service=None,
+        self.make_job(task_id="4444-4444-4444-4444", process=self.process_public.identifier, service=None,
                       user_id=self.user_admin_id, status=STATUS_FAILED, progress=55, access=VISIBILITY_PRIVATE)
         # job public/private service/process combinations
-        self.make_job(task_id='5555-5555-5555-5555',
+        self.make_job(task_id="5555-5555-5555-5555",
                       process=self.process_public.identifier, service=self.service_public.name,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id='6666-6666-6666-6666',
+        self.make_job(task_id="6666-6666-6666-6666",
                       process=self.process_private.identifier, service=self.service_public.name,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id='7777-7777-7777-7777',
+        self.make_job(task_id="7777-7777-7777-7777",
                       process=self.process_public.identifier, service=self.service_private.name,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id='8888-8888-8888-8888',
+        self.make_job(task_id="8888-8888-8888-8888",
                       process=self.process_private.identifier, service=self.service_private.name,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
 
@@ -142,8 +142,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
     def get_job_request_auth_mock(self, user_id):
         is_admin = self.user_admin_id == user_id
         return tuple([
-            mock.patch('pyramid.security.AuthenticationAPIMixin.authenticated_userid', new_callable=lambda: user_id),
-            mock.patch('pyramid.request.AuthorizationAPIMixin.has_permission', return_value=is_admin),
+            mock.patch("pyramid.security.AuthenticationAPIMixin.authenticated_userid", new_callable=lambda: user_id),
+            mock.patch("pyramid.request.AuthorizationAPIMixin.has_permission", return_value=is_admin),
         ])
 
     # noinspection PyProtectedMember
@@ -153,34 +153,34 @@ class WpsRestApiJobsTest(unittest.TestCase):
         mock_processes = mock.PropertyMock
         mock_processes.return_value = processes
         return tuple([
-            mock.patch.object(WebProcessingService, 'getcapabilities', new=lambda *args, **kwargs: None),
-            mock.patch.object(WebProcessingService, 'processes', new_callable=mock_processes, create=True),
+            mock.patch.object(WebProcessingService, "getcapabilities", new=lambda *args, **kwargs: None),
+            mock.patch.object(WebProcessingService, "processes", new_callable=mock_processes, create=True),
         ])
 
     @staticmethod
     def check_job_format(job):
         assert isinstance(job, dict)
-        assert 'jobID' in job and isinstance(job['jobID'], six.string_types)
-        assert 'status' in job and isinstance(job['status'], six.string_types)
-        assert 'message' in job and isinstance(job['message'], six.string_types)
-        assert 'percentCompleted' in job and isinstance(job['percentCompleted'], int)
-        assert 'logs' in job and isinstance(job['logs'], six.string_types)
-        assert job['status'] in job_status_values
-        if job['status'] == STATUS_SUCCEEDED:
-            assert 'result' in job and isinstance(job['result'], six.string_types)
-        elif job['status'] == STATUS_FAILED:
-            assert 'exceptions' in job and isinstance(job['exceptions'], six.string_types)
+        assert "jobID" in job and isinstance(job["jobID"], six.string_types)
+        assert "status" in job and isinstance(job["status"], six.string_types)
+        assert "message" in job and isinstance(job["message"], six.string_types)
+        assert "percentCompleted" in job and isinstance(job["percentCompleted"], int)
+        assert "logs" in job and isinstance(job["logs"], six.string_types)
+        assert job["status"] in job_status_values
+        if job["status"] == STATUS_SUCCEEDED:
+            assert "result" in job and isinstance(job["result"], six.string_types)
+        elif job["status"] == STATUS_FAILED:
+            assert "exceptions" in job and isinstance(job["exceptions"], six.string_types)
 
     @staticmethod
     def check_basic_jobs_info(response):
         assert response.status_code == 200
         assert response.content_type == CONTENT_TYPE_APP_JSON
-        assert 'jobs' in response.json and isinstance(response.json['jobs'], list)
-        assert 'page' in response.json and isinstance(response.json['page'], int)
-        assert 'total' in response.json and isinstance(response.json['total'], int)
-        assert 'limit' in response.json and isinstance(response.json['limit'], int)
-        assert len(response.json['jobs']) <= response.json['limit']
-        assert response.json['page'] == response.json['total'] // response.json['limit']
+        assert "jobs" in response.json and isinstance(response.json["jobs"], list)
+        assert "page" in response.json and isinstance(response.json["page"], int)
+        assert "total" in response.json and isinstance(response.json["total"], int)
+        assert "limit" in response.json and isinstance(response.json["limit"], int)
+        assert len(response.json["jobs"]) <= response.json["limit"]
+        assert response.json["page"] == response.json["total"] // response.json["limit"]
 
     @staticmethod
     def check_basic_jobs_grouped_info(response, group_by):
@@ -188,21 +188,21 @@ class WpsRestApiJobsTest(unittest.TestCase):
             group_by = [group_by]
         assert response.status_code == 200
         assert response.content_type == CONTENT_TYPE_APP_JSON
-        assert 'page' not in response.json
-        assert 'limit' not in response.json
-        assert 'total' in response.json and isinstance(response.json['total'], int)
-        assert 'groups' in response.json
-        assert isinstance(response.json['groups'], list)
+        assert "page" not in response.json
+        assert "limit" not in response.json
+        assert "total" in response.json and isinstance(response.json["total"], int)
+        assert "groups" in response.json
+        assert isinstance(response.json["groups"], list)
         total = 0
-        for grouped_jobs in response.json['groups']:
-            assert 'category' in grouped_jobs and isinstance(grouped_jobs['category'], dict)
-            assert all(g in grouped_jobs['category'] for g in group_by)
-            assert len(set(group_by) - set(grouped_jobs['category'])) == 0
-            assert 'jobs' in grouped_jobs and isinstance(grouped_jobs['jobs'], list)
-            assert 'count' in grouped_jobs and isinstance(grouped_jobs['count'], int)
-            assert len(grouped_jobs['jobs']) == grouped_jobs['count']
-            total += grouped_jobs['count']
-        assert total == response.json['total']
+        for grouped_jobs in response.json["groups"]:
+            assert "category" in grouped_jobs and isinstance(grouped_jobs["category"], dict)
+            assert all(g in grouped_jobs["category"] for g in group_by)
+            assert len(set(group_by) - set(grouped_jobs["category"])) == 0
+            assert "jobs" in grouped_jobs and isinstance(grouped_jobs["jobs"], list)
+            assert "count" in grouped_jobs and isinstance(grouped_jobs["count"], int)
+            assert len(grouped_jobs["jobs"]) == grouped_jobs["count"]
+            total += grouped_jobs["count"]
+        assert total == response.json["total"]
 
     @staticmethod
     def add_params(path, **kwargs):
@@ -211,95 +211,95 @@ class WpsRestApiJobsTest(unittest.TestCase):
     def test_get_jobs_normal_paged(self):
         resp = self.app.get(jobs_short_uri, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
-        for job_id in resp.json['jobs']:
+        for job_id in resp.json["jobs"]:
             assert isinstance(job_id, six.string_types)
 
-        for detail in ('false', 0, 'False', 'no', 'None', 'null', None, ''):
+        for detail in ("false", 0, "False", "no", "None", "null", None, ""):
             path = self.add_params(jobs_short_uri, detail=detail)
             resp = self.app.get(path, headers=self.json_headers)
             self.check_basic_jobs_info(resp)
-            for job_id in resp.json['jobs']:
+            for job_id in resp.json["jobs"]:
                 assert isinstance(job_id, six.string_types)
 
     def test_get_jobs_detail_paged(self):
-        for detail in ('true', 1, 'True', 'yes'):
+        for detail in ("true", 1, "True", "yes"):
             path = self.add_params(jobs_short_uri, detail=detail)
             resp = self.app.get(path, headers=self.json_headers)
             self.check_basic_jobs_info(resp)
-            for job in resp.json['jobs']:
+            for job in resp.json["jobs"]:
                 self.check_job_format(job)
 
     def test_get_jobs_normal_grouped(self):
-        for detail in ('false', 0, 'False', 'no'):
-            groups = ['process', 'service']
-            path = self.add_params(jobs_short_uri, detail=detail, group_by=','.join(groups))
+        for detail in ("false", 0, "False", "no"):
+            groups = ["process", "service"]
+            path = self.add_params(jobs_short_uri, detail=detail, group_by=",".join(groups))
             resp = self.app.get(path, headers=self.json_headers)
             self.check_basic_jobs_grouped_info(resp, group_by=groups)
-            for grouped_jobs in resp.json['groups']:
-                for job in grouped_jobs['jobs']:
+            for grouped_jobs in resp.json["groups"]:
+                for job in grouped_jobs["jobs"]:
                     assert isinstance(job, six.string_types)
 
     def test_get_jobs_detail_grouped(self):
-        for detail in ('true', 1, 'True', 'yes'):
-            groups = ['process', 'service']
-            path = self.add_params(jobs_short_uri, detail=detail, group_by=','.join(groups))
+        for detail in ("true", 1, "True", "yes"):
+            groups = ["process", "service"]
+            path = self.add_params(jobs_short_uri, detail=detail, group_by=",".join(groups))
             resp = self.app.get(path, headers=self.json_headers)
             self.check_basic_jobs_grouped_info(resp, group_by=groups)
-            for grouped_jobs in resp.json['groups']:
-                for job in grouped_jobs['jobs']:
+            for grouped_jobs in resp.json["groups"]:
+                for job in grouped_jobs["jobs"]:
                     self.check_job_format(job)
 
     def test_get_jobs_valid_grouping_by_process(self):
-        path = self.add_params(jobs_short_uri, detail='false', group_by='process')
+        path = self.add_params(jobs_short_uri, detail="false", group_by="process")
         resp = self.app.get(path, headers=self.json_headers)
-        self.check_basic_jobs_grouped_info(resp, group_by='process')
+        self.check_basic_jobs_grouped_info(resp, group_by="process")
 
         # ensure that group categories are distinct
-        for i, grouped_jobs in enumerate(resp.json['groups']):
-            categories = grouped_jobs['category']
-            for j, grp_jobs in enumerate(resp.json['groups']):
-                compared = grp_jobs['category']
+        for i, grouped_jobs in enumerate(resp.json["groups"]):
+            categories = grouped_jobs["category"]
+            for j, grp_jobs in enumerate(resp.json["groups"]):
+                compared = grp_jobs["category"]
                 if i == j:
                     continue
                 assert categories != compared
 
             # validate groups with expected jobs counts and ids (nb: only public jobs are returned)
-            if categories['process'] == self.process_public.identifier:
-                assert len(grouped_jobs['jobs']) == 3
-                assert set(grouped_jobs['jobs']) == {self.job_info[0].id, self.job_info[5].id, self.job_info[7].id}
-            elif categories['process'] == self.process_private.identifier:
-                assert len(grouped_jobs['jobs']) == 3
-                assert set(grouped_jobs['jobs']) == {self.job_info[2].id, self.job_info[6].id, self.job_info[8].id}
-            elif categories['process'] == self.process_unknown:
-                assert len(grouped_jobs['jobs']) == 1
-                assert set(grouped_jobs['jobs']) == {self.job_info[1].id}
+            if categories["process"] == self.process_public.identifier:
+                assert len(grouped_jobs["jobs"]) == 3
+                assert set(grouped_jobs["jobs"]) == {self.job_info[0].id, self.job_info[5].id, self.job_info[7].id}
+            elif categories["process"] == self.process_private.identifier:
+                assert len(grouped_jobs["jobs"]) == 3
+                assert set(grouped_jobs["jobs"]) == {self.job_info[2].id, self.job_info[6].id, self.job_info[8].id}
+            elif categories["process"] == self.process_unknown:
+                assert len(grouped_jobs["jobs"]) == 1
+                assert set(grouped_jobs["jobs"]) == {self.job_info[1].id}
             else:
                 pytest.fail("Unknown job grouping 'process' value not expected.")
 
     def test_get_jobs_valid_grouping_by_service(self):
-        path = self.add_params(jobs_short_uri, detail='false', group_by='service')
+        path = self.add_params(jobs_short_uri, detail="false", group_by="service")
         resp = self.app.get(path, headers=self.json_headers)
-        self.check_basic_jobs_grouped_info(resp, group_by='service')
+        self.check_basic_jobs_grouped_info(resp, group_by="service")
 
         # ensure that group categories are distinct
-        for i, grouped_jobs in enumerate(resp.json['groups']):
-            categories = grouped_jobs['category']
-            for j, grp_jobs in enumerate(resp.json['groups']):
-                compared = grp_jobs['category']
+        for i, grouped_jobs in enumerate(resp.json["groups"]):
+            categories = grouped_jobs["category"]
+            for j, grp_jobs in enumerate(resp.json["groups"]):
+                compared = grp_jobs["category"]
                 if i == j:
                     continue
                 assert categories != compared
 
             # validate groups with expected jobs counts and ids (nb: only public jobs are returned)
-            if categories['service'] == self.service_public.name:
-                assert len(grouped_jobs['jobs']) == 3
-                assert set(grouped_jobs['jobs']) == {self.job_info[1].id, self.job_info[5].id, self.job_info[6].id}
-            elif categories['service'] == self.service_private.name:
-                assert len(grouped_jobs['jobs']) == 2
-                assert set(grouped_jobs['jobs']) == {self.job_info[7].id, self.job_info[8].id}
-            elif categories['service'] is None:
-                assert len(grouped_jobs['jobs']) == 2
-                assert set(grouped_jobs['jobs']) == {self.job_info[0].id, self.job_info[2].id}
+            if categories["service"] == self.service_public.name:
+                assert len(grouped_jobs["jobs"]) == 3
+                assert set(grouped_jobs["jobs"]) == {self.job_info[1].id, self.job_info[5].id, self.job_info[6].id}
+            elif categories["service"] == self.service_private.name:
+                assert len(grouped_jobs["jobs"]) == 2
+                assert set(grouped_jobs["jobs"]) == {self.job_info[7].id, self.job_info[8].id}
+            elif categories["service"] is None:
+                assert len(grouped_jobs["jobs"]) == 2
+                assert set(grouped_jobs["jobs"]) == {self.job_info[0].id, self.job_info[2].id}
             else:
                 pytest.fail("Unknown job grouping 'service' value not expected.")
 
@@ -321,32 +321,32 @@ class WpsRestApiJobsTest(unittest.TestCase):
             resp = self.app.post_json(path, params=body, headers=self.json_headers)
             assert resp.status_code == 201
             assert resp.content_type == CONTENT_TYPE_APP_JSON
-        job_id = resp.json['jobID']
+        job_id = resp.json["jobID"]
 
         # verify the email is not in plain text
         job = self.job_store.fetch_by_id(job_id)
         assert job.notification_email != email and job.notification_email is not None
         assert int(job.notification_email, 16) != 0  # email should be encrypted with hex string
 
-        path = self.add_params(jobs_short_uri, detail='true', notification_email=email)
+        path = self.add_params(jobs_short_uri, detail="true", notification_email=email)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.content_type == CONTENT_TYPE_APP_JSON
-        assert resp.json['total'] == 1, "Should match exactly 1 email with specified literal string as query param."
-        assert resp.json['jobs'][0]['jobID'] == job_id
+        assert resp.json["total"] == 1, "Should match exactly 1 email with specified literal string as query param."
+        assert resp.json["jobs"][0]["jobID"] == job_id
 
     def test_get_jobs_process_in_query_normal(self):
         path = self.add_params(jobs_short_uri, process=self.job_info[0].process)
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
-        assert self.job_info[0].id in resp.json['jobs'], self.message_with_jobs_mapping("expected in")
-        assert self.job_info[1].id not in resp.json['jobs'], self.message_with_jobs_mapping("expected not in")
+        assert self.job_info[0].id in resp.json["jobs"], self.message_with_jobs_mapping("expected in")
+        assert self.job_info[1].id not in resp.json["jobs"], self.message_with_jobs_mapping("expected not in")
 
     def test_get_jobs_process_in_query_detail(self):
-        path = self.add_params(jobs_short_uri, process=self.job_info[0].process, detail='true')
+        path = self.add_params(jobs_short_uri, process=self.job_info[0].process, detail="true")
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
-        job_ids = [j['jobID'] for j in resp.json['jobs']]
+        job_ids = [j["jobID"] for j in resp.json["jobs"]]
         assert self.job_info[0].id in job_ids, self.message_with_jobs_mapping("expected in")
         assert self.job_info[1].id not in job_ids, self.message_with_jobs_mapping("expected not in")
 
@@ -354,25 +354,25 @@ class WpsRestApiJobsTest(unittest.TestCase):
         path = process_jobs_uri.format(process_id=self.job_info[0].process)
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
-        assert self.job_info[0].id in resp.json['jobs'], self.message_with_jobs_mapping("expected in")
-        assert self.job_info[1].id not in resp.json['jobs'], self.message_with_jobs_mapping("expected not in")
+        assert self.job_info[0].id in resp.json["jobs"], self.message_with_jobs_mapping("expected in")
+        assert self.job_info[1].id not in resp.json["jobs"], self.message_with_jobs_mapping("expected not in")
 
     def test_get_jobs_process_in_path_detail(self):
         path = process_jobs_uri.format(process_id=self.job_info[0].process) + "?detail=true"
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
-        job_ids = [j['jobID'] for j in resp.json['jobs']]
+        job_ids = [j["jobID"] for j in resp.json["jobs"]]
         assert self.job_info[0].id in job_ids, self.message_with_jobs_mapping("expected in")
         assert self.job_info[1].id not in job_ids, self.message_with_jobs_mapping("expected not in")
 
     def test_get_jobs_process_unknown_in_path(self):
-        path = process_jobs_uri.format(process_id='unknown-process-id')
+        path = process_jobs_uri.format(process_id="unknown-process-id")
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_get_jobs_process_unknown_in_query(self):
-        path = self.add_params(jobs_short_uri, process='unknown-process-id')
+        path = self.add_params(jobs_short_uri, process="unknown-process-id")
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
         assert resp.content_type == CONTENT_TYPE_APP_JSON
@@ -390,13 +390,13 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_get_jobs_service_and_process_unknown_in_path(self):
-        path = jobs_full_uri.format(provider_id='unknown-service-id', process_id='unknown-process-id')
+        path = jobs_full_uri.format(provider_id="unknown-service-id", process_id="unknown-process-id")
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_get_jobs_service_and_process_unknown_in_query(self):
-        path = self.add_params(jobs_short_uri, service='unknown-service-id', process='unknown-process-id')
+        path = self.add_params(jobs_short_uri, service="unknown-service-id", process="unknown-process-id")
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
         assert resp.content_type == CONTENT_TYPE_APP_JSON
@@ -511,6 +511,6 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 resp = self.app.get(test, headers=self.json_headers)
                 self.check_basic_jobs_info(resp)
                 job_ids = [job.id for job in expected_jobs]
-                job_match = all(job in job_ids for job in resp.json['jobs'])
+                job_match = all(job in job_ids for job in resp.json["jobs"])
                 test_values = dict(path=path, access=access, user_id=user_id)
-                assert job_match, self.message_with_jobs_diffs(resp.json['jobs'], job_ids, test_values, index=i)
+                assert job_match, self.message_with_jobs_diffs(resp.json["jobs"], job_ids, test_values, index=i)

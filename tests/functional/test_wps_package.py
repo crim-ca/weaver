@@ -111,56 +111,105 @@ class WpsPackageAppTest(unittest.TestCase):
         raise NotImplementedError
 
     def test_complex_io_with_multiple_formats(self):
+        # FIXME: multiple output (array) not tested here
         """
         Test validates that different format types are set on different I/O variations simultaneously:
-            - 1 input with 1 format & no default
-            - 1 input with 1 format & 1 default
-            - 1 input with many formats & no default
-            - 1 input with many formats & 1 default
-            - 1 output with 1 format & no default
-            - 1 output with 1 format & 1 default
-            - 1 output with many formats & no default
-            - 1 output with many formats & 1 default
+            - input with 1 format, single value, no default
+            - input with 1 format, array values, no default
+            - input with 1 format, single value, 1 default
+            - input with 1 format, array values, 1 default
+            - input with many formats, single value, no default
+            - input with many formats, array values, no default
+            - input with many formats, single value, 1 default
+            - input with many formats, array values, 1 default
+
+            - output with 1 format, single value, no default
+            - output with 1 format, single value, 1 default
+            - output with many formats, single value, no default
+            - output with many formats, single value, 1 default
+
+        On addition, the test evaluates that:
+            - CWL I/O specified as list preserves the specified ordering
+            - partial WPS definition of I/O format to indicate 'default' are resolved with additional CWL I/O formats
+
+        NOTE:
+            field 'default' in CWL refers to default "value", in WPS refers to default "format" for complex types
         """
         ns1, type1 = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
         ns2, type2 = get_cwl_file_format(CONTENT_TYPE_TEXT_PLAIN)
         ns3, type3 = get_cwl_file_format(CONTENT_TYPE_APP_NETCDF)
         namespaces = dict(ns1.items() + ns2.items() + ns3.items())
+        default_file = "https://server.com/file"
         cwl = {
             "cwlVersion": "v1.0",
             "class": "CommandLineTool",
-            "inputs": {
-                "single": {
+            "inputs": [
+                {
+                    "id": "single_value_single_format",
                     "type": "File",
                     "format": type1,
                 },
-                "multi": {
+                {
+                    "id": "multi_value_single_format",
                     "type": {
                         "type": "array",
                         "items": "File",
-                        "format": type2,
-                    }
+                    },
+                    "format": type2,
                 },
-                "single_default": {
+                {
+                    "id": "single_value_single_format_default",
                     "type": "File",
-                    "format": type1,
+                    "format": type3,
+                    "default": default_file,
                 },
-                "multi_default": {
+                {
+                    "id": "multi_value_single_format_default",
                     "type": {
                         "type": "array",
                         "items": "File",
-                        "format": type2,
-                    }
+                    },
+                    "format": type2,
+                    "default": default_file,
                 },
-            },
-            "outputs": {
-                "values": {
+                {
+                    "id": "single_value_multi_format",
+                    "type": "File",
+                    "format": [type1, type2, type3],
+                },
+                {
+                    "id": "multi_value_multi_format",
+                    "type": {
+                        "type": "array",
+                        "items": "File",
+                    },
+                    "format": [type1, type2, type3],
+                },
+                {
+                    "id": "single_value_multi_format_default",
+                    "type": "File",
+                    "format": [type1, type2, type3],
+                    "default": default_file,
+                },
+                {
+                    "id": "multi_value_multi_format_default",
+                    "type": {
+                        "type": "array",
+                        "items": "File",
+                    },
+                    "format": [type1, type2, type3],
+                    "default": default_file,
+                },
+            ],
+            "outputs": [
+                {
+                    "id": "values",
                     "type": {
                         "type": "array",
                         "items": "float",
                     }
                 }
-            },
+            ],
             "$namespaces": namespaces
         }
         body = {
@@ -169,12 +218,112 @@ class WpsPackageAppTest(unittest.TestCase):
                     "id": self.__name__,
                     "title": "some title",
                     "abstract": "this is a test",
-                }
+                },
+                # only partial inputs provided to fill additional details that cannot be specified with CWL alone
+                # only providing the 'default' format, others auto-resolved/added by CWL definitions
+                "inputs": [
+                    {
+                        "id": "multi_value_multi_format",
+                        "formats": [
+                            {
+                                "mimeType": CONTENT_TYPE_APP_JSON,
+                                "default": True,
+                            }
+                        ]
+                    },
+                    {
+                        "id": "multi_value_multi_format_default",
+                        "formats": [
+                            {
+                                "mimeType": CONTENT_TYPE_APP_NETCDF,
+                                "default": True,
+                            }
+                        ]
+                    }
+                ]
             },
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
         desc, pkg = self.deploy_process(body)
+
+        # process description input validation
+        assert desc["process"]["inputs"][0]["id"] == "single_value_single_format"
+        assert desc["process"]["inputs"][0]["minOccurs"] == "1"
+        assert desc["process"]["inputs"][0]["maxOccurs"] == "1"
+        assert len(desc["process"]["inputs"][0]["formats"]) == 1
+        assert desc["process"]["inputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["inputs"][0]["formats"][0]["default"] is True  # only format available, auto default
+        assert desc["process"]["inputs"][1]["id"] == "multi_value_single_format"
+        assert desc["process"]["inputs"][1]["minOccurs"] == "1"
+        assert desc["process"]["inputs"][1]["maxOccurs"] == "unbounded"
+        assert len(desc["process"]["inputs"][1]["formats"]) == 1
+        assert desc["process"]["inputs"][1]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["inputs"][1]["formats"][0]["default"] is True  # only format available, auto default
+        assert desc["process"]["inputs"][2]["id"] == "single_value_single_format_default"
+        assert desc["process"]["inputs"][2]["minOccurs"] == "0"
+        assert desc["process"]["inputs"][2]["maxOccurs"] == "1"
+        assert len(desc["process"]["inputs"][2]["formats"]) == 1
+        assert desc["process"]["inputs"][2]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert desc["process"]["inputs"][2]["formats"][0]["default"] is True  # only format available, auto default
+        assert desc["process"]["inputs"][3]["id"] == "multi_value_single_format_default"
+        assert desc["process"]["inputs"][3]["minOccurs"] == "0"
+        assert desc["process"]["inputs"][3]["maxOccurs"] == "unbounded"
+        assert len(desc["process"]["inputs"][3]["formats"]) == 1
+        assert desc["process"]["inputs"][3]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["inputs"][3]["formats"][0]["default"] is True  # only format available, auto default
+        assert desc["process"]["inputs"][4]["id"] == "single_value_multi_format"
+        assert desc["process"]["inputs"][4]["minOccurs"] == "1"
+        assert desc["process"]["inputs"][4]["maxOccurs"] == "1"
+        assert len(desc["process"]["inputs"][4]["formats"]) == 3
+        assert desc["process"]["inputs"][4]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["inputs"][4]["formats"][0]["default"] is False
+        assert desc["process"]["inputs"][4]["formats"][1]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["inputs"][4]["formats"][1]["default"] is False
+        assert desc["process"]["inputs"][4]["formats"][2]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert desc["process"]["inputs"][4]["formats"][2]["default"] is False
+        assert desc["process"]["inputs"][5]["id"] == "multi_value_multi_format"
+        assert desc["process"]["inputs"][5]["minOccurs"] == "0"
+        assert desc["process"]["inputs"][5]["maxOccurs"] == "unbounded"
+        assert len(desc["process"]["inputs"][5]["formats"]) == 3
+        assert desc["process"]["inputs"][5]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["inputs"][5]["formats"][0]["default"] is True  # specified in process description
+        assert desc["process"]["inputs"][5]["formats"][1]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["inputs"][5]["formats"][1]["default"] is False
+        assert desc["process"]["inputs"][5]["formats"][2]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert desc["process"]["inputs"][5]["formats"][2]["default"] is False
+        assert desc["process"]["inputs"][6]["id"] == "single_value_multi_format_default"
+        assert desc["process"]["inputs"][6]["minOccurs"] == "0"
+        assert desc["process"]["inputs"][6]["maxOccurs"] == "1"
+        assert len(desc["process"]["inputs"][6]["formats"]) == 3
+        assert desc["process"]["inputs"][6]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["inputs"][6]["formats"][0]["default"] is False
+        assert desc["process"]["inputs"][6]["formats"][1]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["inputs"][6]["formats"][1]["default"] is False
+        assert desc["process"]["inputs"][6]["formats"][2]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert desc["process"]["inputs"][6]["formats"][2]["default"] is False
+        assert desc["process"]["inputs"][7]["id"] == "multi_value_multi_format_default"
+        assert desc["process"]["inputs"][7]["minOccurs"] == "0"
+        assert desc["process"]["inputs"][7]["maxOccurs"] == "unbounded"
+        assert len(desc["process"]["inputs"][7]["formats"]) == 3
+        assert desc["process"]["inputs"][7]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["inputs"][7]["formats"][0]["default"] is False
+        assert desc["process"]["inputs"][7]["formats"][1]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["inputs"][7]["formats"][1]["default"] is False
+        assert desc["process"]["inputs"][7]["formats"][2]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert desc["process"]["inputs"][7]["formats"][2]["default"] is True  # specified in process description
+
+        # process description output validation
+
+
+        # package input validation
+        assert pkg["inputs"]["single_value_single_format"]["format"] == type1
+        assert pkg["inputs"]["single_value_single_format"]["type"] == "File"
+        assert pkg["inputs"]["multi_value_single_format"]["format"] == type1
+        assert pkg["inputs"]["multi_value_single_format"]["type"] == "array"
+
+        # package output validation
+
 
     # FIXME: implement
     @pytest.mark.xfail(reason="not implemented")
@@ -287,7 +436,7 @@ class WpsPackageAppTest(unittest.TestCase):
         assert pkg["inputs"]["resource"]["default"]["mimeType"] == CONTENT_TYPE_APP_NETCDF
         assert pkg["inputs"]["resource"]["default"]["encoding"] is None
         assert pkg["inputs"]["resource"]["default"]["schema"] is None
-        assert pkg["inputs"]["resource"]["format"]["schema"] is EDAM_NETCDF
+        assert pkg["inputs"]["resource"]["format"] == EDAM_NETCDF
         assert pkg["inputs"]["resource"]["type"]["type"] == "array"
         assert pkg["inputs"]["resource"]["type"]["items"] == "File"
         # FIXME: implement (resource input had 3 possible formats)
@@ -312,21 +461,21 @@ class WpsPackageAppTest(unittest.TestCase):
         assert "formats" not in desc["process"]["inputs"][1]
         assert desc["process"]["inputs"][2]["id"] == "resource"
         assert desc["process"]["inputs"][2]["title"] == "Resource"
-        assert desc["process"]["inputs"][2]["abstract"] == "Resampling frequency"
+        assert desc["process"]["inputs"][2]["abstract"] == "NetCDF Files or archive (tar/zip) containing NetCDF files."
         assert desc["process"]["inputs"][2]["keywords"] == []
         assert desc["process"]["inputs"][2]["minOccurs"] == "1"
-        assert desc["process"]["inputs"][2]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][2]["maxOccurs"] == "1000"
         assert len(desc["process"]["inputs"][2]["formats"]) == 3
-        # FIXME: should we store 'None' in db instead of empty string when missing "encoding", "schema", etc. ?
         assert desc["process"]["inputs"][2]["formats"][0]["default"] is True
         assert desc["process"]["inputs"][2]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert "encoding" not in desc["process"]["inputs"][2]["formats"][0]  # none specified, so omitted in response
         assert desc["process"]["inputs"][2]["formats"][0]["encoding"] == ""
         assert desc["process"]["inputs"][2]["formats"][1]["default"] is False
         assert desc["process"]["inputs"][2]["formats"][1]["mimeType"] == CONTENT_TYPE_APP_NETCDF
-        assert desc["process"]["inputs"][2]["formats"][1]["encoding"] == ""
+        assert "encoding" not in desc["process"]["inputs"][2]["formats"][1]  # none specified, so omitted in response
         assert desc["process"]["inputs"][2]["formats"][2]["default"] is False
         assert desc["process"]["inputs"][2]["formats"][2]["mimeType"] == CONTENT_TYPE_APP_NETCDF
-        assert desc["process"]["inputs"][2]["formats"][2]["encoding"] == ""
+        assert "encoding" not in desc["process"]["inputs"][2]["formats"][2]  # none specified, so omitted in response
 
     # FIXME: implement,
     #   need to find a existing WPS with some, or manually write XML
