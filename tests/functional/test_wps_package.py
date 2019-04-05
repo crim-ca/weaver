@@ -202,6 +202,7 @@ class WpsPackageAppTest(unittest.TestCase):
                 },
             ],
             "outputs": [
+                # FIXME: implement other variations of outputs (see docstring)
                 {
                     "id": "values",
                     "type": {
@@ -261,7 +262,7 @@ class WpsPackageAppTest(unittest.TestCase):
         assert desc["process"]["inputs"][1]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
         assert desc["process"]["inputs"][1]["formats"][0]["default"] is True  # only format available, auto default
         assert desc["process"]["inputs"][2]["id"] == "single_value_single_format_default"
-        assert desc["process"]["inputs"][2]["minOccurs"] == "0"
+        assert desc["process"]["inputs"][2]["minOccurs"] == "0"     # FIXME: not set to 0 with 'default' value, is "1"
         assert desc["process"]["inputs"][2]["maxOccurs"] == "1"
         assert len(desc["process"]["inputs"][2]["formats"]) == 1
         assert desc["process"]["inputs"][2]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF
@@ -314,7 +315,7 @@ class WpsPackageAppTest(unittest.TestCase):
         assert desc["process"]["inputs"][7]["formats"][2]["default"] is True  # specified in process description
 
         # process description output validation
-
+        # FIXME: implement
 
         # package input validation
         assert pkg["inputs"]["single_value_single_format"]["format"] == type1
@@ -323,7 +324,7 @@ class WpsPackageAppTest(unittest.TestCase):
         assert pkg["inputs"]["multi_value_single_format"]["type"] == "array"
 
         # package output validation
-
+        # FIXME: implement
 
     # FIXME: implement
     @pytest.mark.xfail(reason="not implemented")
