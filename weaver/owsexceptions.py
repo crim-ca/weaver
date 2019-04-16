@@ -52,7 +52,7 @@ class OWSException(Response, Exception):
 </ExceptionReport>''')
 
     def __init__(self, detail=None, value=None, **kw):
-        status = kw.pop('status', None)
+        status = kw.pop("status", None)
         if isinstance(status, type) and issubclass(status, HTTPException):
             status = status().status
         elif isinstance(status, six.class_types):

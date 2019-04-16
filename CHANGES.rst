@@ -10,6 +10,9 @@ New Features:
 - Add ability to filter jobs with ``notification_email`` query parameter (#44).
 - Add jobs statistics grouping by specific fields using comma-separated list ``group_by`` query parameter (#46).
 - Add some tests to evaluate new job search methods / grouping results and responses (#44, #46).
+- Add handling of multiple ``CWL`` field ``format``
+- Add support for I/O enum array (#30)
+- Add more functional tests (#11, #17)
 
 Changes:
 - Use ``bump2version`` and move all config under ``setup.cfg``
@@ -17,16 +20,17 @@ Changes:
 Fixes:
 - Adjust some typing definitions incorrectly specified.
 - Fix some failing functionality tests.
+- Fix I/O field ordering preserved as specified in payload or loaded reference file
 
 0.2.2 (2019-05-31)
 ==================
 
- - Support notification email subject template
+- Support notification email subject template
 
 0.2.1 (2019-05-29)
 ==================
 
- - Add per-process email notification template
+- Add per-process email notification template
 
 0.2.0 (2019-03-26)
 ==================

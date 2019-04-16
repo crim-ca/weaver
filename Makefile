@@ -327,7 +327,7 @@ clean-dist: backup clean
 test-unit:
 	@echo "Running tests (skip slow and online tests)..."
 	bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
-		pytest tests -v -m 'not slow and not online' --junitxml $(CURDIR)/tests/results.xml"
+		pytest tests -v -m 'not slow and not online and not functional' --junitxml $(CURDIR)/tests/results.xml"
 
 .PHONY: test-func
 test-func:

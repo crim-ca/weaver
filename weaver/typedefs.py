@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     AnyContainer = Union[Configurator, Registry, PyramidRequest, Celery]
     SettingValue = Union[AnyStr, Number, bool, None]
     SettingsType = Dict[AnyStr, SettingValue]
-    AnySettingsContainer = Union[AnyContainer, SettingsType]
+    AnyAnySettingsContainer = Union[AnyContainer, SettingsType]
     AnyRegistryContainer = AnyContainer
     AnyDatabaseContainer = AnyContainer
 

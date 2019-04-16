@@ -635,6 +635,9 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
         # type: (Optional[AnyStr], int, int, Optional[AnyStr]) -> Tuple[List[Quote], int]
         """
         Finds all quotes in mongodb storage matching search filters.
+
+        Returns a tuple of filtered ``items`` and their ``count``, where ``items`` can have paging and be limited
+        to a maximum per page, but ``count`` always indicate the `total` number of matches.
         """
         search_filters = {}
 
@@ -703,6 +706,9 @@ class MongodbBillStore(StoreBills, MongodbStore):
         # type: (Optional[AnyStr], int, int, Optional[AnyStr]) -> Tuple[List[Bill], int]
         """
         Finds all bills in mongodb storage matching search filters.
+
+        Returns a tuple of filtered ``items`` and their ``count``, where ``items`` can have paging and be limited
+        to a maximum per page, but ``count`` always indicate the `total` number of matches.
         """
         search_filters = {}
 

@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 import warnings
 import pymongo
 if TYPE_CHECKING:
-    from weaver.typedefs import AnySettingsContainer
+    from weaver.typedefs import AnyAnySettingsContainer
     from typing import Any, AnyStr, Union
     from pymongo.database import Database
 
@@ -92,7 +92,7 @@ class MongoDatabase(DatabaseInterface):
 
 
 def get_mongodb_connection(container):
-    # type: (AnySettingsContainer) -> Database
+    # type: (AnyAnySettingsContainer) -> Database
     """Obtains the basic database connection from settings."""
     global MongoDB
     if not MongoDB:
@@ -108,7 +108,7 @@ def get_mongodb_connection(container):
 
 
 def get_mongodb_engine(container):
-    # type: (AnySettingsContainer) -> Database
+    # type: (AnyAnySettingsContainer) -> Database
     """Obtains the database with configuration ready for usage."""
     db = get_mongodb_connection(container)
     db.services.create_index("name", unique=True)

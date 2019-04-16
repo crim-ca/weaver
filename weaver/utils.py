@@ -27,7 +27,7 @@ import warnings
 import logging
 if TYPE_CHECKING:
     from weaver.typedefs import (
-        AnyValue, AnyKey, AnySettingsContainer, AnyRegistryContainer, AnyHeadersContainer,
+        AnyValue, AnyKey, AnyAnySettingsContainer, AnyRegistryContainer, AnyHeadersContainer,
         HeadersType, SettingsType, JSON, XML, Number
     )
     from typing import Union, Any, Dict, List, AnyStr, Iterable, Optional
@@ -53,7 +53,7 @@ null = _NullType()
 
 
 def get_weaver_url(container):
-    # type: (AnySettingsContainer) -> AnyStr
+    # type: (AnyAnySettingsContainer) -> AnyStr
     """Retrieves the home URL of the `weaver` application."""
     return get_settings(container).get("weaver.url").rstrip('/').strip()
 
@@ -95,7 +95,7 @@ def get_registry(container):
 
 
 def get_settings(container):
-    # type: (AnySettingsContainer) -> SettingsType
+    # type: (AnyAnySettingsContainer) -> SettingsType
     """Retrieves the application ``settings`` from various containers referencing to it."""
     if isinstance(container, (Celery, Configurator, Request)):
         container = get_registry(container)

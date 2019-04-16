@@ -2,6 +2,8 @@ from weaver.formats import (
     CONTENT_TYPE_APP_JSON,
     CONTENT_TYPE_APP_NETCDF,
     CONTENT_TYPE_TEXT_PLAIN,
+    CONTENT_TYPE_APP_TAR,
+    CONTENT_TYPE_APP_ZIP,
     EDAM_NAMESPACE,
     EDAM_MAPPING,
     get_cwl_file_format,
@@ -219,29 +221,29 @@ class WpsPackageAppTest(unittest.TestCase):
                     "id": self.__name__,
                     "title": "some title",
                     "abstract": "this is a test",
+                    # only partial inputs provided to fill additional details that cannot be specified with CWL alone
+                    # only providing the 'default' format, others auto-resolved/added by CWL definitions
+                    "inputs": [
+                        {
+                            "id": "multi_value_multi_format",
+                            "formats": [
+                                {
+                                    "mimeType": CONTENT_TYPE_APP_JSON,
+                                    "default": True,
+                                }
+                            ]
+                        },
+                        {
+                            "id": "multi_value_multi_format_default",
+                            "formats": [
+                                {
+                                    "mimeType": CONTENT_TYPE_APP_NETCDF,
+                                    "default": True,
+                                }
+                            ]
+                        }
+                    ]
                 },
-                # only partial inputs provided to fill additional details that cannot be specified with CWL alone
-                # only providing the 'default' format, others auto-resolved/added by CWL definitions
-                "inputs": [
-                    {
-                        "id": "multi_value_multi_format",
-                        "formats": [
-                            {
-                                "mimeType": CONTENT_TYPE_APP_JSON,
-                                "default": True,
-                            }
-                        ]
-                    },
-                    {
-                        "id": "multi_value_multi_format_default",
-                        "formats": [
-                            {
-                                "mimeType": CONTENT_TYPE_APP_NETCDF,
-                                "default": True,
-                            }
-                        ]
-                    }
-                ]
             },
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
@@ -262,7 +264,7 @@ class WpsPackageAppTest(unittest.TestCase):
         assert desc["process"]["inputs"][1]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
         assert desc["process"]["inputs"][1]["formats"][0]["default"] is True  # only format available, auto default
         assert desc["process"]["inputs"][2]["id"] == "single_value_single_format_default"
-        assert desc["process"]["inputs"][2]["minOccurs"] == "0"     # FIXME: not set to 0 with 'default' value, is "1"
+        assert desc["process"]["inputs"][2]["minOccurs"] == "0"
         assert desc["process"]["inputs"][2]["maxOccurs"] == "1"
         assert len(desc["process"]["inputs"][2]["formats"]) == 1
         assert desc["process"]["inputs"][2]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF
@@ -278,13 +280,13 @@ class WpsPackageAppTest(unittest.TestCase):
         assert desc["process"]["inputs"][4]["maxOccurs"] == "1"
         assert len(desc["process"]["inputs"][4]["formats"]) == 3
         assert desc["process"]["inputs"][4]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
-        assert desc["process"]["inputs"][4]["formats"][0]["default"] is False
+        assert desc["process"]["inputs"][4]["formats"][0]["default"] is True  # no explicit default, uses first
         assert desc["process"]["inputs"][4]["formats"][1]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
         assert desc["process"]["inputs"][4]["formats"][1]["default"] is False
         assert desc["process"]["inputs"][4]["formats"][2]["mimeType"] == CONTENT_TYPE_APP_NETCDF
         assert desc["process"]["inputs"][4]["formats"][2]["default"] is False
         assert desc["process"]["inputs"][5]["id"] == "multi_value_multi_format"
-        assert desc["process"]["inputs"][5]["minOccurs"] == "0"
+        assert desc["process"]["inputs"][5]["minOccurs"] == "1"
         assert desc["process"]["inputs"][5]["maxOccurs"] == "unbounded"
         assert len(desc["process"]["inputs"][5]["formats"]) == 3
         assert desc["process"]["inputs"][5]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
@@ -298,7 +300,7 @@ class WpsPackageAppTest(unittest.TestCase):
         assert desc["process"]["inputs"][6]["maxOccurs"] == "1"
         assert len(desc["process"]["inputs"][6]["formats"]) == 3
         assert desc["process"]["inputs"][6]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
-        assert desc["process"]["inputs"][6]["formats"][0]["default"] is False
+        assert desc["process"]["inputs"][6]["formats"][0]["default"] is True  # no explicit default, uses first
         assert desc["process"]["inputs"][6]["formats"][1]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
         assert desc["process"]["inputs"][6]["formats"][1]["default"] is False
         assert desc["process"]["inputs"][6]["formats"][2]["mimeType"] == CONTENT_TYPE_APP_NETCDF
@@ -470,18 +472,17 @@ class WpsPackageAppTest(unittest.TestCase):
         assert desc["process"]["inputs"][2]["formats"][0]["default"] is True
         assert desc["process"]["inputs"][2]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF
         assert "encoding" not in desc["process"]["inputs"][2]["formats"][0]  # none specified, so omitted in response
-        assert desc["process"]["inputs"][2]["formats"][0]["encoding"] == ""
         assert desc["process"]["inputs"][2]["formats"][1]["default"] is False
-        assert desc["process"]["inputs"][2]["formats"][1]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert desc["process"]["inputs"][2]["formats"][1]["mimeType"] == CONTENT_TYPE_APP_TAR
         assert "encoding" not in desc["process"]["inputs"][2]["formats"][1]  # none specified, so omitted in response
         assert desc["process"]["inputs"][2]["formats"][2]["default"] is False
-        assert desc["process"]["inputs"][2]["formats"][2]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert desc["process"]["inputs"][2]["formats"][2]["mimeType"] == CONTENT_TYPE_APP_ZIP
         assert "encoding" not in desc["process"]["inputs"][2]["formats"][2]  # none specified, so omitted in response
 
     # FIXME: implement,
     #   need to find a existing WPS with some, or manually write XML
-    #   multi-output would be an indirect 1-output with ref to multi
+    #   multi-output (with same ID) would be an indirect 1-output with ref to multi (Metalink file)
     #   (https://github.com/crim-ca/weaver/issues/25)
     @pytest.mark.xfail(reason="not implemented")
-    def test_multi_format_outputs_from_wps_xml_reference(self):
+    def test_multi_outputs_file_from_wps_xml_reference(self):
         raise NotImplementedError

@@ -41,7 +41,7 @@ import json
 import six
 import os
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON, AnyContainer, AnySettingsContainer, FileSystemPathType
+    from weaver.typedefs import JSON, AnyContainer, AnyAnySettingsContainer, FileSystemPathType
     from weaver.store.mongodb import MongodbProcessStore
     from typing import AnyStr, Dict, Union
     from pywps import Process as ProcessWPS
@@ -147,7 +147,7 @@ def jsonify_value(value):
 
 
 def convert_process_wps_to_db(service, process, container):
-    # type: (Union[Service, Dict[{"url": AnyStr, "name": AnyStr}]], ProcessWPS, AnySettingsContainer) -> ProcessDB
+    # type: (Union[Service, Dict[{"url": AnyStr, "name": AnyStr}]], ProcessWPS, AnyAnySettingsContainer) -> ProcessDB
     """
     Converts an owslib WPS Process to local storage Process.
     """
@@ -307,7 +307,7 @@ def deploy_process_from_payload(payload, container):
 
 
 def register_wps_processes_from_config(wps_processes_file_path, container):
-    # type: (FileSystemPathType, AnySettingsContainer) -> None
+    # type: (FileSystemPathType, AnyAnySettingsContainer) -> None
     """
     Loads a `wps_processes.yml` file and registers `WPS-1` providers processes to the
     current `Weaver` instance as equivalent `WPS-2` processes.
