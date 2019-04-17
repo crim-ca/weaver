@@ -11,20 +11,49 @@ from weaver.wps import get_wps_url, get_wps_output_url, get_wps_output_dir
 from weaver.wps_restapi.processes.processes import execute_process
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 from six.moves.configparser import ConfigParser
-from typing import Any, AnyStr, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 from pyramid import testing
 from pyramid.httpexceptions import HTTPNotFound, HTTPUnprocessableEntity, HTTPException
 from pyramid.registry import Registry
 from pyramid.response import Response
 from pyramid.config import Configurator
 from webtest import TestApp
+from inspect import isclass
 import pyramid_celery
 import warnings
 import mock
 import uuid
+import six
 import os
 if TYPE_CHECKING:
-    from weaver.typedefs import SettingsType
+    from weaver.typedefs import Any, AnyStr, Callable, List, Optional, SettingsType, Type, Union  # noqa: F401
+
+
+def ignore_warning_regex(func, warning_message_regex, warning_categories=DeprecationWarning):
+    # type: (Callable, Union[AnyStr, List[AnyStr]], Union[Type[Warning], List[Type[Warning]]]) -> Callable
+    """Wrapper that eliminates any warning matching ``warning_regex`` during testing logging.
+
+    **NOTE**:
+        Wrapper should be applied on method (not directly on :class:`unittest.TestCase`
+        as it can disable the whole test suite.
+    """
+    if isinstance(warning_message_regex, six.string_types):
+        warning_message_regex = [warning_message_regex]
+    if not isinstance(warning_message_regex, list):
+        raise NotImplementedError("Argument 'warning_message_regex' must be a string or a list of string.")
+    if not isinstance(warning_categories, list):
+        warning_categories = [warning_categories]
+    for warn in warning_categories:
+        if not isclass(warn) or not issubclass(warn, Warning):
+            raise NotImplementedError("Argument 'warning_categories' must be one or multiple subclass(es) of Warning.")
+
+    def do_test(self, *args, **kwargs):
+        with warnings.catch_warnings():
+            for warn_cat in warning_categories:
+                for msg_regex in warning_message_regex:
+                    warnings.filterwarnings(action="ignore", message=msg_regex, category=warn_cat)
+            func(self, *args, **kwargs)
+    return do_test
 
 
 def ignore_wps_warnings(func):
@@ -34,13 +63,9 @@ def ignore_wps_warnings(func):
         Wrapper should be applied on method (not directly on :class:`unittest.TestCase`
         as it can disable the whole test suite.
     """
-    def do_test(self, *args, **kwargs):
-        with warnings.catch_warnings():
-            for warn in [MissingParameterWarning, UnsupportedOperationWarning]:
-                for msg in ["Parameter 'request*", "Parameter 'service*", "Request type '*", "Service '*"]:
-                    warnings.filterwarnings(action="ignore", message=msg, category=warn)
-            func(self, *args, **kwargs)
-    return do_test
+    warn_msg_regex = ["Parameter 'request*", "Parameter 'service*", "Request type '*", "Service '*"]
+    warn_categories = [MissingParameterWarning, UnsupportedOperationWarning]
+    return ignore_warning_regex(func, warn_msg_regex, warn_categories)
 
 
 def ignore_deprecated_nested_warnings(func):
@@ -50,12 +75,7 @@ def ignore_deprecated_nested_warnings(func):
         Wrapper should be applied on method (not directly on :class:`unittest.TestCase`
         as it can disable the whole test suite.
     """
-    def do_test(self, *args, **kwargs):
-        with warnings.catch_warnings():
-            warnings.filterwarnings(action="ignore", category=DeprecationWarning,
-                                    message="With-statements now directly support multiple context managers")
-            func(self, *args, **kwargs)
-    return do_test
+    return ignore_warning_regex(func, "With-statements now directly support multiple context managers")
 
 
 def get_settings_from_config_ini(config_ini_path=None, ini_section_name="app:main"):

@@ -21,6 +21,9 @@ Fixes:
 - Adjust some typing definitions incorrectly specified.
 - Fix some failing functionality tests.
 - Fix I/O field ordering preserved as specified in payload or loaded reference file
+- Fix setting ``minOccurs=0`` when a ``default`` is specified in the corresponding ``CWL`` I/O (#17)
+- Fix incorrectly overridden ``maxOccurs="unbounded"`` by ``maxOccurs="1"`` when a partial array input definition
+  is specified without explicit ``maxOccurs`` in `WPS` payload (#17)
 
 0.2.2 (2019-05-31)
 ==================

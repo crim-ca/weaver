@@ -17,7 +17,8 @@ if TYPE_CHECKING:
     from pywps.app import WPSRequest
     # noinspection PyProtectedMember, PyUnresolvedReferences
     from logging import _loggerClass as LoggerType
-    from typing import Any, AnyStr, Callable, Dict, List, Tuple, Union
+    # noinspection PyUnresolvedReferences
+    from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, Type, Union  # noqa: F401
     import lxml.etree
     import os
     if hasattr(os, 'PathLike'):

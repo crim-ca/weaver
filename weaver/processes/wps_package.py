@@ -275,13 +275,35 @@ def _get_package_type(package_dict):
     return PROCESS_WORKFLOW if package_dict.get("class").lower() == "workflow" else PROCESS_APPLICATION
 
 
-def _get_package_ordered_io_list(io_section):
-    # type: (Union[List[JSON], OrderedDict[AnyStr, JSON]]) -> List[JSON]
+def _get_package_ordered_io(io_section, order_hints=None):
+    # type: (Union[List[JSON], OrderedDict[AnyStr, JSON]], Optional[List[JSON]]) -> List[JSON]
     """
     Converts package I/O definitions defined as dictionary to an equivalent list representation.
-    The list representation ensures that I/O order is preserved when written to file and reloaded.
-    When defined as a dictionary, an ``OrderedDict`` is expected as input to
+    The list representation ensures that I/O order is preserved when written to file and reloaded afterwards
+    regardless of each library's implementation of ``dict`` container.
+
+    Note:
+        When defined as a dictionary, an ``OrderedDict`` is expected as input to ensure preserved field order.
     """
+    if isinstance(io_section, list):
+        return io_section
+    io_list = []
+    io_dict = OrderedDict()
+    if isinstance(io_section, dict) and not isinstance(io_section, OrderedDict) and order_hints and len(order_hints):
+        # pre-order I/O that can be resolved with hint when the specified I/O section is not ordered
+        io_section = deepcopy(io_section)
+        for hint in order_hints:
+            hint_id = _get_field(hint, "identifier", search_variations=True)
+            if hint_id in io_section:
+                io_dict[hint_id] = io_section.pop(hint_id)
+        for hint in io_section:
+            io_dict[hint] = io_section[hint]
+    else:
+        io_dict = io_section
+    for io_id, io_value in io_dict.items():
+        io_list.append(io_value)
+        io_list[-1]["id"] = io_id
+    return io_list
 
 
 def _check_package_file(cwl_file_path_or_url):
@@ -335,6 +357,7 @@ def _load_package_content(package_dict,                             # type: Dict
                           tmp_dir=None,                             # type: Optional[AnyStr]
                           loading_context=None,                     # type: Optional[LoadingContext]
                           runtime_context=None,                     # type: Optional[RuntimeContext]
+                          process_offering=None,                    # type: Optional[JSON]
                           ):  # type: (...) -> Optional[Tuple[CWLFactoryCallable, AnyStr, Dict]]
     """
     Loads the package content to file in a temporary directory.
@@ -345,8 +368,9 @@ def _load_package_content(package_dict,                             # type: Dict
     :param data_source: identifier of the data source to map to specific ADES, or map to localhost if ``None``.
     :param only_dump_file: specify if the ``CWLFactoryCallable`` should be validated and returned.
     :param tmp_dir: location of the temporary directory to dump files (warning: will be deleted on exit).
-    :param loading_context: cwltool context used to create the cwl package
-    :param runtime_context: cwltool context used to execute the cwl package
+    :param loading_context: cwltool context used to create the cwl package (required if ``only_dump_file=False``)
+    :param runtime_context: cwltool context used to execute the cwl package (required if ``only_dump_file=False``)
+    :param process_offering: JSON body of the process description payload (used as I/O hint ordering)
     :return:
         if ``only_dump_file`` is ``True``: ``None``
         otherwise, tuple of:
@@ -370,6 +394,13 @@ def _load_package_content(package_dict,                             # type: Dict
                               data_source=data_source, only_dump_file=True)
         package_dict["steps"][step["name"]]["run"] = package_name
         step_packages[step["name"]] = package_name
+
+    # fix I/O to preserve ordering from dump/load
+    process_offering_hint = process_offering or {}
+    package_input_hint = process_offering_hint.get("inputs", [])
+    package_output_hint = process_offering_hint.get("outputs", [])
+    package_dict["inputs"] = _get_package_ordered_io(package_dict["inputs"], order_hints=package_input_hint)
+    package_dict["outputs"] = _get_package_ordered_io(package_dict["outputs"], order_hints=package_output_hint)
 
     with open(tmp_json_cwl, 'w') as f:
         json.dump(package_dict, f)
@@ -756,7 +787,8 @@ def _json2wps_io(io_info, io_select):
             if fmt.pop("default", None) is True:
                 if _get_field(io_info, "default") != null:  # if set by previous 'fmt'
                     raise PackageTypeError("Cannot have multiple 'default' formats simultaneously.")
-                ##############################################we use 'data_format' instead of 'default' to avoid overwriting
+                # use 'data_format' instead of 'default' to avoid overwriting a potential 'default' value
+                # field 'data_format' is mapped as 'default' format
                 io_info["data_format"] = _json2wps_field(fmt, "supported_formats")
         io_info["supported_formats"] = [_json2wps_field(fmt, "supported_formats") for fmt in formats]
 
@@ -979,24 +1011,39 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
                               for cwl_io in cwl_io_list)
     missing_io_list = [cwl_io for cwl_io in cwl_io_dict if cwl_io not in wps_io_dict]  # preserve ordering
     updated_io_list = list()
-    # WPS I/O by id not matching any CWL->WPS I/O are discarded, otherwise merge details
+
+    # WPS I/O by id not matching any converted CWL->WPS I/O are discarded
+    # otherwise, evaluate provided WPS I/O definitions and find potential new information to be merged
     for cwl_id in cwl_io_dict:
-        # missing WPS I/O are inferred only using CWL->WPS definitions
-        if cwl_id in missing_io_list:
-            updated_io_list.append(cwl_io_dict[cwl_id])
-            continue
-        # evaluate provided WPS I/O definitions and find potential new information
         cwl_io = cwl_io_dict[cwl_id]
+        updated_io_list.append(cwl_io)
+        if cwl_id in missing_io_list:
+            continue  # missing WPS I/O are inferred only using CWL->WPS definitions
+
+        # enforce expected CWL->WPS I/O type and append required parameters if missing
         cwl_io_json = cwl_io.json
         wps_io_json = wps_io_dict[cwl_id]
-        updated_io_list.append(cwl_io)
-        # enforce expected CWL->WPS I/O type and append required parameters if missing
         cwl_identifier = _get_field(cwl_io_json, "identifier", search_variations=True)
         cwl_title = _get_field(wps_io_json, "title", search_variations=True)
-        wps_io_json.update({"type": _get_field(cwl_io_json, "type"),
-                            "identifier": cwl_identifier,
-                            "title": cwl_title if cwl_title is not null else cwl_identifier})
+        wps_io_json.update({
+            "type": _get_field(cwl_io_json, "type"),
+            "identifier": cwl_identifier,
+            "title": cwl_title if cwl_title is not null else cwl_identifier
+        })
+
+        # fill missing WPS min/max occurs in 'provided' json to avoid overwriting resolved CWL values by WPS default '1'
+        #   with 'default' field, this default '1' causes erroneous result when 'min_occurs' should be "0"
+        #   with 'array' type, this default '1' causes erroneous result when 'max_occurs' should be "unbounded"
+        cwl_min_occurs = _get_field(cwl_io_json, "min_occurs", search_variations=True)
+        cwl_max_occurs = _get_field(cwl_io_json, "max_occurs", search_variations=True)
+        wps_min_occurs = _get_field(wps_io_json, "min_occurs", search_variations=True)
+        wps_max_occurs = _get_field(wps_io_json, "max_occurs", search_variations=True)
+        if wps_min_occurs == null and cwl_min_occurs != null:
+            wps_io_json["min_occurs"] = cwl_min_occurs
+        if wps_max_occurs == null and cwl_max_occurs != null:
+            wps_io_json["max_occurs"] = cwl_max_occurs
         wps_io = _json2wps_io(wps_io_json, io_select)
+
         # retrieve any complementing fields (metadata, keywords, etc.) passed as WPS input
         for field_type in WPS_FIELD_MAPPING:
             cwl_field = _get_field(cwl_io, field_type)
@@ -1165,21 +1212,26 @@ def _ows2json_io(ows_io):
 
     # add 'format' if missing, derived from other variants
     if "formats" not in json_io:
-        for field in WPS_FIELD_FORMAT:
-            fmt = _get_field(json_io, field, search_variations=True)
-            if not fmt:
-                continue
-            if isinstance(fmt, dict):
-                fmt = [fmt]
-            fmt = filter(lambda f: isinstance(f, dict), fmt)
-            if not isinstance(json_io.get("formats"), list):
-                json_io["formats"] = list()
-            for var_fmt in fmt:
-                # add it only if not exclusively provided by a previous variant
-                json_fmt_items = [j_fmt.items() for j_fmt in json_io["formats"]]
-                if any(all(var_item in items for var_item in var_fmt.items()) for items in json_fmt_items):
+        fmt_val = _get_field(json_io, "supported_values")
+        if json_io.get("type") == "ComplexData" and fmt_val:
+            json_io["formats"] = json_io.pop("supported_values")
+        else:
+            # search for format fields directly specified in I/O body
+            for field in WPS_FIELD_FORMAT:
+                fmt = _get_field(json_io, field, search_variations=True)
+                if not fmt:
                     continue
-                json_io["formats"].append(var_fmt)
+                if isinstance(fmt, dict):
+                    fmt = [fmt]
+                fmt = filter(lambda f: isinstance(f, dict), fmt)
+                if not isinstance(json_io.get("formats"), list):
+                    json_io["formats"] = list()
+                for var_fmt in fmt:
+                    # add it only if not exclusively provided by a previous variant
+                    json_fmt_items = [j_fmt.items() for j_fmt in json_io["formats"]]
+                    if any(all(var_item in items for var_item in var_fmt.items()) for items in json_fmt_items):
+                        continue
+                    json_io["formats"].append(var_fmt)
 
     return json_io
 
@@ -1247,8 +1299,8 @@ def _xml_wps2cwl(wps_process_response):
                 "provider": get_url_without_query(wps_service_url),
                 "process": process_id,
             }}),
-        ("inputs", {}),
-        ("outputs", {}),
+        ("inputs", OrderedDict()),
+        ("outputs", OrderedDict()),
     ])
     for io_select in [WPS_INPUT, WPS_OUTPUT]:
         io_process = "{}s".format(io_select)
@@ -1397,7 +1449,7 @@ def get_process_definition(process_offering, reference=None, package=None, data_
 
     LOGGER.debug("Using data source: '{}'".format(data_source))
     package_factory, process_type, _ = try_or_raise_package_error(
-        lambda: _load_package_content(package, data_source=data_source),
+        lambda: _load_package_content(package, data_source=data_source, process_offering=process_info),
         reason="Loading package content")
 
     package_inputs, package_outputs = try_or_raise_package_error(
