@@ -1,6 +1,7 @@
 from weaver import status
 from weaver.execute import EXECUTE_MODE_ASYNC
 from weaver.owsexceptions import OWSNoApplicableCode
+from weaver.processes.constants import WPS_COMPLEX_DATA
 from weaver.processes.utils import jsonify_output
 from weaver.processes.wps_process_base import WpsProcessInterface
 from weaver.utils import (
@@ -57,7 +58,7 @@ class Wps1Process(WpsProcessInterface):
             # prepare inputs
             complex_inputs = []
             for process_input in process.dataInputs:
-                if "ComplexData" in process_input.dataType:
+                if WPS_COMPLEX_DATA in process_input.dataType:
                     complex_inputs.append(process_input.identifier)
 
             # remove any 'null' input, should employ the 'default' of the remote WPS process
@@ -89,7 +90,7 @@ class Wps1Process(WpsProcessInterface):
                 wps_inputs = []
 
             # prepare outputs
-            outputs = [(o.identifier, o.dataType == "ComplexData") for o in process.processOutputs
+            outputs = [(o.identifier, o.dataType == WPS_COMPLEX_DATA) for o in process.processOutputs
                        if o.identifier in expected_outputs]
 
             self.update_status("Executing job on remote WPS1 provider.",

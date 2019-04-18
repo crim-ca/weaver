@@ -6,6 +6,7 @@ from weaver.formats import (
     CONTENT_TYPE_APP_ZIP,
     EDAM_NAMESPACE,
     EDAM_MAPPING,
+    IANA_NAMESPACE,
     get_cwl_file_format,
 )
 from weaver.visibility import VISIBILITY_PUBLIC
@@ -24,6 +25,8 @@ import six
 
 EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_TEXT_PLAIN]
 EDAM_NETCDF = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_APP_NETCDF]
+IANA_TAR = IANA_NAMESPACE + ":" + CONTENT_TYPE_APP_TAR
+IANA_ZIP = IANA_NAMESPACE + ":" + CONTENT_TYPE_APP_ZIP
 
 
 @pytest.mark.functional
@@ -114,7 +117,7 @@ class WpsPackageAppTest(unittest.TestCase):
 
     def test_complex_io_with_multiple_formats_and_defaults(self):
         """
-        Test validates that different format types are set on different I/O variations simultaneously:
+        Test validates that different format types are set on different input variations simultaneously:
             - input with 1 format, single value, no default value
             - input with 1 format, array values, no default value
             - input with 1 format, single value, 1 default value
@@ -123,10 +126,13 @@ class WpsPackageAppTest(unittest.TestCase):
             - input with many formats, array values, no default value
             - input with many formats, single value, 1 default value
             - input with many formats, array values, 1 default value
-            - output with 1 format, single value
-            - output with 1 format, array values
-            - output with many formats, single value
-            - output with many formats, array values
+
+        In the case of outputs, CWL 'format' refers to 'applied' format instead of 'supported' format.
+        Therefore, 'format' field is omitted if >1 supported format is specified in WPS to avoid incompatibilities.
+            - output with 1 format, single value (has format in CWL and WPS)
+            - output with 1 format, array values (has format in CWL and WPS)
+            - output with many formats, single value (no format in CWL, WPS formats must be provided)
+            - output with many formats, array values (no format in CWL, WPS formats must be provided)
 
         In addition, the test evaluates that:
             - CWL I/O specified as list preserves the specified ordering
@@ -209,6 +215,15 @@ class WpsPackageAppTest(unittest.TestCase):
                     "type": "File",
                     "format": type1,
                 },
+                {
+                    "id": "single_value_multi_format",
+                    "type": "File",
+                    # NOTE:
+                    #   not valid to have array of format for output as per:
+                    #   https://github.com/common-workflow-language/common-workflow-language/issues/482
+                    #   WPS payload must specify them
+                    # "format": [type1, type2, type3]
+                },
                 # FIXME: multiple output (array) not implemented (https://github.com/crim-ca/weaver/issues/25)
                 # {
                 #    "id": "multi_value_single_format",
@@ -216,21 +231,19 @@ class WpsPackageAppTest(unittest.TestCase):
                 #        "type": "array",
                 #        "items": "File",
                 #    },
-                #    "format": type1,
+                #    "format": type3,
                 # },
-                {
-                    "id": "single_value_multi_format",
-                    "type": "File",
-                    "format": [type1, type2, type3]
-                },
-                # FIXME: multiple output (array) not implemented (https://github.com/crim-ca/weaver/issues/25)
                 # {
                 #     "id": "multi_value_multi_format",
                 #     "type": {
                 #         "type": "array",
                 #         "items": "File",
                 #     },
-                #     "format": [type1, type2, type3],
+                #     # NOTE:
+                #     #   not valid to have array of format for output as per:
+                #     #   https://github.com/common-workflow-language/common-workflow-language/issues/482
+                #     #   WPS payload must specify them
+                #     "format": [type3, type2, type1],
                 # },
             ],
             "$namespaces": namespaces
@@ -262,6 +275,26 @@ class WpsPackageAppTest(unittest.TestCase):
                                 }
                             ]
                         }
+                    ],
+                    # explicitly specify supported formats when many are allowed because CWL cannot support it
+                    "outputs": [
+                        {
+                            "id": "single_value_multi_format",
+                            "formats": [
+                                {"mimeType": CONTENT_TYPE_APP_JSON},
+                                {"mimeType": CONTENT_TYPE_TEXT_PLAIN},
+                                {"mimeType": CONTENT_TYPE_APP_NETCDF},
+                            ]
+                        },
+                        # FIXME: multiple output (array) not implemented (https://github.com/crim-ca/weaver/issues/25)
+                        # {
+                        #     "id": "multi_value_multi_format",
+                        #     "formats": [
+                        #         {"mimeType": CONTENT_TYPE_APP_NETCDF},
+                        #         {"mimeType": CONTENT_TYPE_TEXT_PLAIN},
+                        #         {"mimeType": CONTENT_TYPE_APP_JSON},
+                        #     ]
+                        # }
                     ]
                 },
             },
@@ -299,21 +332,21 @@ class WpsPackageAppTest(unittest.TestCase):
         assert desc["process"]["inputs"][4]["minOccurs"] == "1"
         assert desc["process"]["inputs"][4]["maxOccurs"] == "1"
         assert len(desc["process"]["inputs"][4]["formats"]) == 3
-        assert desc["process"]["inputs"][4]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF
-        assert desc["process"]["inputs"][4]["formats"][0]["default"] is False
+        assert desc["process"]["inputs"][4]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["inputs"][4]["formats"][0]["default"] is True  # no explicit default, uses first
         assert desc["process"]["inputs"][4]["formats"][1]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
-        assert desc["process"]["inputs"][4]["formats"][1]["default"] is True  # no explicit default, uses first
-        assert desc["process"]["inputs"][4]["formats"][2]["mimeType"] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["inputs"][4]["formats"][1]["default"] is False
+        assert desc["process"]["inputs"][4]["formats"][2]["mimeType"] == CONTENT_TYPE_APP_NETCDF
         assert desc["process"]["inputs"][4]["formats"][2]["default"] is False
         assert desc["process"]["inputs"][5]["id"] == "multi_value_multi_format"
         assert desc["process"]["inputs"][5]["minOccurs"] == "1"
         assert desc["process"]["inputs"][5]["maxOccurs"] == "unbounded"
         assert len(desc["process"]["inputs"][5]["formats"]) == 3
-        assert desc["process"]["inputs"][5]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
-        assert desc["process"]["inputs"][5]["formats"][0]["default"] is True  # specified in process description
+        assert desc["process"]["inputs"][5]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert desc["process"]["inputs"][5]["formats"][0]["default"] is False
         assert desc["process"]["inputs"][5]["formats"][1]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
-        assert desc["process"]["inputs"][5]["formats"][1]["default"] is False
-        assert desc["process"]["inputs"][5]["formats"][2]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert desc["process"]["inputs"][5]["formats"][1]["default"] is True  # specified in process description
+        assert desc["process"]["inputs"][5]["formats"][2]["mimeType"] == CONTENT_TYPE_APP_JSON
         assert desc["process"]["inputs"][5]["formats"][2]["default"] is False
         assert desc["process"]["inputs"][6]["id"] == "single_value_multi_format_default"
         assert desc["process"]["inputs"][6]["minOccurs"] == "0"
@@ -337,7 +370,30 @@ class WpsPackageAppTest(unittest.TestCase):
         assert desc["process"]["inputs"][7]["formats"][2]["default"] is True  # specified in process description
 
         # process description output validation
-        # FIXME: implement
+        assert isinstance(desc["process"]["outputs"], list)
+        assert len(desc["process"]["outputs"] == 2)  # FIXME: adjust output count when issue #25 is implemented
+        for output in desc["process"]["outputs"]:
+            for field in ["minOccurs", "maxOccurs", "default"]:
+                assert field not in output
+            for format_spec in output["formats"]:
+                assert "default" not in format_spec
+        assert desc["process"]["outputs"][0]["id"] == "single_value_single_format"
+        assert len(desc["process"]["outputs"][0]["formats"]) == 1
+        assert desc["process"]["outputs"][0]["format"][0] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["outputs"][1]["id"] == "single_value_multi_format"
+        assert len(desc["process"]["outputs"][1]["formats"]) == 3
+        assert desc["process"]["outputs"][1]["formats"][0] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["outputs"][1]["formats"][1] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["outputs"][1]["formats"][2] == CONTENT_TYPE_APP_NETCDF
+        # FIXME: enable when issue #25 is implemented
+        # assert desc["process"]["outputs"][2]["id"] == "multi_value_single_format"
+        # assert len(desc["process"]["outputs"][2]["formats"]) == 1
+        # assert desc["process"]["outputs"][2]["formats"][0] == CONTENT_TYPE_APP_NETCDF
+        # assert desc["process"]["outputs"][3]["id"] == "multi_value_multi_format"
+        # assert len(desc["process"]["outputs"][3]["formats"]) == 3
+        # assert desc["process"]["outputs"][3]["formats"][0] == CONTENT_TYPE_APP_NETCDF
+        # assert desc["process"]["outputs"][3]["formats"][1] == CONTENT_TYPE_TEXT_PLAIN
+        # assert desc["process"]["outputs"][3]["formats"][2] == CONTENT_TYPE_APP_JSON
 
         # package input validation
         assert pkg["inputs"][0]["id"] == "single_value_single_format"
@@ -378,12 +434,29 @@ class WpsPackageAppTest(unittest.TestCase):
         assert pkg["inputs"][7]["default"] == default_file
 
         # package output validation
-        # FIXME: implement
+        for output in desc["process"]["outputs"]:
+            assert "default" not in output
+        assert pkg["outputs"][0]["id"] == "single_value_single_format"
+        assert pkg["outputs"][0]["type"] == "File"
+        assert pkg["outputs"][0]["format"] == CONTENT_TYPE_APP_JSON
+        assert pkg["outputs"][1]["id"] == "single_value_multi_format"
+        assert pkg["outputs"][1]["type"] == "File"
+        assert "format" not in pkg["outputs"][1], "CWL format array not allowed for outputs."
+        # FIXME: enable when issue #25 is implemented
+        # assert pkg["outputs"][2]["id"] == "multi_value_single_format"
+        # assert pkg["outputs"][2]["type"] == "array"
+        # assert pkg["outputs"][2]["items"] == "File"
+        # assert pkg["outputs"][2]["format"] == CONTENT_TYPE_APP_NETCDF
+        # assert pkg["outputs"][3]["id"] == "multi_value_multi_format"
+        # assert pkg["outputs"][3]["type"] == "array"
+        # assert pkg["outputs"][3]["items"] == "File"
+        # assert "format" not in pkg["outputs"][3], "CWL format array not allowed for outputs."
 
     # FIXME: implement, test should validate that
     #   - min=0 if default value, min=1 otherwise when only resolved by CWL
     #   - max=1 if single value, max="unbounded" if array when only resolved by CWL
     #   - min AND max each overridden by WPS sets the corresponding value, regardless of single/array CWL resolution
+    #   - evaluates above cases for both literal and complex inputs
     @pytest.mark.xfail(reason="not implemented")
     def test_merging_io_min_max_occurs(self):
         raise NotImplementedError
@@ -464,9 +537,7 @@ class WpsPackageAppTest(unittest.TestCase):
         assert len(pkg["inputs"]) == 2
         assert isinstance(pkg["inputs"], list)
         assert pkg["inputs"][0]["id"] == "tasmax"
-        assert pkg["inputs"][0]["default"]["mimeType"] == CONTENT_TYPE_APP_NETCDF
-        assert pkg["inputs"][0]["default"]["encoding"] == "base64"
-        assert pkg["inputs"][0]["default"]["schema"] is None
+        assert "default" not in pkg["inputs"][0]
         assert pkg["inputs"][0]["format"] == EDAM_NETCDF
         assert pkg["inputs"][0]["type"]["type"] == "array"
         assert pkg["inputs"][0]["type"]["items"] == "File"
@@ -478,10 +549,12 @@ class WpsPackageAppTest(unittest.TestCase):
         assert len(pkg["outputs"]) == 2
         assert isinstance(pkg["outputs"], list)
         assert pkg["outputs"][0]["id"] == "output_netcdf"
+        assert "default" not in pkg["outputs"][0]
         assert pkg["outputs"][0]["format"] == EDAM_NETCDF
         assert pkg["outputs"][0]["type"] == "File"
         assert pkg["outputs"][0]["outputBinding"]["glob"] == "output_netcdf.nc"
         assert pkg["outputs"][1]["id"] == "output_log"
+        assert "default" not in pkg["outputs"][1]
         assert pkg["outputs"][1]["format"] == EDAM_PLAIN
         assert pkg["outputs"][1]["type"] == "File"
         assert pkg["outputs"][1]["outputBinding"]["glob"] == "output_log.*"
@@ -545,6 +618,7 @@ class WpsPackageAppTest(unittest.TestCase):
         assert isinstance(pkg["inputs"], list)
         assert pkg["inputs"][0]["id"] == "region"
         assert pkg["inputs"][0]["default"] == "DEU"
+        assert "format" not in pkg["inputs"][0]
         assert pkg["inputs"][0]["type"]["type"] == "array"
         assert pkg["inputs"][0]["type"]["items"]["type"] == "enum"
         assert isinstance(pkg["inputs"][0]["type"]["items"]["symbols"], list)
@@ -552,19 +626,17 @@ class WpsPackageAppTest(unittest.TestCase):
         assert all(isinstance(s, six.string_types) for s in pkg["inputs"][0]["type"]["items"]["symbols"])
         assert pkg["inputs"][1]["id"] == "mosaic"
         assert pkg["inputs"][1]["default"] == "null"
+        assert "format" not in pkg["inputs"][1]
         assert pkg["inputs"][1]["type"] == "boolean"
         assert pkg["inputs"][2]["id"] == "resource"
-        assert pkg["inputs"][2]["default"]["mimeType"] == CONTENT_TYPE_APP_NETCDF
-        assert pkg["inputs"][2]["default"]["encoding"] is None
-        assert pkg["inputs"][2]["default"]["schema"] is None
-        assert pkg["inputs"][2]["format"] == EDAM_NETCDF
+        assert "default" not in pkg["inputs"][2]
         assert pkg["inputs"][2]["type"]["type"] == "array"
         assert pkg["inputs"][2]["type"]["items"] == "File"
         assert isinstance(pkg["inputs"][2]["format"], list)
         assert len(pkg["inputs"][2]["format"]) == 3
-        assert pkg["inputs"][2]["format"][0] == CONTENT_TYPE_APP_NETCDF
-        assert pkg["inputs"][2]["format"][1] == CONTENT_TYPE_APP_TAR
-        assert pkg["inputs"][2]["format"][2] == CONTENT_TYPE_APP_ZIP
+        assert pkg["inputs"][2]["format"][0] == EDAM_NETCDF
+        assert pkg["inputs"][2]["format"][1] == IANA_TAR
+        assert pkg["inputs"][2]["format"][2] == IANA_ZIP
 
         # process description I/O validation
         assert len(desc["process"]["inputs"]) == 3

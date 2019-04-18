@@ -147,7 +147,7 @@ class BuiltinProcessJobBase(CommandLineJob):
             self._validate_process()
             super(BuiltinProcessJobBase, self).run(runtime_context)
         except Exception as err:
-            LOGGER.warning(u"Failed to run process:\n%s", err, exc_info=runtime_context.debug)
+            LOGGER.warning(u"Failed to run process:\n{!s}".format(err), exc_info=runtime_context.debug)
             self.output_callback({}, "permanentFail")
 
 

@@ -36,7 +36,7 @@ import os
 # simulated remote server with remote processes (mocked with `responses` package)
 TEST_REMOTE_SERVER_URL = "https://remote-server.com"
 TEST_REMOTE_PROCESS_WPS1_ID = "test-remote-process-wps1"
-TEST_REMOTE_PROCESS_WPS2_ID = "test-remote-process-wps2"
+TEST_REMOTE_PROCESS_WPS3_ID = "test-remote-process-wps3"
 TEST_REMOTE_PROCESS_ROOT = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources")
 TEST_REMOTE_PROCESS_GETCAP_WPS1_FILE = os.path.join(TEST_REMOTE_PROCESS_ROOT, "test_describe_process_wps1.xml")
 TEST_REMOTE_PROCESS_GETCAP_WPS1_URL = "{}/wps?service=WPS&request=GetCapabilities&version=1.0.0" \
@@ -44,7 +44,7 @@ TEST_REMOTE_PROCESS_GETCAP_WPS1_URL = "{}/wps?service=WPS&request=GetCapabilitie
 TEST_REMOTE_PROCESS_DESCRIBE_WPS1_FILE = os.path.join(TEST_REMOTE_PROCESS_ROOT, "test_describe_process_wps1.xml")
 TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL = "{}/wps?service=WPS&request=DescribeProcess&identifier={}&version=1.0.0" \
                                         .format(TEST_REMOTE_SERVER_URL, TEST_REMOTE_PROCESS_WPS1_ID)
-TEST_REMOTE_PROCESS_WPS2_FILE = os.path.join(TEST_REMOTE_PROCESS_ROOT, "test_describe_process_wps2.json")
+TEST_REMOTE_PROCESS_WPS3_FILE = os.path.join(TEST_REMOTE_PROCESS_ROOT, "test_describe_process_wps3.json")
 
 
 def mock_remote_server_requests_wp1(test):
@@ -95,7 +95,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
         self.remote_server = "local"
         self.process_remote_WPS1 = "process_remote_wps1"
-        self.process_remote_WPS2 = "process_remote_wps2"
+        self.process_remote_WPS3 = "process_remote_wps3"
         self.process_public = WpsTestProcess(identifier="process_public")
         self.process_private = WpsTestProcess(identifier="process_private")
         self.process_store.save_process(self.process_public)
@@ -291,7 +291,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert process_wps_endpoint == weaver_wps_path
 
     @staticmethod
-    def assert_deployed_wps2(response_json, expected_process_id):
+    def assert_deployed_wps3(response_json, expected_process_id):
         assert expected_process_id in response_json["process"]["id"]
         assert len(response_json["process"]["inputs"]) == 1
         assert response_json["process"]["inputs"][0]["id"] == "input-1"
@@ -331,7 +331,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
         resp = self.app.get(proc_url, headers=self.json_headers)
         assert resp.status_code == 200
-        self.assert_deployed_wps2(resp.json, expected_process_id)
+        self.assert_deployed_wps3(resp.json, expected_process_id)
 
     # FIXME: implement
     @pytest.mark.xfail(reason="not implemented")
@@ -417,17 +417,17 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     # FIXME: implement
     @pytest.mark.xfail(reason="not implemented")
-    def test_deploy_process_WPS2_DescribeProcess_href(self):
+    def test_deploy_process_WPS3_DescribeProcess_href(self):
         raise NotImplementedError
 
     # FIXME: implement
     @pytest.mark.xfail(reason="not implemented")
-    def test_deploy_process_WPS2_DescribeProcess_owsContext(self):
+    def test_deploy_process_WPS3_DescribeProcess_owsContext(self):
         raise NotImplementedError
 
     # FIXME: implement
     @pytest.mark.xfail(reason="not implemented")
-    def test_deploy_process_WPS2_DescribeProcess_executionUnit(self):
+    def test_deploy_process_WPS3_DescribeProcess_executionUnit(self):
         raise NotImplementedError
 
     def test_delete_process_success(self):

@@ -4,6 +4,7 @@ WPS_COMPLEX = "complex"
 WPS_BOUNDINGBOX = "bbox"
 WPS_LITERAL = "literal"
 WPS_REFERENCE = "reference"
+WPS_COMPLEX_DATA = "ComplexData"
 
 # opensearch
 OPENSEARCH_START_DATE = "StartDate"

@@ -6,6 +6,7 @@ from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN
 from weaver.store.base import StoreProcesses
 from weaver.utils import get_sane_name, get_settings, get_url_without_query
 from weaver.processes import wps_package
+from weaver.processes.constants import WPS_COMPLEX_DATA
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
@@ -82,7 +83,7 @@ def _get_json_multiple_inputs(input_value):
     """
 
     # Check for the json datatype and mimetype
-    if input_value.dataType == "ComplexData" and input_value.mimeType == CONTENT_TYPE_APP_JSON:
+    if input_value.dataType == WPS_COMPLEX_DATA and input_value.mimeType == CONTENT_TYPE_APP_JSON:
 
         # If the json data is referenced read it's content
         if input_value.reference:
@@ -131,7 +132,7 @@ def jsonify_output(output, process_description):
         # WPS standard v1.0.0 specify that Output data field has Zero or one value
         json_output["data"] = output.data[0] if output.data else None
 
-    if json_output["dataType"] == "ComplexData":
+    if json_output["dataType"] == WPS_COMPLEX_DATA:
         json_output["mimeType"] = output.mimeType
 
     return json_output

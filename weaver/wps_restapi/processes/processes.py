@@ -12,6 +12,7 @@ from weaver.execute import (
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes import wps_package, opensearch
+from weaver.processes.constants import WPS_COMPLEX_DATA
 from weaver.processes.utils import jsonify_output, convert_process_wps_to_db, deploy_process_from_payload
 from weaver.processes.types import PROCESS_WORKFLOW, PROCESS_BUILTIN
 from weaver.status import (
@@ -92,7 +93,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
         # prepare inputs
         complex_inputs = []
         for process_input in process.dataInputs:
-            if "ComplexData" in process_input.dataType:
+            if WPS_COMPLEX_DATA in process_input.dataType:
                 complex_inputs.append(process_input.identifier)
 
         try:
@@ -116,7 +117,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
             wps_inputs = []
 
         # prepare outputs
-        outputs = [(o.identifier, o.dataType == "ComplexData") for o in process.processOutputs]
+        outputs = [(o.identifier, o.dataType == WPS_COMPLEX_DATA) for o in process.processOutputs]
 
         mode = EXECUTE_MODE_ASYNC if job.execute_async else EXECUTE_MODE_SYNC
         execution = wps.execute(job.process, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)

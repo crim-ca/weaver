@@ -52,21 +52,28 @@ EDAM_MAPPING = {
 FORMAT_NAMESPACES = frozenset([IANA_NAMESPACE, EDAM_NAMESPACE])
 
 
-def get_cwl_file_format(mime_type, make_reference=False):
-    # type: (AnyStr, bool) -> Union[Tuple[Union[JSON, None], Union[AnyStr, None]], Union[AnyStr, None]]
+def get_cwl_file_format(mime_type, make_reference=False, must_exist=False):
+    # type: (AnyStr, bool, bool) -> Union[Tuple[Union[JSON, None], Union[AnyStr, None]], Union[AnyStr, None]]
     """
-    Obtains the corresponding IANA/EDAM ``format`` value to be applied under a CWL I/O ``File`` from the
-    ``mime_type`` (`Content-Type` header) using the first matched one.
+    Obtains the corresponding `IANA`/`EDAM` ``format`` value to be applied under a `CWL` I/O ``File`` from
+    the ``mime_type`` (`Content-Type` header) using the first matched one.
 
     If ``make_reference=False``:
-        - If there is a match, returns ``tuple(dict<namespace-name: namespace-url>, <format>)``:
+        - If there is a match, returns ``tuple({<namespace-name: namespace-url>}, <format>)``:
             1) corresponding namespace mapping to be applied under ``$namespaces`` in the `CWL`.
             2) value of ``format`` adjusted according to the namespace to be applied to ``File`` in the `CWL`.
+        - If there is no match but ``must_exist=False``:
+            returns a literal and non-existing definition as ``tuple({"iana": <iana-url>}, <format>)``
         - Otherwise, returns ``(None, None)``
 
     If ``make_reference=True``:
         - If there is a match, returns the explicit format reference as ``<namespace-url>/<format>``.
-        - Otherwise, returns a single ``None`` if ``mime_type`` cannot be matched.
+        - If there is no match but ``must_exist=False``, returns the literal reference as ``<iana-url>/<format>``.
+        - Otherwise, returns a single ``None``.
+
+    Note:
+        In situations where ``must_exist=False`` and the default non-existing namespace is returned, the `CWL`
+        behaviour is to evaluate corresponding ``format`` for literal matching strings.
     """
     def _make_if_ref(_map, _key, _fmt):
         return os.path.join(_map[_key], _fmt) if make_reference else (_map, "{}:{}".format(_key, _fmt))
@@ -81,6 +88,8 @@ def get_cwl_file_format(mime_type, make_reference=False):
         pass
     if mime_type in EDAM_MAPPING:
         return _make_if_ref(EDAM_NAMESPACE_DEFINITION, EDAM_NAMESPACE, EDAM_MAPPING[mime_type])
+    if not must_exist:
+        return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, mime_type)
     return None if make_reference else (None, None)
 
 

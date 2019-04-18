@@ -1,7 +1,7 @@
 from weaver.processes.sources import fetch_data_sources
-from weaver.processes.constants import WPS_LITERAL
 from weaver.processes.constants import (
-    OPENSEARCH_START_DATE, OPENSEARCH_END_DATE, OPENSEARCH_AOI, OPENSEARCH_COLLECTION, OPENSEARCH_LOCAL_FILE_SCHEME
+    OPENSEARCH_START_DATE, OPENSEARCH_END_DATE, OPENSEARCH_AOI, OPENSEARCH_COLLECTION, OPENSEARCH_LOCAL_FILE_SCHEME,
+    WPS_LITERAL,
 )
 from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
 from weaver.utils import get_any_id

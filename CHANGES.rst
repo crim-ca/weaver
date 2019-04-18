@@ -10,20 +10,22 @@ New Features:
 - Add ability to filter jobs with ``notification_email`` query parameter (#44).
 - Add jobs statistics grouping by specific fields using comma-separated list ``group_by`` query parameter (#46).
 - Add some tests to evaluate new job search methods / grouping results and responses (#44, #46).
-- Add handling of multiple ``CWL`` field ``format``
+- Add handling of multiple `CWL` field ``format`` for ``File`` type
+- Add missing ontology reference support for `CWL` field ``format`` by defaulting to `IANA` namespace
 - Add support for I/O enum array (#30)
 - Add more functional tests (#11, #17)
 
 Changes:
 - Use ``bump2version`` and move all config under ``setup.cfg``
+- Remove enforced ``text/plain`` for `CWL` ``File`` when missing ``format`` field
 
 Fixes:
 - Adjust some typing definitions incorrectly specified.
 - Fix some failing functionality tests.
 - Fix I/O field ordering preserved as specified in payload or loaded reference file
-- Fix setting ``minOccurs=0`` when a ``default`` is specified in the corresponding ``CWL`` I/O (#17)
+- Fix setting ``minOccurs=0`` when a ``default`` is specified in the corresponding ``CWL`` I/O (#17, #25)
 - Fix incorrectly overridden ``maxOccurs="unbounded"`` by ``maxOccurs="1"`` when a partial array input definition
-  is specified without explicit ``maxOccurs`` in `WPS` payload (#17)
+  is specified without explicit ``maxOccurs`` in `WPS` payload (#17, #25)
 
 0.2.2 (2019-05-31)
 ==================

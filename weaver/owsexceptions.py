@@ -176,7 +176,7 @@ class OWSNoApplicableCode(OWSException):
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPBadRequest
         super(OWSNoApplicableCode, self).__init__(args, kwargs)
-        warnings.warn(self.message, "OWS WPS NoApplicableCode (BadRequest)")
+        warnings.warn(self.message, UnsupportedOperationWarning)
 
 
 class OWSMissingParameterValue(OWSException):

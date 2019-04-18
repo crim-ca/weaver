@@ -35,10 +35,23 @@ def test_get_cwl_file_format_reference():
 
 
 def test_get_cwl_file_format_unknown():
-    res = get_cwl_file_format("application/unknown", make_reference=False)
-    assert isinstance(res, tuple) and res == (None, None)
-    res = get_cwl_file_format("application/unknown", make_reference=True)
+    res = get_cwl_file_format("application/unknown", make_reference=False, must_exist=True)
+    assert isinstance(res, tuple)
+    assert res == (None, None)
+    res = get_cwl_file_format("application/unknown", make_reference=True, must_exist=True)
     assert res is None
+
+
+def test_get_cwl_file_format_default():
+    fmt = "application/unknown"
+    iana_url = IANA_NAMESPACE_DEFINITION[IANA_NAMESPACE]
+    iana_fmt = "{}:{}".format(IANA_NAMESPACE, fmt)
+    res = get_cwl_file_format("application/unknown", make_reference=False, must_exist=False)
+    assert isinstance(res, tuple)
+    assert res[0] == {IANA_NAMESPACE: iana_url}
+    assert res[1] == iana_fmt
+    res = get_cwl_file_format("application/unknown", make_reference=True, must_exist=False)
+    assert res == iana_url + fmt
 
 
 def test_clean_mime_type_format_iana():

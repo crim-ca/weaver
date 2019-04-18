@@ -488,12 +488,12 @@ class WpsWorkflowJob(JobBase):
                 runtimeContext.process_run_id, None, self.prov_obj.workflow_run_uri,
                 now())
         if process_status != "success":
-            LOGGER.warning(u"[job %s] completed %s", self.name, process_status)
+            LOGGER.warning(u"[job {}] completed {}".format(self.name, process_status))
         else:
-            LOGGER.info(u"[job %s] completed %s", self.name, process_status)
+            LOGGER.info(u"[job {}] completed {}".format(self.name, process_status))
 
         if LOGGER.isEnabledFor(logging.DEBUG):
-            LOGGER.debug(u"[job %s] %s", self.name, json_dumps(outputs, indent=4))
+            LOGGER.debug(u"[job {}] {!s}".format(self.name, json_dumps(outputs, indent=4)))
 
         if self.generatemapper and runtimeContext.secret_store:
             # Delete any runtime-generated files containing secrets.
