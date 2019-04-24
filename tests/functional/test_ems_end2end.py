@@ -60,14 +60,17 @@ class End2EndEMSTestCase(TestCase):
     """
     __settings__ = None
     test_processes_info = dict()    # type: Dict[AnyStr, ProcessInfo]
-    headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
+    headers = {                     # type: HeadersType
+        "Accept": CONTENT_TYPE_APP_JSON,
+        "Content-Type": CONTENT_TYPE_APP_JSON
+    }
     cookies = dict()                # type: CookiesType
     app = None                      # type: WebTestApp
     logger_result_dir = None        # type: AnyStr
-    logger_separator_calls = None   # type: AnyStr
-    logger_separator_steps = None   # type: AnyStr
-    logger_separator_tests = None   # type: AnyStr
-    logger_separator_cases = None   # type: AnyStr
+    logger_separator_calls = ""     # type: AnyStr
+    logger_separator_steps = ""     # type: AnyStr
+    logger_separator_tests = ""     # type: AnyStr
+    logger_separator_cases = ""     # type: AnyStr
     logger_level = logging.INFO     # type: int
     logger_enabled = True           # type: bool
     logger = None                   # type: LoggerType

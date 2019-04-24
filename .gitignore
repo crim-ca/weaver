@@ -33,6 +33,7 @@ coverage.xml
 coverage/
 nosetests.xml
 unit_tests/testdata.json
+result[s].xml
 
 # R
 *.Rhistory
