@@ -26,4 +26,3 @@ shapely
 six
 simplejson
 webob
-yagmail
