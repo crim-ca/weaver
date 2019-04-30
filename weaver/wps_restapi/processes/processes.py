@@ -194,12 +194,12 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
             try:
                 job_json = job_format_json(settings, job)
                 notify_job(job, job_json, notification_email, settings)
-                message = "Sent email to: {}".format(notification_email)
+                message = "Email sent successfully."
                 job.save_log(logger=task_logger, message=message)
             except Exception as exc:
                 exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
                 exception = "{0}: {1}".format(exception_class, exc.message)
-                message = "Couldn't send email to: {} ({})".format(notification_email, exception)
+                message = "Couldn't send email ({})".format(exception)
                 job.save_log(errors=message, logger=task_logger, message=message)
 
         job = store.update_job(job)
