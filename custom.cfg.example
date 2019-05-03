@@ -32,6 +32,7 @@ wps-email-notify-smtp-host =
 wps-email-notify-from-addr = example@email.com
 wps-email-notify-password = 123456
 wps-email-notify-port = 25
+wps-email-notify-ssl = true
 wps-email-notify-template = /path/to/mako/template.mako
 wps-processes-file = /path/to/wps_processes.yml
 

@@ -14,6 +14,7 @@ def notify_job(job, job_json, to, settings):
     from_addr = settings.get("weaver.wps_email_notify_from_addr")
     password = settings.get("weaver.wps_email_notify_password")
     port = settings.get("weaver.wps_email_notify_port")
+    ssl = settings.get("weaver.wps_email_notify_ssl")
     # an example template is located in
     # weaver/wps_restapi/templates/notification_email_example.mako
     template_path = settings.get("weaver.wps_email_notify_template")
@@ -26,10 +27,16 @@ def notify_job(job, job_json, to, settings):
 
     message = 'Subject: {}\n\n{}'.format(subject, contents)
 
-    if port == 25:
-        server = smtplib.SMTP(smtp_host, port)
-    else:
+    if ssl:
         server = smtplib.SMTP_SSL(smtp_host, port)
+    else:
+        server = smtplib.SMTP(smtp_host, port)
+        server.ehlo()
+        try:
+            server.starttls()
+            server.ehlo()
+        except smtplib.SMTPException:
+            pass
 
     try:
         if password:
