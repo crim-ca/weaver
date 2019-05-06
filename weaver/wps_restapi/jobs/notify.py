@@ -48,10 +48,7 @@ def notify_job(job, job_json, to, settings):
             server.login(from_addr, password)
         result = server.sendmail(from_addr, to, message)
     finally:
-        try:
-            server.close()
-        except:
-            pass
+        server.close()
 
     if result:
         code, error_message = result[to]
