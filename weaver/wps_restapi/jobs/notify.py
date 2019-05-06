@@ -22,6 +22,9 @@ def notify_job(job, job_json, to, settings):
     if not os.path.exists(template_path):
         raise IOError("Template file doesn't exist: {}".format(template_path))
 
+    if not smtp_host or not port:
+        raise ValueError("The email server configuration is missing.")
+
     template = Template(filename=template_path)
     contents = template.render(job=job, **job_json)
 
@@ -43,7 +46,10 @@ def notify_job(job, job_json, to, settings):
             server.login(from_addr, password)
         result = server.sendmail(from_addr, to, message)
     finally:
-        server.close()
+        try:
+            server.close()
+        except:
+            pass
 
     if result:
         code, error_message = result[to]
