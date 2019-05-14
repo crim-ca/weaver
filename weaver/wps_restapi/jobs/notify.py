@@ -30,7 +30,7 @@ def notify_job(job, job_json, to, settings):
     template = Template(filename=template_path)
     contents = template.render(job=job, **job_json)
 
-    message = 'Subject: {}\n\n{}'.format(subject, contents)
+    message = u'Subject: {}\n\n{}'.format(subject, contents)
 
     if ssl:
         server = smtplib.SMTP_SSL(smtp_host, port)
@@ -46,7 +46,7 @@ def notify_job(job, job_json, to, settings):
     try:
         if password:
             server.login(from_addr, password)
-        result = server.sendmail(from_addr, to, message)
+        result = server.sendmail(from_addr, to, message.encode("utf8"))
     finally:
         server.close()
 
