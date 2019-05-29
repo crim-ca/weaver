@@ -33,7 +33,8 @@ wps-email-notify-from-addr = example@email.com
 wps-email-notify-password = 123456
 wps-email-notify-port = 25
 wps-email-notify-ssl = true
-wps-email-notify-template = /path/to/mako/template.mako
+wps-email-notify-template-dir = /path/to/mako/process/templates/
+wps-email-notify-template-default = custom_default.mako
 wps-processes-file = /path/to/wps_processes.yml
 
 # See weaver.processes.sources.py for schema
