@@ -1,6 +1,11 @@
 Changes
 *******
 
+0.2.1
+=====
+
+ - Add per-process email notification template
+
 0.2.0
 =====
 
