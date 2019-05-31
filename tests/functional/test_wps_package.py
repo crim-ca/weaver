@@ -15,7 +15,6 @@ from tests.utils import (
     mocked_sub_requests,
 )
 from tests import resources
-# noinspection PyPackageRequirements
 import pytest
 import unittest
 

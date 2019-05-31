@@ -1,18 +1,33 @@
 Changes
 *******
 
-0.2.2
-=====
+Unreleased
+==========
+
+New Features:
+- Add ``notification_email`` field to ``Job`` datatype that stores an encrypted email (according to settings) when
+  provided on the job submission body.
+- Add ability to filter jobs with ``notification_email`` query parameter.
+- Add jobs statistics grouping by specific fields using comma-separated list ``group_by`` query parameter.
+
+Changes:
+- Use ``bump2version`` and move all config under ``setup.cfg``
+
+Fixes:
+- Adjust some typing definitions incorrectly specified.
+
+0.2.2 (2019-05-31)
+==================
 
  - Support notification email subject template
 
-0.2.1
-=====
+0.2.1 (2019-05-29)
+==================
 
  - Add per-process email notification template
 
-0.2.0
-=====
+0.2.0 (2019-03-26)
+==================
 
 - Fixes to handle invalid key characters ``"$"`` and ``"."`` during `CWL` package read/write operations to database
 - Fixes some invalid `CWL` package generation from `WPS-1` references

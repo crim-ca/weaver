@@ -9,7 +9,6 @@ from requests.exceptions import HTTPError as RequestsHTTPError
 from six.moves.urllib.parse import urlparse
 from lxml import etree
 from typing import Type
-# noinspection PyPackageRequirements
 import pytest
 
 
@@ -340,3 +339,13 @@ def test_assert_sane_name():
     ]
     for test in test_cases_valid:
         utils.assert_sane_name(test)
+
+
+def test_str2bytes():
+    assert utils.str2bytes(b"test-bytes") == b"test-bytes"
+    assert utils.str2bytes(u"test-unicode") == b"test-unicode"
+
+
+def test_bytes2str():
+    assert utils.bytes2str(b"test-bytes") == u"test-bytes"
+    assert utils.bytes2str(u"test-unicode") == u"test-unicode"

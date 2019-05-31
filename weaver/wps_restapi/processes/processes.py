@@ -22,10 +22,10 @@ from weaver.status import (
     STATUS_SUCCEEDED,
 )
 from weaver.store.base import StoreServices, StoreProcesses, StoreJobs
-from weaver.utils import get_any_id, get_any_value, get_settings, raise_on_xml_exception, wait_secs, get_cookie_headers
+from weaver.utils import get_any_id, get_any_value, get_settings, get_cookie_headers, raise_on_xml_exception, wait_secs
 from weaver.visibility import VISIBILITY_PUBLIC, visibility_values
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.jobs.notify import notify_job
+from weaver.wps_restapi.jobs.notify import notify_job, encrypt_email
 from weaver.wps_restapi.utils import get_wps_restapi_base_url, parse_request_query, OUTPUT_FORMAT_JSON
 from weaver.wps_restapi.jobs.jobs import check_status, job_format_json
 from weaver.wps import load_pywps_cfg
@@ -68,8 +68,9 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
     settings = get_settings(app)
     task_logger = get_task_logger(__name__)
     load_pywps_cfg(settings)
-
     ssl_verify = asbool(settings.get("weaver.ssl_verify", True))
+
+    task_logger.debug("Job task setup.")
     store = get_db(app).get_store(StoreJobs)
     job = store.fetch_by_id(job_id)
     job.task_id = self.request.id
@@ -242,16 +243,19 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
     # TODO: remove when all parameter variations are supported
     validate_supported_submit_job_handler_parameters(json_body)
 
+    settings = get_settings(request)
     provider_id = request.matchdict.get("provider_id")          # None OK if local
     process_id = request.matchdict.get("process_id")
     tags = request.params.get("tags", "").split(",")
     is_execute_async = json_body["mode"] != EXECUTE_MODE_SYNC   # convert auto to async
     notification_email = json_body.get("notification_email")
+    encrypted_email = encrypt_email(notification_email, settings) if notification_email else None
 
     store = get_db(request).get_store(StoreJobs)
     job = store.save_job(task_id=STATUS_ACCEPTED, process=process_id, service=provider_id,
                          inputs=json_body.get("inputs"), is_workflow=is_workflow, access=visibility,
-                         user_id=request.authenticated_userid, execute_async=is_execute_async, custom_tags=tags)
+                         user_id=request.authenticated_userid, execute_async=is_execute_async, custom_tags=tags,
+                         notification_email=encrypted_email)
     result = execute_process.delay(
         job_id=job.id,
         url=clean_ows_url(service_url),
@@ -263,7 +267,7 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
     # local/provider process location
     location_base = "/providers/{provider_id}".format(provider_id=provider_id) if provider_id else ""
     location = "{base_url}{location_base}/processes/{process_id}/jobs/{job_id}".format(
-        base_url=get_wps_restapi_base_url(get_settings(request)),
+        base_url=get_wps_restapi_base_url(settings),
         location_base=location_base,
         process_id=process_id,
         job_id=job.id)

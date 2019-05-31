@@ -23,14 +23,10 @@ from tests.utils import (
 from copy import deepcopy
 # noinspection PyDeprecation
 from contextlib import nested
-# noinspection PyPackageRequirements
 import pytest
-# noinspection PyPackageRequirements
 import mock
-# noinspection PyPackageRequirements
 import webtest
 import unittest
-# noinspection PyPackageRequirements
 import responses
 import pyramid.testing
 import six

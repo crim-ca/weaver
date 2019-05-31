@@ -27,11 +27,8 @@ from collections import OrderedDict
 from contextlib import nested
 from typing import AnyStr, Tuple, List, Union
 from owslib.wps import WebProcessingService, Process as ProcessOWSWPS
-# noinspection PyPackageRequirements
 from pywps.app import Process as ProcessPyWPS
-# noinspection PyPackageRequirements
 import mock
-# noinspection PyPackageRequirements
 import webtest
 import unittest
 import warnings

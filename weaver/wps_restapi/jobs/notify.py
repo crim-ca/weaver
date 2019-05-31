@@ -1,9 +1,14 @@
+from __future__ import unicode_literals
 from weaver.datatype import Job
+from weaver.utils import str2bytes, bytes2str
 from pyramid.settings import asbool
 from mako.template import Template
 from typing import TYPE_CHECKING
 import os
+import six
 import smtplib
+import hashlib
+import binascii
 import logging
 if TYPE_CHECKING:
     from typing import Dict
@@ -106,3 +111,18 @@ def notify_job(job, job_json, to, settings):
     if result:
         code, error_message = result[to]
         raise IOError("Code: {}, Message: {}".format(code, error_message))
+
+
+def encrypt_email(email, settings):
+    if not email or not isinstance(email, six.string_types):
+        raise TypeError("Invalid email: {!s}".format(email))
+    LOGGER.debug("Job email setup.")
+    try:
+        salt = str2bytes(settings.get("weaver.wps_email_encrypt_salt"))
+        email = str2bytes(email)
+        rounds = int(settings.get("weaver.wps_email_encrypt_rounds", 100000))
+        derived_key = hashlib.pbkdf2_hmac("sha256", email, salt, rounds)
+        return bytes2str(binascii.hexlify(derived_key))
+    except Exception as ex:
+        LOGGER.debug("Job email setup failed [{!r}].".format(ex))
+        raise ValueError("Cannot register job, server not properly configured for notification email.")

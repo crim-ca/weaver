@@ -19,7 +19,6 @@ from tests.utils import (
     get_test_weaver_app,
 )
 from xml.etree import ElementTree
-# noinspection PyPackageRequirements
 import pytest
 import unittest
 import pyramid.testing

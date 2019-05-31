@@ -11,9 +11,7 @@ from weaver.wps_restapi.swagger_definitions import (
 )
 from tests.utils import get_test_weaver_app, setup_config_with_mongodb
 # use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
-# noinspection PyPackageRequirements
 from webtest import TestApp as WebTestApp
-# noinspection PyPackageRequirements
 import pytest
 import unittest
 

@@ -13,7 +13,6 @@ from tests.utils import get_test_weaver_app, get_test_weaver_config, get_setting
 from pyramid.httpexceptions import HTTPFound, HTTPUnauthorized, HTTPForbidden
 import colander
 import unittest
-# noinspection PyPackageRequirements
 import mock
 import os
 

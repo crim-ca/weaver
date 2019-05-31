@@ -10,9 +10,7 @@ from pyramid.wsgi import wsgiapp2
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
 from pyramid.threadlocal import get_current_request
-# noinspection PyPackageRequirements
 from pywps import configuration as pywps_config
-# noinspection PyPackageRequirements
 from pywps.app.Service import Service
 from six.moves.configparser import SafeConfigParser
 from six.moves.urllib.parse import urlparse

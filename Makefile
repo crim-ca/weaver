@@ -68,9 +68,8 @@ help:
 	@echo "  install-sys        install system packages from requirements.sh."
 	@echo "  update             update application by running 'bin/buildout -o -c custom.cfg' (buildout offline mode)."
 	@echo "Build and deploy:"
-	@echo "  bump               bump version using version specified as user input"
-	@echo "  bump-dry           bump version using version specified as user input (dry-run)"
-	@echo "  bump-tag           bump version using version specified as user input, tags it and commits change in git"
+	@echo "  bump               bump version using VERSION specified as user input, tags and commits changes"
+	@echo "  dry                bump version will not tag nor apply changes if combined with 'bump' target"
 	@echo "  docker-info        detail about version of docker image to be tagged for build/push"
 	@echo "  docker-build       build docker image"
 	@echo "  docker-push        push built docker image"
@@ -376,29 +375,21 @@ doc8:
 
 ## Bumpversion targets
 
+# Bumpversion 'dry' config
+# if 'dry' is specified as target, any bumpversion call using 'BUMP_XARGS' will not apply changes
+BUMP_XARGS ?= --verbose --allow-dirty
+ifeq ($(filter dry, $(MAKECMDGOALS)), dry)
+	BUMP_XARGS := $(BUMP_XARGS) --dry-run
+endif
+.PHONY: dry
+dry: setup.cfg
+	@-echo > /dev/null
+
 .PHONY: bump
 bump:
-	$(shell bash -c 'read -p "Version: " VERSION_PART; \
-		source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
-		test -f "$(CONDA_ENV_PATH)/bin/bumpversion" || pip install bumpversion; \
-		"$(CONDA_ENV_PATH)/bin/bumpversion" --config-file "$(CURDIR)/.bumpversion.cfg" \
-			--verbose --allow-dirty --no-tag --new-version $$VERSION_PART patch;')
-
-.PHONY: bump-dry
-bump-dry:
-	$(shell bash -c 'read -p "Version: " VERSION_PART; \
-		source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
-		test -f "$(CONDA_ENV_PATH)/bin/bumpversion" || pip install bumpversion; \
-		"$(CONDA_ENV_PATH)/bin/bumpversion" --config-file "$(CURDIR)/.bumpversion.cfg" \
-			--verbose --allow-dirty --dry-run --tag --new-version $$VERSION_PART patch;')
-
-.PHONY: bump-tag
-bump-tag:
-	$(shell bash -c 'read -p "Version: " VERSION_PART; \
-		source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
-		test -f $(CONDA_ENV_PATH)/bin/bumpversion || pip install bumpversion; \
-		"$(CONDA_ENV_PATH)/bin/bumpversion" --config-file "$(CURDIR)/.bumpversion.cfg" \
-			--verbose --allow-dirty --tag --new-version $$VERSION_PART patch;')
+	@-echo "Updating package version ..."
+	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set"; exit 1 )
+	@-bash -c 'bump2version $(BUMP_XARGS) --new-version "${VERSION}" patch;'
 
 ## Docker targets
 

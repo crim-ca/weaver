@@ -17,11 +17,9 @@ from pyramid.httpexceptions import HTTPNotFound, HTTPUnprocessableEntity, HTTPEx
 from pyramid.registry import Registry
 from pyramid.response import Response
 from pyramid.config import Configurator
-# noinspection PyPackageRequirements
 from webtest import TestApp
 import pyramid_celery
 import warnings
-# noinspection PyPackageRequirements
 import mock
 import uuid
 import os

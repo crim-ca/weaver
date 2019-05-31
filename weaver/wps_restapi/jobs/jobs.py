@@ -10,6 +10,7 @@ from weaver.exceptions import (
 from weaver.store.base import StoreServices, StoreProcesses, StoreJobs
 from weaver.utils import get_settings, get_any_id, get_any_value, get_url_without_query
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.jobs.notify import encrypt_email
 from weaver.wps_restapi.utils import get_wps_restapi_base_url, OUTPUT_FORMAT_JSON
 from weaver.wps import get_wps_output_dir, get_wps_output_url
 from weaver.visibility import VISIBILITY_PUBLIC
@@ -64,6 +65,10 @@ def job_format_json(settings, job):
 
     job_json["logs"] = "{job_url}/logs".format(job_url=job_url(settings, job))
     return job_json
+
+
+def job_list_json(settings, jobs, detail=True):
+    return [job_format_json(settings, job) if detail else job.id for job in jobs]
 
 
 def check_status(url=None, response=None, sleep_secs=2, verify=False):
@@ -185,10 +190,12 @@ def get_jobs(request):
     """
     Retrieve the list of jobs which can be filtered/sorted using queries.
     """
+    settings = get_settings(request)
     service, process = validate_service_process(request)
     detail = asbool(request.params.get("detail", False))
     page = int(request.params.get("page", "0"))
     limit = int(request.params.get("limit", "10"))
+    email = request.params.get("notification_email", None)
     filters = {
         "page": page,
         "limit": limit,
@@ -197,18 +204,21 @@ def get_jobs(request):
         "access": request.params.get("access", None),
         "status": request.params.get("status", None),
         "sort": request.params.get("sort", sort.SORT_CREATED),
+        "notification_email": encrypt_email(email, settings) if email else None,
         # service and process can be specified by query (short route) or by path (full route)
         "process": process,
         "service": service,
     }
+    groups = request.params.get("group_by", "")
+    groups = groups.split(",") if groups else None
     store = get_db(request).get_store(StoreJobs)
-    items, count = store.find_jobs(request, **filters)
-    return HTTPOk(json={
-        "count": count,
-        "page": page,
-        "limit": limit,
-        "jobs": [job_format_json(get_settings(request), job) if detail else job.id for job in items]
-    })
+    items, total = store.find_jobs(request, group_by=groups, **filters)
+    body = {"total": total}
+    if groups:
+        body.update({"groups": [{"categories": it[0], "jobs": job_list_json(settings, it[1])} for it in items]})
+    else:
+        body.update({"jobs": job_list_json(settings, items, detail), "page": page, "limit": limit})
+    return HTTPOk(json=body)
 
 
 @sd.job_full_service.get(tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
