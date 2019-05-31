@@ -34,13 +34,13 @@ For more details, see `Configuration`_ section.
     :alt: Requires Python 2.7, 3.5+
     :target: https://www.python.org/getit
 
-.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/0.2.1.svg
+.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/0.2.2.svg
     :alt: Commits since latest release
-    :target: https://github.com/crim-ca/weaver/compare/0.2.1...master
+    :target: https://github.com/crim-ca/weaver/compare/0.2.2...master
 
 .. |version| image:: https://img.shields.io/github/tag/crim-ca/weaver.svg?style=flat
     :alt: Latest Tag
-    :target: https://github.com/crim-ca/weaver/tree/0.2.1
+    :target: https://github.com/crim-ca/weaver/tree/0.2.2
 
 .. |requires| image:: https://requires.io/github/crim-ca/weaver/requirements.svg?branch=master
     :alt: Requirements Status
@@ -50,9 +50,9 @@ For more details, see `Configuration`_ section.
     :alt: Travis-CI Build Status (master branch)
     :target: https://travis-ci.com/crim-ca/weaver
 
-.. |travis_tag| image:: https://img.shields.io/travis/com/crim-ca/weaver/0.2.1.svg?label=0.2.1
+.. |travis_tag| image:: https://img.shields.io/travis/com/crim-ca/weaver/0.2.2.svg?label=0.2.2
     :alt: Travis-CI Build Status (latest tag)
-    :target: https://github.com/crim-ca/weaver/tree/0.2.1
+    :target: https://github.com/crim-ca/weaver/tree/0.2.2
 
 .. |coverage| image:: https://img.shields.io/codecov/c/gh/crim-ca/weaver.svg?label=coverage
     :alt: Travis-CI CodeCov Coverage
@@ -76,7 +76,7 @@ Docker image `repository <https://docker-registry.crim.ca/repositories/3463>`_.
 
 ::
 
-    $ docker pull docker-registry.crim.ca/ogc/weaver:0.2.1
+    $ docker pull docker-registry.crim.ca/ogc/weaver:0.2.2
 
 Test server: https://ogc-ems.crim.ca/weaver/
 
