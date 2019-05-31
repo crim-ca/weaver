@@ -1,6 +1,11 @@
 Changes
 *******
 
+0.2.2
+=====
+
+ - Support notification email subject template
+
 0.2.1
 =====
 

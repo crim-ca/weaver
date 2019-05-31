@@ -12,10 +12,13 @@ LOGGER = logging.getLogger(__name__)
 
 DEFAULT_TEMPLATE = """
 <%doc>
-    This is an example notification message to be sent by email when a job is done
-    It is formatted using the Mako template library (https://www.makotemplates.org/)
+    This is an example notification message to be sent by email when a job is
+    done. It is formatted using the Mako template library
+    (https://www.makotemplates.org/). The content must also include the message
+    header.
 
     The provided variables are:
+    to: Recipient's address
     job: a weaver.datatype.Job object
     settings: application settings
 
@@ -28,6 +31,11 @@ DEFAULT_TEMPLATE = """
     message:          example "Job succeeded."
     percentCompleted: example "100"
 </%doc>
+From: Weaver
+To: ${to}
+Subject: Job ${job.process} ${job.status.title()}
+Content-Type: text/plain; charset=UTF-8
+
 Dear user,
 
 Your job submitted on ${job.created.strftime('%Y/%m/%d %H:%M %Z')} to ${settings.get('weaver.url')} ${job.status}.
@@ -45,7 +53,6 @@ Weaver
 
 def notify_job(job, job_json, to, settings):
     # type: (Job, Dict, str, Dict) -> None
-    subject = "Job {} {}".format(job.process, job.status.title())
     smtp_host = settings.get("weaver.wps_email_notify_smtp_host")
     from_addr = settings.get("weaver.wps_email_notify_from_addr")
     password = settings.get("weaver.wps_email_notify_password")
@@ -72,10 +79,11 @@ def notify_job(job, job_json, to, settings):
         elif os.path.isfile(default_template):
             template = Template(filename=default_template)
         else:
-            raise IOError("Template file doesn't exist: OneOf[{!s}, {!s}]".format(process_name, default_name))
+            raise IOError("Template file doesn't exist: OneOf[{!s}, {!s}]".
+                          format(process_name, default_name))
 
-    contents = template.render(job=job, settings=settings, **job_json)
-    message = u'Subject: {}\n\n{}'.format(subject, contents)
+    contents = template.render(to=to, job=job, settings=settings, **job_json)
+    message = u'{}'.format(contents).strip(u'\n')
 
     if ssl:
         server = smtplib.SMTP_SSL(smtp_host, port)
