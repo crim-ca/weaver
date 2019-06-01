@@ -73,7 +73,7 @@ class WpsPackageAppTest(unittest.TestCase):
         body = {
             "processDescription": {
                 "process": {
-                    "id": self.__name__,
+                    "id": self._testMethodName,
                     "title": "some title",
                     "abstract": "this is a test",
                 }
@@ -82,7 +82,7 @@ class WpsPackageAppTest(unittest.TestCase):
             "executionUnit": [{"unit": cwl}],
         }
         desc, pkg = self.deploy_process(body)
-        assert desc["process"]["id"] == self.__name__
+        assert desc["process"]["id"] == self._testMethodName
         assert desc["process"]["title"] == "some title"
         assert desc["process"]["abstract"] == "this is a test"
         assert isinstance(desc["process"]["inputs"], list)

@@ -9,12 +9,14 @@ New Features:
   provided on the job submission body.
 - Add ability to filter jobs with ``notification_email`` query parameter.
 - Add jobs statistics grouping by specific fields using comma-separated list ``group_by`` query parameter.
+- Add some tests to evaluate new job search methods / grouping results and responses.
 
 Changes:
 - Use ``bump2version`` and move all config under ``setup.cfg``
 
 Fixes:
 - Adjust some typing definitions incorrectly specified.
+- Fix some failing functionality tests.
 
 0.2.2 (2019-05-31)
 ==================

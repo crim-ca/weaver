@@ -165,16 +165,33 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert response.content_type == CONTENT_TYPE_APP_JSON
         assert 'jobs' in response.json and isinstance(response.json['jobs'], list)
         assert 'page' in response.json and isinstance(response.json['page'], int)
-        assert 'count' in response.json and isinstance(response.json['count'], int)
+        assert 'total' in response.json and isinstance(response.json['total'], int)
         assert 'limit' in response.json and isinstance(response.json['limit'], int)
         assert len(response.json['jobs']) <= response.json['limit']
-        assert response.json['page'] == response.json['count'] // response.json['limit']
+        assert response.json['page'] == response.json['total'] // response.json['limit']
+
+    @staticmethod
+    def check_basic_jobs_grouped_info(response, group_by):
+        assert response.status_code == 200
+        assert response.content_type == CONTENT_TYPE_APP_JSON
+        assert 'page' not in response.json
+        assert 'limit' not in response.json
+        assert 'total' in response.json and isinstance(response.json['total'], int)
+        assert isinstance(response.json, list)
+        total = 0
+        for grouped_jobs in response.json:
+            assert 'category' in grouped_jobs and isinstance(grouped_jobs['category'], dict)
+            assert all(g in grouped_jobs['category'] for g in group_by)
+            assert 'jobs' in grouped_jobs and isinstance(grouped_jobs['jobs'], list)
+            assert 'count' in grouped_jobs and len(grouped_jobs['jobs']) == grouped_jobs['count']
+            total += grouped_jobs['count']
+        assert total == response.json['total']
 
     @staticmethod
     def add_params(path, **kwargs):
         return path + "?" + "&".join("{}={}".format(k, v) for k, v in kwargs.items())
 
-    def test_get_jobs_normal(self):
+    def test_get_jobs_normal_paged(self):
         resp = self.app.get(jobs_short_uri, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
         for job_id in resp.json['jobs']:
@@ -187,13 +204,42 @@ class WpsRestApiJobsTest(unittest.TestCase):
             for job_id in resp.json['jobs']:
                 assert isinstance(job_id, six.string_types)
 
-    def test_get_jobs_detail(self):
+    def test_get_jobs_detail_paged(self):
         for detail in ('true', 1, 'True', 'yes'):
             path = self.add_params(jobs_short_uri, detail=detail)
             resp = self.app.get(path, headers=self.json_headers)
             self.check_basic_jobs_info(resp)
             for job in resp.json['jobs']:
                 self.check_job_format(job)
+
+    # TODO: create jobs with variants to test grouping
+    # TODO: validate that only job IDs are returned for 'jobs' sections
+    def test_get_jobs_normal_grouped(self):
+        for detail in ('true', 1, 'True', 'yes'):
+            groups = ['process', 'service']
+            path = self.add_params(jobs_short_uri, detail=detail, group_by=','.join(groups))
+            resp = self.app.get(path, headers=self.json_headers)
+            self.check_basic_jobs_grouped_info(resp, group_by=groups)
+            for grouped_jobs in resp.json:
+                for job in grouped_jobs['jobs']:
+                    self.check_job_format(job)
+
+    # TODO: create jobs with variants to test grouping
+    # TODO: validate that full job detail are returned for 'jobs' sections
+    def test_get_jobs_detail_grouped(self):
+        for detail in ('true', 1, 'True', 'yes'):
+            groups = ['process', 'service']
+            path = self.add_params(jobs_short_uri, detail=detail, group_by=','.join(groups))
+            resp = self.app.get(path, headers=self.json_headers)
+            self.check_basic_jobs_grouped_info(resp, group_by=groups)
+            for grouped_jobs in resp.json:
+                for job in grouped_jobs['jobs']:
+                    self.check_job_format(job)
+
+    # TODO: add process to test that job search by email (literal) evaluates properly with encrypted one
+    @pytest.mark.xfail(reason="not implemented")
+    def test_get_jobs_by_encrypted_email(self):
+        raise NotImplementedError
 
     def test_get_jobs_process_in_query_normal(self):
         path = self.add_params(jobs_short_uri, process=self.job_info[0].process)
