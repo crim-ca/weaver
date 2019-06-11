@@ -13,7 +13,7 @@ Weaver (the nest-builder)
 
 `Weaver` is an `Execution Management Service (EMS)` that allows the execution of workflows chaining various
 applications and `Web Processing Services (WPS)` inputs and outputs. Remote execution is deferred by the `EMS` to an
-`Application Deployment and Execution Service (ADES)`, as defined by `Common Workflow Language (CWL)` configurations.
+`Application Deployment and Execution Service (ADES)`, as defined by `Common Workflow Language` (`CWL`_) configurations.
 
 `Weaver` can be launched either as an `EMS` or an `ADES` according to configuration values it is deployed with.
 For more details, see `Configuration`_ section.
@@ -102,3 +102,4 @@ following improvements. It is also advanced with sponsorship of U.S. Department 
 .. _Birdhouse: http://bird-house.github.io/
 .. _ESGF: https://esgf.llnl.gov/
 .. _Pyramid: http://www.pylonsproject.org
+.. _CWL: https://www.commonwl.org/
