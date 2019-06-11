@@ -288,6 +288,9 @@ def mocked_execute_process():
     Bypasses the ``execute_process.delay`` call by directly invoking the ``execute_process``.
 
     **Note**: since ``delay`` and ``Celery`` are bypassed, the process execution becomes blocking (not asynchronous).
+
+    .. seealso::
+        :function:`mocked_process_job_runner` to completely skip process execution.
     """
     class MockTask(object):
         """
@@ -309,4 +312,30 @@ def mocked_execute_process():
     return (
         mock.patch("weaver.wps_restapi.processes.processes.execute_process.delay", side_effect=mock_execute_process),
         mock.patch("celery.app.task.Context", return_value=task)
+    )
+
+
+def mocked_process_job_runner(job_task_id="mocked-job-id"):
+    """
+    Provides a mock that will no execute the process execution when call during job creation.
+
+    .. seealso::
+        :function:`mocked_execute_process` to still execute the process, but without `Celery` connection.
+    """
+    result = mock.MagicMock()
+    result.id = job_task_id
+    return (
+        mock.patch("weaver.wps_restapi.processes.processes.execute_process.delay", return_value=result),
+    )
+
+
+def mocked_process_package():
+    """
+    Provides mocks that bypasses execution when calling :module:`weaver.processes.wps_package` functions.
+    """
+    return (
+        mock.patch("weaver.processes.wps_package._load_package_file", return_value={"class": "test"}),
+        mock.patch("weaver.processes.wps_package._load_package_content", return_value=(None, "test", None)),
+        mock.patch("weaver.processes.wps_package._get_package_inputs_outputs", return_value=(None, None)),
+        mock.patch("weaver.processes.wps_package._merge_package_inputs_outputs", return_value=([], [])),
     )

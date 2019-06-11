@@ -464,10 +464,10 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         :param process: process name to filter matching jobs.
         :param service: service name to filter matching jobs.
         :param tags: list of tags to filter matching jobs.
-        :param access: access visibility to filter matching jobs.
+        :param access: access visibility to filter matching jobs (default: PUBLIC).
         :param notification_email: notification email to filter matching jobs.
         :param status: status to filter matching jobs.
-        :param sort: field which is used for sorting results.
+        :param sort: field which is used for sorting results (default: creation date, descending).
         :param page: page number to return when using result paging (only when not using ``group_by``).
         :param limit: number of jobs per page when using result paging (only when not using ``group_by``).
         :param group_by: one or many fields specifying categories to form matching groups of jobs (paging disabled).
@@ -559,14 +559,14 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                     "count": {"$sum": 1}},          # count of matches for corresponding grouping categories
                 },
                 {"$project": {
-                    "_id": None,
+                    "_id": False,           # removes "_id" field from results
                     "category": "$_id",     # renames "_id" grouping categories key
                     "jobs": "$jobs",        # preserve field
                     "count": "$count",      # preserve field
                 }
             }])
             found = self.collection.aggregate(pipeline)
-            items = [{k: (v if k != "jobs" else Job(j) for j in v)  # convert to Job object where applicable
+            items = [{k: (v if k != "jobs" else [Job(j) for j in v])    # convert to Job object where applicable
                       for k, v in i.items()} for i in found]
 
         # results with paging

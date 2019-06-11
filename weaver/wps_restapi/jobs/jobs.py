@@ -215,7 +215,9 @@ def get_jobs(request):
     items, total = store.find_jobs(request, group_by=groups, **filters)
     body = {"total": total}
     if groups:
-        body.update({"groups": [{"categories": it[0], "jobs": job_list_json(settings, it[1])} for it in items]})
+        for grouped_jobs in items:
+            grouped_jobs["jobs"] = job_list_json(settings, grouped_jobs["jobs"], detail)
+        body.update({"groups": items})
     else:
         body.update({"jobs": job_list_json(settings, items, detail), "page": page, "limit": limit})
     return HTTPOk(json=body)

@@ -19,12 +19,13 @@ from tests.utils import (
     setup_mongodb_processstore,
     setup_mongodb_jobstore,
     get_test_weaver_app,
+    mocked_process_job_runner,
+    mocked_process_package,
 )
 from copy import deepcopy
 # noinspection PyDeprecation
 from contextlib import nested
 import pytest
-import mock
 import webtest
 import unittest
 import responses
@@ -143,23 +144,6 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             "response": EXECUTE_RESPONSE_DOCUMENT,
         }
 
-    @staticmethod
-    def get_process_package_mock():
-        return (
-            mock.patch("weaver.processes.wps_package._load_package_file", return_value={"class": "test"}),
-            mock.patch("weaver.processes.wps_package._load_package_content", return_value=(None, "test", None)),
-            mock.patch("weaver.processes.wps_package._get_package_inputs_outputs", return_value=(None, None)),
-            mock.patch("weaver.processes.wps_package._merge_package_inputs_outputs", return_value=([], [])),
-        )
-
-    @staticmethod
-    def get_process_job_runner_mock(job_task_id="mocked-job-id"):
-        result = mock.MagicMock()
-        result.id = job_task_id
-        return (
-            mock.patch("weaver.wps_restapi.processes.processes.execute_process.delay", return_value=result),
-        )
-
     def test_get_processes(self):
         uri = "/processes"
         resp = self.app.get(uri, headers=self.json_headers)
@@ -183,7 +167,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         # deploy valid test process
         process_name = self.fully_qualified_test_process_name()
         process_data = self.get_process_deploy_template(process_name)
-        package_mock = self.get_process_package_mock()
+        package_mock = mocked_process_package()
         # noinspection PyDeprecation
         with nested(*package_mock):
             resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=True)
@@ -218,7 +202,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     def test_deploy_process_success(self):
         process_name = self.fully_qualified_test_process_name()
         process_data = self.get_process_deploy_template(process_name)
-        package_mock = self.get_process_package_mock()
+        package_mock = mocked_process_package()
 
         # noinspection PyDeprecation
         with nested(*package_mock):
@@ -234,7 +218,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     def test_deploy_process_bad_name(self):
         process_name = self.fully_qualified_test_process_name() + "..."
         process_data = self.get_process_deploy_template(process_name)
-        package_mock = self.get_process_package_mock()
+        package_mock = mocked_process_package()
 
         # noinspection PyDeprecation
         with nested(*package_mock):
@@ -247,7 +231,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     def test_deploy_process_conflict(self):
         process_name = self.process_private.identifier
         process_data = self.get_process_deploy_template(process_name)
-        package_mock = self.get_process_package_mock()
+        package_mock = mocked_process_package()
 
         # noinspection PyDeprecation
         with nested(*package_mock):
@@ -261,7 +245,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     def test_deploy_process_missing_or_invalid_components(self):
         process_name = self.fully_qualified_test_process_name()
         process_data = self.get_process_deploy_template(process_name)
-        package_mock = self.get_process_package_mock()
+        package_mock = mocked_process_package()
 
         # remove components for testing different cases
         process_data_tests = [deepcopy(process_data) for _ in range(12)]
@@ -292,7 +276,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         """Validates that the default (localhost) endpoint to execute WPS requests are saved during deployment."""
         process_name = self.fully_qualified_test_process_name()
         process_data = self.get_process_deploy_template(process_name)
-        package_mock = self.get_process_package_mock()
+        package_mock = mocked_process_package()
 
         # noinspection PyDeprecation
         with nested(*package_mock):
@@ -479,7 +463,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         uri = "/processes/{}/jobs".format(self.process_public.identifier)
         data = self.get_process_execute_template()
         task = "job-{}".format(fully_qualified_name(self))
-        mock_execute = self.get_process_job_runner_mock(task)
+        mock_execute = mocked_process_job_runner(task)
 
         # noinspection PyDeprecation
         with nested(*mock_execute):
@@ -531,7 +515,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         name = fully_qualified_name(self)
         execute_mock_data_tests = list()
         for i in range(2):
-            mock_execute = self.get_process_job_runner_mock("job-{}-{}".format(name, i))
+            mock_execute = mocked_process_job_runner("job-{}-{}".format(name, i))
             data_execute = self.get_process_execute_template("{}-{}".format(name, i))
             execute_mock_data_tests.append((mock_execute, data_execute))
 

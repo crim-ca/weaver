@@ -4,6 +4,11 @@ from weaver.wps_restapi.swagger_definitions import (
     process_jobs_uri,
 )
 from weaver.datatype import Service, Job
+from weaver.execute import (
+    EXECUTE_MODE_ASYNC,
+    EXECUTE_RESPONSE_DOCUMENT,
+    EXECUTE_TRANSMISSION_MODE_REFERENCE,
+)
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
@@ -21,6 +26,7 @@ from tests.utils import (
     setup_mongodb_servicestore,
     setup_mongodb_processstore,
     setup_mongodb_jobstore,
+    mocked_process_job_runner,
 )
 from collections import OrderedDict
 # noinspection PyDeprecation
@@ -34,6 +40,7 @@ import unittest
 import warnings
 import json
 import pyramid.testing
+import pytest
 import six
 
 
@@ -45,7 +52,10 @@ class WpsRestApiJobsTest(unittest.TestCase):
         cls.config.include('weaver.wps')
         cls.config.include('weaver.wps_restapi')
         cls.config.include('weaver.tweens')
-        cls.config.registry.settings['weaver.url'] = "localhost"
+        cls.config.registry.settings.update({
+            'weaver.url': "localhost",
+            'weaver.wps_email_encrypt_salt': 'weaver-test',
+        })
         cls.config.scan()
         cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
         cls.app = webtest.TestApp(cls.config.make_wsgi_app())
@@ -70,6 +80,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         self.process_private = WpsTestProcess(identifier='process-private')
         self.process_store.save_process(self.process_private)
         self.process_store.set_visibility(self.process_private.identifier, VISIBILITY_PRIVATE)
+        self.process_unknown = 'process-unknown'
 
         self.service_public = Service(name='service-public', url='http://localhost/wps/service-public', public=True)
         self.service_store.save_service(self.service_public)
@@ -80,7 +91,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         self.job_info = []  # type: List[Job]
         self.make_job(task_id='0000-0000-0000-0000', process=self.process_public.identifier, service=None,
                       user_id=self.user_editor1_id, status=STATUS_SUCCEEDED, progress=100, access=VISIBILITY_PUBLIC)
-        self.make_job(task_id='1111-1111-1111-1111', process='process-unknown', service=self.service_public.name,
+        self.make_job(task_id='1111-1111-1111-1111', process=self.process_unknown, service=self.service_public.name,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=99, access=VISIBILITY_PUBLIC)
         self.make_job(task_id='2222-2222-2222-2222', process=self.process_private.identifier, service=None,
                       user_id=self.user_editor1_id, status=STATUS_FAILED, progress=55, access=VISIBILITY_PUBLIC)
@@ -113,6 +124,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         job.progress = progress
         job = self.job_store.update_job(job)
         self.job_info.append(job)
+        return job
 
     def message_with_jobs_mapping(self, message="", indent=2):
         """For helping debugging of auto-generated job ids"""
@@ -172,18 +184,23 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     @staticmethod
     def check_basic_jobs_grouped_info(response, group_by):
+        if isinstance(group_by, six.string_types):
+            group_by = [group_by]
         assert response.status_code == 200
         assert response.content_type == CONTENT_TYPE_APP_JSON
         assert 'page' not in response.json
         assert 'limit' not in response.json
         assert 'total' in response.json and isinstance(response.json['total'], int)
-        assert isinstance(response.json, list)
+        assert 'groups' in response.json
+        assert isinstance(response.json['groups'], list)
         total = 0
-        for grouped_jobs in response.json:
+        for grouped_jobs in response.json['groups']:
             assert 'category' in grouped_jobs and isinstance(grouped_jobs['category'], dict)
             assert all(g in grouped_jobs['category'] for g in group_by)
+            assert len(set(group_by) - set(grouped_jobs['category'])) == 0
             assert 'jobs' in grouped_jobs and isinstance(grouped_jobs['jobs'], list)
-            assert 'count' in grouped_jobs and len(grouped_jobs['jobs']) == grouped_jobs['count']
+            assert 'count' in grouped_jobs and isinstance(grouped_jobs['count'], int)
+            assert len(grouped_jobs['jobs']) == grouped_jobs['count']
             total += grouped_jobs['count']
         assert total == response.json['total']
 
@@ -212,34 +229,112 @@ class WpsRestApiJobsTest(unittest.TestCase):
             for job in resp.json['jobs']:
                 self.check_job_format(job)
 
-    # TODO: create jobs with variants to test grouping
-    # TODO: validate that only job IDs are returned for 'jobs' sections
     def test_get_jobs_normal_grouped(self):
-        for detail in ('true', 1, 'True', 'yes'):
+        for detail in ('false', 0, 'False', 'no'):
             groups = ['process', 'service']
             path = self.add_params(jobs_short_uri, detail=detail, group_by=','.join(groups))
             resp = self.app.get(path, headers=self.json_headers)
             self.check_basic_jobs_grouped_info(resp, group_by=groups)
-            for grouped_jobs in resp.json:
+            for grouped_jobs in resp.json['groups']:
                 for job in grouped_jobs['jobs']:
-                    self.check_job_format(job)
+                    assert isinstance(job, six.string_types)
 
-    # TODO: create jobs with variants to test grouping
-    # TODO: validate that full job detail are returned for 'jobs' sections
     def test_get_jobs_detail_grouped(self):
         for detail in ('true', 1, 'True', 'yes'):
             groups = ['process', 'service']
             path = self.add_params(jobs_short_uri, detail=detail, group_by=','.join(groups))
             resp = self.app.get(path, headers=self.json_headers)
             self.check_basic_jobs_grouped_info(resp, group_by=groups)
-            for grouped_jobs in resp.json:
+            for grouped_jobs in resp.json['groups']:
                 for job in grouped_jobs['jobs']:
                     self.check_job_format(job)
 
+    def test_get_jobs_valid_grouping_by_process(self):
+        path = self.add_params(jobs_short_uri, detail='false', group_by='process')
+        resp = self.app.get(path, headers=self.json_headers)
+        self.check_basic_jobs_grouped_info(resp, group_by='process')
+
+        # ensure that group categories are distinct
+        for i, grouped_jobs in enumerate(resp.json['groups']):
+            categories = grouped_jobs['category']
+            for j, grp_jobs in enumerate(resp.json['groups']):
+                compared = grp_jobs['category']
+                if i == j:
+                    continue
+                assert categories != compared
+
+            # validate groups with expected jobs counts and ids (nb: only public jobs are returned)
+            if categories['process'] == self.process_public.identifier:
+                assert len(grouped_jobs['jobs']) == 3
+                assert set(grouped_jobs['jobs']) == {self.job_info[0].id, self.job_info[5].id, self.job_info[7].id}
+            elif categories['process'] == self.process_private.identifier:
+                assert len(grouped_jobs['jobs']) == 3
+                assert set(grouped_jobs['jobs']) == {self.job_info[2].id, self.job_info[6].id, self.job_info[8].id}
+            elif categories['process'] == self.process_unknown:
+                assert len(grouped_jobs['jobs']) == 1
+                assert set(grouped_jobs['jobs']) == {self.job_info[1].id}
+            else:
+                pytest.fail("Unknown job grouping 'process' value not expected.")
+
+    def test_get_jobs_valid_grouping_by_service(self):
+        path = self.add_params(jobs_short_uri, detail='false', group_by='service')
+        resp = self.app.get(path, headers=self.json_headers)
+        self.check_basic_jobs_grouped_info(resp, group_by='service')
+
+        # ensure that group categories are distinct
+        for i, grouped_jobs in enumerate(resp.json['groups']):
+            categories = grouped_jobs['category']
+            for j, grp_jobs in enumerate(resp.json['groups']):
+                compared = grp_jobs['category']
+                if i == j:
+                    continue
+                assert categories != compared
+
+            # validate groups with expected jobs counts and ids (nb: only public jobs are returned)
+            if categories['service'] == self.service_public.name:
+                assert len(grouped_jobs['jobs']) == 3
+                assert set(grouped_jobs['jobs']) == {self.job_info[1].id, self.job_info[5].id, self.job_info[6].id}
+            elif categories['service'] == self.service_private.name:
+                assert len(grouped_jobs['jobs']) == 2
+                assert set(grouped_jobs['jobs']) == {self.job_info[7].id, self.job_info[8].id}
+            elif categories['service'] is None:
+                assert len(grouped_jobs['jobs']) == 2
+                assert set(grouped_jobs['jobs']) == {self.job_info[0].id, self.job_info[2].id}
+            else:
+                pytest.fail("Unknown job grouping 'service' value not expected.")
+
     # TODO: add process to test that job search by email (literal) evaluates properly with encrypted one
-    @pytest.mark.xfail(reason="not implemented")
+    @ignore_deprecated_nested_warnings
     def test_get_jobs_by_encrypted_email(self):
-        raise NotImplementedError
+        """Verifies that literal email can be used as search criterion although not saved in plain text within db."""
+        email = "some.test@crim.ca"
+        body = {
+            "inputs": [{"id": "test_input", "data": "test"}],
+            "outputs": [{"id": "test_output", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE}],
+            "mode": EXECUTE_MODE_ASYNC,
+            "response": EXECUTE_RESPONSE_DOCUMENT,
+            "notification_email": email
+        }
+
+        # noinspection PyDeprecation
+        with nested(*mocked_process_job_runner()):
+            path = "/processes/{}/jobs".format(self.process_public.identifier)
+            resp = self.app.post_json(path, params=body, headers=self.json_headers)
+            assert resp.status_code == 201
+            assert resp.content_type == CONTENT_TYPE_APP_JSON
+        job_id = resp.json['jobID']
+
+        # verify the email is not in plain text
+        job = self.job_store.fetch_by_id(job_id)
+        assert job.notification_email != email and job.notification_email is not None
+        assert int(job.notification_email, 16) != 0  # email should be encrypted with hex string
+
+        path = self.add_params(jobs_short_uri, detail='true', notification_email=email)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == CONTENT_TYPE_APP_JSON
+        assert resp.json['total'] == 1, "Should match exactly 1 email with specified literal string as query param."
+        assert resp.json['jobs'][0]['jobID'] == job_id
 
     def test_get_jobs_process_in_query_normal(self):
         path = self.add_params(jobs_short_uri, process=self.job_info[0].process)

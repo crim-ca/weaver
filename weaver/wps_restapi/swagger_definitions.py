@@ -736,9 +736,9 @@ class GetPagingJobsSchema(MappingSchema):
 
 
 class GroupedJobsCategorySchema(MappingSchema):
-    category = MappingSchema()
-    jobs = JobCollection()
-    count = SchemaNode(Integer())
+    category = MappingSchema(description="Corresponding grouping values that compose the resulting job list category.")
+    jobs = JobCollection(description="List of jobs that matched the corresponding grouping values.")
+    count = SchemaNode(Integer(), description="Number of matching jobs for the corresponding group category.")
 
 
 class GetGroupedJobsSchema(SequenceSchema):
@@ -750,7 +750,7 @@ class GetFilteredJobsSchema(OneOfMappingSchema):
         GetPagingJobsSchema,
         GetGroupedJobsSchema,
     )
-    total = SchemaNode(Integer())
+    total = SchemaNode(Integer(), description="Total number of matched jobs regardless of grouping or paging result.")
 
 
 class DismissedJobSchema(MappingSchema):

@@ -6,10 +6,10 @@ Unreleased
 
 New Features:
 - Add ``notification_email`` field to ``Job`` datatype that stores an encrypted email (according to settings) when
-  provided on the job submission body.
-- Add ability to filter jobs with ``notification_email`` query parameter.
-- Add jobs statistics grouping by specific fields using comma-separated list ``group_by`` query parameter.
-- Add some tests to evaluate new job search methods / grouping results and responses.
+  provided in the job submission body (#44).
+- Add ability to filter jobs with ``notification_email`` query parameter (#44).
+- Add jobs statistics grouping by specific fields using comma-separated list ``group_by`` query parameter (#46).
+- Add some tests to evaluate new job search methods / grouping results and responses (#44, #46).
 
 Changes:
 - Use ``bump2version`` and move all config under ``setup.cfg``
