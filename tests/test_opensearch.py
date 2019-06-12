@@ -8,7 +8,6 @@ from weaver.wps_restapi.processes import processes
 from tests.utils import setup_mongodb_processstore
 from pyramid import testing
 from pyramid.testing import DummyRequest
-# noinspection PyPackageRequirements
 from pywps.inout.inputs import LiteralInput
 from collections import deque
 from copy import deepcopy
@@ -17,9 +16,7 @@ from six.moves.urllib.parse import urlparse, parse_qsl
 import unittest
 import json
 import os
-# noinspection PyPackageRequirements
 import pytest
-# noinspection PyPackageRequirements
 import mock
 
 OSDD_URL = "http://geo.spacebel.be/opensearch/description.xml"

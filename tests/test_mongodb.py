@@ -6,7 +6,6 @@ from weaver.store.mongodb import MongodbServiceStore
 from weaver.datatype import Service
 from pymongo.collection import Collection
 import unittest
-# noinspection PyPackageRequirements
 import mock
 
 

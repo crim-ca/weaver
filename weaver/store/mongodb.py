@@ -34,8 +34,12 @@ import pymongo
 import six
 import logging
 if TYPE_CHECKING:
+    from weaver.typedefs import AnyValue
     from pymongo.collection import Collection
     from typing import Any, AnyStr, Dict, List, Optional, Tuple, Union
+    JobListAndCount = Tuple[List[Job], int]
+    JobCategory = Dict[AnyStr, Union[AnyValue, Job]]
+    JobCategoriesAndCount = Tuple[List[JobCategory], int]
 
 LOGGER = logging.getLogger(__name__)
 
@@ -348,16 +352,17 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         MongodbStore.__init__(self, *db_args, **db_kwargs)
 
     def save_job(self,
-                 task_id,               # type: AnyStr
-                 process,               # type: AnyStr
-                 service=None,          # type: Optional[AnyStr]
-                 inputs=None,           # type: Optional[List[Any]]
-                 is_workflow=False,     # type: Optional[bool]
-                 user_id=None,          # type: Optional[int]
-                 execute_async=True,    # type: Optional[bool]
-                 custom_tags=None,      # type: Optional[List[AnyStr]]
-                 access=None,           # type: Optional[AnyStr]
-                 ):                     # type: (...) -> Job
+                 task_id,                   # type: AnyStr
+                 process,                   # type: AnyStr
+                 service=None,              # type: Optional[AnyStr]
+                 inputs=None,               # type: Optional[List[Any]]
+                 is_workflow=False,         # type: Optional[bool]
+                 user_id=None,              # type: Optional[int]
+                 execute_async=True,        # type: Optional[bool]
+                 custom_tags=None,          # type: Optional[List[AnyStr]]
+                 access=None,               # type: Optional[AnyStr]
+                 notification_email=None,   # type: Optional[AnyStr]
+                 ):                         # type: (...) -> Job
         """
         Stores a job in mongodb.
         """
@@ -386,6 +391,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                 "created": now(),
                 "tags": tags,
                 "access": access,
+                "notification_email": notification_email,
             })
             self.collection.insert_one(new_job)
             job = self.fetch_by_id(job_id=new_job.id)
@@ -439,18 +445,61 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         return jobs
 
     def find_jobs(self,
-                  request,          # type: Request
-                  page=0,           # type: Optional[int]
-                  limit=10,         # type: Optional[int]
-                  process=None,     # type: Optional[AnyStr]
-                  service=None,     # type: Optional[AnyStr]
-                  tags=None,        # type: Optional[List[AnyStr]]
-                  access=None,      # type: Optional[AnyStr]
-                  status=None,      # type: Optional[AnyStr]
-                  sort=None,        # type: Optional[AnyStr]
-                  ):                # type: (...) -> Tuple[List[Job], int]
+                  request,                  # type: Request
+                  process=None,             # type: Optional[AnyStr]
+                  service=None,             # type: Optional[AnyStr]
+                  tags=None,                # type: Optional[List[AnyStr]]
+                  access=None,              # type: Optional[AnyStr]
+                  notification_email=None,  # type: Optional[AnyStr]
+                  status=None,              # type: Optional[AnyStr]
+                  sort=None,                # type: Optional[AnyStr]
+                  page=0,                   # type: Optional[int]
+                  limit=10,                 # type: Optional[int]
+                  group_by=None,            # type: Optional[Union[AnyStr, List[AnyStr]]]
+                  ):                        # type: (...) -> Union[JobListAndCount, JobCategoriesAndCount]
         """
-        Finds all jobs in mongodb storage matching search filters.
+        Finds all jobs in mongodb storage matching search filters and obtain results with requested paging or grouping.
+
+        :param request: request that lead to this call to obtain permissions and user id.
+        :param process: process name to filter matching jobs.
+        :param service: service name to filter matching jobs.
+        :param tags: list of tags to filter matching jobs.
+        :param access: access visibility to filter matching jobs (default: PUBLIC).
+        :param notification_email: notification email to filter matching jobs.
+        :param status: status to filter matching jobs.
+        :param sort: field which is used for sorting results (default: creation date, descending).
+        :param page: page number to return when using result paging (only when not using ``group_by``).
+        :param limit: number of jobs per page when using result paging (only when not using ``group_by``).
+        :param group_by: one or many fields specifying categories to form matching groups of jobs (paging disabled).
+
+        :returns: (list of jobs matching paging OR list of {categories, list of jobs, count}) AND total of matched job
+
+        Example:
+
+            Using paging (default), result will be in the form::
+
+                (
+                    [Job(1), Job(2), Job(3), ...],
+                    <total>
+                )
+
+            Where ``<total>`` will indicate the complete count of matched jobs with filters, but the list of jobs
+            will be limited only to ``page`` index and ``limit`` specified.
+
+            Using grouping with a list of field specified with ``group_by``, results will be in the form::
+
+                (
+                    [{category: {field1: valueA, field2: valueB, ...}, [Job(1), Job(2), ...], count: <count>},
+                     {category: {field1: valueC, field2: valueD, ...}, [Job(x), Job(y), ...], count: <count>},
+                     ...
+                    ],
+                    <total>
+                )
+
+            Where ``<total>`` will again indicate all matched jobs by every category combined, and ``<count>`` will
+            indicate the amount of jobs matched for each individual category. Also, ``category`` will indicate values
+            of specified fields (from ``group_by``) that compose corresponding jobs with matching values.
+
         """
 
         if any(v in tags for v in visibility_values):
@@ -477,6 +526,9 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         elif status:
             search_filters["status"] = status
 
+        if notification_email is not None:
+            search_filters["notification_email"] = notification_email
+
         if process is not None:
             search_filters["process"] = process
 
@@ -489,13 +541,42 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             sort = "user_id"
         if sort not in job_sort_values:
             raise JobNotFound("Invalid sorting method: '{}'".format(repr(sort)))
-
         sort_order = DESCENDING if sort == SORT_FINISHED or sort == SORT_CREATED else ASCENDING
-        sort_criteria = [(sort, sort_order)]
-        found = self.collection.find(search_filters)
-        count = self.collection.count_documents(search_filters)
-        items = [Job(item) for item in list(found.skip(page * limit).limit(limit).sort(sort_criteria))]
-        return items, count
+        sort_criteria = {sort: sort_order}
+
+        # minimal operation, only search for matches and sort them
+        pipeline = [{"$match": search_filters}, {"$sort": sort_criteria}]
+
+        # results by group categories
+        if group_by:
+            if isinstance(group_by, six.string_types):
+                group_by = [group_by]
+            group_categories = {field: "$" + field for field in group_by}   # fields that can generate groups
+            pipeline.extend([{
+                "$group": {
+                    "_id": group_categories,        # grouping categories to aggregate corresponding jobs
+                    "jobs": {"$push": "$$ROOT"},    # matched jobs for corresponding grouping categories
+                    "count": {"$sum": 1}},          # count of matches for corresponding grouping categories
+                },
+                {"$project": {
+                    "_id": False,           # removes "_id" field from results
+                    "category": "$_id",     # renames "_id" grouping categories key
+                    "jobs": "$jobs",        # preserve field
+                    "count": "$count",      # preserve field
+                }
+            }])
+            found = self.collection.aggregate(pipeline)
+            items = [{k: (v if k != "jobs" else [Job(j) for j in v])    # convert to Job object where applicable
+                      for k, v in i.items()} for i in found]
+
+        # results with paging
+        else:
+            pipeline.extend([{"$skip": page * limit}, {"$limit": limit}])
+            found = self.collection.aggregate(pipeline)
+            items = [Job(item) for item in list(found)]
+
+        total = self.collection.count_documents(search_filters)
+        return items, total
 
     def clear_jobs(self, request=None):
         # type: (Optional[Request]) -> bool

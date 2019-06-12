@@ -729,11 +729,28 @@ class CreatedQuotedJobStatusSchema(CreatedJobStatusSchema):
     bill = SchemaNode(String(), example='d88fda5c-52cc-440b-9309-f2cd20bcd6a2', description="ID of the created bill.")
 
 
-class GetAllJobsSchema(MappingSchema):
-    count = SchemaNode(Integer())
+class GetPagingJobsSchema(MappingSchema):
     jobs = JobCollection()
     limit = SchemaNode(Integer())
     page = SchemaNode(Integer())
+
+
+class GroupedJobsCategorySchema(MappingSchema):
+    category = MappingSchema(description="Corresponding grouping values that compose the resulting job list category.")
+    jobs = JobCollection(description="List of jobs that matched the corresponding grouping values.")
+    count = SchemaNode(Integer(), description="Number of matching jobs for the corresponding group category.")
+
+
+class GetGroupedJobsSchema(SequenceSchema):
+    job_group_category = GroupedJobsCategorySchema()
+
+
+class GetFilteredJobsSchema(OneOfMappingSchema):
+    _one_of = (
+        GetPagingJobsSchema,
+        GetGroupedJobsSchema,
+    )
+    total = SchemaNode(Integer(), description="Total number of matched jobs regardless of grouping or paging result.")
 
 
 class DismissedJobSchema(MappingSchema):
@@ -1349,7 +1366,7 @@ class OkDeleteProcessJobResponse(MappingSchema):
 
 class OkGetAllJobsResponse(MappingSchema):
     header = JsonHeader()
-    body = GetAllJobsSchema()
+    body = GetFilteredJobsSchema()
 
 
 class OkDismissJobResponse(MappingSchema):

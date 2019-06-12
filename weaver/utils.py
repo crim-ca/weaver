@@ -361,6 +361,22 @@ def replace_caps_url(xml, url, prev_url=None):
     return xml
 
 
+def str2bytes(s):
+    # type: (Union[AnyStr, bytes]) -> bytes
+    """Obtains the bytes representation of the string."""
+    if not (isinstance(s, six.string_types) or isinstance(s, bytes)):
+        raise TypeError("Cannot convert item to bytes: {!r}".format(type(s)))
+    return s if isinstance(s, bytes) else s.encode()
+
+
+def bytes2str(s):
+    # type: (Union[AnyStr, bytes]) -> bytes
+    """Obtains the unicode representation of the string."""
+    if not (isinstance(s, six.string_types) or isinstance(s, bytes)):
+        raise TypeError("Cannot convert item to unicode: {!r}".format(type(s)))
+    return s if not isinstance(s, bytes) else s.decode()
+
+
 def islambda(func):
     # type: (AnyStr) -> bool
     return isinstance(func, types.LambdaType) and func.__name__ == (lambda: None).__name__
