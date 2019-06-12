@@ -303,7 +303,6 @@ class WpsRestApiJobsTest(unittest.TestCase):
             else:
                 pytest.fail("Unknown job grouping 'service' value not expected.")
 
-    # TODO: add process to test that job search by email (literal) evaluates properly with encrypted one
     @ignore_deprecated_nested_warnings
     def test_get_jobs_by_encrypted_email(self):
         """Verifies that literal email can be used as search criterion although not saved in plain text within db."""
