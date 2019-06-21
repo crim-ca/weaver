@@ -148,7 +148,8 @@ WPS_FIELD_FORMAT = ["formats", "supported_formats", "supported_values", "default
 
 # default format if missing (minimal requirement of one)
 DefaultFormat = Format(mime_type=CONTENT_TYPE_TEXT_PLAIN)
-setattr(DefaultFormat, "DEFAULT_FORMAT_MISSING", True)
+DEFAULT_FORMAT_MISSING = "DEFAULT_FORMAT_MISSING"
+setattr(DefaultFormat, DEFAULT_FORMAT_MISSING, True)
 
 
 def get_status_location_log_path(status_location, out_dir=None):
@@ -801,6 +802,7 @@ def _json2wps_io(io_info, io_select):
         for fmt in formats:
             fmt["mime_type"] = _get_field(fmt, "mime_type", search_variations=True, pop_found=True)
             fmt.pop("maximumMegabytes", None)
+            # define the 'default' with 'data_format' to be used if explicitly specified from the payload
             if fmt.pop("default", None) is True:
                 if _get_field(io_info, "data_format") != null:  # if set by previous 'fmt'
                     raise PackageTypeError("Cannot have multiple 'default' formats simultaneously.")
@@ -990,7 +992,7 @@ def _merge_io_formats(wps_formats, cwl_formats):
     """
     if not (len(wps_formats) and len(cwl_formats)):
         raise PackageTypeError("Cannot merge formats definitions with invalid lists.")
-    if len(cwl_formats) == 1 and _get_field(cwl_formats[0], "DEFAULT_FORMAT_MISSING") is True:
+    if len(cwl_formats) == 1 and _get_field(cwl_formats[0], DEFAULT_FORMAT_MISSING) is True:
         return wps_formats
 
     formats = []
@@ -1063,12 +1065,14 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
         wps_io = _json2wps_io(wps_io_json, io_select)
 
         # retrieve any complementing fields (metadata, keywords, etc.) passed as WPS input
-        for field_type in WPS_FIELD_MAPPING:
+        # additionally enforce 'default' format defined by 'data_format' to keep value specified by WPS if applicable
+        # (see function '_json2wps_io' for detail)
+        for field_type in list(WPS_FIELD_MAPPING.keys()) + ["data_format"]:
             cwl_field = _get_field(cwl_io, field_type)
             wps_field = _get_field(wps_io, field_type)
             # override if CWL->WPS was missing but is provided by WPS, or if both are provided but different (keep WPS)
             if _are_different_and_set(wps_field, cwl_field) or (wps_field != null and cwl_field == null):
-                # list of formats are updated by individual format since information can be partially complementary
+                # list of formats are updated by comparing format items since information can be partially complementary
                 if field_type in ["supported_formats"]:
                     wps_field = _merge_io_formats(wps_field, cwl_field)
                 _set_field(updated_io_list[-1], field_type, wps_field)

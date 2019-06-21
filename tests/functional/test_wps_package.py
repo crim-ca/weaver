@@ -63,6 +63,10 @@ class WpsPackageAppTest(unittest.TestCase):
         return info
 
     def test_literal_io_from_package(self):
+        """
+        Test validates that literal I/O definitions *only* defined in the `CWL` package as `JSON` within the
+        deployment body generates expected `WPS` process description I/O with corresponding formats and values.
+        """
         cwl = {
             "cwlVersion": "v1.0",
             "class": "CommandLineTool",
@@ -91,7 +95,7 @@ class WpsPackageAppTest(unittest.TestCase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, pkg = self.deploy_process(body)
+        desc, _ = self.deploy_process(body)
         assert desc["process"]["id"] == self._testMethodName
         assert desc["process"]["title"] == "some title"
         assert desc["process"]["abstract"] == "this is a test"
@@ -110,10 +114,106 @@ class WpsPackageAppTest(unittest.TestCase):
         expected_fields = {"id", "title", "abstract", "inputs", "outputs", "executeEndpoint"}
         assert len(set(desc["process"].keys()) - expected_fields) == 0
 
-    # FIXME: implement
-    @pytest.mark.xfail(reason="not implemented")
     def test_literal_io_from_package_and_offering(self):
-        raise NotImplementedError
+        """
+        Test validates that literal I/O definitions simultaneously defined in *both* (but not necessarily for each
+        one and exhaustively) `CWL` and `WPS` payloads are correctly resolved. More specifically, verifies that:
+
+            - `WPS` I/O that don't match any `CWL` I/O by ID are removed completely.
+            - `WPS` I/O that were omitted are added with minimal detail requirements using corresponding `CWL` I/O
+            - `WPS` I/O complementary details are added to corresponding `CWL` I/O (no duplication of IDs)
+
+        .. seealso::
+            - :function:`weaver.processes.wps_package._merge_package_io`
+        """
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "inputs": [
+                {
+                    "id": "literal_input_only_cwl_minimal",
+                    "type": "string"
+                },
+                {
+                    "id": "literal_input_both_cwl_and_wps",
+                    "type": "string"
+                },
+            ],
+            "outputs": [
+                {
+                    "id": "literal_output_only_cwl_minimal",
+                    "type": {
+                        "type": "array",
+                        "items": "float",
+                    }
+                },
+                {
+                    "id": "literal_output_both_cwl_and_wps",
+                    "type": "float"
+                }
+            ]
+        }
+        body = {
+            "processDescription": {
+                "process": {
+                    "id": self._testMethodName,
+                    "title": "some title",
+                    "abstract": "this is a test",
+                    "inputs": [
+                        {
+                            "id": "literal_input_only_wps_removed",
+                        },
+                        {
+                            "id": "literal_input_both_cwl_and_wps",
+                            "title": "Extra detail for I/O both in CWL and WPS"
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "id": "literal_output_only_wps_removed"
+                        },
+                        {
+                            "id": "literal_output_both_cwl_and_wps",
+                            "title": "Additional detail only within WPS output"
+                        }
+                    ]
+                }
+            },
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        desc, pkg = self.deploy_process(body)
+        assert desc["process"]["id"] == self._testMethodName
+        assert desc["process"]["title"] == "some title"
+        assert desc["process"]["abstract"] == "this is a test"
+        assert isinstance(desc["process"]["inputs"], list)
+        assert len(desc["process"]["inputs"]) == 2
+        assert desc["process"]["inputs"][0]["id"] == "literal_input_only_cwl_minimal"
+        assert desc["process"]["inputs"][0]["minOccurs"] == "1"
+        assert desc["process"]["inputs"][0]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][1]["id"] == "literal_input_both_cwl_and_wps"
+        assert desc["process"]["inputs"][1]["minOccurs"] == "1"
+        assert desc["process"]["inputs"][1]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][1]["title"] == "Extra detail for I/O both in CWL and WPS", \
+            "Additional details defined only in WPS matching CWL I/O by ID should be preserved"
+        assert isinstance(desc["process"]["outputs"], list)
+        assert len(desc["process"]["outputs"]) == 2
+        assert desc["process"]["outputs"][0]["id"] == "literal_output_only_cwl_minimal"
+        assert desc["process"]["outputs"][1]["id"] == "literal_output_both_cwl_and_wps"
+        assert desc["process"]["outputs"][1]["title"] == "Additional detail only within WPS output", \
+            "Additional details defined only in WPS matching CWL I/O by ID should be preserved"
+        assert len(pkg["inputs"]) == 2
+        assert pkg["inputs"][0]["id"] == "literal_input_only_cwl_minimal"
+        assert pkg["inputs"][1]["id"] == "literal_input_both_cwl_and_wps"
+        # FIXME: https://github.com/crim-ca/weaver/issues/31
+        # assert pkg["inputs"][1]["label"] == "Extra detail for I/O both in CWL and WPS", \
+        #     "WPS I/O title should be converted to CWL label of corresponding I/O from additional details"
+        assert len(pkg["outputs"]) == 2
+        assert pkg["outputs"][0]["id"] == "literal_output_only_cwl_minimal"
+        assert pkg["outputs"][1]["id"] == "literal_output_both_cwl_and_wps"
+        # FIXME: https://github.com/crim-ca/weaver/issues/31
+        # assert pkg["outputs"][1]["label"] == "Additional detail only within WPS output", \
+        #     "WPS I/O title should be converted to CWL label of corresponding I/O from additional details"
 
     def test_complex_io_with_multiple_formats_and_defaults(self):
         """
@@ -251,7 +351,7 @@ class WpsPackageAppTest(unittest.TestCase):
         body = {
             "processDescription": {
                 "process": {
-                    "id": self.__name__,
+                    "id": self._testMethodName,
                     "title": "some title",
                     "abstract": "this is a test",
                     # only partial inputs provided to fill additional details that cannot be specified with CWL alone
@@ -371,20 +471,24 @@ class WpsPackageAppTest(unittest.TestCase):
 
         # process description output validation
         assert isinstance(desc["process"]["outputs"], list)
-        assert len(desc["process"]["outputs"] == 2)  # FIXME: adjust output count when issue #25 is implemented
+        assert len(desc["process"]["outputs"]) == 2  # FIXME: adjust output count when issue #25 is implemented
         for output in desc["process"]["outputs"]:
             for field in ["minOccurs", "maxOccurs", "default"]:
                 assert field not in output
-            for format_spec in output["formats"]:
-                assert "default" not in format_spec
+            # for format_spec in output["formats"]:
+            #     assert "default" not in format_spec
         assert desc["process"]["outputs"][0]["id"] == "single_value_single_format"
         assert len(desc["process"]["outputs"][0]["formats"]) == 1
-        assert desc["process"]["outputs"][0]["format"][0] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["outputs"][0]["formats"][0]["default"] is True
         assert desc["process"]["outputs"][1]["id"] == "single_value_multi_format"
         assert len(desc["process"]["outputs"][1]["formats"]) == 3
-        assert desc["process"]["outputs"][1]["formats"][0] == CONTENT_TYPE_APP_JSON
-        assert desc["process"]["outputs"][1]["formats"][1] == CONTENT_TYPE_TEXT_PLAIN
-        assert desc["process"]["outputs"][1]["formats"][2] == CONTENT_TYPE_APP_NETCDF
+        assert desc["process"]["outputs"][1]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["outputs"][1]["formats"][1]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["outputs"][1]["formats"][2]["mimeType"] == CONTENT_TYPE_APP_NETCDF
+        assert desc["process"]["outputs"][1]["formats"][0]["default"] is True   # mandatory
+        assert desc["process"]["outputs"][1]["formats"][1].get("default", False) is False  # omission is allowed
+        assert desc["process"]["outputs"][1]["formats"][2].get("default", False) is False  # omission is allowed
         # FIXME: enable when issue #25 is implemented
         # assert desc["process"]["outputs"][2]["id"] == "multi_value_single_format"
         # assert len(desc["process"]["outputs"][2]["formats"]) == 1
@@ -458,10 +562,29 @@ class WpsPackageAppTest(unittest.TestCase):
     #   - min AND max each overridden by WPS sets the corresponding value, regardless of single/array CWL resolution
     #   - evaluates above cases for both literal and complex inputs
     @pytest.mark.xfail(reason="not implemented")
-    def test_merging_io_min_max_occurs(self):
-        raise NotImplementedError
+    def test_resolution_io_min_max_occurs(self):
+        """
+        Test validates that various merging/resolution strategies of I/O definitions are properly applied for
+        corresponding ``minOccurs`` and ``maxOccurs`` fields across `CWL` and `WPS` payloads. Also, fields that
+        can help infer ``minOccurs`` and ``maxOccurs`` values such as ``default`` and ``type`` are tested.
 
-    def test_literal_io_from_package(self):
+        Following cases are evaluated:
+
+            1. ``minOccurs=0`` is automatically added or corrected if ``default`` value is provided
+            2. ``minOccurs=1`` is automatically added or corrected if both ``default`` and ``minOccurs`` are not defined
+            3. ``maxOccurs=1`` is automatically added or corrected when `CWL` ``type`` corresponds to a single value
+               and ``maxOccurs`` was omitted from the `WPS` payload
+
+            3. ``default=null`` is automatically added if ``minOccurs=0`` is provided
+               and ``default`` is not explicitly defined
+            4. s
+
+            5. above cases succeed for both literal and complex I/O
+
+            , min=1 otherwise when only resolved by CWL
+            - ``maxOccurs=1`` if single value, max="unbounded" if array when only resolved by CWL
+            - min AND max each overridden by WPS sets the corresponding value, regardless of single/array CWL resolution
+        """
         cwl = {
             "cwlVersion": "v1.0",
             "class": "CommandLineTool",
@@ -482,7 +605,7 @@ class WpsPackageAppTest(unittest.TestCase):
         body = {
             "processDescription": {
                 "process": {
-                    "id": self.__name__,
+                    "id": self._testMethodName,
                     "title": "some title",
                     "abstract": "this is a test",
                 }
@@ -490,24 +613,20 @@ class WpsPackageAppTest(unittest.TestCase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, pkg = self.deploy_process(body)
-        assert desc["process"]["id"] == self.__name__
-        assert desc["process"]["title"] == "some title"
-        assert desc["process"]["abstract"] == "this is a test"
-        assert isinstance(desc["process"]["inputs"], list)
-        assert len(desc["process"]["inputs"]) == 1
-        assert desc["process"]["inputs"][0]["id"] == "url"
-        assert desc["process"]["inputs"][0]["minOccurs"] == "1"
-        assert desc["process"]["inputs"][0]["maxOccurs"] == "1"
-        assert "format" not in desc["process"]["inputs"][0]
-        assert isinstance(desc["process"]["outputs"], list)
-        assert len(desc["process"]["outputs"]) == 1
-        assert desc["process"]["outputs"][0]["id"] == "values"
-        assert "minOccurs" not in desc["process"]["outputs"][0]
-        assert "maxOccurs" not in desc["process"]["outputs"][0]
-        assert "format" not in desc["process"]["outputs"][0]
-        expected_fields = {"id", "title", "abstract", "inputs", "outputs", "executeEndpoint"}
-        assert len(set(desc["process"].keys()) - expected_fields) == 0
+        desc, _ = self.deploy_process(body)
+
+
+
+
+
+        # (1) test added minOccurs=0
+
+        # (2) test corrected minOccurs=0
+
+        # (3) test added default=null
+
+        # (4) test
+
 
     # FIXME: implement
     @pytest.mark.xfail(reason="not implemented")
@@ -521,7 +640,7 @@ class WpsPackageAppTest(unittest.TestCase):
 
     def test_literal_and_complex_io_from_wps_xml_reference(self):
         body = {
-            "processDescription": {"process": {"id": self.__name__}},
+            "processDescription": {"process": {"id": self._testMethodName}},
             "executionUnit": [{"href": "mock://{}".format(resources.WMS_LITERAL_COMPLEX_IO)}],
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
         }
@@ -530,7 +649,7 @@ class WpsPackageAppTest(unittest.TestCase):
         # basic contents validation
         assert "cwlVersion" in pkg
         assert "process" in desc
-        assert desc["process"]["id"] == self.__name__
+        assert desc["process"]["id"] == self._testMethodName
 
         # package I/O validation
         assert "inputs" in pkg
@@ -601,7 +720,7 @@ class WpsPackageAppTest(unittest.TestCase):
 
     def test_enum_array_and_multi_format_inputs_from_wps_xml_reference(self):
         body = {
-            "processDescription": {"process": {"id": self.__name__}},
+            "processDescription": {"process": {"id": self._testMethodName}},
             "executionUnit": [{"href": "mock://{}".format(resources.WPS_ENUM_ARRAY_IO)}],
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
         }
@@ -610,7 +729,7 @@ class WpsPackageAppTest(unittest.TestCase):
         # basic contents validation
         assert "cwlVersion" in pkg
         assert "process" in desc
-        assert desc["process"]["id"] == self.__name__
+        assert desc["process"]["id"] == self._testMethodName
 
         # package I/O validation
         assert "inputs" in pkg
