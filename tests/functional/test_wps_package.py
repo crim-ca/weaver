@@ -243,10 +243,10 @@ class WpsPackageAppTest(unittest.TestCase):
         NOTE:
             field 'default' in CWL refers to default "value", in WPS refers to default "format" for complex inputs
         """
-        ns1, type1 = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
-        ns2, type2 = get_cwl_file_format(CONTENT_TYPE_TEXT_PLAIN)
-        ns3, type3 = get_cwl_file_format(CONTENT_TYPE_APP_NETCDF)
-        namespaces = dict(ns1.items() + ns2.items() + ns3.items())
+        ns_json, type_json = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
+        ns_text, type_text = get_cwl_file_format(CONTENT_TYPE_TEXT_PLAIN)
+        ns_ncdf, type_ncdf = get_cwl_file_format(CONTENT_TYPE_APP_NETCDF)
+        namespaces = dict(ns_json.items() + ns_text.items() + ns_ncdf.items())
         default_file = "https://server.com/file"
         cwl = {
             "cwlVersion": "v1.0",
@@ -255,7 +255,7 @@ class WpsPackageAppTest(unittest.TestCase):
                 {
                     "id": "single_value_single_format",
                     "type": "File",
-                    "format": type1,
+                    "format": type_json,
                 },
                 {
                     "id": "multi_value_single_format",
@@ -263,12 +263,12 @@ class WpsPackageAppTest(unittest.TestCase):
                         "type": "array",
                         "items": "File",
                     },
-                    "format": type2,
+                    "format": type_text,
                 },
                 {
                     "id": "single_value_single_format_default",
                     "type": "File",
-                    "format": type3,
+                    "format": type_ncdf,
                     "default": default_file,
                 },
                 {
@@ -277,13 +277,13 @@ class WpsPackageAppTest(unittest.TestCase):
                         "type": "array",
                         "items": "File",
                     },
-                    "format": type2,
+                    "format": type_text,
                     "default": default_file,
                 },
                 {
                     "id": "single_value_multi_format",
                     "type": "File",
-                    "format": [type1, type2, type3],
+                    "format": [type_json, type_text, type_ncdf],
                 },
                 {
                     "id": "multi_value_multi_format",
@@ -291,12 +291,12 @@ class WpsPackageAppTest(unittest.TestCase):
                         "type": "array",
                         "items": "File",
                     },
-                    "format": [type3, type2, type1],
+                    "format": [type_ncdf, type_text, type_json],
                 },
                 {
                     "id": "single_value_multi_format_default",
                     "type": "File",
-                    "format": [type1, type2, type3],
+                    "format": [type_json, type_text, type_ncdf],
                     "default": default_file,
                 },
                 {
@@ -305,7 +305,7 @@ class WpsPackageAppTest(unittest.TestCase):
                         "type": "array",
                         "items": "File",
                     },
-                    "format": [type1, type2, type3],
+                    "format": [type_json, type_text, type_ncdf],
                     "default": default_file,
                 },
             ],
@@ -313,7 +313,7 @@ class WpsPackageAppTest(unittest.TestCase):
                 {
                     "id": "single_value_single_format",
                     "type": "File",
-                    "format": type1,
+                    "format": type_json,
                 },
                 {
                     "id": "single_value_multi_format",
@@ -322,7 +322,7 @@ class WpsPackageAppTest(unittest.TestCase):
                     #   not valid to have array of format for output as per:
                     #   https://github.com/common-workflow-language/common-workflow-language/issues/482
                     #   WPS payload must specify them
-                    # "format": [type1, type2, type3]
+                    # "format": [type_json, type2, type3]
                 },
                 # FIXME: multiple output (array) not implemented (https://github.com/crim-ca/weaver/issues/25)
                 # {
@@ -343,7 +343,7 @@ class WpsPackageAppTest(unittest.TestCase):
                 #     #   not valid to have array of format for output as per:
                 #     #   https://github.com/common-workflow-language/common-workflow-language/issues/482
                 #     #   WPS payload must specify them
-                #     "format": [type3, type2, type1],
+                #     "format": [type3, type2, type_json],
                 # },
             ],
             "$namespaces": namespaces
@@ -502,39 +502,39 @@ class WpsPackageAppTest(unittest.TestCase):
         # package input validation
         assert pkg["inputs"][0]["id"] == "single_value_single_format"
         assert pkg["inputs"][0]["type"] == "File"
-        assert pkg["inputs"][0]["format"] == type1
+        assert pkg["inputs"][0]["format"] == type_json
         assert "default" not in pkg["inputs"][0]
         assert pkg["inputs"][1]["id"] == "multi_value_single_format"
-        assert pkg["inputs"][1]["type"] == "array"
-        assert pkg["inputs"][1]["items"] == "File"
-        assert pkg["inputs"][1]["id"]["format"] == type2
+        assert pkg["inputs"][1]["type"]["type"] == "array"
+        assert pkg["inputs"][1]["type"]["items"] == "File"
+        assert pkg["inputs"][1]["format"] == type_text
         assert "default" not in pkg["inputs"][1]
         assert pkg["inputs"][2]["id"] == "single_value_single_format_default"
         assert pkg["inputs"][2]["type"] == "File"
-        assert pkg["inputs"][2]["format"] == type3
+        assert pkg["inputs"][2]["format"] == type_ncdf
         assert pkg["inputs"][2]["default"] == default_file
         assert pkg["inputs"][3]["id"] == "multi_value_single_format_default"
-        assert pkg["inputs"][3]["type"] == "array"
-        assert pkg["inputs"][3]["items"] == "File"
-        assert pkg["inputs"][3]["id"]["format"] == type2
+        assert pkg["inputs"][3]["type"]["type"] == "array"
+        assert pkg["inputs"][3]["type"]["items"] == "File"
+        assert pkg["inputs"][3]["format"] == type_text
         assert pkg["inputs"][3]["default"] == default_file
-        assert pkg["inputs"][4]["id"] == "multi_value_single_format"
+        assert pkg["inputs"][4]["id"] == "single_value_multi_format"
         assert pkg["inputs"][4]["type"] == "File"
-        assert pkg["inputs"][4]["format"] == [type1, type2, type3]
+        assert pkg["inputs"][4]["format"] == [type_json, type_text, type_ncdf]
         assert "default" not in pkg["inputs"][4]
         assert pkg["inputs"][5]["id"] == "multi_value_multi_format"
-        assert pkg["inputs"][5]["type"] == "array"
-        assert pkg["inputs"][5]["items"] == "File"
-        assert pkg["inputs"][5]["format"] == [type3, type2, type1]
+        assert pkg["inputs"][5]["type"]["type"] == "array"
+        assert pkg["inputs"][5]["type"]["items"] == "File"
+        assert pkg["inputs"][5]["format"] == [type_ncdf, type_text, type_json]
         assert "default" not in pkg["inputs"][5]
         assert pkg["inputs"][6]["id"] == "single_value_multi_format_default"
         assert pkg["inputs"][6]["type"] == "File"
-        assert pkg["inputs"][6]["format"] == [type1, type2, type3]
+        assert pkg["inputs"][6]["format"] == [type_json, type_text, type_ncdf]
         assert pkg["inputs"][6]["default"] == default_file
-        assert pkg["inputs"][7]["id"] == "single_value_multi_format_default"
-        assert pkg["inputs"][7]["type"] == "array"
-        assert pkg["inputs"][7]["items"] == "File"
-        assert pkg["inputs"][7]["format"] == [type1, type2, type3]
+        assert pkg["inputs"][7]["id"] == "multi_value_multi_format_default"
+        assert pkg["inputs"][7]["type"]["type"] == "array"
+        assert pkg["inputs"][7]["type"]["items"] == "File"
+        assert pkg["inputs"][7]["format"] == [type_json, type_text, type_ncdf]
         assert pkg["inputs"][7]["default"] == default_file
 
         # package output validation
@@ -542,7 +542,7 @@ class WpsPackageAppTest(unittest.TestCase):
             assert "default" not in output
         assert pkg["outputs"][0]["id"] == "single_value_single_format"
         assert pkg["outputs"][0]["type"] == "File"
-        assert pkg["outputs"][0]["format"] == CONTENT_TYPE_APP_JSON
+        assert pkg["outputs"][0]["format"] == type_json
         assert pkg["outputs"][1]["id"] == "single_value_multi_format"
         assert pkg["outputs"][1]["type"] == "File"
         assert "format" not in pkg["outputs"][1], "CWL format array not allowed for outputs."
@@ -550,7 +550,7 @@ class WpsPackageAppTest(unittest.TestCase):
         # assert pkg["outputs"][2]["id"] == "multi_value_single_format"
         # assert pkg["outputs"][2]["type"] == "array"
         # assert pkg["outputs"][2]["items"] == "File"
-        # assert pkg["outputs"][2]["format"] == CONTENT_TYPE_APP_NETCDF
+        # assert pkg["outputs"][2]["format"] == type_ncdf
         # assert pkg["outputs"][3]["id"] == "multi_value_multi_format"
         # assert pkg["outputs"][3]["type"] == "array"
         # assert pkg["outputs"][3]["items"] == "File"
