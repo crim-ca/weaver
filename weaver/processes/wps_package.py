@@ -123,7 +123,7 @@ PACKAGE_PROGRESS_DONE = 100
 # WPS object attribute -> all possible *other* naming variations
 WPS_FIELD_MAPPING = {
     "identifier": ["Identifier", "ID", "id", "Id"],
-    "title": ["Title"],
+    "title": ["Title", "Label", "label"],
     "abstract": ["Abstract"],
     "metadata": ["Metadata"],
     "keywords": ["Keywords"],

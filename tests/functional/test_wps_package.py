@@ -62,6 +62,24 @@ class WpsPackageAppTest(unittest.TestCase):
             info.append(resp.json)
         return info
 
+    def test_cwl_label_as_process_title(self):
+        title = "This process title comes from the CWL label"
+        cwl = {
+            "cwlVersion": "v1.0",
+            "label": title,
+            "class": "CommandLineTool",
+            "inputs": {"url": {"type": "string"}},
+            "outputs": {"values": {"type": "float"}}
+        }
+        body = {
+            "processDescription": {"process": {"id": self._testMethodName}},
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        desc, pkg = self.deploy_process(body)
+        assert desc["process"]["title"] == title
+        assert pkg["label"] == title
+
     def test_literal_io_from_package(self):
         """
         Test validates that literal I/O definitions *only* defined in the `CWL` package as `JSON` within the
@@ -556,12 +574,6 @@ class WpsPackageAppTest(unittest.TestCase):
         # assert pkg["outputs"][3]["items"] == "File"
         # assert "format" not in pkg["outputs"][3], "CWL format array not allowed for outputs."
 
-    # FIXME: implement, test should validate that
-    #   - min=0 if default value, min=1 otherwise when only resolved by CWL
-    #   - max=1 if single value, max="unbounded" if array when only resolved by CWL
-    #   - min AND max each overridden by WPS sets the corresponding value, regardless of single/array CWL resolution
-    #   - evaluates above cases for both literal and complex inputs
-    @pytest.mark.xfail(reason="not implemented")
     def test_resolution_io_min_max_occurs(self):
         """
         Test validates that various merging/resolution strategies of I/O definitions are properly applied for
@@ -570,36 +582,47 @@ class WpsPackageAppTest(unittest.TestCase):
 
         Following cases are evaluated:
 
-            1. ``minOccurs=0`` is automatically added or corrected if ``default`` value is provided
-            2. ``minOccurs=1`` is automatically added or corrected if both ``default`` and ``minOccurs`` are not defined
-            3. ``maxOccurs=1`` is automatically added or corrected when `CWL` ``type`` corresponds to a single value
-               and ``maxOccurs`` was omitted from the `WPS` payload
-
-            3. ``default=null`` is automatically added if ``minOccurs=0`` is provided
-               and ``default`` is not explicitly defined
-            4. s
-
-            5. above cases succeed for both literal and complex I/O
-
-            , min=1 otherwise when only resolved by CWL
-            - ``maxOccurs=1`` if single value, max="unbounded" if array when only resolved by CWL
-            - min AND max each overridden by WPS sets the corresponding value, regardless of single/array CWL resolution
+            1. ``minOccurs=0`` is automatically added or corrected to `WPS` if ``default`` value is provided in `CWL`
+            2. ``minOccurs=0`` is automatically added or corrected to `WPS` if `CWL` ``type`` specifies it with various
+               formats (shortcut or explicit definition)
+            3. ``minOccurs=1`` is automatically added or corrected to `WPS` if both ``default`` and ``minOccurs`` are
+               not defined within the `CWL`
+            4. ``maxOccurs=1`` is automatically added or corrected in `WPS` if `CWL` ``type`` corresponds to a single
+               value (not an array)
+            5. ``maxOccurs="unbounded"`` is automatically added in `WPS` if `CWL` ``type`` corresponds to an array
+               and ``maxOccurs`` was not specified in `WPS`
+            6. ``maxOccurs=<value>`` is preserved if specified in `WPS` and `CWL` ``type`` corresponds to an array.
+            7. ``maxOccurs>1`` or ``maxOccurs="unbounded"`` defined in `WPS` converts the `CWL` type to a corresponding
+               array definition as required (ex: ``string`` becomes ``string[]``)
+            8. ``default=null`` is automatically added to `CWL` if ``minOccurs=0`` is provided in `WPS` and
+               ``default`` is not explicitly defined in `CWL` nor `WPS`.
+            9. ``default=<value>`` is automatically added to `CWL` if ``default=<value>`` is provided in `WPS` and
+               ``default`` is not explicitly defined in `CWL`.
         """
         cwl = {
             "cwlVersion": "v1.0",
             "class": "CommandLineTool",
-            "inputs": {
-                "url": {
-                    "type": "string"
-                }
-            },
+            "inputs": [
+                # although types are parsed in multiple ways to compare default/null/array/minOccurs/maxOccurs
+                # values, the original definitions here are preserved when there are no complementary WPS details
+                {"id": "required_literal", "type": "string"},
+                {"id": "required_literal_default", "type": "string", "default": "test"},
+                {"id": "optional_literal_shortcut", "type": "string?"},
+                {"id": "optional_literal_explicit", "type": ["null", "string"]},
+                {"id": "required_array_shortcut", "type": "string[]"},
+                {"id": "required_array_explicit", "type": {"type": "array", "items": "string"}},
+                {"id": "optional_array_shortcut", "type": "string[]?"},
+                {"id": "optional_array_explicit", "type": ["null", {"type": "array", "items": "string"}]},
+                # types with complementary WPS details might change slightly depending on combinations encountered
+                {"id": "required_literal_min_fixed_from_wps", "type": "string?"},   # string? becomes string
+                {"id": "optional_literal_min_fixed_from_wps", "type": "string"},    # string becomes string?
+                {"id": "required_array_min_fixed_from_wps", "type": "string"},      # string becomes string[]
+                {"id": "optional_array_min_fixed_from_wps", "type": "string?"},     # string? becomes string[]?
+                {"id": "required_array_max_fixed_from_wps", "type": "string"},      # string becomes string[]
+                {"id": "optional_array_max_fixed_from_wps", "type": "string?"},     # string? becomes string[]?
+            ],
             "outputs": {
-                "values": {
-                    "type": {
-                        "type": "array",
-                        "items": "float",
-                    }
-                }
+                "values": {"type": "float"}
             }
         }
         body = {
@@ -608,25 +631,105 @@ class WpsPackageAppTest(unittest.TestCase):
                     "id": self._testMethodName,
                     "title": "some title",
                     "abstract": "this is a test",
+                    "inputs": [
+                        {"id": "required_literal_min_fixed_from_wps", "minOccurs": "1"},
+                        {"id": "optional_literal_min_fixed_from_wps", "minOccurs": "0"},
+                        {"id": "required_array_min_fixed_from_wps", "minOccurs": "2"},
+                        {"id": "optional_array_min_fixed_from_wps", "minOccurs": "2"},
+                        {"id": "required_array_max_fixed_from_wps", "maxOccurs": "10"},
+                        {"id": "optional_array_max_fixed_from_wps", "minOccurs": "0", "maxOccurs": "10"},
+                    ]
                 }
             },
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
             "executionUnit": [{"unit": cwl}],
         }
-        desc, _ = self.deploy_process(body)
+        desc, pkg = self.deploy_process(body)
 
+        assert desc["process"]["inputs"][0]["id"] == "required_literal"
+        assert desc["process"]["inputs"][0]["minOccurs"] == "1"
+        assert desc["process"]["inputs"][0]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][1]["id"] == "required_literal_default"
+        assert desc["process"]["inputs"][1]["minOccurs"] == "0"
+        assert desc["process"]["inputs"][1]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][2]["id"] == "optional_literal_shortcut"
+        assert desc["process"]["inputs"][2]["minOccurs"] == "0"
+        assert desc["process"]["inputs"][2]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][3]["id"] == "optional_literal_explicit"
+        assert desc["process"]["inputs"][3]["minOccurs"] == "0"
+        assert desc["process"]["inputs"][3]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][4]["id"] == "required_array_shortcut"
+        assert desc["process"]["inputs"][4]["minOccurs"] == "1"
+        assert desc["process"]["inputs"][4]["maxOccurs"] == "unbounded"
+        assert desc["process"]["inputs"][5]["id"] == "required_array_explicit"
+        assert desc["process"]["inputs"][5]["minOccurs"] == "1"
+        assert desc["process"]["inputs"][5]["maxOccurs"] == "unbounded"
+        assert desc["process"]["inputs"][6]["id"] == "optional_array_shortcut"
+        assert desc["process"]["inputs"][6]["minOccurs"] == "0"
+        assert desc["process"]["inputs"][6]["maxOccurs"] == "unbounded"
+        assert desc["process"]["inputs"][7]["id"] == "optional_array_explicit"
+        assert desc["process"]["inputs"][7]["minOccurs"] == "0"
+        assert desc["process"]["inputs"][7]["maxOccurs"] == "unbounded"
+        assert desc["process"]["inputs"][8]["id"] == "required_literal_min_fixed_from_wps"
+        assert desc["process"]["inputs"][8]["minOccurs"] == "1"
+        assert desc["process"]["inputs"][8]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][9]["id"] == "optional_literal_min_fixed_from_wps"
+        assert desc["process"]["inputs"][9]["minOccurs"] == "0"
+        assert desc["process"]["inputs"][9]["maxOccurs"] == "1"
+        assert desc["process"]["inputs"][10]["id"] == "required_array_min_fixed_from_wps"
+        # FIXME:
+        #   `maxOccurs=1` not updated to `maxOccurs="unbounded"` as it is evaluated as a single value,
+        #   but it should be considered an array since `minOccurs>1`
+        #   (see: https://github.com/crim-ca/weaver/issues/17)
+        assert desc["process"]["inputs"][10]["minOccurs"] == "2"
+        # assert desc["process"]["inputs"][10]["maxOccurs"] == "unbounded"
+        assert desc["process"]["inputs"][11]["id"] == "optional_array_min_fixed_from_wps"
+        assert desc["process"]["inputs"][11]["minOccurs"] == "2"
+        # assert desc["process"]["inputs"][11]["maxOccurs"] == "unbounded"
+        assert desc["process"]["inputs"][12]["id"] == "required_array_max_fixed_from_wps"
+        assert desc["process"]["inputs"][12]["minOccurs"] == "1"
+        assert desc["process"]["inputs"][12]["maxOccurs"] == "10"
+        assert desc["process"]["inputs"][13]["id"] == "optional_array_max_fixed_from_wps"
+        assert desc["process"]["inputs"][13]["minOccurs"] == "0"
+        assert desc["process"]["inputs"][13]["maxOccurs"] == "10"
 
-
-
-
-        # (1) test added minOccurs=0
-
-        # (2) test corrected minOccurs=0
-
-        # (3) test added default=null
-
-        # (4) test
-
+        assert pkg["inputs"][0]["id"] == "required_literal"
+        assert pkg["inputs"][0]["type"] == "string"
+        assert pkg["inputs"][1]["id"] == "required_literal_default"
+        assert pkg["inputs"][1]["type"] == "string"
+        assert pkg["inputs"][1]["default"] == "test"
+        assert pkg["inputs"][2]["id"] == "optional_literal_shortcut"
+        assert pkg["inputs"][2]["type"] == "string?"
+        assert pkg["inputs"][3]["id"] == "optional_literal_explicit"
+        assert pkg["inputs"][3]["type"][0] == "null"
+        assert pkg["inputs"][3]["type"][1] == "string"
+        assert pkg["inputs"][4]["id"] == "required_array_shortcut"
+        assert pkg["inputs"][4]["type"] == "string[]"
+        assert pkg["inputs"][5]["id"] == "required_array_explicit"
+        assert pkg["inputs"][5]["type"]["type"] == "array"
+        assert pkg["inputs"][5]["type"]["items"] == "string"
+        assert pkg["inputs"][6]["id"] == "optional_array_shortcut"
+        assert pkg["inputs"][6]["type"] == "string[]?"
+        assert pkg["inputs"][7]["id"] == "optional_array_explicit"
+        assert pkg["inputs"][7]["type"][0] == "null"
+        assert pkg["inputs"][7]["type"][1]["type"] == "array"
+        assert pkg["inputs"][7]["type"][1]["items"] == "string"
+        # FIXME:
+        #   Although WPS minOccurs/maxOccurs' specifications are applied, they are not back-ported to CWL package
+        #   definition in order to preserve the same logic. CWL types should be overridden by complementary details.
+        #   (see: https://github.com/crim-ca/weaver/issues/17)
+        assert pkg["inputs"][8]["id"] == "required_literal_min_fixed_from_wps"
+        # assert pkg["inputs"][8]["type"] == "string"
+        assert pkg["inputs"][9]["id"] == "optional_literal_min_fixed_from_wps"
+        # assert pkg["inputs"][9]["type"] == "string?"
+        assert pkg["inputs"][10]["id"] == "required_array_min_fixed_from_wps"
+        # assert pkg["inputs"][10]["type"] == "string[]"
+        assert pkg["inputs"][11]["id"] == "optional_array_min_fixed_from_wps"
+        # assert pkg["inputs"][11]["type"] == "string[]?"
+        assert pkg["inputs"][12]["id"] == "required_array_max_fixed_from_wps"
+        # assert pkg["inputs"][12]["type"] == "string[]"
+        assert pkg["inputs"][13]["id"] == "optional_array_max_fixed_from_wps"
+        # assert pkg["inputs"][13]["type"] == "string[]?"
 
     # FIXME: implement
     @pytest.mark.xfail(reason="not implemented")

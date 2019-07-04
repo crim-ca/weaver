@@ -14,6 +14,8 @@ New Features:
 - Add missing ontology reference support for `CWL` field ``format`` by defaulting to `IANA` namespace
 - Add support for I/O enum array (#30)
 - Add more functional tests (#11, #17)
+- Add support of ``label`` synonym as ``title`` for inputs and process description
+  (`CWL` specifying a ``label`` will set it in `WPS` process) (#31)
 
 Changes:
 - Use ``bump2version`` and move all config under ``setup.cfg``
@@ -23,7 +25,7 @@ Fixes:
 - Adjust some typing definitions incorrectly specified.
 - Fix some failing functionality tests.
 - Fix I/O field ordering preserved as specified in payload or loaded reference file
-- Fix setting ``minOccurs=0`` when a ``default`` is specified in the corresponding ``CWL`` I/O (#17, #25)
+- Fix setting ``minOccurs=0`` when a ``default`` is specified in the corresponding `CWL` I/O (#17, #25)
 - Fix incorrectly overridden ``maxOccurs="unbounded"`` by ``maxOccurs="1"`` when a partial array input definition
   is specified without explicit ``maxOccurs`` in `WPS` payload (#17, #25)
 
