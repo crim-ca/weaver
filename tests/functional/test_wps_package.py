@@ -114,6 +114,7 @@ class WpsPackageAppTest(unittest.TestCase):
             "executionUnit": [{"unit": cwl}],
         }
         desc, _ = self.deploy_process(body)
+
         assert desc["process"]["id"] == self._testMethodName
         assert desc["process"]["title"] == "some title"
         assert desc["process"]["abstract"] == "this is a test"
@@ -201,6 +202,7 @@ class WpsPackageAppTest(unittest.TestCase):
             "executionUnit": [{"unit": cwl}],
         }
         desc, pkg = self.deploy_process(body)
+
         assert desc["process"]["id"] == self._testMethodName
         assert desc["process"]["title"] == "some title"
         assert desc["process"]["abstract"] == "this is a test"
@@ -220,16 +222,21 @@ class WpsPackageAppTest(unittest.TestCase):
         assert desc["process"]["outputs"][1]["id"] == "literal_output_both_cwl_and_wps"
         assert desc["process"]["outputs"][1]["title"] == "Additional detail only within WPS output", \
             "Additional details defined only in WPS matching CWL I/O by ID should be preserved"
+
         assert len(pkg["inputs"]) == 2
         assert pkg["inputs"][0]["id"] == "literal_input_only_cwl_minimal"
         assert pkg["inputs"][1]["id"] == "literal_input_both_cwl_and_wps"
-        # FIXME: https://github.com/crim-ca/weaver/issues/31
+        # FIXME:
+        #   https://github.com/crim-ca/weaver/issues/31
+        #   https://github.com/crim-ca/weaver/issues/50
         # assert pkg["inputs"][1]["label"] == "Extra detail for I/O both in CWL and WPS", \
         #     "WPS I/O title should be converted to CWL label of corresponding I/O from additional details"
         assert len(pkg["outputs"]) == 2
         assert pkg["outputs"][0]["id"] == "literal_output_only_cwl_minimal"
         assert pkg["outputs"][1]["id"] == "literal_output_both_cwl_and_wps"
-        # FIXME: https://github.com/crim-ca/weaver/issues/31
+        # FIXME:
+        #   https://github.com/crim-ca/weaver/issues/31
+        #   https://github.com/crim-ca/weaver/issues/50
         # assert pkg["outputs"][1]["label"] == "Additional detail only within WPS output", \
         #     "WPS I/O title should be converted to CWL label of corresponding I/O from additional details"
 
@@ -717,7 +724,8 @@ class WpsPackageAppTest(unittest.TestCase):
         # FIXME:
         #   Although WPS minOccurs/maxOccurs' specifications are applied, they are not back-ported to CWL package
         #   definition in order to preserve the same logic. CWL types should be overridden by complementary details.
-        #   (see: https://github.com/crim-ca/weaver/issues/17)
+        #   - https://github.com/crim-ca/weaver/issues/17
+        #   - https://github.com/crim-ca/weaver/issues/50
         assert pkg["inputs"][8]["id"] == "required_literal_min_fixed_from_wps"
         # assert pkg["inputs"][8]["type"] == "string"
         assert pkg["inputs"][9]["id"] == "optional_literal_min_fixed_from_wps"
@@ -731,15 +739,193 @@ class WpsPackageAppTest(unittest.TestCase):
         assert pkg["inputs"][13]["id"] == "optional_array_max_fixed_from_wps"
         # assert pkg["inputs"][13]["type"] == "string[]?"
 
-    # FIXME: implement
-    @pytest.mark.xfail(reason="not implemented")
     def test_complex_io_from_package(self):
-        raise NotImplementedError
+        """
+        Test validates that complex I/O definitions *only* defined in the `CWL` package as `JSON` within the
+        deployment body generates expected `WPS` process description I/O with corresponding formats and values.
+        """
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "inputs": {
+                "url": {
+                    "type": "File"
+                }
+            },
+            "outputs": {
+                "files": {
+                    "type": {
+                        "type": "array",
+                        "items": "File",
+                    }
+                }
+            }
+        }
+        body = {
+            "processDescription": {
+                "process": {
+                    "id": self._testMethodName,
+                    "title": "some title",
+                    "abstract": "this is a test",
+                }
+            },
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        desc, _ = self.deploy_process(body)
+        assert desc["process"]["id"] == self._testMethodName
+        assert desc["process"]["title"] == "some title"
+        assert desc["process"]["abstract"] == "this is a test"
+        assert isinstance(desc["process"]["inputs"], list)
+        assert len(desc["process"]["inputs"]) == 1
+        assert desc["process"]["inputs"][0]["id"] == "url"
+        assert desc["process"]["inputs"][0]["minOccurs"] == "1"
+        assert desc["process"]["inputs"][0]["maxOccurs"] == "1"
+        assert isinstance(desc["process"]["inputs"][0]["formats"], list)
+        assert len(desc["process"]["inputs"][0]["formats"]) == 1
+        assert isinstance(desc["process"]["inputs"][0]["formats"][0], dict)
+        assert desc["process"]["inputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["inputs"][0]["formats"][0]["default"] is True
+        assert isinstance(desc["process"]["outputs"], list)
+        assert len(desc["process"]["outputs"]) == 1
+        assert desc["process"]["outputs"][0]["id"] == "files"
+        assert "minOccurs" not in desc["process"]["outputs"][0]
+        assert "maxOccurs" not in desc["process"]["outputs"][0]
+        assert isinstance(desc["process"]["outputs"][0]["formats"], list)
+        assert len(desc["process"]["outputs"][0]["formats"]) == 1
+        assert isinstance(desc["process"]["outputs"][0]["formats"][0], dict)
+        assert desc["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["outputs"][0]["formats"][0]["default"] is True
+        expected_fields = {"id", "title", "abstract", "inputs", "outputs", "executeEndpoint"}
+        assert len(set(desc["process"].keys()) - expected_fields) == 0
 
-    # FIXME: implement
-    @pytest.mark.xfail(reason="not implemented")
     def test_complex_io_from_package_and_offering(self):
-        raise NotImplementedError
+        """
+        Test validates that complex I/O definitions simultaneously defined in *both* (but not necessarily for each
+        one and exhaustively) `CWL` and `WPS` payloads are correctly resolved. More specifically, verifies that:
+
+            - `WPS` I/O that don't match any `CWL` I/O by ID are removed completely.
+            - `WPS` I/O that were omitted are added with minimal detail requirements using corresponding `CWL` I/O
+            - `WPS` I/O complementary details are added to corresponding `CWL` I/O (no duplication of IDs)
+
+        .. seealso::
+            - :function:`weaver.processes.wps_package._merge_package_io`
+        """
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "inputs": [
+                {
+                    "id": "complex_input_only_cwl_minimal",
+                    "type": "File"
+                },
+                {
+                    "id": "complex_input_both_cwl_and_wps",
+                    "type": "File"
+                },
+            ],
+            "outputs": [
+                {
+                    "id": "complex_output_only_cwl_minimal",
+                    "type": "File",
+                },
+                {
+                    "id": "complex_output_both_cwl_and_wps",
+                    "type": "File"
+                }
+            ]
+        }
+        body = {
+            "processDescription": {
+                "process": {
+                    "id": self._testMethodName,
+                    "title": "some title",
+                    "abstract": "this is a test",
+                    "inputs": [
+                        {
+                            "id": "complex_input_only_wps_removed",
+                        },
+                        {
+                            "id": "complex_input_both_cwl_and_wps",
+                            "title": "Extra detail for I/O both in CWL and WPS"
+                        }
+                    ],
+                    "outputs": [
+                        {
+                            "id": "complex_output_only_wps_removed"
+                        },
+                        {
+                            "id": "complex_output_both_cwl_and_wps",
+                            "title": "Additional detail only within WPS output"
+                        }
+                    ]
+                }
+            },
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        desc, pkg = self.deploy_process(body)
+
+        assert desc["process"]["id"] == self._testMethodName
+        assert desc["process"]["title"] == "some title"
+        assert desc["process"]["abstract"] == "this is a test"
+        assert isinstance(desc["process"]["inputs"], list)
+        assert len(desc["process"]["inputs"]) == 2
+        assert desc["process"]["inputs"][0]["id"] == "complex_input_only_cwl_minimal"
+        assert desc["process"]["inputs"][0]["minOccurs"] == "1"
+        assert desc["process"]["inputs"][0]["maxOccurs"] == "1"
+        assert len(desc["process"]["inputs"][0]["formats"]) == 1, \
+            "Default format should be added to process definition when omitted from both CWL and WPS"
+        assert desc["process"]["inputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["inputs"][0]["formats"][0]["default"] is True
+        assert desc["process"]["inputs"][1]["id"] == "complex_input_both_cwl_and_wps"
+        assert desc["process"]["inputs"][1]["minOccurs"] == "1"
+        assert desc["process"]["inputs"][1]["maxOccurs"] == "1"
+        assert len(desc["process"]["inputs"][1]["formats"]) == 1, \
+            "Default format should be added to process definition when omitted from both CWL and WPS"
+        assert desc["process"]["inputs"][1]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["inputs"][1]["formats"][0]["default"] is True
+        assert desc["process"]["inputs"][1]["title"] == "Extra detail for I/O both in CWL and WPS", \
+            "Additional details defined only in WPS matching CWL I/O by ID should be preserved"
+        assert isinstance(desc["process"]["outputs"], list)
+        assert len(desc["process"]["outputs"]) == 2
+        assert desc["process"]["outputs"][0]["id"] == "complex_output_only_cwl_minimal"
+        assert len(desc["process"]["outputs"][0]["formats"]) == 1, \
+            "Default format should be added to process definition when omitted from both CWL and WPS"
+        assert desc["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["outputs"][0]["formats"][0]["default"] is True
+        assert desc["process"]["outputs"][1]["id"] == "complex_output_both_cwl_and_wps"
+        assert len(desc["process"]["outputs"][1]["formats"]) == 1, \
+            "Default format should be added to process definition when omitted from both CWL and WPS"
+        assert desc["process"]["outputs"][1]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
+        assert desc["process"]["outputs"][1]["formats"][0]["default"] is True
+        assert desc["process"]["outputs"][1]["title"] == "Additional detail only within WPS output", \
+            "Additional details defined only in WPS matching CWL I/O by ID should be preserved"
+
+        assert len(pkg["inputs"]) == 2
+        assert pkg["inputs"][0]["id"] == "complex_input_only_cwl_minimal"
+        assert "format" not in pkg["inputs"][0], "Omitted formats in CWL and WPS I/O definitions during deployment" \
+                                                 "should not add them to the generated CWL package definition"
+        assert pkg["inputs"][1]["id"] == "complex_input_both_cwl_and_wps"
+        # FIXME:
+        #   https://github.com/crim-ca/weaver/issues/31
+        #   https://github.com/crim-ca/weaver/issues/50
+        # assert pkg["inputs"][1]["label"] == "Extra detail for I/O both in CWL and WPS", \
+        #     "WPS I/O title should be converted to CWL label of corresponding I/O from additional details"
+        assert "format" not in pkg["inputs"][1], "Omitted formats in CWL and WPS I/O definitions during deployment" \
+                                                 "should not add them to the generated CWL package definition"
+        assert len(pkg["outputs"]) == 2
+        assert pkg["outputs"][0]["id"] == "complex_output_only_cwl_minimal"
+        assert "format" not in pkg["outputs"][0], "Omitted formats in CWL and WPS I/O definitions during deployment" \
+                                                  "should not add them to the generated CWL package definition"
+        assert pkg["outputs"][1]["id"] == "complex_output_both_cwl_and_wps"
+        # FIXME:
+        #   https://github.com/crim-ca/weaver/issues/31
+        #   https://github.com/crim-ca/weaver/issues/50
+        # assert pkg["outputs"][1]["label"] == "Additional detail only within WPS output", \
+        #     "WPS I/O title should be converted to CWL label of corresponding I/O from additional details"
+        assert "format" not in pkg["outputs"][1], "Omitted formats in CWL and WPS I/O definitions during deployment" \
+                                                  "should not add them to the generated CWL package definition"
 
     def test_literal_and_complex_io_from_wps_xml_reference(self):
         body = {

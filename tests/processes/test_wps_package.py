@@ -1,7 +1,16 @@
 # noinspection PyProtectedMember
-from weaver.processes.wps_package import _json2wps_datatype, _is_cwl_array_type, _is_cwl_enum_type, WPS_LITERAL
+from weaver.processes.wps_package import (
+    _json2wps_datatype,
+    _is_cwl_array_type,
+    _is_cwl_enum_type,
+    _merge_io_formats,
+    DefaultFormat,
+    WPS_LITERAL
+)
 from weaver.exceptions import PackageTypeError
+from weaver.formats import CONTENT_TYPE_APP_NETCDF, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
 from pywps.inout.literaltypes import AnyValue
+from pywps.inout.formats import Format
 from pywps.validator.mode import MODE
 from copy import deepcopy
 # noinspection PyPackageRequirements
@@ -194,3 +203,67 @@ def test_is_cwl_enum_type_int():
     assert res[1] == "int"
     assert res[2] == MODE.SIMPLE
     assert res[3] == [1, 2, 3]
+
+
+def assert_formats_equal_any_order(format_result, format_expect):
+    assert len(format_result) == len(format_expect), "Expected formats sizes mismatch"
+    for r_fmt in format_result:
+        for e_fmt in format_expect:
+            if r_fmt.json == e_fmt.json:
+                format_expect.remove(e_fmt)
+                break
+    assert not format_expect, "Not all expected formats matched {}".format([f.json for f in format_expect])
+
+
+def test_merge_io_formats_no_wps():
+    wps_fmt = []
+    cwl_fmt = [DefaultFormat]
+    res_fmt = _merge_io_formats(wps_fmt, cwl_fmt)
+    assert isinstance(res_fmt, list)
+    assert len(res_fmt) == 1
+    assert res_fmt[0] is DefaultFormat
+
+
+def test_merge_io_formats_with_wps_and_default_cwl():
+    wps_fmt = [Format(CONTENT_TYPE_APP_NETCDF)]
+    cwl_fmt = [DefaultFormat]
+    res_fmt = _merge_io_formats(wps_fmt, cwl_fmt)
+    assert isinstance(res_fmt, list)
+    assert_formats_equal_any_order(res_fmt, [Format(CONTENT_TYPE_APP_NETCDF)])
+
+
+def test_merge_io_formats_both_wps_and_cwl():
+    wps_fmt = [Format(CONTENT_TYPE_APP_NETCDF)]
+    cwl_fmt = [Format(CONTENT_TYPE_APP_JSON)]
+    res_fmt = _merge_io_formats(wps_fmt, cwl_fmt)
+    assert isinstance(res_fmt, list)
+    assert_formats_equal_any_order(res_fmt, [Format(CONTENT_TYPE_APP_NETCDF), Format(CONTENT_TYPE_APP_JSON)])
+
+
+def test_merge_io_formats_wps_complements_cwl():
+    wps_fmt = [Format(CONTENT_TYPE_APP_JSON, encoding="utf-8")]
+    cwl_fmt = [Format(CONTENT_TYPE_APP_JSON)]
+    res_fmt = _merge_io_formats(wps_fmt, cwl_fmt)
+    assert isinstance(res_fmt, list)
+    assert_formats_equal_any_order(res_fmt, [Format(CONTENT_TYPE_APP_JSON, encoding="utf-8")])
+
+
+def test_merge_io_formats_wps_overlaps_cwl():
+    wps_fmt = [
+        Format(CONTENT_TYPE_APP_JSON, encoding="utf-8"),    # complements CWL details
+        Format(CONTENT_TYPE_APP_NETCDF),                    # duplicated in CWL (but different index)
+        Format(CONTENT_TYPE_TEXT_PLAIN)                     # extra (but not default)
+    ]
+    cwl_fmt = [
+        Format(CONTENT_TYPE_APP_JSON),      # overridden by WPS version
+        Format(CONTENT_TYPE_APP_XML),       # extra preserved
+        Format(CONTENT_TYPE_APP_NETCDF),    # duplicated with WPS, merged
+    ]
+    res_fmt = _merge_io_formats(wps_fmt, cwl_fmt)
+    assert isinstance(res_fmt, list)
+    assert_formats_equal_any_order(res_fmt, [
+        Format(CONTENT_TYPE_APP_JSON, encoding="utf-8"),
+        Format(CONTENT_TYPE_APP_NETCDF),
+        Format(CONTENT_TYPE_APP_XML),
+        Format(CONTENT_TYPE_TEXT_PLAIN),
+    ])

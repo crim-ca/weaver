@@ -28,6 +28,9 @@ Fixes:
 - Fix setting ``minOccurs=0`` when a ``default`` is specified in the corresponding `CWL` I/O (#17, #25)
 - Fix incorrectly overridden ``maxOccurs="unbounded"`` by ``maxOccurs="1"`` when a partial array input definition
   is specified without explicit ``maxOccurs`` in `WPS` payload (#17, #25)
+- Fix case where omitted ``format[s]`` in both `CWL` and `WPS` deploy bodies generated a process description with
+  complex I/O (file) without required ``formats`` field. Default ``text/plain`` format is now automatically added.
+- Fix case where ``format[s]`` lists between `CWL` and `WPS` where incorrectly merged.
 
 0.2.2 (2019-05-31)
 ==================

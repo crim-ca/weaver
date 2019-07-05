@@ -981,17 +981,23 @@ def _are_different_and_set(value1, value2):
 
 
 def _merge_io_formats(wps_formats, cwl_formats):
-    # type: (List[ANY_Format_Type], List[ANY_Format_Type]) -> List[JSON]
+    # type: (List[ANY_Format_Type], List[ANY_Format_Type]) -> List[ANY_Format_Type]
     """
-    Merges I/O format definitions by matching ``mime-type`` field. Preserve the WPS version in case of conflict.
+    Merges I/O format definitions by matching ``mime-type`` field.
+    In case of conflict, preserve the WPS version which can be more detailed (for example, by specifying ``encoding``).
 
-    All format list parameters are expected to contain at least one format (empty lists are not supported).
+    Verifies if ``DEFAULT_FORMAT_MISSING`` was written to a single `CWL` format caused by a lack of any value
+    provided as input. In this case, *only* `WPS` formats are kept.
 
-    Verifies also if ``DEFAULT_FORMAT_MISSING`` was written to the CWL formats variants caused by a lack of any value
-    provided as input. In this case, *only* WPS formats are kept.
+    In the event that ``DEFAULT_FORMAT_MISSING`` was written to the `CWL` formats and that no `WPS` format was
+    specified, the ``DefaultFormat`` is returned.
+
+    :raises PackageTypeError: if inputs are invalid format lists
     """
-    if not (len(wps_formats) and len(cwl_formats)):
+    if not (isinstance(wps_formats, (list, tuple, set)) and isinstance(cwl_formats, (list, tuple, set))):
         raise PackageTypeError("Cannot merge formats definitions with invalid lists.")
+    if not len(wps_formats):
+        wps_formats = [DefaultFormat]
     if len(cwl_formats) == 1 and _get_field(cwl_formats[0], DEFAULT_FORMAT_MISSING) is True:
         return wps_formats
 
@@ -1003,6 +1009,9 @@ def _merge_io_formats(wps_formats, cwl_formats):
             formats.append(wps_fmt_dict[cwl_fmt])
         else:
             formats.append(cwl_fmt_dict[cwl_fmt])
+    wps_fmt_only = set(wps_fmt_dict) - set(cwl_fmt_dict)
+    for wps_fmt in wps_fmt_only:
+        formats.append(wps_fmt_dict[wps_fmt])
     return formats
 
 
@@ -1070,7 +1079,7 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
         for field_type in list(WPS_FIELD_MAPPING.keys()) + ["data_format"]:
             cwl_field = _get_field(cwl_io, field_type)
             wps_field = _get_field(wps_io, field_type)
-            # override if CWL->WPS was missing but is provided by WPS, or if both are provided but different (keep WPS)
+            # override provided formats if different (keep WPS), or if CWL->WPS was missing but is provided by WPS
             if _are_different_and_set(wps_field, cwl_field) or (wps_field != null and cwl_field == null):
                 # list of formats are updated by comparing format items since information can be partially complementary
                 if field_type in ["supported_formats"]:
