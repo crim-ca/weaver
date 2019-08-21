@@ -548,16 +548,15 @@ class MongodbJobStore(StoreJobs, MongodbStore):
 
         # results by group categories
         if group_by:
-            if isinstance(group_by, six.string_types):
-                group_by = [group_by]
+            group_by = [group_by] if isinstance(group_by, six.string_types) else group_by  # type: List[AnyStr]
             group_categories = {field: "$" + field for field in group_by}   # fields that can generate groups
-            pipeline.extend([{
+            pipeline.extend([{  # noqa: E123  # ignore indentation checks
                 "$group": {
                     "_id": group_categories,        # grouping categories to aggregate corresponding jobs
                     "jobs": {"$push": "$$ROOT"},    # matched jobs for corresponding grouping categories
                     "count": {"$sum": 1}},          # count of matches for corresponding grouping categories
-                },
-                {"$project": {
+                }, {
+                "$project": {
                     "_id": False,           # removes "_id" field from results
                     "category": "$_id",     # renames "_id" grouping categories key
                     "jobs": "$jobs",        # preserve field
