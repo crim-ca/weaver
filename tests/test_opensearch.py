@@ -273,12 +273,14 @@ def get_template_urls(collection_id):
 
 
 @pytest.mark.online
+@pytest.mark.testbed14
 def test_get_template_sentinel2():
     get_template_urls(COLLECTION_IDS["sentinel2"])
 
 
 @pytest.mark.xfail(reason="Collection 'probav' dataset series cannot be found.")
 @pytest.mark.online
+@pytest.mark.testbed14
 def test_get_template_probav():
     get_template_urls(COLLECTION_IDS["probav"])
 
@@ -386,7 +388,9 @@ def deimos_inputs(unique_aoi_toi=True):
     return inputs, eo_image_source_info
 
 
+@pytest.mark.xfail(reason="Record not available anymore although server still up and reachable.")
 @pytest.mark.online
+@pytest.mark.testbed14
 def test_query_sentinel2():
     inputs, eo_image_source_info = sentinel2_inputs()
     mime_types = {k: eo_image_source_info[k]['mime_types'] for k in eo_image_source_info}
@@ -397,6 +401,7 @@ def test_query_sentinel2():
 
 @pytest.mark.xfail(reason="Cannot login to protected 'probav' opensearch endpoint.")
 @pytest.mark.online
+@pytest.mark.testbed14
 def test_query_probav():
     inputs, eo_image_source_info = probav_inputs()
     mime_types = {k: eo_image_source_info[k]['mime_types'] for k in eo_image_source_info}
@@ -407,6 +412,7 @@ def test_query_probav():
 
 @pytest.mark.skip(reason="The server is not implemented yet.")
 @pytest.mark.online
+@pytest.mark.testbed14
 def test_query_deimos():
     inputs, eo_image_source_info = deimos_inputs()
     mime_types = {k: eo_image_source_info[k]['mime_types'] for k in eo_image_source_info}
@@ -417,6 +423,7 @@ def test_query_deimos():
 
 @pytest.mark.xfail(reason="Cannot login to protected 'probav' opensearch endpoint.")
 @pytest.mark.online
+@pytest.mark.testbed14
 def test_query_non_unique():
     inputs_s2, eo_image_source_info_s2 = sentinel2_inputs(unique_aoi_toi=False)
     inputs_probav, eo_image_source_info_probav = probav_inputs(unique_aoi_toi=False)
