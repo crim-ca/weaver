@@ -14,7 +14,7 @@ from distutils.dir_util import mkpath
 from distutils.version import LooseVersion
 from requests.structures import CaseInsensitiveDict
 from webob.headers import ResponseHeaders, EnvironHeaders
-from inspect import isclass
+from inspect import isclass, isfunction
 from typing import TYPE_CHECKING
 import os
 import six
@@ -30,7 +30,7 @@ if TYPE_CHECKING:
         AnyValue, AnyKey, AnyAnySettingsContainer, AnyRegistryContainer, AnyHeadersContainer,
         HeadersType, SettingsType, JSON, XML, Number
     )
-    from typing import Union, Any, Dict, List, AnyStr, Iterable, Optional
+    from typing import Union, Any, Dict, List, AnyStr, Iterable, Optional, Type
 
 LOGGER = logging.getLogger(__name__)
 
@@ -201,8 +201,10 @@ def parse_service_name(url, protected_path):
 
 
 def fully_qualified_name(obj):
-    # type: (Any) -> AnyStr
-    return '.'.join([obj.__module__, type(obj).__name__])
+    # type: (Union[Any, Type[Any]]) -> str
+    """Obtains the ``'<module>.<name>'`` full path definition of the object to allow finding and importing it."""
+    cls = obj if isclass(obj) or isfunction(obj) else type(obj)
+    return '.'.join([obj.__module__, cls.__name__])
 
 
 def now():
