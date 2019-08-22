@@ -1,7 +1,7 @@
 from weaver.__meta__ import __version__ as weaver_version
 from weaver.utils import get_settings, get_header
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.colander_one_of import CustomTypeConversionDispatcher
+from weaver.wps_restapi.colander_extras import CustomTypeConversionDispatcher
 from weaver.wps_restapi.utils import get_wps_restapi_base_url, wps_restapi_base_path, OUTPUT_FORMAT_JSON
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.owsexceptions import OWSException

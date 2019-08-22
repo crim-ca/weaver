@@ -3,7 +3,52 @@ from cornice_swagger.converters import schema
 from cornice_swagger.converters.exceptions import NoSuchConverter
 
 
+class SchemaNodeDefault(colander.SchemaNode):
+    """
+    If ``default`` keyword is provided during :class:`colander.SchemaNode` creation, overrides the
+    returned value by this default if missing from the structure during :func:`deserialize` call.
+
+    Original behaviour was to drop the missing value instead of replacing by the default.
+    Executes all other :class:`colander.SchemaNode` operations normally.
+    """
+    def deserialize(self, cstruct):
+        result = super(SchemaNodeDefault, self).deserialize(cstruct)
+        if not isinstance(self.default, type(colander.null)) and result is colander.drop:
+            result = self.default
+        return result
+
+
 class OneOfMappingSchema(colander.MappingSchema):
+    """
+    Allows specifying multiple supported mapping schemas variants for an underlying schema definition.
+    Corresponds to the ``oneOf`` specifier of `OpenAPI` specification.
+
+    Example::
+
+        class Variant1(MappingSchema):
+            [...fields of Variant1...]
+
+        class Variant2(MappingSchema):
+            [...fields of Variant2...]
+
+        class RequiredByBoth(MappingSchema):
+            [...fields required by both Variant1 and Variant2...]
+
+        class LiteralDataDomainType(OneOfMappingSchema, RequiredByBoth):
+            _one_of = (Variant1, Variant2)
+            [...alternatively, field required by all variants here...]
+
+    In the above example, the validation (ie: ``deserialize``) process will succeed if any of the ``_one_of``
+    variants' validator completely succeed, and will fail if every variant fails validation execution.
+
+    .. warning::
+        Because the validation process requires only at least one of the variants to succeed, it is important to insert
+        more *permissive* validators later in the ``_one_of`` iterator. For example, having a variant with all fields
+        defined as optional (ie: with ``missing=drop``) inserted as first item in ``_one_of`` will make it always
+        succeed regardless of following variants. This would have as side effect to never validate the other variants
+        explicitly for specific field types and formats since the first option would always consist as a valid input
+        fulfilling the specified definition (ie: an empty ``{}`` schema with all fields missing).
+    """
 
     def __init__(self, *args, **kwargs):
         super(OneOfMappingSchema, self).__init__(*args, **kwargs)

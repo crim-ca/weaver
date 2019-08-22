@@ -21,8 +21,7 @@ from weaver.execute import (
     execute_transmission_mode_options,
 )
 from weaver.visibility import visibility_values, VISIBILITY_PUBLIC
-from weaver.wps_restapi.colander_one_of import OneOfMappingSchema
-from weaver.wps_restapi.colander_defaults import SchemaNodeDefault as SchemaNode
+from weaver.wps_restapi.colander_extras import OneOfMappingSchema, SchemaNodeDefault as SchemaNode
 from colander import String, Boolean, Integer, Float, DateTime, MappingSchema, SequenceSchema, drop, OneOf
 from cornice import Service
 
