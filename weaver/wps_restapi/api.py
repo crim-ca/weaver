@@ -116,6 +116,29 @@ def api_swagger_ui(request):
     return render_to_response("templates/swagger_ui.mako", data_mako, request=request)
 
 
+def get_request_info(request, detail=None):
+    # type: (Request, Optional[AnyStr]) -> JSON
+    """Provided additional response details based on the request and execution stack on failure."""
+    content = {u'route': str(request.upath_info), u'url': str(request.url), u'method': request.method}
+    if isinstance(detail, six.string_types):
+        content.update({"detail": detail})
+    if hasattr(request, "exception"):
+        # handle error raised simply by checking for 'json' property in python 3 when body is invalid
+        has_json = False
+        try:
+            has_json = hasattr(request.exception, "json")
+        except JSONDecodeError:
+            pass
+        if has_json and isinstance(request.exception.json, dict):
+            content.update(request.exception.json)
+        elif isinstance(request.exception, HTTPServerError) and hasattr(request.exception, "message"):
+            content.update({u"exception": str(request.exception.message)})
+    elif hasattr(request, "matchdict"):
+        if request.matchdict is not None and request.matchdict != "":
+            content.update(request.matchdict)
+    return content
+
+
 def ows_json_format(function):
     """Decorator that adds additional detail in the response's JSON body if this is the returned content-type."""
     def format_response_details(response, request):
@@ -175,26 +198,3 @@ def unauthorized_or_forbidden(request):
         if Authenticated not in principals:
             return HTTPUnauthorized("Unauthorized access to this resource.")
     return HTTPForbidden("Forbidden operation under this resource.")
-
-
-def get_request_info(request, detail=None):
-    # type: (Request, Optional[AnyStr]) -> JSON
-    """Provided additional response details based on the request and execution stack on failure."""
-    content = {u'route': str(request.upath_info), u'url': str(request.url), u'method': request.method}
-    if isinstance(detail, six.string_types):
-        content.update({"detail": detail})
-    if hasattr(request, "exception"):
-        # handle error raised simply by checking for 'json' property in python 3 when body is invalid
-        has_json = False
-        try:
-            has_json = hasattr(request.exception, "json")
-        except JSONDecodeError:
-            pass
-        if has_json and isinstance(request.exception.json, dict):
-            content.update(request.exception.json)
-        elif isinstance(request.exception, HTTPServerError) and hasattr(request.exception, "message"):
-            content.update({u"exception": str(request.exception.message)})
-    elif hasattr(request, "matchdict"):
-        if request.matchdict is not None and request.matchdict != "":
-            content.update(request.matchdict)
-    return content

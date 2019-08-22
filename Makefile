@@ -53,6 +53,7 @@ BUILDOUT_FILES := parts eggs develop-eggs bin .installed.cfg .mr.developer.cfg *
 .PHONY: all
 all: help
 
+# FIXME: use autodoc target comments
 .PHONY: help
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
@@ -85,7 +86,11 @@ help:
 	@echo "Testing targets:"
 	@echo "  test-unit          run unit tests (skip long running and online tests)."
 	@echo "  test-func          run funtional tests (online and usage specific)."
+	@echo "  test-online        run online tests (running instance required)."
+	@echo "  test-offline       run offline tests (not marked as online)."
+	@echo "  test-no-tb14       run all tests except ones marked for 'Testbed-14'."
 	@echo "  test-all           run all tests (including long running tests)."
+	@echo "  test               run custom tests from input specification (make TESTS='<spec>' test).
 	@echo "  coverage       	run all tests using coverage analysis."
 	@echo "  pep8               run pep8 code style checks."
 	@echo "Sphinx targets:"
@@ -335,11 +340,36 @@ test-func:
 	bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
 		pytest tests -v -m 'functional' --junitxml $(CURDIR)/tests/results.xml"
 
+.PHONY: test-online
+test-online:
+	@echo "Running online tests (running instance required)..."
+	bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
+		pytest tests -v -m 'online' --junitxml $(CURDIR)/tests/results.xml"
+
+.PHONY: test-offline
+test-offline:
+	@echo "Running offline tests (not marked as online)..."
+	bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
+		pytest tests -v -m 'not online' --junitxml $(CURDIR)/tests/results.xml"
+
+.PHONY: test-no-tb14
+test-no-tb14:
+	@echo "Running all tests except ones marked for 'Testbed-14'..."
+	bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
+		pytest tests -v -m 'not testbed14' --junitxml $(CURDIR)/tests/results.xml"
+
 .PHONY: test-all
 test-all:
 	@echo "Running all tests (including slow and online tests)..."
 	bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
 		pytest tests -v --junitxml $(CURDIR)/tests/results.xml"
+
+.PHONY: test
+test:
+	@echo "Running custom tests from input specification..."
+	@[ "${TESTS}" ] || ( echo ">> 'TESTS' is not set"; exit 1 )
+	bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
+		pytest tests -v -m '${TESTS}' --junitxml $(CURDIR)/tests/results.xml"
 
 .PHONY: coverage
 coverage:

@@ -298,12 +298,21 @@ class DescriptionType(MappingSchema):
     links = JsonLinkList(missing=drop, title="links")
 
 
-class InputDataDescriptionType(DescriptionType):
+class MinMaxOccursInt(MappingSchema):
+    minOccurs = SchemaNode(Integer(), missing=drop)
+    maxOccurs = SchemaNode(Integer(), missing=drop)
+
+
+class MinMaxOccursStr(MappingSchema):
     minOccurs = SchemaNode(String(), missing=drop)
     maxOccurs = SchemaNode(String(), missing=drop)
 
 
-class ComplexInputType(MappingSchema):
+class WithMinMaxOccurs(OneOfMappingSchema):
+    _one_of = (MinMaxOccursStr, MinMaxOccursInt)
+
+
+class ComplexInputType(DescriptionType, WithMinMaxOccurs):
     formats = FormatDescriptionList()
 
 
@@ -316,7 +325,7 @@ class SupportedCrsList(SequenceSchema):
     item = SupportedCrs()
 
 
-class BoundingBoxInputType(MappingSchema):
+class BoundingBoxInputType(DescriptionType, WithMinMaxOccurs):
     supportedCRS = SupportedCrsList()
 
 
@@ -375,11 +384,11 @@ class LiteralDataDomainTypeList(SequenceSchema):
     literalDataDomain = LiteralDataDomainType()
 
 
-class LiteralInputType(MappingSchema):
+class LiteralInputType(DescriptionType, WithMinMaxOccurs):
     literalDataDomains = LiteralDataDomainTypeList(missing=drop)
 
 
-class InputType(OneOfMappingSchema, InputDataDescriptionType):
+class InputType(OneOfMappingSchema):
     _one_of = (
         BoundingBoxInputType,
         ComplexInputType,  # should be 2nd to last because very permission, but requires format at least

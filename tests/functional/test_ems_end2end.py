@@ -129,6 +129,7 @@ class End2EndEMSTestCase(TestCase):
                 .format(cls.logger_separator_cases, cls.current_case_name(), now(), cls.logger_separator_cases))
 
         # test execution configs
+        cls.WEAVER_TEST_REQUEST_TIMEOUT = int(os.getenv("WEAVER_TEST_JOB_ACCEPTED_MAX_TIMEOUT", 60))
         cls.WEAVER_TEST_JOB_ACCEPTED_MAX_TIMEOUT = int(os.getenv("WEAVER_TEST_JOB_ACCEPTED_MAX_TIMEOUT", 30))
         cls.WEAVER_TEST_JOB_RUNNING_MAX_TIMEOUT = int(os.getenv("WEAVER_TEST_JOB_RUNNING_MAX_TIMEOUT", 6000))
         cls.WEAVER_TEST_JOB_GET_STATUS_INTERVAL = int(os.getenv("WEAVER_TEST_JOB_GET_STATUS_INTERVAL", 5))
@@ -433,7 +434,7 @@ class End2EndEMSTestCase(TestCase):
             cls.log(trace)
 
         if with_requests:
-            kw.update({"verify": False})
+            kw.update({"verify": False, "timeout": cls.WEAVER_TEST_REQUEST_TIMEOUT})
             resp = requests.request(method, url, json=json_body, data=data_body, **kw)
 
             # add some properties similar to `webtest.TestApp`
@@ -550,7 +551,7 @@ class End2EndEMSTestCase(TestCase):
             servers.append(cls.WEAVER_TEST_WSO2_URL)
             servers.append(cls.WEAVER_TEST_MAGPIE_URL)
         for server_url in servers:
-            cls.request("GET", server_url, headers=cls.headers, status=HTTPOk.code, timeout=10)
+            cls.request("GET", server_url, headers=cls.headers, status=HTTPOk.code)
         # verify that EMS configuration requirement is met
         resp = cls.request("GET", cls.WEAVER_RESTAPI_URL, headers=cls.headers, status=HTTPOk.code)
         cls.assert_test(lambda: resp.json.get("configuration") == WEAVER_CONFIGURATION_EMS,

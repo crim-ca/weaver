@@ -21,6 +21,7 @@ from tests.utils import (
 from tests import resources
 import pytest
 import unittest
+import colander
 import six
 
 EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_TEXT_PLAIN]
@@ -684,7 +685,7 @@ class WpsPackageAppTest(unittest.TestCase):
         assert desc["process"]["inputs"][9]["minOccurs"] == "0"
         assert desc["process"]["inputs"][9]["maxOccurs"] == "1"
         assert desc["process"]["inputs"][10]["id"] == "required_array_min_fixed_from_wps"
-        # FIXME:
+        # FIXME: https://github.com/crim-ca/weaver/issues/50
         #   `maxOccurs=1` not updated to `maxOccurs="unbounded"` as it is evaluated as a single value,
         #   but it should be considered an array since `minOccurs>1`
         #   (see: https://github.com/crim-ca/weaver/issues/17)
@@ -738,6 +739,106 @@ class WpsPackageAppTest(unittest.TestCase):
         # assert pkg["inputs"][12]["type"] == "string[]"
         assert pkg["inputs"][13]["id"] == "optional_array_max_fixed_from_wps"
         # assert pkg["inputs"][13]["type"] == "string[]?"
+
+    # FIXME: https://github.com/crim-ca/weaver/issues/50
+    #   'unbounded' value should not override literal 2/'2'
+    @pytest.mark.xfail(reason="MinOccurs/MaxOccurs values in response should be preserved as defined in deploy body")
+    def test_valid_io_min_max_occurs_as_str_or_int(self):
+        """
+        Test validates that I/O definitions with ``minOccurs`` and/or ``maxOccurs`` are permitted as both integer
+        and string definitions in order to support (1, "1", "unbounded") variations.
+
+        .. seealso::
+            - :meth:`test_invalid_io_min_max_occurs_wrong_format`
+        """
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "inputs": [
+                {"id": "io_min_int_max_int", "type": "string"},
+                {"id": "io_min_int_max_str", "type": "string"},
+                {"id": "io_min_str_max_int", "type": "string"},
+                {"id": "io_min_str_max_str", "type": "string"},
+                {"id": "io_min_int_max_unbounded", "type": "string"},
+                {"id": "io_min_str_max_unbounded", "type": "string"},
+            ],
+            "outputs": {"values": {"type": "string"}}
+        }
+        body = {
+            "processDescription": {
+                "process": {
+                    "id": self._testMethodName,
+                    "title": "some title",
+                    "abstract": "this is a test",
+                },
+                "inputs": [
+                    {"id": "io_min_int_max_int", "minOccurs": 1, "maxOccurs": 2},
+                    {"id": "io_min_int_max_str", "minOccurs": 1, "maxOccurs": "2"},
+                    {"id": "io_min_str_max_int", "minOccurs": "1", "maxOccurs": 2},
+                    {"id": "io_min_str_max_str", "minOccurs": "1", "maxOccurs": "2"},
+                    {"id": "io_min_int_max_unbounded", "minOccurs": 1, "maxOccurs": "unbounded"},
+                    {"id": "io_min_str_max_unbounded", "minOccurs": "1", "maxOccurs": "unbounded"},
+                ]
+            },
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        try:
+            desc, _ = self.deploy_process(body)
+        except colander.Invalid:
+            self.fail("MinOccurs/MaxOccurs values defined as valid int/str should not raise an invalid schema error")
+
+        inputs = body["processDescription"]["inputs"]
+        assert isinstance(desc["process"]["inputs"], list)
+        assert len(desc["process"]["inputs"]) == len(inputs)
+        for i, input in enumerate(inputs):
+            assert desc["process"]["inputs"][i]["id"] == input["id"]
+            for field in ["minOccurs", "maxOccurs"]:
+                assert desc["process"]["inputs"][i][field] in (input[field], str(input[field]))
+
+    # FIXME: test not working
+    #   same payloads sent directly to running weaver properly raise invalid schema -> bad request error
+    #   somehow they don't work within this test (not raised)...
+    @pytest.mark.xfail(reason="MinOccurs/MaxOccurs somehow fail validation here, but s")
+    def test_invalid_io_min_max_occurs_wrong_format(self):
+        """
+        Test verifies that ``minOccurs`` and/or ``maxOccurs`` definitions other than allowed formats are
+        raised as invalid schemas.
+
+        .. seealso::
+            :meth:`test_valid_io_min_max_occurs_as_str_or_int`
+        """
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "inputs": [{}],   # updated after
+            "outputs": {"values": {"type": "string"}}
+        }
+        body = {
+            "processDescription": {
+                "process": {
+                    "id": self._testMethodName,
+                    "title": "some title",
+                    "abstract": "this is a test",
+                },
+                "inputs": [{}]    # updated after
+            },
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+
+        # replace by invalid min/max and check that it raises
+        cwl["inputs"][0] = {"id": "test", "type": {"type": "array", "items": "string"}}
+        body["processDescription"]["inputs"][0] = {"id": "test", "minOccurs": [1], "maxOccurs": 1}
+        with self.assertRaises(colander.Invalid):
+            desc, _ = self.deploy_process(body)
+            self.fail("Invalid input minOccurs schema definition should have been raised")
+
+        cwl["inputs"][0] = {"id": "test", "type": {"type": "array", "items": "string"}}
+        body["processDescription"]["inputs"][0] = {"id": "test", "minOccurs": 1, "maxOccurs": 3.1416}
+        with self.assertRaises(HTTPBadRequest):
+            desc, _ = self.deploy_process(body)
+            self.fail("Invalid input maxOccurs schema definition should have been raised")
 
     def test_complex_io_from_package(self):
         """

@@ -16,6 +16,7 @@ New Features:
 - Add more functional tests (#11, #17)
 - Add support of ``label`` synonym as ``title`` for inputs and process description
   (`CWL` specifying a ``label`` will set it in `WPS` process) (#31)
+- Add support of input ``minOccurs`` and ``maxOccurs`` as ``int`` while maintaining ``str`` support (#14)
 
 Changes:
 - Use ``bump2version`` and move all config under ``setup.cfg``
@@ -31,6 +32,7 @@ Fixes:
 - Fix case where omitted ``format[s]`` in both `CWL` and `WPS` deploy bodies generated a process description with
   complex I/O (file) without required ``formats`` field. Default ``text/plain`` format is now automatically added.
 - Fix case where ``format[s]`` lists between `CWL` and `WPS` where incorrectly merged.
+- Fix invalid JSON response formatting on failing schema validation of process deployment body.
 
 0.2.2 (2019-05-31)
 ==================

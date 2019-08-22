@@ -24,7 +24,7 @@ OSDD_URL = "http://geo.spacebel.be/opensearch/description.xml"
 COLLECTION_IDS = {
     "sentinel2": "EOP:IPT:Sentinel2",
     "probav": "EOP:VITO:PROBAV_P_V001",
-    # "deimos": "DE2_PS3_L1C",
+    "deimos": "DE2_PS3_L1C",
 }
 
 
@@ -116,7 +116,7 @@ def test_transform_execute_parameters_wps():
             make_deque(OPENSEARCH_START_DATE, "2018-01-30T00:00:00.000Z"),
             make_deque(OPENSEARCH_END_DATE, "2018-01-31T23:59:59.999Z"),
             make_deque(OPENSEARCH_AOI, "100.4,15.3,104.6,19.3"),
-            make_deque("files", "EOP:IPT:Sentinel2"),
+            make_deque("files", COLLECTION_IDS["sentinel2"]),
             make_deque("output_file_type", "GEOTIFF"),
             make_deque("output_name", "stack_result.tif"),
         ]
@@ -134,7 +134,7 @@ def test_transform_execute_parameters_wps():
     )
 
     with mock.patch.object(opensearch.OpenSearchQuery, "query_datasets", return_value=mocked_query):
-        eo_image_source_info = make_eo_image_source_info("files", "EOP:IPT:Sentinel2")
+        eo_image_source_info = make_eo_image_source_info("files", COLLECTION_IDS["sentinel2"])
         mime_types = {'files': eo_image_source_info['files']['mime_types']}
         transformed = opensearch.query_eo_images_from_wps_inputs(inputs, eo_image_source_info, mime_types)
 
@@ -241,19 +241,17 @@ def test_get_additional_parameters():
     assert ("UniqueTOI", ["true"]) in params
 
 
-@pytest.mark.online
-def test_get_template_urls():
+def get_template_urls(collection_id):
     all_fields = set()
-    for name, collection_id in COLLECTION_IDS.items():
-        o = opensearch.OpenSearchQuery(collection_id, osdd_url=OSDD_URL)
-        template = o.get_template_url()
-        params = parse_qsl(urlparse(template).query)
-        param_names = list(sorted(p[0] for p in params))
-        if all_fields:
-            # noinspection PyUnresolvedReferences
-            all_fields = all_fields.intersection(param_names)
-        else:
-            all_fields.update(param_names)
+    o = opensearch.OpenSearchQuery(collection_id, osdd_url=OSDD_URL)
+    template = o.get_template_url()
+    params = parse_qsl(urlparse(template).query)
+    param_names = list(sorted(p[0] for p in params))
+    if all_fields:
+        # noinspection PyUnresolvedReferences
+        all_fields = all_fields.intersection(param_names)
+    else:
+        all_fields.update(param_names)
 
     fields_in_all_queries = list(sorted(all_fields))
     expected = [
@@ -272,6 +270,17 @@ def test_get_template_urls():
         "uid",
     ]
     assert not set(expected) - set(fields_in_all_queries)
+
+
+@pytest.mark.online
+def test_get_template_sentinel2():
+    get_template_urls(COLLECTION_IDS["sentinel2"])
+
+
+@pytest.mark.xfail(reason="Collection 'probav' dataset series cannot be found.")
+@pytest.mark.online
+def test_get_template_probav():
+    get_template_urls(COLLECTION_IDS["probav"])
 
 
 def inputs_unique_aoi_toi(files_id):
@@ -318,13 +327,13 @@ def sentinel2_inputs(unique_aoi_toi=True):
     else:
         inputs = inputs_non_unique_aoi_toi(sentinel_id)
 
-    inputs[sentinel_id][0].data = "EOP:IPT:Sentinel2"
+    inputs[sentinel_id][0].data = COLLECTION_IDS["sentinel2"]
     inputs[end_date][0].data = u"2018-01-31T23:59:59.999Z"
     inputs[start_date][0].data = u"2018-01-30T00:00:00.000Z"
     # inputs[aoi][0].data = u"POLYGON ((100 15, 104 15, 104 19, 100 19, 100 15))"
     inputs[aoi][0].data = u"100.0, 15.0, 104.0, 19.0"
 
-    eo_image_source_info = make_eo_image_source_info(sentinel_id, "EOP:IPT:Sentinel2")
+    eo_image_source_info = make_eo_image_source_info(sentinel_id, COLLECTION_IDS["sentinel2"])
     return inputs, eo_image_source_info
 
 
@@ -336,14 +345,14 @@ def probav_inputs(unique_aoi_toi=True):
     else:
         inputs = inputs_non_unique_aoi_toi(probav_id)
 
-    inputs[probav_id][0].data = "EOP:VITO:PROBAV_P_V001"
+    inputs[probav_id][0].data = COLLECTION_IDS["probav"]
     inputs[end_date][0].data = u"2018-01-31T23:59:59.999Z"
     inputs[start_date][0].data = u"2018-01-30T00:00:00.000Z"
     # inputs[aoi][0].data = u"POLYGON ((100 15, 104 15, 104 19, 100 19, 100 15))"
     inputs[aoi][0].data = u"100.0, 15.0, 104.0, 19.0"
 
     eo_image_source_info = make_eo_image_source_info(
-        probav_id, "EOP:VITO:PROBAV_P_V001"
+        probav_id, COLLECTION_IDS["probav"]
     )
 
     return inputs, eo_image_source_info
@@ -367,13 +376,13 @@ def deimos_inputs(unique_aoi_toi=True):
     end_date, start_date, aoi = query_param_names(unique_aoi_toi, deimos_id)
     inputs = inputs_unique_aoi_toi(deimos_id)
 
-    inputs[deimos_id][0].data = "DE2_PS3_L1C"
+    inputs[deimos_id][0].data = COLLECTION_IDS["deimos"]
     inputs[start_date][0].data = u"2008-01-01T00:00:00Z"
     inputs[end_date][0].data = u"2009-01-01T00:00:00Z"
     # inputs[aoi][0].data = u"MULTIPOINT ((-117 32), (-115 34))"
     inputs[aoi][0].data = u"-117, 32, -115, 34"
 
-    eo_image_source_info = make_eo_image_source_info(deimos_id, "DE2_PS3_L1C")
+    eo_image_source_info = make_eo_image_source_info(deimos_id, COLLECTION_IDS["deimos"])
     return inputs, eo_image_source_info
 
 

@@ -1,15 +1,20 @@
-from pyramid.tweens import INGRESS, EXCVIEW
-from pyramid.httpexceptions import HTTPException, HTTPInternalServerError
+from pyramid.tweens import INGRESS, EXCVIEW, MAIN
+from pyramid.httpexceptions import HTTPSuccessful, HTTPRedirection, HTTPException, HTTPInternalServerError
 from weaver.owsexceptions import OWSException, OWSNotImplemented  # noqa: F401
 from weaver.utils import fully_qualified_name
-
 import logging
 LOGGER = logging.getLogger(__name__)
+
+OWS_TWEEN_HANDLED = "OWS_TWEEN_HANDLED"
 
 
 def ows_response_tween(request, handler):
     try:
-        return handler(request)
+        result = handler(request)
+        if hasattr(handler, OWS_TWEEN_HANDLED):
+            if isinstance(result, Exception) and not isinstance(result, (HTTPSuccessful, HTTPRedirection)):
+                raise result    # let the previous tween handler handle this case
+        return result
     except HTTPException as err:
         LOGGER.debug("http exception -> ows exception response.")
         # Use the same json formatter than OWSException
@@ -36,7 +41,12 @@ def ows_response_tween_factory_excview(handler, registry):
 
 def ows_response_tween_factory_ingress(handler, registry):
     """A tween factory which produces a tween which transforms common exceptions into OWS specific exceptions."""
-    return lambda request: ows_response_tween(request, handler)
+    def handle_ows_tween(request):
+        # because the EXCVIEW will also wrap any exception raised that should before be handled by OWS response
+        # to allow conversions to occur, use a flag that will re-raise the result
+        setattr(handler, OWS_TWEEN_HANDLED, True)
+        return ows_response_tween(request, handler)
+    return handle_ows_tween
 
 
 # names must differ to avoid conflicting configuration error
@@ -47,5 +57,5 @@ OWS_RESPONSE_INGRESS = fully_qualified_name(ows_response_tween_factory_ingress)
 def includeme(config):
     # using 'INGRESS' to run `weaver.wps_restapi.api` views that fix HTTP code before OWS response
     config.add_tween(OWS_RESPONSE_INGRESS, under=INGRESS)
-    # using 'EXCVIEW' to run after any other 'valid' exception raised to adjust formatting and log
-    config.add_tween(OWS_RESPONSE_EXCVIEW, under=EXCVIEW)
+    # using 'EXCVIEW' to run over any other 'valid' exception raised to adjust formatting and log
+    config.add_tween(OWS_RESPONSE_EXCVIEW, over=EXCVIEW)
