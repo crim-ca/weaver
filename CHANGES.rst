@@ -5,6 +5,8 @@ Unreleased
 ==========
 
 New Features:
+-------------
+
 - Add ``notification_email`` field to ``Job`` datatype that stores an encrypted email (according to settings) when
   provided in the job submission body (#44).
 - Add ability to filter jobs with ``notification_email`` query parameter (#44).
@@ -19,10 +21,14 @@ New Features:
 - Add support of input ``minOccurs`` and ``maxOccurs`` as ``int`` while maintaining ``str`` support (#14)
 
 Changes:
+-------------
+
 - Use ``bump2version`` and move all config under ``setup.cfg``
 - Remove enforced ``text/plain`` for `CWL` ``File`` when missing ``format`` field
 
 Fixes:
+-------------
+
 - Adjust some typing definitions incorrectly specified.
 - Fix some failing functionality tests.
 - Fix I/O field ordering preserved as specified in payload or loaded reference file
