@@ -42,11 +42,11 @@ import json
 import six
 import os
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON, AnyContainer, AnyAnySettingsContainer, FileSystemPathType
-    from weaver.store.mongodb import MongodbProcessStore
-    from typing import AnyStr, Dict, Union
-    from pywps import Process as ProcessWPS
-    import owslib.wps
+    from weaver.typedefs import JSON, AnyContainer, AnyAnySettingsContainer, FileSystemPathType     # noqa: F401
+    from weaver.store.mongodb import MongodbProcessStore                                            # noqa: F401
+    from typing import AnyStr, Dict, Union                                                          # noqa: F401
+    from pywps import Process as ProcessWPS                                                         # noqa: F401
+    import owslib.wps                                                                               # noqa: F401
 LOGGER = logging.getLogger(__name__)
 
 
@@ -163,8 +163,8 @@ def convert_process_wps_to_db(service, process, container):
         id=getattr(dataInput, "identifier", ""),
         title=getattr(dataInput, "title", ""),
         abstract=getattr(dataInput, "abstract", ""),
-        minOccurs=str(getattr(dataInput, "minOccurs", 0)),  # FIXME: str applied to match OGC REST-API definition
-        maxOccurs=str(getattr(dataInput, "maxOccurs", 0)),  # FIXME: str applied to match OGC REST-API definition
+        minOccurs=str(getattr(dataInput, "minOccurs", 0)),
+        maxOccurs=str(getattr(dataInput, "maxOccurs", 0)),
         dataType=dataInput.dataType,
         defaultValue=jsonify_value(getattr(dataInput, "defaultValue", None)),
         allowedValues=[jsonify_value(dataValue) for dataValue in getattr(dataInput, 'allowedValues', [])],

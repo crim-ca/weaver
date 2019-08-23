@@ -18,8 +18,8 @@ import requests
 import logging
 import time
 if TYPE_CHECKING:
-    from weaver.typedefs import XML
-    from typing import AnyStr, Deque, Dict, Iterable, List, Tuple
+    from weaver.typedefs import XML                                 # noqa: F401
+    from typing import AnyStr, Deque, Dict, Iterable, List, Tuple   # noqa: F401
 
 LOGGER = logging.getLogger("PACKAGE")
 

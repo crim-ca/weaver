@@ -31,10 +31,12 @@ import shutil
 import tempfile
 from typing import MutableMapping, Callable, cast, Text, TYPE_CHECKING  # these are actually used in the code
 if TYPE_CHECKING:
-    from weaver.typedefs import ExpectedOutputType, GetJobProcessDefinitionFunction, ToolPathObjectType, AnyValue
-    from weaver.processes.wps_process_base import WpsProcessInterface
-    from typing import Any, Dict, Generator, List, Optional, Set, Union
-    from cwltool.command_line_tool import OutputPorts
+    from weaver.typedefs import (   # noqa: F401
+        ExpectedOutputType, GetJobProcessDefinitionFunction, ToolPathObjectType, AnyValue
+    )
+    from weaver.processes.wps_process_base import WpsProcessInterface       # noqa: F401
+    from typing import Any, Dict, Generator, List, Optional, Set, Union     # noqa: F401
+    from cwltool.command_line_tool import OutputPorts                       # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_TMP_PREFIX = "tmp"

@@ -9,9 +9,9 @@ from typing import TYPE_CHECKING
 from abc import abstractmethod
 import requests
 if TYPE_CHECKING:
-    from weaver.typedefs import CWL
-    from typing import AnyStr, Dict
-    from pywps.app import WPSRequest
+    from weaver.typedefs import CWL     # noqa: F401
+    from typing import AnyStr, Dict     # noqa: F401
+    from pywps.app import WPSRequest    # noqa: F401
 
 
 class WpsProcessInterface(object):

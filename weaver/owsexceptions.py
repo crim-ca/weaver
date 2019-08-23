@@ -29,7 +29,7 @@ import warnings
 import json
 import six
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON, SettingsType
+    from weaver.typedefs import JSON, SettingsType  # noqa: F401
 
 
 @implementer(IExceptionResponse)

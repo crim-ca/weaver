@@ -34,12 +34,12 @@ import pymongo
 import six
 import logging
 if TYPE_CHECKING:
-    from weaver.typedefs import AnyValue
-    from pymongo.collection import Collection
-    from typing import Any, AnyStr, Dict, List, Optional, Tuple, Union
-    JobListAndCount = Tuple[List[Job], int]
-    JobCategory = Dict[AnyStr, Union[AnyValue, Job]]
-    JobCategoriesAndCount = Tuple[List[JobCategory], int]
+    from weaver.typedefs import AnyValue                                        # noqa: F401
+    from pymongo.collection import Collection                                   # noqa: F401
+    from typing import Any, AnyStr, Dict, List, Optional, Tuple, Union          # noqa: F401
+    JobListAndCount = Tuple[List[Job], int]                                     # noqa: F401
+    JobCategory = Dict[AnyStr, Union[AnyValue, Job]]                            # noqa: F401
+    JobCategoriesAndCount = Tuple[List[JobCategory], int]                       # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 

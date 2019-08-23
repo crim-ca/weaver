@@ -20,8 +20,8 @@ import six
 import logging
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from weaver.typedefs import AnyAnySettingsContainer
-    from typing import AnyStr, Dict, Union, Optional
+    from weaver.typedefs import AnyAnySettingsContainer     # noqa: F401
+    from typing import AnyStr, Dict, Union, Optional        # noqa: F401
 
 # can be overridden with 'settings.wps-cfg'
 DEFAULT_PYWPS_CFG = os.path.join(os.path.abspath(os.path.dirname(__file__)), "wps.cfg")

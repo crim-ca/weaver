@@ -14,8 +14,8 @@ from time import sleep
 import logging
 import requests
 if TYPE_CHECKING:
-    from weaver.typedefs import UpdateStatusPartialFunction
-    from pywps.app import WPSRequest
+    from weaver.typedefs import UpdateStatusPartialFunction     # noqa: F401
+    from pywps.app import WPSRequest                            # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 

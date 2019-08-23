@@ -21,9 +21,9 @@ import logging
 import six
 import os
 if TYPE_CHECKING:
-    from weaver.typedefs import AnyDatabaseContainer, CWL
-    from cwltool.context import RuntimeContext
-    from typing import AnyStr, Dict, Type, Union
+    from weaver.typedefs import AnyDatabaseContainer, CWL   # noqa: F401
+    from cwltool.context import RuntimeContext              # noqa: F401
+    from typing import AnyStr, Dict, Type, Union            # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 

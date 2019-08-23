@@ -7,8 +7,8 @@ from lxml import etree
 import requests
 import logging
 if TYPE_CHECKING:
-    from pyramid.request import Request
-    from weaver.typedefs import AnyAnySettingsContainer
+    from pyramid.request import Request                     # noqa: F401
+    from weaver.typedefs import AnyAnySettingsContainer     # noqa: F401
 
 LOGGER = logging.getLogger("weaver")
 

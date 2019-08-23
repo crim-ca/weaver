@@ -58,8 +58,8 @@ import colander
 import logging
 import six
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON
-    from typing import AnyStr, List, Tuple, Optional
+    from weaver.typedefs import JSON                    # noqa: F401
+    from typing import AnyStr, List, Tuple, Optional    # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 

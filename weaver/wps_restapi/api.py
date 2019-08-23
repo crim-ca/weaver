@@ -29,7 +29,7 @@ import logging
 import six
 import os
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON
+    from weaver.typedefs import JSON    # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 

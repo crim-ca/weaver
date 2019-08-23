@@ -14,11 +14,11 @@ from typing import TYPE_CHECKING
 import warnings
 import pymongo
 if TYPE_CHECKING:
-    from weaver.typedefs import AnyAnySettingsContainer
-    from typing import Any, AnyStr, Union
-    from pymongo.database import Database
+    from weaver.typedefs import AnyAnySettingsContainer, JSON   # noqa: F401
+    from typing import Any, AnyStr, Optional, Union             # noqa: F401
+    from pymongo.database import Database                       # noqa: F401
 
-MongoDB = None  # type: Database
+MongoDB = None  # type: Optional[Database]
 MongodbStores = frozenset([
     MongodbServiceStore,
     MongodbProcessStore,
@@ -28,8 +28,7 @@ MongodbStores = frozenset([
 ])
 
 if TYPE_CHECKING:
-    AnyStoreType = Union[MongodbStores]
-    from weaver.typedefs import JSON
+    AnyStoreType = Union[MongodbStores]     # noqa: F401
 
 
 class MongoDatabase(DatabaseInterface):

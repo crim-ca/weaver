@@ -26,11 +26,11 @@ import platform
 import warnings
 import logging
 if TYPE_CHECKING:
-    from weaver.typedefs import (
+    from weaver.typedefs import (                                                               # noqa: F401
         AnyValue, AnyKey, AnyAnySettingsContainer, AnyRegistryContainer, AnyHeadersContainer,
         HeadersType, SettingsType, JSON, XML, Number
     )
-    from typing import Union, Any, Dict, List, AnyStr, Iterable, Optional, Type
+    from typing import Union, Any, Dict, List, AnyStr, Iterable, Optional, Type                 # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 

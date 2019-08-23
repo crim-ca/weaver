@@ -2,8 +2,8 @@
 from pywps.response.status import _WPS_STATUS, WPS_STATUS
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from typing import AnyStr, Optional, Union
-    AnyStatusType = Union[AnyStr, int]
+    from typing import AnyStr, Union    # noqa: F401
+    AnyStatusType = Union[AnyStr, int]  # noqa: F401
 
 STATUS_COMPLIANT_OGC = "STATUS_COMPLIANT_OGC"
 STATUS_COMPLIANT_PYWPS = "STATUS_COMPLIANT_PYWPS"

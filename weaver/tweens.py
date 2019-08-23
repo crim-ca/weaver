@@ -1,6 +1,6 @@
-from pyramid.tweens import INGRESS, EXCVIEW, MAIN
+from pyramid.tweens import INGRESS, EXCVIEW
 from pyramid.httpexceptions import HTTPSuccessful, HTTPRedirection, HTTPException, HTTPInternalServerError
-from weaver.owsexceptions import OWSException, OWSNotImplemented  # noqa: F401
+from weaver.owsexceptions import OWSException, OWSNotImplemented
 from weaver.utils import fully_qualified_name
 import logging
 LOGGER = logging.getLogger(__name__)

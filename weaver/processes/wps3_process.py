@@ -33,9 +33,9 @@ import logging
 import warnings
 import requests
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON, UpdateStatusPartialFunction
-    from typing import Union, AnyStr
-    from pywps.app import WPSRequest
+    from weaver.typedefs import JSON, UpdateStatusPartialFunction   # noqa: F401
+    from typing import Union, AnyStr                                # noqa: F401
+    from pywps.app import WPSRequest                                # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 

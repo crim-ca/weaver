@@ -11,7 +11,7 @@ import hashlib
 import binascii
 import logging
 if TYPE_CHECKING:
-    from typing import Dict
+    from typing import Dict     # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 

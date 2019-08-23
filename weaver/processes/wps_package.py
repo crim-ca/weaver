@@ -60,15 +60,15 @@ import logging
 import os
 import six
 if TYPE_CHECKING:
-    from weaver.status import AnyStatusType
-    from weaver.typedefs import (
+    from weaver.status import AnyStatusType     # noqa: F401
+    from weaver.typedefs import (               # noqa: F401
         ToolPathObjectType, CWLFactoryCallable, CWL, AnyKey, AnyValue as AnyValueType, JSON, XML, Number
     )
-    from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, Type, Union
-    from cwltool.process import Process as ProcessCWL
-    from pywps.app import WPSRequest
-    from pywps.response.execute import ExecuteResponse
-    from owslib.wps import Input, Output
+    from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, Type, Union  # noqa: F401
+    from cwltool.process import Process as ProcessCWL                                   # noqa: F401
+    from pywps.app import WPSRequest                                                    # noqa: F401
+    from pywps.response.execute import ExecuteResponse                                  # noqa: F401
+    from owslib.wps import Input, Output                                                # noqa: F401
 
     # typing shortcuts
     WPS_Input_Type = Union[LiteralInput, ComplexInput, BoundingBoxInput]

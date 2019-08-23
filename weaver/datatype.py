@@ -25,8 +25,8 @@ import six
 import uuid
 import traceback
 if TYPE_CHECKING:
-    from weaver.typedefs import Number, LoggerType, CWL, JSON
-    from typing import Any, AnyStr, Dict, List, Optional, Union
+    from weaver.typedefs import Number, LoggerType, CWL, JSON       # noqa: F401
+    from typing import Any, AnyStr, Dict, List, Optional, Union     # noqa: F401
 
 LOGGER = getLogger(__name__)
 

@@ -37,8 +37,8 @@ import time
 import json
 import os
 if TYPE_CHECKING:
-    from weaver.typedefs import HeadersType, CookiesType, SettingsType, AnyResponseType, LoggerType, JSON
-    from typing import AnyStr, Dict, Optional, Any, Tuple, Iterable, Callable, Union
+    from weaver.typedefs import HeadersType, CookiesType, SettingsType, AnyResponseType, LoggerType, JSON   # noqa: F401
+    from typing import AnyStr, Dict, Optional, Any, Tuple, Iterable, Callable, Union                        # noqa: F401
 
 
 class ProcessInfo(object):
