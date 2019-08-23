@@ -41,7 +41,7 @@ notifications:
   email: false
 after_success:
   - bash <(curl -s https://codecov.io/bash) || echo "Codecov did not collect coverage reports"
-  - source $(HOME)/conda/bin/activate weaver && python-codacy-coverage -r coverage.xml
+  - source $(HOME)/conda/bin/activate weaver && python-codacy-coverage -r reports/coverage.xml
   - |
     if [ "$TRAVIS_BRANCH" == "master" ] then
       export TAG_VERSION=latest

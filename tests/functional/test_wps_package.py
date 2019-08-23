@@ -10,6 +10,7 @@ from weaver.formats import (
     get_cwl_file_format,
 )
 from weaver.visibility import VISIBILITY_PUBLIC
+from pyramid.httpexceptions import HTTPBadRequest
 from tests.utils import (
     get_test_weaver_config,
     get_test_weaver_app,

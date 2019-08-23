@@ -1,3 +1,4 @@
+bandit
 bump2version
 codacy-coverage
 coverage
@@ -6,6 +7,7 @@ flake8
 mock
 pluggy>=0.7
 pytest
+pylint
 responses
 sphinx
 sphinx-autoapi

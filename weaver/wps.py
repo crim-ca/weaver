@@ -20,7 +20,7 @@ import six
 import logging
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from weaver.typedefs import AnyAnySettingsContainer     # noqa: F401
+    from weaver.typedefs import AnySettingsContainer        # noqa: F401
     from typing import AnyStr, Dict, Union, Optional        # noqa: F401
 
 # can be overridden with 'settings.wps-cfg'
@@ -28,7 +28,7 @@ DEFAULT_PYWPS_CFG = os.path.join(os.path.abspath(os.path.dirname(__file__)), "wp
 PYWPS_CFG = None
 
 
-def _get_settings_or_wps_config(container,                  # type: AnyAnySettingsContainer
+def _get_settings_or_wps_config(container,                  # type: AnySettingsContainer
                                 weaver_setting_name,        # type: AnyStr
                                 config_setting_section,     # type: AnyStr
                                 config_setting_name,        # type: AnyStr
@@ -49,7 +49,7 @@ def _get_settings_or_wps_config(container,                  # type: AnyAnySettin
 
 
 def get_wps_cfg_path(container):
-    # type: (AnyAnySettingsContainer) -> AnyStr
+    # type: (AnySettingsContainer) -> AnyStr
     """
     Retrieves the WPS configuration file (`wps.cfg` by default or `weaver.wps_cfg` if specified).
     """
@@ -57,7 +57,7 @@ def get_wps_cfg_path(container):
 
 
 def get_wps_path(container):
-    # type: (AnyAnySettingsContainer) -> AnyStr
+    # type: (AnySettingsContainer) -> AnyStr
     """
     Retrieves the WPS path (without hostname).
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
@@ -67,7 +67,7 @@ def get_wps_path(container):
 
 
 def get_wps_url(container):
-    # type: (AnyAnySettingsContainer) -> AnyStr
+    # type: (AnySettingsContainer) -> AnyStr
     """
     Retrieves the full WPS URL (hostname + WPS path).
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
@@ -76,7 +76,7 @@ def get_wps_url(container):
 
 
 def get_wps_output_dir(container):
-    # type: (AnyAnySettingsContainer) -> AnyStr
+    # type: (AnySettingsContainer) -> AnyStr
     """
     Retrieves the WPS output directory path where to write XML and result files.
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
@@ -86,7 +86,7 @@ def get_wps_output_dir(container):
 
 
 def get_wps_output_path(container):
-    # type: (AnyAnySettingsContainer) -> AnyStr
+    # type: (AnySettingsContainer) -> AnyStr
     """
     Retrieves the WPS output path (without hostname) for staging XML status, logs and process outputs.
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
@@ -95,7 +95,7 @@ def get_wps_output_path(container):
 
 
 def get_wps_output_url(container):
-    # type: (AnyAnySettingsContainer) -> AnyStr
+    # type: (AnySettingsContainer) -> AnyStr
     """
     Retrieves the WPS output URL that maps to WPS output directory path.
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
@@ -106,7 +106,7 @@ def get_wps_output_url(container):
 
 
 def load_pywps_cfg(container, config=None):
-    # type: (AnyAnySettingsContainer, Optional[Union[AnyStr, Dict[AnyStr, AnyStr]]]) -> None
+    # type: (AnySettingsContainer, Optional[Union[AnyStr, Dict[AnyStr, AnyStr]]]) -> None
     global PYWPS_CFG
 
     settings = get_settings(container)

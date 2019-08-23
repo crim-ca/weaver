@@ -7,8 +7,8 @@ from lxml import etree
 import requests
 import logging
 if TYPE_CHECKING:
-    from pyramid.request import Request                     # noqa: F401
-    from weaver.typedefs import AnyAnySettingsContainer     # noqa: F401
+    from pyramid.request import Request                 # noqa: F401
+    from weaver.typedefs import AnySettingsContainer    # noqa: F401
 
 LOGGER = logging.getLogger("weaver")
 
@@ -25,14 +25,14 @@ OUTPUT_FORMATS = {
 
 
 def wps_restapi_base_path(container):
-    # type: (AnyAnySettingsContainer) -> AnyStr
+    # type: (AnySettingsContainer) -> AnyStr
     settings = get_settings(container)
     restapi_path = settings.get("weaver.wps_restapi_path", "").rstrip('/').strip()
     return restapi_path
 
 
 def get_wps_restapi_base_url(container):
-    # type: (AnyAnySettingsContainer) -> AnyStr
+    # type: (AnySettingsContainer) -> AnyStr
     settings = get_settings(container)
     weaver_url = get_weaver_url(settings)
     restapi_path = wps_restapi_base_path(settings)

@@ -46,6 +46,9 @@ endif
 DOWNLOAD_CACHE := $(APP_ROOT)/downloads
 BUILDOUT_FILES := parts eggs develop-eggs bin .installed.cfg .mr.developer.cfg *.egg-info bootstrap-buildout.py *.bak.* $(DOWNLOAD_CACHE)
 
+# Tests
+REPORTS_DIR := $(CURDIR)/reports
+
 # end of configuration
 
 .DEFAULT_GOAL := help
@@ -80,7 +83,7 @@ help:
 	@echo "  clean-cache        remove caches such as DOWNLOAD_CACHE."
 	@echo "  clean-env          remove the conda enviroment $(CONDA_ENV)."
 	@echo "  clean-src          remove all *.pyc files."
-	@echo "  clean-test         remove files created by tests or coverage."
+	@echo "  clean-test         remove files created by code checks, tests, coverage and report."
 	@echo "  clean-dist         remove *all* files that are not controlled by 'git'."
 	@echo "                     [WARNING: use it *only* if you know what you do!]"
 	@echo "Testing targets:"
@@ -93,6 +96,9 @@ help:
 	@echo "  test               run custom tests from input specification (make TESTS='<spec>' test).
 	@echo "  coverage       	run all tests using coverage analysis."
 	@echo "  pep8               run pep8 code style checks."
+	@echo "  lint               run linting code style checks."
+	@echo "  secure             run security code checks."
+	@echo "  checks             run every code style checks."
 	@echo "Sphinx targets:"
 	@echo "  docs               generate HTML documentation with Sphinx."
 	@echo "  linkcheck          check all external links in documentation for integrity."
@@ -161,6 +167,10 @@ bootstrap-buildout.py:
 	@echo "Update buildout bootstrap-buildout.py..."
 	@test -f boostrap-buildout.py || curl https://bootstrap.pypa.io/bootstrap-buildout.py \
 		--insecure --silent --output bootstrap-buildout.py
+
+.PHONY: mkdir-reports
+mkdir-reports:
+	@mkdir -p "$(REPORTS_DIR)"
 
 ## conda targets
 
@@ -316,9 +326,11 @@ clean-src:
 
 .PHONY: clean-test
 clean-test:
-	@echo "Removing test/coverage files..."
-	@-rm "$(CURDIR)/coverage.xml"
+	@echo "Removing test/coverage/report files..."
+	@-rm -f "$(CURDIR)/.coverage"
+	@-rm -f "$(CURDIR)/coverage.*"
 	@-rm -fr "$(CURDIR)/coverage"
+	@-rm -fr "$(REPORTS_DIR)"
 
 .PHONY: clean-dist
 clean-dist: backup clean
@@ -372,18 +384,40 @@ test:
 		pytest tests -v -m '${TESTS}' --junitxml $(CURDIR)/tests/results.xml"
 
 .PHONY: coverage
-coverage:
+coverage: mkdir-reports
 	@echo "Running coverage analysis..."
 	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
 		coverage run -m pytest "$(CURDIR)/tests" || true'
-	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; coverage xml -i'
-	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; coverage report -m'
-	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; coverage html -d coverage'
+	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
+		coverage xml --rcfile="$(CURDIR)/setup.cfg" -i -o "$(REPORTS_DIR)/coverage.xml"'
+	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
+		coverage report --rcfile="$(CURDIR)/setup.cfg" -m'
+	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
+		coverage html --rcfile="$(CURDIR)/setup.cfg" -d "$(REPORTS_DIR)/coverage"'
+
+## Code check targets
 
 .PHONY: pep8
-pep8:
+pep8: mkdir-reports
 	@echo "Running pep8 code style checks..."
-	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; flake8'
+	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
+		flake8 --config="$(CURDIR)/setup.cfg" --tee --output-file="$(REPORTS_DIR)/pep8.txt"'
+
+.PHONY: lint
+lint: mkdir-reports
+	@echo "Running linting code style checks..."
+	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
+		pylint --rcfile="$(CURDIR)/setup.cfg" "$(CURDIR)/weaver" "$(CURDIR)/tests" --reports y \
+		| tee "$(REPORTS_DIR)/lint.txt"'
+
+.PHONY: secure
+secure: mkdir-reports
+	@echo "Running security code checks..."
+	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
+		bandit -v -r "$(CURDIR)/weaver" | tee "$(REPORTS_DIR)/secure.txt"'
+
+.PHONY: checks
+checks: pep8 lint secure doc8 linkcheck
 
 ## Documentation targets
 
