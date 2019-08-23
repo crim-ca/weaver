@@ -375,7 +375,7 @@ test:
 coverage:
 	@echo "Running coverage analysis..."
 	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
-		coverage run --source weaver setup.py test || true'
+		coverage run -m pytest "$(CURDIR)/tests" || true'
 	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; coverage xml -i'
 	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; coverage report -m'
 	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; coverage html -d coverage'
