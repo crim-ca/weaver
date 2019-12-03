@@ -391,7 +391,7 @@ coverage: mkdir-reports
 	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
 		coverage xml --rcfile="$(CURDIR)/setup.cfg" -i -o "$(REPORTS_DIR)/coverage.xml"'
 	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
-		coverage report --rcfile="$(CURDIR)/setup.cfg" -m'
+		coverage report --rcfile="$(CURDIR)/setup.cfg" -i -m'
 	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
 		coverage html --rcfile="$(CURDIR)/setup.cfg" -d "$(REPORTS_DIR)/coverage"'
 
