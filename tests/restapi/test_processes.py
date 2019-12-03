@@ -38,7 +38,7 @@ TEST_REMOTE_SERVER_URL = "https://remote-server.com"
 TEST_REMOTE_PROCESS_WPS1_ID = "test-remote-process-wps1"
 TEST_REMOTE_PROCESS_WPS3_ID = "test-remote-process-wps3"
 TEST_REMOTE_PROCESS_ROOT = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources")
-TEST_REMOTE_PROCESS_GETCAP_WPS1_FILE = os.path.join(TEST_REMOTE_PROCESS_ROOT, "test_describe_process_wps1.xml")
+TEST_REMOTE_PROCESS_GETCAP_WPS1_FILE = os.path.join(TEST_REMOTE_PROCESS_ROOT, "test_get_capabilities_wps1.xml")
 TEST_REMOTE_PROCESS_GETCAP_WPS1_URL = "{}/wps?service=WPS&request=GetCapabilities&version=1.0.0" \
                                       .format(TEST_REMOTE_SERVER_URL)
 TEST_REMOTE_PROCESS_DESCRIBE_WPS1_FILE = os.path.join(TEST_REMOTE_PROCESS_ROOT, "test_describe_process_wps1.xml")
@@ -61,8 +61,8 @@ def mock_remote_server_requests_wp1(test):
             mock_resp.add(responses.GET, TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL, body=describe_xml, headers=xml_header)
             mock_resp.add(responses.GET, TEST_REMOTE_PROCESS_GETCAP_WPS1_URL, body=get_cap_xml, headers=xml_header)
             # special case where 'identifier' gets added to 'GetCapabilities', but is simply ignored
-            mock_resp.add(responses.GET, body=get_cap_xml, headers=xml_header,
-                          url=TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL.replace("DescribeProcess", "GetCapabilities"))
+            getcap_with_process_id = TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL.replace("DescribeProcess", "GetCapabilities")
+            mock_resp.add(responses.GET, body=get_cap_xml, headers=xml_header, url=getcap_with_process_id)
             return test(*args, **kwargs)
     return mock_requests_wps1
 
@@ -314,7 +314,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         **Note:** This is a shortcut method for all ``test_deploy_process_<>`` cases.
 
         Attempts to deploy the process using the provided deployment payload, then makes it visible and finally
-        fetches the deployed process to validate the resulting WPS-2 description.
+        fetches the deployed process to validate the resulting WPS-3 REST JSON description.
 
         Any failure along the way is raised.
         """
@@ -382,6 +382,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     @mock_remote_server_requests_wp1
     def test_deploy_process_WPS1_DescribeProcess_executionUnit(self):
+        """Test process deployment using a WPS-1 DescribeProcess URL specified as process description reference."""
         body = {
             "processDescription": {"process": {"id": TEST_REMOTE_PROCESS_WPS1_ID}},
             "executionUnit": [{"href": TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL}],
@@ -390,7 +391,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.deploy_process_make_visible_and_fetch_deployed(body, TEST_REMOTE_PROCESS_WPS1_ID)
 
     @pytest.mark.skip(reason="not implemented")
+    @mock_remote_server_requests_wp1
     def test_deploy_process_WPS1_GetCapabilities_href(self):
+        """Test process deployment using a WPS-1 GetCapabilities URL specified as process description reference."""
         body = {
             "processDescription": {"href": TEST_REMOTE_PROCESS_GETCAP_WPS1_URL},  # this one should be used
             "executionUnit": [{"href": TEST_REMOTE_SERVER_URL}]  # some URL just to fulfill schema validation
@@ -398,7 +401,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.deploy_process_make_visible_and_fetch_deployed(body, TEST_REMOTE_PROCESS_WPS1_ID)
 
     @pytest.mark.skip(reason="not implemented")
+    @mock_remote_server_requests_wp1
     def test_deploy_process_WPS1_GetCapabilities_owsContext(self):
+        """Test process deployment using a WPS-1 GetCapabilities URL specified through the OwsContext definition."""
         body = {
             "processDescription": {"process": {"id": TEST_REMOTE_PROCESS_WPS1_ID}},
             "executionUnit": [{"href": TEST_REMOTE_SERVER_URL}]  # some URL just to fulfill schema validation
@@ -407,7 +412,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.deploy_process_make_visible_and_fetch_deployed(body, TEST_REMOTE_PROCESS_WPS1_ID)
 
     @pytest.mark.skip(reason="not implemented")
+    @mock_remote_server_requests_wp1
     def test_deploy_process_WPS1_GetCapabilities_executionUnit(self):
+        """Test process deployment using a WPS-1 GetCapabilities URL specified through the ExecutionUnit parameter."""
         body = {
             "processDescription": {"process": {"id": TEST_REMOTE_PROCESS_WPS1_ID}},
             "executionUnit": [{"href": TEST_REMOTE_PROCESS_GETCAP_WPS1_URL}],
