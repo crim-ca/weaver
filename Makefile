@@ -12,10 +12,10 @@ OS_NAME := $(shell uname -s 2>/dev/null || echo "unknown")
 CPU_ARCH := $(shell uname -m 2>/dev/null || uname -p 2>/dev/null || echo "unknown")
 
 # Python
-SETUPTOOLS_VERSION := 36.5.0
-CONDA_VERSION := 4.4
+SETUPTOOLS_VERSION := 42.0.2
+CONDA_VERSION := 4.5
 BUILDOUT_VERSION := 2.13.1
-PYTHON_VERSION := 2.7
+PYTHON_VERSION := 3.7
 
 # Conda
 CONDA_HOME ?= $(HOME)/conda
@@ -35,9 +35,9 @@ OUTPUT_PORT ?= 8090
 # choose conda installer depending on your OS
 CONDA_URL = https://repo.continuum.io/miniconda
 ifeq "$(OS_NAME)" "Linux"
-FN := Miniconda2-latest-Linux-x86_64.sh
+FN := Miniconda3-latest-Linux-x86_64.sh
 else ifeq "$(OS_NAME)" "Darwin"
-FN := Miniconda2-latest-MacOSX-x86_64.sh
+FN := Miniconda3-latest-MacOSX-x86_64.sh
 else
 FN := unknown
 endif
@@ -189,7 +189,7 @@ conda-config: conda
 	@-"$(CONDA_HOME)/bin/conda" install -y conda=$(CONDA_VERSION) requests
 	@"$(CONDA_HOME)/bin/conda" config --add envs_dirs $(CONDA_ENVS_DIR)
 	@"$(CONDA_HOME)/bin/conda" config --set ssl_verify true
-	@"$(CONDA_HOME)/bin/conda" config --set use_pip true
+	#@"$(CONDA_HOME)/bin/conda" config --set use_pip true
 	@"$(CONDA_HOME)/bin/conda" config --set channel_priority true
 	@"$(CONDA_HOME)/bin/conda" config --set auto_update_conda false
 	@"$(CONDA_HOME)/bin/conda" config --add channels defaults
@@ -249,6 +249,10 @@ install-sys:
 	@bash bootstrap.sh -i
 	@echo "Installing system packages for your application..."
 	@-test -f requirements.sh && bash requirements.sh
+	# FIXME: above to be removed...
+	@echo "Installing system dependencies..."
+	@bash -c '$(CONDA_CMD) pip install --upgrade pip setuptools'
+	@bash -c '$(CONDA_CMD) pip install gunicorn'
 
 .PHONY: install-pip
 install-pip: install
