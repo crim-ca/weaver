@@ -23,6 +23,16 @@ CONDA_ENV ?= $(APP_NAME)
 CONDA_ENVS_DIR ?= $(HOME)/.conda/envs
 CONDA_ENV_PATH := $(CONDA_ENVS_DIR)/$(CONDA_ENV)
 CONDA_PINNED := $(APP_ROOT)/env/conda-pinned
+CONDA_BIN := $(CONDA_HOME)/bin/conda
+CONDA_ENV_REAL_TARGET_PATH := $(realpath $(CONDA_ENV_PATH))
+CONDA_ENV_REAL_ACTIVE_PATH := $(realpath ${CONDA_PREFIX})
+ifeq "$(CONDA_ENV_REAL_ACTIVE_PATH)" "$(CONDA_ENV_REAL_TARGET_PATH)"
+	CONDA_CMD :=
+	CONDA_ENV_MODE := [using active environment]
+else
+	CONDA_CMD := source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)";
+	CONDA_ENV_MODE := [will activate environment]
+endif
 
 # Docker
 DOCKER_REPO := docker-registry.crim.ca/ogc/weaver
@@ -123,8 +133,11 @@ info:
 	@echo "  OS_NAME             $(OS_NAME)"
 	@echo "  CPU_ARCH            $(CPU_ARCH)"
 	@echo "  Conda Home          $(CONDA_HOME)"
-	@echo "  Conda Environment   $(CONDA_ENV)."
+	@echo "  Conda Environment   $(CONDA_ENV)"
 	@echo "  Conda Prefix        $(CONDA_ENV_PATH)"
+	@echo "  Conda Binary        $(CONDA_BIN)"
+	@echo "  Conda Actication    $(CONDA_ENV_MODE)"
+	@echo "  Conda Command       $(CONDA_CMD)"
 	@echo "  APP_NAME            $(APP_NAME)"
 	@echo "  APP_ROOT            $(APP_ROOT)"
 	@echo "  DOWNLOAD_CACHE      $(DOWNLOAD_CACHE)"
@@ -177,7 +190,7 @@ mkdir-reports:
 .PHONY: conda
 conda:
 	@echo "Installing conda..."
-	@test -f "$(CONDA_HOME)/bin/conda" || ( \
+	@test -f "$(CONDA_BIN)" || ( \
 		echo "Downloading: [$(CONDA_URL)/$(FN)], saved to: [$(DOWNLOAD_CACHE)/$(FN)]." && \
 		mkdir -p "$(DOWNLOAD_CACHE)" && mkdir -p "$(CONDA_HOME)" && \
 		curl "$(CONDA_URL)/$(FN)" --silent --insecure --output "$(DOWNLOAD_CACHE)/$(FN)" && \
@@ -186,23 +199,23 @@ conda:
 .PHONY: conda-config
 conda-config: conda
 	@echo "Update ~/.condarc"
-	@-"$(CONDA_HOME)/bin/conda" install -y conda=$(CONDA_VERSION) requests
-	@"$(CONDA_HOME)/bin/conda" config --add envs_dirs $(CONDA_ENVS_DIR)
-	@"$(CONDA_HOME)/bin/conda" config --set ssl_verify true
-	#@"$(CONDA_HOME)/bin/conda" config --set use_pip true
-	@"$(CONDA_HOME)/bin/conda" config --set channel_priority true
-	@"$(CONDA_HOME)/bin/conda" config --set auto_update_conda false
-	@"$(CONDA_HOME)/bin/conda" config --add channels defaults
-	@"$(CONDA_HOME)/bin/conda" config --append channels birdhouse
-	@"$(CONDA_HOME)/bin/conda" config --append channels conda-forge
+	@-"$(CONDA_BIN)" install -y conda=$(CONDA_VERSION) requests
+	@"$(CONDA_BIN)" config --add envs_dirs $(CONDA_ENVS_DIR)
+	@"$(CONDA_BIN)" config --set ssl_verify true
+	#@"$(CONDA_BIN)" config --set use_pip true
+	@"$(CONDA_BIN)" config --set channel_priority true
+	@"$(CONDA_BIN)" config --set auto_update_conda false
+	@"$(CONDA_BIN)" config --add channels defaults
+	@"$(CONDA_BIN)" config --append channels birdhouse
+	@"$(CONDA_BIN)" config --append channels conda-forge
 
 .PHONY: conda-env
 conda-env: conda conda-config
 	@test -d "$(CONDA_ENV_PATH)" || echo "Creating conda environment: $(CONDA_ENV)..."
-	@echo '"$(CONDA_HOME)/bin/conda" env create -n "$(CONDA_ENV)" "python=$(PYTHON_VERSION)"'
-	@test -d "$(CONDA_ENV_PATH)" || "$(CONDA_HOME)/bin/conda" create -y -n "$(CONDA_ENV)" "python=$(PYTHON_VERSION)"
+	@echo '"$(CONDA_BIN)" env create -n "$(CONDA_ENV)" "python=$(PYTHON_VERSION)"'
+	@test -d "$(CONDA_ENV_PATH)" || "$(CONDA_BIN)" create -y -n "$(CONDA_ENV)" "python=$(PYTHON_VERSION)"
 	@echo "Update conda environment: $(CONDA_ENV)..."
-	"$(CONDA_HOME)/bin/conda" install -y -n "$(CONDA_ENV)" "setuptools=$(SETUPTOOLS_VERSION)" supervisor nginx
+	"$(CONDA_BIN)" install -y -n "$(CONDA_ENV)" "setuptools=$(SETUPTOOLS_VERSION)" supervisor nginx
 	@echo "Updating pip..."
 	@-bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); pip install --upgrade pip"
 
@@ -215,17 +228,15 @@ conda-pinned: conda-env
 .PHONY: conda-env-export
 conda-env-export:
 	@echo "Exporting conda enviroment..."
-	@test -d $(CONDA_ENV_PATH) && "$(CONDA_HOME)/bin/conda" env export -n $(CONDA_ENV) -f environment.yml
+	@test -d $(CONDA_ENV_PATH) && "$(CONDA_BIN)" env export -n $(CONDA_ENV) -f environment.yml
 
 ## Build targets
 
 .PHONY: bootstrap
 bootstrap: init conda-env conda-pinned bootstrap-buildout.py
 	@echo "Bootstrap buildout..."
-	@-bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
-		python -c 'import zc.buildout' || pip install zc.buildout==$(BUILDOUT_VERSION)"
-	@test -f bin/buildout || bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
-		python bootstrap-buildout.py -c custom.cfg \
+	@-bash -c "$(CONDA_CMD) python -c 'import zc.buildout' || pip install zc.buildout==$(BUILDOUT_VERSION)"
+	@test -f bin/buildout || bash -c "$(CONDA_CMD) python bootstrap-buildout.py -c custom.cfg \
 			--allow-site-packages \
 			--setuptools-version=$(SETUPTOOLS_VERSION) \
 			--buildout-version=$(BUILDOUT_VERSION)"
@@ -239,8 +250,7 @@ install-dev: install-pip
 .PHONY: install-base
 install-base:
 	@echo "Installing base packages with pip..."
-	@-bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
-		pip install -r $(APP_ROOT)/requirements.txt --no-cache-dir"
+	@-bash -c "$(CONDA_CMD) pip install -r $(APP_ROOT)/requirements.txt --no-cache-dir"
 	@echo "Install with pip complete."
 
 .PHONY: install-sys
@@ -269,28 +279,24 @@ install-raw:
 .PHONY: install
 install: bootstrap install-base
 	@echo "Installing application with buildout..."
-	@-bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
-		bin/buildout buildout:anaconda-home=$(CONDA_HOME) -c custom.cfg;"
+	@-bash -c "$(CONDA_CMD) bin/buildout buildout:anaconda-home=$(CONDA_HOME) -c custom.cfg;"
 	@echo "Start service with \`make start'"
 
 .PHONY: update
 update:
 	@echo "Update application config with buildout (offline mode)..."
-	@-bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
-		bin/buildout buildout:anaconda-home=$(CONDA_HOME) -o -c custom.cfg"
+	@-bash -c "$(CONDA_CMD) bin/buildout buildout:anaconda-home=$(CONDA_HOME) -o -c custom.cfg"
 
 .PHONY: update-config
 update-config:
 	@echo "Update application config with buildout (offline mode) and environment variables..."
-	@-bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
-		bin/buildout buildout:anaconda-home=$(CONDA_HOME) settings:hostname=$(HOSTNAME) \
+	@-bash -c "$(CONDA_CMD) bin/buildout buildout:anaconda-home=$(CONDA_HOME) settings:hostname=$(HOSTNAME) \
 			settings:output-port=$(OUTPUT_PORT) settings:http-port=$(HTTP_PORT) -o -c custom.cfg"
 
 .PHONY: online-update-config
 online-update-config:
 	@echo "Update application config with buildout (online but non-newest mode) and environment variables..."
-	@-bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
-		bin/buildout buildout:anaconda-home=$(CONDA_HOME) \
+	@-bash -c "$(CONDA_CMD) bin/buildout buildout:anaconda-home=$(CONDA_HOME) \
 			settings:hostname=$(HOSTNAME) settings:output-port=$(OUTPUT_PORT) \
 			settings:http-port=$(HTTP_PORT) -N -c custom.cfg"
 
@@ -320,7 +326,7 @@ clean-cache:
 .PHONY: clean-env
 clean-env: stop
 	@echo "Removing conda env '$(CONDA_ENV)'"
-	@-test -d "$(CONDA_ENV_PATH)" && "$(CONDA_HOME)/bin/conda" remove -n $(CONDA_ENV) --yes --all
+	@-test -d "$(CONDA_ENV_PATH)" && "$(CONDA_BIN)" remove -n $(CONDA_ENV) --yes --all
 
 .PHONY: clean-src
 clean-src:
@@ -347,78 +353,64 @@ clean-dist: backup clean
 .PHONY: test-unit
 test-unit:
 	@echo "Running tests (skip slow and online tests)..."
-	bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
-		pytest tests -v -m 'not slow and not online and not functional' --junitxml $(CURDIR)/tests/results.xml"
+	bash -c "$(CONDA_CMD) pytest tests -v -m 'not slow and not online and not functional' --junitxml $(CURDIR)/tests/results.xml"
 
 .PHONY: test-func
 test-func:
 	@echo "Running functional tests..."
-	bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
-		pytest tests -v -m 'functional' --junitxml $(CURDIR)/tests/results.xml"
+	bash -c "$(CONDA_CMD) pytest tests -v -m 'functional' --junitxml $(CURDIR)/tests/results.xml"
 
 .PHONY: test-online
 test-online:
 	@echo "Running online tests (running instance required)..."
-	bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
-		pytest tests -v -m 'online' --junitxml $(CURDIR)/tests/results.xml"
+	bash -c "$(CONDA_CMD) pytest tests -v -m 'online' --junitxml $(CURDIR)/tests/results.xml"
 
 .PHONY: test-offline
 test-offline:
 	@echo "Running offline tests (not marked as online)..."
-	bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
-		pytest tests -v -m 'not online' --junitxml $(CURDIR)/tests/results.xml"
+	bash -c "$(CONDA_CMD) pytest tests -v -m 'not online' --junitxml $(CURDIR)/tests/results.xml"
 
 .PHONY: test-no-tb14
 test-no-tb14:
 	@echo "Running all tests except ones marked for 'Testbed-14'..."
-	bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
-		pytest tests -v -m 'not testbed14' --junitxml $(CURDIR)/tests/results.xml"
+	bash -c "$(CONDA_CMD) pytest tests -v -m 'not testbed14' --junitxml $(CURDIR)/tests/results.xml"
 
 .PHONY: test-all
 test-all:
 	@echo "Running all tests (including slow and online tests)..."
-	bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
-		pytest tests -v --junitxml $(CURDIR)/tests/results.xml"
+	bash -c "$(CONDA_CMD) pytest tests -v --junitxml $(CURDIR)/tests/results.xml"
 
 .PHONY: test
 test:
 	@echo "Running custom tests from input specification..."
 	@[ "${TESTS}" ] || ( echo ">> 'TESTS' is not set"; exit 1 )
-	bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); \
-		pytest tests -v -m '${TESTS}' --junitxml $(CURDIR)/tests/results.xml"
+	bash -c "$(CONDA_CMD) pytest tests -v -m '${TESTS}' --junitxml $(CURDIR)/tests/results.xml"
 
 .PHONY: coverage
 coverage: mkdir-reports
 	@echo "Running coverage analysis..."
-	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
-		coverage run -m pytest "$(CURDIR)/tests" || true'
-	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
-		coverage xml --rcfile="$(CURDIR)/setup.cfg" -i -o "$(REPORTS_DIR)/coverage.xml"'
-	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
-		coverage report --rcfile="$(CURDIR)/setup.cfg" -i -m'
-	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
-		coverage html --rcfile="$(CURDIR)/setup.cfg" -d "$(REPORTS_DIR)/coverage"'
+	@bash -c '$(CONDA_CMD) coverage run -m pytest "$(CURDIR)/tests" || true'
+	@bash -c '$(CONDA_CMD) coverage xml --rcfile="$(CURDIR)/setup.cfg" -i -o "$(REPORTS_DIR)/coverage.xml"'
+	@bash -c '$(CONDA_CMD) coverage report --rcfile="$(CURDIR)/setup.cfg" -i -m'
+	@bash -c '$(CONDA_CMD) coverage html --rcfile="$(CURDIR)/setup.cfg" -d "$(REPORTS_DIR)/coverage"'
 
 ## Code check targets
 
 .PHONY: pep8
 pep8: mkdir-reports
 	@echo "Running pep8 code style checks..."
-	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
-		flake8 --config="$(CURDIR)/setup.cfg" --tee --output-file="$(REPORTS_DIR)/pep8.txt"'
+	@bash -c '$(CONDA_CMD) flake8 --config="$(CURDIR)/setup.cfg" --tee --output-file="$(REPORTS_DIR)/pep8.txt"'
 
 .PHONY: lint
 lint: mkdir-reports
 	@echo "Running linting code style checks..."
-	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
-		pylint --rcfile="$(CURDIR)/setup.cfg" "$(CURDIR)/weaver" "$(CURDIR)/tests" --reports y \
+	@bash -c '$(CONDA_CMD) pylint --rcfile="$(CURDIR)/setup.cfg" "$(CURDIR)/weaver" "$(CURDIR)/tests" --reports y \
 		| tee "$(REPORTS_DIR)/lint.txt"'
 
 .PHONY: secure
 secure: mkdir-reports
 	@echo "Running security code checks..."
-	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; \
-		bandit -v -r "$(CURDIR)/weaver" | tee "$(REPORTS_DIR)/secure.txt"'
+	@bash -c '$(CONDA_CMD) bandit -v -r "$(CURDIR)/weaver" | tee "$(REPORTS_DIR)/secure.txt"'
 
 .PHONY: checks
 checks: pep8 lint secure doc8 linkcheck

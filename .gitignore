@@ -1,5 +1,6 @@
 # installer
 #Makefile
+[Mm]akefile.config
 
 # Docker
 #Dockerfile
@@ -74,7 +75,7 @@ opt/
 
 # sphinx
 #docs/Makefile
-docs/make.bat
+#docs/make.bat
 docs/doctrees/
 docs/html/
 docs/build/
