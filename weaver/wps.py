@@ -13,7 +13,7 @@ from pyramid_celery import celery_app as app
 from pyramid.threadlocal import get_current_request
 from pywps import configuration as pywps_config
 from pywps.app.Service import Service
-from six.moves.configparser import ConfigParser, SafeConfigParser
+from six.moves.configparser import ConfigParser
 from six.moves.urllib.parse import urlparse
 from typing import TYPE_CHECKING
 import os
@@ -42,8 +42,7 @@ def _get_settings_or_wps_config(container,                  # type: AnySettingsC
     if not found:
         if not PYWPS_CFG:
             load_pywps_cfg(container)
-        wps_cfg = get_wps_cfg_path(settings)
-        wps_path = config.get(config_setting_section, config_setting_name)
+        found = PYWPS_CFG.get(config_setting_section, config_setting_name)
     if not isinstance(found, six.string_types):
         LOGGER.warn("{} not set in settings or WPS configuration, using default value.".format(message_not_found))
         found = default_not_found
@@ -100,7 +99,8 @@ def get_wps_output_url(container):
 
 
 def load_pywps_cfg(container, config=None):
-    # type: (AnySettingsContainer, Optional[Union[AnyStr, Dict[AnyStr, AnyStr]]]) -> None
+    # type: (AnySettingsContainer, Optional[Union[AnyStr, Dict[AnyStr, AnyStr]]]) -> ConfigParser
+    """Loads and updates the PyWPS configuration using Weaver settings."""
     global PYWPS_CFG
 
     settings = get_settings(container)
@@ -116,23 +116,12 @@ def load_pywps_cfg(container, config=None):
         for setting_name, setting_value in settings.items():
             if setting_name.starts_with("weaver.wps_metadata"):
                 PYWPS_CFG.set("metadata:main", setting_name.replace("weaver.wps_metadata", ""), setting_value)
-        # add configuration keyword if not already provided
+        # add weaver configuration keyword if not already provided
         wps_keywords = PYWPS_CFG.get("metadata:main", "identification_keywords")
         weaver_mode = get_weaver_configuration(settings)
-        if get_weaver_configuration(settings) not in wps_keywords:
+        if weaver_mode not in wps_keywords:
             wps_keywords += ("," if wps_keywords else "") + weaver_mode
             PYWPS_CFG.set("metadata:main", "identification_keywords", wps_keywords)
-
-        # update pywps server configs with corresponding weaver settings
-        """
-        [server]
-        url=https://localhost:4000/ows/wps
-        sethomedir=true
-        setworkdir=true
-        outputpath=/tmp
-        outputurl=https://localhost:4000/wpsoutputs
-        
-        """
 
     # add additional config passed as dictionary of {'section.key': 'value'}
     if isinstance(config, dict):
@@ -162,8 +151,11 @@ def load_pywps_cfg(container, config=None):
         settings["weaver.wps_output_url"] = output_url
 
     # enforce back resolved values onto PyWPS config
+    PYWPS_CFG.set("server", "setworkdir", "true")
+    PYWPS_CFG.set("server", "sethomedir", "true")
     PYWPS_CFG.set("server", "outputpath", settings["weaver.wps_output_dir"])
     PYWPS_CFG.set("server", "outputurl", settings["weaver.wps_output_url"])
+    return PYWPS_CFG
 
 
 # @app.task(bind=True)
@@ -200,4 +192,3 @@ def includeme(config):
         wps_path = get_wps_path(settings)
         config.add_route("wps", wps_path)
         config.add_view(pywps_view, route_name="wps")
-        config.add_request_method(lambda req: get_wps_cfg_path(req.registry.settings), "wps_cfg", reify=True)
