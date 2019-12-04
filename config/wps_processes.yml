@@ -1,0 +1,13 @@
+# Details:
+#   - if only the WPS-1 URL endpoint is provided, all processes found by `GetCapabilities` will be added
+#   - if query `identifier=<process-id>` is provided, only matched process(es) will be added.
+#     alternatively, a list of processes can be specified with `processes` sub-field
+#   - if `name` is not provided, a "clean" variation of the hostname will be used
+# Result:
+#   - for each process, `DescribeProcess` request will indicate how to generate and register a WPS-2 equivalent
+#   - each process name will combine the service `name` and process `identifier` to reduce chances of conflicts
+processes:
+  #- url: https://colibri.crim.ca/twitcher/ows/proxy/flyingpigeon/wps?service=WPS&request=describeprocess&version=1.0.0&identifier=subset_bbox
+  #  name: colibri-flyingpieon
+  #- url: https://finch.crim.ca/wps?service=WPS&request=describeprocess&version=1.0.0&identifier=ice_days
+  #  name: finch

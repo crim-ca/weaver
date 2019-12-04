@@ -1,0 +1,4 @@
+# ignore custom configs
+*.*
+!*.example
+!.gitignore

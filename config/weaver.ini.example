@@ -1,0 +1,115 @@
+###
+# app configuration
+# http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/environment.html
+###
+
+[app:main]
+use = egg:weaver
+
+pyramid.reload_templates = false
+pyramid.debug_authorization = false
+pyramid.debug_notfound = false
+pyramid.debug_routematch = false
+pyramid.default_locale_name = en
+
+# mongodb
+mongodb.host = localhost
+mongodb.port = 27017
+mongodb.db_name = weaver
+
+# weaver
+weaver.configuration = ems
+weaver.url = http://localhost:4001
+weaver.username =
+weaver.password =
+weaver.workdir =
+weaver.prefix =
+# WPS settings
+weaver.wps = true
+weaver.wps_path = /ows/wps
+weaver.wps_output = true
+weaver.wps_output_dir = /tmp
+weaver.wps_output_url =
+weaver.wps_output_path = /wpsoutputs
+# WPS metadata
+weaver.wps_metadata_identification_title=Weaver
+weaver.wps_metadata_identification_abstract=Weaver internal WPS used for demo and testing.
+weaver.wps_metadata_identification_keywords=Weaver,WPS,OGC
+weaver.wps_metadata_identification_accessconstraints=NONE
+weaver.wps_metadata_provider_name=CRIM
+weaver.wps_metadata_provider_url=http://pavics-weaver.readthedocs.org/en/latest/
+# WPS REST API
+weaver.wps_restapi = true
+weaver.wps_restapi_path = /
+weaver.wps_restapi_ref = https://github.com/opengeospatial/D009-ADES_and_EMS_Results_and_Best_Practices_Engineering_Report/blob/master/code/ades_wpst.json
+# email notification
+weaver.wps_email_encrypt_salt = salty-email
+weaver.wps_email_encrypt_rounds = 100000
+weaver.wps_email_notify_smtp_host =
+weaver.wps_email_notify_from_addr = example@email.com
+weaver.wps_email_notify_password = 123456
+weaver.wps_email_notify_port = 25
+weaver.wps_email_notify_ssl = true
+weaver.wps_email_notify_template_dir =
+weaver.wps_email_notify_template_default =
+# other configurations
+weaver.wps_processes_file = wps_processes.yml
+weaver.data_sources = data_sources.json
+weaver.extra_options =
+
+###
+# celery scheduler config
+# https://pypi.python.org/pypi/pyramid_celery
+###
+[celery]
+USE_CELERYCONFIG = True
+
+###
+# wsgi server configuration
+###
+
+[server:main]
+use = egg:gunicorn#main
+#bind=unix://${socket}
+bind=localhost:4001
+workers=1
+timeout=1000
+
+###
+# logging configuration
+# http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/logging.html
+###
+
+[loggers]
+keys = root, weaver, celery
+
+[handlers]
+keys = console
+
+[formatters]
+keys = generic
+
+[logger_root]
+level = DEBUG
+handlers = console
+
+[logger_weaver]
+level = DEBUG
+handlers = console
+qualname = weaver
+propagate = 0
+
+[logger_celery]
+level = DEBUG
+handlers = console
+qualname = celery
+propagate = 0
+
+[handler_console]
+class = StreamHandler
+args = (sys.stderr,)
+level = NOTSET
+formatter = generic
+
+[formatter_generic]
+format = %(asctime)s %(levelname)-5.5s [%(name)s][%(threadName)s] %(message)s

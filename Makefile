@@ -4,26 +4,19 @@ RELEASE := master
 -include Makefile.config
 
 # Application
-APP_ROOT := $(CURDIR)
+APP_ROOT := $(abspath $(lastword $(MAKEFILE_LIST))/..)
 APP_NAME := $(shell basename $(APP_ROOT))
 
 # guess OS (Linux, Darwin,...)
 OS_NAME := $(shell uname -s 2>/dev/null || echo "unknown")
 CPU_ARCH := $(shell uname -m 2>/dev/null || uname -p 2>/dev/null || echo "unknown")
 
-# Python
-SETUPTOOLS_VERSION := 42.0.2
-CONDA_VERSION := 4.5
-BUILDOUT_VERSION := 2.13.1
-PYTHON_VERSION := 3.7
-
-# Conda
-CONDA_HOME ?= $(HOME)/conda
-CONDA_ENV ?= $(APP_NAME)
-CONDA_ENVS_DIR ?= $(HOME)/.conda/envs
+# conda
+CONDA_ENV      ?= $(APP_NAME)
+CONDA_HOME     ?= $(HOME)/.conda
+CONDA_ENVS_DIR ?= $(CONDA_HOME)/envs
 CONDA_ENV_PATH := $(CONDA_ENVS_DIR)/$(CONDA_ENV)
-CONDA_PINNED := $(APP_ROOT)/env/conda-pinned
-CONDA_BIN := $(CONDA_HOME)/bin/conda
+CONDA_BIN      := $(CONDA_HOME)/bin/conda
 CONDA_ENV_REAL_TARGET_PATH := $(realpath $(CONDA_ENV_PATH))
 CONDA_ENV_REAL_ACTIVE_PATH := $(realpath ${CONDA_PREFIX})
 ifeq "$(CONDA_ENV_REAL_ACTIVE_PATH)" "$(CONDA_ENV_REAL_TARGET_PATH)"
@@ -33,6 +26,8 @@ else
 	CONDA_CMD := source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)";
 	CONDA_ENV_MODE := [will activate environment]
 endif
+DOWNLOAD_CACHE ?= $(APP_ROOT)/downloads
+PYTHON_VERSION ?= `python -c 'import platform; print(platform.python_version())'`
 
 # Docker
 DOCKER_REPO := docker-registry.crim.ca/ogc/weaver
@@ -57,7 +52,7 @@ DOWNLOAD_CACHE := $(APP_ROOT)/downloads
 BUILDOUT_FILES := parts eggs develop-eggs bin .installed.cfg .mr.developer.cfg *.egg-info bootstrap-buildout.py *.bak.* $(DOWNLOAD_CACHE)
 
 # Tests
-REPORTS_DIR := $(CURDIR)/reports
+REPORTS_DIR := $(APP_ROOT)/reports
 
 # end of configuration
 
@@ -66,69 +61,20 @@ REPORTS_DIR := $(CURDIR)/reports
 .PHONY: all
 all: help
 
-# FIXME: use autodoc target comments
+# Auto documented help from target comments
+#	https://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
 .PHONY: help
-help:
-	@echo "Please use \`make <target>' where <target> is one of"
-	@echo "  help               print this help message. (Default)"
-	@echo "  version            print current project version number."
-	@echo "  info               print information about $(APP_NAME)."
-	@echo "Installation:"
-	@echo "  install            install $(APP_NAME) by running 'bin/buildout -c custom.cfg'."
-	@echo "  install-base       install base packages using pip."
-	@echo "  install-dev        install test packages using pip (also installs $(APP_NAME) with buildout)."
-	@echo "  install-pip        install as a package to allow import in another python code."
-	@echo "  install-raw        install without any requirements or dependencies (suppose everything is setup)."
-	@echo "  install-sys        install system packages from requirements.sh."
-	@echo "  update             update application by running 'bin/buildout -o -c custom.cfg' (buildout offline mode)."
-	@echo "Build and deploy:"
-	@echo "  bump               bump version using VERSION specified as user input, tags and commits changes"
-	@echo "  dry                bump version will not tag nor apply changes if combined with 'bump' target"
-	@echo "  docker-info        detail about version of docker image to be tagged for build/push"
-	@echo "  docker-build       build docker image"
-	@echo "  docker-push        push built docker image"
-	@echo "Cleaning:"
-	@echo "  clean              delete all files that are created by running buildout."
-	@echo "  clean-bld          remove the temporary build files."
-	@echo "  clean-cache        remove caches such as DOWNLOAD_CACHE."
-	@echo "  clean-env          remove the conda enviroment $(CONDA_ENV)."
-	@echo "  clean-src          remove all *.pyc files."
-	@echo "  clean-test         remove files created by code checks, tests, coverage and report."
-	@echo "  clean-dist         remove *all* files that are not controlled by 'git'."
-	@echo "                     [WARNING: use it *only* if you know what you do!]"
-	@echo "Testing targets:"
-	@echo "  test-unit          run unit tests (skip long running and online tests)."
-	@echo "  test-func          run funtional tests (online and usage specific)."
-	@echo "  test-online        run online tests (running instance required)."
-	@echo "  test-offline       run offline tests (not marked as online)."
-	@echo "  test-no-tb14       run all tests except ones marked for 'Testbed-14'."
-	@echo "  test-all           run all tests (including long running tests)."
-	@echo "  test               run custom tests from input specification (make TESTS='<spec>' test).
-	@echo "  coverage       	run all tests using coverage analysis."
-	@echo "  pep8               run pep8 code style checks."
-	@echo "  lint               run linting code style checks."
-	@echo "  secure             run security code checks."
-	@echo "  checks             run every code style checks."
-	@echo "Sphinx targets:"
-	@echo "  docs               generate HTML documentation with Sphinx."
-	@echo "  linkcheck          check all external links in documentation for integrity."
-	@echo "  doc8               run doc8 documentation style checks."
-	@echo "Supporting targets:"
-	@echo "  conda-env-export   export the conda environment."
-	@echo "                     [CAUTION! You always need to check if the enviroment.yml is working.]"
-	@echo "Supervisor targets:"
-	@echo "  start              start supervisor service."
-	@echo "  stop               stop supervisor service."
-	@echo "  restart            restart supervisor service."
-	@echo "  status             show supervisor status"
+help:	## print this help message (default)
+	@echo "$(APP_NAME) help"
+	@echo "Please use 'make <target>' where <target> is one of:"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: version
-version:
-	@echo "Weaver version:"
-	@python -c 'from weaver.__meta__ import __version__; print(__version__)'
+version:	## display current version
+	@-echo "$(APP_NAME) version: $(APP_VERSION)"
 
 .PHONY: info
-info:
+info:		## display make information
 	@echo "Informations about your Bird:"
 	@echo "  OS_NAME             $(OS_NAME)"
 	@echo "  CPU_ARCH            $(CPU_ARCH)"
@@ -143,43 +89,7 @@ info:
 	@echo "  DOWNLOAD_CACHE      $(DOWNLOAD_CACHE)"
 	@echo "  DOCKER_REPO         $(DOCKER_REPO)"
 
-## Helper targets... ensure that Makefile etc are in place
-
-.PHONY: backup
-backup:
-	@echo "Backup custom config..."
-	@-test -f custom.cfg && cp -v --update --backup=numbered --suffix=.bak custom.cfg custom.cfg.bak
-
-.PHONY: .gitignore
-.gitignore:
-	@echo "Setup default .gitignore..."
-	@curl "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/dot_gitignore" \
-		--silent --insecure --output .gitignore
-
-.PHONY: bootstrap.sh
-bootstrap.sh:
-	@echo "Update bootstrap.sh..."
-	@curl "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/bootstrap.sh" \
-		--silent --insecure --output \
-		bootstrap.sh "https://raw.githubusercontent.com/bird-house/birdhousebuilder.bootstrap/$(RELEASE)/bootstrap.sh"
-	@chmod 755 bootstrap.sh
-
-custom.cfg:
-	@echo "Using custom.cfg for buildout..."
-	@test -f custom.cfg || cp -v custom.cfg.example custom.cfg
-
-.PHONY: downloads
-downloads:
-	@echo "Using DOWNLOAD_CACHE $(DOWNLOAD_CACHE)"
-	@test -d $(DOWNLOAD_CACHE) || mkdir -v -p $(DOWNLOAD_CACHE)
-
-.PHONY: init
-init: custom.cfg downloads
-
-bootstrap-buildout.py:
-	@echo "Update buildout bootstrap-buildout.py..."
-	@test -f boostrap-buildout.py || curl https://bootstrap.pypa.io/bootstrap-buildout.py \
-		--insecure --silent --output bootstrap-buildout.py
+## Helper targets
 
 .PHONY: mkdir-reports
 mkdir-reports:
@@ -187,251 +97,209 @@ mkdir-reports:
 
 ## conda targets
 
-.PHONY: conda
-conda:
-	@echo "Installing conda..."
-	@test -f "$(CONDA_BIN)" || ( \
-		echo "Downloading: [$(CONDA_URL)/$(FN)], saved to: [$(DOWNLOAD_CACHE)/$(FN)]." && \
-		mkdir -p "$(DOWNLOAD_CACHE)" && mkdir -p "$(CONDA_HOME)" && \
-		curl "$(CONDA_URL)/$(FN)" --silent --insecure --output "$(DOWNLOAD_CACHE)/$(FN)" && \
-		bash "$(DOWNLOAD_CACHE)/$(FN)" -f -b -p "$(CONDA_HOME)" )
+.PHONY: conda-base
+conda-base:		## obtain and install a missing conda distribution
+	@echo "Validating conda installation..."
+	@test -f "$(CONDA_HOME)/bin/conda" || test -d "$(DOWNLOAD_CACHE)" || \
+		(echo "Creating download directory: $(DOWNLOAD_CACHE)" && mkdir -p "$(DOWNLOAD_CACHE)")
+	@test -f "$(CONDA_HOME)/bin/conda" || test -f "$(DOWNLOAD_CACHE)/$(FN)" || \
+		(echo "Fetching conda distribution from: $(CONDA_URL)/$(FN)" && \
+		 curl "$(CONDA_URL)/$(FN)" --insecure --output "$(DOWNLOAD_CACHE)/$(FN)")
+	@test -f "$(CONDA_HOME)/bin/conda" || \
+		(bash "$(DOWNLOAD_CACHE)/$(FN)" -b -u -p "$(CONDA_HOME)" && \
+		 echo "Make sure to add '$(CONDA_HOME)/bin' to your PATH variable in '~/.bashrc'.")
 
 .PHONY: conda-config
-conda-config: conda
-	@echo "Update ~/.condarc"
-	@-"$(CONDA_BIN)" install -y conda=$(CONDA_VERSION) requests
+conda-config: conda-base	## setup configuration of the conda environment
+	@echo "Updating conda configuration..."
 	@"$(CONDA_BIN)" config --add envs_dirs $(CONDA_ENVS_DIR)
 	@"$(CONDA_BIN)" config --set ssl_verify true
 	#@"$(CONDA_BIN)" config --set use_pip true
 	@"$(CONDA_BIN)" config --set channel_priority true
 	@"$(CONDA_BIN)" config --set auto_update_conda false
 	@"$(CONDA_BIN)" config --add channels defaults
-	@"$(CONDA_BIN)" config --append channels birdhouse
 	@"$(CONDA_BIN)" config --append channels conda-forge
 
 .PHONY: conda-env
-conda-env: conda conda-config
-	@test -d "$(CONDA_ENV_PATH)" || echo "Creating conda environment: $(CONDA_ENV)..."
-	@echo '"$(CONDA_BIN)" env create -n "$(CONDA_ENV)" "python=$(PYTHON_VERSION)"'
-	@test -d "$(CONDA_ENV_PATH)" || "$(CONDA_BIN)" create -y -n "$(CONDA_ENV)" "python=$(PYTHON_VERSION)"
-	@echo "Update conda environment: $(CONDA_ENV)..."
-	"$(CONDA_BIN)" install -y -n "$(CONDA_ENV)" "setuptools=$(SETUPTOOLS_VERSION)" supervisor nginx
-	@echo "Updating pip..."
-	@-bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV); pip install --upgrade pip"
+conda-env: conda-base conda-config	## create the conda environment
+	@test -d "$(CONDA_ENV_PATH)" || \
+		(echo "Creating conda environment at '$(CONDA_ENV_PATH)'..." && \
+		 "$(CONDA_HOME)/bin/conda" create -y -n "$(CONDA_ENV)" python=$(PYTHON_VERSION))
 
 .PHONY: conda-pinned
-conda-pinned: conda-env
+conda-pinned: conda-env		## pin the conda version
 	@echo "Update pinned conda packages..."
 	@-test -d $(CONDA_ENV_PATH) && test -f $(CONDA_PINNED) && \
 		cp -f "$(CONDA_PINNED)" "$(CONDA_ENV_PATH)/conda-meta/pinned"
 
 .PHONY: conda-env-export
-conda-env-export:
+conda-env-export:		## export the conda environment
 	@echo "Exporting conda enviroment..."
 	@test -d $(CONDA_ENV_PATH) && "$(CONDA_BIN)" env export -n $(CONDA_ENV) -f environment.yml
 
 ## Build targets
 
-.PHONY: bootstrap
-bootstrap: init conda-env conda-pinned bootstrap-buildout.py
-	@echo "Bootstrap buildout..."
-	@-bash -c "$(CONDA_CMD) python -c 'import zc.buildout' || pip install zc.buildout==$(BUILDOUT_VERSION)"
-	@test -f bin/buildout || bash -c "$(CONDA_CMD) python bootstrap-buildout.py -c custom.cfg \
-			--allow-site-packages \
-			--setuptools-version=$(SETUPTOOLS_VERSION) \
-			--buildout-version=$(BUILDOUT_VERSION)"
+.PHONY: install
+install: install-sys install-pip install-pkg  ## install application with all its dependencies
 
 .PHONY: install-dev
-install-dev: install-pip
+install-dev: install-pip	## install developement and test dependencies
 	@echo "Installing development packages with pip..."
-	@-bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV);pip install -r $(APP_ROOT)/requirements-dev.txt"
+	@-bash -c '$(CONDA_CMD) pip install -r $(APP_ROOT)/requirements-dev.txt'
 	@echo "Install with pip complete. Test service with \`make test*' variations."
 
-.PHONY: install-base
-install-base:
+.PHONY: install-pkg
+install-pkg: install-pip	## install application package dependencies
 	@echo "Installing base packages with pip..."
 	@-bash -c "$(CONDA_CMD) pip install -r $(APP_ROOT)/requirements.txt --no-cache-dir"
 	@echo "Install with pip complete."
 
 .PHONY: install-sys
-install-sys:
-	@echo "Installing system packages for bootstrap..."
-	@bash bootstrap.sh -i
-	@echo "Installing system packages for your application..."
-	@-test -f requirements.sh && bash requirements.sh
-	# FIXME: above to be removed...
+install-sys: clean conda-env	## install system dependencies and required installers/runners
 	@echo "Installing system dependencies..."
-	@bash -c '$(CONDA_CMD) pip install --upgrade pip setuptools'
-	@bash -c '$(CONDA_CMD) pip install gunicorn'
+	@bash -c '$(CONDA_CMD) pip install --upgrade pip setuptools gunicorn'
 
 .PHONY: install-pip
-install-pip: install
+install-pip:	## install application as a package to allow import from another python package
 	@echo "Installing package with pip..."
-	@-bash -c "source $(CONDA_HOME)/bin/activate $(CONDA_ENV);pip install $(CURDIR)"
+	@-bash -c '$(CONDA_CMD) pip install $(APP_ROOT)'
 	@echo "Install with pip complete."
 
 .PHONY: install-raw
-install-raw:
+install-raw:	## install without any requirements or dependencies (suppose everything is setup)
 	@echo "Installing package without dependencies..."
-	@-bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; pip install -e "$(CURDIR)" --no-deps'
+	@-bash -c '$(CONDA_CMD) pip install -e "$(APP_ROOT)" --no-deps'
 	@echo "Install package complete."
-
-.PHONY: install
-install: bootstrap install-base
-	@echo "Installing application with buildout..."
-	@-bash -c "$(CONDA_CMD) bin/buildout buildout:anaconda-home=$(CONDA_HOME) -c custom.cfg;"
-	@echo "Start service with \`make start'"
-
-.PHONY: update
-update:
-	@echo "Update application config with buildout (offline mode)..."
-	@-bash -c "$(CONDA_CMD) bin/buildout buildout:anaconda-home=$(CONDA_HOME) -o -c custom.cfg"
-
-.PHONY: update-config
-update-config:
-	@echo "Update application config with buildout (offline mode) and environment variables..."
-	@-bash -c "$(CONDA_CMD) bin/buildout buildout:anaconda-home=$(CONDA_HOME) settings:hostname=$(HOSTNAME) \
-			settings:output-port=$(OUTPUT_PORT) settings:http-port=$(HTTP_PORT) -o -c custom.cfg"
-
-.PHONY: online-update-config
-online-update-config:
-	@echo "Update application config with buildout (online but non-newest mode) and environment variables..."
-	@-bash -c "$(CONDA_CMD) bin/buildout buildout:anaconda-home=$(CONDA_HOME) \
-			settings:hostname=$(HOSTNAME) settings:output-port=$(OUTPUT_PORT) \
-			settings:http-port=$(HTTP_PORT) -N -c custom.cfg"
 
 ## Cleanup targets
 
 .PHONY: clean
-clean: clean-bld clean-cache clean-src clean-test
-	@echo "Cleaning buildout files..."
-	@-for i in $(BUILDOUT_FILES); do \
-            test -e $$i && rm -v -rf $$i; \
-        done
+clean: clean-build clean-cache clean-src clean-test		## run all cleanup targets
 
-.PHONY: clean-bld
-clean-bld:
+.PHONY: clean-build
+clean-build:		## remove the temporary build files
 	@echo "Removing build files..."
-	@-rm -fr "$(CURDIR)/eggs"
-	@-rm -fr "$(CURDIR)/develop-eggs"
-	@-rm -fr "$(CURDIR)/$(APP_NAME).egg-info"
-	@-rm -fr "$(CURDIR)/parts"
+	@-rm -fr "$(APP_ROOT)/eggs"
+	@-rm -fr "$(APP_ROOT)/develop-eggs"
+	@-rm -fr "$(APP_ROOT)/$(APP_NAME).egg-info"
+	@-rm -fr "$(APP_ROOT)/parts"
 
 .PHONY: clean-cache
-clean-cache:
+clean-cache:		## remove caches such as DOWNLOAD_CACHE
 	@echo "Removing caches..."
-	@-rm -fr "$(CURDIR)/.pytest_cache"
+	@-rm -fr "$(APP_ROOT)/.pytest_cache"
 	@-rm -fr "$(DOWNLOAD_CACHE)"
 
 .PHONY: clean-env
-clean-env: stop
+clean-env: stop		## remove the conda enviroment
 	@echo "Removing conda env '$(CONDA_ENV)'"
 	@-test -d "$(CONDA_ENV_PATH)" && "$(CONDA_BIN)" remove -n $(CONDA_ENV) --yes --all
 
 .PHONY: clean-src
-clean-src:
+clean-src:		## remove all *.pyc files
 	@echo "Removing *.pyc files..."
 	@-find "$(APP_ROOT)" -type f -name "*.pyc" -exec rm {} \;
 	@-rm -rf ./src
 
 .PHONY: clean-test
-clean-test:
+clean-test:		## remove files created by code checks, tests, coverage and report
 	@echo "Removing test/coverage/report files..."
-	@-rm -f "$(CURDIR)/.coverage"
-	@-rm -f "$(CURDIR)/coverage.*"
-	@-rm -fr "$(CURDIR)/coverage"
+	@-rm -f "$(APP_ROOT)/.coverage"
+	@-rm -f "$(APP_ROOT)/coverage.*"
+	@-rm -fr "$(APP_ROOT)/coverage"
 	@-rm -fr "$(REPORTS_DIR)"
 
 .PHONY: clean-dist
-clean-dist: backup clean
+clean-dist: clean	## remove *all* files that are not controlled by 'git' except *.bak and makefile configuration
 	@echo "Cleaning distribution..."
 	@git diff --quiet HEAD || echo "There are uncommited changes! Not doing 'git clean'..."
-	@-git clean -dfx -e *.bak -e custom.cfg -e Makefile.config
+	@-git clean -dfx -e *.bak -e Makefile.config
 
 ## Testing targets
 
 .PHONY: test-unit
-test-unit:
+test-unit:		## run unit tests (skip long running and online tests)
 	@echo "Running tests (skip slow and online tests)..."
-	bash -c "$(CONDA_CMD) pytest tests -v -m 'not slow and not online and not functional' --junitxml $(CURDIR)/tests/results.xml"
+	bash -c "$(CONDA_CMD) pytest tests -v -m 'not slow and not online and not functional' --junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: test-func
-test-func:
+test-func:		## run funtional tests (online and usage specific)
 	@echo "Running functional tests..."
-	bash -c "$(CONDA_CMD) pytest tests -v -m 'functional' --junitxml $(CURDIR)/tests/results.xml"
+	bash -c "$(CONDA_CMD) pytest tests -v -m 'functional' --junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: test-online
-test-online:
+test-online:	## run online tests (running instance required)
 	@echo "Running online tests (running instance required)..."
-	bash -c "$(CONDA_CMD) pytest tests -v -m 'online' --junitxml $(CURDIR)/tests/results.xml"
+	bash -c "$(CONDA_CMD) pytest tests -v -m 'online' --junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: test-offline
-test-offline:
+test-offline:	## run offline tests (not marked as online)
 	@echo "Running offline tests (not marked as online)..."
-	bash -c "$(CONDA_CMD) pytest tests -v -m 'not online' --junitxml $(CURDIR)/tests/results.xml"
+	bash -c "$(CONDA_CMD) pytest tests -v -m 'not online' --junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: test-no-tb14
-test-no-tb14:
+test-no-tb14:	## run all tests except ones marked for 'Testbed-14'
 	@echo "Running all tests except ones marked for 'Testbed-14'..."
-	bash -c "$(CONDA_CMD) pytest tests -v -m 'not testbed14' --junitxml $(CURDIR)/tests/results.xml"
+	bash -c "$(CONDA_CMD) pytest tests -v -m 'not testbed14' --junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: test-all
-test-all:
+test-all:	## run all tests (including long running tests)
 	@echo "Running all tests (including slow and online tests)..."
-	bash -c "$(CONDA_CMD) pytest tests -v --junitxml $(CURDIR)/tests/results.xml"
+	bash -c "$(CONDA_CMD) pytest tests -v --junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: test
-test:
+test:	## run custom tests from input specification (make TESTS='<spec>' test) [ex: make TESTS='not functional' test]
 	@echo "Running custom tests from input specification..."
 	@[ "${TESTS}" ] || ( echo ">> 'TESTS' is not set"; exit 1 )
-	bash -c "$(CONDA_CMD) pytest tests -v -m '${TESTS}' --junitxml $(CURDIR)/tests/results.xml"
+	bash -c "$(CONDA_CMD) pytest tests -v -m '${TESTS}' --junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: coverage
-coverage: mkdir-reports
+coverage: mkdir-reports		## run all tests using coverage analysis
 	@echo "Running coverage analysis..."
-	@bash -c '$(CONDA_CMD) coverage run -m pytest "$(CURDIR)/tests" || true'
-	@bash -c '$(CONDA_CMD) coverage xml --rcfile="$(CURDIR)/setup.cfg" -i -o "$(REPORTS_DIR)/coverage.xml"'
-	@bash -c '$(CONDA_CMD) coverage report --rcfile="$(CURDIR)/setup.cfg" -i -m'
-	@bash -c '$(CONDA_CMD) coverage html --rcfile="$(CURDIR)/setup.cfg" -d "$(REPORTS_DIR)/coverage"'
+	@bash -c '$(CONDA_CMD) coverage run -m pytest "$(APP_ROOT)/tests" || true'
+	@bash -c '$(CONDA_CMD) coverage xml --rcfile="$(APP_ROOT)/setup.cfg" -i -o "$(REPORTS_DIR)/coverage.xml"'
+	@bash -c '$(CONDA_CMD) coverage report --rcfile="$(APP_ROOT)/setup.cfg" -i -m'
+	@bash -c '$(CONDA_CMD) coverage html --rcfile="$(APP_ROOT)/setup.cfg" -d "$(REPORTS_DIR)/coverage"'
 
 ## Code check targets
 
 .PHONY: pep8
-pep8: mkdir-reports
+pep8: mkdir-reports		## run PEP8 code style checks
 	@echo "Running pep8 code style checks..."
-	@bash -c '$(CONDA_CMD) flake8 --config="$(CURDIR)/setup.cfg" --tee --output-file="$(REPORTS_DIR)/pep8.txt"'
+	@bash -c '$(CONDA_CMD) flake8 --config="$(APP_ROOT)/setup.cfg" --tee --output-file="$(REPORTS_DIR)/pep8.txt"'
 
 .PHONY: lint
-lint: mkdir-reports
+lint: mkdir-reports		## run linting code style checks
 	@echo "Running linting code style checks..."
-	@bash -c '$(CONDA_CMD) pylint --rcfile="$(CURDIR)/setup.cfg" "$(CURDIR)/weaver" "$(CURDIR)/tests" --reports y \
+	@bash -c '$(CONDA_CMD) pylint --rcfile="$(APP_ROOT)/setup.cfg" "$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" --reports y \
 		| tee "$(REPORTS_DIR)/lint.txt"'
 
 .PHONY: secure
-secure: mkdir-reports
+secure: mkdir-reports	## run security code checks
 	@echo "Running security code checks..."
-	@bash -c '$(CONDA_CMD) bandit -v -r "$(CURDIR)/weaver" | tee "$(REPORTS_DIR)/secure.txt"'
+	@bash -c '$(CONDA_CMD) bandit -v -r "$(APP_ROOT)/weaver" | tee "$(REPORTS_DIR)/secure.txt"'
 
 .PHONY: checks
-checks: pep8 lint secure doc8 linkcheck
+checks: pep8 lint secure doc8 docs-linkcheck	## run every code style checks
 
 ## Documentation targets
 
-.PHONY: docs
-docs:
-	@echo "Generating docs with Sphinx..."
-	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; $(MAKE) -C $@ clean html'
-	@echo "open your browser: firefox docs/build/html/index.html"
-
-.PHONY: linkcheck
-linkcheck:
-	@echo "Run link checker on docs..."
-	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; (MAKE) -C docs linkcheck'
-
 .PHONY: doc8
-doc8:
+doc8:	## run doc8 documentation style checks
 	@echo "Running doc8 doc style checks..."
-	@bash -c 'source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)"; doc8 docs/'
+	@bash -c '$(CONDA_CMD) doc8 "$(APP_ROOT)/docs"'
+
+.PHONY: docs-linkcheck
+docs-linkcheck:		## check all external links in documentation for integrity
+	@echo "Run link checker on docs..."
+	@bash -c '$(CONDA_CMD) (MAKE) -C "$(APP_ROOT)/docs" linkcheck'
+
+.PHONY: docs
+docs:	## generate HTML documentation with Sphinx
+	@echo "Generating docs with Sphinx..."
+	@bash -c '$(CONDA_CMD) $(MAKE) -C $@ clean html'
+	@echo "open your browser:"
+	@echo "		firefox '$(APP_ROOT)/docs/build/html/index.html'"
 
 ## Bumpversion targets
 
@@ -460,7 +328,7 @@ docker-info:
 
 .PHONY: docker-build
 docker-build:
-	@bash -c "docker build $(CURDIR) \
+	@bash -c "docker build $(APP_ROOT) \
 		-t $(DOCKER_REPO):`python -c 'from weaver.__meta__ import __version__; print(__version__)'`"
 
 .PHONY: docker-push

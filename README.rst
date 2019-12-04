@@ -11,13 +11,6 @@ Weaver (the nest-builder)
   nesting habits instead.*
   (`Wikipedia <https://en.wikipedia.org/wiki/Ploceidae>`_)
 
-`Weaver` is an `Execution Management Service (EMS)` that allows the execution of workflows chaining various
-applications and `Web Processing Services (WPS)` inputs and outputs. Remote execution is deferred by the `EMS` to an
-`Application Deployment and Execution Service (ADES)`, as defined by `Common Workflow Language (CWL)` configurations.
-
-`Weaver` can be launched either as an `EMS` or an `ADES` according to configuration values it is deployed with.
-For more details, see `Configuration`_ section.
-
 .. start-badges
 
 .. list-table::
@@ -26,7 +19,7 @@ For more details, see `Configuration`_ section.
     * - dependencies
       - | |py_ver| |requires|
     * - build status
-      - | |travis_latest| |travis_tag| |coverage| |codacy|
+      - | |travis_latest| |travis_tagged| |readthedocs| |coverage| |codacy|
     * - releases
       - | |version| |commits-since| |license|
 
@@ -50,9 +43,13 @@ For more details, see `Configuration`_ section.
     :alt: Travis-CI Build Status (master branch)
     :target: https://travis-ci.com/crim-ca/weaver
 
-.. |travis_tag| image:: https://img.shields.io/travis/com/crim-ca/weaver/0.2.2.svg?label=0.2.2
+.. |travis_tagged| image:: https://img.shields.io/travis/com/crim-ca/weaver/0.2.2.svg?label=0.2.2
     :alt: Travis-CI Build Status (latest tag)
     :target: https://github.com/crim-ca/weaver/tree/0.2.2
+
+.. |readthedocs| image:: https://img.shields.io/readthedocs/pavics-weaver
+    :alt: Readthedocs Build Status (master branch)
+    :target: `readthedocs`_
 
 .. |coverage| image:: https://img.shields.io/codecov/c/gh/crim-ca/weaver.svg?label=coverage
     :alt: Travis-CI CodeCov Coverage
@@ -67,6 +64,23 @@ For more details, see `Configuration`_ section.
     :alt: GitHub License
 
 .. end-badges
+
+----------------
+Summary
+----------------
+
+`Weaver` is primarily an `Execution Management Service (EMS)` that allows the execution of workflows chaining various
+applications and `Web Processing Services (WPS)` inputs and outputs. Remote execution of each process in a workflow
+chain is dispatched by the `EMS` to one or many registered `Application Deployment and Execution Service (ADES)` by
+ensuring the transfer of files accordingly between instances when located across multiple remote locations.
+
+`Weaver` can also accomplish the `ADES` role in order to perform application deployment at the data source using
+the application definition provided by `Common Workflow Language (CWL)` configuration. It can then directly execute a
+registered process execution with received inputs from a WPS request to expose output results for a following `ADES`
+in a `EMS` workflow execution chain.
+
+`Weaver` can be launched either as an `EMS` or an `ADES` according to configuration values it is deployed with.
+For more details, see `Configuration`_ and `Documentation`_ sections.
 
 ----------------
 Links
@@ -84,19 +98,38 @@ Test server: https://ogc-ems.crim.ca/weaver/
 Configuration
 ----------------
 
-All configuration settings can be overridden using a ``custom.cfg`` file that will be picked up by `buildout` during installation.
-An example of such file is provided here: `custom.cfg.example <https://github.com/crim-ca/weaver/blob/master/custom.cfg.example>`_.
+All configuration settings can be overridden using a ``weaver.ini`` file that will be picked during
+instantiation of the application. An example of such file is provided here: `weaver.ini.example`_.
 
-Setting `Weaver`'s operational mode (`EMS`/`ADES`) is accomplished using the `configuration` field of ``custom.cfg``.
+Setting `Weaver`'s operational mode (`EMS`/`ADES`) is accomplished using the `configuration` field of ``weaver.ini``.
+
+For more configuration details, please refer to Documentation_.
+
+.. _weaver.ini.example: ./config/weaver.ini.example
+
+----------------
+Documentation
+----------------
+
+The REST API documentation is auto-generated and served under ``{WEAVER_URL}/api/`` using
+Swagger-UI with tag ``latest``.
+
+More ample details about installation, configuration and usage are provided on `readthedocs`_.
+These are generated from corresponding information provided in `docs`_.
+
+.. _readthedocs: https://pavics-weaver.readthedocs.io
+.. _docs: ./docs
 
 ----------------
 Extra Details
 ----------------
 
 The project is developed upon `OGC Testbed-14 – ESA Sponsored Threads – Exploitation Platform` findings and
-following improvements. It is also advanced with sponsorship of U.S. Department of Energy to support common API of the Earth System Grid Federation (`ESGF`_).
+following improvements. It is also advanced with sponsorship of U.S. Department of Energy to support common
+API of the Earth System Grid Federation (`ESGF`_).
 
-`Weaver` is a **prototype** implemented in Python with the `Pyramid`_ web framework. It is part of `PAVICS`_ and `Birdhouse`_ ecosystems.
+`Weaver` is a **prototype** implemented in Python with the `Pyramid`_ web framework.
+It is part of `PAVICS`_ and `Birdhouse`_ ecosystems.
 
 .. _PAVICS: https://ouranosinc.github.io/pavics-sdi/index.html
 .. _Birdhouse: http://bird-house.github.io/

@@ -1,6 +1,7 @@
 """
 pywps 4.x wrapper
 """
+from weaver.config import get_weaver_configuration
 from weaver.database import get_db
 from weaver.store.base import StoreProcesses
 from weaver.owsexceptions import OWSNoApplicableCode
@@ -12,7 +13,7 @@ from pyramid_celery import celery_app as app
 from pyramid.threadlocal import get_current_request
 from pywps import configuration as pywps_config
 from pywps.app.Service import Service
-from six.moves.configparser import SafeConfigParser
+from six.moves.configparser import ConfigParser, SafeConfigParser
 from six.moves.urllib.parse import urlparse
 from typing import TYPE_CHECKING
 import os
@@ -23,9 +24,8 @@ if TYPE_CHECKING:
     from weaver.typedefs import AnySettingsContainer        # noqa: F401
     from typing import AnyStr, Dict, Union, Optional        # noqa: F401
 
-# can be overridden with 'settings.wps-cfg'
-DEFAULT_PYWPS_CFG = os.path.join(os.path.abspath(os.path.dirname(__file__)), "wps.cfg")
-PYWPS_CFG = None
+# global config
+PYWPS_CFG = None    # type: Optional[ConfigParser]
 
 
 def _get_settings_or_wps_config(container,                  # type: AnySettingsContainer
@@ -35,25 +35,19 @@ def _get_settings_or_wps_config(container,                  # type: AnySettingsC
                                 default_not_found,          # type: AnyStr
                                 message_not_found,          # type: AnyStr
                                 ):                          # type: (...) -> AnyStr
+    global PYWPS_CFG
+
     settings = get_settings(container)
-    wps_path = settings.get(weaver_setting_name)
-    if not wps_path:
+    found = settings.get(weaver_setting_name)
+    if not found:
+        if not PYWPS_CFG:
+            load_pywps_cfg(container)
         wps_cfg = get_wps_cfg_path(settings)
-        config = SafeConfigParser()
-        config.read(wps_cfg)
         wps_path = config.get(config_setting_section, config_setting_name)
-    if not isinstance(wps_path, six.string_types):
+    if not isinstance(found, six.string_types):
         LOGGER.warn("{} not set in settings or WPS configuration, using default value.".format(message_not_found))
-        wps_path = default_not_found
-    return wps_path.rstrip('/').strip()
-
-
-def get_wps_cfg_path(container):
-    # type: (AnySettingsContainer) -> AnyStr
-    """
-    Retrieves the WPS configuration file (`wps.cfg` by default or `weaver.wps_cfg` if specified).
-    """
-    return get_settings(container).get("weaver.wps_cfg", DEFAULT_PYWPS_CFG)
+        found = default_not_found
+    return found.strip()
 
 
 def get_wps_path(container):
@@ -111,10 +105,34 @@ def load_pywps_cfg(container, config=None):
 
     settings = get_settings(container)
     if PYWPS_CFG is None:
-        # get PyWPS config
-        file_config = config if isinstance(config, six.string_types) or isinstance(config, list) else None
-        pywps_config.load_configuration(file_config or get_wps_cfg_path(settings))
-        PYWPS_CFG = pywps_config
+        # initial setup of PyWPS config
+        pywps_config.load_configuration([])  # load defaults
+        PYWPS_CFG = pywps_config.CONFIG  # update reference
+        # must be set to INFO to disable sqlalchemy trace.
+        # see : https://github.com/geopython/pywps/blob/master/pywps/dblog.py#L169
+        if logging.getLevelName(PYWPS_CFG.get("logging", "level")) <= logging.DEBUG:
+            PYWPS_CFG.set("logging", "level", "INFO")
+        # update metadata
+        for setting_name, setting_value in settings.items():
+            if setting_name.starts_with("weaver.wps_metadata"):
+                PYWPS_CFG.set("metadata:main", setting_name.replace("weaver.wps_metadata", ""), setting_value)
+        # add configuration keyword if not already provided
+        wps_keywords = PYWPS_CFG.get("metadata:main", "identification_keywords")
+        weaver_mode = get_weaver_configuration(settings)
+        if get_weaver_configuration(settings) not in wps_keywords:
+            wps_keywords += ("," if wps_keywords else "") + weaver_mode
+            PYWPS_CFG.set("metadata:main", "identification_keywords", wps_keywords)
+
+        # update pywps server configs with corresponding weaver settings
+        """
+        [server]
+        url=https://localhost:4000/ows/wps
+        sethomedir=true
+        setworkdir=true
+        outputpath=/tmp
+        outputurl=https://localhost:4000/wpsoutputs
+        
+        """
 
     # add additional config passed as dictionary of {'section.key': 'value'}
     if isinstance(config, dict):
@@ -127,7 +145,7 @@ def load_pywps_cfg(container, config=None):
 
     # find output directory from app config or wps config
     if "weaver.wps_output_dir" not in settings:
-        output_dir = PYWPS_CFG.get_config_value("server", "outputpath")
+        output_dir = pywps_config.get_config_value("server", "outputpath")
         settings["weaver.wps_output_dir"] = output_dir
     # ensure the output dir exists if specified
     output_dir = get_wps_output_dir(settings)
@@ -144,8 +162,8 @@ def load_pywps_cfg(container, config=None):
         settings["weaver.wps_output_url"] = output_url
 
     # enforce back resolved values onto PyWPS config
-    PYWPS_CFG.CONFIG.set("server", "outputpath", settings["weaver.wps_output_dir"])
-    PYWPS_CFG.CONFIG.set("server", "outputurl", settings["weaver.wps_output_url"])
+    PYWPS_CFG.set("server", "outputpath", settings["weaver.wps_output_dir"])
+    PYWPS_CFG.set("server", "outputurl", settings["weaver.wps_output_url"])
 
 
 # @app.task(bind=True)
@@ -159,10 +177,9 @@ def pywps_view(environ, start_response):
     try:
         # get config file
         settings = get_settings(app)
-        pywps_cfg = environ.get("PYWPS_CFG") or settings.get("PYWPS_CFG")
-        if not pywps_cfg:
-            environ["PYWPS_CFG"] = os.getenv("PYWPS_CFG") or get_wps_cfg_path(settings)
-        load_pywps_cfg(app, config=pywps_cfg)
+        pywps_cfg = environ.get("PYWPS_CFG") or settings.get("PYWPS_CFG") or os.getenv("PYWPS_CFG")
+        if not isinstance(pywps_cfg, ConfigParser):
+            environ["PYWPS_CFG"] = load_pywps_cfg(app, config=pywps_cfg)
 
         # call pywps application with processes filtered according to the adapter"s definition
         process_store = get_db(app).get_store(StoreProcesses)
