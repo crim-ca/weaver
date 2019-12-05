@@ -1,12 +1,17 @@
-Dockerfile
+# Docker
+docker
 .dockerignore
 
+# Git
 .git
 
 # installer
 #Makefile
 [Mm]akefile.config
 downloads
+
+# Environments
+env
 
 # Python / Extensions etc.
 *~
@@ -68,7 +73,12 @@ src
 **/*.mod
 **/*.out
 
-# process results
+# Project process results
 workflows
 **/*.tif
 **/*.zip
+
+# Project local configurations
+config/weaver.ini
+config/wps_processes.yml
+config/data_sources.json

@@ -56,8 +56,5 @@ after_success:
     if [ -z "${TAG_VERSION}" ] || [ "$TRAVIS_PULL_REQUEST" = "false" ] then
       echo "Nothing to build for '$TRAVIS_BRANCH' (PR: $TRAVIS_PULL_REQUEST)"
     else
-      echo "Building: 'docker-registry.crim.ca/ogc/weaver:$TAG_VERSION'"
-      docker login docker-registry.crim.ca -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-      docker build . -t docker-registry.crim.ca/ogc/weaver:$TAG_VERSION
-      docker push docker-registry.crim.ca/ogc/weaver:$TAG_VERSION
+      make APP_VERSION=$TAG_VERSION docker-info docker-build docker-push
     fi

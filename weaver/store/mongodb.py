@@ -11,7 +11,7 @@ from weaver.exceptions import (
     QuoteRegistrationError, QuoteNotFound, QuoteInstanceError,
     BillRegistrationError, BillNotFound, BillInstanceError,
 )
-from weaver.utils import get_base_url, islambda, now, get_sane_name
+from weaver.utils import get_base_url, get_weaver_url, get_sane_name, islambda, now
 from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_MODE_SYNC
 from weaver.processes.types import PROCESS_WORKFLOW, PROCESS_APPLICATION, PROCESS_WPS
 from weaver.status import STATUS_ACCEPTED, map_status, job_status_categories
@@ -172,7 +172,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         registry = kwargs.get("registry")
         settings = kwargs.get("settings", {}) if not registry else registry.settings
         default_processes = kwargs.get("default_processes")
-        self.default_host = settings.get("weaver.url", "")
+        self.default_host = get_weaver_url(settings)
         self.default_wps_endpoint = "{host}{wps}".format(host=self.default_host,
                                                          wps=settings.get("weaver.wps_path", ""))
         if default_processes:

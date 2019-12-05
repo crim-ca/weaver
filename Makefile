@@ -51,7 +51,6 @@ endif
 
 # Buildout files and folders
 DOWNLOAD_CACHE := $(APP_ROOT)/downloads
-BUILDOUT_FILES := parts eggs develop-eggs bin .installed.cfg .mr.developer.cfg *.egg-info bootstrap-buildout.py *.bak.* $(DOWNLOAD_CACHE)
 
 # Tests
 REPORTS_DIR := $(APP_ROOT)/reports
@@ -69,7 +68,7 @@ all: help
 help:	## print this help message (default)
 	@echo "$(APP_NAME) help"
 	@echo "Please use 'make <target>' where <target> is one of:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(word 1,$(MAKEFILE_LIST)) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: version
 version:	## display current version
@@ -193,7 +192,7 @@ clean-cache:		## remove caches such as DOWNLOAD_CACHE
 	@-rm -fr "$(DOWNLOAD_CACHE)"
 
 .PHONY: clean-env
-clean-env: stop		## remove the conda enviroment
+clean-env: 		## remove the conda enviroment
 	@echo "Removing conda env '$(CONDA_ENV)'"
 	@-test -d "$(CONDA_ENV_PATH)" && "$(CONDA_BIN)" remove -n $(CONDA_ENV) --yes --all
 
@@ -263,36 +262,39 @@ coverage: mkdir-reports		## run all tests using coverage analysis
 	@bash -c '$(CONDA_CMD) coverage report --rcfile="$(APP_ROOT)/setup.cfg" -i -m'
 	@bash -c '$(CONDA_CMD) coverage html --rcfile="$(APP_ROOT)/setup.cfg" -d "$(REPORTS_DIR)/coverage"'
 
-## Code check targets
+## Documentation and code check targets
 
-.PHONY: pep8
-pep8: mkdir-reports		## run PEP8 code style checks
+.PHONY: check-pep8
+check-pep8: mkdir-reports		## run PEP8 code style checks
 	@echo "Running pep8 code style checks..."
 	@bash -c '$(CONDA_CMD) flake8 --config="$(APP_ROOT)/setup.cfg" --tee --output-file="$(REPORTS_DIR)/pep8.txt"'
 
-.PHONY: lint
-lint: mkdir-reports		## run linting code style checks
+.PHONY: check-lint
+check-lint: mkdir-reports		## run linting code style checks
 	@echo "Running linting code style checks..."
-	@bash -c '$(CONDA_CMD) pylint --rcfile="$(APP_ROOT)/setup.cfg" "$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" --reports y \
+	@bash -c '$(CONDA_CMD) \
+		pylint --rcfile="$(APP_ROOT)/setup.cfg" "$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" --reports y \
 		| tee "$(REPORTS_DIR)/lint.txt"'
 
-.PHONY: secure
-secure: mkdir-reports	## run security code checks
+.PHONY: check-imports
+check-imports:					## run imports code checks
+	@bash -c '$(CONDA_CMD) isort --check-only --diff --recursive $(APP_ROOT) | tee "$(REPORTS_DIR)/imports.txt"'
+
+.PHONY: check-security
+check-security: mkdir-reports	## run security code checks
 	@echo "Running security code checks..."
 	@bash -c '$(CONDA_CMD) bandit -v -r "$(APP_ROOT)/weaver" | tee "$(REPORTS_DIR)/secure.txt"'
 
 .PHONY: checks
-checks: pep8 lint secure doc8 docs-linkcheck	## run every code style checks
+checks: check-pep8 check-lint check-security check-doc8 check-links	## run every code style checks
 
-## Documentation targets
-
-.PHONY: doc8
-doc8:	## run doc8 documentation style checks
+.PHONY: check-doc8
+check-doc8:	## run doc8 documentation style checks
 	@echo "Running doc8 doc style checks..."
 	@bash -c '$(CONDA_CMD) doc8 "$(APP_ROOT)/docs"'
 
-.PHONY: docs-linkcheck
-docs-linkcheck:		## check all external links in documentation for integrity
+.PHONY: check-links
+check-links:		## check all external links in documentation for integrity
 	@echo "Run link checker on docs..."
 	@bash -c '$(CONDA_CMD) (MAKE) -C "$(APP_ROOT)/docs" linkcheck'
 
@@ -325,15 +327,15 @@ bump:
 
 .PHONY: docker-info
 docker-info:		## obtain docker image information
-	@echo "Will be built, tagged and pushed as:"
+	@echo "Docker image will be built, tagged and pushed as:"
 	@echo "$(DOCKER_REPO):$(APP_VERSION)"
 
 .PHONY: docker-build
-docker-build:		## build the docker images
-	@bash -c 'docker build "$(APP_ROOT)" -t "$(DOCKER_REPO):$(APP_VERSION)"'
+docker-build:		## build the docker image
+	@bash -c 'docker build "$(APP_ROOT)/docker" -f Dockerfile-manager -t "$(DOCKER_REPO):$(APP_VERSION)"'
 
 .PHONY: docker-push
-docker-push: docker-build	## push the docker images
+docker-push: docker-build	## push the docker image
 	@bash -c 'docker push "$(DOCKER_REPO):$(APP_VERSION)"'
 
 ## Supervisor targets

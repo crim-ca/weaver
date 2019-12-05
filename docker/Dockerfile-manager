@@ -1,0 +1,35 @@
+FROM python:3.7-alpine
+LABEL Description="Weaver - Workflow Execution Management Service (EMS); Application, Deployment and Execution Service (ADES)"
+LABEL Maintainer="Francis Charette-Migneault <francis.charette-migneault@crim.ca>"
+LABEL Vendor="CRIM"
+
+# setup paths
+ENV APP_DIR=/opt/local/src/weaver
+ENV APP_CONFIG_DIR=${APP_DIR}/config
+ENV APP_ENV_DIR=${APP_DIR}/env
+WORKDIR ${APP_DIR}
+
+# install dependencies
+COPY weaver/__init__.py weaver/__meta__.py ${APP_DIR}/weaver/
+COPY requirements* setup.py README.rst HISTORY.rst ${APP_DIR}/
+RUN apk update \
+    && apk add \
+    bash \
+    py-pip \
+    libxslt-dev \
+    && apk add --virtual .build-deps \
+    gcc \
+    libffi-dev \
+    python-dev \
+    musl-dev \
+    && pip install --no-cache-dir --upgrade pip setuptools \
+    && pip install --no-cache-dir -e ${APP_DIR} \
+    && apk --purge del .build-deps
+
+# install package
+COPY ./ ${APP_DIR}
+# equivalent of `make install` without conda env and pre-installed packages
+RUN pip install --no-dependencies -e ${APP_DIR}
+
+# run app
+CMD gunicorn --paste ${APP_CONFIG_DIR}/weaver.ini --preload

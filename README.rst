@@ -72,18 +72,20 @@ Weaver (the nest-builder)
 Summary
 ----------------
 
-`Weaver` is primarily an `Execution Management Service (EMS)` that allows the execution of workflows chaining various
-applications and `Web Processing Services (WPS)` inputs and outputs. Remote execution of each process in a workflow
-chain is dispatched by the `EMS` to one or many registered `Application Deployment and Execution Service (ADES)` by
+Weaver is primarily an *Execution Management Service (EMS)* that allows the execution of workflows chaining various
+applications and *Web Processing Services (WPS)* inputs and outputs. Remote execution of each process in a workflow
+chain is dispatched by the *EMS* to one or many registered *Application Deployment and Execution Service (ADES)* by
 ensuring the transfer of files accordingly between instances when located across multiple remote locations.
 
-`Weaver` can also accomplish the `ADES` role in order to perform application deployment at the data source using
-the application definition provided by `Common Workflow Language (CWL)` configuration. It can then directly execute a
-registered process execution with received inputs from a WPS request to expose output results for a following `ADES`
-in a `EMS` workflow execution chain.
+Weaver can also accomplish the *ADES* role in order to perform application deployment at the data source using
+the application definition provided by *Common Workflow Language* (`CWL`_) configuration. It can then directly execute
+a registered process execution with received inputs from a WPS request to expose output results for a following *ADES*
+in a *EMS* workflow execution chain.
 
-`Weaver` can be launched either as an `EMS` or an `ADES` according to configuration values it is deployed with.
+Weaver can be launched either as an *EMS* or an *ADES* according to configuration values it is deployed with.
 For more details, see `Configuration`_ and `Documentation`_ sections.
+
+.. _CWL: https://www.commonwl.org/
 
 ----------------
 Links
@@ -95,7 +97,8 @@ Docker image `repository <https://docker-registry.crim.ca/repositories/3463>`_.
 
     $ docker pull docker-registry.crim.ca/ogc/weaver:0.2.2
 
-Test server: https://ogc-ems.crim.ca/weaver/
+- EMS Test server: https://ogc-ems.crim.ca/weaver/
+- ADES Test server: https://ogc-ades.crim.ca/weaver/
 
 ----------------
 Configuration
@@ -104,7 +107,8 @@ Configuration
 All configuration settings can be overridden using a ``weaver.ini`` file that will be picked during
 instantiation of the application. An example of such file is provided here: `weaver.ini.example`_.
 
-Setting `Weaver`'s operational mode (`EMS`/`ADES`) is accomplished using the `configuration` field of ``weaver.ini``.
+Setting Weaver's operational mode (*EMS*/*ADES*) is accomplished using the
+``weaver.configuration`` field of ``weaver.ini``.
 
 For more configuration details, please refer to Documentation_.
 
@@ -127,14 +131,17 @@ These are generated from corresponding information provided in `docs`_.
 Extra Details
 ----------------
 
-The project is developed upon `OGC Testbed-14 – ESA Sponsored Threads – Exploitation Platform` findings and
-following improvements. It is also advanced with sponsorship of U.S. Department of Energy to support common
-API of the Earth System Grid Federation (`ESGF`_).
+The project is developed upon *OGC Testbed-14 – ESA Sponsored Threads – Exploitation Platform* findings and
+following improvements. It is also advanced with sponsorship of *U.S. Department of Energy* to support common
+API of the *Earth System Grid Federation* (`ESGF`_).
 
-`Weaver` is a **prototype** implemented in Python with the `Pyramid`_ web framework.
+The project is furthermore developed through the *Data Analytics for Canadian Climate Services* (`DACCS`_) initiative.
+
+Weaver is a **prototype** implemented in Python with the `Pyramid`_ web framework.
 It is part of `PAVICS`_ and `Birdhouse`_ ecosystems.
 
 .. _PAVICS: https://ouranosinc.github.io/pavics-sdi/index.html
 .. _Birdhouse: http://bird-house.github.io/
 .. _ESGF: https://esgf.llnl.gov/
+.. _DACCS: https://app.dimensions.ai/details/grant/grant.8105745
 .. _Pyramid: http://www.pylonsproject.org

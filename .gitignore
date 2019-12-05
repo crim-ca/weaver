@@ -78,9 +78,12 @@ environment.yml
 env
 venv
 
-# process results
+# project process results
 *.tif
 *.zip
+workflow[s]
 
-# project
-workflows
+# project local configurations
+config/weaver.ini
+config/wps_processes.yml
+config/data_sources.json

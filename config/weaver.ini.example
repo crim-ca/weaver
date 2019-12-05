@@ -71,8 +71,6 @@ USE_CELERYCONFIG = True
 [server:main]
 use = egg:gunicorn#main
 bind = localhost:4001
-host = localhost
-port = 4001
 workers = 1
 timeout = 10
 

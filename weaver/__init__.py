@@ -50,7 +50,7 @@ def main(global_config, **settings):
         local_config.include("pyramid_celery")
         local_config.configure_celery(global_config["__file__"])
 
-    local_config.include('weaver')
+    local_config.include("weaver")
 
     LOGGER.info("Registering builtin processes...")
     register_builtin_processes(local_config)
