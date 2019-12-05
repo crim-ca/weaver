@@ -16,7 +16,7 @@ from tests.utils import (
 from tempfile import NamedTemporaryFile
 from time import sleep
 # noinspection PyDeprecation
-from contextlib import nested
+from contextlib import ExitStack
 # noinspection PyPackageRequirements
 import mock
 # noinspection PyPackageRequirements
@@ -91,7 +91,9 @@ class BuiltinAppTest(unittest.TestCase):
                 "outputs": [{"id": "output", "transmissionMode": "reference"}],
             }
             # noinspection PyDeprecation
-            with nested(*mocked_execute_process()):
+            with ExitStack() as stack:
+                for process in mocked_execute_process():
+                    stack.enter_context(process)
                 path = "/processes/jsonarray2netcdf/jobs"
                 resp = mocked_sub_requests(self.app, "post_json", path, params=data, headers=self.json_headers)
 

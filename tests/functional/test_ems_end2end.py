@@ -21,14 +21,11 @@ from pyramid import testing
 from pyramid.settings import asbool
 from pyramid.httpexceptions import HTTPOk, HTTPCreated, HTTPUnauthorized, HTTPNotFound
 # use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
-# noinspection PyPackageRequirements
 from webtest import TestApp as WebTestApp
 from typing import TYPE_CHECKING
 from copy import deepcopy
 import unittest
-# noinspection PyPackageRequirements
 import pytest
-# noinspection PyPackageRequirements
 import mock
 import requests
 import logging

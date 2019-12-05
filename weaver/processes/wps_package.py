@@ -520,7 +520,6 @@ def _is_cwl_enum_type(io_info):
     return True, io_type, MODE.SIMPLE, io_allow
 
 
-# noinspection PyUnusedLocal
 def _cwl2wps_io(io_info, io_select):
     # type:(CWL_IO_Type, AnyStr) -> WPS_IO_Type
     """Converts input/output parameters from CWL types to WPS types.

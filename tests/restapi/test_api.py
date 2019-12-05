@@ -74,9 +74,8 @@ class GenericApiRoutesTestCase(unittest.TestCase):
 
 class RebasedApiRoutesTestCase(unittest.TestCase):
 
-    # noinspection PyUnusedLocal
     @staticmethod
-    def redirect_api_view(request):
+    def redirect_api_view(request):  # noqa: F811
         return HTTPFound(location=api_swagger_json_service.path)
 
     @classmethod
