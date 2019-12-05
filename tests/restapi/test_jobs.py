@@ -30,8 +30,8 @@ from tests.utils import (
 )
 from collections import OrderedDict
 # noinspection PyDeprecation
-from contextlib import nested
-from typing import AnyStr, Tuple, List, Union
+from contextlib import ExitStack
+from typing import AnyStr, Tuple, List, Union, TYPE_CHECKING
 from owslib.wps import WebProcessingService, Process as ProcessOWSWPS
 from pywps.app import Process as ProcessPyWPS
 import mock
@@ -42,6 +42,8 @@ import json
 import pyramid.testing
 import pytest
 import six
+if TYPE_CHECKING:
+    MockPatch = mock._patch  # noqa: W0212
 
 
 class WpsRestApiJobsTest(unittest.TestCase):
@@ -146,10 +148,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
             mock.patch("pyramid.request.AuthorizationAPIMixin.has_permission", return_value=is_admin),
         ])
 
-    # noinspection PyProtectedMember
     @staticmethod
     def get_job_remote_service_mock(processes):
-        # type: (List[Union[ProcessPyWPS, ProcessOWSWPS]]) -> Tuple[mock._patch]
+        # type: (List[Union[ProcessPyWPS, ProcessOWSWPS]]) -> Tuple[MockPatch]
         mock_processes = mock.PropertyMock
         mock_processes.return_value = processes
         return tuple([
@@ -316,7 +317,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
         }
 
         # noinspection PyDeprecation
-        with nested(*mocked_process_job_runner()):
+        with ExitStack() as stack:
+            for runner in mocked_process_job_runner():
+                stack.enter_context(runner)
             path = "/processes/{}/jobs".format(self.process_public.identifier)
             resp = self.app.post_json(path, params=body, headers=self.json_headers)
             assert resp.status_code == 201
@@ -425,8 +428,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
         path = self.add_params(jobs_short_uri,
                                service=self.service_public.name,
                                process=self.process_private.identifier)
-        # noinspection PyDeprecation
-        with nested(*self.get_job_remote_service_mock([self.process_private])):     # process visible on remote
+        with ExitStack() as stack:
+            for runner in self.get_job_remote_service_mock([self.process_private]):  # process visible on remote
+                stack.enter_context(runner)
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 200
             assert resp.content_type == CONTENT_TYPE_APP_JSON
@@ -505,8 +509,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
         for i, (path, access, user_id, expected_jobs) in enumerate(path_jobs_user_req_tests):
             patches = self.get_job_request_auth_mock(user_id) + self.get_job_remote_service_mock([self.process_public])
-            # noinspection PyDeprecation
-            with nested(*patches):
+            with ExitStack() as stack:
+                for patch in patches:
+                    stack.enter_context(patch)
                 test = self.add_params(path, access=access) if access else path
                 resp = self.app.get(test, headers=self.json_headers)
                 self.check_basic_jobs_info(resp)

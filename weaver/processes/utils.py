@@ -1,4 +1,9 @@
-from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS
+from weaver.config import (
+    WEAVER_CONFIGURATION_EMS,
+    WEAVER_DEFAULT_WPS_PROCESSES_CONFIG,
+    get_weaver_configuration,
+    get_weaver_config_file,
+)
 from weaver.datatype import Service, Process as ProcessDB
 from weaver.database import get_db
 from weaver.exceptions import ProcessNotFound
@@ -35,16 +40,14 @@ from six.moves.urllib.parse import urlparse, parse_qs
 from six.moves.urllib.error import URLError
 from typing import TYPE_CHECKING
 import colander
-import warnings
 import logging
 import yaml
 import json
 import six
-import os
 if TYPE_CHECKING:
     from weaver.typedefs import JSON, AnyContainer, AnySettingsContainer, FileSystemPathType        # noqa: F401
     from weaver.store.mongodb import MongodbProcessStore                                            # noqa: F401
-    from typing import AnyStr, Dict, Union                                                          # noqa: F401
+    from typing import AnyStr, Dict, Optional, Union                                                # noqa: F401
     from pywps import Process as ProcessWPS                                                         # noqa: F401
     import owslib.wps                                                                               # noqa: F401
 LOGGER = logging.getLogger(__name__)
@@ -308,7 +311,7 @@ def deploy_process_from_payload(payload, container):
 
 
 def register_wps_processes_from_config(wps_processes_file_path, container):
-    # type: (FileSystemPathType, AnySettingsContainer) -> None
+    # type: (Optional[FileSystemPathType], AnySettingsContainer) -> None
     """
     Loads a `wps_processes.yml` file and registers `WPS-1` providers processes to the
     current `Weaver` instance as equivalent `WPS-2` processes.
@@ -316,8 +319,12 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
     .. seealso::
         - `weaver.wps_processes.yml.example` for additional file format details
     """
-    if not os.path.isfile(wps_processes_file_path):
-        warnings.warn("No file specified for WPS-1 providers registration.", RuntimeWarning)
+    if wps_processes_file_path is None:
+        LOGGER.warning("No file specified for WPS-1 providers registration.", RuntimeWarning)
+        wps_processes_file_path = get_weaver_config_file("", WEAVER_DEFAULT_WPS_PROCESSES_CONFIG)
+    elif wps_processes_file_path == "":
+        LOGGER.warning("Configuration file for WPS-1 providers registration explicitly defined as empty in settings. "
+                       "Not loading anything.", RuntimeWarning)
         return
     try:
         with open(wps_processes_file_path, 'r') as f:

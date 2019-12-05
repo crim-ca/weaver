@@ -89,6 +89,8 @@ LOGGER = logging.getLogger(__name__)
 
 __all__ = [
     "PACKAGE_EXTENSIONS",
+    "WPS_LITERAL",
+    "DefaultFormat",
     "WpsPackage",
     "get_process_definition",
     "get_process_location",
@@ -1496,7 +1498,7 @@ def get_process_definition(process_offering, reference=None, package=None, data_
             # handle any other sub-exception that wasn't processed by a "package" error as a registration error
             package_errors = (PackageRegistrationError, PackageTypeError, PackageRegistrationError, PackageNotFound)
             exc_type = type(exc) if isinstance(exc, package_errors) else PackageRegistrationError
-            LOGGER.exception(exc.message)
+            LOGGER.exception(exc.message if hasattr(exc, "message") else str(exc))
             raise exc_type(
                 "Invalid package/reference definition. {0} generated error: [{1}].".format(reason, repr(exc))
             )

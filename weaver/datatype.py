@@ -6,10 +6,9 @@ from weaver.processes.types import PROCESS_WITH_MAPPING, PROCESS_WPS
 from weaver.status import job_status_values, STATUS_UNKNOWN
 from weaver.visibility import visibility_values, VISIBILITY_PRIVATE
 from weaver.wps_restapi import swagger_definitions as sd
-from dateutil.parser import parse as dt_parse
+from dateutil.parser import parse as dt_parse   # noqa
 from datetime import datetime, timedelta
-# noinspection PyProtectedMember
-from logging import _levelNames, ERROR, INFO, getLogger
+from logging import ERROR, INFO, getLogger, getLevelName
 from weaver.utils import (
     now,
     localize_datetime,  # for backward compatibility of previously saved jobs not time-locale-aware
@@ -162,7 +161,7 @@ class Job(Base):
             log_msg = [(INFO, self._get_log_msg(message))]
         for level, msg in log_msg:
             fmt_msg = get_log_fmt() % dict(asctime=now().strftime(get_log_date_fmt()),
-                                           levelname=_levelNames[level],
+                                           levelname=getLevelName(level),
                                            name=fully_qualified_name(self),
                                            message=msg)
             if len(self.logs) == 0 or self.logs[-1] != fmt_msg:

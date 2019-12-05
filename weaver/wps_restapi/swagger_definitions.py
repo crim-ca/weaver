@@ -25,7 +25,7 @@ from weaver.wps_restapi.colander_extras import OneOfMappingSchema, SchemaNodeDef
 from colander import String, Boolean, Integer, Float, DateTime, MappingSchema, SequenceSchema, drop, OneOf
 from cornice import Service
 
-API_TITLE = "weaver REST API"
+API_TITLE = "Weaver REST API"
 API_INFO = {
     "description": __meta__.__description__,
     "contact": {"name": __meta__.__authors__, "email": __meta__.__emails__, "url": __meta__.__source_repository__}

@@ -100,10 +100,10 @@ def clean_mime_type_format(mime_type):
     representation (ex: `application/json`) instead of the ``<namespace-name>:<format>`` variant used
     in `CWL->inputs/outputs->File->format`.
     """
-    for v in IANA_NAMESPACE_DEFINITION.values() + EDAM_NAMESPACE_DEFINITION.values():
+    for v in list(IANA_NAMESPACE_DEFINITION.values()) + list(EDAM_NAMESPACE_DEFINITION.values()):
         if v in mime_type:
             mime_type = mime_type.replace(v, "")
-    for v in IANA_NAMESPACE_DEFINITION.keys() + EDAM_NAMESPACE_DEFINITION.keys():
+    for v in list(IANA_NAMESPACE_DEFINITION.keys()) + list(EDAM_NAMESPACE_DEFINITION.keys()):
         if mime_type.startswith(v + ":"):
             mime_type = mime_type.replace(v + ":", "")
     for v in EDAM_MAPPING.values():

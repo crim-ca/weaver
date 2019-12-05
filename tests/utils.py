@@ -5,7 +5,7 @@ from weaver.datatype import Service
 from weaver.database import get_db
 from weaver.formats import CONTENT_TYPE_TEXT_XML, CONTENT_TYPE_APP_JSON
 from weaver.store.mongodb import MongodbServiceStore, MongodbProcessStore, MongodbJobStore
-from weaver.config import WEAVER_CONFIGURATION_DEFAULT
+from weaver.config import WEAVER_CONFIGURATION_DEFAULT, WEAVER_DEFAULT_INI_CONFIG, get_weaver_config_file
 from weaver.utils import null, get_url_without_query
 from weaver.wps import get_wps_url, get_wps_output_url, get_wps_output_dir
 from weaver.wps_restapi.processes.processes import execute_process
@@ -81,14 +81,9 @@ def ignore_deprecated_nested_warnings(func):
 def get_settings_from_config_ini(config_ini_path=None, ini_section_name="app:main"):
     # type: (Optional[AnyStr], AnyStr) -> SettingsType
     parser = ConfigParser()
-    parser.read([config_ini_path or get_default_config_ini_path()])
+    parser.read([get_weaver_config_file(config_ini_path, WEAVER_DEFAULT_INI_CONFIG)])
     settings = dict(parser.items(ini_section_name))
     return settings
-
-
-def get_default_config_ini_path():
-    # type: (...) -> AnyStr
-    return os.path.expanduser("~/birdhouse/etc/weaver/weaver.ini")
 
 
 def setup_config_from_settings(settings=None):
@@ -100,7 +95,7 @@ def setup_config_from_settings(settings=None):
 
 def setup_config_from_ini(config_ini_file_path=None):
     # type: (Optional[AnyStr]) -> Configurator
-    config_ini_file_path = config_ini_file_path or get_default_config_ini_path()
+    config_ini_file_path = get_weaver_config_file(config_ini_file_path, WEAVER_DEFAULT_INI_CONFIG)
     settings = get_settings_from_config_ini(config_ini_file_path, "app:main")
     settings.update(get_settings_from_config_ini(config_ini_file_path, "celery"))
     config = testing.setUp(settings=settings)

@@ -37,7 +37,6 @@ __all__ = [
 def _get_builtin_reference_mapping(root):
     # type: (AnyStr) -> Dict[AnyStr, AnyStr]
     """Generates a mapping of `reference` to actual ``builtin`` package file path."""
-    # noinspection PyProtectedMember
     builtin_names = [_pkg for _pkg in os.listdir(root)
                      if os.path.splitext(_pkg)[-1].replace('.', '') in PACKAGE_EXTENSIONS]
     return {os.path.splitext(_pkg)[0]: os.path.join(root, _pkg) for _pkg in builtin_names}

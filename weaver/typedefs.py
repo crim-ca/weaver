@@ -31,8 +31,7 @@ if TYPE_CHECKING:
     AnyKey = Union[AnyStr, int]
     JSON = Dict[AnyKey, Union[AnyValue, Dict[AnyKey, 'JSON'], List['JSON']]]
     CWL = Dict[{"cwlVersion": AnyStr, "class": AnyStr, "inputs": JSON, "outputs": JSON}]
-    # noinspection PyProtectedMember
-    XML = lxml.etree._Element
+    XML = lxml.etree._Element  # noqa: W0212
 
     AnyContainer = Union[Configurator, Registry, PyramidRequest, Celery]
     SettingValue = Union[AnyStr, Number, bool, None]

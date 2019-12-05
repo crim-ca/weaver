@@ -4,8 +4,10 @@ RELEASE := master
 -include Makefile.config
 
 # Application
-APP_ROOT := $(abspath $(lastword $(MAKEFILE_LIST))/..)
-APP_NAME := $(shell basename $(APP_ROOT))
+APP_ROOT    := $(abspath $(lastword $(MAKEFILE_LIST))/..)
+APP_NAME    := $(shell basename $(APP_ROOT))
+APP_VERSION ?= 0.2.1
+APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
 
 # guess OS (Linux, Darwin,...)
 OS_NAME := $(shell uname -s 2>/dev/null || echo "unknown")
@@ -317,42 +319,27 @@ dry: setup.cfg
 bump:
 	@-echo "Updating package version ..."
 	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set"; exit 1 )
-	@-bash -c 'bump2version $(BUMP_XARGS) --new-version "${VERSION}" patch;'
+	@-bash -c '$(CONDA_CMD) bump2version $(BUMP_XARGS) --new-version "${VERSION}" patch;'
 
 ## Docker targets
 
 .PHONY: docker-info
-docker-info:
+docker-info:		## obtain docker image information
 	@echo "Will be built, tagged and pushed as:"
-	@echo "$(DOCKER_REPO):`python -c 'from weaver.__meta__ import __version__; print(__version__)'`"
+	@echo "$(DOCKER_REPO):$(APP_VERSION)"
 
 .PHONY: docker-build
-docker-build:
-	@bash -c "docker build $(APP_ROOT) \
-		-t $(DOCKER_REPO):`python -c 'from weaver.__meta__ import __version__; print(__version__)'`"
+docker-build:		## build the docker images
+	@bash -c 'docker build "$(APP_ROOT)" -t "$(DOCKER_REPO):$(APP_VERSION)"'
 
 .PHONY: docker-push
-docker-push: docker-build
-	@bash -c "docker push $(DOCKER_REPO):`python -c 'from weaver.__meta__ import __version__; print(__version__)'`"
+docker-push: docker-build	## push the docker images
+	@bash -c 'docker push "$(DOCKER_REPO):$(APP_VERSION)"'
 
 ## Supervisor targets
 
 .PHONY: start
-start:
-	@echo "Starting supervisor service..."
-	bin/supervisord start
-
-.PHONY: stop
-stop:
-	@echo "Stopping supervisor service..."
-	-bin/supervisord stop
-
-.PHONY: restart
-restart:
-	@echo "Restarting supervisor service..."
-	bin/supervisord restart
-
-.PHONY: status
-status:
-	@echo "Supervisor status..."
-	bin/supervisorctl status
+start:	## start the application with gunicorn
+	@echo "Starting application service..."
+	@echo '>>  "$(APP_ROOT)/bin/gunicorn" --paste "$(APP_INI)" --preload'
+	@-bash -c '$(CONDA_CMD) "$(APP_ROOT)/bin/gunicorn" --paste "$(APP_INI)" --preload'

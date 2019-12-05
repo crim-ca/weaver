@@ -1,5 +1,4 @@
-# noinspection PyProtectedMember
-from pywps.response.status import _WPS_STATUS, WPS_STATUS
+from pywps.response.status import _WPS_STATUS, WPS_STATUS   # noqa: W0212
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import AnyStr, Union    # noqa: F401
@@ -49,10 +48,10 @@ job_status_categories = {
     STATUS_CATEGORY_FAILED:     frozenset([STATUS_FAILED, STATUS_DISMISSED, STATUS_EXCEPTION]),                                                  # noqa: E241, E501
 }
 
-
-# noinspection PyProtectedMember
-STATUS_PYWPS_MAP = {s: _WPS_STATUS._fields[s].lower() for s in range(len(WPS_STATUS))}  # id -> str
-STATUS_PYWPS_IDS = {k.lower(): v for v, k in STATUS_PYWPS_MAP.items()}                  # str -> id
+# id -> str
+STATUS_PYWPS_MAP = {s: _WPS_STATUS._fields[s].lower() for s in range(len(WPS_STATUS))}  # noqa: W0212
+# str -> id
+STATUS_PYWPS_IDS = {k.lower(): v for v, k in STATUS_PYWPS_MAP.items()}
 
 
 def map_status(wps_status, compliant=STATUS_COMPLIANT_OGC):

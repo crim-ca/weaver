@@ -1,7 +1,14 @@
+from weaver import WEAVER_CONFIG_DIR
+from weaver.utils import get_settings
 from pyramid.exceptions import ConfigurationError
+from typing import TYPE_CHECKING
 import logging
-LOGGER = logging.getLogger(__name__)
+import shutil
+import os
+if TYPE_CHECKING:
+    from weaver.typedefs import AnyStr, AnySettingsContainer  # noqa: F401
 
+LOGGER = logging.getLogger(__name__)
 
 WEAVER_CONFIGURATION_DEFAULT = "DEFAULT"
 WEAVER_CONFIGURATION_ADES = "ADES"
@@ -12,8 +19,23 @@ WEAVER_CONFIGURATIONS = frozenset([
     WEAVER_CONFIGURATION_EMS,
 ])
 
+WEAVER_DEFAULT_INI_CONFIG = "weaver.ini"
+WEAVER_DEFAULT_DATA_SOURCES_CONFIG = "data_sources.json"
+WEAVER_DEFAULT_WPS_PROCESSES_CONFIG = "wps_processes.yml"
+WEAVER_DEFAULT_CONFIGS = frozenset([
+    WEAVER_DEFAULT_INI_CONFIG,
+    WEAVER_DEFAULT_DATA_SOURCES_CONFIG,
+    WEAVER_DEFAULT_WPS_PROCESSES_CONFIG,
+])
 
-def get_weaver_configuration(settings):
+
+def get_weaver_configuration(container):
+    # type: (AnySettingsContainer) -> AnyStr
+    """Obtains the defined operation configuration mode.
+
+    :returns: one value amongst ``WEAVER_CONFIGURATIONS``.
+    """
+    settings = get_settings(container)
     weaver_config = settings.get("weaver.configuration")
     if not weaver_config:
         LOGGER.warn("Setting 'weaver.configuration' not specified, using '{}'".format(WEAVER_CONFIGURATION_DEFAULT))
@@ -24,6 +46,36 @@ def get_weaver_configuration(settings):
     return weaver_config_up
 
 
-# noinspection PyUnusedLocal
-def includeme(config):
+def get_weaver_config_file(file_path, default_config_file):
+    # type: (AnyStr, AnyStr) -> AnyStr
+    """Validates that the specified configuration file can be found, or falls back to the default one.
+
+    Handles 'relative' paths for settings in ``WEAVER_DEFAULT_INI_CONFIG`` referring to other configuration files.
+    Default file must be one of ``WEAVER_DEFAULT_CONFIGS``.
+    If the default file cannot be found, it is auto-generated from the corresponding example file.
+    """
+    default = os.path.abspath(os.path.join(WEAVER_CONFIG_DIR, default_config_file))
+    if file_path in [default_config_file, os.path.join(os.curdir, default_config_file)]:
+        file_path = default
+    file_path = os.path.abspath(file_path)
+    if os.path.isfile(file_path):
+        LOGGER.info("Resolved specified configuration file: [%s]", file_path)
+        return file_path
+    LOGGER.warning("Cannot find configuration file: [%s]. Falling back to default.", file_path)
+    if default_config_file not in WEAVER_DEFAULT_CONFIGS:
+        raise ValueError("Invalid default configuration file [%s] is not one of %s",
+                         default_config_file, list(WEAVER_DEFAULT_CONFIGS))
+    if os.path.isfile(default):
+        LOGGER.info("Resolved default configuration file: [%s]", default)
+        return default
+    example = default_config_file + ".example"
+    LOGGER.warning("Could not find default configuration file: [%s]. Using generated file: [%s]", file_path, example)
+    example = os.path.abspath(os.path.join(WEAVER_DEFAULT_CONFIGS, example))
+    if not os.path.isfile(example):
+        raise RuntimeError("Could not find expected example configuration file: [%s]", example)
+    shutil.copyfile(example, default)
+    return default
+
+
+def includeme(_):
     LOGGER.debug("Loading weaver configuration.")

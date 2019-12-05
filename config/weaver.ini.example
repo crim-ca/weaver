@@ -70,10 +70,11 @@ USE_CELERYCONFIG = True
 
 [server:main]
 use = egg:gunicorn#main
-#bind=unix://${socket}
-bind=localhost:4001
-workers=1
-timeout=1000
+bind = localhost:4001
+host = localhost
+port = 4001
+workers = 1
+timeout = 10
 
 ###
 # logging configuration
@@ -112,4 +113,4 @@ level = NOTSET
 formatter = generic
 
 [formatter_generic]
-format = %(asctime)s %(levelname)-5.5s [%(name)s][%(threadName)s] %(message)s
+format = [%(asctime)s] %(levelname)-8.8s [%(threadName)s][%(name)s] %(message)s

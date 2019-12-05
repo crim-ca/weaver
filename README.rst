@@ -1,6 +1,9 @@
 =============================================
-Weaver: workflow execution management service
+Weaver
 =============================================
+
+* Workflow Execution Management Service (EMS)
+* Application, Deployment and Execution Service (ADES)
 
 Weaver (the nest-builder)
   *Weaver birds build exquisite and elaborate nest structures that are a rival to any human feat of engineering.

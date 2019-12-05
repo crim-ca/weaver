@@ -46,8 +46,7 @@ class Wps1Process(WpsProcessInterface):
         try:
             try:
                 wps = WebProcessingService(url=self.provider, headers=self.cookies, verify=self.verify)
-                # noinspection PyProtectedMember
-                raise_on_xml_exception(wps._capabilities)
+                raise_on_xml_exception(wps._capabilities)  # noqa: W0212
             except Exception as ex:
                 raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
             try:

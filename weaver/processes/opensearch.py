@@ -7,7 +7,6 @@ from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
 from weaver.utils import get_any_id
 from collections import deque
 from copy import deepcopy
-from itertools import ifilterfalse
 from pyramid.httpexceptions import HTTPGatewayTimeout, HTTPOk
 from pyramid.settings import asbool
 from six.moves.urllib.parse import urlparse, parse_qsl
@@ -355,7 +354,7 @@ class EOImageDescribeProcessHandler(object):
     def __init__(self, inputs):
         # type: (List[Dict]) -> None
         self.eoimage_inputs = list(filter(self.is_eoimage_input, inputs))
-        self.other_inputs = list(ifilterfalse(self.is_eoimage_input, inputs))
+        self.other_inputs = list(filter(lambda i: self.is_eoimage_input(i) is False, inputs))
 
     @staticmethod
     def is_eoimage_input(input_data):

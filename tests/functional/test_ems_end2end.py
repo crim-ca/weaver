@@ -22,8 +22,7 @@ from pyramid.settings import asbool
 from pyramid.httpexceptions import HTTPOk, HTTPCreated, HTTPUnauthorized, HTTPNotFound
 # use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
 # noinspection PyPackageRequirements
-from webtest import TestApp as WebTestApp, TestResponse as WebTestResponse
-from requests import Response
+from webtest import TestApp as WebTestApp
 from typing import TYPE_CHECKING
 from copy import deepcopy
 import unittest
@@ -76,6 +75,7 @@ class End2EndEMSTestCase(TestCase):
     logger = None                   # type: LoggerType
     # setting indent to `None` disables pretty-printing of JSON payload
     logger_json_indent = None       # type: Union[int, None]
+    logger_field_indent = 2         # type: int
     log_full_trace = True           # type: bool
 
     WEAVER_URL = None
@@ -120,6 +120,7 @@ class End2EndEMSTestCase(TestCase):
         cls.logger_enabled = asbool(os.getenv("WEAVER_TEST_LOGGER_ENABLED", cls.logger_enabled))
         cls.logger_result_dir = os.getenv("WEAVER_TEST_LOGGER_RESULT_DIR", os.path.join(WEAVER_ROOT_DIR))
         cls.logger_json_indent = os.getenv("WEAVER_TEST_LOGGER_JSON_INDENT", cls.logger_json_indent)
+        cls.logger_field_indent = os.getenv("WEAVER_TEST_LOGGER_FIELD_INDENT", cls.logger_field_indent)
         cls.logger_separator_calls = os.getenv("WEAVER_TEST_LOGGER_SEPARATOR_CALLS", cls.logger_separator_calls)
         cls.logger_separator_steps = os.getenv("WEAVER_TEST_LOGGER_SEPARATOR_STEPS", cls.logger_separator_steps)
         cls.logger_separator_tests = os.getenv("WEAVER_TEST_LOGGER_SEPARATOR_TESTS", cls.logger_separator_tests)
@@ -394,6 +395,33 @@ class End2EndEMSTestCase(TestCase):
         return headers, cookies
 
     @classmethod
+    def get_indent(cls, indent_level):
+        # type: (int) -> AnyStr
+        return ' ' * cls.logger_field_indent * indent_level
+
+    @classmethod
+    def indent(cls, field, indent_level):
+        # type: (AnyStr, int) -> AnyStr
+        return cls.get_indent(indent_level) + field
+
+    @classmethod
+    def log_json_format(cls, payload, indent_level):
+        # type: (AnyStr, int) -> AnyStr
+        """Logs an indented string representation of a JSON payload according to settings."""
+        sub_indent = cls.get_indent(indent_level if cls.logger_json_indent else 0)
+        log_payload = "\n" if cls.logger_json_indent else "" + json.dumps(payload, indent=cls.logger_json_indent)
+        log_payload.replace("\n", "\n{}".format(sub_indent))
+        if log_payload.endswith("\n"):
+            return log_payload[:-1]  # remove extra line, let logger message generation add it explicitly
+        return log_payload
+
+    @classmethod
+    def log_dict_format(cls, dictionary, indent_level):
+        """Logs dictionary (key, value) pairs in a YAML-like format."""
+        tab = cls.get_indent(indent_level)
+        return tab + "\n{tab}".format(tab=tab).join(["{}: {}".format(k, dictionary[k]) for k in sorted(dictionary)])
+
+    @classmethod
     def request(cls, method, url, ignore_errors=False, force_requests=False, log_enabled=True, **kw):
         # type: (AnyStr, AnyStr, bool, bool, bool, Optional[Any]) -> AnyResponseType
         """
@@ -418,19 +446,22 @@ class End2EndEMSTestCase(TestCase):
 
         if log_enabled:
             if json_body or headers and CONTENT_TYPE_APP_JSON in headers.get("Content-Type"):
-                payload = "\n" if cls.logger_json_indent else "" + json.dumps(json_body, indent=cls.logger_json_indent)
+                payload = cls.log_json_format(json_body, 2)
             else:
                 payload = data_body
             trace = ("{}Request Details:\n".format(cls.logger_separator_steps) +
-                     "  Request: {method} {url}\n".format(method=method, url=url) +
-                     "  Payload: {payload}".format(payload=payload))
+                     cls.indent("Request: {method} {url}\n".format(method=method, url=url), 1) +
+                     cls.indent("Payload: {payload}".format(payload=payload), 1))
             if cls.log_full_trace:
+                module_name = "requests" if with_requests else "webtest.TestApp"
+                headers = cls.log_dict_format(headers, 2)
+                cookies = cls.log_dict_format(cookies, 2)
                 trace += ("\n" +
-                          "  Headers: {headers}\n".format(headers=headers) +
-                          "  Cookies: {cookies}\n".format(cookies=cookies) +
-                          "  Status:  {status} (expected)\n".format(status=status) +
-                          "  Message: {message} (expected)\n".format(message=message) +
-                          "  Module:  {module}\n".format(module="requests" if with_requests else "webtest.TestApp"))
+                          cls.indent("Headers: {headers}\n".format(headers=headers), 1) +
+                          cls.indent("Cookies: {cookies}\n".format(cookies=cookies), 1) +
+                          cls.indent("Status:  {status} (expected)\n".format(status=status), 1) +
+                          cls.indent("Message: {message} (expected)\n".format(message=message), 1) +
+                          cls.indent("Module:  {module}\n".format(module=module_name), 1))
             cls.log(trace)
 
         if with_requests:
@@ -468,7 +499,7 @@ class End2EndEMSTestCase(TestCase):
 
         if log_enabled:
             if CONTENT_TYPE_APP_JSON in resp.headers.get("Content-Type", []):
-                payload = "\n" if cls.logger_json_indent else "" + json.dumps(resp.json, indent=cls.logger_json_indent)
+                payload = cls.log_json_format(resp.json, 2)  # noqa
             else:
                 payload = resp.body
             if cls.log_full_trace:
@@ -476,12 +507,12 @@ class End2EndEMSTestCase(TestCase):
             else:
                 header_filter = ["Location"]
                 headers = {k: v for k, v in resp.headers.items() if k in header_filter}
-
+            headers = cls.log_dict_format(headers, 2)
             cls.log("{}Response Details:\n".format(cls.logger_separator_calls) +
-                    "  Status:  {status} (received)\n".format(status=resp.status_code) +
-                    "  Content: {content}\n".format(content=resp.content_type) +
-                    "  Payload: {payload}\n".format(payload=payload) +
-                    "  Headers: {headers}\n".format(headers=headers))
+                    cls.indent("Status:  {status} (received)\n".format(status=resp.status_code), 1) +
+                    cls.indent("Content: {content}\n".format(content=resp.content_type), 1) +
+                    cls.indent("Payload: {payload}\n".format(payload=payload), 1) +
+                    cls.indent("Headers: {headers}\n".format(headers=headers), 1))
         return resp
 
     @classmethod
@@ -585,7 +616,7 @@ class End2EndEMSTestCase(TestCase):
         path = "{}/processes".format(self.WEAVER_URL)
         resp = self.request("GET", path, headers=headers_a, cookies=cookies_a, status=HTTPOk.code)
         proc = resp.json.get("processes")
-        test_processes = filter(lambda p: p["id"] in [tp.test_id for tp in end2_end_test_processes], proc)
+        test_processes = list(filter(lambda p: p["id"] in [tp.test_id for tp in end2_end_test_processes], proc))
         self.assert_test(lambda: len(test_processes) == 0, message="Test processes shouldn't exist!")
 
         self.request("POST", path, headers=headers_a, cookies=cookies_a, status=HTTPOk.code,
@@ -604,14 +635,14 @@ class End2EndEMSTestCase(TestCase):
         # processes visible by alice
         resp = self.request("GET", path, headers=headers_a, cookies=cookies_a, status=HTTPOk.code)
         proc = resp.json.get("processes")
-        test_processes = filter(lambda p: p["id"] in [tp.test_id for tp in end2_end_test_processes], proc)
+        test_processes = list(filter(lambda p: p["id"] in [tp.test_id for tp in end2_end_test_processes], proc))
         self.assert_test(lambda: len(test_processes) == len(end2_end_test_processes),
                          message="Test processes should exist.")
 
         # processes not yet visible by bob
         resp = self.request("GET", path, headers=headers_b, cookies=cookies_b, status=HTTPOk.code)
         proc = resp.json.get("processes")
-        test_processes = filter(lambda p: p["id"] in [tp.test_id for tp in end2_end_test_processes], proc)
+        test_processes = list(filter(lambda p: p["id"] in [tp.test_id for tp in end2_end_test_processes], proc))
         self.assert_test(lambda: len(test_processes) == 0, message="Test processes shouldn't be visible by bob.")
 
         # processes visibility

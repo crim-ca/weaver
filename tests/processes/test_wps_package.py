@@ -1,9 +1,8 @@
-# noinspection PyProtectedMember
 from weaver.processes.wps_package import (
-    _json2wps_datatype,
-    _is_cwl_array_type,
-    _is_cwl_enum_type,
-    _merge_io_formats,
+    _json2wps_datatype,  # noqa: W0212
+    _is_cwl_array_type,  # noqa: W0212
+    _is_cwl_enum_type,   # noqa: W0212
+    _merge_io_formats,   # noqa: W0212
     DefaultFormat,
     WPS_LITERAL
 )
@@ -13,7 +12,6 @@ from pywps.inout.literaltypes import AnyValue
 from pywps.inout.formats import Format
 from pywps.validator.mode import MODE
 from copy import deepcopy
-# noinspection PyPackageRequirements
 import pytest
 
 
