@@ -29,7 +29,6 @@ from tests.utils import (
     mocked_process_job_runner,
 )
 from collections import OrderedDict
-# noinspection PyDeprecation
 from contextlib import ExitStack
 from typing import AnyStr, Tuple, List, Union, TYPE_CHECKING
 from owslib.wps import WebProcessingService, Process as ProcessOWSWPS
@@ -446,7 +445,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
                                service=self.service_public.name,
                                process=self.process_private.identifier)
         # noinspection PyDeprecation
-        with nested(*self.get_job_remote_service_mock([])):         # process invisible (not returned by remote)
+        with ExitStack() as stack:
+            for job in self.get_job_remote_service_mock([]):    # process invisible (not returned by remote)
+                stack.enter_context(job)
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 404
             assert resp.content_type == CONTENT_TYPE_APP_JSON

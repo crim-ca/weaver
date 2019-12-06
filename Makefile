@@ -262,41 +262,49 @@ coverage: mkdir-reports		## run all tests using coverage analysis
 	@bash -c '$(CONDA_CMD) coverage report --rcfile="$(APP_ROOT)/setup.cfg" -i -m'
 	@bash -c '$(CONDA_CMD) coverage html --rcfile="$(APP_ROOT)/setup.cfg" -d "$(REPORTS_DIR)/coverage"'
 
-## Documentation and code check targets
+## Code check targets
+
+.PHONY: checks
+checks: check-pep8 check-lint check-security check-doc8 check-links	## run every code style checks
 
 .PHONY: check-pep8
 check-pep8: mkdir-reports		## run PEP8 code style checks
 	@echo "Running pep8 code style checks..."
-	@bash -c '$(CONDA_CMD) flake8 --config="$(APP_ROOT)/setup.cfg" --tee --output-file="$(REPORTS_DIR)/pep8.txt"'
+	@bash -c '$(CONDA_CMD) flake8 --config="$(APP_ROOT)/setup.cfg" --tee --output-file="$(REPORTS_DIR)/check-pep8.txt"'
 
 .PHONY: check-lint
 check-lint: mkdir-reports		## run linting code style checks
 	@echo "Running linting code style checks..."
 	@bash -c '$(CONDA_CMD) \
 		pylint --rcfile="$(APP_ROOT)/setup.cfg" "$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" --reports y \
-		| tee "$(REPORTS_DIR)/lint.txt"'
-
-.PHONY: check-imports
-check-imports:					## run imports code checks
-	@bash -c '$(CONDA_CMD) isort --check-only --diff --recursive $(APP_ROOT) | tee "$(REPORTS_DIR)/imports.txt"'
+		| tee "$(REPORTS_DIR)/check-lint.txt"'
 
 .PHONY: check-security
 check-security: mkdir-reports	## run security code checks
 	@echo "Running security code checks..."
-	@bash -c '$(CONDA_CMD) bandit -v -r "$(APP_ROOT)/weaver" | tee "$(REPORTS_DIR)/secure.txt"'
-
-.PHONY: checks
-checks: check-pep8 check-lint check-security check-doc8 check-links	## run every code style checks
+	@bash -c '$(CONDA_CMD) bandit -v -r "$(APP_ROOT)/weaver" | tee "$(REPORTS_DIR)/check-security.txt"'
 
 .PHONY: check-doc8
 check-doc8:	## run doc8 documentation style checks
 	@echo "Running doc8 doc style checks..."
-	@bash -c '$(CONDA_CMD) doc8 "$(APP_ROOT)/docs"'
+	@bash -c '$(CONDA_CMD) doc8 "$(APP_ROOT)/docs" | tee "$(REPORTS_DIR)/check-doc8.txt"'
 
 .PHONY: check-links
 check-links:		## check all external links in documentation for integrity
-	@echo "Run link checker on docs..."
+	@echo "Running link checks on docs..."
 	@bash -c '$(CONDA_CMD) (MAKE) -C "$(APP_ROOT)/docs" linkcheck'
+
+.PHONY: check-imports
+check-imports:		## run imports code checks
+	@echo "Running import checks..."
+	@bash -c '$(CONDA_CMD) isort --check-only --diff --recursive $(APP_ROOT) | tee "$(REPORTS_DIR)/check-imports.txt"'
+
+.PHONY: fix-imports
+fix-imports:		## apply import code checks corrections
+	@echo "Fixing flagged import checks..."
+	@bash -c '$(CONDA_CMD) isort --recursive $(APP_ROOT) | tee "$(REPORTS_DIR)/fixed-imports.txt"'
+
+## Documentation targets
 
 .PHONY: docs
 docs:	## generate HTML documentation with Sphinx

@@ -18,20 +18,24 @@ def ows_response_tween(request, handler):
     except HTTPException as err:
         LOGGER.debug("http exception -> ows exception response.")
         # Use the same json formatter than OWSException
-        err._json_formatter = OWSException.json_formatter
-        r_err = err
+        raised_error = err
+        raised_error._json_formatter = OWSException.json_formatter
+        return_error = raised_error
     except OWSException as err:
         LOGGER.debug('direct ows exception response')
         LOGGER.exception("Raised exception: [{!r}]\nReturned exception: {!r}".format(err, err))
-        r_err = err
+        raised_error = err
+        return_error = err
     except NotImplementedError as err:
         LOGGER.debug('not implemented error -> ows exception response')
-        r_err = OWSNotImplemented(str(err))
+        raised_error = err
+        return_error = OWSNotImplemented(str(err))
     except Exception as err:
         LOGGER.debug("unhandled {!s} exception -> ows exception response".format(type(err).__name__))
-        r_err = OWSException(detail=str(err), status=HTTPInternalServerError)
-    LOGGER.exception("Raised exception: [{!r}]\nReturned exception: {!r}".format(err, r_err))
-    return r_err
+        raised_error = err
+        return_error = OWSException(detail=str(err), status=HTTPInternalServerError)
+    LOGGER.exception("Raised exception: [{!r}]\nReturned exception: {!r}".format(raised_error, return_error))
+    return return_error
 
 
 def ows_response_tween_factory_excview(handler, registry):

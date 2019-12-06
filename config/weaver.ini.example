@@ -62,7 +62,8 @@ weaver.extra_options =
 # https://pypi.python.org/pypi/pyramid_celery
 ###
 [celery]
-USE_CELERYCONFIG = True
+#USE_CELERYCONFIG = True
+CELERY_BROKER_URL = mongodb://localhost:27017/celery
 
 ###
 # wsgi server configuration

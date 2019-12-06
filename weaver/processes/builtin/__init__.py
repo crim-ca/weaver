@@ -88,7 +88,10 @@ def _get_builtin_package(process_id, package):
 
 def register_builtin_processes(container):
     # type: (AnyDatabaseContainer) -> None
-    """Registers every ``builtin`` package to the processes database."""
+    """Registers every ``builtin`` CWL package to the processes database.
+
+    CWL definitions must be located within the :py:mod:``weaver.processes.builtin`` module.
+    """
     restapi_url = get_wps_restapi_base_url(container)
     builtin_apps_mapping = _get_builtin_reference_mapping(os.path.abspath(os.path.dirname(__file__)))
     builtin_processes = []

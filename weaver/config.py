@@ -1,10 +1,13 @@
 from weaver import WEAVER_CONFIG_DIR
 from weaver.utils import get_settings
+
 from pyramid.exceptions import ConfigurationError
-from typing import TYPE_CHECKING
+
 import logging
-import shutil
 import os
+import shutil
+from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from weaver.typedefs import AnyStr, AnySettingsContainer  # noqa: F401
 

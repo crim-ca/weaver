@@ -1,6 +1,7 @@
+import logging
 import os
 import sys
-import logging
+
 logging.captureWarnings(True)
 LOGGER = logging.getLogger("weaver")
 

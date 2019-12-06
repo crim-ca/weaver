@@ -5,6 +5,7 @@ codacy-coverage
 coverage
 doc8
 flake8
+isort
 mock
 pluggy>=0.7
 pytest

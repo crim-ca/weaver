@@ -6,7 +6,7 @@ import logging
 LOGGER = logging.getLogger("PYWPS")
 
 
-class Hello(Process):
+class HelloWPS(Process):
     identifier = 'hello'
     title = 'Say Hello'
     type = PROCESS_WPS
@@ -18,7 +18,7 @@ class Hello(Process):
             LiteralOutput('output', 'Output response',
                           data_type='string')]
 
-        super(Hello, self).__init__(
+        super(HelloWPS, self).__init__(
             self._handler,
             identifier=self.identifier,
             title=self.title,

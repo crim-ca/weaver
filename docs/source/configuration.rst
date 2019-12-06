@@ -1,5 +1,8 @@
 .. _configuration:
 
+# TODO: update all this
+
+
 ******************
 Configuration File
 ******************

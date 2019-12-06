@@ -23,7 +23,6 @@ from pyramid.httpexceptions import (
 )
 from pyramid.settings import asbool
 from pyramid.request import Request
-from pyramid.httpexceptions import HTTPInternalServerError
 from pyramid_celery import celery_app as app
 from typing import AnyStr, Optional, Union, Tuple
 from owslib.wps import WPSExecution
@@ -32,6 +31,7 @@ from lxml import etree
 from celery.utils.log import get_task_logger
 from requests_file import FileAdapter
 import requests
+import six
 import os
 
 LOGGER = get_task_logger(__name__)
@@ -107,7 +107,7 @@ def check_status(url=None, response=None, sleep_secs=2, verify=False):
             xml = open(out_path, 'r').read()
     else:
         raise Exception("you need to provide a status-location url or response object.")
-    if type(xml) is unicode:
+    if isinstance(xml, six.string_types):
         xml = xml.encode("utf8", errors="ignore")
     execution.checkStatus(response=xml, sleepSecs=sleep_secs)
     if execution.response is None:

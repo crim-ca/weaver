@@ -3,26 +3,23 @@ Definitions of types used by tokens.
 """
 from weaver.exceptions import ProcessInstanceError
 from weaver.processes.types import PROCESS_WITH_MAPPING, PROCESS_WPS
-from weaver.status import job_status_values, STATUS_UNKNOWN
-from weaver.visibility import visibility_values, VISIBILITY_PRIVATE
+from weaver.status import STATUS_UNKNOWN, job_status_values
+from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
+from weaver.utils import fully_qualified_name, get_job_log_msg, get_log_date_fmt, get_log_fmt, now
+from weaver.visibility import VISIBILITY_PRIVATE, visibility_values
 from weaver.wps_restapi import swagger_definitions as sd
-from dateutil.parser import parse as dt_parse   # noqa
-from datetime import datetime, timedelta
-from logging import ERROR, INFO, getLogger, getLevelName
-from weaver.utils import (
-    now,
-    localize_datetime,  # for backward compatibility of previously saved jobs not time-locale-aware
-    get_job_log_msg,
-    get_log_fmt,
-    get_log_date_fmt,
-    fully_qualified_name,
-)
+
+import six
+from dateutil.parser import parse as dt_parse  # noqa
 from owslib.wps import WPSException
 from pywps import Process as ProcessWPS
-from typing import TYPE_CHECKING
-import six
-import uuid
+
 import traceback
+import uuid
+from datetime import datetime, timedelta
+from logging import ERROR, INFO, getLevelName, getLogger
+from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from weaver.typedefs import Number, LoggerType, CWL, JSON       # noqa: F401
     from typing import Any, AnyStr, Dict, List, Optional, Union     # noqa: F401

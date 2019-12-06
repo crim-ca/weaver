@@ -15,11 +15,8 @@ from tests.utils import (
 )
 from tempfile import NamedTemporaryFile
 from time import sleep
-# noinspection PyDeprecation
 from contextlib import ExitStack
-# noinspection PyPackageRequirements
 import mock
-# noinspection PyPackageRequirements
 import pytest
 import unittest
 import pyramid.testing

@@ -1,4 +1,4 @@
-__doc__ = """
+"""
 Extracts and fetches NetCDF files from a JSON file containing an URL string array,
 and provides them on the output directory.
 """

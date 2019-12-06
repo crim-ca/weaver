@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from typing import AnyStr, Dict, Union, Optional        # noqa: F401
 
 # global config
-PYWPS_CFG = None    # type: Optional[ConfigParser]
+WEAVER_PYWPS_CFG = None    # type: Optional[ConfigParser]
 
 
 def _get_settings_or_wps_config(container,                  # type: AnySettingsContainer
@@ -35,14 +35,14 @@ def _get_settings_or_wps_config(container,                  # type: AnySettingsC
                                 default_not_found,          # type: AnyStr
                                 message_not_found,          # type: AnyStr
                                 ):                          # type: (...) -> AnyStr
-    global PYWPS_CFG
+    global WEAVER_PYWPS_CFG
 
     settings = get_settings(container)
     found = settings.get(weaver_setting_name)
     if not found:
-        if not PYWPS_CFG:
+        if not WEAVER_PYWPS_CFG:
             load_pywps_cfg(container)
-        found = PYWPS_CFG.get(config_setting_section, config_setting_name)
+        found = WEAVER_PYWPS_CFG.get(config_setting_section, config_setting_name)
     if not isinstance(found, six.string_types):
         LOGGER.warn("{} not set in settings or WPS configuration, using default value.".format(message_not_found))
         found = default_not_found
@@ -101,33 +101,33 @@ def get_wps_output_url(container):
 def load_pywps_cfg(container, config=None):
     # type: (AnySettingsContainer, Optional[Union[AnyStr, Dict[AnyStr, AnyStr]]]) -> ConfigParser
     """Loads and updates the PyWPS configuration using Weaver settings."""
-    global PYWPS_CFG
+    global WEAVER_PYWPS_CFG
 
     settings = get_settings(container)
-    if PYWPS_CFG is None:
+    if WEAVER_PYWPS_CFG is None:
         # initial setup of PyWPS config
         pywps_config.load_configuration([])  # load defaults
-        PYWPS_CFG = pywps_config.CONFIG  # update reference
+        WEAVER_PYWPS_CFG = pywps_config.CONFIG  # update reference
         # must be set to INFO to disable sqlalchemy trace.
         # see : https://github.com/geopython/pywps/blob/master/pywps/dblog.py#L169
-        if logging.getLevelName(PYWPS_CFG.get("logging", "level")) <= logging.DEBUG:
-            PYWPS_CFG.set("logging", "level", "INFO")
+        if logging.getLevelName(WEAVER_PYWPS_CFG.get("logging", "level")) <= logging.DEBUG:
+            WEAVER_PYWPS_CFG.set("logging", "level", "INFO")
         # update metadata
         for setting_name, setting_value in settings.items():
-            if setting_name.starts_with("weaver.wps_metadata"):
-                PYWPS_CFG.set("metadata:main", setting_name.replace("weaver.wps_metadata", ""), setting_value)
+            if setting_name.startswith("weaver.wps_metadata"):
+                WEAVER_PYWPS_CFG.set("metadata:main", setting_name.replace("weaver.wps_metadata", ""), setting_value)
         # add weaver configuration keyword if not already provided
-        wps_keywords = PYWPS_CFG.get("metadata:main", "identification_keywords")
+        wps_keywords = WEAVER_PYWPS_CFG.get("metadata:main", "identification_keywords")
         weaver_mode = get_weaver_configuration(settings)
         if weaver_mode not in wps_keywords:
             wps_keywords += ("," if wps_keywords else "") + weaver_mode
-            PYWPS_CFG.set("metadata:main", "identification_keywords", wps_keywords)
+            WEAVER_PYWPS_CFG.set("metadata:main", "identification_keywords", wps_keywords)
 
     # add additional config passed as dictionary of {'section.key': 'value'}
     if isinstance(config, dict):
         for key, value in config.items():
             section, key = key.split('.')
-            PYWPS_CFG.CONFIG.set(section, key, value)
+            WEAVER_PYWPS_CFG.CONFIG.set(section, key, value)
         # cleanup alternative dict "PYWPS_CFG" which is not expected elsewhere
         if isinstance(settings.get("PYWPS_CFG"), dict):
             del settings["PYWPS_CFG"]
@@ -147,15 +147,15 @@ def load_pywps_cfg(container, config=None):
         if output_path:
             output_url = os.path.join(get_weaver_url(settings), output_path.strip('/'))
         else:
-            output_url = PYWPS_CFG.get_config_value("server", "outputurl")
+            output_url = WEAVER_PYWPS_CFG.get_config_value("server", "outputurl")
         settings["weaver.wps_output_url"] = output_url
 
     # enforce back resolved values onto PyWPS config
-    PYWPS_CFG.set("server", "setworkdir", "true")
-    PYWPS_CFG.set("server", "sethomedir", "true")
-    PYWPS_CFG.set("server", "outputpath", settings["weaver.wps_output_dir"])
-    PYWPS_CFG.set("server", "outputurl", settings["weaver.wps_output_url"])
-    return PYWPS_CFG
+    WEAVER_PYWPS_CFG.set("server", "setworkdir", "true")
+    WEAVER_PYWPS_CFG.set("server", "sethomedir", "true")
+    WEAVER_PYWPS_CFG.set("server", "outputpath", settings["weaver.wps_output_dir"])
+    WEAVER_PYWPS_CFG.set("server", "outputurl", settings["weaver.wps_output_url"])
+    return WEAVER_PYWPS_CFG
 
 
 # @app.task(bind=True)
@@ -171,7 +171,7 @@ def pywps_view(environ, start_response):
         settings = get_settings(app)
         pywps_cfg = environ.get("PYWPS_CFG") or settings.get("PYWPS_CFG") or os.getenv("PYWPS_CFG")
         if not isinstance(pywps_cfg, ConfigParser):
-            environ["PYWPS_CFG"] = load_pywps_cfg(app, config=pywps_cfg)
+            load_pywps_cfg(app, config=pywps_cfg)
 
         # call pywps application with processes filtered according to the adapter"s definition
         process_store = get_db(app).get_store(StoreProcesses)
@@ -179,7 +179,7 @@ def pywps_view(environ, start_response):
                          process_store.list_processes(visibility=VISIBILITY_PUBLIC, request=get_current_request())]
         service = Service(processes_wps)
     except Exception as ex:
-        raise OWSNoApplicableCode("Failed setup of PyWPS Service and/or Processes. Error [{}]".format(ex))
+        raise OWSNoApplicableCode("Failed setup of PyWPS Service and/or Processes. Error [{!r}]".format(ex))
 
     return service(environ, start_response)
 

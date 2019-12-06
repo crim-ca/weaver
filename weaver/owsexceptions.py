@@ -73,6 +73,11 @@ class OWSException(Response, Exception):
     def __str__(self, skip_body=False):
         return self.message
 
+    def __repr__(self):
+        if self.message:
+            return "{}{}".format(type(self), self.message)
+        return str(type(self))
+
     # noinspection PyUnusedLocal
     @staticmethod
     def json_formatter(status, body, title, environ):

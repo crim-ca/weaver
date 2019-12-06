@@ -8,7 +8,7 @@ Based on tests from:
 """
 from weaver.formats import CONTENT_TYPE_ANY_XML
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
-from weaver.processes.wps_default import Hello
+from weaver.processes.wps_default import HelloWPS
 from weaver.processes.wps_testing import WpsTestProcess
 from tests.utils import (
     setup_config_with_mongodb,
@@ -50,8 +50,8 @@ class WpsAppTest(unittest.TestCase):
         self.process_store.set_visibility(self.process_private.identifier, VISIBILITY_PRIVATE)
 
         # add processes by pywps Process type
-        self.process_store.save_process(Hello())
-        self.process_store.set_visibility(Hello.identifier, VISIBILITY_PUBLIC)
+        self.process_store.save_process(HelloWPS())
+        self.process_store.set_visibility(HelloWPS.identifier, VISIBILITY_PUBLIC)
 
     def tearDown(self):
         pyramid.testing.tearDown()
@@ -82,7 +82,7 @@ class WpsAppTest(unittest.TestCase):
 
     @pytest.mark.online
     def test_describeprocess(self):
-        params = "service=wps&request=describeprocess&version=1.0.0&identifier={}".format(Hello.identifier)
+        params = "service=wps&request=describeprocess&version=1.0.0&identifier={}".format(HelloWPS.identifier)
         resp = self.app.get(self.make_url(params))
         assert resp.status_code == 200
         assert resp.content_type in CONTENT_TYPE_ANY_XML
@@ -106,12 +106,12 @@ class WpsAppTest(unittest.TestCase):
 
     @pytest.mark.online
     def test_execute_allowed(self):
-        params = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=name=tux".format(Hello.identifier)
+        params = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=name=tux".format(HelloWPS.identifier)
         url = self.make_url(params)
         resp = self.app.get(url)
         assert resp.status_code == 200
         assert resp.content_type in CONTENT_TYPE_ANY_XML
-        resp.mustcontain("<wps:ProcessSucceeded>PyWPS Process {} finished</wps:ProcessSucceeded>".format(Hello.title))
+        resp.mustcontain("<wps:ProcessSucceeded>PyWPS Process {} finished</wps:ProcessSucceeded>".format(HelloWPS.title))
 
     @pytest.mark.online
     def test_execute_with_visibility(self):
