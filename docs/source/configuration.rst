@@ -11,7 +11,8 @@ Configuration File
     :local:
     :depth: 2
 
-After you have installed weaver you can customize the default weaver configuration by editing the ``custom.cfg`` configuration file. This configuration file overwrites the default settings in the ``buildout.cfg``:
+After you have installed weaver you can customize the default weaver configuration by editing
+the ``weaver/config/weaver.ini`` configuration file. This configuration file overwrites the default settings in the ``buildout.cfg``:
 
 .. code-block:: cfg
 

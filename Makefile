@@ -270,7 +270,8 @@ checks: check-pep8 check-lint check-security check-doc8 check-links	## run every
 .PHONY: check-pep8
 check-pep8: mkdir-reports		## run PEP8 code style checks
 	@echo "Running pep8 code style checks..."
-	@bash -c '$(CONDA_CMD) flake8 --config="$(APP_ROOT)/setup.cfg" --tee --output-file="$(REPORTS_DIR)/check-pep8.txt"'
+	@bash -c '$(CONDA_CMD) \
+		flake8 --config="$(APP_ROOT)/setup.cfg" --output-file="$(REPORTS_DIR)/check-pep8.txt" --tee'
 
 .PHONY: check-lint
 check-lint: mkdir-reports		## run linting code style checks
@@ -282,12 +283,16 @@ check-lint: mkdir-reports		## run linting code style checks
 .PHONY: check-security
 check-security: mkdir-reports	## run security code checks
 	@echo "Running security code checks..."
-	@bash -c '$(CONDA_CMD) bandit -v -r "$(APP_ROOT)/weaver" | tee "$(REPORTS_DIR)/check-security.txt"'
+	@bash -c '$(CONDA_CMD) \
+		bandit -v --ini "$(APP_ROOT)/setup.cfg" -r \
+		| tee "$(REPORTS_DIR)/check-security.txt"'
 
 .PHONY: check-doc8
 check-doc8:	## run doc8 documentation style checks
 	@echo "Running doc8 doc style checks..."
-	@bash -c '$(CONDA_CMD) doc8 "$(APP_ROOT)/docs" | tee "$(REPORTS_DIR)/check-doc8.txt"'
+	@bash -c '$(CONDA_CMD) \
+		doc8 "$(APP_ROOT)/docs" \
+		| tee "$(REPORTS_DIR)/check-doc8.txt"'
 
 .PHONY: check-links
 check-links:		## check all external links in documentation for integrity
