@@ -240,39 +240,39 @@ test: test-all	## alias for 'test-all' target
 .PHONY: test-all
 test-all:	## run all tests (including long running tests)
 	@echo "Running all tests (including slow and online tests)..."
-	bash -c "$(CONDA_CMD) pytest tests -v --junitxml $(APP_ROOT)/tests/results.xml"
+	@bash -c "$(CONDA_CMD) pytest tests -v --junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: test-unit
 test-unit:		## run unit tests (skip long running and online tests)
 	@echo "Running tests (skip slow and online tests)..."
-	bash -c "$(CONDA_CMD) pytest tests -v -m 'not slow and not online and not functional' \
+	@bash -c "$(CONDA_CMD) pytest tests -v -m 'not slow and not online and not functional' \
 	 	--junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: test-func
 test-func:		## run funtional tests (online and usage specific)
 	@echo "Running functional tests..."
-	bash -c "$(CONDA_CMD) pytest tests -v -m 'functional' --junitxml $(APP_ROOT)/tests/results.xml"
+	@bash -c "$(CONDA_CMD) pytest tests -v -m 'functional' --junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: test-online
 test-online:	## run online tests (running instance required)
 	@echo "Running online tests (running instance required)..."
-	bash -c "$(CONDA_CMD) pytest tests -v -m 'online' --junitxml $(APP_ROOT)/tests/results.xml"
+	@bash -c "$(CONDA_CMD) pytest tests -v -m 'online' --junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: test-offline
 test-offline:	## run offline tests (not marked as online)
 	@echo "Running offline tests (not marked as online)..."
-	bash -c "$(CONDA_CMD) pytest tests -v -m 'not online' --junitxml $(APP_ROOT)/tests/results.xml"
+	@bash -c "$(CONDA_CMD) pytest tests -v -m 'not online' --junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: test-no-tb14
 test-no-tb14:	## run all tests except ones marked for 'Testbed-14'
 	@echo "Running all tests except ones marked for 'Testbed-14'..."
-	bash -c "$(CONDA_CMD) pytest tests -v -m 'not testbed14' --junitxml $(APP_ROOT)/tests/results.xml"
+	@bash -c "$(CONDA_CMD) pytest tests -v -m 'not testbed14' --junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: test-spec
 test-spec:	## run tests with custom input specification (pytest format) [make TESTS='<spec>' test-spec]
 	@echo "Running custom tests from input specification..."
 	@[ "${TESTS}" ] || ( echo ">> 'TESTS' is not set"; exit 1 )
-	bash -c "$(CONDA_CMD) pytest tests -v -m '${TESTS}' --junitxml $(APP_ROOT)/tests/results.xml"
+	@bash -c "$(CONDA_CMD) pytest tests -v -m '${TESTS}' --junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: coverage
 coverage: mkdir-reports		## run all tests using coverage analysis

@@ -23,8 +23,7 @@ from tests.utils import (
     mocked_process_package,
 )
 from copy import deepcopy
-# noinspection PyDeprecation
-from contextlib import nested
+from contextlib import ExitStack
 import pytest
 import webtest
 import unittest
@@ -49,7 +48,6 @@ TEST_REMOTE_PROCESS_WPS3_FILE = os.path.join(TEST_REMOTE_PROCESS_ROOT, "test_des
 
 def mock_remote_server_requests_wp1(test):
     """Mocks above `remote` references to local resources."""
-    # noinspection PyUnresolvedReferences, PyUnusedLocal
     def mock_requests_wps1(*args, **kwargs):
         """Mock ``requests`` responses fetching ``TEST_REMOTE_SERVER_URL`` WPS reference."""
         xml_header = {"Content-Type": CONTENT_TYPE_APP_XML}
@@ -168,8 +166,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process_name = self.fully_qualified_test_process_name()
         process_data = self.get_process_deploy_template(process_name)
         package_mock = mocked_process_package()
-        # noinspection PyDeprecation
-        with nested(*package_mock):
+        with ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
             resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=True)
             # TODO: status should be 201 when properly modified to match API conformance
             assert resp.status_code == 200
@@ -204,8 +203,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process_data = self.get_process_deploy_template(process_name)
         package_mock = mocked_process_package()
 
-        # noinspection PyDeprecation
-        with nested(*package_mock):
+        with ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
             uri = "/processes"
             resp = self.app.post_json(uri, params=process_data, headers=self.json_headers, expect_errors=True)
             # TODO: status should be 201 when properly modified to match API conformance
@@ -220,8 +220,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process_data = self.get_process_deploy_template(process_name)
         package_mock = mocked_process_package()
 
-        # noinspection PyDeprecation
-        with nested(*package_mock):
+        with ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
             uri = "/processes"
             resp = self.app.post_json(uri, params=process_data, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 400
@@ -233,8 +234,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process_data = self.get_process_deploy_template(process_name)
         package_mock = mocked_process_package()
 
-        # noinspection PyDeprecation
-        with nested(*package_mock):
+        with ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
             uri = "/processes"
             resp = self.app.post_json(uri, params=process_data, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 409
@@ -262,8 +264,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process_data_tests[10]["executionUnit"][0] = {"href": {}}  # href as package instead of url
         process_data_tests[11]["executionUnit"][0] = {"unit": {}, "href": ""}  # can"t have both unit/href together
 
-        # noinspection PyDeprecation
-        with nested(*package_mock):
+        with ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
             uri = "/processes"
             for i, data in enumerate(process_data_tests):
                 resp = self.app.post_json(uri, params=data, headers=self.json_headers, expect_errors=True)
@@ -278,8 +281,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process_data = self.get_process_deploy_template(process_name)
         package_mock = mocked_process_package()
 
-        # noinspection PyDeprecation
-        with nested(*package_mock):
+        with ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
             uri = "/processes"
             resp = self.app.post_json(uri, params=process_data, headers=self.json_headers, expect_errors=True)
             # TODO: status should be 201 when properly modified to match API conformance
@@ -472,8 +476,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         task = "job-{}".format(fully_qualified_name(self))
         mock_execute = mocked_process_job_runner(task)
 
-        # noinspection PyDeprecation
-        with nested(*mock_execute):
+        with ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
             resp = self.app.post_json(uri, params=data, headers=self.json_headers)
             assert resp.status_code == 201
             assert resp.content_type == CONTENT_TYPE_APP_JSON
@@ -531,8 +536,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         execute_mock_data_tests[0][1]["outputs"][0].pop("transmissionMode")  # should resolve to default value
 
         for mock_execute, data_execute in execute_mock_data_tests:
-            # noinspection PyDeprecation
-            with nested(*mock_execute):
+            with ExitStack() as stack:
+                for exe in mock_execute:
+                    stack.enter_context(exe)
                 path = "/processes/{}/jobs".format(self.process_public.identifier)
                 resp = self.app.post_json(path, params=data_execute, headers=self.json_headers)
                 assert resp.status_code == 201, "Expected job submission without inputs created without error."
