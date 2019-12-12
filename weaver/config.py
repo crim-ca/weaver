@@ -80,5 +80,5 @@ def get_weaver_config_file(file_path, default_config_file):
     return default
 
 
-def includeme(config):ccc
+def includeme(config):  # noqa: E811
     LOGGER.debug("Loading weaver configuration.")

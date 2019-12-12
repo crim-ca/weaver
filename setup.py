@@ -13,7 +13,7 @@ if all(os.path.isfile(os.path.join(CUR_DIR, f)) for f in ['README.rst', 'CHANGES
 sys.path.insert(0, CUR_DIR)
 sys.path.insert(0, os.path.join(CUR_DIR, 'weaver'))
 # don't use 'from' to avoid import errors on not yet installed packages
-import __meta__  # noqa E402
+import __meta__  # noqa: E402
 
 PY2 = sys.version_info[0] == 2
 requirements = [line.strip() for line in open('requirements.txt')]

@@ -59,16 +59,35 @@ REPORTS_DIR := $(APP_ROOT)/reports
 
 .DEFAULT_GOAL := help
 
+## --- Informative targets --- ##
+
 .PHONY: all
 all: help
 
-# Auto documented help from target comments
-#	https://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
+# Auto documented help targets & sections from comments
+#	- detects lines marked by double octothorpe (#), then applies the corresponding target/section markup
+#   - target comments must be defined after their dependencies (if any)
+#	- section comments must have at least a double dash (-)
+#
+# 	Original Reference:
+#		https://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
+# 	Formats:
+#		https://misc.flogisoft.com/bash/tip_colors_and_formatting
+_SECTION := \033[34m
+_TARGET  := \033[36m
+_NORMAL  := \033[0m
 .PHONY: help
+# note: use "\#\#" to escape results that would self-match in this target's search definition
 help:	## print this help message (default)
-	@echo "$(APP_NAME) help"
+	@echo "$(_SECTION)=== $(APP_NAME) help ===$(_NORMAL)"
 	@echo "Please use 'make <target>' where <target> is one of:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(word 1,$(MAKEFILE_LIST)) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
+#	@grep -E '^[a-zA-Z_-]+:.*?\#\# .*$$' $(MAKEFILE_LIST) \
+#		| awk 'BEGIN {FS = ":.*?\#\# "}; {printf "    $(_TARGET)%-24s$(_NORMAL) %s\n", $$1, $$2}'
+	@grep -E '\#\#.*$$' $(MAKEFILE_LIST) \
+		| awk ' BEGIN {FS = "(:|\-\-\-)+.*?\#\# "}; \
+			/\--/ {printf "$(_SECTION)%s$(_NORMAL)\n", $$1;} \
+			/:/   {printf "    $(_TARGET)%-24s$(_NORMAL) %s\n", $$1, $$2} \
+		'
 
 .PHONY: version
 version:	## display current version
@@ -90,13 +109,7 @@ info:		## display make information
 	@echo "  DOWNLOAD_CACHE      $(DOWNLOAD_CACHE)"
 	@echo "  DOCKER_REPO         $(DOCKER_REPO)"
 
-## Helper targets
-
-.PHONY: mkdir-reports
-mkdir-reports:
-	@mkdir -p "$(REPORTS_DIR)"
-
-## conda targets
+## -- Conda targets -- ##
 
 .PHONY: conda-base
 conda-base:		## obtain and install a missing conda distribution
@@ -138,7 +151,7 @@ conda-env-export:		## export the conda environment
 	@echo "Exporting conda enviroment..."
 	@test -d $(CONDA_ENV_PATH) && "$(CONDA_BIN)" env export -n $(CONDA_ENV) -f environment.yml
 
-## Build targets
+## -- Build targets -- ##
 
 .PHONY: install
 install: install-sys install-pip install-pkg  ## install application with all its dependencies
@@ -172,10 +185,13 @@ install-raw:	## install without any requirements or dependencies (suppose everyt
 	@-bash -c '$(CONDA_CMD) pip install -e "$(APP_ROOT)" --no-deps'
 	@echo "Install package complete."
 
-## Cleanup targets
+## -- Cleanup targets -- ##
 
 .PHONY: clean
-clean: clean-build clean-cache clean-src clean-test		## run all cleanup targets
+clean: clean-all	## alias for 'clean-all' target
+
+.PHONY: clean-all
+clean-all: clean-build clean-cache clean-src clean-test		## run all cleanup targets
 
 .PHONY: clean-build
 clean-build:		## remove the temporary build files
@@ -216,12 +232,21 @@ clean-dist: clean	## remove *all* files that are not controlled by 'git' except 
 	@git diff --quiet HEAD || echo "There are uncommited changes! Not doing 'git clean'..."
 	@-git clean -dfx -e *.bak -e Makefile.config
 
-## Testing targets
+## -- Testing targets -- ##
+
+.PHONY: test
+test: test-all	## alias for 'test-all' target
+
+.PHONY: test-all
+test-all:	## run all tests (including long running tests)
+	@echo "Running all tests (including slow and online tests)..."
+	bash -c "$(CONDA_CMD) pytest tests -v --junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: test-unit
 test-unit:		## run unit tests (skip long running and online tests)
 	@echo "Running tests (skip slow and online tests)..."
-	bash -c "$(CONDA_CMD) pytest tests -v -m 'not slow and not online and not functional' --junitxml $(APP_ROOT)/tests/results.xml"
+	bash -c "$(CONDA_CMD) pytest tests -v -m 'not slow and not online and not functional' \
+	 	--junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: test-func
 test-func:		## run funtional tests (online and usage specific)
@@ -243,13 +268,8 @@ test-no-tb14:	## run all tests except ones marked for 'Testbed-14'
 	@echo "Running all tests except ones marked for 'Testbed-14'..."
 	bash -c "$(CONDA_CMD) pytest tests -v -m 'not testbed14' --junitxml $(APP_ROOT)/tests/results.xml"
 
-.PHONY: test-all
-test-all:	## run all tests (including long running tests)
-	@echo "Running all tests (including slow and online tests)..."
-	bash -c "$(CONDA_CMD) pytest tests -v --junitxml $(APP_ROOT)/tests/results.xml"
-
-.PHONY: test
-test:	## run custom tests from input specification (make TESTS='<spec>' test) [ex: make TESTS='not functional' test]
+.PHONY: test-spec
+test-spec:	## run tests with custom input specification (pytest format) [make TESTS='<spec>' test-spec]
 	@echo "Running custom tests from input specification..."
 	@[ "${TESTS}" ] || ( echo ">> 'TESTS' is not set"; exit 1 )
 	bash -c "$(CONDA_CMD) pytest tests -v -m '${TESTS}' --junitxml $(APP_ROOT)/tests/results.xml"
@@ -262,10 +282,17 @@ coverage: mkdir-reports		## run all tests using coverage analysis
 	@bash -c '$(CONDA_CMD) coverage report --rcfile="$(APP_ROOT)/setup.cfg" -i -m'
 	@bash -c '$(CONDA_CMD) coverage html --rcfile="$(APP_ROOT)/setup.cfg" -d "$(REPORTS_DIR)/coverage"'
 
-## Code check targets
+## -- Static code check targets -- ##
 
-.PHONY: checks
-checks: check-pep8 check-lint check-security check-doc8 check-links	## run every code style checks
+.PHONY: mkdir-reports
+mkdir-reports:
+	@mkdir -p "$(REPORTS_DIR)"
+
+.PHONY: check
+check: check-all	## alias for 'check-all' target
+
+.PHONY: check-all
+check-all: check-pep8 check-lint check-security check-doc8 check-links	## run every code style checks
 
 .PHONY: check-pep8
 check-pep8: mkdir-reports		## run PEP8 code style checks
@@ -278,38 +305,42 @@ check-lint: mkdir-reports		## run linting code style checks
 	@echo "Running linting code style checks..."
 	@bash -c '$(CONDA_CMD) \
 		pylint --rcfile="$(APP_ROOT)/setup.cfg" "$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" --reports y \
-		| tee "$(REPORTS_DIR)/check-lint.txt"'
+		1> >(tee "$(REPORTS_DIR)/check-lint.txt")'
 
 .PHONY: check-security
 check-security: mkdir-reports	## run security code checks
 	@echo "Running security code checks..."
 	@bash -c '$(CONDA_CMD) \
 		bandit -v --ini "$(APP_ROOT)/setup.cfg" -r \
-		| tee "$(REPORTS_DIR)/check-security.txt"'
+		1> >(tee "$(REPORTS_DIR)/check-security.txt")'
 
 .PHONY: check-doc8
-check-doc8:	## run doc8 documentation style checks
+check-doc8: mkdir-reports	## run doc8 documentation style checks
 	@echo "Running doc8 doc style checks..."
 	@bash -c '$(CONDA_CMD) \
 		doc8 "$(APP_ROOT)/docs" \
-		| tee "$(REPORTS_DIR)/check-doc8.txt"'
+		1> >(tee "$(REPORTS_DIR)/check-doc8.txt")'
 
 .PHONY: check-links
-check-links:		## check all external links in documentation for integrity
+check-links: 		## check all external links in documentation for integrity
 	@echo "Running link checks on docs..."
 	@bash -c '$(CONDA_CMD) (MAKE) -C "$(APP_ROOT)/docs" linkcheck'
 
 .PHONY: check-imports
-check-imports:		## run imports code checks
+check-imports: mkdir-reports	## run imports code checks
 	@echo "Running import checks..."
-	@bash -c '$(CONDA_CMD) isort --check-only --diff --recursive $(APP_ROOT) | tee "$(REPORTS_DIR)/check-imports.txt"'
+	@bash -c '$(CONDA_CMD) \
+		isort --check-only --diff --recursive $(APP_ROOT) \
+		1> >(tee "$(REPORTS_DIR)/check-imports.txt")'
 
 .PHONY: fix-imports
-fix-imports:		## apply import code checks corrections
+fix-imports: mkdir-reports	## apply import code checks corrections
 	@echo "Fixing flagged import checks..."
-	@bash -c '$(CONDA_CMD) isort --recursive $(APP_ROOT) | tee "$(REPORTS_DIR)/fixed-imports.txt"'
+	@bash -c '$(CONDA_CMD) \
+		isort --recursive $(APP_ROOT) \
+		1> >(tee "$(REPORTS_DIR)/fixed-imports.txt")'
 
-## Documentation targets
+## -- Documentation targets -- ##
 
 .PHONY: docs
 docs:	## generate HTML documentation with Sphinx
@@ -318,7 +349,7 @@ docs:	## generate HTML documentation with Sphinx
 	@echo "open your browser:"
 	@echo "		firefox '$(APP_ROOT)/docs/build/html/index.html'"
 
-## Bumpversion targets
+## -- Versionning targets -- ##
 
 # Bumpversion 'dry' config
 # if 'dry' is specified as target, any bumpversion call using 'BUMP_XARGS' will not apply changes
@@ -336,7 +367,7 @@ bump:
 	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set"; exit 1 )
 	@-bash -c '$(CONDA_CMD) bump2version $(BUMP_XARGS) --new-version "${VERSION}" patch;'
 
-## Docker targets
+## -- Docker targets -- ##
 
 .PHONY: docker-info
 docker-info:		## obtain docker image information
@@ -351,10 +382,17 @@ docker-build:		## build the docker image
 docker-push: docker-build	## push the docker image
 	@bash -c 'docker push "$(DOCKER_REPO):$(APP_VERSION)"'
 
-## Supervisor targets
+## --- Launchers targets --- ##
 
 .PHONY: start
-start:	## start the application with gunicorn
-	@echo "Starting application service..."
-	@echo '>>  "$(APP_ROOT)/bin/gunicorn" --paste "$(APP_INI)" --preload'
-	@-bash -c '$(CONDA_CMD) "$(APP_ROOT)/bin/gunicorn" --paste "$(APP_INI)" --preload'
+start: install	## start application instance(s) with gunicorn
+	@echo "Starting $(APP_NAME)..."
+	@bash -c '$(CONDA_CMD) exec gunicorn -b 0.0.0.0:4001 --paste "$(APP_INI)" --preload &'
+
+.PHONY: stop
+stop: 		## kill application instance(s) started with gunicorn
+	@lsof -t -i :4001 | xargs kill
+
+.PHONY: stat
+stat: 		## display processes with PID(s) of gunicorn instance(s) running the application
+	@lsof -i :4001 || echo "No instance running"
