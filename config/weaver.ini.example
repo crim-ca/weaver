@@ -63,7 +63,7 @@ weaver.extra_options =
 ###
 [celery]
 #USE_CELERYCONFIG = True
-CELERY_BROKER_URL = mongodb://localhost:27017/celery
+BROKER_URL = mongodb://localhost:27017/celery
 
 ###
 # wsgi server configuration

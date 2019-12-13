@@ -76,7 +76,8 @@ class BuiltinAppTest(unittest.TestCase):
     def test_jsonarray2netcdf_execute(self):
         dirname = "/tmp"
         nc_data = "Hello NetCDF!"
-        with NamedTemporaryFile(dir=dirname, suffix=".nc") as nf, NamedTemporaryFile(dir=dirname, suffix=".json") as jf:
+        with NamedTemporaryFile(dir=dirname, mode="w", suffix=".nc") as nf, \
+             NamedTemporaryFile(dir=dirname, mode="w", suffix=".json") as jf:
             nf.write(nc_data)
             nf.seek(0)
             jf.write(json.dumps(["file://{}".format(os.path.join(dirname, nf.name))]))  # app expects list of URL

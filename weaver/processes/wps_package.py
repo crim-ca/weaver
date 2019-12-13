@@ -1848,7 +1848,7 @@ class WpsPackage(Process):
         # multiple, but they are not explicitly handled
         all_hints = list(dict(req) for req in tool.get("requirements", {}))
         all_hints.extend(dict(req) for req in tool.get("hints", {}))
-        app_hints = filter(lambda h: any(h["class"].endswith(t) for t in CWL_REQUIREMENT_APP_TYPES), all_hints)
+        app_hints = list(filter(lambda h: any(h["class"].endswith(t) for t in CWL_REQUIREMENT_APP_TYPES), all_hints))
         if len(app_hints) > 1:
             raise ValueError("Package 'requirements' and/or 'hints' define too many conflicting values: {}, "
                              "only one permitted amongst {}.".format(list(app_hints), list(CWL_REQUIREMENT_APP_TYPES)))

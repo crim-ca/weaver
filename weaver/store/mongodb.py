@@ -368,7 +368,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         """
         try:
             tags = ["dev"]
-            tags.extend(filter(lambda t: t, custom_tags or list()))
+            tags.extend(list(filter(lambda t: t, custom_tags or [])))
             if is_workflow:
                 tags.append(PROCESS_WORKFLOW)
             else:
@@ -389,7 +389,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                 "execute_async": execute_async,
                 "is_workflow": is_workflow,
                 "created": now(),
-                "tags": tags,
+                "tags": list(set(tags)),
                 "access": access,
                 "notification_email": notification_email,
             })

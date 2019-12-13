@@ -34,7 +34,8 @@ def ows_response_tween(request, handler):
         LOGGER.debug("unhandled {!s} exception -> ows exception response".format(type(err).__name__))
         raised_error = err
         return_error = OWSException(detail=str(err), status=HTTPInternalServerError)
-    LOGGER.exception("Raised exception: [{!r}]\nReturned exception: {!r}".format(raised_error, return_error))
+    exc_msg = "Raised exception: [{!r}]\nReturned exception: {!r}".format(raised_error, return_error)
+    LOGGER.error(exc_msg, exc_info=raised_error)
     return return_error
 
 

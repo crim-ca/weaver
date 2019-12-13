@@ -792,10 +792,10 @@ class WpsPackageAppTest(unittest.TestCase):
         inputs = body["processDescription"]["inputs"]
         assert isinstance(desc["process"]["inputs"], list)
         assert len(desc["process"]["inputs"]) == len(inputs)
-        for i, input in enumerate(inputs):
-            assert desc["process"]["inputs"][i]["id"] == input["id"]
+        for i, process_input in enumerate(inputs):
+            assert desc["process"]["inputs"][i]["id"] == process_input["id"]
             for field in ["minOccurs", "maxOccurs"]:
-                assert desc["process"]["inputs"][i][field] in (input[field], str(input[field]))
+                assert desc["process"]["inputs"][i][field] in (process_input[field], str(process_input[field]))
 
     # FIXME: test not working
     #   same payloads sent directly to running weaver properly raise invalid schema -> bad request error
