@@ -42,7 +42,7 @@ class Wps1Process(WpsProcessInterface):
     def execute(self, workflow_inputs, out_dir, expected_outputs):
         self.update_status("Preparing execute request for remote WPS1 provider.",
                            REMOTE_JOB_PROGRESS_REQ_PREP, status.STATUS_RUNNING)
-        LOGGER.debug("Execute process WPS request for {0}".format(self.process))
+        LOGGER.debug("Execute process WPS request for %s", self.process)
         try:
             try:
                 wps = WebProcessingService(url=self.provider, headers=self.cookies, verify=self.verify)
@@ -126,7 +126,7 @@ class Wps1Process(WpsProcessInterface):
                                        status.STATUS_RUNNING)
                 except Exception as exc:
                     num_retries += 1
-                    LOGGER.debug("Exception raised: {}".format(repr(exc)))
+                    LOGGER.debug("Exception raised: %r", exc)
                     sleep(1)
                 else:
                     num_retries = 0
@@ -152,8 +152,7 @@ class Wps1Process(WpsProcessInterface):
 
                     # TODO Should we handle other type than File reference?
                     r = requests.get(result_val, allow_redirects=True)
-                    LOGGER.debug("Fetching result output from [{0}] to cwl output destination : [{1}]"
-                                 .format(result_val, dst_fn))
+                    LOGGER.debug("Fetching result output from [%s] to cwl output destination: [%s]", result_val, dst_fn)
                     with open(dst_fn, mode='wb') as dst_fh:
                         dst_fh.write(r.content)
 

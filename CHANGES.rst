@@ -12,83 +12,86 @@ New Features:
 - Add ability to filter jobs with ``notification_email`` query parameter (#44).
 - Add jobs statistics grouping by specific fields using comma-separated list ``group_by`` query parameter (#46).
 - Add some tests to evaluate new job search methods / grouping results and responses (#44, #46).
-- Add handling of multiple `CWL` field ``format`` for ``File`` type
-- Add missing ontology reference support for `CWL` field ``format`` by defaulting to `IANA` namespace
-- Add support for I/O enum array (#30)
-- Add more functional tests (#11, #17)
+- Add handling of multiple `CWL` field ``format`` for ``File`` type.
+- Add missing ontology reference support for `CWL` field ``format`` by defaulting to `IANA` namespace.
+- Add support for I/O enum array (#30).
+- Add more functional tests (#11, #17).
 - Add support of ``label`` synonym as ``title`` for inputs and process description
   (`CWL` specifying a ``label`` will set it in `WPS` process) (#31)
-- Add support of input ``minOccurs`` and ``maxOccurs`` as ``int`` while maintaining ``str`` support (#14)
+- Add support of input ``minOccurs`` and ``maxOccurs`` as ``int`` while maintaining ``str`` support (#14).
 
 Changes:
 -------------
 
-- Use ``bump2version`` and move all config under ``setup.cfg``
-- Remove enforced ``text/plain`` for `CWL` ``File`` when missing ``format`` field
+- Use ``bump2version`` and move all config under ``setup.cfg``.
+- Remove enforced ``text/plain`` for `CWL` ``File`` when missing ``format`` field.
+- Make ``null`` reference a singleton so that multiple instantiation calls all refer to the same instance and produce
+  the expected behaviour of ``<x> is null`` instead of hard-to-identify errors because of english syntax.
 
 Fixes:
 -------------
 
 - Adjust some typing definitions incorrectly specified.
 - Fix some failing functionality tests.
-- Fix I/O field ordering preserved as specified in payload or loaded reference file
-- Fix setting ``minOccurs=0`` when a ``default`` is specified in the corresponding `CWL` I/O (#17, #25)
+- Fix I/O field ordering preserved as specified in payload or loaded reference file.
+- Fix setting ``minOccurs=0`` when a ``default`` is specified in the corresponding `CWL` I/O (#17, #25).
 - Fix incorrectly overridden ``maxOccurs="unbounded"`` by ``maxOccurs="1"`` when a partial array input definition
-  is specified without explicit ``maxOccurs`` in `WPS` payload (#17, #25)
+  is specified without explicit ``maxOccurs`` in `WPS` payload (#17, #25).
 - Fix case where omitted ``format[s]`` in both `CWL` and `WPS` deploy bodies generated a process description with
   complex I/O (file) without required ``formats`` field. Default ``text/plain`` format is now automatically added.
 - Fix case where ``format[s]`` lists between `CWL` and `WPS` where incorrectly merged.
 - Fix invalid JSON response formatting on failing schema validation of process deployment body.
+- Fix multiple Python 2/3 compatibility issues.
 
 0.2.2 (2019-05-31)
 ==================
 
-- Support notification email subject template
+- Support notification email subject template.
 
 0.2.1 (2019-05-29)
 ==================
 
-- Add per-process email notification template
+- Add per-process email notification template.
 
 0.2.0 (2019-03-26)
 ==================
 
-- Fixes to handle invalid key characters ``"$"`` and ``"."`` during `CWL` package read/write operations to database
-- Fixes some invalid `CWL` package generation from `WPS-1` references
+- Fixes to handle invalid key characters ``"$"`` and ``"."`` during `CWL` package read/write operations to database.
+- Fixes some invalid `CWL` package generation from `WPS-1` references.
 - More cases handled for `WPS-1` to `CWL` ``WPS1Requirement`` conversion
-  (``AllowedValues``, ``Default``, ``SupportedFormats``, ``minOccurs``, ``maxOccurs``)
-- Add file format validation to generated `CWL` package from `WPS-1` `MIME-types`
-- Allow auto-deployment of `WPS-REST` processes from `WPS-1` references specified by configuration
-- Add many deployment and execution validation tests for ``WPS1Requirement``
-- Add builtin application packages support for common operations
+  (``AllowedValues``, ``Default``, ``SupportedFormats``, ``minOccurs``, ``maxOccurs``).
+- Add file format validation to generated `CWL` package from `WPS-1` `MIME-types`.
+- Allow auto-deployment of `WPS-REST` processes from `WPS-1` references specified by configuration.
+- Add many deployment and execution validation tests for ``WPS1Requirement``.
+- Add builtin application packages support for common operations.
 
 0.1.3
 =====
 
-- Add useful `Makefile` targets for deployment
-- Add badges indications in ``README.rst`` for tracking from repo landing page
-- Fix security issue of PyYAML requirement
-- Fix some execution issues for ``Wps1Process``
-- Fix some API schema erroneous definitions
-- Additional logging of unhandled errors
-- Improve some typing definitions
+- Add useful `Makefile` targets for deployment.
+- Add badges indications in ``README.rst`` for tracking from repo landing page.
+- Fix security issue of PyYAML requirement.
+- Fix some execution issues for ``Wps1Process``.
+- Fix some API schema erroneous definitions.
+- Additional logging of unhandled errors.
+- Improve some typing definitions.
 
 0.1.2
 =====
 
-- Introduce ``WPS1Requirement`` and corresponding ``Wps1Process`` to run a `WPS-1` process under `CWL`
-- Remove `mongodb` requirement, assume it is running on an external service or docker image
-- Add some typing definitions
-- Fix some problematic imports
-- Fix some PEP8 issues and PyCharm warnings
+- Introduce ``WPS1Requirement`` and corresponding ``Wps1Process`` to run a `WPS-1` process under `CWL`.
+- Remove `mongodb` requirement, assume it is running on an external service or docker image.
+- Add some typing definitions.
+- Fix some problematic imports.
+- Fix some PEP8 issues and PyCharm warnings.
 
 0.1.1
 =====
 
-- Modify `Dockerfile` to use lighter ``debian:latest`` instead of ``birdhouse/bird-base:latest``
-- Modify `Dockerfile` to reduce build time by reusing built image layers (requirements installation mostly)
-- Make some `buildout` dependencies optional to also reduce build time and image size
-- Some additional striping of deprecated or invalid items from `Twitcher`_
+- Modify `Dockerfile` to use lighter ``debian:latest`` instead of ``birdhouse/bird-base:latest``.
+- Modify `Dockerfile` to reduce build time by reusing built image layers (requirements installation mostly).
+- Make some `buildout` dependencies optional to also reduce build time and image size.
+- Some additional striping of deprecated or invalid items from `Twitcher`_.
 
 0.1.0
 =====

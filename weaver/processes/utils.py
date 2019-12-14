@@ -331,7 +331,7 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
             processes_config = yaml.safe_load(f)
         processes = processes_config.get("processes")
         if not processes:
-            LOGGER.warning("Nothing to process from file: [{}]".format(wps_processes_file_path))
+            LOGGER.warning("Nothing to process from file: [%s]", wps_processes_file_path)
             return
 
         process_store = get_db(container).get_store(StoreProcesses)  # type: MongodbProcessStore
@@ -360,10 +360,10 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
                 raise ValueError("Invalid process value: [{!s}].".format(svc_proc))
 
             # fetch data
-            LOGGER.info("Fetching WPS-1: [{}]".format(svc_url))
+            LOGGER.info("Fetching WPS-1: [%s]", svc_url)
             wps = WebProcessingService(url=svc_url)
             if LooseVersion(wps.version) >= LooseVersion("2.0"):
-                LOGGER.warning("Invalid WPS-1 provider, version was [{}]".format(wps.version))
+                LOGGER.warning("Invalid WPS-1 provider, version was [%s]", wps.version)
                 continue
             wps_processes = [wps.describeprocess(p) for p in svc_proc] or wps.processes
             for wps_process in wps_processes:
@@ -373,7 +373,7 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
                 except ProcessNotFound:
                     pass
                 else:
-                    LOGGER.warning("Process already registered: [{}]. Skipping...".format(proc_id))
+                    LOGGER.warning("Process already registered: [%s]. Skipping...", proc_id)
                     continue
                 proc_url = "{}?service=WPS&request=DescribeProcess&identifier={}&version={}" \
                            .format(svc_url, wps_process.identifier, wps.version)
@@ -386,11 +386,11 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
                 try:
                     resp = deploy_process_from_payload(payload, container)
                     if resp.status_code == HTTPOk.status_code:
-                        LOGGER.info("Process registered: []".format(proc_id))
+                        LOGGER.info("Process registered: [%s]", proc_id)
                     else:
-                        raise RuntimeError("Process registration failed: []".format(proc_id))
+                        raise RuntimeError("Process registration failed: [{}]".format(proc_id))
                 except Exception as ex:
-                    LOGGER.error("Exception during process registration: [{!r}]".format(ex))
+                    LOGGER.error("Exception during process registration: [%r]", ex)
                     continue
 
     except Exception as exc:

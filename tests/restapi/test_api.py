@@ -43,7 +43,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
     def test_swagger_api_format(self):
         resp = self.testapp.get(api_swagger_ui_uri)
         assert 200 == resp.status_code
-        assert "<title>{}</title>".format(API_TITLE) in resp.body
+        assert "<title>{}</title>".format(API_TITLE) in resp.text
 
         resp = self.testapp.get(api_swagger_json_uri, headers=self.json_headers)
         assert 200 == resp.status_code
@@ -110,7 +110,7 @@ class RebasedApiRoutesTestCase(unittest.TestCase):
             # validate that swagger UI still renders and has valid URL
             resp = self.testapp.get(api_swagger_ui_uri)
             assert 200 == resp.status_code
-            assert "<title>{}</title>".format(API_TITLE) in resp.body
+            assert "<title>{}</title>".format(API_TITLE) in resp.text
 
     def test_swagger_api_request_base_path_original(self):
         """
@@ -119,7 +119,7 @@ class RebasedApiRoutesTestCase(unittest.TestCase):
         """
         resp = self.testapp.get(api_swagger_ui_uri)
         assert 200 == resp.status_code
-        assert "<title>{}</title>".format(API_TITLE) in resp.body
+        assert "<title>{}</title>".format(API_TITLE) in resp.text
 
         # ensure that environment that would define the weaver location is not defined for local app
         with mock.patch.dict("os.environ"):
@@ -133,4 +133,4 @@ class RebasedApiRoutesTestCase(unittest.TestCase):
             # validate that swagger UI still renders and has valid URL
             resp = self.testapp.get(api_swagger_ui_uri)
             assert 200 == resp.status_code
-            assert "<title>{}</title>".format(API_TITLE) in resp.body
+            assert "<title>{}</title>".format(API_TITLE) in resp.text

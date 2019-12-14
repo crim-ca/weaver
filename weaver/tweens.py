@@ -22,20 +22,19 @@ def ows_response_tween(request, handler):
         raised_error._json_formatter = OWSException.json_formatter
         return_error = raised_error
     except OWSException as err:
-        LOGGER.debug('direct ows exception response')
-        LOGGER.exception("Raised exception: [{!r}]\nReturned exception: {!r}".format(err, err))
+        LOGGER.debug("direct ows exception response")
+        LOGGER.exception("Raised exception: [%r]\nReturned exception: %r", err, err)
         raised_error = err
         return_error = err
     except NotImplementedError as err:
-        LOGGER.debug('not implemented error -> ows exception response')
+        LOGGER.debug("not implemented error -> ows exception response")
         raised_error = err
         return_error = OWSNotImplemented(str(err))
     except Exception as err:
-        LOGGER.debug("unhandled {!s} exception -> ows exception response".format(type(err).__name__))
+        LOGGER.debug("unhandled %s exception -> ows exception response", type(err).__name__)
         raised_error = err
         return_error = OWSException(detail=str(err), status=HTTPInternalServerError)
-    exc_msg = "Raised exception: [{!r}]\nReturned exception: {!r}".format(raised_error, return_error)
-    LOGGER.error(exc_msg, exc_info=raised_error)
+    LOGGER.error("Raised exception: [%r]\nReturned exception: %r", raised_error, return_error, exc_info=raised_error)
     return return_error
 
 

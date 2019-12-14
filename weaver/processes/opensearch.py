@@ -313,7 +313,7 @@ class OpenSearchQuery(object):
                         feature["properties"]["links"]["alternates"])
                 data_links_mime_types = [d["type"] for d in data_links]
             except KeyError:
-                LOGGER.exception("Badly formatted json at: {}".format(url))
+                LOGGER.exception("Badly formatted json at: [%s]", url)
                 raise
             for mime_type in accept_mime_types:
                 good_links = [data["href"]

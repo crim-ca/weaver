@@ -35,16 +35,28 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
-# noinspection PyClassHasNoInit, PyPep8Coding, PyUnusuedLocal, PyMethodMayBeStatic
-class _NullType:
-    """Represents a ``null`` value to differentiate from ``None``."""
-    def __eq__(self, other):
-        return isinstance(other, _NullType) \
-               or other is null \
-               or (isclass(other) and issubclass(other, _NullType))
+class _Singleton(type):
+    __instance__ = None  # type: Optional[_Singleton]
 
-    def __nonzero__(self):
+    def __call__(cls):
+        if cls.__instance__ is None:
+            cls.__instance__ = super(_Singleton, cls).__call__()
+        return cls.__instance__
+
+
+class _NullType(six.with_metaclass(_Singleton)):
+    """Represents a ``null`` value to differentiate from ``None``."""
+
+    def __eq__(self, other):
+        return (isinstance(other, _NullType)
+                or other is null
+                or other is self.__instance__
+                or (isclass(other) and issubclass(other, _NullType)))
+
+    @staticmethod
+    def __nonzero__():
         return False
+
     __bool__ = __nonzero__
     __len__ = __nonzero__
 

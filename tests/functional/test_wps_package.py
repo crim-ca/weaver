@@ -273,7 +273,7 @@ class WpsPackageAppTest(unittest.TestCase):
         ns_json, type_json = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
         ns_text, type_text = get_cwl_file_format(CONTENT_TYPE_TEXT_PLAIN)
         ns_ncdf, type_ncdf = get_cwl_file_format(CONTENT_TYPE_APP_NETCDF)
-        namespaces = dict(ns_json.items() + ns_text.items() + ns_ncdf.items())
+        namespaces = dict(list(ns_json.items()) + (ns_text.items()) + list(ns_ncdf.items()))
         default_file = "https://server.com/file"
         cwl = {
             "cwlVersion": "v1.0",

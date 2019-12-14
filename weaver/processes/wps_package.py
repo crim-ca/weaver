@@ -81,6 +81,7 @@ if TYPE_CHECKING:
     CWL_Input_Type = Dict[{"id": AnyStr, "type": AnyStr}]
     CWL_Output_Type = Dict[{"id": AnyStr, "type": AnyStr}]
     CWL_IO_Type = Union[CWL_Input_Type, CWL_Output_Type]
+    PKG_IO_Type = Union[JSON_IO_Type, WPS_IO_Type]
     ANY_IO_Type = Union[CWL_IO_Type, JSON_IO_Type, WPS_IO_Type, OWS_IO_Type]
     ANY_Format_Type = Union[Dict[AnyStr, Optional[AnyStr]], Format]
 
@@ -444,7 +445,7 @@ def _is_cwl_array_type(io_info):
         """
         _is_enum, _enum_type, _enum_mode, _enum_allow = _is_cwl_enum_type({"type": _io_item})
         if _is_enum:
-            LOGGER.debug("I/O '{}' parsed as 'array' with sub-item as 'enum'".format(io_info["name"]))
+            LOGGER.debug("I/O [%s] parsed as 'array' with sub-item as 'enum'", io_info["name"])
             io_return["type"] = _enum_type
             io_return["mode"] = _enum_mode
             io_return["allow"] = _enum_allow
@@ -463,7 +464,7 @@ def _is_cwl_array_type(io_info):
             io_return["type"] = io_type["items"]
         if io_return["type"] not in PACKAGE_ARRAY_ITEMS:
             raise PackageTypeError("Unsupported I/O 'array' definition: '{}'.".format(repr(io_info)))
-        LOGGER.debug("I/O '{}' parsed as 'array' with nested dict notation".format(io_info["name"]))
+        LOGGER.debug("I/O [%s] parsed as 'array' with nested dict notation", io_info["name"])
         io_return["array"] = True
     # array type conversion when defined as string '<type>[]'
     elif isinstance(io_return["type"], six.string_types) and io_return["type"] in PACKAGE_ARRAY_TYPES:
@@ -475,7 +476,7 @@ def _is_cwl_array_type(io_info):
             _update_if_sub_enum(io_item)
         if io_return["type"] not in PACKAGE_ARRAY_ITEMS:
             raise PackageTypeError("Unsupported I/O 'array' definition: '{}'.".format(repr(io_info)))
-        LOGGER.debug("I/O '{}' parsed as 'array' with shorthand '[]' notation".format(io_info["name"]))
+        LOGGER.debug("I/O [%s] parsed as 'array' with shorthand '[]' notation", io_info["name"])
         io_return["array"] = True
     return io_return["array"], io_return["type"], io_return["mode"], io_return["allow"]
 
@@ -547,8 +548,6 @@ def _cwl2wps_io(io_info, io_select):
     io_type = io_info["type"]
     io_min_occurs = 1
     io_max_occurs = 1
-    io_allow = AnyValue
-    io_mode = MODE.NONE
 
     # obtain real type if "default" or shorthand "<type>?" was in CWL, which defines "type" as `["null", <type>]`
     if isinstance(io_type, list) and "null" in io_type:
@@ -577,14 +576,14 @@ def _cwl2wps_io(io_info, io_select):
 
     # debug info for unhandled types conversion
     if not isinstance(io_type, six.string_types):
-        LOGGER.debug("is_array:      '{}'".format(repr(is_array)))
-        LOGGER.debug("array_elem:    '{}'".format(repr(array_elem)))
-        LOGGER.debug("is_enum:       '{}'".format(repr(is_enum)))
-        LOGGER.debug("enum_type:     '{}'".format(repr(enum_type)))
-        LOGGER.debug("enum_allow:    '{}'".format(repr(enum_allow)))
-        LOGGER.debug("io_info:       '{}'".format(repr(io_info)))
-        LOGGER.debug("io_type:       '{}'".format(repr(io_type)))
-        LOGGER.debug("type(io_type): '{}'".format(type(io_type)))
+        LOGGER.debug("is_array:      [%s]", repr(is_array))
+        LOGGER.debug("array_elem:    [%s]", repr(array_elem))
+        LOGGER.debug("is_enum:       [%s]", repr(is_enum))
+        LOGGER.debug("enum_type:     [%s]", repr(enum_type))
+        LOGGER.debug("enum_allow:    [%s]", repr(enum_allow))
+        LOGGER.debug("io_info:       [%s]", repr(io_info))
+        LOGGER.debug("io_type:       [%s]", repr(io_type))
+        LOGGER.debug("type(io_type): [%s]", type(io_type))
         raise TypeError("I/O type has not been properly decoded. Should be a string, got: '{!r}'".format(io_type))
 
     # literal types
@@ -660,7 +659,7 @@ def _any2cwl_literal_datatype(io_type):
         return "int"
     if io_type in ["bool", "boolean"]:
         return "boolean"
-    LOGGER.warning("Could not identify a CWL literal data type with '{}'.".format(io_type))
+    LOGGER.warning("Could not identify a CWL literal data type with [%s].", io_type)
     return null
 
 
@@ -713,8 +712,8 @@ def _json2wps_datatype(io_info):
             io_guess = io_guess[0]
         io_type = _any2wps_literal_datatype(io_guess, is_value)
     if not isinstance(io_type, six.string_types):
-        LOGGER.warning("Failed literal data-type guess, using default 'string' for I/O '{}'."
-                       .format(_get_field(io_info, "identifier", search_variations=True)))
+        LOGGER.warning("Failed literal data-type guess, using default 'string' for I/O [%s].",
+                       _get_field(io_info, "identifier", search_variations=True))
         return "string"
     return io_type
 
@@ -795,7 +794,7 @@ def _json2wps_io(io_info, io_select):
             for allow_value in values:
                 io_info["allowed_values"].append(_json2wps_field(allow_value, "allowed_values"))
         else:
-            io_info["allowed_values"] = AnyValue
+            io_info["allowed_values"] = AnyValue  # noqa
 
     # convert supported format objects
     formats = _get_field(io_info, "supported_formats", search_variations=True, pop_found=True)
@@ -972,7 +971,7 @@ def _are_different_and_set(value1, value2):
     """
     Compares two values and returns ``True`` only if both are not ``null``, are of same ``type`` and of different value.
     """
-    if (value1 == null and value2 == null) or value1 == value2:
+    if (value1 is null and value2 is null) or value1 == value2:
         return False
     type1 = str if isinstance(value1, six.string_types) else type(value1)
     type2 = str if isinstance(value2, six.string_types) else type(value2)
@@ -1017,7 +1016,7 @@ def _merge_io_formats(wps_formats, cwl_formats):
 
 
 def _merge_package_io(wps_io_list, cwl_io_list, io_select):
-    # type: (List[ANY_IO_Type], List[WPS_IO_Type], Union[WPS_INPUT, WPS_OUTPUT]) -> List[JSON_IO_Type]
+    # type: (List[ANY_IO_Type], List[WPS_IO_Type], Union[WPS_INPUT, WPS_OUTPUT]) -> List[WPS_IO_Type]
     """
     Update I/O definitions to use for process creation and returned by GetCapabilities, DescribeProcess.
     If WPS I/O definitions where provided during deployment, update `CWL-to-WPS` converted I/O with the WPS I/O
@@ -1163,7 +1162,7 @@ def _merge_package_inputs_outputs(wps_inputs_list,      # type: List[ANY_IO_Type
 
 
 def _get_package_io(package_factory, io_select, as_json):
-    # type: (CWLFactoryCallable, AnyStr, bool) -> List[Union[JSON_IO_Type, WPS_IO_Type]]
+    # type: (CWLFactoryCallable, AnyStr, bool) -> List[PKG_IO_Type]
     """
     Retrieves I/O definitions from a validated ``CWLFactoryCallable``. Returned I/O format depends on value ``as_json``.
     """
@@ -1180,22 +1179,9 @@ def _get_package_io(package_factory, io_select, as_json):
     return wps_package_io
 
 
-def _get_package_inputs(package_factory, as_json=False):
-    # type: (CWLFactoryCallable, bool) -> List[Union[JSON_IO_Type, WPS_IO_Type]]
-    """Generates `WPS-like` ``inputs`` using parsed CWL package input definitions."""
-    return _get_package_io(package_factory, io_select=WPS_INPUT, as_json=as_json)
-
-
-def _get_package_outputs(package_factory, as_json=False):
-    # type: (CWLFactoryCallable, bool) -> List[Union[JSON_IO_Type, WPS_IO_Type]]
-    """Generates `WPS-like` ``outputs`` using parsed CWL package output definitions."""
-    return _get_package_io(package_factory, io_select=WPS_OUTPUT, as_json=as_json)
-
-
 def _get_package_inputs_outputs(package_factory,    # type: CWLFactoryCallable
                                 as_json=False,      # type: bool
-                                ):
-    # type: (...) -> Tuple[Union[JSON_IO_Type, WPS_IO_Type], Union[JSON_IO_Type, WPS_IO_Type]]
+                                ):                  # type: (...) -> Tuple[List[PKG_IO_Type], List[PKG_IO_Type]]
     """Generates `WPS-like` ``(inputs, outputs)`` tuple using parsed CWL package definitions."""
     return (_get_package_io(package_factory, io_select=WPS_INPUT, as_json=as_json),
             _get_package_io(package_factory, io_select=WPS_OUTPUT, as_json=as_json))

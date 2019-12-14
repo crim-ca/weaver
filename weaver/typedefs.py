@@ -10,14 +10,10 @@ if TYPE_CHECKING:
     from pyramid.config import Configurator
     from celery import Celery
     from requests.structures import CaseInsensitiveDict
-    # noinspection PyUnresolvedReferences
-    from cwltool.factory import Callable as CWLFactoryCallable
-    # noinspection PyPackageRequirements
+    from cwltool.factory import Callable as CWLFactoryCallable  # noqa
     from webtest.response import TestResponse
     from pywps.app import WPSRequest
-    # noinspection PyProtectedMember, PyUnresolvedReferences
-    from logging import _loggerClass as LoggerType
-    # noinspection PyUnresolvedReferences
+    from logging import Logger as LoggerType  # noqa
     from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, Type, Union  # noqa: F401
     import lxml.etree
     import os

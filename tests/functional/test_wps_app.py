@@ -76,13 +76,14 @@ class WpsAppTest(unittest.TestCase):
         process_offerings = list(filter(lambda e: "ProcessOfferings" in e.tag, list(root)))
         assert len(process_offerings) == 1
         processes = [p for p in process_offerings[0]]
-        identifiers = [pi.text for pi in [filter(lambda e: e.tag.endswith("Identifier"), p)[0] for p in processes]]
-        assert self.process_private.identifier not in identifiers
-        assert self.process_public.identifier in identifiers
+        ids = [pi.text for pi in [list(filter(lambda e: e.tag.endswith("Identifier"), p))[0] for p in processes]]
+        assert self.process_private.identifier not in ids
+        assert self.process_public.identifier in ids
 
     @pytest.mark.online
     def test_describeprocess(self):
-        params = "service=wps&request=describeprocess&version=1.0.0&identifier={}".format(HelloWPS.identifier)
+        template = "service=wps&request=describeprocess&version=1.0.0&identifier={}"
+        params = template.format(HelloWPS.identifier)
         resp = self.app.get(self.make_url(params))
         assert resp.status_code == 200
         assert resp.content_type in CONTENT_TYPE_ANY_XML
@@ -106,12 +107,14 @@ class WpsAppTest(unittest.TestCase):
 
     @pytest.mark.online
     def test_execute_allowed(self):
-        params = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=name=tux".format(HelloWPS.identifier)
+        template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=name=tux"
+        params = template.format(HelloWPS.identifier)
         url = self.make_url(params)
         resp = self.app.get(url)
         assert resp.status_code == 200
         assert resp.content_type in CONTENT_TYPE_ANY_XML
-        resp.mustcontain("<wps:ProcessSucceeded>PyWPS Process {} finished</wps:ProcessSucceeded>".format(HelloWPS.title))
+        status = "<wps:ProcessSucceeded>PyWPS Process {} finished</wps:ProcessSucceeded>".format(HelloWPS.title)
+        resp.mustcontain(status)
 
     @pytest.mark.online
     def test_execute_with_visibility(self):

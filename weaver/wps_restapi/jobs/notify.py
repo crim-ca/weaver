@@ -124,5 +124,5 @@ def encrypt_email(email, settings):
         derived_key = hashlib.pbkdf2_hmac("sha256", email, salt, rounds)
         return bytes2str(binascii.hexlify(derived_key))
     except Exception as ex:
-        LOGGER.debug("Job email setup failed [{!r}].".format(ex))
+        LOGGER.debug("Job email setup failed [%r].", ex)
         raise ValueError("Cannot register job, server not properly configured for notification email.")

@@ -41,7 +41,7 @@ def get_weaver_configuration(container):
     settings = get_settings(container)
     weaver_config = settings.get("weaver.configuration")
     if not weaver_config:
-        LOGGER.warn("Setting 'weaver.configuration' not specified, using '{}'".format(WEAVER_CONFIGURATION_DEFAULT))
+        LOGGER.warn("Setting 'weaver.configuration' not specified, using '%s'", WEAVER_CONFIGURATION_DEFAULT)
         weaver_config = WEAVER_CONFIGURATION_DEFAULT
     weaver_config_up = weaver_config.upper()
     if weaver_config_up not in WEAVER_CONFIGURATIONS:

@@ -93,7 +93,7 @@ def check_status(url=None, response=None, sleep_secs=2, verify=False):
             request_session.mount("file://", FileAdapter())
             xml = request_session.get(url, verify=verify).content
         except Exception as ex:
-            LOGGER.debug("Got exception during get status: [{!r}]".format(ex))
+            LOGGER.debug("Got exception during get status: [%r]", ex)
             LOGGER.warning("Failed retrieving status-location, attempting with local file.")
             if url and not urlparse(url).scheme in ["", "file://"]:
                 dir_path = get_wps_output_dir(app)

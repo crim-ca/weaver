@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from weaver.typedefs import AnySettingsContainer        # noqa: F401
     from typing import AnyStr, Dict, Union, Optional        # noqa: F401
 
-# global config
+# PyWPS global config
 WEAVER_PYWPS_CFG = None    # type: Optional[ConfigParser]
 
 
@@ -127,7 +127,7 @@ def load_pywps_cfg(container, config=None):
     if isinstance(config, dict):
         for key, value in config.items():
             section, key = key.split('.')
-            WEAVER_PYWPS_CFG.CONFIG.set(section, key, value)
+            WEAVER_PYWPS_CFG.set(section, key, value)
         # cleanup alternative dict "PYWPS_CFG" which is not expected elsewhere
         if isinstance(settings.get("PYWPS_CFG"), dict):
             del settings["PYWPS_CFG"]
@@ -147,7 +147,7 @@ def load_pywps_cfg(container, config=None):
         if output_path:
             output_url = os.path.join(get_weaver_url(settings), output_path.strip('/'))
         else:
-            output_url = WEAVER_PYWPS_CFG.get_config_value("server", "outputurl")
+            output_url = pywps_config.get_config_value("server", "outputurl")
         settings["weaver.wps_output_url"] = output_url
 
     # enforce back resolved values onto PyWPS config
@@ -179,6 +179,7 @@ def pywps_view(environ, start_response):
                          process_store.list_processes(visibility=VISIBILITY_PUBLIC, request=get_current_request())]
         service = Service(processes_wps)
     except Exception as ex:
+        LOGGER.error("Error occurred during PyWPS Service and/or Processes setup.", exc_info=ex)
         raise OWSNoApplicableCode("Failed setup of PyWPS Service and/or Processes. Error [{!r}]".format(ex))
 
     return service(environ, start_response)

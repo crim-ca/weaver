@@ -142,7 +142,7 @@ class Wps3Process(WpsProcessInterface):
             False if authorized access but process cannot be found,
             None if forbidden access.
         """
-        LOGGER.debug("Get process WPS visibility request for {0}".format(self.process))
+        LOGGER.debug("Get process WPS visibility request for [%s]", self.process)
         response = self.make_request(method="GET",
                                      url=self.url + process_visibility_uri.format(process_id=self.process),
                                      retry=False,
@@ -166,7 +166,7 @@ class Wps3Process(WpsProcessInterface):
         user_headers = deepcopy(self.headers)
         user_headers.update(self.get_user_auth_header())
 
-        LOGGER.debug("Update process WPS visibility request for {0} at {1}".format(self.process, path))
+        LOGGER.debug("Update process WPS visibility request for [%s] at [%s]", self.process, path)
         response = self.make_request(method="PUT",
                                      url=path,
                                      json={"value": visibility},
@@ -176,7 +176,7 @@ class Wps3Process(WpsProcessInterface):
 
     def describe_process(self):
         path = self.url + process_uri.format(process_id=self.process)
-        LOGGER.debug("Describe process WPS request for {0} at {1}".format(self.process, path))
+        LOGGER.debug("Describe process WPS request for [%s] at [%s]", self.process, path)
         response = self.make_request(method="GET",
                                      url=path,
                                      retry=False,
@@ -201,23 +201,19 @@ class Wps3Process(WpsProcessInterface):
         user_headers = deepcopy(self.headers)
         user_headers.update(self.get_user_auth_header())
 
-        LOGGER.debug("Deploy process WPS request for {0} at {1}".format(self.process, path))
+        LOGGER.debug("Deploy process WPS request for [%s] at [%s]", self.process, path)
         response = self.make_request(method="POST", url=path, json=self.deploy_body, retry=True,
                                      status_code_mock=HTTPOk.code)
         response.raise_for_status()
 
     def execute(self, workflow_inputs, out_dir, expected_outputs):
-        # TODO
-        #   La section de code 'visibility' provient de la fct execute de la classe WpsWorkflowJob_
-        #   et n'a pas ete teste ici-meme
+        # TODO: test
         visible = self.is_visible()
         if not visible:  # includes private visibility and non-existing cases
             if visible is None:
-                LOGGER.info(u"Process {} access is unauthorized on {} - deploying as admin.".format(
-                    self.process, self.url))
+                LOGGER.info("Process [%s] access is unauthorized on [%s] - deploying as admin.", self.process, self.url)
             elif visible is False:
-                LOGGER.info(u"Process {} is not deployed on {} - deploying.".format(
-                    self.process, self.url))
+                LOGGER.info("Process [%s] is not deployed on [%s] - deploying.", self.process, self.url)
             # TODO: Maybe always redeploy? What about cases of outdated deployed process?
             try:
                 self.deploy()
@@ -225,8 +221,7 @@ class Wps3Process(WpsProcessInterface):
                 # FIXME: support for Spacebel, avoid conflict error incorrectly handled, remove 500 when fixed
                 pass_http_error(e, [HTTPConflict, HTTPInternalServerError])
 
-        LOGGER.info(u"Process {} enforced to public visibility.".format(
-            self.process, self.url))
+        LOGGER.info("Process [%s] enforced to public visibility.", self.process)
         try:
             self.set_visibility(visibility=VISIBILITY_PUBLIC)
         # TODO: support for Spacebel, remove when visibility route properly implemented on ADES
@@ -235,7 +230,7 @@ class Wps3Process(WpsProcessInterface):
 
         self.update_status("Preparing execute request for remote ADES.",
                            REMOTE_JOB_PROGRESS_REQ_PREP, status.STATUS_RUNNING)
-        LOGGER.debug("Execute process WPS request for {0}".format(self.process))
+        LOGGER.debug("Execute process WPS request for [%s]", self.process)
 
         execute_body_inputs = []
         execute_req_id = "id"
@@ -255,9 +250,8 @@ class Wps3Process(WpsProcessInterface):
                     exec_input[execute_req_input_val][len(OPENSEARCH_LOCAL_FILE_SCHEME):])
             elif exec_input[execute_req_input_val].startswith('file://'):
                 exec_input[execute_req_input_val] = self.host_file(exec_input[execute_req_input_val])
-                LOGGER.debug("Hosting intermediate input {0} : {1}".format(
-                    exec_input[execute_req_id],
-                    exec_input[execute_req_input_val]))
+                LOGGER.debug("Hosting intermediate input [%s] : [%s]",
+                             exec_input[execute_req_id], exec_input[execute_req_input_val])
 
         execute_body_outputs = [{execute_req_id: output,
                                  execute_req_out_trans_mode: "reference"} for output in expected_outputs]
@@ -315,10 +309,8 @@ class Wps3Process(WpsProcessInterface):
 
                 # TODO Should we handle other type than File reference?
                 r = requests.get(get_any_value(result), allow_redirects=True)
-                LOGGER.debug("Fetching result output from {0} to cwl output destination : {1}".format(
-                    get_any_value(result),
-                    dst_fn
-                ))
+                LOGGER.debug("Fetching result output from [%s] to cwl output destination: [%s]",
+                             get_any_value(result), dst_fn)
                 with open(dst_fn, mode='wb') as dst_fh:
                     dst_fh.write(r.content)
 

@@ -79,7 +79,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
 
     try:
         try:
-            LOGGER.debug("Execute process WPS request for {0}".format(job.process))
+            LOGGER.debug("Execute process WPS request for [%s]", job.process)
             wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), verify=ssl_verify)
             # noinspection PyProtectedMember
             raise_on_xml_exception(wps._capabilities)
@@ -178,14 +178,14 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
                 job = store.update_job(job)
 
     except (WPSException, Exception) as exc:
-        LOGGER.exception("Failed running {}".format(str(job)))
+        LOGGER.exception("Failed running [%s]", job)
         job.status = map_status(STATUS_FAILED)
-        job.status_message = "Failed to run {}.".format(str(job))
+        job.status_message = "Failed to run {!s}.".format(job)
         if isinstance(exc, WPSException):
             errors = "[{0}] {1}".format(exc.locator, exc.text)
         else:
             exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
-            errors = "{0}: {1}".format(exception_class, str(exc))
+            errors = "{0}: {1!s}".format(exception_class, exc)
         job.save_log(errors=errors, logger=task_logger)
     finally:
         job.status_message = "Job {}.".format(job.status)
@@ -263,7 +263,7 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
         # Convert EnvironHeaders to a simple dict (should cherrypick the required headers)
         headers={k: v for k, v in request.headers.items()},
         notification_email=notification_email)
-    LOGGER.debug("Celery pending task '{}' for job '{}'.".format(result.id, job.id))
+    LOGGER.debug("Celery pending task [%s] for job [%s].", result.id, job.id)
 
     # local/provider process location
     location_base = "/providers/{provider_id}".format(provider_id=provider_id) if provider_id else ""
