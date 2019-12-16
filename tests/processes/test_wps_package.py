@@ -1,18 +1,70 @@
 from weaver.processes.wps_package import (
-    _json2wps_datatype,  # noqa: W0212
-    _is_cwl_array_type,  # noqa: W0212
-    _is_cwl_enum_type,   # noqa: W0212
-    _merge_io_formats,   # noqa: W0212
+    _are_different_and_set,     # noqa: W0212
+    _json2wps_datatype,         # noqa: W0212
+    _is_cwl_array_type,         # noqa: W0212
+    _is_cwl_enum_type,          # noqa: W0212
+    _merge_io_formats,          # noqa: W0212
     DefaultFormat,
     WPS_LITERAL
 )
 from weaver.exceptions import PackageTypeError
 from weaver.formats import CONTENT_TYPE_APP_NETCDF, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
+from weaver.utils import null
 from pywps.inout.literaltypes import AnyValue
 from pywps.inout.formats import Format
 from pywps.validator.mode import MODE
 from copy import deepcopy
 import pytest
+
+
+class ObjectWithEqProperty(object):
+    """Dummy object for some test evaluations."""
+    _prop = "prop"
+
+    def __init__(self, prop="prop"):
+        self._prop = prop
+
+    @property
+    def some_property(self):
+        return self._prop
+
+    def __eq__(self, other):
+        return self.some_property == other.some_property
+
+
+def test_are_different_and_set_both_set():
+    assert _are_different_and_set(1, 2) is True
+    assert _are_different_and_set(1, 1) is False
+    assert _are_different_and_set({"a": 1}, {"a": 2}) is True
+    assert _are_different_and_set({"a": 1}, {"a": 1}) is False
+    assert _are_different_and_set({"a": 1, "b": 2}, {"a": 1}) is True
+    assert _are_different_and_set(ObjectWithEqProperty(), ObjectWithEqProperty()) is False
+    assert _are_different_and_set(ObjectWithEqProperty("a"), ObjectWithEqProperty("b")) is True
+
+
+def test_are_different_and_set_similar_str_formats():
+    assert _are_different_and_set(b"something", u"something") is False
+    assert _are_different_and_set(u"something", u"something") is False
+    assert _are_different_and_set(b"something", b"something") is False
+    assert _are_different_and_set(b"something", u"else") is True
+    assert _are_different_and_set(u"something", u"else") is True
+    assert _are_different_and_set(b"something", b"else") is True
+
+
+def test_are_different_and_set_both_null():
+    assert _are_different_and_set(null, null) is False
+
+
+def test_are_different_and_set_single_null():
+    """
+    Tests that equality check is correctly handled when a single item amongst the two is ``null``.
+    This was identified as problematic is case when the checked and set item implements ``__eq__`` and expects a
+    property to exist, which is not the case for the second item being ``null``.
+    """
+
+    item = ObjectWithEqProperty()
+    assert _are_different_and_set(item, null) is False
+    assert _are_different_and_set(null, item) is False
 
 
 def test_json2wps_datatype():

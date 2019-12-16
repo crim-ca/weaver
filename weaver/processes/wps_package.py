@@ -966,15 +966,19 @@ def _matching_formats(format1, format2):
     return False
 
 
-def _are_different_and_set(value1, value2):
+def _are_different_and_set(item1, item2):
     # type: (Any, Any) -> bool
     """
     Compares two values and returns ``True`` only if both are not ``null``, are of same ``type`` and of different value.
     """
-    if (value1 is null and value2 is null) or value1 == value2:
+    # Note:
+    #   Check `is null` for each item individually *before* comparing them together with equal is critical here.
+    #   Calling `==` can result in one set item's type calling a property to check equality on the second ``null`` item
+    #   depending on this item's type ``__eq__`` implementation (eg: ``Format`` checking for ``item.mime_type``,  etc.).
+    if item1 is null or item2 is null or item1 == item2:
         return False
-    type1 = str if isinstance(value1, six.string_types) else type(value1)
-    type2 = str if isinstance(value2, six.string_types) else type(value2)
+    type1 = str if isinstance(item1, six.string_types) else type(item1)
+    type2 = str if isinstance(item2, six.string_types) else type(item2)
     if type1 != type2:
         return False
     return True

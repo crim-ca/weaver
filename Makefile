@@ -1,10 +1,13 @@
 RELEASE := master
 
+# Included custom configs change the value of MAKEFILE_LIST
+# Extract the required reference beforehand so we can use it for help target
+MAKEFILE_NAME := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 # Include custom config if it is available
 -include Makefile.config
 
 # Application
-APP_ROOT    := $(abspath $(lastword $(MAKEFILE_LIST))/..)
+APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
 APP_NAME    := $(shell basename $(APP_ROOT))
 APP_VERSION ?= 0.2.1
 APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
@@ -83,7 +86,7 @@ help:	## print this help message (default)
 	@echo "Please use 'make <target>' where <target> is one of:"
 #	@grep -E '^[a-zA-Z_-]+:.*?\#\# .*$$' $(MAKEFILE_LIST) \
 #		| awk 'BEGIN {FS = ":.*?\#\# "}; {printf "    $(_TARGET)%-24s$(_NORMAL) %s\n", $$1, $$2}'
-	@grep -E '\#\#.*$$' $(MAKEFILE_LIST) \
+	@grep -E '\#\#.*$$' "$(APP_ROOT)/$(MAKEFILE_NAME)" \
 		| awk ' BEGIN {FS = "(:|\-\-\-)+.*?\#\# "}; \
 			/\--/ {printf "$(_SECTION)%s$(_NORMAL)\n", $$1;} \
 			/:/   {printf "    $(_TARGET)%-24s$(_NORMAL) %s\n", $$1, $$2} \
@@ -358,11 +361,11 @@ ifeq ($(filter dry, $(MAKECMDGOALS)), dry)
 	BUMP_XARGS := $(BUMP_XARGS) --dry-run
 endif
 .PHONY: dry
-dry: setup.cfg
+dry: setup.cfg	## run 'bump' target without applying changes (dry-run) [make VERSION=<x.y.z> bump dry]
 	@-echo > /dev/null
 
 .PHONY: bump
-bump:
+bump:  ## bump version using VERSION specified as user input [make VERSION=<x.y.z> bump]
 	@-echo "Updating package version ..."
 	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set"; exit 1 )
 	@-bash -c '$(CONDA_CMD) bump2version $(BUMP_XARGS) --new-version "${VERSION}" patch;'
