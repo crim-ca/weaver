@@ -157,7 +157,10 @@ conda-env-export:		## export the conda environment
 ## -- Build targets -- ##
 
 .PHONY: install
-install: install-sys install-pip install-pkg  ## install application with all its dependencies
+install: install-all	## alias for 'install-all' target
+
+.PHONY: install-all
+install-all: install-sys install-pip install-pkg install-dev  ## install application with all its dependencies
 
 .PHONY: install-dev
 install-dev: install-pip	## install developement and test dependencies
@@ -174,7 +177,7 @@ install-pkg: install-pip	## install application package dependencies
 .PHONY: install-sys
 install-sys: clean conda-env	## install system dependencies and required installers/runners
 	@echo "Installing system dependencies..."
-	@bash -c '$(CONDA_CMD) pip install --upgrade pip setuptools gunicorn'
+	@bash -c '$(CONDA_CMD) pip install --upgrade pip setuptools'
 
 .PHONY: install-pip
 install-pip:	## install application as a package to allow import from another python package

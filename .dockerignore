@@ -82,3 +82,6 @@ workflows
 config/weaver.ini
 config/wps_processes.yml
 config/data_sources.json
+
+# Old project sources
+[Bb]in

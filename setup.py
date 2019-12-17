@@ -4,10 +4,10 @@ from setuptools import setup, find_packages
 
 CUR_DIR = os.path.abspath(os.path.dirname(__file__))
 LONG_DESCRIPTION = None
-if all(os.path.isfile(os.path.join(CUR_DIR, f)) for f in ['README.rst', 'CHANGES.rst']):
-    README = open(os.path.join(CUR_DIR, 'README.rst')).read()
-    CHANGES = open(os.path.join(CUR_DIR, 'CHANGES.rst')).read()
-    LONG_DESCRIPTION = README + '\n\n' + CHANGES
+if all(os.path.isfile(os.path.join(CUR_DIR, f)) for f in ["README.rst", "CHANGES.rst"]):
+    README = open(os.path.join(CUR_DIR, "README.rst")).read()
+    CHANGES = open(os.path.join(CUR_DIR, "CHANGES.rst")).read()
+    LONG_DESCRIPTION = README + "\n\n" + CHANGES
 
 # ensure that 'weaver' directory can be found for metadata import
 sys.path.insert(0, CUR_DIR)
@@ -15,10 +15,7 @@ sys.path.insert(0, os.path.join(CUR_DIR, 'weaver'))
 # don't use 'from' to avoid import errors on not yet installed packages
 import __meta__  # noqa: E402
 
-PY2 = sys.version_info[0] == 2
-requirements = [line.strip() for line in open('requirements.txt')]
-if PY2:
-    requirements += [line.strip() for line in open('requirements-py2.txt')]
+requirements = [line.strip() for line in open("requirements.txt")]
 
 setup(name=__meta__.__name__,
       version=__meta__.__version__,

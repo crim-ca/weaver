@@ -30,6 +30,7 @@ needs_sphinx = "1.6"
 # ones.
 extensions = [
     "autoapi.extension",
+    "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",

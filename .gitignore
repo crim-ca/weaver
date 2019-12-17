@@ -1,4 +1,4 @@
-# installer
+# Installer
 #Makefile
 [Mm]akefile.config
 downloads
@@ -19,6 +19,8 @@ downloads
 __pycache__
 
 # Unit test / Coverage reports
+*.log
+*.lock
 .cache
 .coverage
 .pytest_cache
@@ -29,6 +31,7 @@ reports
 nosetests.xml
 unit_tests/testdata.json
 result[s].xml
+testdata.json
 
 # R
 *.Rhistory
@@ -52,11 +55,6 @@ result[s].xml
 
 # External Sources
 src
-
-# tests
-*.log
-*.lock
-testdata.json
 
 # IPython
 .ipynb_checkpoints
@@ -87,3 +85,6 @@ workflow[s]
 config/weaver.ini
 config/wps_processes.yml
 config/data_sources.json
+
+# old project sources
+[Bb]in
