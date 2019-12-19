@@ -6,6 +6,7 @@ from weaver.exceptions import (
     ProcessNotAccessible,
     ProcessNotFound,
     JobNotFound,
+    log_unhandled_exceptions,
 )
 from weaver.store.base import StoreServices, StoreProcesses, StoreJobs
 from weaver.utils import get_settings, get_any_id, get_any_value, get_url_without_query
@@ -186,6 +187,7 @@ def validate_service_process(request):
                           schema=sd.GetProviderJobsEndpoint(), response_schemas=sd.get_all_jobs_responses)
 @sd.jobs_short_service.get(tags=[sd.TAG_JOBS], renderer=OUTPUT_FORMAT_JSON,
                            schema=sd.GetJobsEndpoint(), response_schemas=sd.get_all_jobs_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobsResponse.description)
 def get_jobs(request):
     """
     Retrieve the list of jobs which can be filtered/sorted using queries.
@@ -229,6 +231,7 @@ def get_jobs(request):
                           schema=sd.ShortJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
 @sd.process_job_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_JOBS, sd.TAG_STATUS], renderer=OUTPUT_FORMAT_JSON,
                             schema=sd.GetProcessJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobStatusResponse.description)
 def get_job_status(request):
     """
     Retrieve the status of a job.
@@ -244,9 +247,11 @@ def get_job_status(request):
                              schema=sd.ShortJobEndpoint(), response_schemas=sd.delete_job_responses)
 @sd.process_job_service.delete(tags=[sd.TAG_PROCESSES, sd.TAG_JOBS, sd.TAG_DISMISS], renderer=OUTPUT_FORMAT_JSON,
                                schema=sd.DeleteProcessJobEndpoint(), response_schemas=sd.delete_job_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorDeleteJobResponse.description)
 def cancel_job(request):
     """
     Dismiss a job.
+
     Note: Will only stop tracking this particular process (WPS 1.0 doesn't allow to stop a process)
     """
     job = get_job(request)
@@ -270,6 +275,7 @@ def cancel_job(request):
                               schema=sd.ShortResultsEndpoint(), response_schemas=sd.get_job_results_responses)
 @sd.process_results_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.ProcessResultsEndpoint(), response_schemas=sd.get_job_results_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobResultsResponse.description)
 def get_job_results(request):
     """
     Retrieve the results of a job.
@@ -285,6 +291,7 @@ def get_job_results(request):
                                  schema=sd.ShortExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
 @sd.process_exceptions_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                                    schema=sd.ProcessExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobExceptionsResponse.description)
 def get_job_exceptions(request):
     """
     Retrieve the exceptions of a job.
@@ -299,9 +306,18 @@ def get_job_exceptions(request):
                            schema=sd.ShortLogsEndpoint(), response_schemas=sd.get_logs_responses)
 @sd.process_logs_service.get(tags=[sd.TAG_JOBS, sd.TAG_LOGS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                              schema=sd.ProcessLogsEndpoint(), response_schemas=sd.get_logs_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobLogsResponse.description)
 def get_job_logs(request):
     """
     Retrieve the logs of a job.
     """
     job = get_job(request)
     return HTTPOk(json=job.logs)
+
+
+# TODO: https://github.com/crim-ca/weaver/issues/18
+#@sd.process_logs_service.get(tags=[sd.TAG_JOBS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
+#                             schema=sd.ProcessOutputEndpoint(), response_schemas=sd.get_job_output_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobOutputResponse.description)
+def get_job_output(request):
+    pass

@@ -283,6 +283,7 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
 @sd.jobs_full_service.post(tags=[sd.TAG_PROVIDER_PROCESS, sd.TAG_PROVIDERS, sd.TAG_EXECUTE, sd.TAG_JOBS],
                            renderer=OUTPUT_FORMAT_JSON, schema=sd.PostProviderProcessJobRequest(),
                            response_schemas=sd.post_provider_process_job_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostProviderProcessJobResponse.description)
 def submit_provider_job(request):
     """
     Execute a provider process.
@@ -297,7 +298,8 @@ def list_remote_processes(service, request):
     # type: (Service, Request) -> List[ProcessDB]
     """
     Obtains a list of remote service processes in a compatible :class:`weaver.datatype.Process` format.
-    Note: those processes won't be stored to the local process storage.
+
+    Note: remote processes won't be stored to the local process storage.
     """
     wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
     settings = get_settings(request)
@@ -307,6 +309,7 @@ def list_remote_processes(service, request):
 @sd.provider_processes_service.get(tags=[sd.TAG_PROVIDER_PROCESS, sd.TAG_PROVIDERS, sd.TAG_GETCAPABILITIES],
                                    renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderEndpoint(),
                                    response_schemas=sd.get_provider_processes_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProviderProcessesListResponse.description)
 def get_provider_processes(request):
     """
     Retrieve available provider processes (GetCapabilities).
@@ -318,7 +321,7 @@ def get_provider_processes(request):
     return HTTPOk(json=[p.json() for p in processes])
 
 
-def get_provider_process(request):
+def describe_provider_process(request):
     # type: (Request) -> ProcessDB
     """
     Obtains a remote service process description in a compatible local process format.
@@ -336,14 +339,14 @@ def get_provider_process(request):
 
 @sd.provider_process_service.get(tags=[sd.TAG_PROVIDER_PROCESS, sd.TAG_PROVIDERS, sd.TAG_DESCRIBEPROCESS],
                                  renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderProcessEndpoint(),
-                                 response_schemas=sd.get_provider_process_description_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorProviderProcessDescription.description)
-def describe_provider_process(request):
+                                 response_schemas=sd.get_provider_process_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProviderProcessResponse.description)
+def get_provider_process(request):
     """
     Retrieve a process description (DescribeProcess).
     """
     try:
-        process = get_provider_process(request)
+        process = describe_provider_process(request)
         process_offering = process.process_offering()
         return HTTPOk(json=process_offering)
     except colander.Invalid as ex:
@@ -371,6 +374,7 @@ def get_processes_filtered_by_valid_schemas(request):
 
 @sd.processes_service.get(schema=sd.GetProcessesEndpoint(), tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
                           response_schemas=sd.get_processes_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProcessesListResponse.description)
 def get_processes(request):
     """
     List registered processes (GetCapabilities). Optionally list both local and provider processes.
@@ -403,18 +407,13 @@ def get_processes(request):
                         "processes": processes if detail else [get_any_id(p) for p in processes]
                     })
         return HTTPOk(json=response_body)
-    except HTTPException:
-        raise  # re-throw already handled HTTPException
     except colander.Invalid as ex:
         raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))
-    except Exception as ex:
-        LOGGER.exception("Unhandled error during process retrieval: %s", ex)
-        raise HTTPInternalServerError(str(ex))
 
 
 @sd.processes_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OUTPUT_FORMAT_JSON,
-                           schema=sd.PostProcessEndpoint(), response_schemas=sd.post_processes_responses)
-@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during process deployment.")
+                           schema=sd.PostProcessesEndpoint(), response_schemas=sd.post_processes_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostProcessesResponse.description)
 def add_local_process(request):
     """
     Register a local process.
@@ -431,8 +430,6 @@ def get_process(request):
         store = get_db(request).get_store(StoreProcesses)
         process = store.fetch_by_id(process_id, visibility=VISIBILITY_PUBLIC, request=request)
         return process
-    except HTTPException:
-        raise  # re-throw already handled HTTPException
     except InvalidIdentifierValue as ex:
         raise HTTPBadRequest(str(ex))
     except ProcessNotAccessible:
@@ -445,7 +442,7 @@ def get_process(request):
 
 @sd.process_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OUTPUT_FORMAT_JSON,
                         schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_responses)
-@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during process description.")
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProcessResponse.description)
 def get_local_process(request):
     """
     Get a registered local process information (DescribeProcess).
@@ -455,15 +452,13 @@ def get_local_process(request):
         process["inputs"] = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
         process_offering = process.process_offering()
         return HTTPOk(json=process_offering)
-    except HTTPException:
-        raise  # re-throw already handled HTTPException
     except colander.Invalid as ex:
         raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))
 
 
 @sd.process_package_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.ProcessPackageEndpoint(), response_schemas=sd.get_process_package_responses)
-@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during process package description.")
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProcessPackageResponse.description)
 def get_local_process_package(request):
     """
     Get a registered local process package definition.
@@ -474,7 +469,7 @@ def get_local_process_package(request):
 
 @sd.process_payload_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.ProcessPayloadEndpoint(), response_schemas=sd.get_process_payload_responses)
-@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during process payload description.")
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProcessPayloadResponse.description)
 def get_local_process_payload(request):
     """
     Get a registered local process payload definition.
@@ -486,7 +481,7 @@ def get_local_process_payload(request):
 @sd.process_visibility_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_VISIBILITY], renderer=OUTPUT_FORMAT_JSON,
                                    schema=sd.ProcessVisibilityGetEndpoint(),
                                    response_schemas=sd.get_process_visibility_responses)
-@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during process visibility retrieval.")
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProcessVisibilityResponse.description)
 def get_process_visibility(request):
     """
     Get the visibility of a registered local process.
@@ -505,7 +500,7 @@ def get_process_visibility(request):
 @sd.process_visibility_service.put(tags=[sd.TAG_PROCESSES, sd.TAG_VISIBILITY], renderer=OUTPUT_FORMAT_JSON,
                                    schema=sd.ProcessVisibilityPutEndpoint(),
                                    response_schemas=sd.put_process_visibility_responses)
-@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during process visibility update.")
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPutProcessVisibilityResponse.description)
 def set_process_visibility(request):
     """
     Set the visibility of a registered local process.
@@ -536,7 +531,7 @@ def set_process_visibility(request):
 
 @sd.process_service.delete(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OUTPUT_FORMAT_JSON,
                            schema=sd.ProcessEndpoint(), response_schemas=sd.delete_process_responses)
-@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during process deletion.")
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorDeleteProcessResponse.description)
 def delete_local_process(request):
     """
     Unregister a local process.
@@ -564,7 +559,7 @@ def delete_local_process(request):
 
 @sd.process_jobs_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS], renderer=OUTPUT_FORMAT_JSON,
                               schema=sd.PostProcessJobsEndpoint(), response_schemas=sd.post_process_jobs_responses)
-@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during job submission.")
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostProcessJobResponse.description)
 def submit_local_job(request):
     """
     Execute a local process.

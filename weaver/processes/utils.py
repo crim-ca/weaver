@@ -224,7 +224,6 @@ def _get_deploy_process_info(process_info, reference, package):
         raise HTTPUnprocessableEntity(detail=msg)
 
 
-@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during process deployment.")
 def deploy_process_from_payload(payload, container):
     # type: (JSON, AnyContainer) -> HTTPException
     """
@@ -316,7 +315,7 @@ def deploy_process_from_payload(payload, container):
         raise HTTPBadRequest(detail=str(ex))
 
     json_response = {"processSummary": saved_process.process_summary(), "deploymentDone": True}
-    return HTTPOk(json=json_response)
+    return HTTPOk(json=json_response)   # FIXME: should be 201 (created), update swagger accordingly
 
 
 def register_wps_processes_from_config(wps_processes_file_path, container):

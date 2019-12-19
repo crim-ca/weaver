@@ -20,6 +20,7 @@ from weaver.execute import (
     EXECUTE_TRANSMISSION_MODE_REFERENCE,
     execute_transmission_mode_options,
 )
+from weaver.owsexceptions import OWSMissingParameterValue
 from weaver.visibility import visibility_values, VISIBILITY_PUBLIC
 from weaver.wps_restapi.colander_extras import OneOfMappingSchema, SchemaNodeDefault as SchemaNode
 from colander import String, Boolean, Integer, Float, DateTime, MappingSchema, SequenceSchema, drop, OneOf
@@ -1078,7 +1079,7 @@ class Deploy(MappingSchema):
     owsContext = OWSContext(missing=drop)
 
 
-class PostProcessEndpoint(MappingSchema):
+class PostProcessesEndpoint(MappingSchema):
     header = AcceptHeader()
     body = Deploy(title='Deploy')
 
@@ -1259,14 +1260,30 @@ class OkGetProviderCapabilitiesSchema(MappingSchema):
     body = ProviderCapabilitiesSchema()
 
 
+class InternalServerErrorGetProviderCapabilitiesResponse(MappingSchema):
+    description = "Unhandled error occurred during provider capabilities request."
+
+
 class NoContentDeleteProviderSchema(MappingSchema):
     header = JsonHeader()
     body = MappingSchema(default={})
 
 
+class InternalServerErrorDeleteProviderResponse(MappingSchema):
+    description = "Unhandled error occurred during provider removal."
+
+
+class NotImplementedDeleteProviderResponse(MappingSchema):
+    description = "Provider removal not supported using referenced storage."
+
+
 class OkGetProviderProcessesSchema(MappingSchema):
     header = JsonHeader()
     body = ProcessesSchema()
+
+
+class InternalServerErrorGetProviderProcessesListResponse(MappingSchema):
+    description = "Unhandled error occurred during provider processes listing."
 
 
 class GetProcessesQuery(MappingSchema):
@@ -1284,9 +1301,13 @@ class GetProcessesEndpoint(MappingSchema):
     querystring = GetProcessesQuery()
 
 
-class OkGetProcessesSchema(MappingSchema):
+class OkGetProcessesListResponse(MappingSchema):
     header = JsonHeader()
     body = ProcessCollection()
+
+
+class InternalServerErrorGetProcessesListResponse(MappingSchema):
+    description = "Unhandled error occurred during processes listing."
 
 
 class OkPostProcessDeployBodySchema(MappingSchema):
@@ -1296,9 +1317,13 @@ class OkPostProcessDeployBodySchema(MappingSchema):
     failureReason = SchemaNode(String(), missing=drop, description="Description of deploy failure if applicable.")
 
 
-class OkPostProcessesSchema(MappingSchema):
+class OkPostProcessesResponse(MappingSchema):
     header = JsonHeader()
     body = OkPostProcessDeployBodySchema()
+
+
+class InternalServerErrorPostProcessesResponse(MappingSchema):
+    description = "Unhandled error occurred during process deployment."
 
 
 class OkGetProcessSchema(MappingSchema):
@@ -1306,14 +1331,26 @@ class OkGetProcessSchema(MappingSchema):
     body = ProcessOffering()
 
 
+class InternalServerErrorGetProcessResponse(MappingSchema):
+    description = "Unhandled error occurred during process description."
+
+
 class OkGetProcessPackageSchema(MappingSchema):
     header = JsonHeader()
     body = MappingSchema(default={})
 
 
+class InternalServerErrorGetProcessPackageResponse(MappingSchema):
+    description = "Unhandled error occurred during process package description."
+
+
 class OkGetProcessPayloadSchema(MappingSchema):
     header = JsonHeader()
     body = MappingSchema(default={})
+
+
+class InternalServerErrorGetProcessPayloadResponse(MappingSchema):
+    description = "Unhandled error occurred during process payload description."
 
 
 class ProcessVisibilityResponseBodySchema(MappingSchema):
@@ -1325,9 +1362,17 @@ class OkGetProcessVisibilitySchema(MappingSchema):
     body = ProcessVisibilityResponseBodySchema()
 
 
+class InternalServerErrorGetProcessVisibilityResponse(MappingSchema):
+    description = "Unhandled error occurred during process visibility retrieval."
+
+
 class OkPutProcessVisibilitySchema(MappingSchema):
     header = JsonHeader()
     body = ProcessVisibilityResponseBodySchema()
+
+
+class InternalServerErrorPutProcessVisibilityResponse(MappingSchema):
+    description = "Unhandled error occurred during process visibility update."
 
 
 class OkDeleteProcessUndeployBodySchema(MappingSchema):
@@ -1337,17 +1382,21 @@ class OkDeleteProcessUndeployBodySchema(MappingSchema):
     failureReason = SchemaNode(String(), missing=drop, description="Description of undeploy failure if applicable.")
 
 
-class OkDeleteProcessSchema(MappingSchema):
+class OkDeleteProcessResponse(MappingSchema):
     header = JsonHeader()
     body = OkDeleteProcessUndeployBodySchema()
 
 
-class OkGetProviderProcessDescription(MappingSchema):
+class InternalServerErrorDeleteProcessResponse(MappingSchema):
+    description = "Unhandled error occurred during process deletion."
+
+
+class OkGetProviderProcessDescriptionResponse(MappingSchema):
     header = JsonHeader()
     body = ProcessDescriptionBodySchema()
 
 
-class InternalServerErrorProviderProcessDescription(MappingSchema):
+class InternalServerErrorGetProviderProcessResponse(MappingSchema):
     description = "Unhandled error occurred during provider process description."
 
 
@@ -1356,9 +1405,25 @@ class CreatedPostProvider(MappingSchema):
     body = ProviderSummarySchema()
 
 
+class InternalServerErrorPostProviderResponse(MappingSchema):
+    description = "Unhandled error occurred during provider process registration."
+
+
+class NotImplementedPostProviderResponse(MappingSchema):
+    description = "Provider registration not supported using referenced storage."
+
+
 class CreatedLaunchJobResponse(MappingSchema):
     header = JsonHeader()
     body = CreatedJobStatusSchema()
+
+
+class InternalServerErrorPostProcessJobResponse(MappingSchema):
+    description = "Unhandled error occurred during process job submission."
+
+
+class InternalServerErrorPostProviderProcessJobResponse(MappingSchema):
+    description = "Unhandled error occurred during process job submission."
 
 
 class OkGetAllProcessJobsResponse(MappingSchema):
@@ -1376,9 +1441,13 @@ class OkDeleteProcessJobResponse(MappingSchema):
     body = DismissedJobSchema()
 
 
-class OkGetAllJobsResponse(MappingSchema):
+class OkGetJobsResponse(MappingSchema):
     header = JsonHeader()
     body = GetFilteredJobsSchema()
+
+
+class InternalServerErrorGetJobsResponse(MappingSchema):
+    description = "Unhandled error occurred during jobs listing."
 
 
 class OkDismissJobResponse(MappingSchema):
@@ -1386,9 +1455,17 @@ class OkDismissJobResponse(MappingSchema):
     body = DismissedJobSchema()
 
 
-class OkGetSingleJobStatusResponse(MappingSchema):
+class InternalServerErrorDeleteJobResponse(MappingSchema):
+    description = "Unhandled error occurred during job dismiss request."
+
+
+class OkGetJobStatusResponse(MappingSchema):
     header = JsonHeader()
     body = JobStatusInfo()
+
+
+class InternalServerErrorGetJobStatusResponse(MappingSchema):
+    description = "Unhandled error occurred during provider process description."
 
 
 class Result(MappingSchema):
@@ -1396,14 +1473,22 @@ class Result(MappingSchema):
     links = JsonLinkList(missing=drop)
 
 
-class OkGetSingleJobResultsResponse(MappingSchema):
+class OkGetJobResultsResponse(MappingSchema):
     header = JsonHeader()
     body = Result()
 
 
-class OkGetSingleOutputResponse(MappingSchema):
+class InternalServerErrorGetJobResultsResponse(MappingSchema):
+    description = "Unhandled error occurred during job results listing."
+
+
+class OkGetOutputResponse(MappingSchema):
     header = JsonHeader()
     body = JobOutputSchema()
+
+
+class InternalServerErrorGetJobOutputResponse(MappingSchema):
+    description = "Unhandled error occurred during job results listing."
 
 
 class CreatedQuoteExecuteResponse(MappingSchema):
@@ -1436,14 +1521,22 @@ class OkGetBillListResponse(MappingSchema):
     body = BillListSchema()
 
 
-class OkGetExceptionsResponse(MappingSchema):
+class OkGetJobExceptionsResponse(MappingSchema):
     header = JsonHeader()
     body = ExceptionsOutputSchema()
 
 
-class OkGetLogsResponse(MappingSchema):
+class InternalServerErrorGetJobExceptionsResponse(MappingSchema):
+    description = "Unhandled error occurred during job exceptions listing."
+
+
+class OkGetJobLogsResponse(MappingSchema):
     header = JsonHeader()
     body = LogsOutputSchema()
+
+
+class InternalServerErrorGetJobLogsResponse(MappingSchema):
+    description = "Unhandled error occurred during job logs listing."
 
 
 get_api_frontpage_responses = {
@@ -1463,121 +1556,154 @@ get_api_versions_responses = {
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_processes_responses = {
-    "200": OkGetProcessesSchema(description="success"),
+    "200": OkGetProcessesListResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetProcessesListResponse(),
 }
 post_processes_responses = {
-    # TODO: status should be 201 when properly modified to match API conformance
-    "200": OkPostProcessesSchema(description="success"),
+    # FIXME:
+    #   status should be 201 when properly modified to match API conformance
+    #   https://github.com/crim-ca/weaver/issues/14
+    "200": OkPostProcessesResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorPostProcessesResponse(),
 }
 get_process_responses = {
     "200": OkGetProcessSchema(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetProcessResponse(),
 }
 get_process_package_responses = {
     "200": OkGetProcessPackageSchema(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetProcessPackageResponse(),
 }
 get_process_payload_responses = {
-    "200": OkGetProcessPayloadSchema(description="success")
+    "200": OkGetProcessPayloadSchema(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetProcessPayloadResponse(),
 }
 get_process_visibility_responses = {
     "200": OkGetProcessVisibilitySchema(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetProcessVisibilityResponse(),
 }
 put_process_visibility_responses = {
     "200": OkPutProcessVisibilitySchema(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorPutProcessVisibilityResponse(),
 }
 delete_process_responses = {
-    "200": OkDeleteProcessSchema(description="success"),
+    "200": OkDeleteProcessResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorDeleteProcessResponse(),
 }
-get_all_providers_responses = {
+get_providers_list_responses = {
     "200": OkGetProvidersSchema(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
-get_one_provider_responses = {
+get_provider_responses = {
     "200": OkGetProviderCapabilitiesSchema(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetProviderCapabilitiesResponse(),
 }
 delete_provider_responses = {
     "204": NoContentDeleteProviderSchema(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorDeleteProviderResponse(),
+    "501": NotImplementedDeleteProviderResponse(),
 }
 get_provider_processes_responses = {
     "200": OkGetProviderProcessesSchema(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetProviderProcessesListResponse(),
 }
-get_provider_process_description_responses = {
-    "200": OkGetProviderProcessDescription(description="success"),
+get_provider_process_responses = {
+    "200": OkGetProviderProcessDescriptionResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "500": InternalServerErrorProviderProcessDescription(),
+    "500": InternalServerErrorGetProviderProcessResponse(),
 }
 post_provider_responses = {
     "201": CreatedPostProvider(description="success"),
+    "400": MappingSchema(description=OWSMissingParameterValue.explanation),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorPostProviderResponse(),
+    "501": NotImplementedPostProviderResponse(),
 }
 post_provider_process_job_responses = {
     "201": CreatedLaunchJobResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorPostProviderProcessJobResponse(),
 }
 post_process_jobs_responses = {
     "201": CreatedLaunchJobResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorPostProcessJobResponse(),
 }
 get_all_jobs_responses = {
-    "200": OkGetAllJobsResponse(description="success"),
+    "200": OkGetJobsResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetJobsResponse(),
 }
 get_single_job_status_responses = {
-    "200": OkGetSingleJobStatusResponse(description="success"),
+    "200": OkGetJobStatusResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetJobStatusResponse(),
 }
 delete_job_responses = {
     "200": OkDismissJobResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorDeleteJobResponse(),
 }
 get_job_results_responses = {
-    "200": OkGetSingleJobResultsResponse(description="success"),
+    "200": OkGetJobResultsResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetJobResultsResponse(),
+}
+get_job_output_responses = {
+    "200": OkGetOutputResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetJobOutputResponse(),
+}
+get_exceptions_responses = {
+    "200": OkGetJobExceptionsResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetJobExceptionsResponse(),
+}
+get_logs_responses = {
+    "200": OkGetJobLogsResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetJobLogsResponse(),
 }
 get_quote_list_responses = {
     "200": OkGetQuoteListResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetQuoteListResponse(),
 }
 get_quote_responses = {
     "200": OkGetQuoteResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetQuoteResponse(),
 }
 post_quote_responses = {
     "201": CreatedQuoteExecuteResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorPostQuoteExecuteResponse(),
 }
 post_quotes_responses = {
     "201": CreatedQuoteRequestResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorPostQuotesResponse(),
 }
 get_bill_list_responses = {
     "200": OkGetBillListResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetBillListResponse(),
 }
 get_bill_responses = {
     "200": OkGetBillDetailResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-}
-get_single_result_responses = {
-    "200": OkGetSingleOutputResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-}
-get_exceptions_responses = {
-    "200": OkGetExceptionsResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-}
-get_logs_responses = {
-    "200": OkGetLogsResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetBillResponse(),
 }
 
 

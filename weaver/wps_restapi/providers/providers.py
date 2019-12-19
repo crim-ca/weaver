@@ -1,6 +1,6 @@
 from weaver.database import get_db
 from weaver.datatype import Service
-from weaver.exceptions import ServiceNotFound
+from weaver.exceptions import ServiceNotFound, log_unhandled_exceptions
 from weaver.warning import NonBreakingExceptionWarning
 from weaver.owsexceptions import OWSMissingParameterValue, OWSNotImplemented
 from weaver.processes.types import PROCESS_WPS
@@ -18,11 +18,11 @@ from pyramid.httpexceptions import (
 )
 import warnings
 import logging
-logger = logging.getLogger("weaver")
+LOGGER = logging.getLogger("weaver")
 
 
 @sd.providers_service.get(tags=[sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
-                          schema=sd.GetProviders(), response_schemas=sd.get_all_providers_responses)
+                          schema=sd.GetProviders(), response_schemas=sd.get_providers_list_responses)
 def get_providers(request):
     """
     Lists registered providers.
@@ -87,6 +87,7 @@ def get_service(request):
 
 @sd.providers_service.post(tags=[sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
                            schema=sd.PostProvider(), response_schemas=sd.post_provider_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostProviderResponse.description)
 def add_provider(request):
     """
     Add a provider.
@@ -106,13 +107,14 @@ def add_provider(request):
     try:
         store.save_service(new_service, request=request)
     except NotImplementedError:
-        raise OWSNotImplemented("Add provider not supported.", value=new_service)
+        raise OWSNotImplemented(sd.NotImplementedPostProviderResponse.description, value=new_service)
 
     return HTTPCreated(json=get_capabilities(new_service, request))
 
 
 @sd.provider_service.delete(tags=[sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
                             schema=sd.ProviderEndpoint(), response_schemas=sd.delete_provider_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorDeleteProviderResponse.description)
 def remove_provider(request):
     """
     Remove a provider.
@@ -122,16 +124,17 @@ def remove_provider(request):
     try:
         store.delete_service(service.name, request=request)
     except NotImplementedError:
-        raise OWSNotImplemented("Delete provider not supported.")
+        raise OWSNotImplemented(sd.NotImplementedDeleteProviderResponse.description)
 
     return HTTPNoContent(json={})
 
 
 @sd.provider_service.get(tags=[sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
-                         schema=sd.ProviderEndpoint(), response_schemas=sd.get_one_provider_responses)
+                         schema=sd.ProviderEndpoint(), response_schemas=sd.get_provider_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProviderCapabilitiesResponse.description)
 def get_provider(request):
     """
-    Get a provider description.
+    Get a provider definition (GetCapabilities).
     """
     service, store = get_service(request)
     return HTTPOk(json=get_capabilities(service, request))
