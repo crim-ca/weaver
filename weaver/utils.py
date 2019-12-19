@@ -384,7 +384,7 @@ def str2bytes(s):
 
 
 def bytes2str(s):
-    # type: (Union[AnyStr, bytes]) -> bytes
+    # type: (Union[AnyStr, bytes]) -> str
     """Obtains the unicode representation of the string."""
     if not (isinstance(s, six.string_types) or isinstance(s, bytes)):
         raise TypeError("Cannot convert item to unicode: {!r}".format(type(s)))

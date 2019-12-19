@@ -1,7 +1,7 @@
 from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS
 from weaver.database import get_db
 from weaver.datatype import Process as ProcessDB, Service
-from weaver.exceptions import InvalidIdentifierValue, ProcessNotFound, ProcessNotAccessible
+from weaver.exceptions import InvalidIdentifierValue, ProcessNotFound, ProcessNotAccessible, log_unhandled_exceptions
 from weaver.execute import (
     EXECUTE_MODE_AUTO,
     EXECUTE_MODE_ASYNC,
@@ -322,6 +322,7 @@ def get_provider_process(request):
     # type: (Request) -> ProcessDB
     """
     Obtains a remote service process description in a compatible local process format.
+
     Note: this processes won't be stored to the local process storage.
     """
     provider_id = request.matchdict.get("provider_id")
@@ -336,6 +337,7 @@ def get_provider_process(request):
 @sd.provider_process_service.get(tags=[sd.TAG_PROVIDER_PROCESS, sd.TAG_PROVIDERS, sd.TAG_DESCRIBEPROCESS],
                                  renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderProcessEndpoint(),
                                  response_schemas=sd.get_provider_process_description_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorProviderProcessDescription.description)
 def describe_provider_process(request):
     """
     Retrieve a process description (DescribeProcess).
@@ -344,12 +346,8 @@ def describe_provider_process(request):
         process = get_provider_process(request)
         process_offering = process.process_offering()
         return HTTPOk(json=process_offering)
-    except HTTPException:
-        raise  # re-throw already handled HTTPException
     except colander.Invalid as ex:
-        raise HTTPBadRequest("Invalid schema: [{}]".format(str(ex)))
-    except Exception as ex:
-        raise HTTPInternalServerError(str(ex))
+        raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))
 
 
 def get_processes_filtered_by_valid_schemas(request):
@@ -416,6 +414,7 @@ def get_processes(request):
 
 @sd.processes_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OUTPUT_FORMAT_JSON,
                            schema=sd.PostProcessEndpoint(), response_schemas=sd.post_processes_responses)
+@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during process deployment.")
 def add_local_process(request):
     """
     Register a local process.
@@ -437,17 +436,16 @@ def get_process(request):
     except InvalidIdentifierValue as ex:
         raise HTTPBadRequest(str(ex))
     except ProcessNotAccessible:
-        raise HTTPUnauthorized("Process with id '{}' is not accessible.".format(str(process_id)))
+        raise HTTPUnauthorized("Process with id '{!s}' is not accessible.".format(process_id))
     except ProcessNotFound:
-        raise HTTPNotFound("Process with id '{}' does not exist.".format(str(process_id)))
+        raise HTTPNotFound("Process with id '{!s}' does not exist.".format(process_id))
     except colander.Invalid as ex:
-        raise HTTPBadRequest("Invalid schema:\n[{0!r}]\n[{0!s}].".format(ex))
-    except Exception as ex:
-        raise HTTPInternalServerError(str(ex))
+        raise HTTPBadRequest("Invalid schema:\n[{0!r}].".format(ex))
 
 
 @sd.process_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OUTPUT_FORMAT_JSON,
                         schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_responses)
+@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during process description.")
 def get_local_process(request):
     """
     Get a registered local process information (DescribeProcess).
@@ -460,13 +458,12 @@ def get_local_process(request):
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except colander.Invalid as ex:
-        raise HTTPBadRequest("Invalid schema: [{}]".format(str(ex)))
-    except Exception as ex:
-        raise HTTPInternalServerError(str(ex))
+        raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))
 
 
 @sd.process_package_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.ProcessPackageEndpoint(), response_schemas=sd.get_process_package_responses)
+@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during process package description.")
 def get_local_process_package(request):
     """
     Get a registered local process package definition.
@@ -477,6 +474,7 @@ def get_local_process_package(request):
 
 @sd.process_payload_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.ProcessPayloadEndpoint(), response_schemas=sd.get_process_payload_responses)
+@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during process payload description.")
 def get_local_process_payload(request):
     """
     Get a registered local process payload definition.
@@ -488,6 +486,7 @@ def get_local_process_payload(request):
 @sd.process_visibility_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_VISIBILITY], renderer=OUTPUT_FORMAT_JSON,
                                    schema=sd.ProcessVisibilityGetEndpoint(),
                                    response_schemas=sd.get_process_visibility_responses)
+@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during process visibility retrieval.")
 def get_process_visibility(request):
     """
     Get the visibility of a registered local process.
@@ -499,18 +498,14 @@ def get_process_visibility(request):
         store = get_db(request).get_store(StoreProcesses)
         visibility_value = store.get_visibility(process_id, request=request)
         return HTTPOk(json={u"value": visibility_value})
-    except HTTPException:
-        raise  # re-throw already handled HTTPException
     except ProcessNotFound as ex:
         raise HTTPNotFound(str(ex))
-    except Exception as ex:
-        LOGGER.exception("Process visibility retrieval generated an unhandled error: [%r]", ex)
-        raise HTTPInternalServerError("Unhandled error occurred during process visibility retrieval.")
 
 
 @sd.process_visibility_service.put(tags=[sd.TAG_PROCESSES, sd.TAG_VISIBILITY], renderer=OUTPUT_FORMAT_JSON,
                                    schema=sd.ProcessVisibilityPutEndpoint(),
                                    response_schemas=sd.put_process_visibility_responses)
+@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during process visibility update.")
 def set_process_visibility(request):
     """
     Set the visibility of a registered local process.
@@ -531,21 +526,17 @@ def set_process_visibility(request):
             raise HTTPForbidden("Cannot change the visibility of builtin process.")
         store.set_visibility(process_id, visibility_value, request=request)
         return HTTPOk(json={u"value": visibility_value})
-    except HTTPException:
-        raise  # re-throw already handled HTTPException
     except TypeError:
         raise HTTPBadRequest("Value of visibility must be a string.")
     except ValueError:
         raise HTTPUnprocessableEntity("Value of visibility must be one of : {!s}".format(list(visibility_values)))
     except ProcessNotFound as ex:
         raise HTTPNotFound(str(ex))
-    except Exception as ex:
-        LOGGER.exception("Process visibility update generated an unhandled error: [%r]", ex)
-        raise HTTPInternalServerError("Unhandled error occurred during process visibility update.")
 
 
 @sd.process_service.delete(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OUTPUT_FORMAT_JSON,
                            schema=sd.ProcessEndpoint(), response_schemas=sd.delete_process_responses)
+@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during process deletion.")
 def delete_local_process(request):
     """
     Unregister a local process.
@@ -562,8 +553,6 @@ def delete_local_process(request):
             return HTTPOk(json={"undeploymentDone": True, "identifier": process_id})
         LOGGER.error("Existing process [%s] should have been deleted with success status.", process_id)
         raise HTTPForbidden("Deletion of process has been refused by the database or could not have been validated.")
-    except HTTPException:
-        raise  # re-throw already handled HTTPException
     except InvalidIdentifierValue as ex:
         raise HTTPBadRequest(str(ex))
     except ProcessNotAccessible:
@@ -571,13 +560,11 @@ def delete_local_process(request):
     except ProcessNotFound:
         description = "Process with id '{!s}' does not exist.".format(process_id)
         raise HTTPNotFound(description)
-    except Exception as ex:
-        LOGGER.exception("Delete process generated an unhandled error: [%r]", ex)
-        raise HTTPInternalServerError("Unhandled error occurred during deletion of process.")
 
 
 @sd.process_jobs_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS], renderer=OUTPUT_FORMAT_JSON,
                               schema=sd.PostProcessJobsEndpoint(), response_schemas=sd.post_process_jobs_responses)
+@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during job submission.")
 def submit_local_job(request):
     """
     Execute a local process.
@@ -592,14 +579,9 @@ def submit_local_job(request):
                                   is_workflow=process.type == PROCESS_WORKFLOW,
                                   visibility=process.visibility)
         return resp
-    except HTTPException:
-        raise  # re-throw already handled HTTPException
     except InvalidIdentifierValue as ex:
         raise HTTPBadRequest(str(ex))
     except ProcessNotAccessible:
         raise HTTPUnauthorized("Process with id '{!s}' is not accessible.".format(process_id))
     except ProcessNotFound:
         raise HTTPNotFound("The process with id '{!s}' does not exist.".format(process_id))
-    except Exception as ex:
-        LOGGER.exception("Local job submission generated an unhandled error: [%r]", ex)
-        raise HTTPInternalServerError("Unhandled error occurred during job submission.")

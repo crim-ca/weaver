@@ -1,7 +1,6 @@
 """
 Errors raised during the weaver flow.
 """
-from weaver.owsexceptions import OWSException
 from typing import TYPE_CHECKING
 from pyramid.httpexceptions import HTTPException, HTTPInternalServerError
 from functools import wraps
@@ -207,16 +206,19 @@ def log_unhandled_exceptions(logger=LOGGER, message="Unhandled exception occurre
     :param exception: exception type to be raised instead of the caught exception.
     :param force: force handling of any raised exception (default: only *known* unhandled exceptions are logged).
     :param require_http:
-        consider non HTTP-like exceptions as *unknown* and raise :class:`HTTPInternalServerError` instead
-        (or any other HTTP-like exception).
+        consider non HTTP-like exceptions as *unknown* and raise one instead
+        (default: ``True`` and raises :class:`HTTPInternalServerError`, unless ``exception`` is HTTP-like).
     :raises exception: if an *unknown* exception was caught (or forced) during the decorated function's execution.
     :raises Exception: original exception if it is *known*.
     """
+    from weaver.owsexceptions import OWSException   # avoid circular import error
+
     known_exceptions = [WeaverException]
+    known_http_exceptions = [HTTPException, OWSException]
     if require_http:
-        if not issubclass(exception, (HTTPException, OWSException)):
+        if not issubclass(exception, tuple(known_http_exceptions)):
             exception = HTTPInternalServerError
-        known_exceptions.extend([HTTPException, OWSException])
+        known_exceptions.extend(known_http_exceptions)
     known_exceptions = tuple(known_exceptions)
 
     def wrap(function):
@@ -235,7 +237,7 @@ def log_unhandled_exceptions(logger=LOGGER, message="Unhandled exception occurre
                     if force or not isinstance(exc, known_exceptions):
                         setattr(exception, handle, True)    # mark as handled
                         setattr(exception, "error", exc)    # make original exception available through new one raised
-                        logger.exception("%s%s%r", message, (" " if message else "") + "Exception: ", exc)
+                        logger.exception("%s%s[%r]", message, (" " if message else "") + "Exception: ", exc)
                         raise exception(message)
                 raise exc
         return call

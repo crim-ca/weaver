@@ -6,7 +6,7 @@ from weaver.config import (
 )
 from weaver.datatype import Service, Process as ProcessDB
 from weaver.database import get_db
-from weaver.exceptions import ProcessNotFound
+from weaver.exceptions import ProcessNotFound, log_unhandled_exceptions
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN
 from weaver.store.base import StoreProcesses
 from weaver.utils import get_sane_name, get_settings, get_url_without_query
@@ -30,7 +30,6 @@ from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPConflict,
     HTTPUnprocessableEntity,
-    HTTPInternalServerError,
     HTTPException,
 )
 from copy import deepcopy
@@ -199,6 +198,33 @@ def convert_process_wps_to_db(service, process, container):
     )
 
 
+@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during parsing of deploy payload.")
+def _check_deploy(payload):
+    """Validate minimum deploy payload field requirements with exception handling."""
+    try:
+        sd.Deploy().deserialize(payload)
+    except colander.Invalid as ex:
+        raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))
+
+
+@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during parsing of process definition.")
+def _get_deploy_process_info(process_info, reference, package):
+    """Obtain the process definition from deploy payload with exception handling."""
+    try:
+        # data_source `None` forces workflow process to search locally for deployed step applications
+        return wps_package.get_process_definition(process_info, reference, package, data_source=None)
+    except PackageNotFound as ex:
+        # raised when a workflow sub-process is not found (not deployed locally)
+        raise HTTPNotFound(detail=str(ex))
+    except InvalidIdentifierValue as ex:
+        raise HTTPBadRequest(str(ex))
+    except (PackageRegistrationError, PackageTypeError) as ex:
+        msg = "Invalid package/reference definition. Loading generated error: [{!s}]".format(ex)
+        LOGGER.exception(msg)
+        raise HTTPUnprocessableEntity(detail=msg)
+
+
+@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during process deployment.")
 def deploy_process_from_payload(payload, container):
     # type: (JSON, AnyContainer) -> HTTPException
     """
@@ -208,14 +234,7 @@ def deploy_process_from_payload(payload, container):
     :returns: HTTPOk if the process registration was successful
     :raises HTTPException: otherwise
     """
-    # validate minimum field requirements
-    try:
-        sd.Deploy().deserialize(payload)
-    except colander.Invalid as ex:
-        raise HTTPBadRequest("Invalid schema: [{}]".format(str(ex)))
-    except Exception as ex:
-        LOGGER.exception("Unhandled error when parsing 'processDescription': [%r]", ex)
-        raise HTTPInternalServerError("Unhandled error occurred during parsing of 'processDescription'.")
+    _check_deploy(payload)
 
     # use deepcopy of to remove any circular dependencies before writing to mongodb or any updates to the payload
     payload_copy = deepcopy(payload)
@@ -259,21 +278,7 @@ def deploy_process_from_payload(payload, container):
         raise HTTPBadRequest("Missing one of required parameters [href, owsContext, deploymentProfileName].")
 
     # obtain updated process information using WPS process offering, CWL/WPS reference or CWL package definition
-    try:
-        # data_source `None` forces workflow process to search locally for deployed step applications
-        process_info = wps_package.get_process_definition(process_info, reference, package, data_source=None)
-    except PackageNotFound as ex:
-        # raised when a workflow sub-process is not found (not deployed locally)
-        raise HTTPNotFound(detail=str(ex))
-    except InvalidIdentifierValue as ex:
-        raise HTTPBadRequest(str(ex))
-    except (PackageRegistrationError, PackageTypeError) as ex:
-        msg = "Invalid package/reference definition. Loading generated error: [{!s}]".format(ex)
-        LOGGER.exception(msg)
-        raise HTTPUnprocessableEntity(detail=msg)
-    except Exception as ex:
-        LOGGER.exception("Unhandled error during progress package/reference/definition parsing: %r", ex)
-        raise HTTPInternalServerError("Unhandled error occurred during parsing of process definition.")
+    process_info = _get_deploy_process_info(process_info, reference, package)
 
     # validate process type against weaver configuration
     settings = get_settings(container)

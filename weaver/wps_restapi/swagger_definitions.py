@@ -1347,6 +1347,10 @@ class OkGetProviderProcessDescription(MappingSchema):
     body = ProcessDescriptionBodySchema()
 
 
+class InternalServerErrorProviderProcessDescription(MappingSchema):
+    description = "Unhandled error occurred during provider process description."
+
+
 class CreatedPostProvider(MappingSchema):
     header = JsonHeader()
     body = ProviderSummarySchema()
@@ -1443,136 +1447,137 @@ class OkGetLogsResponse(MappingSchema):
 
 
 get_api_frontpage_responses = {
-    '200': OkGetFrontpageSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetFrontpageSchema(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_api_swagger_json_responses = {
-    '200': OkGetSwaggerJSONSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetSwaggerJSONSchema(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_api_swagger_ui_responses = {
-    '200': OkGetSwaggerUISchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetSwaggerUISchema(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_api_versions_responses = {
-    '200': OkGetVersionsSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetVersionsSchema(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_processes_responses = {
-    '200': OkGetProcessesSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetProcessesSchema(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 post_processes_responses = {
     # TODO: status should be 201 when properly modified to match API conformance
-    '200': OkPostProcessesSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkPostProcessesSchema(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_process_responses = {
-    '200': OkGetProcessSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetProcessSchema(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_process_package_responses = {
-    '200': OkGetProcessPackageSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetProcessPackageSchema(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_process_payload_responses = {
-    '200': OkGetProcessPayloadSchema(description='success')
+    "200": OkGetProcessPayloadSchema(description="success")
 }
 get_process_visibility_responses = {
-    '200': OkGetProcessVisibilitySchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetProcessVisibilitySchema(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 put_process_visibility_responses = {
-    '200': OkPutProcessVisibilitySchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkPutProcessVisibilitySchema(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 delete_process_responses = {
-    '200': OkDeleteProcessSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkDeleteProcessSchema(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_all_providers_responses = {
-    '200': OkGetProvidersSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetProvidersSchema(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_one_provider_responses = {
-    '200': OkGetProviderCapabilitiesSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetProviderCapabilitiesSchema(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 delete_provider_responses = {
-    '204': NoContentDeleteProviderSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "204": NoContentDeleteProviderSchema(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_provider_processes_responses = {
-    '200': OkGetProviderProcessesSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetProviderProcessesSchema(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_provider_process_description_responses = {
-    '200': OkGetProviderProcessDescription(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetProviderProcessDescription(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorProviderProcessDescription(),
 }
 post_provider_responses = {
-    '201': CreatedPostProvider(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "201": CreatedPostProvider(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 post_provider_process_job_responses = {
-    '201': CreatedLaunchJobResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "201": CreatedLaunchJobResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 post_process_jobs_responses = {
-    '201': CreatedLaunchJobResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "201": CreatedLaunchJobResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_all_jobs_responses = {
-    '200': OkGetAllJobsResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetAllJobsResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_single_job_status_responses = {
-    '200': OkGetSingleJobStatusResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetSingleJobStatusResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 delete_job_responses = {
-    '200': OkDismissJobResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkDismissJobResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_job_results_responses = {
-    '200': OkGetSingleJobResultsResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetSingleJobResultsResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_quote_list_responses = {
-    '200': OkGetQuoteListResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetQuoteListResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_quote_responses = {
-    '200': OkGetQuoteResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetQuoteResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 post_quote_responses = {
-    '201': CreatedQuoteExecuteResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "201": CreatedQuoteExecuteResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 post_quotes_responses = {
-    '201': CreatedQuoteRequestResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "201": CreatedQuoteRequestResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_bill_list_responses = {
-    '200': OkGetBillListResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetBillListResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_bill_responses = {
-    '200': OkGetBillDetailResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetBillDetailResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_single_result_responses = {
-    '200': OkGetSingleOutputResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetSingleOutputResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_exceptions_responses = {
-    '200': OkGetExceptionsResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetExceptionsResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_logs_responses = {
-    '200': OkGetLogsResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetLogsResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 
 
@@ -1583,4 +1588,4 @@ get_logs_responses = {
 
 def service_api_route_info(service_api, settings):
     api_base = wps_restapi_base_path(settings)
-    return {'name': service_api.name, 'pattern': '{base}{path}'.format(base=api_base, path=service_api.path)}
+    return {"name": service_api.name, "pattern": "{base}{path}".format(base=api_base, path=service_api.path)}
