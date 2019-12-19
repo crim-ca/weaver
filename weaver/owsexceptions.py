@@ -6,7 +6,6 @@ See also: https://github.com/geopython/pywps/blob/master/pywps/exceptions.py
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_XML
 from weaver.utils import clean_json_text_body
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
-# noinspection PyPackageRequirements
 from zope.interface import implementer
 from webob import html_escape as _html_escape
 from webob.acceptparse import create_accept_header

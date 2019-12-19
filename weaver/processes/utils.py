@@ -214,7 +214,8 @@ def deploy_process_from_payload(payload, container):
     except colander.Invalid as ex:
         raise HTTPBadRequest("Invalid schema: [{}]".format(str(ex)))
     except Exception as ex:
-        raise HTTPInternalServerError("Unhandled error when parsing 'processDescription': [{}]".format(str(ex)))
+        LOGGER.exception("Unhandled error when parsing 'processDescription': [%r]", ex)
+        raise HTTPInternalServerError("Unhandled error occurred during parsing of 'processDescription'.")
 
     # use deepcopy of to remove any circular dependencies before writing to mongodb or any updates to the payload
     payload_copy = deepcopy(payload)
@@ -264,12 +265,15 @@ def deploy_process_from_payload(payload, container):
     except PackageNotFound as ex:
         # raised when a workflow sub-process is not found (not deployed locally)
         raise HTTPNotFound(detail=str(ex))
-    except (PackageRegistrationError, PackageTypeError) as ex:
-        raise HTTPUnprocessableEntity(detail=str(ex))
     except InvalidIdentifierValue as ex:
         raise HTTPBadRequest(str(ex))
+    except (PackageRegistrationError, PackageTypeError) as ex:
+        msg = "Invalid package/reference definition. Loading generated error: [{!s}]".format(ex)
+        LOGGER.exception(msg)
+        raise HTTPUnprocessableEntity(detail=msg)
     except Exception as ex:
-        raise HTTPBadRequest("Invalid package/reference definition. Loading generated error: [{!r}]".format(ex))
+        LOGGER.exception("Unhandled error during progress package/reference/definition parsing: %r", ex)
+        raise HTTPInternalServerError("Unhandled error occurred during parsing of process definition.")
 
     # validate process type against weaver configuration
     settings = get_settings(container)
@@ -390,7 +394,7 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
                     else:
                         raise RuntimeError("Process registration failed: [{}]".format(proc_id))
                 except Exception as ex:
-                    LOGGER.error("Exception during process registration: [%r]", ex)
+                    LOGGER.exception("Exception during process registration: [%r]", ex)
                     continue
 
     except Exception as exc:

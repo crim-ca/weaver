@@ -408,9 +408,9 @@ def get_processes(request):
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except colander.Invalid as ex:
-        raise HTTPBadRequest("Invalid schema: [{}]".format(str(ex)))
+        raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))
     except Exception as ex:
-        LOGGER.exception(str(ex), exc_info=True)
+        LOGGER.exception("Unhandled error during process retrieval: %s", ex)
         raise HTTPInternalServerError(str(ex))
 
 
@@ -498,13 +498,14 @@ def get_process_visibility(request):
     try:
         store = get_db(request).get_store(StoreProcesses)
         visibility_value = store.get_visibility(process_id, request=request)
-        return HTTPOk(json={u'value': visibility_value})
+        return HTTPOk(json={u"value": visibility_value})
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except ProcessNotFound as ex:
         raise HTTPNotFound(str(ex))
     except Exception as ex:
-        raise HTTPInternalServerError(str(ex))
+        LOGGER.exception("Process visibility retrieval generated an unhandled error: [%r]", ex)
+        raise HTTPInternalServerError("Unhandled error occurred during process visibility retrieval.")
 
 
 @sd.process_visibility_service.put(tags=[sd.TAG_PROCESSES, sd.TAG_VISIBILITY], renderer=OUTPUT_FORMAT_JSON,
@@ -535,12 +536,12 @@ def set_process_visibility(request):
     except TypeError:
         raise HTTPBadRequest("Value of visibility must be a string.")
     except ValueError:
-        raise HTTPUnprocessableEntity("Value of visibility must be one of : {!s}"
-                                      .format(list(visibility_values)))
+        raise HTTPUnprocessableEntity("Value of visibility must be one of : {!s}".format(list(visibility_values)))
     except ProcessNotFound as ex:
         raise HTTPNotFound(str(ex))
     except Exception as ex:
-        raise HTTPInternalServerError(str(ex))
+        LOGGER.exception("Process visibility update generated an unhandled error: [%r]", ex)
+        raise HTTPInternalServerError("Unhandled error occurred during process visibility update.")
 
 
 @sd.process_service.delete(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OUTPUT_FORMAT_JSON,
@@ -559,18 +560,20 @@ def delete_local_process(request):
             raise HTTPForbidden("Cannot delete a builtin process.")
         if store.delete_process(process_id, visibility=VISIBILITY_PUBLIC, request=request):
             return HTTPOk(json={"undeploymentDone": True, "identifier": process_id})
-        raise HTTPInternalServerError("Delete process failed for unhandled reason.")
+        LOGGER.error("Existing process [%s] should have been deleted with success status.", process_id)
+        raise HTTPForbidden("Deletion of process has been refused by the database or could not have been validated.")
     except HTTPException:
         raise  # re-throw already handled HTTPException
     except InvalidIdentifierValue as ex:
         raise HTTPBadRequest(str(ex))
     except ProcessNotAccessible:
-        raise HTTPUnauthorized("Process with id '{}' is not accessible.".format(str(process_id)))
+        raise HTTPUnauthorized("Process with id '{!s}' is not accessible.".format(process_id))
     except ProcessNotFound:
-        description = "Process with id '{}' does not exist.".format(str(process_id))
+        description = "Process with id '{!s}' does not exist.".format(process_id)
         raise HTTPNotFound(description)
     except Exception as ex:
-        raise HTTPInternalServerError(str(ex))
+        LOGGER.exception("Delete process generated an unhandled error: [%r]", ex)
+        raise HTTPInternalServerError("Unhandled error occurred during deletion of process.")
 
 
 @sd.process_jobs_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS], renderer=OUTPUT_FORMAT_JSON,
@@ -594,8 +597,9 @@ def submit_local_job(request):
     except InvalidIdentifierValue as ex:
         raise HTTPBadRequest(str(ex))
     except ProcessNotAccessible:
-        raise HTTPUnauthorized("Process with id '{}' is not accessible.".format(str(process_id)))
+        raise HTTPUnauthorized("Process with id '{!s}' is not accessible.".format(process_id))
     except ProcessNotFound:
-        raise HTTPNotFound("The process with id '{}' does not exist.".format(str(process_id)))
+        raise HTTPNotFound("The process with id '{!s}' does not exist.".format(process_id))
     except Exception as ex:
-        raise HTTPInternalServerError(str(ex))
+        LOGGER.exception("Local job submission generated an unhandled error: [%r]", ex)
+        raise HTTPInternalServerError("Unhandled error occurred during job submission.")

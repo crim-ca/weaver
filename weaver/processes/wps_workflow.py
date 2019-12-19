@@ -267,7 +267,7 @@ class WpsWorkflow(ProcessCWL):
                         except (OSError, IOError) as e:
                             LOGGER.warning(Text(e))
                         except Exception:
-                            LOGGER.error("Unexpected error from fs_access", exc_info=True)
+                            LOGGER.exception("Unexpected error from fs_access")
                             raise
 
                 for files in r:
@@ -469,14 +469,14 @@ class WpsWorkflowJob(JobBase):
         except OSError as e:
             if e.errno == 2:
                 if runtime:
-                    LOGGER.error(u"'%s' not found", runtime[0])
+                    LOGGER.exception(u"'%s' not found", runtime[0])
                 else:
-                    LOGGER.error(u"'%s' not found", self.command_line[0])
+                    LOGGER.exception(u"'%s' not found", self.command_line[0])
             else:
                 LOGGER.exception("Exception while running job")
             process_status = "permanentFail"
         except WorkflowException as err:
-            LOGGER.error(u"[job %s] Job error:\n%s", self.name, err)
+            LOGGER.exception(u"[job %s] Job error:\n%s", self.name, err)
             process_status = "permanentFail"
         except Exception:
             LOGGER.exception("Exception while running job")

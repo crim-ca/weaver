@@ -179,7 +179,7 @@ def pywps_view(environ, start_response):
                          process_store.list_processes(visibility=VISIBILITY_PUBLIC, request=get_current_request())]
         service = Service(processes_wps)
     except Exception as ex:
-        LOGGER.error("Error occurred during PyWPS Service and/or Processes setup.", exc_info=ex)
+        LOGGER.exception("Error occurred during PyWPS Service and/or Processes setup.")
         raise OWSNoApplicableCode("Failed setup of PyWPS Service and/or Processes. Error [{!r}]".format(ex))
 
     return service(environ, start_response)

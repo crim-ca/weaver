@@ -29,7 +29,7 @@ class MongodbServiceStoreTestCase(unittest.TestCase):
 
     def test_save_service_default(self):
         collection_mock = mock.Mock(spec=Collection)
-        collection_mock.count.return_value = 0
+        collection_mock.count_documents.return_value = 0
         collection_mock.find_one.return_value = self.service
         store = MongodbServiceStore(collection=collection_mock, sane_name_config=self.sane_name_config)
         store.save_service(Service(self.service))
@@ -38,7 +38,7 @@ class MongodbServiceStoreTestCase(unittest.TestCase):
 
     def test_save_service_with_special_name(self):
         collection_mock = mock.Mock(spec=Collection)
-        collection_mock.count.return_value = 0
+        collection_mock.count_documents.return_value = 0
         collection_mock.find_one.return_value = self.service_special
         store = MongodbServiceStore(collection=collection_mock, sane_name_config=self.sane_name_config)
         store.save_service(Service(self.service_special))
@@ -48,7 +48,7 @@ class MongodbServiceStoreTestCase(unittest.TestCase):
 
     def test_save_service_public(self):
         collection_mock = mock.Mock(spec=Collection)
-        collection_mock.count.return_value = 0
+        collection_mock.count_documents.return_value = 0
         collection_mock.find_one.return_value = self.service_public
         store = MongodbServiceStore(collection=collection_mock, sane_name_config=self.sane_name_config)
         store.save_service(Service(self.service_public))

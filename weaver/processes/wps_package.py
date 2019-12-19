@@ -22,7 +22,7 @@ from weaver.wps_restapi.swagger_definitions import process_uri
 from weaver.wps import get_wps_output_dir
 from weaver.utils import (
     get_job_log_msg, get_log_fmt, get_log_date_fmt, get_sane_name, get_settings, get_any_id, get_header,
-    get_url_without_query, null
+    get_url_without_query, str2bytes, null
 )
 from owslib.wps import WebProcessingService, ComplexData
 from pywps.inout.basic import BasicIO
@@ -1084,7 +1084,7 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
             cwl_field = _get_field(cwl_io, field_type)
             wps_field = _get_field(wps_io, field_type)
             # override provided formats if different (keep WPS), or if CWL->WPS was missing but is provided by WPS
-            if _are_different_and_set(wps_field, cwl_field) or (wps_field != null and cwl_field == null):
+            if _are_different_and_set(wps_field, cwl_field) or (wps_field is not null and cwl_field is null):
                 # list of formats are updated by comparing format items since information can be partially complementary
                 if field_type in ["supported_formats"]:
                     wps_field = _merge_io_formats(wps_field, cwl_field)
@@ -1359,7 +1359,7 @@ def _xml_wps2cwl(wps_process_response):
         return _xml.split('}')[-1].lower()
 
     # look for `XML` structure starting at `ProcessDescription` (WPS-1)
-    xml_resp = lxml.etree.fromstring(wps_process_response.content)
+    xml_resp = lxml.etree.fromstring(str2bytes(wps_process_response.content))   # Python 3 content is str, must be bytes
     xml_wps_process = xml_resp.xpath("//ProcessDescription")  # type: List[XML]
     if not len(xml_wps_process) == 1:
         raise ValueError("Could not retrieve a valid 'ProcessDescription' from WPS-1 response.")
@@ -1488,9 +1488,7 @@ def get_process_definition(process_offering, reference=None, package=None, data_
             package_errors = (PackageRegistrationError, PackageTypeError, PackageRegistrationError, PackageNotFound)
             exc_type = type(exc) if isinstance(exc, package_errors) else PackageRegistrationError
             LOGGER.exception(exc.message if hasattr(exc, "message") else str(exc))
-            raise exc_type(
-                "Invalid package/reference definition. {0} generated error: [{1}].".format(reason, repr(exc))
-            )
+            raise exc_type("Invalid package/reference definition. {0} generated error: [{1!r}].".format(reason, exc))
 
     if not (isinstance(package, dict) or isinstance(reference, six.string_types)):
         raise PackageRegistrationError(

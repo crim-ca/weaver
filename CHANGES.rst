@@ -25,6 +25,8 @@ Changes:
 
 - Use ``bump2version`` and move all config under ``setup.cfg``.
 - Remove enforced ``text/plain`` for `CWL` ``File`` when missing ``format`` field.
+- Replace bubbling up of too verbose unhandled exceptions (500 Internal Server Error) by summary message and additional
+  internal logging for debugging the cause using an utility exception log decorator.
 - Make ``null`` reference a singleton so that multiple instantiation calls all refer to the same instance and produce
   the expected behaviour of ``<x> is null`` instead of hard-to-identify errors because of english syntax.
 

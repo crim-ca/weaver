@@ -79,7 +79,7 @@ def get_wps_output_format(request, service_url=None):
                 if isinstance(getcap_resp_200.json()['processes'], list):
                     return OUTPUT_FORMATS[WPS_VERSION_200]
             except Exception as ex:
-                LOGGER.error("Got exception in 'get_wps_output_format' JSON parsing: %r", ex)
+                LOGGER.exception("Got exception in 'get_wps_output_format' JSON parsing: %r", ex)
 
         # analyse XML response
         if isinstance(getcap_resp_100, HTTPSuccessful):
@@ -88,7 +88,7 @@ def get_wps_output_format(request, service_url=None):
                 etree.fromstring(getcap_resp_100.content)
                 return OUTPUT_FORMATS[WPS_VERSION_100]
             except Exception as ex:
-                LOGGER.error("Got exception in 'get_wps_output_format' XML parsing: %r", ex)
+                LOGGER.exception("Got exception in 'get_wps_output_format' XML parsing: %r", ex)
 
     # still not found, default to older version
     # for most probable format supported by services

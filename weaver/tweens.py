@@ -3,6 +3,7 @@ from pyramid.httpexceptions import HTTPSuccessful, HTTPRedirection, HTTPExceptio
 from weaver.owsexceptions import OWSException, OWSNotImplemented
 from weaver.utils import fully_qualified_name
 import logging
+import sys
 LOGGER = logging.getLogger(__name__)
 
 OWS_TWEEN_HANDLED = "OWS_TWEEN_HANDLED"
@@ -21,29 +22,33 @@ def ows_response_tween(request, handler):
         raised_error = err
         raised_error._json_formatter = OWSException.json_formatter
         return_error = raised_error
+        exc_info_err = sys.exc_info()
     except OWSException as err:
         LOGGER.debug("direct ows exception response")
         LOGGER.exception("Raised exception: [%r]\nReturned exception: %r", err, err)
         raised_error = err
         return_error = err
+        exc_info_err = sys.exc_info()
     except NotImplementedError as err:
         LOGGER.debug("not implemented error -> ows exception response")
         raised_error = err
         return_error = OWSNotImplemented(str(err))
+        exc_info_err = sys.exc_info()
     except Exception as err:
         LOGGER.debug("unhandled %s exception -> ows exception response", type(err).__name__)
         raised_error = err
         return_error = OWSException(detail=str(err), status=HTTPInternalServerError)
-    LOGGER.error("Raised exception: [%r]\nReturned exception: %r", raised_error, return_error, exc_info=raised_error)
+        exc_info_err = sys.exc_info()
+    LOGGER.error("Raised exception: [%r]\nReturned exception: %r", raised_error, return_error, exc_info=exc_info_err)
     return return_error
 
 
-def ows_response_tween_factory_excview(handler, registry):
+def ows_response_tween_factory_excview(handler, registry):  # noqa: F811
     """A tween factory which produces a tween which transforms common exceptions into OWS specific exceptions."""
     return lambda request: ows_response_tween(request, handler)
 
 
-def ows_response_tween_factory_ingress(handler, registry):
+def ows_response_tween_factory_ingress(handler, registry):  # noqa: F811
     """A tween factory which produces a tween which transforms common exceptions into OWS specific exceptions."""
     def handle_ows_tween(request):
         # because the EXCVIEW will also wrap any exception raised that should before be handled by OWS response
