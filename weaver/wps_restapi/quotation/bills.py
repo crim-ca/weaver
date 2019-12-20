@@ -1,15 +1,16 @@
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
 from weaver.store.base import StoreBills
-from weaver.exceptions import BillNotFound
+from weaver.exceptions import BillNotFound, log_unhandled_exceptions
 from weaver.database import get_db
 from pyramid.httpexceptions import HTTPOk, HTTPNotFound
 import logging
-logger = logging.getLogger("weaver")
+LOGGER = logging.getLogger(__name__)
 
 
 @sd.bills_service.get(tags=[sd.TAG_BILL_QUOTE], renderer=OUTPUT_FORMAT_JSON,
                       schema=sd.BillsEndpoint(), response_schemas=sd.get_bill_list_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetBillListResponse.description)
 def get_bill_list(request):
     """
     Get list of bills IDs.
@@ -21,6 +22,7 @@ def get_bill_list(request):
 
 @sd.bill_service.get(tags=[sd.TAG_BILL_QUOTE], renderer=OUTPUT_FORMAT_JSON,
                      schema=sd.BillEndpoint(), response_schemas=sd.get_bill_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetBillInfoResponse.description)
 def get_bill_info(request):
     """
     Get bill information.

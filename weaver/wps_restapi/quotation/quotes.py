@@ -1,6 +1,6 @@
 from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS, WEAVER_CONFIGURATION_ADES
 from weaver.database import get_db
-from weaver.exceptions import QuoteNotFound, ProcessNotFound
+from weaver.exceptions import QuoteNotFound, ProcessNotFound, log_unhandled_exceptions
 from weaver.datatype import Bill, Quote
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from weaver.processes.wps_package import get_process_location, get_package_workflow_steps
@@ -21,11 +21,10 @@ from duration import to_iso8601
 import logging
 import random
 
-logger = logging.getLogger("weaver")
+LOGGER = logging.getLogger(__name__)
 
 
-# noinspection PyUnusedLocal
-def process_quote_estimator(process):
+def process_quote_estimator(process):   # noqa: E811
     """
     :param process: instance of :class:`weaver.datatype.Process` for which to evaluate the quote.
     :return: dict of {price, currency, estimatedTime} values for the process quote.
@@ -39,6 +38,7 @@ def process_quote_estimator(process):
 
 @sd.process_quotes_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.PostProcessQuoteRequestEndpoint(), response_schemas=sd.post_quotes_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostQuoteRequestResponse.description)
 def request_quote(request):
     """
     Request a quotation for a process.
@@ -106,6 +106,7 @@ def request_quote(request):
                                schema=sd.ProcessQuotesEndpoint(), response_schemas=sd.get_quote_list_responses)
 @sd.quotes_service.get(tags=[sd.TAG_BILL_QUOTE], renderer=OUTPUT_FORMAT_JSON,
                        schema=sd.QuotesEndpoint(), response_schemas=sd.get_quote_list_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetQuoteListResponse.description)
 def get_quote_list(request):
     """
     Get list of quotes IDs.
@@ -133,6 +134,7 @@ def get_quote_list(request):
                               schema=sd.ProcessQuoteEndpoint(), response_schemas=sd.get_quote_responses)
 @sd.quote_service.get(tags=[sd.TAG_BILL_QUOTE], renderer=OUTPUT_FORMAT_JSON,
                       schema=sd.QuoteEndpoint(), response_schemas=sd.get_quote_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetQuoteInfoResponse.description)
 def get_quote_info(request):
     """
     Get quote information.
@@ -150,6 +152,7 @@ def get_quote_info(request):
                                schema=sd.PostProcessQuote(), response_schemas=sd.post_quote_responses)
 @sd.quote_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_EXECUTE], renderer=OUTPUT_FORMAT_JSON,
                        schema=sd.PostQuote(), response_schemas=sd.post_quote_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostQuoteExecuteResponse.description)
 def execute_quote(request):
     """
     Execute a quoted process.

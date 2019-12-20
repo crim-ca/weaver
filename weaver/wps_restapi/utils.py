@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from pyramid.request import Request                 # noqa: F401
     from weaver.typedefs import AnySettingsContainer    # noqa: F401
 
-LOGGER = logging.getLogger("weaver")
+LOGGER = logging.getLogger(__name__)
 
 WPS_VERSION_100 = "1.0.0"
 WPS_VERSION_200 = "2.0.0"

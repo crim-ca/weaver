@@ -1250,9 +1250,13 @@ class OkGetVersionsSchema(MappingSchema):
     body = VersionsSchema()
 
 
-class OkGetProvidersSchema(MappingSchema):
+class OkGetProvidersListResponse(MappingSchema):
     header = JsonHeader()
     body = ProvidersSchema()
+
+
+class InternalServerErrorGetProvidersListResponse(MappingSchema):
+    description = "Unhandled error occurred during providers listing."
 
 
 class OkGetProviderCapabilitiesSchema(MappingSchema):
@@ -1326,7 +1330,7 @@ class InternalServerErrorPostProcessesResponse(MappingSchema):
     description = "Unhandled error occurred during process deployment."
 
 
-class OkGetProcessSchema(MappingSchema):
+class OkGetProcessInfoResponse(MappingSchema):
     header = JsonHeader()
     body = ProcessOffering()
 
@@ -1496,14 +1500,26 @@ class CreatedQuoteExecuteResponse(MappingSchema):
     body = CreatedQuotedJobStatusSchema()
 
 
+class InternalServerErrorPostQuoteExecuteResponse(MappingSchema):
+    description = "Unhandled error occurred during quote job execution."
+
+
 class CreatedQuoteRequestResponse(MappingSchema):
     header = JsonHeader()
     body = QuoteSchema()
 
 
-class OkGetQuoteResponse(MappingSchema):
+class InternalServerErrorPostQuoteRequestResponse(MappingSchema):
+    description = "Unhandled error occurred during quote submission."
+
+
+class OkGetQuoteInfoResponse(MappingSchema):
     header = JsonHeader()
     body = QuoteSchema()
+
+
+class InternalServerErrorGetQuoteInfoResponse(MappingSchema):
+    description = "Unhandled error occurred during quote retrieval."
 
 
 class OkGetQuoteListResponse(MappingSchema):
@@ -1511,14 +1527,26 @@ class OkGetQuoteListResponse(MappingSchema):
     body = QuotationListSchema()
 
 
+class InternalServerErrorGetQuoteListResponse(MappingSchema):
+    description = "Unhandled error occurred during quote listing."
+
+
 class OkGetBillDetailResponse(MappingSchema):
     header = JsonHeader()
     body = BillSchema()
 
 
+class InternalServerErrorGetBillInfoResponse(MappingSchema):
+    description = "Unhandled error occurred during bill retrieval."
+
+
 class OkGetBillListResponse(MappingSchema):
     header = JsonHeader()
     body = BillListSchema()
+
+
+class InternalServerErrorGetBillListResponse(MappingSchema):
+    description = "Unhandled error occurred during bill listing."
 
 
 class OkGetJobExceptionsResponse(MappingSchema):
@@ -1569,7 +1597,7 @@ post_processes_responses = {
     "500": InternalServerErrorPostProcessesResponse(),
 }
 get_process_responses = {
-    "200": OkGetProcessSchema(description="success"),
+    "200": OkGetProcessInfoResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
     "500": InternalServerErrorGetProcessResponse(),
 }
@@ -1599,8 +1627,9 @@ delete_process_responses = {
     "500": InternalServerErrorDeleteProcessResponse(),
 }
 get_providers_list_responses = {
-    "200": OkGetProvidersSchema(description="success"),
+    "200": OkGetProvidersListResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetProvidersListResponse(),
 }
 get_provider_responses = {
     "200": OkGetProviderCapabilitiesSchema(description="success"),
@@ -1681,19 +1710,19 @@ get_quote_list_responses = {
     "500": InternalServerErrorGetQuoteListResponse(),
 }
 get_quote_responses = {
-    "200": OkGetQuoteResponse(description="success"),
+    "200": OkGetQuoteInfoResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "500": InternalServerErrorGetQuoteResponse(),
+    "500": InternalServerErrorGetQuoteInfoResponse(),
+}
+post_quotes_responses = {
+    "201": CreatedQuoteRequestResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorPostQuoteRequestResponse(),
 }
 post_quote_responses = {
     "201": CreatedQuoteExecuteResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
     "500": InternalServerErrorPostQuoteExecuteResponse(),
-}
-post_quotes_responses = {
-    "201": CreatedQuoteRequestResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "500": InternalServerErrorPostQuotesResponse(),
 }
 get_bill_list_responses = {
     "200": OkGetBillListResponse(description="success"),
@@ -1703,7 +1732,7 @@ get_bill_list_responses = {
 get_bill_responses = {
     "200": OkGetBillDetailResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "500": InternalServerErrorGetBillResponse(),
+    "500": InternalServerErrorGetBillInfoResponse(),
 }
 
 

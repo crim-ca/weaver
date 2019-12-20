@@ -18,11 +18,12 @@ from pyramid.httpexceptions import (
 )
 import warnings
 import logging
-LOGGER = logging.getLogger("weaver")
+LOGGER = logging.getLogger(__name__)
 
 
 @sd.providers_service.get(tags=[sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
                           schema=sd.GetProviders(), response_schemas=sd.get_providers_list_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProvidersListResponse.description)
 def get_providers(request):
     """
     Lists registered providers.

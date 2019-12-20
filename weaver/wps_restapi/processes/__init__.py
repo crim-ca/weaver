@@ -1,5 +1,5 @@
 import logging
-logger = logging.getLogger("weaver")
+LOGGER = logging.getLogger(__name__)
 
 
 def includeme(config):
@@ -7,7 +7,7 @@ def includeme(config):
     from weaver.wps_restapi.processes import processes as p
     from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
 
-    logger.info("Adding WPS REST API processes...")
+    LOGGER.info("Adding WPS REST API processes...")
     settings = config.registry.settings
     config.add_route(**sd.service_api_route_info(sd.processes_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_service, settings))

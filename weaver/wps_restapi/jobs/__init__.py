@@ -2,11 +2,11 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs import jobs as j
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
 import logging
-logger = logging.getLogger("weaver")
+LOGGER = logging.getLogger(__name__)
 
 
 def includeme(config):
-    logger.info("Adding WPS REST API jobs...")
+    LOGGER.info("Adding WPS REST API jobs...")
     settings = config.registry.settings
     config.add_route(**sd.service_api_route_info(sd.jobs_short_service, settings))
     config.add_route(**sd.service_api_route_info(sd.jobs_full_service, settings))

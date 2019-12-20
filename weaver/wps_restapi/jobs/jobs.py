@@ -113,8 +113,7 @@ def check_status(url=None, response=None, sleep_secs=2, verify=False):
     execution.checkStatus(response=xml, sleepSecs=sleep_secs)
     if execution.response is None:
         raise Exception("Missing response, cannot check status.")
-    # noinspection PyProtectedMember
-    if not isinstance(execution.response, etree._Element):
+    if not isinstance(execution.response, etree._Element):  # noqa: W0212
         execution.response = etree.fromstring(execution.response)
     return execution
 
