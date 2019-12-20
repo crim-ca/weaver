@@ -53,6 +53,9 @@ class _NullType(six.with_metaclass(_Singleton)):
                 or other is self.__instance__
                 or (isclass(other) and issubclass(other, _NullType)))
 
+    def __repr__(self):
+        return "<null>"
+
     @staticmethod
     def __nonzero__():
         return False
@@ -67,7 +70,7 @@ null = _NullType()
 def get_weaver_url(container):
     # type: (AnySettingsContainer) -> AnyStr
     """Retrieves the home URL of the `weaver` application."""
-    return get_settings(container).get("weaver.url").rstrip('/').strip()
+    return get_settings(container).get("weaver.url").rstrip("/").strip()
 
 
 def get_any_id(info):
@@ -337,42 +340,6 @@ def raise_on_xml_exception(xml_node):
         while len(node.getchildren()):
             node = node.getchildren()[0]
         raise Exception(node.text)
-
-
-def replace_caps_url(xml, url, prev_url=None):
-    ns = {
-        "ows": "http://www.opengis.net/ows/1.1",
-        "xlink": "http://www.w3.org/1999/xlink"}
-    doc = etree.fromstring(xml)
-    # wms 1.1.1 onlineResource
-    if "WMT_MS_Capabilities" in doc.tag:
-        LOGGER.debug("replace proxy urls in wms 1.1.1")
-        for element in doc.findall(".//OnlineResource[@xlink:href]", namespaces=ns):
-            parsed_url = urlparse(element.get("{http://www.w3.org/1999/xlink}href"))
-            new_url = url
-            if parsed_url.query:
-                new_url += "?" + parsed_url.query
-            element.set("{http://www.w3.org/1999/xlink}href", new_url)
-        xml = etree.tostring(doc)
-    # wms 1.3.0 onlineResource
-    elif "WMS_Capabilities" in doc.tag:
-        LOGGER.debug("replace proxy urls in wms 1.3.0")
-        for element in doc.findall(".//{http://www.opengis.net/wms}OnlineResource[@xlink:href]", namespaces=ns):
-            parsed_url = urlparse(element.get("{http://www.w3.org/1999/xlink}href"))
-            new_url = url
-            if parsed_url.query:
-                new_url += "?" + parsed_url.query
-            element.set("{http://www.w3.org/1999/xlink}href", new_url)
-        xml = etree.tostring(doc)
-    # wps operations
-    elif "Capabilities" in doc.tag:
-        for element in doc.findall("ows:OperationsMetadata//*[@xlink:href]", namespaces=ns):
-            element.set("{http://www.w3.org/1999/xlink}href", url)
-        xml = etree.tostring(doc)
-    elif prev_url:
-        xml = xml.decode("utf-8", "ignore")
-        xml = xml.replace(prev_url, url)
-    return xml
 
 
 def str2bytes(s):

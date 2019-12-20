@@ -198,7 +198,8 @@ def convert_process_wps_to_db(service, process, container):
     )
 
 
-@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during parsing of deploy payload.")
+@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during parsing of deploy payload.",
+                          is_request=False)
 def _check_deploy(payload):
     """Validate minimum deploy payload field requirements with exception handling."""
     try:
@@ -207,7 +208,8 @@ def _check_deploy(payload):
         raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))
 
 
-@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during parsing of process definition.")
+@log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during parsing of process definition.",
+                          is_request=False)
 def _get_deploy_process_info(process_info, reference, package):
     """Obtain the process definition from deploy payload with exception handling."""
     try:

@@ -41,7 +41,8 @@ weaver.wps_metadata_provider_url=http://pavics-weaver.readthedocs.org/en/latest/
 # WPS REST API
 weaver.wps_restapi = true
 weaver.wps_restapi_path = /
-weaver.wps_restapi_ref = https://github.com/opengeospatial/D009-ADES_and_EMS_Results_and_Best_Practices_Engineering_Report/blob/master/code/ades_wpst.json
+weaver.wps_restapi_ref = https://app.swaggerhub.com/apis/geoprocessing/WPS/
+weaver.wps_restapi_doc = https://raw.githubusercontent.com/opengeospatial/wps-rest-binding/develop/docs/18-062.pdf
 # email notification
 weaver.wps_email_encrypt_salt = salty-email
 weaver.wps_email_encrypt_rounds = 100000

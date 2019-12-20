@@ -2,6 +2,7 @@
 Errors raised during the weaver flow.
 """
 from typing import TYPE_CHECKING
+from pyramid.request import Request
 from pyramid.httpexceptions import HTTPException, HTTPInternalServerError
 from functools import wraps
 import logging
@@ -195,8 +196,8 @@ class BillInstanceError(BillException):
 
 
 def log_unhandled_exceptions(logger=LOGGER, message="Unhandled exception occurred.", exception=Exception,
-                             force=False, require_http=True):
-    # type: (LoggerType, AnyStr, Type[Exception], bool, bool) -> Callable
+                             force=False, require_http=True, is_request=True):
+    # type: (LoggerType, AnyStr, Type[Exception], bool, bool, bool) -> Callable
     """
     Decorator that will raise ``exception`` with specified ``message`` if an exception is caught while execution the
     wrapped function, after logging relevant details about the caught exception with ``logger``.
@@ -208,6 +209,7 @@ def log_unhandled_exceptions(logger=LOGGER, message="Unhandled exception occurre
     :param require_http:
         consider non HTTP-like exceptions as *unknown* and raise one instead
         (default: ``True`` and raises :class:`HTTPInternalServerError`, unless ``exception`` is HTTP-like).
+    :param is_request: specifies if the decorator is applied onto a registered request function to handle its inputs.
     :raises exception: if an *unknown* exception was caught (or forced) during the decorated function's execution.
     :raises Exception: original exception if it is *known*.
     """
@@ -226,6 +228,10 @@ def log_unhandled_exceptions(logger=LOGGER, message="Unhandled exception occurre
         @wraps(function)
         def call(*args, **kwargs):
             try:
+                # handle input arguments that are extended by various pyramid operations
+                if is_request:
+                    while len(args) and not isinstance(args[0], Request):
+                        args = args[1:]
                 return function(*args, **kwargs)
             except Exception as exc:
                 # if exception was already handled by this wrapper from a previously wrapped function,

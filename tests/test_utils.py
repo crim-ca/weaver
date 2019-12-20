@@ -77,7 +77,6 @@ def test_path_elements():
 
 
 def test_lxml_strip_ns():
-    import lxml.etree
     wps_xml = """
 <wps100:Execute
 xmlns:wps100="http://www.opengis.net/wps/1.0.0"
@@ -86,37 +85,10 @@ service="WPS"
 version="1.0.0"
 xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/wps/1.0.0/wpsExecute_request.xsd"/>"""
 
-    doc = lxml.etree.fromstring(wps_xml)
+    doc = etree.fromstring(wps_xml)
     assert doc.tag == "{http://www.opengis.net/wps/1.0.0}Execute"
     utils.lxml_strip_ns(doc)
     assert doc.tag == "Execute"
-
-
-def test_replace_caps_url_wps():
-    doc = etree.parse(WPS_CAPS_EMU_XML)
-    xml = etree.tostring(doc)
-    assert "http://localhost:8094/wps" in xml
-    xml = utils.replace_caps_url(xml, "https://localhost/ows/proxy/emu")
-    assert "http://localhost:8094/wps" not in xml
-    assert "https://localhost/ows/proxy/emu" in xml
-
-
-def test_replace_caps_url_wms_111():
-    doc = etree.parse(WMS_CAPS_NCWMS2_111_XML)
-    xml = etree.tostring(doc)
-    assert "http://localhost:8080/ncWMS2/wms" in xml
-    xml = utils.replace_caps_url(xml, "https://localhost/ows/proxy/wms")
-    # assert "http://localhost:8080/ncWMS2/wms" not in xml
-    assert "https://localhost/ows/proxy/wms" in xml
-
-
-def test_replace_caps_url_wms_130():
-    doc = etree.parse(WMS_CAPS_NCWMS2_130_XML)
-    xml = etree.tostring(doc)
-    assert "http://localhost:8080/ncWMS2/wms" in xml
-    xml = utils.replace_caps_url(xml, "https://localhost/ows/proxy/wms")
-    # assert "http://localhost:8080/ncWMS2/wms" not in xml
-    assert "https://localhost/ows/proxy/wms" in xml
 
 
 class MockRequest(object):
@@ -130,8 +102,7 @@ class MockRequest(object):
 
 def test_parse_request_query_basic():
     req = MockRequest("http://localhost:5000/ows/wps?service=wps&request=GetCapabilities&version=1.0.0")
-    # noinspection PyTypeChecker
-    queries = utils.parse_request_query(req)
+    queries = utils.parse_request_query(req)    # noqa
     assert "service" in queries
     assert isinstance(queries["service"], dict)
     assert queries["service"][0] == "wps"

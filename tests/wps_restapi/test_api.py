@@ -1,14 +1,5 @@
 from weaver.formats import CONTENT_TYPE_APP_JSON
-from weaver.wps_restapi.swagger_definitions import (
-    api_frontpage_uri,
-    api_versions_uri,
-    api_swagger_ui_uri,
-    api_swagger_json_uri,
-    api_swagger_json_service,
-    API_TITLE,
-    FrontpageSchema,
-    VersionsSchema,
-)
+from weaver.wps_restapi import swagger_definitions as sd
 from tests.utils import get_test_weaver_app, get_test_weaver_config, get_settings_from_testapp
 from pyramid.httpexceptions import HTTPFound, HTTPUnauthorized, HTTPForbidden
 import colander
@@ -25,27 +16,35 @@ class GenericApiRoutesTestCase(unittest.TestCase):
         cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
 
     def test_frontpage_format(self):
-        resp = self.testapp.get(api_frontpage_uri, headers=self.json_headers)
+        resp = self.testapp.get(sd.api_frontpage_uri, headers=self.json_headers)
         assert 200 == resp.status_code
         try:
-            FrontpageSchema().deserialize(resp.json)
+            sd.FrontpageSchema().deserialize(resp.json)
         except colander.Invalid as ex:
             self.fail("expected valid response format as defined in schema [{!s}]".format(ex))
 
     def test_version_format(self):
-        resp = self.testapp.get(api_versions_uri, headers=self.json_headers)
+        resp = self.testapp.get(sd.api_versions_uri, headers=self.json_headers)
         assert 200 == resp.status_code
         try:
-            VersionsSchema().deserialize(resp.json)
+            sd.VersionsSchema().deserialize(resp.json)
+        except colander.Invalid as ex:
+            self.fail("expected valid response format as defined in schema [{!s}]".format(ex))
+            
+    def test_conformance_format(self):
+        resp = self.testapp.get(sd.api_conformance_uri, headers=self.json_headers)
+        assert 200 == resp.status_code
+        try:
+            sd.ConformanceSchema().deserialize(resp.json)
         except colander.Invalid as ex:
             self.fail("expected valid response format as defined in schema [{!s}]".format(ex))
 
     def test_swagger_api_format(self):
-        resp = self.testapp.get(api_swagger_ui_uri)
+        resp = self.testapp.get(sd.api_swagger_ui_uri)
         assert 200 == resp.status_code
-        assert "<title>{}</title>".format(API_TITLE) in resp.text
+        assert "<title>{}</title>".format(sd.API_TITLE) in resp.text
 
-        resp = self.testapp.get(api_swagger_json_uri, headers=self.json_headers)
+        resp = self.testapp.get(sd.api_swagger_json_uri, headers=self.json_headers)
         assert 200 == resp.status_code
         assert "tags" in resp.json
         assert "info" in resp.json
@@ -57,10 +56,10 @@ class GenericApiRoutesTestCase(unittest.TestCase):
     def test_status_unauthorized_and_forbidden(self):
         # methods should return corresponding status codes, shouldn't be the default '403' on both cases
         with mock.patch("weaver.utils.get_weaver_url", side_effect=HTTPUnauthorized):
-            resp = self.testapp.get(api_frontpage_uri, headers=self.json_headers, expect_errors=True)
+            resp = self.testapp.get(sd.api_frontpage_uri, headers=self.json_headers, expect_errors=True)
             assert 401 == resp.status_code
         with mock.patch("weaver.utils.get_weaver_url", side_effect=HTTPForbidden):
-            resp = self.testapp.get(api_frontpage_uri, headers=self.json_headers, expect_errors=True)
+            resp = self.testapp.get(sd.api_frontpage_uri, headers=self.json_headers, expect_errors=True)
             assert 403 == resp.status_code
 
     def test_status_not_found_and_method_not_allowed(self):
@@ -68,21 +67,20 @@ class GenericApiRoutesTestCase(unittest.TestCase):
         assert 404 == resp.status_code
 
         # test an existing route with wrong method, shouldn't be the default '404' on both cases
-        resp = self.testapp.post(api_frontpage_uri, headers=self.json_headers, expect_errors=True)
+        resp = self.testapp.post(sd.api_frontpage_uri, headers=self.json_headers, expect_errors=True)
         assert 405 == resp.status_code
 
 
 class RebasedApiRoutesTestCase(unittest.TestCase):
-
     @staticmethod
     def redirect_api_view(request):  # noqa: F811
-        return HTTPFound(location=api_swagger_json_service.path)
+        return HTTPFound(location=sd.api_swagger_json_service.path)
 
     @classmethod
     def setUpClass(cls):
         # derived path for testing simulated server proxy pass
         cls.api_base_path = "/weaver/rest"
-        cls.api_base_name = api_swagger_json_service.name + "_rebased"
+        cls.api_base_name = sd.api_swagger_json_service.name + "_rebased"
 
         # create redirect view to simulate the server proxy pass
         config = get_test_weaver_config(settings=None)
@@ -108,18 +106,18 @@ class RebasedApiRoutesTestCase(unittest.TestCase):
             assert resp.json["basePath"] == self.api_base_path
 
             # validate that swagger UI still renders and has valid URL
-            resp = self.testapp.get(api_swagger_ui_uri)
+            resp = self.testapp.get(sd.api_swagger_ui_uri)
             assert 200 == resp.status_code
-            assert "<title>{}</title>".format(API_TITLE) in resp.text
+            assert "<title>{}</title>".format(sd.API_TITLE) in resp.text
 
     def test_swagger_api_request_base_path_original(self):
         """
         Validates that Swagger JSON properly uses the original host/path to test live requests on Swagger UI
         when the app's URI results direct route access.
         """
-        resp = self.testapp.get(api_swagger_ui_uri)
+        resp = self.testapp.get(sd.api_swagger_ui_uri)
         assert 200 == resp.status_code
-        assert "<title>{}</title>".format(API_TITLE) in resp.text
+        assert "<title>{}</title>".format(sd.API_TITLE) in resp.text
 
         # ensure that environment that would define the weaver location is not defined for local app
         with mock.patch.dict("os.environ"):
@@ -128,9 +126,9 @@ class RebasedApiRoutesTestCase(unittest.TestCase):
             resp = resp.follow()
             assert 200 == resp.status_code
             assert self.api_base_path not in resp.json["host"]
-            assert resp.json["basePath"] == api_frontpage_uri
+            assert resp.json["basePath"] == sd.api_frontpage_uri
 
             # validate that swagger UI still renders and has valid URL
-            resp = self.testapp.get(api_swagger_ui_uri)
+            resp = self.testapp.get(sd.api_swagger_ui_uri)
             assert 200 == resp.status_code
-            assert "<title>{}</title>".format(API_TITLE) in resp.text
+            assert "<title>{}</title>".format(sd.API_TITLE) in resp.text

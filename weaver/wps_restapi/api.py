@@ -3,7 +3,7 @@ from weaver.utils import get_settings, get_header
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.colander_extras import CustomTypeConversionDispatcher
 from weaver.wps_restapi.utils import get_wps_restapi_base_url, wps_restapi_base_path, OUTPUT_FORMAT_JSON
-from weaver.formats import CONTENT_TYPE_APP_JSON
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN
 from weaver.owsexceptions import OWSException
 from six.moves.urllib.parse import urlparse
 from cornice_swagger import CorniceSwagger
@@ -50,10 +50,34 @@ def api_frontpage(request):
 
     weaver_api = asbool(settings.get("weaver.wps_restapi"))
     weaver_api_url = get_wps_restapi_base_url(settings) if weaver_api else None
-    weaver_api_doc = weaver_api_url + sd.api_swagger_ui_uri if weaver_api else None
+    weaver_api_def = weaver_api_url + sd.api_swagger_ui_uri if weaver_api else None
+    weaver_api_doc = settings.get("weaver.wps_restapi_doc", None) if weaver_api else None
     weaver_api_ref = settings.get("weaver.wps_restapi_ref", None) if weaver_api else None
     weaver_wps = asbool(settings.get("weaver.wps"))
     weaver_wps_url = weaver_url + get_wps_path(settings) if weaver_wps else None
+    weaver_conform_url = weaver_url + sd.api_conformance_uri
+    weaver_process_url = weaver_url + sd.processes_uri
+    weaver_links = [
+        {"href": weaver_url, "rel": "self", "type": CONTENT_TYPE_APP_JSON, "title": "This document"},
+        {"href": weaver_conform_url, "rel": "conformance", "type": CONTENT_TYPE_APP_JSON,
+         "title": "WPS 2.0/3.0 REST-JSON Binding Extension conformance classes implemented by this service."},
+    ]
+    if weaver_api_def:
+        weaver_links.append({"href": weaver_api_def, "rel": "service", "type": CONTENT_TYPE_APP_JSON,
+                             "title": "API definition of this service."})
+    if isinstance(weaver_api_doc, six.string_types):
+        if "." in weaver_api_doc:
+            ext_type = weaver_api_doc.split(".")[-1]
+            doc_type = "application/{}".format(ext_type)
+        else:
+            doc_type = CONTENT_TYPE_TEXT_PLAIN  # default most basic type
+        weaver_links.append({"href": weaver_api_doc, "rel": "documentation", "type": doc_type,
+                             "title": "API documentation about this service."})
+    if weaver_api_ref:
+        weaver_links.append({"href": weaver_api_ref, "rel": "reference", "type": CONTENT_TYPE_APP_JSON,
+                             "title": "API reference specification of this service."})
+    weaver_links.append({"href": weaver_process_url, "rel": "processes", "type": CONTENT_TYPE_APP_JSON,
+                         "title": "Processes offered by this service."})
 
     return {
         "message": "Weaver Information",
@@ -62,21 +86,40 @@ def api_frontpage(request):
             {"name": "api", "enabled": weaver_api,
              "url": weaver_api_url,
              "doc": weaver_api_doc,
+             "api": weaver_api_def,
              "ref": weaver_api_ref},
             {"name": "wps", "enabled": weaver_wps,
              "url": weaver_wps_url},
-        ]
+        ],
+        "links": weaver_links,
     }
 
 
-# noinspection PyUnusedLocal
 @sd.api_versions_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
                              schema=sd.VersionsEndpoint(), response_schemas=sd.get_api_versions_responses)
-def api_versions(request):
+def api_versions(request):  # noqa: F811
     # type: (Request) -> HTTPException
-    """weaver versions information."""
-    weaver_info = {'name': 'weaver', 'version': weaver_version, "type": "api"}
-    return HTTPOk(json={'versions': [weaver_info]})
+    """Weaver versions information."""
+    weaver_info = {"name": "weaver", "version": weaver_version, "type": "api"}
+    return HTTPOk(json={"versions": [weaver_info]})
+
+
+@sd.api_conformance_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
+                                schema=sd.ConformanceEndpoint(), response_schemas=sd.get_api_conformance_responses)
+def api_conformance(request):  # noqa: F811
+    # type: (Request) -> HTTPException
+    """Weaver specification conformance information."""
+    # TODO: follow updates with https://github.com/geopython/pygeoapi/issues/198
+    conformance = {"conformsTo": [
+        "http://www.opengis.net/spec/wfs-1/3.0/req/core",
+        "http://www.opengis.net/spec/wfs-1/3.0/req/oas30",
+        # "http://www.opengis.net/spec/wfs-1/3.0/req/html",
+        "http://www.opengis.net/spec/wfs-1/3.0/req/geojson",
+        "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/core",
+        "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/oas30",
+        # "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/html"
+    ]}
+    return HTTPOk(json=conformance)
 
 
 @sd.api_swagger_json_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,

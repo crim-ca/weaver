@@ -19,6 +19,8 @@ New Features:
 - Add support of ``label`` synonym as ``title`` for inputs and process description
   (`CWL` specifying a ``label`` will set it in `WPS` process) (#31)
 - Add support of input ``minOccurs`` and ``maxOccurs`` as ``int`` while maintaining ``str`` support (#14).
+- Add conformance route with implementation links (#53).
+- Add additional landing page link details (#54).
 
 Changes:
 -------------
@@ -30,6 +32,7 @@ Changes:
 - Use the same exception log decorator to simplify function definitions when HTTP exceptions are already handled.
 - Make ``null`` reference a singleton so that multiple instantiation calls all refer to the same instance and produce
   the expected behaviour of ``<x> is null`` instead of hard-to-identify errors because of english syntax.
+- Remove unused function ``weaver.utils.replace_caps_url`` and corresponding tests.
 
 Fixes:
 -------------

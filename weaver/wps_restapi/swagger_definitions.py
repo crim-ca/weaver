@@ -41,6 +41,7 @@ api_frontpage_uri = "/"
 api_swagger_ui_uri = "/api"
 api_swagger_json_uri = "/json"
 api_versions_uri = "/versions"
+api_conformance_uri = "/conformance"
 
 processes_uri = "/processes"
 process_uri = "/processes/{process_id}"
@@ -112,6 +113,7 @@ api_frontpage_service = Service(name="api_frontpage", path=api_frontpage_uri)
 api_swagger_ui_service = Service(name="api_swagger_ui", path=api_swagger_ui_uri)
 api_swagger_json_service = Service(name="api_swagger_json", path=api_swagger_json_uri)
 api_versions_service = Service(name="api_versions", path=api_versions_uri)
+api_conformance_service = Service(name="api_conformance", path=api_conformance_uri)
 
 processes_service = Service(name="processes", path=processes_uri)
 process_service = Service(name="process", path=process_uri)
@@ -528,6 +530,10 @@ class VersionsEndpoint(MappingSchema):
     header = AcceptHeader()
 
 
+class ConformanceEndpoint(MappingSchema):
+    header = AcceptHeader()
+
+
 class SwaggerJSONEndpoint(MappingSchema):
     header = AcceptHeader()
 
@@ -667,14 +673,6 @@ class JobControlOptionsList(SequenceSchema):
 class ExceptionReportType(MappingSchema):
     code = SchemaNode(String())
     description = SchemaNode(String(), missing=drop)
-
-
-class ConformsToList(SequenceSchema):
-    item = SchemaNode(String())
-
-
-class ReqClasses(MappingSchema):
-    conformsTo = ConformsToList()
 
 
 class ProcessSummary(DescriptionType):
@@ -1003,10 +1001,10 @@ class LogsOutputSchema(MappingSchema):
 
 
 class FrontpageParameterSchema(MappingSchema):
-    name = SchemaNode(String(), example='api')
+    name = SchemaNode(String(), example="api")
     enabled = SchemaNode(Boolean(), example=True)
-    url = SchemaNode(String(), example='https://weaver-host', missing=drop)
-    doc = SchemaNode(String(), example='https://weaver-host/api', missing=drop)
+    url = SchemaNode(String(), example="https://weaver-host", missing=drop)
+    doc = SchemaNode(String(), example="https://weaver-host/api", missing=drop)
 
 
 class FrontpageParameters(SequenceSchema):
@@ -1014,8 +1012,8 @@ class FrontpageParameters(SequenceSchema):
 
 
 class FrontpageSchema(MappingSchema):
-    message = SchemaNode(String(), default='Weaver Information', example='Weaver Information')
-    configuration = SchemaNode(String(), default='default', example='default')
+    message = SchemaNode(String(), default="Weaver Information", example="Weaver Information")
+    configuration = SchemaNode(String(), default="default", example="default")
     parameters = FrontpageParameters()
 
 
@@ -1039,6 +1037,15 @@ class VersionsList(SequenceSchema):
 
 class VersionsSchema(MappingSchema):
     versions = VersionsList()
+
+
+class ConformanceList(SequenceSchema):
+    item = SchemaNode(String(), description="Conformance specification link.",
+                      example="http://www.opengis.net/spec/wfs-1/3.0/req/core")
+
+
+class ConformanceSchema(MappingSchema):
+    conformsTo = ConformanceList()
 
 
 #################################
@@ -1230,24 +1237,29 @@ class UnauthorizedJsonResponseSchema(MappingSchema):
     body = ErrorJsonResponseBodySchema()
 
 
-class OkGetFrontpageSchema(MappingSchema):
+class OkGetFrontpageResponse(MappingSchema):
     header = JsonHeader()
     body = FrontpageSchema()
 
 
-class OkGetSwaggerJSONSchema(MappingSchema):
+class OkGetSwaggerJSONResponse(MappingSchema):
     header = JsonHeader()
     body = SwaggerJSONSpecSchema(description="Swagger JSON of weaver API.")
 
 
-class OkGetSwaggerUISchema(MappingSchema):
+class OkGetSwaggerUIResponse(MappingSchema):
     header = HtmlHeader()
     body = SwaggerUISpecSchema(description="Swagger UI of weaver API.")
 
 
-class OkGetVersionsSchema(MappingSchema):
+class OkGetVersionsResponse(MappingSchema):
     header = JsonHeader()
     body = VersionsSchema()
+
+
+class OkGetConformanceResponse(MappingSchema):
+    header = JsonHeader()
+    body = ConformanceSchema()
 
 
 class OkGetProvidersListResponse(MappingSchema):
@@ -1568,20 +1580,24 @@ class InternalServerErrorGetJobLogsResponse(MappingSchema):
 
 
 get_api_frontpage_responses = {
-    "200": OkGetFrontpageSchema(description="success"),
+    "200": OkGetFrontpageResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_api_swagger_json_responses = {
-    "200": OkGetSwaggerJSONSchema(description="success"),
+    "200": OkGetSwaggerJSONResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_api_swagger_ui_responses = {
-    "200": OkGetSwaggerUISchema(description="success"),
+    "200": OkGetSwaggerUIResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_api_versions_responses = {
-    "200": OkGetVersionsSchema(description="success"),
+    "200": OkGetVersionsResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+}
+get_api_conformance_responses = {
+    "200": OkGetConformanceResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized")
 }
 get_processes_responses = {
     "200": OkGetProcessesListResponse(description="success"),
