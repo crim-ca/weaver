@@ -179,7 +179,7 @@ class OWSNoApplicableCode(OWSException):
 
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPBadRequest
-        super(OWSNoApplicableCode, self).__init__(args, kwargs)
+        super(OWSNoApplicableCode, self).__init__(*args, **kwargs)
         warnings.warn(self.message, UnsupportedOperationWarning)
 
 
@@ -191,7 +191,7 @@ class OWSMissingParameterValue(OWSException):
 
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPBadRequest
-        super(OWSMissingParameterValue, self).__init__(args, kwargs)
+        super(OWSMissingParameterValue, self).__init__(*args, **kwargs)
         warnings.warn(self.message, MissingParameterWarning)
 
 
@@ -203,7 +203,7 @@ class OWSInvalidParameterValue(OWSException):
 
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPNotAcceptable
-        super(OWSInvalidParameterValue, self).__init__(args, kwargs)
+        super(OWSInvalidParameterValue, self).__init__(*args, **kwargs)
         warnings.warn(self.message, UnsupportedOperationWarning)
 
 
@@ -214,5 +214,5 @@ class OWSNotImplemented(OWSException):
 
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPNotImplemented
-        super(OWSNotImplemented, self).__init__(args, kwargs)
+        super(OWSNotImplemented, self).__init__(*args, **kwargs)
         warnings.warn(self.message, UnsupportedOperationWarning)

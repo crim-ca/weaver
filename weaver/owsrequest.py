@@ -8,10 +8,8 @@ The OWSRequest is based on pywps code:
 import lxml.etree
 
 from pyramid.httpexceptions import HTTPBadRequest
-from weaver.owsexceptions import (OWSNoApplicableCode,
-                                  OWSInvalidParameterValue,
-                                  OWSMissingParameterValue)
-from weaver.utils import lxml_strip_ns
+from weaver.owsexceptions import OWSNoApplicableCode, OWSInvalidParameterValue, OWSMissingParameterValue
+from weaver.utils import lxml_strip_ns, str2bytes
 
 import logging
 logger = logging.getLogger(__name__)
@@ -139,10 +137,10 @@ class Post(OWSParser):
         super(Post, self).__init__(request)
 
         try:
-            self.document = lxml.etree.fromstring(self.request.body)
+            self.document = lxml.etree.fromstring(str2bytes(self.request.body))
             lxml_strip_ns(self.document)
         except Exception as e:
-            raise OWSNoApplicableCode(e.message)
+            raise OWSNoApplicableCode(str(e))
 
     def _get_service(self):
         """Check mandatory service name parameter in POST request."""

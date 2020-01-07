@@ -12,7 +12,7 @@ from typing import Type
 import pytest
 
 
-def test_null():
+def test_null_operators():
     if null:
         raise AssertionError("null should not pass if clause")
     n = null.__class__

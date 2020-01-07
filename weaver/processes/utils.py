@@ -40,6 +40,7 @@ from six.moves.urllib.error import URLError
 from typing import TYPE_CHECKING
 import colander
 import logging
+import warnings
 import yaml
 import json
 import six
@@ -330,11 +331,11 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
         - `weaver.wps_processes.yml.example` for additional file format details
     """
     if wps_processes_file_path is None:
-        LOGGER.warning("No file specified for WPS-1 providers registration.", RuntimeWarning)
+        warnings.warn("No file specified for WPS-1 providers registration.", RuntimeWarning)
         wps_processes_file_path = get_weaver_config_file("", WEAVER_DEFAULT_WPS_PROCESSES_CONFIG)
     elif wps_processes_file_path == "":
-        LOGGER.warning("Configuration file for WPS-1 providers registration explicitly defined as empty in settings. "
-                       "Not loading anything.", RuntimeWarning)
+        warnings.warn("Configuration file for WPS-1 providers registration explicitly defined as empty in settings. "
+                      "Not loading anything.", RuntimeWarning)
         return
     try:
         with open(wps_processes_file_path, 'r') as f:

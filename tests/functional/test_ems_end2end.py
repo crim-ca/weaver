@@ -14,7 +14,7 @@ from weaver.status import (
     job_status_values,
     job_status_categories,
 )
-from tests.utils import get_settings_from_config_ini, get_settings_from_testapp, get_setting
+from tests.utils import get_settings_from_config_ini, get_settings_from_testapp, get_setting, xfail, skip
 from six.moves.urllib.parse import urlparse
 from unittest import TestCase
 from pyramid import testing
@@ -48,8 +48,7 @@ class ProcessInfo(object):
 
 @pytest.mark.slow
 @pytest.mark.functional
-@pytest.mark.skipif(not len(str(os.getenv("WEAVER_TEST_SERVER_HOSTNAME", ""))), reason="Test server not defined!")
-@unittest.skipIf(not len(str(os.getenv("WEAVER_TEST_SERVER_HOSTNAME", ""))), reason="Test server not defined!")
+@skip(condition=not len(str(os.getenv("WEAVER_TEST_SERVER_HOSTNAME", ""))), reason="Test server not defined!")
 class End2EndEMSTestCase(TestCase):
     """
     Runs an end-2-end test procedure on weaver configured as EMS located on specified `WEAVER_TEST_SERVER_HOSTNAME`.
@@ -595,7 +594,7 @@ class End2EndEMSTestCase(TestCase):
                              [self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID],
                              log_full_trace=True)
 
-    @pytest.mark.xfail(reason="Interoperability of remote servers not guaranteed.")
+    @xfail(reason="Interoperability of remote servers not guaranteed.")
     @pytest.mark.testbed14
     def test_workflow_end2end_with_auth(self):
         """Full workflow execution procedure with authentication enabled."""
@@ -683,25 +682,25 @@ class End2EndEMSTestCase(TestCase):
                              message="Response process execution job ID must match expected value to validate results.")
             self.validate_test_job_execution(job_location, headers_b, cookies_b)
 
-    @pytest.mark.xfail(reason="Interoperability of remote servers not guaranteed.")
+    @xfail(reason="Interoperability of remote servers not guaranteed.")
     @pytest.mark.testbed14
     def test_workflow_simple_chain(self):
         self.workflow_runner(self.PROCESS_WORKFLOW_SC_ID,
                              [self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID])
 
-    @pytest.mark.xfail(reason="Interoperability of remote servers not guaranteed.")
+    @xfail(reason="Interoperability of remote servers not guaranteed.")
     @pytest.mark.testbed14
     def test_workflow_S2_and_ProbaV(self):
         self.workflow_runner(self.PROCESS_WORKFLOW_S2P_ID,
                              [self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID])
 
-    @pytest.mark.xfail(reason="Interoperability of remote servers not guaranteed.")
+    @xfail(reason="Interoperability of remote servers not guaranteed.")
     @pytest.mark.testbed14
     def test_workflow_custom(self):
         self.workflow_runner(self.PROCESS_WORKFLOW_CUSTOM_ID,
                              [self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID])
 
-    @pytest.mark.xfail(reason="Interoperability of remote servers not guaranteed.")
+    @xfail(reason="Interoperability of remote servers not guaranteed.")
     @pytest.mark.testbed14
     def test_workflow_flood_detection(self):
         self.workflow_runner(self.PROCESS_WORKFLOW_FLOOD_DETECTION_ID,

@@ -25,7 +25,7 @@ def ows_response_tween(request, handler):
         exc_info_err = sys.exc_info()
     except OWSException as err:
         LOGGER.debug("direct ows exception response")
-        LOGGER.exception("Raised exception: [%r]\nReturned exception: %r", err, err)
+        LOGGER.exception("Raised exception: [%r]\nReturned exception: [%r]", err, err)
         raised_error = err
         return_error = err
         exc_info_err = sys.exc_info()
@@ -39,7 +39,7 @@ def ows_response_tween(request, handler):
         raised_error = err
         return_error = OWSException(detail=str(err), status=HTTPInternalServerError)
         exc_info_err = sys.exc_info()
-    LOGGER.error("Raised exception: [%r]\nReturned exception: %r", raised_error, return_error, exc_info=exc_info_err)
+    LOGGER.error("Raised exception: [%r]\nReturned exception: [%r]", raised_error, return_error, exc_info=exc_info_err)
     return return_error
 
 

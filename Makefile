@@ -301,47 +301,53 @@ check: check-all	## alias for 'check-all' target
 check-all: check-pep8 check-lint check-security check-doc8 check-links	## run every code style checks
 
 .PHONY: check-pep8
-check-pep8: mkdir-reports		## run PEP8 code style checks
+check-pep8: mkdir-reports install-dev 	## run PEP8 code style checks
 	@echo "Running pep8 code style checks..."
+	@-rm -fr "$(REPORTS_DIR)/check-pep8.txt"
 	@bash -c '$(CONDA_CMD) \
 		flake8 --config="$(APP_ROOT)/setup.cfg" --output-file="$(REPORTS_DIR)/check-pep8.txt" --tee'
 
 .PHONY: check-lint
-check-lint: mkdir-reports		## run linting code style checks
+check-lint: mkdir-reports install-dev	## run linting code style checks
 	@echo "Running linting code style checks..."
+	@-rm -fr "$(REPORTS_DIR)/check-lint.txt"
 	@bash -c '$(CONDA_CMD) \
 		pylint --rcfile="$(APP_ROOT)/setup.cfg" "$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" --reports y \
 		1> >(tee "$(REPORTS_DIR)/check-lint.txt")'
 
 .PHONY: check-security
-check-security: mkdir-reports	## run security code checks
+check-security: mkdir-reports install-dev	## run security code checks
 	@echo "Running security code checks..."
+	@-rm -fr "$(REPORTS_DIR)/check-security.txt"
 	@bash -c '$(CONDA_CMD) \
 		bandit -v --ini "$(APP_ROOT)/setup.cfg" -r \
 		1> >(tee "$(REPORTS_DIR)/check-security.txt")'
 
 .PHONY: check-doc8
-check-doc8: mkdir-reports	## run doc8 documentation style checks
+check-doc8: mkdir-reports install-dev	## run doc8 documentation style checks
 	@echo "Running doc8 doc style checks..."
+	@-rm -fr "$(REPORTS_DIR)/check-doc8.txt"
 	@bash -c '$(CONDA_CMD) \
 		doc8 "$(APP_ROOT)/docs" \
 		1> >(tee "$(REPORTS_DIR)/check-doc8.txt")'
 
 .PHONY: check-links
-check-links: 		## check all external links in documentation for integrity
+check-links: install-dev	## check all external links in documentation for integrity
 	@echo "Running link checks on docs..."
 	@bash -c '$(CONDA_CMD) (MAKE) -C "$(APP_ROOT)/docs" linkcheck'
 
 .PHONY: check-imports
-check-imports: mkdir-reports	## run imports code checks
+check-imports: mkdir-reports install-dev	## run imports code checks
 	@echo "Running import checks..."
+	@-rm -fr "$(REPORTS_DIR)/check-imports.txt"
 	@bash -c '$(CONDA_CMD) \
 		isort --check-only --diff --recursive $(APP_ROOT) \
 		1> >(tee "$(REPORTS_DIR)/check-imports.txt")'
 
 .PHONY: fix-imports
-fix-imports: mkdir-reports	## apply import code checks corrections
+fix-imports: mkdir-reports install-dev	## apply import code checks corrections
 	@echo "Fixing flagged import checks..."
+	@-rm -fr "$(REPORTS_DIR)/fixed-imports.txt"
 	@bash -c '$(CONDA_CMD) \
 		isort --recursive $(APP_ROOT) \
 		1> >(tee "$(REPORTS_DIR)/fixed-imports.txt")'

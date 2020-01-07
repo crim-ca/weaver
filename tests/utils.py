@@ -19,7 +19,10 @@ from pyramid.response import Response
 from pyramid.config import Configurator
 from webtest import TestApp
 from inspect import isclass
+import functools
 import pyramid_celery
+import pytest
+import unittest
 import warnings
 import mock
 import uuid
@@ -76,6 +79,39 @@ def ignore_deprecated_nested_warnings(func):
         as it can disable the whole test suite.
     """
     return ignore_warning_regex(func, "With-statements now directly support multiple context managers")
+
+
+def skip(condition=None, reason=None):
+    """
+    Decorator that marks a test function to be skipped, supporting both ``pytest`` and ``unittest`` execution.
+    """
+    def wrap(function):
+        @functools.wraps(function)
+        def decorate(test_func):
+            if condition is None:
+                test_func = pytest.mark.skip(reason)(test_func)
+                test_func = unittest.skip(reason)(test_func)
+                return test_func
+            test_func = pytest.mark.skipif(condition, reason)(test_func)
+            test_func = unittest.skipIf(condition, reason)(test_func)
+            return test_func
+        return decorate
+    return wrap
+
+
+def xfail(condition=None, reason=None):
+    """
+    Decorator that marks a test function as an expected failure, supporting both ``pytest`` and ``unittest`` execution.
+    """
+    def wrap(function):
+        @functools.wraps(function)
+        def decorate(test_func):
+            test_func = pytest.mark.xfail(reason)(test_func)
+            if condition is None or condition:
+                test_func = unittest.expectedFailure(test_func)
+            return test_func
+        return decorate
+    return wrap
 
 
 def get_settings_from_config_ini(config_ini_path=None, ini_section_name="app:main"):
