@@ -21,8 +21,6 @@ from tests.utils import (
     get_test_weaver_app,
     mocked_process_job_runner,
     mocked_process_package,
-    xfail,
-    skip,
 )
 from copy import deepcopy
 from contextlib import ExitStack
@@ -340,32 +338,32 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.assert_deployed_wps3(resp.json, expected_process_id)
 
     # FIXME: implement
-    @skip(reason="not implemented")
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_DockerRequirement_href(self):
         raise NotImplementedError
 
     # FIXME: implement
-    @skip(reason="not implemented")
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_DockerRequirement_owsContext(self):
         raise NotImplementedError
 
     # FIXME: implement
-    @skip(reason="not implemented")
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_DockerRequirement_executionUnit(self):
         raise NotImplementedError
 
     # FIXME: implement
-    @skip(reason="not implemented")
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_WPS1Requirement_href(self):
         raise NotImplementedError
 
     # FIXME: implement
-    @skip(reason="not implemented")
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_WPS1Requirement_owsContext(self):
         raise NotImplementedError
 
     # FIXME: implement
-    @skip(reason="not implemented")
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_WPS1Requirement_executionUnit(self):
         raise NotImplementedError
 
@@ -396,7 +394,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, TEST_REMOTE_PROCESS_WPS1_ID)
 
-    @skip(reason="not implemented")
+    @pytest.mark.skip(reason="not implemented")
     @mock_remote_server_requests_wp1
     def test_deploy_process_WPS1_GetCapabilities_href(self):
         """Test process deployment using a WPS-1 GetCapabilities URL specified as process description reference."""
@@ -406,7 +404,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, TEST_REMOTE_PROCESS_WPS1_ID)
 
-    @skip(reason="not implemented")
+    @pytest.mark.skip(reason="not implemented")
     @mock_remote_server_requests_wp1
     def test_deploy_process_WPS1_GetCapabilities_owsContext(self):
         """Test process deployment using a WPS-1 GetCapabilities URL specified through the OwsContext definition."""
@@ -417,7 +415,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         body["processDescription"]["process"].update(ows_context_href(TEST_REMOTE_PROCESS_GETCAP_WPS1_URL))
         self.deploy_process_make_visible_and_fetch_deployed(body, TEST_REMOTE_PROCESS_WPS1_ID)
 
-    @skip(reason="not implemented")
+    @pytest.mark.skip(reason="not implemented")
     @mock_remote_server_requests_wp1
     def test_deploy_process_WPS1_GetCapabilities_executionUnit(self):
         """Test process deployment using a WPS-1 GetCapabilities URL specified through the ExecutionUnit parameter."""
@@ -429,17 +427,17 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.deploy_process_make_visible_and_fetch_deployed(body, TEST_REMOTE_PROCESS_WPS1_ID)
 
     # FIXME: implement
-    @skip(reason="not implemented")
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_WPS3_DescribeProcess_href(self):
         raise NotImplementedError
 
     # FIXME: implement
-    @skip(reason="not implemented")
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_WPS3_DescribeProcess_owsContext(self):
         raise NotImplementedError
 
     # FIXME: implement
-    @skip(reason="not implemented")
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_WPS3_DescribeProcess_executionUnit(self):
         raise NotImplementedError
 
@@ -545,7 +543,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 resp = self.app.post_json(path, params=data_execute, headers=self.json_headers)
                 assert resp.status_code == 201, "Expected job submission without inputs created without error."
 
-    @xfail(reason="Mode '{}' not supported for job execution.".format(EXECUTE_MODE_SYNC))
+    @pytest.mark.xfail(reason="Mode '{}' not supported for job execution.".format(EXECUTE_MODE_SYNC))
     def test_execute_process_mode_sync_not_supported(self):
         execute_data = self.get_process_execute_template(fully_qualified_name(self))
         execute_data["mode"] = EXECUTE_MODE_SYNC
@@ -554,7 +552,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.status_code in 501
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
-    @xfail(reason="Mode '{}' not supported for job execution.".format(EXECUTE_TRANSMISSION_MODE_VALUE))
+    @pytest.mark.xfail(reason="Mode '{}' not supported for job execution.".format(EXECUTE_TRANSMISSION_MODE_VALUE))
     def test_execute_process_transmission_mode_value_not_supported(self):
         execute_data = self.get_process_execute_template(fully_qualified_name(self))
         execute_data["outputs"][0]["transmissionMode"] = EXECUTE_TRANSMISSION_MODE_VALUE

@@ -18,8 +18,8 @@ from tests.utils import (
     setup_config_with_pywps,
     setup_mongodb_processstore,
     mocked_sub_requests,
-    skip,
 )
+from copy import deepcopy
 from tests import resources
 import pytest
 import unittest
@@ -62,7 +62,7 @@ class WpsPackageAppTest(unittest.TestCase):
         for p in [path, "{}/package".format(path)]:
             resp = self.app.get(p, headers=json_headers)
             assert resp.status_code == 200
-            info.append(resp.json)
+            info.append(deepcopy(resp.json))
         return info
 
     def test_cwl_label_as_process_title(self):
@@ -274,7 +274,7 @@ class WpsPackageAppTest(unittest.TestCase):
         ns_json, type_json = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
         ns_text, type_text = get_cwl_file_format(CONTENT_TYPE_TEXT_PLAIN)
         ns_ncdf, type_ncdf = get_cwl_file_format(CONTENT_TYPE_APP_NETCDF)
-        namespaces = dict(list(ns_json.items()) + (ns_text.items()) + list(ns_ncdf.items()))
+        namespaces = dict(list(ns_json.items()) + list(ns_text.items()) + list(ns_ncdf.items()))
         default_file = "https://server.com/file"
         cwl = {
             "cwlVersion": "v1.0",
@@ -624,12 +624,13 @@ class WpsPackageAppTest(unittest.TestCase):
                 {"id": "optional_array_shortcut", "type": "string[]?"},
                 {"id": "optional_array_explicit", "type": ["null", {"type": "array", "items": "string"}]},
                 # types with complementary WPS details might change slightly depending on combinations encountered
-                {"id": "required_literal_min_fixed_from_wps", "type": "string?"},   # string? becomes string
-                {"id": "optional_literal_min_fixed_from_wps", "type": "string"},    # string becomes string?
-                {"id": "required_array_min_fixed_from_wps", "type": "string"},      # string becomes string[]
-                {"id": "optional_array_min_fixed_from_wps", "type": "string?"},     # string? becomes string[]?
-                {"id": "required_array_max_fixed_from_wps", "type": "string"},      # string becomes string[]
-                {"id": "optional_array_max_fixed_from_wps", "type": "string?"},     # string? becomes string[]?
+                {"id": "required_literal_min_fixed_by_wps", "type": "string?"},         # string? => string    (min=1)
+                {"id": "optional_literal_min_fixed_by_wps", "type": "string"},          # string  => string?   (min=0)
+                {"id": "required_array_min_fixed_by_wps", "type": "string"},            # string  => string[]  (min>1)
+                {"id": "required_array_min_optional_fixed_by_wps", "type": "string?"},  # string? => string[]  (min>1)
+                {"id": "required_array_max_fixed_by_wps", "type": "string"},            # string  => string[]  (max>1)
+                {"id": "optional_array_max_fixed_by_wps", "type": "string?"},           # string? => string[]? (max>1)
+                {"id": "optional_array_min_max_fixed_by_wps", "type": "string"},        # string  => string[]? (0..>1)
             ],
             "outputs": {
                 "values": {"type": "float"}
@@ -642,12 +643,13 @@ class WpsPackageAppTest(unittest.TestCase):
                     "title": "some title",
                     "abstract": "this is a test",
                     "inputs": [
-                        {"id": "required_literal_min_fixed_from_wps", "minOccurs": "1"},
-                        {"id": "optional_literal_min_fixed_from_wps", "minOccurs": "0"},
-                        {"id": "required_array_min_fixed_from_wps", "minOccurs": "2"},
-                        {"id": "optional_array_min_fixed_from_wps", "minOccurs": "2"},
-                        {"id": "required_array_max_fixed_from_wps", "maxOccurs": "10"},
-                        {"id": "optional_array_max_fixed_from_wps", "minOccurs": "0", "maxOccurs": "10"},
+                        {"id": "required_literal_min_fixed_by_wps", "minOccurs": "1"},
+                        {"id": "optional_literal_min_fixed_by_wps", "minOccurs": "0"},
+                        {"id": "required_array_min_fixed_by_wps", "minOccurs": "2"},
+                        {"id": "required_array_min_optional_fixed_by_wps", "minOccurs": "2"},
+                        {"id": "required_array_max_fixed_by_wps", "maxOccurs": "10"},
+                        {"id": "optional_array_max_fixed_by_wps", "minOccurs": "0", "maxOccurs": "10"},
+                        {"id": "optional_array_min_max_fixed_by_wps", "minOccurs": "0", "maxOccurs": "10"},
                     ]
                 }
             },
@@ -680,26 +682,26 @@ class WpsPackageAppTest(unittest.TestCase):
         assert desc["process"]["inputs"][7]["id"] == "optional_array_explicit"
         assert desc["process"]["inputs"][7]["minOccurs"] == "0"
         assert desc["process"]["inputs"][7]["maxOccurs"] == "unbounded"
-        assert desc["process"]["inputs"][8]["id"] == "required_literal_min_fixed_from_wps"
+        assert desc["process"]["inputs"][8]["id"] == "required_literal_min_fixed_by_wps"
         assert desc["process"]["inputs"][8]["minOccurs"] == "1"
         assert desc["process"]["inputs"][8]["maxOccurs"] == "1"
-        assert desc["process"]["inputs"][9]["id"] == "optional_literal_min_fixed_from_wps"
+        assert desc["process"]["inputs"][9]["id"] == "optional_literal_min_fixed_by_wps"
         assert desc["process"]["inputs"][9]["minOccurs"] == "0"
         assert desc["process"]["inputs"][9]["maxOccurs"] == "1"
-        assert desc["process"]["inputs"][10]["id"] == "required_array_min_fixed_from_wps"
+        assert desc["process"]["inputs"][10]["id"] == "required_array_min_fixed_by_wps"
         # FIXME: https://github.com/crim-ca/weaver/issues/50
         #   `maxOccurs=1` not updated to `maxOccurs="unbounded"` as it is evaluated as a single value,
         #   but it should be considered an array since `minOccurs>1`
         #   (see: https://github.com/crim-ca/weaver/issues/17)
         assert desc["process"]["inputs"][10]["minOccurs"] == "2"
         # assert desc["process"]["inputs"][10]["maxOccurs"] == "unbounded"
-        assert desc["process"]["inputs"][11]["id"] == "optional_array_min_fixed_from_wps"
+        assert desc["process"]["inputs"][11]["id"] == "required_array_min_optional_fixed_by_wps"
         assert desc["process"]["inputs"][11]["minOccurs"] == "2"
         # assert desc["process"]["inputs"][11]["maxOccurs"] == "unbounded"
-        assert desc["process"]["inputs"][12]["id"] == "required_array_max_fixed_from_wps"
+        assert desc["process"]["inputs"][12]["id"] == "required_array_max_fixed_by_wps"
         assert desc["process"]["inputs"][12]["minOccurs"] == "1"
         assert desc["process"]["inputs"][12]["maxOccurs"] == "10"
-        assert desc["process"]["inputs"][13]["id"] == "optional_array_max_fixed_from_wps"
+        assert desc["process"]["inputs"][13]["id"] == "optional_array_max_fixed_by_wps"
         assert desc["process"]["inputs"][13]["minOccurs"] == "0"
         assert desc["process"]["inputs"][13]["maxOccurs"] == "10"
 
@@ -729,17 +731,17 @@ class WpsPackageAppTest(unittest.TestCase):
         #   definition in order to preserve the same logic. CWL types should be overridden by complementary details.
         #   - https://github.com/crim-ca/weaver/issues/17
         #   - https://github.com/crim-ca/weaver/issues/50
-        assert pkg["inputs"][8]["id"] == "required_literal_min_fixed_from_wps"
+        assert pkg["inputs"][8]["id"] == "required_literal_min_fixed_by_wps"
         # assert pkg["inputs"][8]["type"] == "string"
-        assert pkg["inputs"][9]["id"] == "optional_literal_min_fixed_from_wps"
+        assert pkg["inputs"][9]["id"] == "optional_literal_min_fixed_by_wps"
         # assert pkg["inputs"][9]["type"] == "string?"
-        assert pkg["inputs"][10]["id"] == "required_array_min_fixed_from_wps"
+        assert pkg["inputs"][10]["id"] == "required_array_min_fixed_by_wps"
         # assert pkg["inputs"][10]["type"] == "string[]"
-        assert pkg["inputs"][11]["id"] == "optional_array_min_fixed_from_wps"
+        assert pkg["inputs"][11]["id"] == "required_array_min_optional_fixed_by_wps"
         # assert pkg["inputs"][11]["type"] == "string[]?"
-        assert pkg["inputs"][12]["id"] == "required_array_max_fixed_from_wps"
+        assert pkg["inputs"][12]["id"] == "required_array_max_fixed_by_wps"
         # assert pkg["inputs"][12]["type"] == "string[]"
-        assert pkg["inputs"][13]["id"] == "optional_array_max_fixed_from_wps"
+        assert pkg["inputs"][13]["id"] == "optional_array_max_fixed_by_wps"
         # assert pkg["inputs"][13]["type"] == "string[]?"
 
     # FIXME: https://github.com/crim-ca/weaver/issues/50
@@ -796,7 +798,11 @@ class WpsPackageAppTest(unittest.TestCase):
         for i, process_input in enumerate(inputs):
             assert desc["process"]["inputs"][i]["id"] == process_input["id"]
             for field in ["minOccurs", "maxOccurs"]:
-                assert desc["process"]["inputs"][i][field] in (process_input[field], str(process_input[field]))
+                proc_in_res = desc["process"]["inputs"][i][field]
+                proc_in_exp = process_input[field]
+                assert proc_in_res in (proc_in_exp, str(proc_in_exp)), \
+                    "Field '{}' of input '{}'({}) is expected to be '{}' but was '{}'" \
+                    .format(field, process_input, i, proc_in_exp, proc_in_res)
 
     # FIXME: test not working
     #   same payloads sent directly to running weaver properly raise invalid schema -> bad request error
@@ -1033,7 +1039,7 @@ class WpsPackageAppTest(unittest.TestCase):
     def test_literal_and_complex_io_from_wps_xml_reference(self):
         body = {
             "processDescription": {"process": {"id": self._testMethodName}},
-            "executionUnit": [{"href": "mock://{}".format(resources.WMS_LITERAL_COMPLEX_IO)}],
+            "executionUnit": [{"href": "mock://{}".format(resources.WPS_LITERAL_COMPLEX_IO)}],
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication"
         }
         desc, pkg = self.deploy_process(body)
@@ -1187,6 +1193,6 @@ class WpsPackageAppTest(unittest.TestCase):
     #   need to find a existing WPS with some, or manually write XML
     #   multi-output (with same ID) would be an indirect 1-output with ref to multi (Metalink file)
     #   (https://github.com/crim-ca/weaver/issues/25)
-    @skip(reason="not implemented")
+    @pytest.mark.skip(reason="not implemented")
     def test_multi_outputs_file_from_wps_xml_reference(self):
         raise NotImplementedError

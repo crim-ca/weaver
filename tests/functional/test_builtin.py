@@ -88,7 +88,6 @@ class BuiltinAppTest(unittest.TestCase):
                 "inputs": [{"id": "input", "href": os.path.join(dirname, jf.name)}],
                 "outputs": [{"id": "output", "transmissionMode": "reference"}],
             }
-            # noinspection PyDeprecation
             with ExitStack() as stack:
                 for process in mocked_execute_process():
                     stack.enter_context(process)

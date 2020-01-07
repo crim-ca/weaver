@@ -12,11 +12,12 @@ from weaver.wps_restapi.processes.processes import execute_process
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 from six.moves.configparser import ConfigParser
 from typing import TYPE_CHECKING
+from contextlib import ExitStack
 from pyramid import testing
 from pyramid.httpexceptions import HTTPNotFound, HTTPUnprocessableEntity, HTTPException
 from pyramid.registry import Registry
-from pyramid.response import Response
 from pyramid.config import Configurator
+from requests import Response
 from webtest import TestApp
 from inspect import isclass
 import functools
@@ -79,39 +80,6 @@ def ignore_deprecated_nested_warnings(func):
         as it can disable the whole test suite.
     """
     return ignore_warning_regex(func, "With-statements now directly support multiple context managers")
-
-
-def skip(condition=None, reason=None):
-    """
-    Decorator that marks a test function to be skipped, supporting both ``pytest`` and ``unittest`` execution.
-    """
-    def wrap(function):
-        @functools.wraps(function)
-        def decorate(test_func):
-            if condition is None:
-                test_func = pytest.mark.skip(reason)(test_func)
-                test_func = unittest.skip(reason)(test_func)
-                return test_func
-            test_func = pytest.mark.skipif(condition, reason)(test_func)
-            test_func = unittest.skipIf(condition, reason)(test_func)
-            return test_func
-        return decorate
-    return wrap
-
-
-def xfail(condition=None, reason=None):
-    """
-    Decorator that marks a test function as an expected failure, supporting both ``pytest`` and ``unittest`` execution.
-    """
-    def wrap(function):
-        @functools.wraps(function)
-        def decorate(test_func):
-            test_func = pytest.mark.xfail(reason)(test_func)
-            if condition is None or condition:
-                test_func = unittest.expectedFailure(test_func)
-            return test_func
-        return decorate
-    return wrap
 
 
 def get_settings_from_config_ini(config_ini_path=None, ini_section_name="app:main"):
@@ -286,22 +254,20 @@ def mocked_sub_requests(app, function="get", *args, **kwargs):
     Generates a `fake` response from a file if the URL scheme is ``mock://``.
     """
 
-    # noinspection PyUnusedLocal
-    def mocked_raise_for_status(self, *_args, **_kwargs):
+    def mocked_raise_for_status(self, *_args, **_kwargs):  # noqa: E811
         if self.status_code >= 400:
             err = HTTPException()
             err.code = self.status_code
             err.title = "Mocked HTTPException"
             raise err
 
-    # noinspection PyUnusedLocal
-    def mocked_request(method, url=None, headers=None, verify=None, cert=None, **req_kwargs):
+    def mocked_request(method, url=None, headers=None, verify=None, cert=None, **req_kwargs):  # noqa: E811
         """
         Request corresponding to :function:`requests.request` that instead gets executed by :class:`webTest.TestApp`.
         """
         method = method.lower()
         req = getattr(app, method)
-        url = req_kwargs.get('base_url', url)
+        url = req_kwargs.get("base_url", url)
         qs = req_kwargs.get("params")
         if qs:
             url = url + "?" + qs
@@ -318,14 +284,15 @@ def mocked_sub_requests(app, function="get", *args, **kwargs):
             if not typ:
                 return HTTPUnprocessableEntity("Unknown Content-Type for mock file: [{}]".format(url))
             resp.status_code = 200
-            resp.content_type = typ
-            resp.content = open(path, 'r').read()
+            resp.headers["Content-Type"] = typ
+            setattr(resp, "content_type", typ)
+            resp._content = open(path, "rb").read()  # noqa: W0212
             resp.url = url
         return resp
 
-    # noinspection PyDeprecation
-    with mock.patch("requests.request", side_effect=mocked_request), \
-         mock.patch("requests.sessions.Session.request", side_effect=mocked_request):   # noqa
+    with ExitStack() as stack:
+        stack.enter_context(mock.patch("requests.request", side_effect=mocked_request))
+        stack.enter_context(mock.patch("requests.sessions.Session.request", side_effect=mocked_request))
         request_func = getattr(app, function)
         return request_func(*args, **kwargs)
 

@@ -1,4 +1,5 @@
 from weaver.datatype import Process
+from copy import deepcopy
 
 
 def test_package_encode_decode():
@@ -17,7 +18,7 @@ def test_package_encode_decode():
 
     process = Process(id="test-package-encode-decode",  # required param
                       processEndpointWPS1="blah",       # required param
-                      package=package)                  # gets encoded
+                      package=deepcopy(package))        # gets encoded
 
     def _replace_specials(value):
         for old, new in Process._character_codes:

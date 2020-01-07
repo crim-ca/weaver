@@ -14,7 +14,7 @@ from weaver.status import (
     job_status_values,
     job_status_categories,
 )
-from tests.utils import get_settings_from_config_ini, get_settings_from_testapp, get_setting, xfail, skip
+from tests.utils import get_settings_from_config_ini, get_settings_from_testapp, get_setting
 from six.moves.urllib.parse import urlparse
 from unittest import TestCase
 from pyramid import testing
@@ -24,7 +24,6 @@ from pyramid.httpexceptions import HTTPOk, HTTPCreated, HTTPUnauthorized, HTTPNo
 from webtest import TestApp as WebTestApp
 from typing import TYPE_CHECKING
 from copy import deepcopy
-import unittest
 import pytest
 import mock
 import requests
@@ -48,7 +47,7 @@ class ProcessInfo(object):
 
 @pytest.mark.slow
 @pytest.mark.functional
-@skip(condition=not len(str(os.getenv("WEAVER_TEST_SERVER_HOSTNAME", ""))), reason="Test server not defined!")
+@pytest.mark.skip(condition=not len(str(os.getenv("WEAVER_TEST_SERVER_HOSTNAME", ""))), reason="Test server not defined!")
 class End2EndEMSTestCase(TestCase):
     """
     Runs an end-2-end test procedure on weaver configured as EMS located on specified `WEAVER_TEST_SERVER_HOSTNAME`.
@@ -126,7 +125,7 @@ class End2EndEMSTestCase(TestCase):
                 .format(cls.logger_separator_cases, cls.current_case_name(), now(), cls.logger_separator_cases))
 
         # test execution configs
-        cls.WEAVER_TEST_REQUEST_TIMEOUT = int(os.getenv("WEAVER_TEST_JOB_ACCEPTED_MAX_TIMEOUT", 60))
+        cls.WEAVER_TEST_REQUEST_TIMEOUT = int(os.getenv("WEAVER_TEST_REQUEST_TIMEOUT", 10))
         cls.WEAVER_TEST_JOB_ACCEPTED_MAX_TIMEOUT = int(os.getenv("WEAVER_TEST_JOB_ACCEPTED_MAX_TIMEOUT", 30))
         cls.WEAVER_TEST_JOB_RUNNING_MAX_TIMEOUT = int(os.getenv("WEAVER_TEST_JOB_RUNNING_MAX_TIMEOUT", 6000))
         cls.WEAVER_TEST_JOB_GET_STATUS_INTERVAL = int(os.getenv("WEAVER_TEST_JOB_GET_STATUS_INTERVAL", 5))
@@ -594,7 +593,7 @@ class End2EndEMSTestCase(TestCase):
                              [self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID],
                              log_full_trace=True)
 
-    @xfail(reason="Interoperability of remote servers not guaranteed.")
+    @pytest.mark.xfail(reason="Interoperability of remote servers not guaranteed.")
     @pytest.mark.testbed14
     def test_workflow_end2end_with_auth(self):
         """Full workflow execution procedure with authentication enabled."""
@@ -682,25 +681,25 @@ class End2EndEMSTestCase(TestCase):
                              message="Response process execution job ID must match expected value to validate results.")
             self.validate_test_job_execution(job_location, headers_b, cookies_b)
 
-    @xfail(reason="Interoperability of remote servers not guaranteed.")
+    @pytest.mark.xfail(reason="Interoperability of remote servers not guaranteed.")
     @pytest.mark.testbed14
     def test_workflow_simple_chain(self):
         self.workflow_runner(self.PROCESS_WORKFLOW_SC_ID,
                              [self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID])
 
-    @xfail(reason="Interoperability of remote servers not guaranteed.")
+    @pytest.mark.xfail(reason="Interoperability of remote servers not guaranteed.")
     @pytest.mark.testbed14
     def test_workflow_S2_and_ProbaV(self):
         self.workflow_runner(self.PROCESS_WORKFLOW_S2P_ID,
                              [self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID])
 
-    @xfail(reason="Interoperability of remote servers not guaranteed.")
+    @pytest.mark.xfail(reason="Interoperability of remote servers not guaranteed.")
     @pytest.mark.testbed14
     def test_workflow_custom(self):
         self.workflow_runner(self.PROCESS_WORKFLOW_CUSTOM_ID,
                              [self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID])
 
-    @xfail(reason="Interoperability of remote servers not guaranteed.")
+    @pytest.mark.xfail(reason="Interoperability of remote servers not guaranteed.")
     @pytest.mark.testbed14
     def test_workflow_flood_detection(self):
         self.workflow_runner(self.PROCESS_WORKFLOW_FLOOD_DETECTION_ID,

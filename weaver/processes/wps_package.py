@@ -22,7 +22,7 @@ from weaver.wps_restapi.swagger_definitions import process_uri
 from weaver.wps import get_wps_output_dir
 from weaver.utils import (
     get_job_log_msg, get_log_fmt, get_log_date_fmt, get_sane_name, get_settings, get_any_id, get_header,
-    get_url_without_query, str2bytes, null
+    get_url_without_query, str2bytes, bytes2str, null
 )
 from owslib.wps import WebProcessingService, ComplexData
 from pywps.inout.basic import BasicIO
@@ -915,7 +915,7 @@ def _wps2json_io(io_wps):
 
 
 def _get_field(io_object, field, search_variations=False, pop_found=False):
-    # type: (ANY_IO_Type, AnyStr, bool, bool) -> Any
+    # type: (Union[ANY_IO_Type, ANY_Format_Type], AnyStr, bool, bool) -> Any
     """
     Gets a field by name from various I/O object types.
 
@@ -940,7 +940,7 @@ def _get_field(io_object, field, search_variations=False, pop_found=False):
 
 
 def _set_field(io_object, field, value, force=False):
-    # type: (ANY_IO_Type, AnyStr, Any, bool) -> None
+    # type: (Union[ANY_IO_Type, ANY_Format_Type], AnyStr, Any, bool) -> None
     """
     Sets a field by name into various I/O object types.
     Field value is set only if not ``null`` to avoid inserting data considered `invalid`.
@@ -969,7 +969,10 @@ def _matching_formats(format1, format2):
 def _are_different_and_set(item1, item2):
     # type: (Any, Any) -> bool
     """
-    Compares two values and returns ``True`` only if both are not ``null``, are of same ``type`` and of different value.
+    Compares two value representations and returns ``True`` only if both are not ``null``, are of same ``type`` and
+    of different representative value. By "representative", we consider here the visual representation of byte/unicode
+    strings to support XML/JSON and Python 2/3 implementations. Other non string-like types are verified with
+    literal (usual) equality method.
     """
     # Note:
     #   Check `is null` for each item individually *before* comparing them together with equal is critical here.
@@ -977,10 +980,11 @@ def _are_different_and_set(item1, item2):
     #   depending on this item's type ``__eq__`` implementation (eg: ``Format`` checking for ``item.mime_type``,  etc.).
     if item1 is null or item2 is null or item1 == item2:
         return False
-    type1 = str if isinstance(item1, six.string_types) else type(item1)
-    type2 = str if isinstance(item2, six.string_types) else type(item2)
-    if type1 != type2:
-        return False
+    # Note: don't only use six.string_types here to check for any python implementation that modifies its value
+    type1 = str if isinstance(item1, (six.string_types, six.binary_type)) else type(item1)
+    type2 = str if isinstance(item2, (six.string_types, six.binary_type)) else type(item2)
+    if type1 is str and type2 is str:
+        return bytes2str(item1) != bytes2str(item2)
     return True
 
 
@@ -1080,7 +1084,7 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
         # retrieve any complementing fields (metadata, keywords, etc.) passed as WPS input
         # additionally enforce 'default' format defined by 'data_format' to keep value specified by WPS if applicable
         # (see function '_json2wps_io' for detail)
-        for field_type in list(WPS_FIELD_MAPPING.keys()) + ["data_format"]:
+        for field_type in list(WPS_FIELD_MAPPING) + ["data_format"]:
             cwl_field = _get_field(cwl_io, field_type)
             wps_field = _get_field(wps_io, field_type)
             # override provided formats if different (keep WPS), or if CWL->WPS was missing but is provided by WPS

@@ -314,8 +314,6 @@ class WpsRestApiJobsTest(unittest.TestCase):
             "response": EXECUTE_RESPONSE_DOCUMENT,
             "notification_email": email
         }
-
-        # noinspection PyDeprecation
         with ExitStack() as stack:
             for runner in mocked_process_job_runner():
                 stack.enter_context(runner)
@@ -444,7 +442,6 @@ class WpsRestApiJobsTest(unittest.TestCase):
         path = self.add_params(jobs_short_uri,
                                service=self.service_public.name,
                                process=self.process_private.identifier)
-        # noinspection PyDeprecation
         with ExitStack() as stack:
             for job in self.get_job_remote_service_mock([]):    # process invisible (not returned by remote)
                 stack.enter_context(job)

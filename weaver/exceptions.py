@@ -2,7 +2,9 @@
 Errors raised during the weaver flow.
 """
 from typing import TYPE_CHECKING
-from pyramid.request import Request
+from pyramid.request import Request as PyramidRequest
+from pyramid.testing import DummyRequest
+from requests import Request as RequestsRequest
 from pyramid.httpexceptions import HTTPException, HTTPInternalServerError
 from functools import wraps
 import logging
@@ -230,7 +232,7 @@ def log_unhandled_exceptions(logger=LOGGER, message="Unhandled exception occurre
             try:
                 # handle input arguments that are extended by various pyramid operations
                 if is_request:
-                    while len(args) and not isinstance(args[0], Request):
+                    while len(args) and not isinstance(args[0], (RequestsRequest, PyramidRequest, DummyRequest)):
                         args = args[1:]
                 return function(*args, **kwargs)
             except Exception as exc:

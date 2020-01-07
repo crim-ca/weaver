@@ -13,6 +13,7 @@ from collections import deque
 from copy import deepcopy
 from pprint import pformat
 from six.moves.urllib.parse import urlparse, parse_qsl
+from contextlib import ExitStack
 import unittest
 import json
 import os
@@ -163,18 +164,20 @@ def test_load_wkt():
 def test_deploy_opensearch():
     store = setup_mongodb_processstore()
 
-    # noinspection PyMethodMayBeStatic, PyUnusedLocal
     class MockDB(object):
         def __init__(self, *args):
             pass
 
-        def get_store(*args):
+        def get_store(*args):  # noqa: E811
             return store
 
-    with mock.patch('weaver.wps_restapi.processes.processes.get_db', side_effect=MockDB), \
-         mock.patch('weaver.wps_restapi.processes.processes.get_settings', side_effect=get_dummy_settings), \
-         mock.patch('weaver.processes.utils.get_db', side_effect=MockDB), \
-         mock.patch('weaver.processes.utils.get_settings', side_effect=get_dummy_settings):  # noqa
+    # mock db functions called by add_local_process
+    with ExitStack() as stack:
+        stack.enter_context(mock.patch("weaver.wps_restapi.processes.processes.get_db", side_effect=MockDB))
+        stack.enter_context(mock.patch("weaver.wps_restapi.processes.processes.get_settings",
+                                       side_effect=get_dummy_settings))
+        stack.enter_context(mock.patch("weaver.processes.utils.get_db", side_effect=MockDB))
+        stack.enter_context(mock.patch("weaver.processes.utils.get_settings", side_effect=get_dummy_settings))
         # given
         opensearch_payload = get_opensearch_payload()
         initial_payload = deepcopy(opensearch_payload)

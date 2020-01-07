@@ -626,20 +626,25 @@ class Process(Base):
 
     def _recursive_replace(self, pkg, index_from, index_to):
         # type: (CWL, int, int) -> CWL
+        new = {}
         for k in pkg:
+            # find modified key with replace matches
+            c_k = k
+            for c in self._character_codes:
+                c_f = c[index_from]
+                c_t = c[index_to]
+                if c_f in k:
+                    c_k = k.replace(c_f, c_t)
+            # process recursive sub-items
             if isinstance(pkg[k], dict):
                 pkg[k] = self._recursive_replace(pkg[k], index_from, index_to)
             if isinstance(pkg[k], list):
                 for i, pkg_i in enumerate(pkg[k]):
                     if isinstance(pkg_i, dict):
                         pkg[k][i] = self._recursive_replace(pkg[k][i], index_from, index_to)
-            for c in self._character_codes:
-                c_f = c[index_from]
-                c_t = c[index_to]
-                if c_f in k:
-                    c_k = k.replace(c_f, c_t)
-                    pkg[c_k] = pkg.pop(k)
-        return pkg
+            # apply new key to obtained sub-items with replaced keys as needed
+            new[c_k] = pkg[k]   # note: cannot use pop when using pkg keys iterator (python 3)
+        return new
 
     def _encode(self, pkg):
         # type: (CWL) -> CWL

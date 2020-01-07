@@ -2,7 +2,6 @@ from weaver import utils
 from weaver import status
 from weaver.utils import null, _NullType   # noqa: W0212
 from weaver.exceptions import ServiceNotFound
-from tests.resources import WPS_CAPS_EMU_XML, WMS_CAPS_NCWMS2_111_XML, WMS_CAPS_NCWMS2_130_XML
 from pyramid.httpexceptions import HTTPError as PyramidHTTPError, HTTPInternalServerError, HTTPNotFound, HTTPConflict
 from pywps.response.status import WPS_STATUS
 from requests.exceptions import HTTPError as RequestsHTTPError
@@ -27,9 +26,12 @@ def test_null_operators():
 
 
 def test_null_singleton():
-    nn = _NullType()
-    assert null is nn
-    assert null is _NullType
+    n1 = _NullType()
+    n2 = _NullType()
+    assert type(null) is _NullType
+    assert null is n1
+    assert null is n2
+    assert n1 is n2
 
 
 def test_is_url_valid():
