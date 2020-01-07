@@ -33,6 +33,7 @@ Changes:
 - Make ``null`` reference a singleton so that multiple instantiation calls all refer to the same instance and produce
   the expected behaviour of ``<x> is null`` instead of hard-to-identify errors because of english syntax.
 - Remove unused function ``weaver.utils.replace_caps_url`` and corresponding tests.
+- Update Apache license.
 
 Fixes:
 -------------
