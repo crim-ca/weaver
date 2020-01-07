@@ -340,32 +340,32 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.assert_deployed_wps3(resp.json, expected_process_id)
 
     # FIXME: implement
-    @xfail(reason="not implemented")
+    @skip(reason="not implemented")
     def test_deploy_process_CWL_DockerRequirement_href(self):
         raise NotImplementedError
 
     # FIXME: implement
-    @xfail(reason="not implemented")
+    @skip(reason="not implemented")
     def test_deploy_process_CWL_DockerRequirement_owsContext(self):
         raise NotImplementedError
 
     # FIXME: implement
-    @xfail(reason="not implemented")
+    @skip(reason="not implemented")
     def test_deploy_process_CWL_DockerRequirement_executionUnit(self):
         raise NotImplementedError
 
     # FIXME: implement
-    @xfail(reason="not implemented")
+    @skip(reason="not implemented")
     def test_deploy_process_CWL_WPS1Requirement_href(self):
         raise NotImplementedError
 
     # FIXME: implement
-    @xfail(reason="not implemented")
+    @skip(reason="not implemented")
     def test_deploy_process_CWL_WPS1Requirement_owsContext(self):
         raise NotImplementedError
 
     # FIXME: implement
-    @xfail(reason="not implemented")
+    @skip(reason="not implemented")
     def test_deploy_process_CWL_WPS1Requirement_executionUnit(self):
         raise NotImplementedError
 
@@ -429,17 +429,17 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.deploy_process_make_visible_and_fetch_deployed(body, TEST_REMOTE_PROCESS_WPS1_ID)
 
     # FIXME: implement
-    @xfail(reason="not implemented")
+    @skip(reason="not implemented")
     def test_deploy_process_WPS3_DescribeProcess_href(self):
         raise NotImplementedError
 
     # FIXME: implement
-    @xfail(reason="not implemented")
+    @skip(reason="not implemented")
     def test_deploy_process_WPS3_DescribeProcess_owsContext(self):
         raise NotImplementedError
 
     # FIXME: implement
-    @xfail(reason="not implemented")
+    @skip(reason="not implemented")
     def test_deploy_process_WPS3_DescribeProcess_executionUnit(self):
         raise NotImplementedError
 

@@ -18,6 +18,7 @@ from tests.utils import (
     setup_config_with_pywps,
     setup_mongodb_processstore,
     mocked_sub_requests,
+    skip,
 )
 from tests import resources
 import pytest
@@ -1186,6 +1187,6 @@ class WpsPackageAppTest(unittest.TestCase):
     #   need to find a existing WPS with some, or manually write XML
     #   multi-output (with same ID) would be an indirect 1-output with ref to multi (Metalink file)
     #   (https://github.com/crim-ca/weaver/issues/25)
-    @pytest.mark.xfail(reason="not implemented")
+    @skip(reason="not implemented")
     def test_multi_outputs_file_from_wps_xml_reference(self):
         raise NotImplementedError
