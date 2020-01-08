@@ -20,10 +20,7 @@ from pyramid.config import Configurator
 from requests import Response
 from webtest import TestApp
 from inspect import isclass
-import functools
 import pyramid_celery
-import pytest
-import unittest
 import warnings
 import mock
 import uuid
@@ -70,16 +67,6 @@ def ignore_wps_warnings(func):
     warn_msg_regex = ["Parameter 'request*", "Parameter 'service*", "Request type '*", "Service '*"]
     warn_categories = [MissingParameterWarning, UnsupportedOperationWarning]
     return ignore_warning_regex(func, warn_msg_regex, warn_categories)
-
-
-def ignore_deprecated_nested_warnings(func):
-    """Wrapper that eliminates :function:`contextlib.nested` related warnings during testing logging.
-
-    **NOTE**:
-        Wrapper should be applied on method (not directly on :class:`unittest.TestCase`
-        as it can disable the whole test suite.
-    """
-    return ignore_warning_regex(func, "With-statements now directly support multiple context managers")
 
 
 def get_settings_from_config_ini(config_ini_path=None, ini_section_name="app:main"):
@@ -266,6 +253,7 @@ def mocked_sub_requests(app, function="get", *args, **kwargs):
         Request corresponding to :function:`requests.request` that instead gets executed by :class:`webTest.TestApp`.
         """
         method = method.lower()
+        headers = headers or req_kwargs.get("headers")
         req = getattr(app, method)
         url = req_kwargs.get("base_url", url)
         qs = req_kwargs.get("params")

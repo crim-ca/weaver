@@ -25,20 +25,13 @@ from weaver.utils import (
     get_url_without_query, str2bytes, bytes2str, null
 )
 from owslib.wps import WebProcessingService, ComplexData
+from pywps import Process
+from pywps.app.Common import Metadata
 from pywps.inout.basic import BasicIO
 from pywps.inout.literaltypes import AnyValue, AllowedValue, ALLOWEDVALUETYPE
+from pywps.inout import LiteralInput, LiteralOutput, ComplexInput, ComplexOutput, BoundingBoxInput, BoundingBoxOutput
+from pywps.inout.formats import Format
 from pywps.validator.mode import MODE
-from pywps.app.Common import Metadata
-from pywps import (
-    Process,
-    LiteralInput,
-    LiteralOutput,
-    ComplexInput,
-    ComplexOutput,
-    BoundingBoxInput,
-    BoundingBoxOutput,
-    Format,
-)
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
 from pyramid_celery import celery_app as app
 from collections import OrderedDict, Hashable
@@ -869,9 +862,11 @@ def _wps2json_io(io_wps):
 
     if not isinstance(io_wps, BasicIO):
         raise PackageTypeError("Invalid type, expected 'BasicIO', got: [{0!r}] '{1!r}'".format(type(io_wps), io_wps))
+    if not hasattr(io_wps, "json"):
+        raise PackageTypeError("Invalid type definition expected to have a 'json' property.")
+
     # in some cases (Complex I/O), 'as_reference=True' causes "type" to be overwritten, revert it back
-    # noinspection PyUnresolvedReferences
-    io_wps_json = io_wps.json
+    io_wps_json = io_wps.json   # noqa
 
     rename = {
         u"identifier": u"id",
@@ -1491,7 +1486,8 @@ def get_process_definition(process_offering, reference=None, package=None, data_
             # handle any other sub-exception that wasn't processed by a "package" error as a registration error
             package_errors = (PackageRegistrationError, PackageTypeError, PackageRegistrationError, PackageNotFound)
             exc_type = type(exc) if isinstance(exc, package_errors) else PackageRegistrationError
-            LOGGER.exception(exc.message if hasattr(exc, "message") else str(exc))
+            exc_msg = exc.message if hasattr(exc, "message") else str(exc)
+            LOGGER.exception(exc_msg)
             raise exc_type("Invalid package/reference definition. {0} generated error: [{1!r}].".format(reason, exc))
 
     if not (isinstance(package, dict) or isinstance(reference, six.string_types)):

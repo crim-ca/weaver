@@ -58,7 +58,7 @@ class MongodbStore(object):
 
     @classmethod
     def get_args_kwargs(cls, *args, **kwargs):
-        # type: (Any, Any) -> Tuple[Tuple, Dict]
+        # type: (*Any, **Any) -> Tuple[Tuple, Dict]
         """
         Filters :class:`MongodbStore`-specific arguments to safely pass them down its ``__init__``.
         """

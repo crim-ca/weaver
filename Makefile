@@ -197,7 +197,7 @@ install-raw:	## install without any requirements or dependencies (suppose everyt
 clean: clean-all	## alias for 'clean-all' target
 
 .PHONY: clean-all
-clean-all: clean-build clean-cache clean-src clean-test		## run all cleanup targets
+clean-all: clean-build clean-cache clean-docs clean-src clean-test		## run all cleanup targets
 
 .PHONY: clean-build
 clean-build:		## remove the temporary build files
@@ -212,6 +212,11 @@ clean-cache:		## remove caches such as DOWNLOAD_CACHE
 	@echo "Removing caches..."
 	@-rm -fr "$(APP_ROOT)/.pytest_cache"
 	@-rm -fr "$(DOWNLOAD_CACHE)"
+
+.PHONY: clean-docs
+clean-docs: 	## remove documentation artefacts
+	@echo "Removing documenation build files..."
+	@$(MAKE) -C "$(APP_ROOT)/docs" clean
 
 .PHONY: clean-env
 clean-env: 		## remove the conda enviroment
@@ -355,9 +360,9 @@ fix-imports: mkdir-reports install-dev	## apply import code checks corrections
 ## -- Documentation targets -- ##
 
 .PHONY: docs
-docs:	## generate HTML documentation with Sphinx
+docs:	clean-docs 	## generate HTML documentation with Sphinx
 	@echo "Generating docs with Sphinx..."
-	@bash -c '$(CONDA_CMD) $(MAKE) -C $@ clean html'
+	@bash -c '$(CONDA_CMD) $(MAKE) -C $@ html'
 	@echo "open your browser:"
 	@echo "		firefox '$(APP_ROOT)/docs/build/html/index.html'"
 

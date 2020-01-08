@@ -3,7 +3,6 @@ from weaver.database import get_db
 from weaver.processes.builtin import register_builtin_processes
 from weaver.status import STATUS_SUCCEEDED, STATUS_CATEGORY_RUNNING, job_status_categories
 from tests.utils import (
-    ignore_deprecated_nested_warnings,
     setup_config_with_mongodb,
     setup_config_with_pywps,
     setup_config_with_celery,
@@ -72,7 +71,6 @@ class BuiltinAppTest(unittest.TestCase):
         assert len(resp.json["process"]["outputs"][0]["formats"]) == 1
         assert resp.json["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF
 
-    @ignore_deprecated_nested_warnings
     def test_jsonarray2netcdf_execute(self):
         dirname = "/tmp"
         nc_data = "Hello NetCDF!"

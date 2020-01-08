@@ -51,7 +51,7 @@ class MongoDatabase(DatabaseInterface):
         return self._database is not None and self._settings is not None
 
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (Union[AnyStr, StoreInterface, MongodbStores], Any, Any) -> AnyStoreType
+        # type: (Union[AnyStr, StoreInterface, MongodbStores], *Any, **Any) -> AnyStoreType
         """
         Retrieve a store from the database.
 

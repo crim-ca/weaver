@@ -14,7 +14,6 @@ from weaver.utils import fully_qualified_name, ows_context_href
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
 from weaver.wps import get_wps_url
 from tests.utils import (
-    ignore_deprecated_nested_warnings,
     setup_config_with_mongodb,
     setup_mongodb_processstore,
     setup_mongodb_jobstore,
@@ -159,7 +158,6 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert self.process_public.identifier in processes_id
         assert self.process_private.identifier not in processes_id
 
-    @ignore_deprecated_nested_warnings
     def test_get_processes_invalid_schemas_handled(self):
         path = "/processes"
         # deploy valid test process
@@ -197,7 +195,6 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.status_code == 401
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
-    @ignore_deprecated_nested_warnings
     def test_deploy_process_success(self):
         process_name = self.fully_qualified_test_process_name()
         process_data = self.get_process_deploy_template(process_name)
@@ -214,7 +211,6 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert resp.json["processSummary"]["id"] == process_name
             assert isinstance(resp.json["deploymentDone"], bool) and resp.json["deploymentDone"]
 
-    @ignore_deprecated_nested_warnings
     def test_deploy_process_bad_name(self):
         process_name = self.fully_qualified_test_process_name() + "..."
         process_data = self.get_process_deploy_template(process_name)
@@ -228,7 +224,6 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert resp.status_code == 400
             assert resp.content_type == CONTENT_TYPE_APP_JSON
 
-    @ignore_deprecated_nested_warnings
     def test_deploy_process_conflict(self):
         process_name = self.process_private.identifier
         process_data = self.get_process_deploy_template(process_name)
@@ -243,7 +238,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     # noinspection PyTypeChecker
-    @ignore_deprecated_nested_warnings
+
     def test_deploy_process_missing_or_invalid_components(self):
         process_name = self.fully_qualified_test_process_name()
         process_data = self.get_process_deploy_template(process_name)
@@ -274,7 +269,6 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 assert resp.status_code in [400, 422], msg.format(i, resp.status_code)
                 assert resp.content_type == CONTENT_TYPE_APP_JSON, msg.format(i, resp.content_type)
 
-    @ignore_deprecated_nested_warnings
     def test_deploy_process_default_endpoint_wps1(self):
         """Validates that the default (localhost) endpoint to execute WPS requests are saved during deployment."""
         process_name = self.fully_qualified_test_process_name()
@@ -469,7 +463,6 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.status_code == 400
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
-    @ignore_deprecated_nested_warnings
     def test_execute_process_success(self):
         uri = "/processes/{}/jobs".format(self.process_public.identifier)
         data = self.get_process_execute_template()
@@ -517,7 +510,6 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert resp.status_code in [400, 422], msg.format(i, resp.status_code)
             assert resp.content_type == CONTENT_TYPE_APP_JSON, msg.format(i, resp.content_type)
 
-    @ignore_deprecated_nested_warnings
     def test_execute_process_no_error_not_required_params(self):
         """
         Optional parameters for execute job shouldn't raise an error if omitted,
@@ -549,7 +541,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         execute_data["mode"] = EXECUTE_MODE_SYNC
         uri = "/processes/{}/jobs".format(self.process_public.identifier)
         resp = self.app.post_json(uri, params=execute_data, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code in 501
+        assert resp.status_code == 501
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     @pytest.mark.xfail(reason="Mode '{}' not supported for job execution.".format(EXECUTE_TRANSMISSION_MODE_VALUE))
@@ -558,7 +550,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         execute_data["outputs"][0]["transmissionMode"] = EXECUTE_TRANSMISSION_MODE_VALUE
         uri = "/processes/{}/jobs".format(self.process_public.identifier)
         resp = self.app.post_json(uri, params=execute_data, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code in 501
+        assert resp.status_code == 501
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_execute_process_not_visible(self):

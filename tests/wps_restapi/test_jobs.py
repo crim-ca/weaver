@@ -21,7 +21,6 @@ from weaver.status import (
     STATUS_CATEGORY_FINISHED,
 )
 from tests.utils import (
-    ignore_deprecated_nested_warnings,
     setup_config_with_mongodb,
     setup_mongodb_servicestore,
     setup_mongodb_processstore,
@@ -302,8 +301,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 assert set(grouped_jobs["jobs"]) == {self.job_info[0].id, self.job_info[2].id}
             else:
                 pytest.fail("Unknown job grouping 'service' value not expected.")
-
-    @ignore_deprecated_nested_warnings
+    
     def test_get_jobs_by_encrypted_email(self):
         """Verifies that literal email can be used as search criterion although not saved in plain text within db."""
         email = "some.test@crim.ca"
@@ -414,8 +412,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 401
         assert resp.content_type == CONTENT_TYPE_APP_JSON
-
-    @ignore_deprecated_nested_warnings
+    
     def test_get_jobs_public_service_private_process_unauthorized_in_query(self):
         """
         NOTE:
@@ -431,8 +428,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 200
             assert resp.content_type == CONTENT_TYPE_APP_JSON
-
-    @ignore_deprecated_nested_warnings
+    
     def test_get_jobs_public_service_no_processes(self):
         """
         NOTE:
@@ -449,7 +445,6 @@ class WpsRestApiJobsTest(unittest.TestCase):
             assert resp.status_code == 404
             assert resp.content_type == CONTENT_TYPE_APP_JSON
 
-    @ignore_deprecated_nested_warnings
     def test_get_jobs_public_with_access_and_request_user(self):
         """Verifies that corresponding processes are returned when proper access/user-id are respected."""
         uri_direct_jobs = jobs_short_uri
@@ -457,18 +452,18 @@ class WpsRestApiJobsTest(unittest.TestCase):
         uri_provider_jobs = jobs_full_uri.format(
             provider_id=self.service_public.name, process_id=self.process_public.identifier)
 
-        admin_public_jobs = filter(lambda j: VISIBILITY_PUBLIC in j.access, self.job_info)
-        admin_private_jobs = filter(lambda j: VISIBILITY_PRIVATE in j.access, self.job_info)
-        editor1_all_jobs = filter(lambda j: j.user_id == self.user_editor1_id, self.job_info)
-        editor1_public_jobs = filter(lambda j: VISIBILITY_PUBLIC in j.access, editor1_all_jobs)
-        editor1_private_jobs = filter(lambda j: VISIBILITY_PRIVATE in j.access, editor1_all_jobs)
-        public_jobs = filter(lambda j: VISIBILITY_PUBLIC in j.access, self.job_info)
+        admin_public_jobs = list(filter(lambda j: VISIBILITY_PUBLIC in j.access, self.job_info))
+        admin_private_jobs = list(filter(lambda j: VISIBILITY_PRIVATE in j.access, self.job_info))
+        editor1_all_jobs = list(filter(lambda j: j.user_id == self.user_editor1_id, self.job_info))
+        editor1_public_jobs = list(filter(lambda j: VISIBILITY_PUBLIC in j.access, editor1_all_jobs))
+        editor1_private_jobs = list(filter(lambda j: VISIBILITY_PRIVATE in j.access, editor1_all_jobs))
+        public_jobs = list(filter(lambda j: VISIBILITY_PUBLIC in j.access, self.job_info))
 
         def filter_process(jobs):
-            return filter(lambda j: j.process == self.process_public.identifier, jobs)
+            return list(filter(lambda j: j.process == self.process_public.identifier, jobs))
 
         def filter_service(jobs):
-            return filter(lambda j: j.service == self.service_public.name, jobs)
+            return list(filter(lambda j: j.service == self.service_public.name, jobs))
 
         # test variations of [paths, query, user-id, expected-job-ids]
         path_jobs_user_req_tests = [
