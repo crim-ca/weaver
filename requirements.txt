@@ -8,8 +8,10 @@ cornice_swagger>=0.7.0
 cwltool==1.0.20180820141117
 duration
 flufl.enum; python_version < "3"
-gunicorn>=19.10,<20; python_version < "3"
-gunicorn>=19.10; python_version >= "3"
+# gunicorn >20 breaks some config loading parameters
+gunicorn>=19.10,<20
+#gunicorn>=19.10,<20; python_version < "3"
+#gunicorn>=19.10; python_version >= "3"
 jsonschema>=3.0.1
 lxml
 mako
