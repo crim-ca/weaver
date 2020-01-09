@@ -160,11 +160,11 @@ def retrieve_package_job_log(execution, job):
         out_dir = get_wps_output_dir(get_settings(app))
         # if the process is a weaver package this status xml should be available in the process output dir
         log_path = get_status_location_log_path(execution.statusLocation, out_dir=out_dir)
-        with open(log_path, 'r') as log_file:
+        with open(log_path, "r") as log_file:
             # Keep the first log entry which is the real start time and replace the following ones with the file content
             job.logs = job.logs[:1]
             for line in log_file:
-                job.logs.append(line.rstrip('\n'))
+                job.logs.append(line.rstrip("\n"))
         os.remove(log_path)
     except (KeyError, IOError):
         pass

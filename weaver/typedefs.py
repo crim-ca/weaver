@@ -17,20 +17,20 @@ if TYPE_CHECKING:
     from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, Type, Union  # noqa: F401
     import lxml.etree
     import os
-    if hasattr(os, 'PathLike'):
+    if hasattr(os, "PathLike"):
         FileSystemPathType = Union[os.PathLike, AnyStr]
     else:
         FileSystemPathType = AnyStr
 
     Number = Union[int, float]
-    AnyValue = Union[AnyStr, Number, bool, None]
+    AnyValue = Optional[Union[AnyStr, Number, bool]]
     AnyKey = Union[AnyStr, int]
-    JSON = Dict[AnyKey, Union[AnyValue, Dict[AnyKey, 'JSON'], List['JSON']]]
+    JSON = Dict[AnyKey, Union[AnyValue, Dict[AnyKey, "JSON"], List["JSON"]]]
     CWL = Dict[{"cwlVersion": AnyStr, "class": AnyStr, "inputs": JSON, "outputs": JSON}]
     XML = lxml.etree._Element  # noqa: W0212
 
     AnyContainer = Union[Configurator, Registry, PyramidRequest, Celery]
-    SettingValue = Union[AnyStr, Number, bool, None]
+    SettingValue = AnyValue
     SettingsType = Dict[AnyStr, SettingValue]
     AnySettingsContainer = Union[AnyContainer, SettingsType]
     AnyRegistryContainer = AnyContainer
@@ -47,9 +47,9 @@ if TYPE_CHECKING:
     AnyCookiesContainer = Union[CookiesBaseType, WPSRequest, PyramidRequest, AnyHeadersContainer]
     AnyResponseType = Union[WebobResponse, PyramidResponse, TestResponse]
 
-    ExpectedOutputType = Dict[{'type': AnyStr, 'id': AnyStr, 'outputBinding': Dict['glob': AnyStr]}]
+    ExpectedOutputType = Dict[{"type": AnyStr, "id": AnyStr, "outputBinding": Dict["glob": AnyStr]}]
     GetJobProcessDefinitionFunction = Callable[[AnyStr, Dict[AnyStr, AnyStr], Dict[AnyStr, Any]], WpsProcessInterface]
     ToolPathObjectType = Dict[AnyStr, Any]
 
-    UpdateStatusPartialFunction = Callable[[{'provider': AnyStr, 'message': AnyStr,
-                                             'progress': int, 'status': AnyStatusType}], None]
+    UpdateStatusPartialFunction = Callable[[{"provider": AnyStr, "message": AnyStr,
+                                             "progress": int, "status": AnyStatusType}], None]

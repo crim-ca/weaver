@@ -136,8 +136,8 @@ def api_swagger_json(request, use_docstring_summary=True):
     # obtain 'server' host and api-base-path, which doesn't correspond necessarily to the app's host and path
     # ex: 'server' adds '/weaver' with proxy redirect before API routes
     weaver_server_url = get_weaver_url(request)
-    LOGGER.debug("Request URL:  {}".format(request.url))
-    LOGGER.debug("WEAVER_URL: {}".format(weaver_server_url))
+    LOGGER.debug("Request app URL:   [%s]", request.url)
+    LOGGER.debug("Weaver config URL: [%s]", weaver_server_url)
     if weaver_server_url:
         weaver_parsed_url = urlparse(weaver_server_url)
         swagger_base_spec["host"] = weaver_parsed_url.netloc

@@ -144,8 +144,8 @@ def load_pywps_cfg(container, config=None):
     # find output url from app config (path/url) or wps config (url only)
     if "weaver.wps_output_url" not in settings:
         output_path = settings.get("weaver.wps_output_path", "")
-        if output_path:
-            output_url = os.path.join(get_weaver_url(settings), output_path.strip('/'))
+        if isinstance(output_path, six.string_types):
+            output_url = os.path.join(get_weaver_url(settings), output_path.strip("/"))
         else:
             output_url = pywps_config.get_config_value("server", "outputurl")
         settings["weaver.wps_output_url"] = output_url

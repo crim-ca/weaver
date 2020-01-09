@@ -148,7 +148,7 @@ class Wps1Process(WpsProcessInterface):
                 if result_id in expected_outputs:
                     # This is where cwl expect the output file to be written
                     # TODO We will probably need to handle multiple output value...
-                    dst_fn = '/'.join([out_dir.rstrip('/'), expected_outputs[result_id]])
+                    dst_fn = "/".join([out_dir.rstrip("/"), expected_outputs[result_id]])
 
                     # TODO Should we handle other type than File reference?
                     r = requests.get(result_val, allow_redirects=True)

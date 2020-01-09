@@ -32,7 +32,6 @@ class WpsAppTest(unittest.TestCase):
             "weaver.url": "",
             "weaver.wps": True,
             "weaver.wps_path": self.wps_path
-
         }
         config = get_test_weaver_config(settings=settings)
         config = setup_config_with_mongodb(config)

@@ -74,8 +74,9 @@ class BuiltinAppTest(unittest.TestCase):
     def test_jsonarray2netcdf_execute(self):
         dirname = "/tmp"
         nc_data = "Hello NetCDF!"
-        with NamedTemporaryFile(dir=dirname, mode="w", suffix=".nc") as nf, \
-             NamedTemporaryFile(dir=dirname, mode="w", suffix=".json") as jf:
+        with ExitStack() as stack_files:
+            nf = stack_files.enter_context(NamedTemporaryFile(dir=dirname, mode="w", suffix=".nc"))
+            jf = stack_files.enter_context(NamedTemporaryFile(dir=dirname, mode="w", suffix=".json"))
             nf.write(nc_data)
             nf.seek(0)
             jf.write(json.dumps(["file://{}".format(os.path.join(dirname, nf.name))]))  # app expects list of URL
@@ -86,9 +87,9 @@ class BuiltinAppTest(unittest.TestCase):
                 "inputs": [{"id": "input", "href": os.path.join(dirname, jf.name)}],
                 "outputs": [{"id": "output", "transmissionMode": "reference"}],
             }
-            with ExitStack() as stack:
+            with ExitStack() as stack_proc:
                 for process in mocked_execute_process():
-                    stack.enter_context(process)
+                    stack_proc.enter_context(process)
                 path = "/processes/jsonarray2netcdf/jobs"
                 resp = mocked_sub_requests(self.app, "post_json", path, params=data, headers=self.json_headers)
 

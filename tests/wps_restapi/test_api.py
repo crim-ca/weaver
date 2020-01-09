@@ -72,63 +72,67 @@ class GenericApiRoutesTestCase(unittest.TestCase):
 
 
 class RebasedApiRoutesTestCase(unittest.TestCase):
-    @staticmethod
-    def redirect_api_view(request):  # noqa: F811
-        return HTTPFound(location=sd.api_swagger_json_service.path)
+    @classmethod
+    def redirect_api_view(cls, request):
+        path = request.url.replace(cls.proxy_path, "")  # noqa
+        return HTTPFound(location=path)
 
     @classmethod
     def setUpClass(cls):
-        # derived path for testing simulated server proxy pass
-        cls.api_base_path = "/weaver/rest"
-        cls.api_base_name = sd.api_swagger_json_service.name + "_rebased"
-
-        # create redirect view to simulate the server proxy pass
-        config = get_test_weaver_config(settings=None)
-        config.add_route(name=cls.api_base_name, path=cls.api_base_path)
-        config.add_view(cls.redirect_api_view, route_name=cls.api_base_name)
-
-        cls.testapp = get_test_weaver_app(config)
-        cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
+        cls.proxy_path = "/weaver-proxy"
+        cls.app_host = "localhost"
+        cls.app_base_url = "http://" + cls.app_host
+        cls.app_proxy_url = cls.app_base_url + cls.proxy_path
+        cls.app_proxy_json = cls.proxy_path + sd.api_swagger_json_service.path
+        cls.app_proxy_ui = cls.proxy_path + sd.api_swagger_ui_service.path
+        cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON}
 
     def test_swagger_api_request_base_path_proxied(self):
         """
         Validates that Swagger JSON properly redefines the host/path to test live requests on Swagger UI
-        when the app's URI results from a proxy pass redirect under another route.
+        when the app's URI resides behind a proxy pass redirect path as specified by setting ``weaver.url``.
         """
-        # setup environment that would define the new weaver location for the proxy pass
-        weaver_server_host = get_settings_from_testapp(self.testapp).get("weaver.url", "")
-        weaver_server_url = weaver_server_host + self.api_base_path
-        with mock.patch.dict("os.environ", {"WEAVER_URL": weaver_server_url}):
-            resp = self.testapp.get(self.api_base_path, headers=self.json_headers)
-            resp = resp.follow()
-            assert 200 == resp.status_code
-            assert self.api_base_path not in resp.json["host"]
-            assert resp.json["basePath"] == self.api_base_path
 
-            # validate that swagger UI still renders and has valid URL
-            resp = self.testapp.get(sd.api_swagger_ui_uri)
-            assert 200 == resp.status_code
-            assert "<title>{}</title>".format(sd.API_TITLE) in resp.text
+        # fake "proxy" derived path for testing simulated server proxy pass
+        # create redirect views to simulate the server proxy pass
+        config = get_test_weaver_config(settings={"weaver.url": self.app_proxy_url})  # real access proxy path in config
+        for service in [sd.api_swagger_json_service, sd.api_swagger_ui_service]:
+            name = service.name + "_proxy"
+            config.add_route(name=name, path=self.proxy_path + service.path)
+            config.add_view(self.redirect_api_view, route_name=name)
+        testapp = get_test_weaver_app(config)
+
+        # setup environment that would define the new weaver location for the proxy pass
+        resp = testapp.get(self.app_proxy_json, headers=self.json_headers)
+        assert resp.status_code == 302, "Request should be at proxy level at this point."
+        resp = resp.follow()
+        assert resp.status_code == 200
+        assert resp.json["host"] == self.app_host
+        assert resp.json["basePath"] == self.proxy_path, \
+            "Proxy path specified by setting 'weaver.url' should be used in API definition to allow live requests."
+
+        # validate that swagger UI still renders and has valid URL
+        resp = testapp.get(self.app_proxy_ui)
+        assert resp.status_code == 302, "Request should be at proxy level at this point."
+        resp = resp.follow()
+        assert resp.status_code == 200
+        assert "<title>{}</title>".format(sd.API_TITLE) in resp.text
 
     def test_swagger_api_request_base_path_original(self):
         """
         Validates that Swagger JSON properly uses the original host/path to test live requests on Swagger UI
         when the app's URI results direct route access.
         """
-        resp = self.testapp.get(sd.api_swagger_ui_uri)
-        assert 200 == resp.status_code
+        # base app without proxy pass
+        # ensure that setting that would define the weaver's location is not defined for local app
+        config = get_test_weaver_config(settings={"weaver.url": None})
+        testapp = get_test_weaver_app(config)
+
+        resp = testapp.get(sd.api_swagger_json_service.path, headers=self.json_headers)
+        assert resp.status_code == 200, "API definition should be accessed directly"
+        assert resp.json["host"] == self.app_host
+        assert resp.json["basePath"] == sd.api_frontpage_uri
+
+        resp = testapp.get(sd.api_swagger_ui_service.path)
+        assert resp.status_code == 200, "API definition should be accessed directly"
         assert "<title>{}</title>".format(sd.API_TITLE) in resp.text
-
-        # ensure that environment that would define the weaver location is not defined for local app
-        with mock.patch.dict("os.environ"):
-            os.environ.pop("WEAVER_URL", None)
-            resp = self.testapp.get(self.api_base_path, headers=self.json_headers)
-            resp = resp.follow()
-            assert 200 == resp.status_code
-            assert self.api_base_path not in resp.json["host"]
-            assert resp.json["basePath"] == sd.api_frontpage_uri
-
-            # validate that swagger UI still renders and has valid URL
-            resp = self.testapp.get(sd.api_swagger_ui_uri)
-            assert 200 == resp.status_code
-            assert "<title>{}</title>".format(sd.API_TITLE) in resp.text

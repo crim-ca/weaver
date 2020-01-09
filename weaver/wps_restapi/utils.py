@@ -27,7 +27,7 @@ OUTPUT_FORMATS = {
 def wps_restapi_base_path(container):
     # type: (AnySettingsContainer) -> AnyStr
     settings = get_settings(container)
-    restapi_path = settings.get("weaver.wps_restapi_path", "").rstrip('/').strip()
+    restapi_path = settings.get("weaver.wps_restapi_path", "").rstrip("/").strip()
     return restapi_path
 
 

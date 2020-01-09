@@ -46,7 +46,7 @@ def get_providers(request):
                     provider_id=service.name),
                 public=service.public))
         except Exception as e:
-            warnings.warn("Exception occurs while fetching wps {0} : {1!r}".format(service.url, e),
+            warnings.warn("Exception occurred while fetching wps {0} : {1!r}".format(service.url, e),
                           NonBreakingExceptionWarning)
             pass
 
