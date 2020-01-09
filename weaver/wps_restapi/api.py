@@ -1,5 +1,5 @@
 from weaver.__meta__ import __version__ as weaver_version
-from weaver.utils import get_settings, get_header
+from weaver.utils import get_settings, get_header, get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.colander_extras import CustomTypeConversionDispatcher
 from weaver.wps_restapi.utils import get_wps_restapi_base_url, wps_restapi_base_path, OUTPUT_FORMAT_JSON
@@ -135,7 +135,7 @@ def api_swagger_json(request, use_docstring_summary=True):
 
     # obtain 'server' host and api-base-path, which doesn't correspond necessarily to the app's host and path
     # ex: 'server' adds '/weaver' with proxy redirect before API routes
-    weaver_server_url = os.getenv("WEAVER_URL")
+    weaver_server_url = get_weaver_url(request)
     LOGGER.debug("Request URL:  {}".format(request.url))
     LOGGER.debug("WEAVER_URL: {}".format(weaver_server_url))
     if weaver_server_url:

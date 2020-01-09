@@ -251,7 +251,6 @@ def get_template_urls(collection_id):
     params = parse_qsl(urlparse(template).query)
     param_names = list(sorted(p[0] for p in params))
     if all_fields:
-        # noinspection PyUnresolvedReferences
         all_fields = all_fields.intersection(param_names)
     else:
         all_fields.update(param_names)

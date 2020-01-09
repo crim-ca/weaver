@@ -47,6 +47,7 @@ Fixes:
 - Fix case where omitted ``format[s]`` in both `CWL` and `WPS` deploy bodies generated a process description with
   complex I/O (file) without required ``formats`` field. Default ``text/plain`` format is now automatically added.
 - Fix case where ``format[s]`` lists between `CWL` and `WPS` where incorrectly merged.
+- Fix ``metadata`` field within a WPS I/O incorrectly parsed when provided by a WPS-1/2 `XML` process definition.
 - Fix invalid JSON response formatting on failing schema validation of process deployment body.
 - Fix multiple Python 2/3 compatibility issues.
 

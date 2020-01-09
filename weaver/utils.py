@@ -347,7 +347,9 @@ def str2bytes(s):
     """Obtains the bytes representation of the string."""
     if not (isinstance(s, six.string_types) or isinstance(s, bytes)):
         raise TypeError("Cannot convert item to bytes: {!r}".format(type(s)))
-    return s if isinstance(s, bytes) else s.encode()
+    if isinstance(s, bytes):
+        return s
+    return s.encode()
 
 
 def bytes2str(s):
@@ -355,7 +357,9 @@ def bytes2str(s):
     """Obtains the unicode representation of the string."""
     if not (isinstance(s, six.string_types) or isinstance(s, bytes)):
         raise TypeError("Cannot convert item to unicode: {!r}".format(type(s)))
-    return s if not isinstance(s, bytes) else s.decode()
+    if not isinstance(s, bytes):
+        return s
+    return s.decode()
 
 
 def islambda(func):

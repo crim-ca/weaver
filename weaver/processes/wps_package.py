@@ -24,7 +24,7 @@ from weaver.utils import (
     get_job_log_msg, get_log_fmt, get_log_date_fmt, get_sane_name, get_settings, get_any_id, get_header,
     get_url_without_query, str2bytes, bytes2str, null
 )
-from owslib.wps import WebProcessingService, ComplexData
+from owslib.wps import WebProcessingService, ComplexData, Metadata as OwsMetadata
 from pywps import Process
 from pywps.app.Common import Metadata
 from pywps.inout.basic import BasicIO
@@ -144,7 +144,7 @@ WPS_FIELD_FORMAT = ["formats", "supported_formats", "supported_values", "default
 
 # default format if missing (minimal requirement of one)
 DefaultFormat = Format(mime_type=CONTENT_TYPE_TEXT_PLAIN)
-DEFAULT_FORMAT_MISSING = "DEFAULT_FORMAT_MISSING"
+DEFAULT_FORMAT_MISSING = "__DEFAULT_FORMAT_MISSING__"
 setattr(DefaultFormat, DEFAULT_FORMAT_MISSING, True)
 
 
@@ -735,6 +735,8 @@ def _json2wps_field(field_info, field_category):
         if isinstance(field_info, six.string_types):
             return Format(field_info)
     elif field_category == "metadata":
+        if isinstance(field_info, Metadata):
+            return field_info
         if isinstance(field_info, dict):
             return Metadata(**field_info)
         if isinstance(field_info, six.string_types):
@@ -743,6 +745,7 @@ def _json2wps_field(field_info, field_category):
         return field_info
     elif field_category in ["identifier", "title", "abstract"] and isinstance(field_info, six.string_types):
         return field_info
+    LOGGER.warning("Field of type '%s' not handled as known WPS field.", field_category)
     return None
 
 
@@ -865,7 +868,6 @@ def _wps2json_io(io_wps):
     if not hasattr(io_wps, "json"):
         raise PackageTypeError("Invalid type definition expected to have a 'json' property.")
 
-    # in some cases (Complex I/O), 'as_reference=True' causes "type" to be overwritten, revert it back
     io_wps_json = io_wps.json   # noqa
 
     rename = {
@@ -885,6 +887,7 @@ def _wps2json_io(io_wps):
 
     transform_json(io_wps_json, rename=rename, replace_values=replace_values, replace_func=replace_func)
 
+    # in some cases (Complex I/O), 'as_reference=True' causes "type" to be overwritten, revert it back
     if "type" in io_wps_json and io_wps_json["type"] == "reference":
         io_wps_json["type"] = WPS_COMPLEX
 
@@ -969,11 +972,18 @@ def _are_different_and_set(item1, item2):
     strings to support XML/JSON and Python 2/3 implementations. Other non string-like types are verified with
     literal (usual) equality method.
     """
-    # Note:
-    #   Check `is null` for each item individually *before* comparing them together with equal is critical here.
-    #   Calling `==` can result in one set item's type calling a property to check equality on the second ``null`` item
-    #   depending on this item's type ``__eq__`` implementation (eg: ``Format`` checking for ``item.mime_type``,  etc.).
-    if item1 is null or item2 is null or item1 == item2:
+    if item1 is null or item2 is null:
+        return False
+    try:
+        # Note:
+        #   Calling ``==`` will result in one defined item's type ``__eq__`` method calling a property to validate
+        #   equality with the second. When compared to a ``null``, ``None`` or differently type'd second item, the
+        #   missing property on the second item could raise and ``AssertionError`` depending on the ``__eq__``
+        #   implementation (eg: ``Format`` checking for ``item.mime_type``,  etc.).
+        equal = item1 == item2
+    except AttributeError:
+        return False
+    if equal:
         return False
     # Note: don't only use six.string_types here to check for any python implementation that modifies its value
     type1 = str if isinstance(item1, (six.string_types, six.binary_type)) else type(item1)
@@ -1214,12 +1224,21 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
 def _ows2json_io(ows_io):
     # type: (OWS_IO_Type) -> JSON_IO_Type
     """Converts I/O from :module:`owslib.wps` to JSON."""
-    def _complex2format(data):
+
+    def _complex2json(data):
         # type: (ComplexData) -> JSON
         return {
             "mimeType": data.mimeType,
             "encoding": data.encoding,
             "schema": data.schema,
+        }
+
+    def _meta2json(meta):
+        # type: (OwsMetadata) -> JSON
+        return {
+            "href": meta.url,
+            "title": meta.title,
+            "role": meta.role
         }
 
     json_io = dict()
@@ -1229,9 +1248,17 @@ def _ows2json_io(ows_io):
         # ignore undefined values represented by `null`, empty list, or empty string
         if value or value in [0, 0.0]:
             if isinstance(value, list):
-                json_io[field] = [_complex2format(v) if isinstance(v, ComplexData) else v for v in value]
+                # complex data is converted as is
+                # metadata converted and preserved if it results into a minimally valid definition (otherwise dropped)
+                json_io[field] = [
+                    _complex2json(v) if isinstance(v, ComplexData) else
+                    _meta2json(v) if isinstance(v, OwsMetadata) else v
+                    for v in value if not isinstance(v, OwsMetadata) or v.url is not None
+                ]
             elif isinstance(value, ComplexData):
-                json_io[field] = _complex2format(value)
+                json_io[field] = _complex2json(value)
+            elif isinstance(value, OwsMetadata):
+                json_io[field] = _meta2json(value)
             else:
                 json_io[field] = value
 
