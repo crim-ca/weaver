@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from weaver.processes.wps_process_base import WpsProcessInterface
+    from weaver.datatype import Process
     from weaver.status import AnyStatusType
     from webob.headers import ResponseHeaders, EnvironHeaders
     from webob.response import Response as WebobResponse
@@ -13,6 +14,7 @@ if TYPE_CHECKING:
     from cwltool.factory import Callable as CWLFactoryCallable  # noqa
     from webtest.response import TestResponse
     from pywps.app import WPSRequest
+    from pywps import Process as ProcessWPS
     from logging import Logger as LoggerType  # noqa
     from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, Type, Union  # noqa: F401
     import lxml.etree
@@ -46,6 +48,9 @@ if TYPE_CHECKING:
     AnyHeadersContainer = Union[HeadersBaseType, ResponseHeaders, EnvironHeaders, CaseInsensitiveDict]
     AnyCookiesContainer = Union[CookiesBaseType, WPSRequest, PyramidRequest, AnyHeadersContainer]
     AnyResponseType = Union[WebobResponse, PyramidResponse, TestResponse]
+
+    AnyProcess = Union[Process, ProcessWPS]
+    AnyProcessType = Union[Type[Process], Type[ProcessWPS]]
 
     ExpectedOutputType = Dict[{"type": AnyStr, "id": AnyStr, "outputBinding": Dict["glob": AnyStr]}]
     GetJobProcessDefinitionFunction = Callable[[AnyStr, Dict[AnyStr, AnyStr], Dict[AnyStr, Any]], WpsProcessInterface]

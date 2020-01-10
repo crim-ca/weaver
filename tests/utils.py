@@ -114,8 +114,7 @@ def setup_mongodb_servicestore(config=None):
     config = setup_config_with_mongodb(config)
     store = get_db(config).get_store(MongodbServiceStore)
     store.clear_services()
-    # noinspection PyTypeChecker
-    return store
+    return store    # noqa
 
 
 def setup_mongodb_processstore(config=None):

@@ -37,8 +37,7 @@ class Base(dict):
         # use the existing property setter if defined
         prop = getattr(type(self), item)
         if isinstance(prop, property) and prop.fset is not None:
-            # noinspection PyArgumentList
-            prop.fset(self, value)
+            prop.fset(self, value)  # noqa
         elif item in self:
             self[item] = value
         else:
@@ -48,8 +47,7 @@ class Base(dict):
         # use existing property getter if defined
         prop = getattr(type(self), item)
         if isinstance(prop, property) and prop.fget is not None:
-            # noinspection PyArgumentList
-            return prop.fget(self, item)
+            return prop.fget(self, item)  # noqa
         elif item in self:
             return self[item]
         else:
@@ -491,6 +489,7 @@ class Job(Base):
 
 
 class Process(Base):
+    # pylint: disable=C0103,invalid-name
     """
     Dictionary that contains a process description for db storage.
     It always has ``identifier`` and ``processEndpointWPS1`` keys.
@@ -558,39 +557,33 @@ class Process(Base):
         # type: () -> Optional[List[Dict[AnyStr, Any]]]
         return self.get("outputs")
 
-    # noinspection PyPep8Naming
     @property
-    def jobControlOptions(self):
+    def jobControlOptions(self):  # noqa: N802
         # type: () -> Optional[List[AnyStr]]
         return self.get("jobControlOptions")
 
-    # noinspection PyPep8Naming
     @property
-    def outputTransmission(self):
+    def outputTransmission(self):  # noqa: N802
         # type: () -> Optional[List[AnyStr]]
         return self.get("outputTransmission")
 
-    # noinspection PyPep8Naming
     @property
-    def processDescriptionURL(self):
+    def processDescriptionURL(self):  # noqa: N802
         # type: () -> Optional[AnyStr]
         return self.get("processDescriptionURL")
 
-    # noinspection PyPep8Naming
     @property
-    def processEndpointWPS1(self):
+    def processEndpointWPS1(self):  # noqa: N802
         # type: () -> Optional[AnyStr]
         return self.get("processEndpointWPS1")
 
-    # noinspection PyPep8Naming
     @property
-    def executeEndpoint(self):
+    def executeEndpoint(self):  # noqa: N802
         # type: () -> Optional[AnyStr]
         return self.get("executeEndpoint")
 
-    # noinspection PyPep8Naming
     @property
-    def owsContext(self):
+    def owsContext(self):  # noqa: N802
         # type: () -> Optional[JSON]
         return self.get("owsContext")
 
@@ -765,6 +758,7 @@ class Process(Base):
 
 
 class Quote(Base):
+    # pylint: disable=C0103,invalid-name
     """
     Dictionary that contains quote information.
     It always has ``id`` and ``process`` keys.
@@ -833,15 +827,13 @@ class Quote(Base):
         """WPS Process ID."""
         return self["process"]
 
-    # noinspection PyPep8Naming
     @property
-    def estimatedTime(self):
+    def estimatedTime(self):  # noqa: N802
         """Process estimated time."""
         return self.get("estimatedTime")
 
-    # noinspection PyPep8Naming
     @property
-    def processParameters(self):
+    def processParameters(self):  # noqa: N802
         """Process execution parameters for quote."""
         return self.get("processParameters")
 

@@ -44,7 +44,7 @@ def _get_settings_or_wps_config(container,                  # type: AnySettingsC
             load_pywps_cfg(container)
         found = WEAVER_PYWPS_CFG.get(config_setting_section, config_setting_name)
     if not isinstance(found, six.string_types):
-        LOGGER.warn("{} not set in settings or WPS configuration, using default value.".format(message_not_found))
+        LOGGER.warning("%s not set in settings or WPS configuration, using default value.", message_not_found)
         found = default_not_found
     return found.strip()
 
@@ -55,8 +55,7 @@ def get_wps_path(container):
     Retrieves the WPS path (without hostname).
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
     """
-    return _get_settings_or_wps_config(
-        container, "weaver.wps_path", "server", "url", "/ows/wps", "WPS path")
+    return _get_settings_or_wps_config(container, "weaver.wps_path", "server", "url", "/ows/wps", "WPS path")
 
 
 def get_wps_url(container):

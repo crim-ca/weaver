@@ -8,6 +8,7 @@ from weaver.processes.types import PROCESS_BUILTIN
 from weaver.processes.wps_package import PACKAGE_EXTENSIONS, get_process_definition
 from weaver.utils import clean_json_text_body, ows_context_href
 from weaver.visibility import VISIBILITY_PUBLIC
+from weaver.wps import get_wps_url
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 from cwltool.command_line_tool import CommandLineTool
 from cwltool.docker import DockerCommandLineJob
@@ -121,6 +122,7 @@ def register_builtin_processes(container):
             inputs=process_info["inputs"],
             outputs=process_info["outputs"],
             processDescriptionURL=process_url,
+            processEndpointWPS1=get_wps_url(container),
             executeEndpoint="/".join([process_url, "jobs"]),
             visibility=VISIBILITY_PUBLIC,
         ))

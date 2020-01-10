@@ -363,7 +363,7 @@ def bytes2str(s):
 
 
 def islambda(func):
-    # type: (AnyStr) -> bool
+    # type: (Any) -> bool
     return isinstance(func, types.LambdaType) and func.__name__ == (lambda: None).__name__
 
 

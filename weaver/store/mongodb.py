@@ -34,12 +34,12 @@ import pymongo
 import six
 import logging
 if TYPE_CHECKING:
-    from weaver.typedefs import AnyValue                                        # noqa: F401
-    from pymongo.collection import Collection                                   # noqa: F401
-    from typing import Any, AnyStr, Dict, List, Optional, Tuple, Union          # noqa: F401
-    JobListAndCount = Tuple[List[Job], int]                                     # noqa: F401
-    JobCategory = Dict[AnyStr, Union[AnyValue, Job]]                            # noqa: F401
-    JobCategoriesAndCount = Tuple[List[JobCategory], int]                       # noqa: F401
+    from weaver.typedefs import AnyValue, AnyProcess, AnyProcessType                # noqa: F401
+    from pymongo.collection import Collection                                       # noqa: F401
+    from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, Union    # noqa: F401
+    JobListAndCount = Tuple[List[Job], int]                                         # noqa: F401
+    JobCategory = Dict[AnyStr, Union[AnyValue, Job]]                                # noqa: F401
+    JobCategoriesAndCount = Tuple[List[JobCategory], int]                           # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 
@@ -71,8 +71,8 @@ class MongodbStore(object):
         return tuple([collection]), {"sane_name_config": sane_name_config}
 
 
-# noinspection PyUnusedLocal
 class MongodbServiceStore(StoreServices, MongodbStore):
+    # pylint: disable=W0212,unused-local
     """
     Registry for OWS services. Uses mongodb to store service url and attributes.
     """
@@ -108,7 +108,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
             auth=service.auth))
         return self.fetch_by_url(url=service_url, request=request)
 
-    def delete_service(self, name, request=None):
+    def delete_service(self, name, request=None):  # noqa: W0212
         # type: (AnyStr, Optional[Request]) -> bool
         """
         Removes service from mongodb storage.
@@ -116,7 +116,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
         self.collection.delete_one({"name": name})
         return True
 
-    def list_services(self, request=None):
+    def list_services(self, request=None):  # noqa: W0212
         # type: (Optional[Request]) -> List[Service]
         """
         Lists all services in mongodb storage.
@@ -126,7 +126,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
             my_services.append(Service(service))
         return my_services
 
-    def fetch_by_name(self, name, visibility=None, request=None):
+    def fetch_by_name(self, name, visibility=None, request=None):  # noqa: W0212
         # type: (AnyStr, Optional[AnyStr], Optional[Request]) -> Service
         """
         Gets service for given ``name`` from mongodb storage.
@@ -141,7 +141,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
             raise ServiceNotAccessible("Service '{}' cannot be accessed.".format(name))
         return service
 
-    def fetch_by_url(self, url, request=None):
+    def fetch_by_url(self, url, request=None):  # noqa: W0212
         # type: (AnyStr, Optional[Request]) -> Service
         """
         Gets service for given ``url`` from mongodb storage.
@@ -151,7 +151,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
             raise ServiceNotFound
         return Service(service)
 
-    def clear_services(self, request=None):
+    def clear_services(self, request=None):  # noqa: W0212
         # type: (Optional[Request]) -> bool
         """
         Removes all OWS services from mongodb storage.
@@ -160,7 +160,6 @@ class MongodbServiceStore(StoreServices, MongodbStore):
         return True
 
 
-# noinspection PyUnusedLocal
 class MongodbProcessStore(StoreProcesses, MongodbStore):
     """
     Registry for processes. Uses mongodb to store processes and attributes.
@@ -183,6 +182,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
                     self._add_process(process)
 
     def _add_process(self, process):
+        # type: (AnyProcess) -> None
         if isinstance(process, ProcessWPS):
             new_process = Process.from_wps(process, processEndpointWPS1=self.default_wps_endpoint)
         else:
@@ -199,6 +199,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
 
     @staticmethod
     def _get_process_field(process, function_dict):
+        # type: (AnyProcess, Union[Dict[AnyProcessType, Callable[[], Any]], Callable[[], Any]]) -> Any
         """
         Takes a lambda expression or a dict of process-specific lambda expressions to retrieve a field.
         Validates that the passed process object is one of the supported types.
@@ -220,20 +221,23 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
             raise ProcessInstanceError("Unsupported process type '{}'".format(type(process)))
 
     def _get_process_id(self, process):
+        # type: (AnyProcess) -> AnyStr
         return self._get_process_field(process, lambda: process.identifier)
 
     def _get_process_type(self, process):
+        # type: (AnyProcess) -> AnyStr
         return self._get_process_field(process, {Process: lambda: process.type,
                                                  ProcessWPS: lambda: getattr(process, "type", PROCESS_WPS)}).lower()
 
     def _get_process_endpoint_wps1(self, process):
+        # type: (AnyProcess) -> AnyStr
         url = self._get_process_field(process, {Process: lambda: process.processEndpointWPS1,
                                                 ProcessWPS: lambda: None})
         if not url:
             url = self.default_wps_endpoint
         return url
 
-    def save_process(self, process, overwrite=True, request=None):
+    def save_process(self, process, overwrite=True, request=None):  # noqa: W0212
         # type: (Union[Process, ProcessWPS], bool, Optional[Request]) -> Process
         """
         Stores a process in storage.
@@ -265,13 +269,13 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
             raise ProcessNotFound("Process '{}' could not be found.".format(sane_name))
         return bool(self.collection.delete_one({"identifier": sane_name}).deleted_count)
 
-    def list_processes(self, visibility=None, request=None):
+    def list_processes(self, visibility=None, request=None):  # noqa: W0212
         # type: (Optional[AnyStr], Optional[Request]) -> List[Process]
         """
         Lists all processes in database, optionally filtered by `visibility`.
 
         :param visibility: One value amongst `weaver.visibility`.
-        :param request:
+        :param request: <unused>
         """
         db_processes = []
         search_filters = {}
@@ -288,7 +292,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
             db_processes.append(Process(process))
         return db_processes
 
-    def fetch_by_id(self, process_id, visibility=None, request=None):
+    def fetch_by_id(self, process_id, visibility=None, request=None):  # noqa: W0212
         # type: (AnyStr, Optional[AnyStr], Optional[Request]) -> Process
         """
         Get process for given `process_id` from storage, optionally filtered by `visibility`.
@@ -296,7 +300,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
 
         :param process_id: process identifier
         :param visibility: one value amongst `weaver.visibility`.
-        :param request:
+        :param request: <unused>
         :return: An instance of :class:`weaver.datatype.Process`.
         """
         sane_name = get_sane_name(process_id, **self.sane_name_config)
@@ -308,7 +312,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
             raise ProcessNotAccessible("Process '{}' cannot be accessed.".format(sane_name))
         return process
 
-    def get_visibility(self, process_id, request=None):
+    def get_visibility(self, process_id, request=None):  # noqa: W0212
         # type: (AnyStr, Optional[Request]) -> AnyStr
         """
         Get `visibility` of a process.
@@ -318,31 +322,33 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         process = self.fetch_by_id(process_id)
         return process.visibility
 
-    def set_visibility(self, process_id, visibility, request=None):
+    def set_visibility(self, process_id, visibility, request=None):  # noqa: W0212
         # type: (AnyStr, AnyStr, Optional[Request]) -> None
         """
         Set `visibility` of a process.
 
         :param visibility: One value amongst `weaver.visibility`.
         :param process_id:
-        :param request:
+        :param request: <unused>
         :raises: ``TypeError`` or ``ValueError`` in case of invalid parameter.
         """
         process = self.fetch_by_id(process_id)
         process.visibility = visibility
         self.save_process(process, overwrite=True)
 
-    def clear_processes(self, request=None):
+    def clear_processes(self, request=None):  # noqa: W0212
         # type: (Optional[Request]) -> bool
         """
         Clears all processes from the store.
+
+        :param request: <unused>
         """
         self.collection.drop()
         return True
 
 
-# noinspection PyUnusedLocal
 class MongodbJobStore(StoreJobs, MongodbStore):
+    # pylint: disable=W0212,unused-local
     """
     Registry for process jobs tracking. Uses mongodb to store job attributes.
     """
@@ -415,7 +421,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             raise JobUpdateError("Error occurred during job update: [{}]".format(repr(ex)))
         raise JobUpdateError("Failed to update specified job: '{}'".format(str(job)))
 
-    def delete_job(self, job_id, request=None):
+    def delete_job(self, job_id, request=None):     # noqa: W0212
         # type: (AnyStr, Optional[Request]) -> bool
         """
         Removes job from mongodb storage.
@@ -423,7 +429,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         self.collection.delete_one({"id": job_id})
         return True
 
-    def fetch_by_id(self, job_id, request=None):
+    def fetch_by_id(self, job_id, request=None):    # noqa: W0212
         # type: (AnyStr, Optional[Request]) -> Job
         """
         Gets job for given ``job_id`` from mongodb storage.
@@ -433,7 +439,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             raise JobNotFound("Could not find job matching: '{}'".format(job_id))
         return Job(job)
 
-    def list_jobs(self, request=None):
+    def list_jobs(self, request=None):  # noqa: W0212
         # type: (Optional[Request]) -> List[Job]
         """
         Lists all jobs in mongodb storage.
@@ -576,7 +582,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         total = self.collection.count_documents(search_filters)
         return items, total
 
-    def clear_jobs(self, request=None):
+    def clear_jobs(self, request=None):  # noqa: W0212
         # type: (Optional[Request]) -> bool
         """
         Removes all jobs from mongodb storage.
