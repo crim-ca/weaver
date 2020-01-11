@@ -735,7 +735,9 @@ class JobStatusInfo(MappingSchema):
 class JobEntrySchema(OneOfMappingSchema):
     _one_of = (
         JobStatusInfo,
-        SchemaNode(String(), description="Job ID."),
+        # FIXME: figure out how to provide this variant (ie: detail=false)
+        #   + enable validation in Job.json()
+        #SchemaNode(String(), description="Job ID."),
     )
 
 

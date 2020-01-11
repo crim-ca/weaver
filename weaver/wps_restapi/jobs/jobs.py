@@ -191,7 +191,9 @@ def get_queried_jobs(request):
         body.update({"groups": items})
     else:
         body.update({"jobs": _job_list(items), "page": page, "limit": limit})
-    return HTTPOk(json=sd.GetQueriedJobsSchema().deserialize(body))
+    # FIXME: use schema validation
+    # body = sd.GetQueriedJobsSchema().deserialize(body)
+    return HTTPOk(json=body)
 
 
 @sd.job_full_service.get(tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
