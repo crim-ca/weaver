@@ -21,6 +21,7 @@ New Features:
 - Add support of input ``minOccurs`` and ``maxOccurs`` as ``int`` while maintaining ``str`` support (#14).
 - Add conformance route with implementation links (#53).
 - Add additional landing page link details (#54).
+- Add ``weaver.wps_restapi.colander_extras.DropableNoneSchema`` to auto-handle some schema JSON deserialization.
 
 Changes:
 -------------
@@ -33,6 +34,8 @@ Changes:
 - Make ``null`` reference a singleton so that multiple instantiation calls all refer to the same instance and produce
   the expected behaviour of ``<x> is null`` instead of hard-to-identify errors because of english syntax.
 - Remove unused function ``weaver.utils.replace_caps_url`` and corresponding tests.
+- Remove ``weaver.processes.utils.jsonify_value`` duplicated by ``weaver.processes.wps_package.complex2json``.
+- Use more JSON body schema validation using API schema definitions deserialization defined by ``weaver.datatype``.
 - Update Apache license.
 
 Fixes:

@@ -12,6 +12,7 @@ from weaver.store.base import StoreProcesses
 from weaver.utils import get_sane_name, get_settings, get_url_without_query
 from weaver.processes import wps_package
 from weaver.processes.constants import WPS_COMPLEX_DATA
+from weaver.processes.wps_package import complex2json as jsonify_value
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
@@ -22,7 +23,7 @@ from weaver.exceptions import (
     PackageTypeError,
     PackageNotFound,
 )
-from owslib.wps import ComplexData, is_reference
+from owslib.wps import is_reference
 from owslib.wps import WebProcessingService
 from pyramid.httpexceptions import (
     HTTPOk,
@@ -139,15 +140,6 @@ def jsonify_output(output, process_description):
         json_output["mimeType"] = output.mimeType
 
     return json_output
-
-
-def jsonify_value(value):
-    # ComplexData type
-    if isinstance(value, ComplexData):
-        return {"mimeType": value.mimeType, "encoding": value.encoding, "schema": value.schema}
-    # other type
-    else:
-        return value
 
 
 def convert_process_wps_to_db(service, process, container):

@@ -133,7 +133,7 @@ class WpsPackageAppTest(unittest.TestCase):
         assert "minOccurs" not in desc["process"]["outputs"][0]
         assert "maxOccurs" not in desc["process"]["outputs"][0]
         assert "format" not in desc["process"]["outputs"][0]
-        expected_fields = {"id", "title", "abstract", "inputs", "outputs", "executeEndpoint"}
+        expected_fields = {"id", "title", "abstract", "inputs", "outputs", "executeEndpoint", "keywords", "metadata"}
         assert len(set(desc["process"].keys()) - expected_fields) == 0
 
     def test_literal_io_from_package_and_offering(self):
@@ -905,7 +905,7 @@ class WpsPackageAppTest(unittest.TestCase):
         assert isinstance(desc["process"]["outputs"][0]["formats"][0], dict)
         assert desc["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
         assert desc["process"]["outputs"][0]["formats"][0]["default"] is True
-        expected_fields = {"id", "title", "abstract", "inputs", "outputs", "executeEndpoint"}
+        expected_fields = {"id", "title", "abstract", "inputs", "outputs", "executeEndpoint", "keywords", "metadata"}
         assert len(set(desc["process"].keys()) - expected_fields) == 0
 
     def test_complex_io_from_package_and_offering(self):

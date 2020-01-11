@@ -3,6 +3,41 @@ from cornice_swagger.converters import schema
 from cornice_swagger.converters.exceptions import NoSuchConverter
 
 
+class DropableNoneSchema(colander.SchemaNode):
+    """
+    Drops the underlying schema node if ``missing=drop`` was specified and that the value representing it is ``None``.
+
+    Original behaviour of schema classes that can have children nodes such as :class:`colander.MappingSchema` and
+    :class:`colander.SequenceSchema` are to drop the sub-node only if its value is resolved as :class:`colander.null`
+    or :class:`colander.drop`. This results in "missing" definitions replaced by ``None`` in many implementations to
+    raise :py:exception:`colander.Invalid` during deserialization. Inheriting this class in a schema definition
+    will handle this situation automatically.
+
+    Required schemas (without ``missing=drop``, i.e.: :class:`colander.required`) will still raise for undefined nodes.
+
+    .. example::
+        .. code-block:: python
+
+            class SchemaA(DropableNoneSchema, MappingSchema):
+                field = SchemaNode(String())
+
+            class SchemaB(MappingSchema):
+                s1 = SchemaA(missing=drop)   # optional
+                s2 = SchemaA()               # required
+
+            SchemaB().deserialize({"s1": None, "s2": {"field": "ok"}})
+            # >> {'s2': {'field': 'ok'}}
+
+    .. seealso:
+        https://github.com/Pylons/colander/issues/276
+        https://github.com/Pylons/colander/issues/299
+    """
+    def deserialize(self, cstruct):
+        if self.default is colander.null and self.missing is colander.drop and cstruct is None:
+            return colander.drop
+        return super(DropableNoneSchema, self).deserialize(cstruct)
+
+
 class SchemaNodeDefault(colander.SchemaNode):
     """
     If ``default`` keyword is provided during :class:`colander.SchemaNode` creation, overrides the

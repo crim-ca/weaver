@@ -12,7 +12,7 @@ from weaver.store.base import StoreServices, StoreProcesses, StoreJobs
 from weaver.utils import get_settings, get_any_id, get_any_value, get_url_without_query
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.notify import encrypt_email
-from weaver.wps_restapi.utils import get_wps_restapi_base_url, OUTPUT_FORMAT_JSON
+from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
 from weaver.wps import get_wps_output_dir, get_wps_output_url
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver import status, sort
@@ -36,40 +36,6 @@ import six
 import os
 
 LOGGER = get_task_logger(__name__)
-
-
-def job_url(settings, job):
-    base_job_url = get_wps_restapi_base_url(settings)
-    if job.service is not None:
-        base_job_url += "/providers/{provider_id}".format(provider_id=job.service)
-    return "{base_job_url}/processes/{process_id}/jobs/{job_id}".format(
-        base_job_url=base_job_url,
-        process_id=job.process,
-        job_id=job.id)
-
-
-def job_format_json(settings, job):
-    job_json = {
-        "jobID": job.id,
-        "status": job.status,
-        "message": job.status_message,
-        "duration": job.duration,
-        "percentCompleted": job.progress,
-    }
-    if job.status in status.job_status_categories[status.STATUS_CATEGORY_FINISHED]:
-        job_status = status.map_status(job.status)
-        if job_status == status.STATUS_SUCCEEDED:
-            resource_type = "result"
-        else:
-            resource_type = "exceptions"
-        job_json[resource_type] = "{job_url}/{res}".format(job_url=job_url(settings, job), res=resource_type.lower())
-
-    job_json["logs"] = "{job_url}/logs".format(job_url=job_url(settings, job))
-    return job_json
-
-
-def job_list_json(settings, jobs, detail=True):
-    return [job_format_json(settings, job) if detail else job.id for job in jobs]
 
 
 def check_status(url=None, response=None, sleep_secs=2, verify=False):
@@ -187,9 +153,9 @@ def validate_service_process(request):
 @sd.jobs_short_service.get(tags=[sd.TAG_JOBS], renderer=OUTPUT_FORMAT_JSON,
                            schema=sd.GetJobsEndpoint(), response_schemas=sd.get_all_jobs_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobsResponse.description)
-def get_jobs(request):
+def get_queried_jobs(request):
     """
-    Retrieve the list of jobs which can be filtered/sorted using queries.
+    Retrieve the list of jobs which can be filtered, sorted, paged and categorized using query parameters.
     """
     settings = get_settings(request)
     service, process = validate_service_process(request)
@@ -215,13 +181,17 @@ def get_jobs(request):
     store = get_db(request).get_store(StoreJobs)
     items, total = store.find_jobs(request, group_by=groups, **filters)
     body = {"total": total}
+
+    def _job_list(jobs):
+        return [j.json(settings) if detail else j.id for j in jobs]
+
     if groups:
         for grouped_jobs in items:
-            grouped_jobs["jobs"] = job_list_json(settings, grouped_jobs["jobs"], detail)
+            grouped_jobs["jobs"] = _job_list(grouped_jobs["jobs"])
         body.update({"groups": items})
     else:
-        body.update({"jobs": job_list_json(settings, items, detail), "page": page, "limit": limit})
-    return HTTPOk(json=body)
+        body.update({"jobs": _job_list(items), "page": page, "limit": limit})
+    return HTTPOk(json=sd.GetQueriedJobsSchema().deserialize(body))
 
 
 @sd.job_full_service.get(tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
@@ -236,8 +206,7 @@ def get_job_status(request):
     Retrieve the status of a job.
     """
     job = get_job(request)
-    response = job_format_json(get_settings(request), job)
-    return HTTPOk(json=response)
+    return HTTPOk(json=job.json(request))
 
 
 @sd.job_full_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,

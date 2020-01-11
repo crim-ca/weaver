@@ -105,7 +105,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
             name=service_name,
             type=service.type,
             public=service.public,
-            auth=service.auth))
+            auth=service.auth).params())
         return self.fetch_by_url(url=service_url, request=request)
 
     def delete_service(self, name, request=None):  # noqa: W0212
@@ -195,7 +195,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         new_process["identifier"] = self._get_process_id(process)
         new_process["processEndpointWPS1"] = self._get_process_endpoint_wps1(process)
         new_process["visibility"] = new_process.visibility
-        self.collection.insert_one(new_process)
+        self.collection.insert_one(new_process.params())
 
     @staticmethod
     def _get_process_field(process, function_dict):
@@ -399,7 +399,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                 "access": access,
                 "notification_email": notification_email,
             })
-            self.collection.insert_one(new_job)
+            self.collection.insert_one(new_job.params())
             job = self.fetch_by_id(job_id=new_job.id)
         except Exception as ex:
             raise JobRegistrationError("Error occurred during job registration: [{}]".format(repr(ex)))
@@ -414,7 +414,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         :param job: instance of ``weaver.datatype.Job``.
         """
         try:
-            result = self.collection.update_one({"id": job.id}, {"$set": job.params})
+            result = self.collection.update_one({"id": job.id}, {"$set": job.params()})
             if result.acknowledged and result.modified_count == 1:
                 return self.fetch_by_id(job.id)
         except Exception as ex:
@@ -608,7 +608,7 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
         if not isinstance(quote, Quote):
             raise QuoteInstanceError("Invalid quote object: '{}'".format(repr(quote)))
         try:
-            self.collection.insert_one(quote)
+            self.collection.insert_one(quote.params())
             quote = self.fetch_by_id(quote_id=quote.id)
         except Exception as ex:
             raise QuoteRegistrationError("Error occurred during quote registration: [{}]".format(repr(ex)))
@@ -679,7 +679,7 @@ class MongodbBillStore(StoreBills, MongodbStore):
         if not isinstance(bill, Bill):
             raise BillInstanceError("Invalid bill object: '{}'".format(repr(bill)))
         try:
-            self.collection.insert_one(bill)
+            self.collection.insert_one(bill.params())
             bill = self.fetch_by_id(bill_id=bill.id)
         except Exception as ex:
             raise BillRegistrationError("Error occurred during bill registration: [{}]".format(repr(ex)))

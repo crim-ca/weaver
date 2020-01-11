@@ -26,9 +26,9 @@ from weaver.store.base import StoreServices, StoreProcesses, StoreJobs
 from weaver.utils import get_any_id, get_any_value, get_settings, get_cookie_headers, raise_on_xml_exception, wait_secs
 from weaver.visibility import VISIBILITY_PUBLIC, visibility_values
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.jobs.notify import notify_job, encrypt_email
+from weaver.wps_restapi.jobs.notify import notify_job_complete, encrypt_email
 from weaver.wps_restapi.utils import get_wps_restapi_base_url, parse_request_query, OUTPUT_FORMAT_JSON
-from weaver.wps_restapi.jobs.jobs import check_status, job_format_json
+from weaver.wps_restapi.jobs.jobs import check_status
 from weaver.wps import load_pywps_cfg
 from owslib.wps import WebProcessingService, WPSException, ComplexDataInput
 from owslib.util import clean_ows_url
@@ -40,11 +40,9 @@ from pyramid.httpexceptions import (
     HTTPNotFound,
     HTTPBadRequest,
     HTTPUnprocessableEntity,
-    HTTPInternalServerError,
     HTTPNotImplemented,
     HTTPServiceUnavailable,
     HTTPSuccessful,
-    HTTPException,
 )
 from time import sleep
 from celery.utils.log import get_task_logger
@@ -194,13 +192,12 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
         # Send email if requested
         if notification_email is not None:
             try:
-                job_json = job_format_json(settings, job)
-                notify_job(job, job_json, notification_email, settings)
+                notify_job_complete(job, notification_email, settings)
                 message = "Email sent successfully."
                 job.save_log(logger=task_logger, message=message)
             except Exception as exc:
                 exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
-                exception = "{0}: {1}".format(exception_class, exc.message)
+                exception = "{0}: {1!s}".format(exception_class, exc)
                 message = "Couldn't send email ({})".format(exception)
                 job.save_log(errors=message, logger=task_logger, message=message)
 

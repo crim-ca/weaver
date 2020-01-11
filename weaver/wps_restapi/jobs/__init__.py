@@ -24,11 +24,11 @@ def includeme(config):
     config.add_route(**sd.service_api_route_info(sd.process_exceptions_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_logs_service, settings))
 
-    config.add_view(j.get_jobs, route_name=sd.process_jobs_service.name,
+    config.add_view(j.get_queried_jobs, route_name=sd.process_jobs_service.name,
                     request_method="GET", renderer=OUTPUT_FORMAT_JSON)
-    config.add_view(j.get_jobs, route_name=sd.jobs_short_service.name,
+    config.add_view(j.get_queried_jobs, route_name=sd.jobs_short_service.name,
                     request_method="GET", renderer=OUTPUT_FORMAT_JSON)
-    config.add_view(j.get_jobs, route_name=sd.jobs_full_service.name,
+    config.add_view(j.get_queried_jobs, route_name=sd.jobs_full_service.name,
                     request_method="GET", renderer=OUTPUT_FORMAT_JSON)
     config.add_view(j.get_job_status, route_name=sd.job_short_service.name,
                     request_method="GET", renderer=OUTPUT_FORMAT_JSON)

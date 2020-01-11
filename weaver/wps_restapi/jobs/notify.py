@@ -1,6 +1,6 @@
 from __future__ import unicode_literals
 from weaver.datatype import Job
-from weaver.utils import str2bytes, bytes2str
+from weaver.utils import str2bytes, bytes2str, get_settings
 from pyramid.settings import asbool
 from mako.template import Template
 from typing import TYPE_CHECKING
@@ -11,6 +11,7 @@ import hashlib
 import binascii
 import logging
 if TYPE_CHECKING:
+    from weaver.typedefs import AnySettingsContainer
     from typing import Dict     # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
@@ -56,8 +57,12 @@ Weaver
 """
 
 
-def notify_job(job, job_json, to, settings):
-    # type: (Job, Dict, str, Dict) -> None
+def notify_job_complete(job, to, container):
+    # type: (Job, str, AnySettingsContainer) -> None
+    """
+    Send email notification of a job completion.
+    """
+    settings = get_settings(container)
     smtp_host = settings.get("weaver.wps_email_notify_smtp_host")
     from_addr = settings.get("weaver.wps_email_notify_from_addr")
     password = settings.get("weaver.wps_email_notify_password")
@@ -87,6 +92,7 @@ def notify_job(job, job_json, to, settings):
             raise IOError("Template file doesn't exist: OneOf[{!s}, {!s}]".
                           format(process_name, default_name))
 
+    job_json = job.json(settings)
     contents = template.render(to=to, job=job, settings=settings, **job_json)
     message = u'{}'.format(contents).strip(u'\n')
 

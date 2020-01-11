@@ -51,9 +51,9 @@ def mock_remote_server_requests_wp1(test):
         """Mock ``requests`` responses fetching ``TEST_REMOTE_SERVER_URL`` WPS reference."""
         xml_header = {"Content-Type": CONTENT_TYPE_APP_XML}
         with responses.RequestsMock(assert_all_requests_are_fired=False) as mock_resp:
-            with open(TEST_REMOTE_PROCESS_DESCRIBE_WPS1_FILE, 'r') as f:
+            with open(TEST_REMOTE_PROCESS_DESCRIBE_WPS1_FILE, "r") as f:
                 describe_xml = f.read()
-            with open(TEST_REMOTE_PROCESS_GETCAP_WPS1_FILE, 'r') as f:
+            with open(TEST_REMOTE_PROCESS_GETCAP_WPS1_FILE, "r") as f:
                 get_cap_xml = f.read()
             mock_resp.add(responses.GET, TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL, body=describe_xml, headers=xml_header)
             mock_resp.add(responses.GET, TEST_REMOTE_PROCESS_GETCAP_WPS1_URL, body=get_cap_xml, headers=xml_header)
@@ -309,12 +309,13 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     def deploy_process_make_visible_and_fetch_deployed(self, deploy_payload, expected_process_id):
         """
-        **Note:** This is a shortcut method for all ``test_deploy_process_<>`` cases.
-
         Attempts to deploy the process using the provided deployment payload, then makes it visible and finally
         fetches the deployed process to validate the resulting WPS-3 REST JSON description.
 
         Any failure along the way is raised.
+
+        .. note::
+            This is a shortcut method for all ``test_deploy_process_<>`` cases.
         """
         resp = self.app.post_json("/processes", params=deploy_payload, headers=self.json_headers)
         assert resp.status_code == 200  # TODO: status should be 201 when properly modified to match API conformance

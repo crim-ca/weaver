@@ -22,9 +22,23 @@ from weaver.execute import (
 )
 from weaver.owsexceptions import OWSMissingParameterValue
 from weaver.visibility import visibility_values, VISIBILITY_PUBLIC
-from weaver.wps_restapi.colander_extras import OneOfMappingSchema, SchemaNodeDefault as SchemaNode
-from colander import String, Boolean, Integer, Float, DateTime, MappingSchema, SequenceSchema, drop, OneOf
+from weaver.wps_restapi.colander_extras import DropableNoneSchema, OneOfMappingSchema, SchemaNodeDefault as SchemaNode
+from colander import (
+    String, Boolean, Integer, Float, DateTime, Time, Range,
+    MappingSchema as MapSchema,
+    SequenceSchema as SeqSchema,
+    drop, OneOf
+)
 from cornice import Service
+
+
+class MappingSchema(DropableNoneSchema, MapSchema):
+    """Override the default :class:`colander.MappingSchema` to auto-handle dropping missing definition as required."""
+
+
+class SequenceSchema(DropableNoneSchema, SeqSchema):
+    """Override the default :class:`colander.SequenceSchema` to auto-handle dropping missing definition as required."""
+
 
 API_TITLE = "Weaver REST API"
 API_INFO = {
@@ -349,7 +363,7 @@ class AllowedValues(MappingSchema):
     allowedValues = AllowedValuesList()
 
 
-class Range(MappingSchema):
+class AllowedRange(MappingSchema):
     minimumValue = SchemaNode(String(), missing=drop)
     maximumValue = SchemaNode(String(), missing=drop)
     spacing = SchemaNode(String(), missing=drop)
@@ -358,7 +372,7 @@ class Range(MappingSchema):
 
 
 class AllowedRangesList(SequenceSchema):
-    allowedRanges = Range()
+    allowedRanges = AllowedRange()
 
 
 class AllowedRanges(MappingSchema):
@@ -707,33 +721,36 @@ class ProcessOutputDescriptionSchema(MappingSchema):
 
 
 class JobStatusInfo(MappingSchema):
-    jobID = SchemaNode(String(), example='a9d14bf4-84e0-449a-bac8-16e598efe807', description="ID of the job.")
+    jobID = SchemaNode(String(), example="a9d14bf4-84e0-449a-bac8-16e598efe807", description="ID of the job.")
     status = JobStatusEnum()
     message = SchemaNode(String(), missing=drop)
     logs = SchemaNode(String(), missing=drop)
     expirationDate = SchemaNode(DateTime(), missing=drop)
     estimatedCompletion = SchemaNode(DateTime(), missing=drop)
-    duration = SchemaNode(DateTime(), missing=drop)
+    duration = SchemaNode(String(), missing=drop, description="Duration of the process execution.")
     nextPoll = SchemaNode(DateTime(), missing=drop)
     percentCompleted = SchemaNode(Integer(), example=0, validator=Range(min=0, max=100))
 
 
-class JobCollectionList(SequenceSchema):
-    item = SchemaNode(String(), description='Job ID.')
+class JobEntrySchema(OneOfMappingSchema):
+    _one_of = (
+        JobStatusInfo,
+        SchemaNode(String(), description="Job ID."),
+    )
 
 
-class JobCollection(MappingSchema):
-    jobs = JobCollectionList()
+class JobCollection(SequenceSchema):
+    item = JobEntrySchema()
 
 
 class CreatedJobStatusSchema(MappingSchema):
     status = SchemaNode(String(), example=STATUS_ACCEPTED)
-    location = SchemaNode(String(), example='http://{host}/weaver/processes/{my-process-id}/jobs/{my-job-id}')
-    jobID = SchemaNode(String(), example='a9d14bf4-84e0-449a-bac8-16e598efe807', description="ID of the created job.")
+    location = SchemaNode(String(), example="http://{host}/weaver/processes/{my-process-id}/jobs/{my-job-id}")
+    jobID = SchemaNode(String(), example="a9d14bf4-84e0-449a-bac8-16e598efe807", description="ID of the created job.")
 
 
 class CreatedQuotedJobStatusSchema(CreatedJobStatusSchema):
-    bill = SchemaNode(String(), example='d88fda5c-52cc-440b-9309-f2cd20bcd6a2', description="ID of the created bill.")
+    bill = SchemaNode(String(), example="d88fda5c-52cc-440b-9309-f2cd20bcd6a2", description="ID of the created bill.")
 
 
 class GetPagingJobsSchema(MappingSchema):
@@ -752,7 +769,7 @@ class GetGroupedJobsSchema(SequenceSchema):
     job_group_category = GroupedJobsCategorySchema()
 
 
-class GetFilteredJobsSchema(OneOfMappingSchema):
+class GetQueriedJobsSchema(OneOfMappingSchema):
     _one_of = (
         GetPagingJobsSchema,
         GetGroupedJobsSchema,
@@ -1442,11 +1459,6 @@ class InternalServerErrorPostProviderProcessJobResponse(MappingSchema):
     description = "Unhandled error occurred during process job submission."
 
 
-class OkGetAllProcessJobsResponse(MappingSchema):
-    header = JsonHeader()
-    body = JobCollection()
-
-
 class OkGetProcessJobResponse(MappingSchema):
     header = JsonHeader()
     body = JobStatusInfo()
@@ -1457,9 +1469,9 @@ class OkDeleteProcessJobResponse(MappingSchema):
     body = DismissedJobSchema()
 
 
-class OkGetJobsResponse(MappingSchema):
+class OkGetQueriedJobsResponse(MappingSchema):
     header = JsonHeader()
-    body = GetFilteredJobsSchema()
+    body = GetQueriedJobsSchema()
 
 
 class InternalServerErrorGetJobsResponse(MappingSchema):
@@ -1686,7 +1698,7 @@ post_process_jobs_responses = {
     "500": InternalServerErrorPostProcessJobResponse(),
 }
 get_all_jobs_responses = {
-    "200": OkGetJobsResponse(description="success"),
+    "200": OkGetQueriedJobsResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
     "500": InternalServerErrorGetJobsResponse(),
 }

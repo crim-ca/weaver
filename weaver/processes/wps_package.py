@@ -83,13 +83,14 @@ LOGGER = logging.getLogger(__name__)
 
 __all__ = [
     "PACKAGE_EXTENSIONS",
-    "WPS_LITERAL",
     "DefaultFormat",
     "WpsPackage",
     "get_process_definition",
     "get_process_location",
     "get_package_workflow_steps",
     "retrieve_package_job_log",
+    "complex2json",
+    "metadata2json",
 ]
 
 # package types and extensions
@@ -1221,25 +1222,37 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
                                                 set(cwl_package_package.get("s:keywords")))
 
 
+def complex2json(data):
+    # type: (Union[ComplexData, Any]) -> Union[JSON, Any]
+    """
+    Obtains the JSON representation of a :class:`ComplexData` or simply return the unmatched type.
+    """
+    if not isinstance(data, ComplexData):
+        return data
+    return {
+        "mimeType": data.mimeType,
+        "encoding": data.encoding,
+        "schema": data.schema,
+    }
+
+
+def metadata2json(meta):
+    # type: (Union[OwsMetadata, Any]) -> Union[JSON, Any]
+    """
+    Obtains the JSON representation of a :class:`OwsMetadata` or simply return the unmatched type.
+    """
+    if not isinstance(meta, OwsMetadata):
+        return meta
+    return {
+        "href": meta.url,
+        "title": meta.title,
+        "role": meta.role
+    }
+
+
 def _ows2json_io(ows_io):
     # type: (OWS_IO_Type) -> JSON_IO_Type
     """Converts I/O from :module:`owslib.wps` to JSON."""
-
-    def _complex2json(data):
-        # type: (ComplexData) -> JSON
-        return {
-            "mimeType": data.mimeType,
-            "encoding": data.encoding,
-            "schema": data.schema,
-        }
-
-    def _meta2json(meta):
-        # type: (OwsMetadata) -> JSON
-        return {
-            "href": meta.url,
-            "title": meta.title,
-            "role": meta.role
-        }
 
     json_io = dict()
     for field in WPS_FIELD_MAPPING:
@@ -1251,14 +1264,14 @@ def _ows2json_io(ows_io):
                 # complex data is converted as is
                 # metadata converted and preserved if it results into a minimally valid definition (otherwise dropped)
                 json_io[field] = [
-                    _complex2json(v) if isinstance(v, ComplexData) else
-                    _meta2json(v) if isinstance(v, OwsMetadata) else v
+                    complex2json(v) if isinstance(v, ComplexData) else
+                    metadata2json(v) if isinstance(v, OwsMetadata) else v
                     for v in value if not isinstance(v, OwsMetadata) or v.url is not None
                 ]
             elif isinstance(value, ComplexData):
-                json_io[field] = _complex2json(value)
+                json_io[field] = complex2json(value)
             elif isinstance(value, OwsMetadata):
-                json_io[field] = _meta2json(value)
+                json_io[field] = metadata2json(value)
             else:
                 json_io[field] = value
 

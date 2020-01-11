@@ -3,11 +3,22 @@ Definitions of types used by tokens.
 """
 from weaver.exceptions import ProcessInstanceError
 from weaver.processes.types import PROCESS_WITH_MAPPING, PROCESS_WPS
-from weaver.status import STATUS_UNKNOWN, job_status_values
-from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
+from weaver.status import (
+    STATUS_UNKNOWN,
+    STATUS_SUCCEEDED,
+    STATUS_CATEGORY_FINISHED,
+    job_status_categories,
+    job_status_values,
+    map_status,
+)
+from weaver.utils import (
+    get_settings,
+    localize_datetime,  # for backward compatibility of previously saved jobs not time-locale-aware
+)
 from weaver.utils import fully_qualified_name, get_job_log_msg, get_log_date_fmt, get_log_fmt, now
 from weaver.visibility import VISIBILITY_PRIVATE, visibility_values
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 import six
 from dateutil.parser import parse as dt_parse  # noqa
@@ -21,7 +32,7 @@ from logging import ERROR, INFO, getLevelName, getLogger
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from weaver.typedefs import Number, LoggerType, CWL, JSON       # noqa: F401
+    from weaver.typedefs import AnySettingsContainer, Number, LoggerType, CWL, JSON       # noqa: F401
     from typing import Any, AnyStr, Dict, List, Optional, Union     # noqa: F401
 
 LOGGER = getLogger(__name__)
@@ -67,6 +78,28 @@ class Base(dict):
     def id(self):
         raise NotImplementedError()
 
+    def json(self):
+        # type: () -> JSON
+        """
+        Obtain the JSON data representation for response body.
+
+        .. note::
+            This method implementation should validate the JSON schema against the API definition whenever
+            applicable to ensure integrity between the represented data type and the expected API response.
+        """
+        raise NotImplementedError("Method 'json' must be defined for JSON request item representation.")
+
+    def params(self):
+        # type: () -> Dict[AnyStr, Any]
+        """
+        Obtain the internal data representation for storage.
+
+        .. note::
+            This method implementation should provide a JSON-serializable definition of all fields representing
+            the object to store.
+        """
+        raise NotImplementedError("Method 'params' must be defined for storage item representation.")
+
 
 class Service(Base):
     """
@@ -110,7 +143,11 @@ class Service(Base):
         """Authentication method: public, token, cert."""
         return self.get("auth", "token")
 
-    @property
+    def json(self):
+        # type: () -> JSON
+        # TODO: apply swagger type deserialize schema check if returned in a response
+        return self.params()
+
     def params(self):
         return {
             "url": self.url,
@@ -137,7 +174,7 @@ class Job(Base):
         # type: (Optional[AnyStr]) -> AnyStr
         if not msg:
             msg = self.status_message
-        return get_job_log_msg(duration=self.duration, progress=self.progress, status=self.status, message=msg)
+        return get_job_log_msg(duration=self.duration_str, progress=self.progress, status=self.status, message=msg)
 
     def save_log(self, errors=None, logger=None, message=None):
         # type: (Optional[Union[AnyStr, List[WPSException]]], Optional[LoggerType], Optional[AnyStr]) -> None
@@ -325,7 +362,7 @@ class Job(Base):
 
     @property
     def finished(self):
-        # type: () -> Optional[AnyStr]
+        # type: () -> Optional[datetime]
         return self.get("finished", None)
 
     def is_finished(self):
@@ -338,11 +375,14 @@ class Job(Base):
 
     @property
     def duration(self):
-        # type: () -> AnyStr
+        # type: () -> timedelta
         final_time = self.finished or now()
-        duration = localize_datetime(final_time) - localize_datetime(self.created)
-        self["duration"] = str(duration).split('.')[0]
-        return self["duration"]
+        return localize_datetime(final_time) - localize_datetime(self.created)
+
+    @property
+    def duration_str(self):
+        # type: () -> AnyStr
+        return str(self.duration).split('.')[0]
 
     @property
     def progress(self):
@@ -458,7 +498,41 @@ class Job(Base):
         """XML status response from WPS execution submission as string."""
         self["response"] = response
 
-    @property
+    def _job_url(self, settings):
+        base_job_url = get_wps_restapi_base_url(settings)
+        if self.service is not None:
+            base_job_url += sd.provider_uri.format(provider_id=self.service)
+        job_path = sd.process_job_uri.format(process_id=self.process, job_id=self.id)
+        return "{base_job_url}{job_path}".format(base_job_url=base_job_url, job_path=job_path)
+
+    def json(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> JSON
+        """Obtain the JSON data representation for response body.
+
+        .. note::
+            Settings are required to update API shortcut URLs to job additional information.
+            Without them, paths will not include the API host, which will not resolve to full URI.
+        """
+        settings = get_settings(container) if container else {}
+        job_json = {
+            "jobID": self.id,
+            "status": self.status,
+            "message": self.status_message,
+            "duration": self.duration_str,
+            "percentCompleted": self.progress,
+        }
+        job_url = self._job_url(settings)
+        # TODO: use links (https://github.com/crim-ca/weaver/issues/58)
+        if self.status in job_status_categories[STATUS_CATEGORY_FINISHED]:
+            job_status = map_status(self.status)
+            if job_status == STATUS_SUCCEEDED:
+                resource_type = "result"
+            else:
+                resource_type = "exceptions"
+            job_json[resource_type] = "{job_url}/{res}".format(job_url=job_url, res=resource_type.lower())
+        job_json["logs"] = "{job_url}/logs".format(job_url=job_url)
+        return sd.JobStatusInfo().deserialize(job_json)
+
     def params(self):
         # type: () -> Dict[AnyStr, Any]
         return {
@@ -475,7 +549,6 @@ class Job(Base):
             "is_workflow": self.is_workflow,
             "created": self.created,
             "finished": self.finished,
-            "duration": self.duration,
             "progress": self.progress,
             "results": self.results,
             "exceptions": self.exceptions,
@@ -504,8 +577,6 @@ class Process(Base):
             self["id"] = self.pop("identifier")
         if "package" not in self:
             raise TypeError("'package' is required")
-        setattr(self, "package", self.pop("package"))           # force encode
-        setattr(self, "payload", self.pop("payload", None))     # force encode
 
     @property
     def id(self):
@@ -596,56 +667,70 @@ class Process(Base):
     @property
     def package(self):
         # type: () -> Optional[CWL]
+        """
+        Package CWL definition as JSON.
+        """
         pkg = self.get("package")
         return self._decode(pkg) if isinstance(pkg, dict) else pkg
 
     @package.setter
     def package(self, pkg):
-        self["package"] = self._encode(pkg) if isinstance(pkg, dict) else pkg
+        # type: (Optional[CWL]) -> None
+        self["package"] = self._decode(pkg) if isinstance(pkg, dict) else pkg
 
     @property
     def payload(self):
         # type: () -> JSON
+        """
+        Deployment specification as JSON body.
+        """
         body = self.get("payload", dict())
         return self._decode(body) if isinstance(body, dict) else body
 
     @payload.setter
     def payload(self, body):
         # type: (JSON) -> None
-        self["payload"] = self._encode(body) if isinstance(body, dict) else dict()
+        self["payload"] = self._decode(body) if isinstance(body, dict) else dict()
 
     # encode(->)/decode(<-) characters that cannot be in a key during save to db
     _character_codes = [('$', "\uFF04"), ('.', "\uFF0E")]
 
-    def _recursive_replace(self, pkg, index_from, index_to):
-        # type: (CWL, int, int) -> CWL
+    @staticmethod
+    def _recursive_replace(pkg, index_from, index_to):
+        # type: (JSON, int, int) -> JSON
         new = {}
         for k in pkg:
             # find modified key with replace matches
             c_k = k
-            for c in self._character_codes:
+            for c in Process._character_codes:
                 c_f = c[index_from]
                 c_t = c[index_to]
                 if c_f in k:
                     c_k = k.replace(c_f, c_t)
             # process recursive sub-items
             if isinstance(pkg[k], dict):
-                pkg[k] = self._recursive_replace(pkg[k], index_from, index_to)
+                pkg[k] = Process._recursive_replace(pkg[k], index_from, index_to)
             if isinstance(pkg[k], list):
                 for i, pkg_i in enumerate(pkg[k]):
                     if isinstance(pkg_i, dict):
-                        pkg[k][i] = self._recursive_replace(pkg[k][i], index_from, index_to)
+                        pkg[k][i] = Process._recursive_replace(pkg[k][i], index_from, index_to)
             # apply new key to obtained sub-items with replaced keys as needed
             new[c_k] = pkg[k]   # note: cannot use pop when using pkg keys iterator (python 3)
         return new
 
-    def _encode(self, pkg):
-        # type: (CWL) -> CWL
-        return self._recursive_replace(pkg, 0, 1)
+    @staticmethod
+    def _encode(obj):
+        # type: (Optional[JSON]) -> Optional[JSON]
+        if obj is None:
+            return None
+        return Process._recursive_replace(obj, 0, 1)
 
-    def _decode(self, pkg):
-        # type: (CWL) -> CWL
-        return self._recursive_replace(pkg, 1, 0)
+    @staticmethod
+    def _decode(obj):
+        # type: (Optional[JSON]) -> Optional[JSON]
+        if obj is None:
+            return None
+        return Process._recursive_replace(obj, 1, 0)
 
     @property
     def visibility(self):
@@ -662,7 +747,6 @@ class Process(Base):
                              .format(visibility, type(self), list(visibility_values)))
         self["visibility"] = visibility
 
-    @property
     def params(self):
         # type: () -> Dict[AnyStr, Any]
         return {
@@ -681,8 +765,8 @@ class Process(Base):
             "executeEndpoint": self.executeEndpoint,
             "owsContext": self.owsContext,
             "type": self.type,
-            "package": self.package,  # deployment specification (json body)
-            "payload": self.payload,
+            "package": self._encode(self.package),
+            "payload": self._encode(self.payload),
             "visibility": self.visibility,
         }
 
@@ -867,8 +951,8 @@ class Quote(Base):
         """Sub-quote IDs if applicable"""
         return self.get("steps", [])
 
-    @property
     def params(self):
+        # type: () -> Dict[AnyStr, Any]
         return {
             "id": self.id,
             "price": self.price,
@@ -887,7 +971,8 @@ class Quote(Base):
         }
 
     def json(self):
-        return self.params
+        # type: () -> JSON
+        return sd.QuoteSchema().deserialize(self)
 
 
 class Bill(Base):
@@ -972,8 +1057,8 @@ class Bill(Base):
         """Quote description."""
         return self.get("description")
 
-    @property
     def params(self):
+        # type: () -> Dict[AnyStr, Any]
         return {
             "id": self.id,
             "user": self.user,
@@ -987,4 +1072,5 @@ class Bill(Base):
         }
 
     def json(self):
-        return self.params
+        # type: () -> JSON
+        return sd.BillSchema().deserialize(self)
