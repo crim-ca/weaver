@@ -182,9 +182,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert response.json["page"] == response.json["total"] // response.json["limit"]
 
     @staticmethod
-    def check_basic_jobs_grouped_info(response, group_by):
-        if isinstance(group_by, six.string_types):
-            group_by = [group_by]
+    def check_basic_jobs_grouped_info(response, groups):
+        if isinstance(groups, six.string_types):
+            groups = [groups]
         assert response.status_code == 200
         assert response.content_type == CONTENT_TYPE_APP_JSON
         assert "page" not in response.json
@@ -195,8 +195,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
         total = 0
         for grouped_jobs in response.json["groups"]:
             assert "category" in grouped_jobs and isinstance(grouped_jobs["category"], dict)
-            assert all(g in grouped_jobs["category"] for g in group_by)
-            assert len(set(group_by) - set(grouped_jobs["category"])) == 0
+            assert all(g in grouped_jobs["category"] for g in groups)
+            assert len(set(groups) - set(grouped_jobs["category"])) == 0
             assert "jobs" in grouped_jobs and isinstance(grouped_jobs["jobs"], list)
             assert "count" in grouped_jobs and isinstance(grouped_jobs["count"], int)
             assert len(grouped_jobs["jobs"]) == grouped_jobs["count"]
@@ -231,7 +231,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
     def test_get_jobs_normal_grouped(self):
         for detail in ("false", 0, "False", "no"):
             groups = ["process", "service"]
-            path = self.add_params(jobs_short_uri, detail=detail, group_by=",".join(groups))
+            path = self.add_params(jobs_short_uri, detail=detail, groups=",".join(groups))
             resp = self.app.get(path, headers=self.json_headers)
             self.check_basic_jobs_grouped_info(resp, group_by=groups)
             for grouped_jobs in resp.json["groups"]:
@@ -241,7 +241,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
     def test_get_jobs_detail_grouped(self):
         for detail in ("true", 1, "True", "yes"):
             groups = ["process", "service"]
-            path = self.add_params(jobs_short_uri, detail=detail, group_by=",".join(groups))
+            path = self.add_params(jobs_short_uri, detail=detail, groups=",".join(groups))
             resp = self.app.get(path, headers=self.json_headers)
             self.check_basic_jobs_grouped_info(resp, group_by=groups)
             for grouped_jobs in resp.json["groups"]:
@@ -249,9 +249,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
                     self.check_job_format(job)
 
     def test_get_jobs_valid_grouping_by_process(self):
-        path = self.add_params(jobs_short_uri, detail="false", group_by="process")
+        path = self.add_params(jobs_short_uri, detail="false", groups="process")
         resp = self.app.get(path, headers=self.json_headers)
-        self.check_basic_jobs_grouped_info(resp, group_by="process")
+        self.check_basic_jobs_grouped_info(resp, groups="process")
 
         # ensure that group categories are distinct
         for i, grouped_jobs in enumerate(resp.json["groups"]):
@@ -276,9 +276,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 pytest.fail("Unknown job grouping 'process' value not expected.")
 
     def test_get_jobs_valid_grouping_by_service(self):
-        path = self.add_params(jobs_short_uri, detail="false", group_by="service")
+        path = self.add_params(jobs_short_uri, detail="false", groups="service")
         resp = self.app.get(path, headers=self.json_headers)
-        self.check_basic_jobs_grouped_info(resp, group_by="service")
+        self.check_basic_jobs_grouped_info(resp, groups="service")
 
         # ensure that group categories are distinct
         for i, grouped_jobs in enumerate(resp.json["groups"]):

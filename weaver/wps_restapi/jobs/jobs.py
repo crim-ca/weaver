@@ -1,4 +1,5 @@
 from weaver.database import get_db
+from weaver.datatype import Job
 from weaver.exceptions import (
     InvalidIdentifierValue,
     ServiceNotFound,
@@ -85,6 +86,7 @@ def check_status(url=None, response=None, sleep_secs=2, verify=False):
 
 
 def get_job(request):
+    # type: (Request) -> Job
     """
     :returns: Job information if found.
     :raises: HTTPNotFound with JSON body details on missing/non-matching job, process, provider IDs.
@@ -176,7 +178,7 @@ def get_queried_jobs(request):
         "process": process,
         "service": service,
     }
-    groups = request.params.get("group_by", "")
+    groups = request.params.get("groups", "")
     groups = groups.split(",") if groups else None
     store = get_db(request).get_store(StoreJobs)
     items, total = store.find_jobs(request, group_by=groups, **filters)
@@ -191,8 +193,7 @@ def get_queried_jobs(request):
         body.update({"groups": items})
     else:
         body.update({"jobs": _job_list(items), "page": page, "limit": limit})
-    # FIXME: use schema validation
-    # body = sd.GetQueriedJobsSchema().deserialize(body)
+    body = sd.GetQueriedJobsSchema().deserialize(body)
     return HTTPOk(json=body)
 
 

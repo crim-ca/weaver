@@ -38,6 +38,17 @@ class DropableNoneSchema(colander.SchemaNode):
         return super(DropableNoneSchema, self).deserialize(cstruct)
 
 
+class VariableMappingSchema(colander.Mapping):
+    """
+    Mapping schema that will allow **any** *unknown* field to remain present in the resulting deserialization.
+
+    This definition is useful for defining a dictionary where some field names are not known in advance.
+    Other fields that are explicitly specified with sub-schema nodes will be validated as per usual behaviour.
+    """
+    def __new__(cls, *args, **kwargs):
+        return colander.SchemaNode(colander.Mapping(unknown="preserve"), *args, **kwargs)
+
+
 class SchemaNodeDefault(colander.SchemaNode):
     """
     If ``default`` keyword is provided during :class:`colander.SchemaNode` creation, overrides the
@@ -101,20 +112,22 @@ class OneOfMappingSchema(colander.MappingSchema):
         invalid_one_of = dict()
         for c in self._one_of:
             try:
-                return c().deserialize(cstruct)
+                # instantiate the class if specified with simple reference, other use pre-instantiated schema object
+                if isinstance(c, colander._SchemaMeta):  # noqa:W0212
+                    c = c()
+                return c.deserialize(cstruct)
             except colander.Invalid as invalid:
                 invalid_one_of.update({type(invalid.node).__name__: str(invalid)})
-                pass
         else:
-            message = 'Incorrect type, must be one of: {}. Errors for each case: {}' \
+            message = "Incorrect type, must be one of: {}. Errors for each case: {}" \
                       .format(list(invalid_one_of), invalid_one_of)
             raise colander.Invalid(node=self, msg=message)
 
     def deserialize(self, cstruct):
         result = self.deserialize_one_of(cstruct)
-        mapping_data = super(OneOfMappingSchema, self).deserialize(cstruct)
-
-        result.update(mapping_data)
+        if isinstance(result, dict):
+            mapping_data = super(OneOfMappingSchema, self).deserialize(cstruct)
+            result.update(mapping_data)
         return result
 
 

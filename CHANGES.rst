@@ -22,6 +22,7 @@ New Features:
 - Add conformance route with implementation links (#53).
 - Add additional landing page link details (#54).
 - Add ``weaver.wps_restapi.colander_extras.DropableNoneSchema`` to auto-handle some schema JSON deserialization.
+- Add ``weaver.wps_restapi.colander_extras.VariableMappingSchema`` to auto-handle some schema JSON deserialization.
 
 Changes:
 -------------
@@ -36,6 +37,7 @@ Changes:
 - Remove unused function ``weaver.utils.replace_caps_url`` and corresponding tests.
 - Remove ``weaver.processes.utils.jsonify_value`` duplicated by ``weaver.processes.wps_package.complex2json``.
 - Use more JSON body schema validation using API schema definitions deserialization defined by ``weaver.datatype``.
+- Replace ``group_by`` query string parameter of jobs listing requests to ``groups``.
 - Update Apache license.
 
 Fixes:

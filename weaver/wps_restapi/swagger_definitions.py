@@ -22,9 +22,14 @@ from weaver.execute import (
 )
 from weaver.owsexceptions import OWSMissingParameterValue
 from weaver.visibility import visibility_values, VISIBILITY_PUBLIC
-from weaver.wps_restapi.colander_extras import DropableNoneSchema, OneOfMappingSchema, SchemaNodeDefault as SchemaNode
+from weaver.wps_restapi.colander_extras import (
+    DropableNoneSchema,
+    OneOfMappingSchema,
+    VariableMappingSchema,
+    SchemaNodeDefault,
+)
 from colander import (
-    String, Boolean, Integer, Float, DateTime, Time, Range,
+    String, Boolean, Integer, Float, DateTime, Range,
     MappingSchema as MapSchema,
     SequenceSchema as SeqSchema,
     drop, OneOf
@@ -32,12 +37,35 @@ from colander import (
 from cornice import Service
 
 
-class MappingSchema(DropableNoneSchema, MapSchema):
-    """Override the default :class:`colander.MappingSchema` to auto-handle dropping missing definition as required."""
+class SchemaNode(SchemaNodeDefault):
+    """
+    Override the default :class:`colander.SchemaNode` to auto-handle ``default`` value substitution if an
+    actual value was omitted during deserialization for a field defined with this schema and a ``default`` parameter.
+
+    .. seealso::
+        Implementation in :class:`SchemaNodeDefault`.
+    """
 
 
 class SequenceSchema(DropableNoneSchema, SeqSchema):
-    """Override the default :class:`colander.SequenceSchema` to auto-handle dropping missing definition as required."""
+    """
+    Override the default :class:`colander.SequenceSchema` to auto-handle dropping missing entry definitions
+    when its value is either ``None``, :class:`colander.null` or :class:`colander.drop`.
+    """
+
+
+class MappingSchema(DropableNoneSchema, MapSchema):
+    """
+    Override the default :class:`colander.MappingSchema` to auto-handle dropping missing field definitions
+    when the corresponding value is either ``None``, :class:`colander.null` or :class:`colander.drop`.
+    """
+
+
+class ExplicitMappingSchema(MapSchema):
+    """
+    Original behaviour of :class:`colander.MappingSchema` implementation, where fields referencing
+    to ``None`` values are kept as an explicit indication of an *undefined* or *missing* value for this field.
+    """
 
 
 API_TITLE = "Weaver REST API"
@@ -724,7 +752,10 @@ class JobStatusInfo(MappingSchema):
     jobID = SchemaNode(String(), example="a9d14bf4-84e0-449a-bac8-16e598efe807", description="ID of the job.")
     status = JobStatusEnum()
     message = SchemaNode(String(), missing=drop)
+    # fixme: use href links (https://github.com/crim-ca/weaver/issues/58) [logs/result/exceptions]
     logs = SchemaNode(String(), missing=drop)
+    result = SchemaNode(String(), missing=drop)
+    exceptions = SchemaNode(String(), missing=drop)
     expirationDate = SchemaNode(DateTime(), missing=drop)
     estimatedCompletion = SchemaNode(DateTime(), missing=drop)
     duration = SchemaNode(String(), missing=drop, description="Duration of the process execution.")
@@ -735,10 +766,11 @@ class JobStatusInfo(MappingSchema):
 class JobEntrySchema(OneOfMappingSchema):
     _one_of = (
         JobStatusInfo,
-        # FIXME: figure out how to provide this variant (ie: detail=false)
-        #   + enable validation in Job.json()
-        #SchemaNode(String(), description="Job ID."),
+        SchemaNode(String(), description="Job ID."),
     )
+    # note:
+    #   Since JobId is a simple string (not a dict), no additional mapping field can be added here.
+    #   They will be discarded by `OneOfMappingSchema.deserialize()`.
 
 
 class JobCollection(SequenceSchema):
@@ -762,13 +794,17 @@ class GetPagingJobsSchema(MappingSchema):
 
 
 class GroupedJobsCategorySchema(MappingSchema):
-    category = MappingSchema(description="Corresponding grouping values that compose the resulting job list category.")
+    category = VariableMappingSchema(description="Grouping values that compose the corresponding job list category.")
     jobs = JobCollection(description="List of jobs that matched the corresponding grouping values.")
     count = SchemaNode(Integer(), description="Number of matching jobs for the corresponding group category.")
 
 
-class GetGroupedJobsSchema(SequenceSchema):
-    job_group_category = GroupedJobsCategorySchema()
+class GroupedCategoryJobsSchema(SequenceSchema):
+    job_group_category_item = GroupedJobsCategorySchema()
+
+
+class GetGroupedJobsSchema(MappingSchema):
+    groups = GroupedCategoryJobsSchema()
 
 
 class GetQueriedJobsSchema(OneOfMappingSchema):
@@ -1118,6 +1154,8 @@ class PostProcessJobsEndpoint(ProcessPath):
 class GetJobsQueries(MappingSchema):
     detail = SchemaNode(Boolean(), description="Provide job details instead of IDs.",
                         default=False, example=True, missing=drop)
+    groups = SchemaNode(String(), description="Comma-separated list of grouping fields with which to list jobs.",
+                        default=False, example="process,service", missing=drop)
     page = SchemaNode(Integer(), missing=drop, default=0)
     limit = SchemaNode(Integer(), missing=drop, default=10)
     status = JobStatusEnum(missing=drop)
