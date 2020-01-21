@@ -127,7 +127,7 @@ def register_builtin_processes(container):
             visibility=VISIBILITY_PUBLIC,
         ))
 
-    # registration of missing apps automatically applied with 'default_processes'
+    # registration of missing/updated apps automatically applied with 'default_processes'
     get_db(container).get_store(StoreProcesses, default_processes=builtin_processes)
 
 

@@ -233,7 +233,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
             groups = ["process", "service"]
             path = self.add_params(jobs_short_uri, detail=detail, groups=",".join(groups))
             resp = self.app.get(path, headers=self.json_headers)
-            self.check_basic_jobs_grouped_info(resp, group_by=groups)
+            self.check_basic_jobs_grouped_info(resp, groups=groups)
             for grouped_jobs in resp.json["groups"]:
                 for job in grouped_jobs["jobs"]:
                     assert isinstance(job, six.string_types)
@@ -243,7 +243,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
             groups = ["process", "service"]
             path = self.add_params(jobs_short_uri, detail=detail, groups=",".join(groups))
             resp = self.app.get(path, headers=self.json_headers)
-            self.check_basic_jobs_grouped_info(resp, group_by=groups)
+            self.check_basic_jobs_grouped_info(resp, groups=groups)
             for grouped_jobs in resp.json["groups"]:
                 for job in grouped_jobs["jobs"]:
                     self.check_job_format(job)

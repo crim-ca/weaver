@@ -70,7 +70,8 @@ null = _NullType()
 def get_weaver_url(container):
     # type: (AnySettingsContainer) -> AnyStr
     """Retrieves the home URL of the `weaver` application."""
-    return get_settings(container).get("weaver.url", "").rstrip("/").strip()
+    value = get_settings(container).get("weaver.url", "") or ""  # handle explicit None
+    return value.rstrip("/").strip()
 
 
 def get_any_id(info):

@@ -3,7 +3,7 @@ cwlVersion: v1.0
 class: CommandLineTool
 # target the installed python pointing to weaver conda env to allow imports
 baseCommand: python
-arguments: ["${APP_DIR}/weaver/processes/builtin/jsonarray2netcdf.py", "-o", $(runtime.outdir)]
+arguments: ["${WEAVER_ROOT_DIR}/weaver/processes/builtin/jsonarray2netcdf.py", "-o", $(runtime.outdir)]
 inputs:
  input:
    type: File

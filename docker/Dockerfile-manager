@@ -1,7 +1,9 @@
 FROM python:3.7-alpine
-LABEL Description="Weaver - Workflow Execution Management Service (EMS); Application, Deployment and Execution Service (ADES)"
-LABEL Maintainer="Francis Charette-Migneault <francis.charette-migneault@crim.ca>"
-LABEL Vendor="CRIM"
+LABEL description.short="Weaver Manager"
+LABEL description.long="Workflow Execution Management Service (EMS); Application, Deployment and Execution Service (ADES)"
+LABEL maintainer="Francis Charette-Migneault <francis.charette-migneault@crim.ca>"
+LABEL version="0.2.2"
+LABEL vendor="CRIM"
 
 # setup paths
 ENV APP_DIR=/opt/local/src/weaver

@@ -130,7 +130,7 @@ class RebasedApiRoutesTestCase(unittest.TestCase):
 
         resp = testapp.get(sd.api_swagger_json_service.path, headers=self.json_headers)
         assert resp.status_code == 200, "API definition should be accessed directly"
-        assert resp.json["host"] == self.app_host
+        assert resp.json["host"] in [self.app_host, "{}:80".format(self.app_host)]
         assert resp.json["basePath"] == sd.api_frontpage_uri
 
         resp = testapp.get(sd.api_swagger_ui_service.path)

@@ -174,12 +174,14 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         self.default_host = get_weaver_url(settings)
         self.default_wps_endpoint = "{host}{wps}".format(host=self.default_host,
                                                          wps=settings.get("weaver.wps_path", ""))
+        # enforce default process re-registration to receive any applicable update
         if default_processes:
             registered_processes = [process.identifier for process in self.list_processes()]
             for process in default_processes:
                 process_name = self._get_process_id(process)
-                if process_name not in registered_processes:
-                    self._add_process(process)
+                if process_name in registered_processes:
+                    self.delete_process(process_name)
+                self._add_process(process)
 
     def _add_process(self, process):
         # type: (AnyProcess) -> None

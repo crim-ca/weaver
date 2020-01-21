@@ -400,7 +400,7 @@ def _load_package_content(package_dict,                             # type: Dict
     package_dict["inputs"] = _get_package_ordered_io(package_dict["inputs"], order_hints=package_input_hint)
     package_dict["outputs"] = _get_package_ordered_io(package_dict["outputs"], order_hints=package_output_hint)
 
-    with open(tmp_json_cwl, 'w') as f:
+    with open(tmp_json_cwl, "w") as f:
         json.dump(package_dict, f)
     if only_dump_file:
         return

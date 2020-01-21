@@ -38,6 +38,7 @@ Changes:
 - Remove ``weaver.processes.utils.jsonify_value`` duplicated by ``weaver.processes.wps_package.complex2json``.
 - Use more JSON body schema validation using API schema definitions deserialization defined by ``weaver.datatype``.
 - Replace ``group_by`` query string parameter of jobs listing requests to ``groups``.
+- Enforce ``builtin`` processes registration on startup to receive applicable updates.
 - Update Apache license.
 
 Fixes:
@@ -76,7 +77,7 @@ Fixes:
 - Add file format validation to generated `CWL` package from `WPS-1` `MIME-types`.
 - Allow auto-deployment of `WPS-REST` processes from `WPS-1` references specified by configuration.
 - Add many deployment and execution validation tests for ``WPS1Requirement``.
-- Add builtin application packages support for common operations.
+- Add ``builtin`` application packages support for common operations.
 
 0.1.3
 =====

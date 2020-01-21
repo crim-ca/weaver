@@ -1,0 +1,6 @@
+FROM python:3.7-alpine
+LABEL description.short="Weaver Worker"
+LABEL description.long="Workflow Execution Management Service (EMS); Application, Deployment and Execution Service (ADES)"
+LABEL maintainer="Francis Charette-Migneault <francis.charette-migneault@crim.ca>"
+LABEL version="0.2.2"
+LABEL vendor="CRIM"
