@@ -36,7 +36,7 @@ def get_weaver_configuration(container):
     # type: (AnySettingsContainer) -> AnyStr
     """Obtains the defined operation configuration mode.
 
-    :returns: one value amongst ``WEAVER_CONFIGURATIONS``.
+    :returns: one value amongst :py:data:`weaver.config.WEAVER_CONFIGURATIONS`.
     """
     settings = get_settings(container)
     weaver_config = settings.get("weaver.configuration")
@@ -56,28 +56,32 @@ def get_weaver_config_file(file_path, default_config_file):
     Handles 'relative' paths for settings in ``WEAVER_DEFAULT_INI_CONFIG`` referring to other configuration files.
     Default file must be one of ``WEAVER_DEFAULT_CONFIGS``.
     If the default file cannot be found, it is auto-generated from the corresponding example file.
+
+    :param file_path: path to a configuration file (can be relative if resolvable or matching a default file name)
+    :param default_config_file: one of :py:data:`WEAVER_DEFAULT_CONFIGS`.
     """
-    default = os.path.abspath(os.path.join(WEAVER_CONFIG_DIR, default_config_file))
+    if default_config_file not in WEAVER_DEFAULT_CONFIGS:
+        raise ValueError("Invalid default configuration file [%s] is not one of %s",
+                         default_config_file, list(WEAVER_DEFAULT_CONFIGS))
+    default_path = os.path.abspath(os.path.join(WEAVER_CONFIG_DIR, default_config_file))
     if file_path in [default_config_file, os.path.join(os.curdir, default_config_file)]:
-        file_path = default
+        file_path = default_path
     file_path = os.path.abspath(file_path)
     if os.path.isfile(file_path):
         LOGGER.info("Resolved specified configuration file: [%s]", file_path)
         return file_path
     LOGGER.warning("Cannot find configuration file: [%s]. Falling back to default.", file_path)
-    if default_config_file not in WEAVER_DEFAULT_CONFIGS:
-        raise ValueError("Invalid default configuration file [%s] is not one of %s",
-                         default_config_file, list(WEAVER_DEFAULT_CONFIGS))
-    if os.path.isfile(default):
-        LOGGER.info("Resolved default configuration file: [%s]", default)
-        return default
-    example = default_config_file + ".example"
-    LOGGER.warning("Could not find default configuration file: [%s]. Using generated file: [%s]", file_path, example)
-    example = os.path.abspath(os.path.join(WEAVER_DEFAULT_CONFIGS, example))
-    if not os.path.isfile(example):
-        raise RuntimeError("Could not find expected example configuration file: [%s]", example)
-    shutil.copyfile(example, default)
-    return default
+    if os.path.isfile(default_path):
+        LOGGER.info("Resolved default configuration file: [%s]", default_path)
+        return default_path
+    example_file = default_config_file + ".example"
+    example_path = default_path + ".example"
+    LOGGER.warning("Could not find default configuration file: [%s]. "
+                   "Using generated file copied from: [%s]", file_path, example_file)
+    if not os.path.isfile(example_path):
+        raise RuntimeError("Could not find expected example configuration file: [%s]", example_path)
+    shutil.copyfile(example_path, default_path)
+    return default_path
 
 
 def includeme(config):  # noqa: E811

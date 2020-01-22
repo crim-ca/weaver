@@ -52,7 +52,7 @@ def fetch_data_sources():
 
     data_source_config = get_settings(app).get("weaver.data_sources", "")
     if data_source_config:
-        data_source_config = get_weaver_config_file(data_source_config, WEAVER_DEFAULT_DATA_SOURCES_CONFIG)
+        data_source_config = get_weaver_config_file(str(data_source_config), WEAVER_DEFAULT_DATA_SOURCES_CONFIG)
         if not os.path.isabs(data_source_config):
             data_source_config = os.path.normpath(os.path.join(WEAVER_ROOT_DIR, data_source_config))
         try:
