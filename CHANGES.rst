@@ -10,12 +10,11 @@ New Features:
 - Add ``notification_email`` field to ``Job`` datatype that stores an encrypted email (according to settings) when
   provided in the job submission body (#44).
 - Add ability to filter jobs with ``notification_email`` query parameter (#44).
-- Add jobs statistics grouping by specific fields using comma-separated list ``group_by`` query parameter (#46).
+- Add jobs statistics grouping by specific fields using comma-separated list ``groups`` query parameter (#46).
 - Add some tests to evaluate new job search methods / grouping results and responses (#44, #46).
 - Add handling of multiple `CWL` field ``format`` for ``File`` type.
 - Add missing ontology reference support for `CWL` field ``format`` by defaulting to `IANA` namespace.
-- Add support for I/O enum array (#30).
-- Add more functional tests (#11, #17).
+- Add support for I/O ``array`` of ``enum`` (ie: multiple values of ``AllowedValues`` for a given input) (#30).
 - Add support of ``label`` synonym as ``title`` for inputs and process description
   (`CWL` specifying a ``label`` will set it in `WPS` process) (#31)
 - Add support of input ``minOccurs`` and ``maxOccurs`` as ``int`` while maintaining ``str`` support (#14).
@@ -23,6 +22,7 @@ New Features:
 - Add additional landing page link details (#54).
 - Add ``weaver.wps_restapi.colander_extras.DropableNoneSchema`` to auto-handle some schema JSON deserialization.
 - Add ``weaver.wps_restapi.colander_extras.VariableMappingSchema`` to auto-handle some schema JSON deserialization.
+- Add more functional tests (#11, #17).
 
 Changes:
 -------------
@@ -37,15 +37,16 @@ Changes:
 - Remove unused function ``weaver.utils.replace_caps_url`` and corresponding tests.
 - Remove ``weaver.processes.utils.jsonify_value`` duplicated by ``weaver.processes.wps_package.complex2json``.
 - Use more JSON body schema validation using API schema definitions deserialization defined by ``weaver.datatype``.
-- Replace ``group_by`` query string parameter of jobs listing requests to ``groups``.
 - Enforce ``builtin`` processes registration on startup to receive applicable updates.
+- Provide 2 separate docker images for `Weaver` *manager* and *worker*, corresponding to the `EMS/ADES` API and the
+  ``celery`` job runner respectively.
 - Update Apache license.
 
 Fixes:
 -------------
 
 - Adjust some typing definitions incorrectly specified.
-- Fix some failing functionality tests.
+- Fix some failing functionality tests (#11, #17).
 - Fix I/O field ordering preserved as specified in payload or loaded reference file.
 - Fix setting ``minOccurs=0`` when a ``default`` is specified in the corresponding `CWL` I/O (#17, #25).
 - Fix incorrectly overridden ``maxOccurs="unbounded"`` by ``maxOccurs="1"`` when a partial array input definition
@@ -55,6 +56,7 @@ Fixes:
 - Fix case where ``format[s]`` lists between `CWL` and `WPS` where incorrectly merged.
 - Fix ``metadata`` field within a WPS I/O incorrectly parsed when provided by a WPS-1/2 `XML` process definition.
 - Fix invalid JSON response formatting on failing schema validation of process deployment body.
+- Fix docker images to support ``pserve`` when using ``gunicorn>=20.x`` dropping support of ``--paste`` config feature.
 - Fix multiple Python 2/3 compatibility issues.
 
 0.2.2 (2019-05-31)

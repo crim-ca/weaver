@@ -9,8 +9,9 @@ MAKEFILE_NAME := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 # Application
 APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
 APP_NAME    := $(shell basename $(APP_ROOT))
-APP_VERSION ?= 0.2.1
+APP_VERSION ?= 0.2.2
 APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
+DOCKER_REPO ?= docker-registry.crim.ca/ogc/weaver
 
 # guess OS (Linux, Darwin,...)
 OS_NAME := $(shell uname -s 2>/dev/null || echo "unknown")
@@ -33,14 +34,6 @@ else
 endif
 DOWNLOAD_CACHE ?= $(APP_ROOT)/downloads
 PYTHON_VERSION ?= `python -c 'import platform; print(platform.python_version())'`
-
-# Docker
-DOCKER_REPO := docker-registry.crim.ca/ogc/weaver
-
-# Configuration used by update-config
-HOSTNAME ?= localhost
-HTTP_PORT ?= 8094
-OUTPUT_PORT ?= 8090
 
 # choose conda installer depending on your OS
 CONDA_URL = https://repo.continuum.io/miniconda
@@ -388,16 +381,37 @@ bump:  ## bump version using VERSION specified as user input [make VERSION=<x.y.
 
 .PHONY: docker-info
 docker-info:		## obtain docker image information
-	@echo "Docker image will be built, tagged and pushed as:"
+	@echo "Docker image will be built as: "
+	@echo "$(APP_NAME):$(APP_VERSION)"
+	@echo "Docker image will be pushed as:"
 	@echo "$(DOCKER_REPO):$(APP_VERSION)"
 
+.PHONY: docker-build-base
+docker-build-base:							## build the base docker image
+	@bash -c '\
+		docker build "$(APP_ROOT)" -f "$(APP_ROOT)/docker/Dockerfile-base" -t "$(APP_NAME)-base:$(APP_VERSION)" && \
+		docker tag "$(APP_NAME)-base:$(APP_VERSION)" "$(DOCKER_REPO)-base:$(APP_VERSION)"'
+
+.PHONY: docker-build-manager
+docker-build-manager: docker-build-base		## build the manager docker image
+	@bash -c '\
+		docker build "$(APP_ROOT)" -f "$(APP_ROOT)/docker/Dockerfile-manager" -t "$(APP_NAME)-manager:$(APP_VERSION)" && \
+		docker tag "$(APP_NAME)-manager:$(APP_VERSION)" "$(DOCKER_REPO)-manager:$(APP_VERSION)"'
+
+.PHONY: docker-build-worker
+docker-build-worker: docker-build-base		## build the worker docker image
+	@bash -c '\
+		docker build "$(APP_ROOT)" -f "$(APP_ROOT)/docker/Dockerfile-worker" -t "$(APP_NAME)-worker:$(APP_VERSION)" && \
+		docker tag "$(APP_NAME)-worker:$(APP_VERSION)" "$(DOCKER_REPO)-worker:$(APP_VERSION)"'
+
 .PHONY: docker-build
-docker-build:		## build the docker image
-	@bash -c 'docker build "$(APP_ROOT)/docker" -f Dockerfile-manager -t "$(DOCKER_REPO):$(APP_VERSION)"'
+docker-build: docker-build-base docker-build-manager docker-build-worker		## build docker images
 
 .PHONY: docker-push
-docker-push: docker-build	## push the docker image
-	@bash -c 'docker push "$(DOCKER_REPO):$(APP_VERSION)"'
+docker-push: docker-build	## push docker images
+	@bash -c '\
+		docker push "$(DOCKER_REPO)-manager:$(APP_VERSION)" && \
+		docker push "$(DOCKER_REPO)-worker:$(APP_VERSION)"'
 
 ## --- Launchers targets --- ##
 

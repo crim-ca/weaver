@@ -1,0 +1,33 @@
+FROM python:3.7-slim
+LABEL description.short="Weaver Base"
+LABEL description.long="Workflow Execution Management Service (EMS); Application, Deployment and Execution Service (ADES)"
+LABEL maintainer="Francis Charette-Migneault <francis.charette-migneault@crim.ca>"
+LABEL vendor="CRIM"
+LABEL version="0.2.2"
+
+# setup paths
+ENV APP_DIR=/opt/local/src/weaver
+ENV APP_CONFIG_DIR=${APP_DIR}/config
+ENV APP_ENV_DIR=${APP_DIR}/env
+WORKDIR ${APP_DIR}
+
+# obtain source files
+COPY weaver/__init__.py weaver/__meta__.py ${APP_DIR}/weaver/
+COPY requirements* setup.py README.rst CHANGES.rst ${APP_DIR}/
+
+# install runtime/package dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+		ca-certificates \
+		netbase \
+		gcc \
+		python-dev \
+	&& rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir --upgrade pip setuptools \
+    && pip install --no-cache-dir -e ${APP_DIR}
+
+# install package
+COPY ./ ${APP_DIR}
+# equivalent of `make install` without conda env and pre-installed packages
+RUN pip install --no-dependencies -e ${APP_DIR}
+
+CMD ["bash"]
