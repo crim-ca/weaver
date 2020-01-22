@@ -416,14 +416,14 @@ docker-push: docker-build	## push docker images
 ## --- Launchers targets --- ##
 
 .PHONY: start
-start: install	## start application instance(s) with gunicorn
+start: install	## start application instance(s) with gunicorn (pserve)
 	@echo "Starting $(APP_NAME)..."
 	@bash -c '$(CONDA_CMD) exec pserve "$(APP_INI)" &'
 
 .PHONY: stop
-stop: 		## kill application instance(s) started with gunicorn
-	@lsof -t -i :4001 | xargs kill
+stop: 		## kill application instance(s) started with gunicorn (pserve)
+	@(lsof -t -i :4001 | xargs kill) 2>/dev/null || echo "No $(APP_NAME) process to stop"
 
 .PHONY: stat
-stat: 		## display processes with PID(s) of gunicorn instance(s) running the application
+stat: 		## display processes with PID(s) of gunicorn (pserve) instance(s) running the application
 	@lsof -i :4001 || echo "No instance running"

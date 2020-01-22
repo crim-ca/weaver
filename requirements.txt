@@ -26,6 +26,7 @@ pywps
 pyyaml>=4.2b4
 requests
 requests_file
+ruamel.yaml>=0.15.78
 shapely
 six
 simplejson

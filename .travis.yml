@@ -32,10 +32,15 @@ install:
 before_script:
   - sleep 5
 script:
-  - make pep8
-  - make docs
+  # run static analysis only once
+  - |
+    if [ "${TRAVIS_PYTHON_VERSION}" -eq "3.7" ]; then
+      make check
+      make coverage
+      make docs
+    fi
+  # run tests for each python version
   - make test-all
-  - make coverage
 after_script:
   - make stop
 matrix:
