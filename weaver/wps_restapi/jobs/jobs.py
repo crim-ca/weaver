@@ -287,8 +287,8 @@ def get_job_logs(request):
 
 
 # TODO: https://github.com/crim-ca/weaver/issues/18
-#@sd.process_logs_service.get(tags=[sd.TAG_JOBS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
-#                             schema=sd.ProcessOutputEndpoint(), response_schemas=sd.get_job_output_responses)
+# @sd.process_logs_service.get(tags=[sd.TAG_JOBS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
+#                              schema=sd.ProcessOutputEndpoint(), response_schemas=sd.get_job_output_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobOutputResponse.description)
 def get_job_output(request):
     pass

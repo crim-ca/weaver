@@ -310,7 +310,10 @@ check-lint: mkdir-reports install-dev	## run linting code style checks
 	@echo "Running linting code style checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-lint.txt"
 	@bash -c '$(CONDA_CMD) \
-		pylint --rcfile="$(APP_ROOT)/setup.cfg" "$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" --reports y \
+		pylint \
+			--load-plugins pylint_quotes \
+			--rcfile="$(APP_ROOT)/setup.cfg" "$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" \
+			--reports y \
 		1> >(tee "$(REPORTS_DIR)/check-lint.txt")'
 
 .PHONY: check-security

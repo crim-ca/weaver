@@ -3,7 +3,7 @@ Extracts and fetches NetCDF files from a JSON file containing an URL string arra
 and provides them on the output directory.
 """
 from six.moves.urllib.parse import urlparse
-from typing import AnyStr
+from typing import Any, AnyStr
 import requests
 import argparse
 import logging
@@ -18,7 +18,7 @@ sys.path.insert(0, CUR_DIR)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(CUR_DIR))))
 
 # place weaver specific imports after sys path fixing to ensure they are found from external call
-from weaver.formats import get_extension, CONTENT_TYPE_APP_NETCDF  # noqa
+from weaver.formats import get_extension, CONTENT_TYPE_APP_NETCDF  # isort:skip # noqa: E402
 
 PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]
 
@@ -29,9 +29,12 @@ LOGGER.setLevel(logging.INFO)
 
 
 def _is_netcdf_url(url):
-    # type: (AnyStr) -> bool
-    return urlparse(url).scheme != "" and \
-           os.path.splitext(url)[-1].replace('.', '') == get_extension(CONTENT_TYPE_APP_NETCDF)
+    # type: (Any) -> bool
+    if not isinstance(url, six.string_types):
+        return False
+    if urlparse(url).scheme == "":
+        return False
+    return os.path.splitext(url)[-1].replace(".", "") == get_extension(CONTENT_TYPE_APP_NETCDF)
 
 
 def j2n(json_file, output_dir):
@@ -41,8 +44,7 @@ def j2n(json_file, output_dir):
     if not os.path.isdir(output_dir):
         raise ValueError("Output dir [{}] does not exist.".format(output_dir))
     json_content = json.load(json_file)
-    if (not isinstance(json_content, list)
-            or any(not isinstance(f, six.string_types) or not _is_netcdf_url(f) for f in json_content)):
+    if not isinstance(json_content, list) or any(not _is_netcdf_url(f) for f in json_content):
         LOGGER.error("Invalid JSON: [%s]", json_content)
         raise ValueError("Invalid JSON file format, expected a plain array of NetCDF file URL strings.")
     for file_url in json_content:
@@ -51,7 +53,7 @@ def j2n(json_file, output_dir):
         if file_url.startswith("file://"):
             shutil.copyfile(file_url[7:], file_path)
         else:
-            with open(file_path, 'wb') as f:
+            with open(file_path, "wb") as f:
                 r = requests.get(file_url)
                 r.raise_for_status()
                 f.write(r.content)

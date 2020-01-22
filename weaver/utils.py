@@ -48,10 +48,10 @@ class _NullType(six.with_metaclass(_Singleton)):
     """Represents a ``null`` value to differentiate from ``None``."""
 
     def __eq__(self, other):
-        return (isinstance(other, _NullType)
-                or other is null
-                or other is self.__instance__
-                or (isclass(other) and issubclass(other, _NullType)))
+        return (isinstance(other, _NullType)                                    # noqa: W503
+                or other is null                                                # noqa: W503
+                or other is self.__instance__                                   # noqa: W503
+                or (isclass(other) and issubclass(other, _NullType)))           # noqa: W503
 
     def __repr__(self):
         return "<null>"

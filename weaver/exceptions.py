@@ -24,8 +24,8 @@ class InvalidIdentifierValue(WeaverException, ValueError):
     Error indicating that an id to be employed for following operations
     is not considered as valid to allow further processed or usage.
     """
-    
-    
+
+
 class ServiceException(WeaverException):
     """Base exception related to a :class:`weaver.datatype.Service`."""
 
@@ -49,8 +49,8 @@ class ServiceRegistrationError(ServiceException):
     Error indicating that an OWS service could not be registered in the
     storage backend by an instance of :class:`weaver.store.ServiceStore`.
     """
-    
-    
+
+
 class ProcessException(WeaverException):
     """Base exception related to a :class:`weaver.datatype.Process`."""
 
@@ -81,8 +81,8 @@ class ProcessInstanceError(ProcessException):
     Error indicating that the process instance passed is not supported with
     storage backend by an instance of :class:`weaver.store.ProcessStore`.
     """
-    
-    
+
+
 class JobException(WeaverException):
     """Base exception related to a :class:`weaver.datatype.Job`."""
 
@@ -106,11 +106,11 @@ class JobUpdateError(JobException):
     Error indicating that a job could not be updated in the
     storage backend by an instance of :class:`weaver.store.JobStore`.
     """
-    
-    
+
+
 class PackageException(WeaverException):
     """Base exception related to a :class:`weaver.processes.wps_package.Package`."""
-    
+
 
 class PackageTypeError(PackageException):
     """
@@ -145,8 +145,8 @@ class PayloadNotFound(PackageException):
     Error indicating that an instance of :class:`weaver.processes.wps_package.Package`
     could not properly retrieve the package deploy payload using provided references.
     """
-    
-    
+
+
 class QuoteException(WeaverException):
     """Base exception related to a :class:`weaver.datatype.Quote`."""
 
@@ -170,8 +170,8 @@ class QuoteInstanceError(QuoteException):
     Error indicating that a given object doesn't correspond to an expected
     instance of :class:`weaver.datatype.Quote`.
     """
-    
-    
+
+
 class BillException(WeaverException):
     """Base exception related to a :class:`weaver.datatype.Bill`."""
 

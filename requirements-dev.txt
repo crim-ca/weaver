@@ -10,6 +10,7 @@ mock
 pluggy>=0.7
 pytest
 pylint
+pylint_quotes
 responses
 WebTest
 wsgiproxy

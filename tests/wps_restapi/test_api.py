@@ -30,7 +30,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
             sd.VersionsSchema().deserialize(resp.json)
         except colander.Invalid as ex:
             self.fail("expected valid response format as defined in schema [{!s}]".format(ex))
-            
+
     def test_conformance_format(self):
         resp = self.testapp.get(sd.api_conformance_uri, headers=self.json_headers)
         assert 200 == resp.status_code

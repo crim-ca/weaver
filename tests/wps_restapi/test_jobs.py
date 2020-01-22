@@ -301,7 +301,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 assert set(grouped_jobs["jobs"]) == {self.job_info[0].id, self.job_info[2].id}
             else:
                 pytest.fail("Unknown job grouping 'service' value not expected.")
-    
+
     def test_get_jobs_by_encrypted_email(self):
         """Verifies that literal email can be used as search criterion although not saved in plain text within db."""
         email = "some.test@crim.ca"
@@ -412,7 +412,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 401
         assert resp.content_type == CONTENT_TYPE_APP_JSON
-    
+
     def test_get_jobs_public_service_private_process_unauthorized_in_query(self):
         """
         NOTE:
@@ -428,7 +428,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 200
             assert resp.content_type == CONTENT_TYPE_APP_JSON
-    
+
     def test_get_jobs_public_service_no_processes(self):
         """
         NOTE:
