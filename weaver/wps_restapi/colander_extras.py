@@ -15,18 +15,19 @@ class DropableNoneSchema(colander.SchemaNode):
 
     Required schemas (without ``missing=drop``, i.e.: :class:`colander.required`) will still raise for undefined nodes.
 
-    .. example::
-        .. code-block:: python
+    The following snippet shows the result that can be achieved using this schema class:
 
-            class SchemaA(DropableNoneSchema, MappingSchema):
-                field = SchemaNode(String())
+    .. code-block:: python
 
-            class SchemaB(MappingSchema):
-                s1 = SchemaA(missing=drop)   # optional
-                s2 = SchemaA()               # required
+        class SchemaA(DropableNoneSchema, MappingSchema):
+            field = SchemaNode(String())
 
-            SchemaB().deserialize({"s1": None, "s2": {"field": "ok"}})
-            # >> {'s2': {'field': 'ok'}}
+        class SchemaB(MappingSchema):
+            s1 = SchemaA(missing=drop)   # optional
+            s2 = SchemaA()               # required
+
+        SchemaB().deserialize({"s1": None, "s2": {"field": "ok"}})
+        # >> {'s2': {'field': 'ok'}}
 
     .. seealso:
         https://github.com/Pylons/colander/issues/276
