@@ -29,7 +29,6 @@ before_install:
   - cp -f tests/travis-ci/data_sources.json ./
 install:
   - make install
-  - make install-dev
   - make start
 before_script:
   - sleep 5
@@ -38,6 +37,8 @@ script:
   - make docs
   - make test-all
   - make coverage
+after_script:
+  - make stop
 matrix:
   allow_failures:
     - os: osx
