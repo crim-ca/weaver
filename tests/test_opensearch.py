@@ -1,24 +1,26 @@
 # noinspection PyProtectedMember
-from weaver.processes.opensearch import _make_specific_identifier
-from weaver.processes.constants import OPENSEARCH_START_DATE, OPENSEARCH_END_DATE, OPENSEARCH_AOI
-from weaver.processes import opensearch
+from tests.utils import setup_mongodb_processstore
 from weaver.datatype import Process
+from weaver.processes import opensearch
+from weaver.processes.constants import OPENSEARCH_AOI, OPENSEARCH_END_DATE, OPENSEARCH_START_DATE
+from weaver.processes.opensearch import _make_specific_identifier
 from weaver.utils import get_any_id
 from weaver.wps_restapi.processes import processes
-from tests.utils import setup_mongodb_processstore
+
+import mock
+import pytest
 from pyramid import testing
 from pyramid.testing import DummyRequest
 from pywps.inout.inputs import LiteralInput
-from collections import deque
-from copy import deepcopy
-from pprint import pformat
-from six.moves.urllib.parse import urlparse, parse_qsl
-from contextlib import ExitStack
-import unittest
+from six.moves.urllib.parse import parse_qsl, urlparse
+
 import json
 import os
-import pytest
-import mock
+import unittest
+from collections import deque
+from contextlib import ExitStack
+from copy import deepcopy
+from pprint import pformat
 
 OSDD_URL = "http://geo.spacebel.be/opensearch/description.xml"
 

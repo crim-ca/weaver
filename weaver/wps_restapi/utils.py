@@ -1,11 +1,14 @@
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
-from weaver.utils import parse_request_query, get_weaver_url, get_settings
-from distutils.version import LooseVersion
-from pyramid.httpexceptions import HTTPSuccessful
-from typing import AnyStr, TYPE_CHECKING
-from lxml import etree
+from weaver.utils import get_settings, get_weaver_url, parse_request_query
+
 import requests
+from lxml import etree
+from pyramid.httpexceptions import HTTPSuccessful
+
 import logging
+from distutils.version import LooseVersion
+from typing import TYPE_CHECKING, AnyStr
+
 if TYPE_CHECKING:
     from pyramid.request import Request                 # noqa: F401
     from weaver.typedefs import AnySettingsContainer    # noqa: F401

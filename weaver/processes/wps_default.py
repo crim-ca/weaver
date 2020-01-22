@@ -1,8 +1,10 @@
-from pywps import Process, LiteralInput, LiteralOutput
 from weaver.processes.types import PROCESS_WPS
 
-import os
+from pywps import LiteralInput, LiteralOutput, Process
+
 import logging
+import os
+
 LOGGER = logging.getLogger("PYWPS")
 
 

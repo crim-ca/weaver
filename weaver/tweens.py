@@ -1,9 +1,12 @@
-from pyramid.tweens import INGRESS, EXCVIEW
-from pyramid.httpexceptions import HTTPSuccessful, HTTPRedirection, HTTPException, HTTPInternalServerError
 from weaver.owsexceptions import OWSException, OWSNotImplemented
 from weaver.utils import fully_qualified_name
+
+from pyramid.httpexceptions import HTTPException, HTTPInternalServerError, HTTPRedirection, HTTPSuccessful
+from pyramid.tweens import EXCVIEW, INGRESS
+
 import logging
 import sys
+
 LOGGER = logging.getLogger(__name__)
 
 OWS_TWEEN_HANDLED = "OWS_TWEEN_HANDLED"

@@ -1,30 +1,32 @@
+from tests import resources
+from tests.utils import (
+    get_test_weaver_app,
+    get_test_weaver_config,
+    mocked_sub_requests,
+    setup_config_with_mongodb,
+    setup_config_with_pywps,
+    setup_mongodb_processstore
+)
 from weaver.formats import (
     CONTENT_TYPE_APP_JSON,
     CONTENT_TYPE_APP_NETCDF,
-    CONTENT_TYPE_TEXT_PLAIN,
     CONTENT_TYPE_APP_TAR,
     CONTENT_TYPE_APP_ZIP,
-    EDAM_NAMESPACE,
+    CONTENT_TYPE_TEXT_PLAIN,
     EDAM_MAPPING,
+    EDAM_NAMESPACE,
     IANA_NAMESPACE,
-    get_cwl_file_format,
+    get_cwl_file_format
 )
 from weaver.visibility import VISIBILITY_PUBLIC
-from pyramid.httpexceptions import HTTPBadRequest
-from tests.utils import (
-    get_test_weaver_config,
-    get_test_weaver_app,
-    setup_config_with_mongodb,
-    setup_config_with_pywps,
-    setup_mongodb_processstore,
-    mocked_sub_requests,
-)
-from copy import deepcopy
-from tests import resources
-import pytest
-import unittest
+
 import colander
+import pytest
 import six
+from pyramid.httpexceptions import HTTPBadRequest
+
+import unittest
+from copy import deepcopy
 
 EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_TEXT_PLAIN]
 EDAM_NETCDF = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_APP_NETCDF]

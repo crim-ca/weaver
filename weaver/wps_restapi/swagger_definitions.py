@@ -5,35 +5,35 @@ so that one can update the swagger without touching any other files after the in
 
 from weaver import __meta__
 from weaver.config import WEAVER_CONFIGURATION_EMS
-from weaver.wps_restapi.utils import wps_restapi_base_path
-from weaver.status import job_status_categories, STATUS_ACCEPTED, STATUS_COMPLIANT_OGC
-from weaver.sort import job_sort_values, quote_sort_values, SORT_CREATED, SORT_ID, SORT_PROCESS
-from weaver.formats import CONTENT_TYPE_TEXT_HTML, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
 from weaver.execute import (
-    EXECUTE_MODE_AUTO,
-    EXECUTE_MODE_ASYNC,
-    execute_mode_options,
     EXECUTE_CONTROL_OPTION_ASYNC,
-    execute_control_options,
+    EXECUTE_MODE_ASYNC,
+    EXECUTE_MODE_AUTO,
     EXECUTE_RESPONSE_RAW,
-    execute_response_options,
     EXECUTE_TRANSMISSION_MODE_REFERENCE,
-    execute_transmission_mode_options,
+    execute_control_options,
+    execute_mode_options,
+    execute_response_options,
+    execute_transmission_mode_options
 )
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_HTML, CONTENT_TYPE_TEXT_PLAIN
 from weaver.owsexceptions import OWSMissingParameterValue
-from weaver.visibility import visibility_values, VISIBILITY_PUBLIC
+from weaver.sort import JOB_SORT_VALUES, QUOTE_SORT_VALUES, SORT_CREATED, SORT_ID, SORT_PROCESS
+from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, STATUS_COMPLIANT_OGC
+from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps_restapi.colander_extras import (
     DropableNoneSchema,
     OneOfMappingSchema,
-    VariableMappingSchema,
     SchemaNodeDefault,
+    VariableMappingSchema
 )
-from colander import (
-    String, Boolean, Integer, Float, DateTime, Range,
-    MappingSchema as MapSchema,
-    SequenceSchema as SeqSchema,
-    drop, OneOf
-)
+from weaver.wps_restapi.utils import wps_restapi_base_path
+
+from colander import Boolean, DateTime, Float, Integer
+from colander import MappingSchema as MapSchema
+from colander import OneOf, Range
+from colander import SequenceSchema as SeqSchema
+from colander import String, drop
 from cornice import Service
 
 
@@ -533,7 +533,7 @@ class JobStatusEnum(SchemaNode):
             String(),
             default=kwargs.get('default', None),
             example=kwargs.get('example', STATUS_ACCEPTED),
-            validator=OneOf(list(job_status_categories[STATUS_COMPLIANT_OGC])),
+            validator=OneOf(list(JOB_STATUS_CATEGORIES[STATUS_COMPLIANT_OGC])),
             **kwargs)
 
 
@@ -545,7 +545,7 @@ class JobSortEnum(SchemaNode):
             String(),
             default=kwargs.get('default', SORT_CREATED),
             example=kwargs.get('example', SORT_CREATED),
-            validator=OneOf(list(job_sort_values)),
+            validator=OneOf(list(JOB_SORT_VALUES)),
             **kwargs)
 
 
@@ -556,7 +556,7 @@ class LaunchJobQuerystring(MappingSchema):
 
 
 class Visibility(MappingSchema):
-    value = SchemaNode(String(), validator=OneOf(list(visibility_values)), example=VISIBILITY_PUBLIC)
+    value = SchemaNode(String(), validator=OneOf(list(VISIBILITY_VALUES)), example=VISIBILITY_PUBLIC)
 
 
 #########################################################
@@ -1215,7 +1215,7 @@ class QuoteSortEnum(SchemaNode):
             String(),
             default=kwargs.get('default', SORT_ID),
             example=kwargs.get('example', SORT_PROCESS),
-            validator=OneOf(quote_sort_values),
+            validator=OneOf(QUOTE_SORT_VALUES),
             **kwargs)
 
 
@@ -1427,7 +1427,7 @@ class InternalServerErrorGetProcessPayloadResponse(MappingSchema):
 
 
 class ProcessVisibilityResponseBodySchema(MappingSchema):
-    value = SchemaNode(String(), validator=OneOf(list(visibility_values)), example=VISIBILITY_PUBLIC)
+    value = SchemaNode(String(), validator=OneOf(list(VISIBILITY_VALUES)), example=VISIBILITY_PUBLIC)
 
 
 class OkGetProcessVisibilitySchema(MappingSchema):

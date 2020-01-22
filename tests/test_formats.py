@@ -1,9 +1,18 @@
 from weaver.formats import (
-    get_cwl_file_format, clean_mime_type_format,
-    CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF, FORMAT_NAMESPACES,
-    EDAM_NAMESPACE, EDAM_NAMESPACE_DEFINITION, EDAM_MAPPING, IANA_NAMESPACE, IANA_NAMESPACE_DEFINITION
+    CONTENT_TYPE_APP_JSON,
+    CONTENT_TYPE_APP_NETCDF,
+    EDAM_MAPPING,
+    EDAM_NAMESPACE,
+    EDAM_NAMESPACE_DEFINITION,
+    FORMAT_NAMESPACES,
+    IANA_NAMESPACE,
+    IANA_NAMESPACE_DEFINITION,
+    clean_mime_type_format,
+    get_cwl_file_format
 )
+
 import six
+
 import os
 
 

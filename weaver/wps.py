@@ -3,22 +3,25 @@ pywps 4.x wrapper
 """
 from weaver.config import get_weaver_configuration
 from weaver.database import get_db
-from weaver.store.base import StoreProcesses
 from weaver.owsexceptions import OWSNoApplicableCode
+from weaver.store.base import StoreProcesses
+from weaver.utils import get_settings, get_weaver_url
 from weaver.visibility import VISIBILITY_PUBLIC
-from weaver.utils import get_weaver_url, get_settings
-from pyramid.wsgi import wsgiapp2
+
+import six
 from pyramid.settings import asbool
-from pyramid_celery import celery_app as app
 from pyramid.threadlocal import get_current_request
+from pyramid.wsgi import wsgiapp2
+from pyramid_celery import celery_app as app
 from pywps import configuration as pywps_config
 from pywps.app.Service import Service
 from six.moves.configparser import ConfigParser
 from six.moves.urllib.parse import urlparse
-from typing import TYPE_CHECKING
-import os
-import six
+
 import logging
+import os
+from typing import TYPE_CHECKING
+
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from weaver.typedefs import AnySettingsContainer        # noqa: F401

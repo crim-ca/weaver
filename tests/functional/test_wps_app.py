@@ -6,22 +6,24 @@ Based on tests from:
 * http://webtest.pythonpaste.org/en/latest/
 * http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/testing.html
 """
-from weaver.formats import CONTENT_TYPE_ANY_XML
-from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
-from weaver.processes.wps_default import HelloWPS
-from weaver.processes.wps_testing import WpsTestProcess
 from tests.utils import (
+    get_test_weaver_app,
+    get_test_weaver_config,
+    setup_config_with_celery,
     setup_config_with_mongodb,
     setup_config_with_pywps,
-    setup_mongodb_processstore,
-    setup_config_with_celery,
-    get_test_weaver_config,
-    get_test_weaver_app,
+    setup_mongodb_processstore
 )
-from xml.etree import ElementTree
-import pytest
-import unittest
+from weaver.formats import CONTENT_TYPE_ANY_XML
+from weaver.processes.wps_default import HelloWPS
+from weaver.processes.wps_testing import WpsTestProcess
+from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
+
 import pyramid.testing
+import pytest
+
+import unittest
+from xml.etree import ElementTree
 
 
 @pytest.mark.functional

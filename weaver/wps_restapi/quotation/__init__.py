@@ -1,7 +1,10 @@
-from weaver.wps_restapi.quotation import bills as b, quotes as q
-from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.quotation import bills as b
+from weaver.wps_restapi.quotation import quotes as q
+from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
+
 import logging
+
 LOGGER = logging.getLogger(__name__)
 
 

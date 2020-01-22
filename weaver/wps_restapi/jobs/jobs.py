@@ -1,40 +1,37 @@
+from weaver import sort, status
 from weaver.database import get_db
 from weaver.datatype import Job
 from weaver.exceptions import (
     InvalidIdentifierValue,
-    ServiceNotFound,
-    ServiceNotAccessible,
+    JobNotFound,
     ProcessNotAccessible,
     ProcessNotFound,
-    JobNotFound,
-    log_unhandled_exceptions,
+    ServiceNotAccessible,
+    ServiceNotFound,
+    log_unhandled_exceptions
 )
-from weaver.store.base import StoreServices, StoreProcesses, StoreJobs
-from weaver.utils import get_settings, get_any_id, get_any_value, get_url_without_query
+from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
+from weaver.utils import get_any_id, get_any_value, get_settings, get_url_without_query
+from weaver.visibility import VISIBILITY_PUBLIC
+from weaver.wps import get_wps_output_dir, get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.notify import encrypt_email
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
-from weaver.wps import get_wps_output_dir, get_wps_output_url
-from weaver.visibility import VISIBILITY_PUBLIC
-from weaver import status, sort
-from pyramid.httpexceptions import (
-    HTTPOk,
-    HTTPBadRequest,
-    HTTPUnauthorized,
-    HTTPNotFound,
-)
-from pyramid.settings import asbool
-from pyramid.request import Request
-from pyramid_celery import celery_app as app
-from typing import AnyStr, Optional, Union, Tuple
-from owslib.wps import WPSExecution
-from six.moves.urllib.parse import urlparse
-from lxml import etree
-from celery.utils.log import get_task_logger
-from requests_file import FileAdapter
+
 import requests
 import six
+from celery.utils.log import get_task_logger
+from lxml import etree
+from owslib.wps import WPSExecution
+from pyramid.httpexceptions import HTTPBadRequest, HTTPNotFound, HTTPOk, HTTPUnauthorized
+from pyramid.request import Request
+from pyramid.settings import asbool
+from pyramid_celery import celery_app as app
+from requests_file import FileAdapter
+from six.moves.urllib.parse import urlparse
+
 import os
+from typing import AnyStr, Optional, Tuple, Union
 
 LOGGER = get_task_logger(__name__)
 
@@ -80,7 +77,7 @@ def check_status(url=None, response=None, sleep_secs=2, verify=False):
     execution.checkStatus(response=xml, sleepSecs=sleep_secs)
     if execution.response is None:
         raise Exception("Missing response, cannot check status.")
-    if not isinstance(execution.response, etree._Element):  # noqa: W0212
+    if not isinstance(execution.response, etree._Element):
         execution.response = etree.fromstring(execution.response)
     return execution
 

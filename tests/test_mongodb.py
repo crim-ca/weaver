@@ -2,11 +2,13 @@
 Based on unittests in https://github.com/wndhydrnt/python-oauth2/tree/master/oauth2/test
 """
 
-from weaver.store.mongodb import MongodbServiceStore
 from weaver.datatype import Service
-from pymongo.collection import Collection
-import unittest
+from weaver.store.mongodb import MongodbServiceStore
+
 import mock
+from pymongo.collection import Collection
+
+import unittest
 
 
 class MongodbServiceStoreTestCase(unittest.TestCase):

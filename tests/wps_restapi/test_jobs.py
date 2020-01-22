@@ -1,47 +1,43 @@
-from weaver.wps_restapi.swagger_definitions import (
-    jobs_short_uri,
-    jobs_full_uri,
-    process_jobs_uri,
+from tests.utils import (
+    mocked_process_job_runner,
+    setup_config_with_mongodb,
+    setup_mongodb_jobstore,
+    setup_mongodb_processstore,
+    setup_mongodb_servicestore
 )
-from weaver.datatype import Service, Job
-from weaver.execute import (
-    EXECUTE_MODE_ASYNC,
-    EXECUTE_RESPONSE_DOCUMENT,
-    EXECUTE_TRANSMISSION_MODE_REFERENCE,
-)
+from weaver.datatype import Job, Service
+from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_REFERENCE
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.processes.wps_testing import WpsTestProcess
-from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
-from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.status import (
-    job_status_values,
-    job_status_categories,
-    STATUS_SUCCEEDED,
-    STATUS_FAILED,
+    JOB_STATUS_CATEGORIES,
+    JOB_STATUS_VALUES,
     STATUS_CATEGORY_FINISHED,
+    STATUS_FAILED,
+    STATUS_SUCCEEDED
 )
-from tests.utils import (
-    setup_config_with_mongodb,
-    setup_mongodb_servicestore,
-    setup_mongodb_processstore,
-    setup_mongodb_jobstore,
-    mocked_process_job_runner,
-)
-from collections import OrderedDict
-from contextlib import ExitStack
-from typing import AnyStr, Tuple, List, Union, TYPE_CHECKING
-from owslib.wps import WebProcessingService, Process as ProcessOWSWPS
-from pywps.app import Process as ProcessPyWPS
+from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
+from weaver.warning import TimeZoneInfoAlreadySetWarning
+from weaver.wps_restapi.swagger_definitions import jobs_full_uri, jobs_short_uri, process_jobs_uri
+
 import mock
-import webtest
-import unittest
-import warnings
-import json
 import pyramid.testing
 import pytest
 import six
+import webtest
+from owslib.wps import Process as ProcessOWSWPS
+from owslib.wps import WebProcessingService
+from pywps.app import Process as ProcessPyWPS
+
+import json
+import unittest
+import warnings
+from collections import OrderedDict
+from contextlib import ExitStack
+from typing import TYPE_CHECKING, AnyStr, List, Tuple, Union
+
 if TYPE_CHECKING:
-    MockPatch = mock._patch  # noqa: W0212
+    MockPatch = mock._patch
 
 
 class WpsRestApiJobsTest(unittest.TestCase):
@@ -119,7 +115,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         job = self.job_store.save_job(task_id=task_id, process=process, service=service, is_workflow=False,
                                       user_id=user_id, execute_async=True, access=access)
         job.status = status
-        if status in job_status_categories[STATUS_CATEGORY_FINISHED]:
+        if status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_FINISHED]:
             job.mark_finished()
         job.progress = progress
         job = self.job_store.update_job(job)
@@ -164,7 +160,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert "message" in job and isinstance(job["message"], six.string_types)
         assert "percentCompleted" in job and isinstance(job["percentCompleted"], int)
         assert "logs" in job and isinstance(job["logs"], six.string_types)
-        assert job["status"] in job_status_values
+        assert job["status"] in JOB_STATUS_VALUES
         if job["status"] == STATUS_SUCCEEDED:
             assert "result" in job and isinstance(job["result"], six.string_types)
         elif job["status"] == STATUS_FAILED:

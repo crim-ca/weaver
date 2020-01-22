@@ -195,7 +195,7 @@ install-raw:	## install without any requirements or dependencies (suppose everyt
 clean: clean-all	## alias for 'clean-all' target
 
 .PHONY: clean-all
-clean-all: clean-build clean-cache clean-docs clean-src clean-test		## run all cleanup targets
+clean-all: clean-build clean-cache clean-docs-dirs clean-src clean-test		## run all cleanup targets
 
 .PHONY: clean-build
 clean-build:	## remove the temporary build files
@@ -212,13 +212,22 @@ clean-cache:	## remove caches such as DOWNLOAD_CACHE
 	@-rm -fr "$(DOWNLOAD_CACHE)"
 
 .PHONY: clean-docs
-clean-docs:	install-dev 	## remove documentation artefacts
+clean-docs:	install-dev clean-docs-dirs		## remove documentation artefacts
 	@echo "Removing documenation build files..."
 	@$(MAKE) -C "$(APP_ROOT)/docs" clean
 
+# extensive cleanup is possible only using sphinx-build
+# allow minimal cleanup when it could not *yet* be installed (dev)
+.PHONY: clean-docs-dirs
+clean-docs-dirs:	## remove documentation artefacts (minimal)
+	@echo "Removing documenation directories..."
+	@-rm -fr "$(APP_ROOT)/docs/build"
+	@-rm -fr "$(APP_ROOT)/docs/html"
+	@-rm -fr "$(APP_ROOT)/docs/xml"
+
 .PHONY: clean-src
 clean-src:		## remove all *.pyc files
-	@echo "Removing *.pyc files..."
+	@echo "Removing python artifacts..."
 	@-find "$(APP_ROOT)" -type f -name "*.pyc" -exec rm {} \;
 	@-rm -rf ./src
 
@@ -312,7 +321,7 @@ check-lint: mkdir-reports install-dev	## run linting code style checks
 	@bash -c '$(CONDA_CMD) \
 		pylint \
 			--load-plugins pylint_quotes \
-			--rcfile="$(APP_ROOT)/setup.cfg" "$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" \
+			--rcfile="$(APP_ROOT)/.pylintrc" "$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" \
 			--reports y \
 		1> >(tee "$(REPORTS_DIR)/check-lint.txt")'
 

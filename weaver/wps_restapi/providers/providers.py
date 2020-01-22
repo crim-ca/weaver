@@ -1,23 +1,21 @@
+from utils import get_cookie_headers
 from weaver.database import get_db
 from weaver.datatype import Service
 from weaver.exceptions import ServiceNotFound, log_unhandled_exceptions
-from weaver.warning import NonBreakingExceptionWarning
 from weaver.owsexceptions import OWSMissingParameterValue, OWSNotImplemented
 from weaver.processes.types import PROCESS_WPS
 from weaver.store.base import StoreServices
 from weaver.utils import get_any_id, get_settings
-from weaver.wps_restapi.utils import get_wps_restapi_base_url, OUTPUT_FORMAT_JSON
-from utils import get_cookie_headers
+from weaver.warning import NonBreakingExceptionWarning
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, get_wps_restapi_base_url
+
 from owslib.wps import WebProcessingService
-from pyramid.httpexceptions import (
-    HTTPOk,
-    HTTPCreated,
-    HTTPNoContent,
-    HTTPNotFound,
-)
-import warnings
+from pyramid.httpexceptions import HTTPCreated, HTTPNoContent, HTTPNotFound, HTTPOk
+
 import logging
+import warnings
+
 LOGGER = logging.getLogger(__name__)
 
 

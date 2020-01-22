@@ -2,16 +2,18 @@
 Extracts and fetches NetCDF files from a JSON file containing an URL string array,
 and provides them on the output directory.
 """
-from six.moves.urllib.parse import urlparse
-from typing import Any, AnyStr
 import requests
-import argparse
-import logging
-import shutil
-import json
 import six
-import sys
+from six.moves.urllib.parse import urlparse
+
+import argparse
+import json
+import logging
 import os
+import shutil
+import sys
+from typing import Any, AnyStr
+
 CUR_DIR = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, CUR_DIR)
 # root to allow 'from weaver import <...>'

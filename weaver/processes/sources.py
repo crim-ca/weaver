@@ -3,12 +3,14 @@ from weaver.config import WEAVER_DEFAULT_DATA_SOURCES_CONFIG, get_weaver_config_
 from weaver.processes.constants import OPENSEARCH_LOCAL_FILE_SCHEME
 from weaver.utils import get_settings
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
-from typing import Union, Text
-from six.moves.urllib.parse import urlparse
+
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
+from six.moves.urllib.parse import urlparse
+
 import json
 import os
+from typing import Text, Union
 
 """
 Schema

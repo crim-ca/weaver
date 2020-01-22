@@ -6,27 +6,30 @@ See also: https://github.com/geopython/pywps/blob/master/pywps/exceptions.py
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_XML
 from weaver.utils import clean_json_text_body
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
-from zope.interface import implementer
+
+import six
+from pyramid.compat import text_type
+from pyramid.httpexceptions import (
+    HTTPBadRequest,
+    HTTPException,
+    HTTPInternalServerError,
+    HTTPNotAcceptable,
+    HTTPNotFound,
+    HTTPNotImplemented,
+    HTTPOk,
+    HTTPUnauthorized
+)
+from pyramid.interfaces import IExceptionResponse
+from pyramid.response import Response
 from webob import html_escape as _html_escape
 from webob.acceptparse import create_accept_header
-from pyramid.interfaces import IExceptionResponse
-from pyramid.httpexceptions import (
-    HTTPException,
-    HTTPOk,
-    HTTPBadRequest,
-    HTTPUnauthorized,
-    HTTPNotFound,
-    HTTPNotAcceptable,
-    HTTPInternalServerError,
-    HTTPNotImplemented,
-)
-from pyramid.response import Response
-from pyramid.compat import text_type
-from string import Template
-from typing import AnyStr, TYPE_CHECKING
-import warnings
+from zope.interface import implementer
+
 import json
-import six
+import warnings
+from string import Template
+from typing import TYPE_CHECKING, AnyStr
+
 if TYPE_CHECKING:
     from weaver.typedefs import JSON, SettingsType  # noqa: F401
 
@@ -39,7 +42,7 @@ class OWSException(Response, Exception):
     locator = "NoApplicableCode"
     explanation = "Unknown Error"
 
-    page_template = Template('''\
+    page_template = Template("""\
 <?xml version="1.0" encoding="utf-8"?>
 <ExceptionReport version="1.0.0"
     xmlns="http://www.opengis.net/ows/1.1"
@@ -48,7 +51,7 @@ class OWSException(Response, Exception):
     <Exception exceptionCode="${code}" locator="${locator}">
         <ExceptionText>${message}</ExceptionText>
     </Exception>
-</ExceptionReport>''')
+</ExceptionReport>""")
 
     def __init__(self, detail=None, value=None, **kw):
         status = kw.pop("status", None)

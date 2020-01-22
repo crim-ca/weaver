@@ -1,14 +1,17 @@
-from weaver import utils
-from weaver import status
-from weaver.utils import null, _NullType   # noqa: W0212
+from weaver import status, utils
 from weaver.exceptions import ServiceNotFound
-from pyramid.httpexceptions import HTTPError as PyramidHTTPError, HTTPInternalServerError, HTTPNotFound, HTTPConflict
+from weaver.utils import _NullType, null
+
+import pytest
+from lxml import etree
+from pyramid.httpexceptions import HTTPConflict
+from pyramid.httpexceptions import HTTPError as PyramidHTTPError
+from pyramid.httpexceptions import HTTPInternalServerError, HTTPNotFound
 from pywps.response.status import WPS_STATUS
 from requests.exceptions import HTTPError as RequestsHTTPError
 from six.moves.urllib.parse import urlparse
-from lxml import etree
+
 from typing import Type
-import pytest
 
 
 def test_null_operators():
@@ -241,24 +244,24 @@ def get_status_variations(status_value):
 
 
 def test_map_status_ogc_compliant():
-    for sv in status.job_status_values:
+    for sv in status.JOB_STATUS_VALUES:
         for s in get_status_variations(sv):
             assert status.map_status(s, status.STATUS_COMPLIANT_OGC) in \
-                   status.job_status_categories[status.STATUS_COMPLIANT_OGC]
+                   status.JOB_STATUS_CATEGORIES[status.STATUS_COMPLIANT_OGC]
 
 
 def test_map_status_pywps_compliant():
-    for sv in status.job_status_values:
+    for sv in status.JOB_STATUS_VALUES:
         for s in get_status_variations(sv):
             assert status.map_status(s, status.STATUS_COMPLIANT_PYWPS) in \
-                   status.job_status_categories[status.STATUS_COMPLIANT_PYWPS]
+                   status.JOB_STATUS_CATEGORIES[status.STATUS_COMPLIANT_PYWPS]
 
 
 def test_map_status_owslib_compliant():
-    for sv in status.job_status_values:
+    for sv in status.JOB_STATUS_VALUES:
         for s in get_status_variations(sv):
             assert status.map_status(s, status.STATUS_COMPLIANT_OWSLIB) in \
-                   status.job_status_categories[status.STATUS_COMPLIANT_OWSLIB]
+                   status.JOB_STATUS_CATEGORIES[status.STATUS_COMPLIANT_OWSLIB]
 
 
 def test_map_status_back_compatibility_and_special_cases():
@@ -270,7 +273,7 @@ def test_map_status_pywps_compliant_as_int_statuses():
     for s in range(len(WPS_STATUS)):
         if status.STATUS_PYWPS_MAP[s] != status.STATUS_UNKNOWN:
             assert status.map_status(s, status.STATUS_COMPLIANT_PYWPS) in \
-                   status.job_status_categories[status.STATUS_COMPLIANT_PYWPS]
+                   status.JOB_STATUS_CATEGORIES[status.STATUS_COMPLIANT_PYWPS]
 
 
 def test_map_status_pywps_back_and_forth():

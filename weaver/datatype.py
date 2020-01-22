@@ -4,19 +4,16 @@ Definitions of types used by tokens.
 from weaver.exceptions import ProcessInstanceError
 from weaver.processes.types import PROCESS_WITH_MAPPING, PROCESS_WPS
 from weaver.status import (
-    STATUS_UNKNOWN,
-    STATUS_SUCCEEDED,
+    JOB_STATUS_CATEGORIES,
+    JOB_STATUS_VALUES,
     STATUS_CATEGORY_FINISHED,
-    job_status_categories,
-    job_status_values,
-    map_status,
+    STATUS_SUCCEEDED,
+    STATUS_UNKNOWN,
+    map_status
 )
-from weaver.utils import (
-    get_settings,
-    localize_datetime,  # for backward compatibility of previously saved jobs not time-locale-aware
-)
-from weaver.utils import fully_qualified_name, get_job_log_msg, get_log_date_fmt, get_log_fmt, now
-from weaver.visibility import VISIBILITY_PRIVATE, visibility_values
+from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
+from weaver.utils import fully_qualified_name, get_job_log_msg, get_log_date_fmt, get_log_fmt, get_settings, now
+from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_VALUES
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
@@ -285,9 +282,9 @@ class Job(Base):
             LOGGER.debug(traceback.extract_stack())
         if not isinstance(status, six.string_types):
             raise TypeError("Type 'str' is required for '{}.status'".format(type(self)))
-        if status not in job_status_values:
+        if status not in JOB_STATUS_VALUES:
             raise ValueError("Status '{0}' is not valid for '{1}.status', must be one of {2!s}'"
-                             .format(status, type(self), list(job_status_values)))
+                             .format(status, type(self), list(JOB_STATUS_VALUES)))
         self["status"] = status
 
     @property
@@ -470,7 +467,7 @@ class Job(Base):
         """Job visibility access from execution."""
         if not isinstance(visibility, six.string_types):
             raise TypeError("Type 'str' is required for '{}.access'".format(type(self)))
-        if visibility not in visibility_values:
+        if visibility not in VISIBILITY_VALUES:
             raise ValueError("Invalid 'visibility' value specified for '{}.access'".format(type(self)))
         self["access"] = visibility
 
@@ -523,7 +520,7 @@ class Job(Base):
         }
         job_url = self._job_url(settings)
         # TODO: use links (https://github.com/crim-ca/weaver/issues/58)
-        if self.status in job_status_categories[STATUS_CATEGORY_FINISHED]:
+        if self.status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_FINISHED]:
             job_status = map_status(self.status)
             if job_status == STATUS_SUCCEEDED:
                 resource_type = "result"
@@ -742,9 +739,9 @@ class Process(Base):
         # type: (AnyStr) -> None
         if not isinstance(visibility, six.string_types):
             raise TypeError("Type 'str' is required for '{}.visibility'".format(type(self)))
-        if visibility not in visibility_values:
+        if visibility not in VISIBILITY_VALUES:
             raise ValueError("Status '{0}' is not valid for '{1}.visibility, must be one of {2!s}'"
-                             .format(visibility, type(self), list(visibility_values)))
+                             .format(visibility, type(self), list(VISIBILITY_VALUES)))
         self["visibility"] = visibility
 
     def params(self):

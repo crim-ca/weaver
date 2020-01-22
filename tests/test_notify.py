@@ -1,4 +1,5 @@
 from weaver.wps_restapi.jobs.notify import encrypt_email
+
 import pytest
 
 

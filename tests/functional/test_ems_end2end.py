@@ -1,36 +1,39 @@
+from tests.utils import get_setting, get_settings_from_config_ini, get_settings_from_testapp
 from weaver import WEAVER_ROOT_DIR
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_FORM
 from weaver.config import WEAVER_CONFIGURATION_EMS
+from weaver.formats import CONTENT_TYPE_APP_FORM, CONTENT_TYPE_APP_JSON
 from weaver.processes.sources import fetch_data_sources
-from weaver.wps_restapi.utils import get_wps_restapi_base_url
-from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
-from weaver.utils import get_weaver_url, now, make_dirs
 from weaver.status import (
+    JOB_STATUS_CATEGORIES,
+    JOB_STATUS_VALUES,
     STATUS_ACCEPTED,
-    STATUS_RUNNING,
-    STATUS_SUCCEEDED,
-    STATUS_CATEGORY_RUNNING,
     STATUS_CATEGORY_FINISHED,
-    job_status_values,
-    job_status_categories,
+    STATUS_CATEGORY_RUNNING,
+    STATUS_RUNNING,
+    STATUS_SUCCEEDED
 )
-from tests.utils import get_settings_from_config_ini, get_settings_from_testapp, get_setting
-from six.moves.urllib.parse import urlparse
-from unittest import TestCase
+from weaver.utils import get_weaver_url, make_dirs, now
+from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
+
+import mock
+import pytest
+import requests
 from pyramid import testing
+from pyramid.httpexceptions import HTTPCreated, HTTPNotFound, HTTPOk, HTTPUnauthorized
 from pyramid.settings import asbool
-from pyramid.httpexceptions import HTTPOk, HTTPCreated, HTTPUnauthorized, HTTPNotFound
+from six.moves.urllib.parse import urlparse
 # use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
 from webtest import TestApp as WebTestApp
-from typing import TYPE_CHECKING
-from copy import deepcopy
-import pytest
-import mock
-import requests
-import logging
-import time
+
 import json
+import logging
 import os
+import time
+from copy import deepcopy
+from typing import TYPE_CHECKING
+from unittest import TestCase
+
 if TYPE_CHECKING:
     from weaver.typedefs import HeadersType, CookiesType, SettingsType, AnyResponseType, LoggerType, JSON   # noqa: F401
     from typing import AnyStr, Dict, Optional, Any, Tuple, Iterable, Callable, Union                        # noqa: F401
@@ -674,7 +677,7 @@ class End2EndEMSTestCase(TestCase):
                              message="Response process ID should match specified test process id.")
             resp = self.request("POST", execute_path, json=execute_body,
                                 headers=headers_b, cookies=cookies_b, status=HTTPCreated.code)
-            self.assert_test(lambda: resp.json.get("status") in job_status_categories[STATUS_CATEGORY_RUNNING],
+            self.assert_test(lambda: resp.json.get("status") in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_RUNNING],
                              message="Response process execution job status should be one of running category values.")
             job_location = resp.json.get("location")
             job_id = resp.json.get("jobID")
@@ -745,7 +748,7 @@ class End2EndEMSTestCase(TestCase):
             execute_path = "{}/jobs".format(process_path)
             resp = self.request("POST", execute_path, status=HTTPCreated.code,
                                 headers=self.headers, json=execute_body)
-            self.assert_test(lambda: resp.json.get("status") in job_status_categories[STATUS_CATEGORY_RUNNING],
+            self.assert_test(lambda: resp.json.get("status") in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_RUNNING],
                              message="Response process execution job status should be one of running values.")
             job_location = resp.json.get("location")
             job_id = resp.json.get("jobID")
@@ -775,16 +778,16 @@ class End2EndEMSTestCase(TestCase):
             resp = self.request("GET", job_location_url,
                                 headers=user_headers, cookies=user_cookies, status=HTTPOk.code)
             status = resp.json.get("status")
-            self.assert_test(lambda: status in job_status_values,
+            self.assert_test(lambda: status in JOB_STATUS_VALUES,
                              message="Cannot identify a valid job status for result validation.")
-            if status in job_status_categories[STATUS_CATEGORY_RUNNING]:
+            if status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_RUNNING]:
                 if status == STATUS_ACCEPTED:
                     timeout_accept -= self.WEAVER_TEST_JOB_GET_STATUS_INTERVAL
                 else:
                     timeout_running -= self.WEAVER_TEST_JOB_GET_STATUS_INTERVAL
                 time.sleep(self.WEAVER_TEST_JOB_GET_STATUS_INTERVAL)
                 continue
-            elif status in job_status_categories[STATUS_CATEGORY_FINISHED]:
+            elif status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_FINISHED]:
                 self.assert_test(lambda: status == STATUS_SUCCEEDED,
                                  message="Job execution '{}' failed, but expected to succeed.".format(job_location_url))
                 break

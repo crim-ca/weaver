@@ -1,35 +1,37 @@
-from weaver.exceptions import ProcessNotFound, JobNotFound
-from weaver.execute import (
-    EXECUTE_MODE_SYNC,
-    EXECUTE_MODE_ASYNC,
-    EXECUTE_CONTROL_OPTION_ASYNC,
-    EXECUTE_RESPONSE_DOCUMENT,
-    EXECUTE_TRANSMISSION_MODE_VALUE,
-    EXECUTE_TRANSMISSION_MODE_REFERENCE,
-)
-from weaver.formats import CONTENT_TYPE_APP_XML, CONTENT_TYPE_APP_JSON
-from weaver.processes.wps_testing import WpsTestProcess
-from weaver.status import STATUS_ACCEPTED
-from weaver.utils import fully_qualified_name, ows_context_href
-from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
-from weaver.wps import get_wps_url
 from tests.utils import (
-    setup_config_with_mongodb,
-    setup_mongodb_processstore,
-    setup_mongodb_jobstore,
     get_test_weaver_app,
     mocked_process_job_runner,
     mocked_process_package,
+    setup_config_with_mongodb,
+    setup_mongodb_jobstore,
+    setup_mongodb_processstore
 )
-from copy import deepcopy
-from contextlib import ExitStack
-import pytest
-import webtest
-import unittest
-import responses
+from weaver.exceptions import JobNotFound, ProcessNotFound
+from weaver.execute import (
+    EXECUTE_CONTROL_OPTION_ASYNC,
+    EXECUTE_MODE_ASYNC,
+    EXECUTE_MODE_SYNC,
+    EXECUTE_RESPONSE_DOCUMENT,
+    EXECUTE_TRANSMISSION_MODE_REFERENCE,
+    EXECUTE_TRANSMISSION_MODE_VALUE
+)
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
+from weaver.processes.wps_testing import WpsTestProcess
+from weaver.status import STATUS_ACCEPTED
+from weaver.utils import fully_qualified_name, ows_context_href
+from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
+from weaver.wps import get_wps_url
+
 import pyramid.testing
+import pytest
+import responses
 import six
+import webtest
+
 import os
+import unittest
+from contextlib import ExitStack
+from copy import deepcopy
 
 # simulated remote server with remote processes (mocked with `responses` package)
 TEST_REMOTE_SERVER_URL = "https://remote-server.com"

@@ -1,7 +1,10 @@
 from weaver.wps_restapi import api
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
+
 from pyramid.settings import asbool
+
 import logging
+
 logger = logging.getLogger(__name__)
 
 

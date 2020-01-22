@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from weaver.processes.wps_process_base import WpsProcessInterface
     from weaver.datatype import Process
@@ -29,7 +30,7 @@ if TYPE_CHECKING:
     AnyKey = Union[AnyStr, int]
     JSON = Dict[AnyKey, Union[AnyValue, Dict[AnyKey, "JSON"], List["JSON"]]]
     CWL = Dict[{"cwlVersion": AnyStr, "class": AnyStr, "inputs": JSON, "outputs": JSON}]
-    XML = lxml.etree._Element  # noqa: W0212
+    XML = lxml.etree._Element
 
     AnyContainer = Union[Configurator, Registry, PyramidRequest, Celery]
     SettingValue = AnyValue

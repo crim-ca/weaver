@@ -1,5 +1,6 @@
-from pywps import Process, LiteralInput, LiteralOutput
 from weaver.processes.types import PROCESS_TEST
+
+from pywps import LiteralInput, LiteralOutput, Process
 
 
 class WpsTestProcess(Process):

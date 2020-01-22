@@ -1,31 +1,34 @@
 """
 Utility methods for various TestCase setup operations.
 """
-from weaver.datatype import Service
-from weaver.database import get_db
-from weaver.formats import CONTENT_TYPE_TEXT_XML, CONTENT_TYPE_APP_JSON
-from weaver.store.mongodb import MongodbServiceStore, MongodbProcessStore, MongodbJobStore
 from weaver.config import WEAVER_CONFIGURATION_DEFAULT, WEAVER_DEFAULT_INI_CONFIG, get_weaver_config_file
-from weaver.utils import null, get_url_without_query
-from weaver.wps import get_wps_url, get_wps_output_url, get_wps_output_dir
-from weaver.wps_restapi.processes.processes import execute_process
+from weaver.database import get_db
+from weaver.datatype import Service
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_XML
+from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
+from weaver.utils import get_url_without_query, null
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
-from six.moves.configparser import ConfigParser
-from typing import TYPE_CHECKING
-from contextlib import ExitStack
-from pyramid import testing
-from pyramid.httpexceptions import HTTPNotFound, HTTPUnprocessableEntity, HTTPException
-from pyramid.registry import Registry
-from pyramid.config import Configurator
-from requests import Response
-from webtest import TestApp
-from inspect import isclass
-import pyramid_celery
-import warnings
+from weaver.wps import get_wps_output_dir, get_wps_output_url, get_wps_url
+from weaver.wps_restapi.processes.processes import execute_process
+
 import mock
-import uuid
+import pyramid_celery
 import six
+from pyramid import testing
+from pyramid.config import Configurator
+from pyramid.httpexceptions import HTTPException, HTTPNotFound, HTTPUnprocessableEntity
+from pyramid.registry import Registry
+from requests import Response
+from six.moves.configparser import ConfigParser
+from webtest import TestApp
+
 import os
+import uuid
+import warnings
+from contextlib import ExitStack
+from inspect import isclass
+from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from weaver.typedefs import Any, AnyStr, Callable, List, Optional, SettingsType, Type, Union  # noqa: F401
 
@@ -273,7 +276,7 @@ def mocked_sub_requests(app, function="get", *args, **kwargs):
             resp.status_code = 200
             resp.headers["Content-Type"] = typ
             setattr(resp, "content_type", typ)
-            resp._content = open(path, "rb").read()  # noqa: W0212
+            resp._content = open(path, "rb").read()
             resp.url = url
         return resp
 

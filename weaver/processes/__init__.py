@@ -1,8 +1,7 @@
+from weaver.processes.types import PROCESS_APPLICATION, PROCESS_BUILTIN, PROCESS_TEST, PROCESS_WORKFLOW
 from weaver.processes.wps_default import HelloWPS
-from weaver.processes.wps_testing import WpsTestProcess
 from weaver.processes.wps_package import WpsPackage
-from weaver.processes.types import PROCESS_TEST, PROCESS_APPLICATION, PROCESS_WORKFLOW, PROCESS_BUILTIN
-
+from weaver.processes.wps_testing import WpsTestProcess
 
 default_processes = [
     HelloWPS()

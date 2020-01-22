@@ -1,13 +1,16 @@
-from weaver.wps import get_wps_output_dir, get_wps_output_url
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.utils import get_cookie_headers, get_settings
-from pyramid_celery import celery_app as app
-from pyramid.settings import asbool
+from weaver.wps import get_wps_output_dir, get_wps_output_url
+
+import requests
 from pyramid.httpexceptions import HTTPBadGateway
+from pyramid.settings import asbool
+from pyramid_celery import celery_app as app
+
+from abc import abstractmethod
 from time import sleep
 from typing import TYPE_CHECKING
-from abc import abstractmethod
-import requests
+
 if TYPE_CHECKING:
     from weaver.typedefs import CWL     # noqa: F401
     from typing import AnyStr, Dict     # noqa: F401

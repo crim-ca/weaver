@@ -2,37 +2,51 @@
 Stores to read/write data to from/to mongodb using pymongo.
 """
 
-from weaver.datatype import Service, Process, Job, Quote, Bill
-from weaver.store.base import StoreServices, StoreProcesses, StoreJobs, StoreQuotes, StoreBills
+from weaver.datatype import Bill, Job, Process, Quote, Service
 from weaver.exceptions import (
-    ServiceRegistrationError, ServiceNotFound, ServiceNotAccessible,
-    ProcessRegistrationError, ProcessNotFound, ProcessNotAccessible, ProcessInstanceError,
-    JobRegistrationError, JobNotFound, JobUpdateError,
-    QuoteRegistrationError, QuoteNotFound, QuoteInstanceError,
-    BillRegistrationError, BillNotFound, BillInstanceError,
+    BillInstanceError,
+    BillNotFound,
+    BillRegistrationError,
+    JobNotFound,
+    JobRegistrationError,
+    JobUpdateError,
+    ProcessInstanceError,
+    ProcessNotAccessible,
+    ProcessNotFound,
+    ProcessRegistrationError,
+    QuoteInstanceError,
+    QuoteNotFound,
+    QuoteRegistrationError,
+    ServiceNotAccessible,
+    ServiceNotFound,
+    ServiceRegistrationError
 )
-from weaver.utils import get_base_url, get_weaver_url, get_sane_name, islambda, now
 from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_MODE_SYNC
-from weaver.processes.types import PROCESS_WORKFLOW, PROCESS_APPLICATION, PROCESS_WPS
-from weaver.status import STATUS_ACCEPTED, map_status, job_status_categories
-from weaver.visibility import visibility_values, VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
+from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW, PROCESS_WPS
 from weaver.sort import (
-    job_sort_values,
-    quote_sort_values,
-    bill_sort_values,
-    SORT_ID,
-    SORT_USER,
+    BILL_SORT_VALUES,
+    JOB_SORT_VALUES,
+    QUOTE_SORT_VALUES,
     SORT_CREATED,
     SORT_FINISHED,
+    SORT_ID,
+    SORT_USER
 )
-# noinspection PyPackageRequirements
-from pywps import Process as ProcessWPS
-from typing import TYPE_CHECKING
-from pyramid.request import Request
-from pymongo import ASCENDING, DESCENDING
+from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, map_status
+from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices
+from weaver.utils import get_base_url, get_sane_name, get_weaver_url, islambda, now
+from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC, VISIBILITY_VALUES
+
 import pymongo
 import six
+from pymongo import ASCENDING, DESCENDING
+from pyramid.request import Request
+# noinspection PyPackageRequirements
+from pywps import Process as ProcessWPS
+
 import logging
+from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from weaver.typedefs import AnyValue, AnyProcess, AnyProcessType                # noqa: F401
     from pymongo.collection import Collection                                       # noqa: F401
@@ -108,7 +122,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
             auth=service.auth).params())
         return self.fetch_by_url(url=service_url, request=request)
 
-    def delete_service(self, name, request=None):  # noqa: W0212
+    def delete_service(self, name, request=None):
         # type: (AnyStr, Optional[Request]) -> bool
         """
         Removes service from mongodb storage.
@@ -116,7 +130,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
         self.collection.delete_one({"name": name})
         return True
 
-    def list_services(self, request=None):  # noqa: W0212
+    def list_services(self, request=None):
         # type: (Optional[Request]) -> List[Service]
         """
         Lists all services in mongodb storage.
@@ -126,7 +140,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
             my_services.append(Service(service))
         return my_services
 
-    def fetch_by_name(self, name, visibility=None, request=None):  # noqa: W0212
+    def fetch_by_name(self, name, visibility=None, request=None):
         # type: (AnyStr, Optional[AnyStr], Optional[Request]) -> Service
         """
         Gets service for given ``name`` from mongodb storage.
@@ -141,7 +155,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
             raise ServiceNotAccessible("Service '{}' cannot be accessed.".format(name))
         return service
 
-    def fetch_by_url(self, url, request=None):  # noqa: W0212
+    def fetch_by_url(self, url, request=None):
         # type: (AnyStr, Optional[Request]) -> Service
         """
         Gets service for given ``url`` from mongodb storage.
@@ -151,7 +165,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
             raise ServiceNotFound
         return Service(service)
 
-    def clear_services(self, request=None):  # noqa: W0212
+    def clear_services(self, request=None):
         # type: (Optional[Request]) -> bool
         """
         Removes all OWS services from mongodb storage.
@@ -239,7 +253,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
             url = self.default_wps_endpoint
         return url
 
-    def save_process(self, process, overwrite=True, request=None):  # noqa: W0212
+    def save_process(self, process, overwrite=True, request=None):
         # type: (Union[Process, ProcessWPS], bool, Optional[Request]) -> Process
         """
         Stores a process in storage.
@@ -271,7 +285,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
             raise ProcessNotFound("Process '{}' could not be found.".format(sane_name))
         return bool(self.collection.delete_one({"identifier": sane_name}).deleted_count)
 
-    def list_processes(self, visibility=None, request=None):  # noqa: W0212
+    def list_processes(self, visibility=None, request=None):
         # type: (Optional[AnyStr], Optional[Request]) -> List[Process]
         """
         Lists all processes in database, optionally filtered by `visibility`.
@@ -282,19 +296,19 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         db_processes = []
         search_filters = {}
         if visibility is None:
-            visibility = visibility_values
+            visibility = VISIBILITY_VALUES
         if isinstance(visibility, six.string_types):
             visibility = [visibility]
         for v in visibility:
-            if v not in visibility_values:
+            if v not in VISIBILITY_VALUES:
                 raise ValueError("Invalid visibility value '{0!s}' is not one of {1!s}"
-                                 .format(v, list(visibility_values)))
+                                 .format(v, list(VISIBILITY_VALUES)))
         search_filters["visibility"] = {"$in": list(visibility)}
         for process in self.collection.find(search_filters).sort("identifier", pymongo.ASCENDING):
             db_processes.append(Process(process))
         return db_processes
 
-    def fetch_by_id(self, process_id, visibility=None, request=None):  # noqa: W0212
+    def fetch_by_id(self, process_id, visibility=None, request=None):
         # type: (AnyStr, Optional[AnyStr], Optional[Request]) -> Process
         """
         Get process for given `process_id` from storage, optionally filtered by `visibility`.
@@ -314,7 +328,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
             raise ProcessNotAccessible("Process '{}' cannot be accessed.".format(sane_name))
         return process
 
-    def get_visibility(self, process_id, request=None):  # noqa: W0212
+    def get_visibility(self, process_id, request=None):
         # type: (AnyStr, Optional[Request]) -> AnyStr
         """
         Get `visibility` of a process.
@@ -324,7 +338,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         process = self.fetch_by_id(process_id)
         return process.visibility
 
-    def set_visibility(self, process_id, visibility, request=None):  # noqa: W0212
+    def set_visibility(self, process_id, visibility, request=None):
         # type: (AnyStr, AnyStr, Optional[Request]) -> None
         """
         Set `visibility` of a process.
@@ -338,7 +352,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         process.visibility = visibility
         self.save_process(process, overwrite=True)
 
-    def clear_processes(self, request=None):  # noqa: W0212
+    def clear_processes(self, request=None):
         # type: (Optional[Request]) -> bool
         """
         Clears all processes from the store.
@@ -423,7 +437,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             raise JobUpdateError("Error occurred during job update: [{}]".format(repr(ex)))
         raise JobUpdateError("Failed to update specified job: '{}'".format(str(job)))
 
-    def delete_job(self, job_id, request=None):     # noqa: W0212
+    def delete_job(self, job_id, request=None):
         # type: (AnyStr, Optional[Request]) -> bool
         """
         Removes job from mongodb storage.
@@ -431,7 +445,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         self.collection.delete_one({"id": job_id})
         return True
 
-    def fetch_by_id(self, job_id, request=None):    # noqa: W0212
+    def fetch_by_id(self, job_id, request=None):
         # type: (AnyStr, Optional[Request]) -> Job
         """
         Gets job for given ``job_id`` from mongodb storage.
@@ -441,7 +455,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             raise JobNotFound("Could not find job matching: '{}'".format(job_id))
         return Job(job)
 
-    def list_jobs(self, request=None):  # noqa: W0212
+    def list_jobs(self, request=None):
         # type: (Optional[Request]) -> List[Job]
         """
         Lists all jobs in mongodb storage.
@@ -509,18 +523,18 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             of specified fields (from ``group_by``) that compose corresponding jobs with matching values.
         """
 
-        if any(v in tags for v in visibility_values):
+        if any(v in tags for v in VISIBILITY_VALUES):
             raise ValueError("Visibility values not acceptable in 'tags', use 'access' instead.")
 
         search_filters = {}
 
-        if request.has_permission("admin") and access in visibility_values:
+        if request.has_permission("admin") and access in VISIBILITY_VALUES:
             search_filters["access"] = access
         else:
             user_id = request.authenticated_userid
             if user_id is not None:
                 search_filters["user_id"] = user_id
-                if access in visibility_values:
+                if access in VISIBILITY_VALUES:
                     search_filters["access"] = access
             else:
                 search_filters["access"] = VISIBILITY_PUBLIC
@@ -528,8 +542,8 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         if tags:
             search_filters["tags"] = {"$all": tags}
 
-        if status in job_status_categories.keys():
-            search_filters["status"] = {"$in": job_status_categories[status]}
+        if status in JOB_STATUS_CATEGORIES.keys():
+            search_filters["status"] = {"$in": JOB_STATUS_CATEGORIES[status]}
         elif status:
             search_filters["status"] = status
 
@@ -546,7 +560,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             sort = SORT_CREATED
         elif sort == SORT_USER:
             sort = "user_id"
-        if sort not in job_sort_values:
+        if sort not in JOB_SORT_VALUES:
             raise JobNotFound("Invalid sorting method: '{}'".format(repr(sort)))
         sort_order = DESCENDING if sort == SORT_FINISHED or sort == SORT_CREATED else ASCENDING
         sort_criteria = {sort: sort_order}
@@ -584,7 +598,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         total = self.collection.count_documents(search_filters)
         return items, total
 
-    def clear_jobs(self, request=None):  # noqa: W0212
+    def clear_jobs(self, request=None):
         # type: (Optional[Request]) -> bool
         """
         Removes all jobs from mongodb storage.
@@ -653,7 +667,7 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
 
         if sort is None:
             sort = SORT_ID
-        if sort not in quote_sort_values:
+        if sort not in QUOTE_SORT_VALUES:
             raise QuoteNotFound("Invalid sorting method: '{!s}'".format(sort))
 
         sort_order = ASCENDING
@@ -724,7 +738,7 @@ class MongodbBillStore(StoreBills, MongodbStore):
 
         if sort is None:
             sort = SORT_ID
-        if sort not in bill_sort_values:
+        if sort not in BILL_SORT_VALUES:
             raise BillNotFound("Invalid sorting method: '{}'".format(repr(sort)))
 
         sort_order = ASCENDING

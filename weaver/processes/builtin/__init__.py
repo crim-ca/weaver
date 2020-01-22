@@ -2,25 +2,28 @@ from weaver import WEAVER_ROOT_DIR
 from weaver.database import get_db
 from weaver.datatype import Process
 from weaver.exceptions import PackageExecutionError, PackageNotFound, ProcessNotAccessible, ProcessNotFound
-from weaver.store.base import StoreProcesses
 from weaver.processes.constants import CWL_REQUIREMENT_APP_BUILTIN
 from weaver.processes.types import PROCESS_BUILTIN
 from weaver.processes.wps_package import PACKAGE_EXTENSIONS, get_process_definition
+from weaver.store.base import StoreProcesses
 from weaver.utils import clean_json_text_body, ows_context_href
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps import get_wps_url
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
+
+import six
 from cwltool.command_line_tool import CommandLineTool
 from cwltool.docker import DockerCommandLineJob
-from cwltool.singularity import SingularityCommandLineJob
 from cwltool.job import CommandLineJob, JobBase
+from cwltool.singularity import SingularityCommandLineJob
 from pyramid_celery import celery_app as app
+
+import logging
+import os
 from importlib import import_module
 from string import Template
 from typing import TYPE_CHECKING
-import logging
-import six
-import os
+
 if TYPE_CHECKING:
     from weaver.typedefs import AnyDatabaseContainer, CWL   # noqa: F401
     from cwltool.context import RuntimeContext              # noqa: F401

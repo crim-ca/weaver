@@ -1,33 +1,36 @@
 from weaver.__meta__ import __version__ as weaver_version
-from weaver.utils import get_settings, get_header, get_weaver_url
-from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.colander_extras import CustomTypeConversionDispatcher
-from weaver.wps_restapi.utils import get_wps_restapi_base_url, wps_restapi_base_path, OUTPUT_FORMAT_JSON
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN
 from weaver.owsexceptions import OWSException
-from six.moves.urllib.parse import urlparse
-from cornice_swagger import CorniceSwagger
+from weaver.utils import get_header, get_settings, get_weaver_url
+from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.colander_extras import CustomTypeConversionDispatcher
+from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, get_wps_restapi_base_url, wps_restapi_base_path
+
+import six
 from cornice.service import get_services
+from cornice_swagger import CorniceSwagger
+from pyramid.authentication import Authenticated, IAuthenticationPolicy
+from pyramid.exceptions import PredicateMismatch
+from pyramid.httpexceptions import (
+    HTTPException,
+    HTTPForbidden,
+    HTTPMethodNotAllowed,
+    HTTPNotFound,
+    HTTPOk,
+    HTTPServerError,
+    HTTPUnauthorized
+)
 from pyramid.renderers import render_to_response
 from pyramid.request import Request
 from pyramid.response import Response
 from pyramid.settings import asbool
-from pyramid.authentication import IAuthenticationPolicy, Authenticated
-from pyramid.exceptions import PredicateMismatch
-from pyramid.httpexceptions import (
-    HTTPOk,
-    HTTPUnauthorized,
-    HTTPForbidden,
-    HTTPNotFound,
-    HTTPMethodNotAllowed,
-    HTTPServerError,
-    HTTPException,
-)
-from typing import AnyStr, Optional, TYPE_CHECKING
 from simplejson import JSONDecodeError
+from six.moves.urllib.parse import urlparse
+
 import logging
-import six
 import os
+from typing import TYPE_CHECKING, AnyStr, Optional
+
 if TYPE_CHECKING:
     from weaver.typedefs import JSON    # noqa: F401
 

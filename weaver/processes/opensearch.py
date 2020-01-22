@@ -1,21 +1,28 @@
-from weaver.processes.sources import fetch_data_sources
-from weaver.processes.constants import (
-    OPENSEARCH_START_DATE, OPENSEARCH_END_DATE, OPENSEARCH_AOI, OPENSEARCH_COLLECTION, OPENSEARCH_LOCAL_FILE_SCHEME,
-    WPS_LITERAL,
-)
 from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
+from weaver.processes.constants import (
+    OPENSEARCH_AOI,
+    OPENSEARCH_COLLECTION,
+    OPENSEARCH_END_DATE,
+    OPENSEARCH_LOCAL_FILE_SCHEME,
+    OPENSEARCH_START_DATE,
+    WPS_LITERAL
+)
+from weaver.processes.sources import fetch_data_sources
 from weaver.utils import get_any_id
-from collections import deque
-from copy import deepcopy
-from pyramid.httpexceptions import HTTPGatewayTimeout, HTTPOk
-from pyramid.settings import asbool
-from six.moves.urllib.parse import urlparse, parse_qsl
-from typing import TYPE_CHECKING
-import shapely.wkt
+
 import lxml.etree
 import requests
+import shapely.wkt
+from pyramid.httpexceptions import HTTPGatewayTimeout, HTTPOk
+from pyramid.settings import asbool
+from six.moves.urllib.parse import parse_qsl, urlparse
+
 import logging
 import time
+from collections import deque
+from copy import deepcopy
+from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from weaver.typedefs import XML                                 # noqa: F401
     from typing import AnyStr, Deque, Dict, Iterable, List, Tuple   # noqa: F401

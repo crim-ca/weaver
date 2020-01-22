@@ -1,57 +1,90 @@
-from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS
-from weaver.processes import opensearch
-from weaver.processes.constants import (
-    WPS_INPUT, WPS_OUTPUT, WPS_COMPLEX_DATA, WPS_COMPLEX, WPS_BOUNDINGBOX, WPS_LITERAL, WPS_REFERENCE,
-    CWL_REQUIREMENT_APP_ESGF_CWT, CWL_REQUIREMENT_APP_WPS1, CWL_REQUIREMENT_APP_TYPES,
-)
-from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
-from weaver.processes.sources import retrieve_data_source_url
+from weaver.config import WEAVER_CONFIGURATION_EMS, get_weaver_configuration
 from weaver.exceptions import (
-    PackageTypeError, PackageRegistrationError, PackageExecutionError,
-    PackageNotFound, PayloadNotFound
+    PackageExecutionError,
+    PackageNotFound,
+    PackageRegistrationError,
+    PackageTypeError,
+    PayloadNotFound
 )
 from weaver.formats import (
-    CONTENT_TYPE_APP_JSON, CONTENT_TYPE_ANY_XML, CONTENT_TYPE_TEXT_PLAIN, get_cwl_file_format, clean_mime_type_format,
-    get_extension,
+    CONTENT_TYPE_ANY_XML,
+    CONTENT_TYPE_APP_JSON,
+    CONTENT_TYPE_TEXT_PLAIN,
+    clean_mime_type_format,
+    get_cwl_file_format,
+    get_extension
 )
+from weaver.processes import opensearch
+from weaver.processes.constants import (
+    CWL_REQUIREMENT_APP_ESGF_CWT,
+    CWL_REQUIREMENT_APP_TYPES,
+    CWL_REQUIREMENT_APP_WPS1,
+    WPS_BOUNDINGBOX,
+    WPS_COMPLEX,
+    WPS_COMPLEX_DATA,
+    WPS_INPUT,
+    WPS_LITERAL,
+    WPS_OUTPUT,
+    WPS_REFERENCE
+)
+from weaver.processes.sources import retrieve_data_source_url
+from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from weaver.status import (
-    STATUS_RUNNING, STATUS_SUCCEEDED, STATUS_EXCEPTION, STATUS_FAILED, STATUS_COMPLIANT_PYWPS, STATUS_PYWPS_IDS,
-    map_status,
+    STATUS_COMPLIANT_PYWPS,
+    STATUS_EXCEPTION,
+    STATUS_FAILED,
+    STATUS_PYWPS_IDS,
+    STATUS_RUNNING,
+    STATUS_SUCCEEDED,
+    map_status
 )
-from weaver.wps_restapi.swagger_definitions import process_uri
-from weaver.wps import get_wps_output_dir
 from weaver.utils import (
-    get_job_log_msg, get_log_fmt, get_log_date_fmt, get_sane_name, get_settings, get_any_id, get_header,
-    get_url_without_query, str2bytes, bytes2str, null
+    bytes2str,
+    get_any_id,
+    get_header,
+    get_job_log_msg,
+    get_log_date_fmt,
+    get_log_fmt,
+    get_sane_name,
+    get_settings,
+    get_url_without_query,
+    null,
+    str2bytes
 )
-from owslib.wps import WebProcessingService, ComplexData, Metadata as OwsMetadata
-from pywps import Process
-from pywps.app.Common import Metadata
-from pywps.inout.basic import BasicIO
-from pywps.inout.literaltypes import AnyValue, AllowedValue, ALLOWEDVALUETYPE
-from pywps.inout import LiteralInput, LiteralOutput, ComplexInput, ComplexOutput, BoundingBoxInput, BoundingBoxOutput
-from pywps.inout.formats import Format
-from pywps.validator.mode import MODE
+from weaver.wps import get_wps_output_dir
+from weaver.wps_restapi.swagger_definitions import process_uri
+
+import cwltool
+import cwltool.factory
+import lxml.etree
+import requests
+import six
+import yaml
+from cwltool.context import LoadingContext, RuntimeContext
+from owslib.wps import ComplexData
+from owslib.wps import Metadata as OwsMetadata
+from owslib.wps import WebProcessingService
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
 from pyramid_celery import celery_app as app
-from collections import OrderedDict, Hashable
+from pywps import Process
+from pywps.app.Common import Metadata
+from pywps.inout import BoundingBoxInput, BoundingBoxOutput, ComplexInput, ComplexOutput, LiteralInput, LiteralOutput
+from pywps.inout.basic import BasicIO
+from pywps.inout.formats import Format
+from pywps.inout.literaltypes import ALLOWEDVALUETYPE, AllowedValue, AnyValue
+from pywps.validator.mode import MODE
 from six.moves.urllib.parse import urlparse
-from typing import TYPE_CHECKING
 from yaml.scanner import ScannerError
-from copy import deepcopy
-from cwltool.context import LoadingContext
-from cwltool.context import RuntimeContext
-import cwltool.factory
-import cwltool
-import lxml.etree
-import yaml
+
 import json
-import tempfile
-import shutil
-import requests
 import logging
 import os
-import six
+import shutil
+import tempfile
+from collections import Hashable, OrderedDict
+from copy import deepcopy
+from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from weaver.status import AnyStatusType     # noqa: F401
     from weaver.typedefs import (               # noqa: F401

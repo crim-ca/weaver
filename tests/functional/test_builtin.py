@@ -1,27 +1,29 @@
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF
-from weaver.database import get_db
-from weaver.processes.builtin import register_builtin_processes
-from weaver.status import STATUS_SUCCEEDED, STATUS_CATEGORY_RUNNING, job_status_categories
 from tests.utils import (
-    setup_config_with_mongodb,
-    setup_config_with_pywps,
-    setup_config_with_celery,
-    get_test_weaver_config,
-    get_test_weaver_app,
     get_settings_from_testapp,
+    get_test_weaver_app,
+    get_test_weaver_config,
     mocked_execute_process,
     mocked_sub_requests,
+    setup_config_with_celery,
+    setup_config_with_mongodb,
+    setup_config_with_pywps
 )
+from weaver.database import get_db
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF
+from weaver.processes.builtin import register_builtin_processes
+from weaver.status import JOB_STATUS_CATEGORIES, STATUS_CATEGORY_RUNNING, STATUS_SUCCEEDED
+
+import mock
+import pyramid.testing
+import pytest
+import six
+
+import json
+import os
+import unittest
+from contextlib import ExitStack
 from tempfile import NamedTemporaryFile
 from time import sleep
-from contextlib import ExitStack
-import mock
-import pytest
-import unittest
-import pyramid.testing
-import json
-import six
-import os
 
 
 @pytest.mark.functional
@@ -101,7 +103,7 @@ class BuiltinAppTest(unittest.TestCase):
                 sleep(1)
                 resp = self.app.get(job_url, headers=self.json_headers)
                 if resp.status_code == 200:
-                    if resp.json["status"] in job_status_categories[STATUS_CATEGORY_RUNNING]:
+                    if resp.json["status"] in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_RUNNING]:
                         continue
                     assert resp.json["status"] == STATUS_SUCCEEDED
                     resp = self.app.get("{}/result".format(job_url), headers=self.json_headers)

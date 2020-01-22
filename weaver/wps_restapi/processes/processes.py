@@ -1,60 +1,58 @@
-from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS
+from weaver.config import WEAVER_CONFIGURATION_EMS, get_weaver_configuration
 from weaver.database import get_db
-from weaver.datatype import Process as ProcessDB, Service
-from weaver.exceptions import InvalidIdentifierValue, ProcessNotFound, ProcessNotAccessible, log_unhandled_exceptions
+from weaver.datatype import Process as ProcessDB
+from weaver.datatype import Service
+from weaver.exceptions import InvalidIdentifierValue, ProcessNotAccessible, ProcessNotFound, log_unhandled_exceptions
 from weaver.execute import (
-    EXECUTE_MODE_AUTO,
     EXECUTE_MODE_ASYNC,
+    EXECUTE_MODE_AUTO,
     EXECUTE_MODE_SYNC,
     EXECUTE_RESPONSE_DOCUMENT,
-    EXECUTE_TRANSMISSION_MODE_REFERENCE,
+    EXECUTE_TRANSMISSION_MODE_REFERENCE
 )
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.owsexceptions import OWSNoApplicableCode
-from weaver.processes import wps_package, opensearch
+from weaver.processes import opensearch, wps_package
 from weaver.processes.constants import WPS_COMPLEX_DATA
-from weaver.processes.utils import jsonify_output, convert_process_wps_to_db, deploy_process_from_payload
-from weaver.processes.types import PROCESS_WORKFLOW, PROCESS_BUILTIN
-from weaver.status import (
-    map_status,
-    STATUS_ACCEPTED,
-    STATUS_STARTED,
-    STATUS_FAILED,
-    STATUS_SUCCEEDED,
-)
-from weaver.store.base import StoreServices, StoreProcesses, StoreJobs
-from weaver.utils import get_any_id, get_any_value, get_settings, get_cookie_headers, raise_on_xml_exception, wait_secs
-from weaver.visibility import VISIBILITY_PUBLIC, visibility_values
-from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.jobs.notify import notify_job_complete, encrypt_email
-from weaver.wps_restapi.utils import get_wps_restapi_base_url, parse_request_query, OUTPUT_FORMAT_JSON
-from weaver.wps_restapi.jobs.jobs import check_status
+from weaver.processes.types import PROCESS_BUILTIN, PROCESS_WORKFLOW
+from weaver.processes.utils import convert_process_wps_to_db, deploy_process_from_payload, jsonify_output
+from weaver.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_STARTED, STATUS_SUCCEEDED, map_status
+from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
+from weaver.utils import get_any_id, get_any_value, get_cookie_headers, get_settings, raise_on_xml_exception, wait_secs
+from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps import load_pywps_cfg
-from owslib.wps import WebProcessingService, WPSException, ComplexDataInput
+from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.jobs.jobs import check_status
+from weaver.wps_restapi.jobs.notify import encrypt_email, notify_job_complete
+from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, get_wps_restapi_base_url, parse_request_query
+
+import colander
+import requests
+import six
+from celery.utils.log import get_task_logger
+from lxml import etree
 from owslib.util import clean_ows_url
+from owslib.wps import ComplexDataInput, WebProcessingService, WPSException
 from pyramid.httpexceptions import (
-    HTTPOk,
+    HTTPBadRequest,
     HTTPCreated,
-    HTTPUnauthorized,
     HTTPForbidden,
     HTTPNotFound,
-    HTTPBadRequest,
-    HTTPUnprocessableEntity,
     HTTPNotImplemented,
+    HTTPOk,
     HTTPServiceUnavailable,
     HTTPSuccessful,
+    HTTPUnauthorized,
+    HTTPUnprocessableEntity
 )
-from time import sleep
-from celery.utils.log import get_task_logger
+from pyramid.request import Request
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
-from pyramid.request import Request
-from lxml import etree
-from typing import TYPE_CHECKING
-import requests
-import colander
+
 import logging
-import six
+from time import sleep
+from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from weaver.typedefs import JSON                    # noqa: F401
     from typing import AnyStr, List, Tuple, Optional    # noqa: F401
@@ -508,7 +506,7 @@ def set_process_visibility(request):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     if not isinstance(visibility_value, six.string_types):
         raise HTTPUnprocessableEntity("Invalid visibility value specified.")
-    if visibility_value not in visibility_values:
+    if visibility_value not in VISIBILITY_VALUES:
         raise HTTPBadRequest("Invalid visibility value specified.")
 
     try:
@@ -521,7 +519,7 @@ def set_process_visibility(request):
     except TypeError:
         raise HTTPBadRequest("Value of visibility must be a string.")
     except ValueError:
-        raise HTTPUnprocessableEntity("Value of visibility must be one of : {!s}".format(list(visibility_values)))
+        raise HTTPUnprocessableEntity("Value of visibility must be one of : {!s}".format(list(VISIBILITY_VALUES)))
     except ProcessNotFound as ex:
         raise HTTPNotFound(str(ex))
 

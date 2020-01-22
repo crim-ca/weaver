@@ -1,27 +1,37 @@
 from weaver.processes.builtin import BuiltinProcess
 from weaver.processes.constants import (
-    CWL_REQUIREMENT_APP_BUILTIN, CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_APP_WPS1, CWL_REQUIREMENT_APP_ESGF_CWT
+    CWL_REQUIREMENT_APP_BUILTIN,
+    CWL_REQUIREMENT_APP_DOCKER,
+    CWL_REQUIREMENT_APP_ESGF_CWT,
+    CWL_REQUIREMENT_APP_WPS1
 )
-from weaver.utils import now, get_settings
+from weaver.utils import get_settings, now
 from weaver.wps import get_wps_output_dir
+
 from cwltool import command_line_tool
-from cwltool.process import stageFiles
-from cwltool.provenance import CreateProvProfile
-from cwltool.builder import (CONTENT_LIMIT, Builder, substitute)
+from cwltool.builder import CONTENT_LIMIT, Builder, substitute
+from cwltool.context import LoadingContext, RuntimeContext, getdefault
 from cwltool.errors import WorkflowException
 from cwltool.job import JobBase, relink_initialworkdir
 from cwltool.pathmapper import adjustDirObjs, adjustFileObjs, get_listing, trim_listing, visit_class
-from cwltool.process import (Process as ProcessCWL, compute_checksums, normalizeFilesDirs,
-                             shortname, uniquename, supportedProcessRequirements)
+from cwltool.process import Process as ProcessCWL
+from cwltool.process import (
+    compute_checksums,
+    normalizeFilesDirs,
+    shortname,
+    stageFiles,
+    supportedProcessRequirements,
+    uniquename
+)
+from cwltool.provenance import CreateProvProfile
 from cwltool.stdfsaccess import StdFsAccess
-from cwltool.utils import (aslist, json_dumps, onWindows, bytes2str_in_dicts)
-from cwltool.context import (LoadingContext, RuntimeContext, getdefault)
+from cwltool.utils import aslist, bytes2str_in_dicts, json_dumps, onWindows
 from cwltool.workflow import Workflow
 from pyramid_celery import celery_app as app
-from functools import cmp_to_key, partial
 from schema_salad import validate
 from schema_salad.sourceline import SourceLine
 from six import string_types
+
 import hashlib
 import json
 import locale
@@ -29,7 +39,9 @@ import logging
 import os
 import shutil
 import tempfile
-from typing import MutableMapping, Callable, cast, Text, TYPE_CHECKING  # these are actually used in the code
+from functools import cmp_to_key, partial
+from typing import TYPE_CHECKING, Callable, MutableMapping, Text, cast  # these are actually used in the code
+
 if TYPE_CHECKING:
     from weaver.typedefs import (   # noqa: F401
         ExpectedOutputType, GetJobProcessDefinitionFunction, ToolPathObjectType, AnyValue

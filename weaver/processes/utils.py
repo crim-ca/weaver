@@ -1,50 +1,54 @@
 from weaver.config import (
     WEAVER_CONFIGURATION_EMS,
     WEAVER_DEFAULT_WPS_PROCESSES_CONFIG,
-    get_weaver_configuration,
     get_weaver_config_file,
+    get_weaver_configuration
 )
-from weaver.datatype import Service, Process as ProcessDB
 from weaver.database import get_db
-from weaver.exceptions import ProcessNotFound, log_unhandled_exceptions
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN
-from weaver.store.base import StoreProcesses
-from weaver.utils import get_sane_name, get_settings, get_url_without_query
-from weaver.processes import wps_package
-from weaver.processes.constants import WPS_COMPLEX_DATA
-from weaver.processes.wps_package import complex2json as jsonify_value
-from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
-from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.utils import get_wps_restapi_base_url
+from weaver.datatype import Process as ProcessDB
+from weaver.datatype import Service
 from weaver.exceptions import (
     InvalidIdentifierValue,
-    ProcessRegistrationError,
+    PackageNotFound,
     PackageRegistrationError,
     PackageTypeError,
-    PackageNotFound,
+    ProcessNotFound,
+    ProcessRegistrationError,
+    log_unhandled_exceptions
 )
-from owslib.wps import is_reference
-from owslib.wps import WebProcessingService
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN
+from weaver.processes import wps_package
+from weaver.processes.constants import WPS_COMPLEX_DATA
+from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
+from weaver.processes.wps_package import complex2json as jsonify_value
+from weaver.store.base import StoreProcesses
+from weaver.utils import get_sane_name, get_settings, get_url_without_query
+from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
+
+import colander
+import six
+import yaml
+from owslib.wps import WebProcessingService, is_reference
 from pyramid.httpexceptions import (
-    HTTPOk,
-    HTTPNotFound,
     HTTPBadRequest,
     HTTPConflict,
-    HTTPUnprocessableEntity,
     HTTPException,
+    HTTPNotFound,
+    HTTPOk,
+    HTTPUnprocessableEntity
 )
-from copy import deepcopy
-from distutils.version import LooseVersion
-from six.moves.urllib.request import urlopen
-from six.moves.urllib.parse import urlparse, parse_qs
 from six.moves.urllib.error import URLError
-from typing import TYPE_CHECKING
-import colander
+from six.moves.urllib.parse import parse_qs, urlparse
+from six.moves.urllib.request import urlopen
+
+import json
 import logging
 import warnings
-import yaml
-import json
-import six
+from copy import deepcopy
+from distutils.version import LooseVersion
+from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from weaver.typedefs import JSON, AnyContainer, AnySettingsContainer, FileSystemPathType        # noqa: F401
     from weaver.store.mongodb import MongodbProcessStore                                            # noqa: F401

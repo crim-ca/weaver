@@ -1,25 +1,22 @@
-from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS, WEAVER_CONFIGURATION_ADES
+from weaver import sort
+from weaver.config import WEAVER_CONFIGURATION_ADES, WEAVER_CONFIGURATION_EMS, get_weaver_configuration
 from weaver.database import get_db
-from weaver.exceptions import QuoteNotFound, ProcessNotFound, log_unhandled_exceptions
 from weaver.datatype import Bill, Quote
+from weaver.exceptions import ProcessNotFound, QuoteNotFound, log_unhandled_exceptions
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
-from weaver.processes.wps_package import get_process_location, get_package_workflow_steps
+from weaver.processes.wps_package import get_package_workflow_steps, get_process_location
 from weaver.store.base import StoreBills, StoreQuotes
-from weaver.utils import get_weaver_url, get_settings
+from weaver.utils import get_settings, get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.processes import submit_local_job
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
-from weaver import sort
-from pyramid.httpexceptions import (
-    HTTPOk,
-    HTTPCreated,
-    HTTPBadRequest,
-    HTTPNotFound,
-)
-from datetime import timedelta
+
 from duration import to_iso8601
+from pyramid.httpexceptions import HTTPBadRequest, HTTPCreated, HTTPNotFound, HTTPOk
+
 import logging
 import random
+from datetime import timedelta
 
 LOGGER = logging.getLogger(__name__)
 

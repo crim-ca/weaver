@@ -5,14 +5,22 @@ from weaver.processes.constants import WPS_COMPLEX_DATA
 from weaver.processes.utils import jsonify_output
 from weaver.processes.wps_process_base import WpsProcessInterface
 from weaver.utils import (
-    get_any_id, get_any_value, get_job_log_msg, get_log_monitor_msg, raise_on_xml_exception, wait_secs,
+    get_any_id,
+    get_any_value,
+    get_job_log_msg,
+    get_log_monitor_msg,
+    raise_on_xml_exception,
+    wait_secs
 )
 from weaver.wps_restapi.jobs.jobs import check_status
-from owslib.wps import WebProcessingService, ComplexDataInput, WPSException
-from typing import AnyStr, TYPE_CHECKING
-from time import sleep
-import logging
+
 import requests
+from owslib.wps import ComplexDataInput, WebProcessingService, WPSException
+
+import logging
+from time import sleep
+from typing import TYPE_CHECKING, AnyStr
+
 if TYPE_CHECKING:
     from weaver.typedefs import UpdateStatusPartialFunction     # noqa: F401
     from pywps.app import WPSRequest                            # noqa: F401
@@ -46,7 +54,7 @@ class Wps1Process(WpsProcessInterface):
         try:
             try:
                 wps = WebProcessingService(url=self.provider, headers=self.cookies, verify=self.verify)
-                raise_on_xml_exception(wps._capabilities)  # noqa: W0212
+                raise_on_xml_exception(wps._capabilities)
             except Exception as ex:
                 raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
             try:

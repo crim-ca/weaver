@@ -1,30 +1,33 @@
-from weaver.exceptions import ServiceNotFound, InvalidIdentifierValue
-from weaver.warning import TimeZoneInfoAlreadySetWarning
+from weaver.exceptions import InvalidIdentifierValue, ServiceNotFound
 from weaver.status import map_status
-from datetime import datetime
-from lxml import etree
+from weaver.warning import TimeZoneInfoAlreadySetWarning
+
+import pytz
+import six
 from celery import Celery
-from pyramid.httpexceptions import HTTPError as PyramidHTTPError
+from lxml import etree
 from pyramid.config import Configurator
+from pyramid.httpexceptions import HTTPError as PyramidHTTPError
 from pyramid.registry import Registry
 from pyramid.request import Request
 from requests import HTTPError as RequestsHTTPError
-from six.moves.urllib.parse import urlparse, parse_qs, urlunsplit, ParseResult
+from requests.structures import CaseInsensitiveDict
+from six.moves.urllib.parse import ParseResult, parse_qs, urlparse, urlunsplit
+from webob.headers import EnvironHeaders, ResponseHeaders
+
+import logging
+import os
+import platform
+import re
+import time
+import types
+import warnings
+from datetime import datetime
 from distutils.dir_util import mkpath
 from distutils.version import LooseVersion
-from requests.structures import CaseInsensitiveDict
-from webob.headers import ResponseHeaders, EnvironHeaders
 from inspect import isclass, isfunction
 from typing import TYPE_CHECKING
-import os
-import six
-import time
-import pytz
-import types
-import re
-import platform
-import warnings
-import logging
+
 if TYPE_CHECKING:
     from weaver.typedefs import (                                                               # noqa: F401
         AnyValue, AnyKey, AnySettingsContainer, AnyRegistryContainer, AnyHeadersContainer,
@@ -47,6 +50,7 @@ class _Singleton(type):
 class _NullType(six.with_metaclass(_Singleton)):
     """Represents a ``null`` value to differentiate from ``None``."""
 
+    # pylint: disable=E1101,no-member
     def __eq__(self, other):
         return (isinstance(other, _NullType)                                    # noqa: W503
                 or other is null                                                # noqa: W503
@@ -64,6 +68,7 @@ class _NullType(six.with_metaclass(_Singleton)):
     __len__ = __nonzero__
 
 
+# pylint: disable=C0103,invalid-name
 null = _NullType()
 
 
@@ -134,9 +139,9 @@ def get_header(header_name, header_container):
         headers = dict(headers)
     if isinstance(headers, dict):
         headers = header_container.items()
-    header_name = header_name.lower().replace('-', '_')
+    header_name = header_name.lower().replace("-", "_")
     for h, v in headers:
-        if h.lower().replace('-', '_') == header_name:
+        if h.lower().replace("-", "_") == header_name:
             return v
     return None
 
@@ -190,8 +195,8 @@ def parse_extra_options(option_str):
     """
     if option_str:
         try:
-            extra_options = option_str.split(',')
-            extra_options = dict([('=' in opt) and opt.split('=', 1) for opt in extra_options])
+            extra_options = option_str.split(",")
+            extra_options = dict([("=" in opt) and opt.split("=", 1) for opt in extra_options])
         except Exception:
             msg = "Can not parse extra-options: {}".format(option_str)
             from pyramid.exceptions import ConfigurationError
@@ -206,7 +211,7 @@ def parse_service_name(url, protected_path):
     parsed_url = urlparse(url)
     service_name = None
     if parsed_url.path.startswith(protected_path):
-        parts_without_protected_path = parsed_url.path[len(protected_path)::].strip('/').split('/')
+        parts_without_protected_path = parsed_url.path[len(protected_path)::].strip("/").split("/")
         if "proxy" in parts_without_protected_path:
             parts_without_protected_path.remove("proxy")
         if len(parts_without_protected_path) > 0:
@@ -220,7 +225,7 @@ def fully_qualified_name(obj):
     # type: (Union[Any, Type[Any]]) -> str
     """Obtains the ``'<module>.<name>'`` full path definition of the object to allow finding and importing it."""
     cls = obj if isclass(obj) or isfunction(obj) else type(obj)
-    return '.'.join([obj.__module__, cls.__name__])
+    return ".".join([obj.__module__, cls.__name__])
 
 
 def now():
@@ -278,7 +283,7 @@ def get_base_url(url):
 
 def path_elements(path):
     # type: (AnyStr) -> List[AnyStr]
-    elements = [el.strip() for el in path.split('/')]
+    elements = [el.strip() for el in path.split("/")]
     elements = [el for el in elements if len(el) > 0]
     return elements
 
@@ -287,11 +292,11 @@ def lxml_strip_ns(tree):
     # type: (XML) -> None
     for node in tree.iter():
         try:
-            has_namespace = node.tag.startswith('{')
+            has_namespace = node.tag.startswith("{")
         except AttributeError:
             continue  # node.tag is not a string (node is a comment or similar)
         if has_namespace:
-            node.tag = node.tag.split('}', 1)[1]
+            node.tag = node.tag.split("}", 1)[1]
 
 
 def ows_context_href(href, partial=False):
@@ -343,24 +348,24 @@ def raise_on_xml_exception(xml_node):
         raise Exception(node.text)
 
 
-def str2bytes(s):
+def str2bytes(string):
     # type: (Union[AnyStr, bytes]) -> bytes
     """Obtains the bytes representation of the string."""
-    if not (isinstance(s, six.string_types) or isinstance(s, bytes)):
-        raise TypeError("Cannot convert item to bytes: {!r}".format(type(s)))
-    if isinstance(s, bytes):
-        return s
-    return s.encode()
+    if not (isinstance(string, six.string_types) or isinstance(string, bytes)):
+        raise TypeError("Cannot convert item to bytes: {!r}".format(type(string)))
+    if isinstance(string, bytes):
+        return string
+    return string.encode()
 
 
-def bytes2str(s):
+def bytes2str(string):
     # type: (Union[AnyStr, bytes]) -> str
     """Obtains the unicode representation of the string."""
-    if not (isinstance(s, six.string_types) or isinstance(s, bytes)):
-        raise TypeError("Cannot convert item to unicode: {!r}".format(type(s)))
-    if not isinstance(s, bytes):
-        return s
-    return s.decode()
+    if not (isinstance(string, six.string_types) or isinstance(string, bytes)):
+        raise TypeError("Cannot convert item to unicode: {!r}".format(type(string)))
+    if not isinstance(string, bytes):
+        return string
+    return string.decode()
 
 
 def islambda(func):
@@ -389,7 +394,7 @@ def parse_request_query(request):
     for q in queries:
         queries_dict[q] = dict()
         for i, kv in enumerate(queries[q]):
-            kvs = kv.split('=')
+            kvs = kv.split("=")
             if len(kvs) > 1:
                 queries_dict[q][kvs[0]] = kvs[1]
             else:
@@ -421,7 +426,7 @@ def get_job_log_msg(status, message, progress=0, duration=None):
 
 def make_dirs(path, mode=0o755, exist_ok=True):
     """Alternative to ``os.makedirs`` with ``exists_ok`` parameter only available for ``python>3.5``."""
-    if LooseVersion(platform.python_version()) >= LooseVersion('3.5'):
+    if LooseVersion(platform.python_version()) >= LooseVersion("3.5"):
         os.makedirs(path, mode=mode, exist_ok=exist_ok)
         return
     dir_path = os.path.dirname(path)
@@ -488,15 +493,15 @@ def clean_json_text_body(body):
     Cleans a textual body field of superfluous characters to provide a better human-readable text in a JSON response.
     """
     # cleanup various escape characters and u'' stings
-    replaces = [(',\n', ', '), ('\\n', ' '), (' \n', ' '), ('\"', '\''), ('\\', ''),
-                ('u\'', '\''), ('u\"', '\''), ('\'\'', '\''), ('  ', ' ')]
+    replaces = [(",\n", ", "), ("\\n", " "), (" \n", " "), ("\"", "\'"), ("\\", ""),
+                ("u\'", "\'"), ("u\"", "\'"), ("\'\'", "\'"), ("  ", " ")]
     replaces_from = [r[0] for r in replaces]
     while any(rf in body for rf in replaces_from):
         for _from, _to in replaces:
             body = body.replace(_from, _to)
 
-    body_parts = [p.strip() for p in body.split('\n') if p != '']               # remove new line and extra spaces
-    body_parts = [p + '.' if not p.endswith('.') else p for p in body_parts]    # add terminating dot per sentence
+    body_parts = [p.strip() for p in body.split("\n") if p != ""]               # remove new line and extra spaces
+    body_parts = [p + "." if not p.endswith(".") else p for p in body_parts]    # add terminating dot per sentence
     body_parts = [p[0].upper() + p[1:] for p in body_parts if len(p)]           # capitalize first word
-    body_parts = ' '.join(p for p in body_parts if p)
+    body_parts = " ".join(p for p in body_parts if p)
     return body_parts

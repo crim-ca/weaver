@@ -1,37 +1,45 @@
 from weaver import status
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_FORM
-from weaver.warning import MissingParameterWarning
-from weaver.visibility import VISIBILITY_PUBLIC
-from weaver.utils import (
-    get_any_id, get_any_value, get_any_message, get_job_log_msg, get_log_monitor_msg, pass_http_error
-)
-from weaver.wps_restapi.swagger_definitions import (
-    processes_uri,
-    process_uri,
-    process_jobs_uri,
-    process_results_uri,
-    process_visibility_uri,
-)
 from weaver.exceptions import PackageExecutionError
+from weaver.formats import CONTENT_TYPE_APP_FORM, CONTENT_TYPE_APP_JSON
 from weaver.processes import opensearch
 from weaver.processes.constants import OPENSEARCH_LOCAL_FILE_SCHEME
-from weaver.processes.sources import retrieve_data_source_url, get_data_source_from_url
+from weaver.processes.sources import get_data_source_from_url, retrieve_data_source_url
 from weaver.processes.wps_process_base import WpsProcessInterface
-from pyramid.settings import asbool
+from weaver.utils import (
+    get_any_id,
+    get_any_message,
+    get_any_value,
+    get_job_log_msg,
+    get_log_monitor_msg,
+    pass_http_error
+)
+from weaver.visibility import VISIBILITY_PUBLIC
+from weaver.warning import MissingParameterWarning
+from weaver.wps_restapi.swagger_definitions import (
+    process_jobs_uri,
+    process_results_uri,
+    process_uri,
+    process_visibility_uri,
+    processes_uri
+)
+
+import requests
 from pyramid.httpexceptions import (
-    HTTPOk,
-    HTTPUnauthorized,
-    HTTPNotFound,
+    HTTPConflict,
     HTTPForbidden,
     HTTPInternalServerError,
-    HTTPConflict
+    HTTPNotFound,
+    HTTPOk,
+    HTTPUnauthorized
 )
+from pyramid.settings import asbool
+
+import logging
+import warnings
 from copy import deepcopy
 from time import sleep
 from typing import TYPE_CHECKING
-import logging
-import warnings
-import requests
+
 if TYPE_CHECKING:
     from weaver.typedefs import JSON, UpdateStatusPartialFunction   # noqa: F401
     from typing import Union, AnyStr                                # noqa: F401
@@ -276,7 +284,7 @@ class Wps3Process(WpsProcessInterface):
         self.update_status("Monitoring job on remote ADES : {0}".format(job_status_uri),
                            REMOTE_JOB_PROGRESS_MONITORING, status.STATUS_RUNNING)
 
-        while job_status_value not in status.job_status_categories[status.STATUS_CATEGORY_FINISHED]:
+        while job_status_value not in status.JOB_STATUS_CATEGORIES[status.STATUS_CATEGORY_FINISHED]:
             sleep(5)
             job_status = self.get_job_status(job_status_uri)
             job_status_value = status.map_status(job_status["status"])
