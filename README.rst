@@ -14,6 +14,14 @@ Weaver (the nest-builder)
   nesting habits instead.*
   (`Wikipedia <https://en.wikipedia.org/wiki/Ploceidae>`_)
 
+`Weaver` is an `Execution Management Service (EMS)` that allows the execution of workflows chaining various
+applications and `Web Processing Services (WPS)` inputs and outputs. Remote execution is deferred by the `EMS` to an
+`Application Deployment and Execution Service (ADES)`, as defined by `Common Workflow Language` (`CWL`_) configurations.
+
+`Weaver` can be launched either as an `EMS` or an `ADES` according to configuration values it is deployed with.
+For more details, see `Configuration`_ section.
+
+
 .. start-badges
 
 .. list-table::
@@ -145,3 +153,4 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems.
 .. _ESGF: https://esgf.llnl.gov/
 .. _DACCS: https://app.dimensions.ai/details/grant/grant.8105745
 .. _Pyramid: http://www.pylonsproject.org
+.. _CWL: https://www.commonwl.org/
