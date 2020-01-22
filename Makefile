@@ -119,6 +119,11 @@ conda-base:		## obtain and install a missing conda distribution
 		(bash "$(DOWNLOAD_CACHE)/$(FN)" -b -u -p "$(CONDA_HOME)" && \
 		 echo "Make sure to add '$(CONDA_HOME)/bin' to your PATH variable in '~/.bashrc'.")
 
+.PHONY: conda-clean
+clean-clean: 	## remove the conda enviroment
+	@echo "Removing conda env '$(CONDA_ENV)'"
+	@-test -d "$(CONDA_ENV_PATH)" && "$(CONDA_BIN)" remove -n $(CONDA_ENV) --yes --all
+
 .PHONY: conda-config
 conda-config: conda-base	## setup configuration of the conda environment
 	@echo "Updating conda configuration..."
@@ -168,7 +173,7 @@ install-pkg: install-pip	## install application package dependencies
 	@echo "Install with pip complete."
 
 .PHONY: install-sys
-install-sys: clean conda-env	## install system dependencies and required installers/runners
+install-sys: conda-env	## install system dependencies and required installers/runners
 	@echo "Installing system dependencies..."
 	@bash -c '$(CONDA_CMD) pip install --upgrade pip setuptools'
 
@@ -193,7 +198,7 @@ clean: clean-all	## alias for 'clean-all' target
 clean-all: clean-build clean-cache clean-docs clean-src clean-test		## run all cleanup targets
 
 .PHONY: clean-build
-clean-build:		## remove the temporary build files
+clean-build:	## remove the temporary build files
 	@echo "Removing build files..."
 	@-rm -fr "$(APP_ROOT)/eggs"
 	@-rm -fr "$(APP_ROOT)/develop-eggs"
@@ -201,20 +206,15 @@ clean-build:		## remove the temporary build files
 	@-rm -fr "$(APP_ROOT)/parts"
 
 .PHONY: clean-cache
-clean-cache:		## remove caches such as DOWNLOAD_CACHE
+clean-cache:	## remove caches such as DOWNLOAD_CACHE
 	@echo "Removing caches..."
 	@-rm -fr "$(APP_ROOT)/.pytest_cache"
 	@-rm -fr "$(DOWNLOAD_CACHE)"
 
 .PHONY: clean-docs
-clean-docs: 	## remove documentation artefacts
+clean-docs:	install-dev 	## remove documentation artefacts
 	@echo "Removing documenation build files..."
 	@$(MAKE) -C "$(APP_ROOT)/docs" clean
-
-.PHONY: clean-env
-clean-env: 		## remove the conda enviroment
-	@echo "Removing conda env '$(CONDA_ENV)'"
-	@-test -d "$(CONDA_ENV_PATH)" && "$(CONDA_BIN)" remove -n $(CONDA_ENV) --yes --all
 
 .PHONY: clean-src
 clean-src:		## remove all *.pyc files
@@ -239,47 +239,47 @@ clean-dist: clean	## remove *all* files that are not controlled by 'git' except 
 ## -- Testing targets -- ##
 
 .PHONY: test
-test: test-all	## alias for 'test-all' target
+test: clean-test test-all	## alias for 'test-all' target
 
 .PHONY: test-all
-test-all:	## run all tests (including long running tests)
+test-all: install-dev		## run all tests (including long running tests)
 	@echo "Running all tests (including slow and online tests)..."
 	@bash -c "$(CONDA_CMD) pytest tests -v --junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: test-unit
-test-unit:		## run unit tests (skip long running and online tests)
+test-unit: install-dev		## run unit tests (skip long running and online tests)
 	@echo "Running tests (skip slow and online tests)..."
 	@bash -c "$(CONDA_CMD) pytest tests -v -m 'not slow and not online and not functional' \
 	 	--junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: test-func
-test-func:		## run funtional tests (online and usage specific)
+test-func: install-dev		## run funtional tests (online and usage specific)
 	@echo "Running functional tests..."
 	@bash -c "$(CONDA_CMD) pytest tests -v -m 'functional' --junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: test-online
-test-online:	## run online tests (running instance required)
+test-online: install-dev 	## run online tests (running instance required)
 	@echo "Running online tests (running instance required)..."
 	@bash -c "$(CONDA_CMD) pytest tests -v -m 'online' --junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: test-offline
-test-offline:	## run offline tests (not marked as online)
+test-offline: install-dev	## run offline tests (not marked as online)
 	@echo "Running offline tests (not marked as online)..."
 	@bash -c "$(CONDA_CMD) pytest tests -v -m 'not online' --junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: test-no-tb14
-test-no-tb14:	## run all tests except ones marked for 'Testbed-14'
+test-no-tb14: install-dev	## run all tests except ones marked for 'Testbed-14'
 	@echo "Running all tests except ones marked for 'Testbed-14'..."
 	@bash -c "$(CONDA_CMD) pytest tests -v -m 'not testbed14' --junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: test-spec
-test-spec:	## run tests with custom input specification (pytest format) [make TESTS='<spec>' test-spec]
+test-spec: install-dev		## run tests with custom input specification (pytest format) [make TESTS='<spec>' test-spec]
 	@echo "Running custom tests from input specification..."
 	@[ "${TESTS}" ] || ( echo ">> 'TESTS' is not set"; exit 1 )
 	@bash -c "$(CONDA_CMD) pytest tests -v -m '${TESTS}' --junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: coverage
-coverage: mkdir-reports		## run all tests using coverage analysis
+coverage: mkdir-reports install-dev		## run all tests using coverage analysis
 	@echo "Running coverage analysis..."
 	@bash -c '$(CONDA_CMD) coverage run -m pytest "$(APP_ROOT)/tests" || true'
 	@bash -c '$(CONDA_CMD) coverage xml --rcfile="$(APP_ROOT)/setup.cfg" -i -o "$(REPORTS_DIR)/coverage.xml"'
@@ -296,7 +296,7 @@ mkdir-reports:
 check: check-all	## alias for 'check-all' target
 
 .PHONY: check-all
-check-all: check-pep8 check-lint check-security check-doc8 check-links	## run every code style checks
+check-all: install-dev check-pep8 check-lint check-security check-doc8 check-links	## run every code style checks
 
 .PHONY: check-pep8
 check-pep8: mkdir-reports install-dev 	## run PEP8 code style checks
@@ -353,7 +353,7 @@ fix-imports: mkdir-reports install-dev	## apply import code checks corrections
 ## -- Documentation targets -- ##
 
 .PHONY: docs
-docs:	clean-docs 	## generate HTML documentation with Sphinx
+docs: install-dev clean-docs 	## generate HTML documentation with Sphinx
 	@echo "Generating docs with Sphinx..."
 	@bash -c '$(CONDA_CMD) $(MAKE) -C $@ html'
 	@echo "open your browser:"
@@ -418,7 +418,7 @@ docker-push: docker-build	## push docker images
 .PHONY: start
 start: install	## start application instance(s) with gunicorn
 	@echo "Starting $(APP_NAME)..."
-	@bash -c '$(CONDA_CMD) exec gunicorn -b 0.0.0.0:4001 --paste "$(APP_INI)" --preload &'
+	@bash -c '$(CONDA_CMD) exec pserve "$(APP_INI)" &'
 
 .PHONY: stop
 stop: 		## kill application instance(s) started with gunicorn
