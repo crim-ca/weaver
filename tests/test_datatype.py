@@ -1,6 +1,6 @@
-from weaver.datatype import Process
-
 from copy import deepcopy
+
+from weaver.datatype import Process
 
 
 def test_package_encode_decode():

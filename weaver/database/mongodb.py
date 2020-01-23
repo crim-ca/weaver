@@ -1,5 +1,10 @@
 # MongoDB
 # http://docs.pylonsproject.org/projects/pyramid-cookbook/en/latest/database/mongodb.html
+import warnings
+from typing import TYPE_CHECKING
+
+import pymongo
+
 from weaver.database.base import DatabaseInterface
 from weaver.store.base import StoreInterface
 from weaver.store.mongodb import (
@@ -10,11 +15,6 @@ from weaver.store.mongodb import (
     MongodbServiceStore
 )
 from weaver.utils import get_settings
-
-import pymongo
-
-import warnings
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from weaver.typedefs import AnySettingsContainer, JSON      # noqa: F401

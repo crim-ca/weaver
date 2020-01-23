@@ -1,3 +1,11 @@
+import unittest
+from copy import deepcopy
+
+import colander
+import pytest
+import six
+from pyramid.httpexceptions import HTTPBadRequest
+
 from tests import resources
 from tests.utils import (
     get_test_weaver_app,
@@ -19,14 +27,6 @@ from weaver.formats import (
     get_cwl_file_format
 )
 from weaver.visibility import VISIBILITY_PUBLIC
-
-import colander
-import pytest
-import six
-from pyramid.httpexceptions import HTTPBadRequest
-
-import unittest
-from copy import deepcopy
 
 EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_TEXT_PLAIN]
 EDAM_NETCDF = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_APP_NETCDF]

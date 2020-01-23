@@ -1,13 +1,13 @@
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
-from weaver.utils import get_settings, get_weaver_url, parse_request_query
+import logging
+from distutils.version import LooseVersion
+from typing import TYPE_CHECKING, AnyStr
 
 import requests
 from lxml import etree
 from pyramid.httpexceptions import HTTPSuccessful
 
-import logging
-from distutils.version import LooseVersion
-from typing import TYPE_CHECKING, AnyStr
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
+from weaver.utils import get_settings, get_weaver_url, parse_request_query
 
 if TYPE_CHECKING:
     from pyramid.request import Request                 # noqa: F401
@@ -79,7 +79,7 @@ def get_wps_output_format(request, service_url=None):
             try:
                 # TODO: update get version if it is ever added to 'GetCapabilities' from WPS REST response
                 # for now, suppose that a valid list in json body means that the service is WPS 2.0.0
-                if isinstance(getcap_resp_200.json()['processes'], list):
+                if isinstance(getcap_resp_200.json()["processes"], list):
                     return OUTPUT_FORMATS[WPS_VERSION_200]
             except Exception as ex:
                 LOGGER.exception("Got exception in 'get_wps_output_format' JSON parsing: %r", ex)

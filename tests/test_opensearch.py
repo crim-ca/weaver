@@ -1,11 +1,10 @@
-# noinspection PyProtectedMember
-from tests.utils import setup_mongodb_processstore
-from weaver.datatype import Process
-from weaver.processes import opensearch
-from weaver.processes.constants import OPENSEARCH_AOI, OPENSEARCH_END_DATE, OPENSEARCH_START_DATE
-from weaver.processes.opensearch import _make_specific_identifier
-from weaver.utils import get_any_id
-from weaver.wps_restapi.processes import processes
+import json
+import os
+import unittest
+from collections import deque
+from contextlib import ExitStack
+from copy import deepcopy
+from pprint import pformat
 
 import mock
 import pytest
@@ -14,13 +13,13 @@ from pyramid.testing import DummyRequest
 from pywps.inout.inputs import LiteralInput
 from six.moves.urllib.parse import parse_qsl, urlparse
 
-import json
-import os
-import unittest
-from collections import deque
-from contextlib import ExitStack
-from copy import deepcopy
-from pprint import pformat
+from tests.utils import setup_mongodb_processstore
+from weaver.datatype import Process
+from weaver.processes import opensearch
+from weaver.processes.constants import OPENSEARCH_AOI, OPENSEARCH_END_DATE, OPENSEARCH_START_DATE
+from weaver.processes.opensearch import _make_specific_identifier
+from weaver.utils import get_any_id
+from weaver.wps_restapi.processes import processes
 
 OSDD_URL = "http://geo.spacebel.be/opensearch/description.xml"
 
@@ -63,10 +62,6 @@ def make_request(**kw):
     return request
 
 
-def get_dummy_settings(r):
-    return r.registry.settings
-
-
 class WpsHandleEOITestCase(unittest.TestCase):
     def setUp(self):
         self.config = testing.setUp()
@@ -95,13 +90,11 @@ def get_dummy_payload():
 
 
 def get_opensearch_payload():
-    js = load_json_test_file("opensearch_deploy.json")
-    return js
+    return load_json_test_file("opensearch_deploy.json")
 
 
 def get_opensearch_process():
-    opensearch_process = Process(load_json_test_file("opensearch_process.json"))
-    return opensearch_process
+    return Process(load_json_test_file("opensearch_process.json"))
 
 
 def test_transform_execute_parameters_wps():
@@ -138,7 +131,7 @@ def test_transform_execute_parameters_wps():
 
     with mock.patch.object(opensearch.OpenSearchQuery, "query_datasets", return_value=mocked_query):
         eo_image_source_info = make_eo_image_source_info("files", COLLECTION_IDS["sentinel2"])
-        mime_types = {'files': eo_image_source_info['files']['mime_types']}
+        mime_types = {"files": eo_image_source_info["files"]["mime_types"]}
         transformed = opensearch.query_eo_images_from_wps_inputs(inputs, eo_image_source_info, mime_types)
 
     def compare(items):
@@ -173,13 +166,15 @@ def test_deploy_opensearch():
         def get_store(*args):  # noqa: E811
             return store
 
+    def _get_mocked(req):
+        return req.registry.settings
+
     # mock db functions called by add_local_process
     with ExitStack() as stack:
         stack.enter_context(mock.patch("weaver.wps_restapi.processes.processes.get_db", side_effect=MockDB))
-        stack.enter_context(mock.patch("weaver.wps_restapi.processes.processes.get_settings",
-                                       side_effect=get_dummy_settings))
+        stack.enter_context(mock.patch("weaver.wps_restapi.processes.processes.get_settings", side_effect=_get_mocked))
         stack.enter_context(mock.patch("weaver.processes.utils.get_db", side_effect=MockDB))
-        stack.enter_context(mock.patch("weaver.processes.utils.get_settings", side_effect=get_dummy_settings))
+        stack.enter_context(mock.patch("weaver.processes.utils.get_settings", side_effect=_get_mocked))
         # given
         opensearch_payload = get_opensearch_payload()
         initial_payload = deepcopy(opensearch_payload)
@@ -199,8 +194,7 @@ def test_deploy_opensearch():
         assert_json_equals(process.payload, initial_payload)
 
 
-# noinspection PyPep8Naming
-def test_handle_EOI_unique_aoi_unique_toi():
+def test_handle_EOI_unique_aoi_unique_toi():  # noqa
     inputs = load_json_test_file("eoimage_inputs_example.json")
     expected = load_json_test_file("eoimage_unique_aoi_unique_toi.json")
     output = opensearch.EOImageDescribeProcessHandler(
@@ -209,8 +203,7 @@ def test_handle_EOI_unique_aoi_unique_toi():
     assert_json_equals(output, expected)
 
 
-# noinspection PyPep8Naming
-def test_handle_EOI_unique_aoi_non_unique_toi():
+def test_handle_EOI_unique_aoi_non_unique_toi():  # noqa
     inputs = load_json_test_file("eoimage_inputs_example.json")
     expected = load_json_test_file("eoimage_unique_aoi_non_unique_toi.json")
     output = opensearch.EOImageDescribeProcessHandler(
@@ -219,8 +212,7 @@ def test_handle_EOI_unique_aoi_non_unique_toi():
     assert_json_equals(output, expected)
 
 
-# noinspection PyPep8Naming
-def test_handle_EOI_non_unique_aoi_unique_toi():
+def test_handle_EOI_non_unique_aoi_unique_toi():  # noqa
     inputs = load_json_test_file("eoimage_inputs_example.json")
     expected = load_json_test_file("eoimage_non_unique_aoi_unique_toi.json")
     output = opensearch.EOImageDescribeProcessHandler(
@@ -248,8 +240,8 @@ def test_get_additional_parameters():
 
 def get_template_urls(collection_id):
     all_fields = set()
-    o = opensearch.OpenSearchQuery(collection_id, osdd_url=OSDD_URL)
-    template = o.get_template_url()
+    opq = opensearch.OpenSearchQuery(collection_id, osdd_url=OSDD_URL)
+    template = opq.get_template_url()
     params = parse_qsl(urlparse(template).query)
     param_names = list(sorted(p[0] for p in params))
     if all_fields:
@@ -397,7 +389,7 @@ def deimos_inputs(unique_aoi_toi=True):
 @pytest.mark.testbed14
 def test_query_sentinel2():
     inputs, eo_image_source_info = sentinel2_inputs()
-    mime_types = {k: eo_image_source_info[k]['mime_types'] for k in eo_image_source_info}
+    mime_types = {k: eo_image_source_info[k]["mime_types"] for k in eo_image_source_info}
     data = opensearch.query_eo_images_from_wps_inputs(inputs, eo_image_source_info, mime_types)
 
     assert len(data["image-sentinel2"]) == inputs["image-sentinel2"][0].max_occurs
@@ -408,7 +400,7 @@ def test_query_sentinel2():
 @pytest.mark.testbed14
 def test_query_probav():
     inputs, eo_image_source_info = probav_inputs()
-    mime_types = {k: eo_image_source_info[k]['mime_types'] for k in eo_image_source_info}
+    mime_types = {k: eo_image_source_info[k]["mime_types"] for k in eo_image_source_info}
     data = opensearch.query_eo_images_from_wps_inputs(inputs, eo_image_source_info, mime_types)
 
     assert len(data["image-probav"]) == inputs["image-probav"][0].max_occurs
@@ -419,7 +411,7 @@ def test_query_probav():
 @pytest.mark.testbed14
 def test_query_deimos():
     inputs, eo_image_source_info = deimos_inputs()
-    mime_types = {k: eo_image_source_info[k]['mime_types'] for k in eo_image_source_info}
+    mime_types = {k: eo_image_source_info[k]["mime_types"] for k in eo_image_source_info}
     data = opensearch.query_eo_images_from_wps_inputs(inputs, eo_image_source_info, mime_types)
 
     assert len(data["image-deimos"]) == inputs["image-deimos"][0].max_occurs
@@ -437,7 +429,7 @@ def test_query_non_unique():
 
     eo_image_source_info = eo_image_source_info_s2
     eo_image_source_info.update(eo_image_source_info_probav)
-    mime_types = {k: eo_image_source_info[k]['mime_types'] for k in eo_image_source_info}
+    mime_types = {k: eo_image_source_info[k]["mime_types"] for k in eo_image_source_info}
     data = opensearch.query_eo_images_from_wps_inputs(inputs, eo_image_source_info, mime_types)
 
     assert len(data["image-sentinel2"]) == inputs["image-sentinel2"][0].max_occurs

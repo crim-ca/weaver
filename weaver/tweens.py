@@ -1,11 +1,11 @@
-from weaver.owsexceptions import OWSException, OWSNotImplemented
-from weaver.utils import fully_qualified_name
+import logging
+import sys
 
 from pyramid.httpexceptions import HTTPException, HTTPInternalServerError, HTTPRedirection, HTTPSuccessful
 from pyramid.tweens import EXCVIEW, INGRESS
 
-import logging
-import sys
+from weaver.owsexceptions import OWSException, OWSNotImplemented
+from weaver.utils import fully_qualified_name
 
 LOGGER = logging.getLogger(__name__)
 

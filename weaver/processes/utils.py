@@ -1,3 +1,26 @@
+import json
+import logging
+import warnings
+from copy import deepcopy
+from distutils.version import LooseVersion
+from typing import TYPE_CHECKING
+
+import colander
+import six
+import yaml
+from owslib.wps import WebProcessingService, is_reference
+from pyramid.httpexceptions import (
+    HTTPBadRequest,
+    HTTPConflict,
+    HTTPException,
+    HTTPNotFound,
+    HTTPOk,
+    HTTPUnprocessableEntity
+)
+from six.moves.urllib.error import URLError
+from six.moves.urllib.parse import parse_qs, urlparse
+from six.moves.urllib.request import urlopen
+
 from weaver.config import (
     WEAVER_CONFIGURATION_EMS,
     WEAVER_DEFAULT_WPS_PROCESSES_CONFIG,
@@ -26,29 +49,6 @@ from weaver.utils import get_sane_name, get_settings, get_url_without_query
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
-import colander
-import six
-import yaml
-from owslib.wps import WebProcessingService, is_reference
-from pyramid.httpexceptions import (
-    HTTPBadRequest,
-    HTTPConflict,
-    HTTPException,
-    HTTPNotFound,
-    HTTPOk,
-    HTTPUnprocessableEntity
-)
-from six.moves.urllib.error import URLError
-from six.moves.urllib.parse import parse_qs, urlparse
-from six.moves.urllib.request import urlopen
-
-import json
-import logging
-import warnings
-from copy import deepcopy
-from distutils.version import LooseVersion
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from weaver.typedefs import JSON, AnyContainer, AnySettingsContainer, FileSystemPathType        # noqa: F401
     from weaver.store.mongodb import MongodbProcessStore                                            # noqa: F401
@@ -66,8 +66,7 @@ def _get_data(input_value):
     # WPS standard v1.0.0 specify that Output data field has zero or one value
     if input_value.data:
         return input_value.data[0]
-    else:
-        return None
+    return None
 
 
 def _read_reference(input_value):
@@ -119,7 +118,7 @@ def jsonify_output(output, process_description):
 
     if not output.dataType:
         for process_output in getattr(process_description, "processOutputs", []):
-            if getattr(process_output, "identifier", '') == output.identifier:
+            if getattr(process_output, "identifier", "") == output.identifier:
                 output.dataType = process_output.dataType
                 break
 
@@ -166,15 +165,15 @@ def convert_process_wps_to_db(service, process, container):
         maxOccurs=str(getattr(dataInput, "maxOccurs", 0)),
         dataType=dataInput.dataType,
         defaultValue=jsonify_value(getattr(dataInput, "defaultValue", None)),
-        allowedValues=[jsonify_value(dataValue) for dataValue in getattr(dataInput, 'allowedValues', [])],
+        allowedValues=[jsonify_value(dataValue) for dataValue in getattr(dataInput, "allowedValues", [])],
         supportedValues=[jsonify_value(dataValue) for dataValue in getattr(dataInput, "supportedValues", [])],
         formats=[jsonify_value(dataValue) for dataValue in getattr(dataInput, "supportedValues", [default_format])],
     ) for dataInput in getattr(process, "dataInputs", [])]
 
     outputs = [dict(
-        id=getattr(processOutput, "identifier", ''),
-        title=getattr(processOutput, "title", ''),
-        abstract=getattr(processOutput, "abstract", ''),
+        id=getattr(processOutput, "identifier", ""),
+        title=getattr(processOutput, "title", ""),
+        abstract=getattr(processOutput, "abstract", ""),
         dataType=processOutput.dataType,
         defaultValue=jsonify_value(getattr(processOutput, "defaultValue", None)),
         formats=[jsonify_value(dataValue) for dataValue in getattr(processOutput, "supportedValues", [default_format])],
@@ -182,8 +181,8 @@ def convert_process_wps_to_db(service, process, container):
 
     return ProcessDB(
         id=process.identifier,
-        label=getattr(process, "title", ''),
-        title=getattr(process, "title", ''),
+        label=getattr(process, "title", ""),
+        title=getattr(process, "title", ""),
         abstract=getattr(process, "abstract", ""),
         inputs=inputs,
         outputs=outputs,
@@ -334,7 +333,7 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
                       "Not loading anything.", RuntimeWarning)
         return
     try:
-        with open(wps_processes_file_path, 'r') as f:
+        with open(wps_processes_file_path, "r") as f:
             processes_config = yaml.safe_load(f)
         processes = processes_config.get("processes")
         if not processes:

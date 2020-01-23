@@ -1,30 +1,30 @@
-from weaver.processes.types import PROCESS_WPS
+import logging
+import os
 
 from pywps import LiteralInput, LiteralOutput, Process
 
-import logging
-import os
+from weaver.processes.types import PROCESS_WPS
 
 LOGGER = logging.getLogger("PYWPS")
 
 
 class HelloWPS(Process):
-    identifier = 'hello'
-    title = 'Say Hello'
+    identifier = "hello"
+    title = "Say Hello"
     type = PROCESS_WPS
 
     def __init__(self):
         inputs = [
-            LiteralInput('name', 'Your name', data_type='string')]
+            LiteralInput("name", "Your name", data_type="string")]
         outputs = [
-            LiteralOutput('output', 'Output response',
-                          data_type='string')]
+            LiteralOutput("output", "Output response",
+                          data_type="string")]
 
         super(HelloWPS, self).__init__(
             self._handler,
             identifier=self.identifier,
             title=self.title,
-            version='1.4',
+            version="1.4",
             inputs=inputs,
             outputs=outputs,
             store_supported=True,

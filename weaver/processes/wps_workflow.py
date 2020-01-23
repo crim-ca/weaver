@@ -1,12 +1,12 @@
-from weaver.processes.builtin import BuiltinProcess
-from weaver.processes.constants import (
-    CWL_REQUIREMENT_APP_BUILTIN,
-    CWL_REQUIREMENT_APP_DOCKER,
-    CWL_REQUIREMENT_APP_ESGF_CWT,
-    CWL_REQUIREMENT_APP_WPS1
-)
-from weaver.utils import get_settings, now
-from weaver.wps import get_wps_output_dir
+import hashlib
+import json
+import locale
+import logging
+import os
+import shutil
+import tempfile
+from functools import cmp_to_key, partial
+from typing import TYPE_CHECKING, Callable, MutableMapping, Text, cast  # these are actually used in the code
 
 from cwltool import command_line_tool
 from cwltool.builder import CONTENT_LIMIT, Builder, substitute
@@ -32,15 +32,15 @@ from schema_salad import validate
 from schema_salad.sourceline import SourceLine
 from six import string_types
 
-import hashlib
-import json
-import locale
-import logging
-import os
-import shutil
-import tempfile
-from functools import cmp_to_key, partial
-from typing import TYPE_CHECKING, Callable, MutableMapping, Text, cast  # these are actually used in the code
+from weaver.processes.builtin import BuiltinProcess
+from weaver.processes.constants import (
+    CWL_REQUIREMENT_APP_BUILTIN,
+    CWL_REQUIREMENT_APP_DOCKER,
+    CWL_REQUIREMENT_APP_ESGF_CWT,
+    CWL_REQUIREMENT_APP_WPS1
+)
+from weaver.utils import get_settings, now
+from weaver.wps import get_wps_output_dir
 
 if TYPE_CHECKING:
     from weaver.typedefs import (   # noqa: F401
@@ -232,8 +232,8 @@ class WpsWorkflow(ProcessCWL):
                                     .format(str(e), json_dumps(ret, indent=4)))
         finally:
             if builder.mutation_manager and readers:
-                for r in readers.values():
-                    builder.mutation_manager.release_reader(jobname, r)
+                for reader in readers.values():
+                    builder.mutation_manager.release_reader(jobname, reader)
 
     def collect_output(self,
                        schema,                # type: Dict[Text, Any]
@@ -243,7 +243,7 @@ class WpsWorkflow(ProcessCWL):
                        compute_checksum=True  # type: bool
                        ):
         # type: (...) -> Optional[Union[Dict[Text, Any], List[Union[Dict[Text, Any], Text]]]]
-        r = []  # type: List[Any]
+        result = []  # type: List[Any]
         empty_and_optional = False
         debug = LOGGER.isEnabledFor(logging.DEBUG)
         if "outputBinding" in schema:
@@ -254,44 +254,45 @@ class WpsWorkflow(ProcessCWL):
 
             if "glob" in binding:
                 with SourceLine(binding, "glob", WorkflowException, debug):
-                    for gb in aslist(binding["glob"]):
-                        gb = builder.do_eval(gb)
-                        if gb:
-                            globpatterns.extend(aslist(gb))
+                    for glob in aslist(binding["glob"]):
+                        glob = builder.do_eval(glob)
+                        if glob:
+                            globpatterns.extend(aslist(glob))
 
-                    for gb in globpatterns:
-                        if gb.startswith(outdir):
-                            gb = gb[len(outdir) + 1:]
-                        elif gb == '.':
-                            gb = outdir
-                        elif gb.startswith('/'):
+                    for glob in globpatterns:
+                        if glob.startswith(outdir):
+                            glob = glob[len(outdir) + 1:]
+                        elif glob == '.':
+                            glob = outdir
+                        elif glob.startswith('/'):
                             raise WorkflowException("glob patterns must not start with '/'")
                         try:
                             prefix = fs_access.glob(outdir)
                             key = cmp_to_key(cast(Callable[[Text, Text], int], locale.strcoll))
-                            r.extend([{"location": g,
-                                       "path": fs_access.join(builder.outdir, g[len(prefix[0])+1:]),
-                                       "basename": os.path.basename(g),
-                                       "nameroot": os.path.splitext(os.path.basename(g))[0],
-                                       "nameext": os.path.splitext(os.path.basename(g))[1],
-                                       "class": "File" if fs_access.isfile(g) else "Directory"}
-                                      for g in sorted(fs_access.glob(fs_access.join(outdir, gb)), key=key)])
-                        except (OSError, IOError) as e:
-                            LOGGER.warning(Text(e))
+                            result.extend([{
+                                "location": g,
+                                "path": fs_access.join(builder.outdir, g[len(prefix[0])+1:]),
+                                "basename": os.path.basename(g),
+                                "nameroot": os.path.splitext(os.path.basename(g))[0],
+                                "nameext": os.path.splitext(os.path.basename(g))[1],
+                                "class": "File" if fs_access.isfile(g) else "Directory"
+                            } for g in sorted(fs_access.glob(fs_access.join(outdir, glob)), key=key)])
+                        except (OSError, IOError) as exc:
+                            LOGGER.warning(Text(exc))
                         except Exception:
                             LOGGER.exception("Unexpected error from fs_access")
                             raise
 
-                for files in r:
+                for files in result:
                     rfile = files.copy()
                     # TODO This function raise an exception and seems to be related to docker (which is not used here)
                     # revmap(rfile)
                     if files["class"] == "Directory":
-                        ll = builder.loadListing or (binding and binding.get("loadListing"))
-                        if ll and ll != "no_listing":
-                            get_listing(fs_access, files, (ll == "deep_listing"))
+                        load_listing = builder.loadListing or (binding and binding.get("loadListing"))
+                        if load_listing and load_listing != "no_listing":
+                            get_listing(fs_access, files, (load_listing == "deep_listing"))
                     else:
-                        with fs_access.open(rfile["location"], 'rb') as f:
+                        with fs_access.open(rfile["location"], "rb") as f:
                             contents = b""
                             if binding.get("loadContents") or compute_checksum:
                                 contents = f.read(CONTENT_LIMIT)
@@ -319,26 +320,25 @@ class WpsWorkflow(ProcessCWL):
 
             if "outputEval" in binding:
                 with SourceLine(binding, "outputEval", WorkflowException, debug):
-                    r = builder.do_eval(binding["outputEval"], context=r)
+                    result = builder.do_eval(binding["outputEval"], context=result)
 
             if single:
-                if not r and not optional:
+                if not result and not optional:
                     with SourceLine(binding, "glob", WorkflowException, debug):
                         raise WorkflowException("Did not find output file with glob pattern: '{}'".format(globpatterns))
-                elif not r and optional:
+                elif not result and optional:
                     pass
-                elif isinstance(r, list):
-                    if len(r) > 1:
+                elif isinstance(result, list):
+                    if len(result) > 1:
                         raise WorkflowException("Multiple matches for output item that is a single file.")
-                    else:
-                        r = r[0]
+                    result = result[0]
 
             if "secondaryFiles" in schema:
                 with SourceLine(schema, "secondaryFiles", WorkflowException, debug):
-                    for primary in aslist(r):
+                    for primary in aslist(result):
                         if isinstance(primary, dict):
                             primary.setdefault("secondaryFiles", [])
-                            pathprefix = primary["path"][0:primary["path"].rindex('/')+1]
+                            pathprefix = primary["path"][0:primary["path"].rindex("/")+1]
                             for sf in aslist(schema["secondaryFiles"]):
                                 if isinstance(sf, dict) or "$(" in sf or "${" in sf:
                                     sfpath = builder.do_eval(sf, context=primary)
@@ -362,14 +362,14 @@ class WpsWorkflow(ProcessCWL):
                                         primary["secondaryFiles"].append(sfitem)
 
             if "format" in schema:
-                for primary in aslist(r):
+                for primary in aslist(result):
                     primary["format"] = builder.do_eval(schema["format"], context=primary)
 
             # Ensure files point to local references outside of the run environment
             # TODO: Again removing revmap....
-            # adjustFileObjs(r, revmap)
+            # adjustFileObjs(result, revmap)
 
-            if not r and optional:
+            if not result and optional:
                 return None
 
         if not empty_and_optional and isinstance(schema["type"], dict) and schema["type"]["type"] == "record":
@@ -379,7 +379,7 @@ class WpsWorkflow(ProcessCWL):
                     f, builder, outdir, fs_access,
                     compute_checksum=compute_checksum)
             return out
-        return r
+        return result
 
 
 # noinspection PyPep8Naming

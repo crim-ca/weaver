@@ -1,7 +1,7 @@
-from setuptools import find_packages, setup
-
 import os
 import sys
+
+from setuptools import find_packages, setup
 
 CUR_DIR = os.path.abspath(os.path.dirname(__file__))
 LONG_DESCRIPTION = None

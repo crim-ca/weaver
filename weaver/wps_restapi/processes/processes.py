@@ -1,3 +1,30 @@
+import logging
+from time import sleep
+from typing import TYPE_CHECKING
+
+import colander
+import requests
+import six
+from celery.utils.log import get_task_logger
+from lxml import etree
+from owslib.util import clean_ows_url
+from owslib.wps import ComplexDataInput, WebProcessingService, WPSException
+from pyramid.httpexceptions import (
+    HTTPBadRequest,
+    HTTPCreated,
+    HTTPForbidden,
+    HTTPNotFound,
+    HTTPNotImplemented,
+    HTTPOk,
+    HTTPServiceUnavailable,
+    HTTPSuccessful,
+    HTTPUnauthorized,
+    HTTPUnprocessableEntity
+)
+from pyramid.request import Request
+from pyramid.settings import asbool
+from pyramid_celery import celery_app as app
+
 from weaver.config import WEAVER_CONFIGURATION_EMS, get_weaver_configuration
 from weaver.database import get_db
 from weaver.datatype import Process as ProcessDB
@@ -25,33 +52,6 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.jobs import check_status
 from weaver.wps_restapi.jobs.notify import encrypt_email, notify_job_complete
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, get_wps_restapi_base_url, parse_request_query
-
-import colander
-import requests
-import six
-from celery.utils.log import get_task_logger
-from lxml import etree
-from owslib.util import clean_ows_url
-from owslib.wps import ComplexDataInput, WebProcessingService, WPSException
-from pyramid.httpexceptions import (
-    HTTPBadRequest,
-    HTTPCreated,
-    HTTPForbidden,
-    HTTPNotFound,
-    HTTPNotImplemented,
-    HTTPOk,
-    HTTPServiceUnavailable,
-    HTTPSuccessful,
-    HTTPUnauthorized,
-    HTTPUnprocessableEntity
-)
-from pyramid.request import Request
-from pyramid.settings import asbool
-from pyramid_celery import celery_app as app
-
-import logging
-from time import sleep
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from weaver.typedefs import JSON                    # noqa: F401

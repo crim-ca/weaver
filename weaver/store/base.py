@@ -7,20 +7,20 @@ class StoreInterface(object):
 
 
 class StoreServices(StoreInterface):
-    type = 'services'
+    type = "services"
 
 
 class StoreProcesses(StoreInterface):
-    type = 'processes'
+    type = "processes"
 
 
 class StoreJobs(StoreInterface):
-    type = 'jobs'
+    type = "jobs"
 
 
 class StoreQuotes(StoreInterface):
-    type = 'quotes'
+    type = "quotes"
 
 
 class StoreBills(StoreInterface):
-    type = 'bills'
+    type = "bills"

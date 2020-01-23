@@ -1,3 +1,14 @@
+import os
+import unittest
+from contextlib import ExitStack
+from copy import deepcopy
+
+import pyramid.testing
+import pytest
+import responses
+import six
+import webtest
+
 from tests.utils import (
     get_test_weaver_app,
     mocked_process_job_runner,
@@ -21,17 +32,6 @@ from weaver.status import STATUS_ACCEPTED
 from weaver.utils import fully_qualified_name, ows_context_href
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 from weaver.wps import get_wps_url
-
-import pyramid.testing
-import pytest
-import responses
-import six
-import webtest
-
-import os
-import unittest
-from contextlib import ExitStack
-from copy import deepcopy
 
 # simulated remote server with remote processes (mocked with `responses` package)
 TEST_REMOTE_SERVER_URL = "https://remote-server.com"

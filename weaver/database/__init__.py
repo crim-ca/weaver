@@ -1,7 +1,7 @@
-from weaver.utils import get_registry
-
 import logging
 from typing import TYPE_CHECKING
+
+from weaver.utils import get_registry
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:

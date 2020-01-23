@@ -1,3 +1,7 @@
+import os
+
+import six
+
 from weaver.formats import (
     CONTENT_TYPE_APP_JSON,
     CONTENT_TYPE_APP_NETCDF,
@@ -10,10 +14,6 @@ from weaver.formats import (
     clean_mime_type_format,
     get_cwl_file_format
 )
-
-import six
-
-import os
 
 
 def test_get_cwl_file_format_tuple():

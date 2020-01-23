@@ -1,6 +1,6 @@
-from weaver import status, utils
-from weaver.exceptions import ServiceNotFound
-from weaver.utils import _NullType, null
+# pylint: disable=C0103,invalid-name
+
+from typing import Type
 
 import pytest
 from lxml import etree
@@ -11,7 +11,9 @@ from pywps.response.status import WPS_STATUS
 from requests.exceptions import HTTPError as RequestsHTTPError
 from six.moves.urllib.parse import urlparse
 
-from typing import Type
+from weaver import status, utils
+from weaver.exceptions import ServiceNotFound
+from weaver.utils import _NullType, null
 
 
 def test_null_operators():

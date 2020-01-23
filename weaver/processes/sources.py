@@ -1,16 +1,16 @@
-from weaver import WEAVER_ROOT_DIR
-from weaver.config import WEAVER_DEFAULT_DATA_SOURCES_CONFIG, get_weaver_config_file
-from weaver.processes.constants import OPENSEARCH_LOCAL_FILE_SCHEME
-from weaver.utils import get_settings
-from weaver.wps_restapi.utils import get_wps_restapi_base_url
+import json
+import os
+from typing import Text, Union
 
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
 from six.moves.urllib.parse import urlparse
 
-import json
-import os
-from typing import Text, Union
+from weaver import WEAVER_ROOT_DIR
+from weaver.config import WEAVER_DEFAULT_DATA_SOURCES_CONFIG, get_weaver_config_file
+from weaver.processes.constants import OPENSEARCH_LOCAL_FILE_SCHEME
+from weaver.utils import get_settings
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 """
 Schema

@@ -3,9 +3,10 @@ OWSExceptions are based on pyramid.httpexceptions.
 
 See also: https://github.com/geopython/pywps/blob/master/pywps/exceptions.py
 """
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_XML
-from weaver.utils import clean_json_text_body
-from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
+import json
+import warnings
+from string import Template
+from typing import TYPE_CHECKING, AnyStr
 
 import six
 from pyramid.compat import text_type
@@ -25,10 +26,9 @@ from webob import html_escape as _html_escape
 from webob.acceptparse import create_accept_header
 from zope.interface import implementer
 
-import json
-import warnings
-from string import Template
-from typing import TYPE_CHECKING, AnyStr
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_XML
+from weaver.utils import clean_json_text_body
+from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 
 if TYPE_CHECKING:
     from weaver.typedefs import JSON, SettingsType  # noqa: F401

@@ -1,3 +1,19 @@
+import json
+import unittest
+import warnings
+from collections import OrderedDict
+from contextlib import ExitStack
+from typing import TYPE_CHECKING, AnyStr, List, Tuple, Union
+
+import mock
+import pyramid.testing
+import pytest
+import six
+import webtest
+from owslib.wps import Process as ProcessOWSWPS
+from owslib.wps import WebProcessingService
+from pywps.app import Process as ProcessPyWPS
+
 from tests.utils import (
     mocked_process_job_runner,
     setup_config_with_mongodb,
@@ -19,22 +35,6 @@ from weaver.status import (
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.wps_restapi.swagger_definitions import jobs_full_uri, jobs_short_uri, process_jobs_uri
-
-import mock
-import pyramid.testing
-import pytest
-import six
-import webtest
-from owslib.wps import Process as ProcessOWSWPS
-from owslib.wps import WebProcessingService
-from pywps.app import Process as ProcessPyWPS
-
-import json
-import unittest
-import warnings
-from collections import OrderedDict
-from contextlib import ExitStack
-from typing import TYPE_CHECKING, AnyStr, List, Tuple, Union
 
 if TYPE_CHECKING:
     MockPatch = mock._patch

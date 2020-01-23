@@ -6,6 +6,12 @@ Based on tests from:
 * http://webtest.pythonpaste.org/en/latest/
 * http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/testing.html
 """
+import unittest
+from xml.etree import ElementTree
+
+import pyramid.testing
+import pytest
+
 from tests.utils import (
     get_test_weaver_app,
     get_test_weaver_config,
@@ -18,12 +24,6 @@ from weaver.formats import CONTENT_TYPE_ANY_XML
 from weaver.processes.wps_default import HelloWPS
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
-
-import pyramid.testing
-import pytest
-
-import unittest
-from xml.etree import ElementTree
 
 
 @pytest.mark.functional

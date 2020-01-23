@@ -1,3 +1,16 @@
+import logging
+import time
+from collections import deque
+from copy import deepcopy
+from typing import TYPE_CHECKING
+
+import lxml.etree
+import requests
+import shapely.wkt
+from pyramid.httpexceptions import HTTPGatewayTimeout, HTTPOk
+from pyramid.settings import asbool
+from six.moves.urllib.parse import parse_qsl, urlparse
+
 from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
 from weaver.processes.constants import (
     OPENSEARCH_AOI,
@@ -9,19 +22,6 @@ from weaver.processes.constants import (
 )
 from weaver.processes.sources import fetch_data_sources
 from weaver.utils import get_any_id
-
-import lxml.etree
-import requests
-import shapely.wkt
-from pyramid.httpexceptions import HTTPGatewayTimeout, HTTPOk
-from pyramid.settings import asbool
-from six.moves.urllib.parse import parse_qsl, urlparse
-
-import logging
-import time
-from collections import deque
-from copy import deepcopy
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from weaver.typedefs import XML                                 # noqa: F401
@@ -121,12 +121,12 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info, accept_mime
                 osdd_url = eoimage_source_info[input_id]["osdd_url"]
                 accept_schemes = eoimage_source_info[input_id]["accept_schemes"]
                 mime_types = accept_mime_types[input_id]
-                os = OpenSearchQuery(
+                osq = OpenSearchQuery(
                     collection_identifier=collection_id, osdd_url=osdd_url
                 )
-                for link in os.query_datasets(params,
-                                              accept_schemes=accept_schemes,
-                                              accept_mime_types=mime_types):
+                for link in osq.query_datasets(params,
+                                               accept_schemes=accept_schemes,
+                                               accept_mime_types=mime_types):
                     new_input = deepcopy(queue[0])
                     new_input.data = replace_with_opensearch_scheme(link)
                     eoimages_queue.append(new_input)
@@ -196,12 +196,12 @@ class OpenSearchQuery(object):
 
     def get_template_url(self):
         """ """
-        r = requests.get(self.osdd_url, params=self.params)
-        r.raise_for_status()
+        resp = requests.get(self.osdd_url, params=self.params)
+        resp.raise_for_status()
 
-        et = lxml.etree.fromstring(r.content)
+        xml = lxml.etree.fromstring(resp.content)
         xpath = "//*[local-name() = 'Url'][@rel='results']"
-        url = et.xpath(xpath)[0]  # type: XML
+        url = xml.xpath(xpath)[0]  # type: XML
         return url.attrib["template"]
 
     def _prepare_query_url(self, template_url, params):
@@ -244,9 +244,9 @@ class OpenSearchQuery(object):
                 r = requests.get(link["href"])
                 r.raise_for_status()
 
-                et = lxml.etree.fromstring(r.content)
+                xml = lxml.etree.fromstring(r.content)
                 xpath = "//*[local-name() = 'entry']/*[local-name() = 'link']"
-                links = et.xpath(xpath)  # type: List[XML]
+                links = xml.xpath(xpath)  # type: List[XML]
                 return [link.attrib for link in links]
         return []
 
@@ -263,8 +263,7 @@ class OpenSearchQuery(object):
             response = requests.get(*args, **kwargs)
             if response.status_code == HTTPOk.code:
                 return response
-            else:
-                time.sleep(wait)
+            time.sleep(wait)
         return response
 
     def _query_features_paginated(self, params):
@@ -591,7 +590,6 @@ def insert_max_occurs(payload, wps_inputs):
             wps_inputs[get_any_id(input_)][0].max_occurs = int(input_["maxOccurs"])
         except ValueError:
             pass
-    return
 
 
 def modified_collection_identifiers(eo_image_identifiers):
@@ -638,8 +636,8 @@ def replace_inputs_describe_process(inputs, payload):
     for i in inputs:
         # noinspection PyBroadException
         try:
-            ap = payload_inputs[get_any_id(i)]["additionalParameters"]
-            i["additionalParameters"] = ap
+            params = payload_inputs[get_any_id(i)]["additionalParameters"]
+            i["additionalParameters"] = params
         except Exception:
             pass
 

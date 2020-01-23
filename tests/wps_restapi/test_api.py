@@ -1,13 +1,13 @@
-from tests.utils import get_settings_from_testapp, get_test_weaver_app, get_test_weaver_config
-from weaver.formats import CONTENT_TYPE_APP_JSON
-from weaver.wps_restapi import swagger_definitions as sd
+import os
+import unittest
 
 import colander
 import mock
 from pyramid.httpexceptions import HTTPForbidden, HTTPFound, HTTPUnauthorized
 
-import os
-import unittest
+from tests.utils import get_settings_from_testapp, get_test_weaver_app, get_test_weaver_config
+from weaver.formats import CONTENT_TYPE_APP_JSON
+from weaver.wps_restapi import swagger_definitions as sd
 
 
 class GenericApiRoutesTestCase(unittest.TestCase):

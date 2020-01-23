@@ -1,3 +1,34 @@
+import json
+import logging
+import os
+import shutil
+import tempfile
+from collections import Hashable, OrderedDict
+from copy import deepcopy
+from typing import TYPE_CHECKING
+
+import cwltool
+import cwltool.factory
+import lxml.etree
+import requests
+import six
+import yaml
+from cwltool.context import LoadingContext, RuntimeContext
+from owslib.wps import ComplexData
+from owslib.wps import Metadata as OwsMetadata
+from owslib.wps import WebProcessingService
+from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
+from pyramid_celery import celery_app as app
+from pywps import Process
+from pywps.app.Common import Metadata
+from pywps.inout import BoundingBoxInput, BoundingBoxOutput, ComplexInput, ComplexOutput, LiteralInput, LiteralOutput
+from pywps.inout.basic import BasicIO
+from pywps.inout.formats import Format
+from pywps.inout.literaltypes import ALLOWEDVALUETYPE, AllowedValue, AnyValue
+from pywps.validator.mode import MODE
+from six.moves.urllib.parse import urlparse
+from yaml.scanner import ScannerError
+
 from weaver.config import WEAVER_CONFIGURATION_EMS, get_weaver_configuration
 from weaver.exceptions import (
     PackageExecutionError,
@@ -54,37 +85,6 @@ from weaver.utils import (
 from weaver.wps import get_wps_output_dir
 from weaver.wps_restapi.swagger_definitions import process_uri
 
-import cwltool
-import cwltool.factory
-import lxml.etree
-import requests
-import six
-import yaml
-from cwltool.context import LoadingContext, RuntimeContext
-from owslib.wps import ComplexData
-from owslib.wps import Metadata as OwsMetadata
-from owslib.wps import WebProcessingService
-from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
-from pyramid_celery import celery_app as app
-from pywps import Process
-from pywps.app.Common import Metadata
-from pywps.inout import BoundingBoxInput, BoundingBoxOutput, ComplexInput, ComplexOutput, LiteralInput, LiteralOutput
-from pywps.inout.basic import BasicIO
-from pywps.inout.formats import Format
-from pywps.inout.literaltypes import ALLOWEDVALUETYPE, AllowedValue, AnyValue
-from pywps.validator.mode import MODE
-from six.moves.urllib.parse import urlparse
-from yaml.scanner import ScannerError
-
-import json
-import logging
-import os
-import shutil
-import tempfile
-from collections import Hashable, OrderedDict
-from copy import deepcopy
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from weaver.status import AnyStatusType     # noqa: F401
     from weaver.typedefs import (               # noqa: F401
@@ -97,6 +97,7 @@ if TYPE_CHECKING:
     from owslib.wps import Input, Output                                                # noqa: F401
 
     # typing shortcuts
+    # pylint: disable=C0103,invalid-name
     WPS_Input_Type = Union[LiteralInput, ComplexInput, BoundingBoxInput]
     WPS_Output_Type = Union[LiteralOutput, ComplexOutput, BoundingBoxOutput]
     WPS_IO_Type = Union[WPS_Input_Type, WPS_Output_Type]
@@ -1614,13 +1615,17 @@ def get_process_definition(process_offering, reference=None, package=None, data_
 
 
 class WpsPackage(Process):
-    package = None
-    job_file = None
-    log_file = None
+    package = None              # type: Optional[CWL]
+    package_id = None           # type: Optional[AnyStr]
+    job_file = None             # type: Optional[AnyStr]
+    log_file = None             # type: Optional[AnyStr]
     log_level = logging.INFO
     logger = None
-    tmp_dir = None
-    percent = None
+    tmp_dir = None              # type: Optional[AnyStr]
+    percent = None              # type: Optional[Number]
+
+    step_package = None         # type: Optional[List[CWL]]
+    step_launched = None        # type: Optional[List[AnyStr]]
 
     def __init__(self, **kw):
         """
@@ -1683,7 +1688,7 @@ class WpsPackage(Process):
         weaver_tweens_logger.setLevel(self.log_level)
 
     def update_status(self, message, progress, status):
-        # type: (AnyStr, int, AnyStatusType) -> None
+        # type: (AnyStr, Number, AnyStatusType) -> None
         """Updates the `PyWPS` real job status from a specified parameters."""
         self.percent = progress or self.percent or 0
 
@@ -1699,7 +1704,7 @@ class WpsPackage(Process):
 
     def step_update_status(self, message, progress, start_step_progress, end_step_progress, step_name,
                            target_host, status):
-        # type: (AnyStr, int, int, int, AnyStr, AnyValue, AnyStr) -> None
+        # type: (AnyStr, Number, Number, Number, AnyStr, AnyValue, AnyStr) -> None
         self.update_status(
             message="{0} [{1}] - {2}".format(target_host, step_name, str(message).strip()),
             progress=self.map_progress(progress, start_step_progress, end_step_progress),
@@ -1707,10 +1712,12 @@ class WpsPackage(Process):
         )
 
     def log_message(self, status, message, progress=None, level=logging.INFO):
+        # type: (AnyStatusType, AnyStr, Optional[Number], int) -> None
         message = get_job_log_msg(status=map_status(status), message=message, progress=progress)
         self.logger.log(level, message, exc_info=level > logging.INFO)
 
     def exception_message(self, exception_type, exception=None, message="no message"):
+        # type: (Type[Exception], Optional[Exception], AnyStr) -> Exception
         exception_msg = " [{}]".format(repr(exception)) if isinstance(exception, Exception) else ""
         self.log_message(status=STATUS_EXCEPTION,
                          message="{0}: {1}{2}".format(exception_type.__name__, message, exception_msg),
@@ -1719,11 +1726,14 @@ class WpsPackage(Process):
 
     @staticmethod
     def map_progress(progress, range_min, range_max):
-        # type: (Number, int, int) -> Number
-        return range_min + (progress * (range_max - range_min)) / 100
+        # type: (Number, Number, Number) -> Number
+        """Calculates the relative progression of the percentage process within min/max values."""
+        return max(range_min, min(range_max, range_min + (progress * (range_max - range_min)) / 100))
 
     @classmethod
     def map_step_progress(cls, step_index, steps_total):
+        # type: (int, int) -> Number
+        """Calculates the percentage progression of a single step of the full process."""
         return cls.map_progress(100 * step_index / steps_total, PACKAGE_PROGRESS_RUN_CWL, PACKAGE_PROGRESS_CWL_DONE)
 
     @staticmethod
@@ -1767,12 +1777,12 @@ class WpsPackage(Process):
             runtime_context = RuntimeContext(kwargs={
                 "no_read_only": True, "outdir": self.workdir, "tmp_outdir_prefix": wps_out_dir_prefix})
             try:
-                self.package_inst, _, self.step_packages = _load_package_content(self.package,
-                                                                                 package_name=self.package_id,
-                                                                                 # no data source for local package
-                                                                                 data_source=None,
-                                                                                 loading_context=loading_context,
-                                                                                 runtime_context=runtime_context)
+                package_inst, _, self.step_packages = _load_package_content(self.package,
+                                                                            package_name=self.package_id,
+                                                                            # no data source for local package
+                                                                            data_source=None,
+                                                                            loading_context=loading_context,
+                                                                            runtime_context=runtime_context)
                 self.step_launched = []
 
             except Exception as ex:
@@ -1780,7 +1790,7 @@ class WpsPackage(Process):
             self.update_status("Loading package content done.", PACKAGE_PROGRESS_LOADING, STATUS_RUNNING)
 
             try:
-                cwl_input_info = dict([(i["name"], i) for i in self.package_inst.t.inputs_record_schema["fields"]])
+                cwl_input_info = dict([(i["name"], i) for i in package_inst.t.inputs_record_schema["fields"]])
                 self.update_status("Retrieve package inputs done.", PACKAGE_PROGRESS_GET_INPUT, STATUS_RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed retrieving package input types.")
@@ -1833,8 +1843,8 @@ class WpsPackage(Process):
                 # Inputs starting with file:// will be interpreted as ems local files
                 # If OpenSearch obtain file:// references that must be passed to the ADES use an uri starting
                 # with OPENSEARCH_LOCAL_FILE_SCHEME://
-                LOGGER.debug("Launching process package with inputs:\n{}".format(cwl_inputs))
-                result = self.package_inst(**cwl_inputs)
+                LOGGER.debug("Launching process package with inputs:\n%s", cwl_inputs)
+                result = package_inst(**cwl_inputs)
                 self.update_status("Package execution done.", PACKAGE_PROGRESS_CWL_DONE, STATUS_RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed package execution.")

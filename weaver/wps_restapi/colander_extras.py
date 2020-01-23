@@ -97,11 +97,13 @@ class OneOfMappingSchema(colander.MappingSchema):
         fulfilling the specified definition (ie: an empty ``{}`` schema with all fields missing).
     """
 
+    _one_of = None
+
     def __init__(self, *args, **kwargs):
         super(OneOfMappingSchema, self).__init__(*args, **kwargs)
-        if not hasattr(self, '_one_of'):
+        if not hasattr(self, "_one_of"):
             raise TypeError("Type '{}' must define '_one_of' element.".format(self))
-        if not hasattr(self._one_of, '__iter__') or not len(self._one_of):
+        if not hasattr(self._one_of, "__iter__") or not len(self._one_of):
             raise ValueError("Element '_one_of' of '{}' must be an iterable of at least 1 value.".format(self))
 
     def __str__(self):
@@ -119,10 +121,9 @@ class OneOfMappingSchema(colander.MappingSchema):
                 return c.deserialize(cstruct)
             except colander.Invalid as invalid:
                 invalid_one_of.update({type(invalid.node).__name__: str(invalid)})
-        else:
-            message = "Incorrect type, must be one of: {}. Errors for each case: {}" \
-                      .format(list(invalid_one_of), invalid_one_of)
-            raise colander.Invalid(node=self, msg=message)
+        message = "Incorrect type, must be one of: {}. Errors for each case: {}" \
+                  .format(list(invalid_one_of), invalid_one_of)
+        raise colander.Invalid(node=self, msg=message)
 
     def deserialize(self, cstruct):
         result = self.deserialize_one_of(cstruct)

@@ -1,3 +1,9 @@
+import logging
+import warnings
+
+from owslib.wps import WebProcessingService
+from pyramid.httpexceptions import HTTPCreated, HTTPNoContent, HTTPNotFound, HTTPOk
+
 from utils import get_cookie_headers
 from weaver.database import get_db
 from weaver.datatype import Service
@@ -9,12 +15,6 @@ from weaver.utils import get_any_id, get_settings
 from weaver.warning import NonBreakingExceptionWarning
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, get_wps_restapi_base_url
-
-from owslib.wps import WebProcessingService
-from pyramid.httpexceptions import HTTPCreated, HTTPNoContent, HTTPNotFound, HTTPOk
-
-import logging
-import warnings
 
 LOGGER = logging.getLogger(__name__)
 
@@ -43,8 +43,8 @@ def get_providers(request):
                     base_url=get_wps_restapi_base_url(get_settings(request)),
                     provider_id=service.name),
                 public=service.public))
-        except Exception as e:
-            warnings.warn("Exception occurred while fetching wps {0} : {1!r}".format(service.url, e),
+        except Exception as exc:
+            warnings.warn("Exception occurred while fetching wps {0} : {1!r}".format(service.url, exc),
                           NonBreakingExceptionWarning)
             pass
 
@@ -95,8 +95,8 @@ def add_provider(request):
 
     try:
         new_service = Service(url=request.json["url"], name=get_any_id(request.json))
-    except KeyError as e:
-        raise OWSMissingParameterValue("Missing json parameter '{!s}'.".format(e), value=str(e))
+    except KeyError as exc:
+        raise OWSMissingParameterValue("Missing json parameter '{!s}'.".format(exc), value=exc)
 
     if "public" in request.json:
         new_service["public"] = request.json["public"]
@@ -135,5 +135,5 @@ def get_provider(request):
     """
     Get a provider definition (GetCapabilities).
     """
-    service, store = get_service(request)
+    service, _ = get_service(request)
     return HTTPOk(json=get_capabilities(service, request))

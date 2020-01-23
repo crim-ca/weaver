@@ -1,3 +1,21 @@
+import json
+import logging
+import os
+import time
+from copy import deepcopy
+from typing import TYPE_CHECKING
+from unittest import TestCase
+
+import mock
+import pytest
+import requests
+from pyramid import testing
+from pyramid.httpexceptions import HTTPCreated, HTTPNotFound, HTTPOk, HTTPUnauthorized
+from pyramid.settings import asbool
+from six.moves.urllib.parse import urlparse
+# use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
+from webtest import TestApp as WebTestApp
+
 from tests.utils import get_setting, get_settings_from_config_ini, get_settings_from_testapp
 from weaver import WEAVER_ROOT_DIR
 from weaver.config import WEAVER_CONFIGURATION_EMS
@@ -15,24 +33,6 @@ from weaver.status import (
 from weaver.utils import get_weaver_url, make_dirs, now
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
-
-import mock
-import pytest
-import requests
-from pyramid import testing
-from pyramid.httpexceptions import HTTPCreated, HTTPNotFound, HTTPOk, HTTPUnauthorized
-from pyramid.settings import asbool
-from six.moves.urllib.parse import urlparse
-# use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
-from webtest import TestApp as WebTestApp
-
-import json
-import logging
-import os
-import time
-from copy import deepcopy
-from typing import TYPE_CHECKING
-from unittest import TestCase
 
 if TYPE_CHECKING:
     from weaver.typedefs import HeadersType, CookiesType, SettingsType, AnyResponseType, LoggerType, JSON   # noqa: F401

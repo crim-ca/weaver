@@ -1,6 +1,15 @@
-from weaver.exceptions import InvalidIdentifierValue, ServiceNotFound
-from weaver.status import map_status
-from weaver.warning import TimeZoneInfoAlreadySetWarning
+import logging
+import os
+import platform
+import re
+import time
+import types
+import warnings
+from datetime import datetime
+from distutils.dir_util import mkpath
+from distutils.version import LooseVersion
+from inspect import isclass, isfunction
+from typing import TYPE_CHECKING
 
 import pytz
 import six
@@ -15,18 +24,9 @@ from requests.structures import CaseInsensitiveDict
 from six.moves.urllib.parse import ParseResult, parse_qs, urlparse, urlunsplit
 from webob.headers import EnvironHeaders, ResponseHeaders
 
-import logging
-import os
-import platform
-import re
-import time
-import types
-import warnings
-from datetime import datetime
-from distutils.dir_util import mkpath
-from distutils.version import LooseVersion
-from inspect import isclass, isfunction
-from typing import TYPE_CHECKING
+from weaver.exceptions import InvalidIdentifierValue, ServiceNotFound
+from weaver.status import map_status
+from weaver.warning import TimeZoneInfoAlreadySetWarning
 
 if TYPE_CHECKING:
     from weaver.typedefs import (                                                               # noqa: F401

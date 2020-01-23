@@ -2,6 +2,14 @@
 This module should contain any and every definitions in use to build the swagger UI,
 so that one can update the swagger without touching any other files after the initial integration
 """
+# pylint: disable=C0103,invalid-name
+
+from colander import Boolean, DateTime, Float, Integer
+from colander import MappingSchema as MapSchema
+from colander import OneOf, Range
+from colander import SequenceSchema as SeqSchema
+from colander import String, drop
+from cornice import Service
 
 from weaver import __meta__
 from weaver.config import WEAVER_CONFIGURATION_EMS
@@ -29,15 +37,8 @@ from weaver.wps_restapi.colander_extras import (
 )
 from weaver.wps_restapi.utils import wps_restapi_base_path
 
-from colander import Boolean, DateTime, Float, Integer
-from colander import MappingSchema as MapSchema
-from colander import OneOf, Range
-from colander import SequenceSchema as SeqSchema
-from colander import String, drop
-from cornice import Service
 
-
-class SchemaNode(SchemaNodeDefault):
+class SchemaNode(SchemaNodeDefault):    # pylint: disable=W0223,abstract-method
     """
     Override the default :class:`colander.SchemaNode` to auto-handle ``default`` value substitution if an
     actual value was omitted during deserialization for a field defined with this schema and a ``default`` parameter.
@@ -419,7 +420,7 @@ class LiteralDataDomainType(OneOfMappingSchema):
     _one_of = (AllowedValues,
                AllowedRanges,
                ValuesReference,
-               AnyValue)  # must be last because it's the most permissive
+               AnyValue)  # must be last because it"s the most permissive
     defaultValue = SchemaNode(String(), missing=drop)
     dataType = DataTypeSchema(missing=drop)
     uom = UomSchema(missing=drop)
@@ -437,7 +438,7 @@ class InputType(OneOfMappingSchema):
     _one_of = (
         BoundingBoxInputType,
         ComplexInputType,  # should be 2nd to last because very permission, but requires format at least
-        LiteralInputType,  # must be last because it's the most permissive (all can default if omitted)
+        LiteralInputType,  # must be last because it"s the most permissive (all can default if omitted)
     )
 
 
@@ -465,7 +466,7 @@ class OutputType(OneOfMappingSchema, OutputDataDescriptionType):
     _one_of = (
         BoundingBoxOutputType,
         ComplexOutputType,  # should be 2nd to last because very permission, but requires format at least
-        LiteralOutputType,  # must be last because it's the most permissive (all can default if omitted)
+        LiteralOutputType,  # must be last because it"s the most permissive (all can default if omitted)
     )
 
 
@@ -476,12 +477,12 @@ class OutputDescriptionList(SequenceSchema):
 class JobExecuteModeEnum(SchemaNode):
     # noinspection PyUnusedLocal
     def __init__(self, *args, **kwargs):
-        kwargs.pop('validator', None)   # ignore passed argument and enforce the validator
+        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(JobExecuteModeEnum, self).__init__(
             String(),
-            title=kwargs.get('title', 'mode'),
-            default=kwargs.get('default', EXECUTE_MODE_AUTO),
-            example=kwargs.get('example', EXECUTE_MODE_ASYNC),
+            title=kwargs.get("title", "mode"),
+            default=kwargs.get("default", EXECUTE_MODE_AUTO),
+            example=kwargs.get("example", EXECUTE_MODE_ASYNC),
             validator=OneOf(list(execute_mode_options)),
             **kwargs)
 
@@ -489,12 +490,12 @@ class JobExecuteModeEnum(SchemaNode):
 class JobControlOptionsEnum(SchemaNode):
     # noinspection PyUnusedLocal
     def __init__(self, *args, **kwargs):
-        kwargs.pop('validator', None)   # ignore passed argument and enforce the validator
+        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(JobControlOptionsEnum, self).__init__(
             String(),
-            title='jobControlOptions',
-            default=kwargs.get('default', EXECUTE_CONTROL_OPTION_ASYNC),
-            example=kwargs.get('example', EXECUTE_CONTROL_OPTION_ASYNC),
+            title="jobControlOptions",
+            default=kwargs.get("default", EXECUTE_CONTROL_OPTION_ASYNC),
+            example=kwargs.get("example", EXECUTE_CONTROL_OPTION_ASYNC),
             validator=OneOf(list(execute_control_options)),
             **kwargs)
 
@@ -502,12 +503,12 @@ class JobControlOptionsEnum(SchemaNode):
 class JobResponseOptionsEnum(SchemaNode):
     # noinspection PyUnusedLocal
     def __init__(self, *args, **kwargs):
-        kwargs.pop('validator', None)   # ignore passed argument and enforce the validator
+        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(JobResponseOptionsEnum, self).__init__(
             String(),
-            title=kwargs.get('title', 'response'),
-            default=kwargs.get('default', EXECUTE_RESPONSE_RAW),
-            example=kwargs.get('example', EXECUTE_RESPONSE_RAW),
+            title=kwargs.get("title", "response"),
+            default=kwargs.get("default", EXECUTE_RESPONSE_RAW),
+            example=kwargs.get("example", EXECUTE_RESPONSE_RAW),
             validator=OneOf(list(execute_response_options)),
             **kwargs)
 
@@ -515,12 +516,12 @@ class JobResponseOptionsEnum(SchemaNode):
 class TransmissionModeEnum(SchemaNode):
     # noinspection PyUnusedLocal
     def __init__(self, *args, **kwargs):
-        kwargs.pop('validator', None)   # ignore passed argument and enforce the validator
+        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(TransmissionModeEnum, self).__init__(
             String(),
-            title=kwargs.get('title', 'transmissionMode'),
-            default=kwargs.get('default', EXECUTE_TRANSMISSION_MODE_REFERENCE),
-            example=kwargs.get('example', EXECUTE_TRANSMISSION_MODE_REFERENCE),
+            title=kwargs.get("title", "transmissionMode"),
+            default=kwargs.get("default", EXECUTE_TRANSMISSION_MODE_REFERENCE),
+            example=kwargs.get("example", EXECUTE_TRANSMISSION_MODE_REFERENCE),
             validator=OneOf(list(execute_transmission_mode_options)),
             **kwargs)
 
@@ -528,11 +529,11 @@ class TransmissionModeEnum(SchemaNode):
 class JobStatusEnum(SchemaNode):
     # noinspection PyUnusedLocal
     def __init__(self, *args, **kwargs):
-        kwargs.pop('validator', None)   # ignore passed argument and enforce the validator
+        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(JobStatusEnum, self).__init__(
             String(),
-            default=kwargs.get('default', None),
-            example=kwargs.get('example', STATUS_ACCEPTED),
+            default=kwargs.get("default", None),
+            example=kwargs.get("example", STATUS_ACCEPTED),
             validator=OneOf(list(JOB_STATUS_CATEGORIES[STATUS_COMPLIANT_OGC])),
             **kwargs)
 
@@ -540,19 +541,19 @@ class JobStatusEnum(SchemaNode):
 class JobSortEnum(SchemaNode):
     # noinspection PyUnusedLocal
     def __init__(self, *args, **kwargs):
-        kwargs.pop('validator', None)   # ignore passed argument and enforce the validator
+        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(JobSortEnum, self).__init__(
             String(),
-            default=kwargs.get('default', SORT_CREATED),
-            example=kwargs.get('example', SORT_CREATED),
+            default=kwargs.get("default", SORT_CREATED),
+            example=kwargs.get("example", SORT_CREATED),
             validator=OneOf(list(JOB_SORT_VALUES)),
             **kwargs)
 
 
 class LaunchJobQuerystring(MappingSchema):
     field_string = SchemaNode(String(), default=None, missing=drop,
-                              description='Comma separated tags that can be used to filter jobs later')
-    field_string.name = 'tags'
+                              description="Comma separated tags that can be used to filter jobs later")
+    field_string.name = "tags"
 
 
 class Visibility(MappingSchema):
@@ -817,8 +818,8 @@ class GetQueriedJobsSchema(OneOfMappingSchema):
 
 class DismissedJobSchema(MappingSchema):
     status = JobStatusEnum()
-    jobID = SchemaNode(String(), example='a9d14bf4-84e0-449a-bac8-16e598efe807', description="ID of the job.")
-    message = SchemaNode(String(), example='Job dismissed.')
+    jobID = SchemaNode(String(), example="a9d14bf4-84e0-449a-bac8-16e598efe807", description="ID of the job.")
+    message = SchemaNode(String(), example="Job dismissed.")
     percentCompleted = SchemaNode(Integer(), example=0)
 
 
@@ -1081,9 +1082,9 @@ class SwaggerUISpecSchema(MappingSchema):
 
 
 class VersionsSpecSchema(MappingSchema):
-    name = SchemaNode(String(), description="Identification name of the current item.", example='weaver')
-    type = SchemaNode(String(), description="Identification type of the current item.", example='api')
-    version = SchemaNode(String(), description="Version of the current item.", example='0.1.0')
+    name = SchemaNode(String(), description="Identification name of the current item.", example="weaver")
+    type = SchemaNode(String(), description="Identification type of the current item.", example="api")
+    version = SchemaNode(String(), description="Version of the current item.", example="0.1.0")
 
 
 class VersionsList(SequenceSchema):
@@ -1143,7 +1144,7 @@ class Deploy(MappingSchema):
 
 class PostProcessesEndpoint(MappingSchema):
     header = AcceptHeader()
-    body = Deploy(title='Deploy')
+    body = Deploy(title="Deploy")
 
 
 class PostProcessJobsEndpoint(ProcessPath):
@@ -1163,7 +1164,7 @@ class GetJobsQueries(MappingSchema):
     provider = SchemaNode(String(), missing=drop, default=None)
     sort = JobSortEnum(missing=drop)
     tags = SchemaNode(String(), missing=drop, default=None,
-                      description='Comma-separated values of tags assigned to jobs')
+                      description="Comma-separated values of tags assigned to jobs")
 
 
 class GetJobsRequest(MappingSchema):
@@ -1210,11 +1211,11 @@ class ProcessQuoteEndpoint(ProcessPath, QuotePath):
 class QuoteSortEnum(SchemaNode):
     # noinspection PyUnusedLocal
     def __init__(self, *args, **kwargs):
-        kwargs.pop('validator', None)   # ignore passed argument and enforce the validator
+        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(QuoteSortEnum, self).__init__(
             String(),
-            default=kwargs.get('default', SORT_ID),
-            example=kwargs.get('example', SORT_PROCESS),
+            default=kwargs.get("default", SORT_ID),
+            example=kwargs.get("example", SORT_PROCESS),
             validator=OneOf(QUOTE_SORT_VALUES),
             **kwargs)
 
@@ -1451,7 +1452,7 @@ class InternalServerErrorPutProcessVisibilityResponse(MappingSchema):
 class OkDeleteProcessUndeployBodySchema(MappingSchema):
     deploymentDone = SchemaNode(Boolean(), description="Indicates if the process was successfully undeployed.",
                                 default=False, example=True)
-    identifier = SchemaNode(String(), example='workflow')
+    identifier = SchemaNode(String(), example="workflow")
     failureReason = SchemaNode(String(), missing=drop, description="Description of undeploy failure if applicable.")
 
 

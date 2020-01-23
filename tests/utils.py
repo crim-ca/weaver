@@ -1,15 +1,12 @@
 """
 Utility methods for various TestCase setup operations.
 """
-from weaver.config import WEAVER_CONFIGURATION_DEFAULT, WEAVER_DEFAULT_INI_CONFIG, get_weaver_config_file
-from weaver.database import get_db
-from weaver.datatype import Service
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_XML
-from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
-from weaver.utils import get_url_without_query, null
-from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
-from weaver.wps import get_wps_output_dir, get_wps_output_url, get_wps_url
-from weaver.wps_restapi.processes.processes import execute_process
+import os
+import uuid
+import warnings
+from contextlib import ExitStack
+from inspect import isclass
+from typing import TYPE_CHECKING
 
 import mock
 import pyramid_celery
@@ -22,12 +19,15 @@ from requests import Response
 from six.moves.configparser import ConfigParser
 from webtest import TestApp
 
-import os
-import uuid
-import warnings
-from contextlib import ExitStack
-from inspect import isclass
-from typing import TYPE_CHECKING
+from weaver.config import WEAVER_CONFIGURATION_DEFAULT, WEAVER_DEFAULT_INI_CONFIG, get_weaver_config_file
+from weaver.database import get_db
+from weaver.datatype import Service
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_XML
+from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
+from weaver.utils import get_url_without_query, null
+from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
+from weaver.wps import get_wps_output_dir, get_wps_output_url, get_wps_url
+from weaver.wps_restapi.processes.processes import execute_process
 
 if TYPE_CHECKING:
     from weaver.typedefs import Any, AnyStr, Callable, List, Optional, SettingsType, Type, Union  # noqa: F401

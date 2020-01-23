@@ -1,3 +1,15 @@
+import json
+import os
+import unittest
+from contextlib import ExitStack
+from tempfile import NamedTemporaryFile
+from time import sleep
+
+import mock
+import pyramid.testing
+import pytest
+import six
+
 from tests.utils import (
     get_settings_from_testapp,
     get_test_weaver_app,
@@ -12,18 +24,6 @@ from weaver.database import get_db
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF
 from weaver.processes.builtin import register_builtin_processes
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_CATEGORY_RUNNING, STATUS_SUCCEEDED
-
-import mock
-import pyramid.testing
-import pytest
-import six
-
-import json
-import os
-import unittest
-from contextlib import ExitStack
-from tempfile import NamedTemporaryFile
-from time import sleep
 
 
 @pytest.mark.functional

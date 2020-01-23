@@ -1,8 +1,8 @@
-from six.moves.urllib.error import HTTPError
-from six.moves.urllib.request import urlopen
-
 import os
 from typing import TYPE_CHECKING
+
+from six.moves.urllib.error import HTTPError
+from six.moves.urllib.request import urlopen
 
 if TYPE_CHECKING:
     from weaver.typedefs import JSON            # noqa: F401

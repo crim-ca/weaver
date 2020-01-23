@@ -2,21 +2,21 @@
 Based on unittests in https://github.com/wndhydrnt/python-oauth2/tree/master/oauth2/test
 """
 
-from weaver.datatype import Service
-from weaver.store.mongodb import MongodbServiceStore
+import unittest
 
 import mock
 from pymongo.collection import Collection
 
-import unittest
+from weaver.datatype import Service
+from weaver.store.mongodb import MongodbServiceStore
 
 
 class MongodbServiceStoreTestCase(unittest.TestCase):
     def setUp(self):
         self.service = dict(name="loving_flamingo", url="http://somewhere.over.the/ocean", type="wps",
-                            public=False, auth='token')
+                            public=False, auth="token")
         self.service_public = dict(name="open_pingu", url="http://somewhere.in.the/deep_ocean", type="wps",
-                                   public=True, auth='token')
+                                   public=True, auth="token")
         self.service_special = dict(url="http://wonderload", name="A special Name", type="wps", auth="token")
         self.sane_name_config = {"assert_invalid": False}
 

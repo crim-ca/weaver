@@ -1,19 +1,22 @@
-from weaver.exceptions import PackageTypeError
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
-from weaver.processes.wps_package import _are_different_and_set
-from weaver.processes.wps_package import _is_cwl_array_type
-from weaver.processes.wps_package import _is_cwl_enum_type
-from weaver.processes.wps_package import _json2wps_datatype
-from weaver.processes.wps_package import _merge_io_formats
-from weaver.processes.wps_package import WPS_LITERAL, DefaultFormat
-from weaver.utils import null
+from copy import deepcopy
 
 import pytest
 from pywps.inout.formats import Format
 from pywps.inout.literaltypes import AnyValue
 from pywps.validator.mode import MODE
 
-from copy import deepcopy
+from weaver.exceptions import PackageTypeError
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
+from weaver.processes.wps_package import (
+    WPS_LITERAL,
+    DefaultFormat,
+    _are_different_and_set,
+    _is_cwl_array_type,
+    _is_cwl_enum_type,
+    _json2wps_datatype,
+    _merge_io_formats
+)
+from weaver.utils import null
 
 
 class ObjectWithEqProperty(object):

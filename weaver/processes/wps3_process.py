@@ -1,3 +1,20 @@
+import logging
+import warnings
+from copy import deepcopy
+from time import sleep
+from typing import TYPE_CHECKING
+
+import requests
+from pyramid.httpexceptions import (
+    HTTPConflict,
+    HTTPForbidden,
+    HTTPInternalServerError,
+    HTTPNotFound,
+    HTTPOk,
+    HTTPUnauthorized
+)
+from pyramid.settings import asbool
+
 from weaver import status
 from weaver.exceptions import PackageExecutionError
 from weaver.formats import CONTENT_TYPE_APP_FORM, CONTENT_TYPE_APP_JSON
@@ -22,23 +39,6 @@ from weaver.wps_restapi.swagger_definitions import (
     process_visibility_uri,
     processes_uri
 )
-
-import requests
-from pyramid.httpexceptions import (
-    HTTPConflict,
-    HTTPForbidden,
-    HTTPInternalServerError,
-    HTTPNotFound,
-    HTTPOk,
-    HTTPUnauthorized
-)
-from pyramid.settings import asbool
-
-import logging
-import warnings
-from copy import deepcopy
-from time import sleep
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from weaver.typedefs import JSON, UpdateStatusPartialFunction   # noqa: F401
@@ -91,7 +91,7 @@ class Wps3Process(WpsProcessInterface):
             deploy_body = step_payload
             url = retrieve_data_source_url(data_source)
         except (IndexError, KeyError) as exc:
-            raise PackageExecutionError("Failed to save package outputs. [{}]".format(repr(exc)))
+            raise PackageExecutionError("Failed to save package outputs. [{!r}]".format(exc))
 
         self.provider = data_source  # fix immediately for `update_status`
         self.update_status("{provider} is selected {reason}.".format(provider=data_source, reason=reason),
@@ -157,9 +157,9 @@ class Wps3Process(WpsProcessInterface):
                                      status_code_mock=HTTPUnauthorized.code)
         if response.status_code in (HTTPUnauthorized.code, HTTPForbidden.code):
             return None
-        elif response.status_code == HTTPNotFound.code:
+        if response.status_code == HTTPNotFound.code:
             return False
-        elif response.status_code == HTTPOk.code:
+        if response.status_code == HTTPOk.code:
             json_body = response.json()
             # FIXME: support for Spacebel, always returns dummy visibility response, enforce deploy with `False`
             if json_body.get("message") == "magic!" or json_body.get("type") == "ok" or json_body.get("code") == 4:
@@ -225,16 +225,16 @@ class Wps3Process(WpsProcessInterface):
             # TODO: Maybe always redeploy? What about cases of outdated deployed process?
             try:
                 self.deploy()
-            except Exception as e:
+            except Exception as exc:
                 # FIXME: support for Spacebel, avoid conflict error incorrectly handled, remove 500 when fixed
-                pass_http_error(e, [HTTPConflict, HTTPInternalServerError])
+                pass_http_error(exc, [HTTPConflict, HTTPInternalServerError])
 
         LOGGER.info("Process [%s] enforced to public visibility.", self.process)
         try:
             self.set_visibility(visibility=VISIBILITY_PUBLIC)
         # TODO: support for Spacebel, remove when visibility route properly implemented on ADES
-        except Exception as e:
-            pass_http_error(e, HTTPNotFound)
+        except Exception as exc:
+            pass_http_error(exc, HTTPNotFound)
 
         self.update_status("Preparing execute request for remote ADES.",
                            REMOTE_JOB_PROGRESS_REQ_PREP, status.STATUS_RUNNING)
@@ -256,7 +256,7 @@ class Wps3Process(WpsProcessInterface):
             if exec_input[execute_req_input_val].startswith("{0}://".format(OPENSEARCH_LOCAL_FILE_SCHEME)):
                 exec_input[execute_req_input_val] = "file{0}".format(
                     exec_input[execute_req_input_val][len(OPENSEARCH_LOCAL_FILE_SCHEME):])
-            elif exec_input[execute_req_input_val].startswith('file://'):
+            elif exec_input[execute_req_input_val].startswith("file://"):
                 exec_input[execute_req_input_val] = self.host_file(exec_input[execute_req_input_val])
                 LOGGER.debug("Hosting intermediate input [%s] : [%s]",
                              exec_input[execute_req_id], exec_input[execute_req_input_val])
@@ -316,11 +316,11 @@ class Wps3Process(WpsProcessInterface):
                 dst_fn = "/".join([out_dir.rstrip("/"), expected_outputs[get_any_id(result)]])
 
                 # TODO Should we handle other type than File reference?
-                r = requests.get(get_any_value(result), allow_redirects=True)
+                resp = requests.get(get_any_value(result), allow_redirects=True)
                 LOGGER.debug("Fetching result output from [%s] to cwl output destination: [%s]",
                              get_any_value(result), dst_fn)
-                with open(dst_fn, mode='wb') as dst_fh:
-                    dst_fh.write(r.content)
+                with open(dst_fn, mode="wb") as dst_fh:
+                    dst_fh.write(resp.content)
 
         self.update_status("Execution on remote ADES completed.",
                            REMOTE_JOB_PROGRESS_COMPLETED, status.STATUS_SUCCEEDED)
@@ -341,7 +341,7 @@ class Wps3Process(WpsProcessInterface):
         # TODO Remove patch for Geomatys not conforming to the status schema
         #  - jobID is missing
         #  - handled by 'map_status': status are upper cases and succeeded process are indicated as successful
-        job_id = job_status_uri.split('/')[-1]
+        job_id = job_status_uri.split("/")[-1]
         if "jobID" not in job_status:
             job_status["jobID"] = job_id
         job_status["status"] = status.map_status(job_status["status"])

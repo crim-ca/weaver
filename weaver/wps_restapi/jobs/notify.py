@@ -1,18 +1,18 @@
 from __future__ import unicode_literals
 
-from weaver.datatype import Job
-from weaver.utils import bytes2str, get_settings, str2bytes
-
-import six
-from mako.template import Template
-from pyramid.settings import asbool
-
 import binascii
 import hashlib
 import logging
 import os
 import smtplib
 from typing import TYPE_CHECKING
+
+import six
+from mako.template import Template
+from pyramid.settings import asbool
+
+from weaver.datatype import Job
+from weaver.utils import bytes2str, get_settings, str2bytes
 
 if TYPE_CHECKING:
     from weaver.typedefs import AnySettingsContainer

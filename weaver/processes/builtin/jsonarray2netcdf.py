@@ -2,10 +2,6 @@
 Extracts and fetches NetCDF files from a JSON file containing an URL string array,
 and provides them on the output directory.
 """
-import requests
-import six
-from six.moves.urllib.parse import urlparse
-
 import argparse
 import json
 import logging
@@ -13,6 +9,10 @@ import os
 import shutil
 import sys
 from typing import Any, AnyStr
+
+import requests
+import six
+from six.moves.urllib.parse import urlparse
 
 CUR_DIR = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, CUR_DIR)
@@ -65,7 +65,7 @@ def j2n(json_file, output_dir):
 if __name__ == "__main__":
     LOGGER.info("Parsing inputs of '%s' process.", PACKAGE_NAME)
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("-i", metavar="json", type=argparse.FileType('r'),
+    parser.add_argument("-i", metavar="json", type=argparse.FileType("r"),
                         help="JSON file to be parsed for NetCDF file names.")
     parser.add_argument("-o", metavar="outdir", default=CUR_DIR,
                         help="Output directory of the retrieved NetCDF files extracted by name from the JSON file.")

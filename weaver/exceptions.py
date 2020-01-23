@@ -1,14 +1,14 @@
 """
 Errors raised during the weaver flow.
 """
+import logging
+from functools import wraps
+from typing import TYPE_CHECKING
+
 from pyramid.httpexceptions import HTTPException, HTTPInternalServerError
 from pyramid.request import Request as PyramidRequest
 from pyramid.testing import DummyRequest
 from requests import Request as RequestsRequest
-
-import logging
-from functools import wraps
-from typing import TYPE_CHECKING
 
 LOGGER = logging.getLogger(__name__)
 

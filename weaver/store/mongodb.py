@@ -2,6 +2,16 @@
 Stores to read/write data to from/to mongodb using pymongo.
 """
 
+import logging
+from typing import TYPE_CHECKING
+
+import pymongo
+import six
+from pymongo import ASCENDING, DESCENDING
+from pyramid.request import Request
+# noinspection PyPackageRequirements
+from pywps import Process as ProcessWPS
+
 from weaver.datatype import Bill, Job, Process, Quote, Service
 from weaver.exceptions import (
     BillInstanceError,
@@ -36,16 +46,6 @@ from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, map_status
 from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices
 from weaver.utils import get_base_url, get_sane_name, get_weaver_url, islambda, now
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC, VISIBILITY_VALUES
-
-import pymongo
-import six
-from pymongo import ASCENDING, DESCENDING
-from pyramid.request import Request
-# noinspection PyPackageRequirements
-from pywps import Process as ProcessWPS
-
-import logging
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from weaver.typedefs import AnyValue, AnyProcess, AnyProcessType                # noqa: F401

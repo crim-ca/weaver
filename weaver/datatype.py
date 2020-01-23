@@ -1,6 +1,17 @@
 """
 Definitions of types used by tokens.
 """
+import traceback
+import uuid
+from datetime import datetime, timedelta
+from logging import ERROR, INFO, getLevelName, getLogger
+from typing import TYPE_CHECKING
+
+import six
+from dateutil.parser import parse as dt_parse  # noqa
+from owslib.wps import WPSException
+from pywps import Process as ProcessWPS
+
 from weaver.exceptions import ProcessInstanceError
 from weaver.processes.types import PROCESS_WITH_MAPPING, PROCESS_WPS
 from weaver.status import (
@@ -16,17 +27,6 @@ from weaver.utils import fully_qualified_name, get_job_log_msg, get_log_date_fmt
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_VALUES
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
-
-import six
-from dateutil.parser import parse as dt_parse  # noqa
-from owslib.wps import WPSException
-from pywps import Process as ProcessWPS
-
-import traceback
-import uuid
-from datetime import datetime, timedelta
-from logging import ERROR, INFO, getLevelName, getLogger
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from weaver.typedefs import AnySettingsContainer, Number, LoggerType, CWL, JSON       # noqa: F401
@@ -826,16 +826,16 @@ class Process(Base):
         # type: () -> ProcessWPS
 
         # import here to avoid circular dependencies
-        from weaver.processes import process_mapping
+        from weaver.processes import PROCESS_MAPPING
 
         process_key = self.type
         if self.type == PROCESS_WPS:
             process_key = self.identifier
-        if process_key not in process_mapping:
+        if process_key not in PROCESS_MAPPING:
             ProcessInstanceError("Unknown process '{}' in mapping.".format(process_key))
         if process_key in PROCESS_WITH_MAPPING:
-            return process_mapping[process_key](**self.params_wps)
-        return process_mapping[process_key]()
+            return PROCESS_MAPPING[process_key](**self.params_wps)
+        return PROCESS_MAPPING[process_key]()
 
 
 class Quote(Base):

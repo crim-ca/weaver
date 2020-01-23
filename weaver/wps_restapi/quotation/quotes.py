@@ -1,3 +1,10 @@
+import logging
+import random
+from datetime import timedelta
+
+from duration import to_iso8601
+from pyramid.httpexceptions import HTTPBadRequest, HTTPCreated, HTTPNotFound, HTTPOk
+
 from weaver import sort
 from weaver.config import WEAVER_CONFIGURATION_ADES, WEAVER_CONFIGURATION_EMS, get_weaver_configuration
 from weaver.database import get_db
@@ -10,13 +17,6 @@ from weaver.utils import get_settings, get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.processes import submit_local_job
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
-
-from duration import to_iso8601
-from pyramid.httpexceptions import HTTPBadRequest, HTTPCreated, HTTPNotFound, HTTPOk
-
-import logging
-import random
-from datetime import timedelta
 
 LOGGER = logging.getLogger(__name__)
 

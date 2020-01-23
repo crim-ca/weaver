@@ -1,10 +1,5 @@
-from weaver.__meta__ import __version__ as weaver_version
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN
-from weaver.owsexceptions import OWSException
-from weaver.utils import get_header, get_settings, get_weaver_url
-from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.colander_extras import CustomTypeConversionDispatcher
-from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, get_wps_restapi_base_url, wps_restapi_base_path
+import logging
+from typing import TYPE_CHECKING, AnyStr, Optional
 
 import six
 from cornice.service import get_services
@@ -27,9 +22,13 @@ from pyramid.settings import asbool
 from simplejson import JSONDecodeError
 from six.moves.urllib.parse import urlparse
 
-import logging
-import os
-from typing import TYPE_CHECKING, AnyStr, Optional
+from weaver.__meta__ import __version__ as weaver_version
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN
+from weaver.owsexceptions import OWSException
+from weaver.utils import get_header, get_settings, get_weaver_url
+from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.colander_extras import CustomTypeConversionDispatcher
+from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, get_wps_restapi_base_url, wps_restapi_base_path
 
 if TYPE_CHECKING:
     from weaver.typedefs import JSON    # noqa: F401
@@ -69,7 +68,7 @@ def api_frontpage(request):
         weaver_links.append({"href": weaver_api_def, "rel": "service", "type": CONTENT_TYPE_APP_JSON,
                              "title": "API definition of this service."})
     if isinstance(weaver_api_doc, six.string_types):
-        if "." in weaver_api_doc:
+        if "." in weaver_api_doc:   # noqa: E1135
             ext_type = weaver_api_doc.split(".")[-1]
             doc_type = "application/{}".format(ext_type)
         else:

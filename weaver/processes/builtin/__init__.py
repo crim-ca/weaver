@@ -1,3 +1,16 @@
+import logging
+import os
+from importlib import import_module
+from string import Template
+from typing import TYPE_CHECKING
+
+import six
+from cwltool.command_line_tool import CommandLineTool
+from cwltool.docker import DockerCommandLineJob
+from cwltool.job import CommandLineJob, JobBase
+from cwltool.singularity import SingularityCommandLineJob
+from pyramid_celery import celery_app as app
+
 from weaver import WEAVER_ROOT_DIR
 from weaver.database import get_db
 from weaver.datatype import Process
@@ -10,19 +23,6 @@ from weaver.utils import clean_json_text_body, ows_context_href
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps import get_wps_url
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
-
-import six
-from cwltool.command_line_tool import CommandLineTool
-from cwltool.docker import DockerCommandLineJob
-from cwltool.job import CommandLineJob, JobBase
-from cwltool.singularity import SingularityCommandLineJob
-from pyramid_celery import celery_app as app
-
-import logging
-import os
-from importlib import import_module
-from string import Template
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from weaver.typedefs import AnyDatabaseContainer, CWL   # noqa: F401
@@ -172,6 +172,6 @@ class BuiltinProcess(CommandLineTool):
         job = super(BuiltinProcess, self).make_job_runner(runtime_context)
         if issubclass(job, DockerCommandLineJob):
             return BuiltinProcessJobDocker
-        elif issubclass(job, SingularityCommandLineJob):
+        if issubclass(job, SingularityCommandLineJob):
             return BuiltinProcessJobSingularity
         return BuiltinProcessJobBase

@@ -1,3 +1,18 @@
+import os
+from typing import AnyStr, Optional, Tuple, Union
+
+import requests
+import six
+from celery.utils.log import get_task_logger
+from lxml import etree
+from owslib.wps import WPSExecution
+from pyramid.httpexceptions import HTTPBadRequest, HTTPNotFound, HTTPOk, HTTPUnauthorized
+from pyramid.request import Request
+from pyramid.settings import asbool
+from pyramid_celery import celery_app as app
+from requests_file import FileAdapter
+from six.moves.urllib.parse import urlparse
+
 from weaver import sort, status
 from weaver.database import get_db
 from weaver.datatype import Job
@@ -17,21 +32,6 @@ from weaver.wps import get_wps_output_dir, get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.notify import encrypt_email
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
-
-import requests
-import six
-from celery.utils.log import get_task_logger
-from lxml import etree
-from owslib.wps import WPSExecution
-from pyramid.httpexceptions import HTTPBadRequest, HTTPNotFound, HTTPOk, HTTPUnauthorized
-from pyramid.request import Request
-from pyramid.settings import asbool
-from pyramid_celery import celery_app as app
-from requests_file import FileAdapter
-from six.moves.urllib.parse import urlparse
-
-import os
-from typing import AnyStr, Optional, Tuple, Union
 
 LOGGER = get_task_logger(__name__)
 
@@ -64,12 +64,12 @@ def check_status(url=None, response=None, sleep_secs=2, verify=False):
                 dir_path = get_wps_output_dir(app)
                 wps_out_url = get_wps_output_url(app)
                 req_out_url = get_url_without_query(url)
-                out_path = os.path.join(dir_path, req_out_url.replace(wps_out_url, "").lstrip('/'))
+                out_path = os.path.join(dir_path, req_out_url.replace(wps_out_url, "").lstrip("/"))
             else:
                 out_path = url.replace("file:://", "")
             if not os.path.isfile(out_path):
                 raise HTTPNotFound("Could not find file resource from [{}].".format(url))
-            xml = open(out_path, 'r').read()
+            xml = open(out_path, "r").read()
     else:
         raise Exception("you need to provide a status-location url or response object.")
     if isinstance(xml, six.string_types):
@@ -166,7 +166,7 @@ def get_queried_jobs(request):
         "page": page,
         "limit": limit,
         # split by comma and filter empty stings
-        "tags": list(filter(lambda s: s, request.params.get("tags", "").split(','))),
+        "tags": list(filter(lambda s: s, request.params.get("tags", "").split(","))),
         "access": request.params.get("access", None),
         "status": request.params.get("status", None),
         "sort": request.params.get("sort", sort.SORT_CREATED),

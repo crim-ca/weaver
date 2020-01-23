@@ -69,6 +69,7 @@ disable=C0111,missing-docstring,
         E0401,import-error,
         R0201,no-self-use
         R0205,useless-object-inheritance,
+        R0901,too-many-ancestors,
         R0904,too-many-public-methods,
         R0912,too-many-branches,
         R0914,too-many-locals,
@@ -359,7 +360,7 @@ function-naming-style=snake_case
 #function-rgx=
 
 # Good variable names which should always be accepted, separated by a comma.
-good-names=i,j,k,v,kv,ex,x,y,z,f,h,db,kw,dt,q,_
+good-names=i,j,k,v,kv,ex,x,y,z,f,h,db,kw,dt,q,ns,_
 
 # Include a hint for the correct naming format with invalid-name.
 include-naming-hint=no

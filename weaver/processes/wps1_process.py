@@ -1,3 +1,10 @@
+import logging
+from time import sleep
+from typing import TYPE_CHECKING, AnyStr
+
+import requests
+from owslib.wps import ComplexDataInput, WebProcessingService, WPSException
+
 from weaver import status
 from weaver.execute import EXECUTE_MODE_ASYNC
 from weaver.owsexceptions import OWSNoApplicableCode
@@ -13,13 +20,6 @@ from weaver.utils import (
     wait_secs
 )
 from weaver.wps_restapi.jobs.jobs import check_status
-
-import requests
-from owslib.wps import ComplexDataInput, WebProcessingService, WPSException
-
-import logging
-from time import sleep
-from typing import TYPE_CHECKING, AnyStr
 
 if TYPE_CHECKING:
     from weaver.typedefs import UpdateStatusPartialFunction     # noqa: F401

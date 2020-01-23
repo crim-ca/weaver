@@ -1,3 +1,9 @@
+import unittest
+
+import pytest
+# use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
+from webtest import TestApp as WebTestApp
+
 from tests.utils import get_test_weaver_app, setup_config_with_mongodb
 from weaver import main
 from weaver.config import WEAVER_CONFIGURATION_DEFAULT
@@ -10,12 +16,6 @@ from weaver.wps_restapi.swagger_definitions import (
     jobs_full_uri,
     jobs_short_uri
 )
-
-import pytest
-# use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
-from webtest import TestApp as WebTestApp
-
-import unittest
 
 public_routes = [
     api_frontpage_uri,

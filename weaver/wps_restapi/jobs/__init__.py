@@ -1,8 +1,8 @@
+import logging
+
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs import jobs as j
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
-
-import logging
 
 LOGGER = logging.getLogger(__name__)
 
