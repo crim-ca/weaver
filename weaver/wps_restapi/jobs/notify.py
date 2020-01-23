@@ -61,7 +61,7 @@ Weaver
 """
 
 
-def notify_job_complete(job, to, container):
+def notify_job_complete(job, to_email_recipient, container):
     # type: (Job, str, AnySettingsContainer) -> None
     """
     Send email notification of a job completion.
@@ -97,8 +97,8 @@ def notify_job_complete(job, to, container):
                           format(process_name, default_name))
 
     job_json = job.json(settings)
-    contents = template.render(to=to, job=job, settings=settings, **job_json)
-    message = u'{}'.format(contents).strip(u'\n')
+    contents = template.render(to=to_email_recipient, job=job, settings=settings, **job_json)
+    message = u"{}".format(contents).strip(u"\n")
 
     if ssl:
         server = smtplib.SMTP_SSL(smtp_host, port)
@@ -114,12 +114,12 @@ def notify_job_complete(job, to, container):
     try:
         if password:
             server.login(from_addr, password)
-        result = server.sendmail(from_addr, to, message.encode("utf8"))
+        result = server.sendmail(from_addr, to_email_recipient, message.encode("utf8"))
     finally:
         server.close()
 
     if result:
-        code, error_message = result[to]
+        code, error_message = result[to_email_recipient]
         raise IOError("Code: {}, Message: {}".format(code, error_message))
 
 

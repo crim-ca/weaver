@@ -16,7 +16,6 @@ if TYPE_CHECKING:
     from webtest.response import TestResponse
     from pywps.app import WPSRequest
     from pywps import Process as ProcessWPS
-    from logging import Logger as LoggerType  # noqa
     from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, Type, Union  # noqa: F401
     import lxml.etree
     import os

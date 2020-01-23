@@ -13,7 +13,6 @@ from requests import Request as RequestsRequest
 LOGGER = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from weaver.typedefs import LoggerType
     from typing import Any, AnyStr, Callable, Type
 
 
@@ -201,7 +200,7 @@ class BillInstanceError(BillException):
 
 def log_unhandled_exceptions(logger=LOGGER, message="Unhandled exception occurred.", exception=Exception,
                              force=False, require_http=True, is_request=True):
-    # type: (LoggerType, AnyStr, Type[Exception], bool, bool, bool) -> Callable
+    # type: (logging.Logger, AnyStr, Type[Exception], bool, bool, bool) -> Callable
     """
     Decorator that will raise ``exception`` with specified ``message`` if an exception is caught while execution the
     wrapped function, after logging relevant details about the caught exception with ``logger``.

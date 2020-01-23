@@ -3,7 +3,7 @@ import logging
 import os
 import shutil
 import tempfile
-from collections import Hashable, OrderedDict
+from collections import Hashable, OrderedDict   # pylint: disable=E0611,no-name-in-module   # moved to .abc in Python 3
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
@@ -69,6 +69,7 @@ from weaver.status import (
     STATUS_SUCCEEDED,
     map_status
 )
+from weaver.processes.utils import map_progress
 from weaver.utils import (
     bytes2str,
     get_any_id,
@@ -178,7 +179,7 @@ WPS_FIELD_MAPPING = {
 WPS_FIELD_FORMAT = ["formats", "supported_formats", "supported_values", "default"]
 
 # default format if missing (minimal requirement of one)
-DefaultFormat = Format(mime_type=CONTENT_TYPE_TEXT_PLAIN)
+DefaultFormat = Format(mime_type=CONTENT_TYPE_TEXT_PLAIN)   # pylint: disable=C0103,invalid-name
 DEFAULT_FORMAT_MISSING = "__DEFAULT_FORMAT_MISSING__"
 setattr(DefaultFormat, DEFAULT_FORMAT_MISSING, True)
 
@@ -240,7 +241,7 @@ def get_package_workflow_steps(package_dict_or_url):
             step_package_ref = workflow_steps[step].get("run")
             # if a local file reference was specified, convert it to process id
             package_ref_name, package_ref_ext = os.path.splitext(step_package_ref)
-            if urlparse(step_package_ref).scheme == "" and package_ref_ext.replace('.', '') in PACKAGE_EXTENSIONS:
+            if urlparse(step_package_ref).scheme == "" and package_ref_ext.replace(".", "") in PACKAGE_EXTENSIONS:
                 step_package_ref = package_ref_name
             workflow_steps_ids.append({"name": step, "reference": step_package_ref})
     return workflow_steps_ids
@@ -262,7 +263,7 @@ def _get_process_package(process_url):
         raise _package_not_found_error(str(process_url))
 
     package_url = "{}/package".format(process_url)
-    package_name = process_url.split('/')[-1]
+    package_name = process_url.split("/")[-1]
     package_resp = requests.get(package_url, headers={"Accept": CONTENT_TYPE_APP_JSON}, verify=False)
     if package_resp.status_code != HTTPOk.code:
         raise _package_not_found_error(package_url)
@@ -359,7 +360,7 @@ def _check_package_file(cwl_file_path_or_url):
         if not os.path.isfile(cwl_path):
             raise PackageRegistrationError("Cannot find CWL file at: '{}'.".format(cwl_path))
 
-    file_ext = os.path.splitext(cwl_path)[1].replace('.', '')
+    file_ext = os.path.splitext(cwl_path)[1].replace(".", "")
     if file_ext not in PACKAGE_EXTENSIONS:
         raise PackageRegistrationError("Not a valid CWL file type: '{}'.".format(file_ext))
     return cwl_path, is_url
@@ -376,7 +377,7 @@ def _load_package_file(file_path):
         if is_url:
             cwl_resp = requests.get(file_path, headers={"Accept": CONTENT_TYPE_TEXT_PLAIN})
             return yaml.safe_load(cwl_resp.content)
-        with open(file_path, 'r') as f:
+        with open(file_path, "r") as f:
             return yaml.safe_load(f)
     except ScannerError as ex:
         raise PackageRegistrationError("Package parsing generated an error: [{!s}]".format(ex))
@@ -525,16 +526,16 @@ def _is_cwl_enum_type(io_info):
         return False, io_type, MODE.NONE, None
 
     if "symbols" not in io_type:
-        raise PackageTypeError("Unsupported I/O 'enum' definition: '{}'.".format(repr(io_info)))
+        raise PackageTypeError("Unsupported I/O 'enum' definition: '{!r}'.".format(io_info))
     io_allow = io_type["symbols"]
     if not isinstance(io_allow, list) or len(io_allow) < 1:
-        raise PackageTypeError("Invalid I/O 'enum.symbols' definition: '{}'.".format(repr(io_info)))
+        raise PackageTypeError("Invalid I/O 'enum.symbols' definition: '{!r}'.".format(io_info))
 
     # validate matching types in allowed symbols and convert to supported CWL type
     first_allow = io_allow[0]
-    for e in io_allow:
-        if type(e) is not type(first_allow):
-            raise PackageTypeError("Ambiguous types in I/O 'enum.symbols' definition: '{}'.".format(repr(io_info)))
+    for io_i in io_allow:
+        if type(io_i) is not type(first_allow):
+            raise PackageTypeError("Ambiguous types in I/O 'enum.symbols' definition: '{!r}'.".format(io_info))
     if isinstance(first_allow, six.string_types):
         io_type = "string"
     elif isinstance(first_allow, float):
@@ -542,8 +543,8 @@ def _is_cwl_enum_type(io_info):
     elif isinstance(first_allow, int):
         io_type = "int"
     else:
-        raise PackageTypeError("Unsupported I/O 'enum' base type: `{0}`, from definition: `{1}`."
-                               .format(str(type(first_allow)), repr(io_info)))
+        raise PackageTypeError("Unsupported I/O 'enum' base type: `{!s}`, from definition: `{!r}`."
+                               .format(type(first_allow), io_info))
 
     # allowed value validator mode must be set for input
     return True, io_type, MODE.SIMPLE, io_allow
@@ -570,7 +571,7 @@ def _cwl2wps_io(io_info, io_select):
         io_complex = ComplexOutput      # type: Union[Type[ComplexInput], Type[ComplexOutput]]
         # io_bbox = BoundingBoxOutput     # type: Union[Type[BoundingBoxInput], Type[BoundingBoxOutput]]
     else:
-        raise PackageTypeError("Unsupported I/O info definition: '{}' with '{}'.".format(repr(io_info), io_select))
+        raise PackageTypeError("Unsupported I/O info definition: '{!r}' with '{}'.".format(io_info, io_select))
 
     io_name = io_info["name"]
     io_type = io_info["type"]
@@ -580,8 +581,8 @@ def _cwl2wps_io(io_info, io_select):
     # obtain real type if "default" or shorthand "<type>?" was in CWL, which defines "type" as `["null", <type>]`
     if isinstance(io_type, list) and "null" in io_type:
         if not len(io_type) == 2:
-            raise PackageTypeError("Unsupported I/O type parsing for info: '{}' with '{}'."
-                                   .format(repr(io_info), io_select))
+            raise PackageTypeError("Unsupported I/O type parsing for info: '{!r}' with '{}'."
+                                   .format(io_info, io_select))
         LOGGER.debug("I/O parsed for 'default'")
         io_type = io_type[1] if io_type[0] == "null" else io_type[0]
         io_info["type"] = io_type
@@ -660,7 +661,7 @@ def _cwl2wps_io(io_info, io_select):
                 kw["as_reference"] = True
             if io_type == "File":
                 has_contents = io_info.get("contents") is not None
-                kw["as_reference"] = False if has_contents else True
+                kw["as_reference"] = not has_contents
         else:
             # note:
             #   value of 'data_format' is identified as 'default' input format if specified with `Format`
@@ -1159,8 +1160,8 @@ def transform_json(json_data,               # type: ANY_IO_Type
             json_data[v] = json_data.pop(k)
 
     # remove
-    for r in remove:
-        json_data.pop(r, None)
+    for r_k in remove:
+        json_data.pop(r_k, None)
 
     # add
     for k, v in add.items():
@@ -1376,7 +1377,7 @@ def _any2cwl_io(wps_io, io_select):
                 cwl_io_ref, cwl_io_fmt, cwl_io_ext = _get_cwl_fmt_details(fmt)
                 cwl_ns.update(cwl_io_ref)
                 break
-            elif isinstance(fmt, list):
+            if isinstance(fmt, list):
                 if len(fmt) == 1:
                     cwl_io_ref, cwl_io_fmt, cwl_io_ext = _get_cwl_fmt_details(fmt[0])
                     cwl_ns.update(cwl_io_ref)
@@ -1429,7 +1430,7 @@ def _xml_wps2cwl(wps_process_response):
         """Obtains ``tag`` from a ``{namespace}Tag`` `XML` element."""
         if hasattr(_xml, "tag"):
             _xml = _xml.tag
-        return _xml.split('}')[-1].lower()
+        return _xml.split("}")[-1].lower()
 
     # look for `XML` structure starting at `ProcessDescription` (WPS-1)
     xml_resp = lxml.etree.fromstring(str2bytes(wps_process_response.content))   # Python 3 content is str, must be bytes
@@ -1438,8 +1439,8 @@ def _xml_wps2cwl(wps_process_response):
         raise ValueError("Could not retrieve a valid 'ProcessDescription' from WPS-1 response.")
     process_id = None
     for sub_xml in xml_wps_process[0]:
-        tn = _tag_name(sub_xml)
-        if tn == "identifier":
+        tag = _tag_name(sub_xml)
+        if tag == "identifier":
             process_id = sub_xml.text
             break
     if not process_id:
@@ -1553,14 +1554,14 @@ def get_process_definition(process_offering, reference=None, package=None, data_
 
     def try_or_raise_package_error(call, reason):
         try:
-            LOGGER.debug("Attempting: [{}].".format(reason))
+            LOGGER.debug("Attempting: [%s].", reason)
             return call()
         except Exception as exc:
             # re-raise any exception already handled by a "package" error as is, but with a more detailed message
             # handle any other sub-exception that wasn't processed by a "package" error as a registration error
             package_errors = (PackageRegistrationError, PackageTypeError, PackageRegistrationError, PackageNotFound)
             exc_type = type(exc) if isinstance(exc, package_errors) else PackageRegistrationError
-            exc_msg = exc.message if hasattr(exc, "message") else str(exc)
+            exc_msg = str(exc)
             LOGGER.exception(exc_msg)
             raise exc_type("Invalid package/reference definition. {0} generated error: [{1!r}].".format(reason, exc))
 
@@ -1580,7 +1581,7 @@ def get_process_definition(process_offering, reference=None, package=None, data_
     if "class" not in package:
         raise PackageRegistrationError("Cannot obtain process type from package class.")
 
-    LOGGER.debug("Using data source: '{}'".format(data_source))
+    LOGGER.debug("Using data source: '%s'", data_source)
     package_factory, process_type, _ = try_or_raise_package_error(
         lambda: _load_package_content(package, data_source=data_source, process_offering=process_info),
         reason="Loading package content")
@@ -1615,17 +1616,18 @@ def get_process_definition(process_offering, reference=None, package=None, data_
 
 
 class WpsPackage(Process):
+    # defined on __init__ call
     package = None              # type: Optional[CWL]
+    # defined only after _handler is called (or sub-methods)
     package_id = None           # type: Optional[AnyStr]
-    job_file = None             # type: Optional[AnyStr]
-    log_file = None             # type: Optional[AnyStr]
-    log_level = logging.INFO
-    logger = None
-    tmp_dir = None              # type: Optional[AnyStr]
     percent = None              # type: Optional[Number]
-
-    step_package = None         # type: Optional[List[CWL]]
+    log_file = None             # type: Optional[AnyStr]
+    log_level = logging.INFO    # type: int
+    logger = None               # type: Optional[logging.Logger]
+    step_packages = None        # type: Optional[List[CWL]]
     step_launched = None        # type: Optional[List[AnyStr]]
+    request = None              # type: Optional[WPSRequest]
+    response = None             # type: Optional[ExecuteResponse]
 
     def __init__(self, **kw):
         """
@@ -1707,7 +1709,7 @@ class WpsPackage(Process):
         # type: (AnyStr, Number, Number, Number, AnyStr, AnyValue, AnyStr) -> None
         self.update_status(
             message="{0} [{1}] - {2}".format(target_host, step_name, str(message).strip()),
-            progress=self.map_progress(progress, start_step_progress, end_step_progress),
+            progress=map_progress(progress, start_step_progress, end_step_progress),
             status=status,
         )
 
@@ -1724,17 +1726,11 @@ class WpsPackage(Process):
                          level=logging.ERROR)
         return exception_type("{0}{1}".format(message, exception_msg))
 
-    @staticmethod
-    def map_progress(progress, range_min, range_max):
-        # type: (Number, Number, Number) -> Number
-        """Calculates the relative progression of the percentage process within min/max values."""
-        return max(range_min, min(range_max, range_min + (progress * (range_max - range_min)) / 100))
-
     @classmethod
     def map_step_progress(cls, step_index, steps_total):
         # type: (int, int) -> Number
         """Calculates the percentage progression of a single step of the full process."""
-        return cls.map_progress(100 * step_index / steps_total, PACKAGE_PROGRESS_RUN_CWL, PACKAGE_PROGRESS_CWL_DONE)
+        return map_progress(100 * step_index / steps_total, PACKAGE_PROGRESS_RUN_CWL, PACKAGE_PROGRESS_CWL_DONE)
 
     @staticmethod
     def make_location_input(input_location, input_type, input_definition):
@@ -1786,11 +1782,11 @@ class WpsPackage(Process):
                 self.step_launched = []
 
             except Exception as ex:
-                raise PackageRegistrationError("Exception occurred on package instantiation: '{}'".format(repr(ex)))
+                raise PackageRegistrationError("Exception occurred on package instantiation: '{!r}'".format(ex))
             self.update_status("Loading package content done.", PACKAGE_PROGRESS_LOADING, STATUS_RUNNING)
 
             try:
-                cwl_input_info = dict([(i["name"], i) for i in package_inst.t.inputs_record_schema["fields"]])
+                cwl_input_info = {i["name"]: i for i in package_inst.t.inputs_record_schema["fields"]}
                 self.update_status("Retrieve package inputs done.", PACKAGE_PROGRESS_GET_INPUT, STATUS_RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed retrieving package input types.")
@@ -1861,7 +1857,6 @@ class WpsPackage(Process):
                 self.update_status("Generate package outputs done.", PACKAGE_PROGRESS_PREP_OUT, STATUS_RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed to save package outputs.")
-        # noinspection PyBroadException
         except Exception:
             # return log file location by status message since outputs are not obtained by WPS failed process
             error_msg = "Package completed with errors. Server logs: {}".format(self.log_file)
@@ -1922,12 +1917,14 @@ class WpsPackage(Process):
         app_hints = list(filter(lambda h: any(h["class"].endswith(t) for t in CWL_REQUIREMENT_APP_TYPES), all_hints))
         if len(app_hints) > 1:
             raise ValueError("Package 'requirements' and/or 'hints' define too many conflicting values: {}, "
-                             "only one permitted amongst {}.".format(list(app_hints), list(CWL_REQUIREMENT_APP_TYPES)))
+                             "only one permitted amongst {}.".format(app_hints, list(CWL_REQUIREMENT_APP_TYPES)))
         requirement = app_hints[0] if app_hints else {"class": ""}
-        if requirement["class"].endswith(CWL_REQUIREMENT_APP_WPS1):
+        req_class = requirement["class"]
+        if req_class.endswith(CWL_REQUIREMENT_APP_WPS1):
+            LOGGER.info("WPS-1 Package resolved from requirement/hint: %s", req_class)
             req_params = ["provider", "process"]
-            if not all(r in requirement for r in ["provider", "process"]):
-                raise ValueError("Missing requirement [{}] details amongst {}".format(requirement["class"], req_params))
+            if not all(req in requirement for req in ["provider", "process"]):
+                raise ValueError("Missing requirement [{}] details amongst {}".format(req_class, req_params))
             provider = requirement["provider"]
             # The process id of the provider isn't required to be the same as the one use in the EMS
             process = requirement["process"]
@@ -1936,11 +1933,13 @@ class WpsPackage(Process):
                                process=process,
                                request=self.request,
                                update_status=_update_status_dispatch)
-        elif requirement["class"].endswith(CWL_REQUIREMENT_APP_ESGF_CWT):
+        elif req_class.endswith(CWL_REQUIREMENT_APP_ESGF_CWT):
+            LOGGER.info("ESGF-CWT Package resolved from requirement/hint: %s", req_class)
             # TODO: implement
             raise NotImplementedError("ESGF-CWTRequirement not implemented")
         else:
             # implements both `PROCESS_APPLICATION` with `CWL_REQUIREMENT_APP_DOCKER` and `PROCESS_WORKFLOW`
+            LOGGER.info("WPS-3 Package resolved from requirement/hint: %s", req_class)
             from weaver.processes.wps3_process import Wps3Process
             return Wps3Process(step_payload=step_payload,
                                joborder=joborder,

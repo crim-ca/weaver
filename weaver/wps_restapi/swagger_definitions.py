@@ -19,10 +19,10 @@ from weaver.execute import (
     EXECUTE_MODE_AUTO,
     EXECUTE_RESPONSE_RAW,
     EXECUTE_TRANSMISSION_MODE_REFERENCE,
-    execute_control_options,
-    execute_mode_options,
-    execute_response_options,
-    execute_transmission_mode_options
+    EXECUTE_CONTROL_OPTIONS,
+    EXECUTE_MODE_OPTIONS,
+    EXECUTE_RESPONSE_OPTIONS,
+    EXECUTE_TRANSMISSION_MODE_OPTIONS
 )
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_HTML, CONTENT_TYPE_TEXT_PLAIN
 from weaver.owsexceptions import OWSMissingParameterValue
@@ -38,7 +38,7 @@ from weaver.wps_restapi.colander_extras import (
 from weaver.wps_restapi.utils import wps_restapi_base_path
 
 
-class SchemaNode(SchemaNodeDefault):    # pylint: disable=W0223,abstract-method
+class SchemaNode(SchemaNodeDefault):
     """
     Override the default :class:`colander.SchemaNode` to auto-handle ``default`` value substitution if an
     actual value was omitted during deserialization for a field defined with this schema and a ``default`` parameter.
@@ -46,6 +46,9 @@ class SchemaNode(SchemaNodeDefault):    # pylint: disable=W0223,abstract-method
     .. seealso::
         Implementation in :class:`SchemaNodeDefault`.
     """
+    @staticmethod
+    def schema_type():
+        raise NotImplementedError
 
 
 class SequenceSchema(DropableNoneSchema, SeqSchema):
@@ -53,6 +56,7 @@ class SequenceSchema(DropableNoneSchema, SeqSchema):
     Override the default :class:`colander.SequenceSchema` to auto-handle dropping missing entry definitions
     when its value is either ``None``, :class:`colander.null` or :class:`colander.drop`.
     """
+    schema_type = SeqSchema.schema_type
 
 
 class MappingSchema(DropableNoneSchema, MapSchema):
@@ -60,6 +64,7 @@ class MappingSchema(DropableNoneSchema, MapSchema):
     Override the default :class:`colander.MappingSchema` to auto-handle dropping missing field definitions
     when the corresponding value is either ``None``, :class:`colander.null` or :class:`colander.drop`.
     """
+    schema_type = MapSchema.schema_type
 
 
 class ExplicitMappingSchema(MapSchema):
@@ -475,63 +480,68 @@ class OutputDescriptionList(SequenceSchema):
 
 
 class JobExecuteModeEnum(SchemaNode):
-    # noinspection PyUnusedLocal
-    def __init__(self, *args, **kwargs):
+    schema_type = String
+
+    def __init__(self, *args, **kwargs):    # noqa: E811
         kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(JobExecuteModeEnum, self).__init__(
-            String(),
+            self.schema_type(),
             title=kwargs.get("title", "mode"),
             default=kwargs.get("default", EXECUTE_MODE_AUTO),
             example=kwargs.get("example", EXECUTE_MODE_ASYNC),
-            validator=OneOf(list(execute_mode_options)),
+            validator=OneOf(list(EXECUTE_MODE_OPTIONS)),
             **kwargs)
 
 
 class JobControlOptionsEnum(SchemaNode):
-    # noinspection PyUnusedLocal
-    def __init__(self, *args, **kwargs):
+    schema_type = String
+
+    def __init__(self, *args, **kwargs):    # noqa: E811
         kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(JobControlOptionsEnum, self).__init__(
-            String(),
+            self.schema_type(),
             title="jobControlOptions",
             default=kwargs.get("default", EXECUTE_CONTROL_OPTION_ASYNC),
             example=kwargs.get("example", EXECUTE_CONTROL_OPTION_ASYNC),
-            validator=OneOf(list(execute_control_options)),
+            validator=OneOf(list(EXECUTE_CONTROL_OPTIONS)),
             **kwargs)
 
 
 class JobResponseOptionsEnum(SchemaNode):
-    # noinspection PyUnusedLocal
-    def __init__(self, *args, **kwargs):
+    schema_type = String
+
+    def __init__(self, *args, **kwargs):    # noqa: E811
         kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(JobResponseOptionsEnum, self).__init__(
-            String(),
+            self.schema_type(),
             title=kwargs.get("title", "response"),
             default=kwargs.get("default", EXECUTE_RESPONSE_RAW),
             example=kwargs.get("example", EXECUTE_RESPONSE_RAW),
-            validator=OneOf(list(execute_response_options)),
+            validator=OneOf(list(EXECUTE_RESPONSE_OPTIONS)),
             **kwargs)
 
 
 class TransmissionModeEnum(SchemaNode):
-    # noinspection PyUnusedLocal
-    def __init__(self, *args, **kwargs):
+    schema_type = String
+
+    def __init__(self, *args, **kwargs):    # noqa: E811
         kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(TransmissionModeEnum, self).__init__(
-            String(),
+            self.schema_type(),
             title=kwargs.get("title", "transmissionMode"),
             default=kwargs.get("default", EXECUTE_TRANSMISSION_MODE_REFERENCE),
             example=kwargs.get("example", EXECUTE_TRANSMISSION_MODE_REFERENCE),
-            validator=OneOf(list(execute_transmission_mode_options)),
+            validator=OneOf(list(EXECUTE_TRANSMISSION_MODE_OPTIONS)),
             **kwargs)
 
 
 class JobStatusEnum(SchemaNode):
-    # noinspection PyUnusedLocal
-    def __init__(self, *args, **kwargs):
+    schema_type = String
+
+    def __init__(self, *args, **kwargs):    # noqa: E811
         kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(JobStatusEnum, self).__init__(
-            String(),
+            self.schema_type(),
             default=kwargs.get("default", None),
             example=kwargs.get("example", STATUS_ACCEPTED),
             validator=OneOf(list(JOB_STATUS_CATEGORIES[STATUS_COMPLIANT_OGC])),
@@ -539,14 +549,28 @@ class JobStatusEnum(SchemaNode):
 
 
 class JobSortEnum(SchemaNode):
-    # noinspection PyUnusedLocal
-    def __init__(self, *args, **kwargs):
+    schema_type = String
+
+    def __init__(self, *args, **kwargs):    # noqa: E811
         kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(JobSortEnum, self).__init__(
             String(),
             default=kwargs.get("default", SORT_CREATED),
             example=kwargs.get("example", SORT_CREATED),
             validator=OneOf(list(JOB_SORT_VALUES)),
+            **kwargs)
+
+
+class QuoteSortEnum(SchemaNode):
+    schema_type = String
+
+    def __init__(self, *args, **kwargs):  # noqa: E811
+        kwargs.pop("validator", None)  # ignore passed argument and enforce the validator
+        super(QuoteSortEnum, self).__init__(
+            self.schema_type(),
+            default=kwargs.get("default", SORT_ID),
+            example=kwargs.get("example", SORT_PROCESS),
+            validator=OneOf(list(QUOTE_SORT_VALUES)),
             **kwargs)
 
 
@@ -896,12 +920,12 @@ class InputList(SequenceSchema):
 class Execute(MappingSchema):
     inputs = InputList(missing=drop)
     outputs = OutputList()
-    mode = SchemaNode(String(), validator=OneOf(list(execute_mode_options)))
+    mode = SchemaNode(String(), validator=OneOf(list(EXECUTE_MODE_OPTIONS)))
     notification_email = SchemaNode(
         String(),
         missing=drop,
         description="Optionally send a notification email when the job is done.")
-    response = SchemaNode(String(), validator=OneOf(list(execute_response_options)))
+    response = SchemaNode(String(), validator=OneOf(list(EXECUTE_RESPONSE_OPTIONS)))
 
 
 class Quotation(MappingSchema):
@@ -1206,18 +1230,6 @@ class ProcessQuotesEndpoint(ProcessPath):
 
 class ProcessQuoteEndpoint(ProcessPath, QuotePath):
     header = AcceptHeader()
-
-
-class QuoteSortEnum(SchemaNode):
-    # noinspection PyUnusedLocal
-    def __init__(self, *args, **kwargs):
-        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
-        super(QuoteSortEnum, self).__init__(
-            String(),
-            default=kwargs.get("default", SORT_ID),
-            example=kwargs.get("example", SORT_PROCESS),
-            validator=OneOf(QUOTE_SORT_VALUES),
-            **kwargs)
 
 
 class GetQuotesQueries(MappingSchema):

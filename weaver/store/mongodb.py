@@ -79,14 +79,13 @@ class MongodbStore(object):
         collection = None
         if len(args):
             collection = args[0]
-        elif "collection" in kwargs:
+        elif "collection" in kwargs:    # pylint: disable=R1715
             collection = kwargs["collection"]
         sane_name_config = kwargs.get("sane_name_config", None)
         return tuple([collection]), {"sane_name_config": sane_name_config}
 
 
 class MongodbServiceStore(StoreServices, MongodbStore):
-    # pylint: disable=W0212,unused-local
     """
     Registry for OWS services. Uses mongodb to store service url and attributes.
     """
@@ -122,7 +121,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
             auth=service.auth).params())
         return self.fetch_by_url(url=service_url, request=request)
 
-    def delete_service(self, name, request=None):
+    def delete_service(self, name, request=None):  # noqa: E811
         # type: (AnyStr, Optional[Request]) -> bool
         """
         Removes service from mongodb storage.
@@ -130,7 +129,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
         self.collection.delete_one({"name": name})
         return True
 
-    def list_services(self, request=None):
+    def list_services(self, request=None):  # noqa: E811  # noqa: E811
         # type: (Optional[Request]) -> List[Service]
         """
         Lists all services in mongodb storage.
@@ -140,7 +139,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
             my_services.append(Service(service))
         return my_services
 
-    def fetch_by_name(self, name, visibility=None, request=None):
+    def fetch_by_name(self, name, visibility=None, request=None):  # noqa: E811
         # type: (AnyStr, Optional[AnyStr], Optional[Request]) -> Service
         """
         Gets service for given ``name`` from mongodb storage.
@@ -155,7 +154,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
             raise ServiceNotAccessible("Service '{}' cannot be accessed.".format(name))
         return service
 
-    def fetch_by_url(self, url, request=None):
+    def fetch_by_url(self, url, request=None):  # noqa: E811
         # type: (AnyStr, Optional[Request]) -> Service
         """
         Gets service for given ``url`` from mongodb storage.
@@ -165,7 +164,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
             raise ServiceNotFound
         return Service(service)
 
-    def clear_services(self, request=None):
+    def clear_services(self, request=None):  # noqa: E811
         # type: (Optional[Request]) -> bool
         """
         Removes all OWS services from mongodb storage.
@@ -253,7 +252,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
             url = self.default_wps_endpoint
         return url
 
-    def save_process(self, process, overwrite=True, request=None):
+    def save_process(self, process, overwrite=True, request=None):  # noqa: E811
         # type: (Union[Process, ProcessWPS], bool, Optional[Request]) -> Process
         """
         Stores a process in storage.
@@ -285,7 +284,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
             raise ProcessNotFound("Process '{}' could not be found.".format(sane_name))
         return bool(self.collection.delete_one({"identifier": sane_name}).deleted_count)
 
-    def list_processes(self, visibility=None, request=None):
+    def list_processes(self, visibility=None, request=None):  # noqa: E811
         # type: (Optional[AnyStr], Optional[Request]) -> List[Process]
         """
         Lists all processes in database, optionally filtered by `visibility`.
@@ -308,7 +307,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
             db_processes.append(Process(process))
         return db_processes
 
-    def fetch_by_id(self, process_id, visibility=None, request=None):
+    def fetch_by_id(self, process_id, visibility=None, request=None):  # noqa: E811
         # type: (AnyStr, Optional[AnyStr], Optional[Request]) -> Process
         """
         Get process for given `process_id` from storage, optionally filtered by `visibility`.
@@ -328,7 +327,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
             raise ProcessNotAccessible("Process '{}' cannot be accessed.".format(sane_name))
         return process
 
-    def get_visibility(self, process_id, request=None):
+    def get_visibility(self, process_id, request=None):  # noqa: E811
         # type: (AnyStr, Optional[Request]) -> AnyStr
         """
         Get `visibility` of a process.
@@ -338,7 +337,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         process = self.fetch_by_id(process_id)
         return process.visibility
 
-    def set_visibility(self, process_id, visibility, request=None):
+    def set_visibility(self, process_id, visibility, request=None):  # noqa: E811
         # type: (AnyStr, AnyStr, Optional[Request]) -> None
         """
         Set `visibility` of a process.
@@ -352,7 +351,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         process.visibility = visibility
         self.save_process(process, overwrite=True)
 
-    def clear_processes(self, request=None):
+    def clear_processes(self, request=None):  # noqa: E811
         # type: (Optional[Request]) -> bool
         """
         Clears all processes from the store.
@@ -364,7 +363,6 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
 
 
 class MongodbJobStore(StoreJobs, MongodbStore):
-    # pylint: disable=W0212,unused-local
     """
     Registry for process jobs tracking. Uses mongodb to store job attributes.
     """
@@ -437,7 +435,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             raise JobUpdateError("Error occurred during job update: [{}]".format(repr(ex)))
         raise JobUpdateError("Failed to update specified job: '{}'".format(str(job)))
 
-    def delete_job(self, job_id, request=None):
+    def delete_job(self, job_id, request=None):  # noqa: E811
         # type: (AnyStr, Optional[Request]) -> bool
         """
         Removes job from mongodb storage.
@@ -445,7 +443,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         self.collection.delete_one({"id": job_id})
         return True
 
-    def fetch_by_id(self, job_id, request=None):
+    def fetch_by_id(self, job_id, request=None):  # noqa: E811
         # type: (AnyStr, Optional[Request]) -> Job
         """
         Gets job for given ``job_id`` from mongodb storage.
@@ -455,7 +453,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             raise JobNotFound("Could not find job matching: '{}'".format(job_id))
         return Job(job)
 
-    def list_jobs(self, request=None):
+    def list_jobs(self, request=None):  # noqa: E811
         # type: (Optional[Request]) -> List[Job]
         """
         Lists all jobs in mongodb storage.
@@ -562,7 +560,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             sort = "user_id"
         if sort not in JOB_SORT_VALUES:
             raise JobNotFound("Invalid sorting method: '{}'".format(repr(sort)))
-        sort_order = DESCENDING if sort == SORT_FINISHED or sort == SORT_CREATED else ASCENDING
+        sort_order = DESCENDING if sort in (SORT_FINISHED, SORT_CREATED) else ASCENDING
         sort_criteria = {sort: sort_order}
 
         # minimal operation, only search for matches and sort them
@@ -598,7 +596,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         total = self.collection.count_documents(search_filters)
         return items, total
 
-    def clear_jobs(self, request=None):
+    def clear_jobs(self, request=None):  # noqa: E811
         # type: (Optional[Request]) -> bool
         """
         Removes all jobs from mongodb storage.

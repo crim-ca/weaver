@@ -13,7 +13,7 @@ import pyramid_celery
 import six
 from pyramid import testing
 from pyramid.config import Configurator
-from pyramid.httpexceptions import HTTPException, HTTPNotFound, HTTPUnprocessableEntity
+from pyramid.httpexceptions import HTTPNotFound, HTTPUnprocessableEntity
 from pyramid.registry import Registry
 from requests import Response
 from six.moves.configparser import ConfigParser
@@ -127,10 +127,8 @@ def setup_mongodb_processstore(config=None):
     store = get_db(config).get_store(MongodbProcessStore)
     store.clear_processes()
     # store must be recreated after clear because processes are added automatically on __init__
-    # noinspection PyProtectedMember
     get_db(config)._stores.pop(MongodbProcessStore.type)
     store = get_db(config).get_store(MongodbProcessStore)
-    # noinspection PyTypeChecker
     return store
 
 
@@ -236,19 +234,12 @@ def init_weaver_service(registry):
     }))
 
 
-def mocked_sub_requests(app, function="get", *args, **kwargs):
+def mocked_sub_requests(app, function, *args, **kwargs):
     """
     Executes ``app.function(*args, **kwargs)`` with a mock of every underlying :function:`requests.request` call
     to relay their execution to the :class:`webTest.TestApp`.
     Generates a `fake` response from a file if the URL scheme is ``mock://``.
     """
-
-    def mocked_raise_for_status(self, *_args, **_kwargs):  # noqa: E811
-        if self.status_code >= 400:
-            err = HTTPException()
-            err.code = self.status_code
-            err.title = "Mocked HTTPException"
-            raise err
 
     def mocked_request(method, url=None, headers=None, verify=None, cert=None, **req_kwargs):  # noqa: E811
         """
@@ -258,9 +249,9 @@ def mocked_sub_requests(app, function="get", *args, **kwargs):
         headers = headers or req_kwargs.get("headers")
         req = getattr(app, method)
         url = req_kwargs.get("base_url", url)
-        qs = req_kwargs.get("params")
-        if qs:
-            url = url + "?" + qs
+        query = req_kwargs.get("params")
+        if query:
+            url = url + "?" + query
         if not url.startswith("mock://"):
             resp = req(url, params=req_kwargs.get("data"), headers=headers)
             setattr(resp, "content", resp.body)

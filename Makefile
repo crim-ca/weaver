@@ -195,7 +195,7 @@ install-raw:	## install without any requirements or dependencies (suppose everyt
 clean: clean-all	## alias for 'clean-all' target
 
 .PHONY: clean-all
-clean-all: clean-build clean-cache clean-docs-dirs clean-src clean-test		## run all cleanup targets
+clean-all: clean-build clean-cache clean-docs-dirs clean-src clean-reports clean-test	## run all cleanup targets
 
 .PHONY: clean-build
 clean-build:	## remove the temporary build files
@@ -232,11 +232,14 @@ clean-src:		## remove all *.pyc files
 	@-rm -rf ./src
 
 .PHONY: clean-test
-clean-test:		## remove files created by code checks, tests, coverage and report
+clean-test:		## remove files created by tests and coverage analysis
 	@echo "Removing test/coverage/report files..."
 	@-rm -f "$(APP_ROOT)/.coverage"
 	@-rm -f "$(APP_ROOT)/coverage.*"
 	@-rm -fr "$(APP_ROOT)/coverage"
+
+.PHONY: clean-reports
+clean-reports:	## remove report files genereated by code checks
 	@-rm -fr "$(REPORTS_DIR)"
 
 .PHONY: clean-dist

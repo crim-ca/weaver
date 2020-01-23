@@ -12,7 +12,6 @@ from requests.exceptions import HTTPError as RequestsHTTPError
 from six.moves.urllib.parse import urlparse
 
 from weaver import status, utils
-from weaver.exceptions import ServiceNotFound
 from weaver.utils import _NullType, null
 
 
@@ -24,15 +23,17 @@ def test_null_operators():
     assert null == n()
     assert null.__class__ == n
     assert null.__class__ == n()
-    assert null != None  # noqa: E711
+    # pylint: disable=C0121,singleton-comparison
+    assert null != None     # noqa: E711
     assert null is not None
     assert bool(null) is False
-    assert null or "not-null" == "not-null"
+    assert (null or "not-null") == "not-null"
 
 
 def test_null_singleton():
     n1 = _NullType()
     n2 = _NullType()
+    # pylint: disable=C0123,unidiomatic-typecheck
     assert type(null) is _NullType
     assert null is n1
     assert null is n2
@@ -45,17 +46,6 @@ def test_is_url_valid():
     assert utils.is_valid_url("file:///my/path") is True
     assert utils.is_valid_url("/my/path") is False
     assert utils.is_valid_url(None) is False
-
-
-def test_parse_service_name():
-    protected_path = "/ows/proxy"
-    assert "emu" == utils.parse_service_name("/ows/proxy/emu", protected_path)
-    assert "emu" == utils.parse_service_name("/ows/proxy/emu/foo/bar", protected_path)
-    assert "emu" == utils.parse_service_name("/ows/proxy/emu/", protected_path)
-    with pytest.raises(ServiceNotFound):
-        assert "emu" == utils.parse_service_name("/ows/proxy/", protected_path)
-    with pytest.raises(ServiceNotFound):
-        assert "emu" == utils.parse_service_name("/ows/nowhere/emu", protected_path)
 
 
 def test_get_url_without_query():
@@ -124,8 +114,7 @@ def test_parse_request_query_basic():
 def test_parse_request_query_many_datainputs_multi_case():
     req = MockRequest("http://localhost:5000/ows/wps?service=wps&request=GetCapabilities&version=1.0.0&" +
                       "datainputs=data1=value1&dataInputs=data2=value2&DataInputs=data3=value3")
-    # noinspection PyTypeChecker
-    queries = utils.parse_request_query(req)
+    queries = utils.parse_request_query(req)  # noqa
     assert "datainputs" in queries
     assert isinstance(queries["datainputs"], dict)
     assert "data1" in queries["datainputs"]
@@ -283,12 +272,11 @@ def test_map_status_pywps_back_and_forth():
         assert status.STATUS_PYWPS_IDS[i] == s
 
 
-# noinspection PyTypeChecker
 def test_get_sane_name_replace():
     kw = {"assert_invalid": False, "max_len": 25}
     assert utils.get_sane_name("Hummingbird", **kw) == "Hummingbird"
     assert utils.get_sane_name("MapMint Demo Instance", **kw) == "MapMint_Demo_Instance"
-    assert utils.get_sane_name(None, **kw) is None
+    assert utils.get_sane_name(None, **kw) is None  # noqa
     assert utils.get_sane_name("12", **kw) is None
     assert utils.get_sane_name(" ab c ", **kw) == "ab_c"
     assert utils.get_sane_name("a_much_to_long_name_for_this_test", **kw) == "a_much_to_long_name_for_t"

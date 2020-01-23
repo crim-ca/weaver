@@ -5,14 +5,14 @@ from pyramid.settings import asbool
 from weaver.wps_restapi import api
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 def includeme(config):
     from weaver.wps_restapi import swagger_definitions as sd
     settings = config.registry.settings
     if asbool(settings.get("weaver.wps_restapi", True)):
-        logger.info("Adding WPS REST API...")
+        LOGGER.info("Adding WPS REST API...")
         config.registry.settings["handle_exceptions"] = False  # avoid cornice conflicting views
         config.include("cornice")
         config.include("cornice_swagger")

@@ -33,7 +33,7 @@ _CONTENT_TYPE_EXTENSION_MAPPING = {
 def get_extension(mime_type):
     # type: (AnyStr) -> AnyStr
     """Retrieves the extension corresponding to ``mime_type`` if explicitly defined, or by simple parsing otherwise."""
-    return _CONTENT_TYPE_EXTENSION_MAPPING.get(mime_type, mime_type.split('/')[-1].replace("x-", ""))
+    return _CONTENT_TYPE_EXTENSION_MAPPING.get(mime_type, mime_type.split("/")[-1].replace("x-", ""))
 
 
 # Mappings for "CWL->File->Format"

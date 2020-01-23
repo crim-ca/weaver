@@ -12,9 +12,7 @@ from weaver.processes.constants import OPENSEARCH_LOCAL_FILE_SCHEME
 from weaver.utils import get_settings
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
-"""
-Schema
-
+DATA_SOURCE_SCHEMA = """
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Data Sources",
@@ -47,7 +45,7 @@ DATA_SOURCES = {}
 
 
 def fetch_data_sources():
-    global DATA_SOURCES
+    global DATA_SOURCES     # pylint: disable=W0603,global-statement
 
     if DATA_SOURCES:
         return DATA_SOURCES
@@ -71,7 +69,7 @@ def fetch_data_sources():
 def get_default_data_source(data_sources):
     # Check for a data source with the default property
     for src, val in data_sources.items():
-        if asbool(val.get('default', False)):
+        if asbool(val.get("default", False)):
             return src
 
     # Use the first one if no default have been set
@@ -91,19 +89,18 @@ def retrieve_data_source_url(data_source):
 
 def get_data_source_from_url(data_url):
     data_sources = fetch_data_sources()
-    # noinspection PyBroadException
     try:
         parsed = urlparse(data_url)
         netloc, path, scheme = parsed.netloc, parsed.path, parsed.scheme
         if netloc:
             for src, val in data_sources.items():
-                if val['netloc'] == netloc:
+                if val["netloc"] == netloc:
                     return src
         elif scheme == OPENSEARCH_LOCAL_FILE_SCHEME:
             # for file links, try to find if any rootdir matches in the file path
             for src, val in data_sources.items():
-                if path.startswith(val['rootdir']):
+                if path.startswith(val["rootdir"]):
                     return src
-    except Exception:
+    except Exception:  # noqa: W0703 # nosec: B110
         pass
     return get_default_data_source(data_sources)

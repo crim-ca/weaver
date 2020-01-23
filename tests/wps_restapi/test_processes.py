@@ -66,6 +66,7 @@ def mock_remote_server_requests_wp1(test):
     return mock_requests_wps1
 
 
+# pylint: disable=C0103,invalid-name
 class WpsRestApiProcessesTest(unittest.TestCase):
     remote_server = None
 
@@ -85,7 +86,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         pyramid.testing.tearDown()
 
     def fully_qualified_test_process_name(self):
-        return fully_qualified_name(self).replace('.', '-')
+        return fully_qualified_name(self).replace(".", "-")
 
     def setUp(self):
         # rebuild clean db on each test
@@ -125,7 +126,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         }
 
     @staticmethod
-    def get_process_execute_template(test_input='not-specified'):
+    def get_process_execute_template(test_input="not-specified"):
         """
         Provides execute process bare minimum template corresponding to
         WPS process `weaver.processes.wps_testing.WpsTestProcess`.
@@ -238,8 +239,6 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             resp = self.app.post_json(uri, params=process_data, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 409
             assert resp.content_type == CONTENT_TYPE_APP_JSON
-
-    # noinspection PyTypeChecker
 
     def test_deploy_process_missing_or_invalid_components(self):
         process_name = self.fully_qualified_test_process_name()

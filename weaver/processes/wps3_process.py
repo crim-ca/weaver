@@ -21,6 +21,7 @@ from weaver.formats import CONTENT_TYPE_APP_FORM, CONTENT_TYPE_APP_JSON
 from weaver.processes import opensearch
 from weaver.processes.constants import OPENSEARCH_LOCAL_FILE_SCHEME
 from weaver.processes.sources import get_data_source_from_url, retrieve_data_source_url
+from weaver.processes.utils import map_progress
 from weaver.processes.wps_process_base import WpsProcessInterface
 from weaver.utils import (
     get_any_id,
@@ -296,8 +297,8 @@ class Wps3Process(WpsProcessInterface):
                                                message=get_any_message(job_status),
                                                progress=job_status.get("percentCompleted", 0),
                                                duration=job_status.get("duration", None)),  # get if available
-                               self.map_progress(job_status.get("percentCompleted", 0),
-                                                 REMOTE_JOB_PROGRESS_MONITORING, REMOTE_JOB_PROGRESS_FETCH_OUT),
+                               map_progress(job_status.get("percentCompleted", 0),
+                                            REMOTE_JOB_PROGRESS_MONITORING, REMOTE_JOB_PROGRESS_FETCH_OUT),
                                status.STATUS_RUNNING)
 
         if job_status_value != status.STATUS_SUCCEEDED:

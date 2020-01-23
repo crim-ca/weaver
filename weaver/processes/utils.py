@@ -50,11 +50,11 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON, AnyContainer, AnySettingsContainer, FileSystemPathType        # noqa: F401
-    from weaver.store.mongodb import MongodbProcessStore                                            # noqa: F401
-    from typing import AnyStr, Dict, Optional, Union                                                # noqa: F401
-    from pywps import Process as ProcessWPS                                                         # noqa: F401
-    import owslib.wps                                                                               # noqa: F401
+    from weaver.typedefs import AnyContainer, AnySettingsContainer, FileSystemPathType, JSON, Number
+    from weaver.store.mongodb import MongodbProcessStore
+    from typing import AnyStr, Dict, Optional, Union
+    from pywps import Process as ProcessWPS
+    import owslib.wps
 LOGGER = logging.getLogger(__name__)
 
 
@@ -76,7 +76,6 @@ def _read_reference(input_value):
     try:
         return urlopen(input_value.reference).read()
     except URLError:
-        # Don't raise exceptions coming from that.
         return None
 
 
@@ -108,6 +107,12 @@ def _get_json_multiple_inputs(input_value):
                     return None
             return json_data
     return None
+
+
+def map_progress(progress, range_min, range_max):
+    # type: (Number, Number, Number) -> Number
+    """Calculates the relative progression of the percentage process within min/max values."""
+    return max(range_min, min(range_max, range_min + (progress * (range_max - range_min)) / 100))
 
 
 def jsonify_output(output, process_description):
@@ -342,7 +347,6 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
 
         process_store = get_db(container).get_store(StoreProcesses)  # type: MongodbProcessStore
 
-        from weaver.wps_restapi.processes.processes import list_remote_processes
         for cfg_service in processes:
             # parse info
             if isinstance(cfg_service, dict):

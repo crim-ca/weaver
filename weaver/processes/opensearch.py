@@ -77,10 +77,7 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info, accept_mime
                 return wps_inputs[id_][0].data
             except KeyError:
                 pass
-        else:
-            raise ValueError(
-                "Missing input identifier: {}".format(" or ".join(ids_to_get))
-            )
+        raise ValueError("Missing input identifier: {}".format(" or ".join(ids_to_get)))
 
     def is_eoimage_parameter(param):
         # type: (str) -> bool
@@ -195,7 +192,6 @@ class OpenSearchQuery(object):
             )
 
     def get_template_url(self):
-        """ """
         resp = requests.get(self.osdd_url, params=self.params)
         resp.raise_for_status()
 
@@ -217,7 +213,7 @@ class OpenSearchQuery(object):
         query_params = {}
         template_parameters = parse_qsl(query)
 
-        allowed_names = set([p[0] for p in template_parameters])
+        allowed_names = {p[0] for p in template_parameters}
         for key, value in template_parameters:
             if "{" in value and "}" in value:
                 pass
@@ -241,17 +237,17 @@ class OpenSearchQuery(object):
         # Try loading from atom alternate link
         for link in alternate_links:
             if link["type"] == "application/atom+xml":
-                r = requests.get(link["href"])
-                r.raise_for_status()
+                resp = requests.get(link["href"])
+                resp.raise_for_status()
 
-                xml = lxml.etree.fromstring(r.content)
+                xml = lxml.etree.fromstring(resp.content)
                 xpath = "//*[local-name() = 'entry']/*[local-name() = 'link']"
                 links = xml.xpath(xpath)  # type: List[XML]
                 return [link.attrib for link in links]
         return []
 
-    # noinspection PyMethodMayBeStatic
-    def requests_get_retry(self, *args, **kwargs):
+    @staticmethod
+    def _requests_get_retry(*args, **kwargs):
         """Retry a requests.get call
 
         :param args: passed to requests.get
@@ -277,7 +273,7 @@ class OpenSearchQuery(object):
         base_url, query_params = self._prepare_query_url(template_url, params)
         while True:
             query_params["startRecord"] = start_index
-            response = self.requests_get_retry(base_url, params=query_params)
+            response = self._requests_get_retry(base_url, params=query_params)
             if not response.status_code == 200:
                 break
             json_body = response.json()
@@ -634,11 +630,10 @@ def replace_inputs_describe_process(inputs, payload):
     # add "additionalParameters" property from the payload
     payload_inputs = {get_any_id(i): i for i in process_inputs}
     for i in inputs:
-        # noinspection PyBroadException
         try:
             params = payload_inputs[get_any_id(i)]["additionalParameters"]
             i["additionalParameters"] = params
-        except Exception:
+        except Exception:  # noqa: W0703 # nosec: B110
             pass
 
     additional_parameters = get_additional_parameters(payload_process)

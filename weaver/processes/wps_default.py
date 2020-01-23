@@ -31,8 +31,7 @@ class HelloWPS(Process):
             status_supported=True
         )
 
-    # noinspection PyMethodMayBeStatic
-    def _handler(self, request, response):
+    def _handler(self, request, response):  # noqa
         response.update_status("saying hello...", 0)
         LOGGER.debug("HOME=[%s], Current Dir=[%s]", os.environ.get("HOME"), os.path.abspath(os.curdir))
         response.outputs["output"].data = "Hello " + request.inputs["name"][0].data

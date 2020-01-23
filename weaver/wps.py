@@ -38,7 +38,7 @@ def _get_settings_or_wps_config(container,                  # type: AnySettingsC
                                 default_not_found,          # type: AnyStr
                                 message_not_found,          # type: AnyStr
                                 ):                          # type: (...) -> AnyStr
-    global WEAVER_PYWPS_CFG
+    global WEAVER_PYWPS_CFG  # pylint: disable=W0603,global-statement
 
     settings = get_settings(container)
     found = settings.get(weaver_setting_name)
@@ -103,7 +103,7 @@ def get_wps_output_url(container):
 def load_pywps_cfg(container, config=None):
     # type: (AnySettingsContainer, Optional[Union[AnyStr, Dict[AnyStr, AnyStr]]]) -> ConfigParser
     """Loads and updates the PyWPS configuration using Weaver settings."""
-    global WEAVER_PYWPS_CFG
+    global WEAVER_PYWPS_CFG  # pylint: disable=W0603,global-statement
 
     settings = get_settings(container)
     if WEAVER_PYWPS_CFG is None:
@@ -128,7 +128,7 @@ def load_pywps_cfg(container, config=None):
     # add additional config passed as dictionary of {'section.key': 'value'}
     if isinstance(config, dict):
         for key, value in config.items():
-            section, key = key.split('.')
+            section, key = key.split(".")
             WEAVER_PYWPS_CFG.set(section, key, value)
         # cleanup alternative dict "PYWPS_CFG" which is not expected elsewhere
         if isinstance(settings.get("PYWPS_CFG"), dict):

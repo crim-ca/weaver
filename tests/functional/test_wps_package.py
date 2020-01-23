@@ -61,8 +61,8 @@ class WpsPackageAppTest(unittest.TestCase):
         resp = self.app.put_json("{}/visibility".format(path), params=body, headers=json_headers)
         assert resp.status_code == 200
         info = []
-        for p in [path, "{}/package".format(path)]:
-            resp = self.app.get(p, headers=json_headers)
+        for pkg_url in [path, "{}/package".format(path)]:
+            resp = self.app.get(pkg_url, headers=json_headers)
             assert resp.status_code == 200
             info.append(deepcopy(resp.json))
         return info
@@ -841,13 +841,13 @@ class WpsPackageAppTest(unittest.TestCase):
         cwl["inputs"][0] = {"id": "test", "type": {"type": "array", "items": "string"}}
         body["processDescription"]["inputs"][0] = {"id": "test", "minOccurs": [1], "maxOccurs": 1}
         with self.assertRaises(colander.Invalid):
-            desc, _ = self.deploy_process(body)
+            self.deploy_process(body)
             self.fail("Invalid input minOccurs schema definition should have been raised")
 
         cwl["inputs"][0] = {"id": "test", "type": {"type": "array", "items": "string"}}
         body["processDescription"]["inputs"][0] = {"id": "test", "minOccurs": 1, "maxOccurs": 3.1416}
         with self.assertRaises(HTTPBadRequest):
-            desc, _ = self.deploy_process(body)
+            self.deploy_process(body)
             self.fail("Invalid input maxOccurs schema definition should have been raised")
 
     def test_complex_io_from_package(self):

@@ -1,7 +1,6 @@
 from weaver.owsexceptions import OWSException
 
 
-# noinspection SpellCheckingInspection
 def test_owsexceptions_json_formatter():
     test_cases = [
         ("\nLeading new-line",

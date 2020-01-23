@@ -4,7 +4,7 @@ Definitions of types used by tokens.
 import traceback
 import uuid
 from datetime import datetime, timedelta
-from logging import ERROR, INFO, getLevelName, getLogger
+from logging import ERROR, INFO, getLevelName, getLogger, Logger
 from typing import TYPE_CHECKING
 
 import six
@@ -29,8 +29,8 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from weaver.typedefs import AnySettingsContainer, Number, LoggerType, CWL, JSON       # noqa: F401
-    from typing import Any, AnyStr, Dict, List, Optional, Union     # noqa: F401
+    from weaver.typedefs import AnySettingsContainer, Number, CWL, JSON     # noqa: F401
+    from typing import Any, AnyStr, Dict, List, Optional, Union             # noqa: F401
 
 LOGGER = getLogger(__name__)
 
@@ -174,7 +174,7 @@ class Job(Base):
         return get_job_log_msg(duration=self.duration_str, progress=self.progress, status=self.status, message=msg)
 
     def save_log(self, errors=None, logger=None, message=None):
-        # type: (Optional[Union[AnyStr, List[WPSException]]], Optional[LoggerType], Optional[AnyStr]) -> None
+        # type: (Optional[Union[AnyStr, List[WPSException]]], Optional[Logger], Optional[AnyStr]) -> None
         if isinstance(errors, six.string_types):
             log_msg = [(ERROR, self._get_log_msg(message))]
             self.exceptions.append(errors)
@@ -379,7 +379,7 @@ class Job(Base):
     @property
     def duration_str(self):
         # type: () -> AnyStr
-        return str(self.duration).split('.')[0]
+        return str(self.duration).split(".")[0]
 
     @property
     def progress(self):
@@ -502,7 +502,7 @@ class Job(Base):
         job_path = sd.process_job_uri.format(process_id=self.process, job_id=self.id)
         return "{base_job_url}{job_path}".format(base_job_url=base_job_url, job_path=job_path)
 
-    def json(self, container=None):
+    def json(self, container=None):     # pylint: disable=W0221,arguments-differ
         # type: (Optional[AnySettingsContainer]) -> JSON
         """Obtain the JSON data representation for response body.
 
@@ -690,7 +690,7 @@ class Process(Base):
         self["payload"] = self._decode(body) if isinstance(body, dict) else dict()
 
     # encode(->)/decode(<-) characters that cannot be in a key during save to db
-    _character_codes = [('$', "\uFF04"), ('.', "\uFF0E")]
+    _character_codes = [("$", "\uFF04"), (".", "\uFF0E")]
 
     @staticmethod
     def _recursive_replace(pkg, index_from, index_to):
@@ -849,19 +849,19 @@ class Quote(Base):
         super(Quote, self).__init__(*args, **kwargs)
         if "process" not in self:
             raise TypeError("Field 'Quote.process' is required")
-        elif not isinstance(self.get("process"), six.string_types):
+        if not isinstance(self.get("process"), six.string_types):
             raise ValueError("Field 'Quote.process' must be a string.")
         if "user" not in self:
             raise TypeError("Field 'Quote.user' is required")
-        elif not isinstance(self.get("user"), six.string_types):
+        if not isinstance(self.get("user"), six.string_types):
             raise ValueError("Field 'Quote.user' must be a string.")
         if "price" not in self:
             raise TypeError("Field 'Quote.price' is required")
-        elif not isinstance(self.get("price"), float):
+        if not isinstance(self.get("price"), float):
             raise ValueError("Field 'Quote.price' must be a float number.")
         if "currency" not in self:
             raise TypeError("Field 'Quote.currency' is required")
-        elif not isinstance(self.get("currency"), six.string_types) or len(self.get("currency")) != 3:
+        if not isinstance(self.get("currency"), six.string_types) or len(self.get("currency")) != 3:
             raise ValueError("Field 'Quote.currency' must be an ISO-4217 currency string code.")
         if "created" not in self:
             self["created"] = now()
@@ -982,23 +982,23 @@ class Bill(Base):
         super(Bill, self).__init__(*args, **kwargs)
         if "quote" not in self:
             raise TypeError("Field 'Bill.quote' is required")
-        elif not isinstance(self.get("quote"), six.string_types):
+        if not isinstance(self.get("quote"), six.string_types):
             raise ValueError("Field 'Bill.quote' must be a string.")
         if "job" not in self:
             raise TypeError("Field 'Bill.job' is required")
-        elif not isinstance(self.get("job"), six.string_types):
+        if not isinstance(self.get("job"), six.string_types):
             raise ValueError("Field 'Bill.job' must be a string.")
         if "user" not in self:
             raise TypeError("Field 'Bill.user' is required")
-        elif not isinstance(self.get("user"), six.string_types):
+        if not isinstance(self.get("user"), six.string_types):
             raise ValueError("Field 'Bill.user' must be a string.")
         if "price" not in self:
             raise TypeError("Field 'Bill.price' is required")
-        elif not isinstance(self.get("price"), float):
+        if not isinstance(self.get("price"), float):
             raise ValueError("Field 'Bill.price' must be a float number.")
         if "currency" not in self:
             raise TypeError("Field 'Bill.currency' is required")
-        elif not isinstance(self.get("currency"), six.string_types) or len(self.get("currency")) != 3:
+        if not isinstance(self.get("currency"), six.string_types) or len(self.get("currency")) != 3:
             raise ValueError("Field 'Bill.currency' must be an ISO-4217 currency string code.")
         if "created" not in self:
             self["created"] = now()

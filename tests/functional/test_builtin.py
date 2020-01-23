@@ -77,16 +77,16 @@ class BuiltinAppTest(unittest.TestCase):
         dirname = "/tmp"
         nc_data = "Hello NetCDF!"
         with ExitStack() as stack_files:
-            nf = stack_files.enter_context(NamedTemporaryFile(dir=dirname, mode="w", suffix=".nc"))
-            jf = stack_files.enter_context(NamedTemporaryFile(dir=dirname, mode="w", suffix=".json"))
-            nf.write(nc_data)
-            nf.seek(0)
-            jf.write(json.dumps(["file://{}".format(os.path.join(dirname, nf.name))]))  # app expects list of URL
-            jf.seek(0)
+            tmp_ncdf = stack_files.enter_context(NamedTemporaryFile(dir=dirname, mode="w", suffix=".nc"))
+            tmp_json = stack_files.enter_context(NamedTemporaryFile(dir=dirname, mode="w", suffix=".json"))
+            tmp_ncdf.write(nc_data)
+            tmp_ncdf.seek(0)
+            tmp_json.write(json.dumps(["file://{}".format(os.path.join(dirname, tmp_ncdf.name))]))
+            tmp_json.seek(0)
             data = {
                 "mode": "async",
                 "response": "document",
-                "inputs": [{"id": "input", "href": os.path.join(dirname, jf.name)}],
+                "inputs": [{"id": "input", "href": os.path.join(dirname, tmp_json.name)}],
                 "outputs": [{"id": "output", "transmissionMode": "reference"}],
             }
             with ExitStack() as stack_proc:
@@ -99,7 +99,7 @@ class BuiltinAppTest(unittest.TestCase):
             assert resp.content_type in CONTENT_TYPE_APP_JSON
             job_url = resp.json["location"]
             nc_path = None
-            for i in range(5):
+            for _ in range(5):
                 sleep(1)
                 resp = self.app.get(job_url, headers=self.json_headers)
                 if resp.status_code == 200:
@@ -118,5 +118,5 @@ class BuiltinAppTest(unittest.TestCase):
             assert nc_path.startswith(wps_out)
             assert os.path.split(nc_real_path)[-1] == os.path.split(nc_path)[-1]
             assert os.path.isfile(nc_real_path)
-            with open(nc_real_path, 'r') as f:
+            with open(nc_real_path, "r") as f:
                 assert f.read() == nc_data

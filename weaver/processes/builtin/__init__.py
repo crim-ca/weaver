@@ -42,7 +42,7 @@ def _get_builtin_reference_mapping(root):
     # type: (AnyStr) -> Dict[AnyStr, AnyStr]
     """Generates a mapping of `reference` to actual ``builtin`` package file path."""
     builtin_names = [_pkg for _pkg in os.listdir(root)
-                     if os.path.splitext(_pkg)[-1].replace('.', '') in PACKAGE_EXTENSIONS]
+                     if os.path.splitext(_pkg)[-1].replace(".", "") in PACKAGE_EXTENSIONS]
     return {os.path.splitext(_pkg)[0]: os.path.join(root, _pkg) for _pkg in builtin_names}
 
 
@@ -66,7 +66,7 @@ def _replace_template(pkg, var, val):
         return Template(pkg).safe_substitute({var: val})
     for k in pkg:
         if isinstance(pkg[k], list):
-            for i, pkg_i in enumerate(pkg[k]):
+            for i, _ in enumerate(pkg[k]):
                 pkg[k][i] = _replace_template(pkg[k][i], var, val)
         elif isinstance(pkg[k], (dict, six.string_types)):
             pkg[k] = _replace_template(pkg[k], var, val)
@@ -135,7 +135,6 @@ def register_builtin_processes(container):
 
 
 class BuiltinProcessJobBase(CommandLineJob):
-    # noinspection PyUnusedLocal
     def __init__(self, builder, joborder, make_path_mapper, requirements, hints, name):
         self.process = [h.get("process") for h in hints][0]
         super(BuiltinProcessJobBase, self).__init__(builder, joborder, make_path_mapper, requirements, hints, name)
@@ -149,7 +148,9 @@ class BuiltinProcessJobBase(CommandLineJob):
         if process.type != PROCESS_BUILTIN:
             raise PackageExecutionError("Invalid package is not of type '{}'".format(PROCESS_BUILTIN))
 
-    def run(self, runtime_context):  # type: (RuntimeContext) -> None
+    # pylint: disable=W0221,arguments-differ    # naming using python like arguments
+    def run(self, runtime_context):
+        # type: (RuntimeContext) -> None
         try:
             self._validate_process()
             super(BuiltinProcessJobBase, self).run(runtime_context)
@@ -166,6 +167,7 @@ class BuiltinProcessJobSingularity(BuiltinProcessJobBase, SingularityCommandLine
     pass
 
 
+# pylint: disable=W0221,arguments-differ    # naming using python like arguments
 class BuiltinProcess(CommandLineTool):
     def make_job_runner(self, runtime_context):
         # type: (RuntimeContext) -> Type[JobBase]

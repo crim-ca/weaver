@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from typing import Any, AnyStr, Optional, Union             # noqa: F401
     from pymongo.database import Database                       # noqa: F401
 
+# pylint: disable=C0103,invalid-name
 MongoDB = None  # type: Optional[Database]
 MongodbStores = frozenset([
     MongodbServiceStore,
@@ -31,6 +32,7 @@ MongodbStores = frozenset([
 ])
 
 if TYPE_CHECKING:
+    # pylint: disable=E0601,used-before-assignment
     AnyStoreType = Union[MongodbStores]     # noqa: F401
 
 
@@ -90,13 +92,12 @@ class MongoDatabase(DatabaseInterface):
     def run_migration(self):
         # type: (...) -> None
         warnings.warn("Not implemented {}.run_migration implementation.".format(self.type))
-        pass
 
 
 def get_mongodb_connection(container):
     # type: (AnySettingsContainer) -> Database
     """Obtains the basic database connection from settings."""
-    global MongoDB
+    global MongoDB  # pylint: disable=W0603,global-statement
     if not MongoDB:
         settings = get_settings(container)
         settings_default = [("mongodb.host", "localhost"), ("mongodb.port", 27017), ("mongodb.db_name", "weaver")]

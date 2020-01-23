@@ -13,6 +13,7 @@ if all(os.path.isfile(os.path.join(CUR_DIR, f)) for f in ["README.rst", "CHANGES
 # ensure that 'weaver' directory can be found for metadata import
 sys.path.insert(0, CUR_DIR)
 sys.path.insert(0, os.path.join(CUR_DIR, os.path.split(CUR_DIR)[-1]))
+# pylint: disable=C0413,wrong-import-order
 from weaver import __meta__  # isort:skip # noqa: E402
 
 requirements = [line.strip() for line in open("requirements.txt")]

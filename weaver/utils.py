@@ -24,7 +24,7 @@ from requests.structures import CaseInsensitiveDict
 from six.moves.urllib.parse import ParseResult, parse_qs, urlparse, urlunsplit
 from webob.headers import EnvironHeaders, ResponseHeaders
 
-from weaver.exceptions import InvalidIdentifierValue, ServiceNotFound
+from weaver.exceptions import InvalidIdentifierValue
 from weaver.status import map_status
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 
@@ -168,16 +168,14 @@ def get_url_without_query(url):
         url = urlparse(url)
     if not isinstance(url, ParseResult):
         raise TypeError("Expected a parsed URL.")
-    return urlunsplit(url[:4] + tuple(['']))
+    return urlunsplit(url[:4] + tuple([""]))
 
 
 def is_valid_url(url):
     # type: (Union[AnyStr, None]) -> bool
-    # noinspection PyBroadException
     try:
-        parsed_url = urlparse(url)
-        return True if all([parsed_url.scheme, ]) else False
-    except Exception:
+        return bool(urlparse(url).scheme)
+    except Exception:  # noqa: W0703 # nosec: B110
         return False
 
 
@@ -195,6 +193,7 @@ def parse_extra_options(option_str):
     """
     if option_str:
         try:
+            # pylint: disable=R1717,consider-using-dict-comprehension
             extra_options = option_str.split(",")
             extra_options = dict([("=" in opt) and opt.split("=", 1) for opt in extra_options])
         except Exception:
@@ -204,21 +203,6 @@ def parse_extra_options(option_str):
     else:
         extra_options = {}
     return extra_options
-
-
-def parse_service_name(url, protected_path):
-    # type: (AnyStr, AnyStr) -> AnyStr
-    parsed_url = urlparse(url)
-    service_name = None
-    if parsed_url.path.startswith(protected_path):
-        parts_without_protected_path = parsed_url.path[len(protected_path)::].strip("/").split("/")
-        if "proxy" in parts_without_protected_path:
-            parts_without_protected_path.remove("proxy")
-        if len(parts_without_protected_path) > 0:
-            service_name = parts_without_protected_path[0]
-    if not service_name:
-        raise ServiceNotFound
-    return service_name
 
 
 def fully_qualified_name(obj):
@@ -351,7 +335,7 @@ def raise_on_xml_exception(xml_node):
 def str2bytes(string):
     # type: (Union[AnyStr, bytes]) -> bytes
     """Obtains the bytes representation of the string."""
-    if not (isinstance(string, six.string_types) or isinstance(string, bytes)):
+    if not isinstance(string, (six.string_types, bytes)):
         raise TypeError("Cannot convert item to bytes: {!r}".format(type(string)))
     if isinstance(string, bytes):
         return string
@@ -361,7 +345,7 @@ def str2bytes(string):
 def bytes2str(string):
     # type: (Union[AnyStr, bytes]) -> str
     """Obtains the unicode representation of the string."""
-    if not (isinstance(string, six.string_types) or isinstance(string, bytes)):
+    if not isinstance(string, (six.string_types, bytes)):
         raise TypeError("Cannot convert item to unicode: {!r}".format(type(string)))
     if not isinstance(string, bytes):
         return string
@@ -440,7 +424,7 @@ REGEX_SEARCH_INVALID_CHARACTERS = re.compile(r"[^a-zA-Z0-9_\-]")
 REGEX_ASSERT_INVALID_CHARACTERS = re.compile(r"^[a-zA-Z0-9_\-]+$")
 
 
-def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_character='_'):
+def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_character="_"):
     # type: (AnyStr, Optional[int], Optional[Union[int, None]], Optional[bool], Optional[AnyStr]) -> Union[AnyStr, None]
     """
     Returns a cleaned-up version of the input name, replacing invalid characters matched with
@@ -478,9 +462,9 @@ def assert_sane_name(name, min_len=3, max_len=None):
     if name is None:
         raise InvalidIdentifierValue("Invalid name : {0}".format(name))
     name = name.strip()
-    if '--' in name \
-       or name.startswith('-') \
-       or name.endswith('-') \
+    if "--" in name \
+       or name.startswith("-") \
+       or name.endswith("-") \
        or len(name) < min_len \
        or (max_len is not None and len(name) > max_len) \
        or not re.match(REGEX_ASSERT_INVALID_CHARACTERS, name):

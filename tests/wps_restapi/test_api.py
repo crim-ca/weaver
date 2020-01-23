@@ -1,11 +1,10 @@
-import os
 import unittest
 
 import colander
 import mock
 from pyramid.httpexceptions import HTTPForbidden, HTTPFound, HTTPUnauthorized
 
-from tests.utils import get_settings_from_testapp, get_test_weaver_app, get_test_weaver_config
+from tests.utils import get_test_weaver_app, get_test_weaver_config
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.wps_restapi import swagger_definitions as sd
 
@@ -19,7 +18,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
 
     def test_frontpage_format(self):
         resp = self.testapp.get(sd.api_frontpage_uri, headers=self.json_headers)
-        assert 200 == resp.status_code
+        assert resp.status_code == 200
         try:
             sd.FrontpageSchema().deserialize(resp.json)
         except colander.Invalid as ex:
@@ -27,7 +26,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
 
     def test_version_format(self):
         resp = self.testapp.get(sd.api_versions_uri, headers=self.json_headers)
-        assert 200 == resp.status_code
+        assert resp.status_code == 200
         try:
             sd.VersionsSchema().deserialize(resp.json)
         except colander.Invalid as ex:
@@ -35,7 +34,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
 
     def test_conformance_format(self):
         resp = self.testapp.get(sd.api_conformance_uri, headers=self.json_headers)
-        assert 200 == resp.status_code
+        assert resp.status_code == 200
         try:
             sd.ConformanceSchema().deserialize(resp.json)
         except colander.Invalid as ex:
@@ -43,11 +42,11 @@ class GenericApiRoutesTestCase(unittest.TestCase):
 
     def test_swagger_api_format(self):
         resp = self.testapp.get(sd.api_swagger_ui_uri)
-        assert 200 == resp.status_code
+        assert resp.status_code == 200
         assert "<title>{}</title>".format(sd.API_TITLE) in resp.text
 
         resp = self.testapp.get(sd.api_swagger_json_uri, headers=self.json_headers)
-        assert 200 == resp.status_code
+        assert resp.status_code == 200
         assert "tags" in resp.json
         assert "info" in resp.json
         assert "host" in resp.json
@@ -56,21 +55,28 @@ class GenericApiRoutesTestCase(unittest.TestCase):
         assert "basePath" in resp.json
 
     def test_status_unauthorized_and_forbidden(self):
-        # methods should return corresponding status codes, shouldn't be the default '403' on both cases
-        with mock.patch("weaver.utils.get_weaver_url", side_effect=HTTPUnauthorized):
+        """
+        Validates that 401/403 status codes are correctly handled and that the appropriate one is returned.
+        Shouldn't be the default behaviour to employ 403 on both cases.
+        """
+        with mock.patch("weaver.wps_restapi.api.get_weaver_url", side_effect=HTTPUnauthorized):
             resp = self.testapp.get(sd.api_frontpage_uri, headers=self.json_headers, expect_errors=True)
-            assert 401 == resp.status_code
-        with mock.patch("weaver.utils.get_weaver_url", side_effect=HTTPForbidden):
+            assert resp.status_code == 401
+        with mock.patch("weaver.wps_restapi.api.get_weaver_url", side_effect=HTTPForbidden):
             resp = self.testapp.get(sd.api_frontpage_uri, headers=self.json_headers, expect_errors=True)
-            assert 403 == resp.status_code
+            assert resp.status_code == 403
 
     def test_status_not_found_and_method_not_allowed(self):
+        """
+        Validates that 404/405 status codes are correctly handled and that the appropriate one is returned.
+        Shouldn't be the default behaviour to employ 404 on both cases.
+        """
         resp = self.testapp.post("/random", headers=self.json_headers, expect_errors=True)
-        assert 404 == resp.status_code
+        assert resp.status_code == 404
 
         # test an existing route with wrong method, shouldn't be the default '404' on both cases
         resp = self.testapp.post(sd.api_frontpage_uri, headers=self.json_headers, expect_errors=True)
-        assert 405 == resp.status_code
+        assert resp.status_code == 405
 
 
 class RebasedApiRoutesTestCase(unittest.TestCase):

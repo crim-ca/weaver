@@ -163,7 +163,7 @@ def test_deploy_opensearch():
         def __init__(self, *args):
             pass
 
-        def get_store(*args):  # noqa: E811
+        def get_store(self, *args):  # noqa: E811
             return store
 
     def _get_mocked(req):
@@ -194,7 +194,7 @@ def test_deploy_opensearch():
         assert_json_equals(process.payload, initial_payload)
 
 
-def test_handle_EOI_unique_aoi_unique_toi():  # noqa
+def test_handle_eoi_unique_aoi_unique_toi():  # noqa
     inputs = load_json_test_file("eoimage_inputs_example.json")
     expected = load_json_test_file("eoimage_unique_aoi_unique_toi.json")
     output = opensearch.EOImageDescribeProcessHandler(
@@ -203,7 +203,7 @@ def test_handle_EOI_unique_aoi_unique_toi():  # noqa
     assert_json_equals(output, expected)
 
 
-def test_handle_EOI_unique_aoi_non_unique_toi():  # noqa
+def test_handle_eoi_unique_aoi_non_unique_toi():
     inputs = load_json_test_file("eoimage_inputs_example.json")
     expected = load_json_test_file("eoimage_unique_aoi_non_unique_toi.json")
     output = opensearch.EOImageDescribeProcessHandler(
@@ -212,7 +212,7 @@ def test_handle_EOI_unique_aoi_non_unique_toi():  # noqa
     assert_json_equals(output, expected)
 
 
-def test_handle_EOI_non_unique_aoi_unique_toi():  # noqa
+def test_handle_eoi_non_unique_aoi_unique_toi():
     inputs = load_json_test_file("eoimage_inputs_example.json")
     expected = load_json_test_file("eoimage_non_unique_aoi_unique_toi.json")
     output = opensearch.EOImageDescribeProcessHandler(

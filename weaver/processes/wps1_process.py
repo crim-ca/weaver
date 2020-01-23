@@ -3,13 +3,13 @@ from time import sleep
 from typing import TYPE_CHECKING, AnyStr
 
 import requests
-from owslib.wps import ComplexDataInput, WebProcessingService, WPSException
+from owslib.wps import ComplexDataInput, WebProcessingService
 
 from weaver import status
 from weaver.execute import EXECUTE_MODE_ASYNC
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes.constants import WPS_COMPLEX_DATA
-from weaver.processes.utils import jsonify_output
+from weaver.processes.utils import jsonify_output, map_progress
 from weaver.processes.wps_process_base import WpsProcessInterface
 from weaver.utils import (
     get_any_id,
@@ -121,7 +121,7 @@ class Wps1Process(WpsProcessInterface):
                 try:
                     execution = check_status(url=execution.statusLocation, verify=self.verify,
                                              sleep_secs=wait_secs(run_step))
-                    job_id = execution.statusLocation.replace(".xml", "").split('/')[-1]
+                    job_id = execution.statusLocation.replace(".xml", "").split("/")[-1]
                     LOGGER.debug(get_log_monitor_msg(job_id, status.map_status(execution.getStatus()),
                                                      execution.percentCompleted, execution.statusMessage,
                                                      execution.statusLocation))
@@ -129,8 +129,8 @@ class Wps1Process(WpsProcessInterface):
                                                        message=execution.statusMessage,
                                                        progress=execution.percentCompleted,
                                                        duration=None),  # get if available
-                                       self.map_progress(execution.percentCompleted,
-                                                         REMOTE_JOB_PROGRESS_MONITORING, REMOTE_JOB_PROGRESS_FETCH_OUT),
+                                       map_progress(execution.percentCompleted,
+                                                    REMOTE_JOB_PROGRESS_MONITORING, REMOTE_JOB_PROGRESS_FETCH_OUT),
                                        status.STATUS_RUNNING)
                 except Exception as exc:
                     num_retries += 1
@@ -159,17 +159,15 @@ class Wps1Process(WpsProcessInterface):
                     dst_fn = "/".join([out_dir.rstrip("/"), expected_outputs[result_id]])
 
                     # TODO Should we handle other type than File reference?
-                    r = requests.get(result_val, allow_redirects=True)
-                    LOGGER.debug("Fetching result output from [%s] to cwl output destination: [%s]", result_val, dst_fn)
-                    with open(dst_fn, mode='wb') as dst_fh:
-                        dst_fh.write(r.content)
 
-        except (WPSException, Exception) as exc:
-            if isinstance(exc, WPSException):
-                errors = "[{0}] {1}".format(exc.locator, exc.text)
-            else:
-                exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
-                errors = "{0}: {1}".format(exception_class, exc.message)
+                    resp = requests.get(result_val, allow_redirects=True)
+                    LOGGER.debug("Fetching result output from [%s] to cwl output destination: [%s]", result_val, dst_fn)
+                    with open(dst_fn, mode="wb") as dst_fh:
+                        dst_fh.write(resp.content)
+
+        except Exception as exc:
+            exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
+            errors = "{0}: {1!s}".format(exception_class, exc)
             raise Exception(errors)
 
         self.update_status("Execution on remote WPS1 provider completed.",

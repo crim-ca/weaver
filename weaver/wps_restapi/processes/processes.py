@@ -8,7 +8,7 @@ import six
 from celery.utils.log import get_task_logger
 from lxml import etree
 from owslib.util import clean_ows_url
-from owslib.wps import ComplexDataInput, WebProcessingService, WPSException
+from owslib.wps import ComplexDataInput, WebProcessingService
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPCreated,
@@ -27,7 +27,6 @@ from pyramid_celery import celery_app as app
 
 from weaver.config import WEAVER_CONFIGURATION_EMS, get_weaver_configuration
 from weaver.database import get_db
-from weaver.datatype import Process as ProcessDB
 from weaver.datatype import Service
 from weaver.exceptions import InvalidIdentifierValue, ProcessNotAccessible, ProcessNotFound, log_unhandled_exceptions
 from weaver.execute import (
@@ -54,6 +53,7 @@ from weaver.wps_restapi.jobs.notify import encrypt_email, notify_job_complete
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, get_wps_restapi_base_url, parse_request_query
 
 if TYPE_CHECKING:
+    from weaver.datatype import Process as ProcessDB    # noqa: F401
     from weaver.typedefs import JSON                    # noqa: F401
     from typing import AnyStr, List, Tuple, Optional    # noqa: F401
 
@@ -161,8 +161,8 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
 
             except Exception as exc:
                 num_retries += 1
-                task_logger.debug("Exception raised: {}".format(repr(exc)))
-                job.status_message = "Could not read status xml document for {}. Trying again...".format(str(job))
+                task_logger.debug("Exception raised: %s", repr(exc))
+                job.status_message = "Could not read status xml document for {!s}. Trying again...".format(job)
                 job.save_log(errors=execution.errors, logger=task_logger)
                 sleep(1)
             else:
@@ -173,15 +173,12 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
             finally:
                 job = store.update_job(job)
 
-    except (WPSException, Exception) as exc:
+    except Exception as exc:
         LOGGER.exception("Failed running [%s]", job)
         job.status = map_status(STATUS_FAILED)
         job.status_message = "Failed to run {!s}.".format(job)
-        if isinstance(exc, WPSException):
-            errors = "[{0}] {1}".format(exc.locator, exc.text)
-        else:
-            exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
-            errors = "{0}: {1!s}".format(exception_class, exc)
+        exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
+        errors = "{0}: {1!s}".format(exception_class, exc)
         job.save_log(errors=errors, logger=task_logger)
     finally:
         job.status_message = "Job {}.".format(job.status)
@@ -363,7 +360,6 @@ def get_processes_filtered_by_valid_schemas(request):
             valid_processes.append(process.process_summary())
         except colander.Invalid:
             invalid_processes_ids.append(process.identifier)
-            pass
     return valid_processes, invalid_processes_ids
 
 

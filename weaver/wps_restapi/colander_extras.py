@@ -1,6 +1,11 @@
+from typing import TYPE_CHECKING
+
 import colander
 from cornice_swagger.converters import schema
 from cornice_swagger.converters.exceptions import NoSuchConverter
+
+if TYPE_CHECKING:
+    from typing import Iterable
 
 
 class DropableNoneSchema(colander.SchemaNode):
@@ -33,6 +38,11 @@ class DropableNoneSchema(colander.SchemaNode):
         https://github.com/Pylons/colander/issues/276
         https://github.com/Pylons/colander/issues/299
     """
+    @staticmethod
+    def schema_type():
+        raise NotImplementedError
+
+    # pylint: disable=W0222,signature-differs
     def deserialize(self, cstruct):
         if self.default is colander.null and self.missing is colander.drop and cstruct is None:
             return colander.drop
@@ -58,6 +68,11 @@ class SchemaNodeDefault(colander.SchemaNode):
     Original behaviour was to drop the missing value instead of replacing by the default.
     Executes all other :class:`colander.SchemaNode` operations normally.
     """
+    @staticmethod
+    def schema_type():
+        raise NotImplementedError
+
+    # pylint: disable=W0222,signature-differs
     def deserialize(self, cstruct):
         result = super(SchemaNodeDefault, self).deserialize(cstruct)
         if not isinstance(self.default, type(colander.null)) and result is colander.drop:
@@ -96,35 +111,35 @@ class OneOfMappingSchema(colander.MappingSchema):
         explicitly for specific field types and formats since the first option would always consist as a valid input
         fulfilling the specified definition (ie: an empty ``{}`` schema with all fields missing).
     """
-
-    _one_of = None
+    @staticmethod
+    def _one_of():
+        # type: () -> Iterable[colander._SchemaMeta]
+        raise NotImplementedError
 
     def __init__(self, *args, **kwargs):
         super(OneOfMappingSchema, self).__init__(*args, **kwargs)
         if not hasattr(self, "_one_of"):
             raise TypeError("Type '{}' must define '_one_of' element.".format(self))
-        if not hasattr(self._one_of, "__iter__") or not len(self._one_of):
+        if not hasattr(self._one_of, "__iter__") or not len(self._one_of):  # noqa
             raise ValueError("Element '_one_of' of '{}' must be an iterable of at least 1 value.".format(self))
-
-    def __str__(self):
-        return self.__name__
 
     def deserialize_one_of(self, cstruct):
         # test each possible case, return all corresponding errors if
         # none of the '_one_of' possibilities is valid including all sub-dependencies
         invalid_one_of = dict()
-        for c in self._one_of:
+        for schema_class in self._one_of:  # noqa
             try:
                 # instantiate the class if specified with simple reference, other use pre-instantiated schema object
-                if isinstance(c, colander._SchemaMeta):  # noqa:W0212
-                    c = c()
-                return c.deserialize(cstruct)
+                if isinstance(schema_class, colander._SchemaMeta):  # noqa:W0212
+                    schema_class = schema_class()
+                return schema_class.deserialize(cstruct)
             except colander.Invalid as invalid:
                 invalid_one_of.update({type(invalid.node).__name__: str(invalid)})
         message = "Incorrect type, must be one of: {}. Errors for each case: {}" \
                   .format(list(invalid_one_of), invalid_one_of)
         raise colander.Invalid(node=self, msg=message)
 
+    # pylint: disable=W0222,signature-differs
     def deserialize(self, cstruct):
         result = self.deserialize_one_of(cstruct)
         if isinstance(result, dict):

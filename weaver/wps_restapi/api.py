@@ -43,7 +43,6 @@ def api_frontpage(request):
 
     # import here to avoid circular import errors
     from weaver.config import get_weaver_configuration
-    from weaver.utils import get_weaver_url
     from weaver.wps import get_wps_path
 
     settings = get_settings(request)
@@ -68,7 +67,7 @@ def api_frontpage(request):
         weaver_links.append({"href": weaver_api_def, "rel": "service", "type": CONTENT_TYPE_APP_JSON,
                              "title": "API definition of this service."})
     if isinstance(weaver_api_doc, six.string_types):
-        if "." in weaver_api_doc:   # noqa: E1135
+        if "." in weaver_api_doc:   # pylint: disable=E1135,unsupported-membership-test
             ext_type = weaver_api_doc.split(".")[-1]
             doc_type = "application/{}".format(ext_type)
         else:
@@ -156,7 +155,7 @@ def api_swagger_json(request, use_docstring_summary=True):
 def api_swagger_ui(request):
     """weaver REST API swagger-ui schema documentation (this page)."""
     json_path = wps_restapi_base_path(request.registry.settings) + sd.api_swagger_json_uri
-    json_path = json_path.lstrip('/')   # if path starts by '/', swagger-ui doesn't find it on remote
+    json_path = json_path.lstrip("/")   # if path starts by '/', swagger-ui doesn't find it on remote
     data_mako = {"api_title": sd.API_TITLE, "api_swagger_json_path": json_path}
     return render_to_response("templates/swagger_ui.mako", data_mako, request=request)
 
@@ -164,7 +163,7 @@ def api_swagger_ui(request):
 def get_request_info(request, detail=None):
     # type: (Request, Optional[AnyStr]) -> JSON
     """Provided additional response details based on the request and execution stack on failure."""
-    content = {u'route': str(request.upath_info), u'url': str(request.url), u'method': request.method}
+    content = {u"route": str(request.upath_info), u"url": str(request.url), u"method": request.method}
     if isinstance(detail, six.string_types):
         content.update({"detail": detail})
     if hasattr(request, "exception"):

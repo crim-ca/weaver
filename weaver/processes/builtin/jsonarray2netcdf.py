@@ -20,6 +20,7 @@ sys.path.insert(0, CUR_DIR)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(CUR_DIR))))
 
 # place weaver specific imports after sys path fixing to ensure they are found from external call
+# pylint: disable=C0413,wrong-import-order
 from weaver.formats import get_extension, CONTENT_TYPE_APP_NETCDF  # isort:skip # noqa: E402
 
 PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]
@@ -55,14 +56,14 @@ def j2n(json_file, output_dir):
         if file_url.startswith("file://"):
             shutil.copyfile(file_url[7:], file_path)
         else:
-            with open(file_path, "wb") as f:
-                r = requests.get(file_url)
-                r.raise_for_status()
-                f.write(r.content)
+            with open(file_path, "wb") as file:
+                resp = requests.get(file_url)
+                resp.raise_for_status()
+                file.write(resp.content)
     LOGGER.info("Process '%s' execution completed.", PACKAGE_NAME)
 
 
-if __name__ == "__main__":
+def main():
     LOGGER.info("Parsing inputs of '%s' process.", PACKAGE_NAME)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("-i", metavar="json", type=argparse.FileType("r"),
@@ -71,3 +72,7 @@ if __name__ == "__main__":
                         help="Output directory of the retrieved NetCDF files extracted by name from the JSON file.")
     args = parser.parse_args()
     sys.exit(j2n(args.i, args.o))
+
+
+if __name__ == "__main__":
+    main()
