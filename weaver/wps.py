@@ -3,6 +3,7 @@ pywps 4.x wrapper
 """
 import logging
 import os
+import tempfile
 from typing import TYPE_CHECKING
 
 import six
@@ -76,8 +77,9 @@ def get_wps_output_dir(container):
     Retrieves the WPS output directory path where to write XML and result files.
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
     """
-    return _get_settings_or_wps_config(
-        container, "weaver.wps_output_dir", "server", "outputpath", "/tmp", "WPS output directory")
+    tmp_dir = tempfile.gettempdir()
+    return _get_settings_or_wps_config(container, "weaver.wps_output_dir",
+                                       "server", "outputpath", tmp_dir, "WPS output directory")
 
 
 def get_wps_output_path(container):

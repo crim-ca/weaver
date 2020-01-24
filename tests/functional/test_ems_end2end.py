@@ -649,7 +649,7 @@ class End2EndEMSTestCase(TestCase):
 
         # processes visibility
         visible = {"value": VISIBILITY_PUBLIC}
-        for process_id, process_info in self.test_processes_info.items():
+        for process_info in self.test_processes_info.values():
             # get private visibility initially
             process_path = "{}/processes/{}".format(self.WEAVER_URL, process_info.test_id)
             visible_path = "{}/visibility".format(process_path)

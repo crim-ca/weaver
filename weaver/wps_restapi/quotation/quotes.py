@@ -27,9 +27,9 @@ def process_quote_estimator(process):   # noqa: E811
     :return: dict of {price, currency, estimatedTime} values for the process quote.
     """
     # TODO: replace by some fancy ml technique or something?
-    price = random.uniform(0, 10)
+    price = random.uniform(0, 10)  # nosec
     currency = "CAD"
-    estimated_time = to_iso8601(timedelta(minutes=random.uniform(5, 60)))
+    estimated_time = to_iso8601(timedelta(minutes=random.uniform(5, 60)))  # nosec
     return {"price": price, "currency": currency, "estimatedTime": estimated_time}
 
 

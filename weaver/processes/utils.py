@@ -52,51 +52,60 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url
 if TYPE_CHECKING:
     from weaver.typedefs import AnyContainer, AnySettingsContainer, FileSystemPathType, JSON, Number
     from weaver.store.mongodb import MongodbProcessStore
-    from typing import AnyStr, Dict, Optional, Union
+    from typing import Any, AnyStr, Dict, List, Optional, Union
     from pywps import Process as ProcessWPS
     import owslib.wps
 LOGGER = logging.getLogger(__name__)
 
 
-def _get_data(input_value):
+def _get_data(output):
+    # type: (owslib.wps.Output) -> Optional[Any]
     """
-    Extract the data from the input value
+    Extract the data from the output value.
     """
     # process output data are append into a list and
     # WPS standard v1.0.0 specify that Output data field has zero or one value
-    if input_value.data:
-        return input_value.data[0]
+    if output.data:
+        return output.data[0]
     return None
 
 
-def _read_reference(input_value):
+def _read_reference(url):
+    # type: (AnyStr) -> Optional[AnyStr]
     """
-    Read a WPS reference and return the content
+    Read a reference HTTP(S) URL and return the content.
     """
+    if not isinstance(url, six.string_types):
+        return None
+    if not url.lower().startswith("http"):
+        LOGGER.warning("URL reading not allowed because of potentially insecure scheme: [%s]", url)
+        return None
     try:
-        return urlopen(input_value.reference).read()
+        return urlopen(url).read()  # nosec: B310
     except URLError:
         return None
 
 
-def _get_json_multiple_inputs(input_value):
+def _get_multi_json_references(output):
+    # type: (owslib.wps.Output) -> Optional[List[JSON]]
     """
     Since WPS standard does not allow to return multiple values for a single output,
     a lot of process actually return a json array containing references to these outputs.
-    This function goal is to detect this particular format
-    :return: An array of references if the input_value is effectively a json containing that,
-             None otherwise
+    This function goal is to detect this particular format.
+
+    :return: An array of HTTP(S) references if the specified output is effectively a JSON containing that,
+             ``None`` otherwise.
     """
 
     # Check for the json datatype and mimetype
-    if input_value.dataType == WPS_COMPLEX_DATA and input_value.mimeType == CONTENT_TYPE_APP_JSON:
+    if output.dataType == WPS_COMPLEX_DATA and output.mimeType == CONTENT_TYPE_APP_JSON:
 
         # If the json data is referenced read it's content
-        if input_value.reference:
-            json_data_str = _read_reference(input_value)
+        if output.reference:
+            json_data_str = _read_reference(output.reference)
         # Else get the data directly
         else:
-            json_data_str = _get_data(input_value)
+            json_data_str = _get_data(output)
 
         # Load the actual json dict
         json_data = json.loads(json_data_str)
@@ -137,7 +146,7 @@ def jsonify_output(output, process_description):
 
         # Handle special case where we have a reference to a json array containing dataset reference
         # Avoid reference to reference by fetching directly the dataset references
-        json_array = _get_json_multiple_inputs(output)
+        json_array = _get_multi_json_references(output)
         if json_array and all(str(ref).startswith("http") for ref in json_array):
             json_output["data"] = json_array
     else:

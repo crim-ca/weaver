@@ -82,16 +82,16 @@ def notify_job_complete(job, to_email_recipient, container):
     # find appropriate template according to settings
     if not os.path.isdir(template_dir):
         LOGGER.warning("No default email template directory configured. Using default format.")
-        template = Template(text=DEFAULT_TEMPLATE)
+        template = Template(text=DEFAULT_TEMPLATE)  # nosec: B702
     else:
         default_name = settings.get("weaver.wps_email_notify_template_default", "default.mako")
         process_name = "{!s}.mako".format(job.process)
         default_template = os.path.join(template_dir, default_name)
         process_template = os.path.join(template_dir, process_name)
         if os.path.isfile(process_template):
-            template = Template(filename=process_template)
+            template = Template(filename=process_template)  # nosec: B702
         elif os.path.isfile(default_template):
-            template = Template(filename=default_template)
+            template = Template(filename=default_template)  # nosec: B702
         else:
             raise IOError("Template file doesn't exist: OneOf[{!s}, {!s}]".
                           format(process_name, default_name))

@@ -84,7 +84,7 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=False):
     # FIXME: ConnectionRefused with `requests.get`, using `urllib` instead
     try:
         mime_type_url = "{}{}".format(IANA_NAMESPACE_DEFINITION[IANA_NAMESPACE], mime_type)
-        resp = urlopen(mime_type_url)   # 404 on not implemented/referenced mime-type
+        resp = urlopen(mime_type_url)  # nosec: B310 # is hardcoded HTTP(S)
         if resp.code == 200:
             return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, mime_type)
     except HTTPError:

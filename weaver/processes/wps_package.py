@@ -247,6 +247,28 @@ def get_package_workflow_steps(package_dict_or_url):
     return workflow_steps_ids
 
 
+def _fetch_process_info(process_info_url, fetch_error):
+    # type: (AnyStr, Type[Exception]) -> JSON
+    """
+    Fetches the JSON process information from the specified URL and validates that it contains something.
+
+    :raises: provided exception with URL message if the process information could not be retrieved.
+    """
+    def _info_not_found_error():
+        return fetch_error("Could not find reference: '{!s}'".format(process_info_url))
+
+    if not isinstance(process_info_url, six.string_types):
+        raise _info_not_found_error()
+    verify = get_settings(app).get("weaver.ssl_verify", True)
+    resp = requests.get(process_info_url, headers={"Accept": CONTENT_TYPE_APP_JSON}, verify=verify)
+    if resp.status_code != HTTPOk.code:
+        raise _info_not_found_error()
+    body = resp.json()
+    if not isinstance(body, dict) or not len(body):
+        raise _info_not_found_error()
+    return body
+
+
 def _get_process_package(process_url):
     # type: (AnyStr) -> Tuple[CWL, AnyStr]
     """
@@ -255,23 +277,9 @@ def _get_process_package(process_url):
     :param process_url: process literal URL to DescribeProcess WPS-REST location.
     :return: tuple of package body as dictionary and package reference name.
     """
-
-    def _package_not_found_error(ref):
-        return PackageNotFound("Could not find workflow step reference: '{}'".format(ref))
-
-    if not isinstance(process_url, six.string_types):
-        raise _package_not_found_error(str(process_url))
-
-    package_url = "{}/package".format(process_url)
+    package_url = "{!s}/package".format(process_url)
+    package_body = _fetch_process_info(package_url, PackageNotFound)
     package_name = process_url.split("/")[-1]
-    package_resp = requests.get(package_url, headers={"Accept": CONTENT_TYPE_APP_JSON}, verify=False)
-    if package_resp.status_code != HTTPOk.code:
-        raise _package_not_found_error(package_url)
-    package_body = package_resp.json()
-
-    if not isinstance(package_body, dict) or not len(package_body):
-        raise _package_not_found_error(str(process_url))
-
     return package_body, package_name
 
 
@@ -283,23 +291,9 @@ def _get_process_payload(process_url):
     :param process_url: process literal URL to DescribeProcess WPS-REST location.
     :return: payload body as dictionary.
     """
-
-    def _payload_not_found_error(ref):
-        return PayloadNotFound("Could not find workflow step reference: '{}'".format(ref))
-
-    if not isinstance(process_url, six.string_types):
-        raise _payload_not_found_error(str(process_url))
-
     process_url = get_process_location(process_url)
-    payload_url = "{}/payload".format(process_url)
-    payload_resp = requests.get(payload_url, headers={"Accept": CONTENT_TYPE_APP_JSON}, verify=False)
-    if payload_resp.status_code != HTTPOk.code:
-        raise _payload_not_found_error(payload_url)
-    payload_body = payload_resp.json()
-
-    if not isinstance(payload_body, dict) or not len(payload_body):
-        raise _payload_not_found_error(str(process_url))
-
+    payload_url = "{!s}/payload".format(process_url)
+    payload_body = _fetch_process_info(payload_url, PayloadNotFound)
     return payload_body
 
 
@@ -1433,7 +1427,7 @@ def _xml_wps2cwl(wps_process_response):
         return _xml.split("}")[-1].lower()
 
     # look for `XML` structure starting at `ProcessDescription` (WPS-1)
-    xml_resp = lxml.etree.fromstring(str2bytes(wps_process_response.content))   # Python 3 content is str, must be bytes
+    xml_resp = lxml.etree.fromstring(str2bytes(wps_process_response.content))
     xml_wps_process = xml_resp.xpath("//ProcessDescription")  # type: List[XML]
     if not len(xml_wps_process) == 1:
         raise ValueError("Could not retrieve a valid 'ProcessDescription' from WPS-1 response.")

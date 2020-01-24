@@ -299,7 +299,7 @@ class WpsWorkflow(ProcessCWL):
                             if binding.get("loadContents"):
                                 files["contents"] = contents.decode("utf-8")
                             if compute_checksum:
-                                checksum = hashlib.sha1()
+                                checksum = hashlib.sha1()   # nosec: B303
                                 while contents != b"":
                                     checksum.update(contents)
                                     contents = f.read(1024 * 1024)
