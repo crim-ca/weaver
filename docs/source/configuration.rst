@@ -1,83 +1,57 @@
 .. _configuration:
 
-# TODO: update all this
-
-
 ******************
-Configuration File
+Configuration
 ******************
 
 .. contents::
     :local:
     :depth: 2
 
-After you have installed weaver you can customize the default weaver configuration by editing
-the ``weaver/config/weaver.ini`` configuration file. This configuration file overwrites the default settings in the ``buildout.cfg``:
-
-.. code-block:: cfg
-
-   $ vim custom.cfg
-   $ cat custom.cfg
-   [buildout]
-   extends = buildout.cfg
-
-   [settings]
-   hostname = localhost
-   http-port = 8083
-   https-port = 5000
-   log-level = WARN
-   username =
-   password =
-   workdir =
-   ows-security = true
-   ows-proxy = true
-   rpcinterface = true
-   wps = true
-   wps-cfg = /path/to/my/default/pywps.cfg
-
-After your have made a change in ``custom.cfg`` you *need to update* the installation and restart the weaver service:
-
-.. code-block:: sh
-
-   $ make update
-   $ make restart
-   $ make status
-
-Set hostname and port
-=====================
-
-Edit the options ``hostname``, ``http-port`` and ``https-port``.
+After you have installed `Weaver`, you can customize its behaviour using multiple configuration settings.
 
 
-Activate basic-auth for XML-RPC control interface
-=================================================
-
-Set ``username`` and ``password``.
-
-
-Configure the default WPS configuration
+Configuration Settings
 =======================================
 
-Edit the ``wps-cfg`` option to set the default PyWPS configuration for the capabilities of the internal WPS (PyWPS) application.
+All settings are configured using a ``weaver.ini`` configuration file. An `weaver.ini.example`_ file is provided
+with default values to help in the configuration process.
+
+.. todo:: complete docs
 
 
-Deactivate weaver components
-==============================
 
-weaver has four components which by default are activated:
+Configuration of Data Sources
+=======================================
 
-ows-security
-   The OWS security wsgi middleware
-ows-proxy
-   A proxy wsgi application for OWS services
-rpcinterface
-   An XML-RPC interface to control token generation and service registration
-wps
-   An internal WPS wsgi application (PyWPS)
+.. todo:: complete docs
 
-By setting a component option to ``false`` you can deactivate it:
+`data_sources.json.example`_
 
-.. code-block:: sh
 
-   [settings]
-   ows-proxy = false
+Configuration of WPS Processes
+=======================================
+
+.. todo:: complete docs
+
+
+`wps_processes.yml.example`_
+
+
+Starting the Application
+=======================================
+
+.. todo:: complete docs
+
+``make start`` (or similar command)
+
+- need to start ``gunicorn/pserve`` (example `Dockerfile-manager`_)
+- need to start ``celery`` worker (example `Dockerfile-worker`_)
+
+
+
+.. _weaver.ini.example: ../../../config/weaver.ini.example
+.. _data_sources.json.example: ../../../config/data_sources.json.example
+.. _wps_processes.yml.example: ../../../config/wps_processes.yml.example
+.. _Dockerfile-manager: ../../../docker/Dockerfile-manager
+.. _Dockerfile-worker: ../../../docker/Dockerfile-worker

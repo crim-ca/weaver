@@ -40,10 +40,8 @@ from weaver.exceptions import (
     log_unhandled_exceptions
 )
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN
-from weaver.processes import wps_package
 from weaver.processes.constants import WPS_COMPLEX_DATA
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
-from weaver.processes.wps_package import complex2json as jsonify_value
 from weaver.store.base import StoreProcesses
 from weaver.utils import get_sane_name, get_settings, get_url_without_query
 from weaver.wps_restapi import swagger_definitions as sd
@@ -164,6 +162,8 @@ def convert_process_wps_to_db(service, process, container):
     """
     Converts an owslib WPS Process to local storage Process.
     """
+    from weaver.processes.wps_package import complex2json as jsonify_value
+
     describe_process_url = "{base_url}/providers/{provider_id}/processes/{process_id}".format(
         base_url=get_wps_restapi_base_url(container),
         provider_id=service.get("name"),
@@ -222,9 +222,10 @@ def _check_deploy(payload):
                           is_request=False)
 def _get_deploy_process_info(process_info, reference, package):
     """Obtain the process definition from deploy payload with exception handling."""
+    from weaver.processes.wps_package import get_process_definition
     try:
         # data_source `None` forces workflow process to search locally for deployed step applications
-        return wps_package.get_process_definition(process_info, reference, package, data_source=None)
+        return get_process_definition(process_info, reference, package, data_source=None)
     except PackageNotFound as ex:
         # raised when a workflow sub-process is not found (not deployed locally)
         raise HTTPNotFound(detail=str(ex))

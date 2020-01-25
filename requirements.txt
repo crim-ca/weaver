@@ -6,6 +6,7 @@ colander
 cornice
 cornice_swagger>=0.7.0
 cwltool==1.0.20180820141117
+#cwltool==2.0.20200122124526; python_version >= "3.5"
 duration
 flufl.enum; python_version < "3"
 # gunicorn >20 breaks some config.ini loading parameters (paste)
@@ -26,7 +27,10 @@ pywps
 pyyaml>=4.2b4
 requests
 requests_file
-ruamel.yaml>=0.15.78
+# let cwltool define ruamel.yaml version (<=16.5)
+# ensure minimal 0.15.78 to solve install issue
+# (https://bitbucket.org/ruamel/yaml/issues/261/error-while-installing-ruamelyaml-setuppy)
+#ruamel.yaml>=0.15.78,<16
 shapely
 six
 simplejson
