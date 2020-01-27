@@ -4,7 +4,6 @@ Utility methods for various TestCase setup operations.
 import os
 import uuid
 import warnings
-from contextlib import ExitStack
 from inspect import isclass
 from typing import TYPE_CHECKING
 
@@ -19,6 +18,7 @@ from requests import Response
 from six.moves.configparser import ConfigParser
 from webtest import TestApp
 
+from tests.compat import contextlib
 from weaver.config import WEAVER_CONFIGURATION_DEFAULT, WEAVER_DEFAULT_INI_CONFIG, get_weaver_config_file
 from weaver.database import get_db
 from weaver.datatype import Service
@@ -264,7 +264,7 @@ def mocked_sub_requests(app, function, *args, **kwargs):
             resp.url = url
         return resp
 
-    with ExitStack() as stack:
+    with contextlib.ExitStack() as stack:
         stack.enter_context(mock.patch("requests.request", side_effect=mocked_request))
         stack.enter_context(mock.patch("requests.sessions.Session.request", side_effect=mocked_request))
         request_func = getattr(app, function)

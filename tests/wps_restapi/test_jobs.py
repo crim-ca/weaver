@@ -2,7 +2,6 @@ import json
 import unittest
 import warnings
 from collections import OrderedDict
-from contextlib import ExitStack
 from typing import TYPE_CHECKING, AnyStr, List, Tuple, Union
 
 import mock
@@ -12,6 +11,7 @@ import six
 import webtest
 from owslib.wps import WebProcessingService
 
+from tests.compat import contextlib
 from tests.utils import (
     mocked_process_job_runner,
     setup_config_with_mongodb,
@@ -309,7 +309,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
             "response": EXECUTE_RESPONSE_DOCUMENT,
             "notification_email": email
         }
-        with ExitStack() as stack:
+        with contextlib.ExitStack() as stack:
             for runner in mocked_process_job_runner():
                 stack.enter_context(runner)
             path = "/processes/{}/jobs".format(self.process_public.identifier)
@@ -419,7 +419,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         path = self.add_params(jobs_short_uri,
                                service=self.service_public.name,
                                process=self.process_private.identifier)
-        with ExitStack() as stack:
+        with contextlib.ExitStack() as stack:
             for runner in self.get_job_remote_service_mock([self.process_private]):  # process visible on remote
                 stack.enter_context(runner)
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
@@ -435,7 +435,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         path = self.add_params(jobs_short_uri,
                                service=self.service_public.name,
                                process=self.process_private.identifier)
-        with ExitStack() as stack:
+        with contextlib.ExitStack() as stack:
             for job in self.get_job_remote_service_mock([]):    # process invisible (not returned by remote)
                 stack.enter_context(job)
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
@@ -500,7 +500,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
         for i, (path, access, user_id, expected_jobs) in enumerate(path_jobs_user_req_tests):
             patches = self.get_job_request_auth_mock(user_id) + self.get_job_remote_service_mock([self.process_public])
-            with ExitStack() as stack:
+            with contextlib.ExitStack() as stack:
                 for patch in patches:
                     stack.enter_context(patch)
                 test = self.add_params(path, access=access) if access else path

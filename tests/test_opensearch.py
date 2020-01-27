@@ -2,7 +2,6 @@ import json
 import os
 import unittest
 from collections import deque
-from contextlib import ExitStack
 from copy import deepcopy
 from pprint import pformat
 
@@ -14,6 +13,7 @@ from pywps.inout.inputs import LiteralInput
 from six.moves.urllib.parse import parse_qsl, urlparse
 
 from tests.utils import setup_mongodb_processstore
+from tests.compat import contextlib
 from weaver.datatype import Process
 from weaver.processes import opensearch
 from weaver.processes.constants import OPENSEARCH_AOI, OPENSEARCH_END_DATE, OPENSEARCH_START_DATE
@@ -170,7 +170,7 @@ def test_deploy_opensearch():
         return req.registry.settings
 
     # mock db functions called by add_local_process
-    with ExitStack() as stack:
+    with contextlib.ExitStack() as stack:
         stack.enter_context(mock.patch("weaver.wps_restapi.processes.processes.get_db", side_effect=MockDB))
         stack.enter_context(mock.patch("weaver.wps_restapi.processes.processes.get_settings", side_effect=_get_mocked))
         stack.enter_context(mock.patch("weaver.processes.utils.get_db", side_effect=MockDB))

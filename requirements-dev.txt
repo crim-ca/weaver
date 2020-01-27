@@ -2,6 +2,7 @@
 bandit
 bump2version
 codacy-coverage
+contextlib2; python_version < "3"
 coverage
 doc8
 flake8

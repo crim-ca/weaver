@@ -1,7 +1,6 @@
 import json
 import os
 import unittest
-from contextlib import ExitStack
 from tempfile import NamedTemporaryFile
 from time import sleep
 
@@ -10,6 +9,7 @@ import pyramid.testing
 import pytest
 import six
 
+from tests.compat import contextlib
 from tests.utils import (
     get_settings_from_testapp,
     get_test_weaver_app,
@@ -76,7 +76,7 @@ class BuiltinAppTest(unittest.TestCase):
     def test_jsonarray2netcdf_execute(self):
         dirname = "/tmp"
         nc_data = "Hello NetCDF!"
-        with ExitStack() as stack_files:
+        with contextlib.ExitStack() as stack_files:
             tmp_ncdf = stack_files.enter_context(NamedTemporaryFile(dir=dirname, mode="w", suffix=".nc"))
             tmp_json = stack_files.enter_context(NamedTemporaryFile(dir=dirname, mode="w", suffix=".json"))
             tmp_ncdf.write(nc_data)
@@ -89,7 +89,7 @@ class BuiltinAppTest(unittest.TestCase):
                 "inputs": [{"id": "input", "href": os.path.join(dirname, tmp_json.name)}],
                 "outputs": [{"id": "output", "transmissionMode": "reference"}],
             }
-            with ExitStack() as stack_proc:
+            with contextlib.ExitStack() as stack_proc:
                 for process in mocked_execute_process():
                     stack_proc.enter_context(process)
                 path = "/processes/jsonarray2netcdf/jobs"
