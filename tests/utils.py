@@ -87,15 +87,6 @@ def setup_config_from_settings(settings=None):
     return config
 
 
-def setup_config_from_ini(config_ini_file_path=None):
-    # type: (Optional[AnyStr]) -> Configurator
-    config_ini_file_path = get_weaver_config_file(config_ini_file_path, WEAVER_DEFAULT_INI_CONFIG)
-    settings = get_settings_from_config_ini(config_ini_file_path, "app:main")
-    settings.update(get_settings_from_config_ini(config_ini_file_path, "celery"))
-    config = testing.setUp(settings=settings)
-    return config
-
-
 def setup_config_with_mongodb(config=None, settings=None):
     # type: (Optional[Configurator], Optional[SettingsType]) -> Configurator
     settings = settings or {}
@@ -180,6 +171,8 @@ def get_test_weaver_config(config=None, settings=None):
         config.registry.settings["weaver.configuration"] = WEAVER_CONFIGURATION_DEFAULT
     if "weaver.url" not in config.registry.settings:
         config.registry.settings["weaver.url"] = "https://localhost"
+    # ignore example config files that would be auto-generated when missing
+    config.registry.settings["weaver.wps_processes"] = None
     if settings:
         config.registry.settings.update(settings)
     # create the test application
