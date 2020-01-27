@@ -1,12 +1,8 @@
 import unittest
 
 import pytest
-# use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
-from webtest import TestApp as WebTestApp
 
-from tests.utils import setup_config_with_mongodb
-from weaver import main
-from weaver.config import WEAVER_CONFIGURATION_DEFAULT
+from tests.utils import setup_config_with_mongodb, get_test_weaver_app
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.wps_restapi.swagger_definitions import (
     api_frontpage_uri,
@@ -55,10 +51,7 @@ class StatusCodeTestCase(unittest.TestCase):
 
     def setUp(self):
         config = setup_config_with_mongodb()
-        config.registry.settings["weaver.configuration"] = WEAVER_CONFIGURATION_DEFAULT
-        config.registry.settings["weaver.url"] = "https://localhost"
-        app = main({}, **config.registry.settings)
-        self.testapp = WebTestApp(app)
+        self.testapp = get_test_weaver_app(config)
 
     def test_200(self):
         for uri in TEST_PUBLIC_ROUTES:

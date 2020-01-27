@@ -172,7 +172,7 @@ def get_test_weaver_config(config=None, settings=None):
     if "weaver.url" not in config.registry.settings:
         config.registry.settings["weaver.url"] = "https://localhost"
     # ignore example config files that would be auto-generated when missing
-    config.registry.settings["weaver.wps_processes"] = None
+    config.registry.settings["weaver.wps_processes"] = ""
     if settings:
         config.registry.settings.update(settings)
     # create the test application
