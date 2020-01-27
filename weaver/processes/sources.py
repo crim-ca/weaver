@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Text, Union
+from typing import TYPE_CHECKING
 
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
@@ -12,36 +12,44 @@ from weaver.processes.constants import OPENSEARCH_LOCAL_FILE_SCHEME
 from weaver.utils import get_settings
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
-DATA_SOURCE_SCHEMA = """
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Data Sources",
-  "type": "object",
-  "patternProperties": {
-    ".*": {
+if TYPE_CHECKING:
+    from typing import Optional, Text
+
+DATA_SOURCES = {}
+"""Data sources configuration.
+
+Unless explicitly overridden, the configuration will be loaded from file as specified by 
+``weaver.data_sources`` setting. Following schema format is expected: 
+
+.. code-block:: json
+
+    {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Data Sources",
       "type": "object",
-      "required": [ "netloc", "ades" ],
-      "additionalProperties": false,
-      "properties": {
-        "netloc": {
-          "type": "string",
-          "description": "Net location of a data source url use to match this data source."
-        },
-        "ades": {
-          "type": "string",
-          "description": "ADES endpoint where the processing of this data source can occur."
-        },
-        "default": {
-          "type": "string",
-          "description": "True indicate that if no data source match this one should be used (Use the first default)."
+      "patternProperties": {
+        ".*": {
+          "type": "object",
+          "required": [ "netloc", "ades" ],
+          "additionalProperties": false,
+          "properties": {
+            "netloc": {
+              "type": "string",
+              "description": "Net location of a data source url use to match this data source."
+            },
+            "ades": {
+              "type": "string",
+              "description": "ADES endpoint where the processing of this data source can occur."
+            },
+            "default": {
+              "type": "string",
+              "description": "True indicate that if no data source match this one should be used (Use the first default)."
+            }
+          }
         }
       }
     }
-  }
-}
 """
-
-DATA_SOURCES = {}
 
 
 def fetch_data_sources():
@@ -77,9 +85,12 @@ def get_default_data_source(data_sources):
 
 
 def retrieve_data_source_url(data_source):
-    # type: (Union[Text, None]) -> Text
-    """Finds the data source URL using the provided data source identifier.
-    :returns: found URL, 'default' data source if not found, or current weaver WPS Rest API base URL if `None`."""
+    # type: (Optional[Text]) -> Text
+    """
+    Finds the data source URL using the provided data source identifier.
+
+    :returns: found URL, 'default' data source if not found, or current weaver WPS Rest API base URL if `None`.
+    """
     if data_source is None:
         # get local data source
         return get_wps_restapi_base_url(get_settings(app))

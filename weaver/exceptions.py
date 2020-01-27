@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 class WeaverException(Exception):
-    """Base class of exceptions defined by :py:mod:`weaver` package."""
+    """Base class of exceptions defined by :mod:`weaver` package."""
 
 
 class InvalidIdentifierValue(WeaverException, ValueError):
@@ -205,7 +205,7 @@ def log_unhandled_exceptions(logger=LOGGER, message="Unhandled exception occurre
     Decorator that will raise ``exception`` with specified ``message`` if an exception is caught while execution the
     wrapped function, after logging relevant details about the caught exception with ``logger``.
 
-    :param logger: logger to use for logging (default: use :py:mod:`weaver.exception` logger).
+    :param logger: logger to use for logging (default: use :data:`weaver.exception.LOGGER`).
     :param message: message that will be logged with details and then raised with ``exception``.
     :param exception: exception type to be raised instead of the caught exception.
     :param force: force handling of any raised exception (default: only *known* unhandled exceptions are logged).

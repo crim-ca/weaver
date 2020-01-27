@@ -457,7 +457,7 @@ def assert_sane_name(name, min_len=3, max_len=None):
     """Asserts that the sane name respects conditions.
 
     .. seealso::
-        - argument details in :function:`get_sane_name`
+        - argument details in :func:`get_sane_name`
     """
     if name is None:
         raise InvalidIdentifierValue("Invalid name : {0}".format(name))

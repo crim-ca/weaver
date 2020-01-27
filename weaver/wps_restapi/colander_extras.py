@@ -15,7 +15,7 @@ class DropableNoneSchema(colander.SchemaNode):
     Original behaviour of schema classes that can have children nodes such as :class:`colander.MappingSchema` and
     :class:`colander.SequenceSchema` are to drop the sub-node only if its value is resolved as :class:`colander.null`
     or :class:`colander.drop`. This results in "missing" definitions replaced by ``None`` in many implementations to
-    raise :py:exception:`colander.Invalid` during deserialization. Inheriting this class in a schema definition
+    raise :py:exc:`colander.Invalid` during deserialization. Inheriting this class in a schema definition
     will handle this situation automatically.
 
     Required schemas (without ``missing=drop``, i.e.: :class:`colander.required`) will still raise for undefined nodes.

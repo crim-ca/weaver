@@ -148,7 +148,7 @@ class WpsPackageAppTest(unittest.TestCase):
             - `WPS` I/O complementary details are added to corresponding `CWL` I/O (no duplication of IDs)
 
         .. seealso::
-            - :function:`weaver.processes.wps_package._merge_package_io`
+            - :func:`weaver.processes.wps_package._merge_package_io`
         """
         cwl = {
             "cwlVersion": "v1.0",
@@ -920,7 +920,7 @@ class WpsPackageAppTest(unittest.TestCase):
             - `WPS` I/O complementary details are added to corresponding `CWL` I/O (no duplication of IDs)
 
         .. seealso::
-            - :function:`weaver.processes.wps_package._merge_package_io`
+            - :func:`weaver.processes.wps_package._merge_package_io`
         """
         cwl = {
             "cwlVersion": "v1.0",

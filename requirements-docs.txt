@@ -1,5 +1,6 @@
+pycodestyle
 # FIXME: bug when using 1.2 (https://github.com/readthedocs/sphinx-autoapi/issues/186)
 sphinx-autoapi<1.2
 sphinx>=1.6
-pycodestyle
+sphinx_autodoc_typehints[type_comments]
 -e git+https://github.com/huard/sphinx-autodoc-pywps.git#egg=sphinx_autodoc_pywps

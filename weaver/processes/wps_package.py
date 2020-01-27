@@ -1628,9 +1628,9 @@ class WpsPackage(Process):
         Creates a `WPS-3 Process` instance to execute a `CWL` package definition.
 
         Process parameters should be loaded from an existing :class:`weaver.datatype.Process`
-        instance generated using :function:`weaver.wps_package.get_process_definition`.
+        instance generated using :func:`weaver.wps_package.get_process_definition`.
 
-        Provided ``kw`` should correspond to :method:`weaver.datatype.Process.params_wps`
+        Provided ``kw`` should correspond to :meth:`weaver.datatype.Process.params_wps`
         """
         self.payload = kw.pop("payload")
         self.package = kw.pop("package")

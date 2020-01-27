@@ -16,30 +16,28 @@ from weaver.utils import bytes2str, get_settings, str2bytes
 
 if TYPE_CHECKING:
     from weaver.typedefs import AnySettingsContainer
-    from typing import Dict     # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 
-DEFAULT_TEMPLATE = """
+__DEFAULT_TEMPLATE__ = """
 <%doc>
-    This is an example notification message to be sent by email when a job is
-    done. It is formatted using the Mako template library
-    (https://www.makotemplates.org/). The content must also include the message
-    header.
+    This is an example notification message to be sent by email when a job is done. 
+    It is formatted using the Mako template library (https://www.makotemplates.org/). 
+    The content must also include the message header.
 
     The provided variables are:
     to: Recipient's address
-    job: a weaver.datatype.Job object
+    job: weaver.datatype.Job object
     settings: application settings
 
-    And every variable returned by the `weaver.wps_restapi.jobs.jobs.job_format_json` function:
+    And every variable returned by the `weaver.datatype.Job.json` method:
     status:           succeeded, failed
     logs:             url to the logs
     jobID:	          example "617f23d3-f474-47f9-a8ec-55da9dd6ac71"
     result:           url to the outputs
     duration:         example "0:01:02"
     message:          example "Job succeeded."
-    percentCompleted: example "100"
+    percentCompleted: example 100
 </%doc>
 From: Weaver
 To: ${to}
@@ -48,10 +46,10 @@ Content-Type: text/plain; charset=UTF-8
 
 Dear user,
 
-Your job submitted on ${job.created.strftime('%Y/%m/%d %H:%M %Z')} to ${settings.get('weaver.url')} ${job.status}.
+Your job submitted on ${job.created.strftime("%Y/%m/%d %H:%M %Z")} to ${settings.get("weaver.url")} ${job.status}.
 
-% if job.status == 'succeeded':
-You can retrieve the output(s) at the following link: ${job.results[0]['reference']}
+% if job.status == "succeeded":
+You can retrieve the output(s) at the following link: ${job.results[0]["reference"]}
 % endif
 
 The logs are available here: ${logs}
@@ -82,7 +80,7 @@ def notify_job_complete(job, to_email_recipient, container):
     # find appropriate template according to settings
     if not os.path.isdir(template_dir):
         LOGGER.warning("No default email template directory configured. Using default format.")
-        template = Template(text=DEFAULT_TEMPLATE)  # nosec: B702
+        template = Template(text=__DEFAULT_TEMPLATE__)  # nosec: B702
     else:
         default_name = settings.get("weaver.wps_email_notify_template_default", "default.mako")
         process_name = "{!s}.mako".format(job.process)

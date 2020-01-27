@@ -39,7 +39,7 @@ LOGGER = get_task_logger(__name__)
 def check_status(url=None, response=None, sleep_secs=2, verify=False):
     # type: (Optional[AnyStr], Optional[etree.ElementBase], int, bool) -> WPSExecution
     """
-    Run :function:`owslib.wps.WPSExecution.checkStatus` with additional exception handling.
+    Run :func:`owslib.wps.WPSExecution.checkStatus` with additional exception handling.
 
     :param url: job URL where to look for job status.
     :param response: WPS response document of job status.
@@ -85,6 +85,8 @@ def check_status(url=None, response=None, sleep_secs=2, verify=False):
 def get_job(request):
     # type: (Request) -> Job
     """
+    Obtain a job from request parameters.
+
     :returns: Job information if found.
     :raises: HTTPNotFound with JSON body details on missing/non-matching job, process, provider IDs.
     """

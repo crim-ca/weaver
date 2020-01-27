@@ -7,6 +7,5 @@
    configuration
    running
    tutorial
-   api
    changes
    appendix

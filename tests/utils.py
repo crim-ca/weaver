@@ -236,14 +236,14 @@ def init_weaver_service(registry):
 
 def mocked_sub_requests(app, function, *args, **kwargs):
     """
-    Executes ``app.function(*args, **kwargs)`` with a mock of every underlying :function:`requests.request` call
+    Executes ``app.function(*args, **kwargs)`` with a mock of every underlying :func:`requests.request` call
     to relay their execution to the :class:`webTest.TestApp`.
     Generates a `fake` response from a file if the URL scheme is ``mock://``.
     """
 
     def mocked_request(method, url=None, headers=None, verify=None, cert=None, **req_kwargs):  # noqa: E811
         """
-        Request corresponding to :function:`requests.request` that instead gets executed by :class:`webTest.TestApp`.
+        Request corresponding to :func:`requests.request` that instead gets executed by :class:`webTest.TestApp`.
         """
         method = method.lower()
         headers = headers or req_kwargs.get("headers")
@@ -280,7 +280,7 @@ def mocked_sub_requests(app, function, *args, **kwargs):
 
 def mocked_execute_process():
     """
-    Provides a mock to call :function:`weaver.wps_restapi.processes.processes.execute_process` safely within
+    Provides a mock to call :func:`weaver.wps_restapi.processes.processes.execute_process` safely within
     a test employing a :class:`webTest.TestApp` without a running ``Celery`` app.
     This avoids connection error from ``Celery`` during a job execution request.
 
@@ -289,12 +289,12 @@ def mocked_execute_process():
     **Note**: since ``delay`` and ``Celery`` are bypassed, the process execution becomes blocking (not asynchronous).
 
     .. seealso::
-        :function:`mocked_process_job_runner` to completely skip process execution.
+        :func:`mocked_process_job_runner` to completely skip process execution.
     """
     class MockTask(object):
         """
-        Mocks call ``self.request.id`` in :function:`weaver.wps_restapi.processes.processes.execute_process` and
-        call ``result.id`` in :function:`weaver.wps_restapi.processes.processes.submit_job_handler`.
+        Mocks call ``self.request.id`` in :func:`weaver.wps_restapi.processes.processes.execute_process` and
+        call ``result.id`` in :func:`weaver.wps_restapi.processes.processes.submit_job_handler`.
         """
         _id = str(uuid.uuid4())
 
@@ -319,7 +319,7 @@ def mocked_process_job_runner(job_task_id="mocked-job-id"):
     Provides a mock that will no execute the process execution when call during job creation.
 
     .. seealso::
-        :function:`mocked_execute_process` to still execute the process, but without `Celery` connection.
+        :func:`mocked_execute_process` to still execute the process, but without `Celery` connection.
     """
     result = mock.MagicMock()
     result.id = job_task_id

@@ -347,7 +347,7 @@ check-doc8: mkdir-reports install-dev	## run doc8 documentation style checks
 .PHONY: check-links
 check-links: install-dev	## check all external links in documentation for integrity
 	@echo "Running link checks on docs..."
-	@bash -c '$(CONDA_CMD) (MAKE) -C "$(APP_ROOT)/docs" linkcheck'
+	@bash -c '$(CONDA_CMD) $(MAKE) -C "$(APP_ROOT)/docs" linkcheck'
 
 .PHONY: check-imports
 check-imports: mkdir-reports install-dev	## run imports code checks
@@ -371,8 +371,6 @@ fix-imports: mkdir-reports install-dev	## apply import code checks corrections
 docs: install-dev clean-docs 	## generate HTML documentation with Sphinx
 	@echo "Generating docs with Sphinx..."
 	@bash -c '$(CONDA_CMD) $(MAKE) -C $@ html'
-	@echo "open your browser:"
-	@echo "		firefox '$(APP_ROOT)/docs/build/html/index.html'"
 
 ## -- Versionning targets -- ##
 
