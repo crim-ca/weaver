@@ -25,12 +25,17 @@ CONDA_ENV_PATH := $(CONDA_ENVS_DIR)/$(CONDA_ENV)
 CONDA_BIN      := $(CONDA_HOME)/bin/conda
 CONDA_ENV_REAL_TARGET_PATH := $(realpath $(CONDA_ENV_PATH))
 CONDA_ENV_REAL_ACTIVE_PATH := $(realpath ${CONDA_PREFIX})
-ifeq "$(CONDA_ENV_REAL_ACTIVE_PATH)" "$(CONDA_ENV_REAL_TARGET_PATH)"
-	CONDA_CMD :=
+ifneq "$(CONDA_ENV_REAL_ACTIVE_PATH)" ""
 	CONDA_ENV_MODE := [using active environment]
-else
-	CONDA_CMD := source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)";
+	CONDA_ENV := $(notdir $(CONDA_ENV_REAL_ACTIVE_PATH))
+	CONDA_CMD :=
+else $(CONDA_ENV_REAL_TARGET_PATH) ""
 	CONDA_ENV_MODE := [will activate environment]
+	CONDA_CMD := source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)";
+else
+	CONDA_ENV_MODE := [will activate environment]
+	CONDA_ENV := $(notdir $(CONDA_ENV_REAL_TARGET_PATH))
+	CONDA_CMD := source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)";
 endif
 DOWNLOAD_CACHE ?= $(APP_ROOT)/downloads
 PYTHON_VERSION ?= `python -c 'import platform; print(platform.python_version())'`
@@ -95,8 +100,9 @@ info:		## display make information
 	@echo "  OS_NAME             $(OS_NAME)"
 	@echo "  CPU_ARCH            $(CPU_ARCH)"
 	@echo "  Conda Home          $(CONDA_HOME)"
-	@echo "  Conda Environment   $(CONDA_ENV)"
 	@echo "  Conda Prefix        $(CONDA_ENV_PATH)"
+	@echo "  Conda Env Real Name $(CONDA_ENV)"
+	@echo "  Conda Env Real Path $(CONDA_ENV_REAL_ACTIVE_PATH)"
 	@echo "  Conda Binary        $(CONDA_BIN)"
 	@echo "  Conda Actication    $(CONDA_ENV_MODE)"
 	@echo "  Conda Command       $(CONDA_CMD)"
@@ -129,7 +135,6 @@ conda-config: conda-base	## setup configuration of the conda environment
 	@echo "Updating conda configuration..."
 	@"$(CONDA_BIN)" config --add envs_dirs $(CONDA_ENVS_DIR)
 	@"$(CONDA_BIN)" config --set ssl_verify true
-	#@"$(CONDA_BIN)" config --set use_pip true
 	@"$(CONDA_BIN)" config --set channel_priority true
 	@"$(CONDA_BIN)" config --set auto_update_conda false
 	@"$(CONDA_BIN)" config --add channels defaults
@@ -163,6 +168,8 @@ install-all: install-sys install-pip install-pkg install-dev  ## install applica
 .PHONY: install-dev
 install-dev: install-pip	## install developement and test dependencies
 	@echo "Installing development packages with pip..."
+	@echo "`which pip`"
+	@echo "YUP"
 	@-bash -c '$(CONDA_CMD) pip install -r $(APP_ROOT)/requirements-dev.txt'
 	@echo "Install with pip complete. Test service with \`make test*' variations."
 
