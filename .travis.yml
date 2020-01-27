@@ -40,7 +40,7 @@ script:
       make docs
     fi
   # run tests for each python version
-  - make test-all
+  - make test
 after_script:
   - make stop
 matrix:

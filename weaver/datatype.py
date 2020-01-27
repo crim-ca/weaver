@@ -13,7 +13,7 @@ from owslib.wps import WPSException
 from pywps import Process as ProcessWPS
 
 from weaver.exceptions import ProcessInstanceError
-from weaver.processes.types import PROCESS_WITH_MAPPING, PROCESS_WPS
+from weaver.processes.types import PROCESS_APPLICATION, PROCESS_BUILTIN, PROCESS_TEST, PROCESS_WORKFLOW, PROCESS_WPS
 from weaver.status import (
     JOB_STATUS_CATEGORIES,
     JOB_STATUS_VALUES,
@@ -659,6 +659,7 @@ class Process(Base):
     @property
     def type(self):
         # type: () -> AnyStr
+        from weaver.processes.types import PROCESS_WPS
         return self.get("type", PROCESS_WPS)
 
     @property
@@ -824,17 +825,24 @@ class Process(Base):
     def wps(self):
         # type: () -> ProcessWPS
 
-        # import here to avoid circular dependencies
-        from weaver.processes import PROCESS_MAPPING
+        # import here to avoid circular import errors
+        from weaver.processes.wps_default import HelloWPS
+        from weaver.processes.wps_package import WpsPackage
+        from weaver.processes.wps_testing import WpsTestProcess
+        process_map = {
+            HelloWPS.identifier: HelloWPS,
+            PROCESS_TEST: WpsTestProcess,
+            PROCESS_APPLICATION: WpsPackage,
+            PROCESS_WORKFLOW: WpsPackage,
+            PROCESS_BUILTIN: WpsPackage,
+        }
 
         process_key = self.type
         if self.type == PROCESS_WPS:
             process_key = self.identifier
-        if process_key not in PROCESS_MAPPING:
+        if process_key not in process_map:
             ProcessInstanceError("Unknown process '{}' in mapping.".format(process_key))
-        if process_key in PROCESS_WITH_MAPPING:
-            return PROCESS_MAPPING[process_key](**self.params_wps)
-        return PROCESS_MAPPING[process_key]()
+        return process_map[process_key](**self.params_wps)
 
 
 class Quote(Base):

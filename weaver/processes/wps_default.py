@@ -13,7 +13,7 @@ class HelloWPS(Process):
     title = "Say Hello"
     type = PROCESS_WPS
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):  # noqa: E811
         inputs = [
             LiteralInput("name", "Your name", data_type="string")]
         outputs = [
