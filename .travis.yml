@@ -47,6 +47,7 @@ after_script:
 matrix:
   allow_failures:
     - os: osx
+    - python: "2.7"
 notifications:
   email: false
 after_success:
