@@ -4,6 +4,12 @@ Changes
 Unreleased
 ==========
 
+Changes:
+-------------
+
+- Simplify docker image generation and make base/manager/worker variants all available under the same docker
+  repo `docker-registry.crim.ca/ogc/weaver <docker-registry.crim.ca/ogc/weaver>`_  with different tags.
+
 Fixes:
 -------------
 
