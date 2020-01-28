@@ -55,14 +55,12 @@ after_success:
   - bash <(curl -s https://codecov.io/bash) || echo "Codecov did not collect coverage reports"
   - source $(HOME)/conda/bin/activate weaver && python-codacy-coverage -r reports/coverage.xml
   - |
-    if [ "$TRAVIS_BRANCH" == "master" ] then
-      export TAG_VERSION=latest
-    else
-      export TAG_VERSION=$TRAVIS_TAG
+    if [ "$TRAVIS_BRANCH" == "master" ];
+    then export TAG_VERSION=latest;
+    else export TAG_VERSION=$TRAVIS_TAG;
     fi
   - |
-    if [ -z "${TAG_VERSION}" ] || [ "$TRAVIS_PULL_REQUEST" = "false" ] then
-      echo "Nothing to build for '$TRAVIS_BRANCH' (PR: $TRAVIS_PULL_REQUEST)"
-    else
-      make APP_VERSION=$TAG_VERSION docker-info docker-build docker-push
+    if [ -z "${TAG_VERSION}" ] || [ "$TRAVIS_PULL_REQUEST" = "false" ];
+    then echo "Nothing to build for '$TRAVIS_BRANCH' (PR: $TRAVIS_PULL_REQUEST)";
+    else make APP_VERSION=$TAG_VERSION docker-info docker-build docker-push;
     fi
