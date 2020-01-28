@@ -4,6 +4,11 @@ Changes
 Unreleased
 ==========
 
+Fixes:
+-------------
+
+- Fix `readthedocs <https://img.shields.io/readthedocs/pavics-weaver>`_ documentation generation.
+
 1.0.0 (2020-01-28)
 ==================
 
