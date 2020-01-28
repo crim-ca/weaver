@@ -47,7 +47,8 @@ after_script:
 matrix:
   allow_failures:
     - os: osx
-    - python: "2.7"
+    - python: "2.7"   # deprecated support
+    - python: "3.8"   # experimental packages
 notifications:
   email: false
 after_success:
