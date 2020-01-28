@@ -93,8 +93,6 @@ in a *EMS* workflow execution chain.
 Weaver can be launched either as an *EMS* or an *ADES* according to configuration values it is deployed with.
 For more details, see `Configuration`_ and `Documentation`_ sections.
 
-.. _CWL: https://www.commonwl.org/
-
 ----------------
 Links
 ----------------
@@ -105,8 +103,19 @@ Docker image `repository <https://docker-registry.crim.ca/repositories/3463>`_.
 
     $ docker pull docker-registry.crim.ca/ogc/weaver:1.0.0
 
+For convenience, following tags are also available:
+
+- ``weaver:1.0.0-manager``: `Weaver` image that will run the API for WPS process and job management.
+- ``weaver:1.0.0-worker``: `Weaver` image that will run the process job runner application.
+
+Following links correspond to existing servers with `Weaver` configured as *EMS*/*ADES* instances respectively.
+
 - EMS Test server: https://ogc-ems.crim.ca/weaver/
 - ADES Test server: https://ogc-ades.crim.ca/weaver/
+
+.. note::
+    The test servers will **not** necessarily be up-to-date with the *latest* version.
+    Request the ``${server}/weaver/versions`` route to verify the running version.
 
 ----------------
 Configuration

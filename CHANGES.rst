@@ -4,6 +4,18 @@ Changes
 Unreleased
 ==========
 
+Changes:
+-------------
+
+- Simplify docker image generation and make base/manager/worker variants all available under the same docker
+  repo `docker-registry.crim.ca/ogc/weaver <docker-registry.crim.ca/ogc/weaver>`_  with different tags.
+
+Fixes:
+-------------
+
+- Fix `readthedocs <https://img.shields.io/readthedocs/pavics-weaver>`_ documentation generation.
+- Fix ``.travis`` docker image build condition.
+
 1.0.0 (2020-01-28)
 ==================
 

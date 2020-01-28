@@ -29,12 +29,11 @@ ifneq "$(CONDA_ENV_REAL_ACTIVE_PATH)" ""
 	CONDA_ENV_MODE := [using active environment]
 	CONDA_ENV := $(notdir $(CONDA_ENV_REAL_ACTIVE_PATH))
 	CONDA_CMD :=
-else $(CONDA_ENV_REAL_TARGET_PATH) ""
-	CONDA_ENV_MODE := [will activate environment]
-	CONDA_CMD := source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)";
 else
-	CONDA_ENV_MODE := [will activate environment]
+ifneq $(CONDA_ENV_REAL_TARGET_PATH) ""
 	CONDA_ENV := $(notdir $(CONDA_ENV_REAL_TARGET_PATH))
+endif
+	CONDA_ENV_MODE := [will activate environment]
 	CONDA_CMD := source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)";
 endif
 DOWNLOAD_CACHE ?= $(APP_ROOT)/downloads
@@ -168,8 +167,6 @@ install-all: install-sys install-pip install-pkg install-dev  ## install applica
 .PHONY: install-dev
 install-dev: install-pip	## install developement and test dependencies
 	@echo "Installing development packages with pip..."
-	@echo "`which pip`"
-	@echo "YUP"
 	@-bash -c '$(CONDA_CMD) pip install -r $(APP_ROOT)/requirements-dev.txt'
 	@echo "Install with pip complete. Test service with \`make test*' variations."
 
@@ -408,30 +405,36 @@ docker-info:		## obtain docker image information
 
 .PHONY: docker-build-base
 docker-build-base:							## build the base docker image
-	@bash -c '\
-		docker build "$(APP_ROOT)" -f "$(APP_ROOT)/docker/Dockerfile-base" -t "$(APP_NAME)-base:$(APP_VERSION)" && \
-		docker tag "$(APP_NAME)-base:$(APP_VERSION)" "$(DOCKER_REPO)-base:$(APP_VERSION)"'
+	docker build "$(APP_ROOT)" -f "$(APP_ROOT)/docker/Dockerfile-base" -t "$(APP_NAME):$(APP_VERSION)"
+	docker tag "$(APP_NAME):$(APP_VERSION)" "$(DOCKER_REPO):$(APP_VERSION)"
 
 .PHONY: docker-build-manager
 docker-build-manager: docker-build-base		## build the manager docker image
-	@bash -c '\
-		docker build "$(APP_ROOT)" -f "$(APP_ROOT)/docker/Dockerfile-manager" -t "$(APP_NAME)-manager:$(APP_VERSION)" && \
-		docker tag "$(APP_NAME)-manager:$(APP_VERSION)" "$(DOCKER_REPO)-manager:$(APP_VERSION)"'
+	docker build "$(APP_ROOT)" -f "$(APP_ROOT)/docker/Dockerfile-manager" -t "$(APP_NAME):$(APP_VERSION)-manager"
+	docker tag "$(APP_NAME):$(APP_VERSION)-manager" "$(DOCKER_REPO):$(APP_VERSION)-manager"
 
 .PHONY: docker-build-worker
 docker-build-worker: docker-build-base		## build the worker docker image
-	@bash -c '\
-		docker build "$(APP_ROOT)" -f "$(APP_ROOT)/docker/Dockerfile-worker" -t "$(APP_NAME)-worker:$(APP_VERSION)" && \
-		docker tag "$(APP_NAME)-worker:$(APP_VERSION)" "$(DOCKER_REPO)-worker:$(APP_VERSION)"'
+	docker build "$(APP_ROOT)" -f "$(APP_ROOT)/docker/Dockerfile-worker" -t "$(APP_NAME):$(APP_VERSION)-worker"
+	docker tag "$(APP_NAME):$(APP_VERSION)-worker" "$(DOCKER_REPO):$(APP_VERSION)-worker"
 
 .PHONY: docker-build
-docker-build: docker-build-base docker-build-manager docker-build-worker		## build docker images
+docker-build: docker-build-base docker-build-manager docker-build-worker		## build all docker images
+
+.PHONY: docker-push-base
+docker-push-base: docker-build-base			## push the base docker image
+	docker push "$(DOCKER_REPO):$(APP_VERSION)"
+
+.PHONY: docker-push-manager
+docker-push-manager: docker-build-manager	## push the manager docker image
+	docker push "$(DOCKER_REPO):$(APP_VERSION)-manager"
+
+.PHONY: docker-push-worker
+docker-push-worker: docker-build-worker		## push the worker docker image
+	docker push "$(DOCKER_REPO):$(APP_VERSION)-worker"
 
 .PHONY: docker-push
-docker-push: docker-build	## push docker images
-	@bash -c '\
-		docker push "$(DOCKER_REPO)-manager:$(APP_VERSION)" && \
-		docker push "$(DOCKER_REPO)-worker:$(APP_VERSION)"'
+docker-push: docker-push-base docker-push-manager docker-push-worker	## push all docker images
 
 ## --- Launchers targets --- ##
 
