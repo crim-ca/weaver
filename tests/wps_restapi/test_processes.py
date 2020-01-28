@@ -1,72 +1,72 @@
-from weaver.exceptions import ProcessNotFound, JobNotFound
-from weaver.execute import (
-    EXECUTE_MODE_SYNC,
-    EXECUTE_MODE_ASYNC,
-    EXECUTE_CONTROL_OPTION_ASYNC,
-    EXECUTE_RESPONSE_DOCUMENT,
-    EXECUTE_TRANSMISSION_MODE_VALUE,
-    EXECUTE_TRANSMISSION_MODE_REFERENCE,
-)
-from weaver.formats import CONTENT_TYPE_APP_XML, CONTENT_TYPE_APP_JSON
-from weaver.processes.wps_testing import WpsTestProcess
-from weaver.status import STATUS_ACCEPTED
-from weaver.utils import fully_qualified_name, ows_context_href
-from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
-from weaver.wps import get_wps_url
+import os
+import unittest
+from copy import deepcopy
+
+import pyramid.testing
+import pytest
+import responses
+import six
+import webtest
+
+from tests.compat import contextlib
 from tests.utils import (
-    ignore_deprecated_nested_warnings,
-    setup_config_with_mongodb,
-    setup_mongodb_processstore,
-    setup_mongodb_jobstore,
     get_test_weaver_app,
     mocked_process_job_runner,
     mocked_process_package,
+    setup_config_with_mongodb,
+    setup_mongodb_jobstore,
+    setup_mongodb_processstore
 )
-from copy import deepcopy
-# noinspection PyDeprecation
-from contextlib import nested
-import pytest
-import webtest
-import unittest
-import responses
-import pyramid.testing
-import six
-import os
+from weaver.exceptions import JobNotFound, ProcessNotFound
+from weaver.execute import (
+    EXECUTE_CONTROL_OPTION_ASYNC,
+    EXECUTE_MODE_ASYNC,
+    EXECUTE_MODE_SYNC,
+    EXECUTE_RESPONSE_DOCUMENT,
+    EXECUTE_TRANSMISSION_MODE_REFERENCE,
+    EXECUTE_TRANSMISSION_MODE_VALUE
+)
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
+from weaver.processes.wps_testing import WpsTestProcess
+from weaver.status import STATUS_ACCEPTED
+from weaver.utils import fully_qualified_name, ows_context_href
+from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
+from weaver.wps import get_wps_url
 
 # simulated remote server with remote processes (mocked with `responses` package)
 TEST_REMOTE_SERVER_URL = "https://remote-server.com"
 TEST_REMOTE_PROCESS_WPS1_ID = "test-remote-process-wps1"
-TEST_REMOTE_PROCESS_WPS2_ID = "test-remote-process-wps2"
+TEST_REMOTE_PROCESS_WPS3_ID = "test-remote-process-wps3"
 TEST_REMOTE_PROCESS_ROOT = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources")
-TEST_REMOTE_PROCESS_GETCAP_WPS1_FILE = os.path.join(TEST_REMOTE_PROCESS_ROOT, "test_describe_process_wps1.xml")
+TEST_REMOTE_PROCESS_GETCAP_WPS1_FILE = os.path.join(TEST_REMOTE_PROCESS_ROOT, "test_get_capabilities_wps1.xml")
 TEST_REMOTE_PROCESS_GETCAP_WPS1_URL = "{}/wps?service=WPS&request=GetCapabilities&version=1.0.0" \
                                       .format(TEST_REMOTE_SERVER_URL)
 TEST_REMOTE_PROCESS_DESCRIBE_WPS1_FILE = os.path.join(TEST_REMOTE_PROCESS_ROOT, "test_describe_process_wps1.xml")
 TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL = "{}/wps?service=WPS&request=DescribeProcess&identifier={}&version=1.0.0" \
                                         .format(TEST_REMOTE_SERVER_URL, TEST_REMOTE_PROCESS_WPS1_ID)
-TEST_REMOTE_PROCESS_WPS2_FILE = os.path.join(TEST_REMOTE_PROCESS_ROOT, "test_describe_process_wps2.json")
+TEST_REMOTE_PROCESS_WPS3_FILE = os.path.join(TEST_REMOTE_PROCESS_ROOT, "test_describe_process_wps3.json")
 
 
 def mock_remote_server_requests_wp1(test):
     """Mocks above `remote` references to local resources."""
-    # noinspection PyUnresolvedReferences, PyUnusedLocal
     def mock_requests_wps1(*args, **kwargs):
         """Mock ``requests`` responses fetching ``TEST_REMOTE_SERVER_URL`` WPS reference."""
         xml_header = {"Content-Type": CONTENT_TYPE_APP_XML}
         with responses.RequestsMock(assert_all_requests_are_fired=False) as mock_resp:
-            with open(TEST_REMOTE_PROCESS_DESCRIBE_WPS1_FILE, 'r') as f:
+            with open(TEST_REMOTE_PROCESS_DESCRIBE_WPS1_FILE, "r") as f:
                 describe_xml = f.read()
-            with open(TEST_REMOTE_PROCESS_GETCAP_WPS1_FILE, 'r') as f:
+            with open(TEST_REMOTE_PROCESS_GETCAP_WPS1_FILE, "r") as f:
                 get_cap_xml = f.read()
             mock_resp.add(responses.GET, TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL, body=describe_xml, headers=xml_header)
             mock_resp.add(responses.GET, TEST_REMOTE_PROCESS_GETCAP_WPS1_URL, body=get_cap_xml, headers=xml_header)
             # special case where 'identifier' gets added to 'GetCapabilities', but is simply ignored
-            mock_resp.add(responses.GET, body=get_cap_xml, headers=xml_header,
-                          url=TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL.replace("DescribeProcess", "GetCapabilities"))
+            getcap_with_process_id = TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL.replace("DescribeProcess", "GetCapabilities")
+            mock_resp.add(responses.GET, body=get_cap_xml, headers=xml_header, url=getcap_with_process_id)
             return test(*args, **kwargs)
     return mock_requests_wps1
 
 
+# pylint: disable=C0103,invalid-name
 class WpsRestApiProcessesTest(unittest.TestCase):
     remote_server = None
 
@@ -86,7 +86,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         pyramid.testing.tearDown()
 
     def fully_qualified_test_process_name(self):
-        return fully_qualified_name(self).replace('.', '-')
+        return fully_qualified_name(self).replace(".", "-")
 
     def setUp(self):
         # rebuild clean db on each test
@@ -95,7 +95,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
         self.remote_server = "local"
         self.process_remote_WPS1 = "process_remote_wps1"
-        self.process_remote_WPS2 = "process_remote_wps2"
+        self.process_remote_WPS3 = "process_remote_wps3"
         self.process_public = WpsTestProcess(identifier="process_public")
         self.process_private = WpsTestProcess(identifier="process_private")
         self.process_store.save_process(self.process_public)
@@ -126,7 +126,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         }
 
     @staticmethod
-    def get_process_execute_template(test_input='not-specified'):
+    def get_process_execute_template(test_input="not-specified"):
         """
         Provides execute process bare minimum template corresponding to
         WPS process `weaver.processes.wps_testing.WpsTestProcess`.
@@ -161,15 +161,15 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert self.process_public.identifier in processes_id
         assert self.process_private.identifier not in processes_id
 
-    @ignore_deprecated_nested_warnings
     def test_get_processes_invalid_schemas_handled(self):
         path = "/processes"
         # deploy valid test process
         process_name = self.fully_qualified_test_process_name()
         process_data = self.get_process_deploy_template(process_name)
         package_mock = mocked_process_package()
-        # noinspection PyDeprecation
-        with nested(*package_mock):
+        with contextlib.ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
             resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=True)
             # TODO: status should be 201 when properly modified to match API conformance
             assert resp.status_code == 200
@@ -198,14 +198,14 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.status_code == 401
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
-    @ignore_deprecated_nested_warnings
     def test_deploy_process_success(self):
         process_name = self.fully_qualified_test_process_name()
         process_data = self.get_process_deploy_template(process_name)
         package_mock = mocked_process_package()
 
-        # noinspection PyDeprecation
-        with nested(*package_mock):
+        with contextlib.ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
             uri = "/processes"
             resp = self.app.post_json(uri, params=process_data, headers=self.json_headers, expect_errors=True)
             # TODO: status should be 201 when properly modified to match API conformance
@@ -214,34 +214,32 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert resp.json["processSummary"]["id"] == process_name
             assert isinstance(resp.json["deploymentDone"], bool) and resp.json["deploymentDone"]
 
-    @ignore_deprecated_nested_warnings
     def test_deploy_process_bad_name(self):
         process_name = self.fully_qualified_test_process_name() + "..."
         process_data = self.get_process_deploy_template(process_name)
         package_mock = mocked_process_package()
 
-        # noinspection PyDeprecation
-        with nested(*package_mock):
+        with contextlib.ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
             uri = "/processes"
             resp = self.app.post_json(uri, params=process_data, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 400
             assert resp.content_type == CONTENT_TYPE_APP_JSON
 
-    @ignore_deprecated_nested_warnings
     def test_deploy_process_conflict(self):
         process_name = self.process_private.identifier
         process_data = self.get_process_deploy_template(process_name)
         package_mock = mocked_process_package()
 
-        # noinspection PyDeprecation
-        with nested(*package_mock):
+        with contextlib.ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
             uri = "/processes"
             resp = self.app.post_json(uri, params=process_data, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 409
             assert resp.content_type == CONTENT_TYPE_APP_JSON
 
-    # noinspection PyTypeChecker
-    @ignore_deprecated_nested_warnings
     def test_deploy_process_missing_or_invalid_components(self):
         process_name = self.fully_qualified_test_process_name()
         process_data = self.get_process_deploy_template(process_name)
@@ -262,8 +260,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process_data_tests[10]["executionUnit"][0] = {"href": {}}  # href as package instead of url
         process_data_tests[11]["executionUnit"][0] = {"unit": {}, "href": ""}  # can"t have both unit/href together
 
-        # noinspection PyDeprecation
-        with nested(*package_mock):
+        with contextlib.ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
             uri = "/processes"
             for i, data in enumerate(process_data_tests):
                 resp = self.app.post_json(uri, params=data, headers=self.json_headers, expect_errors=True)
@@ -271,15 +270,15 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 assert resp.status_code in [400, 422], msg.format(i, resp.status_code)
                 assert resp.content_type == CONTENT_TYPE_APP_JSON, msg.format(i, resp.content_type)
 
-    @ignore_deprecated_nested_warnings
     def test_deploy_process_default_endpoint_wps1(self):
         """Validates that the default (localhost) endpoint to execute WPS requests are saved during deployment."""
         process_name = self.fully_qualified_test_process_name()
         process_data = self.get_process_deploy_template(process_name)
         package_mock = mocked_process_package()
 
-        # noinspection PyDeprecation
-        with nested(*package_mock):
+        with contextlib.ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
             uri = "/processes"
             resp = self.app.post_json(uri, params=process_data, headers=self.json_headers, expect_errors=True)
             # TODO: status should be 201 when properly modified to match API conformance
@@ -291,7 +290,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert process_wps_endpoint == weaver_wps_path
 
     @staticmethod
-    def assert_deployed_wps2(response_json, expected_process_id):
+    def assert_deployed_wps3(response_json, expected_process_id):
         assert expected_process_id in response_json["process"]["id"]
         assert len(response_json["process"]["inputs"]) == 1
         assert response_json["process"]["inputs"][0]["id"] == "input-1"
@@ -311,12 +310,13 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     def deploy_process_make_visible_and_fetch_deployed(self, deploy_payload, expected_process_id):
         """
-        **Note:** This is a shortcut method for all ``test_deploy_process_<>`` cases.
-
         Attempts to deploy the process using the provided deployment payload, then makes it visible and finally
-        fetches the deployed process to validate the resulting WPS-2 description.
+        fetches the deployed process to validate the resulting WPS-3 REST JSON description.
 
         Any failure along the way is raised.
+
+        .. note::
+            This is a shortcut method for all ``test_deploy_process_<>`` cases.
         """
         resp = self.app.post_json("/processes", params=deploy_payload, headers=self.json_headers)
         assert resp.status_code == 200  # TODO: status should be 201 when properly modified to match API conformance
@@ -331,35 +331,35 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
         resp = self.app.get(proc_url, headers=self.json_headers)
         assert resp.status_code == 200
-        self.assert_deployed_wps2(resp.json, expected_process_id)
+        self.assert_deployed_wps3(resp.json, expected_process_id)
 
     # FIXME: implement
-    @pytest.mark.xfail(reason="not implemented")
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_DockerRequirement_href(self):
         raise NotImplementedError
 
     # FIXME: implement
-    @pytest.mark.xfail(reason="not implemented")
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_DockerRequirement_owsContext(self):
         raise NotImplementedError
 
     # FIXME: implement
-    @pytest.mark.xfail(reason="not implemented")
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_DockerRequirement_executionUnit(self):
         raise NotImplementedError
 
     # FIXME: implement
-    @pytest.mark.xfail(reason="not implemented")
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_WPS1Requirement_href(self):
         raise NotImplementedError
 
     # FIXME: implement
-    @pytest.mark.xfail(reason="not implemented")
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_WPS1Requirement_owsContext(self):
         raise NotImplementedError
 
     # FIXME: implement
-    @pytest.mark.xfail(reason="not implemented")
+    @pytest.mark.skip(reason="not implemented")
     def test_deploy_process_CWL_WPS1Requirement_executionUnit(self):
         raise NotImplementedError
 
@@ -382,6 +382,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     @mock_remote_server_requests_wp1
     def test_deploy_process_WPS1_DescribeProcess_executionUnit(self):
+        """Test process deployment using a WPS-1 DescribeProcess URL specified as process description reference."""
         body = {
             "processDescription": {"process": {"id": TEST_REMOTE_PROCESS_WPS1_ID}},
             "executionUnit": [{"href": TEST_REMOTE_PROCESS_DESCRIBE_WPS1_URL}],
@@ -390,7 +391,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.deploy_process_make_visible_and_fetch_deployed(body, TEST_REMOTE_PROCESS_WPS1_ID)
 
     @pytest.mark.skip(reason="not implemented")
+    @mock_remote_server_requests_wp1
     def test_deploy_process_WPS1_GetCapabilities_href(self):
+        """Test process deployment using a WPS-1 GetCapabilities URL specified as process description reference."""
         body = {
             "processDescription": {"href": TEST_REMOTE_PROCESS_GETCAP_WPS1_URL},  # this one should be used
             "executionUnit": [{"href": TEST_REMOTE_SERVER_URL}]  # some URL just to fulfill schema validation
@@ -398,7 +401,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.deploy_process_make_visible_and_fetch_deployed(body, TEST_REMOTE_PROCESS_WPS1_ID)
 
     @pytest.mark.skip(reason="not implemented")
+    @mock_remote_server_requests_wp1
     def test_deploy_process_WPS1_GetCapabilities_owsContext(self):
+        """Test process deployment using a WPS-1 GetCapabilities URL specified through the OwsContext definition."""
         body = {
             "processDescription": {"process": {"id": TEST_REMOTE_PROCESS_WPS1_ID}},
             "executionUnit": [{"href": TEST_REMOTE_SERVER_URL}]  # some URL just to fulfill schema validation
@@ -407,7 +412,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.deploy_process_make_visible_and_fetch_deployed(body, TEST_REMOTE_PROCESS_WPS1_ID)
 
     @pytest.mark.skip(reason="not implemented")
+    @mock_remote_server_requests_wp1
     def test_deploy_process_WPS1_GetCapabilities_executionUnit(self):
+        """Test process deployment using a WPS-1 GetCapabilities URL specified through the ExecutionUnit parameter."""
         body = {
             "processDescription": {"process": {"id": TEST_REMOTE_PROCESS_WPS1_ID}},
             "executionUnit": [{"href": TEST_REMOTE_PROCESS_GETCAP_WPS1_URL}],
@@ -416,18 +423,18 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         self.deploy_process_make_visible_and_fetch_deployed(body, TEST_REMOTE_PROCESS_WPS1_ID)
 
     # FIXME: implement
-    @pytest.mark.xfail(reason="not implemented")
-    def test_deploy_process_WPS2_DescribeProcess_href(self):
+    @pytest.mark.skip(reason="not implemented")
+    def test_deploy_process_WPS3_DescribeProcess_href(self):
         raise NotImplementedError
 
     # FIXME: implement
-    @pytest.mark.xfail(reason="not implemented")
-    def test_deploy_process_WPS2_DescribeProcess_owsContext(self):
+    @pytest.mark.skip(reason="not implemented")
+    def test_deploy_process_WPS3_DescribeProcess_owsContext(self):
         raise NotImplementedError
 
     # FIXME: implement
-    @pytest.mark.xfail(reason="not implemented")
-    def test_deploy_process_WPS2_DescribeProcess_executionUnit(self):
+    @pytest.mark.skip(reason="not implemented")
+    def test_deploy_process_WPS3_DescribeProcess_executionUnit(self):
         raise NotImplementedError
 
     def test_delete_process_success(self):
@@ -458,15 +465,15 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.status_code == 400
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
-    @ignore_deprecated_nested_warnings
     def test_execute_process_success(self):
         uri = "/processes/{}/jobs".format(self.process_public.identifier)
         data = self.get_process_execute_template()
         task = "job-{}".format(fully_qualified_name(self))
         mock_execute = mocked_process_job_runner(task)
 
-        # noinspection PyDeprecation
-        with nested(*mock_execute):
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
             resp = self.app.post_json(uri, params=data, headers=self.json_headers)
             assert resp.status_code == 201
             assert resp.content_type == CONTENT_TYPE_APP_JSON
@@ -505,7 +512,6 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert resp.status_code in [400, 422], msg.format(i, resp.status_code)
             assert resp.content_type == CONTENT_TYPE_APP_JSON, msg.format(i, resp.content_type)
 
-    @ignore_deprecated_nested_warnings
     def test_execute_process_no_error_not_required_params(self):
         """
         Optional parameters for execute job shouldn't raise an error if omitted,
@@ -524,30 +530,29 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         execute_mock_data_tests[0][1]["outputs"][0].pop("transmissionMode")  # should resolve to default value
 
         for mock_execute, data_execute in execute_mock_data_tests:
-            # noinspection PyDeprecation
-            with nested(*mock_execute):
+            with contextlib.ExitStack() as stack:
+                for exe in mock_execute:
+                    stack.enter_context(exe)
                 path = "/processes/{}/jobs".format(self.process_public.identifier)
                 resp = self.app.post_json(path, params=data_execute, headers=self.json_headers)
                 assert resp.status_code == 201, "Expected job submission without inputs created without error."
 
     @pytest.mark.xfail(reason="Mode '{}' not supported for job execution.".format(EXECUTE_MODE_SYNC))
-    @unittest.expectedFailure
     def test_execute_process_mode_sync_not_supported(self):
         execute_data = self.get_process_execute_template(fully_qualified_name(self))
         execute_data["mode"] = EXECUTE_MODE_SYNC
         uri = "/processes/{}/jobs".format(self.process_public.identifier)
         resp = self.app.post_json(uri, params=execute_data, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code in 501
+        assert resp.status_code == 501
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     @pytest.mark.xfail(reason="Mode '{}' not supported for job execution.".format(EXECUTE_TRANSMISSION_MODE_VALUE))
-    @unittest.expectedFailure
     def test_execute_process_transmission_mode_value_not_supported(self):
         execute_data = self.get_process_execute_template(fully_qualified_name(self))
         execute_data["outputs"][0]["transmissionMode"] = EXECUTE_TRANSMISSION_MODE_VALUE
         uri = "/processes/{}/jobs".format(self.process_public.identifier)
         resp = self.app.post_json(uri, params=execute_data, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code in 501
+        assert resp.status_code == 501
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_execute_process_not_visible(self):

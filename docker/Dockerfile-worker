@@ -1,0 +1,5 @@
+FROM weaver-base:0.2.2
+LABEL description.short="Weaver Worker"
+
+# run app
+CMD celery worker -A pyramid_celery.celery_app --ini "${APP_CONFIG_DIR}/weaver.ini"

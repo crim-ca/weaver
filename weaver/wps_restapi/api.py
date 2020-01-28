@@ -1,35 +1,37 @@
-from weaver.__meta__ import __version__ as weaver_version
-from weaver.utils import get_settings, get_header
-from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.colander_one_of import CustomTypeConversionDispatcher
-from weaver.wps_restapi.utils import get_wps_restapi_base_url, wps_restapi_base_path, OUTPUT_FORMAT_JSON
-from weaver.formats import CONTENT_TYPE_APP_JSON
-from weaver.owsexceptions import OWSException
-from six.moves.urllib.parse import urlparse
-from cornice_swagger import CorniceSwagger
+import logging
+from typing import TYPE_CHECKING, AnyStr, Optional
+
+import six
 from cornice.service import get_services
+from cornice_swagger import CorniceSwagger
+from pyramid.authentication import Authenticated, IAuthenticationPolicy
+from pyramid.exceptions import PredicateMismatch
+from pyramid.httpexceptions import (
+    HTTPException,
+    HTTPForbidden,
+    HTTPMethodNotAllowed,
+    HTTPNotFound,
+    HTTPOk,
+    HTTPServerError,
+    HTTPUnauthorized
+)
 from pyramid.renderers import render_to_response
 from pyramid.request import Request
 from pyramid.response import Response
 from pyramid.settings import asbool
-from pyramid.authentication import IAuthenticationPolicy, Authenticated
-from pyramid.exceptions import PredicateMismatch
-from pyramid.httpexceptions import (
-    HTTPOk,
-    HTTPUnauthorized,
-    HTTPForbidden,
-    HTTPNotFound,
-    HTTPMethodNotAllowed,
-    HTTPServerError,
-    HTTPException,
-)
-from typing import AnyStr, Optional, TYPE_CHECKING
 from simplejson import JSONDecodeError
-import logging
-import six
-import os
+from six.moves.urllib.parse import urlparse
+
+from weaver.__meta__ import __version__ as weaver_version
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN
+from weaver.owsexceptions import OWSException
+from weaver.utils import get_header, get_settings, get_weaver_url
+from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.colander_extras import CustomTypeConversionDispatcher
+from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, get_wps_restapi_base_url, wps_restapi_base_path
+
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON
+    from weaver.typedefs import JSON    # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 
@@ -41,7 +43,6 @@ def api_frontpage(request):
 
     # import here to avoid circular import errors
     from weaver.config import get_weaver_configuration
-    from weaver.utils import get_weaver_url
     from weaver.wps import get_wps_path
 
     settings = get_settings(request)
@@ -50,10 +51,34 @@ def api_frontpage(request):
 
     weaver_api = asbool(settings.get("weaver.wps_restapi"))
     weaver_api_url = get_wps_restapi_base_url(settings) if weaver_api else None
-    weaver_api_doc = weaver_api_url + sd.api_swagger_ui_uri if weaver_api else None
+    weaver_api_def = weaver_api_url + sd.api_swagger_ui_uri if weaver_api else None
+    weaver_api_doc = settings.get("weaver.wps_restapi_doc", None) if weaver_api else None
     weaver_api_ref = settings.get("weaver.wps_restapi_ref", None) if weaver_api else None
     weaver_wps = asbool(settings.get("weaver.wps"))
     weaver_wps_url = weaver_url + get_wps_path(settings) if weaver_wps else None
+    weaver_conform_url = weaver_url + sd.api_conformance_uri
+    weaver_process_url = weaver_url + sd.processes_uri
+    weaver_links = [
+        {"href": weaver_url, "rel": "self", "type": CONTENT_TYPE_APP_JSON, "title": "This document"},
+        {"href": weaver_conform_url, "rel": "conformance", "type": CONTENT_TYPE_APP_JSON,
+         "title": "WPS 2.0/3.0 REST-JSON Binding Extension conformance classes implemented by this service."},
+    ]
+    if weaver_api_def:
+        weaver_links.append({"href": weaver_api_def, "rel": "service", "type": CONTENT_TYPE_APP_JSON,
+                             "title": "API definition of this service."})
+    if isinstance(weaver_api_doc, six.string_types):
+        if "." in weaver_api_doc:   # pylint: disable=E1135,unsupported-membership-test
+            ext_type = weaver_api_doc.split(".")[-1]
+            doc_type = "application/{}".format(ext_type)
+        else:
+            doc_type = CONTENT_TYPE_TEXT_PLAIN  # default most basic type
+        weaver_links.append({"href": weaver_api_doc, "rel": "documentation", "type": doc_type,
+                             "title": "API documentation about this service."})
+    if weaver_api_ref:
+        weaver_links.append({"href": weaver_api_ref, "rel": "reference", "type": CONTENT_TYPE_APP_JSON,
+                             "title": "API reference specification of this service."})
+    weaver_links.append({"href": weaver_process_url, "rel": "processes", "type": CONTENT_TYPE_APP_JSON,
+                         "title": "Processes offered by this service."})
 
     return {
         "message": "Weaver Information",
@@ -62,21 +87,40 @@ def api_frontpage(request):
             {"name": "api", "enabled": weaver_api,
              "url": weaver_api_url,
              "doc": weaver_api_doc,
+             "api": weaver_api_def,
              "ref": weaver_api_ref},
             {"name": "wps", "enabled": weaver_wps,
              "url": weaver_wps_url},
-        ]
+        ],
+        "links": weaver_links,
     }
 
 
-# noinspection PyUnusedLocal
 @sd.api_versions_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
                              schema=sd.VersionsEndpoint(), response_schemas=sd.get_api_versions_responses)
-def api_versions(request):
+def api_versions(request):  # noqa: F811
     # type: (Request) -> HTTPException
-    """weaver versions information."""
-    weaver_info = {'name': 'weaver', 'version': weaver_version, "type": "api"}
-    return HTTPOk(json={'versions': [weaver_info]})
+    """Weaver versions information."""
+    weaver_info = {"name": "weaver", "version": weaver_version, "type": "api"}
+    return HTTPOk(json={"versions": [weaver_info]})
+
+
+@sd.api_conformance_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
+                                schema=sd.ConformanceEndpoint(), response_schemas=sd.get_api_conformance_responses)
+def api_conformance(request):  # noqa: F811
+    # type: (Request) -> HTTPException
+    """Weaver specification conformance information."""
+    # TODO: follow updates with https://github.com/geopython/pygeoapi/issues/198
+    conformance = {"conformsTo": [
+        "http://www.opengis.net/spec/wfs-1/3.0/req/core",
+        "http://www.opengis.net/spec/wfs-1/3.0/req/oas30",
+        # "http://www.opengis.net/spec/wfs-1/3.0/req/html",
+        "http://www.opengis.net/spec/wfs-1/3.0/req/geojson",
+        "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/core",
+        "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/oas30",
+        # "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/html"
+    ]}
+    return HTTPOk(json=conformance)
 
 
 @sd.api_swagger_json_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
@@ -92,9 +136,9 @@ def api_swagger_json(request, use_docstring_summary=True):
 
     # obtain 'server' host and api-base-path, which doesn't correspond necessarily to the app's host and path
     # ex: 'server' adds '/weaver' with proxy redirect before API routes
-    weaver_server_url = os.getenv("WEAVER_URL")
-    LOGGER.debug("Request URL:  {}".format(request.url))
-    LOGGER.debug("WEAVER_URL: {}".format(weaver_server_url))
+    weaver_server_url = get_weaver_url(request)
+    LOGGER.debug("Request app URL:   [%s]", request.url)
+    LOGGER.debug("Weaver config URL: [%s]", weaver_server_url)
     if weaver_server_url:
         weaver_parsed_url = urlparse(weaver_server_url)
         swagger_base_spec["host"] = weaver_parsed_url.netloc
@@ -111,9 +155,32 @@ def api_swagger_json(request, use_docstring_summary=True):
 def api_swagger_ui(request):
     """weaver REST API swagger-ui schema documentation (this page)."""
     json_path = wps_restapi_base_path(request.registry.settings) + sd.api_swagger_json_uri
-    json_path = json_path.lstrip('/')   # if path starts by '/', swagger-ui doesn't find it on remote
+    json_path = json_path.lstrip("/")   # if path starts by '/', swagger-ui doesn't find it on remote
     data_mako = {"api_title": sd.API_TITLE, "api_swagger_json_path": json_path}
     return render_to_response("templates/swagger_ui.mako", data_mako, request=request)
+
+
+def get_request_info(request, detail=None):
+    # type: (Request, Optional[AnyStr]) -> JSON
+    """Provided additional response details based on the request and execution stack on failure."""
+    content = {u"route": str(request.upath_info), u"url": str(request.url), u"method": request.method}
+    if isinstance(detail, six.string_types):
+        content.update({"detail": detail})
+    if hasattr(request, "exception"):
+        # handle error raised simply by checking for 'json' property in python 3 when body is invalid
+        has_json = False
+        try:
+            has_json = hasattr(request.exception, "json")
+        except JSONDecodeError:
+            pass
+        if has_json and isinstance(request.exception.json, dict):
+            content.update(request.exception.json)
+        elif isinstance(request.exception, HTTPServerError) and hasattr(request.exception, "message"):
+            content.update({u"exception": str(request.exception.message)})
+    elif hasattr(request, "matchdict"):
+        if request.matchdict is not None and request.matchdict != "":
+            content.update(request.matchdict)
+    return content
 
 
 def ows_json_format(function):
@@ -175,26 +242,3 @@ def unauthorized_or_forbidden(request):
         if Authenticated not in principals:
             return HTTPUnauthorized("Unauthorized access to this resource.")
     return HTTPForbidden("Forbidden operation under this resource.")
-
-
-def get_request_info(request, detail=None):
-    # type: (Request, Optional[AnyStr]) -> JSON
-    """Provided additional response details based on the request and execution stack on failure."""
-    content = {u'route': str(request.upath_info), u'url': str(request.url), u'method': request.method}
-    if isinstance(detail, six.string_types):
-        content.update({"detail": detail})
-    if hasattr(request, "exception"):
-        # handle error raised simply by checking for 'json' property in python 3 when body is invalid
-        has_json = False
-        try:
-            has_json = hasattr(request.exception, "json")
-        except JSONDecodeError:
-            pass
-        if has_json and isinstance(request.exception.json, dict):
-            content.update(request.exception.json)
-        elif isinstance(request.exception, HTTPServerError) and hasattr(request.exception, "message"):
-            content.update({u"exception": str(request.exception.message)})
-    elif hasattr(request, "matchdict"):
-        if request.matchdict is not None and request.matchdict != "":
-            content.update(request.matchdict)
-    return content

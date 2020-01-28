@@ -1,16 +1,19 @@
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
-from weaver.utils import parse_request_query, get_weaver_url, get_settings
-from distutils.version import LooseVersion
-from pyramid.httpexceptions import HTTPSuccessful
-from typing import AnyStr, TYPE_CHECKING
-from lxml import etree
-import requests
 import logging
-if TYPE_CHECKING:
-    from pyramid.request import Request
-    from weaver.typedefs import AnySettingsContainer
+from distutils.version import LooseVersion
+from typing import TYPE_CHECKING, AnyStr
 
-LOGGER = logging.getLogger("weaver")
+import requests
+from lxml import etree
+from pyramid.httpexceptions import HTTPSuccessful
+
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
+from weaver.utils import get_settings, get_weaver_url, parse_request_query
+
+if TYPE_CHECKING:
+    from pyramid.request import Request                 # noqa: F401
+    from weaver.typedefs import AnySettingsContainer    # noqa: F401
+
+LOGGER = logging.getLogger(__name__)
 
 WPS_VERSION_100 = "1.0.0"
 WPS_VERSION_200 = "2.0.0"
@@ -27,7 +30,7 @@ OUTPUT_FORMATS = {
 def wps_restapi_base_path(container):
     # type: (AnySettingsContainer) -> AnyStr
     settings = get_settings(container)
-    restapi_path = settings.get("weaver.wps_restapi_path", "").rstrip('/').strip()
+    restapi_path = settings.get("weaver.wps_restapi_path", "").rstrip("/").strip()
     return restapi_path
 
 
@@ -76,10 +79,10 @@ def get_wps_output_format(request, service_url=None):
             try:
                 # TODO: update get version if it is ever added to 'GetCapabilities' from WPS REST response
                 # for now, suppose that a valid list in json body means that the service is WPS 2.0.0
-                if isinstance(getcap_resp_200.json()['processes'], list):
+                if isinstance(getcap_resp_200.json()["processes"], list):
                     return OUTPUT_FORMATS[WPS_VERSION_200]
             except Exception as ex:
-                LOGGER.error("Got exception in 'get_wps_output_format' JSON parsing: {}".format(repr(ex)))
+                LOGGER.exception("Got exception in 'get_wps_output_format' JSON parsing: %r", ex)
 
         # analyse XML response
         if isinstance(getcap_resp_100, HTTPSuccessful):
@@ -88,7 +91,7 @@ def get_wps_output_format(request, service_url=None):
                 etree.fromstring(getcap_resp_100.content)
                 return OUTPUT_FORMATS[WPS_VERSION_100]
             except Exception as ex:
-                LOGGER.error("Got exception in 'get_wps_output_format' XML parsing: {}".format(repr(ex)))
+                LOGGER.exception("Got exception in 'get_wps_output_format' XML parsing: %r", ex)
 
     # still not found, default to older version
     # for most probable format supported by services

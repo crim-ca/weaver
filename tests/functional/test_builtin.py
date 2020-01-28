@@ -1,31 +1,29 @@
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF
-from weaver.database import get_db
-from weaver.processes.builtin import register_builtin_processes
-from weaver.status import STATUS_SUCCEEDED, STATUS_CATEGORY_RUNNING, job_status_categories
-from tests.utils import (
-    ignore_deprecated_nested_warnings,
-    setup_config_with_mongodb,
-    setup_config_with_pywps,
-    setup_config_with_celery,
-    get_test_weaver_config,
-    get_test_weaver_app,
-    get_settings_from_testapp,
-    mocked_execute_process,
-    mocked_sub_requests,
-)
+import json
+import os
+import unittest
 from tempfile import NamedTemporaryFile
 from time import sleep
-# noinspection PyDeprecation
-from contextlib import nested
-# noinspection PyPackageRequirements
+
 import mock
-# noinspection PyPackageRequirements
-import pytest
-import unittest
 import pyramid.testing
-import json
+import pytest
 import six
-import os
+
+from tests.compat import contextlib
+from tests.utils import (
+    get_settings_from_testapp,
+    get_test_weaver_app,
+    get_test_weaver_config,
+    mocked_execute_process,
+    mocked_sub_requests,
+    setup_config_with_celery,
+    setup_config_with_mongodb,
+    setup_config_with_pywps
+)
+from weaver.database import get_db
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF
+from weaver.processes.builtin import register_builtin_processes
+from weaver.status import JOB_STATUS_CATEGORIES, STATUS_CATEGORY_RUNNING, STATUS_SUCCEEDED
 
 
 @pytest.mark.functional
@@ -75,23 +73,25 @@ class BuiltinAppTest(unittest.TestCase):
         assert len(resp.json["process"]["outputs"][0]["formats"]) == 1
         assert resp.json["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF
 
-    @ignore_deprecated_nested_warnings
     def test_jsonarray2netcdf_execute(self):
         dirname = "/tmp"
         nc_data = "Hello NetCDF!"
-        with NamedTemporaryFile(dir=dirname, suffix=".nc") as nf, NamedTemporaryFile(dir=dirname, suffix=".json") as jf:
-            nf.write(nc_data)
-            nf.seek(0)
-            jf.write(json.dumps(["file://{}".format(os.path.join(dirname, nf.name))]))  # app expects list of URL
-            jf.seek(0)
+        with contextlib.ExitStack() as stack_files:
+            tmp_ncdf = stack_files.enter_context(NamedTemporaryFile(dir=dirname, mode="w", suffix=".nc"))
+            tmp_json = stack_files.enter_context(NamedTemporaryFile(dir=dirname, mode="w", suffix=".json"))
+            tmp_ncdf.write(nc_data)
+            tmp_ncdf.seek(0)
+            tmp_json.write(json.dumps(["file://{}".format(os.path.join(dirname, tmp_ncdf.name))]))
+            tmp_json.seek(0)
             data = {
                 "mode": "async",
                 "response": "document",
-                "inputs": [{"id": "input", "href": os.path.join(dirname, jf.name)}],
+                "inputs": [{"id": "input", "href": os.path.join(dirname, tmp_json.name)}],
                 "outputs": [{"id": "output", "transmissionMode": "reference"}],
             }
-            # noinspection PyDeprecation
-            with nested(*mocked_execute_process()):
+            with contextlib.ExitStack() as stack_proc:
+                for process in mocked_execute_process():
+                    stack_proc.enter_context(process)
                 path = "/processes/jsonarray2netcdf/jobs"
                 resp = mocked_sub_requests(self.app, "post_json", path, params=data, headers=self.json_headers)
 
@@ -99,11 +99,11 @@ class BuiltinAppTest(unittest.TestCase):
             assert resp.content_type in CONTENT_TYPE_APP_JSON
             job_url = resp.json["location"]
             nc_path = None
-            for i in range(5):
+            for _ in range(5):
                 sleep(1)
                 resp = self.app.get(job_url, headers=self.json_headers)
                 if resp.status_code == 200:
-                    if resp.json["status"] in job_status_categories[STATUS_CATEGORY_RUNNING]:
+                    if resp.json["status"] in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_RUNNING]:
                         continue
                     assert resp.json["status"] == STATUS_SUCCEEDED
                     resp = self.app.get("{}/result".format(job_url), headers=self.json_headers)
@@ -118,5 +118,5 @@ class BuiltinAppTest(unittest.TestCase):
             assert nc_path.startswith(wps_out)
             assert os.path.split(nc_real_path)[-1] == os.path.split(nc_path)[-1]
             assert os.path.isfile(nc_real_path)
-            with open(nc_real_path, 'r') as f:
+            with open(nc_real_path, "r") as f:
                 assert f.read() == nc_data

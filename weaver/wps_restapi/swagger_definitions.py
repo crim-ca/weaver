@@ -2,31 +2,79 @@
 This module should contain any and every definitions in use to build the swagger UI,
 so that one can update the swagger without touching any other files after the initial integration
 """
+# pylint: disable=C0103,invalid-name
+
+from colander import Boolean, DateTime, Float, Integer
+from colander import MappingSchema as MapSchema
+from colander import OneOf, Range
+from colander import SequenceSchema as SeqSchema
+from colander import String, drop
+from cornice import Service
 
 from weaver import __meta__
 from weaver.config import WEAVER_CONFIGURATION_EMS
-from weaver.wps_restapi.utils import wps_restapi_base_path
-from weaver.status import job_status_categories, STATUS_ACCEPTED, STATUS_COMPLIANT_OGC
-from weaver.sort import job_sort_values, quote_sort_values, SORT_CREATED, SORT_ID, SORT_PROCESS
-from weaver.formats import CONTENT_TYPE_TEXT_HTML, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
 from weaver.execute import (
-    EXECUTE_MODE_AUTO,
-    EXECUTE_MODE_ASYNC,
-    execute_mode_options,
     EXECUTE_CONTROL_OPTION_ASYNC,
-    execute_control_options,
+    EXECUTE_MODE_ASYNC,
+    EXECUTE_MODE_AUTO,
     EXECUTE_RESPONSE_RAW,
-    execute_response_options,
     EXECUTE_TRANSMISSION_MODE_REFERENCE,
-    execute_transmission_mode_options,
+    EXECUTE_CONTROL_OPTIONS,
+    EXECUTE_MODE_OPTIONS,
+    EXECUTE_RESPONSE_OPTIONS,
+    EXECUTE_TRANSMISSION_MODE_OPTIONS
 )
-from weaver.visibility import visibility_values, VISIBILITY_PUBLIC
-from weaver.wps_restapi.colander_one_of import OneOfMappingSchema
-from weaver.wps_restapi.colander_defaults import SchemaNodeDefault as SchemaNode
-from colander import String, Boolean, Integer, Float, DateTime, MappingSchema, SequenceSchema, drop, OneOf
-from cornice import Service
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_HTML, CONTENT_TYPE_TEXT_PLAIN
+from weaver.owsexceptions import OWSMissingParameterValue
+from weaver.sort import JOB_SORT_VALUES, QUOTE_SORT_VALUES, SORT_CREATED, SORT_ID, SORT_PROCESS
+from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, STATUS_COMPLIANT_OGC
+from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
+from weaver.wps_restapi.colander_extras import (
+    DropableNoneSchema,
+    OneOfMappingSchema,
+    SchemaNodeDefault,
+    VariableMappingSchema
+)
+from weaver.wps_restapi.utils import wps_restapi_base_path
 
-API_TITLE = "weaver REST API"
+
+class SchemaNode(SchemaNodeDefault):
+    """
+    Override the default :class:`colander.SchemaNode` to auto-handle ``default`` value substitution if an
+    actual value was omitted during deserialization for a field defined with this schema and a ``default`` parameter.
+
+    .. seealso::
+        Implementation in :class:`SchemaNodeDefault`.
+    """
+    @staticmethod
+    def schema_type():
+        raise NotImplementedError
+
+
+class SequenceSchema(DropableNoneSchema, SeqSchema):
+    """
+    Override the default :class:`colander.SequenceSchema` to auto-handle dropping missing entry definitions
+    when its value is either ``None``, :class:`colander.null` or :class:`colander.drop`.
+    """
+    schema_type = SeqSchema.schema_type
+
+
+class MappingSchema(DropableNoneSchema, MapSchema):
+    """
+    Override the default :class:`colander.MappingSchema` to auto-handle dropping missing field definitions
+    when the corresponding value is either ``None``, :class:`colander.null` or :class:`colander.drop`.
+    """
+    schema_type = MapSchema.schema_type
+
+
+class ExplicitMappingSchema(MapSchema):
+    """
+    Original behaviour of :class:`colander.MappingSchema` implementation, where fields referencing
+    to ``None`` values are kept as an explicit indication of an *undefined* or *missing* value for this field.
+    """
+
+
+API_TITLE = "Weaver REST API"
 API_INFO = {
     "description": __meta__.__description__,
     "contact": {"name": __meta__.__authors__, "email": __meta__.__emails__, "url": __meta__.__source_repository__}
@@ -41,6 +89,7 @@ api_frontpage_uri = "/"
 api_swagger_ui_uri = "/api"
 api_swagger_json_uri = "/json"
 api_versions_uri = "/versions"
+api_conformance_uri = "/conformance"
 
 processes_uri = "/processes"
 process_uri = "/processes/{process_id}"
@@ -112,6 +161,7 @@ api_frontpage_service = Service(name="api_frontpage", path=api_frontpage_uri)
 api_swagger_ui_service = Service(name="api_swagger_ui", path=api_swagger_ui_uri)
 api_swagger_json_service = Service(name="api_swagger_json", path=api_swagger_json_uri)
 api_versions_service = Service(name="api_versions", path=api_versions_uri)
+api_conformance_service = Service(name="api_conformance", path=api_conformance_uri)
 
 processes_service = Service(name="processes", path=processes_uri)
 process_service = Service(name="process", path=process_uri)
@@ -299,12 +349,21 @@ class DescriptionType(MappingSchema):
     links = JsonLinkList(missing=drop, title="links")
 
 
-class InputDataDescriptionType(DescriptionType):
+class MinMaxOccursInt(MappingSchema):
+    minOccurs = SchemaNode(Integer(), missing=drop)
+    maxOccurs = SchemaNode(Integer(), missing=drop)
+
+
+class MinMaxOccursStr(MappingSchema):
     minOccurs = SchemaNode(String(), missing=drop)
     maxOccurs = SchemaNode(String(), missing=drop)
 
 
-class ComplexInputType(MappingSchema):
+class WithMinMaxOccurs(OneOfMappingSchema):
+    _one_of = (MinMaxOccursStr, MinMaxOccursInt)
+
+
+class ComplexInputType(DescriptionType, WithMinMaxOccurs):
     formats = FormatDescriptionList()
 
 
@@ -317,7 +376,7 @@ class SupportedCrsList(SequenceSchema):
     item = SupportedCrs()
 
 
-class BoundingBoxInputType(MappingSchema):
+class BoundingBoxInputType(DescriptionType, WithMinMaxOccurs):
     supportedCRS = SupportedCrsList()
 
 
@@ -338,7 +397,7 @@ class AllowedValues(MappingSchema):
     allowedValues = AllowedValuesList()
 
 
-class Range(MappingSchema):
+class AllowedRange(MappingSchema):
     minimumValue = SchemaNode(String(), missing=drop)
     maximumValue = SchemaNode(String(), missing=drop)
     spacing = SchemaNode(String(), missing=drop)
@@ -347,7 +406,7 @@ class Range(MappingSchema):
 
 
 class AllowedRangesList(SequenceSchema):
-    allowedRanges = Range()
+    allowedRanges = AllowedRange()
 
 
 class AllowedRanges(MappingSchema):
@@ -366,7 +425,7 @@ class LiteralDataDomainType(OneOfMappingSchema):
     _one_of = (AllowedValues,
                AllowedRanges,
                ValuesReference,
-               AnyValue)  # must be last because it's the most permissive
+               AnyValue)  # must be last because it"s the most permissive
     defaultValue = SchemaNode(String(), missing=drop)
     dataType = DataTypeSchema(missing=drop)
     uom = UomSchema(missing=drop)
@@ -376,15 +435,15 @@ class LiteralDataDomainTypeList(SequenceSchema):
     literalDataDomain = LiteralDataDomainType()
 
 
-class LiteralInputType(MappingSchema):
+class LiteralInputType(DescriptionType, WithMinMaxOccurs):
     literalDataDomains = LiteralDataDomainTypeList(missing=drop)
 
 
-class InputType(OneOfMappingSchema, InputDataDescriptionType):
+class InputType(OneOfMappingSchema):
     _one_of = (
         BoundingBoxInputType,
         ComplexInputType,  # should be 2nd to last because very permission, but requires format at least
-        LiteralInputType,  # must be last because it's the most permissive (all can default if omitted)
+        LiteralInputType,  # must be last because it"s the most permissive (all can default if omitted)
     )
 
 
@@ -412,7 +471,7 @@ class OutputType(OneOfMappingSchema, OutputDataDescriptionType):
     _one_of = (
         BoundingBoxOutputType,
         ComplexOutputType,  # should be 2nd to last because very permission, but requires format at least
-        LiteralOutputType,  # must be last because it's the most permissive (all can default if omitted)
+        LiteralOutputType,  # must be last because it"s the most permissive (all can default if omitted)
     )
 
 
@@ -421,89 +480,108 @@ class OutputDescriptionList(SequenceSchema):
 
 
 class JobExecuteModeEnum(SchemaNode):
-    # noinspection PyUnusedLocal
-    def __init__(self, *args, **kwargs):
-        kwargs.pop('validator', None)   # ignore passed argument and enforce the validator
+    schema_type = String
+
+    def __init__(self, *args, **kwargs):    # noqa: E811
+        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(JobExecuteModeEnum, self).__init__(
-            String(),
-            title=kwargs.get('title', 'mode'),
-            default=kwargs.get('default', EXECUTE_MODE_AUTO),
-            example=kwargs.get('example', EXECUTE_MODE_ASYNC),
-            validator=OneOf(list(execute_mode_options)),
+            self.schema_type(),
+            title=kwargs.get("title", "mode"),
+            default=kwargs.get("default", EXECUTE_MODE_AUTO),
+            example=kwargs.get("example", EXECUTE_MODE_ASYNC),
+            validator=OneOf(list(EXECUTE_MODE_OPTIONS)),
             **kwargs)
 
 
 class JobControlOptionsEnum(SchemaNode):
-    # noinspection PyUnusedLocal
-    def __init__(self, *args, **kwargs):
-        kwargs.pop('validator', None)   # ignore passed argument and enforce the validator
+    schema_type = String
+
+    def __init__(self, *args, **kwargs):    # noqa: E811
+        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(JobControlOptionsEnum, self).__init__(
-            String(),
-            title='jobControlOptions',
-            default=kwargs.get('default', EXECUTE_CONTROL_OPTION_ASYNC),
-            example=kwargs.get('example', EXECUTE_CONTROL_OPTION_ASYNC),
-            validator=OneOf(list(execute_control_options)),
+            self.schema_type(),
+            title="jobControlOptions",
+            default=kwargs.get("default", EXECUTE_CONTROL_OPTION_ASYNC),
+            example=kwargs.get("example", EXECUTE_CONTROL_OPTION_ASYNC),
+            validator=OneOf(list(EXECUTE_CONTROL_OPTIONS)),
             **kwargs)
 
 
 class JobResponseOptionsEnum(SchemaNode):
-    # noinspection PyUnusedLocal
-    def __init__(self, *args, **kwargs):
-        kwargs.pop('validator', None)   # ignore passed argument and enforce the validator
+    schema_type = String
+
+    def __init__(self, *args, **kwargs):    # noqa: E811
+        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(JobResponseOptionsEnum, self).__init__(
-            String(),
-            title=kwargs.get('title', 'response'),
-            default=kwargs.get('default', EXECUTE_RESPONSE_RAW),
-            example=kwargs.get('example', EXECUTE_RESPONSE_RAW),
-            validator=OneOf(list(execute_response_options)),
+            self.schema_type(),
+            title=kwargs.get("title", "response"),
+            default=kwargs.get("default", EXECUTE_RESPONSE_RAW),
+            example=kwargs.get("example", EXECUTE_RESPONSE_RAW),
+            validator=OneOf(list(EXECUTE_RESPONSE_OPTIONS)),
             **kwargs)
 
 
 class TransmissionModeEnum(SchemaNode):
-    # noinspection PyUnusedLocal
-    def __init__(self, *args, **kwargs):
-        kwargs.pop('validator', None)   # ignore passed argument and enforce the validator
+    schema_type = String
+
+    def __init__(self, *args, **kwargs):    # noqa: E811
+        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(TransmissionModeEnum, self).__init__(
-            String(),
-            title=kwargs.get('title', 'transmissionMode'),
-            default=kwargs.get('default', EXECUTE_TRANSMISSION_MODE_REFERENCE),
-            example=kwargs.get('example', EXECUTE_TRANSMISSION_MODE_REFERENCE),
-            validator=OneOf(list(execute_transmission_mode_options)),
+            self.schema_type(),
+            title=kwargs.get("title", "transmissionMode"),
+            default=kwargs.get("default", EXECUTE_TRANSMISSION_MODE_REFERENCE),
+            example=kwargs.get("example", EXECUTE_TRANSMISSION_MODE_REFERENCE),
+            validator=OneOf(list(EXECUTE_TRANSMISSION_MODE_OPTIONS)),
             **kwargs)
 
 
 class JobStatusEnum(SchemaNode):
-    # noinspection PyUnusedLocal
-    def __init__(self, *args, **kwargs):
-        kwargs.pop('validator', None)   # ignore passed argument and enforce the validator
+    schema_type = String
+
+    def __init__(self, *args, **kwargs):    # noqa: E811
+        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(JobStatusEnum, self).__init__(
-            String(),
-            default=kwargs.get('default', None),
-            example=kwargs.get('example', STATUS_ACCEPTED),
-            validator=OneOf(list(job_status_categories[STATUS_COMPLIANT_OGC])),
+            self.schema_type(),
+            default=kwargs.get("default", None),
+            example=kwargs.get("example", STATUS_ACCEPTED),
+            validator=OneOf(list(JOB_STATUS_CATEGORIES[STATUS_COMPLIANT_OGC])),
             **kwargs)
 
 
 class JobSortEnum(SchemaNode):
-    # noinspection PyUnusedLocal
-    def __init__(self, *args, **kwargs):
-        kwargs.pop('validator', None)   # ignore passed argument and enforce the validator
+    schema_type = String
+
+    def __init__(self, *args, **kwargs):    # noqa: E811
+        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(JobSortEnum, self).__init__(
             String(),
-            default=kwargs.get('default', SORT_CREATED),
-            example=kwargs.get('example', SORT_CREATED),
-            validator=OneOf(list(job_sort_values)),
+            default=kwargs.get("default", SORT_CREATED),
+            example=kwargs.get("example", SORT_CREATED),
+            validator=OneOf(list(JOB_SORT_VALUES)),
+            **kwargs)
+
+
+class QuoteSortEnum(SchemaNode):
+    schema_type = String
+
+    def __init__(self, *args, **kwargs):  # noqa: E811
+        kwargs.pop("validator", None)  # ignore passed argument and enforce the validator
+        super(QuoteSortEnum, self).__init__(
+            self.schema_type(),
+            default=kwargs.get("default", SORT_ID),
+            example=kwargs.get("example", SORT_PROCESS),
+            validator=OneOf(list(QUOTE_SORT_VALUES)),
             **kwargs)
 
 
 class LaunchJobQuerystring(MappingSchema):
     field_string = SchemaNode(String(), default=None, missing=drop,
-                              description='Comma separated tags that can be used to filter jobs later')
-    field_string.name = 'tags'
+                              description="Comma separated tags that can be used to filter jobs later")
+    field_string.name = "tags"
 
 
 class Visibility(MappingSchema):
-    value = SchemaNode(String(), validator=OneOf(list(visibility_values)), example=VISIBILITY_PUBLIC)
+    value = SchemaNode(String(), validator=OneOf(list(VISIBILITY_VALUES)), example=VISIBILITY_PUBLIC)
 
 
 #########################################################
@@ -516,6 +594,10 @@ class FrontpageEndpoint(MappingSchema):
 
 
 class VersionsEndpoint(MappingSchema):
+    header = AcceptHeader()
+
+
+class ConformanceEndpoint(MappingSchema):
     header = AcceptHeader()
 
 
@@ -660,14 +742,6 @@ class ExceptionReportType(MappingSchema):
     description = SchemaNode(String(), missing=drop)
 
 
-class ConformsToList(SequenceSchema):
-    item = SchemaNode(String())
-
-
-class ReqClasses(MappingSchema):
-    conformsTo = ConformsToList()
-
-
 class ProcessSummary(DescriptionType):
     """WPS process definition."""
     version = SchemaNode(String(), missing=drop)
@@ -700,33 +774,42 @@ class ProcessOutputDescriptionSchema(MappingSchema):
 
 
 class JobStatusInfo(MappingSchema):
-    jobID = SchemaNode(String(), example='a9d14bf4-84e0-449a-bac8-16e598efe807', description="ID of the job.")
+    jobID = SchemaNode(String(), example="a9d14bf4-84e0-449a-bac8-16e598efe807", description="ID of the job.")
     status = JobStatusEnum()
     message = SchemaNode(String(), missing=drop)
+    # fixme: use href links (https://github.com/crim-ca/weaver/issues/58) [logs/result/exceptions]
     logs = SchemaNode(String(), missing=drop)
+    result = SchemaNode(String(), missing=drop)
+    exceptions = SchemaNode(String(), missing=drop)
     expirationDate = SchemaNode(DateTime(), missing=drop)
     estimatedCompletion = SchemaNode(DateTime(), missing=drop)
-    duration = SchemaNode(DateTime(), missing=drop)
+    duration = SchemaNode(String(), missing=drop, description="Duration of the process execution.")
     nextPoll = SchemaNode(DateTime(), missing=drop)
     percentCompleted = SchemaNode(Integer(), example=0, validator=Range(min=0, max=100))
 
 
-class JobCollectionList(SequenceSchema):
-    item = SchemaNode(String(), description='Job ID.')
+class JobEntrySchema(OneOfMappingSchema):
+    _one_of = (
+        JobStatusInfo,
+        SchemaNode(String(), description="Job ID."),
+    )
+    # note:
+    #   Since JobId is a simple string (not a dict), no additional mapping field can be added here.
+    #   They will be discarded by `OneOfMappingSchema.deserialize()`.
 
 
-class JobCollection(MappingSchema):
-    jobs = JobCollectionList()
+class JobCollection(SequenceSchema):
+    item = JobEntrySchema()
 
 
 class CreatedJobStatusSchema(MappingSchema):
     status = SchemaNode(String(), example=STATUS_ACCEPTED)
-    location = SchemaNode(String(), example='http://{host}/weaver/processes/{my-process-id}/jobs/{my-job-id}')
-    jobID = SchemaNode(String(), example='a9d14bf4-84e0-449a-bac8-16e598efe807', description="ID of the created job.")
+    location = SchemaNode(String(), example="http://{host}/weaver/processes/{my-process-id}/jobs/{my-job-id}")
+    jobID = SchemaNode(String(), example="a9d14bf4-84e0-449a-bac8-16e598efe807", description="ID of the created job.")
 
 
 class CreatedQuotedJobStatusSchema(CreatedJobStatusSchema):
-    bill = SchemaNode(String(), example='d88fda5c-52cc-440b-9309-f2cd20bcd6a2', description="ID of the created bill.")
+    bill = SchemaNode(String(), example="d88fda5c-52cc-440b-9309-f2cd20bcd6a2", description="ID of the created bill.")
 
 
 class GetPagingJobsSchema(MappingSchema):
@@ -736,16 +819,20 @@ class GetPagingJobsSchema(MappingSchema):
 
 
 class GroupedJobsCategorySchema(MappingSchema):
-    category = MappingSchema(description="Corresponding grouping values that compose the resulting job list category.")
+    category = VariableMappingSchema(description="Grouping values that compose the corresponding job list category.")
     jobs = JobCollection(description="List of jobs that matched the corresponding grouping values.")
     count = SchemaNode(Integer(), description="Number of matching jobs for the corresponding group category.")
 
 
-class GetGroupedJobsSchema(SequenceSchema):
-    job_group_category = GroupedJobsCategorySchema()
+class GroupedCategoryJobsSchema(SequenceSchema):
+    job_group_category_item = GroupedJobsCategorySchema()
 
 
-class GetFilteredJobsSchema(OneOfMappingSchema):
+class GetGroupedJobsSchema(MappingSchema):
+    groups = GroupedCategoryJobsSchema()
+
+
+class GetQueriedJobsSchema(OneOfMappingSchema):
     _one_of = (
         GetPagingJobsSchema,
         GetGroupedJobsSchema,
@@ -755,8 +842,8 @@ class GetFilteredJobsSchema(OneOfMappingSchema):
 
 class DismissedJobSchema(MappingSchema):
     status = JobStatusEnum()
-    jobID = SchemaNode(String(), example='a9d14bf4-84e0-449a-bac8-16e598efe807', description="ID of the job.")
-    message = SchemaNode(String(), example='Job dismissed.')
+    jobID = SchemaNode(String(), example="a9d14bf4-84e0-449a-bac8-16e598efe807", description="ID of the job.")
+    message = SchemaNode(String(), example="Job dismissed.")
     percentCompleted = SchemaNode(Integer(), example=0)
 
 
@@ -833,12 +920,12 @@ class InputList(SequenceSchema):
 class Execute(MappingSchema):
     inputs = InputList(missing=drop)
     outputs = OutputList()
-    mode = SchemaNode(String(), validator=OneOf(list(execute_mode_options)))
+    mode = SchemaNode(String(), validator=OneOf(list(EXECUTE_MODE_OPTIONS)))
     notification_email = SchemaNode(
         String(),
         missing=drop,
         description="Optionally send a notification email when the job is done.")
-    response = SchemaNode(String(), validator=OneOf(list(execute_response_options)))
+    response = SchemaNode(String(), validator=OneOf(list(EXECUTE_RESPONSE_OPTIONS)))
 
 
 class Quotation(MappingSchema):
@@ -994,10 +1081,10 @@ class LogsOutputSchema(MappingSchema):
 
 
 class FrontpageParameterSchema(MappingSchema):
-    name = SchemaNode(String(), example='api')
+    name = SchemaNode(String(), example="api")
     enabled = SchemaNode(Boolean(), example=True)
-    url = SchemaNode(String(), example='https://weaver-host', missing=drop)
-    doc = SchemaNode(String(), example='https://weaver-host/api', missing=drop)
+    url = SchemaNode(String(), example="https://weaver-host", missing=drop)
+    doc = SchemaNode(String(), example="https://weaver-host/api", missing=drop)
 
 
 class FrontpageParameters(SequenceSchema):
@@ -1005,8 +1092,8 @@ class FrontpageParameters(SequenceSchema):
 
 
 class FrontpageSchema(MappingSchema):
-    message = SchemaNode(String(), default='Weaver Information', example='Weaver Information')
-    configuration = SchemaNode(String(), default='default', example='default')
+    message = SchemaNode(String(), default="Weaver Information", example="Weaver Information")
+    configuration = SchemaNode(String(), default="default", example="default")
     parameters = FrontpageParameters()
 
 
@@ -1019,9 +1106,9 @@ class SwaggerUISpecSchema(MappingSchema):
 
 
 class VersionsSpecSchema(MappingSchema):
-    name = SchemaNode(String(), description="Identification name of the current item.", example='weaver')
-    type = SchemaNode(String(), description="Identification type of the current item.", example='api')
-    version = SchemaNode(String(), description="Version of the current item.", example='0.1.0')
+    name = SchemaNode(String(), description="Identification name of the current item.", example="weaver")
+    type = SchemaNode(String(), description="Identification type of the current item.", example="api")
+    version = SchemaNode(String(), description="Version of the current item.", example="0.1.0")
 
 
 class VersionsList(SequenceSchema):
@@ -1030,6 +1117,15 @@ class VersionsList(SequenceSchema):
 
 class VersionsSchema(MappingSchema):
     versions = VersionsList()
+
+
+class ConformanceList(SequenceSchema):
+    item = SchemaNode(String(), description="Conformance specification link.",
+                      example="http://www.opengis.net/spec/wfs-1/3.0/req/core")
+
+
+class ConformanceSchema(MappingSchema):
+    conformsTo = ConformanceList()
 
 
 #################################
@@ -1070,9 +1166,9 @@ class Deploy(MappingSchema):
     owsContext = OWSContext(missing=drop)
 
 
-class PostProcessEndpoint(MappingSchema):
+class PostProcessesEndpoint(MappingSchema):
     header = AcceptHeader()
-    body = Deploy(title='Deploy')
+    body = Deploy(title="Deploy")
 
 
 class PostProcessJobsEndpoint(ProcessPath):
@@ -1083,6 +1179,8 @@ class PostProcessJobsEndpoint(ProcessPath):
 class GetJobsQueries(MappingSchema):
     detail = SchemaNode(Boolean(), description="Provide job details instead of IDs.",
                         default=False, example=True, missing=drop)
+    groups = SchemaNode(String(), description="Comma-separated list of grouping fields with which to list jobs.",
+                        default=False, example="process,service", missing=drop)
     page = SchemaNode(Integer(), missing=drop, default=0)
     limit = SchemaNode(Integer(), missing=drop, default=10)
     status = JobStatusEnum(missing=drop)
@@ -1090,7 +1188,7 @@ class GetJobsQueries(MappingSchema):
     provider = SchemaNode(String(), missing=drop, default=None)
     sort = JobSortEnum(missing=drop)
     tags = SchemaNode(String(), missing=drop, default=None,
-                      description='Comma-separated values of tags assigned to jobs')
+                      description="Comma-separated values of tags assigned to jobs")
 
 
 class GetJobsRequest(MappingSchema):
@@ -1132,18 +1230,6 @@ class ProcessQuotesEndpoint(ProcessPath):
 
 class ProcessQuoteEndpoint(ProcessPath, QuotePath):
     header = AcceptHeader()
-
-
-class QuoteSortEnum(SchemaNode):
-    # noinspection PyUnusedLocal
-    def __init__(self, *args, **kwargs):
-        kwargs.pop('validator', None)   # ignore passed argument and enforce the validator
-        super(QuoteSortEnum, self).__init__(
-            String(),
-            default=kwargs.get('default', SORT_ID),
-            example=kwargs.get('example', SORT_PROCESS),
-            validator=OneOf(quote_sort_values),
-            **kwargs)
 
 
 class GetQuotesQueries(MappingSchema):
@@ -1221,29 +1307,38 @@ class UnauthorizedJsonResponseSchema(MappingSchema):
     body = ErrorJsonResponseBodySchema()
 
 
-class OkGetFrontpageSchema(MappingSchema):
+class OkGetFrontpageResponse(MappingSchema):
     header = JsonHeader()
     body = FrontpageSchema()
 
 
-class OkGetSwaggerJSONSchema(MappingSchema):
+class OkGetSwaggerJSONResponse(MappingSchema):
     header = JsonHeader()
     body = SwaggerJSONSpecSchema(description="Swagger JSON of weaver API.")
 
 
-class OkGetSwaggerUISchema(MappingSchema):
+class OkGetSwaggerUIResponse(MappingSchema):
     header = HtmlHeader()
     body = SwaggerUISpecSchema(description="Swagger UI of weaver API.")
 
 
-class OkGetVersionsSchema(MappingSchema):
+class OkGetVersionsResponse(MappingSchema):
     header = JsonHeader()
     body = VersionsSchema()
 
 
-class OkGetProvidersSchema(MappingSchema):
+class OkGetConformanceResponse(MappingSchema):
+    header = JsonHeader()
+    body = ConformanceSchema()
+
+
+class OkGetProvidersListResponse(MappingSchema):
     header = JsonHeader()
     body = ProvidersSchema()
+
+
+class InternalServerErrorGetProvidersListResponse(MappingSchema):
+    description = "Unhandled error occurred during providers listing."
 
 
 class OkGetProviderCapabilitiesSchema(MappingSchema):
@@ -1251,14 +1346,30 @@ class OkGetProviderCapabilitiesSchema(MappingSchema):
     body = ProviderCapabilitiesSchema()
 
 
+class InternalServerErrorGetProviderCapabilitiesResponse(MappingSchema):
+    description = "Unhandled error occurred during provider capabilities request."
+
+
 class NoContentDeleteProviderSchema(MappingSchema):
     header = JsonHeader()
     body = MappingSchema(default={})
 
 
+class InternalServerErrorDeleteProviderResponse(MappingSchema):
+    description = "Unhandled error occurred during provider removal."
+
+
+class NotImplementedDeleteProviderResponse(MappingSchema):
+    description = "Provider removal not supported using referenced storage."
+
+
 class OkGetProviderProcessesSchema(MappingSchema):
     header = JsonHeader()
     body = ProcessesSchema()
+
+
+class InternalServerErrorGetProviderProcessesListResponse(MappingSchema):
+    description = "Unhandled error occurred during provider processes listing."
 
 
 class GetProcessesQuery(MappingSchema):
@@ -1276,9 +1387,13 @@ class GetProcessesEndpoint(MappingSchema):
     querystring = GetProcessesQuery()
 
 
-class OkGetProcessesSchema(MappingSchema):
+class OkGetProcessesListResponse(MappingSchema):
     header = JsonHeader()
     body = ProcessCollection()
+
+
+class InternalServerErrorGetProcessesListResponse(MappingSchema):
+    description = "Unhandled error occurred during processes listing."
 
 
 class OkPostProcessDeployBodySchema(MappingSchema):
@@ -1288,14 +1403,22 @@ class OkPostProcessDeployBodySchema(MappingSchema):
     failureReason = SchemaNode(String(), missing=drop, description="Description of deploy failure if applicable.")
 
 
-class OkPostProcessesSchema(MappingSchema):
+class OkPostProcessesResponse(MappingSchema):
     header = JsonHeader()
     body = OkPostProcessDeployBodySchema()
 
 
-class OkGetProcessSchema(MappingSchema):
+class InternalServerErrorPostProcessesResponse(MappingSchema):
+    description = "Unhandled error occurred during process deployment."
+
+
+class OkGetProcessInfoResponse(MappingSchema):
     header = JsonHeader()
     body = ProcessOffering()
+
+
+class InternalServerErrorGetProcessResponse(MappingSchema):
+    description = "Unhandled error occurred during process description."
 
 
 class OkGetProcessPackageSchema(MappingSchema):
@@ -1303,13 +1426,21 @@ class OkGetProcessPackageSchema(MappingSchema):
     body = MappingSchema(default={})
 
 
+class InternalServerErrorGetProcessPackageResponse(MappingSchema):
+    description = "Unhandled error occurred during process package description."
+
+
 class OkGetProcessPayloadSchema(MappingSchema):
     header = JsonHeader()
     body = MappingSchema(default={})
 
 
+class InternalServerErrorGetProcessPayloadResponse(MappingSchema):
+    description = "Unhandled error occurred during process payload description."
+
+
 class ProcessVisibilityResponseBodySchema(MappingSchema):
-    value = SchemaNode(String(), validator=OneOf(list(visibility_values)), example=VISIBILITY_PUBLIC)
+    value = SchemaNode(String(), validator=OneOf(list(VISIBILITY_VALUES)), example=VISIBILITY_PUBLIC)
 
 
 class OkGetProcessVisibilitySchema(MappingSchema):
@@ -1317,26 +1448,42 @@ class OkGetProcessVisibilitySchema(MappingSchema):
     body = ProcessVisibilityResponseBodySchema()
 
 
+class InternalServerErrorGetProcessVisibilityResponse(MappingSchema):
+    description = "Unhandled error occurred during process visibility retrieval."
+
+
 class OkPutProcessVisibilitySchema(MappingSchema):
     header = JsonHeader()
     body = ProcessVisibilityResponseBodySchema()
 
 
+class InternalServerErrorPutProcessVisibilityResponse(MappingSchema):
+    description = "Unhandled error occurred during process visibility update."
+
+
 class OkDeleteProcessUndeployBodySchema(MappingSchema):
     deploymentDone = SchemaNode(Boolean(), description="Indicates if the process was successfully undeployed.",
                                 default=False, example=True)
-    identifier = SchemaNode(String(), example='workflow')
+    identifier = SchemaNode(String(), example="workflow")
     failureReason = SchemaNode(String(), missing=drop, description="Description of undeploy failure if applicable.")
 
 
-class OkDeleteProcessSchema(MappingSchema):
+class OkDeleteProcessResponse(MappingSchema):
     header = JsonHeader()
     body = OkDeleteProcessUndeployBodySchema()
 
 
-class OkGetProviderProcessDescription(MappingSchema):
+class InternalServerErrorDeleteProcessResponse(MappingSchema):
+    description = "Unhandled error occurred during process deletion."
+
+
+class OkGetProviderProcessDescriptionResponse(MappingSchema):
     header = JsonHeader()
     body = ProcessDescriptionBodySchema()
+
+
+class InternalServerErrorGetProviderProcessResponse(MappingSchema):
+    description = "Unhandled error occurred during provider process description."
 
 
 class CreatedPostProvider(MappingSchema):
@@ -1344,14 +1491,25 @@ class CreatedPostProvider(MappingSchema):
     body = ProviderSummarySchema()
 
 
+class InternalServerErrorPostProviderResponse(MappingSchema):
+    description = "Unhandled error occurred during provider process registration."
+
+
+class NotImplementedPostProviderResponse(MappingSchema):
+    description = "Provider registration not supported using referenced storage."
+
+
 class CreatedLaunchJobResponse(MappingSchema):
     header = JsonHeader()
     body = CreatedJobStatusSchema()
 
 
-class OkGetAllProcessJobsResponse(MappingSchema):
-    header = JsonHeader()
-    body = JobCollection()
+class InternalServerErrorPostProcessJobResponse(MappingSchema):
+    description = "Unhandled error occurred during process job submission."
+
+
+class InternalServerErrorPostProviderProcessJobResponse(MappingSchema):
+    description = "Unhandled error occurred during process job submission."
 
 
 class OkGetProcessJobResponse(MappingSchema):
@@ -1364,9 +1522,13 @@ class OkDeleteProcessJobResponse(MappingSchema):
     body = DismissedJobSchema()
 
 
-class OkGetAllJobsResponse(MappingSchema):
+class OkGetQueriedJobsResponse(MappingSchema):
     header = JsonHeader()
-    body = GetFilteredJobsSchema()
+    body = GetQueriedJobsSchema()
+
+
+class InternalServerErrorGetJobsResponse(MappingSchema):
+    description = "Unhandled error occurred during jobs listing."
 
 
 class OkDismissJobResponse(MappingSchema):
@@ -1374,9 +1536,17 @@ class OkDismissJobResponse(MappingSchema):
     body = DismissedJobSchema()
 
 
-class OkGetSingleJobStatusResponse(MappingSchema):
+class InternalServerErrorDeleteJobResponse(MappingSchema):
+    description = "Unhandled error occurred during job dismiss request."
+
+
+class OkGetJobStatusResponse(MappingSchema):
     header = JsonHeader()
     body = JobStatusInfo()
+
+
+class InternalServerErrorGetJobStatusResponse(MappingSchema):
+    description = "Unhandled error occurred during provider process description."
 
 
 class Result(MappingSchema):
@@ -1384,14 +1554,22 @@ class Result(MappingSchema):
     links = JsonLinkList(missing=drop)
 
 
-class OkGetSingleJobResultsResponse(MappingSchema):
+class OkGetJobResultsResponse(MappingSchema):
     header = JsonHeader()
     body = Result()
 
 
-class OkGetSingleOutputResponse(MappingSchema):
+class InternalServerErrorGetJobResultsResponse(MappingSchema):
+    description = "Unhandled error occurred during job results listing."
+
+
+class OkGetOutputResponse(MappingSchema):
     header = JsonHeader()
     body = JobOutputSchema()
+
+
+class InternalServerErrorGetJobOutputResponse(MappingSchema):
+    description = "Unhandled error occurred during job results listing."
 
 
 class CreatedQuoteExecuteResponse(MappingSchema):
@@ -1399,14 +1577,26 @@ class CreatedQuoteExecuteResponse(MappingSchema):
     body = CreatedQuotedJobStatusSchema()
 
 
+class InternalServerErrorPostQuoteExecuteResponse(MappingSchema):
+    description = "Unhandled error occurred during quote job execution."
+
+
 class CreatedQuoteRequestResponse(MappingSchema):
     header = JsonHeader()
     body = QuoteSchema()
 
 
-class OkGetQuoteResponse(MappingSchema):
+class InternalServerErrorPostQuoteRequestResponse(MappingSchema):
+    description = "Unhandled error occurred during quote submission."
+
+
+class OkGetQuoteInfoResponse(MappingSchema):
     header = JsonHeader()
     body = QuoteSchema()
+
+
+class InternalServerErrorGetQuoteInfoResponse(MappingSchema):
+    description = "Unhandled error occurred during quote retrieval."
 
 
 class OkGetQuoteListResponse(MappingSchema):
@@ -1414,9 +1604,17 @@ class OkGetQuoteListResponse(MappingSchema):
     body = QuotationListSchema()
 
 
+class InternalServerErrorGetQuoteListResponse(MappingSchema):
+    description = "Unhandled error occurred during quote listing."
+
+
 class OkGetBillDetailResponse(MappingSchema):
     header = JsonHeader()
     body = BillSchema()
+
+
+class InternalServerErrorGetBillInfoResponse(MappingSchema):
+    description = "Unhandled error occurred during bill retrieval."
 
 
 class OkGetBillListResponse(MappingSchema):
@@ -1424,147 +1622,198 @@ class OkGetBillListResponse(MappingSchema):
     body = BillListSchema()
 
 
-class OkGetExceptionsResponse(MappingSchema):
+class InternalServerErrorGetBillListResponse(MappingSchema):
+    description = "Unhandled error occurred during bill listing."
+
+
+class OkGetJobExceptionsResponse(MappingSchema):
     header = JsonHeader()
     body = ExceptionsOutputSchema()
 
 
-class OkGetLogsResponse(MappingSchema):
+class InternalServerErrorGetJobExceptionsResponse(MappingSchema):
+    description = "Unhandled error occurred during job exceptions listing."
+
+
+class OkGetJobLogsResponse(MappingSchema):
     header = JsonHeader()
     body = LogsOutputSchema()
 
 
+class InternalServerErrorGetJobLogsResponse(MappingSchema):
+    description = "Unhandled error occurred during job logs listing."
+
+
 get_api_frontpage_responses = {
-    '200': OkGetFrontpageSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetFrontpageResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_api_swagger_json_responses = {
-    '200': OkGetSwaggerJSONSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetSwaggerJSONResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_api_swagger_ui_responses = {
-    '200': OkGetSwaggerUISchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetSwaggerUIResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_api_versions_responses = {
-    '200': OkGetVersionsSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetVersionsResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+}
+get_api_conformance_responses = {
+    "200": OkGetConformanceResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized")
 }
 get_processes_responses = {
-    '200': OkGetProcessesSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetProcessesListResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetProcessesListResponse(),
 }
 post_processes_responses = {
-    # TODO: status should be 201 when properly modified to match API conformance
-    '200': OkPostProcessesSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    # FIXME:
+    #   status should be 201 when properly modified to match API conformance
+    #   https://github.com/crim-ca/weaver/issues/14
+    "200": OkPostProcessesResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorPostProcessesResponse(),
 }
 get_process_responses = {
-    '200': OkGetProcessSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetProcessInfoResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetProcessResponse(),
 }
 get_process_package_responses = {
-    '200': OkGetProcessPackageSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetProcessPackageSchema(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetProcessPackageResponse(),
 }
 get_process_payload_responses = {
-    '200': OkGetProcessPayloadSchema(description='success')
+    "200": OkGetProcessPayloadSchema(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetProcessPayloadResponse(),
 }
 get_process_visibility_responses = {
-    '200': OkGetProcessVisibilitySchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetProcessVisibilitySchema(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetProcessVisibilityResponse(),
 }
 put_process_visibility_responses = {
-    '200': OkPutProcessVisibilitySchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkPutProcessVisibilitySchema(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorPutProcessVisibilityResponse(),
 }
 delete_process_responses = {
-    '200': OkDeleteProcessSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkDeleteProcessResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorDeleteProcessResponse(),
 }
-get_all_providers_responses = {
-    '200': OkGetProvidersSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+get_providers_list_responses = {
+    "200": OkGetProvidersListResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetProvidersListResponse(),
 }
-get_one_provider_responses = {
-    '200': OkGetProviderCapabilitiesSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+get_provider_responses = {
+    "200": OkGetProviderCapabilitiesSchema(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetProviderCapabilitiesResponse(),
 }
 delete_provider_responses = {
-    '204': NoContentDeleteProviderSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "204": NoContentDeleteProviderSchema(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorDeleteProviderResponse(),
+    "501": NotImplementedDeleteProviderResponse(),
 }
 get_provider_processes_responses = {
-    '200': OkGetProviderProcessesSchema(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetProviderProcessesSchema(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetProviderProcessesListResponse(),
 }
-get_provider_process_description_responses = {
-    '200': OkGetProviderProcessDescription(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+get_provider_process_responses = {
+    "200": OkGetProviderProcessDescriptionResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetProviderProcessResponse(),
 }
 post_provider_responses = {
-    '201': CreatedPostProvider(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "201": CreatedPostProvider(description="success"),
+    "400": MappingSchema(description=OWSMissingParameterValue.explanation),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorPostProviderResponse(),
+    "501": NotImplementedPostProviderResponse(),
 }
 post_provider_process_job_responses = {
-    '201': CreatedLaunchJobResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "201": CreatedLaunchJobResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorPostProviderProcessJobResponse(),
 }
 post_process_jobs_responses = {
-    '201': CreatedLaunchJobResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "201": CreatedLaunchJobResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorPostProcessJobResponse(),
 }
 get_all_jobs_responses = {
-    '200': OkGetAllJobsResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetQueriedJobsResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetJobsResponse(),
 }
 get_single_job_status_responses = {
-    '200': OkGetSingleJobStatusResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetJobStatusResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetJobStatusResponse(),
 }
 delete_job_responses = {
-    '200': OkDismissJobResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkDismissJobResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorDeleteJobResponse(),
 }
 get_job_results_responses = {
-    '200': OkGetSingleJobResultsResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetJobResultsResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetJobResultsResponse(),
 }
-get_quote_list_responses = {
-    '200': OkGetQuoteListResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
-}
-get_quote_responses = {
-    '200': OkGetQuoteResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
-}
-post_quote_responses = {
-    '201': CreatedQuoteExecuteResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
-}
-post_quotes_responses = {
-    '201': CreatedQuoteRequestResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
-}
-get_bill_list_responses = {
-    '200': OkGetBillListResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
-}
-get_bill_responses = {
-    '200': OkGetBillDetailResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
-}
-get_single_result_responses = {
-    '200': OkGetSingleOutputResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+get_job_output_responses = {
+    "200": OkGetOutputResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetJobOutputResponse(),
 }
 get_exceptions_responses = {
-    '200': OkGetExceptionsResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetJobExceptionsResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetJobExceptionsResponse(),
 }
 get_logs_responses = {
-    '200': OkGetLogsResponse(description='success'),
-    '401': UnauthorizedJsonResponseSchema(description='unauthorized'),
+    "200": OkGetJobLogsResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetJobLogsResponse(),
+}
+get_quote_list_responses = {
+    "200": OkGetQuoteListResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetQuoteListResponse(),
+}
+get_quote_responses = {
+    "200": OkGetQuoteInfoResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetQuoteInfoResponse(),
+}
+post_quotes_responses = {
+    "201": CreatedQuoteRequestResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorPostQuoteRequestResponse(),
+}
+post_quote_responses = {
+    "201": CreatedQuoteExecuteResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorPostQuoteExecuteResponse(),
+}
+get_bill_list_responses = {
+    "200": OkGetBillListResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetBillListResponse(),
+}
+get_bill_responses = {
+    "200": OkGetBillDetailResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetBillInfoResponse(),
 }
 
 
@@ -1575,4 +1824,4 @@ get_logs_responses = {
 
 def service_api_route_info(service_api, settings):
     api_base = wps_restapi_base_path(settings)
-    return {'name': service_api.name, 'pattern': '{base}{path}'.format(base=api_base, path=service_api.path)}
+    return {"name": service_api.name, "pattern": "{base}{path}".format(base=api_base, path=service_api.path)}

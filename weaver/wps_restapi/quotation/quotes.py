@@ -1,44 +1,41 @@
-from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS, WEAVER_CONFIGURATION_ADES
+import logging
+import random
+from datetime import timedelta
+
+from duration import to_iso8601
+from pyramid.httpexceptions import HTTPBadRequest, HTTPCreated, HTTPNotFound, HTTPOk
+
+from weaver import sort
+from weaver.config import WEAVER_CONFIGURATION_ADES, WEAVER_CONFIGURATION_EMS, get_weaver_configuration
 from weaver.database import get_db
-from weaver.exceptions import QuoteNotFound, ProcessNotFound
 from weaver.datatype import Bill, Quote
+from weaver.exceptions import ProcessNotFound, QuoteNotFound, log_unhandled_exceptions
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
-from weaver.processes.wps_package import get_process_location, get_package_workflow_steps
+from weaver.processes.wps_package import get_package_workflow_steps, get_process_location
 from weaver.store.base import StoreBills, StoreQuotes
-from weaver.utils import get_weaver_url, get_settings
+from weaver.utils import get_settings, get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.processes import submit_local_job
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
-from weaver import sort
-from pyramid.httpexceptions import (
-    HTTPOk,
-    HTTPCreated,
-    HTTPBadRequest,
-    HTTPNotFound,
-)
-from datetime import timedelta
-from duration import to_iso8601
-import logging
-import random
 
-logger = logging.getLogger("weaver")
+LOGGER = logging.getLogger(__name__)
 
 
-# noinspection PyUnusedLocal
-def process_quote_estimator(process):
+def process_quote_estimator(process):   # noqa: E811
     """
     :param process: instance of :class:`weaver.datatype.Process` for which to evaluate the quote.
     :return: dict of {price, currency, estimatedTime} values for the process quote.
     """
     # TODO: replace by some fancy ml technique or something?
-    price = random.uniform(0, 10)
+    price = random.uniform(0, 10)  # nosec
     currency = "CAD"
-    estimated_time = to_iso8601(timedelta(minutes=random.uniform(5, 60)))
+    estimated_time = to_iso8601(timedelta(minutes=random.uniform(5, 60)))  # nosec
     return {"price": price, "currency": currency, "estimatedTime": estimated_time}
 
 
 @sd.process_quotes_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.PostProcessQuoteRequestEndpoint(), response_schemas=sd.post_quotes_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostQuoteRequestResponse.description)
 def request_quote(request):
     """
     Request a quotation for a process.
@@ -106,6 +103,7 @@ def request_quote(request):
                                schema=sd.ProcessQuotesEndpoint(), response_schemas=sd.get_quote_list_responses)
 @sd.quotes_service.get(tags=[sd.TAG_BILL_QUOTE], renderer=OUTPUT_FORMAT_JSON,
                        schema=sd.QuotesEndpoint(), response_schemas=sd.get_quote_list_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetQuoteListResponse.description)
 def get_quote_list(request):
     """
     Get list of quotes IDs.
@@ -133,6 +131,7 @@ def get_quote_list(request):
                               schema=sd.ProcessQuoteEndpoint(), response_schemas=sd.get_quote_responses)
 @sd.quote_service.get(tags=[sd.TAG_BILL_QUOTE], renderer=OUTPUT_FORMAT_JSON,
                       schema=sd.QuoteEndpoint(), response_schemas=sd.get_quote_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetQuoteInfoResponse.description)
 def get_quote_info(request):
     """
     Get quote information.
@@ -150,6 +149,7 @@ def get_quote_info(request):
                                schema=sd.PostProcessQuote(), response_schemas=sd.post_quote_responses)
 @sd.quote_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_EXECUTE], renderer=OUTPUT_FORMAT_JSON,
                        schema=sd.PostQuote(), response_schemas=sd.post_quote_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostQuoteExecuteResponse.description)
 def execute_quote(request):
     """
     Execute a quoted process.

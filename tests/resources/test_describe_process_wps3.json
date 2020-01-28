@@ -1,15 +1,15 @@
 {
     "process": {
-        "id": "test-remote-process-wps2",
+        "id": "test-remote-process-wps3",
         "keywords": [],
-        "title": "Test Remote Process WPS2",
-        "abstract": "Testing WPS-2 dummy remote process description.",
+        "title": "Test Remote Process WPS3",
+        "abstract": "Testing WPS-3 dummy remote process description.",
         "inputs": [
             {
                 "id": "input-1",
                 "maxOccurs": "1",
                 "minOccurs": "1",
-                "keywords": [],
+                "keywords": []
             }
         ],
         "outputs": [
@@ -18,7 +18,7 @@
                 "title": "The output",
                 "minOccurs": "1",
                 "maxOccurs": "1",
-                "keywords": [],
+                "keywords": []
             }
         ],
         "owsContext": {
@@ -28,7 +28,7 @@
                 }
             }
         },
-        "executeEndpoint": "https://remote-server.com/processes/test-remote-process-wps2/jobs"
+        "executeEndpoint": "https://remote-server.com/processes/test-remote-process-wps3/jobs"
     },
     "outputTransmission": [
         "reference"

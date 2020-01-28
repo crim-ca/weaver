@@ -1,13 +1,18 @@
+import logging
 import os
 import sys
-import logging
+
 logging.captureWarnings(True)
 LOGGER = logging.getLogger("weaver")
 
 WEAVER_MODULE_DIR = os.path.abspath(os.path.dirname(__file__))
 WEAVER_ROOT_DIR = os.path.abspath(os.path.dirname(WEAVER_MODULE_DIR))
+WEAVER_CONFIG_DIR = os.path.abspath(os.path.join(WEAVER_ROOT_DIR, "config"))
 sys.path.insert(0, WEAVER_ROOT_DIR)
 sys.path.insert(0, WEAVER_MODULE_DIR)
+
+# provide standard package version location
+from __meta__ import __version__  # isort:skip # noqa: E402 # pylint: disable=C0413
 
 # ===============================================================================================
 #   DO NOT IMPORT ANYTHING NOT PROVIDED BY BASE PYTHON HERE TO AVOID "setup.py" INSTALL FAILURE
@@ -28,6 +33,8 @@ def main(global_config, **settings):
     """
     Creates a Pyramid WSGI application for Weaver.
     """
+    LOGGER.info("Initiating weaver application")
+
     from weaver.config import get_weaver_configuration
     from weaver.processes.builtin import register_builtin_processes
     from weaver.processes.utils import register_wps_processes_from_config
@@ -47,13 +54,13 @@ def main(global_config, **settings):
         local_config.include("pyramid_celery")
         local_config.configure_celery(global_config["__file__"])
 
-    local_config.include('weaver')
+    local_config.include("weaver")
 
     LOGGER.info("Registering builtin processes...")
     register_builtin_processes(local_config)
 
     LOGGER.info("Registering WPS-1 processes from configuration file...")
-    wps_processes_file = get_settings(local_config).get('weaver.wps_processes_file', '')
+    wps_processes_file = get_settings(local_config).get("weaver.wps_processes_file")
     register_wps_processes_from_config(wps_processes_file, local_config)
 
     return local_config.make_wsgi_app()

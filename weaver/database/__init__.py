@@ -1,10 +1,12 @@
-from weaver.utils import get_registry
-from typing import TYPE_CHECKING
 import logging
+from typing import TYPE_CHECKING
+
+from weaver.utils import get_registry
+
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from weaver.database.mongodb import MongoDatabase
-    from weaver.typedefs import AnyDatabaseContainer
+    from weaver.database.mongodb import MongoDatabase   # noqa: F401
+    from weaver.typedefs import AnyDatabaseContainer    # noqa: F401
 
 
 def get_db(container):

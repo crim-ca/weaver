@@ -1,5 +1,6 @@
-from weaver.wps_restapi.jobs.notify import encrypt_email
 import pytest
+
+from weaver.wps_restapi.jobs.notify import encrypt_email
 
 
 def test_encrypt_email_valid():
@@ -7,7 +8,7 @@ def test_encrypt_email_valid():
         "weaver.wps_email_encrypt_salt": "salty-email",
     }
     email = encrypt_email("some@email.com", settings)
-    assert email == u'a1724b030d999322e2ecc658453f992472c63867cd3cef3b3d829d745bd80f34'
+    assert email == u"a1724b030d999322e2ecc658453f992472c63867cd3cef3b3d829d745bd80f34"
 
 
 def test_encrypt_email_raise():

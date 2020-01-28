@@ -1,28 +1,27 @@
+import logging
+import warnings
+
+from owslib.wps import WebProcessingService
+from pyramid.httpexceptions import HTTPCreated, HTTPNoContent, HTTPNotFound, HTTPOk
+
+from utils import get_cookie_headers
 from weaver.database import get_db
 from weaver.datatype import Service
-from weaver.exceptions import ServiceNotFound
-from weaver.warning import NonBreakingExceptionWarning
+from weaver.exceptions import ServiceNotFound, log_unhandled_exceptions
 from weaver.owsexceptions import OWSMissingParameterValue, OWSNotImplemented
 from weaver.processes.types import PROCESS_WPS
 from weaver.store.base import StoreServices
 from weaver.utils import get_any_id, get_settings
-from weaver.wps_restapi.utils import get_wps_restapi_base_url, OUTPUT_FORMAT_JSON
-from utils import get_cookie_headers
+from weaver.warning import NonBreakingExceptionWarning
 from weaver.wps_restapi import swagger_definitions as sd
-from owslib.wps import WebProcessingService
-from pyramid.httpexceptions import (
-    HTTPOk,
-    HTTPCreated,
-    HTTPNoContent,
-    HTTPNotFound,
-)
-import warnings
-import logging
-logger = logging.getLogger("weaver")
+from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, get_wps_restapi_base_url
+
+LOGGER = logging.getLogger(__name__)
 
 
 @sd.providers_service.get(tags=[sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
-                          schema=sd.GetProviders(), response_schemas=sd.get_all_providers_responses)
+                          schema=sd.GetProviders(), response_schemas=sd.get_providers_list_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProvidersListResponse.description)
 def get_providers(request):
     """
     Lists registered providers.
@@ -44,10 +43,9 @@ def get_providers(request):
                     base_url=get_wps_restapi_base_url(get_settings(request)),
                     provider_id=service.name),
                 public=service.public))
-        except Exception as e:
-            warnings.warn("Exception occurs while fetching wps {0} : {1!r}".format(service.url, e),
+        except Exception as exc:
+            warnings.warn("Exception occurred while fetching wps {0} : {1!r}".format(service.url, exc),
                           NonBreakingExceptionWarning)
-            pass
 
     return HTTPOk(json=providers)
 
@@ -87,6 +85,7 @@ def get_service(request):
 
 @sd.providers_service.post(tags=[sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
                            schema=sd.PostProvider(), response_schemas=sd.post_provider_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostProviderResponse.description)
 def add_provider(request):
     """
     Add a provider.
@@ -95,8 +94,8 @@ def add_provider(request):
 
     try:
         new_service = Service(url=request.json["url"], name=get_any_id(request.json))
-    except KeyError as e:
-        raise OWSMissingParameterValue("Missing json parameter '{!s}'.".format(e), value=str(e))
+    except KeyError as exc:
+        raise OWSMissingParameterValue("Missing json parameter '{!s}'.".format(exc), value=exc)
 
     if "public" in request.json:
         new_service["public"] = request.json["public"]
@@ -106,13 +105,14 @@ def add_provider(request):
     try:
         store.save_service(new_service, request=request)
     except NotImplementedError:
-        raise OWSNotImplemented("Add provider not supported.", value=new_service)
+        raise OWSNotImplemented(sd.NotImplementedPostProviderResponse.description, value=new_service)
 
     return HTTPCreated(json=get_capabilities(new_service, request))
 
 
 @sd.provider_service.delete(tags=[sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
                             schema=sd.ProviderEndpoint(), response_schemas=sd.delete_provider_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorDeleteProviderResponse.description)
 def remove_provider(request):
     """
     Remove a provider.
@@ -122,16 +122,17 @@ def remove_provider(request):
     try:
         store.delete_service(service.name, request=request)
     except NotImplementedError:
-        raise OWSNotImplemented("Delete provider not supported.")
+        raise OWSNotImplemented(sd.NotImplementedDeleteProviderResponse.description)
 
     return HTTPNoContent(json={})
 
 
 @sd.provider_service.get(tags=[sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
-                         schema=sd.ProviderEndpoint(), response_schemas=sd.get_one_provider_responses)
+                         schema=sd.ProviderEndpoint(), response_schemas=sd.get_provider_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProviderCapabilitiesResponse.description)
 def get_provider(request):
     """
-    Get a provider description.
+    Get a provider definition (GetCapabilities).
     """
-    service, store = get_service(request)
+    service, _ = get_service(request)
     return HTTPOk(json=get_capabilities(service, request))

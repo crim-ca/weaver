@@ -1,25 +1,31 @@
-from weaver.processes.sources import fetch_data_sources
-from weaver.processes.constants import WPS_LITERAL
-from weaver.processes.constants import (
-    OPENSEARCH_START_DATE, OPENSEARCH_END_DATE, OPENSEARCH_AOI, OPENSEARCH_COLLECTION, OPENSEARCH_LOCAL_FILE_SCHEME
-)
-from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
-from weaver.utils import get_any_id
-from collections import deque
-from copy import deepcopy
-from itertools import ifilterfalse
-from pyramid.httpexceptions import HTTPGatewayTimeout, HTTPOk
-from pyramid.settings import asbool
-from six.moves.urllib.parse import urlparse, parse_qsl
-from typing import TYPE_CHECKING
-import shapely.wkt
-import lxml.etree
-import requests
 import logging
 import time
+from collections import deque
+from copy import deepcopy
+from typing import TYPE_CHECKING
+
+import lxml.etree
+import requests
+import shapely.wkt
+from pyramid.httpexceptions import HTTPGatewayTimeout, HTTPOk
+from pyramid.settings import asbool
+from six.moves.urllib.parse import parse_qsl, urlparse
+
+from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
+from weaver.processes.constants import (
+    OPENSEARCH_AOI,
+    OPENSEARCH_COLLECTION,
+    OPENSEARCH_END_DATE,
+    OPENSEARCH_LOCAL_FILE_SCHEME,
+    OPENSEARCH_START_DATE,
+    WPS_LITERAL
+)
+from weaver.processes.sources import fetch_data_sources
+from weaver.utils import get_any_id
+
 if TYPE_CHECKING:
-    from weaver.typedefs import XML
-    from typing import AnyStr, Deque, Dict, Iterable, List, Tuple
+    from weaver.typedefs import XML                                 # noqa: F401
+    from typing import AnyStr, Deque, Dict, Iterable, List, Tuple   # noqa: F401
 
 LOGGER = logging.getLogger("PACKAGE")
 
@@ -71,10 +77,7 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info, accept_mime
                 return wps_inputs[id_][0].data
             except KeyError:
                 pass
-        else:
-            raise ValueError(
-                "Missing input identifier: {}".format(" or ".join(ids_to_get))
-            )
+        raise ValueError("Missing input identifier: {}".format(" or ".join(ids_to_get)))
 
     def is_eoimage_parameter(param):
         # type: (str) -> bool
@@ -115,12 +118,12 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info, accept_mime
                 osdd_url = eoimage_source_info[input_id]["osdd_url"]
                 accept_schemes = eoimage_source_info[input_id]["accept_schemes"]
                 mime_types = accept_mime_types[input_id]
-                os = OpenSearchQuery(
+                osq = OpenSearchQuery(
                     collection_identifier=collection_id, osdd_url=osdd_url
                 )
-                for link in os.query_datasets(params,
-                                              accept_schemes=accept_schemes,
-                                              accept_mime_types=mime_types):
+                for link in osq.query_datasets(params,
+                                               accept_schemes=accept_schemes,
+                                               accept_mime_types=mime_types):
                     new_input = deepcopy(queue[0])
                     new_input.data = replace_with_opensearch_scheme(link)
                     eoimages_queue.append(new_input)
@@ -189,13 +192,12 @@ class OpenSearchQuery(object):
             )
 
     def get_template_url(self):
-        """ """
-        r = requests.get(self.osdd_url, params=self.params)
-        r.raise_for_status()
+        resp = requests.get(self.osdd_url, params=self.params)
+        resp.raise_for_status()
 
-        et = lxml.etree.fromstring(r.content)
+        xml = lxml.etree.fromstring(resp.content)
         xpath = "//*[local-name() = 'Url'][@rel='results']"
-        url = et.xpath(xpath)[0]  # type: XML
+        url = xml.xpath(xpath)[0]  # type: XML
         return url.attrib["template"]
 
     def _prepare_query_url(self, template_url, params):
@@ -211,7 +213,7 @@ class OpenSearchQuery(object):
         query_params = {}
         template_parameters = parse_qsl(query)
 
-        allowed_names = set([p[0] for p in template_parameters])
+        allowed_names = {p[0] for p in template_parameters}
         for key, value in template_parameters:
             if "{" in value and "}" in value:
                 pass
@@ -235,17 +237,17 @@ class OpenSearchQuery(object):
         # Try loading from atom alternate link
         for link in alternate_links:
             if link["type"] == "application/atom+xml":
-                r = requests.get(link["href"])
-                r.raise_for_status()
+                resp = requests.get(link["href"])
+                resp.raise_for_status()
 
-                et = lxml.etree.fromstring(r.content)
+                xml = lxml.etree.fromstring(resp.content)
                 xpath = "//*[local-name() = 'entry']/*[local-name() = 'link']"
-                links = et.xpath(xpath)  # type: List[XML]
+                links = xml.xpath(xpath)  # type: List[XML]
                 return [link.attrib for link in links]
         return []
 
-    # noinspection PyMethodMayBeStatic
-    def requests_get_retry(self, *args, **kwargs):
+    @staticmethod
+    def _requests_get_retry(*args, **kwargs):
         """Retry a requests.get call
 
         :param args: passed to requests.get
@@ -257,8 +259,7 @@ class OpenSearchQuery(object):
             response = requests.get(*args, **kwargs)
             if response.status_code == HTTPOk.code:
                 return response
-            else:
-                time.sleep(wait)
+            time.sleep(wait)
         return response
 
     def _query_features_paginated(self, params):
@@ -272,7 +273,7 @@ class OpenSearchQuery(object):
         base_url, query_params = self._prepare_query_url(template_url, params)
         while True:
             query_params["startRecord"] = start_index
-            response = self.requests_get_retry(base_url, params=query_params)
+            response = self._requests_get_retry(base_url, params=query_params)
             if not response.status_code == 200:
                 break
             json_body = response.json()
@@ -314,7 +315,7 @@ class OpenSearchQuery(object):
                         feature["properties"]["links"]["alternates"])
                 data_links_mime_types = [d["type"] for d in data_links]
             except KeyError:
-                LOGGER.exception("Badly formatted json at: {}".format(url))
+                LOGGER.exception("Badly formatted json at: [%s]", url)
                 raise
             for mime_type in accept_mime_types:
                 good_links = [data["href"]
@@ -355,7 +356,7 @@ class EOImageDescribeProcessHandler(object):
     def __init__(self, inputs):
         # type: (List[Dict]) -> None
         self.eoimage_inputs = list(filter(self.is_eoimage_input, inputs))
-        self.other_inputs = list(ifilterfalse(self.is_eoimage_input, inputs))
+        self.other_inputs = list(filter(lambda i: self.is_eoimage_input(i) is False, inputs))
 
     @staticmethod
     def is_eoimage_input(input_data):
@@ -585,7 +586,6 @@ def insert_max_occurs(payload, wps_inputs):
             wps_inputs[get_any_id(input_)][0].max_occurs = int(input_["maxOccurs"])
         except ValueError:
             pass
-    return
 
 
 def modified_collection_identifiers(eo_image_identifiers):
@@ -630,11 +630,10 @@ def replace_inputs_describe_process(inputs, payload):
     # add "additionalParameters" property from the payload
     payload_inputs = {get_any_id(i): i for i in process_inputs}
     for i in inputs:
-        # noinspection PyBroadException
         try:
-            ap = payload_inputs[get_any_id(i)]["additionalParameters"]
-            i["additionalParameters"] = ap
-        except Exception:
+            params = payload_inputs[get_any_id(i)]["additionalParameters"]
+            i["additionalParameters"] = params
+        except Exception:  # noqa: W0703 # nosec: B110
             pass
 
     additional_parameters = get_additional_parameters(payload_process)

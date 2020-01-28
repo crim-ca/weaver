@@ -2,44 +2,58 @@
 Stores to read/write data to from/to mongodb using pymongo.
 """
 
-from weaver.datatype import Service, Process, Job, Quote, Bill
-from weaver.store.base import StoreServices, StoreProcesses, StoreJobs, StoreQuotes, StoreBills
-from weaver.exceptions import (
-    ServiceRegistrationError, ServiceNotFound, ServiceNotAccessible,
-    ProcessRegistrationError, ProcessNotFound, ProcessNotAccessible, ProcessInstanceError,
-    JobRegistrationError, JobNotFound, JobUpdateError,
-    QuoteRegistrationError, QuoteNotFound, QuoteInstanceError,
-    BillRegistrationError, BillNotFound, BillInstanceError,
-)
-from weaver.utils import get_base_url, islambda, now, get_sane_name
-from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_MODE_SYNC
-from weaver.processes.types import PROCESS_WORKFLOW, PROCESS_APPLICATION, PROCESS_WPS
-from weaver.status import STATUS_ACCEPTED, map_status, job_status_categories
-from weaver.visibility import visibility_values, VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
-from weaver.sort import (
-    job_sort_values,
-    quote_sort_values,
-    bill_sort_values,
-    SORT_ID,
-    SORT_USER,
-    SORT_CREATED,
-    SORT_FINISHED,
-)
-# noinspection PyPackageRequirements
-from pywps import Process as ProcessWPS
+import logging
 from typing import TYPE_CHECKING
-from pyramid.request import Request
-from pymongo import ASCENDING, DESCENDING
+
 import pymongo
 import six
-import logging
+from pymongo import ASCENDING, DESCENDING
+from pyramid.request import Request
+# noinspection PyPackageRequirements
+from pywps import Process as ProcessWPS
+
+from weaver.datatype import Bill, Job, Process, Quote, Service
+from weaver.exceptions import (
+    BillInstanceError,
+    BillNotFound,
+    BillRegistrationError,
+    JobNotFound,
+    JobRegistrationError,
+    JobUpdateError,
+    ProcessInstanceError,
+    ProcessNotAccessible,
+    ProcessNotFound,
+    ProcessRegistrationError,
+    QuoteInstanceError,
+    QuoteNotFound,
+    QuoteRegistrationError,
+    ServiceNotAccessible,
+    ServiceNotFound,
+    ServiceRegistrationError
+)
+from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_MODE_SYNC
+from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW, PROCESS_WPS
+from weaver.sort import (
+    BILL_SORT_VALUES,
+    JOB_SORT_VALUES,
+    QUOTE_SORT_VALUES,
+    SORT_CREATED,
+    SORT_FINISHED,
+    SORT_ID,
+    SORT_USER
+)
+from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, map_status
+from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices
+from weaver.utils import get_base_url, get_sane_name, get_weaver_url, islambda, now
+from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC, VISIBILITY_VALUES
+
 if TYPE_CHECKING:
-    from weaver.typedefs import AnyValue
-    from pymongo.collection import Collection
-    from typing import Any, AnyStr, Dict, List, Optional, Tuple, Union
-    JobListAndCount = Tuple[List[Job], int]
-    JobCategory = Dict[AnyStr, Union[AnyValue, Job]]
-    JobCategoriesAndCount = Tuple[List[JobCategory], int]
+    from weaver.typedefs import AnyValue, AnyProcess, AnyProcessType                # noqa: F401
+    from pymongo.collection import Collection                                       # noqa: F401
+    from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, Union    # noqa: F401
+    JobListAndCount = Tuple[List[Job], int]                                         # noqa: F401
+    JobCategory = Dict[AnyStr, Union[AnyValue, Job]]                                # noqa: F401
+    JobCategoriesAndCount = Tuple[List[JobCategory], int]                           # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 
@@ -58,20 +72,19 @@ class MongodbStore(object):
 
     @classmethod
     def get_args_kwargs(cls, *args, **kwargs):
-        # type: (Any, Any) -> Tuple[Tuple, Dict]
+        # type: (*Any, **Any) -> Tuple[Tuple, Dict]
         """
         Filters :class:`MongodbStore`-specific arguments to safely pass them down its ``__init__``.
         """
         collection = None
         if len(args):
             collection = args[0]
-        elif "collection" in kwargs:
+        elif "collection" in kwargs:    # pylint: disable=R1715
             collection = kwargs["collection"]
         sane_name_config = kwargs.get("sane_name_config", None)
         return tuple([collection]), {"sane_name_config": sane_name_config}
 
 
-# noinspection PyUnusedLocal
 class MongodbServiceStore(StoreServices, MongodbStore):
     """
     Registry for OWS services. Uses mongodb to store service url and attributes.
@@ -83,7 +96,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
         MongodbStore.__init__(self, *db_args, **db_kwargs)
 
     def save_service(self, service, overwrite=True, request=None):
-        # type: (Service, Optional[bool], Optional[Request]) -> Service
+        # type: (Service, bool, Optional[Request]) -> Service
         """
         Stores an OWS service in mongodb.
         """
@@ -105,10 +118,10 @@ class MongodbServiceStore(StoreServices, MongodbStore):
             name=service_name,
             type=service.type,
             public=service.public,
-            auth=service.auth))
+            auth=service.auth).params())
         return self.fetch_by_url(url=service_url, request=request)
 
-    def delete_service(self, name, request=None):
+    def delete_service(self, name, request=None):  # noqa: E811
         # type: (AnyStr, Optional[Request]) -> bool
         """
         Removes service from mongodb storage.
@@ -116,7 +129,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
         self.collection.delete_one({"name": name})
         return True
 
-    def list_services(self, request=None):
+    def list_services(self, request=None):  # noqa: E811  # noqa: E811
         # type: (Optional[Request]) -> List[Service]
         """
         Lists all services in mongodb storage.
@@ -126,7 +139,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
             my_services.append(Service(service))
         return my_services
 
-    def fetch_by_name(self, name, visibility=None, request=None):
+    def fetch_by_name(self, name, visibility=None, request=None):  # noqa: E811
         # type: (AnyStr, Optional[AnyStr], Optional[Request]) -> Service
         """
         Gets service for given ``name`` from mongodb storage.
@@ -141,7 +154,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
             raise ServiceNotAccessible("Service '{}' cannot be accessed.".format(name))
         return service
 
-    def fetch_by_url(self, url, request=None):
+    def fetch_by_url(self, url, request=None):  # noqa: E811
         # type: (AnyStr, Optional[Request]) -> Service
         """
         Gets service for given ``url`` from mongodb storage.
@@ -151,7 +164,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
             raise ServiceNotFound
         return Service(service)
 
-    def clear_services(self, request=None):
+    def clear_services(self, request=None):  # noqa: E811
         # type: (Optional[Request]) -> bool
         """
         Removes all OWS services from mongodb storage.
@@ -160,7 +173,6 @@ class MongodbServiceStore(StoreServices, MongodbStore):
         return True
 
 
-# noinspection PyUnusedLocal
 class MongodbProcessStore(StoreProcesses, MongodbStore):
     """
     Registry for processes. Uses mongodb to store processes and attributes.
@@ -172,17 +184,20 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         registry = kwargs.get("registry")
         settings = kwargs.get("settings", {}) if not registry else registry.settings
         default_processes = kwargs.get("default_processes")
-        self.default_host = settings.get("weaver.url", "")
+        self.default_host = get_weaver_url(settings)
         self.default_wps_endpoint = "{host}{wps}".format(host=self.default_host,
                                                          wps=settings.get("weaver.wps_path", ""))
+        # enforce default process re-registration to receive any applicable update
         if default_processes:
             registered_processes = [process.identifier for process in self.list_processes()]
             for process in default_processes:
                 process_name = self._get_process_id(process)
-                if process_name not in registered_processes:
-                    self._add_process(process)
+                if process_name in registered_processes:
+                    self.delete_process(process_name)
+                self._add_process(process)
 
     def _add_process(self, process):
+        # type: (AnyProcess) -> None
         if isinstance(process, ProcessWPS):
             new_process = Process.from_wps(process, processEndpointWPS1=self.default_wps_endpoint)
         else:
@@ -195,10 +210,11 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         new_process["identifier"] = self._get_process_id(process)
         new_process["processEndpointWPS1"] = self._get_process_endpoint_wps1(process)
         new_process["visibility"] = new_process.visibility
-        self.collection.insert_one(new_process)
+        self.collection.insert_one(new_process.params())
 
     @staticmethod
     def _get_process_field(process, function_dict):
+        # type: (AnyProcess, Union[Dict[AnyProcessType, Callable[[], Any]], Callable[[], Any]]) -> Any
         """
         Takes a lambda expression or a dict of process-specific lambda expressions to retrieve a field.
         Validates that the passed process object is one of the supported types.
@@ -220,21 +236,24 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
             raise ProcessInstanceError("Unsupported process type '{}'".format(type(process)))
 
     def _get_process_id(self, process):
+        # type: (AnyProcess) -> AnyStr
         return self._get_process_field(process, lambda: process.identifier)
 
     def _get_process_type(self, process):
+        # type: (AnyProcess) -> AnyStr
         return self._get_process_field(process, {Process: lambda: process.type,
                                                  ProcessWPS: lambda: getattr(process, "type", PROCESS_WPS)}).lower()
 
     def _get_process_endpoint_wps1(self, process):
+        # type: (AnyProcess) -> AnyStr
         url = self._get_process_field(process, {Process: lambda: process.processEndpointWPS1,
                                                 ProcessWPS: lambda: None})
         if not url:
             url = self.default_wps_endpoint
         return url
 
-    def save_process(self, process, overwrite=True, request=None):
-        # type: (Union[Process, ProcessWPS], Optional[bool], Optional[Request]) -> Process
+    def save_process(self, process, overwrite=True, request=None):  # noqa: E811
+        # type: (Union[Process, ProcessWPS], bool, Optional[Request]) -> Process
         """
         Stores a process in storage.
 
@@ -265,30 +284,30 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
             raise ProcessNotFound("Process '{}' could not be found.".format(sane_name))
         return bool(self.collection.delete_one({"identifier": sane_name}).deleted_count)
 
-    def list_processes(self, visibility=None, request=None):
+    def list_processes(self, visibility=None, request=None):  # noqa: E811
         # type: (Optional[AnyStr], Optional[Request]) -> List[Process]
         """
         Lists all processes in database, optionally filtered by `visibility`.
 
         :param visibility: One value amongst `weaver.visibility`.
-        :param request:
+        :param request: <unused>
         """
         db_processes = []
         search_filters = {}
         if visibility is None:
-            visibility = visibility_values
+            visibility = VISIBILITY_VALUES
         if isinstance(visibility, six.string_types):
             visibility = [visibility]
         for v in visibility:
-            if v not in visibility_values:
+            if v not in VISIBILITY_VALUES:
                 raise ValueError("Invalid visibility value '{0!s}' is not one of {1!s}"
-                                 .format(v, list(visibility_values)))
+                                 .format(v, list(VISIBILITY_VALUES)))
         search_filters["visibility"] = {"$in": list(visibility)}
         for process in self.collection.find(search_filters).sort("identifier", pymongo.ASCENDING):
             db_processes.append(Process(process))
         return db_processes
 
-    def fetch_by_id(self, process_id, visibility=None, request=None):
+    def fetch_by_id(self, process_id, visibility=None, request=None):  # noqa: E811
         # type: (AnyStr, Optional[AnyStr], Optional[Request]) -> Process
         """
         Get process for given `process_id` from storage, optionally filtered by `visibility`.
@@ -296,7 +315,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
 
         :param process_id: process identifier
         :param visibility: one value amongst `weaver.visibility`.
-        :param request:
+        :param request: <unused>
         :return: An instance of :class:`weaver.datatype.Process`.
         """
         sane_name = get_sane_name(process_id, **self.sane_name_config)
@@ -308,7 +327,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
             raise ProcessNotAccessible("Process '{}' cannot be accessed.".format(sane_name))
         return process
 
-    def get_visibility(self, process_id, request=None):
+    def get_visibility(self, process_id, request=None):  # noqa: E811
         # type: (AnyStr, Optional[Request]) -> AnyStr
         """
         Get `visibility` of a process.
@@ -318,30 +337,31 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         process = self.fetch_by_id(process_id)
         return process.visibility
 
-    def set_visibility(self, process_id, visibility, request=None):
+    def set_visibility(self, process_id, visibility, request=None):  # noqa: E811
         # type: (AnyStr, AnyStr, Optional[Request]) -> None
         """
         Set `visibility` of a process.
 
         :param visibility: One value amongst `weaver.visibility`.
         :param process_id:
-        :param request:
+        :param request: <unused>
         :raises: ``TypeError`` or ``ValueError`` in case of invalid parameter.
         """
         process = self.fetch_by_id(process_id)
         process.visibility = visibility
         self.save_process(process, overwrite=True)
 
-    def clear_processes(self, request=None):
+    def clear_processes(self, request=None):  # noqa: E811
         # type: (Optional[Request]) -> bool
         """
         Clears all processes from the store.
+
+        :param request: <unused>
         """
         self.collection.drop()
         return True
 
 
-# noinspection PyUnusedLocal
 class MongodbJobStore(StoreJobs, MongodbStore):
     """
     Registry for process jobs tracking. Uses mongodb to store job attributes.
@@ -356,9 +376,9 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                  process,                   # type: AnyStr
                  service=None,              # type: Optional[AnyStr]
                  inputs=None,               # type: Optional[List[Any]]
-                 is_workflow=False,         # type: Optional[bool]
+                 is_workflow=False,         # type: bool
                  user_id=None,              # type: Optional[int]
-                 execute_async=True,        # type: Optional[bool]
+                 execute_async=True,        # type: bool
                  custom_tags=None,          # type: Optional[List[AnyStr]]
                  access=None,               # type: Optional[AnyStr]
                  notification_email=None,   # type: Optional[AnyStr]
@@ -368,7 +388,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         """
         try:
             tags = ["dev"]
-            tags.extend(filter(lambda t: t, custom_tags or list()))
+            tags.extend(list(filter(lambda t: t, custom_tags or [])))
             if is_workflow:
                 tags.append(PROCESS_WORKFLOW)
             else:
@@ -389,11 +409,11 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                 "execute_async": execute_async,
                 "is_workflow": is_workflow,
                 "created": now(),
-                "tags": tags,
+                "tags": list(set(tags)),
                 "access": access,
                 "notification_email": notification_email,
             })
-            self.collection.insert_one(new_job)
+            self.collection.insert_one(new_job.params())
             job = self.fetch_by_id(job_id=new_job.id)
         except Exception as ex:
             raise JobRegistrationError("Error occurred during job registration: [{}]".format(repr(ex)))
@@ -408,14 +428,14 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         :param job: instance of ``weaver.datatype.Job``.
         """
         try:
-            result = self.collection.update_one({"id": job.id}, {"$set": job.params})
+            result = self.collection.update_one({"id": job.id}, {"$set": job.params()})
             if result.acknowledged and result.modified_count == 1:
                 return self.fetch_by_id(job.id)
         except Exception as ex:
             raise JobUpdateError("Error occurred during job update: [{}]".format(repr(ex)))
         raise JobUpdateError("Failed to update specified job: '{}'".format(str(job)))
 
-    def delete_job(self, job_id, request=None):
+    def delete_job(self, job_id, request=None):  # noqa: E811
         # type: (AnyStr, Optional[Request]) -> bool
         """
         Removes job from mongodb storage.
@@ -423,7 +443,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         self.collection.delete_one({"id": job_id})
         return True
 
-    def fetch_by_id(self, job_id, request=None):
+    def fetch_by_id(self, job_id, request=None):  # noqa: E811
         # type: (AnyStr, Optional[Request]) -> Job
         """
         Gets job for given ``job_id`` from mongodb storage.
@@ -433,7 +453,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             raise JobNotFound("Could not find job matching: '{}'".format(job_id))
         return Job(job)
 
-    def list_jobs(self, request=None):
+    def list_jobs(self, request=None):  # noqa: E811
         # type: (Optional[Request]) -> List[Job]
         """
         Lists all jobs in mongodb storage.
@@ -453,8 +473,8 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                   notification_email=None,  # type: Optional[AnyStr]
                   status=None,              # type: Optional[AnyStr]
                   sort=None,                # type: Optional[AnyStr]
-                  page=0,                   # type: Optional[int]
-                  limit=10,                 # type: Optional[int]
+                  page=0,                   # type: int
+                  limit=10,                 # type: int
                   group_by=None,            # type: Optional[Union[AnyStr, List[AnyStr]]]
                   ):                        # type: (...) -> Union[JobListAndCount, JobCategoriesAndCount]
         """
@@ -499,21 +519,20 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             Where ``<total>`` will again indicate all matched jobs by every category combined, and ``<count>`` will
             indicate the amount of jobs matched for each individual category. Also, ``category`` will indicate values
             of specified fields (from ``group_by``) that compose corresponding jobs with matching values.
-
         """
 
-        if any(v in tags for v in visibility_values):
+        if any(v in tags for v in VISIBILITY_VALUES):
             raise ValueError("Visibility values not acceptable in 'tags', use 'access' instead.")
 
         search_filters = {}
 
-        if request.has_permission("admin") and access in visibility_values:
+        if request.has_permission("admin") and access in VISIBILITY_VALUES:
             search_filters["access"] = access
         else:
             user_id = request.authenticated_userid
             if user_id is not None:
                 search_filters["user_id"] = user_id
-                if access in visibility_values:
+                if access in VISIBILITY_VALUES:
                     search_filters["access"] = access
             else:
                 search_filters["access"] = VISIBILITY_PUBLIC
@@ -521,8 +540,8 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         if tags:
             search_filters["tags"] = {"$all": tags}
 
-        if status in job_status_categories.keys():
-            search_filters["status"] = {"$in": job_status_categories[status]}
+        if status in JOB_STATUS_CATEGORIES.keys():
+            search_filters["status"] = {"$in": JOB_STATUS_CATEGORIES[status]}
         elif status:
             search_filters["status"] = status
 
@@ -539,9 +558,9 @@ class MongodbJobStore(StoreJobs, MongodbStore):
             sort = SORT_CREATED
         elif sort == SORT_USER:
             sort = "user_id"
-        if sort not in job_sort_values:
+        if sort not in JOB_SORT_VALUES:
             raise JobNotFound("Invalid sorting method: '{}'".format(repr(sort)))
-        sort_order = DESCENDING if sort == SORT_FINISHED or sort == SORT_CREATED else ASCENDING
+        sort_order = DESCENDING if sort in (SORT_FINISHED, SORT_CREATED) else ASCENDING
         sort_criteria = {sort: sort_order}
 
         # minimal operation, only search for matches and sort them
@@ -549,16 +568,15 @@ class MongodbJobStore(StoreJobs, MongodbStore):
 
         # results by group categories
         if group_by:
-            if isinstance(group_by, six.string_types):
-                group_by = [group_by]
+            group_by = [group_by] if isinstance(group_by, six.string_types) else group_by  # type: List[AnyStr]
             group_categories = {field: "$" + field for field in group_by}   # fields that can generate groups
-            pipeline.extend([{
+            pipeline.extend([{  # noqa: E123  # ignore indentation checks
                 "$group": {
                     "_id": group_categories,        # grouping categories to aggregate corresponding jobs
                     "jobs": {"$push": "$$ROOT"},    # matched jobs for corresponding grouping categories
                     "count": {"$sum": 1}},          # count of matches for corresponding grouping categories
-                },
-                {"$project": {
+                }, {
+                "$project": {
                     "_id": False,           # removes "_id" field from results
                     "category": "$_id",     # renames "_id" grouping categories key
                     "jobs": "$jobs",        # preserve field
@@ -578,7 +596,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         total = self.collection.count_documents(search_filters)
         return items, total
 
-    def clear_jobs(self, request=None):
+    def clear_jobs(self, request=None):  # noqa: E811
         # type: (Optional[Request]) -> bool
         """
         Removes all jobs from mongodb storage.
@@ -604,7 +622,7 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
         if not isinstance(quote, Quote):
             raise QuoteInstanceError("Invalid quote object: '{}'".format(repr(quote)))
         try:
-            self.collection.insert_one(quote)
+            self.collection.insert_one(quote.params())
             quote = self.fetch_by_id(quote_id=quote.id)
         except Exception as ex:
             raise QuoteRegistrationError("Error occurred during quote registration: [{}]".format(repr(ex)))
@@ -633,9 +651,12 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
         return quotes
 
     def find_quotes(self, process_id=None, page=0, limit=10, sort=None):
-        # type: (Optional[AnyStr], Optional[int], Optional[int], Optional[AnyStr]) -> Tuple[List[Quote], int]
+        # type: (Optional[AnyStr], int, int, Optional[AnyStr]) -> Tuple[List[Quote], int]
         """
         Finds all quotes in mongodb storage matching search filters.
+
+        Returns a tuple of filtered ``items`` and their ``count``, where ``items`` can have paging and be limited
+        to a maximum per page, but ``count`` always indicate the `total` number of matches.
         """
         search_filters = {}
 
@@ -644,7 +665,7 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
 
         if sort is None:
             sort = SORT_ID
-        if sort not in quote_sort_values:
+        if sort not in QUOTE_SORT_VALUES:
             raise QuoteNotFound("Invalid sorting method: '{!s}'".format(sort))
 
         sort_order = ASCENDING
@@ -672,7 +693,7 @@ class MongodbBillStore(StoreBills, MongodbStore):
         if not isinstance(bill, Bill):
             raise BillInstanceError("Invalid bill object: '{}'".format(repr(bill)))
         try:
-            self.collection.insert_one(bill)
+            self.collection.insert_one(bill.params())
             bill = self.fetch_by_id(bill_id=bill.id)
         except Exception as ex:
             raise BillRegistrationError("Error occurred during bill registration: [{}]".format(repr(ex)))
@@ -701,9 +722,12 @@ class MongodbBillStore(StoreBills, MongodbStore):
         return bills
 
     def find_bills(self, quote_id=None, page=0, limit=10, sort=None):
-        # type: (Optional[AnyStr], Optional[int], Optional[int], Optional[AnyStr]) -> Tuple[List[Bill], int]
+        # type: (Optional[AnyStr], int, int, Optional[AnyStr]) -> Tuple[List[Bill], int]
         """
         Finds all bills in mongodb storage matching search filters.
+
+        Returns a tuple of filtered ``items`` and their ``count``, where ``items`` can have paging and be limited
+        to a maximum per page, but ``count`` always indicate the `total` number of matches.
         """
         search_filters = {}
 
@@ -712,7 +736,7 @@ class MongodbBillStore(StoreBills, MongodbStore):
 
         if sort is None:
             sort = SORT_ID
-        if sort not in bill_sort_values:
+        if sort not in BILL_SORT_VALUES:
             raise BillNotFound("Invalid sorting method: '{}'".format(repr(sort)))
 
         sort_order = ASCENDING

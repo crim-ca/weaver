@@ -3,33 +3,35 @@ OWSExceptions are based on pyramid.httpexceptions.
 
 See also: https://github.com/geopython/pywps/blob/master/pywps/exceptions.py
 """
+import json
+import warnings
+from string import Template
+from typing import TYPE_CHECKING, AnyStr
+
+import six
+from pyramid.compat import text_type
+from pyramid.httpexceptions import (
+    HTTPBadRequest,
+    HTTPException,
+    HTTPInternalServerError,
+    HTTPNotAcceptable,
+    HTTPNotFound,
+    HTTPNotImplemented,
+    HTTPOk,
+    HTTPUnauthorized
+)
+from pyramid.interfaces import IExceptionResponse
+from pyramid.response import Response
+from webob import html_escape as _html_escape
+from webob.acceptparse import create_accept_header
+from zope.interface import implementer
+
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_XML
 from weaver.utils import clean_json_text_body
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
-# noinspection PyPackageRequirements
-from zope.interface import implementer
-from webob import html_escape as _html_escape
-from webob.acceptparse import create_accept_header
-from pyramid.interfaces import IExceptionResponse
-from pyramid.httpexceptions import (
-    HTTPException,
-    HTTPOk,
-    HTTPBadRequest,
-    HTTPUnauthorized,
-    HTTPNotFound,
-    HTTPNotAcceptable,
-    HTTPInternalServerError,
-    HTTPNotImplemented,
-)
-from pyramid.response import Response
-from pyramid.compat import text_type
-from string import Template
-from typing import AnyStr, TYPE_CHECKING
-import warnings
-import json
-import six
+
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON, SettingsType
+    from weaver.typedefs import JSON, SettingsType  # noqa: F401
 
 
 @implementer(IExceptionResponse)
@@ -40,7 +42,7 @@ class OWSException(Response, Exception):
     locator = "NoApplicableCode"
     explanation = "Unknown Error"
 
-    page_template = Template('''\
+    page_template = Template("""\
 <?xml version="1.0" encoding="utf-8"?>
 <ExceptionReport version="1.0.0"
     xmlns="http://www.opengis.net/ows/1.1"
@@ -49,10 +51,10 @@ class OWSException(Response, Exception):
     <Exception exceptionCode="${code}" locator="${locator}">
         <ExceptionText>${message}</ExceptionText>
     </Exception>
-</ExceptionReport>''')
+</ExceptionReport>""")
 
     def __init__(self, detail=None, value=None, **kw):
-        status = kw.pop('status', None)
+        status = kw.pop("status", None)
         if isinstance(status, type) and issubclass(status, HTTPException):
             status = status().status
         elif isinstance(status, six.class_types):
@@ -72,6 +74,11 @@ class OWSException(Response, Exception):
 
     def __str__(self, skip_body=False):
         return self.message
+
+    def __repr__(self):
+        if self.message:
+            return "{}{}".format(type(self), self.message)
+        return str(type(self))
 
     # noinspection PyUnusedLocal
     @staticmethod
@@ -175,8 +182,8 @@ class OWSNoApplicableCode(OWSException):
 
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPBadRequest
-        super(OWSNoApplicableCode, self).__init__(args, kwargs)
-        warnings.warn(self.message, "OWS WPS NoApplicableCode (BadRequest)")
+        super(OWSNoApplicableCode, self).__init__(*args, **kwargs)
+        warnings.warn(self.message, UnsupportedOperationWarning)
 
 
 class OWSMissingParameterValue(OWSException):
@@ -187,7 +194,7 @@ class OWSMissingParameterValue(OWSException):
 
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPBadRequest
-        super(OWSMissingParameterValue, self).__init__(args, kwargs)
+        super(OWSMissingParameterValue, self).__init__(*args, **kwargs)
         warnings.warn(self.message, MissingParameterWarning)
 
 
@@ -199,7 +206,7 @@ class OWSInvalidParameterValue(OWSException):
 
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPNotAcceptable
-        super(OWSInvalidParameterValue, self).__init__(args, kwargs)
+        super(OWSInvalidParameterValue, self).__init__(*args, **kwargs)
         warnings.warn(self.message, UnsupportedOperationWarning)
 
 
@@ -210,5 +217,5 @@ class OWSNotImplemented(OWSException):
 
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPNotImplemented
-        super(OWSNotImplemented, self).__init__(args, kwargs)
+        super(OWSNotImplemented, self).__init__(*args, **kwargs)
         warnings.warn(self.message, UnsupportedOperationWarning)

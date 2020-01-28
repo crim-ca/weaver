@@ -1,24 +1,28 @@
 # MongoDB
 # http://docs.pylonsproject.org/projects/pyramid-cookbook/en/latest/database/mongodb.html
+import warnings
+from typing import TYPE_CHECKING
+
+import pymongo
+
 from weaver.database.base import DatabaseInterface
 from weaver.store.base import StoreInterface
 from weaver.store.mongodb import (
-    MongodbServiceStore,
-    MongodbProcessStore,
-    MongodbJobStore,
-    MongodbQuoteStore,
     MongodbBillStore,
+    MongodbJobStore,
+    MongodbProcessStore,
+    MongodbQuoteStore,
+    MongodbServiceStore
 )
 from weaver.utils import get_settings
-from typing import TYPE_CHECKING
-import warnings
-import pymongo
-if TYPE_CHECKING:
-    from weaver.typedefs import AnySettingsContainer
-    from typing import Any, AnyStr, Union
-    from pymongo.database import Database
 
-MongoDB = None  # type: Database
+if TYPE_CHECKING:
+    from weaver.typedefs import AnySettingsContainer, JSON      # noqa: F401
+    from typing import Any, AnyStr, Optional, Union             # noqa: F401
+    from pymongo.database import Database                       # noqa: F401
+
+# pylint: disable=C0103,invalid-name
+MongoDB = None  # type: Optional[Database]
 MongodbStores = frozenset([
     MongodbServiceStore,
     MongodbProcessStore,
@@ -28,8 +32,8 @@ MongodbStores = frozenset([
 ])
 
 if TYPE_CHECKING:
-    AnyStoreType = Union[MongodbStores]
-    from weaver.typedefs import JSON
+    # pylint: disable=E0601,used-before-assignment
+    AnyStoreType = Union[MongodbStores]     # noqa: F401
 
 
 class MongoDatabase(DatabaseInterface):
@@ -49,7 +53,7 @@ class MongoDatabase(DatabaseInterface):
         return self._database is not None and self._settings is not None
 
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (Union[AnyStr, StoreInterface, MongodbStores], Any, Any) -> AnyStoreType
+        # type: (Union[AnyStr, StoreInterface, MongodbStores], *Any, **Any) -> AnyStoreType
         """
         Retrieve a store from the database.
 
@@ -88,13 +92,12 @@ class MongoDatabase(DatabaseInterface):
     def run_migration(self):
         # type: (...) -> None
         warnings.warn("Not implemented {}.run_migration implementation.".format(self.type))
-        pass
 
 
 def get_mongodb_connection(container):
     # type: (AnySettingsContainer) -> Database
     """Obtains the basic database connection from settings."""
-    global MongoDB
+    global MongoDB  # pylint: disable=W0603,global-statement
     if not MongoDB:
         settings = get_settings(container)
         settings_default = [("mongodb.host", "localhost"), ("mongodb.port", 27017), ("mongodb.db_name", "weaver")]

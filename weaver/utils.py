@@ -1,61 +1,82 @@
-from weaver.exceptions import ServiceNotFound, InvalidIdentifierValue
-from weaver.warning import TimeZoneInfoAlreadySetWarning
-from weaver.status import map_status
+import logging
+import os
+import platform
+import re
+import time
+import types
+import warnings
 from datetime import datetime
-from lxml import etree
+from distutils.dir_util import mkpath
+from distutils.version import LooseVersion
+from inspect import isclass, isfunction
+from typing import TYPE_CHECKING
+
+import pytz
+import six
 from celery import Celery
-from pyramid.httpexceptions import HTTPError as PyramidHTTPError
+from lxml import etree
 from pyramid.config import Configurator
+from pyramid.httpexceptions import HTTPError as PyramidHTTPError
 from pyramid.registry import Registry
 from pyramid.request import Request
 from requests import HTTPError as RequestsHTTPError
-from six.moves.urllib.parse import urlparse, parse_qs, urlunsplit, ParseResult
-from distutils.dir_util import mkpath
-from distutils.version import LooseVersion
 from requests.structures import CaseInsensitiveDict
-from webob.headers import ResponseHeaders, EnvironHeaders
-from inspect import isclass
-from typing import TYPE_CHECKING
-import os
-import six
-import time
-import pytz
-import types
-import re
-import platform
-import warnings
-import logging
+from six.moves.urllib.parse import ParseResult, parse_qs, urlparse, urlunsplit
+from webob.headers import EnvironHeaders, ResponseHeaders
+
+from weaver.exceptions import InvalidIdentifierValue
+from weaver.status import map_status
+from weaver.warning import TimeZoneInfoAlreadySetWarning
+
 if TYPE_CHECKING:
-    from weaver.typedefs import (
+    from weaver.typedefs import (                                                               # noqa: F401
         AnyValue, AnyKey, AnySettingsContainer, AnyRegistryContainer, AnyHeadersContainer,
         HeadersType, SettingsType, JSON, XML, Number
     )
-    from typing import Union, Any, Dict, List, AnyStr, Iterable, Optional
+    from typing import Union, Any, Dict, List, AnyStr, Iterable, Optional, Type                 # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 
 
-# noinspection PyClassHasNoInit, PyPep8Coding, PyUnusuedLocal, PyMethodMayBeStatic
-class _NullType:
-    """Represents a ``null`` value to differentiate from ``None``."""
-    def __eq__(self, other):
-        return isinstance(other, _NullType) \
-               or other is null \
-               or (isclass(other) and issubclass(other, _NullType))
+class _Singleton(type):
+    __instance__ = None  # type: Optional[_Singleton]
 
-    def __nonzero__(self):
+    def __call__(cls):
+        if cls.__instance__ is None:
+            cls.__instance__ = super(_Singleton, cls).__call__()
+        return cls.__instance__
+
+
+class _NullType(six.with_metaclass(_Singleton)):
+    """Represents a ``null`` value to differentiate from ``None``."""
+
+    # pylint: disable=E1101,no-member
+    def __eq__(self, other):
+        return (isinstance(other, _NullType)                                    # noqa: W503
+                or other is null                                                # noqa: W503
+                or other is self.__instance__                                   # noqa: W503
+                or (isclass(other) and issubclass(other, _NullType)))           # noqa: W503
+
+    def __repr__(self):
+        return "<null>"
+
+    @staticmethod
+    def __nonzero__():
         return False
+
     __bool__ = __nonzero__
     __len__ = __nonzero__
 
 
+# pylint: disable=C0103,invalid-name
 null = _NullType()
 
 
 def get_weaver_url(container):
     # type: (AnySettingsContainer) -> AnyStr
     """Retrieves the home URL of the `weaver` application."""
-    return get_settings(container).get("weaver.url").rstrip('/').strip()
+    value = get_settings(container).get("weaver.url", "") or ""  # handle explicit None
+    return value.rstrip("/").strip()
 
 
 def get_any_id(info):
@@ -118,9 +139,9 @@ def get_header(header_name, header_container):
         headers = dict(headers)
     if isinstance(headers, dict):
         headers = header_container.items()
-    header_name = header_name.lower().replace('-', '_')
+    header_name = header_name.lower().replace("-", "_")
     for h, v in headers:
-        if h.lower().replace('-', '_') == header_name:
+        if h.lower().replace("-", "_") == header_name:
             return v
     return None
 
@@ -147,16 +168,14 @@ def get_url_without_query(url):
         url = urlparse(url)
     if not isinstance(url, ParseResult):
         raise TypeError("Expected a parsed URL.")
-    return urlunsplit(url[:4] + tuple(['']))
+    return urlunsplit(url[:4] + tuple([""]))
 
 
 def is_valid_url(url):
     # type: (Union[AnyStr, None]) -> bool
-    # noinspection PyBroadException
     try:
-        parsed_url = urlparse(url)
-        return True if all([parsed_url.scheme, ]) else False
-    except Exception:
+        return bool(urlparse(url).scheme)
+    except Exception:  # noqa: W0703 # nosec: B110
         return False
 
 
@@ -174,8 +193,9 @@ def parse_extra_options(option_str):
     """
     if option_str:
         try:
-            extra_options = option_str.split(',')
-            extra_options = dict([('=' in opt) and opt.split('=', 1) for opt in extra_options])
+            # pylint: disable=R1717,consider-using-dict-comprehension
+            extra_options = option_str.split(",")
+            extra_options = dict([("=" in opt) and opt.split("=", 1) for opt in extra_options])
         except Exception:
             msg = "Can not parse extra-options: {}".format(option_str)
             from pyramid.exceptions import ConfigurationError
@@ -185,24 +205,11 @@ def parse_extra_options(option_str):
     return extra_options
 
 
-def parse_service_name(url, protected_path):
-    # type: (AnyStr, AnyStr) -> AnyStr
-    parsed_url = urlparse(url)
-    service_name = None
-    if parsed_url.path.startswith(protected_path):
-        parts_without_protected_path = parsed_url.path[len(protected_path)::].strip('/').split('/')
-        if "proxy" in parts_without_protected_path:
-            parts_without_protected_path.remove("proxy")
-        if len(parts_without_protected_path) > 0:
-            service_name = parts_without_protected_path[0]
-    if not service_name:
-        raise ServiceNotFound
-    return service_name
-
-
 def fully_qualified_name(obj):
-    # type: (Any) -> AnyStr
-    return '.'.join([obj.__module__, type(obj).__name__])
+    # type: (Union[Any, Type[Any]]) -> str
+    """Obtains the ``'<module>.<name>'`` full path definition of the object to allow finding and importing it."""
+    cls = obj if isclass(obj) or isfunction(obj) else type(obj)
+    return ".".join([obj.__module__, cls.__name__])
 
 
 def now():
@@ -260,7 +267,7 @@ def get_base_url(url):
 
 def path_elements(path):
     # type: (AnyStr) -> List[AnyStr]
-    elements = [el.strip() for el in path.split('/')]
+    elements = [el.strip() for el in path.split("/")]
     elements = [el for el in elements if len(el) > 0]
     return elements
 
@@ -269,11 +276,11 @@ def lxml_strip_ns(tree):
     # type: (XML) -> None
     for node in tree.iter():
         try:
-            has_namespace = node.tag.startswith('{')
+            has_namespace = node.tag.startswith("{")
         except AttributeError:
             continue  # node.tag is not a string (node is a comment or similar)
         if has_namespace:
-            node.tag = node.tag.split('}', 1)[1]
+            node.tag = node.tag.split("}", 1)[1]
 
 
 def ows_context_href(href, partial=False):
@@ -325,60 +332,28 @@ def raise_on_xml_exception(xml_node):
         raise Exception(node.text)
 
 
-def replace_caps_url(xml, url, prev_url=None):
-    ns = {
-        "ows": "http://www.opengis.net/ows/1.1",
-        "xlink": "http://www.w3.org/1999/xlink"}
-    doc = etree.fromstring(xml)
-    # wms 1.1.1 onlineResource
-    if "WMT_MS_Capabilities" in doc.tag:
-        LOGGER.debug("replace proxy urls in wms 1.1.1")
-        for element in doc.findall(".//OnlineResource[@xlink:href]", namespaces=ns):
-            parsed_url = urlparse(element.get("{http://www.w3.org/1999/xlink}href"))
-            new_url = url
-            if parsed_url.query:
-                new_url += "?" + parsed_url.query
-            element.set("{http://www.w3.org/1999/xlink}href", new_url)
-        xml = etree.tostring(doc)
-    # wms 1.3.0 onlineResource
-    elif "WMS_Capabilities" in doc.tag:
-        LOGGER.debug("replace proxy urls in wms 1.3.0")
-        for element in doc.findall(".//{http://www.opengis.net/wms}OnlineResource[@xlink:href]", namespaces=ns):
-            parsed_url = urlparse(element.get("{http://www.w3.org/1999/xlink}href"))
-            new_url = url
-            if parsed_url.query:
-                new_url += "?" + parsed_url.query
-            element.set("{http://www.w3.org/1999/xlink}href", new_url)
-        xml = etree.tostring(doc)
-    # wps operations
-    elif "Capabilities" in doc.tag:
-        for element in doc.findall("ows:OperationsMetadata//*[@xlink:href]", namespaces=ns):
-            element.set("{http://www.w3.org/1999/xlink}href", url)
-        xml = etree.tostring(doc)
-    elif prev_url:
-        xml = xml.decode("utf-8", "ignore")
-        xml = xml.replace(prev_url, url)
-    return xml
-
-
-def str2bytes(s):
+def str2bytes(string):
     # type: (Union[AnyStr, bytes]) -> bytes
     """Obtains the bytes representation of the string."""
-    if not (isinstance(s, six.string_types) or isinstance(s, bytes)):
-        raise TypeError("Cannot convert item to bytes: {!r}".format(type(s)))
-    return s if isinstance(s, bytes) else s.encode()
+    if not isinstance(string, (six.string_types, bytes)):
+        raise TypeError("Cannot convert item to bytes: {!r}".format(type(string)))
+    if isinstance(string, bytes):
+        return string
+    return string.encode()
 
 
-def bytes2str(s):
-    # type: (Union[AnyStr, bytes]) -> bytes
+def bytes2str(string):
+    # type: (Union[AnyStr, bytes]) -> str
     """Obtains the unicode representation of the string."""
-    if not (isinstance(s, six.string_types) or isinstance(s, bytes)):
-        raise TypeError("Cannot convert item to unicode: {!r}".format(type(s)))
-    return s if not isinstance(s, bytes) else s.decode()
+    if not isinstance(string, (six.string_types, bytes)):
+        raise TypeError("Cannot convert item to unicode: {!r}".format(type(string)))
+    if not isinstance(string, bytes):
+        return string
+    return string.decode()
 
 
 def islambda(func):
-    # type: (AnyStr) -> bool
+    # type: (Any) -> bool
     return isinstance(func, types.LambdaType) and func.__name__ == (lambda: None).__name__
 
 
@@ -403,7 +378,7 @@ def parse_request_query(request):
     for q in queries:
         queries_dict[q] = dict()
         for i, kv in enumerate(queries[q]):
-            kvs = kv.split('=')
+            kvs = kv.split("=")
             if len(kvs) > 1:
                 queries_dict[q][kvs[0]] = kvs[1]
             else:
@@ -435,7 +410,7 @@ def get_job_log_msg(status, message, progress=0, duration=None):
 
 def make_dirs(path, mode=0o755, exist_ok=True):
     """Alternative to ``os.makedirs`` with ``exists_ok`` parameter only available for ``python>3.5``."""
-    if LooseVersion(platform.python_version()) >= LooseVersion('3.5'):
+    if LooseVersion(platform.python_version()) >= LooseVersion("3.5"):
         os.makedirs(path, mode=mode, exist_ok=exist_ok)
         return
     dir_path = os.path.dirname(path)
@@ -449,7 +424,7 @@ REGEX_SEARCH_INVALID_CHARACTERS = re.compile(r"[^a-zA-Z0-9_\-]")
 REGEX_ASSERT_INVALID_CHARACTERS = re.compile(r"^[a-zA-Z0-9_\-]+$")
 
 
-def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_character='_'):
+def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_character="_"):
     # type: (AnyStr, Optional[int], Optional[Union[int, None]], Optional[bool], Optional[AnyStr]) -> Union[AnyStr, None]
     """
     Returns a cleaned-up version of the input name, replacing invalid characters matched with
@@ -482,14 +457,14 @@ def assert_sane_name(name, min_len=3, max_len=None):
     """Asserts that the sane name respects conditions.
 
     .. seealso::
-        - argument details in :function:`get_sane_name`
+        - argument details in :func:`get_sane_name`
     """
     if name is None:
         raise InvalidIdentifierValue("Invalid name : {0}".format(name))
     name = name.strip()
-    if '--' in name \
-       or name.startswith('-') \
-       or name.endswith('-') \
+    if "--" in name \
+       or name.startswith("-") \
+       or name.endswith("-") \
        or len(name) < min_len \
        or (max_len is not None and len(name) > max_len) \
        or not re.match(REGEX_ASSERT_INVALID_CHARACTERS, name):
@@ -502,15 +477,15 @@ def clean_json_text_body(body):
     Cleans a textual body field of superfluous characters to provide a better human-readable text in a JSON response.
     """
     # cleanup various escape characters and u'' stings
-    replaces = [(',\n', ', '), (' \n', ' '), ('\"', '\''), ('\\', ''),
-                ('u\'', '\''), ('u\"', '\''), ('\'\'', '\''), ('  ', ' ')]
+    replaces = [(",\n", ", "), ("\\n", " "), (" \n", " "), ("\"", "\'"), ("\\", ""),
+                ("u\'", "\'"), ("u\"", "\'"), ("\'\'", "\'"), ("  ", " ")]
     replaces_from = [r[0] for r in replaces]
     while any(rf in body for rf in replaces_from):
         for _from, _to in replaces:
             body = body.replace(_from, _to)
 
-    body_parts = [p.strip() for p in body.split('\n') if p != '']               # remove new line and extra spaces
-    body_parts = [p + '.' if not p.endswith('.') else p for p in body_parts]    # add terminating dot per sentence
+    body_parts = [p.strip() for p in body.split("\n") if p != ""]               # remove new line and extra spaces
+    body_parts = [p + "." if not p.endswith(".") else p for p in body_parts]    # add terminating dot per sentence
     body_parts = [p[0].upper() + p[1:] for p in body_parts if len(p)]           # capitalize first word
-    body_parts = ' '.join(p for p in body_parts if p)
+    body_parts = " ".join(p for p in body_parts if p)
     return body_parts

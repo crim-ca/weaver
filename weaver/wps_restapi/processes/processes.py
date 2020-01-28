@@ -1,64 +1,61 @@
-from weaver.config import get_weaver_configuration, WEAVER_CONFIGURATION_EMS
+import logging
+from time import sleep
+from typing import TYPE_CHECKING
+
+import colander
+import requests
+import six
+from celery.utils.log import get_task_logger
+from lxml import etree
+from owslib.util import clean_ows_url
+from owslib.wps import ComplexDataInput, WebProcessingService
+from pyramid.httpexceptions import (
+    HTTPBadRequest,
+    HTTPCreated,
+    HTTPForbidden,
+    HTTPNotFound,
+    HTTPNotImplemented,
+    HTTPOk,
+    HTTPServiceUnavailable,
+    HTTPSuccessful,
+    HTTPUnauthorized,
+    HTTPUnprocessableEntity
+)
+from pyramid.request import Request
+from pyramid.settings import asbool
+from pyramid_celery import celery_app as app
+
+from weaver.config import WEAVER_CONFIGURATION_EMS, get_weaver_configuration
 from weaver.database import get_db
-from weaver.datatype import Process as ProcessDB, Service
-from weaver.exceptions import InvalidIdentifierValue, ProcessNotFound, ProcessNotAccessible
+from weaver.datatype import Service
+from weaver.exceptions import InvalidIdentifierValue, ProcessNotAccessible, ProcessNotFound, log_unhandled_exceptions
 from weaver.execute import (
-    EXECUTE_MODE_AUTO,
     EXECUTE_MODE_ASYNC,
+    EXECUTE_MODE_AUTO,
     EXECUTE_MODE_SYNC,
     EXECUTE_RESPONSE_DOCUMENT,
-    EXECUTE_TRANSMISSION_MODE_REFERENCE,
+    EXECUTE_TRANSMISSION_MODE_REFERENCE
 )
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.owsexceptions import OWSNoApplicableCode
-from weaver.processes import wps_package, opensearch
-from weaver.processes.utils import jsonify_output, convert_process_wps_to_db, deploy_process_from_payload
-from weaver.processes.types import PROCESS_WORKFLOW, PROCESS_BUILTIN
-from weaver.status import (
-    map_status,
-    STATUS_ACCEPTED,
-    STATUS_STARTED,
-    STATUS_FAILED,
-    STATUS_SUCCEEDED,
-)
-from weaver.store.base import StoreServices, StoreProcesses, StoreJobs
-from weaver.utils import get_any_id, get_any_value, get_settings, get_cookie_headers, raise_on_xml_exception, wait_secs
-from weaver.visibility import VISIBILITY_PUBLIC, visibility_values
-from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.jobs.notify import notify_job, encrypt_email
-from weaver.wps_restapi.utils import get_wps_restapi_base_url, parse_request_query, OUTPUT_FORMAT_JSON
-from weaver.wps_restapi.jobs.jobs import check_status, job_format_json
+from weaver.processes import opensearch, wps_package
+from weaver.processes.constants import WPS_COMPLEX_DATA
+from weaver.processes.types import PROCESS_BUILTIN, PROCESS_WORKFLOW
+from weaver.processes.utils import convert_process_wps_to_db, deploy_process_from_payload, jsonify_output
+from weaver.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_STARTED, STATUS_SUCCEEDED, map_status
+from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
+from weaver.utils import get_any_id, get_any_value, get_cookie_headers, get_settings, raise_on_xml_exception, wait_secs
+from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps import load_pywps_cfg
-from owslib.wps import WebProcessingService, WPSException, ComplexDataInput
-from owslib.util import clean_ows_url
-from pyramid.httpexceptions import (
-    HTTPOk,
-    HTTPCreated,
-    HTTPUnauthorized,
-    HTTPForbidden,
-    HTTPNotFound,
-    HTTPBadRequest,
-    HTTPUnprocessableEntity,
-    HTTPInternalServerError,
-    HTTPNotImplemented,
-    HTTPServiceUnavailable,
-    HTTPSuccessful,
-    HTTPException,
-)
-from time import sleep
-from celery.utils.log import get_task_logger
-from pyramid.settings import asbool
-from pyramid_celery import celery_app as app
-from pyramid.request import Request
-from lxml import etree
-from typing import TYPE_CHECKING
-import requests
-import colander
-import logging
-import six
+from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.jobs.jobs import check_status
+from weaver.wps_restapi.jobs.notify import encrypt_email, notify_job_complete
+from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, get_wps_restapi_base_url, parse_request_query
+
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON
-    from typing import AnyStr, List, Tuple, Optional
+    from weaver.datatype import Process as ProcessDB    # noqa: F401
+    from weaver.typedefs import JSON                    # noqa: F401
+    from typing import AnyStr, List, Tuple, Optional    # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 
@@ -78,7 +75,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
 
     try:
         try:
-            LOGGER.debug("Execute process WPS request for {0}".format(job.process))
+            LOGGER.debug("Execute process WPS request for [%s]", job.process)
             wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), verify=ssl_verify)
             # noinspection PyProtectedMember
             raise_on_xml_exception(wps._capabilities)
@@ -92,7 +89,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
         # prepare inputs
         complex_inputs = []
         for process_input in process.dataInputs:
-            if "ComplexData" in process_input.dataType:
+            if WPS_COMPLEX_DATA in process_input.dataType:
                 complex_inputs.append(process_input.identifier)
 
         try:
@@ -116,7 +113,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
             wps_inputs = []
 
         # prepare outputs
-        outputs = [(o.identifier, o.dataType == "ComplexData") for o in process.processOutputs]
+        outputs = [(o.identifier, o.dataType == WPS_COMPLEX_DATA) for o in process.processOutputs]
 
         mode = EXECUTE_MODE_ASYNC if job.execute_async else EXECUTE_MODE_SYNC
         execution = wps.execute(job.process, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
@@ -164,8 +161,8 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
 
             except Exception as exc:
                 num_retries += 1
-                task_logger.debug("Exception raised: {}".format(repr(exc)))
-                job.status_message = "Could not read status xml document for {}. Trying again...".format(str(job))
+                task_logger.debug("Exception raised: %s", repr(exc))
+                job.status_message = "Could not read status xml document for {!s}. Trying again...".format(job)
                 job.save_log(errors=execution.errors, logger=task_logger)
                 sleep(1)
             else:
@@ -176,15 +173,12 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
             finally:
                 job = store.update_job(job)
 
-    except (WPSException, Exception) as exc:
-        LOGGER.exception("Failed running {}".format(str(job)))
+    except Exception as exc:
+        LOGGER.exception("Failed running [%s]", job)
         job.status = map_status(STATUS_FAILED)
-        job.status_message = "Failed to run {}.".format(str(job))
-        if isinstance(exc, WPSException):
-            errors = "[{0}] {1}".format(exc.locator, exc.text)
-        else:
-            exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
-            errors = "{0}: {1}".format(exception_class, str(exc))
+        job.status_message = "Failed to run {!s}.".format(job)
+        exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
+        errors = "{0}: {1!s}".format(exception_class, exc)
         job.save_log(errors=errors, logger=task_logger)
     finally:
         job.status_message = "Job {}.".format(job.status)
@@ -193,13 +187,12 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
         # Send email if requested
         if notification_email is not None:
             try:
-                job_json = job_format_json(settings, job)
-                notify_job(job, job_json, notification_email, settings)
+                notify_job_complete(job, notification_email, settings)
                 message = "Email sent successfully."
                 job.save_log(logger=task_logger, message=message)
             except Exception as exc:
                 exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
-                exception = "{0}: {1}".format(exception_class, exc.message)
+                exception = "{0}: {1!s}".format(exception_class, exc)
                 message = "Couldn't send email ({})".format(exception)
                 job.save_log(errors=message, logger=task_logger, message=message)
 
@@ -262,7 +255,7 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
         # Convert EnvironHeaders to a simple dict (should cherrypick the required headers)
         headers={k: v for k, v in request.headers.items()},
         notification_email=notification_email)
-    LOGGER.debug("Celery pending task '{}' for job '{}'.".format(result.id, job.id))
+    LOGGER.debug("Celery pending task [%s] for job [%s].", result.id, job.id)
 
     # local/provider process location
     location_base = "/providers/{provider_id}".format(provider_id=provider_id) if provider_id else ""
@@ -282,6 +275,7 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
 @sd.jobs_full_service.post(tags=[sd.TAG_PROVIDER_PROCESS, sd.TAG_PROVIDERS, sd.TAG_EXECUTE, sd.TAG_JOBS],
                            renderer=OUTPUT_FORMAT_JSON, schema=sd.PostProviderProcessJobRequest(),
                            response_schemas=sd.post_provider_process_job_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostProviderProcessJobResponse.description)
 def submit_provider_job(request):
     """
     Execute a provider process.
@@ -296,7 +290,8 @@ def list_remote_processes(service, request):
     # type: (Service, Request) -> List[ProcessDB]
     """
     Obtains a list of remote service processes in a compatible :class:`weaver.datatype.Process` format.
-    Note: those processes won't be stored to the local process storage.
+
+    Note: remote processes won't be stored to the local process storage.
     """
     wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
     settings = get_settings(request)
@@ -306,6 +301,7 @@ def list_remote_processes(service, request):
 @sd.provider_processes_service.get(tags=[sd.TAG_PROVIDER_PROCESS, sd.TAG_PROVIDERS, sd.TAG_GETCAPABILITIES],
                                    renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderEndpoint(),
                                    response_schemas=sd.get_provider_processes_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProviderProcessesListResponse.description)
 def get_provider_processes(request):
     """
     Retrieve available provider processes (GetCapabilities).
@@ -317,10 +313,11 @@ def get_provider_processes(request):
     return HTTPOk(json=[p.json() for p in processes])
 
 
-def get_provider_process(request):
+def describe_provider_process(request):
     # type: (Request) -> ProcessDB
     """
     Obtains a remote service process description in a compatible local process format.
+
     Note: this processes won't be stored to the local process storage.
     """
     provider_id = request.matchdict.get("provider_id")
@@ -334,21 +331,18 @@ def get_provider_process(request):
 
 @sd.provider_process_service.get(tags=[sd.TAG_PROVIDER_PROCESS, sd.TAG_PROVIDERS, sd.TAG_DESCRIBEPROCESS],
                                  renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderProcessEndpoint(),
-                                 response_schemas=sd.get_provider_process_description_responses)
-def describe_provider_process(request):
+                                 response_schemas=sd.get_provider_process_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProviderProcessResponse.description)
+def get_provider_process(request):
     """
     Retrieve a process description (DescribeProcess).
     """
     try:
-        process = get_provider_process(request)
+        process = describe_provider_process(request)
         process_offering = process.process_offering()
         return HTTPOk(json=process_offering)
-    except HTTPException:
-        raise  # re-throw already handled HTTPException
     except colander.Invalid as ex:
-        raise HTTPBadRequest("Invalid schema: [{}]".format(str(ex)))
-    except Exception as ex:
-        raise HTTPInternalServerError(str(ex))
+        raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))
 
 
 def get_processes_filtered_by_valid_schemas(request):
@@ -366,12 +360,12 @@ def get_processes_filtered_by_valid_schemas(request):
             valid_processes.append(process.process_summary())
         except colander.Invalid:
             invalid_processes_ids.append(process.identifier)
-            pass
     return valid_processes, invalid_processes_ids
 
 
 @sd.processes_service.get(schema=sd.GetProcessesEndpoint(), tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
                           response_schemas=sd.get_processes_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProcessesListResponse.description)
 def get_processes(request):
     """
     List registered processes (GetCapabilities). Optionally list both local and provider processes.
@@ -404,17 +398,13 @@ def get_processes(request):
                         "processes": processes if detail else [get_any_id(p) for p in processes]
                     })
         return HTTPOk(json=response_body)
-    except HTTPException:
-        raise  # re-throw already handled HTTPException
     except colander.Invalid as ex:
-        raise HTTPBadRequest("Invalid schema: [{}]".format(str(ex)))
-    except Exception as ex:
-        LOGGER.exception(str(ex), exc_info=True)
-        raise HTTPInternalServerError(str(ex))
+        raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))
 
 
 @sd.processes_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OUTPUT_FORMAT_JSON,
-                           schema=sd.PostProcessEndpoint(), response_schemas=sd.post_processes_responses)
+                           schema=sd.PostProcessesEndpoint(), response_schemas=sd.post_processes_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostProcessesResponse.description)
 def add_local_process(request):
     """
     Register a local process.
@@ -431,22 +421,19 @@ def get_process(request):
         store = get_db(request).get_store(StoreProcesses)
         process = store.fetch_by_id(process_id, visibility=VISIBILITY_PUBLIC, request=request)
         return process
-    except HTTPException:
-        raise  # re-throw already handled HTTPException
     except InvalidIdentifierValue as ex:
         raise HTTPBadRequest(str(ex))
     except ProcessNotAccessible:
-        raise HTTPUnauthorized("Process with id '{}' is not accessible.".format(str(process_id)))
+        raise HTTPUnauthorized("Process with id '{!s}' is not accessible.".format(process_id))
     except ProcessNotFound:
-        raise HTTPNotFound("Process with id '{}' does not exist.".format(str(process_id)))
+        raise HTTPNotFound("Process with id '{!s}' does not exist.".format(process_id))
     except colander.Invalid as ex:
-        raise HTTPBadRequest("Invalid schema:\n[{0!r}]\n[{0!s}].".format(ex))
-    except Exception as ex:
-        raise HTTPInternalServerError(str(ex))
+        raise HTTPBadRequest("Invalid schema:\n[{0!r}].".format(ex))
 
 
 @sd.process_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OUTPUT_FORMAT_JSON,
                         schema=sd.ProcessEndpoint(), response_schemas=sd.get_process_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProcessResponse.description)
 def get_local_process(request):
     """
     Get a registered local process information (DescribeProcess).
@@ -456,16 +443,13 @@ def get_local_process(request):
         process["inputs"] = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
         process_offering = process.process_offering()
         return HTTPOk(json=process_offering)
-    except HTTPException:
-        raise  # re-throw already handled HTTPException
     except colander.Invalid as ex:
-        raise HTTPBadRequest("Invalid schema: [{}]".format(str(ex)))
-    except Exception as ex:
-        raise HTTPInternalServerError(str(ex))
+        raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))
 
 
 @sd.process_package_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.ProcessPackageEndpoint(), response_schemas=sd.get_process_package_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProcessPackageResponse.description)
 def get_local_process_package(request):
     """
     Get a registered local process package definition.
@@ -476,6 +460,7 @@ def get_local_process_package(request):
 
 @sd.process_payload_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.ProcessPayloadEndpoint(), response_schemas=sd.get_process_payload_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProcessPayloadResponse.description)
 def get_local_process_payload(request):
     """
     Get a registered local process payload definition.
@@ -487,6 +472,7 @@ def get_local_process_payload(request):
 @sd.process_visibility_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_VISIBILITY], renderer=OUTPUT_FORMAT_JSON,
                                    schema=sd.ProcessVisibilityGetEndpoint(),
                                    response_schemas=sd.get_process_visibility_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProcessVisibilityResponse.description)
 def get_process_visibility(request):
     """
     Get the visibility of a registered local process.
@@ -497,18 +483,15 @@ def get_process_visibility(request):
     try:
         store = get_db(request).get_store(StoreProcesses)
         visibility_value = store.get_visibility(process_id, request=request)
-        return HTTPOk(json={u'value': visibility_value})
-    except HTTPException:
-        raise  # re-throw already handled HTTPException
+        return HTTPOk(json={u"value": visibility_value})
     except ProcessNotFound as ex:
         raise HTTPNotFound(str(ex))
-    except Exception as ex:
-        raise HTTPInternalServerError(str(ex))
 
 
 @sd.process_visibility_service.put(tags=[sd.TAG_PROCESSES, sd.TAG_VISIBILITY], renderer=OUTPUT_FORMAT_JSON,
                                    schema=sd.ProcessVisibilityPutEndpoint(),
                                    response_schemas=sd.put_process_visibility_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPutProcessVisibilityResponse.description)
 def set_process_visibility(request):
     """
     Set the visibility of a registered local process.
@@ -519,7 +502,7 @@ def set_process_visibility(request):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
     if not isinstance(visibility_value, six.string_types):
         raise HTTPUnprocessableEntity("Invalid visibility value specified.")
-    if visibility_value not in visibility_values:
+    if visibility_value not in VISIBILITY_VALUES:
         raise HTTPBadRequest("Invalid visibility value specified.")
 
     try:
@@ -529,21 +512,17 @@ def set_process_visibility(request):
             raise HTTPForbidden("Cannot change the visibility of builtin process.")
         store.set_visibility(process_id, visibility_value, request=request)
         return HTTPOk(json={u"value": visibility_value})
-    except HTTPException:
-        raise  # re-throw already handled HTTPException
     except TypeError:
         raise HTTPBadRequest("Value of visibility must be a string.")
     except ValueError:
-        raise HTTPUnprocessableEntity("Value of visibility must be one of : {!s}"
-                                      .format(list(visibility_values)))
+        raise HTTPUnprocessableEntity("Value of visibility must be one of : {!s}".format(list(VISIBILITY_VALUES)))
     except ProcessNotFound as ex:
         raise HTTPNotFound(str(ex))
-    except Exception as ex:
-        raise HTTPInternalServerError(str(ex))
 
 
 @sd.process_service.delete(tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY], renderer=OUTPUT_FORMAT_JSON,
                            schema=sd.ProcessEndpoint(), response_schemas=sd.delete_process_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorDeleteProcessResponse.description)
 def delete_local_process(request):
     """
     Unregister a local process.
@@ -558,22 +537,20 @@ def delete_local_process(request):
             raise HTTPForbidden("Cannot delete a builtin process.")
         if store.delete_process(process_id, visibility=VISIBILITY_PUBLIC, request=request):
             return HTTPOk(json={"undeploymentDone": True, "identifier": process_id})
-        raise HTTPInternalServerError("Delete process failed for unhandled reason.")
-    except HTTPException:
-        raise  # re-throw already handled HTTPException
+        LOGGER.error("Existing process [%s] should have been deleted with success status.", process_id)
+        raise HTTPForbidden("Deletion of process has been refused by the database or could not have been validated.")
     except InvalidIdentifierValue as ex:
         raise HTTPBadRequest(str(ex))
     except ProcessNotAccessible:
-        raise HTTPUnauthorized("Process with id '{}' is not accessible.".format(str(process_id)))
+        raise HTTPUnauthorized("Process with id '{!s}' is not accessible.".format(process_id))
     except ProcessNotFound:
-        description = "Process with id '{}' does not exist.".format(str(process_id))
+        description = "Process with id '{!s}' does not exist.".format(process_id)
         raise HTTPNotFound(description)
-    except Exception as ex:
-        raise HTTPInternalServerError(str(ex))
 
 
 @sd.process_jobs_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS], renderer=OUTPUT_FORMAT_JSON,
                               schema=sd.PostProcessJobsEndpoint(), response_schemas=sd.post_process_jobs_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostProcessJobResponse.description)
 def submit_local_job(request):
     """
     Execute a local process.
@@ -588,13 +565,9 @@ def submit_local_job(request):
                                   is_workflow=process.type == PROCESS_WORKFLOW,
                                   visibility=process.visibility)
         return resp
-    except HTTPException:
-        raise  # re-throw already handled HTTPException
     except InvalidIdentifierValue as ex:
         raise HTTPBadRequest(str(ex))
     except ProcessNotAccessible:
-        raise HTTPUnauthorized("Process with id '{}' is not accessible.".format(str(process_id)))
+        raise HTTPUnauthorized("Process with id '{!s}' is not accessible.".format(process_id))
     except ProcessNotFound:
-        raise HTTPNotFound("The process with id '{}' does not exist.".format(str(process_id)))
-    except Exception as ex:
-        raise HTTPInternalServerError(str(ex))
+        raise HTTPNotFound("The process with id '{!s}' does not exist.".format(process_id))

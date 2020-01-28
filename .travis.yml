@@ -4,7 +4,10 @@ os:
 #  - osx
 python:
   - "2.7"
-sudo: false
+  - "3.5"
+  - "3.6"
+  - "3.7"
+  - "3.8"
 env:
   global:
   - secure: j7fuAPDXdl0SF1My1f0e3hr8mq4idP41jsz98Y1hN30GGOmIputScxIwSjIBi8zFCJ+K4RleMIoWLhnFsMeMD4DapRqDe5YnJJFOyfiyplzEcn4yONYRJf1nzfXBrpoGSEibgr/e3uYK62bkantI+b0pBPNAKbRjbRKKwTKEAxWb1pfaAMEQMB8/Wmvo0XYAZRB96H4q/7Dtd4CaIqh99Fs/9TjaGdNNtDtjwL0AWPXNfamsA8oNW0frNp1lEYpJpRE+PHFiKWZWyrRqjDA/UNU2UE/2H1O53I6tUXGJjORrUGRp1M9Xq/NhC8C4l7KrdpYH7YkYdvRDts3+XmJZ5kCsGB35YLP8DF1yUXIL4ZMskegBsBKqKKgnXGo4uYkaHp0QR2r8v2tdO8q3JWGYLSCgGVu5YkHU6Nlqf98W5LQLYSuZEkLplrk9vISHNS6TI4G3m7huToY1HwOu01hTZHAEhr/ouUxOfu6pQs8ZYVCyj98o65KFlFCRa7qKHc2/lXVbFPaOeQmFYqCGfFMTB0G0DHlsyOJk3QzoTr0HxJlbEwh9XLJOAnGO/TwcOUZndlj0+lTuCTpeBhjHywr+b00HnYtJ3cVnUVjT8TZydG2ATogeKRvOe0m58ug36EUGwbjr0JoN2hHjeFNSdvTUzFFFmRBY9rps47rzEDyRBGc=
@@ -23,25 +26,34 @@ before_install:
   - source tests/travis-ci/weaver.env
   - cp -f tests/travis-ci/custom.cfg ./
   - cp -f tests/travis-ci/data_sources.json ./
+  - make info
 install:
   - make install
-  - make install-dev
   - make start
 before_script:
   - sleep 5
 script:
-  - make pep8
-  - make docs
-  - make test-all
-  - make coverage
+  # run static analysis only once
+  - |
+    if [ "${TRAVIS_PYTHON_VERSION}" -eq "3.7" ]; then
+      make check
+      make coverage
+      make docs
+    fi
+  # run tests for each python version
+  - make test
+after_script:
+  - make stop
 matrix:
   allow_failures:
     - os: osx
+    - python: "2.7"   # deprecated support
+    - python: "3.8"   # experimental packages
 notifications:
   email: false
 after_success:
   - bash <(curl -s https://codecov.io/bash) || echo "Codecov did not collect coverage reports"
-  - source $(HOME)/conda/bin/activate weaver && python-codacy-coverage -r coverage.xml
+  - source $(HOME)/conda/bin/activate weaver && python-codacy-coverage -r reports/coverage.xml
   - |
     if [ "$TRAVIS_BRANCH" == "master" ] then
       export TAG_VERSION=latest
@@ -52,8 +64,5 @@ after_success:
     if [ -z "${TAG_VERSION}" ] || [ "$TRAVIS_PULL_REQUEST" = "false" ] then
       echo "Nothing to build for '$TRAVIS_BRANCH' (PR: $TRAVIS_PULL_REQUEST)"
     else
-      echo "Building: 'docker-registry.crim.ca/ogc/weaver:$TAG_VERSION'"
-      docker login docker-registry.crim.ca -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-      docker build . -t docker-registry.crim.ca/ogc/weaver:$TAG_VERSION
-      docker push docker-registry.crim.ca/ogc/weaver:$TAG_VERSION
+      make APP_VERSION=$TAG_VERSION docker-info docker-build docker-push
     fi

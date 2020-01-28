@@ -6,22 +6,24 @@ Based on tests from:
 * http://webtest.pythonpaste.org/en/latest/
 * http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/testing.html
 """
-from weaver.formats import CONTENT_TYPE_ANY_XML
-from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_PRIVATE
-from weaver.processes.wps_default import Hello
-from weaver.processes.wps_testing import WpsTestProcess
+import unittest
+from xml.etree import ElementTree
+
+import pyramid.testing
+import pytest
+
 from tests.utils import (
+    get_test_weaver_app,
+    get_test_weaver_config,
+    setup_config_with_celery,
     setup_config_with_mongodb,
     setup_config_with_pywps,
-    setup_mongodb_processstore,
-    setup_config_with_celery,
-    get_test_weaver_config,
-    get_test_weaver_app,
+    setup_mongodb_processstore
 )
-from xml.etree import ElementTree
-import pytest
-import unittest
-import pyramid.testing
+from weaver.formats import CONTENT_TYPE_ANY_XML
+from weaver.processes.wps_default import HelloWPS
+from weaver.processes.wps_testing import WpsTestProcess
+from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 
 
 @pytest.mark.functional
@@ -32,7 +34,6 @@ class WpsAppTest(unittest.TestCase):
             "weaver.url": "",
             "weaver.wps": True,
             "weaver.wps_path": self.wps_path
-
         }
         config = get_test_weaver_config(settings=settings)
         config = setup_config_with_mongodb(config)
@@ -50,8 +51,8 @@ class WpsAppTest(unittest.TestCase):
         self.process_store.set_visibility(self.process_private.identifier, VISIBILITY_PRIVATE)
 
         # add processes by pywps Process type
-        self.process_store.save_process(Hello())
-        self.process_store.set_visibility(Hello.identifier, VISIBILITY_PUBLIC)
+        self.process_store.save_process(HelloWPS())
+        self.process_store.set_visibility(HelloWPS.identifier, VISIBILITY_PUBLIC)
 
     def tearDown(self):
         pyramid.testing.tearDown()
@@ -76,13 +77,14 @@ class WpsAppTest(unittest.TestCase):
         process_offerings = list(filter(lambda e: "ProcessOfferings" in e.tag, list(root)))
         assert len(process_offerings) == 1
         processes = [p for p in process_offerings[0]]
-        identifiers = [pi.text for pi in [filter(lambda e: e.tag.endswith("Identifier"), p)[0] for p in processes]]
-        assert self.process_private.identifier not in identifiers
-        assert self.process_public.identifier in identifiers
+        ids = [pi.text for pi in [list(filter(lambda e: e.tag.endswith("Identifier"), p))[0] for p in processes]]
+        assert self.process_private.identifier not in ids
+        assert self.process_public.identifier in ids
 
     @pytest.mark.online
     def test_describeprocess(self):
-        params = "service=wps&request=describeprocess&version=1.0.0&identifier={}".format(Hello.identifier)
+        template = "service=wps&request=describeprocess&version=1.0.0&identifier={}"
+        params = template.format(HelloWPS.identifier)
         resp = self.app.get(self.make_url(params))
         assert resp.status_code == 200
         assert resp.content_type in CONTENT_TYPE_ANY_XML
@@ -106,12 +108,14 @@ class WpsAppTest(unittest.TestCase):
 
     @pytest.mark.online
     def test_execute_allowed(self):
-        params = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=name=tux".format(Hello.identifier)
+        template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=name=tux"
+        params = template.format(HelloWPS.identifier)
         url = self.make_url(params)
         resp = self.app.get(url)
         assert resp.status_code == 200
         assert resp.content_type in CONTENT_TYPE_ANY_XML
-        resp.mustcontain("<wps:ProcessSucceeded>PyWPS Process {} finished</wps:ProcessSucceeded>".format(Hello.title))
+        status = "<wps:ProcessSucceeded>PyWPS Process {} finished</wps:ProcessSucceeded>".format(HelloWPS.title)
+        resp.mustcontain(status)
 
     @pytest.mark.online
     def test_execute_with_visibility(self):

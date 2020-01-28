@@ -11,9 +11,9 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys
 import os
 import shlex
+import sys
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -29,19 +29,26 @@ needs_sphinx = "1.6"
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    "autoapi.extension",
+    "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
-    "sphinx.ext.napoleon",
-    # TODO: enable pywps extension
-    # 'sphinx_autodoc_pywps',
+    #"sphinx.ext.napoleon",
+    "sphinx_autodoc_typehints",
+    "sphinx_autodoc_pywps",
+    "autoapi.extension",
 ]
 
 autoapi_type = "python"
 autoapi_dirs = ["../../weaver"]
 autoapi_file_pattern = "*.py"
 autoapi_options = ["members", "undoc-members", "private-members"]
+autoapi_python_class_content = "both"   # class|both|init
+
+# sphinx_autodoc_typehints
+set_type_checking_flag = True
+typehints_fully_qualified = True
+always_document_param_types = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
@@ -327,17 +334,6 @@ rst_epilog = """
 .. _Sphinx: http://sphinx-doc.org/
 .. _reStructuredText: http://sphinx-doc.org/rest.html
 .. _Read the Docs: https://readthedocs.org
-.. _Anaconda: https://www.continuum.io/
-.. _Buildout: http://www.buildout.org/en/latest/
-.. _Phoenix: http://pyramid-phoenix.readthedocs.io/en/latest/
-.. _Malleefowl: http://malleefowl.readthedocs.io/en/latest/
-.. _weaver: http://weaver.readthedocs.io/en/latest/
-.. _Flyingpigeon: http://flyingpigeon.readthedocs.io/en/latest/
-.. _Hummingbird: http://birdhouse-hummingbird.readthedocs.io/en/latest/
-.. _Emu: http://emu.readthedocs.io/en/latest/
-.. _Birdy: http://birdy.readthedocs.io/en/latest/
-.. _Bootstrap: http://birdhousebuilderbootstrap.readthedocs.io/en/latest/
-.. _icclim: http://icclim.readthedocs.io/en/latest/
+.. _Weaver: https://github.com/crim-ca/weaver
 .. _PyWPS: http://pywps.org/
-.. _dispel4py: https://github.com/dispel4py/dispel4py
 """

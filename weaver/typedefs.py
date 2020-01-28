@@ -1,6 +1,8 @@
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from weaver.processes.wps_process_base import WpsProcessInterface
+    from weaver.datatype import Process
     from weaver.status import AnyStatusType
     from webob.headers import ResponseHeaders, EnvironHeaders
     from webob.response import Response as WebobResponse
@@ -10,31 +12,27 @@ if TYPE_CHECKING:
     from pyramid.config import Configurator
     from celery import Celery
     from requests.structures import CaseInsensitiveDict
-    # noinspection PyUnresolvedReferences
-    from cwltool.factory import Callable as CWLFactoryCallable
-    # noinspection PyPackageRequirements
+    from cwltool.factory import Callable as CWLFactoryCallable  # noqa
     from webtest.response import TestResponse
     from pywps.app import WPSRequest
-    # noinspection PyProtectedMember, PyUnresolvedReferences
-    from logging import _loggerClass as LoggerType
-    from typing import Any, AnyStr, Callable, Dict, List, Tuple, Union
+    from pywps import Process as ProcessWPS
+    from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, Type, Union  # noqa: F401
     import lxml.etree
     import os
-    if hasattr(os, 'PathLike'):
+    if hasattr(os, "PathLike"):
         FileSystemPathType = Union[os.PathLike, AnyStr]
     else:
         FileSystemPathType = AnyStr
 
     Number = Union[int, float]
-    AnyValue = Union[AnyStr, Number, bool, None]
+    AnyValue = Optional[Union[AnyStr, Number, bool]]
     AnyKey = Union[AnyStr, int]
-    JSON = Dict[AnyKey, Union[AnyValue, Dict[AnyKey, 'JSON'], List['JSON']]]
+    JSON = Dict[AnyKey, Union[AnyValue, Dict[AnyKey, "JSON"], List["JSON"]]]
     CWL = Dict[{"cwlVersion": AnyStr, "class": AnyStr, "inputs": JSON, "outputs": JSON}]
-    # noinspection PyProtectedMember
     XML = lxml.etree._Element
 
     AnyContainer = Union[Configurator, Registry, PyramidRequest, Celery]
-    SettingValue = Union[AnyStr, Number, bool, None]
+    SettingValue = AnyValue
     SettingsType = Dict[AnyStr, SettingValue]
     AnySettingsContainer = Union[AnyContainer, SettingsType]
     AnyRegistryContainer = AnyContainer
@@ -51,9 +49,12 @@ if TYPE_CHECKING:
     AnyCookiesContainer = Union[CookiesBaseType, WPSRequest, PyramidRequest, AnyHeadersContainer]
     AnyResponseType = Union[WebobResponse, PyramidResponse, TestResponse]
 
-    ExpectedOutputType = Dict[{'type': AnyStr, 'id': AnyStr, 'outputBinding': Dict['glob': AnyStr]}]
+    AnyProcess = Union[Process, ProcessWPS]
+    AnyProcessType = Union[Type[Process], Type[ProcessWPS]]
+
+    ExpectedOutputType = Dict[{"type": AnyStr, "id": AnyStr, "outputBinding": Dict["glob": AnyStr]}]
     GetJobProcessDefinitionFunction = Callable[[AnyStr, Dict[AnyStr, AnyStr], Dict[AnyStr, Any]], WpsProcessInterface]
     ToolPathObjectType = Dict[AnyStr, Any]
 
-    UpdateStatusPartialFunction = Callable[[{'provider': AnyStr, 'message': AnyStr,
-                                             'progress': int, 'status': AnyStatusType}], None]
+    UpdateStatusPartialFunction = Callable[[{"provider": AnyStr, "message": AnyStr,
+                                             "progress": int, "status": AnyStatusType}], None]

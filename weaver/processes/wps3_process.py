@@ -1,41 +1,50 @@
-from weaver import status
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_FORM
-from weaver.warning import MissingParameterWarning
-from weaver.visibility import VISIBILITY_PUBLIC
-from weaver.utils import (
-    get_any_id, get_any_value, get_any_message, get_job_log_msg, get_log_monitor_msg, pass_http_error
-)
-from weaver.wps_restapi.swagger_definitions import (
-    processes_uri,
-    process_uri,
-    process_jobs_uri,
-    process_results_uri,
-    process_visibility_uri,
-)
-from weaver.exceptions import PackageExecutionError
-from weaver.processes import opensearch
-from weaver.processes.constants import OPENSEARCH_LOCAL_FILE_SCHEME
-from weaver.processes.sources import retrieve_data_source_url, get_data_source_from_url
-from weaver.processes.wps_process_base import WpsProcessInterface
-from pyramid.settings import asbool
-from pyramid.httpexceptions import (
-    HTTPOk,
-    HTTPUnauthorized,
-    HTTPNotFound,
-    HTTPForbidden,
-    HTTPInternalServerError,
-    HTTPConflict
-)
+import logging
+import warnings
 from copy import deepcopy
 from time import sleep
 from typing import TYPE_CHECKING
-import logging
-import warnings
+
 import requests
+from pyramid.httpexceptions import (
+    HTTPConflict,
+    HTTPForbidden,
+    HTTPInternalServerError,
+    HTTPNotFound,
+    HTTPOk,
+    HTTPUnauthorized
+)
+from pyramid.settings import asbool
+
+from weaver import status
+from weaver.exceptions import PackageExecutionError
+from weaver.formats import CONTENT_TYPE_APP_FORM, CONTENT_TYPE_APP_JSON
+from weaver.processes import opensearch
+from weaver.processes.constants import OPENSEARCH_LOCAL_FILE_SCHEME
+from weaver.processes.sources import get_data_source_from_url, retrieve_data_source_url
+from weaver.processes.utils import map_progress
+from weaver.processes.wps_process_base import WpsProcessInterface
+from weaver.utils import (
+    get_any_id,
+    get_any_message,
+    get_any_value,
+    get_job_log_msg,
+    get_log_monitor_msg,
+    pass_http_error
+)
+from weaver.visibility import VISIBILITY_PUBLIC
+from weaver.warning import MissingParameterWarning
+from weaver.wps_restapi.swagger_definitions import (
+    process_jobs_uri,
+    process_results_uri,
+    process_uri,
+    process_visibility_uri,
+    processes_uri
+)
+
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON, UpdateStatusPartialFunction
-    from typing import Union, AnyStr
-    from pywps.app import WPSRequest
+    from weaver.typedefs import JSON, UpdateStatusPartialFunction   # noqa: F401
+    from typing import Union, AnyStr                                # noqa: F401
+    from pywps.app import WPSRequest                                # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 
@@ -83,7 +92,7 @@ class Wps3Process(WpsProcessInterface):
             deploy_body = step_payload
             url = retrieve_data_source_url(data_source)
         except (IndexError, KeyError) as exc:
-            raise PackageExecutionError("Failed to save package outputs. [{}]".format(repr(exc)))
+            raise PackageExecutionError("Failed to save package outputs. [{!r}]".format(exc))
 
         self.provider = data_source  # fix immediately for `update_status`
         self.update_status("{provider} is selected {reason}.".format(provider=data_source, reason=reason),
@@ -142,16 +151,16 @@ class Wps3Process(WpsProcessInterface):
             False if authorized access but process cannot be found,
             None if forbidden access.
         """
-        LOGGER.debug("Get process WPS visibility request for {0}".format(self.process))
+        LOGGER.debug("Get process WPS visibility request for [%s]", self.process)
         response = self.make_request(method="GET",
                                      url=self.url + process_visibility_uri.format(process_id=self.process),
                                      retry=False,
                                      status_code_mock=HTTPUnauthorized.code)
         if response.status_code in (HTTPUnauthorized.code, HTTPForbidden.code):
             return None
-        elif response.status_code == HTTPNotFound.code:
+        if response.status_code == HTTPNotFound.code:
             return False
-        elif response.status_code == HTTPOk.code:
+        if response.status_code == HTTPOk.code:
             json_body = response.json()
             # FIXME: support for Spacebel, always returns dummy visibility response, enforce deploy with `False`
             if json_body.get("message") == "magic!" or json_body.get("type") == "ok" or json_body.get("code") == 4:
@@ -166,7 +175,7 @@ class Wps3Process(WpsProcessInterface):
         user_headers = deepcopy(self.headers)
         user_headers.update(self.get_user_auth_header())
 
-        LOGGER.debug("Update process WPS visibility request for {0} at {1}".format(self.process, path))
+        LOGGER.debug("Update process WPS visibility request for [%s] at [%s]", self.process, path)
         response = self.make_request(method="PUT",
                                      url=path,
                                      json={"value": visibility},
@@ -176,7 +185,7 @@ class Wps3Process(WpsProcessInterface):
 
     def describe_process(self):
         path = self.url + process_uri.format(process_id=self.process)
-        LOGGER.debug("Describe process WPS request for {0} at {1}".format(self.process, path))
+        LOGGER.debug("Describe process WPS request for [%s] at [%s]", self.process, path)
         response = self.make_request(method="GET",
                                      url=path,
                                      retry=False,
@@ -201,41 +210,36 @@ class Wps3Process(WpsProcessInterface):
         user_headers = deepcopy(self.headers)
         user_headers.update(self.get_user_auth_header())
 
-        LOGGER.debug("Deploy process WPS request for {0} at {1}".format(self.process, path))
+        LOGGER.debug("Deploy process WPS request for [%s] at [%s]", self.process, path)
         response = self.make_request(method="POST", url=path, json=self.deploy_body, retry=True,
                                      status_code_mock=HTTPOk.code)
         response.raise_for_status()
 
     def execute(self, workflow_inputs, out_dir, expected_outputs):
-        # TODO
-        #   La section de code 'visibility' provient de la fct execute de la classe WpsWorkflowJob_
-        #   et n'a pas ete teste ici-meme
+        # TODO: test
         visible = self.is_visible()
         if not visible:  # includes private visibility and non-existing cases
             if visible is None:
-                LOGGER.info(u"Process {} access is unauthorized on {} - deploying as admin.".format(
-                    self.process, self.url))
+                LOGGER.info("Process [%s] access is unauthorized on [%s] - deploying as admin.", self.process, self.url)
             elif visible is False:
-                LOGGER.info(u"Process {} is not deployed on {} - deploying.".format(
-                    self.process, self.url))
+                LOGGER.info("Process [%s] is not deployed on [%s] - deploying.", self.process, self.url)
             # TODO: Maybe always redeploy? What about cases of outdated deployed process?
             try:
                 self.deploy()
-            except Exception as e:
+            except Exception as exc:
                 # FIXME: support for Spacebel, avoid conflict error incorrectly handled, remove 500 when fixed
-                pass_http_error(e, [HTTPConflict, HTTPInternalServerError])
+                pass_http_error(exc, [HTTPConflict, HTTPInternalServerError])
 
-        LOGGER.info(u"Process {} enforced to public visibility.".format(
-            self.process, self.url))
+        LOGGER.info("Process [%s] enforced to public visibility.", self.process)
         try:
             self.set_visibility(visibility=VISIBILITY_PUBLIC)
         # TODO: support for Spacebel, remove when visibility route properly implemented on ADES
-        except Exception as e:
-            pass_http_error(e, HTTPNotFound)
+        except Exception as exc:
+            pass_http_error(exc, HTTPNotFound)
 
         self.update_status("Preparing execute request for remote ADES.",
                            REMOTE_JOB_PROGRESS_REQ_PREP, status.STATUS_RUNNING)
-        LOGGER.debug("Execute process WPS request for {0}".format(self.process))
+        LOGGER.debug("Execute process WPS request for [%s]", self.process)
 
         execute_body_inputs = []
         execute_req_id = "id"
@@ -253,11 +257,10 @@ class Wps3Process(WpsProcessInterface):
             if exec_input[execute_req_input_val].startswith("{0}://".format(OPENSEARCH_LOCAL_FILE_SCHEME)):
                 exec_input[execute_req_input_val] = "file{0}".format(
                     exec_input[execute_req_input_val][len(OPENSEARCH_LOCAL_FILE_SCHEME):])
-            elif exec_input[execute_req_input_val].startswith('file://'):
+            elif exec_input[execute_req_input_val].startswith("file://"):
                 exec_input[execute_req_input_val] = self.host_file(exec_input[execute_req_input_val])
-                LOGGER.debug("Hosting intermediate input {0} : {1}".format(
-                    exec_input[execute_req_id],
-                    exec_input[execute_req_input_val]))
+                LOGGER.debug("Hosting intermediate input [%s] : [%s]",
+                             exec_input[execute_req_id], exec_input[execute_req_input_val])
 
         execute_body_outputs = [{execute_req_id: output,
                                  execute_req_out_trans_mode: "reference"} for output in expected_outputs]
@@ -282,7 +285,7 @@ class Wps3Process(WpsProcessInterface):
         self.update_status("Monitoring job on remote ADES : {0}".format(job_status_uri),
                            REMOTE_JOB_PROGRESS_MONITORING, status.STATUS_RUNNING)
 
-        while job_status_value not in status.job_status_categories[status.STATUS_CATEGORY_FINISHED]:
+        while job_status_value not in status.JOB_STATUS_CATEGORIES[status.STATUS_CATEGORY_FINISHED]:
             sleep(5)
             job_status = self.get_job_status(job_status_uri)
             job_status_value = status.map_status(job_status["status"])
@@ -294,8 +297,8 @@ class Wps3Process(WpsProcessInterface):
                                                message=get_any_message(job_status),
                                                progress=job_status.get("percentCompleted", 0),
                                                duration=job_status.get("duration", None)),  # get if available
-                               self.map_progress(job_status.get("percentCompleted", 0),
-                                                 REMOTE_JOB_PROGRESS_MONITORING, REMOTE_JOB_PROGRESS_FETCH_OUT),
+                               map_progress(job_status.get("percentCompleted", 0),
+                                            REMOTE_JOB_PROGRESS_MONITORING, REMOTE_JOB_PROGRESS_FETCH_OUT),
                                status.STATUS_RUNNING)
 
         if job_status_value != status.STATUS_SUCCEEDED:
@@ -311,16 +314,14 @@ class Wps3Process(WpsProcessInterface):
             if get_any_id(result) in expected_outputs:
                 # This is where cwl expect the output file to be written
                 # TODO We will probably need to handle multiple output value...
-                dst_fn = '/'.join([out_dir.rstrip('/'), expected_outputs[get_any_id(result)]])
+                dst_fn = "/".join([out_dir.rstrip("/"), expected_outputs[get_any_id(result)]])
 
                 # TODO Should we handle other type than File reference?
-                r = requests.get(get_any_value(result), allow_redirects=True)
-                LOGGER.debug("Fetching result output from {0} to cwl output destination : {1}".format(
-                    get_any_value(result),
-                    dst_fn
-                ))
-                with open(dst_fn, mode='wb') as dst_fh:
-                    dst_fh.write(r.content)
+                resp = requests.get(get_any_value(result), allow_redirects=True)
+                LOGGER.debug("Fetching result output from [%s] to cwl output destination: [%s]",
+                             get_any_value(result), dst_fn)
+                with open(dst_fn, mode="wb") as dst_fh:
+                    dst_fh.write(resp.content)
 
         self.update_status("Execution on remote ADES completed.",
                            REMOTE_JOB_PROGRESS_COMPLETED, status.STATUS_SUCCEEDED)
@@ -341,7 +342,7 @@ class Wps3Process(WpsProcessInterface):
         # TODO Remove patch for Geomatys not conforming to the status schema
         #  - jobID is missing
         #  - handled by 'map_status': status are upper cases and succeeded process are indicated as successful
-        job_id = job_status_uri.split('/')[-1]
+        job_id = job_status_uri.split("/")[-1]
         if "jobID" not in job_status:
             job_status["jobID"] = job_id
         job_status["status"] = status.map_status(job_status["status"])

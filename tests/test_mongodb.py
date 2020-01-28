@@ -2,19 +2,21 @@
 Based on unittests in https://github.com/wndhydrnt/python-oauth2/tree/master/oauth2/test
 """
 
-from weaver.store.mongodb import MongodbServiceStore
-from weaver.datatype import Service
-from pymongo.collection import Collection
 import unittest
+
 import mock
+from pymongo.collection import Collection
+
+from weaver.datatype import Service
+from weaver.store.mongodb import MongodbServiceStore
 
 
 class MongodbServiceStoreTestCase(unittest.TestCase):
     def setUp(self):
         self.service = dict(name="loving_flamingo", url="http://somewhere.over.the/ocean", type="wps",
-                            public=False, auth='token')
+                            public=False, auth="token")
         self.service_public = dict(name="open_pingu", url="http://somewhere.in.the/deep_ocean", type="wps",
-                                   public=True, auth='token')
+                                   public=True, auth="token")
         self.service_special = dict(url="http://wonderload", name="A special Name", type="wps", auth="token")
         self.sane_name_config = {"assert_invalid": False}
 
@@ -29,7 +31,7 @@ class MongodbServiceStoreTestCase(unittest.TestCase):
 
     def test_save_service_default(self):
         collection_mock = mock.Mock(spec=Collection)
-        collection_mock.count.return_value = 0
+        collection_mock.count_documents.return_value = 0
         collection_mock.find_one.return_value = self.service
         store = MongodbServiceStore(collection=collection_mock, sane_name_config=self.sane_name_config)
         store.save_service(Service(self.service))
@@ -38,7 +40,7 @@ class MongodbServiceStoreTestCase(unittest.TestCase):
 
     def test_save_service_with_special_name(self):
         collection_mock = mock.Mock(spec=Collection)
-        collection_mock.count.return_value = 0
+        collection_mock.count_documents.return_value = 0
         collection_mock.find_one.return_value = self.service_special
         store = MongodbServiceStore(collection=collection_mock, sane_name_config=self.sane_name_config)
         store.save_service(Service(self.service_special))
@@ -48,7 +50,7 @@ class MongodbServiceStoreTestCase(unittest.TestCase):
 
     def test_save_service_public(self):
         collection_mock = mock.Mock(spec=Collection)
-        collection_mock.count.return_value = 0
+        collection_mock.count_documents.return_value = 0
         collection_mock.find_one.return_value = self.service_public
         store = MongodbServiceStore(collection=collection_mock, sane_name_config=self.sane_name_config)
         store.save_service(Service(self.service_public))
