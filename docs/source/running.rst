@@ -1,7 +1,7 @@
 .. _running:
 
 ****************
-Running weaver
+Running Weaver
 ****************
 
 .. contents::

@@ -1,3 +1,4 @@
+# pylint: disable=W0611,unused-import
 try:
     import six
     if six.PY2:

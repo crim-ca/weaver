@@ -659,7 +659,6 @@ class Process(Base):
     @property
     def type(self):
         # type: () -> AnyStr
-        from weaver.processes.types import PROCESS_WPS
         return self.get("type", PROCESS_WPS)
 
     @property

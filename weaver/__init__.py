@@ -11,6 +11,9 @@ WEAVER_CONFIG_DIR = os.path.abspath(os.path.join(WEAVER_ROOT_DIR, "config"))
 sys.path.insert(0, WEAVER_ROOT_DIR)
 sys.path.insert(0, WEAVER_MODULE_DIR)
 
+# provide standard package version location
+from __meta__ import __version__  # isort:skip # noqa: E402 # pylint: disable=C0413
+
 # ===============================================================================================
 #   DO NOT IMPORT ANYTHING NOT PROVIDED BY BASE PYTHON HERE TO AVOID "setup.py" INSTALL FAILURE
 # ===============================================================================================
