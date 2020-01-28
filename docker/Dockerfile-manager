@@ -1,4 +1,4 @@
-FROM weaver-base:0.2.2
+FROM weaver-base:1.0.0
 LABEL description.short="Weaver Manager"
 
 # python 2, gunicorn 19.x
