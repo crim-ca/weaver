@@ -29,12 +29,11 @@ ifneq "$(CONDA_ENV_REAL_ACTIVE_PATH)" ""
 	CONDA_ENV_MODE := [using active environment]
 	CONDA_ENV := $(notdir $(CONDA_ENV_REAL_ACTIVE_PATH))
 	CONDA_CMD :=
-else $(CONDA_ENV_REAL_TARGET_PATH) ""
-	CONDA_ENV_MODE := [will activate environment]
-	CONDA_CMD := source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)";
 else
-	CONDA_ENV_MODE := [will activate environment]
+ifneq $(CONDA_ENV_REAL_TARGET_PATH) ""
 	CONDA_ENV := $(notdir $(CONDA_ENV_REAL_TARGET_PATH))
+endif
+	CONDA_ENV_MODE := [will activate environment]
 	CONDA_CMD := source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)";
 endif
 DOWNLOAD_CACHE ?= $(APP_ROOT)/downloads
@@ -168,8 +167,6 @@ install-all: install-sys install-pip install-pkg install-dev  ## install applica
 .PHONY: install-dev
 install-dev: install-pip	## install developement and test dependencies
 	@echo "Installing development packages with pip..."
-	@echo "`which pip`"
-	@echo "YUP"
 	@-bash -c '$(CONDA_CMD) pip install -r $(APP_ROOT)/requirements-dev.txt'
 	@echo "Install with pip complete. Test service with \`make test*' variations."
 

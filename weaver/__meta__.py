@@ -4,9 +4,9 @@ __version__ = "1.0.0"
 __description__ = "Workflow Execution Management Service (EMS); Application, Deployment and Execution Service (ADES)."
 __source_repository__ = "https://www.crim.ca/stash/projects/OGC/repos/weaver"
 __docker_repository__ = "docker-registry.crim.ca/ogc/weaver:latest"
-__license__ = "Apache License 2.0"
+__license_type__ = "Apache License 2.0"
+__license_short__ = "2020, CRIM"
 __authors__ = [
-    "Birdhouse Developers",
     "CRIM",
 ]
 __emails__ = [

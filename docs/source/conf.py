@@ -12,13 +12,16 @@
 # serve to show the default.
 
 import os
-import shlex
 import sys
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-# sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath(".."))
+sys.path.insert(0, os.path.abspath("../.."))
+sys.path.insert(0, os.path.abspath("../../.."))
+
+from weaver import __meta__  # isort:skip # noqa: E402 # pylint: disable=C0413
 
 # -- General configuration ------------------------------------------------
 
@@ -65,9 +68,9 @@ source_suffix = ".rst"
 master_doc = "index"
 
 # General information about the project.
-project = u"weaver"
-copyright = u"2018, Birdhouse"
-author = u"Birdhouse"
+project = __meta__.__title__
+copyright = __meta__.__license_short__
+author = ", ".join(__meta__.__authors__)
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -240,7 +243,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, "project.tex", u"weaver Documentation", u"Birdhouse", "manual")
+    (master_doc, "Weaver Documentation", "manual")
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
