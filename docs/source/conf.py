@@ -36,7 +36,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
-    #"sphinx.ext.napoleon",
+    "sphinx.ext.napoleon",
     "sphinx_autodoc_typehints",
     "sphinx_autodoc_pywps",
     "autoapi.extension",
