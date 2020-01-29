@@ -25,16 +25,22 @@ CONDA_ENV_PATH := $(CONDA_ENVS_DIR)/$(CONDA_ENV)
 CONDA_BIN      := $(CONDA_HOME)/bin/conda
 CONDA_ENV_REAL_TARGET_PATH := $(realpath $(CONDA_ENV_PATH))
 CONDA_ENV_REAL_ACTIVE_PATH := $(realpath ${CONDA_PREFIX})
+# environment already active - use it directly
 ifneq ("$(CONDA_ENV_REAL_ACTIVE_PATH)", "")
 	CONDA_ENV_MODE := [using active environment]
 	CONDA_ENV := $(notdir $(CONDA_ENV_REAL_ACTIVE_PATH))
 	CONDA_CMD :=
-else
+endif
+# environment not active but it exists - activate and use it
 ifneq ($(CONDA_ENV_REAL_TARGET_PATH), "")
 	CONDA_ENV := $(notdir $(CONDA_ENV_REAL_TARGET_PATH))
-else ifeq ("$(CONDA_ENV)", "")
+endif
+# environment not active and not found - create, activate and use it
+ifeq ("$(CONDA_ENV)", "")
 	CONDA_ENV := $(APP_NAME)
 endif
+# update paths for environment activation
+ifeq ("$(CONDA_ENV_REAL_ACTIVE_PATH)", "")
 	CONDA_ENV_MODE := [will activate environment]
 	CONDA_CMD := source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)";
 endif
@@ -95,19 +101,19 @@ version:	## display current version
 .PHONY: info
 info:		## display make information
 	@echo "Makefile configuration details:"
-	@echo "  OS Name               	$(OS_NAME)"
-	@echo "  CPU Architecture       $(CPU_ARCH)"
-	@echo "  Conda Home            	$(CONDA_HOME)"
-	@echo "  Conda Prefix          	$(CONDA_ENV_PATH)"
-	@echo "  Conda Env Real Name   	$(CONDA_ENV)"
-	@echo "  Conda Env Real Path   	$(CONDA_ENV_REAL_ACTIVE_PATH)"
-	@echo "  Conda Binary          	$(CONDA_BIN)"
-	@echo "  Conda Actication      	$(CONDA_ENV_MODE)"
-	@echo "  Conda Command         	$(CONDA_CMD)"
-	@echo "  Application Name      	$(APP_NAME)"
-	@echo "  Application Root      	$(APP_ROOT)"
-	@echo "  Donwload Cache        	$(DOWNLOAD_CACHE)"
-	@echo "  Docker Repository 		$(DOCKER_REPO)"
+	@echo "  OS Name            $(OS_NAME)"
+	@echo "  CPU Architecture   $(CPU_ARCH)"
+	@echo "  Conda Home         $(CONDA_HOME)"
+	@echo "  Conda Prefix       $(CONDA_ENV_PATH)"
+	@echo "  Conda Env Name     $(CONDA_ENV)"
+	@echo "  Conda Env Path     $(CONDA_ENV_REAL_ACTIVE_PATH)"
+	@echo "  Conda Binary       $(CONDA_BIN)"
+	@echo "  Conda Actication   $(CONDA_ENV_MODE)"
+	@echo "  Conda Command      $(CONDA_CMD)"
+	@echo "  Application Name   $(APP_NAME)"
+	@echo "  Application Root   $(APP_ROOT)"
+	@echo "  Donwload Cache     $(DOWNLOAD_CACHE)"
+	@echo "  Docker Repository  $(DOCKER_REPO)"
 
 ## -- Conda targets -- ##
 
