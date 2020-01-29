@@ -407,16 +407,19 @@ docker-info:		## obtain docker image information
 docker-build-base:							## build the base docker image
 	docker build "$(APP_ROOT)" -f "$(APP_ROOT)/docker/Dockerfile-base" -t "$(APP_NAME):$(APP_VERSION)"
 	docker tag "$(APP_NAME):$(APP_VERSION)" "$(DOCKER_REPO):$(APP_VERSION)"
+	docker tag "$(APP_NAME):$(APP_VERSION)" "$(DOCKER_REPO):latest"
 
 .PHONY: docker-build-manager
 docker-build-manager: docker-build-base		## build the manager docker image
 	docker build "$(APP_ROOT)" -f "$(APP_ROOT)/docker/Dockerfile-manager" -t "$(APP_NAME):$(APP_VERSION)-manager"
 	docker tag "$(APP_NAME):$(APP_VERSION)-manager" "$(DOCKER_REPO):$(APP_VERSION)-manager"
+	docker tag "$(APP_NAME):$(APP_VERSION)-manager" "$(DOCKER_REPO):latest-manager"
 
 .PHONY: docker-build-worker
 docker-build-worker: docker-build-base		## build the worker docker image
 	docker build "$(APP_ROOT)" -f "$(APP_ROOT)/docker/Dockerfile-worker" -t "$(APP_NAME):$(APP_VERSION)-worker"
 	docker tag "$(APP_NAME):$(APP_VERSION)-worker" "$(DOCKER_REPO):$(APP_VERSION)-worker"
+	docker tag "$(APP_NAME):$(APP_VERSION)-worker" "$(DOCKER_REPO):latest-worker"
 
 .PHONY: docker-build
 docker-build: docker-build-base docker-build-manager docker-build-worker		## build all docker images
@@ -424,14 +427,17 @@ docker-build: docker-build-base docker-build-manager docker-build-worker		## bui
 .PHONY: docker-push-base
 docker-push-base: docker-build-base			## push the base docker image
 	docker push "$(DOCKER_REPO):$(APP_VERSION)"
+	docker push "$(DOCKER_REPO):latest"
 
 .PHONY: docker-push-manager
 docker-push-manager: docker-build-manager	## push the manager docker image
 	docker push "$(DOCKER_REPO):$(APP_VERSION)-manager"
+	docker push "$(DOCKER_REPO):latest-manager"
 
 .PHONY: docker-push-worker
 docker-push-worker: docker-build-worker		## push the worker docker image
 	docker push "$(DOCKER_REPO):$(APP_VERSION)-worker"
+	docker push "$(DOCKER_REPO):latest-worker"
 
 .PHONY: docker-push
 docker-push: docker-push-base docker-push-manager docker-push-worker	## push all docker images
