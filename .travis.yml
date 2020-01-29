@@ -26,6 +26,7 @@ before_install:
   - source tests/travis-ci/weaver.env
   - cp -f tests/travis-ci/custom.cfg ./
   - cp -f tests/travis-ci/data_sources.json ./
+  - make --version
   - make info
 install:
   - make install
