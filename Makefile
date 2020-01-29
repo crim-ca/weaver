@@ -25,12 +25,12 @@ CONDA_ENV_PATH := $(CONDA_ENVS_DIR)/$(CONDA_ENV)
 CONDA_BIN      := $(CONDA_HOME)/bin/conda
 CONDA_ENV_REAL_TARGET_PATH := $(realpath $(CONDA_ENV_PATH))
 CONDA_ENV_REAL_ACTIVE_PATH := $(realpath ${CONDA_PREFIX})
-ifneq "$(CONDA_ENV_REAL_ACTIVE_PATH)" ""
+ifneq ("$(CONDA_ENV_REAL_ACTIVE_PATH)", "")
 	CONDA_ENV_MODE := [using active environment]
 	CONDA_ENV := $(notdir $(CONDA_ENV_REAL_ACTIVE_PATH))
 	CONDA_CMD :=
 else
-ifneq $(CONDA_ENV_REAL_TARGET_PATH) ""
+ifneq ($(CONDA_ENV_REAL_TARGET_PATH), "")
 	CONDA_ENV := $(notdir $(CONDA_ENV_REAL_TARGET_PATH))
 endif
 	CONDA_ENV_MODE := [will activate environment]
@@ -41,9 +41,9 @@ PYTHON_VERSION ?= `python -c 'import platform; print(platform.python_version())'
 
 # choose conda installer depending on your OS
 CONDA_URL = https://repo.continuum.io/miniconda
-ifeq "$(OS_NAME)" "Linux"
+ifeq ("$(OS_NAME)", "Linux")
 FN := Miniconda3-latest-Linux-x86_64.sh
-else ifeq "$(OS_NAME)" "Darwin"
+else ifeq ("$(OS_NAME)", "Darwin")
 FN := Miniconda3-latest-MacOSX-x86_64.sh
 else
 FN := unknown
