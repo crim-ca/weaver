@@ -32,6 +32,8 @@ ifneq ("$(CONDA_ENV_REAL_ACTIVE_PATH)", "")
 else
 ifneq ($(CONDA_ENV_REAL_TARGET_PATH), "")
 	CONDA_ENV := $(notdir $(CONDA_ENV_REAL_TARGET_PATH))
+else ifeq ("$(CONDA_ENV)", "")
+	CONDA_ENV := $(APP_NAME)
 endif
 	CONDA_ENV_MODE := [will activate environment]
 	CONDA_CMD := source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)";
@@ -48,9 +50,6 @@ FN := Miniconda3-latest-MacOSX-x86_64.sh
 else
 FN := unknown
 endif
-
-# Buildout files and folders
-DOWNLOAD_CACHE := $(APP_ROOT)/downloads
 
 # Tests
 REPORTS_DIR := $(APP_ROOT)/reports
@@ -95,20 +94,20 @@ version:	## display current version
 
 .PHONY: info
 info:		## display make information
-	@echo "Informations about your Bird:"
-	@echo "  OS_NAME             $(OS_NAME)"
-	@echo "  CPU_ARCH            $(CPU_ARCH)"
-	@echo "  Conda Home          $(CONDA_HOME)"
-	@echo "  Conda Prefix        $(CONDA_ENV_PATH)"
-	@echo "  Conda Env Real Name $(CONDA_ENV)"
-	@echo "  Conda Env Real Path $(CONDA_ENV_REAL_ACTIVE_PATH)"
-	@echo "  Conda Binary        $(CONDA_BIN)"
-	@echo "  Conda Actication    $(CONDA_ENV_MODE)"
-	@echo "  Conda Command       $(CONDA_CMD)"
-	@echo "  APP_NAME            $(APP_NAME)"
-	@echo "  APP_ROOT            $(APP_ROOT)"
-	@echo "  DOWNLOAD_CACHE      $(DOWNLOAD_CACHE)"
-	@echo "  DOCKER_REPO         $(DOCKER_REPO)"
+	@echo "Makefile configuration details:"
+	@echo "  OS Name               	$(OS_NAME)"
+	@echo "  CPU Architecture       $(CPU_ARCH)"
+	@echo "  Conda Home            	$(CONDA_HOME)"
+	@echo "  Conda Prefix          	$(CONDA_ENV_PATH)"
+	@echo "  Conda Env Real Name   	$(CONDA_ENV)"
+	@echo "  Conda Env Real Path   	$(CONDA_ENV_REAL_ACTIVE_PATH)"
+	@echo "  Conda Binary          	$(CONDA_BIN)"
+	@echo "  Conda Actication      	$(CONDA_ENV_MODE)"
+	@echo "  Conda Command         	$(CONDA_CMD)"
+	@echo "  Application Name      	$(APP_NAME)"
+	@echo "  Application Root      	$(APP_ROOT)"
+	@echo "  Donwload Cache        	$(DOWNLOAD_CACHE)"
+	@echo "  Docker Repository 		$(DOCKER_REPO)"
 
 ## -- Conda targets -- ##
 
