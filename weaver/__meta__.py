@@ -9,6 +9,7 @@ __license_short__ = "2020, CRIM"
 __authors__ = [
     "CRIM",
 ]
+__author__ = ", ".join(__authors__)
 __emails__ = [
     ""
 ]
