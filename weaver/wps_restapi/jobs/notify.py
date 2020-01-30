@@ -21,8 +21,8 @@ LOGGER = logging.getLogger(__name__)
 
 __DEFAULT_TEMPLATE__ = """
 <%doc>
-    This is an example notification message to be sent by email when a job is done. 
-    It is formatted using the Mako template library (https://www.makotemplates.org/). 
+    This is an example notification message to be sent by email when a job is done.
+    It is formatted using the Mako template library (https://www.makotemplates.org/).
     The content must also include the message header.
 
     The provided variables are:
