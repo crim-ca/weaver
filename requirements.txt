@@ -5,8 +5,10 @@ cffi
 colander
 cornice
 cornice_swagger>=0.7.0
-cwltool==1.0.20180820141117
-#cwltool==2.0.20200122124526; python_version >= "3.5"
+# cwltool Python 2 support dropped on 2.x
+# enforce Python 3 with version >=2 to update existing 1.x installations
+cwltool>=1.0.20180820141117,<2; python_version < "3"
+cwltool>=2; python_version >= "3"
 duration
 flufl.enum; python_version < "3"
 # gunicorn >20 breaks some config.ini loading parameters (paste)
