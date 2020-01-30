@@ -4,6 +4,8 @@ docker
 
 # Git
 .git
+.github
+.gitignore
 
 # installer
 #Makefile
