@@ -66,11 +66,12 @@ source_suffix = ".rst"
 
 # The master toctree document.
 master_doc = "index"
+master_title = "{} Documentation".format(__meta__.__title__)
 
 # General information about the project.
 project = __meta__.__title__
 copyright = __meta__.__license_short__
-author = ", ".join(__meta__.__authors__)
+author = __meta__.__author__
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -242,8 +243,9 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
+latex_file = "{}.tex".format(__meta__.__name__)
 latex_documents = [
-    (master_doc, "Weaver Documentation", "manual")
+    (master_doc, latex_file, master_title, __meta__.__author__, "manual"),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -271,7 +273,7 @@ latex_documents = [
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [(master_doc, "project", u"weaver Documentation", [author], 1)]
+man_pages = [(master_doc, "project", master_title, [author], 1)]
 
 # If true, show URL addresses after external links.
 # man_show_urls = False
@@ -286,7 +288,7 @@ texinfo_documents = [
     (
         master_doc,
         "project",
-        u"weaver Documentation",
+        master_title,
         author,
         "project",
         "One line description of project.",
@@ -311,15 +313,7 @@ texinfo_documents = [
 # intersphinx_mapping = {'https://docs.python.org/': None}
 intersphinx_mapping = {
     "python": ("http://docs.python.org/", None),
-    "birdhouse": ("http://birdhouse.readthedocs.io/en/latest/", None),
-    "phoenix": ("http://pyramid-phoenix.readthedocs.io/en/latest/", None),
-    "malleefowl": ("http://malleefowl.readthedocs.io/en/latest/", None),
-    "weaver": ("http://weaver.readthedocs.io/en/latest/", None),
-    "flyingpigeon": ("http://flyingpigeon.readthedocs.io/en/latest/", None),
-    "hummingbird": ("http://birdhouse-hummingbird.readthedocs.io/en/latest/", None),
-    "emu": ("http://emu.readthedocs.io/en/latest/", None),
-    "birdy": ("http://birdy.readthedocs.io/en/latest/", None),
-    "bootstrap": ("http://birdhousebuilderbootstrap.readthedocs.io/en/latest/", None),
+    "weaver": ("http://pavics-weaver.readthedocs.io/en/latest/", None),
 }
 
 # linkcheck options
