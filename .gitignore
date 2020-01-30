@@ -79,7 +79,7 @@ venv
 # project process results
 *.tif
 *.zip
-workflow[s]
+./workflow[s]
 
 # project local configurations
 config/weaver.ini
