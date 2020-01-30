@@ -69,6 +69,6 @@ after_script:
       then echo "Nothing to build for '$TRAVIS_BRANCH' (PR: $TRAVIS_PULL_REQUEST)";
       else
         echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-        make DOCKER_REPO=pavics/weaver APP_VERSION=$TAG_VERSION docker-info docker-build docker-push;
+        make DOCKER_REPO=pavics/weaver APP_VERSION=$TAG_VERSION docker-info docker-build docker-push
       fi
     fi
