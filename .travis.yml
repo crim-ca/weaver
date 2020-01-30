@@ -37,13 +37,10 @@ install:
 before_script:
   - sleep 5
 script:
-  # run static analysis only once
-  - |
-    if [ "${TRAVIS_PYTHON_VERSION}" == "3.7" ]; then
-      make check
-      make coverage
-      make docs
-    fi
+  # run static analysis only once (run ifs separately to identify the failing case)
+  - if [ "${TRAVIS_PYTHON_VERSION}" == "3.7" ]; then make check; fi
+  - if [ "${TRAVIS_PYTHON_VERSION}" == "3.7" ]; then make coverage; fi
+  - if [ "${TRAVIS_PYTHON_VERSION}" == "3.7" ]; then make docs; fi
   # run tests for each python version
   - make test
 matrix:
@@ -56,7 +53,6 @@ notifications:
 after_success:
   - bash <(curl -s https://codecov.io/bash) || echo "Codecov did not collect coverage reports"
   - source $(HOME)/conda/bin/activate weaver && python-codacy-coverage -r reports/coverage.xml
-after_script:
   - make stop
   - |
     if [ "$TRAVIS_BRANCH" == "master" ];
