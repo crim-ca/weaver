@@ -326,6 +326,18 @@ class Job(Base):
         self["notification_email"] = email
 
     @property
+    def accept_language(self):
+        # type: () -> Optional[AnyStr]
+        return self.get("accept_language")
+
+    @accept_language.setter
+    def accept_language(self, language):
+        # type: (Optional[Union[AnyStr]]) -> None
+        if not isinstance(language, six.string_types):
+            raise TypeError("Type 'str' is required for '{}.accept_language'".format(type(self)))
+        self["accept_language"] = language
+
+    @property
     def execute_async(self):
         # type: () -> bool
         return self.get("execute_async", True)

@@ -60,6 +60,15 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
+def set_wps_language(wps, accept_language):
+    """Set the `language` property on the `WebProcessingService` object.
+
+    Given the `accept_language` header value, match the best language
+    to the supported languages.
+    """
+    pass
+
+
 @app.task(bind=True)
 def execute_process(self, job_id, url, headers=None, notification_email=None):
     settings = get_settings(app)
@@ -77,6 +86,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
         try:
             LOGGER.debug("Execute process WPS request for [%s]", job.process)
             wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), verify=ssl_verify)
+            set_wps_language(wps, job.accept_language)
             # noinspection PyProtectedMember
             raise_on_xml_exception(wps._capabilities)
         except Exception as ex:
@@ -248,7 +258,7 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
     job = store.save_job(task_id=STATUS_ACCEPTED, process=process_id, service=provider_id,
                          inputs=json_body.get("inputs"), is_workflow=is_workflow, access=visibility,
                          user_id=request.authenticated_userid, execute_async=is_execute_async, custom_tags=tags,
-                         notification_email=encrypted_email)
+                         notification_email=encrypted_email, accept_language=request.accept_language)
     result = execute_process.delay(
         job_id=job.id,
         url=clean_ows_url(service_url),

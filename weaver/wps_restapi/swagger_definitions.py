@@ -258,6 +258,11 @@ class AcceptHeader(MappingSchema):
     ]))
 
 
+class AcceptLanguageHeader(AcceptHeader):
+    AcceptLanguage = SchemaNode(String(), missing=drop)
+    AcceptLanguage.name = "Accept-Language"
+
+
 class KeywordList(SequenceSchema):
     keyword = SchemaNode(String())
 
@@ -1172,7 +1177,7 @@ class PostProcessesEndpoint(MappingSchema):
 
 
 class PostProcessJobsEndpoint(ProcessPath):
-    header = AcceptHeader()
+    header = AcceptLanguageHeader()
     body = Execute()
 
 

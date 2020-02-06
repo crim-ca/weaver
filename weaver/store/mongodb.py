@@ -382,6 +382,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                  custom_tags=None,          # type: Optional[List[AnyStr]]
                  access=None,               # type: Optional[AnyStr]
                  notification_email=None,   # type: Optional[AnyStr]
+                 accept_language=None,      # type: Optional[AnyStr]
                  ):                         # type: (...) -> Job
         """
         Stores a job in mongodb.
@@ -412,6 +413,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                 "tags": list(set(tags)),
                 "access": access,
                 "notification_email": notification_email,
+                "accept_language": accept_language,
             })
             self.collection.insert_one(new_job.params())
             job = self.fetch_by_id(job_id=new_job.id)
