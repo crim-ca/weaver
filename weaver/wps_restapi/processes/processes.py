@@ -203,17 +203,26 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
 
 
 def set_wps_language(wps, accept_language):
+    # type: (WebProcessingService, str) -> None
     """Set the `language` property on the `WebProcessingService` object.
 
     Given the `accept_language` header value, match the best language
     to the supported languages.
 
     By default, and if no match is found, the `language` property is None.
+
+    https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Accept-Language
+    (q-factor weighting is ignored, only order is considered)
     """
-    accepted_languages = [lang.strip() for lang in accept_language.lower().split(",")]
+    if not hasattr(wps, "languages"):
+        # owslib version doesn't support setting a language
+        return
+
+    accepted_languages = [lang.strip().split(';')[0] for lang in accept_language.lower().split(",")]
 
     for accept in accepted_languages:
         for language in wps.languages.supported:
+            # Accept-Language header could be only 'fr' instead of 'fr-CA'
             if language.lower().startswith(accept):
                 wps.language = language
                 return
@@ -266,7 +275,7 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
     job = store.save_job(task_id=STATUS_ACCEPTED, process=process_id, service=provider_id,
                          inputs=json_body.get("inputs"), is_workflow=is_workflow, access=visibility,
                          user_id=request.authenticated_userid, execute_async=is_execute_async, custom_tags=tags,
-                         notification_email=encrypted_email, accept_language=request.accept_language)
+                         notification_email=encrypted_email, accept_language=str(request.accept_language))
     result = execute_process.delay(
         job_id=job.id,
         url=clean_ows_url(service_url),

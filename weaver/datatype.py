@@ -567,6 +567,7 @@ class Job(Base):
             "request": self.request,
             "response": self.response,
             "notification_email": self.notification_email,
+            "accept_language": self.accept_language,
         }
 
 
