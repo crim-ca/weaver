@@ -1,7 +1,7 @@
 import os
 import unittest
 from copy import deepcopy
-from unittest.mock import Mock
+import mock
 
 import pyramid.testing
 import pytest
@@ -509,8 +509,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert job.accept_language == "fr-CA"
 
     def test_set_wps_language(self):
-        wps = Mock()
-        languages = Mock()
+        wps = mock.Mock()
+        languages = mock.Mock()
         wps.languages = languages
         languages.default = 'en-US'
         languages.supported = ['en-US', 'fr-CA']
