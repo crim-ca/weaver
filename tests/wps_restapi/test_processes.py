@@ -1,6 +1,7 @@
 import os
 import unittest
 from copy import deepcopy
+from unittest.mock import Mock
 
 import pyramid.testing
 import pytest
@@ -32,6 +33,7 @@ from weaver.status import STATUS_ACCEPTED
 from weaver.utils import fully_qualified_name, ows_context_href
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 from weaver.wps import get_wps_url
+from weaver.wps_restapi.processes.processes import set_wps_language
 
 # simulated remote server with remote processes (mocked with `responses` package)
 TEST_REMOTE_SERVER_URL = "https://remote-server.com"
@@ -485,6 +487,36 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 self.fail("Job should have been created and be retrievable.")
             assert job.id == resp.json["jobID"]
             assert job.task_id == STATUS_ACCEPTED  # temporary value until processed by celery
+
+    def test_execute_process_language(self):
+        uri = "/processes/{}/jobs".format(self.process_public.identifier)
+        data = self.get_process_execute_template()
+        task = "job-{}".format(fully_qualified_name(self))
+        mock_execute = mocked_process_job_runner(task)
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+            headers = self.json_headers.copy()
+            headers["Accept-Language"] = "fr-CA"
+            resp = self.app.post_json(uri, params=data, headers=headers)
+            assert resp.status_code == 201
+            try:
+                job = self.job_store.fetch_by_id(resp.json["jobID"])
+            except JobNotFound:
+                self.fail("Job should have been created and be retrievable.")
+            assert job.id == resp.json["jobID"]
+            assert job.accept_language == "fr-CA"
+
+    def test_set_wps_language(self):
+        wps = Mock()
+        languages = Mock()
+        wps.languages = languages
+        languages.default = 'en-US'
+        languages.supported = ['en-US', 'fr-CA']
+
+        set_wps_language(wps, 'ru, fr;q=0.5')
+        assert wps.language == 'fr-CA'
 
     def test_execute_process_no_json_body(self):
         uri = "/processes/{}/jobs".format(self.process_public.identifier)
