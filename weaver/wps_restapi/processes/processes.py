@@ -60,15 +60,6 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
-def set_wps_language(wps, accept_language):
-    """Set the `language` property on the `WebProcessingService` object.
-
-    Given the `accept_language` header value, match the best language
-    to the supported languages.
-    """
-    pass
-
-
 @app.task(bind=True)
 def execute_process(self, job_id, url, headers=None, notification_email=None):
     settings = get_settings(app)
@@ -209,6 +200,23 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
         job = store.update_job(job)
 
     return job.status
+
+
+def set_wps_language(wps, accept_language):
+    """Set the `language` property on the `WebProcessingService` object.
+
+    Given the `accept_language` header value, match the best language
+    to the supported languages.
+
+    By default, and if no match is found, the `language` property is None.
+    """
+    accepted_languages = [lang.strip() for lang in accept_language.lower().split(",")]
+
+    for accept in accepted_languages:
+        for language in wps.languages.supported:
+            if language.lower().startswith(accept):
+                wps.language = language
+                return
 
 
 def validate_supported_submit_job_handler_parameters(json_body):
