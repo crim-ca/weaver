@@ -48,6 +48,7 @@ if TYPE_CHECKING:
     from typing import Any, Dict, Generator, List, Optional, Set, Union     # noqa: F401
     from cwltool.command_line_tool import OutputPorts                       # noqa: F401
     from cwltool.provenance import ProvenanceProfile
+    import threading    # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_TMP_PREFIX = "tmp"
@@ -409,6 +410,7 @@ class WpsWorkflowJob(JobBase):
 
     def run(self,
             runtimeContext,     # type: RuntimeContext
+            tmpdir_lock=None,   # type: Optional[threading.Lock]
             ):                  # type: (...) -> None
 
         if not os.path.exists(self.tmpdir):
@@ -432,8 +434,8 @@ class WpsWorkflowJob(JobBase):
         # stageFiles(self.pathmapper, ignoreWritable=True, symLink=True, secret_store=runtimeContext.secret_store)
         if self.generatemapper:
             # FIXME: see if this is needed... func doesn't exist anymore in cwltool 2.x
-            #stageFiles(self.generatemapper, ignoreWritable=self.inplace_update,
-            #           symLink=True, secret_store=runtimeContext.secret_store)
+            # stageFiles(self.generatemapper, ignoreWritable=self.inplace_update,
+            #            symLink=True, secret_store=runtimeContext.secret_store)
             relink_initialworkdir(self.generatemapper, self.outdir,
                                   self.builder.outdir, inplace_update=self.inplace_update)
 
