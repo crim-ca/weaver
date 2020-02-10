@@ -77,6 +77,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
         try:
             LOGGER.debug("Execute process WPS request for [%s]", job.process)
             wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), verify=ssl_verify)
+            set_wps_language(wps, job.accept_language)
             # noinspection PyProtectedMember
             raise_on_xml_exception(wps._capabilities)
         except Exception as ex:
@@ -201,6 +202,35 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
     return job.status
 
 
+def set_wps_language(wps, accept_language):
+    # type: (WebProcessingService, str) -> None
+    """Set the :attr:`language` property on the :class:`WebProcessingService` object.
+
+    Given the `Accept-Language` header value, match the best language
+    to the supported languages.
+
+    By default, and if no match is found, the :attr:`WebProcessingService.language`
+    property is set to None.
+
+    https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Accept-Language
+    (q-factor weighting is ignored, only order is considered)
+
+    :param str accept_language: the value of the Accept-Language header
+    """
+    if not hasattr(wps, "languages"):
+        # owslib version doesn't support setting a language
+        return
+
+    accepted_languages = [lang.strip().split(';')[0] for lang in accept_language.lower().split(",")]
+
+    for accept in accepted_languages:
+        for language in wps.languages.supported:
+            # Accept-Language header could be only 'fr' instead of 'fr-CA'
+            if language.lower().startswith(accept):
+                wps.language = language
+                return
+
+
 def validate_supported_submit_job_handler_parameters(json_body):
     """
     Tests supported parameters not automatically validated by colander deserialize.
@@ -248,7 +278,7 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
     job = store.save_job(task_id=STATUS_ACCEPTED, process=process_id, service=provider_id,
                          inputs=json_body.get("inputs"), is_workflow=is_workflow, access=visibility,
                          user_id=request.authenticated_userid, execute_async=is_execute_async, custom_tags=tags,
-                         notification_email=encrypted_email)
+                         notification_email=encrypted_email, accept_language=str(request.accept_language))
     result = execute_process.delay(
         job_id=job.id,
         url=clean_ows_url(service_url),
