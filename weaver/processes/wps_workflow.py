@@ -19,13 +19,11 @@ from cwltool.process import (
     compute_checksums,
     normalizeFilesDirs,
     shortname,
-    stageFiles,
     supportedProcessRequirements,
     uniquename
 )
-from cwltool.provenance import CreateProvProfile
 from cwltool.stdfsaccess import StdFsAccess
-from cwltool.utils import aslist, bytes2str_in_dicts, json_dumps, onWindows
+from cwltool.utils import aslist, bytes2str_in_dicts, onWindows
 from cwltool.workflow import Workflow
 from pyramid_celery import celery_app as app
 from schema_salad import validate
@@ -49,6 +47,7 @@ if TYPE_CHECKING:
     from weaver.processes.wps_process_base import WpsProcessInterface       # noqa: F401
     from typing import Any, Dict, Generator, List, Optional, Set, Union     # noqa: F401
     from cwltool.command_line_tool import OutputPorts                       # noqa: F401
+    from cwltool.provenance import ProvenanceProfile
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_TMP_PREFIX = "tmp"
@@ -94,7 +93,7 @@ class CallbackJob(object):
         self.output_callback = output_callback
         self.cache_builder = cachebuilder
         self.output_dir = jobcache
-        self.prov_obj = None  # type: Optional[CreateProvProfile]
+        self.prov_obj = None  # type: Optional[ProvenanceProfile]
 
     def run(self, loading_context):
         # type: (RuntimeContext) -> None
@@ -196,7 +195,7 @@ class WpsWorkflow(ProcessCWL):
                 with fs_access.open(custom_output, "r") as f:
                     ret = json.load(f)
                 if debug:
-                    LOGGER.debug(u"Raw output from %s: %s", custom_output, json_dumps(ret, indent=4))
+                    LOGGER.debug(u"Raw output from %s: %s", custom_output, json.dumps(ret, indent=4))
             else:
                 for i, port in enumerate(ports):
                     def make_workflow_exception(msg):
@@ -229,7 +228,7 @@ class WpsWorkflow(ProcessCWL):
             return ret if ret is not None else {}
         except validate.ValidationException as exc:
             raise WorkflowException("Error validating output record: {!s}\nIn:\n{}"
-                                    .format(exc, json_dumps(ret, indent=4)))
+                                    .format(exc, json.dumps(ret, indent=4)))
         finally:
             if builder.mutation_manager and readers:
                 for reader in readers.values():
@@ -432,8 +431,9 @@ class WpsWorkflowJob(JobBase):
 
         # stageFiles(self.pathmapper, ignoreWritable=True, symLink=True, secret_store=runtimeContext.secret_store)
         if self.generatemapper:
-            stageFiles(self.generatemapper, ignoreWritable=self.inplace_update,
-                       symLink=True, secret_store=runtimeContext.secret_store)
+            # FIXME: see if this is needed... func doesn't exist anymore in cwltool 2.x
+            #stageFiles(self.generatemapper, ignoreWritable=self.inplace_update,
+            #           symLink=True, secret_store=runtimeContext.secret_store)
             relink_initialworkdir(self.generatemapper, self.outdir,
                                   self.builder.outdir, inplace_update=self.inplace_update)
 
@@ -502,7 +502,7 @@ class WpsWorkflowJob(JobBase):
             LOGGER.info(u"[job %s] completed %s", self.name, process_status)
 
         if LOGGER.isEnabledFor(logging.DEBUG):
-            LOGGER.debug(u"[job %s] %s", self.name, json_dumps(outputs, indent=4))
+            LOGGER.debug(u"[job %s] %s", self.name, json.dumps(outputs, indent=4))
 
         if self.generatemapper and runtime_context.secret_store:
             # Delete any runtime-generated files containing secrets.
