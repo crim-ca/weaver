@@ -204,15 +204,18 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
 
 def set_wps_language(wps, accept_language):
     # type: (WebProcessingService, str) -> None
-    """Set the `language` property on the `WebProcessingService` object.
+    """Set the :attr:`language` property on the :class:`WebProcessingService` object.
 
-    Given the `accept_language` header value, match the best language
+    Given the `Accept-Language` header value, match the best language
     to the supported languages.
 
-    By default, and if no match is found, the `language` property is None.
+    By default, and if no match is found, the :attr:`WebProcessingService.language`
+    property is set to None.
 
     https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Accept-Language
     (q-factor weighting is ignored, only order is considered)
+
+    :param str accept_language: the value of the Accept-Language header
     """
     if not hasattr(wps, "languages"):
         # owslib version doesn't support setting a language
