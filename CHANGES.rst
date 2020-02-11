@@ -9,12 +9,14 @@ Changes:
 
 - Simplify docker image generation and make base/manager/worker variants all available under the same docker
   repo `docker-registry.crim.ca/ogc/weaver <docker-registry.crim.ca/ogc/weaver>`_  with different tags.
+- Add *planned future support* of ``Accept-Language`` header for `WPS-1/2` (``geopython/OWSLib 0.20.0``) (#74).
 
 Fixes:
 -------------
 
 - Fix `readthedocs <https://img.shields.io/readthedocs/pavics-weaver>`_ documentation generation.
 - Fix ``.travis`` docker image build condition.
+- Fix ``geopython/OWSLib>=0.19.1`` requirement for Python 3.8 support (#62).
 
 1.0.0 (2020-01-28)
 ==================
