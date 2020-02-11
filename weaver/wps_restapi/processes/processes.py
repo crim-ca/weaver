@@ -215,6 +215,7 @@ def set_wps_language(wps, accept_language):
     https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Accept-Language
     (q-factor weighting is ignored, only order is considered)
 
+    :param wps: process for which to set the language header if it is accepted
     :param str accept_language: the value of the Accept-Language header
     """
     if not accept_language:
@@ -224,10 +225,10 @@ def set_wps_language(wps, accept_language):
         # owslib version doesn't support setting a language
         return
 
-    accepted_languages = [lang.strip().split(';')[0] for lang in accept_language.lower().split(",")]
+    accepted_languages = [lang.strip().split(";")[0] for lang in accept_language.lower().split(",")]
 
     for accept in accepted_languages:
-        for language in wps.languages.supported:
+        for language in wps.languages.supported:    # noqa
             # Accept-Language header could be only 'fr' instead of 'fr-CA'
             if language.lower().startswith(accept):
                 wps.language = language

@@ -15,7 +15,7 @@ flufl.enum; python_version < "3"
 # it is also only available for Python >=3.5
 gunicorn>=19.10,<20; python_version < "3"
 # use pserve to continue supporting config.ini with paste settings
-gunicorn>=19.10; python_version >= "3.5"
+gunicorn>=20.0.4; python_version >= "3.5"
 jsonschema>=3.0.1
 lxml
 mako
