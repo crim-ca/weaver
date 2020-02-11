@@ -218,6 +218,9 @@ def set_wps_language(wps, accept_language):
     :param wps: process for which to set the language header if it is accepted
     :param str accept_language: the value of the Accept-Language header
     """
+    if not accept_language:
+        return
+
     if not hasattr(wps, "languages"):
         # owslib version doesn't support setting a language
         return
@@ -279,7 +282,7 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
     job = store.save_job(task_id=STATUS_ACCEPTED, process=process_id, service=provider_id,
                          inputs=json_body.get("inputs"), is_workflow=is_workflow, access=visibility,
                          user_id=request.authenticated_userid, execute_async=is_execute_async, custom_tags=tags,
-                         notification_email=encrypted_email, accept_language=str(request.accept_language))
+                         notification_email=encrypted_email, accept_language=request.accept_language.header_value)
     result = execute_process.delay(
         job_id=job.id,
         url=clean_ows_url(service_url),
