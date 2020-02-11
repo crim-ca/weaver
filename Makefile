@@ -410,9 +410,9 @@ docker-info:		## obtain docker image information
 
 .PHONY: docker-build-base
 docker-build-base:							## build the base docker image
-	docker build "$(APP_ROOT)" -f "$(APP_ROOT)/docker/Dockerfile-base" -t "$(APP_NAME):$(APP_VERSION)"
-	docker tag "$(APP_NAME):$(APP_VERSION)" "$(DOCKER_REPO):$(APP_VERSION)"
-	docker tag "$(APP_NAME):$(APP_VERSION)" "$(DOCKER_REPO):latest"
+	docker build "$(APP_ROOT)" -f "$(APP_ROOT)/docker/Dockerfile-base" -t "$(APP_NAME):base"
+	docker tag "$(APP_NAME):base" "$(DOCKER_REPO):$(APP_VERSION)"
+	docker tag "$(APP_NAME):base" "$(DOCKER_REPO):latest"
 
 .PHONY: docker-build-manager
 docker-build-manager: docker-build-base		## build the manager docker image

@@ -13,6 +13,8 @@ env:
   - secure: j7fuAPDXdl0SF1My1f0e3hr8mq4idP41jsz98Y1hN30GGOmIputScxIwSjIBi8zFCJ+K4RleMIoWLhnFsMeMD4DapRqDe5YnJJFOyfiyplzEcn4yONYRJf1nzfXBrpoGSEibgr/e3uYK62bkantI+b0pBPNAKbRjbRKKwTKEAxWb1pfaAMEQMB8/Wmvo0XYAZRB96H4q/7Dtd4CaIqh99Fs/9TjaGdNNtDtjwL0AWPXNfamsA8oNW0frNp1lEYpJpRE+PHFiKWZWyrRqjDA/UNU2UE/2H1O53I6tUXGJjORrUGRp1M9Xq/NhC8C4l7KrdpYH7YkYdvRDts3+XmJZ5kCsGB35YLP8DF1yUXIL4ZMskegBsBKqKKgnXGo4uYkaHp0QR2r8v2tdO8q3JWGYLSCgGVu5YkHU6Nlqf98W5LQLYSuZEkLplrk9vISHNS6TI4G3m7huToY1HwOu01hTZHAEhr/ouUxOfu6pQs8ZYVCyj98o65KFlFCRa7qKHc2/lXVbFPaOeQmFYqCGfFMTB0G0DHlsyOJk3QzoTr0HxJlbEwh9XLJOAnGO/TwcOUZndlj0+lTuCTpeBhjHywr+b00HnYtJ3cVnUVjT8TZydG2ATogeKRvOe0m58ug36EUGwbjr0JoN2hHjeFNSdvTUzFFFmRBY9rps47rzEDyRBGc=
   - secure: jtK2GwC2Z97r1LdZpqDoj7UGVbTq9Dk+CdXXRbrWuSFCc/SA/TFFeEaHJHm1V0oVFeC5YVpu2B7Z/Di71SmqF/tafArLuDF5LCFegddZBlG372xaKn/ilfLRriA9dyb/yopmnRInqh9ynd1/CokNFjMAKuj4bZYJZImL7nsY9iCdAfuv51thQg2Nd4oj50SiR9MSgEhxOsdos5CncJqSbJrw9KEJGpz69ZtOD6p6UVfd8PgCaDSRuU/RaTAZLLFznRW4+OcUyOy1KXkmEyo7YoF6D/OJvS5INYvACk3/5o5qNYA7YJh6MfQbHd0Y9qvjGO6jvPRikNWhbo4pvCDNx37A5B9BdvUQFpP1T1SdBGCWdfF9qDvskw95kryh/fbs5YTd6rjQUGlQ9Qzt7eJFUd3SpasZRviqcHHyGCJtTqOw0ow6rMYmk2dSDoAi+/H6DDxuZc/a0K+s9U/fCDGCUCee2IyD8zz1CoG+BKO66rVHN1eeuOKlaDzmG6gPLcTbOCcP/jlM/KlBTQO2vzUvc7k0tBb9NunLXSV2eu5zXPyyVbCsKkc2wCNKO40Hsmx9+lALmS4LVlxNBHcNmdHWYiSIOVH2yhM7Ud1/Wsj2NVjzd2KJ5WAuO85cegn3r1o+VtsFNr8YeFdiNCyYETgfxs3OoLnhG/wN++oxXGeXXpQ=
   - secure: BZBVvKMZaMuMBq3LvdwpBEnyk2OO9yDu+Izxqvoba3/QT2zD0lA8bOFFUYErjuhKecmda1OyNnjdejs2wpGxEEal21AR/BoNHeVTH7euaQzjhWo9MaBnnpFqsKABxy4EFdHZHGD90LrrFoCj7HgI4w+BxABQSsdSuWNYHl4oCyAF9TsPnKGFIlW0HlAR32rxaWHjuxVtxLkiws2GJbyjA3EDSJb7vB5pfnJPTaLTPkgZpAWHa8cGQoXQrZdfG0an7dg3GdPKPc75N0piVqnpEDK89wCpjSK5AwYrsjcc5E1cjJiab9XNopZDLxQzWf8+u455TrSAvcZNkev5o/qg1hbHqnUkOoMvGbipyyNxu0/dzElesRYQ7673fGT/yiZDd7re9qUz31HFIDC5TUfMPoVs0NMX+lNHEDy9FH5UvVV8udTVAJPw5+7vjzd3CpMIGWHt9Syk6OwU1BxdHIeielrlfK7YMkgXQe69KcLKwIdg5QaF7l4I0EtDQ4Ra5d/N36uyLejBIZ7laOgl1IAO9zUXoEtvEI7mcivvWAOSdV6FblG5U4K+/27d3FxRmO06KuIVaYEbPp2HWeVaJADxqTVpRp5bUZ8aEGWihI4L74UbHXWRUPkHt4AG16Ubb/hTrYnCCKL3pvUMFBU5/LoJeyjCVGgi0WOFBaJJazl3XyI=
+  - secure: L5Ko19kx9zbaqZJWKP+elx5G4/OO8WC0PnY4Dacv0hULtv09sEP0g4EKcMP6spMeEsz4B/i/JQzySSqaprcP0Jl2MumjMD4tN9XOHhGQKeqT7FwchyVm0d7HfB2eIQ9wrgNn+4+b3sJPKDla+0OGONLR29CZNZvu9Ev1iPUkfHYz0CFdP2FDNyMJv6XMln6uOPtpSXyIi/YdRCWWVwIjIdp2oMordGt66EUq1BIfv4gcVuBYfekljs/62llt2m4FXh5Z2LkUt7/4od4RZyWvM6yaYk33iSul0uzGJ7hfTRoHbJbJTMlmjkQTZoCFGdnCxIGpVSHR57hOin82NVw5Uj3Y+T/0QwyYCrH0khaqThUEqnvAhd0zf0HsBwpABVzjK8wWynF7aN11vWzTURr7RzaDSMAhWRvfjlrurRkPcsFpewzg8KvowdrFT5MErj3YVWL2/0TqEKImlB/v+ip35YFk3ZigJtA7UKQajAW+zrEbf0pizEmdyUmZDBlBJ5euDJybM+hk204MSYgA1CTSzVlgWoW+M0UPOJtPDnC1YaHtcUBhEWx/rJeIVq3GfBuwN0xHm1WhcctIv7+WR+Fn3QadvWeCc2EcQOdDzqKI52GI+RyFYQheXTL2ULpRpBdzbAD0JkVueFhCFdWTv7EHIak3WCal+P2DC9ay4TzFlW4=
+  - secure: MteZFKkISMErROvLnjoZipPFBPWoaF0xxncTD76qN1AO2N/oK59O4pxSYN6+yqP8KEp4K1maNOsV2BcE5WGkH5R6jfdezVfvxKbKIoIECWhgK2e0rR4Cp4833cw4F6maSqcLkJL5zDeHyHbofzLLVd/1qugz07vZx2GJGTgt2KJtN+j0zeVp0SC7BQwY8RZZ0BSZB06SjsG05AiBIUfnJqVmGCb1ORZvPD5F6sa0HF/dsuR+m6ITYhQfR6A2gKpW6ZE5YS1wNg/J4gybQcko1jZMaiORdUcKH+0DyedhBh6Ne2spfC5kvIUynEm63u5igRwEXIeLQoicV2C87w2u3EkVP+2WOFQDyyfv8pBPXRhXg3UbtJQEuE6hRDXWyQJ8gBjA349aUQppp/D4garo5B6A7diJiPPr6xNk1g+1CPTFtEfWig+B9xFsNzgyacIchh7YHUB4Rz2FJvJ3zD+ntj7BJzj11Uha3U+l0/nna/R7YqmtmN8Av4/J8CYmDs1Sv8aLJYU/jW8fGaoDR//P5hhy8T9IS3h/FRTeSntFeBkBNjM+hHZ0C6ets3hDduMKYLr9il9MyJz6TdxB/87X0uBbfIdod1lucUFZQs9G71XtiNJKR1JWelWu8vG4oRogXbgj7JlAgJubaGmHoGXJvc7anx13uLs1ta6AbbQYMvA=
 cache:
   - pip
   - directories:
@@ -22,6 +24,7 @@ cache:
 if: branch = master OR tag IS present
 services:
   - mongodb
+  - docker
 before_install:
   - source tests/travis-ci/weaver.env
   - cp -f tests/travis-ci/custom.cfg ./
@@ -34,17 +37,12 @@ install:
 before_script:
   - sleep 5
 script:
-  # run static analysis only once
-  - |
-    if [ "${TRAVIS_PYTHON_VERSION}" -eq "3.7" ]; then
-      make check
-      make coverage
-      make docs
-    fi
+  # run static analysis only once (run ifs separately to identify the failing case)
+  - if [ "${TRAVIS_PYTHON_VERSION}" == "3.7" ]; then make check; fi
+  - if [ "${TRAVIS_PYTHON_VERSION}" == "3.7" ]; then make coverage; fi
+  - if [ "${TRAVIS_PYTHON_VERSION}" == "3.7" ]; then make docs; fi
   # run tests for each python version
   - make test
-after_script:
-  - make stop
 matrix:
   allow_failures:
     - os: osx
@@ -55,13 +53,18 @@ notifications:
 after_success:
   - bash <(curl -s https://codecov.io/bash) || echo "Codecov did not collect coverage reports"
   - source $(HOME)/conda/bin/activate weaver && python-codacy-coverage -r reports/coverage.xml
+  - make stop
   - |
     if [ "$TRAVIS_BRANCH" == "master" ];
     then export TAG_VERSION=latest;
     else export TAG_VERSION=$TRAVIS_TAG;
     fi
   - |
-    if [ -z "${TAG_VERSION}" ] || [ "$TRAVIS_PULL_REQUEST" = "false" ];
-    then echo "Nothing to build for '$TRAVIS_BRANCH' (PR: $TRAVIS_PULL_REQUEST)";
-    else make APP_VERSION=$TAG_VERSION docker-info docker-build docker-push;
+    if [ "${TRAVIS_PYTHON_VERSION}" == "3.7" ]; then
+      if [ -z "${TAG_VERSION}" ] || [ "$TRAVIS_PULL_REQUEST" == "false" ];
+      then echo "Nothing to build for '$TRAVIS_BRANCH' (PR: $TRAVIS_PULL_REQUEST)";
+      else
+        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+        make DOCKER_REPO=pavics/weaver APP_VERSION=$TAG_VERSION docker-info docker-build docker-push
+      fi
     fi
