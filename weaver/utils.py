@@ -2,6 +2,7 @@ import logging
 import os
 import platform
 import re
+import shutil
 import time
 import types
 import warnings
@@ -12,6 +13,7 @@ from inspect import isclass, isfunction
 from typing import TYPE_CHECKING
 
 import pytz
+import requests
 import six
 from celery import Celery
 from lxml import etree
@@ -418,6 +420,28 @@ def make_dirs(path, mode=0o755, exist_ok=True):
         for subdir in mkpath(dir_path):
             if not os.path.isdir(subdir):
                 os.mkdir(subdir, mode)
+
+
+def fetch_file(file_reference, file_outdir):
+    # type: (AnyStr, AnyStr) -> AnyStr
+    """
+    Fetches a file from a local path or remote URL and dumps it's content to the specified output directory.
+
+    :param file_reference: Local filesystem path or remote URL file reference.
+    :param file_outdir: Output directory path of the fetched file.
+    :return: Path of the local copy of the fetched file.
+    """
+    file_path = os.path.join(file_outdir, os.path.basename(file_reference))
+    if file_reference.startswith("file://"):
+        file_reference = file_reference[7:]
+    if os.path.isfile(file_reference):
+        shutil.copyfile(file_reference, file_path)
+    else:
+        with open(file_path, "wb") as file:
+            resp = requests.get(file_reference)
+            resp.raise_for_status()
+            file.write(resp.content)
+    return file_path
 
 
 REGEX_SEARCH_INVALID_CHARACTERS = re.compile(r"[^a-zA-Z0-9_\-]")

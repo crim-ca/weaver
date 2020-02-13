@@ -1,7 +1,7 @@
 import json
 import os
+import tempfile
 import unittest
-from tempfile import NamedTemporaryFile
 from time import sleep
 
 import mock
@@ -74,11 +74,11 @@ class BuiltinAppTest(unittest.TestCase):
         assert resp.json["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF
 
     def test_jsonarray2netcdf_execute(self):
-        dirname = "/tmp"
+        dirname = tempfile.gettempdir()
         nc_data = "Hello NetCDF!"
         with contextlib.ExitStack() as stack_files:
-            tmp_ncdf = stack_files.enter_context(NamedTemporaryFile(dir=dirname, mode="w", suffix=".nc"))
-            tmp_json = stack_files.enter_context(NamedTemporaryFile(dir=dirname, mode="w", suffix=".json"))
+            tmp_ncdf = stack_files.enter_context(tempfile.NamedTemporaryFile(dir=dirname, mode="w", suffix=".nc"))
+            tmp_json = stack_files.enter_context(tempfile.NamedTemporaryFile(dir=dirname, mode="w", suffix=".json"))
             tmp_ncdf.write(nc_data)
             tmp_ncdf.seek(0)
             tmp_json.write(json.dumps(["file://{}".format(os.path.join(dirname, tmp_ncdf.name))]))
