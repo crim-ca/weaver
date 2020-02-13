@@ -19,6 +19,7 @@ Fixes:
 - Fix `readthedocs <https://img.shields.io/readthedocs/pavics-weaver>`_ documentation generation.
 - Fix ``.travis`` docker image build condition.
 - Fix ``geopython/OWSLib>=0.19.1`` requirement for Python 3.8 support (#62).
+- Fix job update filling due to status location incorrectly resolved according to configured PyWPS output path.
 
 1.0.0 (2020-01-28)
 ==================
