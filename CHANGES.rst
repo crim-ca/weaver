@@ -8,8 +8,9 @@ Changes:
 -------------
 
 - Simplify docker image generation and make base/manager/worker variants all available under the same docker
-  repo `docker-registry.crim.ca/ogc/weaver <docker-registry.crim.ca/ogc/weaver>`_  with different tags.
+  repo `docker-registry.crim.ca/ogc/weaver <docker-registry.crim.ca/ogc/weaver>`_  with different tags (#5).
 - Add *planned future support* of ``Accept-Language`` header for `WPS-1/2` (``geopython/OWSLib 0.20.0``) (#74).
+- Improved job logs update with message and progress to allow better tracking of internal operations and/or problems.
 
 Fixes:
 -------------

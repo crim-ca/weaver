@@ -87,6 +87,7 @@ from weaver.wps import get_wps_output_dir
 from weaver.wps_restapi.swagger_definitions import process_uri
 
 if TYPE_CHECKING:
+    from weaver.datatype import Job             # noqa: F401
     from weaver.status import AnyStatusType     # noqa: F401
     from weaver.typedefs import (               # noqa: F401
         ToolPathObjectType, CWLFactoryCallable, CWL, AnyKey, AnyValue as AnyValueType, JSON, XML, Number
@@ -95,7 +96,7 @@ if TYPE_CHECKING:
     from cwltool.process import Process as ProcessCWL                                   # noqa: F401
     from pywps.app import WPSRequest                                                    # noqa: F401
     from pywps.response.execute import ExecuteResponse                                  # noqa: F401
-    from owslib.wps import Input, Output                                                # noqa: F401
+    from owslib.wps import Input, Output, WPSExecution                                  # noqa: F401
 
     # typing shortcuts
     # pylint: disable=C0103,invalid-name
@@ -191,19 +192,20 @@ def get_status_location_log_path(status_location, out_dir=None):
 
 
 def retrieve_package_job_log(execution, job):
+    # type: (WPSExecution, Job) -> None
+    """
+    Obtains the underlying WPS execution log from the status file to add them after existing job log entries.
+    """
     try:
         # weaver package log every status update into this file (we no longer rely on the http monitoring)
         out_dir = get_wps_output_dir(get_settings(app))
         # if the process is a weaver package this status xml should be available in the process output dir
         log_path = get_status_location_log_path(execution.statusLocation, out_dir=out_dir)
         with open(log_path, "r") as log_file:
-            # Keep the first log entry which is the real start time and replace the following ones with the file content
-            job.logs = job.logs[:1]
             for line in log_file:
-                job.logs.append(line.rstrip("\n"))
-        os.remove(log_path)
+                job.save_log(message=line.rstrip("\n"))
     except (KeyError, IOError):
-        pass
+        LOGGER.warning("Failed retrieving package log for %s", job)
 
 
 def get_process_location(process_id_or_url, data_source=None):
@@ -1709,6 +1711,7 @@ class WpsPackage(Process):
 
     def log_message(self, status, message, progress=None, level=logging.INFO):
         # type: (AnyStatusType, AnyStr, Optional[Number], int) -> None
+        progress = progress if progress is not None else self.percent
         message = get_job_log_msg(status=map_status(status), message=message, progress=progress)
         self.logger.log(level, message, exc_info=level > logging.INFO)
 

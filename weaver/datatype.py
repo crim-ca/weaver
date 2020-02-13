@@ -173,8 +173,30 @@ class Job(Base):
             msg = self.status_message
         return get_job_log_msg(duration=self.duration_str, progress=self.progress, status=self.status, message=msg)
 
-    def save_log(self, errors=None, logger=None, message=None):
-        # type: (Optional[Union[AnyStr, List[WPSException]]], Optional[Logger], Optional[AnyStr]) -> None
+    def save_log(self,
+                 errors=None,       # type: Optional[Union[AnyStr, List[WPSException]]]
+                 logger=None,       # type: Optional[Logger]
+                 message=None,      # type: Optional[AnyStr]
+                 level=INFO,        # type: int
+                 ):                 # type: (...) -> None
+        """
+        Logs the specified error and/or message, and adds the log entry to the complete job log.
+
+        For each new log entry, additional :class:`Job` properties are added according to :meth:`Job._get_log_msg`
+        and the format defined by :func:`get_job_log_msg`.
+
+        :param errors:
+            An error message or a list of WPS exceptions from which to log and save generated message stack.
+        :param logger:
+            An additional :class:`Logger` for which to propagate logged messages on top saving them to the job.
+        :param message:
+            Explicit string to be logged, otherwise use the current :py:attr:`Job.status_message` is used.
+        :param level:
+            Logging level to apply to the logged ``message``. This parameter is ignored if ``errors`` are logged.
+
+        .. note::
+            The job object is updated with the log but still requires to be pushed to database to actually persist it.
+        """
         if isinstance(errors, six.string_types):
             log_msg = [(ERROR, self._get_log_msg(message))]
             self.exceptions.append(errors)
@@ -187,16 +209,16 @@ class Job(Base):
                 "Text": error.text
             } for error in errors])
         else:
-            log_msg = [(INFO, self._get_log_msg(message))]
-        for level, msg in log_msg:
+            log_msg = [(level, self._get_log_msg(message))]
+        for lvl, msg in log_msg:
             fmt_msg = get_log_fmt() % dict(asctime=now().strftime(get_log_date_fmt()),
-                                           levelname=getLevelName(level),
+                                           levelname=getLevelName(lvl),
                                            name=fully_qualified_name(self),
                                            message=msg)
             if len(self.logs) == 0 or self.logs[-1] != fmt_msg:
                 self.logs.append(fmt_msg)
                 if logger:
-                    logger.log(level, msg)
+                    logger.log(lvl, msg)
 
     @property
     def id(self):
@@ -438,13 +460,13 @@ class Job(Base):
     exceptions = property(_get_exceptions, _set_exceptions)
 
     def _get_logs(self):
-        # type: () -> List[Optional[Dict[AnyStr, AnyStr]]]
+        # type: () -> List[Dict[AnyStr, AnyStr]]
         if self.get("logs") is None:
             self["logs"] = list()
         return self["logs"]
 
     def _set_logs(self, logs):
-        # type: (List[Optional[Dict[AnyStr, AnyStr]]]) -> None
+        # type: (List[Dict[AnyStr, AnyStr]]) -> None
         if not isinstance(logs, list):
             raise TypeError("Type 'list' is required for '{}.logs'".format(type(self)))
         self["logs"] = logs

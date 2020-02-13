@@ -1,4 +1,5 @@
 import logging
+import os
 from time import sleep
 from typing import TYPE_CHECKING
 
@@ -46,7 +47,7 @@ from weaver.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_STARTED, STATUS
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import get_any_id, get_any_value, get_cookie_headers, get_settings, raise_on_xml_exception, wait_secs
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
-from weaver.wps import load_pywps_cfg
+from weaver.wps import get_wps_output_dir, load_pywps_cfg
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.jobs import check_status
 from weaver.wps_restapi.jobs.notify import encrypt_email, notify_job_complete
@@ -59,27 +60,45 @@ if TYPE_CHECKING:
 
 LOGGER = logging.getLogger(__name__)
 
+# job process execution progress
+JOB_PROGRESS_SETUP = 1
+JOB_PROGRESS_DESCRIBE = 2
+JOB_PROGRESS_GET_INPUTS = 4
+JOB_PROGRESS_GET_OUTPUTS = 6
+JOB_PROGRESS_EXECUTE_REQUEST = 8
+JOB_PROGRESS_EXECUTE_STATUS_LOCATION = 10
+JOB_PROGRESS_EXECUTE_MONITOR_START = 20
+JOB_PROGRESS_EXECUTE_MONITOR_LOOP = 30
+JOB_PROGRESS_EXECUTE_MONITOR_ERROR = 80
+JOB_PROGRESS_EXECUTE_MONITOR_END = 90
+JOB_PROGRESS_NOTIFY = 95
+JOB_PROGRESS_DONE = 100
+
 
 @app.task(bind=True)
 def execute_process(self, job_id, url, headers=None, notification_email=None):
+    LOGGER.debug("Job execute process called.")
     settings = get_settings(app)
     task_logger = get_task_logger(__name__)
     load_pywps_cfg(settings)
     ssl_verify = asbool(settings.get("weaver.ssl_verify", True))
+    wps_out_dir = get_wps_output_dir(settings)
 
     task_logger.debug("Job task setup.")
     store = get_db(app).get_store(StoreJobs)
     job = store.fetch_by_id(job_id)
     job.task_id = self.request.id
+    job.progress = JOB_PROGRESS_SETUP
+    job.save_log(logger=task_logger, message="Job task setup completed.")
     job = store.update_job(job)
 
     try:
         try:
-            LOGGER.debug("Execute process WPS request for [%s]", job.process)
+            job.progress = JOB_PROGRESS_DESCRIBE
+            job.save_log(logger=task_logger, message="Execute WPS request for process [{!s}]".format(job.process))
             wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), verify=ssl_verify)
             set_wps_language(wps, job.accept_language)
-            # noinspection PyProtectedMember
-            raise_on_xml_exception(wps._capabilities)
+            raise_on_xml_exception(wps._capabilities)   # noqa
         except Exception as ex:
             raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
         try:
@@ -88,6 +107,8 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
             raise OWSNoApplicableCode("Failed to retrieve WPS process description. Error: [{}].".format(str(ex)))
 
         # prepare inputs
+        job.progress = JOB_PROGRESS_GET_INPUTS
+        job.save_log(logger=task_logger, message="Fetching job input definitions.")
         complex_inputs = []
         for process_input in process.dataInputs:
             if WPS_COMPLEX_DATA in process_input.dataType:
@@ -114,19 +135,39 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
             wps_inputs = []
 
         # prepare outputs
+        job.progress = JOB_PROGRESS_GET_OUTPUTS
+        job.save_log(logger=task_logger, message="Fetching job output definitions.")
         outputs = [(o.identifier, o.dataType == WPS_COMPLEX_DATA) for o in process.processOutputs]
 
         mode = EXECUTE_MODE_ASYNC if job.execute_async else EXECUTE_MODE_SYNC
+        job.progress = JOB_PROGRESS_EXECUTE_REQUEST
+        job.save_log(logger=task_logger, message="Starting job process execution")
         execution = wps.execute(job.process, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
         if not execution.process and execution.errors:
             raise execution.errors[0]
 
+        # adjust status location
+        wps_status_path = execution.statusLocation
+        job.progress = JOB_PROGRESS_EXECUTE_STATUS_LOCATION
+        job.save_log(logger=task_logger, message="Verifying job status location.")
+        if not execution.statusLocation.startswith("http") and not os.path.isfile(execution.statusLocation):
+            wps_status_path = "file://{}".format(os.path.join(wps_out_dir, execution.statusLocation))
+            if os.path.isfile(wps_status_path):
+                execution.statusLocation = wps_status_path
+                job.save_log(logger=task_logger, level=logging.INFO,
+                             message="WPS status location has been corrected using internal server location.")
+            else:
+                job.save_log(logger=task_logger, level=logging.WARNING,
+                             message="WPS status location could not be found")
+        LOGGER.debug("WPS status location that will be queried: [%s]", wps_status_path)
+
         job.status = map_status(STATUS_STARTED)
         job.status_message = execution.statusMessage or "{} initiation done.".format(str(job))
-        job.status_location = execution.statusLocation
+        job.status_location = wps_status_path
         job.request = execution.request
         job.response = etree.tostring(execution.response)
-        job.save_log(logger=task_logger)
+        job.progress = JOB_PROGRESS_EXECUTE_MONITOR_START
+        job.save_log(logger=task_logger, message="Starting monitoring of job execution.")
         job = store.update_job(job)
 
         max_retries = 5
@@ -136,27 +177,33 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
             if num_retries >= max_retries:
                 raise Exception("Could not read status document after {} retries. Giving up.".format(max_retries))
             try:
-                execution = check_status(url=execution.statusLocation, verify=ssl_verify,
-                                         sleep_secs=wait_secs(run_step))
-
+                # NOTE:
+                #   Don't actually log anything here until process is completed (success or fail) so that underlying
+                #   WPS execution logs can be inserted within the current job log and appear continuously.
+                #   Only update internal job fields in case they get referenced elsewhere.
+                job.progress = JOB_PROGRESS_EXECUTE_MONITOR_LOOP
+                execution = check_status(url=wps_status_path, verify=ssl_verify, sleep_secs=wait_secs(run_step))
+                job_msg = (execution.statusMessage or "").strip()
                 job.response = etree.tostring(execution.response)
                 job.status = map_status(execution.getStatus())
-                job.status_message = execution.statusMessage
-                job.progress = execution.percentCompleted
-                job.save_log(logger=task_logger)
+                job.status_message = "Job execution monitoring (progress: {}%, status: {})."\
+                                     .format(execution.percentCompleted, job_msg or "n/a")
+                # job.save_log(logger=task_logger)
+                # job = store.update_job(job)
 
                 if execution.isComplete():
                     job.mark_finished()
+                    job.progress = JOB_PROGRESS_EXECUTE_MONITOR_END
+                    msg_progress = " (status: {})".format(job_msg) if job_msg else ""
                     if execution.isSucceded():
-                        job.progress = 100
                         job.status = map_status(STATUS_SUCCEEDED)
-                        job.status_message = execution.statusMessage or "Job succeeded."
+                        job.status_message = "Job succeeded{}.".format(msg_progress)
                         wps_package.retrieve_package_job_log(execution, job)
                         job.save_log(logger=task_logger)
                         job.results = [jsonify_output(output, process) for output in execution.processOutputs]
                     else:
                         task_logger.debug("Job failed.")
-                        job.status_message = execution.statusMessage or "Job failed."
+                        job.status_message = "Job failed{}.".format(msg_progress)
                         wps_package.retrieve_package_job_log(execution, job)
                         job.save_log(errors=execution.errors, logger=task_logger)
 
@@ -178,25 +225,30 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
         LOGGER.exception("Failed running [%s]", job)
         job.status = map_status(STATUS_FAILED)
         job.status_message = "Failed to run {!s}.".format(job)
+        job.progress = JOB_PROGRESS_EXECUTE_MONITOR_ERROR
         exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
         errors = "{0}: {1!s}".format(exception_class, exc)
         job.save_log(errors=errors, logger=task_logger)
     finally:
+        job.progress = JOB_PROGRESS_EXECUTE_MONITOR_END
         job.status_message = "Job {}.".format(job.status)
         job.save_log(logger=task_logger)
 
         # Send email if requested
         if notification_email is not None:
+            job.progress = JOB_PROGRESS_NOTIFY
             try:
                 notify_job_complete(job, notification_email, settings)
-                message = "Email sent successfully."
+                message = "Notification email sent successfully."
                 job.save_log(logger=task_logger, message=message)
             except Exception as exc:
                 exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
                 exception = "{0}: {1!s}".format(exception_class, exc)
-                message = "Couldn't send email ({})".format(exception)
+                message = "Couldn't send notification email ({})".format(exception)
                 job.save_log(errors=message, logger=task_logger, message=message)
 
+        job.progress = JOB_PROGRESS_DONE
+        job.save_log(logger=task_logger, message="Job task complete.")
         job = store.update_job(job)
 
     return job.status
