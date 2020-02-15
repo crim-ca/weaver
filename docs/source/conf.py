@@ -325,6 +325,7 @@ linkcheck_ignore = [
     "https://mouflon.dkrz.de/",
     "https://esgf-data.dkrz.de/",
     "https://indico.egi.eu/",
+    "https://docker-registry.crim.ca.*",
 ]
 linkcheck_timeout = 15
 
@@ -336,3 +337,4 @@ rst_epilog = """
 .. _Weaver: https://github.com/crim-ca/weaver
 .. _PyWPS: http://pywps.org/
 """
+

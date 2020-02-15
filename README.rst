@@ -97,11 +97,15 @@ For more details, see `Configuration`_ and `Documentation`_ sections.
 Links
 ----------------
 
-Docker image `repository <https://docker-registry.crim.ca/repositories/3463>`_.
+Docker image repositories: 
+
+- CRIM registry: `ogc/weaver <https://docker-registry.crim.ca/repositories/3463>`_
+- OGC processes: `ogc-public <https://docker-registry.crim.ca/namespaces/39>`_
+- DockerHub: `pavics/weaver <https://hub.docker.com/r/pavics/weaver>`_
 
 ::
 
-    $ docker pull docker-registry.crim.ca/ogc/weaver:1.0.0
+    $ docker pull pavics/weaver:1.0.0
 
 For convenience, following tags are also available:
 
@@ -110,8 +114,9 @@ For convenience, following tags are also available:
 
 Following links correspond to existing servers with `Weaver` configured as *EMS*/*ADES* instances respectively.
 
-- EMS Test server: https://ogc-ems.crim.ca/weaver/
 - ADES Test server: https://ogc-ades.crim.ca/weaver/
+- EMS Test server: https://ogc-ems.crim.ca/weaver/
+- EMS Extra server: https://ogc.crim.ca/ems/
 
 .. note::
     The test servers will **not** necessarily be up-to-date with the *latest* version.
