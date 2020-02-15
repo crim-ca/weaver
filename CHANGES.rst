@@ -12,6 +12,9 @@ Changes:
 - Add *planned future support* of ``Accept-Language`` header for `WPS-1/2` (``geopython/OWSLib 0.20.0``) (#74).
 - Improved job logs update with message and progress to allow better tracking of internal operations and/or problems.
 - Allow WPS builtin process ``jsonarray2netcdf`` to fetch a remote file.
+- Change doc to point to DockerHub `pavics/weaver <https://hub.docker.com/r/pavics/weaver>`_ images.
+- Adjust CI rule long-lasting failures until it gets patched by original reference 
+  (`gitleaks-actions#3 <https://github.com/eshork/gitleaks-action/issues/3>`_).
 
 Fixes:
 -------------
