@@ -11,6 +11,11 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
+# note:
+#   ignore invalid-name convention flagged by codacy/pylint
+#   as they refer to valid setting names defined by sphinx
+# pylint: disable=C0103
+
 import os
 import sys
 
@@ -337,4 +342,3 @@ rst_epilog = """
 .. _Weaver: https://github.com/crim-ca/weaver
 .. _PyWPS: http://pywps.org/
 """
-

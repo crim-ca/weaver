@@ -87,6 +87,7 @@ from weaver.wps import get_wps_output_dir
 from weaver.wps_restapi.swagger_definitions import process_uri
 
 if TYPE_CHECKING:
+    # pylint: disable=W0611,unused-import
     from weaver.datatype import Job             # noqa: F401
     from weaver.status import AnyStatusType     # noqa: F401
     from weaver.typedefs import (               # noqa: F401
