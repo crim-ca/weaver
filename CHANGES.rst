@@ -8,8 +8,13 @@ Changes:
 -------------
 
 - Simplify docker image generation and make base/manager/worker variants all available under the same docker
-  repo `docker-registry.crim.ca/ogc/weaver <docker-registry.crim.ca/ogc/weaver>`_  with different tags.
+  repo `docker-registry.crim.ca/ogc/weaver <docker-registry.crim.ca/ogc/weaver>`_  with different tags (#5).
 - Add *planned future support* of ``Accept-Language`` header for `WPS-1/2` (``geopython/OWSLib 0.20.0``) (#74).
+- Improved job logs update with message and progress to allow better tracking of internal operations and/or problems.
+- Allow WPS builtin process ``jsonarray2netcdf`` to fetch a remote file.
+- Change doc to point to DockerHub `pavics/weaver <https://hub.docker.com/r/pavics/weaver>`_ images.
+- Adjust CI rule long-lasting failures until it gets patched by original reference 
+  (`gitleaks-actions#3 <https://github.com/eshork/gitleaks-action/issues/3>`_).
 
 Fixes:
 -------------
@@ -17,6 +22,7 @@ Fixes:
 - Fix `readthedocs <https://img.shields.io/readthedocs/pavics-weaver>`_ documentation generation.
 - Fix ``.travis`` docker image build condition.
 - Fix ``geopython/OWSLib>=0.19.1`` requirement for Python 3.8 support (#62).
+- Fix job update filling due to status location incorrectly resolved according to configured PyWPS output path.
 
 1.0.0 (2020-01-28)
 ==================

@@ -223,7 +223,7 @@ clean-cache:	## remove caches such as DOWNLOAD_CACHE
 .PHONY: clean-docs
 clean-docs:	install-dev clean-docs-dirs		## remove documentation artefacts
 	@echo "Removing documenation build files..."
-	@$(MAKE) -C "$(APP_ROOT)/docs" clean
+	@$(MAKE) -C "$(APP_ROOT)/docs" clean || true
 
 # extensive cleanup is possible only using sphinx-build
 # allow minimal cleanup when it could not *yet* be installed (dev)

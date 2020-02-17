@@ -11,6 +11,11 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
+# note:
+#   ignore invalid-name convention flagged by codacy/pylint
+#   as they refer to valid setting names defined by sphinx
+# pylint: disable=C0103
+
 import os
 import sys
 
@@ -325,6 +330,7 @@ linkcheck_ignore = [
     "https://mouflon.dkrz.de/",
     "https://esgf-data.dkrz.de/",
     "https://indico.egi.eu/",
+    "https://docker-registry.crim.ca.*",
 ]
 linkcheck_timeout = 15
 

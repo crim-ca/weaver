@@ -431,7 +431,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         """
         try:
             result = self.collection.update_one({"id": job.id}, {"$set": job.params()})
-            if result.acknowledged and result.modified_count == 1:
+            if result.acknowledged and result.matched_count == 1:
                 return self.fetch_by_id(job.id)
         except Exception as ex:
             raise JobUpdateError("Error occurred during job update: [{}]".format(repr(ex)))

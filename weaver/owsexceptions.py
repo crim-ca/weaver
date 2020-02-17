@@ -69,6 +69,7 @@ class OWSException(Response, Exception):
         Response.__init__(self, status=status, **kw)
         Exception.__init__(self, detail)
         self.message = detail or self.explanation
+        self.content_type = CONTENT_TYPE_TEXT_XML
         if value:
             self.locator = value
 
@@ -80,9 +81,8 @@ class OWSException(Response, Exception):
             return "{}{}".format(type(self), self.message)
         return str(type(self))
 
-    # noinspection PyUnusedLocal
     @staticmethod
-    def json_formatter(status, body, title, environ):
+    def json_formatter(status, body, title, environ):  # noqa: F811
         # type: (AnyStr, AnyStr, AnyStr, SettingsType) -> JSON
         body = clean_json_text_body(body)
         return {"description": body, "code": int(status.split()[0]), "status": status, "title": title}
