@@ -438,9 +438,10 @@ def fetch_file(file_reference, file_outdir):
         shutil.copyfile(file_reference, file_path)
     else:
         with open(file_path, "wb") as file:
-            resp = requests.get(file_reference)
+            resp = requests.get(file_reference, stream=True)
             resp.raise_for_status()
-            file.write(resp.content)
+            for chunk in resp.iter_content():
+                file.write(chunk)
     return file_path
 
 
