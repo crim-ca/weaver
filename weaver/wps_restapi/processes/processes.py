@@ -315,7 +315,7 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
     except Exception as ex:
         raise HTTPBadRequest("Invalid JSON body cannot be decoded for job submission. [{}]".format(ex))
     try:
-        sd.Execute().deserialize(json_body)
+        json_body = sd.Execute().deserialize(json_body)
     except colander.Invalid as ex:
         raise HTTPBadRequest("Invalid schema: [{}]".format(str(ex)))
 

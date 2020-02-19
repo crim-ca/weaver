@@ -127,14 +127,25 @@ class OneOfMappingSchema(colander.MappingSchema):
         # test each possible case, return all corresponding errors if
         # none of the '_one_of' possibilities is valid including all sub-dependencies
         invalid_one_of = dict()
+        valid_one_of = []
         for schema_class in self._one_of:  # noqa
             try:
                 # instantiate the class if specified with simple reference, other use pre-instantiated schema object
                 if isinstance(schema_class, colander._SchemaMeta):  # noqa:W0212
                     schema_class = schema_class()
-                return schema_class.deserialize(cstruct)
+                valid_one_of.append(schema_class.deserialize(cstruct))
             except colander.Invalid as invalid:
                 invalid_one_of.update({type(invalid.node).__name__: str(invalid)})
+
+        if valid_one_of:
+            # Try to return the format which didn't change the input data
+            for valid in valid_one_of:
+                if isinstance(valid, dict) and all(cstruct[k] == v for k, v in valid.items()):
+                    return valid
+            else:
+                # If that fails, return the first valid deserialization
+                return valid_one_of[0]
+
         message = "Incorrect type, must be one of: {}. Errors for each case: {}" \
                   .format(list(invalid_one_of), invalid_one_of)
         raise colander.Invalid(node=self, msg=message)
