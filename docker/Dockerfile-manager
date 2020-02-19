@@ -1,0 +1,6 @@
+FROM weaver:base
+LABEL description.short="Weaver Manager"
+
+# must enforce --bind to work accros versions (gunicorn>=20 drops --preload support)
+# must bind to 0.0.0.0 inside docker otherwise localhost causes reset connection
+CMD gunicorn --bind 0.0.0.0:4001 --paste "${APP_CONFIG_DIR}/weaver.ini" --preload

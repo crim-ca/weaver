@@ -11,14 +11,22 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys
+# note:
+#   ignore invalid-name convention flagged by codacy/pylint
+#   as they refer to valid setting names defined by sphinx
+# pylint: disable=C0103
+
 import os
-import shlex
+import sys
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-# sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath(".."))
+sys.path.insert(0, os.path.abspath("../.."))
+sys.path.insert(0, os.path.abspath("../../.."))
+
+from weaver import __meta__  # isort:skip # noqa: E402 # pylint: disable=C0413
 
 # -- General configuration ------------------------------------------------
 
@@ -29,19 +37,26 @@ needs_sphinx = "1.6"
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    "autoapi.extension",
+    "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
     "sphinx.ext.napoleon",
-    # TODO: enable pywps extension
-    # 'sphinx_autodoc_pywps',
+    "sphinx_autodoc_typehints",
+    "pywps.ext_autodoc",
+    "autoapi.extension",
 ]
 
 autoapi_type = "python"
 autoapi_dirs = ["../../weaver"]
 autoapi_file_pattern = "*.py"
 autoapi_options = ["members", "undoc-members", "private-members"]
+autoapi_python_class_content = "both"   # class|both|init
+
+# sphinx_autodoc_typehints
+set_type_checking_flag = True
+typehints_fully_qualified = True
+always_document_param_types = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
@@ -56,11 +71,12 @@ source_suffix = ".rst"
 
 # The master toctree document.
 master_doc = "index"
+master_title = "{} Documentation".format(__meta__.__title__)
 
 # General information about the project.
-project = u"weaver"
-copyright = u"2018, Birdhouse"
-author = u"Birdhouse"
+project = __meta__.__title__
+copyright = __meta__.__license_short__
+author = __meta__.__author__
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -151,7 +167,9 @@ html_theme = "alabaster"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ["_static"]
+html_static_path = [
+    # "_static"
+]
 
 # Add any extra paths that contain custom files (such as robots.txt or
 # .htaccess) here, relative to this directory. These files are copied
@@ -232,8 +250,9 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
+latex_file = "{}.tex".format(__meta__.__name__)
 latex_documents = [
-    (master_doc, "project.tex", u"weaver Documentation", u"Birdhouse", "manual")
+    (master_doc, latex_file, master_title, __meta__.__author__, "manual"),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -261,7 +280,7 @@ latex_documents = [
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [(master_doc, "project", u"weaver Documentation", [author], 1)]
+man_pages = [(master_doc, "project", master_title, [author], 1)]
 
 # If true, show URL addresses after external links.
 # man_show_urls = False
@@ -276,7 +295,7 @@ texinfo_documents = [
     (
         master_doc,
         "project",
-        u"weaver Documentation",
+        master_title,
         author,
         "project",
         "One line description of project.",
@@ -301,15 +320,7 @@ texinfo_documents = [
 # intersphinx_mapping = {'https://docs.python.org/': None}
 intersphinx_mapping = {
     "python": ("http://docs.python.org/", None),
-    "birdhouse": ("http://birdhouse.readthedocs.io/en/latest/", None),
-    "phoenix": ("http://pyramid-phoenix.readthedocs.io/en/latest/", None),
-    "malleefowl": ("http://malleefowl.readthedocs.io/en/latest/", None),
-    "weaver": ("http://weaver.readthedocs.io/en/latest/", None),
-    "flyingpigeon": ("http://flyingpigeon.readthedocs.io/en/latest/", None),
-    "hummingbird": ("http://birdhouse-hummingbird.readthedocs.io/en/latest/", None),
-    "emu": ("http://emu.readthedocs.io/en/latest/", None),
-    "birdy": ("http://birdy.readthedocs.io/en/latest/", None),
-    "bootstrap": ("http://birdhousebuilderbootstrap.readthedocs.io/en/latest/", None),
+    "weaver": ("http://pavics-weaver.readthedocs.io/en/latest/", None),
 }
 
 # linkcheck options
@@ -319,6 +330,7 @@ linkcheck_ignore = [
     "https://mouflon.dkrz.de/",
     "https://esgf-data.dkrz.de/",
     "https://indico.egi.eu/",
+    "https://docker-registry.crim.ca.*",
 ]
 linkcheck_timeout = 15
 
@@ -327,17 +339,6 @@ rst_epilog = """
 .. _Sphinx: http://sphinx-doc.org/
 .. _reStructuredText: http://sphinx-doc.org/rest.html
 .. _Read the Docs: https://readthedocs.org
-.. _Anaconda: https://www.continuum.io/
-.. _Buildout: http://www.buildout.org/en/latest/
-.. _Phoenix: http://pyramid-phoenix.readthedocs.io/en/latest/
-.. _Malleefowl: http://malleefowl.readthedocs.io/en/latest/
-.. _weaver: http://weaver.readthedocs.io/en/latest/
-.. _Flyingpigeon: http://flyingpigeon.readthedocs.io/en/latest/
-.. _Hummingbird: http://birdhouse-hummingbird.readthedocs.io/en/latest/
-.. _Emu: http://emu.readthedocs.io/en/latest/
-.. _Birdy: http://birdy.readthedocs.io/en/latest/
-.. _Bootstrap: http://birdhousebuilderbootstrap.readthedocs.io/en/latest/
-.. _icclim: http://icclim.readthedocs.io/en/latest/
+.. _Weaver: https://github.com/crim-ca/weaver
 .. _PyWPS: http://pywps.org/
-.. _dispel4py: https://github.com/dispel4py/dispel4py
 """

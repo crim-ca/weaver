@@ -1,0 +1,14 @@
+# configuration to setup readthedocs
+version: 2
+sphinx:
+  configuration: docs/source/conf.py
+formats: all
+python:
+  version: 3.7
+  install:
+    - requirements: requirements-docs.txt
+#    - method: pip
+#      path: .
+#      extra_requirements:
+#        - docs
+  system_packages: true

@@ -1,20 +1,29 @@
+import logging
+from time import sleep
+from typing import TYPE_CHECKING, AnyStr
+
+import requests
+from owslib.wps import ComplexDataInput, WebProcessingService
+
 from weaver import status
 from weaver.execute import EXECUTE_MODE_ASYNC
 from weaver.owsexceptions import OWSNoApplicableCode
-from weaver.processes.utils import jsonify_output
+from weaver.processes.constants import WPS_COMPLEX_DATA
+from weaver.processes.utils import jsonify_output, map_progress
 from weaver.processes.wps_process_base import WpsProcessInterface
 from weaver.utils import (
-    get_any_id, get_any_value, get_job_log_msg, get_log_monitor_msg, raise_on_xml_exception, wait_secs,
+    get_any_id,
+    get_any_value,
+    get_job_log_msg,
+    get_log_monitor_msg,
+    raise_on_xml_exception,
+    wait_secs
 )
 from weaver.wps_restapi.jobs.jobs import check_status
-from owslib.wps import WebProcessingService, ComplexDataInput, WPSException
-from typing import AnyStr, TYPE_CHECKING
-from time import sleep
-import logging
-import requests
+
 if TYPE_CHECKING:
-    from weaver.typedefs import UpdateStatusPartialFunction
-    from pywps.app import WPSRequest
+    from weaver.typedefs import UpdateStatusPartialFunction     # noqa: F401
+    from pywps.app import WPSRequest                            # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 
@@ -41,11 +50,10 @@ class Wps1Process(WpsProcessInterface):
     def execute(self, workflow_inputs, out_dir, expected_outputs):
         self.update_status("Preparing execute request for remote WPS1 provider.",
                            REMOTE_JOB_PROGRESS_REQ_PREP, status.STATUS_RUNNING)
-        LOGGER.debug("Execute process WPS request for {0}".format(self.process))
+        LOGGER.debug("Execute process WPS request for %s", self.process)
         try:
             try:
                 wps = WebProcessingService(url=self.provider, headers=self.cookies, verify=self.verify)
-                # noinspection PyProtectedMember
                 raise_on_xml_exception(wps._capabilities)
             except Exception as ex:
                 raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
@@ -57,7 +65,7 @@ class Wps1Process(WpsProcessInterface):
             # prepare inputs
             complex_inputs = []
             for process_input in process.dataInputs:
-                if "ComplexData" in process_input.dataType:
+                if WPS_COMPLEX_DATA in process_input.dataType:
                     complex_inputs.append(process_input.identifier)
 
             # remove any 'null' input, should employ the 'default' of the remote WPS process
@@ -89,7 +97,7 @@ class Wps1Process(WpsProcessInterface):
                 wps_inputs = []
 
             # prepare outputs
-            outputs = [(o.identifier, o.dataType == "ComplexData") for o in process.processOutputs
+            outputs = [(o.identifier, o.dataType == WPS_COMPLEX_DATA) for o in process.processOutputs
                        if o.identifier in expected_outputs]
 
             self.update_status("Executing job on remote WPS1 provider.",
@@ -113,7 +121,7 @@ class Wps1Process(WpsProcessInterface):
                 try:
                     execution = check_status(url=execution.statusLocation, verify=self.verify,
                                              sleep_secs=wait_secs(run_step))
-                    job_id = execution.statusLocation.replace(".xml", "").split('/')[-1]
+                    job_id = execution.statusLocation.replace(".xml", "").split("/")[-1]
                     LOGGER.debug(get_log_monitor_msg(job_id, status.map_status(execution.getStatus()),
                                                      execution.percentCompleted, execution.statusMessage,
                                                      execution.statusLocation))
@@ -121,12 +129,12 @@ class Wps1Process(WpsProcessInterface):
                                                        message=execution.statusMessage,
                                                        progress=execution.percentCompleted,
                                                        duration=None),  # get if available
-                                       self.map_progress(execution.percentCompleted,
-                                                         REMOTE_JOB_PROGRESS_MONITORING, REMOTE_JOB_PROGRESS_FETCH_OUT),
+                                       map_progress(execution.percentCompleted,
+                                                    REMOTE_JOB_PROGRESS_MONITORING, REMOTE_JOB_PROGRESS_FETCH_OUT),
                                        status.STATUS_RUNNING)
                 except Exception as exc:
                     num_retries += 1
-                    LOGGER.debug("Exception raised: {}".format(repr(exc)))
+                    LOGGER.debug("Exception raised: %r", exc)
                     sleep(1)
                 else:
                     num_retries = 0
@@ -148,21 +156,18 @@ class Wps1Process(WpsProcessInterface):
                 if result_id in expected_outputs:
                     # This is where cwl expect the output file to be written
                     # TODO We will probably need to handle multiple output value...
-                    dst_fn = '/'.join([out_dir.rstrip('/'), expected_outputs[result_id]])
+                    dst_fn = "/".join([out_dir.rstrip("/"), expected_outputs[result_id]])
 
                     # TODO Should we handle other type than File reference?
-                    r = requests.get(result_val, allow_redirects=True)
-                    LOGGER.debug("Fetching result output from [{0}] to cwl output destination : [{1}]"
-                                 .format(result_val, dst_fn))
-                    with open(dst_fn, mode='wb') as dst_fh:
-                        dst_fh.write(r.content)
 
-        except (WPSException, Exception) as exc:
-            if isinstance(exc, WPSException):
-                errors = "[{0}] {1}".format(exc.locator, exc.text)
-            else:
-                exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
-                errors = "{0}: {1}".format(exception_class, exc.message)
+                    resp = requests.get(result_val, allow_redirects=True)
+                    LOGGER.debug("Fetching result output from [%s] to cwl output destination: [%s]", result_val, dst_fn)
+                    with open(dst_fn, mode="wb") as dst_fh:
+                        dst_fh.write(resp.content)
+
+        except Exception as exc:
+            exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
+            errors = "{0}: {1!s}".format(exception_class, exc)
             raise Exception(errors)
 
         self.update_status("Execution on remote WPS1 provider completed.",

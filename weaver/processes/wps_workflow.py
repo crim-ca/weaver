@@ -1,27 +1,3 @@
-from weaver.processes.builtin import BuiltinProcess
-from weaver.processes.constants import (
-    CWL_REQUIREMENT_APP_BUILTIN, CWL_REQUIREMENT_APP_DOCKER, CWL_REQUIREMENT_APP_WPS1, CWL_REQUIREMENT_APP_ESGF_CWT
-)
-from weaver.utils import now, get_settings
-from weaver.wps import get_wps_output_dir
-from cwltool import command_line_tool
-from cwltool.process import stageFiles
-from cwltool.provenance import CreateProvProfile
-from cwltool.builder import (CONTENT_LIMIT, Builder, substitute)
-from cwltool.errors import WorkflowException
-from cwltool.job import JobBase, relink_initialworkdir
-from cwltool.pathmapper import adjustDirObjs, adjustFileObjs, get_listing, trim_listing, visit_class
-from cwltool.process import (Process as ProcessCWL, compute_checksums, normalizeFilesDirs,
-                             shortname, uniquename, supportedProcessRequirements)
-from cwltool.stdfsaccess import StdFsAccess
-from cwltool.utils import (aslist, json_dumps, onWindows, bytes2str_in_dicts)
-from cwltool.context import (LoadingContext, RuntimeContext, getdefault)
-from cwltool.workflow import Workflow
-from pyramid_celery import celery_app as app
-from functools import cmp_to_key, partial
-from schema_salad import validate
-from schema_salad.sourceline import SourceLine
-from six import string_types
 import hashlib
 import json
 import locale
@@ -29,12 +5,50 @@ import logging
 import os
 import shutil
 import tempfile
-from typing import MutableMapping, Callable, cast, Text, TYPE_CHECKING  # these are actually used in the code
+from functools import cmp_to_key, partial
+from typing import TYPE_CHECKING, Callable, MutableMapping, Text, cast  # these are actually used in the code
+
+from cwltool import command_line_tool
+from cwltool.builder import CONTENT_LIMIT, Builder, substitute
+from cwltool.context import LoadingContext, RuntimeContext, getdefault
+from cwltool.errors import WorkflowException
+from cwltool.job import JobBase, relink_initialworkdir
+from cwltool.pathmapper import adjustDirObjs, adjustFileObjs, get_listing, trim_listing, visit_class
+from cwltool.process import Process as ProcessCWL
+from cwltool.process import (
+    compute_checksums,
+    normalizeFilesDirs,
+    shortname,
+    supportedProcessRequirements,
+    uniquename
+)
+from cwltool.stdfsaccess import StdFsAccess
+from cwltool.utils import aslist, bytes2str_in_dicts, onWindows
+from cwltool.workflow import Workflow
+from pyramid_celery import celery_app as app
+from schema_salad import validate
+from schema_salad.sourceline import SourceLine
+from six import string_types
+
+from weaver.processes.builtin import BuiltinProcess
+from weaver.processes.constants import (
+    CWL_REQUIREMENT_APP_BUILTIN,
+    CWL_REQUIREMENT_APP_DOCKER,
+    CWL_REQUIREMENT_APP_ESGF_CWT,
+    CWL_REQUIREMENT_APP_WPS1
+)
+from weaver.utils import get_settings, now
+from weaver.wps import get_wps_output_dir
+
 if TYPE_CHECKING:
-    from weaver.typedefs import ExpectedOutputType, GetJobProcessDefinitionFunction, ToolPathObjectType, AnyValue
-    from weaver.processes.wps_process_base import WpsProcessInterface
-    from typing import Any, Dict, Generator, List, Optional, Set, Union
-    from cwltool.command_line_tool import OutputPorts
+    from weaver.typedefs import (   # noqa: F401
+        ExpectedOutputType, GetJobProcessDefinitionFunction, ToolPathObjectType, AnyValue
+    )
+    from weaver.processes.wps_process_base import WpsProcessInterface       # noqa: F401
+    from typing import Any, Dict, Generator, List, Optional, Set, Union     # noqa: F401
+    from cwltool.command_line_tool import OutputPorts                       # noqa: F401
+    from cwltool.provenance import ProvenanceProfile
+    import threading    # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_TMP_PREFIX = "tmp"
@@ -80,7 +94,7 @@ class CallbackJob(object):
         self.output_callback = output_callback
         self.cache_builder = cachebuilder
         self.output_dir = jobcache
-        self.prov_obj = None  # type: Optional[CreateProvProfile]
+        self.prov_obj = None  # type: Optional[ProvenanceProfile]
 
     def run(self, loading_context):
         # type: (RuntimeContext) -> None
@@ -91,7 +105,6 @@ class CallbackJob(object):
             getdefault(loading_context.compute_checksum, True)), "success")
 
 
-# noinspection PyPep8Naming
 class WpsWorkflow(ProcessCWL):
     def __init__(self, toolpath_object, loading_context, get_job_process_definition):
         # type: (Dict[Text, Any], LoadingContext, GetJobProcessDefinitionFunction) -> None
@@ -103,31 +116,32 @@ class WpsWorkflow(ProcessCWL):
         self.requirements = list(filter(lambda req: req["class"] != CWL_REQUIREMENT_APP_DOCKER, self.requirements))
         self.hints = list(filter(lambda req: req["class"] != CWL_REQUIREMENT_APP_DOCKER, self.hints))
 
+    # pylint: disable=W0221,arguments-differ    # naming using python like arguments
     def job(self,
             joborder,           # type: Dict[Text, AnyValue]
             output_callbacks,   # type: Callable[[Any, Any], Any]
-            runtimeContext,     # type: RuntimeContext
+            runtime_context,    # type: RuntimeContext
             ):                  # type: (...) -> Generator[Union[JobBase, CallbackJob], None, None]
         """
         Workflow job generator.
 
         :param joborder: inputs of the job submission
         :param output_callbacks: method to fetch step outputs and corresponding step details
-        :param runtimeContext: configs about execution environment
+        :param runtime_context: configs about execution environment
         :return:
         """
         require_prefix = ""
         if self.metadata["cwlVersion"] == "v1.0":
             require_prefix = "http://commonwl.org/cwltool#"
 
-        jobname = uniquename(runtimeContext.name or shortname(self.tool.get("id", "job")))
+        jobname = uniquename(runtime_context.name or shortname(self.tool.get("id", "job")))
 
         # outdir must be served by the EMS because downstream step will need access to upstream steps output
         weaver_out_dir = get_wps_output_dir(get_settings(app))
-        runtimeContext.outdir = tempfile.mkdtemp(
-            prefix=getdefault(runtimeContext.tmp_outdir_prefix, DEFAULT_TMP_PREFIX),
+        runtime_context.outdir = tempfile.mkdtemp(
+            prefix=getdefault(runtime_context.tmp_outdir_prefix, DEFAULT_TMP_PREFIX),
             dir=weaver_out_dir)
-        builder = self._init_job(joborder, runtimeContext)
+        builder = self._init_job(joborder, runtime_context)
 
         # `jobname` is the step name and `joborder` is the actual step inputs
         wps_workflow_job = WpsWorkflowJob(builder, builder.job, self.requirements, self.hints, jobname,
@@ -158,7 +172,7 @@ class WpsWorkflow(ProcessCWL):
 
         wps_workflow_job.collect_outputs = partial(
             self.collect_output_ports, self.tool["outputs"], builder,
-            compute_checksum=getdefault(runtimeContext.compute_checksum, True),
+            compute_checksum=getdefault(runtime_context.compute_checksum, True),
             jobname=jobname,
             readers=readers)
         wps_workflow_job.output_callback = output_callbacks
@@ -179,17 +193,17 @@ class WpsWorkflow(ProcessCWL):
             fs_access = builder.make_fs_access(outdir)
             custom_output = fs_access.join(outdir, "cwl.output.json")
             if fs_access.exists(custom_output):
-                with fs_access.open(custom_output, 'r') as f:
+                with fs_access.open(custom_output, "r") as f:
                     ret = json.load(f)
                 if debug:
-                    LOGGER.debug(u"Raw output from %s: %s", custom_output, json_dumps(ret, indent=4))
+                    LOGGER.debug(u"Raw output from %s: %s", custom_output, json.dumps(ret, indent=4))
             else:
                 for i, port in enumerate(ports):
-                    def makeWorkflowException(msg):
+                    def make_workflow_exception(msg):
                         return WorkflowException(
                             u"Error collecting output for parameter '%s':\n%s"
                             % (shortname(port["id"]), msg))
-                    with SourceLine(ports, i, makeWorkflowException, debug):
+                    with SourceLine(ports, i, make_workflow_exception, debug):
                         fragment = shortname(port["id"])
                         ret[fragment] = self.collect_output(port, builder, outdir, fs_access,
                                                             compute_checksum=compute_checksum)
@@ -213,13 +227,13 @@ class WpsWorkflow(ProcessCWL):
             if ret is not None and builder.mutation_manager is not None:
                 adjustFileObjs(ret, builder.mutation_manager.set_generation)
             return ret if ret is not None else {}
-        except validate.ValidationException as e:
-            raise WorkflowException("Error validating output record: {}\nIn:\n{}"
-                                    .format(str(e), json_dumps(ret, indent=4)))
+        except validate.ValidationException as exc:
+            raise WorkflowException("Error validating output record: {!s}\nIn:\n{}"
+                                    .format(exc, json.dumps(ret, indent=4)))
         finally:
             if builder.mutation_manager and readers:
-                for r in readers.values():
-                    builder.mutation_manager.release_reader(jobname, r)
+                for reader in readers.values():
+                    builder.mutation_manager.release_reader(jobname, reader)
 
     def collect_output(self,
                        schema,                # type: Dict[Text, Any]
@@ -229,7 +243,7 @@ class WpsWorkflow(ProcessCWL):
                        compute_checksum=True  # type: bool
                        ):
         # type: (...) -> Optional[Union[Dict[Text, Any], List[Union[Dict[Text, Any], Text]]]]
-        r = []  # type: List[Any]
+        result = []  # type: List[Any]
         empty_and_optional = False
         debug = LOGGER.isEnabledFor(logging.DEBUG)
         if "outputBinding" in schema:
@@ -240,51 +254,52 @@ class WpsWorkflow(ProcessCWL):
 
             if "glob" in binding:
                 with SourceLine(binding, "glob", WorkflowException, debug):
-                    for gb in aslist(binding["glob"]):
-                        gb = builder.do_eval(gb)
-                        if gb:
-                            globpatterns.extend(aslist(gb))
+                    for glob in aslist(binding["glob"]):
+                        glob = builder.do_eval(glob)
+                        if glob:
+                            globpatterns.extend(aslist(glob))
 
-                    for gb in globpatterns:
-                        if gb.startswith(outdir):
-                            gb = gb[len(outdir) + 1:]
-                        elif gb == '.':
-                            gb = outdir
-                        elif gb.startswith('/'):
+                    for glob in globpatterns:
+                        if glob.startswith(outdir):
+                            glob = glob[len(outdir) + 1:]
+                        elif glob == ".":
+                            glob = outdir
+                        elif glob.startswith("/"):
                             raise WorkflowException("glob patterns must not start with '/'")
                         try:
                             prefix = fs_access.glob(outdir)
                             key = cmp_to_key(cast(Callable[[Text, Text], int], locale.strcoll))
-                            r.extend([{"location": g,
-                                       "path": fs_access.join(builder.outdir, g[len(prefix[0])+1:]),
-                                       "basename": os.path.basename(g),
-                                       "nameroot": os.path.splitext(os.path.basename(g))[0],
-                                       "nameext": os.path.splitext(os.path.basename(g))[1],
-                                       "class": "File" if fs_access.isfile(g) else "Directory"}
-                                      for g in sorted(fs_access.glob(fs_access.join(outdir, gb)), key=key)])
-                        except (OSError, IOError) as e:
-                            LOGGER.warning(Text(e))
+                            result.extend([{
+                                "location": g,
+                                "path": fs_access.join(builder.outdir, g[len(prefix[0])+1:]),
+                                "basename": os.path.basename(g),
+                                "nameroot": os.path.splitext(os.path.basename(g))[0],
+                                "nameext": os.path.splitext(os.path.basename(g))[1],
+                                "class": "File" if fs_access.isfile(g) else "Directory"
+                            } for g in sorted(fs_access.glob(fs_access.join(outdir, glob)), key=key)])
+                        except (OSError, IOError) as exc:
+                            LOGGER.warning(Text(exc))
                         except Exception:
-                            LOGGER.error("Unexpected error from fs_access", exc_info=True)
+                            LOGGER.exception("Unexpected error from fs_access")
                             raise
 
-                for files in r:
+                for files in result:
                     rfile = files.copy()
                     # TODO This function raise an exception and seems to be related to docker (which is not used here)
                     # revmap(rfile)
                     if files["class"] == "Directory":
-                        ll = builder.loadListing or (binding and binding.get("loadListing"))
-                        if ll and ll != "no_listing":
-                            get_listing(fs_access, files, (ll == "deep_listing"))
+                        load_listing = builder.loadListing or (binding and binding.get("loadListing"))
+                        if load_listing and load_listing != "no_listing":
+                            get_listing(fs_access, files, (load_listing == "deep_listing"))
                     else:
-                        with fs_access.open(rfile["location"], 'rb') as f:
+                        with fs_access.open(rfile["location"], "rb") as f:
                             contents = b""
                             if binding.get("loadContents") or compute_checksum:
                                 contents = f.read(CONTENT_LIMIT)
                             if binding.get("loadContents"):
                                 files["contents"] = contents.decode("utf-8")
                             if compute_checksum:
-                                checksum = hashlib.sha1()
+                                checksum = hashlib.sha1()   # nosec: B303
                                 while contents != b"":
                                     checksum.update(contents)
                                     contents = f.read(1024 * 1024)
@@ -305,32 +320,31 @@ class WpsWorkflow(ProcessCWL):
 
             if "outputEval" in binding:
                 with SourceLine(binding, "outputEval", WorkflowException, debug):
-                    r = builder.do_eval(binding["outputEval"], context=r)
+                    result = builder.do_eval(binding["outputEval"], context=result)
 
             if single:
-                if not r and not optional:
+                if not result and not optional:
                     with SourceLine(binding, "glob", WorkflowException, debug):
                         raise WorkflowException("Did not find output file with glob pattern: '{}'".format(globpatterns))
-                elif not r and optional:
+                elif not result and optional:
                     pass
-                elif isinstance(r, list):
-                    if len(r) > 1:
+                elif isinstance(result, list):
+                    if len(result) > 1:
                         raise WorkflowException("Multiple matches for output item that is a single file.")
-                    else:
-                        r = r[0]
+                    result = result[0]
 
             if "secondaryFiles" in schema:
                 with SourceLine(schema, "secondaryFiles", WorkflowException, debug):
-                    for primary in aslist(r):
+                    for primary in aslist(result):
                         if isinstance(primary, dict):
                             primary.setdefault("secondaryFiles", [])
-                            pathprefix = primary["path"][0:primary["path"].rindex('/')+1]
-                            for sf in aslist(schema["secondaryFiles"]):
-                                if isinstance(sf, dict) or "$(" in sf or "${" in sf:
-                                    sfpath = builder.do_eval(sf, context=primary)
+                            pathprefix = primary["path"][0:primary["path"].rindex("/")+1]
+                            for file in aslist(schema["secondaryFiles"]):
+                                if isinstance(file, dict) or "$(" in file or "${" in file:
+                                    sfpath = builder.do_eval(file, context=primary)
                                     subst = False
                                 else:
-                                    sfpath = sf
+                                    sfpath = file
                                     subst = True
                                 for sfitem in aslist(sfpath):
                                     if isinstance(sfitem, string_types):
@@ -348,14 +362,14 @@ class WpsWorkflow(ProcessCWL):
                                         primary["secondaryFiles"].append(sfitem)
 
             if "format" in schema:
-                for primary in aslist(r):
+                for primary in aslist(result):
                     primary["format"] = builder.do_eval(schema["format"], context=primary)
 
             # Ensure files point to local references outside of the run environment
             # TODO: Again removing revmap....
-            # adjustFileObjs(r, revmap)
+            # adjustFileObjs(result, revmap)
 
-            if not r and optional:
+            if not result and optional:
                 return None
 
         if not empty_and_optional and isinstance(schema["type"], dict) and schema["type"]["type"] == "record":
@@ -365,7 +379,7 @@ class WpsWorkflow(ProcessCWL):
                     f, builder, outdir, fs_access,
                     compute_checksum=compute_checksum)
             return out
-        return r
+        return result
 
 
 # noinspection PyPep8Naming
@@ -396,6 +410,7 @@ class WpsWorkflowJob(JobBase):
 
     def run(self,
             runtimeContext,     # type: RuntimeContext
+            tmpdir_lock=None,   # type: Optional[threading.Lock]
             ):                  # type: (...) -> None
 
         if not os.path.exists(self.tmpdir):
@@ -418,30 +433,26 @@ class WpsWorkflowJob(JobBase):
 
         # stageFiles(self.pathmapper, ignoreWritable=True, symLink=True, secret_store=runtimeContext.secret_store)
         if self.generatemapper:
-            stageFiles(self.generatemapper, ignoreWritable=self.inplace_update,
-                       symLink=True, secret_store=runtimeContext.secret_store)
+            # FIXME: see if this is needed... func doesn't exist anymore in cwltool 2.x
+            # stageFiles(self.generatemapper, ignoreWritable=self.inplace_update,
+            #            symLink=True, secret_store=runtimeContext.secret_store)
             relink_initialworkdir(self.generatemapper, self.outdir,
                                   self.builder.outdir, inplace_update=self.inplace_update)
 
         self.execute([], env, runtimeContext)
 
-    # noinspection PyUnusedLocal
-    def execute(self,
-                runtime,        # type: List[Text]
-                env,            # type: MutableMapping[Text, Text]
-                runtimeContext  # type: RuntimeContext
-                ):              # type: (...) -> None
+    # pylint: disable=W0221,arguments-differ    # naming using python like arguments
+    def execute(self, runtime, env, runtime_context):   # noqa: E811
+        # type: (List[Text], MutableMapping[Text, Text], RuntimeContext) -> None
 
         self.results = self.wps_process.execute(self.builder.job, self.outdir, self.expected_outputs)
 
-        if self.joborder and runtimeContext.research_obj:
+        if self.joborder and runtime_context.research_obj:
             job_order = self.joborder
-            assert runtimeContext.prov_obj
-            assert runtimeContext.process_run_id
-            runtimeContext.prov_obj.used_artefacts(
-                job_order, runtimeContext.process_run_id, str(self.name))
+            assert runtime_context.prov_obj
+            assert runtime_context.process_run_id
+            runtime_context.prov_obj.used_artefacts(job_order, runtime_context.process_run_id, str(self.name))
         outputs = {}  # type: Dict[Text, Text]
-        # noinspection PyBroadException
         try:
             rcode = 0
 
@@ -464,28 +475,28 @@ class WpsWorkflowJob(JobBase):
 
             outputs = self.collect_outputs(self.outdir)
             outputs = bytes2str_in_dicts(outputs)  # type: ignore
-        except OSError as e:
-            if e.errno == 2:
+        except OSError as exc:
+            if exc.errno == 2:
                 if runtime:
-                    LOGGER.error(u"'%s' not found", runtime[0])
+                    LOGGER.exception(u"'%s' not found", runtime[0])
                 else:
-                    LOGGER.error(u"'%s' not found", self.command_line[0])
+                    LOGGER.exception(u"'%s' not found", self.command_line[0])
             else:
                 LOGGER.exception("Exception while running job")
             process_status = "permanentFail"
         except WorkflowException as err:
-            LOGGER.error(u"[job %s] Job error:\n%s", self.name, err)
+            LOGGER.exception(u"[job %s] Job error:\n%s", self.name, err)
             process_status = "permanentFail"
-        except Exception:
+        except Exception:  # noqa: W0703 # nosec: B110
             LOGGER.exception("Exception while running job")
             process_status = "permanentFail"
-        if runtimeContext.research_obj and self.prov_obj and \
-                runtimeContext.process_run_id:
+        if runtime_context.research_obj and self.prov_obj and \
+                runtime_context.process_run_id:
             # creating entities for the outputs produced by each step (in the provenance document)
             self.prov_obj.generate_output_prov(
-                outputs, runtimeContext.process_run_id, str(self.name))
+                outputs, runtime_context.process_run_id, str(self.name))
             self.prov_obj.document.wasEndedBy(
-                runtimeContext.process_run_id, None, self.prov_obj.workflow_run_uri,
+                runtime_context.process_run_id, None, self.prov_obj.workflow_run_uri,
                 now())
         if process_status != "success":
             LOGGER.warning(u"[job %s] completed %s", self.name, process_status)
@@ -493,31 +504,31 @@ class WpsWorkflowJob(JobBase):
             LOGGER.info(u"[job %s] completed %s", self.name, process_status)
 
         if LOGGER.isEnabledFor(logging.DEBUG):
-            LOGGER.debug(u"[job %s] %s", self.name, json_dumps(outputs, indent=4))
+            LOGGER.debug(u"[job %s] %s", self.name, json.dumps(outputs, indent=4))
 
-        if self.generatemapper and runtimeContext.secret_store:
+        if self.generatemapper and runtime_context.secret_store:
             # Delete any runtime-generated files containing secrets.
-            for f, p in self.generatemapper.items():
-                if p.type == "CreateFile":
-                    if runtimeContext.secret_store.has_secret(p.resolved):
+            for _, path_item in self.generatemapper.items():
+                if path_item.type == "CreateFile":
+                    if runtime_context.secret_store.has_secret(path_item.resolved):
                         host_outdir = self.outdir
                         container_outdir = self.builder.outdir
-                        host_outdir_tgt = p.target
-                        if p.target.startswith(container_outdir + '/'):
+                        host_outdir_tgt = path_item.target
+                        if path_item.target.startswith(container_outdir + "/"):
                             host_outdir_tgt = os.path.join(
-                                host_outdir, p.target[len(container_outdir)+1:])
+                                host_outdir, path_item.target[len(container_outdir)+1:])
                         os.remove(host_outdir_tgt)
 
-        if runtimeContext.workflow_eval_lock is None:
-            raise WorkflowException("runtimeContext.workflow_eval_lock must not be None")
+        if runtime_context.workflow_eval_lock is None:
+            raise WorkflowException("runtime_context.workflow_eval_lock must not be None")
 
-        with runtimeContext.workflow_eval_lock:
+        with runtime_context.workflow_eval_lock:
             self.output_callback(outputs, process_status)
 
         if self.stagedir and os.path.exists(self.stagedir):
             LOGGER.debug(u"[job %s] Removing input staging directory %s", self.name, self.stagedir)
             shutil.rmtree(self.stagedir, True)
 
-        if runtimeContext.rm_tmpdir:
+        if runtime_context.rm_tmpdir:
             LOGGER.debug(u"[job %s] Removing temporary directory %s", self.name, self.tmpdir)
             shutil.rmtree(self.tmpdir, True)

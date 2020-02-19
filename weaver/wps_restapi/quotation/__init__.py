@@ -1,12 +1,15 @@
-from weaver.wps_restapi.quotation import bills as b, quotes as q
-from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
-from weaver.wps_restapi import swagger_definitions as sd
 import logging
-logger = logging.getLogger("weaver")
+
+from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.quotation import bills as b
+from weaver.wps_restapi.quotation import quotes as q
+from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
+
+LOGGER = logging.getLogger(__name__)
 
 
 def includeme(config):
-    logger.info("Adding WPS REST API quotation...")
+    LOGGER.info("Adding WPS REST API quotation...")
     settings = config.registry.settings
     config.add_route(**sd.service_api_route_info(sd.process_quotes_service, settings))
     config.add_route(**sd.service_api_route_info(sd.process_quote_service, settings))

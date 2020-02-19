@@ -5,14 +5,24 @@ cffi
 colander
 cornice
 cornice_swagger>=0.7.0
-cwltool==1.0.20180820141117
+# cwltool Python 2 support dropped on 2.x
+# enforce Python 3 with version >=2 to update existing 1.x installations
+cwltool>=1.0.20180820141117,<2; python_version < "3"
+cwltool>=2; python_version >= "3"
 duration
-gunicorn
-# TODO: this avoids buildout install error, should be removable after issue #5
+flufl.enum; python_version < "3"
+# gunicorn >20 breaks some config.ini loading parameters (paste)
+# it is also only available for Python >=3.5
+gunicorn>=19.10,<20; python_version < "3"
+# use pserve to continue supporting config.ini with paste settings
+gunicorn>=20.0.4; python_version >= "3.5"
 jsonschema>=3.0.1
 lxml
 mako
-owslib
+owslib<0.19.0; python_version < "3"
+owslib>=0.19.1; python_version >= "3"
+# fix tagged owslib (https://github.com/crim-ca/weaver/issues/62)
+owslib>0.19.0; python_version >= "3.8"
 pymongo
 pyramid>=1.7.3
 pyramid_celery
@@ -22,8 +32,12 @@ pywps
 pyyaml>=4.2b4
 requests
 requests_file
+# let cwltool define ruamel.yaml version (<=0.16.5)
+# ensure minimal 0.15.78 to solve install issue (python 3.8)
+# (https://bitbucket.org/ruamel/yaml/issues/261/error-while-installing-ruamelyaml-setuppy)
+# let cwltool fully define the version if python 2 is used
+ruamel.yaml>=0.15.78,<=0.16.5; python_version >= "3"
 shapely
 six
 simplejson
 webob
-yagmail

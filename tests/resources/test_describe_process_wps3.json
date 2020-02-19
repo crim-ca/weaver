@@ -1,0 +1,39 @@
+{
+    "process": {
+        "id": "test-remote-process-wps3",
+        "keywords": [],
+        "title": "Test Remote Process WPS3",
+        "abstract": "Testing WPS-3 dummy remote process description.",
+        "inputs": [
+            {
+                "id": "input-1",
+                "maxOccurs": "1",
+                "minOccurs": "1",
+                "keywords": []
+            }
+        ],
+        "outputs": [
+            {
+                "id": "output",
+                "title": "The output",
+                "minOccurs": "1",
+                "maxOccurs": "1",
+                "keywords": []
+            }
+        ],
+        "owsContext": {
+            "offering": {
+                "content": {
+                    "href": "test-remote-process.cwl"
+                }
+            }
+        },
+        "executeEndpoint": "https://remote-server.com/processes/test-remote-process-wps3/jobs"
+    },
+    "outputTransmission": [
+        "reference"
+    ],
+    "jobControlOptions": [
+        "async-execute"
+    ]
+}

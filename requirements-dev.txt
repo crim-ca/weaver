@@ -1,16 +1,18 @@
-bumpversion
+-r requirements-docs.txt
+bandit
+bump2version
+codacy-coverage
+contextlib2; python_version < "3"
 coverage
 doc8
 flake8
+isort
 mock
 pluggy>=0.7
 pytest
+pylint
+pylint_quotes
 responses
-sphinx
-sphinx-autoapi
 WebTest
 wsgiproxy
 WSGIProxy2
-# internal WPS
-##pywps>=4.0.0
-##-e git+https://github.com/geopython/pywps#egg=pywps

@@ -1,20 +1,21 @@
-from weaver import utils
-from weaver import status
-from weaver.utils import null
-from weaver.exceptions import ServiceNotFound
-from tests.resources import WPS_CAPS_EMU_XML, WMS_CAPS_NCWMS2_111_XML, WMS_CAPS_NCWMS2_130_XML
-from pyramid.httpexceptions import HTTPError as PyramidHTTPError, HTTPInternalServerError, HTTPNotFound, HTTPConflict
+# pylint: disable=C0103,invalid-name
+
+from typing import Type
+
+import pytest
+from lxml import etree
+from pyramid.httpexceptions import HTTPConflict
+from pyramid.httpexceptions import HTTPError as PyramidHTTPError
+from pyramid.httpexceptions import HTTPInternalServerError, HTTPNotFound
 from pywps.response.status import WPS_STATUS
 from requests.exceptions import HTTPError as RequestsHTTPError
 from six.moves.urllib.parse import urlparse
-from lxml import etree
-from typing import Type
-# noinspection PyPackageRequirements
-import pytest
+
+from weaver import status, utils
+from weaver.utils import _NullType, null
 
 
-# noinspection PyComparisonWithNone
-def test_null():
+def test_null_operators():
     if null:
         raise AssertionError("null should not pass if clause")
     n = null.__class__
@@ -22,10 +23,21 @@ def test_null():
     assert null == n()
     assert null.__class__ == n
     assert null.__class__ == n()
-    assert null != None  # noqa: E711
+    # pylint: disable=C0121,singleton-comparison
+    assert null != None     # noqa: E711
     assert null is not None
     assert bool(null) is False
-    assert null or "not-null" == "not-null"
+    assert (null or "not-null") == "not-null"
+
+
+def test_null_singleton():
+    n1 = _NullType()
+    n2 = _NullType()
+    # pylint: disable=C0123,unidiomatic-typecheck
+    assert type(null) is _NullType
+    assert null is n1
+    assert null is n2
+    assert n1 is n2
 
 
 def test_is_url_valid():
@@ -34,17 +46,6 @@ def test_is_url_valid():
     assert utils.is_valid_url("file:///my/path") is True
     assert utils.is_valid_url("/my/path") is False
     assert utils.is_valid_url(None) is False
-
-
-def test_parse_service_name():
-    protected_path = "/ows/proxy"
-    assert "emu" == utils.parse_service_name("/ows/proxy/emu", protected_path)
-    assert "emu" == utils.parse_service_name("/ows/proxy/emu/foo/bar", protected_path)
-    assert "emu" == utils.parse_service_name("/ows/proxy/emu/", protected_path)
-    with pytest.raises(ServiceNotFound):
-        assert "emu" == utils.parse_service_name("/ows/proxy/", protected_path)
-    with pytest.raises(ServiceNotFound):
-        assert "emu" == utils.parse_service_name("/ows/nowhere/emu", protected_path)
 
 
 def test_get_url_without_query():
@@ -73,7 +74,6 @@ def test_path_elements():
 
 
 def test_lxml_strip_ns():
-    import lxml.etree
     wps_xml = """
 <wps100:Execute
 xmlns:wps100="http://www.opengis.net/wps/1.0.0"
@@ -82,37 +82,10 @@ service="WPS"
 version="1.0.0"
 xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/wps/1.0.0/wpsExecute_request.xsd"/>"""
 
-    doc = lxml.etree.fromstring(wps_xml)
+    doc = etree.fromstring(wps_xml)
     assert doc.tag == "{http://www.opengis.net/wps/1.0.0}Execute"
     utils.lxml_strip_ns(doc)
     assert doc.tag == "Execute"
-
-
-def test_replace_caps_url_wps():
-    doc = etree.parse(WPS_CAPS_EMU_XML)
-    xml = etree.tostring(doc)
-    assert "http://localhost:8094/wps" in xml
-    xml = utils.replace_caps_url(xml, "https://localhost/ows/proxy/emu")
-    assert "http://localhost:8094/wps" not in xml
-    assert "https://localhost/ows/proxy/emu" in xml
-
-
-def test_replace_caps_url_wms_111():
-    doc = etree.parse(WMS_CAPS_NCWMS2_111_XML)
-    xml = etree.tostring(doc)
-    assert "http://localhost:8080/ncWMS2/wms" in xml
-    xml = utils.replace_caps_url(xml, "https://localhost/ows/proxy/wms")
-    # assert "http://localhost:8080/ncWMS2/wms" not in xml
-    assert "https://localhost/ows/proxy/wms" in xml
-
-
-def test_replace_caps_url_wms_130():
-    doc = etree.parse(WMS_CAPS_NCWMS2_130_XML)
-    xml = etree.tostring(doc)
-    assert "http://localhost:8080/ncWMS2/wms" in xml
-    xml = utils.replace_caps_url(xml, "https://localhost/ows/proxy/wms")
-    # assert "http://localhost:8080/ncWMS2/wms" not in xml
-    assert "https://localhost/ows/proxy/wms" in xml
 
 
 class MockRequest(object):
@@ -126,8 +99,7 @@ class MockRequest(object):
 
 def test_parse_request_query_basic():
     req = MockRequest("http://localhost:5000/ows/wps?service=wps&request=GetCapabilities&version=1.0.0")
-    # noinspection PyTypeChecker
-    queries = utils.parse_request_query(req)
+    queries = utils.parse_request_query(req)    # noqa
     assert "service" in queries
     assert isinstance(queries["service"], dict)
     assert queries["service"][0] == "wps"
@@ -142,8 +114,7 @@ def test_parse_request_query_basic():
 def test_parse_request_query_many_datainputs_multi_case():
     req = MockRequest("http://localhost:5000/ows/wps?service=wps&request=GetCapabilities&version=1.0.0&" +
                       "datainputs=data1=value1&dataInputs=data2=value2&DataInputs=data3=value3")
-    # noinspection PyTypeChecker
-    queries = utils.parse_request_query(req)
+    queries = utils.parse_request_query(req)  # noqa
     assert "datainputs" in queries
     assert isinstance(queries["datainputs"], dict)
     assert "data1" in queries["datainputs"]
@@ -264,24 +235,24 @@ def get_status_variations(status_value):
 
 
 def test_map_status_ogc_compliant():
-    for sv in status.job_status_values:
+    for sv in status.JOB_STATUS_VALUES:
         for s in get_status_variations(sv):
             assert status.map_status(s, status.STATUS_COMPLIANT_OGC) in \
-                   status.job_status_categories[status.STATUS_COMPLIANT_OGC]
+                   status.JOB_STATUS_CATEGORIES[status.STATUS_COMPLIANT_OGC]
 
 
 def test_map_status_pywps_compliant():
-    for sv in status.job_status_values:
+    for sv in status.JOB_STATUS_VALUES:
         for s in get_status_variations(sv):
             assert status.map_status(s, status.STATUS_COMPLIANT_PYWPS) in \
-                   status.job_status_categories[status.STATUS_COMPLIANT_PYWPS]
+                   status.JOB_STATUS_CATEGORIES[status.STATUS_COMPLIANT_PYWPS]
 
 
 def test_map_status_owslib_compliant():
-    for sv in status.job_status_values:
+    for sv in status.JOB_STATUS_VALUES:
         for s in get_status_variations(sv):
             assert status.map_status(s, status.STATUS_COMPLIANT_OWSLIB) in \
-                   status.job_status_categories[status.STATUS_COMPLIANT_OWSLIB]
+                   status.JOB_STATUS_CATEGORIES[status.STATUS_COMPLIANT_OWSLIB]
 
 
 def test_map_status_back_compatibility_and_special_cases():
@@ -293,7 +264,7 @@ def test_map_status_pywps_compliant_as_int_statuses():
     for s in range(len(WPS_STATUS)):
         if status.STATUS_PYWPS_MAP[s] != status.STATUS_UNKNOWN:
             assert status.map_status(s, status.STATUS_COMPLIANT_PYWPS) in \
-                   status.job_status_categories[status.STATUS_COMPLIANT_PYWPS]
+                   status.JOB_STATUS_CATEGORIES[status.STATUS_COMPLIANT_PYWPS]
 
 
 def test_map_status_pywps_back_and_forth():
@@ -301,12 +272,11 @@ def test_map_status_pywps_back_and_forth():
         assert status.STATUS_PYWPS_IDS[i] == s
 
 
-# noinspection PyTypeChecker
 def test_get_sane_name_replace():
     kw = {"assert_invalid": False, "max_len": 25}
     assert utils.get_sane_name("Hummingbird", **kw) == "Hummingbird"
     assert utils.get_sane_name("MapMint Demo Instance", **kw) == "MapMint_Demo_Instance"
-    assert utils.get_sane_name(None, **kw) is None
+    assert utils.get_sane_name(None, **kw) is None  # noqa
     assert utils.get_sane_name("12", **kw) is None
     assert utils.get_sane_name(" ab c ", **kw) == "ab_c"
     assert utils.get_sane_name("a_much_to_long_name_for_this_test", **kw) == "a_much_to_long_name_for_t"
@@ -340,3 +310,13 @@ def test_assert_sane_name():
     ]
     for test in test_cases_valid:
         utils.assert_sane_name(test)
+
+
+def test_str2bytes():
+    assert utils.str2bytes(b"test-bytes") == b"test-bytes"
+    assert utils.str2bytes(u"test-unicode") == b"test-unicode"
+
+
+def test_bytes2str():
+    assert utils.bytes2str(b"test-bytes") == u"test-bytes"
+    assert utils.bytes2str(u"test-unicode") == u"test-unicode"

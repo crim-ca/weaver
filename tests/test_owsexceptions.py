@@ -34,7 +34,8 @@ def test_owsexceptions_json_formatter():
         ("Long line that, for some reason,\n was split on next line after comma.",
          "Long line that, for some reason, was split on next line after comma."),
         ("Another long line,\n with many commas and newlines, \nbut placed differently,\njust for the heck of it.",
-         "Another long line, with many commas and newlines, but placed differently, just for the heck of it.")
+         "Another long line, with many commas and newlines, but placed differently, just for the heck of it."),
+        ("Literal new-lines are\\nresolved to space", "Literal new-lines are resolved to space."),
     ]
 
     test_code = 418

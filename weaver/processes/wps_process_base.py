@@ -1,17 +1,20 @@
-from weaver.wps import get_wps_output_dir, get_wps_output_url
-from weaver.formats import CONTENT_TYPE_APP_JSON
-from weaver.utils import get_cookie_headers, get_settings
-from pyramid_celery import celery_app as app
-from pyramid.settings import asbool
-from pyramid.httpexceptions import HTTPBadGateway
+from abc import abstractmethod
 from time import sleep
 from typing import TYPE_CHECKING
-from abc import abstractmethod
+
 import requests
+from pyramid.httpexceptions import HTTPBadGateway
+from pyramid.settings import asbool
+from pyramid_celery import celery_app as app
+
+from weaver.formats import CONTENT_TYPE_APP_JSON
+from weaver.utils import get_cookie_headers, get_settings
+from weaver.wps import get_wps_output_dir, get_wps_output_url
+
 if TYPE_CHECKING:
-    from weaver.typedefs import CWL
-    from typing import AnyStr, Dict
-    from pywps.app import WPSRequest
+    from weaver.typedefs import CWL     # noqa: F401
+    from typing import AnyStr, Dict     # noqa: F401
+    from pywps.app import WPSRequest    # noqa: F401
 
 
 class WpsProcessInterface(object):
@@ -60,16 +63,12 @@ class WpsProcessInterface(object):
         return response
 
     @staticmethod
-    def host_file(fn):
+    def host_file(file_name):
         settings = get_settings(app)
         weaver_output_url = get_wps_output_url(settings)
         weaver_output_dir = get_wps_output_dir(settings)
-        fn = fn.replace("file://", "")
+        file_name = file_name.replace("file://", "")
 
-        if not fn.startswith(weaver_output_dir):
-            raise Exception("Cannot host files outside of the output path : {0}".format(fn))
-        return fn.replace(weaver_output_dir, weaver_output_url)
-
-    @staticmethod
-    def map_progress(progress, range_min, range_max):
-        return range_min + (progress * (range_max - range_min)) / 100
+        if not file_name.startswith(weaver_output_dir):
+            raise Exception("Cannot host files outside of the output path : {0}".format(file_name))
+        return file_name.replace(weaver_output_dir, weaver_output_url)

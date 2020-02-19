@@ -1,0 +1,52 @@
+# label rules used by .github/workflows/label.yml
+
+# label 'ci' all automation-related steps and files
+ci:
+  - .*  # all '.<>' files
+  - MANIFEST.in
+  - hooks/**/*
+  - Makefile*
+  - Dockerfile*
+  - setup.*
+  - requirements*
+  - tests/travis-ci/**/*
+
+doc:
+  - "*.rst"
+  - "*.example"
+  - LICENCE*
+  - docs/**/*
+
+db:
+  - weaver/datatype.py
+  - weaver/database/**/*
+  - weaver/store/**/*
+
+security:
+  - weaver/visibility.py
+
+tests:
+  - tests/**/*
+  - weaver/processes/wps_default.py
+  - weaver/processes/wps_testing.py
+
+## -- WPS processes --
+
+builtin:
+  - weaver/processes/builtin/**/*
+
+CWL:
+  - weaver/processes/wps_process_base.py
+  - weaver/processes/wps_package.py
+  - weaver/processes/wps_workflow.py
+
+WPS1:
+  - weaver/wps.py
+  - weaver/processes/wps1*
+
+WPS2:
+  - weaver/wps.py
+  - weaver/processes/wps2*
+
+WPS3:
+  - weaver/wps_restapi/**/*

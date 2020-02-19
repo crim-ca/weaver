@@ -1,3 +1,4 @@
+## -*- coding: utf-8 -*-
 <%doc>
     This is an example notification message to be sent by email when a job is done
     It is formatted using the Mako template library (https://www.makotemplates.org/)
