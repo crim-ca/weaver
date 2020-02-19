@@ -142,9 +142,8 @@ class OneOfMappingSchema(colander.MappingSchema):
             for valid in valid_one_of:
                 if isinstance(valid, dict) and all(cstruct[k] == v for k, v in valid.items()):
                     return valid
-            else:
-                # If that fails, return the first valid deserialization
-                return valid_one_of[0]
+            # If that fails, return the first valid deserialization
+            return valid_one_of[0]
 
         message = "Incorrect type, must be one of: {}. Errors for each case: {}" \
                   .format(list(invalid_one_of), invalid_one_of)
