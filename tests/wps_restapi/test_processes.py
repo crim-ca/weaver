@@ -546,8 +546,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     def test_execute_process_dont_cast_one_of(self):
         """
-        Optional parameters for execute job shouldn't raise an error if omitted,
-        and should resolve to default values if any was specified.
+        When validating the schema for OneOf values, don't cast the result to the first valid schema.
         """
         # get basic mock/data templates
         name = fully_qualified_name(self)
