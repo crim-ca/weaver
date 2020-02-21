@@ -127,14 +127,24 @@ class OneOfMappingSchema(colander.MappingSchema):
         # test each possible case, return all corresponding errors if
         # none of the '_one_of' possibilities is valid including all sub-dependencies
         invalid_one_of = dict()
+        valid_one_of = []
         for schema_class in self._one_of:  # noqa
             try:
                 # instantiate the class if specified with simple reference, other use pre-instantiated schema object
                 if isinstance(schema_class, colander._SchemaMeta):  # noqa:W0212
                     schema_class = schema_class()
-                return schema_class.deserialize(cstruct)
+                valid_one_of.append(schema_class.deserialize(cstruct))
             except colander.Invalid as invalid:
                 invalid_one_of.update({type(invalid.node).__name__: str(invalid)})
+
+        if valid_one_of:
+            # Try to return the format which didn't change the input data
+            for valid in valid_one_of:
+                if _dict_nested_equals(cstruct, valid):
+                    return valid
+            # If that fails, return the first valid deserialization
+            return valid_one_of[0]
+
         message = "Incorrect type, must be one of: {}. Errors for each case: {}" \
                   .format(list(invalid_one_of), invalid_one_of)
         raise colander.Invalid(node=self, msg=message)
@@ -191,3 +201,30 @@ class CustomTypeConversionDispatcher(object):
         converted = converter(schema_node)
 
         return converted
+
+
+def _dict_nested_equals(parent, child):
+    """Tests that a dict is 'contained' within a parent dict
+
+    >>> parent = {"other": 2, "test": [{"inside": 1, "other_nested": 2}]}
+    >>> child = {"test": [{"inside": 1}]}
+    >>> _dict_nested_equals(parent, child)
+    True
+
+    :param dict parent: The dict that could contain the child
+    :param dict child: The dict that could be nested inside the parent
+    """
+
+    if not isinstance(parent, dict) or not isinstance(child, dict):
+        return parent == child
+
+    for key, value in child.items():
+        if key not in parent:
+            return False
+        if isinstance(value, list):
+            if len(parent[key]) != len(value):
+                return False
+            return all(_dict_nested_equals(p, c) for p, c in zip(parent[key], value))
+        return _dict_nested_equals(parent[key], value)
+
+    return True

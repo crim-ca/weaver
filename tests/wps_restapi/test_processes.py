@@ -544,6 +544,27 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             assert resp.status_code in [400, 422], msg.format(i, resp.status_code)
             assert resp.content_type == CONTENT_TYPE_APP_JSON, msg.format(i, resp.content_type)
 
+    def test_execute_process_dont_cast_one_of(self):
+        """
+        When validating the schema for OneOf values, don't cast the result to the first valid schema.
+        """
+        # get basic mock/data templates
+        name = fully_qualified_name(self)
+        execute_mock_data_tests = list()
+
+        mock_execute = mocked_process_job_runner("job-{}".format(name))
+        data_execute = self.get_process_execute_template("100")
+        execute_mock_data_tests.append((mock_execute, data_execute))
+
+        with contextlib.ExitStack() as stack:
+            for exe in mock_execute:
+                stack.enter_context(exe)
+            path = "/processes/{}/jobs".format(self.process_public.identifier)
+            resp = self.app.post_json(path, params=data_execute, headers=self.json_headers)
+            assert resp.status_code == 201, "Expected job submission without inputs created without error."
+            job = self.job_store.fetch_by_id(resp.json["jobID"])
+            assert job.inputs[0]["data"] == "100"  # not cast to float or integer
+
     def test_execute_process_no_error_not_required_params(self):
         """
         Optional parameters for execute job shouldn't raise an error if omitted,
