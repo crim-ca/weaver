@@ -4,6 +4,13 @@ Changes
 Unreleased
 ==========
 
+Fixes:
+------
+
+- Fix a bug where the validation of OneOf items was casting the value to the first valid possibility.
+  Now, it doesn't change the value if it's valid without casting it (and still casts it if it's 
+  necessary to make it valid).
+
 1.1.0 (2020-02-17)
 ==================
 
