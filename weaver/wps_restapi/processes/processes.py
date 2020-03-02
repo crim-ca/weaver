@@ -97,7 +97,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
             job.progress = JOB_PROGRESS_DESCRIBE
             job.save_log(logger=task_logger, message="Execute WPS request for process [{!s}]".format(job.process))
             wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), verify=ssl_verify)
-            set_wps_language(wps, job.accept_language)
+            set_wps_language(wps, accept_language=job.accept_language)
             raise_on_xml_exception(wps._capabilities)   # noqa
         except Exception as ex:
             raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
@@ -254,8 +254,8 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
     return job.status
 
 
-def set_wps_language(wps, accept_language):
-    # type: (WebProcessingService, str) -> None
+def set_wps_language(wps, accept_language=None, request=None):
+    # type: (WebProcessingService, Optional[str], Optional[Request]) -> None
     """Set the :attr:`language` property on the :class:`WebProcessingService` object.
 
     Given the `Accept-Language` header value, match the best language
@@ -270,6 +270,9 @@ def set_wps_language(wps, accept_language):
     :param wps: process for which to set the language header if it is accepted
     :param str accept_language: the value of the Accept-Language header
     """
+    if not accept_language and request:
+        accept_language = request.accept_language.header_value
+
     if not accept_language:
         return
 
@@ -380,6 +383,7 @@ def list_remote_processes(service, request):
     Note: remote processes won't be stored to the local process storage.
     """
     wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
+    set_wps_language(wps, request=request)
     settings = get_settings(request)
     return [convert_process_wps_to_db(service, process, settings) for process in wps.processes]
 
@@ -411,6 +415,7 @@ def describe_provider_process(request):
     store = get_db(request).get_store(StoreServices)
     service = store.fetch_by_name(provider_id, request=request)
     wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
+    set_wps_language(wps, request=request)
     process = wps.describeprocess(process_id)
     return convert_process_wps_to_db(service, process, get_settings(request))
 

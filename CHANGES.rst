@@ -4,6 +4,11 @@ Changes
 Unreleased
 ==========
 
+Changes:
+--------
+
+- Add wps languages for other wps requests types: DescribeProcess and GetCapabilities
+
 Fixes:
 ------
 
