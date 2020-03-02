@@ -255,7 +255,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
 
 
 def set_wps_language(wps, accept_language=None, request=None):
-    # type: (WebProcessingService, str, Request) -> None
+    # type: (WebProcessingService, Optional[str], Optional[Request]) -> None
     """Set the :attr:`language` property on the :class:`WebProcessingService` object.
 
     Given the `Accept-Language` header value, match the best language
