@@ -148,6 +148,7 @@ Fixes:
 
 Changes:
 --------
+<<<<<<< HEAD
 - Generate Weaver OpenAPI specification for readthedocs publication.
 - Add some sections for documentation (`#61 <https://github.com/crim-ca/weaver/issues/61>`_).
 - Add support of documentation RST file redirection to generated HTML for reference resolution in both Github source
@@ -396,18 +397,9 @@ Changes:
   unnecessary failures during edge case connexion problems.
 - Add support of ``title`` and ``version`` field of ``builtin`` processes.
 
-- Provide HTTP links to corresponding items of job in status JSON body (#58).
-- Provide OGC compliance of ``<job-uri>/results`` response schema as well as some expected ``code``/``description``
-  fields in case where the request fails.
-- Add ``<job-uri>/outputs`` providing the 'old' format of the job results as well as ``<job-uri>/inputs`` to retrieve
-  the inputs that were provided during job submission (#86).
-- Add more reference/documentation links to `WPS-1/2` and update conformance references (#53).
-- Add some minimal caching support of routes.
-
 Fixes:
 ------
 
-<<<<<<< 8b37e0af5db9f2071f2f51ffc1ab571ceb072161
 - Patch ``builtin`` process execution failing since ``cwltool 2.x`` update.
 - Avoid long fetch operation using streamed request that defaulted to chuck size of 1.
   Now, we use an appropriate size according to available memory.
