@@ -14,6 +14,7 @@ OWS_TWEEN_HANDLED = "OWS_TWEEN_HANDLED"
 
 def ows_response_tween(request, handler):
     """Tween that wraps any API request with appropriate dispatch of error conversion to handle formatting."""
+    exc_log_lvl = logging.WARNING
     try:
         result = handler(request)
         if hasattr(handler, OWS_TWEEN_HANDLED):
@@ -33,13 +34,11 @@ def ows_response_tween(request, handler):
         raised_error = err
         return_error = err
         exc_info_err = False
-        exc_log_lvl = logging.WARNING
     except NotImplementedError as err:
         LOGGER.debug("not implemented error -> ows exception response")
         raised_error = err
         return_error = OWSNotImplemented(str(err))
         exc_info_err = sys.exc_info()
-        exc_log_lvl = logging.WARNING
     except Exception as err:
         LOGGER.debug("unhandled %s exception -> ows exception response", type(err).__name__)
         raised_error = err

@@ -65,7 +65,6 @@ def api_frontpage_body(settings):
     weaver_api = asbool(settings.get("weaver.wps_restapi"))
     weaver_api_url = get_wps_restapi_base_url(settings) if weaver_api else None
     weaver_api_def = weaver_api_url + sd.api_swagger_ui_service.path if weaver_api else None
-
     weaver_wps = asbool(settings.get("weaver.wps"))
     weaver_wps_url = get_wps_url(settings) if weaver_wps else None
     weaver_conform_url = weaver_url + sd.api_conformance_service.path
@@ -192,7 +191,6 @@ def api_swagger_json(request):  # noqa: F811
     weaver_server_url = get_weaver_url(request)
     LOGGER.debug("Request app URL:   [%s]", request.url)
     LOGGER.debug("Weaver config URL: [%s]", weaver_server_url)
-    # http_scheme=request.scheme, http_host=request.host
     return get_swagger_json(base_url=weaver_server_url, use_docstring_summary=True)
 
 
