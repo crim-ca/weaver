@@ -70,6 +70,8 @@ def api_frontpage_body(settings):
     weaver_api_ref = settings.get("weaver.wps_restapi_ref", None) if weaver_api else None
     weaver_wps = asbool(settings.get("weaver.wps"))
     weaver_wps_url = get_wps_url(settings) if weaver_wps else None
+    weaver_wps_doc = settings.get("weaver.wps_doc", None) if weaver_wps else None
+    weaver_wps_ref = settings.get("weaver.wps_ref", None) if weaver_wps else None
     weaver_conform_url = weaver_url + sd.api_conformance_service.path
     weaver_process_url = weaver_url + sd.processes_service.path
     weaver_links = [
@@ -127,7 +129,9 @@ def api_frontpage_body(settings):
              "url": weaver_api_url,
              "api": weaver_api_def},
             {"name": "wps", "enabled": weaver_wps,
-             "url": weaver_wps_url},
+             "url": weaver_wps_url,
+             "doc": weaver_wps_doc,
+             "ref": weaver_wps_ref},
         ],
         "links": weaver_links,
     }
