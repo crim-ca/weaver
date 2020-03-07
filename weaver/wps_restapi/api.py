@@ -56,6 +56,8 @@ def api_frontpage(request):
     weaver_api_ref = settings.get("weaver.wps_restapi_ref", None) if weaver_api else None
     weaver_wps = asbool(settings.get("weaver.wps"))
     weaver_wps_url = get_wps_url(settings) if weaver_wps else None
+    weaver_wps_doc = settings.get("weaver.wps_doc", None) if weaver_wps else None
+    weaver_wps_ref = settings.get("weaver.wps_ref", None) if weaver_wps else None
     weaver_conform_url = weaver_url + sd.api_conformance_service.path
     weaver_process_url = weaver_url + sd.processes_service.path
     weaver_links = [
@@ -90,7 +92,9 @@ def api_frontpage(request):
              "api": weaver_api_def,
              "ref": weaver_api_ref},
             {"name": "wps", "enabled": weaver_wps,
-             "url": weaver_wps_url},
+             "url": weaver_wps_url,
+             "doc": weaver_wps_doc,
+             "ref": weaver_wps_ref},
         ],
         "links": weaver_links,
     }
@@ -112,13 +116,16 @@ def api_conformance(request):  # noqa: F811
     """Weaver specification conformance information."""
     # TODO: follow updates with https://github.com/geopython/pygeoapi/issues/198
     conformance = {"conformsTo": [
-        "http://www.opengis.net/spec/wfs-1/3.0/req/core",
-        "http://www.opengis.net/spec/wfs-1/3.0/req/oas30",
+        # "http://www.opengis.net/spec/wfs-1/3.0/req/core",
+        # "http://www.opengis.net/spec/wfs-1/3.0/req/oas30",
         # "http://www.opengis.net/spec/wfs-1/3.0/req/html",
-        "http://www.opengis.net/spec/wfs-1/3.0/req/geojson",
+        # "http://www.opengis.net/spec/wfs-1/3.0/req/geojson",
+        "http://schemas.opengis.net/wps/1.0.0/",
+        "http://schemas.opengis.net/wps/2.0/",
         "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/core",
-        "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/oas30",
+        # "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/oas30",
         # "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/html"
+        "https://github.com/opengeospatial/wps-rest-binding",
     ]}
     return HTTPOk(json=conformance)
 
