@@ -218,17 +218,40 @@ class XmlHeader(MappingSchema):
     content_type.name = "Content-Type"
 
 
+class RequestContentTypeHeader(OneOfMappingSchema):
+    _one_of = (
+        JsonHeader(),
+        XmlHeader(),
+    )
+
+
+class ResponseContentTypeHeader(OneOfMappingSchema):
+    _one_of = (
+        JsonHeader(),
+        XmlHeader(),
+        HtmlHeader(),
+    )
+
+
 class AcceptHeader(MappingSchema):
     Accept = SchemaNode(String(), missing=drop, default=CONTENT_TYPE_APP_JSON, validator=OneOf([
         CONTENT_TYPE_APP_JSON,
         CONTENT_TYPE_APP_XML,
-        CONTENT_TYPE_TEXT_HTML,
+        # CONTENT_TYPE_TEXT_HTML,   # defaults to JSON for easy use within browsers
     ]))
 
 
-class AcceptLanguageHeader(AcceptHeader):
+class AcceptLanguageHeader(MappingSchema):
     AcceptLanguage = SchemaNode(String(), missing=drop)
     AcceptLanguage.name = "Accept-Language"
+
+
+class RequestHeaders(AcceptHeader, AcceptLanguageHeader, RequestContentTypeHeader):
+    """Headers that can indicate how to adjust the behavior and/or result the be provided in the response."""
+
+
+class ResponseHeaders(ResponseContentTypeHeader):
+    """Headers describing resulting response."""
 
 
 class KeywordList(SequenceSchema):
@@ -582,19 +605,19 @@ class Visibility(MappingSchema):
 
 
 class FrontpageEndpoint(MappingSchema):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class VersionsEndpoint(MappingSchema):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class ConformanceEndpoint(MappingSchema):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class SwaggerJSONEndpoint(MappingSchema):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class SwaggerUIEndpoint(MappingSchema):
@@ -643,100 +666,100 @@ class ErrorWPSResponse(MappingSchema):
 
 
 class ProviderEndpoint(ProviderPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class ProviderProcessEndpoint(ProviderPath, ProcessPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class ProcessEndpoint(ProcessPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class ProcessPackageEndpoint(ProcessPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class ProcessPayloadEndpoint(ProcessPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class ProcessVisibilityGetEndpoint(ProcessPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class ProcessVisibilityPutEndpoint(ProcessPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
     body = Visibility()
 
 
 class FullJobEndpoint(ProviderPath, ProcessPath, JobPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class ShortJobEndpoint(JobPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class ProcessInputsEndpoint(ProcessPath, JobPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class ProviderInputsEndpoint(ProviderPath, ProcessPath, JobPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class JobInputsEndpoint(JobPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class ProcessOutputsEndpoint(ProcessPath, JobPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class ProviderOutputsEndpoint(ProviderPath, ProcessPath, JobPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class JobOutputsEndpoint(JobPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class ProcessResultsEndpoint(ProcessPath, JobPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class FullResultsEndpoint(ProviderPath, ProcessPath, JobPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class ShortResultsEndpoint(ProviderPath, ProcessPath, JobPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class FullExceptionsEndpoint(ProviderPath, ProcessPath, JobPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class ShortExceptionsEndpoint(JobPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class ProcessExceptionsEndpoint(ProcessPath, JobPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class FullLogsEndpoint(ProviderPath, ProcessPath, JobPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class ShortLogsEndpoint(JobPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class ProcessLogsEndpoint(ProcessPath, JobPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 ##################################################################
@@ -1222,7 +1245,7 @@ class Deploy(MappingSchema):
 
 
 class PostProcessesEndpoint(MappingSchema):
-    header = AcceptHeader()
+    header = RequestHeaders()
     body = Deploy(title="Deploy")
 
 
@@ -1247,7 +1270,7 @@ class GetJobsQueries(MappingSchema):
 
 
 class GetJobsRequest(MappingSchema):
-    header = AcceptHeader()
+    header = RequestHeaders()
     querystring = GetJobsQueries()
 
 
@@ -1264,27 +1287,27 @@ class GetProviderJobsEndpoint(GetJobsRequest, ProviderPath, ProcessPath):
 
 
 class GetProcessJobEndpoint(ProcessPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class DeleteProcessJobEndpoint(ProcessPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class BillsEndpoint(MappingSchema):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class BillEndpoint(BillPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class ProcessQuotesEndpoint(ProcessPath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class ProcessQuoteEndpoint(ProcessPath, QuotePath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class GetQuotesQueries(MappingSchema):
@@ -1295,26 +1318,26 @@ class GetQuotesQueries(MappingSchema):
 
 
 class QuotesEndpoint(MappingSchema):
-    header = AcceptHeader()
+    header = RequestHeaders()
     querystring = GetQuotesQueries()
 
 
 class QuoteEndpoint(QuotePath):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class PostProcessQuote(ProcessPath, QuotePath):
-    header = AcceptHeader()
+    header = RequestHeaders()
     body = MappingSchema(default={})
 
 
 class PostQuote(QuotePath):
-    header = AcceptHeader()
+    header = RequestHeaders()
     body = MappingSchema(default={})
 
 
 class PostProcessQuoteRequestEndpoint(ProcessPath, QuotePath):
-    header = AcceptHeader()
+    header = RequestHeaders()
     body = QuoteProcessParametersSchema()
 
 
@@ -1324,25 +1347,25 @@ class PostProcessQuoteRequestEndpoint(ProcessPath, QuotePath):
 
 
 class GetProviders(MappingSchema):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class PostProvider(MappingSchema):
-    header = AcceptHeader()
+    header = RequestHeaders()
     body = CreateProviderRequestBody()
 
 
 class GetProviderProcesses(MappingSchema):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class GetProviderProcess(MappingSchema):
-    header = AcceptHeader()
+    header = RequestHeaders()
 
 
 class PostProviderProcessJobRequest(MappingSchema):
     """Launching a new process request definition."""
-    header = AcceptHeader()
+    header = RequestHeaders()
     querystring = LaunchJobQuerystring()
     body = Execute()
 
@@ -1350,6 +1373,10 @@ class PostProviderProcessJobRequest(MappingSchema):
 #################################
 # Responses schemas
 #################################
+
+class ErrorDetail(MappingSchema):
+    code = SchemaNode(Integer(), example=401)
+    status = SchemaNode(String(), example="401 Unauthorized.")
 
 
 class OWSExceptionResponse(MappingSchema):
@@ -1367,22 +1394,22 @@ class ErrorJsonResponseBodySchema(MappingSchema):
 
 
 class UnauthorizedJsonResponseSchema(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 
 
 class ForbiddenJsonResponseSchema(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 
 
 class OkGetFrontpageResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = FrontpageSchema()
 
 
 class OkGetSwaggerJSONResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = SwaggerJSONSpecSchema(description="Swagger JSON of weaver API.")
 
 
@@ -1392,17 +1419,17 @@ class OkGetSwaggerUIResponse(MappingSchema):
 
 
 class OkGetVersionsResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = VersionsSchema()
 
 
 class OkGetConformanceResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = ConformanceSchema()
 
 
 class OkGetProvidersListResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = ProvidersSchema()
 
 
@@ -1411,7 +1438,7 @@ class InternalServerErrorGetProvidersListResponse(MappingSchema):
 
 
 class OkGetProviderCapabilitiesSchema(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = ProviderCapabilitiesSchema()
 
 
@@ -1420,7 +1447,7 @@ class InternalServerErrorGetProviderCapabilitiesResponse(MappingSchema):
 
 
 class NoContentDeleteProviderSchema(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = MappingSchema(default={})
 
 
@@ -1433,7 +1460,7 @@ class NotImplementedDeleteProviderResponse(MappingSchema):
 
 
 class OkGetProviderProcessesSchema(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = ProcessCollection()
 
 
@@ -1457,7 +1484,7 @@ class GetProcessesEndpoint(MappingSchema):
 
 
 class OkGetProcessesListResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = ProcessCollection()
 
 
@@ -1473,7 +1500,7 @@ class OkPostProcessDeployBodySchema(MappingSchema):
 
 
 class OkPostProcessesResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = OkPostProcessDeployBodySchema()
 
 
@@ -1482,7 +1509,7 @@ class InternalServerErrorPostProcessesResponse(MappingSchema):
 
 
 class OkGetProcessInfoResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = ProcessOffering()
 
 
@@ -1496,7 +1523,7 @@ class InternalServerErrorGetProcessResponse(MappingSchema):
 
 
 class OkGetProcessPackageSchema(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = MappingSchema(default={})
 
 
@@ -1505,7 +1532,7 @@ class InternalServerErrorGetProcessPackageResponse(MappingSchema):
 
 
 class OkGetProcessPayloadSchema(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = MappingSchema(default={})
 
 
@@ -1518,7 +1545,7 @@ class ProcessVisibilityResponseBodySchema(MappingSchema):
 
 
 class OkGetProcessVisibilitySchema(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = ProcessVisibilityResponseBodySchema()
 
 
@@ -1527,7 +1554,7 @@ class InternalServerErrorGetProcessVisibilityResponse(MappingSchema):
 
 
 class OkPutProcessVisibilitySchema(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = ProcessVisibilityResponseBodySchema()
 
 
@@ -1543,7 +1570,7 @@ class OkDeleteProcessUndeployBodySchema(MappingSchema):
 
 
 class OkDeleteProcessResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = OkDeleteProcessUndeployBodySchema()
 
 
@@ -1552,7 +1579,7 @@ class InternalServerErrorDeleteProcessResponse(MappingSchema):
 
 
 class OkGetProviderProcessDescriptionResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = ProcessDescriptionBodySchema()
 
 
@@ -1561,7 +1588,7 @@ class InternalServerErrorGetProviderProcessResponse(MappingSchema):
 
 
 class CreatedPostProvider(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = ProviderSummarySchema()
 
 
@@ -1574,7 +1601,7 @@ class NotImplementedPostProviderResponse(MappingSchema):
 
 
 class CreatedLaunchJobResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = CreatedJobStatusSchema()
 
 
@@ -1587,17 +1614,17 @@ class InternalServerErrorPostProviderProcessJobResponse(MappingSchema):
 
 
 class OkGetProcessJobResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = JobStatusInfo()
 
 
 class OkDeleteProcessJobResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = DismissedJobSchema()
 
 
 class OkGetQueriedJobsResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = GetQueriedJobsSchema()
 
 
@@ -1606,7 +1633,7 @@ class InternalServerErrorGetJobsResponse(MappingSchema):
 
 
 class OkDismissJobResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = DismissedJobSchema()
 
 
@@ -1615,7 +1642,7 @@ class InternalServerErrorDeleteJobResponse(MappingSchema):
 
 
 class OkGetJobStatusResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = JobStatusInfo()
 
 
@@ -1629,7 +1656,7 @@ class Inputs(MappingSchema):
 
 
 class OkGetJobInputsResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = Inputs()
 
 
@@ -1639,7 +1666,7 @@ class Outputs(MappingSchema):
 
 
 class OkGetJobOutputsResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = Outputs()
 
 
@@ -1648,7 +1675,7 @@ class ResultInfoList(OutputInfoList):
 
 
 class OkGetJobResultsResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = ResultInfoList()
 
 
@@ -1661,7 +1688,7 @@ class InternalServerErrorGetJobOutputResponse(MappingSchema):
 
 
 class CreatedQuoteExecuteResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = CreatedQuotedJobStatusSchema()
 
 
@@ -1670,7 +1697,7 @@ class InternalServerErrorPostQuoteExecuteResponse(MappingSchema):
 
 
 class CreatedQuoteRequestResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = QuoteSchema()
 
 
@@ -1679,7 +1706,7 @@ class InternalServerErrorPostQuoteRequestResponse(MappingSchema):
 
 
 class OkGetQuoteInfoResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = QuoteSchema()
 
 
@@ -1688,7 +1715,7 @@ class InternalServerErrorGetQuoteInfoResponse(MappingSchema):
 
 
 class OkGetQuoteListResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = QuotationListSchema()
 
 
@@ -1697,7 +1724,7 @@ class InternalServerErrorGetQuoteListResponse(MappingSchema):
 
 
 class OkGetBillDetailResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = BillSchema()
 
 
@@ -1706,7 +1733,7 @@ class InternalServerErrorGetBillInfoResponse(MappingSchema):
 
 
 class OkGetBillListResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = BillListSchema()
 
 
@@ -1715,7 +1742,7 @@ class InternalServerErrorGetBillListResponse(MappingSchema):
 
 
 class OkGetJobExceptionsResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = ExceptionsOutputSchema()
 
 
@@ -1724,7 +1751,7 @@ class InternalServerErrorGetJobExceptionsResponse(MappingSchema):
 
 
 class OkGetJobLogsResponse(MappingSchema):
-    header = JsonHeader()
+    header = ResponseHeaders()
     body = LogsOutputSchema()
 
 
@@ -1758,10 +1785,7 @@ get_processes_responses = {
     "500": InternalServerErrorGetProcessesListResponse(),
 }
 post_processes_responses = {
-    # FIXME:
-    #   status should be 201 when properly modified to match API conformance
-    #   https://github.com/crim-ca/weaver/issues/14
-    "200": OkPostProcessesResponse(description="success"),
+    "201": OkPostProcessesResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
     "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorPostProcessesResponse(),
