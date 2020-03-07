@@ -2,6 +2,7 @@ import logging
 from typing import TYPE_CHECKING, AnyStr, Optional
 
 import six
+from beaker.cache import cache_region
 from cornice.service import get_services
 from cornice_swagger import CorniceSwagger
 from pyramid.authentication import Authenticated, IAuthenticationPolicy
@@ -23,7 +24,12 @@ from simplejson import JSONDecodeError
 from six.moves.urllib.parse import urlparse
 
 from weaver.__meta__ import __version__ as weaver_version
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN
+from weaver.formats import (
+    CONTENT_TYPE_APP_JSON,
+    CONTENT_TYPE_APP_PDF,
+    CONTENT_TYPE_APP_XML,
+    CONTENT_TYPE_TEXT_HTML
+)
 from weaver.owsexceptions import OWSException
 from weaver.utils import get_header, get_settings, get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd
@@ -38,6 +44,7 @@ LOGGER = logging.getLogger(__name__)
 
 @sd.api_frontpage_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
                               schema=sd.FrontpageEndpoint(), response_schemas=sd.get_api_frontpage_responses)
+@cache_region("doc", sd.api_frontpage_service.name)
 def api_frontpage(request):
     """Frontpage of weaver."""
 
@@ -52,12 +59,9 @@ def api_frontpage(request):
     weaver_api = asbool(settings.get("weaver.wps_restapi"))
     weaver_api_url = get_wps_restapi_base_url(settings) if weaver_api else None
     weaver_api_def = weaver_api_url + sd.api_swagger_ui_service.path if weaver_api else None
-    weaver_api_doc = settings.get("weaver.wps_restapi_doc", None) if weaver_api else None
-    weaver_api_ref = settings.get("weaver.wps_restapi_ref", None) if weaver_api else None
+
     weaver_wps = asbool(settings.get("weaver.wps"))
     weaver_wps_url = get_wps_url(settings) if weaver_wps else None
-    weaver_wps_doc = settings.get("weaver.wps_doc", None) if weaver_wps else None
-    weaver_wps_ref = settings.get("weaver.wps_ref", None) if weaver_wps else None
     weaver_conform_url = weaver_url + sd.api_conformance_service.path
     weaver_process_url = weaver_url + sd.processes_service.path
     weaver_links = [
@@ -65,36 +69,45 @@ def api_frontpage(request):
         {"href": weaver_conform_url, "rel": "conformance", "type": CONTENT_TYPE_APP_JSON,
          "title": "WPS 2.0/3.0 REST-JSON Binding Extension conformance classes implemented by this service."},
     ]
-    if weaver_api_def:
-        weaver_links.append({"href": weaver_api_def, "rel": "service", "type": CONTENT_TYPE_APP_JSON,
-                             "title": "API definition of this service."})
-    if isinstance(weaver_api_doc, six.string_types):
-        if "." in weaver_api_doc:   # pylint: disable=E1135,unsupported-membership-test
-            ext_type = weaver_api_doc.split(".")[-1]
-            doc_type = "application/{}".format(ext_type)
-        else:
-            doc_type = CONTENT_TYPE_TEXT_PLAIN  # default most basic type
-        weaver_links.append({"href": weaver_api_doc, "rel": "documentation", "type": doc_type,
-                             "title": "API documentation about this service."})
-    if weaver_api_ref:
-        weaver_links.append({"href": weaver_api_ref, "rel": "reference", "type": CONTENT_TYPE_APP_JSON,
-                             "title": "API reference specification of this service."})
-    weaver_links.append({"href": weaver_process_url, "rel": "processes", "type": CONTENT_TYPE_APP_JSON,
-                         "title": "Processes offered by this service."})
-
+    if weaver_api:
+        weaver_links.extend([
+            {"href": weaver_api_url,
+             "rel": "service", "type": CONTENT_TYPE_APP_JSON,
+             "title": "WPS REST API endpoint of this service."},
+            {"href": weaver_api_def,
+             "rel": "OpenAPI", "type": CONTENT_TYPE_TEXT_HTML,
+             "title": "WPS REST API definition of this service."},
+            {"href": "https://raw.githubusercontent.com/opengeospatial/wps-rest-binding/develop/docs/18-062.pdf",
+             "rel": "documentation", "type": CONTENT_TYPE_APP_PDF,
+             "title": "API documentation about this service."},
+            {"href": "https://app.swaggerhub.com/apis/geoprocessing/WPS/",
+             "rel": "wps-rest-swagger", "type": CONTENT_TYPE_TEXT_HTML,
+             "title": "API reference specification of this service."},
+            {"href": weaver_process_url,
+             "rel": "processes", "type": CONTENT_TYPE_APP_JSON,
+             "title": "Processes offered by this service."}
+        ])
+    if weaver_wps:
+        weaver_links.extend([
+            {"href": weaver_wps,
+             "rel": "wps", "type": CONTENT_TYPE_APP_XML,
+             "title": "WPS 1/2 endpoint of this service."},
+            {"href": "http://docs.opengeospatial.org/is/14-065/14-065.html",
+             "rel": "wps-xml-specification", "type": CONTENT_TYPE_TEXT_HTML,
+             "title": "WPS 1/2 definition of this service."},
+            {"href": "http://schemas.opengis.net/wps/",
+             "rel": "wps-xml-schema", "type": CONTENT_TYPE_APP_XML,
+             "title": "WPS 1/2 XML validation schemas."}
+        ])
     return {
         "message": "Weaver Information",
         "configuration": weaver_config,
         "parameters": [
             {"name": "api", "enabled": weaver_api,
              "url": weaver_api_url,
-             "doc": weaver_api_doc,
-             "api": weaver_api_def,
-             "ref": weaver_api_ref},
+             "api": weaver_api_def},
             {"name": "wps", "enabled": weaver_wps,
-             "url": weaver_wps_url,
-             "doc": weaver_wps_doc,
-             "ref": weaver_wps_ref},
+             "url": weaver_wps_url},
         ],
         "links": weaver_links,
     }
