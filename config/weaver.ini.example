@@ -20,8 +20,10 @@ mongodb.port = 27017
 mongodb.db_name = weaver
 
 # caching
-cache.regions = result
+cache.regions = doc, result
 cache.type = memory
+cache.doc.expire = 86400
+cache.doc.enabled = true
 cache.result.expire = 3600
 cache.result.enabled = false
 
@@ -77,9 +79,6 @@ weaver.wps_workdir =
 # --- Weaver WPS metadata ---
 # all attributes under "metadata:main" can be specified as 'weaver.wps_metadata_<field>'
 # (reference: https://pywps.readthedocs.io/en/master/configuration.html#metadata-main)
-weaver.wps_ref = http://schemas.opengis.net/wps/
-weaver.wps_doc = http://docs.opengeospatial.org/is/14-065/14-065.html
-# WPS metadata
 weaver.wps_metadata_identification_title=Weaver
 weaver.wps_metadata_identification_abstract=Weaver internal WPS used for demo and testing.
 weaver.wps_metadata_identification_keywords=Weaver,WPS,OGC
@@ -105,8 +104,6 @@ weaver.wps_metadata_contact_role=Information
 weaver.wps_restapi = true
 weaver.wps_restapi_url =
 weaver.wps_restapi_path = /
-weaver.wps_restapi_ref = https://app.swaggerhub.com/apis/geoprocessing/WPS/
-weaver.wps_restapi_doc = https://raw.githubusercontent.com/opengeospatial/wps-rest-binding/develop/docs/18-062.pdf
 
 # --- Weaver job email notification ---
 weaver.wps_email_encrypt_salt = salty-email

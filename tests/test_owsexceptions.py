@@ -41,9 +41,10 @@ def test_owsexceptions_json_formatter():
     test_code = 418
     test_status = "{} I'm a teapot".format(test_code)
     for test, expect in test_cases:
-        json_body = OWSException.json_formatter(status=test_status, body=test, title="", environ={})
-        assert json_body["code"] == test_code
-        assert json_body["status"] == test_status
+        json_body = OWSException.json_formatter(status=test_status, body=test, title="SomeCode", environ={})
+        assert json_body["code"] == "SomeCode"
+        assert json_body["error"]["code"] == test_code
+        assert json_body["error"]["status"] == test_status
         assert json_body["description"] == expect, \
             "Result does not match expected value" + \
             "\n  Result: '{}'".format(json_body["description"]) + \

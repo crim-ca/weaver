@@ -237,8 +237,19 @@ def get_job_outputs(request):
     Retrieve the outputs of a job.
     """
     job = get_job(request)
-    results = dict(outputs=[dict(id=get_any_id(result), value=get_any_value(result)) for result in job.results])
-    return HTTPOk(json=results)
+    id_val = [(get_any_id(result), get_any_value(result)) for result in job.results]
+    outputs = [{"id": result[0], "href" if result[1].startswith("http") else "value": result[1]} for result in id_val]
+    ref_url = request.url.rstrip("/").rsplit("/", 1)[0]
+    input_url = ref_url + "/" + sd.job_inputs_service.path.rsplit("/")[-1]
+    results_url = ref_url + "/" + sd.job_results_service.path.rsplit("/")[-1]
+    return HTTPOk(json={
+        "outputs": outputs,
+        "links": [
+            {"rel": "self", "href": request.url},
+            {"rel": "inputs", "href": input_url},
+            {"rel": "results", "href": results_url}
+        ]
+    })
 
 
 def get_results(job, container):
