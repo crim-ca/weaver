@@ -39,7 +39,7 @@ if TYPE_CHECKING:
         AnyValue, AnyKey, AnySettingsContainer, AnyRegistryContainer, AnyHeadersContainer,
         AnyResponseType, HeadersType, SettingsType, JSON, XML, Number
     )
-    from typing import Union, Any, Dict, List, AnyStr, Iterable, Optional, Type                 # noqa: F401
+    from typing import Union, Any, Callable, Dict, List, AnyStr, Iterable, Optional, Type       # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 
@@ -871,3 +871,58 @@ def clean_json_text_body(body):
     body_parts = [p[0].upper() + p[1:] for p in body_parts if len(p)]           # capitalize first word
     body_parts = " ".join(p for p in body_parts if p)
     return body_parts
+
+
+def transform_json(json_data,               # type: JSON
+                   rename=None,             # type: Optional[Dict[AnyKey, Any]]
+                   remove=None,             # type: Optional[List[AnyKey]]
+                   add=None,                # type: Optional[Dict[AnyKey, Any]]
+                   replace_values=None,     # type: Optional[Dict[AnyKey, Any]]
+                   replace_func=None,       # type: Optional[Dict[AnyKey, Callable[[Any], Any]]]
+                   ):                       # type: (...) -> JSON
+    """
+    Transforms the input ``json_data`` with different methods.
+    The transformations are applied in the same order as the arguments.
+    """
+    rename = rename or {}
+    remove = remove or []
+    add = add or {}
+    replace_values = replace_values or {}
+    replace_func = replace_func or {}
+
+    # rename
+    for k, v in rename.items():
+        if k in json_data:
+            json_data[v] = json_data.pop(k)
+
+    # remove
+    for r_k in remove:
+        json_data.pop(r_k, None)
+
+    # add
+    for k, v in add.items():
+        json_data[k] = v
+
+    # replace values
+    for key, value in json_data.items():
+        for old_value, new_value in replace_values.items():
+            if value == old_value:
+                json_data[key] = new_value
+
+    # replace with function call
+    for k, func in replace_func.items():
+        if k in json_data:
+            json_data[k] = func(json_data[k])
+
+    # also rename if the type of the value is a list of dicts
+    for key, value in json_data.items():
+        if isinstance(value, list):
+            for nested_item in value:
+                if isinstance(nested_item, dict):
+                    for k, v in rename.items():
+                        if k in nested_item:
+                            nested_item[v] = nested_item.pop(k)
+                    for k, func in replace_func.items():
+                        if k in nested_item:
+                            nested_item[k] = func(nested_item[k])
+    return json_data

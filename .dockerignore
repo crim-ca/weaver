@@ -25,6 +25,7 @@ env
 *.egg[s]
 *.egg-info
 *egg[s]__pycache__
+.python_history
 
 # Unit test / Coverage reports
 .cache

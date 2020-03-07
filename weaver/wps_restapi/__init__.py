@@ -21,6 +21,12 @@ def includeme(config):
         config.include("weaver.wps_restapi.processes")
         config.include("weaver.wps_restapi.quotation")
         config.include("pyramid_mako")
+        config.include("pyramid_rewrite")
+        # attempt finding a not found route using either an added or removed trailing slash according to situation
+        config.add_rewrite_rule(r"/(?P<path>.*)/", r"/%(path)s")
+        config.add_notfound_view(api.not_found_or_method_not_allowed, append_slash=True)
+        config.add_forbidden_view(api.unauthorized_or_forbidden)
+
         config.add_route(**sd.service_api_route_info(sd.api_frontpage_service, settings))
         config.add_route(**sd.service_api_route_info(sd.api_swagger_json_service, settings))
         config.add_route(**sd.service_api_route_info(sd.api_swagger_ui_service, settings))
@@ -36,5 +42,3 @@ def includeme(config):
                         request_method="GET", renderer=OUTPUT_FORMAT_JSON)
         config.add_view(api.api_conformance, route_name=sd.api_conformance_service.name,
                         request_method="GET", renderer=OUTPUT_FORMAT_JSON)
-        config.add_notfound_view(api.not_found_or_method_not_allowed, append_slash=True)
-        config.add_forbidden_view(api.unauthorized_or_forbidden)

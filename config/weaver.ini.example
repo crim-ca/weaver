@@ -19,6 +19,12 @@ mongodb.host = mongodb
 mongodb.port = 27017
 mongodb.db_name = weaver
 
+# caching
+cache.regions = result
+cache.type = memory
+cache.result.expire = 3600
+cache.result.enabled = false
+
 # NOTE:
 #   For all below parameters, settings suffixed by `_url` are automatically generated from their corresponding `_path`
 #   settings using `weaver.url` if they are not provided. Otherwise, the explicit definition provided by `_url` suffixed

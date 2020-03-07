@@ -4,28 +4,21 @@ import pytest
 
 from tests.utils import get_test_weaver_app, setup_config_with_mongodb
 from weaver.formats import CONTENT_TYPE_APP_JSON
-from weaver.wps_restapi.swagger_definitions import (
-    api_frontpage_uri,
-    api_swagger_json_uri,
-    api_swagger_ui_uri,
-    api_versions_uri,
-    jobs_full_uri,
-    jobs_short_uri
-)
+from weaver.wps_restapi import swagger_definitions as sd
 
 TEST_PUBLIC_ROUTES = [
-    api_frontpage_uri,
-    api_swagger_ui_uri,
-    api_swagger_json_uri,
-    api_versions_uri,
+    sd.api_frontpage_service.path,
+    sd.api_swagger_ui_service.path,
+    sd.api_swagger_json_service.path,
+    sd.api_versions_service.path,
 ]
 TEST_FORBIDDEN_ROUTES = [
-    jobs_short_uri,  # should always be visible
-    jobs_full_uri,  # could be 401
+    sd.jobs_service.path,  # should always be visible
+    sd.provider_jobs_service.path,  # could be 401
 ]
 TEST_NOTFOUND_ROUTES = [
-    "/jobs/not-found",
-    "/providers/not-found",
+    sd.job_service.path.format(job_id="not-found"),
+    sd.provider_service.path.format(provider_id="not-found"),
 ]
 
 

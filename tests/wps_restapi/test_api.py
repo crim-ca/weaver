@@ -17,7 +17,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
         cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
 
     def test_frontpage_format(self):
-        resp = self.testapp.get(sd.api_frontpage_uri, headers=self.json_headers)
+        resp = self.testapp.get(sd.api_frontpage_service.path, headers=self.json_headers)
         assert resp.status_code == 200
         try:
             sd.FrontpageSchema().deserialize(resp.json)
@@ -25,7 +25,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
             self.fail("expected valid response format as defined in schema [{!s}]".format(ex))
 
     def test_version_format(self):
-        resp = self.testapp.get(sd.api_versions_uri, headers=self.json_headers)
+        resp = self.testapp.get(sd.api_versions_service.path, headers=self.json_headers)
         assert resp.status_code == 200
         try:
             sd.VersionsSchema().deserialize(resp.json)
@@ -33,7 +33,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
             self.fail("expected valid response format as defined in schema [{!s}]".format(ex))
 
     def test_conformance_format(self):
-        resp = self.testapp.get(sd.api_conformance_uri, headers=self.json_headers)
+        resp = self.testapp.get(sd.api_conformance_service.path, headers=self.json_headers)
         assert resp.status_code == 200
         try:
             sd.ConformanceSchema().deserialize(resp.json)
@@ -41,11 +41,11 @@ class GenericApiRoutesTestCase(unittest.TestCase):
             self.fail("expected valid response format as defined in schema [{!s}]".format(ex))
 
     def test_swagger_api_format(self):
-        resp = self.testapp.get(sd.api_swagger_ui_uri)
+        resp = self.testapp.get(sd.api_swagger_ui_service.path)
         assert resp.status_code == 200
         assert "<title>{}</title>".format(sd.API_TITLE) in resp.text
 
-        resp = self.testapp.get(sd.api_swagger_json_uri, headers=self.json_headers)
+        resp = self.testapp.get(sd.api_swagger_json_service.path, headers=self.json_headers)
         assert resp.status_code == 200
         assert "tags" in resp.json
         assert "info" in resp.json
@@ -60,10 +60,10 @@ class GenericApiRoutesTestCase(unittest.TestCase):
         Shouldn't be the default behaviour to employ 403 on both cases.
         """
         with mock.patch("weaver.wps_restapi.api.get_weaver_url", side_effect=HTTPUnauthorized):
-            resp = self.testapp.get(sd.api_frontpage_uri, headers=self.json_headers, expect_errors=True)
+            resp = self.testapp.get(sd.api_frontpage_service.path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 401
         with mock.patch("weaver.wps_restapi.api.get_weaver_url", side_effect=HTTPForbidden):
-            resp = self.testapp.get(sd.api_frontpage_uri, headers=self.json_headers, expect_errors=True)
+            resp = self.testapp.get(sd.api_frontpage_service.path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 403
 
     def test_status_not_found_and_method_not_allowed(self):
@@ -75,7 +75,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
         assert resp.status_code == 404
 
         # test an existing route with wrong method, shouldn't be the default '404' on both cases
-        resp = self.testapp.post(sd.api_frontpage_uri, headers=self.json_headers, expect_errors=True)
+        resp = self.testapp.post(sd.api_frontpage_service.path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 405
 
 
@@ -139,7 +139,7 @@ class RebasedApiRoutesTestCase(unittest.TestCase):
         resp = testapp.get(sd.api_swagger_json_service.path, headers=self.json_headers)
         assert resp.status_code == 200, "API definition should be accessed directly"
         assert resp.json["host"] in [self.app_host, "{}:80".format(self.app_host)]
-        assert resp.json["basePath"] == sd.api_frontpage_uri
+        assert resp.json["basePath"] == sd.api_frontpage_service.path
 
         resp = testapp.get(sd.api_swagger_ui_service.path)
         assert resp.status_code == 200, "API definition should be accessed directly"

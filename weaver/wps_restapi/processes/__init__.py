@@ -38,7 +38,7 @@ def includeme(config):
                     request_method="GET", renderer=OUTPUT_FORMAT_JSON)
     config.add_view(p.describe_provider_process, route_name=sd.provider_process_service.name,
                     request_method="GET", renderer=OUTPUT_FORMAT_JSON)
-    config.add_view(p.submit_provider_job, route_name=sd.jobs_full_service.name,
+    config.add_view(p.submit_provider_job, route_name=sd.provider_jobs_service.name,
                     request_method="POST", renderer=OUTPUT_FORMAT_JSON)
     config.add_view(p.get_process_visibility, route_name=sd.process_visibility_service.name,
                     request_method="GET", renderer=OUTPUT_FORMAT_JSON)

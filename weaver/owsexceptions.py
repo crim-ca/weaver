@@ -26,7 +26,12 @@ from webob import html_escape as _html_escape
 from webob.acceptparse import create_accept_header
 from zope.interface import implementer
 
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_XML
+from weaver.formats import (
+    CONTENT_TYPE_APP_XML,
+    CONTENT_TYPE_APP_JSON,
+    CONTENT_TYPE_TEXT_HTML,
+    CONTENT_TYPE_TEXT_XML
+)
 from weaver.utils import clean_json_text_body
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 
@@ -40,7 +45,7 @@ class OWSException(Response, Exception):
     code = "NoApplicableCode"
     value = None
     locator = "NoApplicableCode"
-    explanation = "Unknown Error"
+    description = "Unknown Error"
 
     page_template = Template("""\
 <?xml version="1.0" encoding="utf-8"?>
@@ -66,10 +71,12 @@ class OWSException(Response, Exception):
             status = status.status
         elif not status:
             status = HTTPOk().status
+        self.code = str(kw.pop("code", self.code))
+        self.description = str(detail or kw.pop("description", self.description))
         Response.__init__(self, status=status, **kw)
         Exception.__init__(self, detail)
-        self.message = detail or self.explanation
-        self.content_type = CONTENT_TYPE_TEXT_XML
+        self.message = detail or self.description
+        self.content_type = CONTENT_TYPE_APP_JSON
         if value:
             self.locator = value
 
@@ -84,16 +91,26 @@ class OWSException(Response, Exception):
     @staticmethod
     def json_formatter(status, body, title, environ):  # noqa: F811
         # type: (AnyStr, AnyStr, AnyStr, SettingsType) -> JSON
-        body = clean_json_text_body(body)
-        return {"description": body, "code": int(status.split()[0]), "status": status, "title": title}
+        body = clean_json_text_body(body)   # message/description
+        code = int(status.split()[0])       # HTTP status code
+        body = {"description": body, "code": title}     # title is the string OGC 'code'
+        if code >= 400:
+            body["error"] = {"code": code, "status": status}
+        return body
 
     def prepare(self, environ):
         if not self.body:
             accept_value = environ.get("HTTP_ACCEPT", "")
             accept = create_accept_header(accept_value)
 
-            # Attempt to match xml or json, if those don't match, we will fall through to defaulting to xml
-            match = accept.best_match([CONTENT_TYPE_TEXT_XML, CONTENT_TYPE_APP_JSON])
+            # Attempt to match XML or JSON, if those don't match, we will fall back to defaulting to JSON
+            #   since browsers add HTML automatically and it is closer to XML, we 'allow' it only to catch this
+            #   explicit case and fallback to JSON manually
+            match = accept.best_match([CONTENT_TYPE_TEXT_HTML, CONTENT_TYPE_APP_JSON,
+                                       CONTENT_TYPE_TEXT_XML, CONTENT_TYPE_APP_XML],
+                                      default_match=CONTENT_TYPE_APP_JSON)
+            if match == CONTENT_TYPE_TEXT_HTML:
+                match = CONTENT_TYPE_APP_JSON
 
             if match == CONTENT_TYPE_APP_JSON:
                 self.content_type = CONTENT_TYPE_APP_JSON
@@ -106,21 +123,21 @@ class OWSException(Response, Exception):
                     def __init__(self, excobj):
                         self.excobj = excobj
 
-                    def substitute(self, code, locator, message):  # noqa: W0613
+                    def substitute(self, code, locator, message):   # noqa: W0613,E811
+                        msg_code = getattr(self.excobj, "code", None)
                         return json.dumps(self.excobj.json_formatter(
-                            status=self.excobj.status, body=message, title=None, environ=environ))
+                            status=self.excobj.status, body=message, title=msg_code, environ=environ))
 
                 page_template = JsonPageTemplate(self)
-
+                args = {"code": self.code, "locator": self.locator, "message": self.message}
             else:
                 self.content_type = CONTENT_TYPE_TEXT_XML
                 page_template = self.page_template
-
-            args = {
-                "code": _html_escape(self.code),
-                "locator": _html_escape(self.locator),
-                "message": _html_escape(self.message or ""),
-            }
+                args = {
+                    "code": _html_escape(self.code),
+                    "locator": _html_escape(self.locator),
+                    "message": _html_escape(self.message or ""),
+                }
             page = page_template.substitute(**args)
             if isinstance(page, text_type):
                 page = page.encode(self.charset if self.charset else "UTF-8")
@@ -148,7 +165,7 @@ class OWSException(Response, Exception):
 
 class OWSAccessForbidden(OWSException):
     locator = "AccessUnauthorized"
-    explanation = "Access to this service is unauthorized."
+    description = "Access to this service is unauthorized."
 
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPUnauthorized
@@ -157,7 +174,7 @@ class OWSAccessForbidden(OWSException):
 
 class OWSNotFound(OWSException):
     locator = "NotFound"
-    explanation = "This resource does not exist."
+    description = "This resource does not exist."
 
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPNotFound
@@ -166,7 +183,7 @@ class OWSNotFound(OWSException):
 
 class OWSNotAcceptable(OWSException):
     locator = "NotAcceptable"
-    explanation = "Access to this service failed."
+    description = "Access to this service failed."
 
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPNotAcceptable
@@ -177,7 +194,7 @@ class OWSNoApplicableCode(OWSException):
     """WPS Bad Request Exception"""
     code = "NoApplicableCode"
     locator = ""
-    explanation = "Parameter value is missing"
+    description = "Parameter value is missing"
 
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPBadRequest
@@ -189,7 +206,7 @@ class OWSMissingParameterValue(OWSException):
     """MissingParameterValue WPS Exception"""
     code = "MissingParameterValue"
     locator = ""
-    explanation = "Parameter value is missing"
+    description = "Parameter value is missing"
 
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPBadRequest
@@ -201,7 +218,7 @@ class OWSInvalidParameterValue(OWSException):
     """InvalidParameterValue WPS Exception"""
     code = "InvalidParameterValue"
     locator = ""
-    explanation = "Parameter value is not acceptable."
+    description = "Parameter value is not acceptable."
 
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPNotAcceptable
@@ -212,7 +229,7 @@ class OWSInvalidParameterValue(OWSException):
 class OWSNotImplemented(OWSException):
     code = "NotImplemented"
     locator = ""
-    explanation = "Operation is not implemented."
+    description = "Operation is not implemented."
 
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPNotImplemented

@@ -98,20 +98,25 @@ from weaver.utils import (
     get_settings,
     get_url_without_query,
     null,
+<<<<<<< HEAD
     request_extra,
     str2bytes
+=======
+    str2bytes,
+    transform_json
+>>>>>>> support json/xml according to accept header + add job status links (#58) + extra job routes (#86) + compliance with ogc api
 )
 from weaver.wps import get_wps_output_dir
-from weaver.wps_restapi.swagger_definitions import process_uri
+from weaver.wps_restapi.swagger_definitions import process_service
 
 if TYPE_CHECKING:
     # pylint: disable=W0611,unused-import
     from weaver.datatype import Job             # noqa: F401
     from weaver.status import AnyStatusType     # noqa: F401
     from weaver.typedefs import (               # noqa: F401
-        ToolPathObjectType, CWLFactoryCallable, CWL, AnyKey, AnyValue as AnyValueType, JSON, XML, Number
+        ToolPathObjectType, CWLFactoryCallable, CWL, AnyValue as AnyValueType, JSON, XML, Number
     )
-    from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, Type, Union  # noqa: F401
+    from typing import Any, AnyStr, Dict, List, Optional, Tuple, Type, Union  # noqa: F401
     from cwltool.process import Process as ProcessCWL                                   # noqa: F401
     from pywps.app import WPSRequest                                                    # noqa: F401
     from pywps.response.execute import ExecuteResponse                                  # noqa: F401
@@ -261,7 +266,7 @@ def get_process_location(process_id_or_url, data_source=None):
         return process_id_or_url
     data_source_url = retrieve_data_source_url(data_source)
     process_id = get_sane_name(process_id_or_url)
-    process_url = process_uri.format(process_id=process_id)
+    process_url = process_service.path.format(process_id=process_id)
     return "{host}{path}".format(host=data_source_url, path=process_url)
 
 
@@ -1235,61 +1240,6 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
                         continue
                 _set_field(updated_io_list[-1], field_type, wps_field)
     return updated_io_list
-
-
-def transform_json(json_data,               # type: ANY_IO_Type
-                   rename=None,             # type: Optional[Dict[AnyKey, Any]]
-                   remove=None,             # type: Optional[List[AnyKey]]
-                   add=None,                # type: Optional[Dict[AnyKey, Any]]
-                   replace_values=None,     # type: Optional[Dict[AnyKey, Any]]
-                   replace_func=None,       # type: Optional[Dict[AnyKey, Callable[[Any], Any]]]
-                   ):                       # type: (...) -> ANY_IO_Type
-    """
-    Transforms the input json_data with different methods.
-    The transformations are applied in the same order as the arguments.
-    """
-    rename = rename or {}
-    remove = remove or []
-    add = add or {}
-    replace_values = replace_values or {}
-    replace_func = replace_func or {}
-
-    # rename
-    for k, v in rename.items():
-        if k in json_data:
-            json_data[v] = json_data.pop(k)
-
-    # remove
-    for r_k in remove:
-        json_data.pop(r_k, None)
-
-    # add
-    for k, v in add.items():
-        json_data[k] = v
-
-    # replace values
-    for key, value in json_data.items():
-        for old_value, new_value in replace_values.items():
-            if value == old_value:
-                json_data[key] = new_value
-
-    # replace with function call
-    for k, func in replace_func.items():
-        if k in json_data:
-            json_data[k] = func(json_data[k])
-
-    # also rename if the type of the value is a list of dicts
-    for key, value in json_data.items():
-        if isinstance(value, list):
-            for nested_item in value:
-                if isinstance(nested_item, dict):
-                    for k, v in rename.items():
-                        if k in nested_item:
-                            nested_item[v] = nested_item.pop(k)
-                    for k, func in replace_func.items():
-                        if k in nested_item:
-                            nested_item[k] = func(nested_item[k])
-    return json_data
 
 
 def _merge_package_inputs_outputs(wps_inputs_list,      # type: List[ANY_IO_Type]

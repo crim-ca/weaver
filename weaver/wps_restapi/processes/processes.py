@@ -52,6 +52,7 @@ from weaver.utils import (
     get_ssl_verify_option,
     raise_on_xml_exception,
     request_extra,
+    transform_json,
     wait_secs
 )
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
@@ -381,6 +382,9 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
                              .format(CONTENT_TYPE_APP_JSON))
     try:
         json_body = request.json_body
+        if "inputs" in json_body and isinstance(json_body["inputs"], list):
+            for i in json_body["inputs"]:
+                transform_json(i, rename={"data": "value"})     # backward compatibility
     except Exception as ex:
         raise HTTPBadRequest("Invalid JSON body cannot be decoded for job submission. [{}]".format(ex))
     try:
@@ -427,9 +431,9 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
     return HTTPCreated(location=location, json=body_data)
 
 
-@sd.jobs_full_service.post(tags=[sd.TAG_PROVIDER_PROCESS, sd.TAG_PROVIDERS, sd.TAG_EXECUTE, sd.TAG_JOBS],
-                           renderer=OUTPUT_FORMAT_JSON, schema=sd.PostProviderProcessJobRequest(),
-                           response_schemas=sd.post_provider_process_job_responses)
+@sd.provider_jobs_service.post(tags=[sd.TAG_PROVIDER_PROCESS, sd.TAG_PROVIDERS, sd.TAG_EXECUTE, sd.TAG_JOBS],
+                               renderer=OUTPUT_FORMAT_JSON, schema=sd.PostProviderProcessJobRequest(),
+                               response_schemas=sd.post_provider_process_job_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostProviderProcessJobResponse.description)
 def submit_provider_job(request):
     """
@@ -727,8 +731,14 @@ def submit_local_job(request):
                                   visibility=process.visibility)
         return resp
     except InvalidIdentifierValue as ex:
-        raise HTTPBadRequest(str(ex))
+        raise HTTPBadRequest(json={
+            "code": InvalidIdentifierValue.__name__,
+            "description": str(ex)
+        })
     except ProcessNotAccessible:
-        raise HTTPUnauthorized("Process with id '{!s}' is not accessible.".format(process_id))
+        raise HTTPUnauthorized(json={
+            "code": "",
+            "description": "Process with id '{!s}' is not accessible.".format(process_id)
+        })
     except ProcessNotFound:
         raise HTTPNotFound("The process with id '{!s}' does not exist.".format(process_id))

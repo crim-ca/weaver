@@ -26,7 +26,6 @@ def ows_response_tween(request, handler):
         raised_error = err
         raised_error._json_formatter = OWSException.json_formatter
         return_error = raised_error
-
         exc_info_err = False
         exc_log_lvl = logging.WARNING if err.status_code < 500 else logging.ERROR
     except OWSException as err:
@@ -40,7 +39,7 @@ def ows_response_tween(request, handler):
         raised_error = err
         return_error = OWSNotImplemented(str(err))
         exc_info_err = sys.exc_info()
-        exc_log_lvl = logging.ERROR
+        exc_log_lvl = logging.WARNING
     except Exception as err:
         LOGGER.debug("unhandled %s exception -> ows exception response", type(err).__name__)
         raised_error = err

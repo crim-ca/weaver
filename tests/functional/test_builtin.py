@@ -108,7 +108,7 @@ class BuiltinAppTest(unittest.TestCase):
                         continue
                     assert resp.json["status"] == STATUS_SUCCEEDED, \
                         "Process execution failed. Response body:\n{}".format(resp.json)
-                    resp = self.app.get("{}/result".format(job_url), headers=self.json_headers)
+                    resp = self.app.get("{}/outputs".format(job_url), headers=self.json_headers)
                     assert resp.status_code == 200
                     assert resp.json["outputs"][0]["id"] == "output"
                     nc_path = resp.json["outputs"][0]["href"]
