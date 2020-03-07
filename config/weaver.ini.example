@@ -104,8 +104,12 @@ weaver.wps_metadata_contact_role=Information
 weaver.wps_restapi = true
 weaver.wps_restapi_url =
 weaver.wps_restapi_path = /
+<<<<<<< HEAD
 
 # --- Weaver job email notification ---
+=======
+# email notification
+>>>>>>> convert conformance / frontpage references to literal http links
 weaver.wps_email_encrypt_salt = salty-email
 weaver.wps_email_encrypt_rounds = 100000
 weaver.wps_email_notify_smtp_host =

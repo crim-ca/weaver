@@ -402,6 +402,7 @@ Changes:
 - Add ``<job-uri>/outputs`` providing the 'old' format of the job results as well as ``<job-uri>/inputs`` to retrieve
   the inputs that were provided during job submission (#86).
 - Add more reference/documentation links to `WPS-1/2` and update conformance references (#53).
+- Add some minimal caching support of routes.
 
 Fixes:
 ------
