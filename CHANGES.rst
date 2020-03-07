@@ -362,9 +362,17 @@ Changes:
   unnecessary failures during edge case connexion problems.
 - Add support of ``title`` and ``version`` field of ``builtin`` processes.
 
+- Provide HTTP links to corresponding items of job in status JSON body (#58).
+- Provide OGC compliance of ``<job-uri>/results`` response schema as well as some expected ``code``/``description``
+  fields in case where the request fails.
+- Add ``<job-uri>/outputs`` providing the 'old' format of the job results as well as ``<job-uri>/inputs`` to retrieve
+  the inputs that were provided during job submission (#86).
+- Add more reference/documentation links to `WPS-1/2` and update conformance references (#53).
+
 Fixes:
 ------
 
+<<<<<<< 8b37e0af5db9f2071f2f51ffc1ab571ceb072161
 - Patch ``builtin`` process execution failing since ``cwltool 2.x`` update.
 - Avoid long fetch operation using streamed request that defaulted to chuck size of 1.
   Now, we use an appropriate size according to available memory.
@@ -386,6 +394,9 @@ Changes:
 
 - Provide a way to override the external URL reported by `WPS-1/2` and `WPS-REST` via configuration settings allowing
   for more advanced server-side results in response bodies.
+=======
+- Handle additional trailing slash resulting in ``NotFound`` that corresponds to a valid route without the slash.
+>>>>>>> update changelog - fix #53, #58, #86
 
 `1.2.0 <https://github.com/crim-ca/weaver/tree/1.2.0>`_ (2020-03-06)
 ========================================================================
