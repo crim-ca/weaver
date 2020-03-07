@@ -96,57 +96,6 @@ API_INFO = {
 }
 URL = "url"
 
-#########################################################################
-# API endpoints
-#########################################################################
-
-api_frontpage_uri = "/"
-api_swagger_ui_uri = "/api"
-api_swagger_json_uri = "/json"
-api_versions_uri = "/versions"
-api_conformance_uri = "/conformance"
-
-processes_uri = "/processes"
-process_uri = "/processes/{process_id}"
-process_package_uri = "/processes/{process_id}/package"
-process_payload_uri = "/processes/{process_id}/payload"
-process_visibility_uri = "/processes/{process_id}/visibility"
-process_jobs_uri = "/processes/{process_id}/jobs"
-process_job_uri = "/processes/{process_id}/jobs/{job_id}"
-process_quotes_uri = "/processes/{process_id}/quotations"
-process_quote_uri = "/processes/{process_id}/quotations/{quote_id}"
-process_results_uri = "/processes/{process_id}/jobs/{job_id}/result"
-process_exceptions_uri = "/processes/{process_id}/jobs/{job_id}/exceptions"
-process_logs_uri = "/processes/{process_id}/jobs/{job_id}/logs"
-
-providers_uri = "/providers"
-provider_uri = "/providers/{provider_id}"
-
-provider_processes_uri = "/providers/{provider_id}/processes"
-provider_process_uri = "/providers/{provider_id}/processes/{process_id}"
-
-jobs_short_uri = "/jobs"
-jobs_full_uri = "/providers/{provider_id}/processes/{process_id}/jobs"
-job_full_uri = "/providers/{provider_id}/processes/{process_id}/jobs/{job_id}"
-job_exceptions_uri = "/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/exceptions"
-job_short_uri = "/jobs/{job_id}"
-
-quotes_uri = "/quotations"
-quote_uri = "/quotations/{quote_id}"
-bills_uri = "/bills"
-bill_uri = "/bill/{bill_id}"
-
-results_full_uri = "/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/result"
-results_short_uri = "/jobs/{job_id}/result"
-result_full_uri = "/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/result/{result_id}"
-result_short_uri = "/jobs/{job_id}/result/{result_id}"
-
-exceptions_full_uri = "/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/exceptions"
-exceptions_short_uri = "/jobs/{job_id}/exceptions"
-
-logs_full_uri = "/providers/{provider_id}/processes/{process_id}/jobs/{job_id}/logs"
-logs_short_uri = "/jobs/{job_id}/logs"
-
 #########################################################
 # API tags
 #########################################################
@@ -168,53 +117,57 @@ TAG_EXCEPTIONS = "Exceptions"
 TAG_LOGS = "Logs"
 TAG_WPS = "WPS"
 
-###############################################################################
+#########################################################################
+# API endpoints
 # These "services" are wrappers that allow Cornice to generate the JSON API
 ###############################################################################
 
-api_frontpage_service = Service(name="api_frontpage", path=api_frontpage_uri)
-api_swagger_ui_service = Service(name="api_swagger_ui", path=api_swagger_ui_uri)
-api_swagger_json_service = Service(name="api_swagger_json", path=api_swagger_json_uri)
-api_versions_service = Service(name="api_versions", path=api_versions_uri)
-api_conformance_service = Service(name="api_conformance", path=api_conformance_uri)
+api_frontpage_service = Service(name="api_frontpage", path="/")
+api_swagger_ui_service = Service(name="api_swagger_ui", path="/api")
+api_swagger_json_service = Service(name="api_swagger_json", path="/json")
+api_versions_service = Service(name="api_versions", path="/versions")
+api_conformance_service = Service(name="api_conformance", path="/conformance")
 
-processes_service = Service(name="processes", path=processes_uri)
-process_service = Service(name="process", path=process_uri)
-process_package_service = Service(name="process_package", path=process_package_uri)
-process_payload_service = Service(name="process_payload", path=process_payload_uri)
-process_visibility_service = Service(name="process_visibility", path=process_visibility_uri)
-process_jobs_service = Service(name="process_jobs", path=process_jobs_uri)
-process_job_service = Service(name="process_job", path=process_job_uri)
-process_quotes_service = Service(name="process_quotes", path=process_quotes_uri)
-process_quote_service = Service(name="process_quote", path=process_quote_uri)
-process_results_service = Service(name="process_results", path=process_results_uri)
-process_exceptions_service = Service(name="process_exceptions", path=process_exceptions_uri)
-process_logs_service = Service(name="process_logs", path=process_logs_uri)
+quotes_service = Service(name="quotes", path="/quotations")
+quote_service = Service(name="quote", path=quotes_service.path + "/{quote_id}")
+bills_service = Service(name="bills", path="/bills")
+bill_service = Service(name="bill", path=bills_service.path + "/{bill_id}")
 
-providers_service = Service(name="providers", path=providers_uri)
-provider_service = Service(name="provider", path=provider_uri)
+jobs_service = Service(name="jobs", path="/jobs")
+job_service = Service(name="job", path=jobs_service.path + "/{job_id}")
+job_results_service = Service(name="job_results", path=job_service.path + "/results")
+job_exceptions_service = Service(name="job_exceptions", path=job_service.path + "/exceptions")
+job_outputs_service = Service(name="job_outputs", path=job_service.path + "/outputs")
+job_inputs_service = Service(name="job_inputs", path=job_service.path + "/inputs")
+job_logs_service = Service(name="job_logs", path=job_service.path + "/logs")
 
-provider_processes_service = Service(name="provider_processes", path=provider_processes_uri)
-provider_process_service = Service(name="provider_process", path=provider_process_uri)
+processes_service = Service(name="processes", path="/processes")
+process_service = Service(name="process", path=processes_service.path + "/{process_id}")
+process_quotes_service = Service(name="process_quotes", path=process_service.path + quotes_service.path)
+process_quote_service = Service(name="process_quote", path=process_service.path + quote_service.path)
+process_visibility_service = Service(name="process_visibility", path=process_service.path + "/visibility")
+process_package_service = Service(name="process_package", path=process_service.path + "/package")
+process_payload_service = Service(name="process_payload", path=process_service.path + "/payload")
+process_jobs_service = Service(name="process_jobs", path=process_service.path + jobs_service.path)
+process_job_service = Service(name="process_job", path=process_service.path + job_service.path)
+process_results_service = Service(name="process_results", path=process_service.path + job_results_service.path)
+process_inputs_service = Service(name="process_inputs", path=process_service.path + job_inputs_service.path)
+process_outputs_service = Service(name="process_outputs", path=process_service.path + job_outputs_service.path)
+process_exceptions_service = Service(name="process_exceptions", path=process_service.path + job_exceptions_service.path)
+process_logs_service = Service(name="process_logs", path=process_service.path + job_logs_service.path)
 
-jobs_short_service = Service(name="jobs_short", path=jobs_short_uri)
-jobs_full_service = Service(name="jobs_full", path=jobs_full_uri)
-job_full_service = Service(name="job_full", path=job_full_uri)
-job_short_service = Service(name="job_short", path=job_short_uri)
-
-quotes_service = Service(name="quotes", path=quotes_uri)
-quote_service = Service(name="quote", path=quote_uri)
-bills_service = Service(name="bills", path=bills_uri)
-bill_service = Service(name="bill", path=bill_uri)
-
-results_full_service = Service(name="results_full", path=results_full_uri)
-results_short_service = Service(name="results_short", path=results_short_uri)
-
-exceptions_full_service = Service(name="exceptions_full", path=exceptions_full_uri)
-exceptions_short_service = Service(name="exceptions_short", path=exceptions_short_uri)
-
-logs_full_service = Service(name="logs_full", path=logs_full_uri)
-logs_short_service = Service(name="logs_short", path=logs_short_uri)
+providers_service = Service(name="providers", path="/providers")
+provider_service = Service(name="provider", path=providers_service.path + "/{provider_id}")
+provider_processes_service = Service(name="provider_processes", path=provider_service.path + processes_service.path)
+provider_process_service = Service(name="provider_process", path=provider_service.path + process_service.path)
+provider_jobs_service = Service(name="provider_jobs", path=provider_service.path + process_jobs_service.path)
+provider_job_service = Service(name="provider_job", path=provider_service.path + process_job_service.path)
+provider_results_service = Service(name="provider_results", path=provider_service.path + process_results_service.path)
+provider_inputs_service = Service(name="provider_inputs", path=provider_service.path + process_inputs_service.path)
+provider_outputs_service = Service(name="provider_outputs", path=provider_service.path + process_outputs_service.path)
+provider_logs_service = Service(name="provider_logs", path=provider_service.path + process_logs_service.path)
+provider_exceptions_service = Service(name="provider_exceptions",
+                                      path=provider_service.path + process_exceptions_service.path)
 
 #########################################################
 # Path parameter definitions
@@ -516,7 +469,7 @@ class OutputDescriptionList(SequenceSchema):
 class JobExecuteModeEnum(SchemaNode):
     schema_type = String
 
-    def __init__(self, *args, **kwargs):    # noqa: E811
+    def __init__(self, *_, **kwargs):
         kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(JobExecuteModeEnum, self).__init__(
             self.schema_type(),
@@ -530,7 +483,7 @@ class JobExecuteModeEnum(SchemaNode):
 class JobControlOptionsEnum(SchemaNode):
     schema_type = String
 
-    def __init__(self, *args, **kwargs):    # noqa: E811
+    def __init__(self, *_, **kwargs):
         kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(JobControlOptionsEnum, self).__init__(
             self.schema_type(),
@@ -544,7 +497,7 @@ class JobControlOptionsEnum(SchemaNode):
 class JobResponseOptionsEnum(SchemaNode):
     schema_type = String
 
-    def __init__(self, *args, **kwargs):    # noqa: E811
+    def __init__(self, *_, **kwargs):
         kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(JobResponseOptionsEnum, self).__init__(
             self.schema_type(),
@@ -558,7 +511,7 @@ class JobResponseOptionsEnum(SchemaNode):
 class TransmissionModeEnum(SchemaNode):
     schema_type = String
 
-    def __init__(self, *args, **kwargs):    # noqa: E811
+    def __init__(self, *_, **kwargs):
         kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(TransmissionModeEnum, self).__init__(
             self.schema_type(),
@@ -572,7 +525,7 @@ class TransmissionModeEnum(SchemaNode):
 class JobStatusEnum(SchemaNode):
     schema_type = String
 
-    def __init__(self, *args, **kwargs):    # noqa: E811
+    def __init__(self, *_, **kwargs):
         kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(JobStatusEnum, self).__init__(
             self.schema_type(),
@@ -585,7 +538,7 @@ class JobStatusEnum(SchemaNode):
 class JobSortEnum(SchemaNode):
     schema_type = String
 
-    def __init__(self, *args, **kwargs):    # noqa: E811
+    def __init__(self, *_, **kwargs):
         kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
         super(JobSortEnum, self).__init__(
             String(),
@@ -598,7 +551,7 @@ class JobSortEnum(SchemaNode):
 class QuoteSortEnum(SchemaNode):
     schema_type = String
 
-    def __init__(self, *args, **kwargs):    # noqa: E811
+    def __init__(self, *_, **kwargs):
         kwargs.pop("validator", None)  # ignore passed argument and enforce the validator
         super(QuoteSortEnum, self).__init__(
             self.schema_type(),
@@ -723,6 +676,30 @@ class FullJobEndpoint(ProviderPath, ProcessPath, JobPath):
 
 
 class ShortJobEndpoint(JobPath):
+    header = AcceptHeader()
+
+
+class ProcessInputsEndpoint(ProcessPath, JobPath):
+    header = AcceptHeader()
+
+
+class ProviderInputsEndpoint(ProviderPath, ProcessPath, JobPath):
+    header = AcceptHeader()
+
+
+class JobInputsEndpoint(JobPath):
+    header = AcceptHeader()
+
+
+class ProcessOutputsEndpoint(ProcessPath, JobPath):
+    header = AcceptHeader()
+
+
+class ProviderOutputsEndpoint(ProviderPath, ProcessPath, JobPath):
+    header = AcceptHeader()
+
+
+class JobOutputsEndpoint(JobPath):
     header = AcceptHeader()
 
 
@@ -858,15 +835,12 @@ class JobStatusInfo(MappingSchema):
     jobID = SchemaNode(String(), example="a9d14bf4-84e0-449a-bac8-16e598efe807", description="ID of the job.")
     status = JobStatusEnum()
     message = SchemaNode(String(), missing=drop)
-    # fixme: use href links (https://github.com/crim-ca/weaver/issues/58) [logs/result/exceptions]
-    logs = SchemaNode(String(), missing=drop)
-    result = SchemaNode(String(), missing=drop)
-    exceptions = SchemaNode(String(), missing=drop)
     expirationDate = SchemaNode(DateTime(), missing=drop)
     estimatedCompletion = SchemaNode(DateTime(), missing=drop)
     duration = SchemaNode(String(), missing=drop, description="Duration of the process execution.")
     nextPoll = SchemaNode(DateTime(), missing=drop)
     percentCompleted = SchemaNode(Integer(), example=0, validator=Range(min=0, max=100))
+    links = JsonLinkList(missing=drop)
 
 
 class JobEntrySchema(OneOfMappingSchema):
@@ -966,32 +940,35 @@ class DataEncodingAttributes(MappingSchema):
     encoding = SchemaNode(String(), missing=drop)
 
 
-class DataFloat(DataEncodingAttributes):
-    data = SchemaNode(Float())
+class ValueFloat(DataEncodingAttributes):
+    value = SchemaNode(Float())
 
 
-class DataInteger(DataEncodingAttributes):
-    data = SchemaNode(Integer())
+class ValueInteger(DataEncodingAttributes):
+    value = SchemaNode(Integer())
 
 
-class DataString(DataEncodingAttributes):
-    data = SchemaNode(String())
+class ValueString(DataEncodingAttributes):
+    value = SchemaNode(String())
 
 
-class DataBoolean(DataEncodingAttributes):
-    data = SchemaNode(Boolean())
+class ValueBoolean(DataEncodingAttributes):
+    value = SchemaNode(Boolean())
 
 
 class ValueType(OneOfMappingSchema):
-    _one_of = (DataFloat,
-               DataInteger,
-               DataString,
-               DataBoolean,
+    _one_of = (ValueFloat,
+               ValueInteger,
+               ValueString,
+               ValueBoolean,
                Reference)
 
 
 class Input(InputDataType, ValueType):
-    pass
+    """
+    Default value to be looked for uses key 'value' to conform to OGC API standard.
+    We still look for 'href', 'data' and 'reference' to remain back-compatible.
+    """
 
 
 class InputList(SequenceSchema):
@@ -1128,10 +1105,10 @@ class JobOutputsSchema(SequenceSchema):
 
 
 class OutputInfo(OutputDataType, OneOfMappingSchema):
-    _one_of = (DataFloat,
-               DataInteger,
-               DataString,
-               DataBoolean,
+    _one_of = (ValueFloat,
+               ValueInteger,
+               ValueString,
+               ValueBoolean,
                Reference)
 
 
@@ -1646,23 +1623,37 @@ class InternalServerErrorGetJobStatusResponse(MappingSchema):
     description = "Unhandled error occurred during provider process description."
 
 
-class Result(MappingSchema):
+class Inputs(MappingSchema):
+    inputs = InputList()
+    links = JsonLinkList(missing=drop)
+
+
+class OkGetJobInputsResponse(MappingSchema):
+    header = JsonHeader()
+    body = Inputs()
+
+
+class Outputs(MappingSchema):
     outputs = OutputInfoList()
     links = JsonLinkList(missing=drop)
 
 
+class OkGetJobOutputsResponse(MappingSchema):
+    header = JsonHeader()
+    body = Outputs()
+
+
+class ResultInfoList(OutputInfoList):
+    pass
+
+
 class OkGetJobResultsResponse(MappingSchema):
     header = JsonHeader()
-    body = Result()
+    body = ResultInfoList()
 
 
 class InternalServerErrorGetJobResultsResponse(MappingSchema):
     description = "Unhandled error occurred during job results listing."
-
-
-class OkGetOutputResponse(MappingSchema):
-    header = JsonHeader()
-    body = JobOutputSchema()
 
 
 class InternalServerErrorGetJobOutputResponse(MappingSchema):
@@ -1845,7 +1836,7 @@ get_provider_process_responses = {
 }
 post_provider_responses = {
     "201": CreatedPostProvider(description="success"),
-    "400": MappingSchema(description=OWSMissingParameterValue.explanation),
+    "400": MappingSchema(description=OWSMissingParameterValue.description),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
     "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorPostProviderResponse(),
@@ -1881,17 +1872,22 @@ delete_job_responses = {
     "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorDeleteJobResponse(),
 }
-get_job_results_responses = {
-    "200": OkGetJobResultsResponse(description="success"),
+get_job_inputs_responses = {
+    "200": OkGetJobInputsResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
     "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetJobResultsResponse(),
 }
-get_job_output_responses = {
-    "200": OkGetOutputResponse(description="success"),
+get_job_outputs_responses = {
+    "200": OkGetJobOutputsResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
     "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetJobOutputResponse(),
+}
+get_job_results_responses = {
+    "200": OkGetJobResultsResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorGetJobResultsResponse(),
 }
 get_exceptions_responses = {
     "200": OkGetJobExceptionsResponse(description="success"),

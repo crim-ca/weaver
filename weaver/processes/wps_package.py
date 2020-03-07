@@ -92,7 +92,7 @@ from weaver.utils import (
     setup_loggers
 )
 from weaver.wps.utils import get_wps_output_dir
-from weaver.wps_restapi.swagger_definitions import process_uri
+from weaver.wps_restapi.swagger_definitions import process_service
 
 if TYPE_CHECKING:
     from typing import Any, Deque, Dict, List, Optional, Tuple, Type, Union
@@ -121,8 +121,13 @@ if TYPE_CHECKING:
     ListCWLRequirements = List[CWLRequirement]       # [{'class': <req>, <param>: <val>}]
     AnyCWLRequirements = Union[DictCWLRequirements, ListCWLRequirements]
     # results from CWL execution
-    CWLResultEntry = Dict[str, Union[AnyValueType, List[AnyValueType]]]
+    CWLResultFile = TypedDict("CWLResultFile", {"location": str}, total=False)
+    CWLResultValue = Union[AnyValueType, List[AnyValueType]]
+    CWLResultEntry = Union[Dict[str, CWLResultValue], CWLResultFile, List[CWLResultFile]]
     CWLResults = Dict[str, CWLResultEntry]
+
+    # cwl_result[output_id]["location"]
+    # cwl_result[output_id][i]["location"]
 
 # NOTE:
 #   Only use this logger for 'utility' methods (not residing under WpsPackage).
@@ -189,7 +194,7 @@ def get_process_location(process_id_or_url, data_source=None):
         return process_id_or_url
     data_source_url = retrieve_data_source_url(data_source)
     process_id = get_sane_name(process_id_or_url)
-    process_url = process_uri.format(process_id=process_id)
+    process_url = process_service.path.format(process_id=process_id)
     return "{host}{path}".format(host=data_source_url, path=process_url)
 
 
@@ -389,7 +394,7 @@ def _load_package_content(package_dict,                             # type: Dict
                           loading_context=None,                     # type: Optional[LoadingContext]
                           runtime_context=None,                     # type: Optional[RuntimeContext]
                           process_offering=None,                    # type: Optional[JSON]
-                          ):  # type: (...) -> Optional[Tuple[CWLFactoryCallable, str, Dict]]
+                          ):  # type: (...) -> Optional[Tuple[CWLFactoryCallable, str, Dict[str, str]]]
     """
     Loads the package content to file in a temporary directory.
     Recursively processes sub-packages steps if the parent is a `Workflow` (CWL class).
@@ -407,7 +412,7 @@ def _load_package_content(package_dict,                             # type: Dict
         otherwise, tuple of:
             - instance of ``CWLFactoryCallable``
             - package type (``PROCESS_WORKFLOW`` or ``PROCESS_APPLICATION``)
-            - dict of each step with their package name that must be run
+            - mapping of each step ID with their package name that must be run
 
     .. warning::
         Specified :paramref:`tmp_dir` will be deleted on exit.
@@ -503,7 +508,7 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
         and "$namespaces" in cwl_package_package
         and isinstance(cwl_package_package["$namespaces"], dict)
     ):
-        metadata = wps_package_metadata.get("metadata", list())
+        metadata = wps_package_metadata.get("metadata", [])
         namespaces_inv = {v: k for k, v in cwl_package_package["$namespaces"]}
         for schema in cwl_package_package["$schemas"]:
             for namespace_url in namespaces_inv:
@@ -765,8 +770,8 @@ class WpsPackage(Process):
         :returns:  captured execution log lines retrieved from files
         """
         captured_log = []
+        status = STATUS_RUNNING
         try:
-            status = STATUS_RUNNING
             if isinstance(result, CWLException):
                 result = getattr(result, "out")
                 status = STATUS_FAILED

@@ -1,4 +1,5 @@
 alembic
+beaker
 # AWS support (S3 buckets)
 boto3
 # celery 5 to be released in near future
@@ -27,9 +28,11 @@ oauthlib
 owslib>=0.19.2
 pymongo
 pyramid>=1.7.3
+pyramid_beaker>=0.8
 pyramid_celery
 pyramid_mako
 python-dateutil
+pyramid_rewrite
 pytz
 # no viable pywps version with Python>3.5 dependencies
 # use '4.2.4' plus a few commits that provide fix, but not yet released

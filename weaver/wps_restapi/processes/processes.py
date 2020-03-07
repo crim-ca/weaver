@@ -37,9 +37,9 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
-@sd.jobs_full_service.post(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
-                           renderer=OUTPUT_FORMAT_JSON, schema=sd.PostProviderProcessJobRequest(),
-                           response_schemas=sd.post_provider_process_job_responses)
+@sd.provider_jobs_service.post(tags=[sd.TAG_PROVIDERS, sd.TAG_PROVIDERS, sd.TAG_EXECUTE, sd.TAG_JOBS],
+                               renderer=OUTPUT_FORMAT_JSON, schema=sd.PostProviderProcessJobRequest(),
+                               response_schemas=sd.post_provider_process_job_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostProviderProcessJobResponse.description)
 def submit_provider_job(request):
     """

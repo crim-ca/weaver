@@ -29,7 +29,12 @@ from pywps.exceptions import InvalidParameterValue, MissingParameterValue, NoApp
 from webob.acceptparse import create_accept_header
 from zope.interface import implementer
 
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_XML
+from weaver.formats import (
+    CONTENT_TYPE_APP_XML,
+    CONTENT_TYPE_APP_JSON,
+    CONTENT_TYPE_TEXT_HTML,
+    CONTENT_TYPE_TEXT_XML
+)
 from weaver.utils import clean_json_text_body
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 
@@ -43,7 +48,7 @@ class OWSException(Response, Exception):
     code = "NoApplicableCode"
     value = None
     locator = "NoApplicableCode"
-    explanation = "Unknown Error"
+    description = "Unknown Error"
 
     page_template = Template("""\
 <?xml version="1.0" encoding="utf-8"?>
@@ -69,10 +74,12 @@ class OWSException(Response, Exception):
             status = status.status
         elif not status:
             status = HTTPOk().status
+        self.code = str(kw.pop("code", self.code))
+        self.description = str(detail or kw.pop("description", self.description))
         Response.__init__(self, status=status, **kw)
         Exception.__init__(self, detail)
-        self.message = detail or self.explanation
-        self.content_type = CONTENT_TYPE_TEXT_XML
+        self.message = detail or self.description or self.explanation
+        self.content_type = CONTENT_TYPE_APP_JSON
         value = kw.get("locator", value)
         if value:
             self.locator = value
@@ -86,18 +93,28 @@ class OWSException(Response, Exception):
         return str(type(self))
 
     @staticmethod
-    def json_formatter(status, body, title, environ):  # noqa: F811
+    def json_formatter(status, body, title, __environ):
         # type: (str, str, str, SettingsType) -> JSON
-        body = clean_json_text_body(body)
-        return {"description": body, "code": int(status.split()[0]), "status": status, "title": title}
+        body = clean_json_text_body(body)   # message/description
+        code = int(status.split()[0])       # HTTP status code
+        body = {"description": body, "code": title}     # title is the string OGC 'code'
+        if code >= 400:
+            body["error"] = {"code": code, "status": status}
+        return body
 
     def prepare(self, environ):
         if not self.body:
             accept_value = environ.get("HTTP_ACCEPT", "")
             accept = create_accept_header(accept_value)
 
-            # Attempt to match xml or json, if those don't match, we will fall through to defaulting to xml
-            match = accept.best_match([CONTENT_TYPE_TEXT_XML, CONTENT_TYPE_APP_JSON])
+            # Attempt to match XML or JSON, if those don't match, we will fall back to defaulting to JSON
+            #   since browsers add HTML automatically and it is closer to XML, we 'allow' it only to catch this
+            #   explicit case and fallback to JSON manually
+            match = accept.best_match([CONTENT_TYPE_TEXT_HTML, CONTENT_TYPE_APP_JSON,
+                                       CONTENT_TYPE_TEXT_XML, CONTENT_TYPE_APP_XML],
+                                      default_match=CONTENT_TYPE_APP_JSON)
+            if match == CONTENT_TYPE_TEXT_HTML:
+                match = CONTENT_TYPE_APP_JSON
 
             if match == CONTENT_TYPE_APP_JSON:
                 self.content_type = CONTENT_TYPE_APP_JSON
@@ -112,7 +129,8 @@ class OWSException(Response, Exception):
 
                     def substitute(self, code, locator, message):
                         status = self.excobj.status
-                        data = self.excobj.json_formatter(status=status, body=message, title=None, environ=environ)
+                        title = getattr(self.excobj, "code", None)
+                        data = self.excobj.json_formatter(status=status, body=message, title=title, environ=environ)
                         data["exception"] = {
                             "code": code or "",
                             "locator": locator or "",
@@ -121,16 +139,15 @@ class OWSException(Response, Exception):
                         return json.dumps(data)
 
                 page_template = JsonPageTemplate(self)
-
+                args = {"code": self.code, "locator": self.locator, "message": self.message}
             else:
                 self.content_type = CONTENT_TYPE_TEXT_XML
                 page_template = self.page_template
-
-            args = {
-                "code": self.code,
-                "locator": self.locator,
-                "message": self.message or "",
-            }
+                args = {
+                    "code": self.code,
+                    "locator": self.locator,
+                    "message": self.message or "",
+                }
             page = page_template.substitute(**args)
             if isinstance(page, str):
                 page = page.encode(self.charset if self.charset else "UTF-8")
@@ -202,7 +219,7 @@ class OWSMissingParameterValue(OWSException, MissingParameterValue):
     """MissingParameterValue WPS Exception"""
     code = "MissingParameterValue"
     locator = ""
-    explanation = "Parameter value is missing"
+    description = "Parameter value is missing"
 
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPBadRequest
@@ -214,7 +231,7 @@ class OWSInvalidParameterValue(OWSException, InvalidParameterValue):
     """InvalidParameterValue WPS Exception"""
     code = "InvalidParameterValue"
     locator = ""
-    explanation = "Parameter value is not acceptable."
+    description = "Parameter value is not acceptable."
 
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPBadRequest
@@ -225,7 +242,7 @@ class OWSInvalidParameterValue(OWSException, InvalidParameterValue):
 class OWSNotImplemented(OWSException):
     code = "NotImplemented"
     locator = ""
-    explanation = "Operation is not implemented."
+    description = "Operation is not implemented."
 
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPNotImplemented

@@ -33,5 +33,3 @@ def includeme(config):
                         request_method="GET", renderer=OUTPUT_FORMAT_JSON)
         config.add_view(api.api_conformance, route_name=sd.api_conformance_service.name,
                         request_method="GET", renderer=OUTPUT_FORMAT_JSON)
-        config.add_notfound_view(api.not_found_or_method_not_allowed, append_slash=True)
-        config.add_forbidden_view(api.unauthorized_or_forbidden)

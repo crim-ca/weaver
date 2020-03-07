@@ -11,6 +11,7 @@ from pyramid.httpexceptions import HTTPNotFound
 from pywps import configuration as pywps_config
 
 from weaver.config import get_weaver_configuration
+from weaver.typedefs import XML
 from weaver.utils import get_settings, get_url_without_query, get_weaver_url, is_uuid, make_dirs, request_extra
 
 LOGGER = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ if TYPE_CHECKING:
     from pyramid.request import Request
     from owslib.wps import WebProcessingService
 
-    from weaver.typedefs import AnySettingsContainer, XML
+    from weaver.typedefs import AnySettingsContainer
 
 
 def _get_settings_or_wps_config(container,                  # type: AnySettingsContainer
@@ -177,7 +178,7 @@ def check_wps_status(location=None,     # type: Optional[str]
     execution.checkStatus(response=xml, sleepSecs=sleep_secs)
     if execution.response is None:
         raise Exception("Missing response, cannot check status.")
-    if not isinstance(execution.response, lxml.etree._Element):  # noqa
+    if not isinstance(execution.response, XML):
         execution.response = lxml.etree.fromstring(execution.response)
     return execution
 

@@ -20,6 +20,7 @@ from weaver.exceptions import (
     log_unhandled_exceptions
 )
 from weaver.formats import OUTPUT_FORMAT_JSON
+from weaver.owsexceptions import OWSNotFound
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import get_any_id, get_any_value, get_settings
 from weaver.visibility import VISIBILITY_PUBLIC
@@ -28,6 +29,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import Optional, Tuple
+    from pyramid.httpexceptions import HTTPException
     from weaver.typedefs import AnySettingsContainer, JSON
 
 LOGGER = get_task_logger(__name__)
@@ -46,15 +48,21 @@ def get_job(request):
     try:
         job = store.fetch_by_id(job_id)
     except JobNotFound:
-        raise HTTPNotFound("Could not find job with specified 'job_id'.")
+        raise OWSNotFound(code="NoSuchJob", description="Could not find job with specified 'job_id'.")
 
     provider_id = request.matchdict.get("provider_id", job.service)
     process_id = request.matchdict.get("process_id", job.process)
 
     if job.service != provider_id:
-        raise HTTPNotFound("Could not find job with specified 'provider_id'.")
+        raise OWSNotFound(
+            code="NoSuchProvider",
+            description="Could not find job corresponding to specified 'provider_id'."
+        )
     if job.process != process_id:
-        raise HTTPNotFound("Could not find job with specified 'process_id'.")
+        raise OWSNotFound(
+            code="NoSuchProcess",
+            description="Could not find job corresponding to specified 'process_id'."
+        )
     return job
 
 
@@ -89,21 +97,30 @@ def validate_service_process(request):
                 if process_name not in [p.id for p in processes]:
                     raise ProcessNotFound
     except (ServiceNotFound, ProcessNotFound):
-        raise HTTPNotFound("{} of id '{}' cannot be found.".format(item_type, item_test))
+        raise HTTPNotFound(json={
+            "code": "NoSuch{}".format(item_type),
+            "description": "{} of id '{}' cannot be found.".format(item_type, item_test)
+        })
     except (ServiceNotAccessible, ProcessNotAccessible):
-        raise HTTPUnauthorized("{} of id '{}' is not accessible.".format(item_type, item_test))
+        raise HTTPUnauthorized(json={
+            "code": "Unauthorized{}".format(item_type),
+            "description": "{} of id '{}' is not accessible.".format(item_type, item_test)
+        })
     except InvalidIdentifierValue as ex:
-        raise HTTPBadRequest(str(ex))
+        raise HTTPBadRequest(json={
+            "code": InvalidIdentifierValue.__name__,
+            "description": str(ex)
+        })
 
     return service_name, process_name
 
 
 @sd.process_jobs_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_JOBS], renderer=OUTPUT_FORMAT_JSON,
                              schema=sd.GetProcessJobsEndpoint(), response_schemas=sd.get_all_jobs_responses)
-@sd.jobs_full_service.get(tags=[sd.TAG_JOBS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
-                          schema=sd.GetProviderJobsEndpoint(), response_schemas=sd.get_all_jobs_responses)
-@sd.jobs_short_service.get(tags=[sd.TAG_JOBS], renderer=OUTPUT_FORMAT_JSON,
-                           schema=sd.GetJobsEndpoint(), response_schemas=sd.get_all_jobs_responses)
+@sd.provider_jobs_service.get(tags=[sd.TAG_JOBS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
+                              schema=sd.GetProviderJobsEndpoint(), response_schemas=sd.get_all_jobs_responses)
+@sd.jobs_service.get(tags=[sd.TAG_JOBS], renderer=OUTPUT_FORMAT_JSON,
+                     schema=sd.GetJobsEndpoint(), response_schemas=sd.get_all_jobs_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobsResponse.description)
 def get_queried_jobs(request):
     """
@@ -147,10 +164,10 @@ def get_queried_jobs(request):
     return HTTPOk(json=body)
 
 
-@sd.job_full_service.get(tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
-                         schema=sd.FullJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
-@sd.job_short_service.get(tags=[sd.TAG_JOBS, sd.TAG_STATUS], renderer=OUTPUT_FORMAT_JSON,
-                          schema=sd.ShortJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
+@sd.provider_job_service.get(tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
+                             schema=sd.FullJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
+@sd.job_service.get(tags=[sd.TAG_JOBS, sd.TAG_STATUS], renderer=OUTPUT_FORMAT_JSON,
+                    schema=sd.ShortJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
 @sd.process_job_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_JOBS, sd.TAG_STATUS], renderer=OUTPUT_FORMAT_JSON,
                             schema=sd.GetProcessJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobStatusResponse.description)
@@ -162,10 +179,10 @@ def get_job_status(request):
     return HTTPOk(json=job.json(request))
 
 
-@sd.job_full_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
-                            schema=sd.FullJobEndpoint(), response_schemas=sd.delete_job_responses)
-@sd.job_short_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS], renderer=OUTPUT_FORMAT_JSON,
-                             schema=sd.ShortJobEndpoint(), response_schemas=sd.delete_job_responses)
+@sd.provider_job_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
+                                schema=sd.FullJobEndpoint(), response_schemas=sd.delete_job_responses)
+@sd.job_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS], renderer=OUTPUT_FORMAT_JSON,
+                       schema=sd.ShortJobEndpoint(), response_schemas=sd.delete_job_responses)
 @sd.process_job_service.delete(tags=[sd.TAG_PROCESSES, sd.TAG_JOBS, sd.TAG_DISMISS], renderer=OUTPUT_FORMAT_JSON,
                                schema=sd.DeleteProcessJobEndpoint(), response_schemas=sd.delete_job_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorDeleteJobResponse.description)
@@ -190,6 +207,40 @@ def cancel_job(request):
     })
 
 
+@sd.provider_inputs_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
+                                schema=sd.ProviderInputsEndpoint(), response_schemas=sd.get_job_inputs_responses)
+@sd.process_inputs_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
+                               schema=sd.ProcessInputsEndpoint(), response_schemas=sd.get_job_inputs_responses)
+@sd.job_inputs_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
+                           schema=sd.JobInputsEndpoint(), response_schemas=sd.get_job_inputs_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobResultsResponse.description)
+def get_job_inputs(request):
+    # type: (Request) -> HTTPException
+    """
+    Retrieve the inputs of a job.
+    """
+    job = get_job(request)
+    results = dict(inputs=[dict(id=get_any_id(_input), value=get_any_value(_input)) for _input in job.inputs])
+    return HTTPOk(json=results)
+
+
+@sd.provider_outputs_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
+                                 schema=sd.ProviderOutputsEndpoint(), response_schemas=sd.get_job_outputs_responses)
+@sd.process_outputs_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
+                                schema=sd.ProcessOutputsEndpoint(), response_schemas=sd.get_job_outputs_responses)
+@sd.job_outputs_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
+                            schema=sd.JobOutputsEndpoint(), response_schemas=sd.get_job_outputs_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobResultsResponse.description)
+def get_job_outputs(request):
+    # type: (Request) -> HTTPException
+    """
+    Retrieve the outputs of a job.
+    """
+    job = get_job(request)
+    results = dict(outputs=[dict(id=get_any_id(result), value=get_any_value(result)) for result in job.results])
+    return HTTPOk(json=results)
+
+
 def get_results(job, container):
     # type: (Job, AnySettingsContainer) -> JSON
     """
@@ -208,26 +259,34 @@ def get_results(job, container):
     return {"outputs": outputs}
 
 
-@sd.results_full_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
-                             schema=sd.FullResultsEndpoint(), response_schemas=sd.get_job_results_responses)
-@sd.results_short_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS], renderer=OUTPUT_FORMAT_JSON,
-                              schema=sd.ShortResultsEndpoint(), response_schemas=sd.get_job_results_responses)
+@sd.provider_results_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
+                                 schema=sd.FullResultsEndpoint(), response_schemas=sd.get_job_results_responses)
 @sd.process_results_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.ProcessResultsEndpoint(), response_schemas=sd.get_job_results_responses)
+@sd.job_results_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS], renderer=OUTPUT_FORMAT_JSON,
+                            schema=sd.ShortResultsEndpoint(), response_schemas=sd.get_job_results_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobResultsResponse.description)
 def get_job_results(request):
+    # type: (Request) -> HTTPException
     """
     Retrieve the results of a job.
     """
     job = get_job(request)
+    job_status = status.map_status(job.status)
+    if job_status in status.JOB_STATUS_CATEGORIES[status.STATUS_CATEGORY_RUNNING]:
+        raise HTTPNotFound(json={
+            "code": "ResultsNotReady",
+            "description": "Job status is '{}'. Results are not yet available.".format(job_status)
+        })
     results = get_results(job, request)
     return HTTPOk(json=results)
 
 
-@sd.exceptions_full_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
-                                schema=sd.FullExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
-@sd.exceptions_short_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS], renderer=OUTPUT_FORMAT_JSON,
-                                 schema=sd.ShortExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
+@sd.provider_exceptions_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS, sd.TAG_PROVIDERS],
+                                    renderer=OUTPUT_FORMAT_JSON,
+                                    schema=sd.FullExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
+@sd.job_exceptions_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS], renderer=OUTPUT_FORMAT_JSON,
+                               schema=sd.ShortExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
 @sd.process_exceptions_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                                    schema=sd.ProcessExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobExceptionsResponse.description)
@@ -239,10 +298,10 @@ def get_job_exceptions(request):
     return HTTPOk(json=job.exceptions)
 
 
-@sd.logs_full_service.get(tags=[sd.TAG_JOBS, sd.TAG_LOGS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
-                          schema=sd.FullLogsEndpoint(), response_schemas=sd.get_logs_responses)
-@sd.logs_short_service.get(tags=[sd.TAG_JOBS, sd.TAG_LOGS], renderer=OUTPUT_FORMAT_JSON,
-                           schema=sd.ShortLogsEndpoint(), response_schemas=sd.get_logs_responses)
+@sd.provider_logs_service.get(tags=[sd.TAG_JOBS, sd.TAG_LOGS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
+                              schema=sd.FullLogsEndpoint(), response_schemas=sd.get_logs_responses)
+@sd.job_logs_service.get(tags=[sd.TAG_JOBS, sd.TAG_LOGS], renderer=OUTPUT_FORMAT_JSON,
+                         schema=sd.ShortLogsEndpoint(), response_schemas=sd.get_logs_responses)
 @sd.process_logs_service.get(tags=[sd.TAG_JOBS, sd.TAG_LOGS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                              schema=sd.ProcessLogsEndpoint(), response_schemas=sd.get_logs_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobLogsResponse.description)
@@ -252,11 +311,3 @@ def get_job_logs(request):
     """
     job = get_job(request)
     return HTTPOk(json=job.logs)
-
-
-# TODO: https://github.com/crim-ca/weaver/issues/18
-# @sd.process_logs_service.get(tags=[sd.TAG_JOBS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
-#                              schema=sd.ProcessOutputEndpoint(), response_schemas=sd.get_job_output_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobOutputResponse.description)
-def get_job_output(request):
-    pass

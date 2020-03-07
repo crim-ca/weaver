@@ -34,13 +34,7 @@ from weaver.utils import (
 )
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.warning import MissingParameterWarning
-from weaver.wps_restapi.swagger_definitions import (
-    process_jobs_uri,
-    process_results_uri,
-    process_uri,
-    process_visibility_uri,
-    processes_uri
-)
+from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import Union
@@ -157,7 +151,7 @@ class Wps3Process(WpsProcessInterface):
         """
         LOGGER.debug("Get process WPS visibility request for [%s]", self.process)
         response = self.make_request(method="GET",
-                                     url=self.url + process_visibility_uri.format(process_id=self.process),
+                                     url=self.url + sd.process_visibility_service.path.format(process_id=self.process),
                                      retry=False,
                                      status_code_mock=HTTPUnauthorized.code)
         if response.status_code in (HTTPUnauthorized.code, HTTPForbidden.code):
@@ -175,7 +169,7 @@ class Wps3Process(WpsProcessInterface):
     def set_visibility(self, visibility):
         self.update_status("Updating process visibility on remote ADES.",
                            REMOTE_JOB_PROGRESS_VISIBLE, status.STATUS_RUNNING)
-        path = self.url + process_visibility_uri.format(process_id=self.process)
+        path = self.url + sd.process_visibility_service.path.format(process_id=self.process)
         user_headers = deepcopy(self.headers)
         user_headers.update(self.get_user_auth_header())
 
@@ -188,7 +182,7 @@ class Wps3Process(WpsProcessInterface):
         response.raise_for_status()
 
     def describe_process(self):
-        path = self.url + process_uri.format(process_id=self.process)
+        path = self.url + sd.process_service.path.format(process_id=self.process)
         LOGGER.debug("Describe process WPS request for [%s] at [%s]", self.process, path)
         response = self.make_request(method="GET",
                                      url=path,
@@ -210,7 +204,7 @@ class Wps3Process(WpsProcessInterface):
     def deploy(self):
         self.update_status("Deploying process on remote ADES.",
                            REMOTE_JOB_PROGRESS_DEPLOY, status.STATUS_RUNNING)
-        path = self.url + processes_uri
+        path = self.url + sd.processes_service.path
         user_headers = deepcopy(self.headers)
         user_headers.update(self.get_user_auth_header())
 
@@ -283,7 +277,7 @@ class Wps3Process(WpsProcessInterface):
                             response=EXECUTE_RESPONSE_DOCUMENT,
                             inputs=execute_body_inputs,
                             outputs=execute_body_outputs)
-        request_url = self.url + process_jobs_uri.format(process_id=self.process)
+        request_url = self.url + sd.process_jobs_service.path.format(process_id=self.process)
         response = self.make_request(method="POST",
                                      url=request_url,
                                      json=execute_body,
@@ -362,7 +356,7 @@ class Wps3Process(WpsProcessInterface):
         return job_status
 
     def get_job_results(self, job_id):
-        result_url = self.url + process_results_uri.format(process_id=self.process, job_id=job_id)
+        result_url = self.url + sd.process_results_service.path.format(process_id=self.process, job_id=job_id)
         response = self.make_request(method="GET",
                                      url=result_url,
                                      retry=True)

@@ -6,7 +6,6 @@ import re
 import shutil
 import sys
 import time
-import types
 import warnings
 from copy import deepcopy
 from datetime import datetime
@@ -18,7 +17,6 @@ import colander
 import pytz
 import requests
 from celery.app import Celery
-from lxml import etree
 from pyramid.config import Configurator
 from pyramid.httpexceptions import HTTPError as PyramidHTTPError, HTTPGatewayTimeout, HTTPTooManyRequests
 from pyramid.registry import Registry
@@ -31,10 +29,11 @@ from urlmatch import urlmatch
 from webob.headers import EnvironHeaders, ResponseHeaders
 
 from weaver.status import map_status
+from weaver.typedefs import XML
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Iterable, Optional, Type, Union
+    from typing import Any, Callable, Dict, List, Iterable, Optional, Type, Union
 
     from weaver.typedefs import (
         AnyKey,
@@ -47,8 +46,7 @@ if TYPE_CHECKING:
         JSON,
         KVP_Item,
         Number,
-        SettingsType,
-        XML
+        SettingsType
     )
 
 LOGGER = logging.getLogger(__name__)
@@ -357,10 +355,10 @@ def pass_http_error(exception, expected_http_error):
 def raise_on_xml_exception(xml_node):
     """
     Raises an exception with the description if the XML response document defines an ExceptionReport.
-    :param xml_node: instance of :class:`etree.Element`
+    :param xml_node: instance of :class:`XML`
     :raise Exception: on found ExceptionReport document.
     """
-    if not isinstance(xml_node, etree._Element):  # noqa: W0212
+    if not isinstance(xml_node, XML):
         raise TypeError("Invalid input, expecting XML element node.")
     if "ExceptionReport" in xml_node.tag:
         node = xml_node
@@ -391,7 +389,7 @@ def bytes2str(string):
 
 def islambda(func):
     # type: (Any) -> bool
-    return isinstance(func, types.LambdaType) and func.__name__ == (lambda: None).__name__
+    return isinstance(func, type(lambda: None)) and func.__name__ == (lambda: None).__name__
 
 
 first_cap_re = re.compile(r"(.)([A-Z][a-z]+)")
@@ -888,7 +886,7 @@ REGEX_ASSERT_INVALID_CHARACTERS = re.compile(r"^[a-zA-Z0-9_\-]+$")
 
 
 def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_character="_"):
-    # type: (str, Optional[int], Optional[Union[int, None]], Optional[bool], Optional[str]) -> Union[str, None]
+    # type: (str, Optional[int], Optional[Union[int, None]], Optional[bool], str) -> Union[str, None]
     """
     Returns a cleaned-up version of the input name, replacing invalid characters not matched with
     :py:data:`REGEX_SEARCH_INVALID_CHARACTERS` by :paramref:`replace_character`.
@@ -954,3 +952,58 @@ def clean_json_text_body(body):
     body_parts = [p[0].upper() + p[1:] for p in body_parts if len(p)]           # capitalize first word
     body_parts = " ".join(p for p in body_parts if p)
     return body_parts
+
+
+def transform_json(json_data,               # type: JSON
+                   rename=None,             # type: Optional[Dict[AnyKey, Any]]
+                   remove=None,             # type: Optional[List[AnyKey]]
+                   add=None,                # type: Optional[Dict[AnyKey, Any]]
+                   replace_values=None,     # type: Optional[Dict[AnyKey, Any]]
+                   replace_func=None,       # type: Optional[Dict[AnyKey, Callable[[Any], Any]]]
+                   ):                       # type: (...) -> JSON
+    """
+    Transforms the input ``json_data`` with different methods.
+    The transformations are applied in the same order as the arguments.
+    """
+    rename = rename or {}
+    remove = remove or []
+    add = add or {}
+    replace_values = replace_values or {}
+    replace_func = replace_func or {}
+
+    # rename
+    for k, v in rename.items():
+        if k in json_data:
+            json_data[v] = json_data.pop(k)
+
+    # remove
+    for r_k in remove:
+        json_data.pop(r_k, None)
+
+    # add
+    for k, v in add.items():
+        json_data[k] = v
+
+    # replace values
+    for key, value in json_data.items():
+        for old_value, new_value in replace_values.items():
+            if value == old_value:
+                json_data[key] = new_value
+
+    # replace with function call
+    for k, func in replace_func.items():
+        if k in json_data:
+            json_data[k] = func(json_data[k])
+
+    # also rename if the type of the value is a list of dicts
+    for key, value in json_data.items():
+        if isinstance(value, list):
+            for nested_item in value:
+                if isinstance(nested_item, dict):
+                    for k, v in rename.items():
+                        if k in nested_item:
+                            nested_item[v] = nested_item.pop(k)
+                    for k, func in replace_func.items():
+                        if k in nested_item:
+                            nested_item[k] = func(nested_item[k])
+    return json_data

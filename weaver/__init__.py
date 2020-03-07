@@ -33,3 +33,6 @@ def includeme(config):
     config.include("cornice")
     config.include("cornice_swagger")
     config.include("pyramid_mako")
+    config.include("pyramid_rewrite")
+    # attempt finding a not found route using either an added or removed trailing slash according to situation
+    config.add_rewrite_rule(r"/(?P<path>.*)/", r"/%(path)s")

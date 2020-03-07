@@ -1,5 +1,10 @@
 from typing import TYPE_CHECKING
 
+import lxml.etree
+
+# define this type here so that code can use it for actual logic without repeating 'noqa'
+XML = lxml.etree._Element  # noqa
+
 if TYPE_CHECKING:
     import os
     import typing
@@ -13,7 +18,6 @@ if TYPE_CHECKING:
     else:
         FileSystemPathType = str
 
-    import lxml.etree
     from celery.app import Celery
     from owslib.wps import Process as ProcessOWS
     from pyramid.httpexceptions import HTTPSuccessful, HTTPRedirection

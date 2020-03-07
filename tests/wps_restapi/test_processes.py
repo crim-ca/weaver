@@ -553,7 +553,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             resp = self.app.post_json(path, params=data_execute, headers=self.json_headers)
             assert resp.status_code == 201, "Expected job submission without inputs created without error."
             job = self.job_store.fetch_by_id(resp.json["jobID"])
-            assert job.inputs[0]["data"] == "100"  # not cast to float or integer
+            assert job.inputs[0]["value"] == "100"  # not cast to float or integer
 
     def test_execute_process_no_error_not_required_params(self):
         """

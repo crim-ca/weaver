@@ -393,14 +393,12 @@ Changes:
 Changes:
 --------
 
-- Add wps languages for other wps requests types: ``DescribeProcess`` and ``GetCapabilities``.
+- Add `WPS` languages for other wps requests types: ``DescribeProcess`` and ``GetCapabilities``.
 
 Fixes:
 ------
 
 - Fix a bug where the validation of ``OneOf`` items was casting the value to the first valid possibility.
-  Now, it doesn't change the value if it's valid without casting it (and still casts it if it's
-  necessary to make it valid).
 
 `1.1.0 <https://github.com/crim-ca/weaver/tree/1.1.0>`_ (2020-02-17)
 ========================================================================
