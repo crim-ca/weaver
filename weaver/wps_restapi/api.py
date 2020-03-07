@@ -206,7 +206,6 @@ def api_swagger_json(request):  # noqa: F811
     weaver_server_url = get_weaver_url(request)
     LOGGER.debug("Request app URL:   [%s]", request.url)
     LOGGER.debug("Weaver config URL: [%s]", weaver_server_url)
-    # http_scheme=request.scheme, http_host=request.host
     return get_swagger_json(base_url=weaver_server_url, use_docstring_summary=True)
 
 

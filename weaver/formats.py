@@ -30,6 +30,11 @@ LANGUAGES = frozenset([
     LANGUAGE_EN_US,
 ])
 
+# Languages
+LANGUAGE_EN_CA = "en-CA"
+LANGUAGE_FR_CA = "fr-CA"
+LANGUAGE_EN_US = "en-US"
+
 # Content-Types
 #   MIME-type nomenclature:
 #       <type> "/" [x- | <tree> "."] <subtype> ["+" suffix] *[";" parameter=value]

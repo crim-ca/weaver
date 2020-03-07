@@ -1014,13 +1014,7 @@ class AlternateQuotationList(ExtendedSequenceSchema):
     step = AlternateQuotation(description="Quote of a workflow step process.")
 
 
-# same as base Format, but for process/job responses instead of process submission
-# (ie: 'Format' is for allowed/supported formats, this is the result format)
-class DataEncodingAttributes(Format):
-    pass
-
-
-class Reference(DataEncodingAttributes):
+class Reference(Format):
     href = URL(description="Endpoint of the reference.")
     body = ExtendedSchemaNode(String(), missing=drop)
     bodyReference = URL(missing=drop)
