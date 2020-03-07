@@ -708,30 +708,6 @@ class JobOutputsEndpoint(JobPath):
     header = Headers()
 
 
-class ProcessInputsEndpoint(ProcessPath, JobPath):
-    header = AcceptHeader()
-
-
-class ProviderInputsEndpoint(ProviderPath, ProcessPath, JobPath):
-    header = AcceptHeader()
-
-
-class JobInputsEndpoint(JobPath):
-    header = AcceptHeader()
-
-
-class ProcessOutputsEndpoint(ProcessPath, JobPath):
-    header = AcceptHeader()
-
-
-class ProviderOutputsEndpoint(ProviderPath, ProcessPath, JobPath):
-    header = AcceptHeader()
-
-
-class JobOutputsEndpoint(JobPath):
-    header = AcceptHeader()
-
-
 class ProcessResultsEndpoint(ProcessPath, JobPath):
     header = Headers()
 
@@ -955,7 +931,13 @@ class AlternateQuotationList(ExtendedSequenceSchema):
     step = AlternateQuotation(description="Quote of a workflow step process.")
 
 
-class Reference(Format):
+# same as base Format, but for process/job responses instead of process submission
+# (ie: 'Format' is for allowed/supported formats, this is the result format)
+class DataEncodingAttributes(Format):
+    pass
+
+
+class Reference(DataEncodingAttributes):
     href = URL(description="Endpoint of the reference.")
     body = ExtendedSchemaNode(String(), missing=drop)
     bodyReference = URL(missing=drop)
