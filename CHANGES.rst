@@ -4,16 +4,19 @@ Changes
 Unreleased
 ==========
 
+1.2.0 (2020-03-06)
+==================
+
 Changes:
 --------
 
-- Add wps languages for other wps requests types: DescribeProcess and GetCapabilities
+- Add wps languages for other wps requests types: ``DescribeProcess`` and ``GetCapabilities``.
 
 Fixes:
 ------
 
-- Fix a bug where the validation of OneOf items was casting the value to the first valid possibility.
-  Now, it doesn't change the value if it's valid without casting it (and still casts it if it's 
+- Fix a bug where the validation of ``OneOf`` items was casting the value to the first valid possibility.
+  Now, it doesn't change the value if it's valid without casting it (and still casts it if it's
   necessary to make it valid).
 
 1.1.0 (2020-02-17)
@@ -28,7 +31,7 @@ Changes:
 - Improved job logs update with message and progress to allow better tracking of internal operations and/or problems.
 - Allow WPS builtin process ``jsonarray2netcdf`` to fetch a remote file.
 - Change doc to point to DockerHub `pavics/weaver <https://hub.docker.com/r/pavics/weaver>`_ images.
-- Adjust CI rule long-lasting failures until it gets patched by original reference 
+- Adjust CI rule long-lasting failures until it gets patched by original reference
   (`gitleaks-actions#3 <https://github.com/eshork/gitleaks-action/issues/3>`_).
 
 Fixes:
