@@ -332,7 +332,8 @@ linkcheck_ignore = [
     "https://indico.egi.eu/",
     "https://docker-registry.crim.ca.*",
 ]
-linkcheck_timeout = 15
+linkcheck_timeout = 30
+linkcheck_retries = 5
 
 # Link references always present on RST page.
 rst_epilog = """
