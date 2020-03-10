@@ -26,6 +26,7 @@ from weaver.__meta__ import __version__ as weaver_version
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN
 from weaver.owsexceptions import OWSException
 from weaver.utils import get_header, get_settings, get_weaver_url
+from weaver.wps import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.colander_extras import CustomTypeConversionDispatcher
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, get_wps_restapi_base_url, wps_restapi_base_path
@@ -55,7 +56,7 @@ def api_frontpage(request):
     weaver_api_doc = settings.get("weaver.wps_restapi_doc", None) if weaver_api else None
     weaver_api_ref = settings.get("weaver.wps_restapi_ref", None) if weaver_api else None
     weaver_wps = asbool(settings.get("weaver.wps"))
-    weaver_wps_url = weaver_url + get_wps_path(settings) if weaver_wps else None
+    weaver_wps_url = get_wps_url(settings) if weaver_wps else None
     weaver_conform_url = weaver_url + sd.api_conformance_uri
     weaver_process_url = weaver_url + sd.processes_uri
     weaver_links = [

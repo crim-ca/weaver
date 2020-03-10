@@ -4,6 +4,12 @@ Changes
 Unreleased
 ==========
 
+Changes:
+--------
+
+- Provide a way to override the external URL reported by `WPS-1/2` and `WPS-REST` via configuration settings allowing
+  for more advanced server-side results in response bodies.
+
 1.2.0 (2020-03-06)
 ==================
 

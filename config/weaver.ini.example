@@ -17,6 +17,17 @@ mongodb.host = localhost
 mongodb.port = 27017
 mongodb.db_name = weaver
 
+# NOTE:
+#   For all below parameters, settings suffixed by `_url` are automatically generated from their corresponding `_path`
+#   settings using `weaver.url` if they are not provided. Otherwise, the explicit definition provided by `_url` suffixed
+#   setting is used. The obtained full URL (either generated or explicitly provided) are used for response body values
+#   and for external monitoring, resource access, etc. while the `_path` suffixed settings are used internally.
+#
+#   Providing explicit `_url` settings that differ from the generated result of `weaver.url`+`_path` therefore allows
+#   you to configure the application to report different *external* routes than the *internal* ones, allowing to define,
+#   amongst other things, secured access points or other advanced server-side behaviour, but it then becomes your
+#   responsibility to correctly map your server routes to internal routes after applying the server-side operation.
+
 # weaver
 weaver.configuration = ems
 weaver.url = http://localhost:4001
@@ -26,6 +37,7 @@ weaver.workdir =
 weaver.prefix =
 # WPS settings
 weaver.wps = true
+weaver.wps_url =
 weaver.wps_path = /ows/wps
 weaver.wps_output = true
 weaver.wps_output_dir = /tmp
@@ -40,6 +52,7 @@ weaver.wps_metadata_provider_name=CRIM
 weaver.wps_metadata_provider_url=http://pavics-weaver.readthedocs.org/en/latest/
 # WPS REST API
 weaver.wps_restapi = true
+weaver.wps_restapi_url =
 weaver.wps_restapi_path = /
 weaver.wps_restapi_ref = https://app.swaggerhub.com/apis/geoprocessing/WPS/
 weaver.wps_restapi_doc = https://raw.githubusercontent.com/opengeospatial/wps-rest-binding/develop/docs/18-062.pdf
