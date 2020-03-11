@@ -43,7 +43,7 @@ def api_frontpage(request):
 
     # import here to avoid circular import errors
     from weaver.config import get_weaver_configuration
-    from weaver.wps import get_wps_path
+    from weaver.wps import get_wps_url
 
     settings = get_settings(request)
     weaver_url = get_weaver_url(settings)
@@ -55,7 +55,7 @@ def api_frontpage(request):
     weaver_api_doc = settings.get("weaver.wps_restapi_doc", None) if weaver_api else None
     weaver_api_ref = settings.get("weaver.wps_restapi_ref", None) if weaver_api else None
     weaver_wps = asbool(settings.get("weaver.wps"))
-    weaver_wps_url = weaver_url + get_wps_path(settings) if weaver_wps else None
+    weaver_wps_url = get_wps_url(settings) if weaver_wps else None
     weaver_conform_url = weaver_url + sd.api_conformance_uri
     weaver_process_url = weaver_url + sd.processes_uri
     weaver_links = [

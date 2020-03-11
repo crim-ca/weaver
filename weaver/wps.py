@@ -68,7 +68,7 @@ def get_wps_url(container):
     Retrieves the full WPS URL (hostname + WPS path).
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
     """
-    return get_weaver_url(container) + get_wps_path(container)
+    return get_settings(container).get("weaver.wps_url") or get_weaver_url(container) + get_wps_path(container)
 
 
 def get_wps_output_dir(container):
