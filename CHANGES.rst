@@ -4,6 +4,12 @@ Changes
 Unreleased
 ==========
 
+Changes:
+--------
+
+- Update owslib to 0.19.2
+- Drop support for python 3.5
+
 1.3.0 (2020-03-10)
 ==================
 
