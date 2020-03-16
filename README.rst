@@ -34,8 +34,8 @@ For more details, see `Configuration`_ section.
     * - releases
       - | |version| |commits-since| |license|
 
-.. |py_ver| image:: https://img.shields.io/badge/python-2.7%2C%203.5%2B-blue.svg
-    :alt: Requires Python 2.7, 3.5+
+.. |py_ver| image:: https://img.shields.io/badge/python-2.7%2C%203.6%2B-blue.svg
+    :alt: Requires Python 2.7, 3.6+
     :target: https://www.python.org/getit
 
 .. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/1.3.0.svg
