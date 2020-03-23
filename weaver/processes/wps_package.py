@@ -647,12 +647,12 @@ def _cwl2wps_io(io_info, io_select):
         if "format" in io_info:
             io_formats = [io_info["format"]] if isinstance(io_info["format"], six.string_types) else io_info["format"]
             kw["supported_formats"] = [Format(clean_mime_type_format(str(fmt))) for fmt in io_formats]
-            kw["mode"] = MODE.SIMPLE
+            kw["mode"] = MODE.SIMPLE  # only validate the extension (not file contents)
         else:
             # we need to minimally add 1 format, otherwise empty list is evaluated as None by pywps
             # when "supported_formats" is None, the process's json property raises because of it cannot iterate formats
             kw["supported_formats"] = [DefaultFormat]
-            kw["mode"] = MODE.NONE
+            kw["mode"] = MODE.NONE  # don't validate anything as default is only raw text
         if is_output:
             if io_type == "Directory":
                 kw["as_reference"] = True
@@ -1821,6 +1821,13 @@ class WpsPackage(Process):
                             cwl_inputs[input_id] = [self.make_location_input(data, input_type, input_def)
                                                     for data, input_def in zip(input_data, input_occurs)]
                         else:
+                            # FIXME: we don't want auto fetch because we pass down value, but this is PyWPS bug
+                            #   (https://github.com/geopython/pywps/issues/526)
+                            #   (https://github.com/crim-ca/weaver/issues/91)
+                            #   href are sometime already handled (pulled and staged locally), use it directly
+                            #   validate using the internal '_file' instead of 'file' otherwise we trigger the fetch
+                            if input_i.file and os.path.isfile(input_i._file):  # noqa:W0212
+                                input_data = input_i.file
                             cwl_inputs[input_id] = self.make_location_input(input_data, input_type, input_i)
                     elif isinstance(input_i, (LiteralInput, BoundingBoxInput)):
                         cwl_inputs[input_id] = input_data

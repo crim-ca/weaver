@@ -27,7 +27,7 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url
 if TYPE_CHECKING:
     from weaver.typedefs import AnyDatabaseContainer, CWL   # noqa: F401
     from cwltool.context import RuntimeContext              # noqa: F401
-    from typing import AnyStr, Dict, Type, Union            # noqa: F401
+    from typing import Any, AnyStr, Dict, Type, Union       # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 
@@ -136,7 +136,10 @@ def register_builtin_processes(container):
 
 class BuiltinProcessJobBase(CommandLineJob):
     def __init__(self, builder, joborder, make_path_mapper, requirements, hints, name):
-        self.process = [h.get("process") for h in hints][0]
+        process_hints = [h for h in hints if "process" in h]
+        if not process_hints or len(process_hints) != 1:
+            raise PackageNotFound("Could not extract referenced process in job.")
+        self.process = process_hints[0]["process"]
         super(BuiltinProcessJobBase, self).__init__(builder, joborder, make_path_mapper, requirements, hints, name)
 
     def _validate_process(self):
@@ -149,11 +152,11 @@ class BuiltinProcessJobBase(CommandLineJob):
             raise PackageExecutionError("Invalid package is not of type '{}'".format(PROCESS_BUILTIN))
 
     # pylint: disable=W0221,arguments-differ    # naming using python like arguments
-    def run(self, runtime_context):
-        # type: (RuntimeContext) -> None
+    def run(self, runtime_context, **kwargs):
+        # type: (RuntimeContext, Any) -> None
         try:
             self._validate_process()
-            super(BuiltinProcessJobBase, self).run(runtime_context)
+            super(BuiltinProcessJobBase, self).run(runtime_context, **kwargs)
         except Exception as err:
             LOGGER.warning(u"Failed to run process:\n%s", err, exc_info=runtime_context.debug)
             self.output_callback({}, "permanentFail")
