@@ -44,21 +44,25 @@ def j2n(json_reference, output_dir):
     # type: (AnyStr, AnyStr) -> None
     LOGGER.info("Process '%s' execution starting...", PACKAGE_NAME)
     LOGGER.debug("Process '%s' output directory: [%s].", PACKAGE_NAME, output_dir)
-    if not os.path.isdir(output_dir):
-        raise ValueError("Output dir [{}] does not exist.".format(output_dir))
-    with tempfile.TemporaryDirectory(prefix="wps_process_{}_".format(PACKAGE_NAME)) as tmp_dir:
-        LOGGER.debug("Fetching JSON file: [%s]", json_reference)
-        json_path = fetch_file(json_reference, tmp_dir)
-        LOGGER.debug("Reading JSON file: [%s]", json_path)
-        with open(json_path) as json_file:
-            json_content = json.load(json_file)
-        if not isinstance(json_content, list) or any(not _is_netcdf_url(f) for f in json_content):
-            LOGGER.error("Invalid JSON: [%s]", json_content)
-            raise ValueError("Invalid JSON file format, expected a plain array of NetCDF file URL strings.")
-        LOGGER.debug("Parsing JSON file references.")
-        for file_url in json_content:
-            LOGGER.debug("Fetching NetCDF reference from JSON file: [%s]", file_url)
-            fetch_file(file_url, output_dir)
+    try:
+        if not os.path.isdir(output_dir):
+            raise ValueError("Output dir [{}] does not exist.".format(output_dir))
+        with tempfile.TemporaryDirectory(prefix="wps_process_{}_".format(PACKAGE_NAME)) as tmp_dir:
+            LOGGER.debug("Fetching JSON file: [%s]", json_reference)
+            json_path = fetch_file(json_reference, tmp_dir)
+            LOGGER.debug("Reading JSON file: [%s]", json_path)
+            with open(json_path) as json_file:
+                json_content = json.load(json_file)
+            if not isinstance(json_content, list) or any(not _is_netcdf_url(f) for f in json_content):
+                LOGGER.error("Invalid JSON: [%s]", json_content)
+                raise ValueError("Invalid JSON file format, expected a plain array of NetCDF file URL strings.")
+            LOGGER.debug("Parsing JSON file references.")
+            for file_url in json_content:
+                LOGGER.debug("Fetching NetCDF reference from JSON file: [%s]", file_url)
+                fetch_file(file_url, output_dir)
+    except Exception as exc:
+        LOGGER.debug("Process '%s' raised an exception: [%s]", PACKAGE_NAME, exc)
+        raise
     LOGGER.info("Process '%s' execution completed.", PACKAGE_NAME)
 
 

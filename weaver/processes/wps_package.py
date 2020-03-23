@@ -1808,6 +1808,7 @@ class WpsPackage(Process):
                     # process single occurrences
                     input_i = input_occurs[0]
                     # handle as reference/data
+                    # NOTE: must not call data/file methods if URL reference, otherwise contents get fetched
                     is_array, elem_type, _, _ = _is_cwl_array_type(cwl_input_info[input_id])
                     if is_array:
                         # extend array data that allow max_occur > 1
@@ -1826,8 +1827,8 @@ class WpsPackage(Process):
                             #   (https://github.com/crim-ca/weaver/issues/91)
                             #   href are sometime already handled (pulled and staged locally), use it directly
                             #   validate using the internal '_file' instead of 'file' otherwise we trigger the fetch
-                            if input_i.file and os.path.isfile(input_i._file):  # noqa:W0212
-                                input_data = input_i.file
+                            if input_i._file and os.path.isfile(input_i._file):  # noqa:W0212
+                                input_data = input_i._file                       # noqa:W0212
                             cwl_inputs[input_id] = self.make_location_input(input_data, input_type, input_i)
                     elif isinstance(input_i, (LiteralInput, BoundingBoxInput)):
                         cwl_inputs[input_id] = input_data
