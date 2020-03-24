@@ -4,6 +4,17 @@ Changes
 Unreleased
 ==========
 
+Changes:
+--------
+
+- Avoid long fetch operation using streamed request that defaulted to chuck size of 1.
+  Now, we use an appropriate size according to available memory.
+- Adjust incorrectly parsed href file reference as WPS complex input which resulted in failing location retrieval.
+- Partially address unnecessary fetch of file that has to be passed down to CWL, which will in turn request the file
+  as required. Need update from PyWPS to resolve completely (#91, geopython/pywps#526).
+- Adjust WPS output results to use relative HTTP path in order to recompose the output URL if server settings change.
+- Support WPS output results as value (WPS literal data). Everything was considered an href file beforehand.
+
 1.4.0 (2020-03-18)
 ==================
 

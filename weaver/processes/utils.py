@@ -140,6 +140,10 @@ def jsonify_output(output, process_description):
 
     # WPS standard v1.0.0 specify that either a reference or a data field has to be provided
     if output.reference:
+        # NOTE:
+        #   Save the results as relative paths to output directory configured in PyWPS (ie: weaver.wps_output_dir).
+        #   This allows us to easily adjust the result HTTP path according to server configuration
+        #   and it also avoid rewriting the whole db job results if the setting is changed later on.
         json_output["reference"] = output.reference
 
         # Handle special case where we have a reference to a json array containing dataset reference

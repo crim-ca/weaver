@@ -61,6 +61,7 @@ def j2n(json_reference, output_dir):
                 LOGGER.debug("Fetching NetCDF reference from JSON file: [%s]", file_url)
                 fetch_file(file_url, output_dir)
     except Exception as exc:
+        # log only debug for tracking, re-raise and actual error wil be logged by top process monitor
         LOGGER.debug("Process '%s' raised an exception: [%s]", PACKAGE_NAME, exc)
         raise
     LOGGER.info("Process '%s' execution completed.", PACKAGE_NAME)

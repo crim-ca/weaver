@@ -431,17 +431,22 @@ def fetch_file(file_reference, file_outdir):
     :param file_outdir: Output directory path of the fetched file.
     :return: Path of the local copy of the fetched file.
     """
+    file_href = file_reference
     file_path = os.path.join(file_outdir, os.path.basename(file_reference))
     if file_reference.startswith("file://"):
         file_reference = file_reference[7:]
+    LOGGER.debug("Fetch file resolved:\n"
+                 "  Reference: [%s]\n"
+                 "  File Path: [%s]", file_href, file_path)
     if os.path.isfile(file_reference):
-        shutil.copyfile(file_reference, file_path)
+        shutil.copyfile(file_reference, file_path, follow_symlinks=False)
     else:
         with open(file_path, "wb") as file:
             resp = requests.get(file_reference, stream=True)
             resp.raise_for_status()
-            for chunk in resp.iter_content():
+            for chunk in resp.iter_content(chunk_size=None):
                 file.write(chunk)
+    LOGGER.debug("Fetch file written")
     return file_path
 
 
