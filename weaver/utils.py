@@ -440,13 +440,19 @@ def fetch_file(file_reference, file_outdir, **request_kwargs):
                  "  Reference: [%s]\n"
                  "  File Path: [%s]", file_href, file_path)
     if os.path.isfile(file_reference):
-        # if file is available locally, make a symlink to avoid extra copy
+        # NOTE:
+        #   If file is available locally and referenced as a system link, disabling follow symlink
+        #   creates a copy of the symlink instead of an extra hard-copy of the linked file.
+        #   PyWPS will tend to generate symlink to pre-fetched files to avoid this kind of extra hard-copy.
         shutil.copyfile(file_reference, file_path, follow_symlinks=False)
     else:
         request_kwargs.pop("stream", None)
         with open(file_path, "wb") as file:
             resp = requests.get(file_reference, stream=True, **request_kwargs)
             resp.raise_for_status()
+            # NOTE:
+            #   Setting 'chunk_size=None' lets the request find a suitable size according to
+            #   available memory. Without this, it defaults to 1 which is extremely slow.
             for chunk in resp.iter_content(chunk_size=None):
                 file.write(chunk)
     LOGGER.debug("Fetch file written")
