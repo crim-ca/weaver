@@ -12,7 +12,9 @@ Changes:
 
 - Adjust incorrectly parsed href file reference as WPS complex input which resulted in failing location retrieval.
 - Partially address unnecessary fetch of file that has to be passed down to CWL, which will in turn request the file
-  as required. Need update from PyWPS to resolve completely (#91, geopython/pywps#526).
+  as required. Need update from PyWPS to resolve completely
+  (`#91 <https://github.com/crim-ca/weaver/issues/91>`_,
+  `geopython/pywps#526 <https://github.com/geopython/pywps/issues/526>`_).
 - Adjust WPS output results to use relative HTTP path in order to recompose the output URL if server settings change.
 - Support WPS output results as value (WPS literal data). Everything was considered an href file beforehand.
 - Add additional ``timeout`` and ``retry`` during fetching of remote file for process ``jsonarray2netcdf`` to avoid
@@ -66,8 +68,10 @@ Changes:
 -------------
 
 - Simplify docker image generation and make base/manager/worker variants all available under the same docker
-  repo `docker-registry.crim.ca/ogc/weaver <docker-registry.crim.ca/ogc/weaver>`_  with different tags (#5).
-- Add *planned future support* of ``Accept-Language`` header for `WPS-1/2` (``geopython/OWSLib 0.20.0``) (#74).
+  repo `docker-registry.crim.ca/ogc/weaver <docker-registry.crim.ca/ogc/weaver>`_  with different tags
+  (`#5 <https://github.com/crim-ca/weaver/issues/5>`_).
+- Add *planned future support* of ``Accept-Language`` header for `WPS-1/2` (``geopython/OWSLib 0.20.0``)
+  (`#74 <https://github.com/crim-ca/weaver/issues/74>`_).
 - Improved job logs update with message and progress to allow better tracking of internal operations and/or problems.
 - Allow WPS builtin process ``jsonarray2netcdf`` to fetch a remote file.
 - Change doc to point to DockerHub `pavics/weaver <https://hub.docker.com/r/pavics/weaver>`_ images.
@@ -79,7 +83,8 @@ Fixes:
 
 - Fix `readthedocs <https://img.shields.io/readthedocs/pavics-weaver>`_ documentation generation.
 - Fix ``.travis`` docker image build condition.
-- Fix ``geopython/OWSLib>=0.19.1`` requirement for Python 3.8 support (#62).
+- Fix ``geopython/OWSLib>=0.19.1`` requirement for Python 3.8 support
+  (`#62 <https://github.com/crim-ca/weaver/issues/62>`_).
 - Fix job update filling due to status location incorrectly resolved according to configured PyWPS output path.
 
 `1.0.0 <https://github.com/crim-ca/weaver/tree/1.0.0>`_ (2020-01-28)
@@ -89,21 +94,28 @@ New Features:
 -------------
 
 - Add ``notification_email`` field to ``Job`` datatype that stores an encrypted email (according to settings) when
-  provided in the job submission body (#44).
-- Add ability to filter jobs with ``notification_email`` query parameter (#44).
-- Add jobs statistics grouping by specific fields using comma-separated list ``groups`` query parameter (#46).
-- Add some tests to evaluate new job search methods / grouping results and responses (#44, #46).
+  provided in the job submission body (`#44 <https://github.com/crim-ca/weaver/issues/44>`_).
+- Add ability to filter jobs with ``notification_email`` query parameter
+  (`#44 <https://github.com/crim-ca/weaver/issues/44>`_).
+- Add jobs statistics grouping by specific fields using comma-separated list ``groups`` query parameter
+  (`#46 <https://github.com/crim-ca/weaver/issues/46>`_).
+- Add some tests to evaluate new job search methods / grouping results and responses
+  (`#44 <https://github.com/crim-ca/weaver/issues/44>`_, `#46 <https://github.com/crim-ca/weaver/issues/46>`_).
 - Add handling of multiple `CWL` field ``format`` for ``File`` type.
 - Add missing ontology reference support for `CWL` field ``format`` by defaulting to `IANA` namespace.
-- Add support for I/O ``array`` of ``enum`` (ie: multiple values of ``AllowedValues`` for a given input) (#30).
+- Add support for I/O ``array`` of ``enum`` (ie: multiple values of ``AllowedValues`` for a given input)
+  (`#30 <https://github.com/crim-ca/weaver/issues/30>`_).
 - Add support of ``label`` synonym as ``title`` for inputs and process description
-  (`CWL` specifying a ``label`` will set it in `WPS` process) (#31)
-- Add support of input ``minOccurs`` and ``maxOccurs`` as ``int`` while maintaining ``str`` support (#14).
-- Add conformance route with implementation links (#53).
-- Add additional landing page link details (#54).
+  (`CWL` specifying a ``label`` will set it in `WPS` process)
+  (`#31 <https://github.com/crim-ca/weaver/issues/31>`_)
+- Add support of input ``minOccurs`` and ``maxOccurs`` as ``int`` while maintaining ``str`` support
+  (`#14 <https://github.com/crim-ca/weaver/issues/14>`_).
+- Add conformance route with implementation links (`#53 <https://github.com/crim-ca/weaver/issues/53>`_).
+- Add additional landing page link details (`#54 <https://github.com/crim-ca/weaver/issues/54>`_).
 - Add ``weaver.wps_restapi.colander_extras.DropableNoneSchema`` to auto-handle some schema JSON deserialization.
 - Add ``weaver.wps_restapi.colander_extras.VariableMappingSchema`` to auto-handle some schema JSON deserialization.
-- Add more functional tests (#11, #17).
+- Add more functional tests
+  (`#11 <https://github.com/crim-ca/weaver/issues/11>`_, `#17 <https://github.com/crim-ca/weaver/issues/17>`_).
 
 Changes:
 -------------
@@ -127,11 +139,14 @@ Fixes:
 -------------
 
 - Adjust some typing definitions incorrectly specified.
-- Fix some failing functionality tests (#11, #17).
+- Fix some failing functionality tests
+  (`#11 <https://github.com/crim-ca/weaver/issues/11>`_, `#17 <https://github.com/crim-ca/weaver/issues/17>`_).
 - Fix I/O field ordering preserved as specified in payload or loaded reference file.
-- Fix setting ``minOccurs=0`` when a ``default`` is specified in the corresponding `CWL` I/O (#17, #25).
+- Fix setting ``minOccurs=0`` when a ``default`` is specified in the corresponding `CWL` I/O
+  (`#17 <https://github.com/crim-ca/weaver/issues/17>`_, `#25 <https://github.com/crim-ca/weaver/issues/25>`_).
 - Fix incorrectly overridden ``maxOccurs="unbounded"`` by ``maxOccurs="1"`` when a partial array input definition
-  is specified without explicit ``maxOccurs`` in `WPS` payload (#17, #25).
+  is specified without explicit ``maxOccurs`` in `WPS` payload
+  (`#17 <https://github.com/crim-ca/weaver/issues/17>`_, `#25 <https://github.com/crim-ca/weaver/issues/25>`_).
 - Fix case where omitted ``format[s]`` in both `CWL` and `WPS` deploy bodies generated a process description with
   complex I/O (file) without required ``formats`` field. Default ``text/plain`` format is now automatically added.
 - Fix case where ``format[s]`` lists between `CWL` and `WPS` where incorrectly merged.
