@@ -148,7 +148,6 @@ Fixes:
 
 Changes:
 --------
-<<<<<<< HEAD
 - Generate Weaver OpenAPI specification for readthedocs publication.
 - Add some sections for documentation (`#61 <https://github.com/crim-ca/weaver/issues/61>`_).
 - Add support of documentation RST file redirection to generated HTML for reference resolution in both Github source
@@ -421,9 +420,6 @@ Changes:
 
 - Provide a way to override the external URL reported by `WPS-1/2` and `WPS-REST` via configuration settings allowing
   for more advanced server-side results in response bodies.
-=======
-- Handle additional trailing slash resulting in ``NotFound`` that corresponds to a valid route without the slash.
->>>>>>> update changelog - fix #53, #58, #86
 
 `1.2.0 <https://github.com/crim-ca/weaver/tree/1.2.0>`_ (2020-03-06)
 ========================================================================
