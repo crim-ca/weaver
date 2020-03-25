@@ -131,7 +131,7 @@ class OneOfMappingSchema(colander.MappingSchema):
         for schema_class in self._one_of:  # noqa
             try:
                 # instantiate the class if specified with simple reference, other use pre-instantiated schema object
-                if isinstance(schema_class, colander._SchemaMeta):  # noqa:W0212
+                if isinstance(schema_class, colander._SchemaMeta):  # noqa: W0212
                     schema_class = schema_class()
                 valid_one_of.append(schema_class.deserialize(cstruct))
             except colander.Invalid as invalid:

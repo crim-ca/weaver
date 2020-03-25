@@ -35,7 +35,7 @@ from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from weaver.typedefs import HeadersType, CookiesType, SettingsType, AnyResponseType, JSON   # noqa: F401
+    from weaver.typedefs import AnyResponseType, CookiesType, HeadersType, JSON, SettingsType   # noqa: F401
     from typing import AnyStr, Dict, Optional, Any, Tuple, Iterable, Callable, Union            # noqa: F401
 
 

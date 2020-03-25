@@ -27,7 +27,7 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url
 if TYPE_CHECKING:
     from weaver.typedefs import AnyDatabaseContainer, CWL   # noqa: F401
     from cwltool.context import RuntimeContext              # noqa: F401
-    from typing import AnyStr, Dict, Type, Union            # noqa: F401
+    from typing import Any, AnyStr, Dict, Type, Union       # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 
@@ -46,15 +46,18 @@ def _get_builtin_reference_mapping(root):
     return {os.path.splitext(_pkg)[0]: os.path.join(root, _pkg) for _pkg in builtin_names}
 
 
-def _get_builtin_abstract(process_id, process_path):
-    # type: (AnyStr, AnyStr) -> Union[AnyStr, None]
-    """Retrieves the ``builtin`` process ``abstract`` from its `docstring` (``__doc__``) if it exists."""
+def _get_builtin_metadata(process_id, process_path, meta_field, clean=False):
+    # type: (AnyStr, AnyStr, AnyStr, bool) -> Union[AnyStr, None]
+    """
+    Retrieves the ``builtin`` process ``meta_field`` from its definition if it exists.
+    """
     py_file = os.path.splitext(process_path)[0] + ".py"
     if os.path.isfile(py_file):
         try:
             mod = import_module("{}.{}".format(__name__, process_id))
-            if hasattr(mod, "__doc__") and isinstance(mod.__doc__, six.string_types) and len(mod.__doc__):
-                return clean_json_text_body(mod.__doc__)
+            meta = getattr(mod, meta_field, None)
+            if meta and isinstance(meta, six.string_types):
+                return clean_json_text_body(meta) if clean else meta
         except ImportError:
             pass
     return None
@@ -103,12 +106,16 @@ def register_builtin_processes(container):
         process_info = get_process_definition({}, package=None, reference=process_path)
         process_url = "/".join([restapi_url, "processes", process_id])
         process_package = _get_builtin_package(process_id, process_info["package"])
-        process_abstract = _get_builtin_abstract(process_id, process_path)
+        process_abstract = _get_builtin_metadata(process_id, process_path, "__doc__", clean=True)
+        process_version = _get_builtin_metadata(process_id, process_path, "__version__")
+        process_title = _get_builtin_metadata(process_id, process_path, "__title__")
         process_payload = {
             "processDescription": {
                 "process": {
                     "id": process_id,
                     "type": PROCESS_BUILTIN,
+                    "title": process_title,
+                    "version": process_version,
                     "abstract": process_abstract,
                 }
             },
@@ -119,6 +126,8 @@ def register_builtin_processes(container):
         builtin_processes.append(Process(
             id=process_id,
             type=PROCESS_BUILTIN,
+            title=process_title,
+            version=process_version,
             abstract=process_abstract,
             payload=process_payload,
             package=process_package,
@@ -136,7 +145,10 @@ def register_builtin_processes(container):
 
 class BuiltinProcessJobBase(CommandLineJob):
     def __init__(self, builder, joborder, make_path_mapper, requirements, hints, name):
-        self.process = [h.get("process") for h in hints][0]
+        process_hints = [h for h in hints if "process" in h]
+        if not process_hints or len(process_hints) != 1:
+            raise PackageNotFound("Could not extract referenced process in job.")
+        self.process = process_hints[0]["process"]
         super(BuiltinProcessJobBase, self).__init__(builder, joborder, make_path_mapper, requirements, hints, name)
 
     def _validate_process(self):
@@ -149,11 +161,11 @@ class BuiltinProcessJobBase(CommandLineJob):
             raise PackageExecutionError("Invalid package is not of type '{}'".format(PROCESS_BUILTIN))
 
     # pylint: disable=W0221,arguments-differ    # naming using python like arguments
-    def run(self, runtime_context):
-        # type: (RuntimeContext) -> None
+    def run(self, runtime_context, **kwargs):
+        # type: (RuntimeContext, Any) -> None
         try:
             self._validate_process()
-            super(BuiltinProcessJobBase, self).run(runtime_context)
+            super(BuiltinProcessJobBase, self).run(runtime_context, **kwargs)
         except Exception as err:
             LOGGER.warning(u"Failed to run process:\n%s", err, exc_info=runtime_context.debug)
             self.output_callback({}, "permanentFail")

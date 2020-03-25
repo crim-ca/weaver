@@ -98,8 +98,9 @@ def get_wps_output_url(container):
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
     """
     wps_output_default = get_weaver_url(container) + "/wpsoutputs"
-    return _get_settings_or_wps_config(
+    wps_output_config = _get_settings_or_wps_config(
         container, "weaver.wps_output_url", "server", "outputurl", wps_output_default, "WPS output url")
+    return wps_output_config or wps_output_default
 
 
 def load_pywps_cfg(container, config=None):

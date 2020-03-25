@@ -22,7 +22,7 @@ from pyramid_celery import celery_app as app
 from pywps import Process
 from pywps.app.Common import Metadata
 from pywps.inout import BoundingBoxInput, BoundingBoxOutput, ComplexInput, ComplexOutput, LiteralInput, LiteralOutput
-from pywps.inout.basic import BasicIO
+from pywps.inout.basic import BasicIO, SOURCE_TYPE
 from pywps.inout.formats import Format
 from pywps.inout.literaltypes import ALLOWEDVALUETYPE, AllowedValue, AnyValue
 from pywps.validator.mode import MODE
@@ -647,12 +647,12 @@ def _cwl2wps_io(io_info, io_select):
         if "format" in io_info:
             io_formats = [io_info["format"]] if isinstance(io_info["format"], six.string_types) else io_info["format"]
             kw["supported_formats"] = [Format(clean_mime_type_format(str(fmt))) for fmt in io_formats]
-            kw["mode"] = MODE.SIMPLE
+            kw["mode"] = MODE.SIMPLE  # only validate the extension (not file contents)
         else:
             # we need to minimally add 1 format, otherwise empty list is evaluated as None by pywps
             # when "supported_formats" is None, the process's json property raises because of it cannot iterate formats
             kw["supported_formats"] = [DefaultFormat]
-            kw["mode"] = MODE.NONE
+            kw["mode"] = MODE.NONE  # don't validate anything as default is only raw text
         if is_output:
             if io_type == "Directory":
                 kw["as_reference"] = True
@@ -1731,8 +1731,34 @@ class WpsPackage(Process):
         return map_progress(100 * step_index / steps_total, PACKAGE_PROGRESS_RUN_CWL, PACKAGE_PROGRESS_CWL_DONE)
 
     @staticmethod
-    def make_location_input(input_location, input_type, input_definition):
-        # type: (AnyStr, AnyStr, ComplexInput) -> JSON
+    def make_location_input(input_type, input_definition):
+        # type: (AnyStr, ComplexInput) -> JSON
+        """Generates the JSON content required to specify a CWL File input definition from a location."""
+        # We don't want auto fetch because we pass down value to CWL which will handle it accordingly
+        input_location = None
+        # cannot rely only on 'as_reference' as sometime it is not provided by the request although it's an href
+        if input_definition.as_reference:
+            input_location = input_definition.url
+        # FIXME: PyWPS bug - calling 'file' method fetches it, and it is always called during type validation
+        #   (https://github.com/geopython/pywps/issues/526)
+        #   (https://github.com/crim-ca/weaver/issues/91)
+        #   since href is already handled (pulled and staged locally), use it directly to avoid double fetch with CWL
+        #   validate using the internal '_file' instead of 'file' otherwise we trigger the fetch
+        #   normally, file should be pulled an this check should fail
+        if input_definition._file and os.path.isfile(input_definition._file):     # noqa: W0212
+            input_location = input_definition._file                               # noqa: W0212
+        # if source type is data, we actually need to call 'data' (without fetch of remote file, already fetched)
+        # value of 'file' in this case points to a local file path where the wanted link was dumped as raw data
+        if input_definition.source_type == SOURCE_TYPE.DATA:
+            input_location = input_definition.data
+        if not input_location:
+            url = getattr(input_definition, "url")
+            if isinstance(url, six.string_types) and any([url.startswith(p) for p in ["http", "file"]]):
+                input_location = url
+            else:
+                # last option, could not resolve 'lazily' so will fetch data if needed
+                input_location = input_definition.data
+
         location = {"location": input_location, "class": input_type}
         if input_definition.data_format is not None and input_definition.data_format.mime_type:
             fmt = get_cwl_file_format(input_definition.data_format.mime_type, make_reference=True)
@@ -1759,7 +1785,8 @@ class WpsPackage(Process):
             self.update_status("Launching package...", PACKAGE_PROGRESS_LAUNCHING, STATUS_RUNNING)
 
             settings = get_settings(app)
-            if get_weaver_configuration(settings) == WEAVER_CONFIGURATION_EMS:
+            is_ems = get_weaver_configuration(settings) == WEAVER_CONFIGURATION_EMS
+            if is_ems:
                 # EMS dispatch the execution to the ADES
                 loading_context = LoadingContext()
                 loading_context.construct_tool_object = self.make_tool
@@ -1808,21 +1835,23 @@ class WpsPackage(Process):
                     # process single occurrences
                     input_i = input_occurs[0]
                     # handle as reference/data
+                    # NOTE: must not call data/file methods if URL reference, otherwise contents get fetched
                     is_array, elem_type, _, _ = _is_cwl_array_type(cwl_input_info[input_id])
-                    if is_array:
-                        # extend array data that allow max_occur > 1
-                        input_data = [i.url if i.as_reference else i.data for i in input_occurs]
-                        input_type = elem_type
-                    else:
-                        input_data = input_i.url if input_i.as_reference else input_i.data
-                        input_type = cwl_input_info[input_id]["type"]
                     if isinstance(input_i, ComplexInput) or elem_type == "File":
-                        if isinstance(input_data, list):
-                            cwl_inputs[input_id] = [self.make_location_input(data, input_type, input_def)
-                                                    for data, input_def in zip(input_data, input_occurs)]
+                        # extend array data that allow max_occur > 1
+                        if is_array:
+                            input_type = elem_type
+                            cwl_inputs[input_id] = [self.make_location_input(input_type, input_def)
+                                                    for input_def in input_occurs]
                         else:
-                            cwl_inputs[input_id] = self.make_location_input(input_data, input_type, input_i)
+                            input_type = cwl_input_info[input_id]["type"]
+                            cwl_inputs[input_id] = self.make_location_input(input_type, input_i)
                     elif isinstance(input_i, (LiteralInput, BoundingBoxInput)):
+                        # extend array data that allow max_occur > 1
+                        if is_array:
+                            input_data = [i.url if i.as_reference else i.data for i in input_occurs]
+                        else:
+                            input_data = input_i.url if input_i.as_reference else input_i.data
                         cwl_inputs[input_id] = input_data
                     else:
                         raise self.exception_message(

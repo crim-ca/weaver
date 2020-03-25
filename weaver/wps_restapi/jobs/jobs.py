@@ -1,5 +1,5 @@
 import os
-from typing import AnyStr, Optional, Tuple, Union
+from typing import TYPE_CHECKING
 
 import requests
 import six
@@ -32,6 +32,10 @@ from weaver.wps import get_wps_output_dir, get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.notify import encrypt_email
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
+
+if TYPE_CHECKING:
+    from weaver.typedefs import AnySettingsContainer, JSON  # noqa: F401
+    from typing import AnyStr, Optional, Tuple, Union       # noqa: F401
 
 LOGGER = get_task_logger(__name__)
 
@@ -77,7 +81,7 @@ def check_status(url=None, response=None, sleep_secs=2, verify=False):
     execution.checkStatus(response=xml, sleepSecs=sleep_secs)
     if execution.response is None:
         raise Exception("Missing response, cannot check status.")
-    if not isinstance(execution.response, etree._Element):
+    if not isinstance(execution.response, etree._Element):  # noqa: W0212
         execution.response = etree.fromstring(execution.response)
     return execution
 
@@ -239,6 +243,24 @@ def cancel_job(request):
     })
 
 
+def get_results(job, container):
+    # type: (Job, AnySettingsContainer) -> JSON
+    """
+    Obtains the results with extended full WPS output URL as applicable and according to configuration settings.
+    """
+    wps_url = get_wps_output_url(container)
+    if not wps_url.endswith("/"):
+        wps_url = wps_url + "/"
+    outputs = []
+    for result in job.results:
+        rtype = "data" if any(k in result for k in ["data", "value"]) else "href"
+        value = get_any_value(result)
+        if rtype == "href":
+            value = wps_url + str(value).lstrip("/")
+        outputs.append({"id": get_any_id(result), rtype: value})
+    return {"outputs": outputs}
+
+
 @sd.results_full_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
                              schema=sd.FullResultsEndpoint(), response_schemas=sd.get_job_results_responses)
 @sd.results_short_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS], renderer=OUTPUT_FORMAT_JSON,
@@ -251,7 +273,7 @@ def get_job_results(request):
     Retrieve the results of a job.
     """
     job = get_job(request)
-    results = dict(outputs=[dict(id=get_any_id(result), href=get_any_value(result)) for result in job.results])
+    results = get_results(job, request)
     return HTTPOk(json=results)
 
 

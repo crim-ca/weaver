@@ -422,26 +422,40 @@ def make_dirs(path, mode=0o755, exist_ok=True):
                 os.mkdir(subdir, mode)
 
 
-def fetch_file(file_reference, file_outdir):
-    # type: (AnyStr, AnyStr) -> AnyStr
+def fetch_file(file_reference, file_outdir, **request_kwargs):
+    # type: (AnyStr, AnyStr, Any) -> AnyStr
     """
     Fetches a file from a local path or remote URL and dumps it's content to the specified output directory.
 
     :param file_reference: Local filesystem path or remote URL file reference.
     :param file_outdir: Output directory path of the fetched file.
+    :param request_kwargs: additional keywords to forward to request call (if needed).
     :return: Path of the local copy of the fetched file.
     """
+    file_href = file_reference
     file_path = os.path.join(file_outdir, os.path.basename(file_reference))
     if file_reference.startswith("file://"):
         file_reference = file_reference[7:]
+    LOGGER.debug("Fetch file resolved:\n"
+                 "  Reference: [%s]\n"
+                 "  File Path: [%s]", file_href, file_path)
     if os.path.isfile(file_reference):
-        shutil.copyfile(file_reference, file_path)
+        # NOTE:
+        #   If file is available locally and referenced as a system link, disabling follow symlink
+        #   creates a copy of the symlink instead of an extra hard-copy of the linked file.
+        #   PyWPS will tend to generate symlink to pre-fetched files to avoid this kind of extra hard-copy.
+        shutil.copyfile(file_reference, file_path, follow_symlinks=False)
     else:
+        request_kwargs.pop("stream", None)
         with open(file_path, "wb") as file:
-            resp = requests.get(file_reference, stream=True)
+            resp = requests.get(file_reference, stream=True, **request_kwargs)
             resp.raise_for_status()
-            for chunk in resp.iter_content():
+            # NOTE:
+            #   Setting 'chunk_size=None' lets the request find a suitable size according to
+            #   available memory. Without this, it defaults to 1 which is extremely slow.
+            for chunk in resp.iter_content(chunk_size=None):
                 file.write(chunk)
+    LOGGER.debug("Fetch file written")
     return file_path
 
 

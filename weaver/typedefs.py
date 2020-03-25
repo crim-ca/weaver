@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    # pylint: disable=W0611,unused-import
     from weaver.processes.wps_process_base import WpsProcessInterface
     from weaver.datatype import Process
     from weaver.status import AnyStatusType
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
     from pyramid.config import Configurator
     from celery import Celery
     from requests.structures import CaseInsensitiveDict
-    from cwltool.factory import Callable as CWLFactoryCallable  # noqa
+    from cwltool.factory import Callable as CWLFactoryCallable  # noqa: F401
     from webtest.response import TestResponse
     from pywps.app import WPSRequest
     from pywps import Process as ProcessWPS
@@ -29,7 +30,7 @@ if TYPE_CHECKING:
     AnyKey = Union[AnyStr, int]
     JSON = Dict[AnyKey, Union[AnyValue, Dict[AnyKey, "JSON"], List["JSON"]]]
     CWL = Dict[{"cwlVersion": AnyStr, "class": AnyStr, "inputs": JSON, "outputs": JSON}]
-    XML = lxml.etree._Element
+    XML = lxml.etree._Element  # noqa: W0212
 
     AnyContainer = Union[Configurator, Registry, PyramidRequest, Celery]
     SettingValue = AnyValue
