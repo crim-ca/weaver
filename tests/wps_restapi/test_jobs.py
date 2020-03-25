@@ -35,10 +35,11 @@ from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.wps_restapi.swagger_definitions import jobs_full_uri, jobs_short_uri, process_jobs_uri
 
 if TYPE_CHECKING:
-    from owslib.wps import Process as ProcessOWSWPS
-    from pywps.app import Process as ProcessPyWPS
+    # pylint: disable=W0611,unused-import
+    from owslib.wps import Process as ProcessOWSWPS  # noqa: F401
+    from pywps.app import Process as ProcessPyWPS    # noqa: F401
     # pylint: disable=C0103,invalid-name,E1101,no-member
-    MockPatch = mock._patch
+    MockPatch = mock._patch  # noqa: W0212
 
 
 class WpsRestApiJobsTest(unittest.TestCase):

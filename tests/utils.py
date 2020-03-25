@@ -118,7 +118,7 @@ def setup_mongodb_processstore(config=None):
     store = get_db(config).get_store(MongodbProcessStore)
     store.clear_processes()
     # store must be recreated after clear because processes are added automatically on __init__
-    get_db(config)._stores.pop(MongodbProcessStore.type)
+    get_db(config)._stores.pop(MongodbProcessStore.type)  # noqa: W0212
     store = get_db(config).get_store(MongodbProcessStore)
     return store
 

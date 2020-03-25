@@ -268,14 +268,14 @@ def make_results_relative(results, settings):
     """
     wps_url = get_wps_output_url(settings)
     wps_path = get_wps_output_path(settings)
-    for r in results:
-        ref = r.get("reference")
+    for res in results:
+        ref = res.get("reference")
         if isinstance(ref, six.string_types) and ref:
             if ref.startswith(wps_url):
                 ref = ref.replace(wps_url, "", 1)
             if ref.startswith(wps_path):
                 ref = ref.replace(wps_path, "", 1)
-            r["reference"] = ref
+            res["reference"] = ref
     return results
 
 
