@@ -38,13 +38,13 @@ For more details, see `Configuration`_ section.
     :alt: Requires Python 2.7, 3.6+
     :target: https://www.python.org/getit
 
-.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/1.4.0.svg
+.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/1.5.0.svg
     :alt: Commits since latest release
-    :target: https://github.com/crim-ca/weaver/compare/1.4.0...master
+    :target: https://github.com/crim-ca/weaver/compare/1.5.0...master
 
 .. |version| image:: https://img.shields.io/github/tag/crim-ca/weaver.svg?style=flat
     :alt: Latest Tag
-    :target: https://github.com/crim-ca/weaver/tree/1.4.0
+    :target: https://github.com/crim-ca/weaver/tree/1.5.0
 
 .. |requires| image:: https://requires.io/github/crim-ca/weaver/requirements.svg?branch=master
     :alt: Requirements Status
@@ -54,9 +54,9 @@ For more details, see `Configuration`_ section.
     :alt: Travis-CI Build Status (master branch)
     :target: https://travis-ci.com/crim-ca/weaver
 
-.. |travis_tagged| image:: https://img.shields.io/travis/com/crim-ca/weaver/1.4.0.svg?label=1.4.0
+.. |travis_tagged| image:: https://img.shields.io/travis/com/crim-ca/weaver/1.5.0.svg?label=1.5.0
     :alt: Travis-CI Build Status (latest tag)
-    :target: https://github.com/crim-ca/weaver/tree/1.4.0
+    :target: https://github.com/crim-ca/weaver/tree/1.5.0
 
 .. |readthedocs| image:: https://img.shields.io/readthedocs/pavics-weaver
     :alt: Readthedocs Build Status (master branch)
@@ -105,12 +105,12 @@ Docker image repositories:
 
 ::
 
-    $ docker pull pavics/weaver:1.4.0
+    $ docker pull pavics/weaver:1.5.0
 
 For convenience, following tags are also available:
 
-- ``weaver:1.4.0-manager``: `Weaver` image that will run the API for WPS process and job management.
-- ``weaver:1.4.0-worker``: `Weaver` image that will run the process job runner application.
+- ``weaver:1.5.0-manager``: `Weaver` image that will run the API for WPS process and job management.
+- ``weaver:1.5.0-worker``: `Weaver` image that will run the process job runner application.
 
 Following links correspond to existing servers with `Weaver` configured as *EMS*/*ADES* instances respectively.
 
