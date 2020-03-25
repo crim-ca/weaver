@@ -422,13 +422,14 @@ def make_dirs(path, mode=0o755, exist_ok=True):
                 os.mkdir(subdir, mode)
 
 
-def fetch_file(file_reference, file_outdir):
-    # type: (AnyStr, AnyStr) -> AnyStr
+def fetch_file(file_reference, file_outdir, **request_kwargs):
+    # type: (AnyStr, AnyStr, Any) -> AnyStr
     """
     Fetches a file from a local path or remote URL and dumps it's content to the specified output directory.
 
     :param file_reference: Local filesystem path or remote URL file reference.
     :param file_outdir: Output directory path of the fetched file.
+    :param request_kwargs: additional keywords to forward to request call (if needed).
     :return: Path of the local copy of the fetched file.
     """
     file_href = file_reference
@@ -439,10 +440,12 @@ def fetch_file(file_reference, file_outdir):
                  "  Reference: [%s]\n"
                  "  File Path: [%s]", file_href, file_path)
     if os.path.isfile(file_reference):
+        # if file is available locally, make a symlink to avoid extra copy
         shutil.copyfile(file_reference, file_path, follow_symlinks=False)
     else:
+        request_kwargs.pop("stream", None)
         with open(file_path, "wb") as file:
-            resp = requests.get(file_reference, stream=True)
+            resp = requests.get(file_reference, stream=True, **request_kwargs)
             resp.raise_for_status()
             for chunk in resp.iter_content(chunk_size=None):
                 file.write(chunk)

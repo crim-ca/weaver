@@ -47,15 +47,16 @@ from weaver.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_STARTED, STATUS
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import get_any_id, get_any_value, get_cookie_headers, get_settings, raise_on_xml_exception, wait_secs
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
-from weaver.wps import get_wps_output_dir, load_pywps_cfg
+from weaver.wps import get_wps_output_dir, get_wps_output_url, get_wps_output_path, load_pywps_cfg
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.jobs import check_status
 from weaver.wps_restapi.jobs.notify import encrypt_email, notify_job_complete
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, get_wps_restapi_base_url, parse_request_query
 
 if TYPE_CHECKING:
+    # pylint: disable=W0611,unused-import
     from weaver.datatype import Process as ProcessDB    # noqa: F401
-    from weaver.typedefs import JSON                    # noqa: F401
+    from weaver.typedefs import JSON, SettingsType      # noqa: F401
     from typing import AnyStr, List, Tuple, Optional    # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
@@ -200,7 +201,8 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
                         job.status_message = "Job succeeded{}.".format(msg_progress)
                         wps_package.retrieve_package_job_log(execution, job)
                         job.save_log(logger=task_logger)
-                        job.results = [jsonify_output(output, process) for output in execution.processOutputs]
+                        job_results = [jsonify_output(output, process) for output in execution.processOutputs]
+                        job.results = make_results_relative(job_results, settings)
                     else:
                         task_logger.debug("Job failed.")
                         job.status_message = "Job failed{}.".format(msg_progress)
@@ -254,6 +256,29 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
     return job.status
 
 
+def make_results_relative(results, settings):
+    # type: (List[JSON], SettingsType) -> List[JSON]
+    """
+    Redefines job results to be saved in database as relative paths to output directory configured in PyWPS
+    (i.e.: relative to ``weaver.wps_output_dir``).
+
+    This allows us to easily adjust the exposed result HTTP path according to server configuration
+    (i.e.: relative to ``weaver.wps_output_path`` and/or ``weaver.wps_output_url``) and it also avoid rewriting
+    the whole database job results if the setting is changed later on.
+    """
+    wps_url = get_wps_output_url(settings)
+    wps_path = get_wps_output_path(settings)
+    for r in results:
+        ref = r.get("reference")
+        if isinstance(ref, six.string_types) and ref:
+            if ref.startswith(wps_url):
+                ref = ref.replace(wps_url, "", 1)
+            if ref.startswith(wps_path):
+                ref = ref.replace(wps_path, "", 1)
+            r["reference"] = ref
+    return results
+
+
 def set_wps_language(wps, accept_language=None, request=None):
     # type: (WebProcessingService, Optional[str], Optional[Request]) -> None
     """Set the :attr:`language` property on the :class:`WebProcessingService` object.
@@ -269,6 +294,7 @@ def set_wps_language(wps, accept_language=None, request=None):
 
     :param wps: process for which to set the language header if it is accepted
     :param str accept_language: the value of the Accept-Language header
+    :param request: request from which to extract Accept-Language header if not provided directly
     """
     if not accept_language and request:
         accept_language = request.accept_language.header_value

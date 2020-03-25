@@ -12,6 +12,9 @@ Changes:
   as required. Need update from PyWPS to resolve completely (#91, geopython/pywps#526).
 - Adjust WPS output results to use relative HTTP path in order to recompose the output URL if server settings change.
 - Support WPS output results as value (WPS literal data). Everything was considered an href file beforehand.
+- Add additional ``timeout`` and ``retry`` during fetching of remote file for process ``jsonarray2netcdf`` to avoid
+  unnecessary failures during edge case connexion problems.
+- Add support of ``title`` and ``version`` field of ``builtin`` processes.
 
 Fixes:
 ------

@@ -30,6 +30,11 @@ LOGGER = logging.getLogger(__name__)
 LOGGER.addHandler(logging.StreamHandler(sys.stdout))
 LOGGER.setLevel(logging.INFO)
 
+# process details
+__version__ = "1.0"
+__title__ = "JSON array to NetCDF"
+__abstract__ = __doc__  # NOTE: '__doc__' is fetched directly, this is mostly to be informative
+
 
 def _is_netcdf_url(url):
     # type: (Any) -> bool
@@ -49,7 +54,7 @@ def j2n(json_reference, output_dir):
             raise ValueError("Output dir [{}] does not exist.".format(output_dir))
         with tempfile.TemporaryDirectory(prefix="wps_process_{}_".format(PACKAGE_NAME)) as tmp_dir:
             LOGGER.debug("Fetching JSON file: [%s]", json_reference)
-            json_path = fetch_file(json_reference, tmp_dir)
+            json_path = fetch_file(json_reference, tmp_dir, timeout=10, retry=3)
             LOGGER.debug("Reading JSON file: [%s]", json_path)
             with open(json_path) as json_file:
                 json_content = json.load(json_file)
@@ -59,7 +64,7 @@ def j2n(json_reference, output_dir):
             LOGGER.debug("Parsing JSON file references.")
             for file_url in json_content:
                 LOGGER.debug("Fetching NetCDF reference from JSON file: [%s]", file_url)
-                fetch_file(file_url, output_dir)
+                fetch_file(file_url, output_dir, timeout=10, retry=3)
     except Exception as exc:
         # log only debug for tracking, re-raise and actual error wil be logged by top process monitor
         LOGGER.debug("Process '%s' raised an exception: [%s]", PACKAGE_NAME, exc)

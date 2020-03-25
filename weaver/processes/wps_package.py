@@ -22,7 +22,7 @@ from pyramid_celery import celery_app as app
 from pywps import Process
 from pywps.app.Common import Metadata
 from pywps.inout import BoundingBoxInput, BoundingBoxOutput, ComplexInput, ComplexOutput, LiteralInput, LiteralOutput
-from pywps.inout.basic import BasicIO
+from pywps.inout.basic import BasicIO, SOURCE_TYPE
 from pywps.inout.formats import Format
 from pywps.inout.literaltypes import ALLOWEDVALUETYPE, AllowedValue, AnyValue
 from pywps.validator.mode import MODE
@@ -1745,13 +1745,18 @@ class WpsPackage(Process):
         #   since href is already handled (pulled and staged locally), use it directly to avoid double fetch with CWL
         #   validate using the internal '_file' instead of 'file' otherwise we trigger the fetch
         #   normally, file should be pulled an this check should fail
-        if input_definition._file and os.path.isfile(input_definition._file):     # noqa:W0212
-            input_location = input_definition._file                               # noqa:W0212
+        if input_definition._file and os.path.isfile(input_definition._file):     # noqa: W0212
+            input_location = input_definition._file                               # noqa: W0212
+        # if source type is data, we actually need to call 'data' (without fetch of remote file, already fetched)
+        # value of 'file' in this case points to a local file path where the wanted link was dumped as raw data
+        if input_definition.source_type == SOURCE_TYPE.DATA:
+            input_location = input_definition.data
         if not input_location:
             url = getattr(input_definition, "url")
             if isinstance(url, six.string_types) and any([url.startswith(p) for p in ["http", "file"]]):
                 input_location = url
             else:
+                # last option, could not resolve 'lazily' so will fetch data if needed
                 input_location = input_definition.data
 
         location = {"location": input_location, "class": input_type}
