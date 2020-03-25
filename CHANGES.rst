@@ -168,14 +168,19 @@ WIP:
 Fixes:
 ------
 
-- Provide HTTP links to corresponding items of job in status JSON body (#58).
+- Provide HTTP links to corresponding items of job in status JSON body
+  (`#58 <https://github.com/crim-ca/weaver/issues/58>`_).
 - Provide OGC compliance of ``<job-uri>/results`` response schema as well as some expected ``code``/``description``
   fields in case where the request fails.
 - Add ``<job-uri>/outputs`` providing the 'old' format of the job results as well as ``<job-uri>/inputs`` to retrieve
-  the inputs that were provided during job submission (#86).
-- Add more reference/documentation links to `WPS-1/2` and update conformance references (#53).
+  the inputs that were provided during job submission
+  (`#86 <https://github.com/crim-ca/weaver/issues/86>`_).
+- Add more reference/documentation links to `WPS-1/2` and update conformance references
+  (`#53 <https://github.com/crim-ca/weaver/issues/53>`_).
 - Add some minimal caching support of routes.
-- Adjust job creation route to return ``201`` (created) as it is correctly defined by the OGC API specification (#14).
+- Adjust job creation route to return ``201`` (created) as it is correctly defined by the OGC API specification
+  (`#14 <https://github.com/crim-ca/weaver/issues/14>`_).
+- Handle additional trailing slash resulting in ``NotFound`` that corresponds to a valid route without the slash.
 
 `1.10.1 <https://github.com/crim-ca/weaver/tree/1.10.1>`_ (2020-06-03)
 ========================================================================
@@ -401,9 +406,6 @@ Changes:
 
 - Provide a way to override the external URL reported by `WPS-1/2` and `WPS-REST` via configuration settings allowing
   for more advanced server-side results in response bodies.
-=======
-- Handle additional trailing slash resulting in ``NotFound`` that corresponds to a valid route without the slash.
->>>>>>> update changelog - fix #53, #58, #86
 
 `1.2.0 <https://github.com/crim-ca/weaver/tree/1.2.0>`_ (2020-03-06)
 ========================================================================
