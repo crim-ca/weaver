@@ -89,7 +89,7 @@ class WpsPackageConfigBase(unittest.TestCase):
         :returns: resulting tuple of ``(process-description, package)`` JSON responses.
         """
         resp = mocked_sub_requests(self.app, "post_json", "/processes", params=payload, headers=self.json_headers)
-        assert resp.status_code == 200  # TODO: status should be 201 when properly modified to match API conformance
+        assert resp.status_code == 201
         path = resp.json["processSummary"]["processDescriptionURL"]
         body = {"value": VISIBILITY_PUBLIC}
         resp = self.app.put_json("{}/visibility".format(path), params=body, headers=self.json_headers)

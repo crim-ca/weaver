@@ -175,8 +175,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             for pkg in package_mock:
                 stack.enter_context(pkg)
             resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=True)
-            # TODO: status should be 201 when properly modified to match API conformance
-            assert resp.status_code == 200
+            assert resp.status_code == 201
             assert resp.json["processSummary"]["id"] == process_name
 
         # change value that will trigger schema error on check
@@ -212,8 +211,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 stack.enter_context(pkg)
             uri = "/processes"
             resp = self.app.post_json(uri, params=process_data, headers=self.json_headers, expect_errors=True)
-            # TODO: status should be 201 when properly modified to match API conformance
-            assert resp.status_code == 200
+            assert resp.status_code == 201
             assert resp.content_type == CONTENT_TYPE_APP_JSON
             assert resp.json["processSummary"]["id"] == process_name
             assert isinstance(resp.json["deploymentDone"], bool) and resp.json["deploymentDone"]
@@ -285,8 +283,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 stack.enter_context(pkg)
             uri = "/processes"
             resp = self.app.post_json(uri, params=process_data, headers=self.json_headers, expect_errors=True)
-            # TODO: status should be 201 when properly modified to match API conformance
-            assert resp.status_code == 200
+            assert resp.status_code == 201
 
         weaver_wps_path = get_wps_url(self.config.registry.settings)
         process_wps_endpoint = self.process_store.fetch_by_id(process_name).processEndpointWPS1
@@ -323,7 +320,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             This is a shortcut method for all ``test_deploy_process_<>`` cases.
         """
         resp = self.app.post_json("/processes", params=deploy_payload, headers=self.json_headers)
-        assert resp.status_code == 200  # TODO: status should be 201 when properly modified to match API conformance
+        assert resp.status_code == 201
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
         # apply visibility to allow retrieval
