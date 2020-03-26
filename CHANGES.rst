@@ -4,6 +4,17 @@ Changes
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
 
+Changes:
+--------
+
+- Add unittest of utility function ``fetch_file``.
+- Split some unittest utility functions to allow more reuse.
+
+Fixes:
+------
+
+- Fix invalid ``retry`` parameter not handled automatically by request.
+
 `1.5.0 <https://github.com/crim-ca/weaver/tree/1.5.0>`_ (2020-03-25)
 ========================================================================
 

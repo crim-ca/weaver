@@ -1,18 +1,27 @@
 # pylint: disable=C0103,invalid-name
 
+import inspect
+import json
+import os
+import shutil
+import tempfile
 from typing import Type
 
+import mock
 import pytest
 from lxml import etree
 from pyramid.httpexceptions import HTTPConflict
 from pyramid.httpexceptions import HTTPError as PyramidHTTPError
-from pyramid.httpexceptions import HTTPInternalServerError, HTTPNotFound
+from pyramid.httpexceptions import HTTPInternalServerError, HTTPNotFound, HTTPRequestTimeout
 from pywps.response.status import WPS_STATUS
 from requests.exceptions import HTTPError as RequestsHTTPError
+from requests import Response
 from six.moves.urllib.parse import urlparse
 
+from tests.compat import contextlib
+from tests.utils import mocked_file_response
 from weaver import status, utils
-from weaver.utils import _NullType, null
+from weaver.utils import _NullType, null, fetch_file  # noqa: W0212
 
 
 def test_null_operators():
@@ -320,3 +329,69 @@ def test_str2bytes():
 def test_bytes2str():
     assert utils.bytes2str(b"test-bytes") == u"test-bytes"
     assert utils.bytes2str(u"test-unicode") == u"test-unicode"
+
+
+def test_fetch_file_local_with_protocol():
+    """
+    Test function :func:`weaver.utils.fetch_file` when the reference is a pre-fetched local file.
+    """
+    tmp_dir = tempfile.gettempdir()
+    with tempfile.NamedTemporaryFile(dir=tmp_dir, mode="w", suffix=".json") as tmp_json:
+        tmp_data = {"message": "fetch-file-protocol"}
+        tmp_json.write(json.dumps(tmp_data))
+        tmp_json.seek(0)
+        tmp_name = os.path.split(tmp_json.name)[-1]
+        res_dir = os.path.join(tmp_dir, inspect.currentframe().f_code.co_name)
+        res_path = os.path.join(res_dir, tmp_name)
+        try:
+            os.makedirs(res_dir, exist_ok=True)
+            for protocol in ["", "file://"]:
+                tmp_path = protocol + tmp_json.name
+                fetch_file(tmp_path, res_dir)
+                assert os.path.isfile(res_path), "File [{}] should be accessible under [{}]".format(tmp_path, res_path)
+                assert json.load(open(res_path)) == tmp_data, "File should be properly copied/referenced from original"
+        except Exception:
+            raise
+        finally:
+            shutil.rmtree(res_dir, ignore_errors=True)
+
+
+def test_fetch_file_remote_with_request():
+    """
+    Test function :func:`weaver.utils.fetch_file` when the reference is an URL.
+    Also validates retries of the failing request.
+    """
+    tmp_dir = tempfile.gettempdir()
+    with contextlib.ExitStack() as stack:
+        tmp_json = stack.enter_context(tempfile.NamedTemporaryFile(dir=tmp_dir, mode="w", suffix=".json"))
+        tmp_data = {"message": "fetch-file-request"}
+        tmp_json.write(json.dumps(tmp_data))
+        tmp_json.seek(0)
+        tmp_name = os.path.split(tmp_json.name)[-1]
+        tmp_http = "http://weaver.mock" + tmp_json.name
+        tmp_retry = 2
+
+        def mocked_request(*args, **kwargs):  # noqa: E811
+            nonlocal tmp_json, tmp_http, tmp_retry
+            tmp_retry -= 1
+            if not tmp_retry:
+                return mocked_file_response(tmp_json.name, tmp_http)
+            resp = Response()
+            resp.status_code = HTTPRequestTimeout.code
+            return resp  # will be available on next call (to test retries)
+
+        m_request = stack.enter_context(mock.patch("requests.request", side_effect=mocked_request))
+        stack.enter_context(mock.patch("requests.sessions.Session.request", side_effect=mocked_request))
+
+        res_dir = os.path.join(tmp_dir, inspect.currentframe().f_code.co_name)
+        res_path = os.path.join(res_dir, tmp_name)
+        try:
+            os.makedirs(res_dir, exist_ok=True)
+            fetch_file(tmp_http, res_dir, retry=tmp_retry + 1)
+            assert os.path.isfile(res_path), "File [{}] should be accessible under [{}]".format(tmp_http, res_path)
+            assert m_request.call_count == 2, "Request method should have been called twice because of retries"
+            assert json.load(open(res_path)) == tmp_data, "File should be properly generated from HTTP reference"
+        except Exception:
+            raise
+        finally:
+            shutil.rmtree(res_dir, ignore_errors=True)
