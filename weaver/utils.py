@@ -22,6 +22,7 @@ from pyramid.httpexceptions import HTTPError as PyramidHTTPError
 from pyramid.registry import Registry
 from pyramid.request import Request
 from requests import HTTPError as RequestsHTTPError
+from requests.adapters import HTTPAdapter
 from requests.structures import CaseInsensitiveDict
 from six.moves.urllib.parse import ParseResult, parse_qs, urlparse, urlunsplit
 from webob.headers import EnvironHeaders, ResponseHeaders
@@ -422,10 +423,39 @@ def make_dirs(path, mode=0o755, exist_ok=True):
                 os.mkdir(subdir, mode)
 
 
+def request_retry(method, url, retries=0, backoff=0.3, **request_kwargs):
+    # type: (AnyStr, AnyStr, int, Number, Any) -> requests.Response
+    """
+    Implements basic request retry operation if the previous request failed, up to the specified number of retries.
+
+    :param method: HTTP method to set request.
+    :param url: URL of the request to execute.
+    :param retries: number of retries to attempt.
+    :param backoff: factor by which to multiply delays between retries.
+    """
+    # catch kw passed to request corresponding to retries parameters
+    kw_retries = request_kwargs.pop("retries", request_kwargs.pop("retry", request_kwargs.pop("max_retries", 0)))
+    kw_backoff = request_kwargs.pop("backoff", request_kwargs.pop("backoff_factor", 0.3))
+    retries = retries or kw_retries
+    backoff = backoff or kw_backoff
+    retry = 0
+    resp = None
+    while retries >= retry:
+        resp = requests.request(method, url, **request_kwargs)
+        if resp.status_code < 400 or retry == retries:
+            return resp
+        retry += 1
+        delay = backoff * (2 ** retry)
+        time.sleep(delay)
+    return resp
+
+
 def fetch_file(file_reference, file_outdir, **request_kwargs):
     # type: (AnyStr, AnyStr, Any) -> AnyStr
     """
     Fetches a file from a local path or remote URL and dumps it's content to the specified output directory.
+
+    The output directory is expected to exist prior to this function call.
 
     :param file_reference: Local filesystem path or remote URL file reference.
     :param file_outdir: Output directory path of the fetched file.
@@ -448,7 +478,7 @@ def fetch_file(file_reference, file_outdir, **request_kwargs):
     else:
         request_kwargs.pop("stream", None)
         with open(file_path, "wb") as file:
-            resp = requests.get(file_reference, stream=True, **request_kwargs)
+            resp = request_retry("get", file_reference, stream=True, **request_kwargs)
             resp.raise_for_status()
             # NOTE:
             #   Setting 'chunk_size=None' lets the request find a suitable size according to

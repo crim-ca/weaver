@@ -12,7 +12,7 @@ import pyramid_celery
 import six
 from pyramid import testing
 from pyramid.config import Configurator
-from pyramid.httpexceptions import HTTPNotFound, HTTPUnprocessableEntity
+from pyramid.httpexceptions import HTTPNotFound, HTTPUnprocessableEntity, HTTPException
 from pyramid.registry import Registry
 from requests import Response
 from six.moves.configparser import ConfigParser
@@ -227,6 +227,39 @@ def init_weaver_service(registry):
     }))
 
 
+def mocked_file_response(path, url):
+    # type: (AnyStr, AnyStr) -> Union[Response, HTTPException]
+    """
+    Generates a mocked response from the provided file path, and represented as if coming from the specified URL.
+
+    :param path: actual file path to be served in the response
+    :param url: wanted file URL
+    :return: generated response
+    """
+    if not os.path.isfile(path):
+        raise HTTPNotFound("Could not find mock file: [{}]".format(url))
+    resp = Response()
+    ext = os.path.splitext(path)[-1]
+    typ = CONTENT_TYPE_APP_JSON if ext == ".json" else CONTENT_TYPE_TEXT_XML if ext == ".xml" else None
+    if not typ:
+        return HTTPUnprocessableEntity("Unknown Content-Type for mock file: [{}]".format(url))
+    resp.status_code = 200
+    resp.headers["Content-Type"] = typ
+    setattr(resp, "content_type", typ)
+    content = open(path, "rb").read()
+
+    class StreamReader(object):
+        _data = [None, content]  # should technically be split up more to respect chuck size...
+
+        def read(self, chuck_size=None):  # noqa: E811
+            return self._data.pop(-1)
+
+    setattr(resp, "raw", StreamReader())
+    resp._content   # noqa: W0212
+    resp.url = url
+    return resp
+
+
 def mocked_sub_requests(app, function, *args, **kwargs):
     """
     Executes ``app.function(*args, **kwargs)`` with a mock of every underlying :func:`requests.request` call
@@ -250,18 +283,7 @@ def mocked_sub_requests(app, function, *args, **kwargs):
             setattr(resp, "content", resp.body)
         else:
             path = get_url_without_query(url.replace("mock://", ""))
-            if not os.path.isfile(path):
-                raise HTTPNotFound("Could not find mock file: [{}]".format(url))
-            resp = Response()
-            ext = os.path.splitext(path)[-1]
-            typ = CONTENT_TYPE_APP_JSON if ext == ".json" else CONTENT_TYPE_TEXT_XML if ext == ".xml" else None
-            if not typ:
-                return HTTPUnprocessableEntity("Unknown Content-Type for mock file: [{}]".format(url))
-            resp.status_code = 200
-            resp.headers["Content-Type"] = typ
-            setattr(resp, "content_type", typ)
-            resp._content = open(path, "rb").read()
-            resp.url = url
+            resp = mocked_file_response(path, url)
         return resp
 
     with contextlib.ExitStack() as stack:
