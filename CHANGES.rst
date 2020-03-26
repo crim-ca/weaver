@@ -1,18 +1,20 @@
 Changes
 *******
 
-Unreleased
-==========
+`Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
+========================================================================
 
-1.5.0 (2020-03-25)
-==================
+`1.5.0 <https://github.com/crim-ca/weaver/tree/1.5.0>`_ (2020-03-25)
+========================================================================
 
 Changes:
 --------
 
 - Adjust incorrectly parsed href file reference as WPS complex input which resulted in failing location retrieval.
 - Partially address unnecessary fetch of file that has to be passed down to CWL, which will in turn request the file
-  as required. Need update from PyWPS to resolve completely (#91, geopython/pywps#526).
+  as required. Need update from PyWPS to resolve completely
+  (`#91 <https://github.com/crim-ca/weaver/issues/91>`_,
+  `geopython/pywps#526 <https://github.com/geopython/pywps/issues/526>`_).
 - Adjust WPS output results to use relative HTTP path in order to recompose the output URL if server settings change.
 - Support WPS output results as value (WPS literal data). Everything was considered an href file beforehand.
 - Add additional ``timeout`` and ``retry`` during fetching of remote file for process ``jsonarray2netcdf`` to avoid
@@ -26,8 +28,8 @@ Fixes:
 - Avoid long fetch operation using streamed request that defaulted to chuck size of 1.
   Now, we use an appropriate size according to available memory.
 
-1.4.0 (2020-03-18)
-==================
+`1.4.0 <https://github.com/crim-ca/weaver/tree/1.4.0>`_ (2020-03-18)
+========================================================================
 
 Changes:
 --------
@@ -35,8 +37,8 @@ Changes:
 - Update owslib to 0.19.2
 - Drop support for python 3.5
 
-1.3.0 (2020-03-10)
-==================
+`1.3.0 <https://github.com/crim-ca/weaver/tree/1.3.0>`_ (2020-03-10)
+========================================================================
 
 Changes:
 --------
@@ -44,8 +46,8 @@ Changes:
 - Provide a way to override the external URL reported by `WPS-1/2` and `WPS-REST` via configuration settings allowing
   for more advanced server-side results in response bodies.
 
-1.2.0 (2020-03-06)
-==================
+`1.2.0 <https://github.com/crim-ca/weaver/tree/1.2.0>`_ (2020-03-06)
+========================================================================
 
 Changes:
 --------
@@ -59,15 +61,17 @@ Fixes:
   Now, it doesn't change the value if it's valid without casting it (and still casts it if it's
   necessary to make it valid).
 
-1.1.0 (2020-02-17)
-==================
+`1.1.0 <https://github.com/crim-ca/weaver/tree/1.1.0>`_ (2020-02-17)
+========================================================================
 
 Changes:
 -------------
 
 - Simplify docker image generation and make base/manager/worker variants all available under the same docker
-  repo `docker-registry.crim.ca/ogc/weaver <docker-registry.crim.ca/ogc/weaver>`_  with different tags (#5).
-- Add *planned future support* of ``Accept-Language`` header for `WPS-1/2` (``geopython/OWSLib 0.20.0``) (#74).
+  repo `docker-registry.crim.ca/ogc/weaver <docker-registry.crim.ca/ogc/weaver>`_  with different tags
+  (`#5 <https://github.com/crim-ca/weaver/issues/5>`_).
+- Add *planned future support* of ``Accept-Language`` header for `WPS-1/2` (``geopython/OWSLib 0.20.0``)
+  (`#74 <https://github.com/crim-ca/weaver/issues/74>`_).
 - Improved job logs update with message and progress to allow better tracking of internal operations and/or problems.
 - Allow WPS builtin process ``jsonarray2netcdf`` to fetch a remote file.
 - Change doc to point to DockerHub `pavics/weaver <https://hub.docker.com/r/pavics/weaver>`_ images.
@@ -79,31 +83,39 @@ Fixes:
 
 - Fix `readthedocs <https://img.shields.io/readthedocs/pavics-weaver>`_ documentation generation.
 - Fix ``.travis`` docker image build condition.
-- Fix ``geopython/OWSLib>=0.19.1`` requirement for Python 3.8 support (#62).
+- Fix ``geopython/OWSLib>=0.19.1`` requirement for Python 3.8 support
+  (`#62 <https://github.com/crim-ca/weaver/issues/62>`_).
 - Fix job update filling due to status location incorrectly resolved according to configured PyWPS output path.
 
-1.0.0 (2020-01-28)
-==================
+`1.0.0 <https://github.com/crim-ca/weaver/tree/1.0.0>`_ (2020-01-28)
+========================================================================
 
 New Features:
 -------------
 
 - Add ``notification_email`` field to ``Job`` datatype that stores an encrypted email (according to settings) when
-  provided in the job submission body (#44).
-- Add ability to filter jobs with ``notification_email`` query parameter (#44).
-- Add jobs statistics grouping by specific fields using comma-separated list ``groups`` query parameter (#46).
-- Add some tests to evaluate new job search methods / grouping results and responses (#44, #46).
+  provided in the job submission body (`#44 <https://github.com/crim-ca/weaver/issues/44>`_).
+- Add ability to filter jobs with ``notification_email`` query parameter
+  (`#44 <https://github.com/crim-ca/weaver/issues/44>`_).
+- Add jobs statistics grouping by specific fields using comma-separated list ``groups`` query parameter
+  (`#46 <https://github.com/crim-ca/weaver/issues/46>`_).
+- Add some tests to evaluate new job search methods / grouping results and responses
+  (`#44 <https://github.com/crim-ca/weaver/issues/44>`_, `#46 <https://github.com/crim-ca/weaver/issues/46>`_).
 - Add handling of multiple `CWL` field ``format`` for ``File`` type.
 - Add missing ontology reference support for `CWL` field ``format`` by defaulting to `IANA` namespace.
-- Add support for I/O ``array`` of ``enum`` (ie: multiple values of ``AllowedValues`` for a given input) (#30).
+- Add support for I/O ``array`` of ``enum`` (ie: multiple values of ``AllowedValues`` for a given input)
+  (`#30 <https://github.com/crim-ca/weaver/issues/30>`_).
 - Add support of ``label`` synonym as ``title`` for inputs and process description
-  (`CWL` specifying a ``label`` will set it in `WPS` process) (#31)
-- Add support of input ``minOccurs`` and ``maxOccurs`` as ``int`` while maintaining ``str`` support (#14).
-- Add conformance route with implementation links (#53).
-- Add additional landing page link details (#54).
+  (`CWL` specifying a ``label`` will set it in `WPS` process)
+  (`#31 <https://github.com/crim-ca/weaver/issues/31>`_)
+- Add support of input ``minOccurs`` and ``maxOccurs`` as ``int`` while maintaining ``str`` support
+  (`#14 <https://github.com/crim-ca/weaver/issues/14>`_).
+- Add conformance route with implementation links (`#53 <https://github.com/crim-ca/weaver/issues/53>`_).
+- Add additional landing page link details (`#54 <https://github.com/crim-ca/weaver/issues/54>`_).
 - Add ``weaver.wps_restapi.colander_extras.DropableNoneSchema`` to auto-handle some schema JSON deserialization.
 - Add ``weaver.wps_restapi.colander_extras.VariableMappingSchema`` to auto-handle some schema JSON deserialization.
-- Add more functional tests (#11, #17).
+- Add more functional tests
+  (`#11 <https://github.com/crim-ca/weaver/issues/11>`_, `#17 <https://github.com/crim-ca/weaver/issues/17>`_).
 
 Changes:
 -------------
@@ -127,11 +139,14 @@ Fixes:
 -------------
 
 - Adjust some typing definitions incorrectly specified.
-- Fix some failing functionality tests (#11, #17).
+- Fix some failing functionality tests
+  (`#11 <https://github.com/crim-ca/weaver/issues/11>`_, `#17 <https://github.com/crim-ca/weaver/issues/17>`_).
 - Fix I/O field ordering preserved as specified in payload or loaded reference file.
-- Fix setting ``minOccurs=0`` when a ``default`` is specified in the corresponding `CWL` I/O (#17, #25).
+- Fix setting ``minOccurs=0`` when a ``default`` is specified in the corresponding `CWL` I/O
+  (`#17 <https://github.com/crim-ca/weaver/issues/17>`_, `#25 <https://github.com/crim-ca/weaver/issues/25>`_).
 - Fix incorrectly overridden ``maxOccurs="unbounded"`` by ``maxOccurs="1"`` when a partial array input definition
-  is specified without explicit ``maxOccurs`` in `WPS` payload (#17, #25).
+  is specified without explicit ``maxOccurs`` in `WPS` payload
+  (`#17 <https://github.com/crim-ca/weaver/issues/17>`_, `#25 <https://github.com/crim-ca/weaver/issues/25>`_).
 - Fix case where omitted ``format[s]`` in both `CWL` and `WPS` deploy bodies generated a process description with
   complex I/O (file) without required ``formats`` field. Default ``text/plain`` format is now automatically added.
 - Fix case where ``format[s]`` lists between `CWL` and `WPS` where incorrectly merged.
@@ -140,18 +155,18 @@ Fixes:
 - Fix docker images to support ``pserve`` when using ``gunicorn>=20.x`` dropping support of ``--paste`` config feature.
 - Fix multiple Python 2/3 compatibility issues.
 
-0.2.2 (2019-05-31)
-==================
+`0.2.2 <https://github.com/crim-ca/weaver/tree/0.2.2>`_ (2019-05-31)
+========================================================================
 
 - Support notification email subject template.
 
-0.2.1 (2019-05-29)
-==================
+`0.2.1 <https://github.com/crim-ca/weaver/tree/0.2.1>`_ (2019-05-29)
+========================================================================
 
 - Add per-process email notification template.
 
-0.2.0 (2019-03-26)
-==================
+`0.2.0 <https://github.com/crim-ca/weaver/tree/0.2.0>`_ (2019-03-26)
+========================================================================
 
 - Fixes to handle invalid key characters ``"$"`` and ``"."`` during `CWL` package read/write operations to database.
 - Fixes some invalid `CWL` package generation from `WPS-1` references.
@@ -162,8 +177,8 @@ Fixes:
 - Add many deployment and execution validation tests for ``WPS1Requirement``.
 - Add ``builtin`` application packages support for common operations.
 
-0.1.3
-=====
+`0.1.3 <https://github.com/crim-ca/weaver/tree/0.1.3>`_ (2019-03-07)
+=============================================================================
 
 - Add useful `Makefile` targets for deployment.
 - Add badges indications in ``README.rst`` for tracking from repo landing page.
@@ -173,8 +188,8 @@ Fixes:
 - Additional logging of unhandled errors.
 - Improve some typing definitions.
 
-0.1.2
-=====
+`0.1.2 <https://github.com/crim-ca/weaver/tree/0.1.2>`_ (2019-03-05)
+=============================================================================
 
 - Introduce ``WPS1Requirement`` and corresponding ``Wps1Process`` to run a `WPS-1` process under `CWL`.
 - Remove `mongodb` requirement, assume it is running on an external service or docker image.
@@ -182,16 +197,16 @@ Fixes:
 - Fix some problematic imports.
 - Fix some PEP8 issues and PyCharm warnings.
 
-0.1.1
-=====
+`0.1.1 <https://github.com/crim-ca/weaver/tree/0.1.1>`_ (2019-03-04)
+=============================================================================
 
 - Modify `Dockerfile` to use lighter ``debian:latest`` instead of ``birdhouse/bird-base:latest``.
 - Modify `Dockerfile` to reduce build time by reusing built image layers (requirements installation mostly).
 - Make some `buildout` dependencies optional to also reduce build time and image size.
 - Some additional striping of deprecated or invalid items from `Twitcher`_.
 
-0.1.0
-=====
+`0.1.0 <https://github.com/crim-ca/weaver/tree/0.1.0>`_ (2019-02-26)
+=============================================================================
 
 - Initial Release. Based off `Twitcher`_ tag `ogc-0.4.7`.
 
