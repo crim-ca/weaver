@@ -22,7 +22,6 @@ from pyramid.httpexceptions import HTTPError as PyramidHTTPError
 from pyramid.registry import Registry
 from pyramid.request import Request
 from requests import HTTPError as RequestsHTTPError
-from requests.adapters import HTTPAdapter
 from requests.structures import CaseInsensitiveDict
 from six.moves.urllib.parse import ParseResult, parse_qs, urlparse, urlunsplit
 from webob.headers import EnvironHeaders, ResponseHeaders

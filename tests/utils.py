@@ -247,6 +247,7 @@ def mocked_file_response(path, url):
     resp.headers["Content-Type"] = typ
     setattr(resp, "content_type", typ)
     content = open(path, "rb").read()
+    resp._content = content  # noqa: W0212
 
     class StreamReader(object):
         _data = [None, content]  # should technically be split up more to respect chuck size...
@@ -255,7 +256,6 @@ def mocked_file_response(path, url):
             return self._data.pop(-1)
 
     setattr(resp, "raw", StreamReader())
-    resp._content   # noqa: W0212
     resp.url = url
     return resp
 
