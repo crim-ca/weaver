@@ -185,7 +185,7 @@ def test_deploy_opensearch():
         response = processes.add_local_process(request)
 
         # then
-        assert response.code == 200
+        assert response.code == 201
         assert response.json["deploymentDone"]
         process = store.fetch_by_id(process_id)
         assert process
