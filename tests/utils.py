@@ -22,6 +22,7 @@ from six.moves.configparser import ConfigParser
 from webtest import TestApp
 
 from tests.compat import contextlib
+from weaver import main as weaver_main
 from weaver.config import WEAVER_CONFIGURATION_DEFAULT, WEAVER_DEFAULT_INI_CONFIG, get_weaver_config_file
 from weaver.database import get_db
 from weaver.datatype import Service
@@ -200,8 +201,8 @@ def get_test_weaver_config(config=None, settings=None):
 def get_test_weaver_app(config=None, settings=None):
     # type: (Optional[Configurator], Optional[SettingsType]) -> TestApp
     config = get_test_weaver_config(config=config, settings=settings)
-    config.scan()
-    return TestApp(config.make_wsgi_app())
+    app = weaver_main({}, **config.get_settings())
+    return TestApp(app)
 
 
 def get_settings_from_testapp(testapp):
