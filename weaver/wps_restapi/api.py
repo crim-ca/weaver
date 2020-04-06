@@ -39,21 +39,27 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url, wps_restapi_base_
 
 if TYPE_CHECKING:
     from typing import Optional
-    from weaver.typedefs import JSON
+    from weaver.typedefs import JSON, SettingsType
 
 LOGGER = logging.getLogger(__name__)
 
 
 @sd.api_frontpage_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
                               schema=sd.FrontpageEndpoint(), response_schemas=sd.get_api_frontpage_responses)
-@cache_region("doc", sd.api_frontpage_service.name)
 def api_frontpage(request):
-    """Frontpage of weaver."""
+    """Frontpage of Weaver."""
+    settings = get_settings(request)
+    return api_frontpage_body(settings)
+
+
+@cache_region("doc", sd.api_frontpage_service.name)
+def api_frontpage_body(settings):
+    # type: (SettingsType) -> JSON
+    """Generates the JSON body describing the Weaver API and documentation references."""
 
     # import here to avoid circular import errors
     from weaver.config import get_weaver_configuration
 
-    settings = get_settings(request)
     weaver_url = get_weaver_url(settings)
     weaver_config = get_weaver_configuration(settings)
 
