@@ -46,7 +46,6 @@ LOGGER = logging.getLogger(__name__)
 
 @sd.api_frontpage_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
                               schema=sd.FrontpageEndpoint(), response_schemas=sd.get_api_frontpage_responses)
-@cache_region("doc", sd.api_frontpage_service.name)
 def api_frontpage(request):
     """Frontpage of Weaver."""
     settings = get_settings(request)
