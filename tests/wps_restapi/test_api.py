@@ -59,10 +59,12 @@ class GenericApiRoutesTestCase(unittest.TestCase):
         Validates that 401/403 status codes are correctly handled and that the appropriate one is returned.
         Shouldn't be the default behaviour to employ 403 on both cases.
         """
-        with mock.patch("weaver.wps_restapi.api.get_weaver_url", side_effect=HTTPUnauthorized):
+        # mock any function called inside the corresponding views just so that the exception is raised
+        # check for the resulting status code to see if that raised HTTP exception was correctly handled
+        with mock.patch("weaver.wps_restapi.api.api_frontpage_body", side_effect=HTTPUnauthorized):
             resp = self.testapp.get(sd.api_frontpage_service.path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 401
-        with mock.patch("weaver.wps_restapi.api.get_weaver_url", side_effect=HTTPForbidden):
+        with mock.patch("weaver.wps_restapi.api.api_frontpage_body", side_effect=HTTPForbidden):
             resp = self.testapp.get(sd.api_frontpage_service.path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 403
 
