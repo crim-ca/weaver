@@ -167,6 +167,16 @@ def test_get_package_ordered_io_with_list():
     assert result == expected_result
 
 
+def test_get_package_ordered_io_when_direct_type_string():
+    inputs_as_strings = {
+        "input-1": "File[]",
+        "input-2": "float"
+    }
+    result = _get_package_ordered_io({"inputs": inputs_as_strings})
+    assert all(i in [res_i["id"] for res_i in result] for i in inputs_as_strings.keys())
+    assert all("type" in res_i and res_i["type"] == inputs_as_strings[res_i["id"]] for res_i in result)
+
+
 def test_json2wps_datatype():
     # pylint: disable=C0326,bad-whitespace
     test_cases = [

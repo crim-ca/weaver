@@ -99,6 +99,9 @@ Fixes:
 - Adjust job creation route to return ``201`` (created) as it is correctly defined by the OGC API specification
   (`#14 <https://github.com/crim-ca/weaver/issues/14>`_).
 - Handle additional trailing slash resulting in ``NotFound`` that corresponds to a valid route without the slash.
+- Fix failing conversion of `CWL` input definition when specified as plain text instead of more frequently employed
+  JSON object. This case can occur for example when the process takes any kind of file or value, and therefore only
+  specifies the type as ``{"input": "<type>"}``, instead of ``{"input": {"type:" "<type>", "format": [...]}}``.
 
 `1.10.1 <https://github.com/crim-ca/weaver/tree/1.10.1>`_ (2020-06-03)
 ========================================================================

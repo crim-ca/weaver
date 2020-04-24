@@ -98,13 +98,9 @@ from weaver.utils import (
     get_settings,
     get_url_without_query,
     null,
-<<<<<<< HEAD
     request_extra,
-    str2bytes
-=======
     str2bytes,
     transform_json
->>>>>>> support json/xml according to accept header + add job status links (#58) + extra job routes (#86) + compliance with ogc api
 )
 from weaver.wps import get_wps_output_dir
 from weaver.wps_restapi.swagger_definitions import process_service
@@ -363,7 +359,7 @@ def _get_package_requirements_as_class_list(requirements):
 
 
 def _get_package_ordered_io(io_section, order_hints=None):
-    # type: (Union[List[JSON], OrderedDict[AnyStr, JSON]], Optional[List[JSON]]) -> List[JSON]
+    # type: (Union[List[JSON], OrderedDict[AnyStr, JSON], Dict[AnyStr, JSON]], Optional[List[JSON]]) -> List[JSON]
     """
     Converts `CWL` package I/O definitions defined as dictionary to an equivalent :class:`list` representation.
     The list representation ensures that I/O order is preserved when written to file and reloaded afterwards
@@ -1710,7 +1706,7 @@ class WpsPackage(Process):
 
     def __init__(self, **kw):
         """
-        Creates a `WPS-3 Process` instance to execute a `CWL` package definition.
+        Creates a `WPS-3 Process` instance to execute a `CWL` application package definition.
 
         Process parameters should be loaded from an existing :class:`weaver.datatype.Process`
         instance generated using :func:`weaver.wps_package.get_process_definition`.
@@ -2259,14 +2255,16 @@ class WpsPackage(Process):
         # type: (AnyStr, JSON, CWL) -> WpsPackage
         """
         This function is called before running an ADES job (either from a workflow step or a simple EMS dispatch).
-        It must return a WpsProcess instance configured with the proper package, ADES target and cookies.
+        It must return a :class:`weaver.processes.wps_process.WpsProcess` instance configured with the proper ``CWL``
+        package definition, ADES target and cookies to access it (if protected).
 
-        :param jobname: The workflow step or the package id that must be launch on an ADES :class:`string`
+        :param jobname: The workflow step or the package id that must be launched on an ADES :class:`string`
         :param joborder: The params for the job :class:`dict {input_name: input_value}`
                          input_value is one of `input_object` or `array [input_object]`
                          input_object is one of `string` or `dict {class: File, location: string}`
                          in our case input are expected to be File object
         :param tool: Whole `CWL` config including hints requirement
+                     (see: :py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_TYPES`)
         """
 
         if jobname == self.package_id:

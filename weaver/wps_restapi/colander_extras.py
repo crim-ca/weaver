@@ -35,8 +35,8 @@ class DropableNoneSchema(colander.SchemaNode):
         # >> {'s2': {'field': 'ok'}}
 
     .. seealso:
-        https://github.com/Pylons/colander/issues/276
-        https://github.com/Pylons/colander/issues/299
+        - https://github.com/Pylons/colander/issues/276
+        - https://github.com/Pylons/colander/issues/299
     """
     @staticmethod
     def schema_type():

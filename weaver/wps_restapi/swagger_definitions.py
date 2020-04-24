@@ -51,7 +51,7 @@ class SchemaNode(SchemaNodeDefault):
     actual value was omitted during deserialization for a field defined with this schema and a ``default`` parameter.
 
     .. seealso::
-        Implementation in :class:`SchemaNodeDefault`.
+        - Implementation in :class:`SchemaNodeDefault`.
     """
     @staticmethod
     def schema_type():
@@ -1389,7 +1389,7 @@ class GetProcessesQuery(MappingSchema):
     providers = SchemaNode(
         Boolean(), example=True, default=False, missing=drop,
         description="List local processes as well as all sub-processes of all registered providers. "
-                    "Applicable only for weaver in {} mode, false otherwise.".format(WEAVER_CONFIGURATION_EMS))
+                    "Applicable only for Weaver in {} mode, false otherwise.".format(WEAVER_CONFIGURATION_EMS))
     detail = SchemaNode(
         Boolean(), example=True, default=True, missing=drop,
         description="Return summary details about each process, or simply their IDs."
