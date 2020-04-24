@@ -43,7 +43,7 @@ LOGGER = logging.getLogger(__name__)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostProviderProcessJobResponse.description)
 def submit_provider_job(request):
     """
-    Execute a provider process.
+    Execute a remote provider process.
     """
     store = get_db(request).get_store(StoreServices)
     provider_id = request.matchdict.get("provider_id")
@@ -286,7 +286,7 @@ def delete_local_process(request):
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostProcessJobResponse.description)
 def submit_local_job(request):
     """
-    Execute a local process.
+    Execute a process registered locally.
     """
     process = get_process(request=request)
     body = submit_job(request, process, tags=["wps-rest"])
