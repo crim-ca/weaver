@@ -286,7 +286,7 @@ def delete_local_process(request):
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostProcessJobResponse.description)
 def submit_local_job(request):
     """
-    Execute a process registered locally.
+    Execute a process registered locally. The execution occurs where the WPS location was defined during deployment.
     """
     process = get_process(request=request)
     body = submit_job(request, process, tags=["wps-rest"])

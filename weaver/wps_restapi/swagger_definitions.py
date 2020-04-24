@@ -59,7 +59,7 @@ class SchemaNode(SchemaNodeDefault):
     actual value was omitted during deserialization for a field defined with this schema and a ``default`` parameter.
 
     .. seealso::
-        Implementation in :class:`SchemaNodeDefault`.
+        - Implementation in :class:`SchemaNodeDefault`.
     """
     @staticmethod
     def schema_type():

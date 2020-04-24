@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 class WpsProcessInterface(object):
     """
-    Common interface for WpsProcess to be used is cwl jobs
+    Common interface for WpsProcess to be used in ``CWL`` jobs.
     """
 
     @abstractmethod

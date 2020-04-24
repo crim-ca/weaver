@@ -923,7 +923,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         raised as invalid schemas.
 
         .. seealso::
-            :meth:`test_valid_io_min_max_occurs_as_str_or_int`
+            - :meth:`test_valid_io_min_max_occurs_as_str_or_int`
         """
         cwl = {
             "cwlVersion": "v1.0",

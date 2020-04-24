@@ -117,7 +117,12 @@ def _check_deploy(payload):
 @log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during parsing of process definition.",
                           is_request=False)
 def _get_deploy_process_info(process_info, reference, package):
-    """Obtain the process definition from deploy payload with exception handling."""
+    """
+    Obtain the process definition from deploy payload with exception handling.
+
+    .. seealso::
+        - :func:`weaver.processes.wps_package.get_process_definition`
+    """
     from weaver.processes.wps_package import get_process_definition
     try:
         # data_source `None` forces workflow process to search locally for deployed step applications

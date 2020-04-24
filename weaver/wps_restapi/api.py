@@ -291,7 +291,7 @@ def unauthorized_or_forbidden(request):
     Without this fix, both situations return [403] regardless.
 
     .. seealso::
-        http://www.restapitutorial.com/httpstatuscodes.html
+        - http://www.restapitutorial.com/httpstatuscodes.html
     """
     authn_policy = request.registry.queryUtility(IAuthenticationPolicy)
     if authn_policy:
