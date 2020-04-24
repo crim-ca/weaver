@@ -19,6 +19,15 @@ class ConversionValueError(ConversionError, ValueError):
     """Conversion error due to invalid value."""
 
 
+class OneOfCaseInsensitive(colander.OneOf):
+    """
+    Validator that ensures the given value matches one of the available choices, but allowing case insensitive values.
+    """
+    def __call__(self, node, value):
+        if str(value).lower() not in (choice.lower() for choice in self.choices):
+            return super(OneOfCaseInsensitive, self).__call__(node, value)
+
+
 class DropableSchemaNode(colander.SchemaNode):
     """
     Drops the underlying schema node if ``missing=drop`` was specified and that the value
@@ -191,13 +200,34 @@ class ExtendedMappingSchema(DefaultSchemaNode, DropableSchemaNode, colander.Mapp
     schema_type = colander.MappingSchema.schema_type
 
 
-class OneOfCaseInsensitive(colander.OneOf):
+class PermissiveMappingSchema(ExtendedMappingSchema):
     """
-    Validator that ensures the given value matches one of the available choices, but allowing case insensitve values.
+    Object schema that will allow *any unknown* field to remain present in the resulting deserialization.
+
+    This type is useful for defining a dictionary where some field names are not known in advance, or
+    when more optional keys that don't need to all be exhaustively provided in the schema are acceptable.
+
+    When doing schema deserialization to validate it, unknown keys would normally be removed without this class
+    (default behaviour is to ``ignore`` them). With this schema, content under an unknown key is ``preserved``
+    as it was received without any validation. Other fields that are explicitly specified with sub-schema nodes
+    will still be validated as per usual behaviour.
+
+    Example::
+
+        class AnyKeyObject(PermissiveMappingSchema):
+            known_key = SchemaNode(String())
+
+        AnyKeyObject().deserialize({"unknown": "kept", "known_key": "requirement"}))
+        # result: dictionary returned as is instead of removing 'unknown' entry
+        #         'known_key' is still validated with its string schema
+
+    .. note::
+        This class is only a shorthand definition of ``unknown`` keyword for convenience.
+        All :class:`colander.MappingSchema` support this natively.
     """
-    def __call__(self, node, value):
-        if str(value).lower() not in (choice.lower() for choice in self.choices):
-            return super(OneOfCaseInsensitive, self).__call__(node, value)
+    def __init__(self, *args, **kwargs):
+        kwargs["unknown"] = "preserve"
+        super(PermissiveMappingSchema, self).__init__(*args, **kwargs)
 
 
 class KeywordMapper(colander.MappingSchema):
@@ -588,10 +618,12 @@ class CustomTypeConversionDispatcher(TypeConversionDispatcher):
 def _dict_nested_contained(parent, child):
     """Tests that a dict is 'contained' within a parent dict
 
-    >>> parent = {"other": 2, "test": [{"inside": 1, "other_nested": 2}]}
-    >>> child = {"test": [{"inside": 1}]}
-    >>> _dict_nested_contained(parent, child)
-    True
+    .. code-block:: python
+
+        >>> parent = {"other": 2, "test": [{"inside": 1, "other_nested": 2}]}
+        >>> child = {"test": [{"inside": 1}]}
+        >>> _dict_nested_contained(parent, child)
+        True
 
     :param dict parent: The dict that could contain the child
     :param dict child: The dict that could be nested inside the parent
