@@ -292,7 +292,7 @@ def _get_package_requirements_as_class_list(requirements):
 
 
 def _get_package_ordered_io(io_section, order_hints=None):
-    # type: (Union[List[JSON], OrderedDict[str, JSON], Dict[str, JSON]], Optional[List[JSON]]) -> List[JSON]
+    # type: (Union[List[JSON], Dict[str, Union[JSON, str]]], Optional[List[JSON]]) -> List[JSON]
     """
     Converts `CWL` package I/O definitions defined as dictionary to an equivalent :class:`list` representation.
     The list representation ensures that I/O order is preserved when written to file and reloaded afterwards
