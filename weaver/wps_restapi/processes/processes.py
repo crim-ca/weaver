@@ -437,7 +437,7 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostProviderProcessJobResponse.description)
 def submit_provider_job(request):
     """
-    Execute a provider process.
+    Execute a remote provider process.
     """
     store = get_db(request).get_store(StoreServices)
     provider_id = request.matchdict.get("provider_id")
@@ -718,7 +718,7 @@ def delete_local_process(request):
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostProcessJobResponse.description)
 def submit_local_job(request):
     """
-    Execute a local process.
+    Execute a process registered locally.
     """
     process_id = request.matchdict.get("process_id")
     if not isinstance(process_id, six.string_types):
