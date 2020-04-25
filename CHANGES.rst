@@ -184,6 +184,8 @@ Fixes:
 - Fix failing conversion of `CWL` input definition when specified as plain text instead of more frequently employed
   JSON object. This case can occur for example when the process takes any kind of file or value, and therefore only
   specifies the type as ``{"input": "<type>"}``, instead of ``{"input": {"type:" "<type>", "format": [...]}}``.
+- Fix ``weaver.config.get_weaver_config_file`` called with empty path to be resolved just as requesting the default
+  file path explicitly instead of returning an invalid directory.
 
 `1.10.1 <https://github.com/crim-ca/weaver/tree/1.10.1>`_ (2020-06-03)
 ========================================================================
