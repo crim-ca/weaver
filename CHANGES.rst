@@ -165,22 +165,27 @@ Fixes:
 WIP:
 ~~~~
 
-Fixes:
-------
-
-- Provide HTTP links to corresponding items of job in status JSON body
-  (`#58 <https://github.com/crim-ca/weaver/issues/58>`_).
-- Provide OGC compliance of ``<job-uri>/results`` response schema as well as some expected ``code``/``description``
+Changes:
+--------
+- Provide HTTP links to corresponding items of job in JSON body of status, inputs and outputs routes
+  (`#58 <https://github.com/crim-ca/weaver/issues/58>`_, `#86 <https://github.com/crim-ca/weaver/issues/86>`_).
+- Provide OGC compliant ``<job-uri>/results`` response schema as well as some expected ``code``/``description``
   fields in case where the request fails.
-- Add ``<job-uri>/outputs`` providing the 'old' format of the job results as well as ``<job-uri>/inputs`` to retrieve
-  the inputs that were provided during job submission
+- Add ``<job-uri>/outputs`` providing the ``data``/``href`` formatted job results as well as ``<job-uri>/inputs`` to
+  retrieve the inputs that were provided during job submission
   (`#86 <https://github.com/crim-ca/weaver/issues/86>`_).
 - Add more reference/documentation links to `WPS-1/2` and update conformance references
   (`#53 <https://github.com/crim-ca/weaver/issues/53>`_).
 - Add some minimal caching support of routes.
-- Adjust job creation route to return ``201`` (created) as it is correctly defined by the OGC API specification
+- Adjust job creation route to return ``201`` (created) as it is now correctly defined by the OGC API specification
   (`#14 <https://github.com/crim-ca/weaver/issues/14>`_).
+- Add ``Job.link`` method that auto-generates all applicable links (inputs, outputs, logs, etc.).
 - Handle additional trailing slash resulting in ``NotFound`` that corresponds to a valid route without the slash.
+- Update OpenAPI template to not render the useless version selector since we only provide the current version.
+- Update Swagger definitions to reflect changes and better reuse existing schemas.
+
+Fixes:
+------
 - Fix failing conversion of `CWL` input definition when specified as plain text instead of more frequently employed
   JSON object. This case can occur for example when the process takes any kind of file or value, and therefore only
   specifies the type as ``{"input": "<type>"}``, instead of ``{"input": {"type:" "<type>", "format": [...]}}``.

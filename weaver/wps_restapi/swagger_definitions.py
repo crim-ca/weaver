@@ -298,14 +298,24 @@ class LandingPage(MappingSchema):
 
 
 class Format(MappingSchema):
-    mimeType = SchemaNode(String(), default=CONTENT_TYPE_TEXT_PLAIN)
+    mimeType = SchemaNode(String(), missing=drop)
     schema = SchemaNode(String(), missing=drop)
     encoding = SchemaNode(String(), missing=drop)
 
 
-class FormatDescription(Format):
+class FormatDefault(Format):
+    """Format for process input are assumed plain text if the MIME-type was omitted and is not
+    one of the known formats by this instance. When executing a job, the best match will be used
+    to run the process, and will fallback to the default as last resort.
+    """
+    mimeType = SchemaNode(String(), default=CONTENT_TYPE_TEXT_PLAIN, example=CONTENT_TYPE_APP_JSON)
+
+
+class FormatDescription(FormatDefault):
     maximumMegabytes = SchemaNode(Integer(), missing=drop)
-    default = SchemaNode(Boolean(), missing=drop, default=False)
+    default = SchemaNode(Boolean(), missing=drop, default=False,
+                         description="Indicate if this format should be considered as the default one in case none"
+                                     "of the other allowed/supported formats is matched against the job input.")
 
 
 class FormatDescriptionList(SequenceSchema):
@@ -948,19 +958,36 @@ class AlternateQuotationList(SequenceSchema):
     step = AlternateQuotation(description="Quote of a workflow step process.")
 
 
-class Reference(MappingSchema):
-    href = SchemaNode(String())
-    mimeType = SchemaNode(String(), missing=drop)
-    schema = SchemaNode(String(), missing=drop)
-    encoding = SchemaNode(String(), missing=drop)
+# same as base Format, but for process/job responses instead of process submission
+# (ie: 'Format' is for allowed/supported formats, this is the result format)
+class DataEncodingAttributes(Format):
+    pass
+
+
+class Reference(DataEncodingAttributes):
+    href = SchemaNode(String(), format=URL)
     body = SchemaNode(String(), missing=drop)
     bodyReference = SchemaNode(String(), missing=drop, format=URL)
 
 
-class DataEncodingAttributes(MappingSchema):
-    mimeType = SchemaNode(String(), missing=drop)
-    schema = SchemaNode(String(), missing=drop)
-    encoding = SchemaNode(String(), missing=drop)
+class DataFloat(DataEncodingAttributes):
+    data = SchemaNode(Float())
+
+
+class DataInteger(DataEncodingAttributes):
+    data = SchemaNode(Integer())
+
+
+class DataString(DataEncodingAttributes):
+    data = SchemaNode(String())
+
+
+class DataBoolean(DataEncodingAttributes):
+    data = SchemaNode(Boolean())
+
+
+class LiteralReference(DataEncodingAttributes):
+    reference = SchemaNode(String(), format=URL)
 
 
 class ValueFloat(DataEncodingAttributes):
@@ -979,15 +1006,34 @@ class ValueBoolean(DataEncodingAttributes):
     value = SchemaNode(Boolean())
 
 
+class ValueReference(DataEncodingAttributes):
+    value = SchemaNode(String(), format=URL)
+
+
 class ValueType(OneOfMappingSchema):
-    _one_of = (ValueFloat,
-               ValueInteger,
-               ValueString,
-               ValueBoolean,
-               Reference)
+    """OGC-specific format, always 'value' key."""
+    _one_of = (
+        ValueFloat,
+        ValueInteger,
+        ValueBoolean,
+        ValueReference,
+        ValueString
+    )
 
 
-class Input(InputDataType, ValueType):
+class AnyType(OneOfMappingSchema):
+    """Permissive variants that we attempt to parse automatically."""
+    _one_of = (
+        # literal data with 'data' key
+        DataFloat, DataInteger, DataString, DataBoolean,
+        # same with 'value' key
+        ValueFloat, ValueInteger, ValueBoolean, ValueReference, ValueString,
+        # HTTP references with various keywords
+        LiteralReference, Reference
+    )
+
+
+class Input(InputDataType, AnyType):
     """
     Default value to be looked for uses key 'value' to conform to OGC API standard.
     We still look for 'href', 'data' and 'reference' to remain back-compatible.
@@ -995,7 +1041,7 @@ class Input(InputDataType, ValueType):
 
 
 class InputList(SequenceSchema):
-    item = Input(missing=drop)
+    item = Input(missing=drop, description="Received input definition during job submission.")
 
 
 class Execute(MappingSchema):
@@ -1114,47 +1160,50 @@ class ProvidersSchema(SequenceSchema):
     providers_service = ProviderSummarySchema()
 
 
-class JobOutputSchema(MappingSchema):
+class ProcessesSchema(SequenceSchema):
+    provider_processes_service = Process()
+
+
+class JobOutput(OneOfMappingSchema, OutputDataType):
+    """Job output result with specific keyword according to represented format."""
     id = SchemaNode(String(), description="Job output id corresponding to process description outputs.")
-    data = SchemaNode(String(), missing=drop)
-    href = SchemaNode(String(), format=URL, missing=drop)
-    mimeType = SchemaNode(String(), missing=drop)
-    schema = SchemaNode(String(), missing=drop)
-    encoding = SchemaNode(String(), missing=drop)
+    _one_of = (
+        Reference,
+        DataFloat,
+        DataInteger,
+        DataBoolean,
+        DataString
+    )
 
 
-class JobOutputsSchema(SequenceSchema):
-    output = JobOutputSchema()
+class JobOutputList(SequenceSchema):
+    output = JobOutput()
 
 
-class OutputInfo(OutputDataType, OneOfMappingSchema):
-    _one_of = (ValueFloat,
-               ValueInteger,
-               ValueString,
-               ValueBoolean,
-               Reference)
+class JobResultValue(OutputDataType, OneOfMappingSchema):
+    """Job outputs route conforming to OGC standard with 'value' key."""
+    _one_of = (
+        ValueFloat,
+        ValueInteger,
+        ValueBoolean,
+        ValueReference,
+        ValueString
+    )
 
 
-class OutputInfoList(SequenceSchema):
-    output = OutputInfo()
-
-
-class ExceptionTextList(SequenceSchema):
-    text = SchemaNode(String())
-
-
-class ExceptionSchema(MappingSchema):
+class JobException(MappingSchema):
+    # note: test fields correspond exactly to 'owslib.wps.WPSException', they are serialized as is
     Code = SchemaNode(String())
-    Locator = SchemaNode(String())
-    Text = ExceptionTextList()
+    Locator = SchemaNode(String(), default=None)
+    Text = SchemaNode(String())
 
 
-class ExceptionsOutputSchema(SequenceSchema):
-    exceptions = ExceptionSchema()
+class JobExceptionList(SequenceSchema):
+    exceptions = JobException()
 
 
-class LogsOutputSchema(MappingSchema):
-    pass
+class JobLogList(SequenceSchema):
+    log = SchemaNode(String())
 
 
 class FrontpageParameterSchema(MappingSchema):
@@ -1661,7 +1710,7 @@ class OkGetJobInputsResponse(MappingSchema):
 
 
 class Outputs(MappingSchema):
-    outputs = OutputInfoList()
+    outputs = JobOutputList()
     links = JsonLinkList(missing=drop)
 
 
@@ -1670,13 +1719,14 @@ class OkGetJobOutputsResponse(MappingSchema):
     body = Outputs()
 
 
-class ResultInfoList(OutputInfoList):
-    pass
+class Results(SequenceSchema):
+    """List of outputs obtained from a successful process job execution."""
+    result = JobResultValue()
 
 
 class OkGetJobResultsResponse(MappingSchema):
     header = ResponseHeaders()
-    body = ResultInfoList()
+    body = Results()  # list is returned directly without extra metadata, OGC-standard
 
 
 class InternalServerErrorGetJobResultsResponse(MappingSchema):
@@ -1743,7 +1793,7 @@ class InternalServerErrorGetBillListResponse(MappingSchema):
 
 class OkGetJobExceptionsResponse(MappingSchema):
     header = ResponseHeaders()
-    body = ExceptionsOutputSchema()
+    body = JobExceptionList()
 
 
 class InternalServerErrorGetJobExceptionsResponse(MappingSchema):
@@ -1752,7 +1802,7 @@ class InternalServerErrorGetJobExceptionsResponse(MappingSchema):
 
 class OkGetJobLogsResponse(MappingSchema):
     header = ResponseHeaders()
-    body = LogsOutputSchema()
+    body = JobLogList()
 
 
 class InternalServerErrorGetJobLogsResponse(MappingSchema):

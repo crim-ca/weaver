@@ -1,8 +1,10 @@
 from typing import TYPE_CHECKING
+from abc import abstractmethod
 
 import colander
 from cornice_swagger.converters import schema
 from cornice_swagger.converters.exceptions import NoSuchConverter
+from cornice_swagger.converters.schema import TypeConversionDispatcher
 
 if TYPE_CHECKING:
     from typing import Iterable
@@ -32,7 +34,7 @@ class DropableNoneSchema(colander.SchemaNode):
             s2 = SchemaA()               # required
 
         SchemaB().deserialize({"s1": None, "s2": {"field": "ok"}})
-        # >> {'s2': {'field': 'ok'}}
+        # results: {'s2': {'field': 'ok'}}
 
     .. seealso:
         - https://github.com/Pylons/colander/issues/276
@@ -121,6 +123,7 @@ class OneOfMappingSchema(colander.MappingSchema):
         fulfilling the specified definition (ie: an empty ``{}`` schema with all fields missing).
     """
     @staticmethod
+    @abstractmethod
     def _one_of():
         # type: () -> Iterable[colander._SchemaMeta]
         raise NotImplementedError
@@ -167,28 +170,45 @@ class OneOfMappingSchema(colander.MappingSchema):
         return result
 
 
-class CustomTypeConversionDispatcher(object):
+class OneOfObjectTypeConverter(schema.ObjectTypeConverter):
+    """Object converter that generates the ``oneOf`` """
+    def convert_type(self, schema_node):
+
+        converted = super(OneOfObjectTypeConverter,
+                          self).convert_type(schema_node)
+
+        properties = {}
+        required = []
+
+        for sub_node in schema_node.children:
+            properties[sub_node.name] = self.dispatcher(sub_node)
+            if sub_node.required:
+                required.append(sub_node.name)
+
+        if len(properties) > 0:
+            converted['properties'] = properties
+
+        if len(required) > 0:
+            converted['required'] = required
+
+        if schema_node.typ.unknown == 'preserve':
+            converted['additionalProperties'] = {}
+
+        return converted
+
+
+class CustomTypeConversionDispatcher(TypeConversionDispatcher):
 
     def __init__(self, custom_converters=None, default_converter=None):
-
-        self.converters = {
-            colander.Boolean: schema.BooleanTypeConverter,
-            colander.Date: schema.DateTypeConverter,
-            colander.DateTime: schema.DateTimeTypeConverter,
-            colander.Float: schema.NumberTypeConverter,
-            colander.Integer: schema.IntegerTypeConverter,
-            colander.Mapping: schema.ObjectTypeConverter,
-            colander.Sequence: schema.ArrayTypeConverter,
-            colander.String: schema.StringTypeConverter,
-            colander.Time: schema.TimeTypeConverter,
-        }
-
         self.converters_base_classes = {
-            OneOfMappingSchema: schema.ObjectTypeConverter,
+            OneOfMappingSchema: OneOfObjectTypeConverter,
         }
+        custom_converters = custom_converters or {}
+        custom_converters.update(self.converters_base_classes)
+        super(CustomTypeConversionDispatcher, self).__init__(custom_converters or {}, default_converter)
 
-        self.converters.update(custom_converters or {})
-        self.default_converter = default_converter
+        #self.converters.update(custom_converters or {})
+        #self.default_converter = default_converter
 
     def __call__(self, schema_node):
         schema_instance = schema_node.typ

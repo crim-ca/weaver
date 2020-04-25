@@ -1,6 +1,7 @@
 """
 Definitions of types used by tokens.
 """
+import copy
 import traceback
 import uuid
 import warnings
@@ -648,9 +649,44 @@ class Job(Base):
         job_path = sd.process_job_service.path.format(process_id=self.process, job_id=self.id)
         return "{base_job_url}{job_path}".format(base_job_url=base_job_url, job_path=job_path)
 
-    def json(self, container=None):     # pylint: disable=W0221,arguments-differ
-        # type: (Optional[AnySettingsContainer]) -> JSON
-        """Obtain the JSON data representation for response body.
+    def links(self, container=None, self_link=None):
+        # type: (Optional[AnySettingsContainer], Optional[AnyStr]) -> JSON
+        """Obtains the JSON links section of many response body for jobs.
+
+        If :paramref:`self_link` is provided (e.g.: `"outputs"`) the link for that corresponding item will also
+        be added as `self` entry to the links. It must be a recognized job link field.
+
+        :param container: object that helps retrieve instance details, namely the host URL.
+        :param self_link: name of a section that represents the current link that will be returned.
+        """
+        settings = get_settings(container) if container else {}
+        job_url = self._job_url(settings)
+        job_links_body = {"links": [
+            {"href": job_url, "rel": "status", "title": "Job status."},
+        ]}
+        job_links = ["logs", "inputs"]
+        if self.status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_FINISHED]:
+            job_status = map_status(self.status)
+            if job_status == STATUS_SUCCEEDED:
+                job_links.extend(["outputs", "results"])
+            else:
+                job_links.extend(["exceptions"])
+        for link_type in job_links:
+            link_href = "{job_url}/{res}".format(job_url=job_url, res=link_type)
+            job_links_body["links"].append({"href": link_href, "rel": link_type, "title": "Job {}.".format(link_type)})
+        link_meta = {"type": CONTENT_TYPE_APP_JSON, "hreflang": LANGUAGE_EN_US}
+        for link in job_links_body["links"]:
+            link.update(link_meta)
+        if self_link in ["status", "inputs", "outputs", "results", "logs", "exceptions"]:
+            self_link_body = list(filter(lambda _link: _link["rel"] == self_link, job_links_body["links"]))[-1]
+            self_link_body = copy.deepcopy(self_link_body)
+            self_link_body["rel"] = "self"
+            job_links_body["links"].append(self_link_body)
+        return job_links_body
+
+    def json(self, container=None, self_link=None):     # pylint: disable=W0221,arguments-differ
+        # type: (Optional[AnySettingsContainer], Optional[AnyStr]) -> JSON
+        """Obtains the JSON data representation for response body.
 
         .. note::
             Settings are required to update API shortcut URLs to job additional information.
@@ -662,24 +698,9 @@ class Job(Base):
             "status": self.status,
             "message": self.status_message,
             "duration": self.duration_str,
-            "percentCompleted": self.progress,
-            "links": []
+            "percentCompleted": self.progress
         }
-        job_url = self._job_url(settings)
-        job_json["links"].append({"href": job_url, "rel": "self", "title": "Job status."})
-        job_links = ["logs", "inputs"]
-        if self.status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_FINISHED]:
-            job_status = map_status(self.status)
-            if job_status == STATUS_SUCCEEDED:
-                job_links.extend(["outputs", "results"])
-            else:
-                job_links.extend(["exceptions"])
-        for link_type in job_links:
-            link_href = "{job_url}/{res}".format(job_url=job_url, res=link_type)
-            job_json["links"].append({"href": link_href, "rel": link_type, "title": "Job {}.".format(link_type)})
-        link_meta = {"type": CONTENT_TYPE_APP_JSON, "hreflang": LANGUAGE_EN_US}
-        for link in job_json["links"]:
-            link.update(link_meta)
+        job_json.update(self.links(settings, self_link=self_link))
         return sd.JobStatusInfo().deserialize(job_json)
 
     def params(self):

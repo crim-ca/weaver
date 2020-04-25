@@ -28,7 +28,7 @@ from weaver.wps.utils import get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import Optional, Tuple
+    from typing import List, Optional, Tuple
     from pyramid.httpexceptions import HTTPException
     from weaver.typedefs import AnySettingsContainer, JSON
 
@@ -64,6 +64,38 @@ def get_job(request):
             description="Could not find job corresponding to specified 'process_id'."
         )
     return job
+
+
+def get_results(job, container, value_key=None):
+    # type: (Job, AnySettingsContainer, Optional[str]) -> List[JSON]
+    """
+    Obtains the job results with extended full WPS output URL as applicable and according to configuration settings.
+
+    :param job: job from which to retrieve results.
+    :param container: any container giving access to instance settings (to resolve reference output location).
+    :param value_key:
+        If not specified, the returned values will have the appropriate ``data``/``href`` key according to the content.
+        Otherwise, all values will have the specified key.
+    :returns: list of all outputs each with minimally an ID and value under the requested key.
+    """
+    wps_url = get_wps_output_url(container)
+    if not wps_url.endswith("/"):
+        wps_url = wps_url + "/"
+    outputs = []
+    for result in job.results:
+        rtype = "data" if any(k in result for k in ["data", "value"]) else "href"
+        value = get_any_value(result)
+        if rtype == "href":
+            value = wps_url + str(value).lstrip("/")
+        output_key = value_key if value_key else rtype
+        output = {"id": get_any_id(result), output_key: value}
+        if "mimeType" in result:  # required for the rest to be there, other fields optional
+            output["format"] = {"mimeType": result["mimeType"]}
+            for field in ["encoding", "schema"]:
+                if field in result:
+                    output["format"][field] = result[field]
+        outputs.append(output)
+    return outputs
 
 
 def validate_service_process(request):
@@ -176,7 +208,7 @@ def get_job_status(request):
     Retrieve the status of a job.
     """
     job = get_job(request)
-    return HTTPOk(json=job.json(request))
+    return HTTPOk(json=job.json(request, self_link="status"))
 
 
 @sd.provider_job_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
@@ -220,8 +252,9 @@ def get_job_inputs(request):
     Retrieve the inputs of a job.
     """
     job = get_job(request)
-    results = dict(inputs=[dict(id=get_any_id(_input), value=get_any_value(_input)) for _input in job.inputs])
-    return HTTPOk(json=results)
+    inputs = dict(inputs=[dict(id=get_any_id(_input), value=get_any_value(_input)) for _input in job.inputs])
+    inputs.update(job.links(request, self_link="inputs"))
+    return HTTPOk(json=inputs)
 
 
 @sd.provider_outputs_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
@@ -237,37 +270,9 @@ def get_job_outputs(request):
     Retrieve the outputs of a job.
     """
     job = get_job(request)
-    id_val = [(get_any_id(result), get_any_value(result)) for result in job.results]
-    outputs = [{"id": result[0], "href" if result[1].startswith("http") else "value": result[1]} for result in id_val]
-    ref_url = request.url.rstrip("/").rsplit("/", 1)[0]
-    input_url = ref_url + "/" + sd.job_inputs_service.path.rsplit("/")[-1]
-    results_url = ref_url + "/" + sd.job_results_service.path.rsplit("/")[-1]
-    return HTTPOk(json={
-        "outputs": outputs,
-        "links": [
-            {"rel": "self", "href": request.url},
-            {"rel": "inputs", "href": input_url},
-            {"rel": "results", "href": results_url}
-        ]
-    })
-
-
-def get_results(job, container):
-    # type: (Job, AnySettingsContainer) -> JSON
-    """
-    Obtains the results with extended full WPS output URL as applicable and according to configuration settings.
-    """
-    wps_url = get_wps_output_url(container)
-    if not wps_url.endswith("/"):
-        wps_url = wps_url + "/"
-    outputs = []
-    for result in job.results:
-        rtype = "data" if any(k in result for k in ["data", "value"]) else "href"
-        value = get_any_value(result)
-        if rtype == "href" and "://" not in value:
-            value = wps_url + str(value).lstrip("/")
-        outputs.append({"id": get_any_id(result), rtype: value})
-    return {"outputs": outputs}
+    outputs = {"outputs": get_results(job, request)}
+    outputs.update(job.links(request, self_link="outputs"))
+    return HTTPOk(json=outputs)
 
 
 @sd.provider_results_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
@@ -289,7 +294,7 @@ def get_job_results(request):
             "code": "ResultsNotReady",
             "description": "Job status is '{}'. Results are not yet available.".format(job_status)
         })
-    results = get_results(job, request)
+    results = get_results(job, request, value_key="value")
     return HTTPOk(json=results)
 
 

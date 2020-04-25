@@ -213,7 +213,7 @@ def api_swagger_ui(request):
     """weaver REST API swagger-ui schema documentation (this page)."""
     json_path = wps_restapi_base_path(request.registry.settings) + sd.api_swagger_json_service.path
     json_path = json_path.lstrip("/")   # if path starts by '/', swagger-ui doesn't find it on remote
-    data_mako = {"api_title": sd.API_TITLE, "api_swagger_json_path": json_path}
+    data_mako = {"api_title": sd.API_TITLE, "api_swagger_json_path": json_path, "api_version": weaver_version}
     return render_to_response("templates/swagger_ui.mako", data_mako, request=request)
 
 
