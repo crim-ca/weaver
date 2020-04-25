@@ -72,7 +72,7 @@ def get_weaver_config_file(file_path, default_config_file, generate_default_from
         raise ValueError("Invalid default configuration file [{}] is not one of {}"
                          .format(default_config_file, list(WEAVER_DEFAULT_CONFIGS)))
     default_path = os.path.abspath(os.path.join(WEAVER_CONFIG_DIR, default_config_file))
-    if file_path in [default_config_file, os.path.join(os.curdir, default_config_file)]:
+    if file_path in ["", default_config_file, os.path.join(os.curdir, default_config_file)]:
         file_path = default_path
     if str(file_path).strip() != "":
         file_path = os.path.abspath(file_path)
