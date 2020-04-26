@@ -12,7 +12,7 @@
                 url: "${api_swagger_json_path}",
                 dom_id: '#swagger-ui',
                 deepLinking: true,
-                docExpansion: 'none',
+                docExpansion: 'list',
                 validatorUrl: false,
                 presets: [
                     SwaggerUIBundle.presets.apis,

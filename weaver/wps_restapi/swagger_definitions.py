@@ -94,6 +94,10 @@ API_INFO = {
     "description": __meta__.__description__,
     "contact": {"name": __meta__.__authors__, "email": __meta__.__emails__, "url": __meta__.__source_repository__}
 }
+API_DOCS = {
+    "description": "{} documentation".format(__meta__.__title__),
+    "url": __meta__.__documentation_url__
+}
 URL = "url"
 
 #########################################################

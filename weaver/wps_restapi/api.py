@@ -22,7 +22,7 @@ from pyramid.response import Response
 from pyramid.settings import asbool
 from simplejson import JSONDecodeError
 
-from weaver.__meta__ import __version__ as weaver_version
+from weaver import __meta__
 from weaver.formats import (
     CONTENT_TYPE_APP_JSON,
     CONTENT_TYPE_TEXT_HTML,
@@ -138,7 +138,7 @@ def api_frontpage_body(settings):
 def api_versions(request):  # noqa: F811
     # type: (Request) -> HTTPException
     """Weaver versions information."""
-    weaver_info = {"name": "weaver", "version": weaver_version, "type": "api"}
+    weaver_info = {"name": "weaver", "version": __meta__.__version__, "type": "api"}
     return HTTPOk(json={"versions": [weaver_info]})
 
 
@@ -190,7 +190,9 @@ def get_swagger_json(http_scheme="http", http_host="localhost", base_url=None, u
         swagger_base_spec["host"] = http_host
         swagger_base_path = sd.api_frontpage_service.path
     swagger.swagger = swagger_base_spec
-    return swagger.generate(title=sd.API_TITLE, version=weaver_version, base_path=swagger_base_path)
+    swagger_json = swagger.generate(title=sd.API_TITLE, version=__meta__.__version__, base_path=swagger_base_path)
+    swagger_json["externalDocs"] = sd.API_DOCS
+    return swagger_json
 
 
 @sd.api_swagger_json_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
@@ -213,7 +215,7 @@ def api_swagger_ui(request):
     """weaver REST API swagger-ui schema documentation (this page)."""
     json_path = wps_restapi_base_path(request.registry.settings) + sd.api_swagger_json_service.path
     json_path = json_path.lstrip("/")   # if path starts by '/', swagger-ui doesn't find it on remote
-    data_mako = {"api_title": sd.API_TITLE, "api_swagger_json_path": json_path, "api_version": weaver_version}
+    data_mako = {"api_title": sd.API_TITLE, "api_swagger_json_path": json_path, "api_version": __meta__.__version__}
     return render_to_response("templates/swagger_ui.mako", data_mako, request=request)
 
 

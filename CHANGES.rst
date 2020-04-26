@@ -181,9 +181,10 @@ Changes:
   (`#14 <https://github.com/crim-ca/weaver/issues/14>`_).
 - Add ``Job.link`` method that auto-generates all applicable links (inputs, outputs, logs, etc.).
 - Handle additional trailing slash resulting in ``NotFound`` that corresponds to a valid route without the slash.
+- Provide basic conda environment setup through ``Makefile`` for Windows bash-like shell (ie: ``MINGW``/``MINGW64``).
 - Update OpenAPI template to not render the useless version selector since we only provide the current version.
 - Update Swagger definitions to reflect changes and better reuse existing schemas.
-- Provide basic conda environment setup through ``Makefile`` for Windows bash-like shell (ie: ``MINGW``/``MINGW64``).
+- Update Swagger UI to provide the `readthedocs` URL.
 - Update documentation for minimal adjustments needed to run under Windows.
 
 Fixes:

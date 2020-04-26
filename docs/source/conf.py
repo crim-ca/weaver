@@ -392,7 +392,7 @@ texinfo_documents = [
 # intersphinx_mapping = {'https://docs.python.org/': None}
 intersphinx_mapping = {
     "python": ("http://docs.python.org/", None),
-    "weaver": ("http://pavics-weaver.readthedocs.io/en/latest/", None),
+    "weaver": (__meta__.__documentation_url__, None),
 }
 
 # linkcheck options
