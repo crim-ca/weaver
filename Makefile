@@ -23,9 +23,16 @@ CONDA_ENV      ?= $(APP_NAME)
 CONDA_HOME     ?= $(HOME)/.conda
 CONDA_ENVS_DIR ?= $(CONDA_HOME)/envs
 CONDA_ENV_PATH := $(CONDA_ENVS_DIR)/$(CONDA_ENV)
-CONDA_BIN      := $(CONDA_HOME)/bin/conda
+# allow pre-installed conda in Windows bash-like shell
+ifeq (,$(findstring "MINGW",$(OS_NAME)))
+  CONDA_BIN_DIR ?= $(CONDA_HOME)/Scripts
+else:
+  CONDA_BIN_DIR ?= $(CONDA_HOME)/bin
+endif
+CONDA_BIN := $(CONDA_BIN_DIR)/conda
 CONDA_ENV_REAL_TARGET_PATH := $(realpath $(CONDA_ENV_PATH))
 CONDA_ENV_REAL_ACTIVE_PATH := $(realpath ${CONDA_PREFIX})
+
 # environment already active - use it directly
 ifneq ("$(CONDA_ENV_REAL_ACTIVE_PATH)", "")
   CONDA_ENV_MODE := [using active environment]
@@ -43,7 +50,7 @@ endif
 # update paths for environment activation
 ifeq ("$(CONDA_ENV_REAL_ACTIVE_PATH)", "")
   CONDA_ENV_MODE := [will activate environment]
-  CONDA_CMD := source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)";
+  CONDA_CMD := source "$(CONDA_BIN_DIR)/activate" "$(CONDA_ENV)";
 endif
 DOWNLOAD_CACHE ?= $(APP_ROOT)/downloads
 PYTHON_VERSION ?= `python -c 'import platform; print(platform.python_version())'`
@@ -138,14 +145,14 @@ info:		## display make information
 .PHONY: conda-base
 conda-base:		## obtain and install a missing conda distribution
 	@echo "Validating conda installation..."
-	@test -f "$(CONDA_HOME)/bin/conda" || test -d "$(DOWNLOAD_CACHE)" || \
+	@test -f "$(CONDA_BIN)" || test -d "$(DOWNLOAD_CACHE)" || \
 		(echo "Creating download directory: $(DOWNLOAD_CACHE)" && mkdir -p "$(DOWNLOAD_CACHE)")
-	@test -f "$(CONDA_HOME)/bin/conda" || test -f "$(DOWNLOAD_CACHE)/$(FN)" || \
+	@test -f "$(CONDA_BIN)" || test -f "$(DOWNLOAD_CACHE)/$(FN)" || \
 		(echo "Fetching conda distribution from: $(CONDA_URL)/$(FN)" && \
 		 curl "$(CONDA_URL)/$(FN)" --insecure --location --output "$(DOWNLOAD_CACHE)/$(FN)")
-	@test -f "$(CONDA_HOME)/bin/conda" || \
+	@test -f "$(CONDA_BIN)" || \
 		(bash "$(DOWNLOAD_CACHE)/$(FN)" -b -u -p "$(CONDA_HOME)" && \
-		 echo "Make sure to add '$(CONDA_HOME)/bin' to your PATH variable in '~/.bashrc'.")
+		 echo "Make sure to add '$(CONDA_BIN_DIR)' to your PATH variable in '~/.bashrc'.")
 
 .PHONY: conda-clean
 clean-clean: 	## remove the conda environment

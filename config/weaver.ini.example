@@ -138,10 +138,19 @@ BROKER_URL = mongodb://mongodb:27017/celery
 ###
 
 [server:main]
+# NOTE: Gunicorn not supported on Windows, use waitress instead
+
+# --- gunicorn ---
 use = egg:gunicorn#main
 bind = 0.0.0.0:4001
-workers = 5
+workers = 10
 timeout = 10
+
+# --- waitress ---
+# use = egg:waitress#main
+# listen = localhost:4002
+# threads = 10
+# channel_timeout = 10
 
 ###
 # logging configuration
