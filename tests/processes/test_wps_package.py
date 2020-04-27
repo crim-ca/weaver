@@ -10,6 +10,7 @@ from copy import deepcopy
 
 import mock
 import pytest
+import tempfile
 
 from pytest import fail
 from pywps.app import WPSRequest
