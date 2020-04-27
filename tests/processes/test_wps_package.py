@@ -8,7 +8,9 @@ import tempfile
 from collections import OrderedDict
 from copy import deepcopy
 
+import mock
 import pytest
+
 from pytest import fail
 from pywps.app import WPSRequest
 from pywps.inout.formats import Format
@@ -20,6 +22,7 @@ from weaver.exceptions import PackageTypeError
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
 from weaver.processes.constants import WPS_LITERAL
 from weaver.processes.wps_package import _are_different_and_set  # noqa: W0212
+from weaver.processes.wps_package import _check_package_file  # noqa: W0212
 from weaver.processes.wps_package import _get_package_ordered_io  # noqa: W0212
 from weaver.processes.wps_package import _is_cwl_array_type  # noqa: W0212
 from weaver.processes.wps_package import _is_cwl_enum_type  # noqa: W0212
@@ -165,6 +168,45 @@ def test_get_package_ordered_io_with_list():
     result = _get_package_ordered_io(deepcopy(expected_result))
     assert isinstance(result, list) and len(result) == len(expected_result)
     assert result == expected_result
+
+
+class MockResponseOk(object):
+    status_code = 200
+
+
+def test_check_package_file_with_url():
+    package_url = "https://example.com/package.cwl"
+    with mock.patch("requests.head", return_value=MockResponseOk()) as mock_request:
+        res_path, is_url = _check_package_file(package_url)
+        mock_request.assert_called_with(package_url)
+    assert res_path == package_url
+    assert is_url is True
+
+
+def test_check_package_file_with_file_scheme():
+    file_path = "/tmp/package.cwl"
+    package_file = "file://{}".format(file_path)
+    with mock.patch("requests.head", return_value=MockResponseOk()) as mock_request:
+        res_path, is_url = _check_package_file(package_file)
+        mock_request.assert_not_called()
+    assert res_path == file_path
+    assert is_url is False
+
+
+def test_check_package_file_with_posix_path():
+    with tempfile.NamedTemporaryFile(mode='r', suffix="test-package.cwl") as tmp_file:
+        res_path, is_url = _check_package_file(tmp_file.name)
+        assert res_path == tmp_file.name
+        assert is_url is False
+
+
+def test_check_package_file_with_windows_path():
+    test_file = "C:/Windows/Temp/package.cwl"   # fake existing, just test format handled correctly
+    with mock.patch("os.path.isfile", return_value=True) as mock_isfile:
+        res_path, is_url = _check_package_file(test_file)
+        mock_isfile.assert_called_with(test_file)
+    assert res_path == test_file
+    assert is_url is False
 
 
 def test_get_package_ordered_io_when_direct_type_string():

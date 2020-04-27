@@ -12,6 +12,7 @@ Functions and classes that offer interoperability and conversion between corresp
 import json
 import logging
 import os
+import posixpath
 import shutil
 import tempfile
 import time
@@ -419,7 +420,11 @@ def _check_package_file(cwl_file_path_or_url):
     :raises PackageRegistrationError: in case of missing file, invalid format or invalid HTTP status code.
     """
     is_url = False
-    if urlparse(cwl_file_path_or_url).scheme != "":
+    cwl_file_path_or_url = cwl_file_path_or_url.replace("file://", "")
+    scheme = urlparse(cwl_file_path_or_url).scheme
+    if scheme != "" and not posixpath.ismount("{}:".format(scheme)):    # windows partition
+        is_url = True
+    if is_url:
         cwl_path = cwl_file_path_or_url
         cwl_resp = request_extra("head", cwl_path, settings=get_settings(app))
         is_url = True
@@ -430,7 +435,7 @@ def _check_package_file(cwl_file_path_or_url):
         if not os.path.isfile(cwl_path):
             raise PackageRegistrationError("Cannot find CWL file at: '{}'.".format(cwl_path))
 
-    file_ext = os.path.splitext(cwl_path)[1].replace(".", "")
+    file_ext = os.path.splitext(cwl_path)[-1].replace(".", "")
     if file_ext not in PACKAGE_EXTENSIONS:
         raise PackageRegistrationError("Not a valid CWL file type: '{}'.".format(file_ext))
     return cwl_path, is_url

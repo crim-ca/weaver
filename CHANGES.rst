@@ -101,6 +101,8 @@ Changes:
 - Handle additional trailing slash resulting in ``NotFound`` that corresponds to a valid route without the slash.
 - Update OpenAPI template to not render the useless version selector since we only provide the current version.
 - Update Swagger definitions to reflect changes and better reuse existing schemas.
+- Provide basic conda environment setup through ``Makefile`` for Windows bash-like shell (ie: ``MINGW``/``MINGW64``).
+- Update documentation for minimal adjustments needed to run under Windows.
 
 Fixes:
 ------
@@ -109,6 +111,7 @@ Fixes:
   specifies the type as ``{"input": "<type>"}``, instead of ``{"input": {"type:" "<type>", "format": [...]}}``.
 - Fix ``weaver.config.get_weaver_config_file`` called with empty path to be resolved just as requesting the default
   file path explicitly instead of returning an invalid directory.
+- Fix `CWL` package path resolution under Windows incorrectly parsed partition as URL protocol.
 
 `1.10.1 <https://github.com/crim-ca/weaver/tree/1.10.1>`_ (2020-06-03)
 ========================================================================

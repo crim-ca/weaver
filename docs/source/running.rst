@@ -22,13 +22,16 @@ specified connection settings in ``weaver/config/weaver.ini``.
 `Weaver` installation comes with a `Makefile`_ which provides a shortcut command to start the application with
 `Gunicorn`_:
 
+.. note::
+    If using ``Windows``, make sure you have read the `Windows Installation <windows_install>`_ section.
+
 .. code-block:: sh
 
     $ make start    # start Weaver WSGI application server
 
 
 Weaver should be running after this operation.
-It will be available under the configured URL endpoint in ``weaver/config/weaver.ini``.
+It will be available under the configured URL endpoint in ``weaver.ini`` (see `example <weaver_config_example>`_).
 If everything was configured correctly, calling this URL (default: ``http://localhost:4001``) should
 provide a response containing a JSON body with basic information about Weaver.
 
