@@ -38,7 +38,7 @@ from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, STATUS_COMPLIA
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps_restapi.colander_extras import (
     DropableNoneSchema,
-    OneOfMappingSchema,
+    OneOfKeywordSchema,
     SchemaNodeDefault,
     VariableMappingSchema
 )
@@ -356,7 +356,7 @@ class MinMaxOccursStr(MappingSchema):
     maxOccurs = SchemaNode(String(), missing=drop)
 
 
-class WithMinMaxOccurs(OneOfMappingSchema):
+class WithMinMaxOccurs(OneOfKeywordSchema):
     _one_of = (MinMaxOccursStr, MinMaxOccursInt)
 
 
@@ -418,7 +418,7 @@ class ValuesReference(MappingSchema):
     valueReference = SchemaNode(String(), format=URL, )
 
 
-class LiteralDataDomainType(OneOfMappingSchema):
+class LiteralDataDomainType(OneOfKeywordSchema):
     _one_of = (AllowedValues,
                AllowedRanges,
                ValuesReference,
@@ -436,7 +436,7 @@ class LiteralInputType(DescriptionType, WithMinMaxOccurs):
     literalDataDomains = LiteralDataDomainTypeList(missing=drop)
 
 
-class InputType(OneOfMappingSchema):
+class InputType(OneOfKeywordSchema):
     _one_of = (
         BoundingBoxInputType,
         ComplexInputType,  # should be 2nd to last because very permission, but requires format at least
@@ -464,7 +464,7 @@ class OutputDataDescriptionType(DescriptionType):
     pass
 
 
-class OutputType(OneOfMappingSchema, OutputDataDescriptionType):
+class OutputType(OneOfKeywordSchema, OutputDataDescriptionType):
     _one_of = (
         BoundingBoxOutputType,
         ComplexOutputType,  # should be 2nd to last because very permission, but requires format at least
@@ -806,14 +806,14 @@ class JobStatusInfo(MappingSchema):
     links = JsonLinkList(missing=drop)
 
 
-class JobEntrySchema(OneOfMappingSchema):
+class JobEntrySchema(OneOfKeywordSchema):
     _one_of = (
         JobStatusInfo,
         SchemaNode(String(), description="Job ID."),
     )
     # note:
     #   Since JobId is a simple string (not a dict), no additional mapping field can be added here.
-    #   They will be discarded by `OneOfMappingSchema.deserialize()`.
+    #   They will be discarded by `OneOfKeywordSchema.deserialize()`.
 
 
 class JobCollection(SequenceSchema):
@@ -850,7 +850,7 @@ class GetGroupedJobsSchema(MappingSchema):
     groups = GroupedCategoryJobsSchema()
 
 
-class GetQueriedJobsSchema(OneOfMappingSchema):
+class GetQueriedJobsSchema(OneOfKeywordSchema):
     _one_of = (
         GetPagingJobsSchema,
         GetGroupedJobsSchema,
@@ -940,7 +940,7 @@ class ValueReference(DataEncodingAttributes):
     value = SchemaNode(String(), format=URL)
 
 
-class ValueType(OneOfMappingSchema):
+class ValueType(OneOfKeywordSchema):
     """OGC-specific format, always 'value' key."""
     _one_of = (
         ValueFloat,
@@ -951,7 +951,7 @@ class ValueType(OneOfMappingSchema):
     )
 
 
-class AnyType(OneOfMappingSchema):
+class AnyType(OneOfKeywordSchema):
     """Permissive variants that we attempt to parse automatically."""
     _one_of = (
         # literal data with 'data' key
@@ -997,7 +997,7 @@ class Quotation(MappingSchema):
     userId = SchemaNode(String(), description="User id that requested the quote.")
     details = SchemaNode(String(), description="Details of the quotation.", missing=drop)
     estimatedTime = SchemaNode(String(), description="Estimated duration of the process execution.", missing=drop)
-    processParameters = Execute()
+    processParameters = Execute(title="ProcessExecuteParameters")
     alternativeQuotations = AlternateQuotationList(missing=drop)
 
 
@@ -1094,7 +1094,7 @@ class ProcessesSchema(SequenceSchema):
     provider_processes_service = Process()
 
 
-class JobOutput(OneOfMappingSchema, OutputDataType):
+class JobOutput(OneOfKeywordSchema, OutputDataType):
     """Job output result with specific keyword according to represented format."""
     id = SchemaNode(String(), description="Job output id corresponding to process description outputs.")
     _one_of = (
@@ -1110,7 +1110,7 @@ class JobOutputList(SequenceSchema):
     output = JobOutput()
 
 
-class JobResultValue(OutputDataType, OneOfMappingSchema):
+class JobResultValue(OutputDataType, OneOfKeywordSchema):
     """Job outputs route conforming to OGC standard with 'value' key."""
     _one_of = (
         ValueFloat,
@@ -1210,7 +1210,7 @@ class ProcessOffering(MappingSchema):
     outputTransmission = TransmissionModeList(missing=drop)
 
 
-class ProcessDescriptionChoiceType(OneOfMappingSchema):
+class ProcessDescriptionChoiceType(OneOfKeywordSchema):
     _one_of = (Reference,
                ProcessOffering)
 
