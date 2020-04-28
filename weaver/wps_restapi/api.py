@@ -190,7 +190,8 @@ def get_swagger_json(http_scheme="http", http_host="localhost", base_url=None, u
         swagger_base_spec["host"] = http_host
         swagger_base_path = sd.api_frontpage_service.path
     swagger.swagger = swagger_base_spec
-    swagger_json = swagger.generate(title=sd.API_TITLE, version=__meta__.__version__, base_path=swagger_base_path)
+    swagger_json = swagger.generate(title=sd.API_TITLE, version=__meta__.__version__,
+                                    base_path=swagger_base_path, openapi_spec=3)
     swagger_json["externalDocs"] = sd.API_DOCS
     return swagger_json
 

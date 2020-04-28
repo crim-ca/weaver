@@ -125,7 +125,7 @@ class OneOfMappingSchema(colander.MappingSchema):
     @staticmethod
     @abstractmethod
     def _one_of():
-        # type: () -> Iterable[colander._SchemaMeta]
+        # type: () -> Iterable[colander._SchemaMeta]  # noqa: W0212
         raise NotImplementedError
 
     def __init__(self, *args, **kwargs):
