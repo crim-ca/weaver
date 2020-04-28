@@ -106,24 +106,29 @@ class KeywordMapper(colander.MappingSchema):
 
     Each implementer must provide the corresponding ``keyword`` it defines amongst `OpenAPI` specification keywords.
     """
-    _keywords = frozenset(["_one_of", "_all_of", "_any_of", "_not"])
+    _keywords = frozenset(['_one_of', '_all_of', '_any_of', '_not'])
+    _keyword_map = {_kw: _kw.replace('_of', 'Of').replace('_', '') for _kw in _keywords}
     _keyword = None  # type: str
 
     def __init__(self, *args, **kwargs):
         super(KeywordMapper, self).__init__(*args, **kwargs)
         if not hasattr(self, self._keyword):
             raise ConversionTypeError("Type '{}' must define '{}' element.".format(self, self._keyword))
-        kw_items = self._get_keyword_items()
+        kw_items = self.get_keyword_items()
         kw_items_args = kwargs.get(self._keyword)
         if not kw_items and kw_items_args:
             setattr(self, self._keyword, kw_items_args)
             kw_items = kw_items_args
-        if not hasattr(kw_items, "__iter__") or not len(kw_items):  # noqa
+        if not hasattr(kw_items, '__iter__') or not len(kw_items):  # noqa
             raise ConversionValueError("Element '{}' of '{!s}' must be iterable with at least 1 value. "
                                        "Instead it was '{!s}'".format(self._keyword, self, kw_items))
         self._validate_single()
 
-    def _get_keyword_items(self):
+    @classmethod
+    def get_keyword_name(cls):
+        return cls._keyword_map[cls._keyword]
+
+    def get_keyword_items(self):
         return getattr(self, self._keyword)
 
     def _validate_single(self):
@@ -217,10 +222,7 @@ class OneOfKeywordSchema(KeywordMapper):
         valid_one_of = []
         for schema_class in self._one_of:  # noqa
             try:
-                # instantiate the class if specified with simple reference,
-                # other use pre-instantiated schema object
-                if isinstance(schema_class, colander._SchemaMeta):  # noqa: W0212
-                    schema_class = schema_class()
+                schema_class = _make_node_instance(schema_class)
                 valid_one_of.append(schema_class.deserialize(cstruct))
             except colander.Invalid as invalid:
                 invalid_one_of.update({type(invalid.node).__name__: str(invalid)})
@@ -271,10 +273,7 @@ class AllOfKeywordSchema(KeywordMapper):
         merged_all_of = dict()
         for schema_class in self._one_of:  # noqa
             try:
-                # instantiate the class if specified with simple reference,
-                # other use pre-instantiated schema object
-                if isinstance(schema_class, colander._SchemaMeta):  # noqa: W0212
-                    schema_class = schema_class()
+                schema_class = _make_node_instance(schema_class)
                 # update items with new ones
                 required_all_of.update({type(schema_class).__name__: str(schema_class)})
                 merged_all_of.update({schema_class.deserialize(cstruct)})
@@ -313,7 +312,7 @@ class AnyOfKeywordSchema(KeywordMapper):
 
     @classmethod
     @abstractmethod
-    def _all_of(cls):
+    def _any_of(cls):
         # type: () -> Iterable[colander._SchemaMeta]  # noqa: W0212
         """This must be overridden in the schema definition using it."""
         raise ConversionTypeError("Missing '{}' keyword.".format(cls._keyword))
@@ -326,10 +325,7 @@ class AnyOfKeywordSchema(KeywordMapper):
         merged_any_of = dict()
         for schema_class in self._one_of:  # noqa
             try:
-                # instantiate the class if specified with simple reference,
-                # other use pre-instantiated schema object
-                if isinstance(schema_class, colander._SchemaMeta):  # noqa: W0212
-                    schema_class = schema_class()
+                schema_class = _make_node_instance(schema_class)
                 # update items with new ones
                 option_any_of.update({type(schema_class).__name__: str(schema_class)})
                 merged_any_of.update({schema_class.deserialize(cstruct)})
@@ -353,17 +349,19 @@ class NotKeywordSchema(KeywordMapper):
 class KeywordTypeConverter(schema.TypeConverter):
     """Generic keyword converter that builds schema with a list of sub-schemas under the keyword."""
     def convert_type(self, schema_node):
+        keyword = schema_node.get_keyword_name()
         keyword_schema = {
-            schema_node._keyword: []
+            keyword: []
         }
 
-        for item_schema in schema_node._get_keyword_items():
-            obj_converted = self.dispatcher(item_schema)
-            keyword_schema[schema_node._keyword].append(obj_converted)
+        for item_schema in schema_node.get_keyword_items():
+            obj_instance = _make_node_instance(item_schema)
+            obj_converted = self.dispatcher(obj_instance)
+            keyword_schema[keyword].append(obj_converted)
         return keyword_schema
 
 
-class OneOfKeywordTypeConverter(schema.TypeConverter):
+class OneOfKeywordTypeConverter(KeywordTypeConverter):
     """Object converter that generates the ``oneOf`` keyword definition.
 
     This object does a bit more work than other :class:`KeywordTypeConverter` as it
@@ -373,15 +371,18 @@ class OneOfKeywordTypeConverter(schema.TypeConverter):
         - :class:`OneOfKeywordSchema`
     """
     def convert_type(self, schema_node):
+        keyword = schema_node.get_keyword_name()
         one_of_obj = {
-            schema_node._keyword: []
+            keyword: []
         }
 
-        for obj in schema_node._one_of:
+        for item_schema in schema_node.get_keyword_items():
             # shortcut definition of oneOf/allOf mix, see OneOfKeywordSchema docstring)
             # (eg: other schema fields always needed regardless of additional ones by oneOf)
-            if len(schema_node.children):
-                obj_no_one_of = schema_node.clone()  # type: OneOfKeywordSchema
+            item_obj = _make_node_instance(item_schema)
+
+            if len(getattr(schema_node, 'children', [])):
+                obj_no_one_of = item_obj.clone()  # type: OneOfKeywordSchema
                 # un-specialize the keyword schema to base schema (otherwise we recurse)
                 if isinstance(obj_no_one_of, colander.MappingSchema):
                     obj_no_one_of = colander.MappingSchema(obj_no_one_of)
@@ -389,12 +390,12 @@ class OneOfKeywordTypeConverter(schema.TypeConverter):
                     obj_no_one_of = colander.SequenceSchema(obj_no_one_of)
                 else:
                     raise ConversionTypeError(
-                        'Unknown base type to convert oneOf schema: {}'.format(type(obj_no_one_of)))
-                all_of = AllOfKeywordSchema(_all_of=[obj_no_one_of, obj])
+                        'Unknown base type to convert oneOf schema item: {}'.format(type(obj_no_one_of)))
+                all_of = AllOfKeywordSchema(_all_of=[obj_no_one_of, item_obj])
                 obj_converted = self.dispatcher(all_of)
             else:
-                obj_converted = super(OneOfKeywordTypeConverter, self).convert_type(obj)
-            one_of_obj[schema_node._keyword].append(obj_converted)
+                obj_converted = self.dispatcher(item_obj)
+            one_of_obj[keyword].append(obj_converted)
 
         return one_of_obj
 
@@ -495,3 +496,22 @@ def _dict_nested_contained(parent, child):
         return _dict_nested_contained(parent[key], value)
 
     return True
+
+
+def _make_node_instance(schema_node_or_class):
+    """Obtains a schema node instance in case it was specified only by type reference.
+
+    This helps being more permissive of provided definitions while handling situations
+    like presented in the example below::
+
+        class Map(OneOfMappingSchema):
+            # uses types instead of instances like 'SubMap1([...])' and 'SubMap2([...])'
+            _one_of = (SubMap1, SubMap2)
+
+    """
+    if isinstance(schema_node_or_class, colander._SchemaMeta):  # noqa: W0212
+        schema_node_or_class = schema_node_or_class()
+    if not isinstance(schema_node_or_class, colander.SchemaNode):
+        raise ConversionTypeError(
+            "Invalid item should be a SchemaNode, got: {!s}".format(type(schema_node_or_class)))
+    return schema_node_or_class
