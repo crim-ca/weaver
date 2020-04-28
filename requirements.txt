@@ -5,12 +5,12 @@ boto3
 # windows fixes until
 # https://github.com/celery/billiard/issues/260
 # https://github.com/celery/billiard/issues/313
-billiard
-billiard<3.6; sys_platform == "win32"
 # celery 5 to be released in near future
 # celery >=4.4.3 breaks on 'future.utils' import
-celery[mongodb]==4.4.2
-celery[mongodb]<4.4; sys_platform == "win32"
+billiard; sys_platform != "win32"
+billiard>3.2,<3.4; sys_platform == "win32"
+celery[mongodb]==4.4.2; sys_platform != "win32"
+celery[mongodb]<4; sys_platform == "win32"
 cffi
 colander
 cornice
