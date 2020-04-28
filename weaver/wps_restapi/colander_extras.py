@@ -734,6 +734,7 @@ class OneOfKeywordSchema(KeywordMapper):
 
     @classmethod
     @abstractmethod
+
     def _one_of(cls):
         # type: () -> Iterable[colander._SchemaMeta]  # noqa: W0212
         """This must be overridden in the schema definition using it."""
