@@ -179,15 +179,17 @@ def jsonify_output(output, process_description, container=None):
 def convert_process_wps_to_db(service, process, container):
     # type: (Service, ProcessWPS, AnySettingsContainer) -> ProcessDB
     """
-    Converts an owslib WPS Process to local storage Process.
+    Converts an :class:`owslib.wps.WebProcessingService` process to local storage :class:`weaver.datatype.Process`.
     """
     from weaver.processes.wps_package import complex2json as jsonify_value
 
-    describe_process_url = "{base_url}/providers/{provider_id}/processes/{process_id}".format(
-        base_url=get_wps_restapi_base_url(container),
-        provider_id=service.get("name"),
-        process_id=process.identifier)
-    execute_process_url = "{describe_url}/jobs".format(describe_url=describe_process_url)
+    provider_id = service.get("name")
+    process_id = process.identifier
+    base_url = get_wps_restapi_base_url(container)
+    describe_process_path = sd.provider_process_service.path.format(provider_id=provider_id, process_id=process_id)
+    describe_process_url = os.path.join(base_url, describe_process_path)
+    execute_process_path = sd.provider_jobs_service.path.format(provider_id=provider_id, process_id=process_id)
+    execute_process_url = os.path.join(base_url, execute_process_path)
 
     default_format = {"mimeType": CONTENT_TYPE_TEXT_PLAIN}
     inputs = [dict(

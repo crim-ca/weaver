@@ -309,11 +309,11 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
     def fetch_by_id(self, process_id, visibility=None, request=None):  # noqa: E811
         # type: (AnyStr, Optional[AnyStr], Optional[Request]) -> Process
         """
-        Get process for given `process_id` from storage, optionally filtered by `visibility`.
+        Get process for given :paramref:`process_id` from storage, optionally filtered by :paramref:`visibility`.
         If ``visibility=None``, the process is retrieved (if existing) regardless of its visibility value.
 
         :param process_id: process identifier
-        :param visibility: one value amongst `weaver.visibility`.
+        :param visibility: one value amongst :py:mod:`weaver.visibility`.
         :param request: <unused>
         :return: An instance of :class:`weaver.datatype.Process`.
         """

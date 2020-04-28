@@ -44,9 +44,15 @@ that environment. You can also enforce a specific environment using:
 Windows
 =======
 
-Minimal support is provided to run the code in Windows. To do so, the ``Makefile`` assumes you are running in a
+*Minimal* support is provided to run the code on Windows. To do so, the ``Makefile`` assumes you are running in a
 ``MINGW`` environment, that ``conda`` is already installed, and that it is available from ``CONDA_HOME`` variable or
 similar. If this is not the case, you will have to adjust the reference variables accordingly.
+
+.. note::
+    Windows support is not official and any dependency could stop supporting it at any given time. Particularly,
+    libraries for `Celery`_ task execution have a tendency to break between versions for Windows. The application
+    is regularly evaluated on a Linux virtual machine. It is recommended to run it as so or using the existing
+    Docker images.
 
 Known issues
 ------------
