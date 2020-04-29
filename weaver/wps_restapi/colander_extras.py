@@ -58,7 +58,7 @@ class DropableSchemaNode(colander.SchemaNode):
     """
     @staticmethod
     def schema_type():
-        raise NotImplementedError
+        raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
     # pylint: disable=W0222,signature-differs
     def deserialize(self, cstruct):
@@ -82,7 +82,7 @@ class DefaultSchemaNode(colander.SchemaNode):
 
     @staticmethod
     def schema_type():
-        raise NotImplementedError
+        raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
     # pylint: disable=W0222,signature-differs
     def deserialize(self, cstruct):
@@ -104,7 +104,7 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode):
     """
     @staticmethod
     def schema_type():
-        raise NotImplementedError
+        raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
     def __int__(self, *args, **kwargs):
         colander.SchemaNode.__init__(*args, **kwargs)

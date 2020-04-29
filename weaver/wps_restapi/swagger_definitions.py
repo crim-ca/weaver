@@ -307,8 +307,8 @@ class AdditionalParametersList(ExtendedSequenceSchema):
 
 
 class Content(ExtendedMappingSchema):
-    href = ExtendedSchemaNode(String(), format=URL, description="URL to CWL file.", title="href",
-                              example="http://some.host/applications/cwl/multisensor_ndvi.cwl")
+    href = URL(description="URL to CWL file.", title="href",
+               example="http://some.host/applications/cwl/multisensor_ndvi.cwl")
 
 
 class Offering(ExtendedMappingSchema):
@@ -349,17 +349,17 @@ class ComplexInputType(DescriptionType, WithMinMaxOccurs):
     formats = FormatDescriptionList()
 
 
-class SupportedCrs(ExtendedMappingSchema):
-    crs = ExtendedSchemaNode(String(), format=URL)
+class SupportedCRS(ExtendedMappingSchema):
+    crs = URL(tile="crs", description="Coordinate Reference System")
     default = ExtendedSchemaNode(Boolean(), missing=drop)
 
 
-class SupportedCrsList(ExtendedSequenceSchema):
-    item = SupportedCrs()
+class SupportedCRSList(ExtendedSequenceSchema):
+    item = SupportedCRS(title="SupportedCRS")
 
 
 class BoundingBoxInputType(DescriptionType, WithMinMaxOccurs):
-    supportedCRS = SupportedCrsList()
+    supportedCRS = SupportedCRSList()
 
 
 class LiteralReference(ExtendedMappingSchema):
@@ -404,7 +404,7 @@ class AnyValue(ExtendedMappingSchema):
 
 
 class ValuesReference(ExtendedMappingSchema):
-    valueReference = ExtendedSchemaNode(String(), format=URL, )
+    valueReference = URL()
 
 
 class LiteralDataDomainType(OneOfKeywordSchema):
@@ -442,7 +442,7 @@ class LiteralOutputType(ExtendedMappingSchema):
 
 
 class BoundingBoxOutputType(ExtendedMappingSchema):
-    supportedCRS = SupportedCrsList()
+    supportedCRS = SupportedCRSList()
 
 
 class ComplexOutputType(ExtendedMappingSchema):
@@ -1119,18 +1119,19 @@ class CWLArguments(ExtendedSequenceSchema):
 # Note: can be very different schemas, this is enough doc for Weaver purpose, don't go in full details
 class CWLInput(VariableMappingSchema):
     id = ExtendedSchemaNode(String())
-    _type = ExtendedSchemaNode(name="type")
+    type = ExtendedSchemaNode(String(), name="type")
     inputBinding = ExtendedMappingSchema(missing=drop, description="Defines how to specify the input for the command.")
     default = ValueTypeFormats(missing=drop)
 
 
 class OutputBinding(VariableMappingSchema):
-    glob = ExtendedSchemaNode(description="Glob pattern the will find the output on disk or mounted docker volume.")
+    glob = ExtendedSchemaNode(String(),
+                              description="Glob pattern the will find the output on disk or mounted docker volume.")
 
 
 class CWLOutput(VariableMappingSchema):
     id = ExtendedSchemaNode(String())
-    _type = ExtendedSchemaNode(name="type")
+    type = ExtendedSchemaNode(String(), name="type")
     outputBinding = OutputBinding(description="Defines how to retrieve the output result from the command.")
 
 
@@ -1146,7 +1147,7 @@ class CWL(VariableMappingSchema, CWLRequirementReferences):
     cwlVersion = Version(description="CWL version of the described application package.")
     _class = CWLClass()
     baseCommand = ExtendedSchemaNode(
-        missing=drop,
+        String(), missing=drop,
         description="Command called in the docker image or on shell "
                     "according to requirements and hints specifications.")
     arguments = CWLArguments(description="Base arguments passed to the command.")
@@ -1309,7 +1310,7 @@ class Deploy(ExtendedMappingSchema):
     processDescription = ProcessDescriptionChoiceType()
     immediateDeployment = ExtendedSchemaNode(Boolean(), missing=drop, default=True)
     executionUnit = ExecutionUnitList()
-    deploymentProfileName = ExtendedSchemaNode(String(), format="url", missing=drop)
+    deploymentProfileName = URL(missing=drop)
     owsContext = OWSContext(missing=drop)
 
 
