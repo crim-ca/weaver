@@ -33,12 +33,12 @@ from weaver.execute import (
     EXECUTE_TRANSMISSION_MODE_REFERENCE
 )
 from weaver.formats import (
-    ACCEPT_LANGUAGE_EN_CA,
-    ACCEPT_LANGUAGES,
     CONTENT_TYPE_APP_JSON,
     CONTENT_TYPE_APP_XML,
     CONTENT_TYPE_TEXT_HTML,
-    CONTENT_TYPE_TEXT_PLAIN
+    CONTENT_TYPE_TEXT_PLAIN,
+    ACCEPT_LANGUAGE_EN_CA,
+    ACCEPT_LANGUAGES
 )
 from weaver.owsexceptions import OWSMissingParameterValue
 from weaver.sort import JOB_SORT_VALUES, QUOTE_SORT_VALUES, SORT_CREATED, SORT_ID, SORT_PROCESS
