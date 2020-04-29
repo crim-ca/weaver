@@ -19,23 +19,26 @@ class ConversionValueError(ConversionError, ValueError):
     """Conversion error due to invalid value."""
 
 
-class DropableNoneSchema(colander.SchemaNode):
+class DropableSchemaNode(colander.SchemaNode):
     """
-    Drops the underlying schema node if ``missing=drop`` was specified and that the value representing it is ``None``.
+    Drops the underlying schema node if ``missing=drop`` was specified and that the value
+    representing it is ``None``.
 
-    Original behaviour of schema classes that can have children nodes such as :class:`colander.MappingSchema` and
-    :class:`colander.SequenceSchema` are to drop the sub-node only if its value is resolved as :class:`colander.null`
-    or :class:`colander.drop`. This results in "missing" definitions replaced by ``None`` in many implementations to
-    raise :py:exc:`colander.Invalid` during deserialization. Inheriting this class in a schema definition
+    Original behaviour of schema classes that can have children nodes such as
+    :class:`colander.MappingSchema` and :class:`colander.SequenceSchema` are to drop the sub-node
+    only if its value is resolved as :class:`colander.null` or :class:`colander.drop`. This results
+    in *optional* field definitions replaced by ``None`` in many implementations to raise
+    :py:exc:`colander.Invalid` during deserialization. Inheriting this class in a schema definition
     will handle this situation automatically.
 
-    Required schemas (without ``missing=drop``, i.e.: :class:`colander.required`) will still raise for undefined nodes.
+    Required schemas (without ``missing=drop``, i.e.: :class:`colander.required`) will still raise
+    for undefined nodes.
 
     The following snippet shows the result that can be achieved using this schema class:
 
     .. code-block:: python
 
-        class SchemaA(DropableNoneSchema, MappingSchema):
+        class SchemaA(DropableSchemaNode, MappingSchema):
             field = SchemaNode(String())
 
         class SchemaB(MappingSchema):
@@ -48,6 +51,10 @@ class DropableNoneSchema(colander.SchemaNode):
     .. seealso:
         - https://github.com/Pylons/colander/issues/276
         - https://github.com/Pylons/colander/issues/299
+
+    .. seealso::
+        - :class:`DropableMappingSchema`
+        - :class:`DropableSequenceSchema`
     """
     @staticmethod
     def schema_type():
@@ -57,7 +64,50 @@ class DropableNoneSchema(colander.SchemaNode):
     def deserialize(self, cstruct):
         if self.default is colander.null and self.missing is colander.drop and cstruct is None:
             return colander.drop
-        return super(DropableNoneSchema, self).deserialize(cstruct)
+        return super(DropableSchemaNode, self).deserialize(cstruct)
+
+
+class DefaultSchemaNode(colander.SchemaNode):
+    """
+    If ``default`` keyword is provided during :class:`colander.SchemaNode` creation, overrides the
+    returned value by this default if missing from the structure during :meth:`deserialize` call.
+
+    Original behaviour was to drop the missing value instead of replacing by ``default``.
+    Executes all other :class:`colander.SchemaNode` operations normally.
+
+    .. seealso::
+        - :class:`DefaultMappingSchema`
+        - :class:`DefaultSequenceSchema`
+    """
+
+    @staticmethod
+    def schema_type():
+        raise NotImplementedError
+
+    # pylint: disable=W0222,signature-differs
+    def deserialize(self, cstruct):
+        result = super(DefaultSchemaNode, self).deserialize(cstruct)
+        if not isinstance(self.default, type(colander.null)) and result is colander.drop:
+            result = self.default
+        return result
+
+
+class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode):
+    """
+    Combines :class:`DefaultSchemaNode` and :class:`DropableSchemaNode` extensions so that
+    ``default`` keyword is used first to resolve a missing field value during :meth:`deserialize`
+    call, and then removes the node completely if no ``default`` was provided.
+
+    .. seealso::
+        - :class:`ExtendedMappingSchema`
+        - :class:`ExtendedSequenceSchema`
+    """
+    @staticmethod
+    def schema_type():
+        raise NotImplementedError
+
+    def __int__(self, *args, **kwargs):
+        colander.SchemaNode.__init__(*args, **kwargs)
 
 
 class VariableMappingSchema(colander.Mapping):
@@ -66,29 +116,79 @@ class VariableMappingSchema(colander.Mapping):
 
     This definition is useful for defining a dictionary where some field names are not known in advance.
     Other fields that are explicitly specified with sub-schema nodes will be validated as per usual behaviour.
+
+    When doing schema deserialization to validate it, unknown keys would normally be dropped without this class.
+
+    Example::
+
+        class AnyKeyObject(VariableMappingSchema):
+            known_key = SchemaNode(String())
+
+        AnyKeyObject().deserialize({"unknown": "kept", "known_key": "requirement"}))
+        # result: dictionary returned as is instead of removing 'unknown' entry
+        #         'known_key' is still looked for to validate the schema
+
     """
     def __new__(cls, *args, **kwargs):
         return colander.SchemaNode(colander.Mapping(unknown="preserve"), *args, **kwargs)
 
 
-class SchemaNodeDefault(colander.SchemaNode):
+class DropableSequenceSchema(DropableSchemaNode, colander.SequenceSchema):
     """
-    If ``default`` keyword is provided during :class:`colander.SchemaNode` creation, overrides the
-    returned value by this default if missing from the structure during :func:`deserialize` call.
-
-    Original behaviour was to drop the missing value instead of replacing by the default.
-    Executes all other :class:`colander.SchemaNode` operations normally.
+    Extends :class:`colander.SequenceSchema` to auto-handle dropping missing entry definitions
+    when its value is either ``None``, :class:`colander.null` or :class:`colander.drop`.
     """
-    @staticmethod
-    def schema_type():
-        raise NotImplementedError
+    schema_type = colander.SequenceSchema.schema_type
 
-    # pylint: disable=W0222,signature-differs
-    def deserialize(self, cstruct):
-        result = super(SchemaNodeDefault, self).deserialize(cstruct)
-        if not isinstance(self.default, type(colander.null)) and result is colander.drop:
-            result = self.default
-        return result
+
+class DefaultSequenceSchema(DefaultSchemaNode, colander.SequenceSchema):
+    """
+    Extends :class:`colander.SequenceSchema` to auto-handle replacing the result using the provided
+    ``default`` value when the deserialization results into a sequence that should normally be dropped.
+    """
+    schema_type = colander.SequenceSchema.schema_type
+
+
+class ExtendedSequenceSchema(DefaultSchemaNode, DropableSchemaNode, colander.SequenceSchema):
+    """
+    Combines :class:`DefaultSequenceSchema` and :class:`DefaultSequenceSchema` extensions so that
+    ``default`` keyword is used first to resolve a missing sequence during :meth:`deserialize`
+    call, and then removes the node completely if no ``default`` was provided.
+
+    .. seealso::
+        - :class:`ExtendedSchemaNode`
+        - :class:`ExtendedMappingSchema`
+    """
+    schema_type = colander.SequenceSchema.schema_type
+
+
+class DropableMappingSchema(DropableSchemaNode, colander.MappingSchema):
+    """
+    Override the default :class:`colander.MappingSchema` to auto-handle dropping missing field definitions
+    when the corresponding value is either ``None``, :class:`colander.null` or :class:`colander.drop`.
+    """
+    schema_type = colander.MappingSchema.schema_type
+
+
+class DefaultMappingSchema(DefaultSchemaNode, colander.MappingSchema):
+    """
+    Override the default :class:`colander.MappingSchema` to auto-handle replacing missing entries by
+    their specified ``default`` during deserialization.
+    """
+    schema_type = colander.MappingSchema.schema_type
+
+
+class ExtendedMappingSchema(DefaultSchemaNode, DropableSchemaNode, colander.MappingSchema):
+    """
+    Combines :class:`DefaultMappingSchema` and :class:`DropableMappingSchema` extensions so that
+    ``default`` keyword is used first to resolve a missing object during :meth:`deserialize`
+    call, and then removes the node completely if no ``default`` was provided.
+
+    .. seealso::
+        - :class:`ExtendedSequenceSchema`
+        - :class:`ExtendedMappingSchema`
+    """
+    schema_type = colander.MappingSchema.schema_type
 
 
 class OneOfCaseInsensitive(colander.OneOf):
@@ -107,22 +207,23 @@ class KeywordMapper(colander.MappingSchema):
     Each implementer must provide the corresponding ``keyword`` it defines amongst `OpenAPI` specification keywords.
     """
     _keywords = frozenset(['_one_of', '_all_of', '_any_of', '_not'])
-    _keyword_map = {_kw: _kw.replace('_of', 'Of').replace('_', '') for _kw in _keywords}
+    _keyword_map = {_kw: _kw.replace('_of', 'Of').replace('_', '') for _kw in _keywords}  # kw->name
+    _keyword_inv = {_kn: _kw for _kw, _kn in _keyword_map.items()}                        # name->kw
     _keyword = None  # type: str
 
     def __init__(self, *args, **kwargs):
         super(KeywordMapper, self).__init__(*args, **kwargs)
         if not hasattr(self, self._keyword):
-            raise ConversionTypeError("Type '{}' must define '{}' element.".format(self, self._keyword))
-        kw_items = self.get_keyword_items()
-        kw_items_args = kwargs.get(self._keyword)
-        if not kw_items and kw_items_args:
-            setattr(self, self._keyword, kw_items_args)
-            kw_items = kw_items_args
-        if not hasattr(kw_items, '__iter__') or not len(kw_items):  # noqa
-            raise ConversionValueError("Element '{}' of '{!s}' must be iterable with at least 1 value. "
-                                       "Instead it was '{!s}'".format(self._keyword, self, kw_items))
-        self._validate_single()
+            # try retrieving from a kwarg definition (either as literal keyword or pretty name)
+            if kwargs:
+                maybe_kwargs = [_kw for _kw in kwargs
+                                if _kw in self._keyword_map or _kw in self._keyword_inv]
+                if len(maybe_kwargs) == 1:
+                    self._keyword = self._keyword_inv.get(maybe_kwargs[0], maybe_kwargs[0])
+                    setattr(self, self._keyword, kwargs.get(maybe_kwargs[0]))
+            if not self._keyword:
+                raise ConversionTypeError("Type '{}' must define a keyword element.".format(self))
+        self._validate_keyword()
 
     @classmethod
     def get_keyword_name(cls):
@@ -131,7 +232,11 @@ class KeywordMapper(colander.MappingSchema):
     def get_keyword_items(self):
         return getattr(self, self._keyword)
 
-    def _validate_single(self):
+    def _validate_keyword(self):
+        kw_items = self.get_keyword_items()
+        if not hasattr(kw_items, '__iter__') or not len(kw_items):  # noqa
+            raise ConversionValueError("Element '{}' of '{!s}' must be iterable with at least 1 value. "
+                                       "Instead it was '{!s}'".format(self._keyword, self, kw_items))
         total = 0
         for kw in self._keywords:
             if hasattr(self, kw):
@@ -183,15 +288,24 @@ class OneOfKeywordSchema(KeywordMapper):
     validation execution.
 
     .. note::
-        The ``OneOfWithRequiredFields`` example is a shorthand variant of the real OpenAPI
-        documentation method which normally requires you to do
-        ``oneOf[allOf[RequiredByBoth, Variant1], allOf[RequiredByBoth, Variant2]]``, but this is
-        both painful to read and is a lot of extra code writing. You can still do it manually
-        though, the result will be the same specification.
+        Class ``OneOfWithRequiredFields`` in the example is a shortcut variant to generate a
+        specification that represents the pseudo-code ``oneOf([<list-of-objects-with-same-base>])``.
+
+    The real OpenAPI method to implement the above very commonly occurring situation is as
+    presented by the following pseudo-code::
+
+        oneOf[allOf[RequiredByBoth, Variant1], allOf[RequiredByBoth, Variant2]]
+
+    This is both painful to read and is a lot of extra code to write when you actually expand it
+    all into classes (each ``oneOf/allOf`` is another class). Class :class:`OneOfKeywordSchema`
+    will actually simplify this by automatically making the ``allOf`` definitions for you if it
+    detects other schema nodes than ``oneOf`` specified in the class. You can still do the full
+    ``oneOf/allOf`` classes expansion manually though, it will result into the same specification.
 
     .. warning::
-        Because the validation process requires only at least one of the variants to succeed, it
-        is important to insert *more permissive* validators later in the ``_one_of`` iterator (or
+        When calling :meth:`deserialize`, because the validation process requires only at least
+        one of the variants to succeed to consider the whole object to evaluate as valid, it is
+        important to insert *more permissive* validators later in the ``_one_of`` iterator (or
         ``validator`` keyword). For example, having a variant with all fields defined as optional
         (ie: with ``missing=drop``) inserted as first item in ``_one_of`` will make it always
         succeed regardless of following variants. This would have as side effect to never validate
@@ -377,10 +491,9 @@ class OneOfKeywordTypeConverter(KeywordTypeConverter):
         }
 
         for item_schema in schema_node.get_keyword_items():
+            item_obj = _make_node_instance(item_schema)
             # shortcut definition of oneOf/allOf mix, see OneOfKeywordSchema docstring)
             # (eg: other schema fields always needed regardless of additional ones by oneOf)
-            item_obj = _make_node_instance(item_schema)
-
             if len(getattr(schema_node, 'children', [])):
                 obj_no_one_of = item_obj.clone()  # type: OneOfKeywordSchema
                 # un-specialize the keyword schema to base schema (otherwise we recurse)
@@ -453,7 +566,8 @@ class CustomTypeConversionDispatcher(TypeConversionDispatcher):
                     keyword_class = self.keyword_validators[type(schema_node.validator)]
                     keyword_items = getattr(schema_node.validator, "choices",
                                             getattr(schema_node.validator, "validators"))
-                    keyword_schema = keyword_class(**{keyword_class._keyword: keyword_items})
+                    keyword_kwargs = {keyword_class.get_keyword_name(): keyword_items}
+                    keyword_schema = keyword_class(**keyword_kwargs)
                     converted = self(keyword_schema)
                     return converted
 
