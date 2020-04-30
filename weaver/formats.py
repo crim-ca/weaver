@@ -44,6 +44,7 @@ CONTENT_TYPE_APP_GEOJSON = "application/geo+json"
 CONTENT_TYPE_APP_VDN_GEOJSON = "application/vnd.geo+json"
 CONTENT_TYPE_APP_XML = "application/xml"
 CONTENT_TYPE_IMAGE_GEOTIFF = "image/tiff; subtype=geotiff"
+CONTENT_TYPE_IMAGE_TIFF = "image/tiff"
 CONTENT_TYPE_TEXT_XML = "text/xml"
 CONTENT_TYPE_ANY_XML = {CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_XML}
 CONTENT_TYPE_ANY = "*/*"
