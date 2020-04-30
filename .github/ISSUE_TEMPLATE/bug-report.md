@@ -27,4 +27,4 @@ If applicable, add screenshots to help explain your problem.
  - OS: [e.g. Linux|Windows] (if running locally)
  - Browser [e.g. chrome, safari] (if running as a service)
  - Instance: [ADES|EMS] and URL
- - Version ["1.2.3", see /versions endpoint]
+ - Version ["1.2.3", see `/versions` endpoint]
