@@ -172,6 +172,7 @@ class UUID(ExtendedSchemaNode):
     description = "UUID"
     example = "a9d14bf4-84e0-449a-bac8-16e598efe807"
     format = "uuid"
+    title = "UUID"
 
 
 class Version(ExtendedSchemaNode):
@@ -612,7 +613,7 @@ class AnyId(OneOfKeywordSchema):
     _one_of = (
         SLUG(description="Generic identifier. This is a user-friendly slug-name. "
                          "Note that this will represent the latest process matching this name. "
-                         "For specific process version, use the UUID instead."),
+                         "For specific process version, use the UUID instead.", title="ID"),
         UUID(description="Unique identifier.")
     )
 
@@ -1219,7 +1220,7 @@ class CWLOutputList(ExtendedSequenceSchema):
     input = CWLInput(description="Output specification. " + CWL_DOC_MESSAGE)
 
 
-class CWL(VariableMappingSchema, CWLRequirementReferences):
+class CWL(CWLRequirementReferences):
     cwlVersion = Version(description="CWL version of the described application package.")
     _class = CWLClass()
     baseCommand = ExtendedSchemaNode(
@@ -1387,7 +1388,7 @@ class Deploy(ExtendedMappingSchema):
     immediateDeployment = ExtendedSchemaNode(Boolean(), missing=drop, default=True)
     executionUnit = ExecutionUnitList()
     deploymentProfileName = URL(missing=drop)
-    owsContext = OWSContext(missing=drop)
+    owsContext = OWSContext(title="owsContext", missing=drop)
 
 
 class PostProcessesEndpoint(ExtendedMappingSchema):
@@ -1402,9 +1403,10 @@ class PostProcessJobsEndpoint(ProcessPath):
 
 class GetJobsQueries(ExtendedMappingSchema):
     detail = ExtendedSchemaNode(Boolean(), description="Provide job details instead of IDs.",
-                        default=False, example=True, missing=drop)
-    groups = ExtendedSchemaNode(String(), description="Comma-separated list of grouping fields with which to list jobs.",
-                        default=False, example="process,service", missing=drop)
+                                default=False, example=True, missing=drop)
+    groups = ExtendedSchemaNode(String(),
+                                description="Comma-separated list of grouping fields with which to list jobs.",
+                                default=False, example="process,service", missing=drop)
     page = ExtendedSchemaNode(Integer(), missing=drop, default=0)
     limit = ExtendedSchemaNode(Integer(), missing=drop, default=10)
     status = JobStatusEnum(missing=drop)
@@ -1412,7 +1414,7 @@ class GetJobsQueries(ExtendedMappingSchema):
     provider = ExtendedSchemaNode(String(), missing=drop, default=None)
     sort = JobSortEnum(missing=drop)
     tags = ExtendedSchemaNode(String(), missing=drop, default=None,
-                      description="Comma-separated values of tags assigned to jobs")
+                              description="Comma-separated values of tags assigned to jobs")
 
 
 class GetJobsRequest(ExtendedMappingSchema):
