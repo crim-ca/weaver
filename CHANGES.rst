@@ -180,6 +180,8 @@ Changes:
 - Adjust job creation route to return ``201`` (created) as it is now correctly defined by the OGC API specification
   (`#14 <https://github.com/crim-ca/weaver/issues/14>`_).
 - Add ``Job.link`` method that auto-generates all applicable links (inputs, outputs, logs, etc.).
+- Add ``image/jpeg``, ``image/png``, ``image/tiff`` formats to supported ``weaver.formats``
+  (relates to `#100 <https://github.com/crim-ca/weaver/issues/100>`_).
 - Handle additional trailing slash resulting in ``NotFound`` that corresponds to a valid route without the slash.
 - Provide basic conda environment setup through ``Makefile`` for Windows bash-like shell (ie: ``MINGW``/``MINGW64``).
 - Update documentation for minimal adjustments needed to run under Windows.
@@ -194,6 +196,8 @@ Fixes:
 - Fix ``weaver.config.get_weaver_config_file`` called with empty path to be resolved just as requesting the default
   file path explicitly instead of returning an invalid directory.
 - Fix `CWL` package path resolution under Windows incorrectly parsed partition as URL protocol.
+- Fix ``AttributeError`` of ``pywps.inout.formats.Format`` equality check compared to ``null`` object (using getter
+  patch on ``null`` since fix `#507 <https://github.com/geopython/pywps/pull/507>`_ not released at this point).
 
 `1.10.1 <https://github.com/crim-ca/weaver/tree/1.10.1>`_ (2020-06-03)
 ========================================================================

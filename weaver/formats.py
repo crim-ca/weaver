@@ -30,17 +30,6 @@ LANGUAGES = frozenset([
     LANGUAGE_EN_US,
 ])
 
-# Languages
-LANGUAGE_EN_CA = "en-CA"
-LANGUAGE_FR_CA = "fr-CA"
-LANGUAGE_EN_US = "en-US"
-
-LANGUAGES = frozenset([
-    LANGUAGE_EN_CA,
-    LANGUAGE_FR_CA,
-    LANGUAGE_EN_US,
-])
-
 # Content-Types
 #   MIME-type nomenclature:
 #       <type> "/" [x- | <tree> "."] <subtype> ["+" suffix] *[";" parameter=value]
@@ -61,6 +50,8 @@ CONTENT_TYPE_APP_GEOJSON = "application/geo+json"
 CONTENT_TYPE_APP_VDN_GEOJSON = "application/vnd.geo+json"
 CONTENT_TYPE_APP_XML = "application/xml"
 CONTENT_TYPE_IMAGE_GEOTIFF = "image/tiff; subtype=geotiff"
+CONTENT_TYPE_IMAGE_JPEG = "image/jpeg"
+CONTENT_TYPE_IMAGE_PNG = "image/png"
 CONTENT_TYPE_IMAGE_TIFF = "image/tiff"
 CONTENT_TYPE_TEXT_XML = "text/xml"
 CONTENT_TYPE_ANY_XML = {CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_XML}
