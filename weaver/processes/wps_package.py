@@ -99,7 +99,7 @@ from weaver.utils import (
     get_settings,
     get_url_without_query,
     null,
-    request_extra,
+    NullType,
     str2bytes,
     transform_json
 )
@@ -762,7 +762,7 @@ def _cwl2wps_io(io_info, io_select):
 
 
 def _any2cwl_literal_datatype(io_type):
-    # type: (AnyStr) -> Union[AnyStr, Type[null]]
+    # type: (AnyStr) -> Union[AnyStr, NullType]
     """
     Solves common literal data-type names to supported ones for `CWL`.
     """
@@ -779,7 +779,7 @@ def _any2cwl_literal_datatype(io_type):
 
 
 def _any2wps_literal_datatype(io_type, is_value):
-    # type: (AnyValueType, bool) -> Union[AnyStr, Type[null]]
+    # type: (AnyValueType, bool) -> Union[AnyStr, NullType]
     """
     Solves common literal data-type names to supported ones for `WPS`.
     Verification is accomplished by name when ``is_value=False``, otherwise with python ``type`` when ``is_value=True``.

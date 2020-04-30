@@ -27,8 +27,15 @@ from six.moves.urllib.parse import urlparse
 from tests.compat import contextlib
 from tests.utils import mocked_aws_credentials, mocked_aws_s3, mocked_aws_s3_bucket_test_file, mocked_file_response
 from weaver import status, utils
-from weaver.utils import _NullType  # noqa: W0212
-from weaver.utils import fetch_file, get_request_options, get_ssl_verify_option, make_dirs, null, request_extra
+from weaver.utils import (
+    fetch_file,
+    get_request_options,
+    get_ssl_verify_option,
+    make_dirs,
+    null,
+    NullType,
+    request_extra
+)
 
 
 def test_null_operators():
@@ -47,10 +54,10 @@ def test_null_operators():
 
 
 def test_null_singleton():
-    n1 = _NullType()
-    n2 = _NullType()
+    n1 = NullType()
+    n2 = NullType()
     # pylint: disable=C0123,unidiomatic-typecheck
-    assert type(null) is _NullType
+    assert type(null) is NullType
     assert null is n1
     assert null is n2
     assert n1 is n2

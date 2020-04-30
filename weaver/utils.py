@@ -60,15 +60,26 @@ class _Singleton(type):
         return cls.__instance__
 
 
-class _NullType(six.with_metaclass(_Singleton)):
+class NullType(six.with_metaclass(_Singleton)):
     """Represents a ``null`` value to differentiate from ``None``."""
 
     # pylint: disable=E1101,no-member
     def __eq__(self, other):
-        return (isinstance(other, _NullType)                                    # noqa: W503
+        """Makes any instance of :class:`NullType` compare as the same (ie: Singleton)"""
+        return (isinstance(other, NullType)                                     # noqa: W503
                 or other is null                                                # noqa: W503
                 or other is self.__instance__                                   # noqa: W503
                 or (inspect.isclass(other) and issubclass(other, _NullType)))   # noqa: W503
+
+    def __getattr__(self, item):
+        # type: (Any) -> NullType
+        """Makes any property getter return ``null`` to make any sub-item also look like ``null``.
+
+        Useful for example in the case of type comparators that do not validate their
+        own type before accessing a property that they expect to be there. Without this
+        the get operation on ``null`` would raise an unknown key or attribute error.
+        """
+        return null
 
     def __repr__(self):
         return "<null>"
@@ -82,7 +93,7 @@ class _NullType(six.with_metaclass(_Singleton)):
 
 
 # pylint: disable=C0103,invalid-name
-null = _NullType()
+null = NullType()
 
 
 def get_weaver_url(container):
