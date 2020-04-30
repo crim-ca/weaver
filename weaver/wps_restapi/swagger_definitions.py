@@ -11,10 +11,8 @@ from colander import (
     DateTime,
     Float,
     Integer,
-    MappingSchema as MapSchema,
     OneOf,
     Range,
-    SequenceSchema as SeqSchema,
     String,
     drop
 )
@@ -46,13 +44,14 @@ from weaver.sort import JOB_SORT_VALUES, QUOTE_SORT_VALUES, SORT_CREATED, SORT_I
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, STATUS_COMPLIANT_OGC
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps_restapi.colander_extras import (
+    AnyOfKeywordSchema,
     DropableSchemaNode,
     OneOfCaseInsensitive,
     ExtendedMappingSchema,
     ExtendedSequenceSchema,
     ExtendedSchemaNode,
     OneOfKeywordSchema,
-    VariableMappingSchema
+    PermissiveMappingSchema
 )
 from weaver.wps_restapi.utils import wps_restapi_base_path
 
@@ -75,6 +74,9 @@ API_DOCS = {
 CWL_DOC_MESSAGE = "Note that multiple formats are supported and not all specification variants or parameters " \
                   "are presented here. Please refer to official CWL documentation for more details " \
                   "(https://www.commonwl.org/)."
+
+IO_INFO_IDS = "Identifier of the {first} {what}. To merge details between corresponding {first} and {second} " \
+              "{what} specifications, this is the value that will be used to associate them together."
 
 #########################################################
 # API tags
@@ -175,13 +177,28 @@ class UUID(ExtendedSchemaNode):
     title = "UUID"
 
 
+class AnyId(OneOfKeywordSchema):
+    _one_of = (
+        SLUG(description="Generic identifier. This is a user-friendly slug-name. "
+                         "Note that this will represent the latest process matching this name. "
+                         "For specific process version, use the UUID instead.", title="ID"),
+        UUID(description="Unique identifier.")
+    )
+
+
+# NOTE: future (https://github.com/crim-ca/weaver/issues/107)
+#  replace process/provider 'AnyIdentifier' by above 'AnyId'
+class AnyIdentifier(ExtendedSchemaNode):
+    schema_type = String
+
+
 class Version(ExtendedSchemaNode):
     # note: internally use LooseVersion, so don't be too strict about pattern
     schema_type = String
     description = "Version string."
     example = "1.2.3"
     format = "version"
-    pattern = r"^(\d+\.)(\d+\.)(\d+\.)(\d).*$"
+    pattern = r"^\d+(\.\d+(\.\d+(\.[a-zA-Z0-9\-_]+)*)*)*$"
 
 
 class JsonHeader(ExtendedMappingSchema):
@@ -304,9 +321,11 @@ class FormatDefault(Format):
 
 class FormatDescription(FormatDefault):
     maximumMegabytes = ExtendedSchemaNode(Integer(), missing=drop)
-    default = ExtendedSchemaNode(Boolean(), missing=drop, default=False,
-                         description="Indicate if this format should be considered as the default one in case none"
-                                     "of the other allowed/supported formats is matched against the job input.")
+    default = ExtendedSchemaNode(
+        Boolean(), missing=drop, default=False,
+        description="Indicate if this format should be considered as the default one in case none "
+                    "of the other allowed/supported formats is matched against the job input."
+    )
 
 
 class FormatDescriptionList(ExtendedSequenceSchema):
@@ -350,7 +369,6 @@ class OWSContext(ExtendedMappingSchema):
 
 
 class DescriptionType(ExtendedMappingSchema):
-    id = ExtendedSchemaNode(String())
     title = ExtendedSchemaNode(String(), missing=drop)
     abstract = ExtendedSchemaNode(String(), missing=drop)
     keywords = KeywordList(missing=drop)
@@ -374,7 +392,19 @@ class WithMinMaxOccurs(ExtendedMappingSchema):
                               description="Maximum allowed number of data occurrences of this item.")
 
 
-class ComplexInputType(DescriptionType, WithMinMaxOccurs):
+class ProcessDescriptionType(DescriptionType):
+    id = AnyIdentifier(description="Process identifier.")
+
+
+class InputDescriptionType(DescriptionType):
+    id = SLUG(description=IO_INFO_IDS.format(first="WPS", second="CWL", what="input"))
+
+
+class OutputDescriptionType(DescriptionType):
+    id = ExtendedSchemaNode(String(), description=IO_INFO_IDS.format(first="WPS", second="CWL", what="output"))
+
+
+class ComplexInputType(InputDescriptionType, WithMinMaxOccurs):
     formats = FormatDescriptionList()
 
 
@@ -387,7 +417,7 @@ class SupportedCRSList(ExtendedSequenceSchema):
     item = SupportedCRS(title="SupportedCRS")
 
 
-class BoundingBoxInputType(DescriptionType, WithMinMaxOccurs):
+class BoundingBoxInputType(InputDescriptionType, WithMinMaxOccurs):
     supportedCRS = SupportedCRSList()
 
 
@@ -450,14 +480,14 @@ class LiteralDataDomainTypeList(ExtendedSequenceSchema):
     literalDataDomain = LiteralDataDomainType()
 
 
-class LiteralInputType(DescriptionType, WithMinMaxOccurs):
+class LiteralInputType(InputDescriptionType, WithMinMaxOccurs):
     literalDataDomains = LiteralDataDomainTypeList(missing=drop)
 
 
 class InputType(OneOfKeywordSchema):
     _one_of = (
         BoundingBoxInputType,
-        ComplexInputType,  # should be 2nd to last because very permission, but requires format at least
+        ComplexInputType,  # should be 2nd to last because very permissive, but requires format at least
         LiteralInputType,  # must be last because it"s the most permissive (all can default if omitted)
     )
 
@@ -478,7 +508,7 @@ class ComplexOutputType(ExtendedMappingSchema):
     formats = FormatDescriptionList()
 
 
-class OutputDataDescriptionType(DescriptionType):
+class OutputDataDescriptionType(OutputDescriptionType):
     pass
 
 
@@ -590,9 +620,8 @@ class QuoteSortEnum(ExtendedSchemaNode):
 
 
 class LaunchJobQuerystring(ExtendedMappingSchema):
-    field_string = ExtendedSchemaNode(String(), default=None, missing=drop,
+    tags = ExtendedSchemaNode(String(), default=None, missing=drop,
                               description="Comma separated tags that can be used to filter jobs later")
-    field_string.name = "tags"
 
 
 class VisibilityValue(ExtendedSchemaNode):
@@ -609,25 +638,13 @@ class Visibility(ExtendedMappingSchema):
 # Path parameter definitions
 #########################################################
 
-class AnyId(OneOfKeywordSchema):
-    _one_of = (
-        SLUG(description="Generic identifier. This is a user-friendly slug-name. "
-                         "Note that this will represent the latest process matching this name. "
-                         "For specific process version, use the UUID instead.", title="ID"),
-        UUID(description="Unique identifier.")
-    )
-
 
 class ProcessPath(ExtendedMappingSchema):
-    process_id = ExtendedSchemaNode(String(), description="The process identifier.")
-    # NOTE: future (https://github.com/crim-ca/weaver/issues/107)
-    #   process_id = AnyId(description="The process identifier.")
+    process_id = AnyIdentifier(description="The process identifier.")
 
 
 class ProviderPath(ExtendedMappingSchema):
-    provider_id = ExtendedSchemaNode(String(), description="The provider identifier")
-    # NOTE: future (https://github.com/crim-ca/weaver/issues/107)
-    #   provider_id = AnyId(description="The process identifier.")
+    provider_id = AnyIdentifier(description="The provider identifier")
 
 
 class JobPath(ExtendedMappingSchema):
@@ -869,12 +886,13 @@ class ExceptionReportType(ExtendedMappingSchema):
     description = ExtendedSchemaNode(String(), missing=drop)
 
 
-class ProcessSummary(DescriptionType):
+class ProcessSummary(ProcessDescriptionType):
     """WPS process definition."""
     version = ExtendedSchemaNode(String(), missing=drop)
     jobControlOptions = JobControlOptionsList(missing=drop)
     outputTransmission = TransmissionModeList(missing=drop)
-    processDescriptionURL = URL(description="Process description endpoint.", missing=drop)
+    processDescriptionURL = URL(description="Process description endpoint.",
+                                missing=drop, title="processDescriptionURL")
 
 
 class ProcessSummaryList(ExtendedSequenceSchema):
@@ -885,7 +903,7 @@ class ProcessCollection(ExtendedMappingSchema):
     processes = ProcessSummaryList()
 
 
-class Process(DescriptionType):
+class Process(ProcessDescriptionType):
     inputs = InputTypeList(missing=drop)
     outputs = OutputDescriptionList(missing=drop)
     visibility = VisibilityValue(missing=drop)
@@ -902,25 +920,25 @@ class ProcessOutputDescriptionSchema(ExtendedMappingSchema):
 
 
 class JobStatusInfo(ExtendedMappingSchema):
-    jobId = UUID(example="a9d14bf4-84e0-449a-bac8-16e598efe807", description="ID of the job.")
+    jobID = UUID(example="a9d14bf4-84e0-449a-bac8-16e598efe807", description="ID of the job.")
     status = JobStatusEnum()
     message = ExtendedSchemaNode(String(), missing=drop)
     expirationDate = ExtendedSchemaNode(DateTime(), missing=drop)
     estimatedCompletion = ExtendedSchemaNode(DateTime(), missing=drop)
-    duration = ExtendedSchemaNode(String(), missing=drop, description="Duration of the process execution.")
+    duration = ExtendedSchemaNode(Time(), missing=drop, description="Duration of the process execution.")
     nextPoll = ExtendedSchemaNode(DateTime(), missing=drop)
     percentCompleted = ExtendedSchemaNode(Integer(), example=0, validator=Range(min=0, max=100))
     links = LinkList(missing=drop)
 
 
 class JobEntrySchema(OneOfKeywordSchema):
+    # note:
+    #   Since JobID is a simple string (not a dict), no additional mapping field can be added here.
+    #   They will be discarded by `OneOfKeywordSchema.deserialize()`.
     _one_of = (
         JobStatusInfo,
         ExtendedSchemaNode(String(), description="Job ID."),
     )
-    # note:
-    #   Since JobId is a simple string (not a dict), no additional mapping field can be added here.
-    #   They will be discarded by `OneOfKeywordSchema.deserialize()`.
 
 
 class JobCollection(ExtendedSequenceSchema):
@@ -944,7 +962,7 @@ class GetPagingJobsSchema(ExtendedMappingSchema):
 
 
 class GroupedJobsCategorySchema(ExtendedMappingSchema):
-    category = VariableMappingSchema(description="Grouping values that compose the corresponding job list category.")
+    category = PermissiveMappingSchema(description="Grouping values that compose the corresponding job list category.")
     jobs = JobCollection(description="List of jobs that matched the corresponding grouping values.")
     count = ExtendedSchemaNode(Integer(), description="Number of matching jobs for the corresponding group category.")
 
@@ -1008,7 +1026,23 @@ class Reference(DataEncodingAttributes):
     bodyReference = URL(missing=drop)
 
 
-class DataTypeFormats(OneOfKeywordSchema):
+class DataInteger(ExtendedMappingSchema):
+    data = ExtendedSchemaNode(Integer())
+
+
+class DataBoolean(ExtendedMappingSchema):
+    data = ExtendedSchemaNode(Boolean())
+
+
+class DataString(ExtendedMappingSchema):
+    data = ExtendedSchemaNode(String())
+
+
+class DataFloat(ExtendedMappingSchema):
+    data = ExtendedSchemaNode(Float())
+
+
+class AnyDataTypeFormats(ExtendedMappingSchema):
     """Items with 'data' key, only literal data.
 
     .. note::
@@ -1018,47 +1052,102 @@ class DataTypeFormats(OneOfKeywordSchema):
         - :class:`DataType`
         - :class:`AnyType`
     """
-    _one_of = (
-        ExtendedSchemaNode(Float()),  # before Integer because more restrictive Number format
-        ExtendedSchemaNode(Integer()),  # before Boolean because bool can be interpreted using int
-        ExtendedSchemaNode(Boolean()),
-        ExtendedSchemaNode(String())
+    _any_of = (
+        DataFloat(),
+        DataInteger(),
+        DataBoolean(),
+        DataString(),
+        ##ExtendedSchemaNode(Float()),  # before Integer because more restrictive Number format
+        ##ExtendedSchemaNode(Integer()),  # before Boolean because bool can be interpreted using int
+        ##ExtendedSchemaNode(Boolean()),
+        ##ExtendedSchemaNode(String())
     )
 
 
-class DataType(DataEncodingAttributes):
-    data = DataTypeFormats(description="Value provided by one of the accepted types.")
+#class DataType(DataEncodingAttributes):
+#    data = DataTypeFormats(description="Value provided by one of the accepted types.")
 
 
-class ValueTypeFormats(OneOfKeywordSchema):
+class DefaultFloat(ExtendedMappingSchema):
+    default = ExtendedSchemaNode(Float())
+
+
+class DefaultInteger(ExtendedMappingSchema):
+    default = ExtendedSchemaNode(Integer())
+
+
+class DefaultBoolean(ExtendedMappingSchema):
+    default = ExtendedSchemaNode(Boolean())
+
+
+class DefaultString(ExtendedMappingSchema):
+    default = ExtendedSchemaNode(String())
+
+
+class AnyDefaultTypeFormats(AnyOfKeywordSchema):
+    ##class ValueTypeFormats(OneOfKeywordSchema):
+    """Default format, always 'default' key regardless of content."""
+    _any_of = (
+        DefaultString(),
+        DefaultBoolean(),
+        DefaultInteger(),
+        DefaultFloat(),
+    )
+
+
+class ValueFloat(ExtendedMappingSchema):
+    value = ExtendedSchemaNode(Float())
+
+
+class ValueInteger(ExtendedMappingSchema):
+    value = ExtendedSchemaNode(Integer())
+
+
+class ValueBoolean(ExtendedMappingSchema):
+    value = ExtendedSchemaNode(Boolean())
+
+
+class ValueString(ExtendedMappingSchema):
+    value = ExtendedSchemaNode(String())
+
+
+class AnyValueTypeFormats(AnyOfKeywordSchema):
+##class ValueTypeFormats(OneOfKeywordSchema):
     """OGC-specific format, always 'value' key regardless of content.
 
     .. seealso::
         - :class:`ValueType`
         - :class:`AnyType`
     """
-    _one_of = (
-        ExtendedSchemaNode(Float()),  # before Integer because more restrictive Number format
-        ExtendedSchemaNode(Integer()),  # before Boolean because bool can be interpreted using int
-        ExtendedSchemaNode(Boolean()),
-        URL(), # before String because more restrictive (format)
-        ExtendedSchemaNode(String())
+    _any_of = (
+        ValueString(),
+        ValueBoolean(),
+        ValueInteger(),
+        ValueFloat(),
+        ##ExtendedSchemaNode(Float()),  # before Integer because more restrictive Number format
+        ##ExtendedSchemaNode(Integer()),  # before Boolean because bool can be interpreted using int
+        ##ExtendedSchemaNode(Boolean()),
+        ##ExtendedSchemaNode(String()),
+        ##URL(),  # any-of will override previous string if URL validator succeeds because they have the same keys
     )
 
 
-class ValueType(ExtendedMappingSchema):
-    value = ValueTypeFormats(description="Value provided by one of the accepted types.")
+##class ValueType(ExtendedMappingSchema):
+##    value = ValueTypeFormats(description="Value provided by one of the accepted types.")
 
 
-class AnyType(OneOfKeywordSchema):
+##class AnyType(OneOfKeywordSchema):
+class AnyType(AnyOfKeywordSchema):
     """Permissive variants that we attempt to parse automatically."""
-    _one_of = (
+    _any_of = (
         # literal data with 'data' key
-        DataType,
+        AnyDataTypeFormats(),
+        ##DataType,
         # same with 'value' key (OGC specification)
-        ValueType,
+        AnyValueTypeFormats(),
+        ##ValueType,
         # HTTP references with various keywords
-        LiteralReference, Reference
+        LiteralReference(), Reference()
     )
 
 
@@ -1157,35 +1246,52 @@ class CWLClass(ExtendedSchemaNode):
                   "definitions and Workflow that chains multiple packages."
 
 
-class DockerRequirementSpecification(ExtendedMappingSchema):
+class DockerRequirementSpecification(PermissiveMappingSchema):
     dockerPull = URL(example="docker-registry.host.com/namespace/image:1.2.3",
+                     title="Docker pull reference",
                      description="Reference package that will be retrieved and executed by CWL.")
 
 
-class DockerRequirement(VariableMappingSchema):
-    DockerRequirement = DockerRequirementSpecification(title="DockerRequirement")
+class DockerRequirement(DockerRequirementSpecification):
+    name = "DockerRequirement"
+    title = "DockerRequirement"
 
 
-class CWLRequirement(OneOfKeywordSchema):
-    _one_of = (DockerRequirement, )
+class DockerGpuRequirement(DockerRequirementSpecification):
+    name = "DockerGpuRequirement"
+    title = "DockerGpuRequirement"
+    description = "Docker requirement with GPU-enabled support (https://github.com/NVIDIA/nvidia-docker). " \
+                  "The instance must have the NVIDIA toolkit installed to use this feature."
 
 
-class CWLRequirementList(ExtendedSequenceSchema):
-    requirement = CWLRequirement()
+class InitialWorkDirRequirement(PermissiveMappingSchema):
+    name = "InitialWorkDirRequirement"
+    title = "InitialWorkDirRequirement"
+    listing = PermissiveMappingSchema()
 
 
-class CWLRequirementsSpecification(VariableMappingSchema):
-    requirements = CWLRequirementList()
+class BuiltinRequirement(PermissiveMappingSchema):
+    name = "BuiltinRequirement"
+    title = "BuiltinRequirement"
+    description = "Hint indicating that the Application Package corresponds to a builtin process of " \
+                  "this instance. (note: can only be an hint as it is unofficial CWL specification)."
+    process = AnyIdentifier()
 
 
-class CWLHintsSpecification(VariableMappingSchema):
-    hints = CWLRequirementList()
+class CWLRequirements(AnyOfKeywordSchema, PermissiveMappingSchema):
+    _any_of = [
+        DockerRequirement(missing=drop),
+        DockerGpuRequirement(missing=drop),
+        InitialWorkDirRequirement(missing=drop),
+    ]
 
 
-class CWLRequirementReferences(OneOfKeywordSchema):
-    _one_of = [
-        CWLRequirementsSpecification(description="Explicit requirement to execute the application package."),
-        CWLHintsSpecification(description="Additional hints listing that could help resolve extra requirement.")
+class CWLHints(AnyOfKeywordSchema, PermissiveMappingSchema):
+    _any_of = [
+        BuiltinRequirement(missing=drop),
+        DockerRequirement(missing=drop),
+        DockerGpuRequirement(missing=drop),
+        InitialWorkDirRequirement(missing=drop),
     ]
 
 
@@ -1193,43 +1299,111 @@ class CWLArguments(ExtendedSequenceSchema):
     argument = ExtendedSchemaNode(String())
 
 
-# Note: can be very different schemas, this is enough doc for Weaver purpose, don't go in full details
-class CWLInput(VariableMappingSchema):
-    id = ExtendedSchemaNode(String())
-    type = ExtendedSchemaNode(String(), name="type")
-    inputBinding = ExtendedMappingSchema(missing=drop, description="Defines how to specify the input for the command.")
-    default = ValueTypeFormats(missing=drop)
+class CWLSymbols(ExtendedSequenceSchema):
+    symbol = ExtendedSchemaNode(String())
 
 
-class OutputBinding(VariableMappingSchema):
-    glob = ExtendedSchemaNode(String(),
-                              description="Glob pattern the will find the output on disk or mounted docker volume.")
+class CWLTypeMap(PermissiveMappingSchema):
+    type = ExtendedSchemaNode(String(), summary="CWL Type")
+    items = ExtendedSchemaNode(String(), missing=drop, summary="Sub-type when defining an array.")
+    symbols = CWLSymbols(missing=drop, summary="Allowed symbols (enum).")
 
 
-class CWLOutput(VariableMappingSchema):
-    id = ExtendedSchemaNode(String())
-    type = ExtendedSchemaNode(String(), name="type")
-    outputBinding = OutputBinding(description="Defines how to retrieve the output result from the command.")
+class CWLType(OneOfKeywordSchema):
+    title = "CWL Type"
+    _one_of = [
+        ExtendedSchemaNode(String(), title="Type", description="Literal type.", example="float"),
+        CWLTypeMap(summary="CWL type with additional properties.")
+    ]
+
+
+class CWLInputBase(PermissiveMappingSchema):
+    type = CWLType()
+    inputBinding = ExtendedMappingSchema(missing=drop, title="Input Binding",
+                                         description="Defines how to specify the input for the command.")
+
+
+class CWLInputObject(AnyOfKeywordSchema):
+    _any_of = [
+        CWLInputBase(),
+        AnyDefaultTypeFormats(missing=drop),
+    ]
+
+
+class CWLInputMap(ExtendedMappingSchema):
+    input_id = CWLInputObject(variable="<input-id>", title="Input Identifier",
+                              description=IO_INFO_IDS.format(first="CWL", second="WPS", what="input") +
+                              " (Note: '<input-id>' is a variable corresponding for each identifier)")
+
+
+class CWLInputItem(CWLInputObject):
+    id = ExtendedSchemaNode(String(), description=IO_INFO_IDS.format(first="CWL", second="WPS", what="input"))
 
 
 class CWLInputList(ExtendedSequenceSchema):
-    input = CWLInput(description="Input specification. " + CWL_DOC_MESSAGE)
+    input = CWLInputItem(title="Input", description="Input specification. " + CWL_DOC_MESSAGE)
+
+
+class CWLInputsDefinition(OneOfKeywordSchema):
+    _one_of = [
+        CWLInputList(description="Package inputs defined as items."),
+        CWLInputMap(description="Package inputs defined as mapping."),
+    ]
+
+
+class OutputBinding(PermissiveMappingSchema):
+    glob = ExtendedSchemaNode(String(), missing=drop,
+                              description="Glob pattern the will find the output on disk or mounted docker volume.")
+
+
+class CWLOutputObject(PermissiveMappingSchema):
+    type = CWLType()
+    outputBinding = OutputBinding(description="Defines how to retrieve the output result from the command.")
+
+
+class CWLOutputMap(ExtendedMappingSchema):
+    output_id = CWLOutputObject(variable="<output-id>", title="Output Identifier",
+                                description=IO_INFO_IDS.format(first="CWL", second="WPS", what="output") +
+                                " (Note: '<output-id>' is a variable corresponding for each identifier)")
+
+
+class CWLOutputItem(CWLOutputObject):
+    id = ExtendedSchemaNode(String())
 
 
 class CWLOutputList(ExtendedSequenceSchema):
-    input = CWLInput(description="Output specification. " + CWL_DOC_MESSAGE)
+    input = CWLOutputItem(description="Output specification. " + CWL_DOC_MESSAGE)
 
 
-class CWL(CWLRequirementReferences):
+class CWLOutputsDefinition(OneOfKeywordSchema):
+    _one_of = [
+        CWLOutputList(description="Package outputs defined as items."),
+        CWLOutputMap(description="Package outputs defined as mapping."),
+    ]
+
+
+class CWLCommandParts(ExtendedSequenceSchema):
+    cmd = ExtendedSchemaNode(String())
+
+
+class CWLCommand(OneOfKeywordSchema):
+    _one_of = [
+        ExtendedSchemaNode(String(), title="String command."),
+        CWLCommandParts(title="Command Parts")
+    ]
+
+
+class CWL(PermissiveMappingSchema):
     cwlVersion = Version(description="CWL version of the described application package.")
     _class = CWLClass()
-    baseCommand = ExtendedSchemaNode(
-        String(), missing=drop,
-        description="Command called in the docker image or on shell "
-                    "according to requirements and hints specifications.")
-    arguments = CWLArguments(description="Base arguments passed to the command.")
-    inputs = CWLInputList(description="All inputs available to the Application Package.")
-    outputs = CWLInputList(description="All outputs produced by the Application Package.")
+    requirements = CWLRequirements(description="Explicit requirement to execute the application package.", missing=drop)
+    hints = CWLHints(description="Non-failing additional hints that can help resolve extra requirements.", missing=drop)
+    baseCommand = CWLCommand(description="Command called in the docker image or on shell according to requirements "
+                                         "and hints specifications. Can be omitted if already defined in the "
+                                         "docker image.", missing=drop)
+    arguments = CWLArguments(description="Base arguments passed to the command.", missing=drop)
+    inputs = CWLInputsDefinition(description="All inputs available to the Application Package.")
+    outputs = CWLOutputsDefinition(description="All outputs produced by the Application Package.")
 
 
 class UnitType(ExtendedMappingSchema):
@@ -1278,8 +1452,8 @@ class ProcessesSchema(ExtendedSequenceSchema):
 class JobOutput(OneOfKeywordSchema, OutputDataType):
     id = UUID(description="Job output id corresponding to process description outputs.")
     _one_of = (
-        Reference,
-        DataType
+        Reference(),
+        AnyDataTypeFormats()
     )
 
 
@@ -1287,8 +1461,11 @@ class JobOutputList(ExtendedSequenceSchema):
     output = JobOutput(description="Job output result with specific keyword according to represented format.")
 
 
-class JobResultValue(OutputDataType):
-    value = ValueType(description="Job outputs result conforming to OGC standard.")
+class JobResultValue(AnyOfKeywordSchema):
+    _any_of = [
+        OutputDataType(),
+        AnyValueTypeFormats(description="Job outputs result conforming to OGC standard.")
+    ]
 
 
 class JobException(ExtendedMappingSchema):
@@ -1347,7 +1524,7 @@ class VersionsSchema(ExtendedMappingSchema):
 
 class ConformanceList(ExtendedSequenceSchema):
     item = URL(description="Conformance specification link.",
-               example="http://www.opengis.net/spec/wfs-1/3.0/req/core")
+               example="http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/core")
 
 
 class ConformanceSchema(ExtendedMappingSchema):
@@ -1368,7 +1545,7 @@ class ExecutionUnit(OneOfKeywordSchema):
 
 
 class ExecutionUnitList(ExtendedSequenceSchema):
-    unit = ExecutionUnit()
+    unit = ExecutionUnit(description="Definition of the Application Package to execute.")
 
 
 class ProcessOffering(ExtendedMappingSchema):
@@ -1643,10 +1820,11 @@ class InternalServerErrorGetProcessesListResponse(ExtendedMappingSchema):
 
 
 class OkPostProcessDeployBodySchema(ExtendedMappingSchema):
-    deploymentDone = ExtendedSchemaNode(Boolean(), description="Indicates if the process was successfully deployed.",
-                                default=False, example=True)
+    deploymentDone = ExtendedSchemaNode(Boolean(), default=False, example=True,
+                                        description="Indicates if the process was successfully deployed.")
     processSummary = ProcessSummary(missing=drop, description="Deployed process summary if successful.")
-    failureReason = ExtendedSchemaNode(String(), missing=drop, description="Description of deploy failure if applicable.")
+    failureReason = ExtendedSchemaNode(String(), missing=drop,
+                                       description="Description of deploy failure if applicable.")
 
 
 class OkPostProcessesResponse(ExtendedMappingSchema):
