@@ -15,13 +15,21 @@ celery[mongodb]<4; sys_platform == "win32"
 cffi
 colander
 cornice
-cornice_swagger>=0.7.0
+# use cornice-swagger with OpenAPI-3 definitions support until integrated
+# (https://github.com/Cornices/cornice.ext.swagger/issues/133)
+# cornice_swagger>=0.7.0
+git+https://github.com/fmigneault/cornice.ext.swagger@openapi-3#egg=cornice_swagger
 # cwltool Python 2 support dropped on 2.x
 # enforce Python 3 with version >=2 to update existing 1.x installations
 cwltool>=1.0.20180820141117,<2; python_version < "3"
 # FIXME: avoid error invalid get_listing import location,
 #        remove properly as per https://github.com/crim-ca/weaver/issues/154
 cwltool>=2,<=3.0.20200324120055; python_version >= "3"
+# use cwltool gpu-enabled support until integrated within the original tool
+# (https://github.com/common-workflow-language/common-workflow-language/issues/587)
+### git+https://github.com/crim-ca/cwltool@docker-gpu#egg=cwltool; python_version >= "3"
+# pymongo requirement that doesn't get installed somehow
+dnspython<2.0.0,>=1.16.0
 duration
 flufl.enum; python_version < "3"
 # gunicorn >20 breaks some config.ini loading parameters (paste)
