@@ -14,14 +14,14 @@ if TYPE_CHECKING:
     from typing import AnyStr, Dict, Optional, Tuple, Union     # noqa: F401
 
 # Languages
-LANGUAGE_EN_CA = "en-CA"
-LANGUAGE_FR_CA = "fr-CA"
-LANGUAGE_EN_US = "en-US"
+ACCEPT_LANGUAGE_EN_CA = "en-CA"
+ACCEPT_LANGUAGE_FR_CA = "fr-CA"
+ACCEPT_LANGUAGE_EN_US = "en-US"
 
-LANGUAGES = frozenset([
-    LANGUAGE_EN_CA,
-    LANGUAGE_FR_CA,
-    LANGUAGE_EN_US,
+ACCEPT_LANGUAGES = frozenset([
+    ACCEPT_LANGUAGE_EN_CA,
+    ACCEPT_LANGUAGE_FR_CA,
+    ACCEPT_LANGUAGE_EN_US,
 ])
 
 # Content-Types

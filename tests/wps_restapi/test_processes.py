@@ -28,7 +28,7 @@ from weaver.execute import (
     EXECUTE_TRANSMISSION_MODE_REFERENCE,
     EXECUTE_TRANSMISSION_MODE_VALUE
 )
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, ACCEPT_LANGUAGE_FR_CA, ACCEPT_LANGUAGE_EN_US
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import STATUS_ACCEPTED
 from weaver.utils import fully_qualified_name, ows_context_href
@@ -497,7 +497,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             for exe in mock_execute:
                 stack.enter_context(exe)
             headers = self.json_headers.copy()
-            headers["Accept-Language"] = "fr-CA"
+            headers["Accept-Language"] = ACCEPT_LANGUAGE_FR_CA
             resp = self.app.post_json(uri, params=data, headers=headers)
             assert resp.status_code == 201
             try:
@@ -505,17 +505,17 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             except JobNotFound:
                 self.fail("Job should have been created and be retrievable.")
             assert job.id == resp.json["jobID"]
-            assert job.accept_language == "fr-CA"
+            assert job.accept_language == ACCEPT_LANGUAGE_FR_CA
 
     def test_set_wps_language(self):    # noqa
         wps = mock.Mock()
         languages = mock.Mock()
         wps.languages = languages
-        languages.default = "en-US"
-        languages.supported = ["en-US", "fr-CA"]
+        languages.default = ACCEPT_LANGUAGE_EN_US
+        languages.supported = [ACCEPT_LANGUAGE_EN_US, ACCEPT_LANGUAGE_FR_CA]
 
         set_wps_language(wps, "ru, fr;q=0.5")
-        assert wps.language == "fr-CA"
+        assert wps.language == ACCEPT_LANGUAGE_FR_CA
 
     def test_execute_process_no_json_body(self):
         uri = "/processes/{}/jobs".format(self.process_public.identifier)

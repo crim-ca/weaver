@@ -14,7 +14,7 @@ from owslib.wps import WPSException
 from pywps import Process as ProcessWPS
 
 from weaver.exceptions import ProcessInstanceError
-from weaver.formats import CONTENT_TYPE_APP_JSON, LANGUAGE_EN_US
+from weaver.formats import CONTENT_TYPE_APP_JSON, ACCEPT_LANGUAGE_EN_US
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_BUILTIN, PROCESS_TEST, PROCESS_WORKFLOW, PROCESS_WPS
 from weaver.status import (
     JOB_STATUS_CATEGORIES,
@@ -600,7 +600,7 @@ class Job(Base):
         for link_type in job_links:
             link_href = "{job_url}/{res}".format(job_url=job_url, res=link_type)
             job_links_body["links"].append({"href": link_href, "rel": link_type, "title": "Job {}.".format(link_type)})
-        link_meta = {"type": CONTENT_TYPE_APP_JSON, "hreflang": LANGUAGE_EN_US}
+        link_meta = {"type": CONTENT_TYPE_APP_JSON, "hreflang": ACCEPT_LANGUAGE_EN_US}
         for link in job_links_body["links"]:
             link.update(link_meta)
         if self_link in ["status", "inputs", "outputs", "results", "logs", "exceptions"]:
