@@ -24,12 +24,6 @@ ACCEPT_LANGUAGES = frozenset([
     ACCEPT_LANGUAGE_EN_US,
 ])
 
-LANGUAGES = frozenset([
-    LANGUAGE_EN_CA,
-    LANGUAGE_FR_CA,
-    LANGUAGE_EN_US,
-])
-
 # Content-Types
 #   MIME-type nomenclature:
 #       <type> "/" [x- | <tree> "."] <subtype> ["+" suffix] *[";" parameter=value]
