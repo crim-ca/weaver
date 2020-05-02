@@ -1041,7 +1041,7 @@ def _wps2json_io(io_wps):
 
 
 def _get_field(io_object, field, search_variations=False, pop_found=False, default=null):
-    # type: (Union[ANY_IO_Type, ANY_Format_Type], AnyStr, bool, bool, Any) -> Any
+    # type: (Union[ANY_IO_Type, ANY_Format_Type, ANY_Metadata_Type], AnyStr, bool, bool, Any) -> Any
     """
     Gets a field by name from various I/O object types.
 

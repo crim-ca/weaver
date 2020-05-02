@@ -100,14 +100,13 @@ Changes:
 - Add ``Job.link`` method that auto-generates all applicable links (inputs, outputs, logs, etc.).
 - Add ``image/jpeg``, ``image/png``, ``image/tiff`` formats to supported ``weaver.formats``
   (relates to `#100 <https://github.com/crim-ca/weaver/issues/100>`_).
-- Handle additional trailing slash resulting in ``NotFound`` that corresponds to a valid route without the slash.
+- Handle additional trailing slash resulting in ``HTTPNotFound [404]`` to automatically resolve to corresponding
+  valid route without the slash when applicable.
 - Provide basic conda environment setup through ``Makefile`` for Windows bash-like shell (ie: ``MINGW``/``MINGW64``).
 - Update documentation for minimal adjustments needed to run under Windows.
 - Update OpenAPI template to not render the useless version selector since we only provide the current version.
 - Update Swagger definitions to reflect changes and better reuse existing schemas.
 - Update Swagger UI to provide the `readthedocs` URL.
-- Provide basic conda environment setup through ``Makefile`` for Windows bash-like shell (ie: ``MINGW``/``MINGW64``).
-- Update documentation for minimal adjustments needed to run under Windows.
 
 Fixes:
 ------
@@ -116,6 +115,9 @@ Fixes:
 - Fix `CWL` package path resolution under Windows incorrectly parsed partition as URL protocol.
 - Fix ``AttributeError`` of ``pywps.inout.formats.Format`` equality check compared to ``null`` object (using getter
   patch on ``null`` since fix `#507 <https://github.com/geopython/pywps/pull/507>`_ not released at this point).
+- Fix potential invalid database state that could have saved an invalid process although the following
+  ``ProcessSummary`` schema validation would fail and return ``HTTPBadRequest [400]``. The process is now saved only
+  after complete and successful schema validation.
 
 `1.10.1 <https://github.com/crim-ca/weaver/tree/1.10.1>`_ (2020-06-03)
 ========================================================================

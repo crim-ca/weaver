@@ -346,14 +346,16 @@ def deploy_process_from_payload(payload, container):
 
     try:
         store = get_db(container).get_store(StoreProcesses)
-        saved_process = store.save_process(ProcessDB(process_info), overwrite=False)
+        process = ProcessDB(process_info)
+        process_summary = process.process_summary()  # make if fail before save if invalid
+        store.save_process(process, overwrite=False)
     except ProcessRegistrationError as ex:
         raise HTTPConflict(detail=str(ex))
-    except ValueError as ex:
+    except (ValueError, colander.Invalid) as ex:
         # raised on invalid process name
         raise HTTPBadRequest(detail=str(ex))
 
-    json_response = {"processSummary": saved_process.process_summary(), "deploymentDone": True}
+    json_response = {"processSummary": process_summary, "deploymentDone": True}
     return HTTPCreated(json=json_response)
 
 
