@@ -26,7 +26,7 @@ CONDA_ENV_PATH := $(CONDA_ENVS_DIR)/$(CONDA_ENV)
 # allow pre-installed conda in Windows bash-like shell
 ifeq (,$(findstring "MINGW",$(OS_NAME)))
 	CONDA_BIN_DIR ?= $(CONDA_HOME)/Scripts
-else:
+else
 	CONDA_BIN_DIR ?= $(CONDA_HOME)/bin
 endif
 CONDA_BIN := $(CONDA_BIN_DIR)/conda
