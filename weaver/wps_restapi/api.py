@@ -68,6 +68,7 @@ def api_frontpage_body(settings):
     weaver_api_def = weaver_api_url + sd.api_swagger_ui_service.path if weaver_api else None
     weaver_api_doc = settings.get("weaver.wps_restapi_doc", None) if weaver_api else None
     weaver_api_ref = settings.get("weaver.wps_restapi_ref", None) if weaver_api else None
+    weaver_api_spec = weaver_api_url + sd.api_swagger_json_service.path if weaver_api else None
     weaver_wps = asbool(settings.get("weaver.wps"))
     weaver_wps_url = get_wps_url(settings) if weaver_wps else None
     weaver_conform_url = weaver_url + sd.api_conformance_service.path
@@ -75,7 +76,7 @@ def api_frontpage_body(settings):
     weaver_links = [
         {"href": weaver_url, "rel": "self", "type": CONTENT_TYPE_APP_JSON, "title": "This document"},
         {"href": weaver_conform_url, "rel": "conformance", "type": CONTENT_TYPE_APP_JSON,
-         "title": "WPS 2.0/3.0 REST-JSON Binding Extension conformance classes implemented by this service."},
+         "title": "WPS conformance classes implemented by this service."},
     ]
     if weaver_api_def:
         weaver_links.append({"href": weaver_api_def, "rel": "service", "type": CONTENT_TYPE_APP_JSON,
@@ -86,8 +87,11 @@ def api_frontpage_body(settings):
              "rel": "service", "type": CONTENT_TYPE_APP_JSON,
              "title": "WPS REST API endpoint of this service."},
             {"href": weaver_api_def,
-             "rel": "OpenAPI", "type": CONTENT_TYPE_TEXT_HTML,
+             "rel": "swagger", "type": CONTENT_TYPE_TEXT_HTML,
              "title": "WPS REST API definition of this service."},
+            {"href": weaver_api_spec,
+             "rel": "OpenAPI", "type": CONTENT_TYPE_APP_JSON,
+             "title": "WPS REST API specification of this service."},
             {"href": weaver_process_url,
              "rel": "processes", "type": CONTENT_TYPE_APP_JSON,
              "title": "Processes offered by this service."}
@@ -111,13 +115,13 @@ def api_frontpage_body(settings):
         weaver_links.extend([
             {"href": weaver_wps,
              "rel": "wps", "type": CONTENT_TYPE_TEXT_XML,
-             "title": "WPS 1/2 endpoint of this service."},
+             "title": "WPS 1.0.0/2.0 XML endpoint of this service."},
             {"href": "http://docs.opengeospatial.org/is/14-065/14-065.html",
              "rel": "wps-xml-specification", "type": CONTENT_TYPE_TEXT_HTML,
-             "title": "WPS 1/2 definition of this service."},
+             "title": "WPS 1.0.0/2.0 definition of this service."},
             {"href": "http://schemas.opengis.net/wps/",
              "rel": "wps-xml-schema", "type": CONTENT_TYPE_TEXT_XML,
-             "title": "WPS 1/2 XML validation schemas."}
+             "title": "WPS 1.0.0/2.0 XML validation schemas."}
         ])
     return {
         "message": "Weaver Information",
