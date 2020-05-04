@@ -7,7 +7,7 @@ on :mod:`weaver.wps_restapi.swagger_definitions` objects.
 from weaver.wps_restapi import swagger_definitions as sd
 
 
-def test_cwl_deploy_io_deserialize_mapping():
+def test_oneof_io_formats_deserialize_as_mapping():
     """
     Evaluates OneOf deserialization for inputs/outputs CWL definition specified as key-mapping of objects.
     Should work simultaneously with the listing variation using the same deserializer.
@@ -16,14 +16,12 @@ def test_cwl_deploy_io_deserialize_mapping():
         - :func:`test_cwl_deploy_io_deserialize_listing`
     """
     data = {
-        "inputs": {
-            "input-1": {"type": "float"},
-            "input-2": {"type": "File"},
-            "input-3": {"type": {"type": "array", "items": "string"}}
-        }
+        "input-1": {"type": "float"},
+        "input-2": {"type": "File"},
+        "input-3": {"type": {"type": "array", "items": "string"}}
     }
 
-    result = sd.CWLInputsDefinition().deserialize(data)
+    result = sd.CWLInputsDefinition(name=__name__).deserialize(data)
     assert isinstance(result, dict)
     assert all(input_key in result for input_key in ["input-1", "input-2", "input-3"])
     assert result["input-1"]["type"] == "float"
@@ -33,7 +31,7 @@ def test_cwl_deploy_io_deserialize_mapping():
     assert result["input-3"]["type"]["items"] == "string"
 
 
-def test_cwl_deploy_io_deserialize_listing():
+def test_oneof_io_formats_deserialize_as_listing():
     """
     Evaluates OneOf deserialization for inputs/outputs CWL definition specified as list of objects.
     Should work simultaneously with the mapping variation using the same deserializer.
@@ -47,7 +45,7 @@ def test_cwl_deploy_io_deserialize_listing():
         {"id": "input-3", "type": {"type": "array", "items": "string"}}
     ]
 
-    result = sd.CWLInputsDefinition().deserialize(data)
+    result = sd.CWLInputsDefinition(name=__name__).deserialize(data)
     assert isinstance(result, list)
     assert all(result[i]["id"] == input_key for i, input_key in enumerate(["input-1", "input-2", "input-3"]))
     assert result[0]["type"] == "float"
@@ -59,7 +57,7 @@ def test_cwl_deploy_io_deserialize_listing():
 
 def test_any_of_under_variable():
     key = "this-variable-key-does-not-matter"
-    result = sd.CWLInputMap().deserialize({key: {"type": "float"}})
+    result = sd.CWLInputMap(name=__name__).deserialize({key: {"type": "float"}})
     assert isinstance(result, dict)
     assert key in result
     assert result[key] == {"type": "float"}
