@@ -114,6 +114,7 @@ if TYPE_CHECKING:
     PKG_IO_Type = Union[JSON_IO_Type, WPS_IO_Type]
     ANY_IO_Type = Union[CWL_IO_Type, JSON_IO_Type, WPS_IO_Type, OWS_IO_Type]
     ANY_Format_Type = Union[Dict[AnyStr, Optional[AnyStr]], Format]
+    ANY_Metadata_Type = Union[OwsMetadata, Metadata, Dict[AnyStr, AnyStr]]
 
 
 LOGGER = logging.getLogger(__name__)
@@ -174,6 +175,7 @@ WPS_FIELD_MAPPING = {
     "max_occurs": ["maxOccurs", "MaxOccurs", "Max_Occurs", "maxoccurs"],
     "mime_type": ["mimeType", "MimeType", "mime-type", "Mime-Type", "MIME-Type", "mimetype"],
     "encoding": ["Encoding"],
+    "href": ["url", "link", "reference"],
 }
 # WPS fields that contain a structure corresponding to `Format` object
 #   - keys must match `WPS_FIELD_MAPPING` keys
@@ -774,7 +776,7 @@ def _json2wps_field(field_info, field_category):
         if isinstance(field_info, Metadata):
             return field_info
         if isinstance(field_info, dict):
-            return Metadata(**field_info)
+            return Metadata(**metadata2json(field_info, force=True))
         if isinstance(field_info, six.string_types):
             return Metadata(field_info)
     elif field_category == "keywords" and isinstance(field_info, list):
@@ -948,12 +950,18 @@ def _wps2json_io(io_wps):
     return io_wps_json
 
 
-def _get_field(io_object, field, search_variations=False, pop_found=False):
-    # type: (Union[ANY_IO_Type, ANY_Format_Type], AnyStr, bool, bool) -> Any
+def _get_field(io_object, field, search_variations=False, pop_found=False, default=null):
+    # type: (Union[ANY_IO_Type, ANY_Format_Type], AnyStr, bool, bool, Any) -> Any
     """
     Gets a field by name from various I/O object types.
 
-    :returns: matched value (including search variations if enabled), or ``null``.
+    Default value is :py:data:`null` used for most situations to differentiate from
+    literal ``None`` which is often used as default for parameters. The :class:`NullType`
+    allows to explicitly tell that there was 'no field' and not 'no value' in existing
+    field. If you provided another value, it will be returned if not found within
+    the input object.
+
+    :returns: matched value (including search variations if enabled), or ``default``.
     """
     if isinstance(io_object, dict):
         value = io_object.get(field, null)
@@ -970,7 +978,7 @@ def _get_field(io_object, field, search_variations=False, pop_found=False):
             value = _get_field(io_object, var, pop_found=pop_found)
             if value is not null:
                 return value
-    return null
+    return default
 
 
 def _set_field(io_object, field, value, force=False):
@@ -1271,17 +1279,19 @@ def complex2json(data):
     }
 
 
-def metadata2json(meta):
-    # type: (Union[OwsMetadata, Any]) -> Union[JSON, Any]
+def metadata2json(meta, force=False):
+    # type: (Union[ANY_Metadata_Type, Any], bool) -> Union[JSON, Any]
     """
-    Obtains the JSON representation of a :class:`OwsMetadata` or simply return the unmatched type.
+    Obtains the JSON representation of a :class:`OwsMetadata` or :class:`pywps.app.Common.Metadata`.
+    Otherwise, simply return the unmatched type.
+    If requested, can enforce parsing a dictionary for the corresponding keys.
     """
-    if not isinstance(meta, OwsMetadata):
+    if not force and not isinstance(meta, (OwsMetadata, Metadata)):
         return meta
     return {
-        "href": meta.url,
-        "title": meta.title,
-        "role": meta.role
+        "href": _get_field(meta, "href", search_variations=True, default=None),
+        "title": _get_field(meta, "title", search_variations=True, default=None),
+        "role":  _get_field(meta, "role", search_variations=True, default=None),
     }
 
 

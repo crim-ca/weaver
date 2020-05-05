@@ -7,9 +7,11 @@ Changes
 Fixes:
 ------
 
-- Avoid invalid ``AllowedValue`` parsing when using ``LiteralData`` inputs that resulted in ``AnyValue`` being parsed
+- Fix invalid ``AllowedValue`` parsing when using ``LiteralData`` inputs that resulted in ``AnyValue`` being parsed
   as a ``"None"`` string. This was transparent in case of string inputs and breaking for other types like integer when
   they attempted conversion.
+- Fix erroneous ``Metadata`` keywords passed down to ``owslib.wps.Metadata`` objects in case of more verbose detailed
+  not allowed by this implementation.
 
 `1.5.1 <https://github.com/crim-ca/weaver/tree/1.5.1>`_ (2020-03-26)
 ========================================================================
