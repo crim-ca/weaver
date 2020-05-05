@@ -402,10 +402,9 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
                     "executionUnit": [{"href": proc_url}],
                     "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
                 }
-                # noinspection PyBroadException
                 try:
                     resp = deploy_process_from_payload(payload, container)
-                    if resp.status_code == HTTPOk.status_code:
+                    if resp.status_code == HTTPOk.code:
                         LOGGER.info("Process registered: [%s]", proc_id)
                     else:
                         raise RuntimeError("Process registration failed: [{}]".format(proc_id))

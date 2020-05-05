@@ -9,7 +9,6 @@ import pymongo
 import six
 from pymongo import ASCENDING, DESCENDING
 from pyramid.request import Request
-# noinspection PyPackageRequirements
 from pywps import Process as ProcessWPS
 
 from weaver.datatype import Bill, Job, Process, Quote, Service

@@ -324,8 +324,7 @@ def raise_on_xml_exception(xml_node):
     :param xml_node: instance of :class:`etree.Element`
     :raise Exception: on found ExceptionReport document.
     """
-    # noinspection PyProtectedMember
-    if not isinstance(xml_node, etree._Element):
+    if not isinstance(xml_node, etree._Element):  # noqa: W0212
         raise TypeError("Invalid input, expecting XML element node.")
     if "ExceptionReport" in xml_node.tag:
         node = xml_node

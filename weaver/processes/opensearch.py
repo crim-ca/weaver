@@ -394,9 +394,8 @@ class EOImageDescribeProcessHandler(object):
         }
         return data
 
-    # noinspection PyUnusedLocal
     @staticmethod
-    def make_collection(identifier, allowed_values):
+    def make_collection(identifier, allowed_values):  # noqa: W0613
         description = u"Collection of the data."
         data = {
             u"id": u"{}".format(identifier),

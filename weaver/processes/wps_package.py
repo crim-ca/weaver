@@ -1716,8 +1716,7 @@ class WpsPackage(Process):
 
         # pywps overrides 'status' by 'accepted' in 'update_status', so use the '_update_status' to enforce the status
         # using protected method also avoids weird overrides of progress percent on failure and final 'success' status
-        # noinspection PyProtectedMember
-        self.response._update_status(pywps_status_id, message, self.percent)
+        self.response._update_status(pywps_status_id, message, self.percent)  # noqa: W0212
         self.log_message(status=status, message=message, progress=progress)
 
     def step_update_status(self, message, progress, start_step_progress, end_step_progress, step_name,

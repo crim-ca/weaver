@@ -129,7 +129,6 @@ def setup_mongodb_jobstore(config=None):
     config = setup_config_with_mongodb(config)
     store = get_db(config).get_store(MongodbJobStore)
     store.clear_jobs()
-    # noinspection PyTypeChecker
     return store
 
 
@@ -191,7 +190,7 @@ def get_settings_from_testapp(testapp):
     # type: (TestApp) -> SettingsType
     settings = {}
     if hasattr(testapp.app, "registry"):
-        settings = testapp.app.registry.settings or {}
+        settings = testapp.app.registry.settings or {}  # noqa
     return settings
 
 

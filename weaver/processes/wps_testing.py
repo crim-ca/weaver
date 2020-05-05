@@ -26,7 +26,6 @@ class WpsTestProcess(Process):
             **kw
         )
 
-    # noinspection PyMethodMayBeStatic
     def _handler(self, request, response):
         response.update_status("WPS Test Output from process {}...".format(self.identifier), 0)
         response.outputs["test_output"].data = request.inputs["test_input"][0].data
