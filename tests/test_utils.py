@@ -371,11 +371,13 @@ def test_fetch_file_remote_with_request():
         tmp_http = "http://weaver.mock" + tmp_json.name
         tmp_retry = 2
 
+        # share in below mocked_request, 'nonlocal' back compatible with Python 2
+        tmp = {"retry": tmp_retry, "json": tmp_json, "http": tmp_http}
+
         def mocked_request(*args, **kwargs):  # noqa: E811
-            nonlocal tmp_json, tmp_http, tmp_retry
-            tmp_retry -= 1
-            if not tmp_retry:
-                return mocked_file_response(tmp_json.name, tmp_http)
+            tmp["retry"] -= 1
+            if not tmp["retry"]:
+                return mocked_file_response(tmp["json"].name, tmp["http"])
             resp = Response()
             resp.status_code = HTTPRequestTimeout.code
             return resp  # will be available on next call (to test retries)
