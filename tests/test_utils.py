@@ -14,14 +14,14 @@ from pyramid.httpexceptions import HTTPConflict
 from pyramid.httpexceptions import HTTPError as PyramidHTTPError
 from pyramid.httpexceptions import HTTPInternalServerError, HTTPNotFound, HTTPRequestTimeout
 from pywps.response.status import WPS_STATUS
-from requests.exceptions import HTTPError as RequestsHTTPError
 from requests import Response
+from requests.exceptions import HTTPError as RequestsHTTPError
 from six.moves.urllib.parse import urlparse
 
 from tests.compat import contextlib
 from tests.utils import mocked_file_response
 from weaver import status, utils
-from weaver.utils import _NullType, null, fetch_file  # noqa: W0212
+from weaver.utils import _NullType, fetch_file, null  # noqa: W0212
 
 
 def test_null_operators():

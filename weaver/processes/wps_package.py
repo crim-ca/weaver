@@ -3,7 +3,7 @@ import logging
 import os
 import shutil
 import tempfile
-from collections import Hashable, OrderedDict   # pylint: disable=E0611,no-name-in-module   # moved to .abc in Python 3
+from collections import Hashable, OrderedDict  # pylint: disable=E0611,no-name-in-module   # moved to .abc in Python 3
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
@@ -22,7 +22,7 @@ from pyramid_celery import celery_app as app
 from pywps import Process
 from pywps.app.Common import Metadata
 from pywps.inout import BoundingBoxInput, BoundingBoxOutput, ComplexInput, ComplexOutput, LiteralInput, LiteralOutput
-from pywps.inout.basic import BasicIO, SOURCE_TYPE
+from pywps.inout.basic import SOURCE_TYPE, BasicIO
 from pywps.inout.formats import Format
 from pywps.inout.literaltypes import ALLOWEDVALUETYPE, AllowedValue, AnyValue
 from pywps.validator.mode import MODE
@@ -60,6 +60,7 @@ from weaver.processes.constants import (
 )
 from weaver.processes.sources import retrieve_data_source_url
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
+from weaver.processes.utils import map_progress
 from weaver.status import (
     STATUS_COMPLIANT_PYWPS,
     STATUS_EXCEPTION,
@@ -69,7 +70,6 @@ from weaver.status import (
     STATUS_SUCCEEDED,
     map_status
 )
-from weaver.processes.utils import map_progress
 from weaver.utils import (
     bytes2str,
     get_any_id,

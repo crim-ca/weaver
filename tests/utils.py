@@ -12,7 +12,7 @@ import pyramid_celery
 import six
 from pyramid import testing
 from pyramid.config import Configurator
-from pyramid.httpexceptions import HTTPNotFound, HTTPUnprocessableEntity, HTTPException
+from pyramid.httpexceptions import HTTPException, HTTPNotFound, HTTPUnprocessableEntity
 from pyramid.registry import Registry
 from requests import Response
 from six.moves.configparser import ConfigParser
