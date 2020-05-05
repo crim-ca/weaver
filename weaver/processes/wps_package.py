@@ -1297,7 +1297,7 @@ def metadata2json(meta, force=False):
     return {
         "href": _get_field(meta, "href", search_variations=True, default=None),
         "title": _get_field(meta, "title", search_variations=True, default=None),
-        "role":  _get_field(meta, "role", search_variations=True, default=None),
+        "role": _get_field(meta, "role", search_variations=True, default=None),
     }
 
 
