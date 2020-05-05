@@ -479,6 +479,12 @@ def _is_cwl_array_type(io_info):
             io_return["allow"] = _enum_allow
         return _is_enum
 
+    # optional I/O could be an array of '["null", "<type>"]' with "<type>" being any of the formats parsed after
+    # is it the literal representation instead of the shorthand with '?'
+    if isinstance(io_info["type"], list) and any(sub_type == "null" for sub_type in io_info["type"]):
+        # we can ignore the optional indication in this case because it doesn't impact following parsing
+        io_return["type"] = list(filter(lambda sub_type: sub_type != "null", io_info["type"]))[0]
+
     # array type conversion when defined as '{"type": "array", "items": "<type>"}'
     # validate against 'Hashable' instead of 'dict' since 'OrderedDict'/'CommentedMap' can fail 'isinstance()'
     if not isinstance(io_return["type"], six.string_types) and not isinstance(io_return["type"], Hashable) \
@@ -487,7 +493,7 @@ def _is_cwl_array_type(io_info):
         if io_type["type"] != PACKAGE_ARRAY_BASE:
             raise PackageTypeError("Unsupported I/O 'array' definition: '{}'.".format(repr(io_info)))
         # parse enum in case we got an array of allowed symbols
-        is_enum = _update_if_sub_enum(io_info["type"]["items"])
+        is_enum = _update_if_sub_enum(io_type["items"])
         if not is_enum:
             io_return["type"] = io_type["items"]
         if io_return["type"] not in PACKAGE_ARRAY_ITEMS:

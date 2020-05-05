@@ -213,6 +213,92 @@ def test_is_cwl_array_type_shorthand_enum():
     assert res[3] == ["a", "b", "c"]
 
 
+def test_is_cwl_array_type_explicit_optional_not_array():
+    io_info = {
+        "name": "test",
+        "type": ["null", "float"],
+    }
+    res = _is_cwl_array_type(io_info)
+    assert res[0] is False
+    assert res[1] == "float"
+    assert res[2] == MODE.NONE
+    assert res[3] == AnyValue
+
+
+def test_is_cwl_array_type_explicit_optional_simple_enum():
+    io_info = {
+        "name": "test",
+        "type": ["null", "enum"],
+        "symbols": ["a", "b", "c"]
+    }
+    res = _is_cwl_array_type(io_info)
+    assert res[0] is False
+    assert res[1] == "enum"
+    assert res[2] == MODE.NONE
+    assert res[3] == AnyValue
+
+
+def test_is_cwl_array_type_explicit_optional_explicit_base():
+    io_info = {
+        "name": "test",
+        "type": [
+            "null",
+            {"type": "array", "items": "string"}
+        ]
+    }
+    res = _is_cwl_array_type(io_info)
+    assert res[0] is True
+    assert res[1] == "string"
+    assert res[2] == MODE.NONE
+    assert res[3] == AnyValue
+
+
+def test_is_cwl_array_type_explicit_optional_explicit_enum():
+    io_info = {
+        "name": "test",
+        "type": [
+            "null",
+            {
+                "type": "array",
+                "items": {
+                    "type": "enum",
+                    "symbols": ["a", "b", "c"]
+                }
+            }
+        ]
+    }
+    res = _is_cwl_array_type(io_info)
+    assert res[0] is True
+    assert res[1] == "string"
+    assert res[2] == MODE.SIMPLE
+    assert res[3] == ["a", "b", "c"]
+
+
+def test_is_cwl_array_type_explicit_optional_shorthand_base():
+    io_info = {
+        "name": "test",
+        "type": ["null", "string[]"]
+    }
+    res = _is_cwl_array_type(io_info)
+    assert res[0] is True
+    assert res[1] == "string"
+    assert res[2] == MODE.NONE
+    assert res[3] == AnyValue
+
+
+def test_is_cwl_array_type_explicit_optional_shorthand_enum():
+    io_info = {
+        "name": "test",
+        "type": ["null", "enum[]"],
+        "symbols": ["a", "b", "c"]
+    }
+    res = _is_cwl_array_type(io_info)
+    assert res[0] is True
+    assert res[1] == "string"
+    assert res[2] == MODE.SIMPLE
+    assert res[3] == ["a", "b", "c"]
+
+
 def test_is_cwl_enum_type_string():
     io_info = {
         "name": "test",

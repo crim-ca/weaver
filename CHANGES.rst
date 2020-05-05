@@ -12,6 +12,8 @@ Fixes:
   they attempted conversion.
 - Fix erroneous ``Metadata`` keywords passed down to ``owslib.wps.Metadata`` objects in case of more verbose detailed
   not allowed by this implementation.
+- Fix parsing of explicitly-typed optional array CWL I/O notation that was not considered
+  (i.e.: using ``type`` as list with additional ``"null"`` instead of ``type: "<type>?"`` shorthand).
 
 `1.5.1 <https://github.com/crim-ca/weaver/tree/1.5.1>`_ (2020-03-26)
 ========================================================================
