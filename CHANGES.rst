@@ -4,6 +4,13 @@ Changes
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
 
+Fixes:
+------
+
+- Avoid invalid ``AllowedValue`` parsing when using ``LiteralData`` inputs that resulted in ``AnyValue`` being parsed
+  as a ``"None"`` string. This was transparent in case of string inputs and breaking for other types like integer when
+  they attempted conversion.
+
 `1.5.1 <https://github.com/crim-ca/weaver/tree/1.5.1>`_ (2020-03-26)
 ========================================================================
 

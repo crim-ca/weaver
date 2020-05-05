@@ -631,8 +631,11 @@ def _cwl2wps_io(io_info, io_select):
             "mode": io_mode,
         }
         if is_input:
+            # avoid storing 'AnyValue' which become more problematic than
+            # anything later on when CWL/WPS merging is attempted
+            if io_allow is not AnyValue:
+                kw["allowed_values"] = io_allow
             kw["default"] = io_info.get("default", None)
-            kw["allowed_values"] = io_allow
             kw["min_occurs"] = io_min_occurs
             kw["max_occurs"] = io_max_occurs
         return io_literal(**kw)
@@ -1669,7 +1672,7 @@ class WpsPackage(Process):
         log_file_handler.setFormatter(log_file_formatter)
 
         # prepare package logger
-        self.logger = logging.getLogger("wps_package.{}".format(self.package_id))
+        self.logger = logging.getLogger("{}.{}".format(LOGGER.name, self.package_id))
         self.logger.addHandler(log_file_handler)
         self.logger.setLevel(self.log_level)
 

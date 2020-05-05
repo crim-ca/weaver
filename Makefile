@@ -238,6 +238,7 @@ clean-docs-dirs:	## remove documentation artefacts (minimal)
 clean-src:		## remove all *.pyc files
 	@echo "Removing python artifacts..."
 	@-find "$(APP_ROOT)" -type f -name "*.pyc" -exec rm {} \;
+	@-rm -rf ./build
 	@-rm -rf ./src
 
 .PHONY: clean-test

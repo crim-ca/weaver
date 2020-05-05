@@ -54,6 +54,7 @@ testdata.json
 *.sublime*
 
 # External Sources
+[Bb]uild
 src
 
 # IPython
