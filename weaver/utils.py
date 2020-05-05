@@ -476,7 +476,11 @@ def fetch_file(file_reference, file_outdir, **request_kwargs):
         #   If file is available locally and referenced as a system link, disabling follow symlink
         #   creates a copy of the symlink instead of an extra hard-copy of the linked file.
         #   PyWPS will tend to generate symlink to pre-fetched files to avoid this kind of extra hard-copy.
-        shutil.copyfile(file_reference, file_path, follow_symlinks=False)
+        #   Do symlink operation by hand instead of with argument to have Python-2 compatibility.
+        if os.path.islink(file_reference):
+            os.symlink(os.readlink(file_reference), file_path)
+        else:
+            shutil.copyfile(file_reference, file_path)
     else:
         request_kwargs.pop("stream", None)
         with open(file_path, "wb") as file:
