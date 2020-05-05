@@ -62,7 +62,7 @@ def default_make_tool(toolpath_object,              # type: ToolPathObjectType
                       loading_context,              # type: LoadingContext
                       get_job_process_definition,   # type: GetJobProcessDefinitionFunction
                       ):                            # type: (...) -> ProcessCWL
-    if not isinstance(toolpath_object, MutableMapping):  # noqa: W1116  # typing alias mapped to real type
+    if not isinstance(toolpath_object, MutableMapping):  # pylint: disable=W1116  # typing alias mapped to real type
         raise WorkflowException(u"Not a dict: '%s'" % toolpath_object)
     if "class" in toolpath_object:
         if toolpath_object["class"] == "CommandLineTool":
