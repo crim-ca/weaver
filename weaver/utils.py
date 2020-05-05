@@ -267,14 +267,14 @@ def get_base_url(url):
     return service_url
 
 
-def path_elements(path):
+def xml_path_elements(path):
     # type: (AnyStr) -> List[AnyStr]
     elements = [el.strip() for el in path.split("/")]
     elements = [el for el in elements if len(el) > 0]
     return elements
 
 
-def lxml_strip_ns(tree):
+def xml_strip_ns(tree):
     # type: (XML) -> None
     for node in tree.iter():
         try:

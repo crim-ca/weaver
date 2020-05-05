@@ -14,14 +14,14 @@ from pyramid.httpexceptions import HTTPConflict
 from pyramid.httpexceptions import HTTPError as PyramidHTTPError
 from pyramid.httpexceptions import HTTPInternalServerError, HTTPNotFound, HTTPRequestTimeout
 from pywps.response.status import WPS_STATUS
-from requests import Response
 from requests.exceptions import HTTPError as RequestsHTTPError
+from requests import Response
 from six.moves.urllib.parse import urlparse
 
 from tests.compat import contextlib
 from tests.utils import mocked_file_response
 from weaver import status, utils
-from weaver.utils import _NullType, fetch_file, null  # noqa: W0212
+from weaver.utils import _NullType, null, fetch_file  # noqa: W0212
 
 
 def test_null_operators():
@@ -76,13 +76,13 @@ def test_get_base_url():
         utils.get_base_url("ftp://localhost:8094/wps")
 
 
-def test_path_elements():
-    assert utils.path_elements("/ows/proxy/lovely_bird") == ["ows", "proxy", "lovely_bird"]
-    assert utils.path_elements("/ows/proxy/lovely_bird/") == ["ows", "proxy", "lovely_bird"]
-    assert utils.path_elements("/ows/proxy/lovely_bird/ ") == ["ows", "proxy", "lovely_bird"]
+def test_xml_path_elements():
+    assert utils.xml_path_elements("/ows/proxy/lovely_bird") == ["ows", "proxy", "lovely_bird"]
+    assert utils.xml_path_elements("/ows/proxy/lovely_bird/") == ["ows", "proxy", "lovely_bird"]
+    assert utils.xml_path_elements("/ows/proxy/lovely_bird/ ") == ["ows", "proxy", "lovely_bird"]
 
 
-def test_lxml_strip_ns():
+def test_xml_strip_ns():
     wps_xml = """
 <wps100:Execute
 xmlns:wps100="http://www.opengis.net/wps/1.0.0"
@@ -93,7 +93,7 @@ xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/
 
     doc = etree.fromstring(wps_xml)
     assert doc.tag == "{http://www.opengis.net/wps/1.0.0}Execute"
-    utils.lxml_strip_ns(doc)
+    utils.xml_strip_ns(doc)
     assert doc.tag == "Execute"
 
 

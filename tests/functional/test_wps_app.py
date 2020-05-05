@@ -7,8 +7,8 @@ Based on tests from:
 * http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/testing.html
 """
 import unittest
-from xml.etree import ElementTree
 
+from lxml import etree
 import pyramid.testing
 import pytest
 
@@ -23,6 +23,7 @@ from tests.utils import (
 from weaver.formats import CONTENT_TYPE_ANY_XML
 from weaver.processes.wps_default import HelloWPS
 from weaver.processes.wps_testing import WpsTestProcess
+from weaver.utils import str2bytes
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 
 
@@ -73,8 +74,8 @@ class WpsAppTest(unittest.TestCase):
         assert resp.status_code == 200
         assert resp.content_type in CONTENT_TYPE_ANY_XML
         resp.mustcontain("<wps:ProcessOfferings>")
-        root = ElementTree.fromstring(resp.text)
-        process_offerings = list(filter(lambda e: "ProcessOfferings" in e.tag, list(root)))
+        root = etree.fromstring(str2bytes(resp.text))  # test response has no 'content'
+        process_offerings = list(filter(lambda e: "ProcessOfferings" in e.tag, root.iter(etree.Element)))
         assert len(process_offerings) == 1
         processes = [p for p in process_offerings[0]]
         ids = [pi.text for pi in [list(filter(lambda e: e.tag.endswith("Identifier"), p))[0] for p in processes]]
