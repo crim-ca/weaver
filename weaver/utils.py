@@ -1,15 +1,12 @@
 import errno
 import logging
 import os
-import platform
 import re
 import shutil
 import time
 import types
 import warnings
 from datetime import datetime
-from distutils.dir_util import mkpath
-from distutils.version import LooseVersion
 from inspect import isclass, isfunction
 from typing import TYPE_CHECKING
 
