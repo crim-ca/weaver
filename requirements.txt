@@ -1,5 +1,6 @@
 alembic
 argcomplete
+backports.tempfile; python_version < "3"
 celery
 cffi
 colander

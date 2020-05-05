@@ -7,11 +7,15 @@ import json
 import logging
 import os
 import sys
-import tempfile
 from typing import Any, AnyStr
 
 import six
 from six.moves.urllib.parse import urlparse
+
+if six.PY3:
+    from tempfile import TemporaryDirectory
+else:
+    from backports.tempfile import TemporaryDirectory
 
 CUR_DIR = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, CUR_DIR)
@@ -52,7 +56,7 @@ def j2n(json_reference, output_dir):
     try:
         if not os.path.isdir(output_dir):
             raise ValueError("Output dir [{}] does not exist.".format(output_dir))
-        with tempfile.TemporaryDirectory(prefix="wps_process_{}_".format(PACKAGE_NAME)) as tmp_dir:
+        with TemporaryDirectory(prefix="wps_process_{}_".format(PACKAGE_NAME)) as tmp_dir:
             LOGGER.debug("Fetching JSON file: [%s]", json_reference)
             json_path = fetch_file(json_reference, tmp_dir, timeout=10, retry=3)
             LOGGER.debug("Reading JSON file: [%s]", json_path)
