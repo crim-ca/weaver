@@ -31,7 +31,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_ESGF_CWT,
     CWL_REQUIREMENT_APP_WPS1
 )
-from weaver.utils import get_settings, now
+from weaver.utils import get_settings, make_dirs, now
 from weaver.wps import get_wps_output_dir
 
 if TYPE_CHECKING:
@@ -406,8 +406,7 @@ class WpsWorkflowJob(JobBase):  # noqa: N802
             tmpdir_lock=None,   # type: Optional[threading.Lock]
             ):                  # type: (...) -> None
 
-        if not os.path.exists(self.tmpdir):
-            os.makedirs(self.tmpdir)
+        make_dirs(self.tmpdir, exist_ok=True)
         env = self.environment
         vars_to_preserve = runtimeContext.preserve_environment
         if runtimeContext.preserve_entire_environment:

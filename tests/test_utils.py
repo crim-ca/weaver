@@ -21,7 +21,7 @@ from six.moves.urllib.parse import urlparse
 from tests.compat import contextlib
 from tests.utils import mocked_file_response
 from weaver import status, utils
-from weaver.utils import _NullType, null, fetch_file  # noqa: W0212
+from weaver.utils import _NullType, null, fetch_file, make_dirs  # noqa: W0212
 
 
 def test_null_operators():
@@ -344,7 +344,7 @@ def test_fetch_file_local_with_protocol():
         res_dir = os.path.join(tmp_dir, inspect.currentframe().f_code.co_name)
         res_path = os.path.join(res_dir, tmp_name)
         try:
-            os.makedirs(res_dir, exist_ok=True)
+            make_dirs(res_dir, exist_ok=True)
             for protocol in ["", "file://"]:
                 tmp_path = protocol + tmp_json.name
                 fetch_file(tmp_path, res_dir)
@@ -388,7 +388,7 @@ def test_fetch_file_remote_with_request():
         res_dir = os.path.join(tmp_dir, inspect.currentframe().f_code.co_name)
         res_path = os.path.join(res_dir, tmp_name)
         try:
-            os.makedirs(res_dir, exist_ok=True)
+            make_dirs(res_dir, exist_ok=True)
             fetch_file(tmp_http, res_dir, retry=tmp_retry + 1)
             assert os.path.isfile(res_path), "File [{}] should be accessible under [{}]".format(tmp_http, res_path)
             assert m_request.call_count == 2, "Request method should have been called twice because of retries"

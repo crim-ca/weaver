@@ -1,3 +1,4 @@
+import errno
 import logging
 import os
 import platform
@@ -409,16 +410,22 @@ def get_job_log_msg(status, message, progress=0, duration=None):
     return "{d} {p:3d}% {s:10} {m}".format(d=duration or "", p=int(progress or 0), s=map_status(status), m=message)
 
 
-def make_dirs(path, mode=0o755, exist_ok=True):
-    """Alternative to ``os.makedirs`` with ``exists_ok`` parameter only available for ``python>3.5``."""
-    if LooseVersion(platform.python_version()) >= LooseVersion("3.5"):
-        os.makedirs(path, mode=mode, exist_ok=exist_ok)
-        return
-    dir_path = os.path.dirname(path)
-    if not os.path.isfile(path) or not os.path.isdir(dir_path):
-        for subdir in mkpath(dir_path):
-            if not os.path.isdir(subdir):
-                os.mkdir(subdir, mode)
+def make_dirs(path, mode=0o755, exist_ok=False):
+    """
+    Alternative to ``os.makedirs`` with ``exists_ok`` parameter only available for ``python>3.5``.
+    Also using a reduced set of permissions ``755`` instead of original default ``777``.
+
+    .. note::
+        The method employed in this function is safer then ``if os.pat.exists`` or ``if os.pat.isdir`` pre-check
+        to calling ``os.makedirs`` as this can result in race condition (between evaluation and actual creation).
+    """
+    try:
+        os.makedirs(path, mode=mode)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
+        if not exist_ok:
+            raise
 
 
 def request_retry(method, url, retries=0, backoff=0.3, **request_kwargs):
