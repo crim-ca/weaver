@@ -3,7 +3,7 @@ import logging
 import os
 import shutil
 import tempfile
-from collections import Hashable, OrderedDict   # pylint: disable=E0611,no-name-in-module   # moved to .abc in Python 3
+from collections import Hashable, OrderedDict  # pylint: disable=E0611,no-name-in-module   # moved to .abc in Python 3
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
@@ -22,7 +22,7 @@ from pyramid_celery import celery_app as app
 from pywps import Process
 from pywps.app.Common import Metadata
 from pywps.inout import BoundingBoxInput, BoundingBoxOutput, ComplexInput, ComplexOutput, LiteralInput, LiteralOutput
-from pywps.inout.basic import BasicIO, SOURCE_TYPE
+from pywps.inout.basic import SOURCE_TYPE, BasicIO
 from pywps.inout.formats import Format
 from pywps.inout.literaltypes import ALLOWEDVALUETYPE, AllowedValue, AnyValue
 from pywps.validator.mode import MODE
@@ -60,6 +60,7 @@ from weaver.processes.constants import (
 )
 from weaver.processes.sources import retrieve_data_source_url
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
+from weaver.processes.utils import map_progress
 from weaver.status import (
     STATUS_COMPLIANT_PYWPS,
     STATUS_EXCEPTION,
@@ -69,7 +70,6 @@ from weaver.status import (
     STATUS_SUCCEEDED,
     map_status
 )
-from weaver.processes.utils import map_progress
 from weaver.utils import (
     bytes2str,
     get_any_id,
@@ -114,6 +114,7 @@ if TYPE_CHECKING:
     PKG_IO_Type = Union[JSON_IO_Type, WPS_IO_Type]
     ANY_IO_Type = Union[CWL_IO_Type, JSON_IO_Type, WPS_IO_Type, OWS_IO_Type]
     ANY_Format_Type = Union[Dict[AnyStr, Optional[AnyStr]], Format]
+    ANY_Metadata_Type = Union[OwsMetadata, Metadata, Dict[AnyStr, AnyStr]]
 
 
 LOGGER = logging.getLogger(__name__)
@@ -174,6 +175,7 @@ WPS_FIELD_MAPPING = {
     "max_occurs": ["maxOccurs", "MaxOccurs", "Max_Occurs", "maxoccurs"],
     "mime_type": ["mimeType", "MimeType", "mime-type", "Mime-Type", "MIME-Type", "mimetype"],
     "encoding": ["Encoding"],
+    "href": ["url", "link", "reference"],
 }
 # WPS fields that contain a structure corresponding to `Format` object
 #   - keys must match `WPS_FIELD_MAPPING` keys
@@ -477,6 +479,12 @@ def _is_cwl_array_type(io_info):
             io_return["allow"] = _enum_allow
         return _is_enum
 
+    # optional I/O could be an array of '["null", "<type>"]' with "<type>" being any of the formats parsed after
+    # is it the literal representation instead of the shorthand with '?'
+    if isinstance(io_info["type"], list) and any(sub_type == "null" for sub_type in io_info["type"]):
+        # we can ignore the optional indication in this case because it doesn't impact following parsing
+        io_return["type"] = list(filter(lambda sub_type: sub_type != "null", io_info["type"]))[0]
+
     # array type conversion when defined as '{"type": "array", "items": "<type>"}'
     # validate against 'Hashable' instead of 'dict' since 'OrderedDict'/'CommentedMap' can fail 'isinstance()'
     if not isinstance(io_return["type"], six.string_types) and not isinstance(io_return["type"], Hashable) \
@@ -485,7 +493,7 @@ def _is_cwl_array_type(io_info):
         if io_type["type"] != PACKAGE_ARRAY_BASE:
             raise PackageTypeError("Unsupported I/O 'array' definition: '{}'.".format(repr(io_info)))
         # parse enum in case we got an array of allowed symbols
-        is_enum = _update_if_sub_enum(io_info["type"]["items"])
+        is_enum = _update_if_sub_enum(io_type["items"])
         if not is_enum:
             io_return["type"] = io_type["items"]
         if io_return["type"] not in PACKAGE_ARRAY_ITEMS:
@@ -631,8 +639,11 @@ def _cwl2wps_io(io_info, io_select):
             "mode": io_mode,
         }
         if is_input:
+            # avoid storing 'AnyValue' which become more problematic than
+            # anything later on when CWL/WPS merging is attempted
+            if io_allow is not AnyValue:
+                kw["allowed_values"] = io_allow
             kw["default"] = io_info.get("default", None)
-            kw["allowed_values"] = io_allow
             kw["min_occurs"] = io_min_occurs
             kw["max_occurs"] = io_max_occurs
         return io_literal(**kw)
@@ -771,7 +782,7 @@ def _json2wps_field(field_info, field_category):
         if isinstance(field_info, Metadata):
             return field_info
         if isinstance(field_info, dict):
-            return Metadata(**field_info)
+            return Metadata(**metadata2json(field_info, force=True))
         if isinstance(field_info, six.string_types):
             return Metadata(field_info)
     elif field_category == "keywords" and isinstance(field_info, list):
@@ -945,12 +956,18 @@ def _wps2json_io(io_wps):
     return io_wps_json
 
 
-def _get_field(io_object, field, search_variations=False, pop_found=False):
-    # type: (Union[ANY_IO_Type, ANY_Format_Type], AnyStr, bool, bool) -> Any
+def _get_field(io_object, field, search_variations=False, pop_found=False, default=null):
+    # type: (Union[ANY_IO_Type, ANY_Format_Type], AnyStr, bool, bool, Any) -> Any
     """
     Gets a field by name from various I/O object types.
 
-    :returns: matched value (including search variations if enabled), or ``null``.
+    Default value is :py:data:`null` used for most situations to differentiate from
+    literal ``None`` which is often used as default for parameters. The :class:`NullType`
+    allows to explicitly tell that there was 'no field' and not 'no value' in existing
+    field. If you provided another value, it will be returned if not found within
+    the input object.
+
+    :returns: matched value (including search variations if enabled), or ``default``.
     """
     if isinstance(io_object, dict):
         value = io_object.get(field, null)
@@ -967,7 +984,7 @@ def _get_field(io_object, field, search_variations=False, pop_found=False):
             value = _get_field(io_object, var, pop_found=pop_found)
             if value is not null:
                 return value
-    return null
+    return default
 
 
 def _set_field(io_object, field, value, force=False):
@@ -1268,17 +1285,19 @@ def complex2json(data):
     }
 
 
-def metadata2json(meta):
-    # type: (Union[OwsMetadata, Any]) -> Union[JSON, Any]
+def metadata2json(meta, force=False):
+    # type: (Union[ANY_Metadata_Type, Any], bool) -> Union[JSON, Any]
     """
-    Obtains the JSON representation of a :class:`OwsMetadata` or simply return the unmatched type.
+    Obtains the JSON representation of a :class:`OwsMetadata` or :class:`pywps.app.Common.Metadata`.
+    Otherwise, simply return the unmatched type.
+    If requested, can enforce parsing a dictionary for the corresponding keys.
     """
-    if not isinstance(meta, OwsMetadata):
+    if not force and not isinstance(meta, (OwsMetadata, Metadata)):
         return meta
     return {
-        "href": meta.url,
-        "title": meta.title,
-        "role": meta.role
+        "href": _get_field(meta, "href", search_variations=True, default=None),
+        "title": _get_field(meta, "title", search_variations=True, default=None),
+        "role": _get_field(meta, "role", search_variations=True, default=None),
     }
 
 
@@ -1669,7 +1688,7 @@ class WpsPackage(Process):
         log_file_handler.setFormatter(log_file_formatter)
 
         # prepare package logger
-        self.logger = logging.getLogger("wps_package.{}".format(self.package_id))
+        self.logger = logging.getLogger("{}.{}".format(LOGGER.name, self.package_id))
         self.logger.addHandler(log_file_handler)
         self.logger.setLevel(self.log_level)
 
@@ -1697,8 +1716,7 @@ class WpsPackage(Process):
 
         # pywps overrides 'status' by 'accepted' in 'update_status', so use the '_update_status' to enforce the status
         # using protected method also avoids weird overrides of progress percent on failure and final 'success' status
-        # noinspection PyProtectedMember
-        self.response._update_status(pywps_status_id, message, self.percent)
+        self.response._update_status(pywps_status_id, message, self.percent)  # noqa: W0212
         self.log_message(status=status, message=message, progress=progress)
 
     def step_update_status(self, message, progress, start_step_progress, end_step_progress, step_name,

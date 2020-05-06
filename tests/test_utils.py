@@ -21,7 +21,7 @@ from six.moves.urllib.parse import urlparse
 from tests.compat import contextlib
 from tests.utils import mocked_file_response
 from weaver import status, utils
-from weaver.utils import _NullType, null, fetch_file  # noqa: W0212
+from weaver.utils import _NullType, null, fetch_file, make_dirs  # noqa: W0212
 
 
 def test_null_operators():
@@ -76,13 +76,13 @@ def test_get_base_url():
         utils.get_base_url("ftp://localhost:8094/wps")
 
 
-def test_path_elements():
-    assert utils.path_elements("/ows/proxy/lovely_bird") == ["ows", "proxy", "lovely_bird"]
-    assert utils.path_elements("/ows/proxy/lovely_bird/") == ["ows", "proxy", "lovely_bird"]
-    assert utils.path_elements("/ows/proxy/lovely_bird/ ") == ["ows", "proxy", "lovely_bird"]
+def test_xml_path_elements():
+    assert utils.xml_path_elements("/ows/proxy/lovely_bird") == ["ows", "proxy", "lovely_bird"]
+    assert utils.xml_path_elements("/ows/proxy/lovely_bird/") == ["ows", "proxy", "lovely_bird"]
+    assert utils.xml_path_elements("/ows/proxy/lovely_bird/ ") == ["ows", "proxy", "lovely_bird"]
 
 
-def test_lxml_strip_ns():
+def test_xml_strip_ns():
     wps_xml = """
 <wps100:Execute
 xmlns:wps100="http://www.opengis.net/wps/1.0.0"
@@ -93,7 +93,7 @@ xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/
 
     doc = etree.fromstring(wps_xml)
     assert doc.tag == "{http://www.opengis.net/wps/1.0.0}Execute"
-    utils.lxml_strip_ns(doc)
+    utils.xml_strip_ns(doc)
     assert doc.tag == "Execute"
 
 
@@ -344,7 +344,7 @@ def test_fetch_file_local_with_protocol():
         res_dir = os.path.join(tmp_dir, inspect.currentframe().f_code.co_name)
         res_path = os.path.join(res_dir, tmp_name)
         try:
-            os.makedirs(res_dir, exist_ok=True)
+            make_dirs(res_dir, exist_ok=True)
             for protocol in ["", "file://"]:
                 tmp_path = protocol + tmp_json.name
                 fetch_file(tmp_path, res_dir)
@@ -371,11 +371,13 @@ def test_fetch_file_remote_with_request():
         tmp_http = "http://weaver.mock" + tmp_json.name
         tmp_retry = 2
 
+        # share in below mocked_request, 'nonlocal' back compatible with Python 2
+        tmp = {"retry": tmp_retry, "json": tmp_json, "http": tmp_http}
+
         def mocked_request(*args, **kwargs):  # noqa: E811
-            nonlocal tmp_json, tmp_http, tmp_retry
-            tmp_retry -= 1
-            if not tmp_retry:
-                return mocked_file_response(tmp_json.name, tmp_http)
+            tmp["retry"] -= 1
+            if not tmp["retry"]:
+                return mocked_file_response(tmp["json"].name, tmp["http"])
             resp = Response()
             resp.status_code = HTTPRequestTimeout.code
             return resp  # will be available on next call (to test retries)
@@ -386,7 +388,7 @@ def test_fetch_file_remote_with_request():
         res_dir = os.path.join(tmp_dir, inspect.currentframe().f_code.co_name)
         res_path = os.path.join(res_dir, tmp_name)
         try:
-            os.makedirs(res_dir, exist_ok=True)
+            make_dirs(res_dir, exist_ok=True)
             fetch_file(tmp_http, res_dir, retry=tmp_retry + 1)
             assert os.path.isfile(res_path), "File [{}] should be accessible under [{}]".format(tmp_http, res_path)
             assert m_request.call_count == 2, "Request method should have been called twice because of retries"

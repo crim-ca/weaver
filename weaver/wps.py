@@ -20,7 +20,7 @@ from weaver.config import get_weaver_configuration
 from weaver.database import get_db
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.store.base import StoreProcesses
-from weaver.utils import get_settings, get_weaver_url
+from weaver.utils import get_settings, get_weaver_url, make_dirs
 from weaver.visibility import VISIBILITY_PUBLIC
 
 LOGGER = logging.getLogger(__name__)
@@ -143,8 +143,7 @@ def load_pywps_cfg(container, config=None):
         settings["weaver.wps_output_dir"] = output_dir
     # ensure the output dir exists if specified
     output_dir = get_wps_output_dir(settings)
-    if not os.path.isdir(output_dir):
-        os.makedirs(output_dir)
+    make_dirs(output_dir, exist_ok=True)
 
     # find output url from app config (path/url) or wps config (url only)
     if "weaver.wps_output_url" not in settings:

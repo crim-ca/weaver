@@ -2,7 +2,7 @@ import unittest
 
 import pytest
 
-from tests.utils import setup_config_with_mongodb, get_test_weaver_app
+from tests.utils import get_test_weaver_app, setup_config_with_mongodb
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.wps_restapi.swagger_definitions import (
     api_frontpage_uri,

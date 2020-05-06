@@ -4,7 +4,7 @@ Definitions of types used by tokens.
 import traceback
 import uuid
 from datetime import datetime, timedelta
-from logging import ERROR, INFO, getLevelName, getLogger, Logger
+from logging import ERROR, INFO, Logger, getLevelName, getLogger
 from typing import TYPE_CHECKING
 
 import six

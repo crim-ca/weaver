@@ -106,8 +106,7 @@ class OWSException(Response, Exception):
                     def __init__(self, excobj):
                         self.excobj = excobj
 
-                    # noinspection PyUnusedLocal
-                    def substitute(self, code, locator, message):
+                    def substitute(self, code, locator, message):  # noqa: W0613
                         return json.dumps(self.excobj.json_formatter(
                             status=self.excobj.status, body=message, title=None, environ=environ))
 

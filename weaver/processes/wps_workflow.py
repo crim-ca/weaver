@@ -15,13 +15,7 @@ from cwltool.errors import WorkflowException
 from cwltool.job import JobBase, relink_initialworkdir
 from cwltool.pathmapper import adjustDirObjs, adjustFileObjs, get_listing, trim_listing, visit_class
 from cwltool.process import Process as ProcessCWL
-from cwltool.process import (
-    compute_checksums,
-    normalizeFilesDirs,
-    shortname,
-    supportedProcessRequirements,
-    uniquename
-)
+from cwltool.process import compute_checksums, normalizeFilesDirs, shortname, supportedProcessRequirements, uniquename
 from cwltool.stdfsaccess import StdFsAccess
 from cwltool.utils import aslist, bytes2str_in_dicts, onWindows
 from cwltool.workflow import Workflow
@@ -37,7 +31,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_ESGF_CWT,
     CWL_REQUIREMENT_APP_WPS1
 )
-from weaver.utils import get_settings, now
+from weaver.utils import get_settings, make_dirs, now
 from weaver.wps import get_wps_output_dir
 
 if TYPE_CHECKING:
@@ -68,7 +62,7 @@ def default_make_tool(toolpath_object,              # type: ToolPathObjectType
                       loading_context,              # type: LoadingContext
                       get_job_process_definition,   # type: GetJobProcessDefinitionFunction
                       ):                            # type: (...) -> ProcessCWL
-    if not isinstance(toolpath_object, MutableMapping):
+    if not isinstance(toolpath_object, MutableMapping):  # pylint: disable=W1116  # typing alias mapped to real type
         raise WorkflowException(u"Not a dict: '%s'" % toolpath_object)
     if "class" in toolpath_object:
         if toolpath_object["class"] == "CommandLineTool":
@@ -382,8 +376,7 @@ class WpsWorkflow(ProcessCWL):
         return result
 
 
-# noinspection PyPep8Naming
-class WpsWorkflowJob(JobBase):
+class WpsWorkflowJob(JobBase):  # noqa: N802
     def __init__(self,
                  builder,           # type: Builder
                  joborder,          # type: Dict[Text, Union[Dict[Text, Any], List, Text, None]]
@@ -413,8 +406,7 @@ class WpsWorkflowJob(JobBase):
             tmpdir_lock=None,   # type: Optional[threading.Lock]
             ):                  # type: (...) -> None
 
-        if not os.path.exists(self.tmpdir):
-            os.makedirs(self.tmpdir)
+        make_dirs(self.tmpdir, exist_ok=True)
         env = self.environment
         vars_to_preserve = runtimeContext.preserve_environment
         if runtimeContext.preserve_entire_environment:

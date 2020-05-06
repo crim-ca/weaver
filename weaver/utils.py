@@ -1,14 +1,12 @@
+import errno
 import logging
 import os
-import platform
 import re
 import shutil
 import time
 import types
 import warnings
 from datetime import datetime
-from distutils.dir_util import mkpath
-from distutils.version import LooseVersion
 from inspect import isclass, isfunction
 from typing import TYPE_CHECKING
 
@@ -267,14 +265,14 @@ def get_base_url(url):
     return service_url
 
 
-def path_elements(path):
+def xml_path_elements(path):
     # type: (AnyStr) -> List[AnyStr]
     elements = [el.strip() for el in path.split("/")]
     elements = [el for el in elements if len(el) > 0]
     return elements
 
 
-def lxml_strip_ns(tree):
+def xml_strip_ns(tree):
     # type: (XML) -> None
     for node in tree.iter():
         try:
@@ -324,8 +322,7 @@ def raise_on_xml_exception(xml_node):
     :param xml_node: instance of :class:`etree.Element`
     :raise Exception: on found ExceptionReport document.
     """
-    # noinspection PyProtectedMember
-    if not isinstance(xml_node, etree._Element):
+    if not isinstance(xml_node, etree._Element):  # noqa: W0212
         raise TypeError("Invalid input, expecting XML element node.")
     if "ExceptionReport" in xml_node.tag:
         node = xml_node
@@ -410,16 +407,22 @@ def get_job_log_msg(status, message, progress=0, duration=None):
     return "{d} {p:3d}% {s:10} {m}".format(d=duration or "", p=int(progress or 0), s=map_status(status), m=message)
 
 
-def make_dirs(path, mode=0o755, exist_ok=True):
-    """Alternative to ``os.makedirs`` with ``exists_ok`` parameter only available for ``python>3.5``."""
-    if LooseVersion(platform.python_version()) >= LooseVersion("3.5"):
-        os.makedirs(path, mode=mode, exist_ok=exist_ok)
-        return
-    dir_path = os.path.dirname(path)
-    if not os.path.isfile(path) or not os.path.isdir(dir_path):
-        for subdir in mkpath(dir_path):
-            if not os.path.isdir(subdir):
-                os.mkdir(subdir, mode)
+def make_dirs(path, mode=0o755, exist_ok=False):
+    """
+    Alternative to ``os.makedirs`` with ``exists_ok`` parameter only available for ``python>3.5``.
+    Also using a reduced set of permissions ``755`` instead of original default ``777``.
+
+    .. note::
+        The method employed in this function is safer then ``if os.pat.exists`` or ``if os.pat.isdir`` pre-check
+        to calling ``os.makedirs`` as this can result in race condition (between evaluation and actual creation).
+    """
+    try:
+        os.makedirs(path, mode=mode)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
+        if not exist_ok:
+            raise
 
 
 def request_retry(method, url, retries=0, backoff=0.3, **request_kwargs):
@@ -473,7 +476,11 @@ def fetch_file(file_reference, file_outdir, **request_kwargs):
         #   If file is available locally and referenced as a system link, disabling follow symlink
         #   creates a copy of the symlink instead of an extra hard-copy of the linked file.
         #   PyWPS will tend to generate symlink to pre-fetched files to avoid this kind of extra hard-copy.
-        shutil.copyfile(file_reference, file_path, follow_symlinks=False)
+        #   Do symlink operation by hand instead of with argument to have Python-2 compatibility.
+        if os.path.islink(file_reference):
+            os.symlink(os.readlink(file_reference), file_path)
+        else:
+            shutil.copyfile(file_reference, file_path)
     else:
         request_kwargs.pop("stream", None)
         with open(file_path, "wb") as file:

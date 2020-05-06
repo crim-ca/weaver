@@ -47,7 +47,7 @@ from weaver.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_STARTED, STATUS
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import get_any_id, get_any_value, get_cookie_headers, get_settings, raise_on_xml_exception, wait_secs
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
-from weaver.wps import get_wps_output_dir, get_wps_output_url, get_wps_output_path, load_pywps_cfg
+from weaver.wps import get_wps_output_dir, get_wps_output_path, get_wps_output_url, load_pywps_cfg
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.jobs import check_status
 from weaver.wps_restapi.jobs.notify import encrypt_email, notify_job_complete

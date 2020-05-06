@@ -1,8 +1,8 @@
 import os
 import unittest
 from copy import deepcopy
-import mock
 
+import mock
 import pyramid.testing
 import pytest
 import responses
