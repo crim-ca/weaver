@@ -1,8 +1,11 @@
 import os
 from typing import TYPE_CHECKING
 
+from requests.exceptions import ConnectionError
 from six.moves.urllib.error import HTTPError
 from six.moves.urllib.request import urlopen
+
+from weaver.utils import request_retry
 
 if TYPE_CHECKING:
     from weaver.typedefs import JSON            # noqa: F401
@@ -81,14 +84,28 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=False):
     def _make_if_ref(_map, _key, _fmt):
         return os.path.join(_map[_key], _fmt) if make_reference else (_map, "{}:{}".format(_key, _fmt))
 
-    # FIXME: ConnectionRefused with `requests.get`, using `urllib` instead
-    try:
-        mime_type_url = "{}{}".format(IANA_NAMESPACE_DEFINITION[IANA_NAMESPACE], mime_type)
-        resp = urlopen(mime_type_url)  # nosec: B310 # is hardcoded HTTP(S)
-        if resp.code == 200:
-            return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, mime_type)
-    except HTTPError:
-        pass
+    def _retry_various(_mime_type):
+        """
+        Attempts multiple request-retry variants to be as permissive as possible to sporadic temporary failures.
+        """
+        _mime_type_url = "{}{}".format(IANA_NAMESPACE_DEFINITION[IANA_NAMESPACE], _mime_type)
+        try:
+            resp = request_retry("get", _mime_type_url, retries=3, allowed_codes=[200])
+            if resp.status_code == 200:
+                return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _mime_type)
+        except ConnectionError:
+            pass
+        try:
+            resp = urlopen(_mime_type_url)  # nosec: B310 # is hardcoded HTTP(S)
+            if resp.code == 200:
+                return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _mime_type)
+        except HTTPError:
+            pass
+        return None
+
+    result = _retry_various(mime_type)
+    if result is not None:
+        return result
     if mime_type in EDAM_MAPPING:
         return _make_if_ref(EDAM_NAMESPACE_DEFINITION, EDAM_NAMESPACE, EDAM_MAPPING[mime_type])
     if not must_exist:
