@@ -16,7 +16,7 @@ import six
 from celery import Celery
 from lxml import etree
 from pyramid.config import Configurator
-from pyramid.httpexceptions import HTTPError as PyramidHTTPError
+from pyramid.httpexceptions import HTTPError as PyramidHTTPError, HTTPGatewayTimeout
 from pyramid.registry import Registry
 from pyramid.request import Request
 from requests import HTTPError as RequestsHTTPError
@@ -31,7 +31,7 @@ from weaver.warning import TimeZoneInfoAlreadySetWarning
 if TYPE_CHECKING:
     from weaver.typedefs import (                                                               # noqa: F401
         AnyValue, AnyKey, AnySettingsContainer, AnyRegistryContainer, AnyHeadersContainer,
-        HeadersType, SettingsType, JSON, XML, Number
+        AnyResponseType, HeadersType, SettingsType, JSON, XML, Number
     )
     from typing import Union, Any, Dict, List, AnyStr, Iterable, Optional, Type                 # noqa: F401
 
@@ -425,35 +425,60 @@ def make_dirs(path, mode=0o755, exist_ok=False):
             raise
 
 
-def request_retry(method, url, retries=0, backoff=0.3, **request_kwargs):
-    # type: (AnyStr, AnyStr, int, Number, Any) -> requests.Response
+def request_retry(method,               # type: AnyStr
+                  url,                  # type: AnyStr
+                  retries=0,            # type: int
+                  backoff=0,            # type: Number
+                  intervals=None,       # type: Optional[List[Union[float, int]]]
+                  allowed_codes=None,   # type: Optional[List[int]]
+                  **request_kwargs,     # type: Any
+                  ):                    # type: (...) -> AnyResponseType
     """
     Implements basic request retry operation if the previous request failed, up to the specified number of retries.
+
+    Using :paramref:`backoff` factor, you can control the interval between request attempts such as::
+
+        delay = backoff * (2 ^ retry)
+
+    Alternatively, you can explicitly define ``intervals=[...]`` with the list values being the number of seconds to
+    wait between each request attempt. In this case, :paramref:`backoff` is ignored and :paramref:`retries` is
+    overridden by the list size.
+
+    Because different request implementations use different parameter naming conventions, all following keywords are
+    looked for:
+        - Both variants of ``backoff`` and ``backoff_factor`` are accepted.
+        - All variants of ``retires``, ``retry`` and ``max_retries`` are accepted.
 
     :param method: HTTP method to set request.
     :param url: URL of the request to execute.
     :param retries: number of retries to attempt.
     :param backoff: factor by which to multiply delays between retries.
+    :param intervals: explicit intervals in seconds between retries.
+    :param allowed_codes: HTTP status codes that are considered valid to stop retrying (default: any non-4xx/5xx code).
+    :param request_kwargs: All other keyword arguments are passed down to the request call.
     """
     # catch kw passed to request corresponding to retries parameters
-    kw_retries = request_kwargs.pop("retries", request_kwargs.pop("retry", request_kwargs.pop("max_retries", 0)))
+    kw_retries = request_kwargs.pop("retries", request_kwargs.pop("retry", request_kwargs.pop("max_retries", 1)))
     kw_backoff = request_kwargs.pop("backoff", request_kwargs.pop("backoff_factor", 0.3))
     retries = retries or kw_retries
     backoff = backoff or kw_backoff
-    retry = 0
-    resp = None
-    while retries >= retry:
+    if intervals and len(intervals) and all(isinstance(i, (int, float)) for i in intervals):
+        retries = len(intervals)
+        backoff = 0  # disable first part of delay calculation
+    for retry in range(retries):
         resp = requests.request(method, url, **request_kwargs)
-        if resp.status_code < 400 or retry == retries:
+        if allowed_codes and len(allowed_codes):
+            if resp.status_code in allowed_codes:
+                return resp
+        elif resp.status_code < 400:
             return resp
-        retry += 1
-        delay = backoff * (2 ** retry)
+        delay = (backoff * (2 ** (retry + 1))) or intervals[retry]
         time.sleep(delay)
-    return resp
+    return HTTPGatewayTimeout(detail="Request ran out of retries.")
 
 
 def fetch_file(file_reference, file_outdir, **request_kwargs):
-    # type: (AnyStr, AnyStr, Any) -> AnyStr
+    # type: (AnyStr, AnyStr, **Any) -> AnyStr
     """
     Fetches a file from a local path or remote URL and dumps it's content to the specified output directory.
 
@@ -485,7 +510,8 @@ def fetch_file(file_reference, file_outdir, **request_kwargs):
         request_kwargs.pop("stream", None)
         with open(file_path, "wb") as file:
             resp = request_retry("get", file_reference, stream=True, **request_kwargs)
-            resp.raise_for_status()
+            if resp.status_code >= 400:
+                raise resp
             # NOTE:
             #   Setting 'chunk_size=None' lets the request find a suitable size according to
             #   available memory. Without this, it defaults to 1 which is extremely slow.

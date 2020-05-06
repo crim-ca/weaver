@@ -266,7 +266,7 @@ def mocked_sub_requests(app, function, *args, **kwargs):
     Generates a `fake` response from a file if the URL scheme is ``mock://``.
     """
 
-    def mocked_request(method, url=None, headers=None, verify=None, cert=None, **req_kwargs):  # noqa: E811
+    def mocked_app_request(method, url=None, headers=None, verify=None, cert=None, **req_kwargs):  # noqa: E811
         """
         Request corresponding to :func:`requests.request` that instead gets executed by :class:`webTest.TestApp`.
         """
@@ -286,8 +286,8 @@ def mocked_sub_requests(app, function, *args, **kwargs):
         return resp
 
     with contextlib.ExitStack() as stack:
-        stack.enter_context(mock.patch("requests.request", side_effect=mocked_request))
-        stack.enter_context(mock.patch("requests.sessions.Session.request", side_effect=mocked_request))
+        stack.enter_context(mock.patch("requests.request", side_effect=mocked_app_request))
+        stack.enter_context(mock.patch("requests.sessions.Session.request", side_effect=mocked_app_request))
         request_func = getattr(app, function)
         return request_func(*args, **kwargs)
 
