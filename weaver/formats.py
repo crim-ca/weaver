@@ -29,11 +29,12 @@ CONTENT_TYPE_APP_XML = "application/xml"
 CONTENT_TYPE_IMAGE_GEOTIFF = "image/tiff; subtype=geotiff"
 CONTENT_TYPE_TEXT_XML = "text/xml"
 CONTENT_TYPE_ANY_XML = {CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_XML}
+CONTENT_TYPE_ANY = "*/*"
 
 _CONTENT_TYPE_EXTENSION_MAPPING = {
     CONTENT_TYPE_APP_NETCDF: ".nc",
     CONTENT_TYPE_APP_GZIP: ".gz",
-    CONTENT_TYPE_TEXT_PLAIN: ".*",   # any for glob
+    CONTENT_TYPE_ANY: ".*",   # any for glob
 }  # type: Dict[AnyStr, AnyStr]
 # extend with all known pywps formats
 _CONTENT_TYPE_FORMATS = {

@@ -8,6 +8,7 @@ from pywps.inout.formats import Format
 from requests.exceptions import ConnectionError
 
 from weaver.formats import (
+    CONTENT_TYPE_ANY,
     CONTENT_TYPE_APP_JSON,
     CONTENT_TYPE_APP_GEOJSON,
     CONTENT_TYPE_APP_NETCDF,
@@ -33,6 +34,10 @@ def test_get_extension():
     assert get_extension(CONTENT_TYPE_IMAGE_GEOTIFF) == ".tiff"  # pywps definition
     assert get_extension("application/x-custom") == ".custom"
     assert get_extension("application/unknown") == ".unknown"
+
+
+def test_get_extension_glob_any():
+    assert get_extension(CONTENT_TYPE_ANY) == ".*"
 
 
 def test_get_format():

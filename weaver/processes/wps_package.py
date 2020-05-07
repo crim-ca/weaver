@@ -38,6 +38,7 @@ from weaver.exceptions import (
     PayloadNotFound
 )
 from weaver.formats import (
+    CONTENT_TYPE_ANY,
     CONTENT_TYPE_ANY_XML,
     CONTENT_TYPE_APP_JSON,
     CONTENT_TYPE_TEXT_PLAIN,
@@ -1382,7 +1383,7 @@ def _any2cwl_io(wps_io, io_select):
             cwl_io["type"] = cwl_io_type
     else:
         cwl_io_fmt = None
-        cwl_io_ext = "*"
+        cwl_io_ext = CONTENT_TYPE_ANY
         cwl_io["type"] = "File"
 
         # inputs are allowed to define multiple 'supported' formats
