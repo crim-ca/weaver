@@ -12,6 +12,8 @@ Changes:
 - Add even more failure-permissive request attempts when validating a MIME-type against IANA website.
 - Add auto-resolution of common extensions known under `PyWPS` as well as employing their specific encoding.
 - Add ``geotiff`` format type support via `PyWPS` (`#100 <https://github.com/crim-ca/weaver/issues/100>`_).
+- Make WPS status check more resilient to failing WPS outputs location not found in case the directory path can be
+  resolved to a valid local file representing the XML status (i.e.: don't depend as much on the HTTP WPS output route).
 
 Fixes:
 ------
