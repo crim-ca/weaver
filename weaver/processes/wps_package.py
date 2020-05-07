@@ -41,7 +41,6 @@ from weaver.formats import (
     CONTENT_TYPE_ANY_XML,
     CONTENT_TYPE_APP_JSON,
     CONTENT_TYPE_TEXT_PLAIN,
-    clean_mime_type_format,
     get_cwl_file_format,
     get_extension,
     get_format,
