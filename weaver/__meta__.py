@@ -1,6 +1,6 @@
 __name__ = "weaver"
 __title__ = "Weaver"
-__version__ = "1.5.1"
+__version__ = "1.6.0"
 __description__ = "Workflow Execution Management Service (EMS); Application, Deployment and Execution Service (ADES)."
 # __source_repository__ = "https://www.crim.ca/stash/projects/OGC/repos/weaver"
 # __docker_repository__ = "docker-registry.crim.ca/ogc/weaver:latest"
