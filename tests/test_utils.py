@@ -365,7 +365,7 @@ def test_fetch_file_local_with_protocol():
 
 def test_request_retry_allowed_codes():
     """Verifies that ``allowed_codes`` only are considered as valid status instead of any non-error HTTP code."""
-    mocked_codes = {"codes": [HTTPCreated.code, HTTPOk.code, HTTPCreated.code]}
+    mocked_codes = {"codes": [HTTPCreated.code, HTTPOk.code, HTTPCreated.code]}  # note: used in reverse order
 
     def mocked_request(*args, **kwargs):  # noqa: E811
         mocked_resp = Response()

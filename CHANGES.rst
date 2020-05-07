@@ -4,6 +4,15 @@ Changes
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
 
+Changes:
+--------
+
+- Reuse ``weaver.utils.request_retry`` function across a few locations that where essentially reimplementing
+  the core functionality.
+- Add even more failure-permissive request attempts when validating a MIME-type against IANA website.
+- Add auto-resolution of common extensions known under `PyWPS` as well as employing their specific encoding.
+- Add ``geotiff`` format type support via `PyWPS` (`#100 <https://github.com/crim-ca/weaver/issues/100>`_).
+
 Fixes:
 ------
 
@@ -14,6 +23,8 @@ Fixes:
   not allowed by this implementation.
 - Fix parsing of explicitly-typed optional array CWL I/O notation that was not considered
   (i.e.: using ``type`` as list with additional ``"null"`` instead of ``type: "<type>?"`` shorthand).
+- Fix parsing of MIME-type from ``format`` field to exclude additional parameters (e.g.: ``; charset=UTF-8`` for
+  remote IANA validation.
 
 `1.5.1 <https://github.com/crim-ca/weaver/tree/1.5.1>`_ (2020-03-26)
 ========================================================================

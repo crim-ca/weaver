@@ -43,7 +43,8 @@ from weaver.formats import (
     CONTENT_TYPE_TEXT_PLAIN,
     clean_mime_type_format,
     get_cwl_file_format,
-    get_extension
+    get_extension,
+    get_format,
 )
 from weaver.processes import opensearch
 from weaver.processes.constants import (
@@ -657,7 +658,7 @@ def _cwl2wps_io(io_info, io_select):
         }
         if "format" in io_info:
             io_formats = [io_info["format"]] if isinstance(io_info["format"], six.string_types) else io_info["format"]
-            kw["supported_formats"] = [Format(clean_mime_type_format(str(fmt))) for fmt in io_formats]
+            kw["supported_formats"] = [get_format(fmt) for fmt in io_formats]
             kw["mode"] = MODE.SIMPLE  # only validate the extension (not file contents)
         else:
             # we need to minimally add 1 format, otherwise empty list is evaluated as None by pywps
@@ -1413,7 +1414,7 @@ def _any2cwl_io(wps_io, io_select):
         if io_select == WPS_OUTPUT:
             # FIXME: (?) how to specify the 'name' part of the glob (using the "id" value for now)
             cwl_io["outputBinding"] = {
-                "glob": "{}.{}".format(wps_io_id, cwl_io_ext)
+                "glob": "{}{}".format(wps_io_id, cwl_io_ext)
             }
 
     if io_select == WPS_INPUT:
