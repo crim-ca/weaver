@@ -9,7 +9,7 @@ from weaver.exceptions import PackageTypeError
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
 from weaver.processes.wps_package import (
     WPS_LITERAL,
-    DefaultFormat,
+    DEFAULT_FORMAT,
     _are_different_and_set,
     _is_cwl_array_type,
     _is_cwl_enum_type,
@@ -356,16 +356,16 @@ def assert_formats_equal_any_order(format_result, format_expect):
 
 def test_merge_io_formats_no_wps():
     wps_fmt = []
-    cwl_fmt = [DefaultFormat]
+    cwl_fmt = [DEFAULT_FORMAT]
     res_fmt = _merge_io_formats(wps_fmt, cwl_fmt)
     assert isinstance(res_fmt, list)
     assert len(res_fmt) == 1
-    assert res_fmt[0] is DefaultFormat
+    assert res_fmt[0] is DEFAULT_FORMAT
 
 
 def test_merge_io_formats_with_wps_and_default_cwl():
     wps_fmt = [Format(CONTENT_TYPE_APP_NETCDF)]
-    cwl_fmt = [DefaultFormat]
+    cwl_fmt = [DEFAULT_FORMAT]
     res_fmt = _merge_io_formats(wps_fmt, cwl_fmt)
     assert isinstance(res_fmt, list)
     assert_formats_equal_any_order(res_fmt, [Format(CONTENT_TYPE_APP_NETCDF)])

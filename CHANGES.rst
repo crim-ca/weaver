@@ -14,6 +14,10 @@ Changes:
 - Add ``geotiff`` format type support via `PyWPS` (`#100 <https://github.com/crim-ca/weaver/issues/100>`_).
 - Make WPS status check more resilient to failing WPS outputs location not found in case the directory path can be
   resolved to a valid local file representing the XML status (i.e.: don't depend as much on the HTTP WPS output route).
+- Ensure backward support of generic/default ``text/plain`` I/O when extracted from a referenced WPS-1/2 XML remote
+  process which provides insufficient format details. For CWL output generated from it, replace the glob pattern to
+  match anything (``<id>.*``) instead of ``<id>.txt`` extracted from ``text/plain`` to simulate MIME-type as ``*/*``.
+  Issue log warning message for future use cases.
 
 Fixes:
 ------

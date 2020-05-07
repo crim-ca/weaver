@@ -37,7 +37,7 @@ class BuiltinAppTest(unittest.TestCase):
             "weaver.wps": True,
             "weaver.wps_output": True,
             "weaver.wps_output_path": "/wpsoutputs",
-            "weaver.wps_output_dir": "/tmp",
+            "weaver.wps_output_dir": "/tmp",  # nosec: B108 # don't care hardcoded for test
             "weaver.wps_path": "/ows/wps",
             "weaver.wps_restapi_path": "/",
         }
