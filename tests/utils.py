@@ -30,7 +30,9 @@ from weaver.wps import get_wps_output_dir, get_wps_output_url, get_wps_url
 from weaver.wps_restapi.processes.processes import execute_process
 
 if TYPE_CHECKING:
-    from weaver.typedefs import Any, AnyStr, Callable, List, Optional, SettingsType, Type, Union  # noqa: F401
+    from weaver.typedefs import (  # noqa: F401
+        Any, AnyResponseType, AnyStr, Callable, List, Optional, SettingsType, Type, Union
+    )
 
 
 def ignore_warning_regex(func, warning_message_regex, warning_categories=DeprecationWarning):
@@ -260,13 +262,15 @@ def mocked_file_response(path, url):
 
 
 def mocked_sub_requests(app, function, *args, **kwargs):
+    # type: (TestApp, AnyStr, *Any, **Any) -> AnyResponseType
     """
     Executes ``app.function(*args, **kwargs)`` with a mock of every underlying :func:`requests.request` call
     to relay their execution to the :class:`webTest.TestApp`.
+
     Generates a `fake` response from a file if the URL scheme is ``mock://``.
     """
 
-    def mocked_request(method, url=None, headers=None, verify=None, cert=None, **req_kwargs):  # noqa: E811
+    def mocked_app_request(method, url=None, headers=None, verify=None, cert=None, **req_kwargs):  # noqa: E811
         """
         Request corresponding to :func:`requests.request` that instead gets executed by :class:`webTest.TestApp`.
         """
@@ -278,7 +282,7 @@ def mocked_sub_requests(app, function, *args, **kwargs):
         if query:
             url = url + "?" + query
         if not url.startswith("mock://"):
-            resp = req(url, params=req_kwargs.get("data"), headers=headers)
+            resp = req(url, params=req_kwargs.get("data"), headers=headers, expect_errors=True)
             setattr(resp, "content", resp.body)
         else:
             path = get_url_without_query(url.replace("mock://", ""))
@@ -286,9 +290,10 @@ def mocked_sub_requests(app, function, *args, **kwargs):
         return resp
 
     with contextlib.ExitStack() as stack:
-        stack.enter_context(mock.patch("requests.request", side_effect=mocked_request))
-        stack.enter_context(mock.patch("requests.sessions.Session.request", side_effect=mocked_request))
+        stack.enter_context(mock.patch("requests.request", side_effect=mocked_app_request))
+        stack.enter_context(mock.patch("requests.sessions.Session.request", side_effect=mocked_app_request))
         request_func = getattr(app, function)
+        kwargs.setdefault("expect_errors", True)
         return request_func(*args, **kwargs)
 
 

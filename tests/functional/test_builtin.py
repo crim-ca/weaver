@@ -37,6 +37,7 @@ class BuiltinAppTest(unittest.TestCase):
             "weaver.wps": True,
             "weaver.wps_output": True,
             "weaver.wps_output_path": "/wpsoutputs",
+            "weaver.wps_output_dir": "/tmp",  # nosec: B108 # don't care hardcoded for test
             "weaver.wps_path": "/ows/wps",
             "weaver.wps_restapi_path": "/",
         }
@@ -99,8 +100,8 @@ class BuiltinAppTest(unittest.TestCase):
             assert resp.content_type in CONTENT_TYPE_APP_JSON
             job_url = resp.json["location"]
             nc_path = None
-            for _ in range(5):
-                sleep(1)
+            for delay in range(5):
+                sleep(delay)
                 resp = self.app.get(job_url, headers=self.json_headers)
                 if resp.status_code == 200:
                     if resp.json["status"] in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_RUNNING]:

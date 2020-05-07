@@ -38,12 +38,13 @@ from weaver.exceptions import (
     PayloadNotFound
 )
 from weaver.formats import (
+    CONTENT_TYPE_ANY,
     CONTENT_TYPE_ANY_XML,
     CONTENT_TYPE_APP_JSON,
     CONTENT_TYPE_TEXT_PLAIN,
-    clean_mime_type_format,
     get_cwl_file_format,
-    get_extension
+    get_extension,
+    get_format,
 )
 from weaver.processes import opensearch
 from weaver.processes.constants import (
@@ -121,7 +122,7 @@ LOGGER = logging.getLogger(__name__)
 
 __all__ = [
     "PACKAGE_EXTENSIONS",
-    "DefaultFormat",
+    "DEFAULT_FORMAT",
     "WpsPackage",
     "get_process_definition",
     "get_process_location",
@@ -183,9 +184,9 @@ WPS_FIELD_MAPPING = {
 WPS_FIELD_FORMAT = ["formats", "supported_formats", "supported_values", "default"]
 
 # default format if missing (minimal requirement of one)
-DefaultFormat = Format(mime_type=CONTENT_TYPE_TEXT_PLAIN)   # pylint: disable=C0103,invalid-name
+DEFAULT_FORMAT = Format(mime_type=CONTENT_TYPE_TEXT_PLAIN)
 DEFAULT_FORMAT_MISSING = "__DEFAULT_FORMAT_MISSING__"
-setattr(DefaultFormat, DEFAULT_FORMAT_MISSING, True)
+setattr(DEFAULT_FORMAT, DEFAULT_FORMAT_MISSING, True)
 
 
 def get_status_location_log_path(status_location, out_dir=None):
@@ -657,12 +658,12 @@ def _cwl2wps_io(io_info, io_select):
         }
         if "format" in io_info:
             io_formats = [io_info["format"]] if isinstance(io_info["format"], six.string_types) else io_info["format"]
-            kw["supported_formats"] = [Format(clean_mime_type_format(str(fmt))) for fmt in io_formats]
+            kw["supported_formats"] = [get_format(fmt) for fmt in io_formats]
             kw["mode"] = MODE.SIMPLE  # only validate the extension (not file contents)
         else:
             # we need to minimally add 1 format, otherwise empty list is evaluated as None by pywps
             # when "supported_formats" is None, the process's json property raises because of it cannot iterate formats
-            kw["supported_formats"] = [DefaultFormat]
+            kw["supported_formats"] = [DEFAULT_FORMAT]
             kw["mode"] = MODE.NONE  # don't validate anything as default is only raw text
         if is_output:
             if io_type == "Directory":
@@ -869,7 +870,7 @@ def _json2wps_io(io_info, io_select):
         if io_type in (WPS_REFERENCE, WPS_COMPLEX):
             io_info.pop("data_type", None)
             if "supported_formats" not in io_info:
-                io_info["supported_formats"] = [DefaultFormat]
+                io_info["supported_formats"] = [DEFAULT_FORMAT]
             if ("max_occurs", "unbounded") in io_info.items():
                 io_info["max_occurs"] = PACKAGE_ARRAY_MAX_SIZE
             io_info.pop("supported_values", None)
@@ -939,7 +940,7 @@ def _wps2json_io(io_wps):
     if io_wps_json["type"] == WPS_COMPLEX:
         # FIXME: should we store 'None' in db instead of empty string when missing "encoding", "schema", etc. ?
         if "formats" not in io_wps_json or not len(io_wps_json["formats"]):
-            io_wps_json["formats"] = [DefaultFormat.json]
+            io_wps_json["formats"] = [DEFAULT_FORMAT.json]
         for io_format in io_wps_json["formats"]:
             transform_json(io_format, rename=rename, replace_values=replace_values, replace_func=replace_func)
 
@@ -1053,14 +1054,14 @@ def _merge_io_formats(wps_formats, cwl_formats):
     provided as input. In this case, *only* `WPS` formats are kept.
 
     In the event that ``DEFAULT_FORMAT_MISSING`` was written to the `CWL` formats and that no `WPS` format was
-    specified, the ``DefaultFormat`` is returned.
+    specified, the :py:data:`DEFAULT_FORMAT` is returned.
 
     :raises PackageTypeError: if inputs are invalid format lists
     """
     if not (isinstance(wps_formats, (list, tuple, set)) and isinstance(cwl_formats, (list, tuple, set))):
         raise PackageTypeError("Cannot merge formats definitions with invalid lists.")
     if not len(wps_formats):
-        wps_formats = [DefaultFormat]
+        wps_formats = [DEFAULT_FORMAT]
     if len(cwl_formats) == 1 and _get_field(cwl_formats[0], DEFAULT_FORMAT_MISSING) is True:
         return wps_formats
 
@@ -1382,7 +1383,7 @@ def _any2cwl_io(wps_io, io_select):
             cwl_io["type"] = cwl_io_type
     else:
         cwl_io_fmt = None
-        cwl_io_ext = "*"
+        cwl_io_ext = CONTENT_TYPE_ANY
         cwl_io["type"] = "File"
 
         # inputs are allowed to define multiple 'supported' formats
@@ -1409,11 +1410,18 @@ def _any2cwl_io(wps_io, io_select):
                 break
         if cwl_io_fmt:
             cwl_io["format"] = cwl_io_fmt
-
+        # for backward compatibility with deployed processes, consider text/plan as 'any' for glob pattern
+        cwl_io_txt = get_extension(CONTENT_TYPE_TEXT_PLAIN)
+        if cwl_io_ext == cwl_io_txt:
+            cwl_io_any = get_extension(CONTENT_TYPE_ANY)
+            LOGGER.warning("Replacing '%s' [%s] to generic '%s' [%s] glob pattern. "
+                           "More explicit format could be considered for %s '%s'.",
+                           CONTENT_TYPE_TEXT_PLAIN, cwl_io_txt, CONTENT_TYPE_ANY, cwl_io_any, io_select, wps_io_id)
+            cwl_io_ext = cwl_io_any
         if io_select == WPS_OUTPUT:
             # FIXME: (?) how to specify the 'name' part of the glob (using the "id" value for now)
             cwl_io["outputBinding"] = {
-                "glob": "{}.{}".format(wps_io_id, cwl_io_ext)
+                "glob": "{}{}".format(wps_io_id, cwl_io_ext)
             }
 
     if io_select == WPS_INPUT:

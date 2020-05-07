@@ -51,29 +51,37 @@ def check_status(url=None, response=None, sleep_secs=2, verify=False):
     :param verify: Flag to enable SSL verification.
     :return: OWSLib.wps.WPSExecution object.
     """
+    def _retry_file(nothrow=False):
+        LOGGER.warning("Failed retrieving status-location, attempting with local file.")
+        if url and not urlparse(url).scheme in ["", "file://"]:
+            dir_path = get_wps_output_dir(app)
+            wps_out_url = get_wps_output_url(app)
+            req_out_url = get_url_without_query(url)
+            out_path = os.path.join(dir_path, req_out_url.replace(wps_out_url, "").lstrip("/"))
+        else:
+            out_path = url.replace("file:://", "")
+        if not os.path.isfile(out_path):
+            raise HTTPNotFound("Could not find file resource from [{}].".format(url))
+        return open(out_path, "r").read()
+
     execution = WPSExecution()
     if response:
         LOGGER.debug("using response document...")
         xml = response
     elif url:
+        xml_resp = HTTPNotFound()
         try:
             LOGGER.debug("using status-location url...")
             request_session = requests.Session()
             request_session.mount("file://", FileAdapter())
-            xml = request_session.get(url, verify=verify).content
+            xml_resp = request_session.get(url, verify=verify)
+            xml = xml_resp.content
         except Exception as ex:
             LOGGER.debug("Got exception during get status: [%r]", ex)
-            LOGGER.warning("Failed retrieving status-location, attempting with local file.")
-            if url and not urlparse(url).scheme in ["", "file://"]:
-                dir_path = get_wps_output_dir(app)
-                wps_out_url = get_wps_output_url(app)
-                req_out_url = get_url_without_query(url)
-                out_path = os.path.join(dir_path, req_out_url.replace(wps_out_url, "").lstrip("/"))
-            else:
-                out_path = url.replace("file:://", "")
-            if not os.path.isfile(out_path):
-                raise HTTPNotFound("Could not find file resource from [{}].".format(url))
-            xml = open(out_path, "r").read()
+            xml = _retry_file()
+        if xml_resp.status_code == HTTPNotFound.code:
+            LOGGER.debug("Got not-found during get status: [%r]", xml)
+            xml = _retry_file()
     else:
         raise Exception("you need to provide a status-location url or response object.")
     if isinstance(xml, six.string_types):

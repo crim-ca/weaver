@@ -10,9 +10,16 @@ from typing import Type
 import mock
 import pytest
 from lxml import etree
-from pyramid.httpexceptions import HTTPConflict
-from pyramid.httpexceptions import HTTPError as PyramidHTTPError
-from pyramid.httpexceptions import HTTPInternalServerError, HTTPNotFound, HTTPRequestTimeout
+from pyramid.httpexceptions import (
+    HTTPOk,
+    HTTPCreated,
+    HTTPNotFound,
+    HTTPConflict,
+    HTTPError as PyramidHTTPError,
+    HTTPInternalServerError,
+    HTTPRequestTimeout,
+    HTTPGatewayTimeout,
+)
 from pywps.response.status import WPS_STATUS
 from requests.exceptions import HTTPError as RequestsHTTPError
 from requests import Response
@@ -21,7 +28,7 @@ from six.moves.urllib.parse import urlparse
 from tests.compat import contextlib
 from tests.utils import mocked_file_response
 from weaver import status, utils
-from weaver.utils import _NullType, null, fetch_file, make_dirs  # noqa: W0212
+from weaver.utils import _NullType, null, fetch_file, make_dirs, request_retry  # noqa: W0212
 
 
 def test_null_operators():
@@ -354,6 +361,44 @@ def test_fetch_file_local_with_protocol():
             raise
         finally:
             shutil.rmtree(res_dir, ignore_errors=True)
+
+
+def test_request_retry_allowed_codes():
+    """Verifies that ``allowed_codes`` only are considered as valid status instead of any non-error HTTP code."""
+    mocked_codes = {"codes": [HTTPCreated.code, HTTPOk.code, HTTPCreated.code]}  # note: used in reverse order
+
+    def mocked_request(*args, **kwargs):  # noqa: E811
+        mocked_resp = Response()
+        mocked_resp.status_code = mocked_codes["codes"].pop()
+        return mocked_resp
+
+    with mock.patch("requests.request", side_effect=mocked_request) as mocked:
+        resp = request_retry("get", "http://whatever", retries=3, allowed_codes=[HTTPOk.code])
+        assert resp.status_code == HTTPOk.code
+        assert mocked.call_count == 2
+
+
+def test_request_retry_intervals():
+    """Verifies that ``intervals`` are used for calling the retry operations instead of ``backoff``/``retries``."""
+
+    def mock_request(*args, **kwargs):  # noqa: E811
+        m_resp = Response()
+        m_resp.status_code = HTTPNotFound.code
+        return m_resp
+
+    def mock_sleep(delay):  # noqa: E811
+        return
+
+    with mock.patch("requests.request", side_effect=mock_request) as mocked_request:
+        with mock.patch("weaver.utils.time.sleep", side_effect=mock_sleep) as mocked_sleep:
+            intervals = [1e6, 3e6, 5e6]  # random values that shouldn't normally be used with sleep() (too big)
+            # values will not match if backoff/retries are not automatically corrected by internals parameter
+            resp = request_retry("get", "http://whatever", intervals=intervals, backoff=1000, retries=10)
+            assert resp.status_code == HTTPGatewayTimeout.code
+            assert mocked_request.call_count == 3
+            # NOTE: below could fail if using debugger/breakpoints that uses more calls to sleep()
+            assert mocked_sleep.call_count == 3
+            mocked_sleep.assert_has_calls([mock.call(i) for i in intervals])
 
 
 def test_fetch_file_remote_with_request():

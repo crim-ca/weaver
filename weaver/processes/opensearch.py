@@ -1,5 +1,4 @@
 import logging
-import time
 from collections import deque
 from copy import deepcopy
 from typing import TYPE_CHECKING
@@ -7,7 +6,7 @@ from typing import TYPE_CHECKING
 import lxml.etree
 import requests
 import shapely.wkt
-from pyramid.httpexceptions import HTTPGatewayTimeout, HTTPOk
+from pyramid.httpexceptions import HTTPOk
 from pyramid.settings import asbool
 from six.moves.urllib.parse import parse_qsl, urlparse
 
@@ -21,7 +20,7 @@ from weaver.processes.constants import (
     WPS_LITERAL
 )
 from weaver.processes.sources import fetch_data_sources
-from weaver.utils import get_any_id
+from weaver.utils import get_any_id, request_retry
 
 if TYPE_CHECKING:
     from weaver.typedefs import XML                                 # noqa: F401
@@ -246,22 +245,6 @@ class OpenSearchQuery(object):
                 return [link.attrib for link in links]
         return []
 
-    @staticmethod
-    def _requests_get_retry(*args, **kwargs):
-        """Retry a requests.get call
-
-        :param args: passed to requests.get
-        :param kwargs: passed to requests.get
-        """
-        response = HTTPGatewayTimeout(detail="Request ran out of retries.")
-        retries_in_secs = range(1, 6)  # 1 to 5 secs
-        for wait in retries_in_secs:
-            response = requests.get(*args, **kwargs)
-            if response.status_code == HTTPOk.code:
-                return response
-            time.sleep(wait)
-        return response
-
     def _query_features_paginated(self, params):
         # type: (Dict) -> Iterable[Dict, str]
         """
@@ -273,7 +256,8 @@ class OpenSearchQuery(object):
         base_url, query_params = self._prepare_query_url(template_url, params)
         while True:
             query_params["startRecord"] = start_index
-            response = self._requests_get_retry(base_url, params=query_params)
+            response = request_retry("get", base_url, params=query_params,
+                                     intervals=list(range(1, 5)), allowed_codes=[HTTPOk.code])
             if not response.status_code == 200:
                 break
             json_body = response.json()

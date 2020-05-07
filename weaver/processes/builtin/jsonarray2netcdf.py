@@ -46,7 +46,7 @@ def _is_netcdf_url(url):
         return False
     if urlparse(url).scheme == "":
         return False
-    return os.path.splitext(url)[-1].replace(".", "") == get_extension(CONTENT_TYPE_APP_NETCDF)
+    return os.path.splitext(url)[-1] == get_extension(CONTENT_TYPE_APP_NETCDF)
 
 
 def j2n(json_reference, output_dir):
