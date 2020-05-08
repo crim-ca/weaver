@@ -18,7 +18,6 @@ sys.path.insert(0, os.path.join(CUR_DIR, os.path.split(CUR_DIR)[-1]))
 # pylint: disable=C0413,wrong-import-order
 from weaver import __meta__  # isort:skip # noqa: E402
 
-
 LOGGER = logging.getLogger("weaver.setup")
 
 
