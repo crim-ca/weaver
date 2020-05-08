@@ -227,23 +227,33 @@ class End2EndEMSTestCase(TestCase):
         cls.PROCESS_FLOOD_DETECTION_ID = "FloodDetection"
         cls.PROCESS_ICE_DAYS_ID = "Finch_IceDays"
         cls.PROCESS_SUBSET_BBOX_ID = "ColibriFlyingpigeon_SubsetBbox"
+        cls.PROCESS_SUBSET_ESGF = "SubsetESGF"
+        cls.PROCESS_SUBSET_NASAESGF = "SubsetNASAESGF"
         cls.PROCESS_WORKFLOW_ID = "Workflow"
         cls.PROCESS_WORKFLOW_SC_ID = "WorkflowSimpleChain"
         cls.PROCESS_WORKFLOW_S2P_ID = "WorkflowS2ProbaV"
         cls.PROCESS_WORKFLOW_CUSTOM_ID = "CustomWorkflow"
         cls.PROCESS_WORKFLOW_FLOOD_DETECTION_ID = "WorkflowFloodDetection"
         cls.PROCESS_WORKFLOW_SUBSET_ICE_DAYS = "WorkflowSubsetIceDays"
+        cls.PROCESS_WORKFLOW_SUBSETLLNL_SUBSETCRIM = "WorkflowSubsetLLNL_SubsetCRIM"
+        cls.PROCESS_WORKFLOW_SUBSETNASAESGF_SUBSETCRIM = "WorkflowSubsetNASAESGF_SubsetCRIM"
+        cls.PROCESS_WORKFLOW_FILE_TO_SUBSETCRIM = "WorkflowFile_To_SubsetCRIM"
         application_set = {cls.PROCESS_STACKER_ID,
                            cls.PROCESS_SFS_ID,
                            cls.PROCESS_FLOOD_DETECTION_ID,
                            cls.PROCESS_ICE_DAYS_ID,
-                           cls.PROCESS_SUBSET_BBOX_ID}
+                           cls.PROCESS_SUBSET_BBOX_ID,
+                           cls.PROCESS_SUBSET_ESGF,
+                           cls.PROCESS_SUBSET_NASAESGF}
         workflow_set = {cls.PROCESS_WORKFLOW_ID,
                         cls.PROCESS_WORKFLOW_SC_ID,
                         cls.PROCESS_WORKFLOW_S2P_ID,
                         cls.PROCESS_WORKFLOW_CUSTOM_ID,
                         cls.PROCESS_WORKFLOW_FLOOD_DETECTION_ID,
-                        cls.PROCESS_WORKFLOW_SUBSET_ICE_DAYS}
+                        cls.PROCESS_WORKFLOW_SUBSET_ICE_DAYS,
+                        cls.PROCESS_WORKFLOW_SUBSETLLNL_SUBSETCRIM,
+                        cls.PROCESS_WORKFLOW_SUBSETNASAESGF_SUBSETCRIM,
+                        cls.PROCESS_WORKFLOW_FILE_TO_SUBSETCRIM}
         test_set = application_set | workflow_set
         for process in test_set:
             cls.test_processes_info.update({process: cls.retrieve_process_info(process)})
@@ -602,6 +612,16 @@ class End2EndEMSTestCase(TestCase):
     def test_workflow_wps1_requirements(self):
         self.workflow_runner(self.PROCESS_WORKFLOW_SUBSET_ICE_DAYS,
                              [self.PROCESS_SUBSET_BBOX_ID, self.PROCESS_ICE_DAYS_ID],
+                             log_full_trace=True)
+
+    def test_workflow_file_to_string_array(self):
+        self.workflow_runner(self.PROCESS_WORKFLOW_FILE_TO_SUBSETCRIM,
+                             [self.PROCESS_SUBSET_BBOX_ID],
+                             log_full_trace=True)
+
+    def test_workflow_esgf_requirements(self):
+        self.workflow_runner(self.PROCESS_WORKFLOW_SUBSETNASAESGF_SUBSETCRIM,
+                             [self.PROCESS_SUBSET_NASAESGF, self.PROCESS_SUBSET_BBOX_ID],
                              log_full_trace=True)
 
     def test_workflow_wps3_requirements(self):
