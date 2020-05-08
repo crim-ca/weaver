@@ -45,3 +45,6 @@ simplejson
 urlmatch
 xmltodict
 webob
+-e git://github.com/ESGF/esgf-compute-api.git@v2.1.0#egg=esgf_compute_api
+pyxb
+cwt
