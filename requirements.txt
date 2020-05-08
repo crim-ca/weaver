@@ -31,6 +31,7 @@ pyramid_mako
 pytz
 pywps
 pyyaml>=4.2b4
+pyxb
 requests
 requests_file
 # let cwltool define ruamel.yaml version (<=0.16.5)
@@ -43,4 +44,3 @@ six
 simplejson
 urlmatch
 webob
-pyxb
