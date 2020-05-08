@@ -19,6 +19,9 @@ cornice_swagger>=0.7.0
 # enforce Python 3 with version >=2 to update existing 1.x installations
 # FIXME: avoid error invalid get_listing import location,
 #        remove properly as per https://github.com/crim-ca/weaver/issues/154
+# use cwltool gpu-enabled support until integrated within the original tool
+# (https://github.com/common-workflow-language/common-workflow-language/issues/587)
+### git+https://github.com/crim-ca/cwltool@docker-gpu#egg=cwltool; python_version >= "3"
 cwltool>=2,<=3.0.20200324120055
 duration
 git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7#egg=esgf-compute-api
