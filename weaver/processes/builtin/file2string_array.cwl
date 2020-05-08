@@ -15,4 +15,4 @@ outputs:
   output:
     type:
       type: array
-      items: string
+      items: File
