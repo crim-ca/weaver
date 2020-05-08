@@ -28,6 +28,7 @@ cwltool>=2,<=3.0.20200324120055; python_version >= "3"
 # use cwltool gpu-enabled support until integrated within the original tool
 # (https://github.com/common-workflow-language/common-workflow-language/issues/587)
 ### git+https://github.com/crim-ca/cwltool@docker-gpu#egg=cwltool; python_version >= "3"
+git+https://github.com/ESGF/esgf-compute-api.git@v2.1.0#egg=cwt
 # pymongo requirement that doesn't get installed somehow
 dnspython<2.0.0,>=1.16.0
 duration
