@@ -93,7 +93,11 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
     wps_out_dir = get_wps_output_dir(settings)
 
     task_logger.debug("Job task setup.")
-    store = get_db(app).get_store(StoreJobs)
+
+    # reset the connection because we are in a forked celery process
+    db = get_db(app, reset_connection=True)
+    store = db.get_store(StoreJobs)
+
     job = store.fetch_by_id(job_id)
     job.task_id = self.request.id
     job.progress = JOB_PROGRESS_SETUP
