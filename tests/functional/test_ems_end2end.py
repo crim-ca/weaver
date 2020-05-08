@@ -49,6 +49,7 @@ class ProcessInfo(object):
 
 # pylint: disable=C0103,invalid-name
 @pytest.mark.slow
+@pytest.mark.debug
 @pytest.mark.functional
 @pytest.mark.skipif(condition=not len(str(os.getenv("WEAVER_TEST_SERVER_HOSTNAME", ""))),
                     reason="Test server not defined!")
@@ -597,6 +598,7 @@ class End2EndEMSTestCase(TestCase):
         cls.assert_test(lambda: resp.json.get("configuration") == WEAVER_CONFIGURATION_EMS,
                         message="weaver must be configured as EMS.")
 
+    @pytest.mark.debug
     def test_workflow_wps1_requirements(self):
         self.workflow_runner(self.PROCESS_WORKFLOW_SUBSET_ICE_DAYS,
                              [self.PROCESS_SUBSET_BBOX_ID, self.PROCESS_ICE_DAYS_ID],
