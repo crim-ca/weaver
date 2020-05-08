@@ -44,4 +44,3 @@ six
 simplejson
 urlmatch
 webob
-pyxb
