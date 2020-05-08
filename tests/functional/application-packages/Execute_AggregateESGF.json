@@ -1,0 +1,28 @@
+{
+  "mode": "async",
+  "response": "document",
+  "inputs": [
+		{
+			"id": "files",
+			"href": "https://boreas.ouranos.ca/twitcher/ows/proxy/thredds/dodsC/birdhouse/nrcan/nrcan_northamerica_monthly/tasmin/nrcan_northamerica_monthly_2015_tasmin.nc"
+		},
+		{
+			"id": "files",
+			"href": "https://boreas.ouranos.ca/twitcher/ows/proxy/thredds/dodsC/birdhouse/nrcan/nrcan_northamerica_monthly/tasmin/nrcan_northamerica_monthly_2014_tasmin.nc"
+		},
+		{
+			"id": "variable",
+			"data": "tasmax"
+		},
+		{
+			"id": "api_key",
+			"data": "{{ api_key }}"
+		}
+  ],
+  "outputs": [
+    {
+      "id": "output",
+      "transmissionMode": "reference"
+    }
+  ]
+}

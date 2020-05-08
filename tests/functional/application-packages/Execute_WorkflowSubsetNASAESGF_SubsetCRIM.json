@@ -11,10 +11,6 @@
       "data": "tasmin"
     },
     {
-      "id": "esgf_api_key",
-      "data": "G2LhbLn4clvTW9SHM10D0ZGPFPkEeCmm7zJU0LPJ7mTaJzrgkJ3tazcsxdCp3nl5"
-    },
-    {
       "id": "crim_lat0",
       "data": "40"
     },
@@ -30,21 +26,20 @@
       "id": "crim_lon1",
       "data": "-60"
     },
-
     {
-      "id": "llnl_lat0",
+      "id": "nasa_lat0",
       "data": "50"
     },
     {
-      "id": "llnl_lat1",
+      "id": "nasa_lat1",
       "data": "45"
     },
     {
-      "id": "llnl_lon0",
+      "id": "nasa_lon0",
       "data": "-70"
     },
     {
-      "id": "llnl_lon1",
+      "id": "nasa_lon1",
       "data": "-65"
     }
   ],
