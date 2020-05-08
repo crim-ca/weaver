@@ -7,6 +7,7 @@ Unit tests of functions within :mod:`weaver.processes.wps_package`.
 import tempfile
 from collections import OrderedDict
 from copy import deepcopy
+import sys
 
 import mock
 
@@ -120,13 +121,13 @@ def test_check_package_file_with_url():
 
 
 def test_check_package_file_with_file_scheme():
-    file_path = "/tmp/package.cwl"
-    package_file = "file://{}".format(file_path)
     with mock.patch("requests.head", return_value=MockResponseOk()) as mock_request:
-        res_path, is_url = _check_package_file(package_file)
-        mock_request.assert_not_called()
-    assert res_path == file_path
-    assert is_url is False
+        with tempfile.NamedTemporaryFile(mode='r', suffix="test-package.cwl") as tmp_file:
+            package_file = "file://{}".format(tmp_file.name)
+            res_path, is_url = _check_package_file(package_file)
+            mock_request.assert_not_called()
+            assert res_path == tmp_file.name
+            assert is_url is False
 
 
 def test_check_package_file_with_posix_path():
@@ -136,6 +137,7 @@ def test_check_package_file_with_posix_path():
         assert is_url is False
 
 
+@pytest.mark.skipif(not sys.platform.startswith("win"), reason="Test for Windows only.")
 def test_check_package_file_with_windows_path():
     test_file = "C:/Windows/Temp/package.cwl"   # fake existing, just test format handled correctly
     with mock.patch("os.path.isfile", return_value=True) as mock_isfile:

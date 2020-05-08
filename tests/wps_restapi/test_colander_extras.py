@@ -26,7 +26,7 @@ def test_oneof_io_formats_deserialize_as_mapping():
     assert all(input_key in result for input_key in ["input-1", "input-2", "input-3"])
     assert result["input-1"]["type"] == "float"
     assert result["input-2"]["type"] == "File"
-    assert isinstance(result["input-2"]["type"], dict)
+    assert isinstance(result["input-3"]["type"], dict)
     assert result["input-3"]["type"]["type"] == "array"
     assert result["input-3"]["type"]["items"] == "string"
 
