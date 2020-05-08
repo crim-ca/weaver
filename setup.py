@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 
 from setuptools import find_packages, setup
 
@@ -17,6 +18,12 @@ sys.path.insert(0, os.path.join(CUR_DIR, os.path.split(CUR_DIR)[-1]))
 from weaver import __meta__  # isort:skip # noqa: E402
 
 requirements = [line.strip() for line in open("requirements.txt")]
+
+egg_regex = re.compile(r"#egg=(\w+)")
+for n, req in enumerate(requirements):
+    git_url_match = egg_regex.search(req)
+    if git_url_match:
+        requirements[n] = git_url_match.group(1)
 
 setup(name=__meta__.__name__,
       version=__meta__.__version__,
