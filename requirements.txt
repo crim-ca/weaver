@@ -45,4 +45,3 @@ simplejson
 urlmatch
 xmltodict
 webob
-pyxb
