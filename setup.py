@@ -1,9 +1,10 @@
 import logging
 import os
 import sys
+
 from distutils.version import LooseVersion
-from typing import Iterable, Set, Tuple, Union
 from setuptools import find_packages, setup
+from typing import Iterable, Set, Tuple, Union
 
 CUR_DIR = os.path.abspath(os.path.dirname(__file__))
 LONG_DESCRIPTION = None
@@ -134,7 +135,6 @@ LOGGER.info("base requirements: %s", REQUIREMENTS)
 LOGGER.info("docs requirements: %s", DOCS_REQUIREMENTS)
 LOGGER.info("test requirements: %s", TEST_REQUIREMENTS)
 LOGGER.info("link requirements: %s", LINKS)
-
 
 setup(name=__meta__.__name__,
       version=__meta__.__version__,
