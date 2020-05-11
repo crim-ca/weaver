@@ -1,11 +1,9 @@
 import logging
 import os
 import sys
-import re
-
 from distutils.version import LooseVersion
-from setuptools import find_packages, setup
 from typing import Iterable, Set, Tuple, Union
+from setuptools import find_packages, setup
 
 CUR_DIR = os.path.abspath(os.path.dirname(__file__))
 LONG_DESCRIPTION = None
@@ -19,6 +17,7 @@ sys.path.insert(0, CUR_DIR)
 sys.path.insert(0, os.path.join(CUR_DIR, os.path.split(CUR_DIR)[-1]))
 # pylint: disable=C0413,wrong-import-order
 from weaver import __meta__  # isort:skip # noqa: E402
+
 
 LOGGER = logging.getLogger("weaver.setup")
 
@@ -136,6 +135,7 @@ LOGGER.info("base requirements: %s", REQUIREMENTS)
 LOGGER.info("docs requirements: %s", DOCS_REQUIREMENTS)
 LOGGER.info("test requirements: %s", TEST_REQUIREMENTS)
 LOGGER.info("link requirements: %s", LINKS)
+
 
 setup(name=__meta__.__name__,
       version=__meta__.__version__,
