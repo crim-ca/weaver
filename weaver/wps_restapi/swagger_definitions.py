@@ -1148,7 +1148,8 @@ class AnyType(AnyOfKeywordSchema):
         AnyValueTypeFormats(),
         ##ValueType,
         # HTTP references with various keywords
-        LiteralReference(), Reference()
+        LiteralReference(),
+        Reference(),
     )
 
 

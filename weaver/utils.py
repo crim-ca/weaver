@@ -287,7 +287,7 @@ def expires_at(hours=1):
 def localize_datetime(dt, tz_name="UTC"):
     # type: (datetime, Optional[str]) -> datetime
     """
-    Provide a timezone-aware object for a given datetime and timezone name
+    Provide a timezone-aware object for a given datetime and timezone name.
     """
     tz_aware_dt = dt
     if dt.tzinfo is None:

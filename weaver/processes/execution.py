@@ -34,6 +34,7 @@ from weaver.utils import (
     get_cookie_headers,
     get_settings,
     get_ssl_verify_option,
+    now,
     raise_on_xml_exception,
     wait_secs
 )
@@ -88,6 +89,7 @@ def execute_process(self, job_id, url, headers=None):
     store = db.get_store(StoreJobs)
 
     job = store.fetch_by_id(job_id)
+    job.started = now()
     job.task_id = self.request.id
     job.progress = JOB_PROGRESS_SETUP
     job.save_log(logger=task_logger, message="Job task setup completed.")

@@ -501,6 +501,21 @@ class Job(Base):
         return localize_datetime(self.get("created"))
 
     @property
+    def started(self):
+        # type: () -> Optional[datetime]
+        started = self.get("started", None)
+        if not started:
+            return None
+        return localize_datetime(started)
+
+    @started.setter
+    def started(self, started):
+        # type: (datetime) -> None
+        if not isinstance(started, datetime):
+            raise TypeError("Type 'datetime' is required for '{}.started'".format(type(self)))
+        self["started"] = started
+
+    @property
     def finished(self):
         # type: () -> Optional[datetime]
         return self.get("finished", None)
@@ -515,14 +530,19 @@ class Job(Base):
 
     @property
     def duration(self):
-        # type: () -> timedelta
+        # type: () -> Optional[timedelta]
+        if not self.started:
+            return None
         final_time = self.finished or now()
-        return localize_datetime(final_time) - localize_datetime(self.created)
+        return localize_datetime(final_time) - localize_datetime(self.started)
 
     @property
     def duration_str(self):
         # type: () -> str
-        return str(self.duration).split(".")[0]
+        duration = self.duration
+        if duration is None:
+            return "00:00:00"
+        return str(duration).split(".")[0].zfill(8)  # "HH:MM:SS"
 
     @property
     def progress(self):
@@ -698,10 +718,14 @@ class Job(Base):
             "status": self.status,
             "message": self.status_message,
             "duration": self.duration_str,
-            "percentCompleted": self.progress
+            # TODO: available fields not yet employed (https://github.com/crim-ca/weaver/issues/129)
+            "nextPoll": None,
+            "expirationDate": None,
+            "estimatedCompletion": None,
+            "percentCompleted": self.progress,
         }
         job_json.update(self.links(settings, self_link=self_link))
-        return sd.JobStatusInfo().deserialize(job_json)
+        return sd.JobStatusInfo().serialize(job_json)
 
     def params(self):
         # type: () -> Dict[str, Any]
@@ -719,6 +743,7 @@ class Job(Base):
             "execute_async": self.execute_async,
             "is_workflow": self.is_workflow,
             "created": self.created,
+            "started": self.started,
             "finished": self.finished,
             "progress": self.progress,
             "results": self.results,
@@ -964,10 +989,16 @@ class Process(Base):
 
     def json(self):
         # type: () -> JSON
-        return sd.Process().deserialize(self)
+        """
+        Obtains the JSON serializable complete representation of the process.
+        """
+        return sd.Process().serialize(self)
 
-    def process_offering(self):
+    def offering(self):
         # type: () -> JSON
+        """
+        Obtains the JSON serializable offering representation of the process.
+        """
         process_offering = {"process": self}
         if self.version:
             process_offering.update({"processVersion": self.version})
@@ -975,11 +1006,14 @@ class Process(Base):
             process_offering.update({"jobControlOptions": self.jobControlOptions})
         if self.outputTransmission:
             process_offering.update({"outputTransmission": self.outputTransmission})
-        return sd.ProcessOffering().deserialize(process_offering)
+        return sd.ProcessOffering().serialize(process_offering)
 
-    def process_summary(self):
+    def summary(self):
         # type: () -> JSON
-        return sd.ProcessSummary().deserialize(self)
+        """
+        Obtains the JSON serializable summary representation of the process.
+        """
+        return sd.ProcessSummary().serialize(self)
 
     @staticmethod
     def from_wps(wps_process, **extra_params):
@@ -1199,7 +1233,7 @@ class Quote(Base):
 
     def json(self):
         # type: () -> JSON
-        return sd.QuoteSchema().deserialize(self)
+        return sd.QuoteSchema().serialize(self)
 
 
 class Bill(Base):
@@ -1300,4 +1334,4 @@ class Bill(Base):
 
     def json(self):
         # type: () -> JSON
-        return sd.BillSchema().deserialize(self)
+        return sd.BillSchema().serialize(self)
