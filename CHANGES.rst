@@ -4,6 +4,21 @@ Changes
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
 
+Changes:
+--------
+
+- Improve handling of `WPS-REST` HREF output matching a JSON file with array of URL references corresponding to process
+  pseudo multiple-output format (relates to `#25 <https://github.com/crim-ca/weaver/issues/25>`_). The output is now
+  expanded to contain both the original JSON file reference and the extended contained URL references so that either
+  variation can be retrieved as result.
+
+Fixes:
+------
+
+- Fix handling of WPS-REST output matching a JSON file for multiple-output format specified with a relative local path
+  as specified by job output location. Only remote HTTP references where correctly parsed. Also avoid failing the job if
+  the reference JSON parsing fails. It will simply return the original reference URL in this case without expanded data.
+
 `1.6.0 <https://github.com/crim-ca/weaver/tree/1.6.0>`_ (2020-05-07)
 ========================================================================
 

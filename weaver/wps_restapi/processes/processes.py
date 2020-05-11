@@ -201,7 +201,8 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
                         job.status_message = "Job succeeded{}.".format(msg_progress)
                         wps_package.retrieve_package_job_log(execution, job)
                         job.save_log(logger=task_logger)
-                        job_results = [jsonify_output(output, process) for output in execution.processOutputs]
+                        job_results = [jsonify_output(output, process, settings)
+                                       for output in execution.processOutputs]
                         job.results = make_results_relative(job_results, settings)
                     else:
                         task_logger.debug("Job failed.")
