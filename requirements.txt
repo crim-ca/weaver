@@ -46,3 +46,7 @@ simplejson
 urlmatch
 xmltodict
 webob
+<<<<<<< 35f234c24e4adb99f34345d4111bc902ccf53656
+=======
+pyxb
+>>>>>>> added dependency_links in setup.py
