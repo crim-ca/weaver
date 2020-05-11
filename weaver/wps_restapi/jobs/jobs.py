@@ -192,7 +192,7 @@ def get_queried_jobs(request):
         body.update({"groups": items})
     else:
         body.update({"jobs": _job_list(items), "page": page, "limit": limit})
-    body = sd.GetQueriedJobsSchema().deserialize(body)
+    body = sd.GetQueriedJobsSchema().serialize(body)
     return HTTPOk(json=body)
 
 

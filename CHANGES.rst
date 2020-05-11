@@ -89,6 +89,8 @@ Changes:
 --------
 - Provide HTTP links to corresponding items of job in JSON body of status, inputs and outputs routes
   (`#58 <https://github.com/crim-ca/weaver/issues/58>`_, `#86 <https://github.com/crim-ca/weaver/issues/86>`_).
+- Provide ``Job.started`` datetime and calculate ``Job.duration`` from it to indicate the duration of the process
+  execution instead of counting from the time the job was submitted (i.e.: ``Job.created``).
 - Provide OGC compliant ``<job-uri>/results`` response schema as well as some expected ``code``/``description``
   fields in case where the request fails.
 - Add ``<job-uri>/outputs`` providing the ``data``/``href`` formatted job results as well as ``<job-uri>/inputs`` to
@@ -109,6 +111,11 @@ Changes:
 - Update OpenAPI template to not render the useless version selector since we only provide the current version.
 - Update Swagger definitions to reflect changes and better reuse existing schemas.
 - Update Swagger UI to provide the `readthedocs` URL.
+- Add `crim-ca/cwltool@docker-gpu <https://github.com/crim-ca/cwltool/tree/docker-gpu>`_ as ``cwltool`` requirement
+  to allow processing of GPU-enabled dockers with `nvidia-docker <https://github.com/NVIDIA/nvidia-docker>`_.
+- Add `fmigneault/cornice.ext.swagger@openapi-3 <https://github.com/fmigneault/cornice.ext.swagger/tree/openapi-3>`_
+  as ``cornice_swagger`` requirement to allow OpenAPI-3 definitions support of schema generation and deserialization
+  validation of JSON payloads.
 
 Fixes:
 ------

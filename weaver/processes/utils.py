@@ -233,6 +233,7 @@ def convert_process_wps_to_db(service, process, container):
                           is_request=False)
 def _check_deploy(payload):
     """Validate minimum deploy payload field requirements with exception handling."""
+    # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     try:
         sd.Deploy().deserialize(payload)
     except colander.Invalid as ex:
@@ -344,11 +345,13 @@ def deploy_process_from_payload(payload, container):
     elif isinstance(ows_context, dict):
         process_info["owsContext"] = ows_context
 
+    # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     try:
         store = get_db(container).get_store(StoreProcesses)
         process = ProcessDB(process_info)
-        process_summary = process.process_summary()  # make if fail before save if invalid
+        sd.ProcessSummary().deserialize(process)  # make if fail before save if invalid
         store.save_process(process, overwrite=False)
+        process_summary = process.summary()
     except ProcessRegistrationError as ex:
         raise HTTPConflict(detail=str(ex))
     except (ValueError, colander.Invalid) as ex:

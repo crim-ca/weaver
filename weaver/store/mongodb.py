@@ -385,7 +385,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                  accept_language=None,      # type: Optional[AnyStr]
                  ):                         # type: (...) -> Job
         """
-        Stores a job in mongodb.
+        Creates a new :class:`Job` and stores it in mongodb.
         """
         try:
             tags = ["dev"]

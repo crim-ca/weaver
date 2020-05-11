@@ -50,6 +50,7 @@ from weaver.utils import (
     get_cookie_headers,
     get_settings,
     get_ssl_verify_option,
+    now,
     raise_on_xml_exception,
     request_extra,
     transform_json,
@@ -104,6 +105,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
     store = db.get_store(StoreJobs)
 
     job = store.fetch_by_id(job_id)
+    job.started = now()
     job.task_id = self.request.id
     job.progress = JOB_PROGRESS_SETUP
     job.save_log(logger=task_logger, message="Job task setup completed.")
@@ -387,6 +389,7 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
                 transform_json(i, rename={"data": "value"})     # backward compatibility
     except Exception as ex:
         raise HTTPBadRequest("Invalid JSON body cannot be decoded for job submission. [{}]".format(ex))
+    # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     try:
         json_body = sd.Execute().deserialize(json_body)
     except colander.Invalid as ex:
@@ -500,8 +503,10 @@ def get_provider_process(request):
     """
     try:
         process = describe_provider_process(request)
-        process_offering = process.process_offering()
+        sd.ProcessOffering().deserialize(process)
+        process_offering = process.offering()
         return HTTPOk(json=process_offering)
+    # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     except colander.Invalid as ex:
         raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))
 
@@ -518,7 +523,7 @@ def get_processes_filtered_by_valid_schemas(request):
     invalid_processes_ids = list()
     for process in processes:
         try:
-            valid_processes.append(process.process_summary())
+            valid_processes.append(process.summary())
         except colander.Invalid as invalid:
             LOGGER.debug("Invalid process [%s] because:\n%s", process.identifier, invalid)
             invalid_processes_ids.append(process.identifier)
@@ -547,6 +552,7 @@ def get_processes(request):
         settings = get_settings(request)
         if get_weaver_configuration(settings) == WEAVER_CONFIGURATION_EMS:
             queries = parse_request_query(request)
+            # FIXME: many steps below suppose that everything goes well...
             if "providers" in queries and asbool(queries["providers"][0]) is True:
                 prov_url = "{host}/providers".format(host=request.host_url)
                 providers_response = request_extra("GET", prov_url, settings=settings,
@@ -560,9 +566,10 @@ def get_processes(request):
                                              headers=request.headers, cookies=request.cookies)
                     processes = response.json().get("processes", [])
                     response_body["providers"][i].update({
-                        "processes": processes if detail else [get_any_id(p) for p in processes]
+                        "processes": processes if detail else [get_any_id(proc) for proc in processes.json()]
                     })
         return HTTPOk(json=response_body)
+    # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     except colander.Invalid as ex:
         raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))
 
@@ -579,6 +586,12 @@ def add_local_process(request):
 
 def get_process(request):
     # type: (Request) -> ProcessDB
+    """
+    Obtains the *local* process from the database using the request details.
+
+    Handles basic operations such as *NotFound* so that when the function completes successfully, an existing process
+    is guaranteed.
+    """
     process_id = request.matchdict.get("process_id")
     if not isinstance(process_id, six.string_types):
         raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
@@ -592,6 +605,7 @@ def get_process(request):
         raise HTTPUnauthorized("Process with id '{!s}' is not accessible.".format(process_id))
     except ProcessNotFound:
         raise HTTPNotFound("Process with id '{!s}' does not exist.".format(process_id))
+    # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     except colander.Invalid as ex:
         raise HTTPBadRequest("Invalid schema:\n[{0!r}].".format(ex))
 
@@ -606,8 +620,10 @@ def get_local_process(request):
     try:
         process = get_process(request)
         process["inputs"] = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
-        process_offering = process.process_offering()
+        sd.ProcessOffering().deserialize(process)  # validate
+        process_offering = process.offering()
         return HTTPOk(json=process_offering)
+    # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     except colander.Invalid as ex:
         raise HTTPBadRequest("Invalid schema: [{!s}]".format(ex))
 
