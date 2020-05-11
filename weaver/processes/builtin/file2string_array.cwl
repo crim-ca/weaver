@@ -12,4 +12,7 @@ inputs:
      loadContents: false
      valueFrom: $(self.location)
 outputs:
- output: string[]
+ output:
+  type:
+    type: array
+    items: File
