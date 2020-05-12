@@ -476,7 +476,8 @@ def get_processes_filtered_by_valid_schemas(request):
     for process in processes:
         try:
             valid_processes.append(process.process_summary())
-        except colander.Invalid:
+        except colander.Invalid as invalid:
+            LOGGER.debug("Invalid process [%s] because:\n%s", process.identifier, invalid)
             invalid_processes_ids.append(process.identifier)
     return valid_processes, invalid_processes_ids
 
