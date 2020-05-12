@@ -425,14 +425,15 @@ def make_dirs(path, mode=0o755, exist_ok=False):
             raise
 
 
-def request_retry(method,               # type: AnyStr
-                  url,                  # type: AnyStr
-                  retries=0,            # type: int
-                  backoff=0,            # type: Number
-                  intervals=None,       # type: Optional[List[Union[float, int]]]
-                  allowed_codes=None,   # type: Optional[List[int]]
-                  **request_kwargs,     # type: Any
-                  ):                    # type: (...) -> AnyResponseType
+def request_retry(method,                       # type: AnyStr
+                  url,                          # type: AnyStr
+                  retries=0,                    # type: int
+                  backoff=0,                    # type: Number
+                  intervals=None,               # type: Optional[List[Union[float, int]]]
+                  allowed_codes=None,           # type: Optional[List[int]]
+                  only_server_errors=True,      # type: bool
+                  **request_kwargs,             # type: Any
+                  ):                            # type: (...) -> AnyResponseType
     """
     Implements basic request retry operation if the previous request failed, up to the specified number of retries.
 
@@ -455,6 +456,10 @@ def request_retry(method,               # type: AnyStr
     :param backoff: factor by which to multiply delays between retries.
     :param intervals: explicit intervals in seconds between retries.
     :param allowed_codes: HTTP status codes that are considered valid to stop retrying (default: any non-4xx/5xx code).
+    :param only_server_errors:
+        Only HTTP status codes in the 5xx values will be considered for retrying the request (default: True).
+        This catches sporadic server timeout, connection error, etc., but 4xx errors are still considered valid results.
+        This parameter is ignored if allowed codes are explicitly specified.
     :param request_kwargs: All other keyword arguments are passed down to the request call.
     """
     # catch kw passed to request corresponding to retries parameters
@@ -466,12 +471,15 @@ def request_retry(method,               # type: AnyStr
         retries = len(intervals)
         backoff = 0  # disable first part of delay calculation
     for retry in range(retries):
-        resp = requests.request(method, url, **request_kwargs)
-        if allowed_codes and len(allowed_codes):
-            if resp.status_code in allowed_codes:
+        try:
+            resp = requests.request(method, url, **request_kwargs)
+            if allowed_codes and len(allowed_codes):
+                if resp.status_code in allowed_codes:
+                    return resp
+            elif resp.status_code < (500 if only_server_errors else 400):
                 return resp
-        elif resp.status_code < 400:
-            return resp
+        except requests.ConnectionError:
+            pass
         delay = (backoff * (2 ** (retry + 1))) or intervals[retry]
         time.sleep(delay)
     return HTTPGatewayTimeout(detail="Request ran out of retries.")
