@@ -13,11 +13,16 @@ if TYPE_CHECKING:
     from pyramid.config import Configurator
     from celery import Celery
     from requests.structures import CaseInsensitiveDict
-    from cwltool.factory import Callable as CWLFactoryCallable  # noqa: F401
+    from cwltool.factory import Callable as CWLFactoryCallable  # noqa: F401  # provide alias name, not used here
     from webtest.response import TestResponse
     from pywps.app import WPSRequest
     from pywps import Process as ProcessWPS
-    from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, Type, Union  # noqa: F401
+    from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, Type, Union
+    import typing
+    if hasattr(typing, "TypedDict"):
+        from typing import TypedDict  # pylint: disable=E0611,no-name-in-module
+    else:
+        from typing_extensions import TypedDict
     import lxml.etree
     import os
     if hasattr(os, "PathLike"):
@@ -29,7 +34,7 @@ if TYPE_CHECKING:
     AnyValue = Optional[Union[AnyStr, Number, bool]]
     AnyKey = Union[AnyStr, int]
     JSON = Dict[AnyKey, Union[AnyValue, Dict[AnyKey, "JSON"], List["JSON"]]]
-    CWL = Dict[{"cwlVersion": AnyStr, "class": AnyStr, "inputs": JSON, "outputs": JSON}]
+    CWL = TypedDict("CWL", {"cwlVersion": AnyStr, "class": AnyStr, "inputs": JSON, "outputs": JSON})
     XML = lxml.etree._Element  # noqa: W0212
 
     AnyContainer = Union[Configurator, Registry, PyramidRequest, Celery]
@@ -53,9 +58,10 @@ if TYPE_CHECKING:
     AnyProcess = Union[Process, ProcessWPS]
     AnyProcessType = Union[Type[Process], Type[ProcessWPS]]
 
-    ExpectedOutputType = Dict[{"type": AnyStr, "id": AnyStr, "outputBinding": Dict["glob": AnyStr]}]
+    GlobType = TypedDict("GlobType", {"glob": AnyStr})
+    ExpectedOutputType = TypedDict("ExpectedOutputType", {"type": AnyStr, "id": AnyStr, "outputBinding": GlobType})
     GetJobProcessDefinitionFunction = Callable[[AnyStr, Dict[AnyStr, AnyStr], Dict[AnyStr, Any]], WpsProcessInterface]
     ToolPathObjectType = Dict[AnyStr, Any]
 
-    UpdateStatusPartialFunction = Callable[[{"provider": AnyStr, "message": AnyStr,
-                                             "progress": int, "status": AnyStatusType}], None]
+    # update_status(provider, message, progress, status)
+    UpdateStatusPartialFunction = Callable[[AnyStr, AnyStr, int, AnyStatusType], None]
