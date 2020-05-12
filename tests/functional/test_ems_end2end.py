@@ -8,7 +8,6 @@ from unittest import TestCase
 
 import mock
 import pytest
-import requests
 from pyramid import testing
 from pyramid.httpexceptions import HTTPCreated, HTTPNotFound, HTTPOk, HTTPUnauthorized
 from pyramid.settings import asbool
@@ -30,7 +29,7 @@ from weaver.status import (
     STATUS_RUNNING,
     STATUS_SUCCEEDED
 )
-from weaver.utils import get_weaver_url, make_dirs, now
+from weaver.utils import get_weaver_url, make_dirs, now, request_retry
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
@@ -299,14 +298,15 @@ class End2EndEMSTestCase(TestCase):
         # type: (AnyStr) -> Dict
         local_path = os.path.join(os.path.dirname(__file__), "application-packages", url.split("/")[-1])
         try:
+            # Try to find it locally, then fallback to remote
+            if os.path.isfile(local_path):
+                with open(local_path, "r") as f:
+                    json_payload = json.load(f)
+                    return json_payload
             if urlparse(url).scheme != "":
                 resp = cls.request("GET", url, force_requests=True, ignore_errors=True)
                 if resp.status_code == HTTPOk.code:
                     return resp.json()
-            # Try to find it locally
-            with open(local_path, "r") as f:
-                json_payload = json.load(f)
-                return json_payload
         except (IOError, ValueError):
             pass
         cls.log("{}Cannot find payload from either references:\n[{}]\n[{}]\n"
@@ -445,9 +445,12 @@ class End2EndEMSTestCase(TestCase):
         has_port = url_parsed.port is not None
         is_remote = hasattr(cls.app.app, "net_loc") and cls.app.app.net_loc != "localhost" and not is_localhost
         with_requests = is_localhost and has_port or is_remote or force_requests
+        if not json_body and data_body and headers and CONTENT_TYPE_APP_JSON in headers.get("Content-Type"):
+            json_body = data_body
+            data_body = None
 
         if log_enabled:
-            if json_body or headers and CONTENT_TYPE_APP_JSON in headers.get("Content-Type"):
+            if json_body:
                 payload = cls.log_json_format(json_body, 2)
             else:
                 payload = data_body
@@ -468,16 +471,19 @@ class End2EndEMSTestCase(TestCase):
 
         if with_requests:
             kw.update({"verify": False, "timeout": cls.WEAVER_TEST_REQUEST_TIMEOUT})
-            resp = requests.request(method, url, json=json_body, data=data_body, **kw)
+            # retry request if the error was caused by some connection error
+            resp = request_retry(method, url, json=json_body, data=data_body, retries=3, **kw)
 
             # add some properties similar to `webtest.TestApp`
+            resp_body = getattr(resp, "body", None)  # if error is pyramid HTTPException, body is byte only
             if CONTENT_TYPE_APP_JSON in resp.headers.get("Content-Type", []):
+                if resp_body is None:
+                    setattr(resp, "body", resp.json)
                 setattr(resp, "json", resp.json())
-                setattr(resp, "body", resp.json)
                 setattr(resp, "content_type", CONTENT_TYPE_APP_JSON)
             else:
-                setattr(resp, "body", None)
-                setattr(resp, "body", resp.text)
+                if resp_body is None:
+                    setattr(resp, "body", resp.text)
                 setattr(resp, "content_type", resp.headers.get("Content-Type"))
 
         else:

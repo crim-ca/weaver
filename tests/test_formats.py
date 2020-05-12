@@ -114,10 +114,15 @@ def test_get_cwl_file_format_retry_fallback_urlopen():
     def mock_connect_error(*args, **kwargs):  # noqa: E811
         raise ConnectionError()
 
+    def mock_urlopen(*args, **kwargs):  # noqa: E811
+        return HTTPOk()
+
     with mock.patch("requests.request", side_effect=mock_connect_error) as mocked_request:
-        _, fmt = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
-        assert fmt == "{}:{}".format(IANA_NAMESPACE, CONTENT_TYPE_APP_JSON)
-        assert mocked_request.call_count == 1
+        with mock.patch("weaver.formats.urlopen", side_effect=mock_urlopen) as mocked_urlopen:
+            _, fmt = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
+            assert fmt == "{}:{}".format(IANA_NAMESPACE, CONTENT_TYPE_APP_JSON)
+            assert mocked_request.call_count == 3   # internally attempted 3 times
+            assert mocked_urlopen.call_count == 1
 
 
 def test_clean_mime_type_format_iana():

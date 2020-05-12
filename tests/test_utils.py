@@ -393,9 +393,10 @@ def test_request_retry_intervals():
         with mock.patch("weaver.utils.time.sleep", side_effect=mock_sleep) as mocked_sleep:
             intervals = [1e6, 3e6, 5e6]  # random values that shouldn't normally be used with sleep() (too big)
             # values will not match if backoff/retries are not automatically corrected by internals parameter
-            resp = request_retry("get", "http://whatever", intervals=intervals, backoff=1000, retries=10)
+            resp = request_retry("get", "http://whatever", only_server_errors=False,
+                                 intervals=intervals, backoff=1000, retries=10)
             assert resp.status_code == HTTPGatewayTimeout.code
-            assert mocked_request.call_count == 3
+            assert mocked_request.call_count == 4
             # NOTE: below could fail if using debugger/breakpoints that uses more calls to sleep()
             assert mocked_sleep.call_count == 3
             mocked_sleep.assert_has_calls([mock.call(i) for i in intervals])
@@ -423,8 +424,7 @@ def test_fetch_file_remote_with_request():
             tmp["retry"] -= 1
             if not tmp["retry"]:
                 return mocked_file_response(tmp["json"].name, tmp["http"])
-            resp = Response()
-            resp.status_code = HTTPRequestTimeout.code
+            resp = HTTPInternalServerError()  # internal retry expect at least a 5xx code to retry
             return resp  # will be available on next call (to test retries)
 
         m_request = stack.enter_context(mock.patch("requests.request", side_effect=mocked_request))
