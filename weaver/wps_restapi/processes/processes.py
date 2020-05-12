@@ -68,9 +68,9 @@ JOB_PROGRESS_GET_INPUTS = 4
 JOB_PROGRESS_GET_OUTPUTS = 6
 JOB_PROGRESS_EXECUTE_REQUEST = 8
 JOB_PROGRESS_EXECUTE_STATUS_LOCATION = 10
-JOB_PROGRESS_EXECUTE_MONITOR_START = 20
-JOB_PROGRESS_EXECUTE_MONITOR_LOOP = 30
-JOB_PROGRESS_EXECUTE_MONITOR_ERROR = 80
+JOB_PROGRESS_EXECUTE_MONITOR_START = 15
+JOB_PROGRESS_EXECUTE_MONITOR_LOOP = 20
+JOB_PROGRESS_EXECUTE_MONITOR_ERROR = 85
 JOB_PROGRESS_EXECUTE_MONITOR_END = 90
 JOB_PROGRESS_NOTIFY = 95
 JOB_PROGRESS_DONE = 100
@@ -201,7 +201,8 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
                         job.status_message = "Job succeeded{}.".format(msg_progress)
                         wps_package.retrieve_package_job_log(execution, job)
                         job.save_log(logger=task_logger)
-                        job_results = [jsonify_output(output, process) for output in execution.processOutputs]
+                        job_results = [jsonify_output(output, process, settings)
+                                       for output in execution.processOutputs]
                         job.results = make_results_relative(job_results, settings)
                     else:
                         task_logger.debug("Job failed.")
@@ -508,9 +509,10 @@ def get_processes(request):
                 response_body.update({"providers": providers})
                 for i, provider in enumerate(providers):
                     provider_id = get_any_id(provider)
-                    processes = requests.request("GET", "{host}/providers/{provider_id}/processes"
-                                                 .format(host=request.host_url, provider_id=provider_id),
-                                                 headers=request.headers, cookies=request.cookies)
+                    response = requests.request("GET", "{host}/providers/{provider_id}/processes"
+                                                .format(host=request.host_url, provider_id=provider_id),
+                                                headers=request.headers, cookies=request.cookies)
+                    processes = response.json().get("processes", [])
                     response_body["providers"][i].update({
                         "processes": processes if detail else [get_any_id(p) for p in processes]
                     })
