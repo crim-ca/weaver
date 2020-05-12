@@ -4,6 +4,23 @@ Changes
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
 
+Changes:
+--------
+
+- Add additional status log for ``EOImage`` input modification with `OpenSearch` during process execution.
+- Add captured ``stderr/stdout`` logging of underlying `CWL` application being executed to resulting ``Job`` logs
+  (addresses first step of `#131 <https://github.com/crim-ca/weaver/issues/131>`_).
+
+Fixes:
+------
+
+- Fix handling of WPS-REST output matching a JSON file for multiple-output format specified with a relative local path
+  as specified by job output location. Only remote HTTP references where correctly parsed. Also avoid failing the job if
+  the reference JSON parsing fails. It will simply return the original reference URL in this case without expanded data
+  (relates to `#25 <https://github.com/crim-ca/weaver/issues/25>`_).
+- Fix `CWL` job logs to be timezone aware, just like most other logs that will report UTC time.
+- Fix JSON response parsing of remote provider processes.
+
 `1.6.0 <https://github.com/crim-ca/weaver/tree/1.6.0>`_ (2020-05-07)
 ========================================================================
 
