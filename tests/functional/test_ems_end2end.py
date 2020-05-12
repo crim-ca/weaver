@@ -307,7 +307,7 @@ class End2EndEMSTestCase(TestCase):
                 resp = cls.request("GET", url, force_requests=True, ignore_errors=True)
                 if resp.status_code == HTTPOk.code:
                     return resp.json()
-        except (IOError, ValueError) as exc:
+        except (IOError, ValueError):
             pass
         cls.log("{}Cannot find payload from either references:\n[{}]\n[{}]\n"
                 .format(cls.logger_separator_calls, url, local_path), exception=True)
