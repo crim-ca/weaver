@@ -1541,7 +1541,7 @@ def _generate_process_with_cwl_from_reference(reference):
 
     # match against WPS-1/2 reference
     else:
-        response = request_retry("GET", reference)
+        response = request_retry("GET", reference, retries=3)
         if response.status_code != HTTPOk.code:
             raise HTTPServiceUnavailable("Couldn't obtain a valid response from [{}]. Service response: [{} {}]"
                                          .format(reference, response.status_code, response.reason))

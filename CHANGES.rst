@@ -10,6 +10,8 @@ Changes:
 - Add additional status log for ``EOImage`` input modification with `OpenSearch` during process execution.
 - Add captured ``stderr/stdout`` logging of underlying `CWL` application being executed to resulting ``Job`` logs
   (addresses first step of `#131 <https://github.com/crim-ca/weaver/issues/131>`_).
+- Use ``weaver.utils.request_retry`` in even more places and extend convenience arguments offered by it to adapt it to
+  specific use cases.
 
 Fixes:
 ------

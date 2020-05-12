@@ -443,7 +443,7 @@ def request_retry(method,                       # type: AnyStr
 
     Alternatively, you can explicitly define ``intervals=[...]`` with the list values being the number of seconds to
     wait between each request attempt. In this case, :paramref:`backoff` is ignored and :paramref:`retries` is
-    overridden by the list size.
+    overridden accordingly with the number of items specified in the list.
 
     Because different request implementations use different parameter naming conventions, all following keywords are
     looked for:
@@ -454,7 +454,9 @@ def request_retry(method,                       # type: AnyStr
     :param url: URL of the request to execute.
     :param retries: number of retries to attempt.
     :param backoff: factor by which to multiply delays between retries.
-    :param intervals: explicit intervals in seconds between retries.
+    :param intervals:
+        Explicit intervals in seconds between retries.
+        (note: amount of request attempts will be +1 the number of interval items as first request is done immediately)
     :param allowed_codes: HTTP status codes that are considered valid to stop retrying (default: any non-4xx/5xx code).
     :param only_server_errors:
         Only HTTP status codes in the 5xx values will be considered for retrying the request (default: True).
@@ -468,9 +470,15 @@ def request_retry(method,                       # type: AnyStr
     retries = retries or kw_retries
     backoff = backoff or kw_backoff
     if intervals and len(intervals) and all(isinstance(i, (int, float)) for i in intervals):
+        intervals = [0] + intervals
         retries = len(intervals)
         backoff = 0  # disable first part of delay calculation
+    resp = None
+    failures = []
     for retry in range(retries):
+        if retry:
+            delay = (backoff * (2 ** (retry + 1))) or intervals[retry]
+            time.sleep(delay)
         try:
             resp = requests.request(method, url, **request_kwargs)
             if allowed_codes and len(allowed_codes):
@@ -478,11 +486,19 @@ def request_retry(method,                       # type: AnyStr
                     return resp
             elif resp.status_code < (500 if only_server_errors else 400):
                 return resp
-        except requests.ConnectionError:
-            pass
-        delay = (backoff * (2 ** (retry + 1))) or intervals[retry]
-        time.sleep(delay)
-    return HTTPGatewayTimeout(detail="Request ran out of retries.")
+            failures.append("{} ({})".format(getattr(resp, "reason", type(resp).__name__),
+                                             getattr(resp, "status_code", getattr(resp, "code", 500))))
+        # function called without retries raises original error
+        # as if calling requests module directly
+        except requests.ConnectionError as exc:
+            if not retries:
+                raise
+            failures.append(type(exc).__name__)
+    # also pass-through here if no retries
+    if not retries and resp:
+        return resp
+    detail = "Request ran out of retries. Attempts generated following errors: {}".format(failures)
+    return HTTPGatewayTimeout(detail=detail)
 
 
 def fetch_file(file_reference, file_outdir, **request_kwargs):
@@ -517,7 +533,7 @@ def fetch_file(file_reference, file_outdir, **request_kwargs):
     else:
         request_kwargs.pop("stream", None)
         with open(file_path, "wb") as file:
-            resp = request_retry("get", file_reference, stream=True, **request_kwargs)
+            resp = request_retry("get", file_reference, stream=True, retries=3, **request_kwargs)
             if resp.status_code >= 400:
                 raise resp
             # NOTE:
