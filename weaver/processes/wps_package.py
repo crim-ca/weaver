@@ -3,6 +3,7 @@ import logging
 import os
 import shutil
 import tempfile
+import time
 import uuid
 from collections import Hashable, OrderedDict  # pylint: disable=E0611,no-name-in-module   # moved to .abc in Python 3
 from copy import deepcopy
@@ -82,8 +83,6 @@ from weaver.utils import (
     get_sane_name,
     get_settings,
     get_url_without_query,
-    localize_datetime,
-    now,
     null,
     str2bytes
 )
@@ -1706,7 +1705,7 @@ class WpsPackage(Process):
         self.log_file = get_status_location_log_path(self.status_location)
         log_file_handler = logging.FileHandler(self.log_file)
         log_file_formatter = logging.Formatter(fmt=get_log_fmt(), datefmt=get_log_date_fmt())
-        log_file_formatter.converter = lambda *_: localize_datetime(now())
+        log_file_formatter.converter = time.gmtime
         log_file_handler.setFormatter(log_file_formatter)
 
         # prepare package logger
