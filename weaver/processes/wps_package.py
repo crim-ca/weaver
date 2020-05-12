@@ -2261,7 +2261,7 @@ class WpsPackage(Process):
             )
         else:
             # implements both `PROCESS_APPLICATION` with `CWL_REQUIREMENT_APP_DOCKER` and `PROCESS_WORKFLOW`
-            LOGGER.info("WPS-3 Package resolved from requirement/hint: %s", req_class)
+            LOGGER.info("WPS-3 Package resolved from requirement/hint: %s", requirement['class'])
             from weaver.processes.wps3_process import Wps3Process
             return Wps3Process(step_payload=step_payload,
                                joborder=joborder,
