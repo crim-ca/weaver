@@ -16,11 +16,16 @@ doc:
   - "*.example"
   - LICENCE*
   - docs/**/*
+  - weaver/wps_restapi/api.py
+  - weaver/wps_restapi/colander_extras.py
+  - weaver/wps_restapi/swagger_definitions.py
+  - weaver/wps_restapi/templates/swagger_ui.mako
 
 db:
   - weaver/datatype.py
   - weaver/database/**/*
   - weaver/store/**/*
+  - weaver/sort.py
 
 security:
   - weaver/visibility.py
@@ -29,6 +34,14 @@ tests:
   - tests/**/*
   - weaver/processes/wps_default.py
   - weaver/processes/wps_testing.py
+
+## -- Files that *always* impact jobs --
+
+job: 
+  - weaver/execute.py
+  - weaver/sort.py
+  - weaver/wps_restapi/jobs/**/*
+  - weaver/wps_restapi/templates/notification_email_example.mako
 
 ## -- WPS processes --
 
