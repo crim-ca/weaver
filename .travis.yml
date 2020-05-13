@@ -43,7 +43,7 @@ script:
   - make ${MAKE_TEST_CMD}
 stages:
   - check
-  - unittest
+  - test
   - coverage
   - extra
   - functional
@@ -55,7 +55,7 @@ jobs:
       python: "3.7"
       os: linux
       env: MAKE_TEST_CMD=check docs
-    - stage: unittest
+    - stage: test  # use default stage to avoid duplicate run
       name: "Unit Tests"
       env: MAKE_TEST_CMD=test-unit
     - stage: coverage
