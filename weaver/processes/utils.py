@@ -52,7 +52,7 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url
 if TYPE_CHECKING:
     from weaver.typedefs import AnyContainer, AnySettingsContainer, FileSystemPathType, JSON, Number
     from weaver.store.mongodb import MongodbProcessStore
-    from typing import Any, AnyStr, Dict, List, Optional, Union
+    from typing import Any, AnyStr, List, Optional
     from pywps import Process as ProcessWPS
     import owslib.wps
 LOGGER = logging.getLogger(__name__)
@@ -177,7 +177,7 @@ def jsonify_output(output, process_description, container=None):
 
 
 def convert_process_wps_to_db(service, process, container):
-    # type: (Union[Service, Dict[{"url": AnyStr, "name": AnyStr}]], ProcessWPS, AnySettingsContainer) -> ProcessDB
+    # type: (Service, ProcessWPS, AnySettingsContainer) -> ProcessDB
     """
     Converts an owslib WPS Process to local storage Process.
     """

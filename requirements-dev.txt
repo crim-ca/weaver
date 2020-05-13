@@ -13,6 +13,8 @@ pytest
 pylint>=2.5
 pylint_quotes
 responses
+# typing extension required for TypedDict
+typing_extensions; python_version < "3.8"
 WebTest
 wsgiproxy
 WSGIProxy2
