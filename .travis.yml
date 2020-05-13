@@ -1,6 +1,7 @@
 language: python
 os:
   - linux
+  - windows
 python:
   - "2.7"
   - "3.6"
@@ -31,18 +32,17 @@ before_install:
   - make info
 install:
   - make install
-  - make start
 before_script:
   - sleep 5
-script:
-  # run operation for each job matrix variation
-  - make ${MAKE_TEST_CMD}
 stages:
-  - check
-  - test  # use default stage to run matrix
+  - check   # run linting checks and don't bother with the rest if invlaid
+  - test    # use default stage to run job matrix variations
   - coverage
   - extra
   - functional
+script:
+  # script executed for each job matrix variation in 'test' stage
+  - make test-unit
 jobs:
   include:
     # use stages to quick fail faster tests
@@ -50,21 +50,20 @@ jobs:
       name: "Linter Checks"
       python: "3.7"
       os: linux
-      env: MAKE_TEST_CMD=check docs
-    - stage: test
-      name: "Unit Tests"
-      env: MAKE_TEST_CMD=test-unit
+      script: make check docs
     - stage: coverage
       name: "Coverage"
       python: "3.7"
       os: linux
-      env: MAKE_TEST_CMD=coverage
+      script: make coverage
     - stage: extra
       name: "Extra Tests"
-      env: MAKE_TEST_CMD=TEST='not (functional or testbed14) and (slow or online)' test-spec
+      script: make TEST='not (functional or testbed14) and (slow or online)' test-spec
     - stage: functional
       name: "Functional Tests"
-      env: MAKE_TEST_CMD=test-func test-online
+      script:
+        - make start
+        - make test-func test-online
   allow_failures:
     - python: "2.7"   # deprecated support
     - python: "3.8"   # experimental packages
