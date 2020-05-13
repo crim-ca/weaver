@@ -1,5 +1,7 @@
 # label rules used by .github/workflows/label.yml
-# reference: https://github.com/actions/labeler
+# references:
+#   original: https://github.com/actions/labeler
+#   extended: https://github.com/ilyam8/periodic-pr-labeler
 
 # label 'ci' all automation-related steps and files
 ci:
@@ -40,7 +42,7 @@ tests:
 
 ## -- Files that *always* impact jobs --
 
-job: 
+job:
   - weaver/execute.py
   - weaver/sort.py
   - weaver/wps_restapi/jobs/**/*
