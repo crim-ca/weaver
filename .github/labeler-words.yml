@@ -1,0 +1,14 @@
+# label rules used by labelers to match words
+# references:
+#   - https://github.com/github/issue-labeler
+
+
+CWL:
+  - '(CWL|cwl)'
+  - 'workflow'
+
+feature:
+  - 'feature'
+
+bug:
+  - 'bug'

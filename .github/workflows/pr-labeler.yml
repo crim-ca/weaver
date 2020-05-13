@@ -1,0 +1,32 @@
+# This workflow will triage pull requests and apply a label based on the
+# paths that are modified in the pull request.
+#
+# To use this workflow, you will need to set up a .github/labeler.yml
+# file with configuration.  For more information, see:
+# https://github.com/actions/labeler/blob/master/README.md
+
+name: Pull Request Labeler
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+  schedule:
+    - cron: '*/10 * * * *'
+
+jobs:
+  original-labeler:
+    # reference: https://github.com/actions/labeler
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/labeler@v2
+      with:
+        configuration-path: .github/labeler-files.yml
+        repo-token: "${{ secrets.GITHUB_TOKEN }}"
+  extended-labeler:
+    # reference: https://github.com/ilyam8/periodic-pr-labeler
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker://docker.io/ilyam8/periodic-pr-labeler:latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          LABEL_MAPPINGS_FILE: .github/labeler-files.yml
