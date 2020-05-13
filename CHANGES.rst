@@ -22,6 +22,9 @@ Fixes:
   (relates to `#25 <https://github.com/crim-ca/weaver/issues/25>`_).
 - Fix `CWL` job logs to be timezone aware, just like most other logs that will report UTC time.
 - Fix JSON response parsing of remote provider processes.
+- Fix parsing of `CWL` ordered parsing when I/O is specified as shorthand ``"<id>":"<type>" directly under the
+  ``inputs`` or ``outputs`` dictionary instead of extended sub-dictionary variant
+  (fixes `#137 <https://github.com/crim-ca/weaver/issues/137>`_).
 
 `1.6.0 <https://github.com/crim-ca/weaver/tree/1.6.0>`_ (2020-05-07)
 ========================================================================

@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from copy import deepcopy
 
 import pytest
@@ -7,14 +8,15 @@ from pywps.validator.mode import MODE
 
 from weaver.exceptions import PackageTypeError
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
+from weaver.processes.constants import WPS_LITERAL
 from weaver.processes.wps_package import (
-    WPS_LITERAL,
     DEFAULT_FORMAT,
-    _are_different_and_set,
-    _is_cwl_array_type,
-    _is_cwl_enum_type,
-    _json2wps_datatype,
-    _merge_io_formats
+    _are_different_and_set,     # noqa: W0212
+    _get_package_ordered_io,    # noqa: W0212
+    _is_cwl_array_type,         # noqa: W0212
+    _is_cwl_enum_type,          # noqa: W0212
+    _json2wps_datatype,         # noqa: W0212
+    _merge_io_formats           # noqa: W0212
 )
 from weaver.utils import null
 
@@ -67,6 +69,92 @@ def test_are_different_and_set_single_null():
     item = ObjectWithEqProperty()
     assert _are_different_and_set(item, null) is False
     assert _are_different_and_set(null, item) is False
+
+
+def test_get_package_ordered_io_with_builtin_dict_and_hints():
+    """
+    Validate that I/O are all still there in the results with their respective contents.
+
+    Literal types should be modified to a dictionary with ``type`` key.
+    All dictionary contents should then remain as is, except with added ``id``.
+
+    .. note::
+        Ordering is not mandatory, so we don't validate this.
+        Also actually hard to test since employed python version running the test changes the behaviour.
+    """
+    test_inputs = {
+        "id-literal-type": "float",
+        "id-dict-details": {
+            "type": "string"
+        },
+        "id-array-type": {
+            "type": {
+                "type": "array",
+                "items": "float"
+            }
+        },
+        "id-literal-array": "string[]"
+    }
+    test_wps_hints = [
+        {"id": "id-literal-type"},
+        {"id": "id-array-type"},
+        {"id": "id-dict-with-more-stuff"},
+        {"id": "id-dict-details"},
+    ]
+    expected_result = [
+        {"id": "id-literal-type", "type": "float"},
+        {"id": "id-dict-details", "type": "string"},
+        {"id": "id-array-type", "type": {"type": "array", "items": "float"}},
+        {"id": "id-literal-array", "type": "string[]"}
+    ]
+    result = _get_package_ordered_io(test_inputs, test_wps_hints)
+    assert isinstance(result, list) and len(result) == len(expected_result)
+    # *maybe* not same order, so validate values accordingly
+    for expect in expected_result:
+        for res in result:
+            if res["id"] == expect["id"]:
+                assert res == expect
+                break
+        raise AssertionError("expected '{}' was not validated against any result value".format(expect["id"]))
+
+
+def test_get_package_ordered_io_with_ordered_dict():
+    test_inputs = OrderedDict([
+        ("id-literal-type", "float"),
+        ("id-dict-details", {"type": "string"}),
+        ("id-array-type", {
+            "type": {
+                "type": "array",
+                "items": "float"
+            }
+        }),
+        ("id-literal-array", "string[]"),
+    ])
+    expected_result = [
+        {"id": "id-literal-type", "type": "float"},
+        {"id": "id-dict-details", "type": "string"},
+        {"id": "id-array-type", "type": {"type": "array", "items": "float"}},
+        {"id": "id-literal-array", "type": "string[]"}
+    ]
+    result = _get_package_ordered_io(test_inputs)
+    assert isinstance(result, list) and len(result) == len(expected_result)
+    assert result == expected_result
+
+
+def test_get_package_ordered_io_with_list():
+    """
+    Everything should remain the same as list variant is only allowed to have I/O objects.
+    (i.e.: not allowed to have both objects and literal string-type simultaneously as for dictionary variant).
+    """
+    expected_result = [
+        {"id": "id-literal-type", "type": "float"},
+        {"id": "id-dict-details", "type": "string"},
+        {"id": "id-array-type", "type": {"type": "array", "items": "float"}},
+        {"id": "id-literal-array", "type": "string[]"}
+    ]
+    result = _get_package_ordered_io(deepcopy(expected_result))
+    assert isinstance(result, list) and len(result) == len(expected_result)
+    assert result == expected_result
 
 
 def test_json2wps_datatype():
