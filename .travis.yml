@@ -35,15 +35,11 @@ install:
 before_script:
   - sleep 5
 script:
-  # run static analysis only once (run ifs separately to identify the failing case)
-  - if [ "${TRAVIS_PYTHON_VERSION}" == "3.7" ]; then make check; fi
-  - if [ "${TRAVIS_PYTHON_VERSION}" == "3.7" ]; then make coverage; fi
-  - if [ "${TRAVIS_PYTHON_VERSION}" == "3.7" ]; then make docs; fi
-  # run tests for each python version
+  # run operation for each job matrix variation
   - make ${MAKE_TEST_CMD}
 stages:
   - check
-  - unittest
+  - test  # use default stage to run matrix
   - coverage
   - extra
   - functional
@@ -55,7 +51,7 @@ jobs:
       python: "3.7"
       os: linux
       env: MAKE_TEST_CMD=check docs
-    - stage: unittest
+    - stage: test
       name: "Unit Tests"
       env: MAKE_TEST_CMD=test-unit
     - stage: coverage
@@ -69,9 +65,6 @@ jobs:
     - stage: functional
       name: "Functional Tests"
       env: MAKE_TEST_CMD=test-func test-online
-  # ignore default stage
-  exclude:
-    - stage: test
   allow_failures:
     - python: "2.7"   # deprecated support
     - python: "3.8"   # experimental packages
