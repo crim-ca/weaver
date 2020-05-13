@@ -111,11 +111,13 @@ def test_get_package_ordered_io_with_builtin_dict_and_hints():
     assert isinstance(result, list) and len(result) == len(expected_result)
     # *maybe* not same order, so validate values accordingly
     for expect in expected_result:
+        validated = False
         for res in result:
             if res["id"] == expect["id"]:
                 assert res == expect
-                break
-        raise AssertionError("expected '{}' was not validated against any result value".format(expect["id"]))
+                validated = True
+        if not validated:
+            raise AssertionError("expected '{}' was not validated against any result value".format(expect["id"]))
 
 
 def test_get_package_ordered_io_with_ordered_dict():
