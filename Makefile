@@ -275,7 +275,7 @@ test-unit: install-dev		## run unit tests (skip long running and online tests)
 	 	--junitxml $(APP_ROOT)/tests/results.xml"
 
 .PHONY: test-func
-test-func: install-dev		## run funtional tests (online and usage specific)
+test-func: install-dev		## run functional tests (online and usage specific)
 	@echo "Running functional tests..."
 	@bash -c "$(CONDA_CMD) pytest tests -v -m 'functional' --junitxml $(APP_ROOT)/tests/results.xml"
 
