@@ -1,4 +1,4 @@
-# label rules used by .github/workflows/label.yml
+# label rules used by PR labelers to match repository files
 # references:
 #   original: https://github.com/actions/labeler
 #   extended: https://github.com/ilyam8/periodic-pr-labeler
@@ -6,7 +6,7 @@
 # label 'ci' all automation-related steps and files
 ci:
   - .*  # all '.<>' files
-  - .github/**/*
+  - ".github/**"
   - MANIFEST.in
   - hooks/**/*
   - Makefile*

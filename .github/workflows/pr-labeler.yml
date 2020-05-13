@@ -13,17 +13,20 @@ on:
     - cron: '*/10 * * * *'
 
 jobs:
-  #original-labeler:
-  #  runs-on: ubuntu-latest
-  #  steps:
-  #  - uses: actions/labeler@v2
-  #    with:
-  #      repo-token: "${{ secrets.GITHUB_TOKEN }}"
+  original-labeler:
+    # reference: https://github.com/actions/labeler
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/labeler@v2
+      with:
+        configuration-path: .github/labeler-files.yml
+        repo-token: "${{ secrets.GITHUB_TOKEN }}"
   extended-labeler:
+    # reference: https://github.com/ilyam8/periodic-pr-labeler
     runs-on: ubuntu-latest
     steps:
       - uses: docker://docker.io/ilyam8/periodic-pr-labeler:latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          LABEL_MAPPINGS_FILE: .github/labeler.yml
+          LABEL_MAPPINGS_FILE: .github/labeler-files.yml
