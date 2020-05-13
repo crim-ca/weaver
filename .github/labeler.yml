@@ -1,4 +1,5 @@
 # label rules used by .github/workflows/label.yml
+# reference: https://github.com/actions/labeler
 
 # label 'ci' all automation-related steps and files
 ci:
@@ -13,6 +14,8 @@ ci:
 
 doc:
   - "*.rst"
+  # ignore changelog as doc would almost always be tagged
+  - "!CHANGES.rst"
   - "*.example"
   - LICENCE*
   - docs/**/*
