@@ -43,7 +43,7 @@ script:
   - make ${MAKE_TEST_CMD}
 stages:
   - check
-  - test
+  - unittest
   - coverage
   - extra
   - functional
@@ -55,7 +55,7 @@ jobs:
       python: "3.7"
       os: linux
       env: MAKE_TEST_CMD=check docs
-    - stage: test  # use default stage to avoid duplicate run
+    - stage: unittest
       name: "Unit Tests"
       env: MAKE_TEST_CMD=test-unit
     - stage: coverage
@@ -69,6 +69,9 @@ jobs:
     - stage: functional
       name: "Functional Tests"
       env: MAKE_TEST_CMD=test-func test-online
+  # ignore default stage
+  exclude:
+    - stage: test
   allow_failures:
     - python: "2.7"   # deprecated support
     - python: "3.8"   # experimental packages
