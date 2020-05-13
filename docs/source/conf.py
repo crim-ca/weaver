@@ -334,7 +334,7 @@ linkcheck_ignore = [
     # might not exist yet (we are generating it!)
     "https://pavics-weaver.readthedocs.io/en/latest/api.html",
     # ignore requires.io which just fails periodically - not critical link
-    "https://requires.io/github/crim-ca/weaver/requirements/.*"
+    "https://requires.io/github/crim-ca/weaver/.*"
 ]
 
 linkcheck_timeout = 30
