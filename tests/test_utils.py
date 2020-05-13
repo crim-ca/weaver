@@ -17,7 +17,6 @@ from pyramid.httpexceptions import (
     HTTPConflict,
     HTTPError as PyramidHTTPError,
     HTTPInternalServerError,
-    HTTPRequestTimeout,
     HTTPGatewayTimeout,
 )
 from pywps.response.status import WPS_STATUS
