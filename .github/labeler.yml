@@ -6,6 +6,7 @@
 # label 'ci' all automation-related steps and files
 ci:
   - .*  # all '.<>' files
+  - .github/**/*
   - MANIFEST.in
   - hooks/**/*
   - Makefile*
