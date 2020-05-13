@@ -845,7 +845,7 @@ class Process(Base):
         Converts a PyWPS Process into a :class:`weaver.datatype.Process` using provided parameters.
         """
         # import here to avoid circular dependencies
-        from weaver.processes.wps_package import _wps2json_io
+        from weaver.processes.wps_package import _wps2json_io  # noqa: W0212
 
         assert isinstance(wps_process, ProcessWPS)
         process = wps_process.json

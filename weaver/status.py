@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from pywps.response.status import _WPS_STATUS, WPS_STATUS
+from pywps.response.status import _WPS_STATUS, WPS_STATUS  # noqa: W0212
 
 if TYPE_CHECKING:
     from typing import AnyStr, Union    # noqa: F401

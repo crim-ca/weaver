@@ -331,7 +331,12 @@ linkcheck_ignore = [
     "https://esgf-data.dkrz.de/",
     "https://indico.egi.eu/",
     "https://docker-registry.crim.ca.*",
+    # might not exist yet (we are generating it!)
+    "https://pavics-weaver.readthedocs.io/en/latest/api.html",
+    # ignore requires.io which just fails periodically - not critical link
+    "https://requires.io/github/crim-ca/weaver/.*"
 ]
+
 linkcheck_timeout = 30
 linkcheck_retries = 5
 

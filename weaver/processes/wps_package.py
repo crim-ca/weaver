@@ -1,3 +1,14 @@
+"""
+Functions and classes that offer interoperability and conversion between corresponding elements defined as
+`CWL CommandLineTool/Workflow` and `WPS ProcessDescription` in order to generate `ADES/EMS Application Package`.
+
+.. seealso::
+    - `CWL specification <https://www.commonwl.org/#Specification>`_
+    - `WPS-1/2 schemas <http://schemas.opengis.net/wps/>`_
+    - `WPS-REST schemas <https://github.com/opengeospatial/wps-rest-binding>`_
+    - :mod:`weaver.wps_restapi.api` conformance details
+"""
+
 import json
 import logging
 import os
@@ -315,12 +326,26 @@ def _get_package_type(package_dict):
 def _get_package_ordered_io(io_section, order_hints=None):
     # type: (Union[List[JSON], OrderedDict[AnyStr, JSON]], Optional[List[JSON]]) -> List[JSON]
     """
-    Converts package I/O definitions defined as dictionary to an equivalent list representation.
+    Converts `CWL` package I/O definitions defined as dictionary to an equivalent :class:`list` representation.
     The list representation ensures that I/O order is preserved when written to file and reloaded afterwards
-    regardless of each library's implementation of ``dict`` container.
+    regardless of each server and/or library's implementation of :class:`dict` container.
 
-    Note:
-        When defined as a dictionary, an ``OrderedDict`` is expected as input to ensure preserved field order.
+    If this function fails to correctly order any I/O or cannot correctly guarantee such result because of the provided
+    parameters (e.g.: no hints given when required), the result will not break nor change the final processing behaviour
+    of the `CWL` engine. This is merely *cosmetic* adjustments to ease readability of I/O to avoid always shuffling
+    their order across multiple application package reporting.
+
+    The important result of this function is to provide the `CWL` I/O as a consistent list of objects so it is less
+    cumbersome to compare/merge/iterate over the elements with all functions that will follow.
+
+    .. note::
+        When defined as a dictionary, an :class:`OrderedDict` is expected as input to ensure preserved field order.
+        Prior to Python 3.7 or CPython 3.5, preserved order is not guaranteed for *builtin* :class:`dict`.
+        In this case the :paramref:`order_hints` is required to ensure same order.
+
+    :param io_section: Definition contained under the `CWL` ``inputs`` or ``outputs`` package fields.
+    :param order_hints: Optional/partial list of WPS I/O definitions hinting an order to sort CWL unsorted-dict I/O.
+    :returns: I/O specified as list of dictionary definitions with preserved order (as best as possible).
     """
     if isinstance(io_section, list):
         return io_section
@@ -338,7 +363,13 @@ def _get_package_ordered_io(io_section, order_hints=None):
     else:
         io_dict = io_section
     for io_id, io_value in io_dict.items():
-        io_list.append(io_value)
+        # I/O value can be a literal type string or dictionary with more details at this point
+        # make it always detailed dictionary to avoid problems for later parsing
+        # this is also required to make the list, since all list items must have a matching type
+        if isinstance(io_value, six.string_types):
+            io_list.append({"type": io_value})
+        else:
+            io_list.append(io_value)
         io_list[-1]["id"] = io_id
     return io_list
 
@@ -432,7 +463,7 @@ def _load_package_content(package_dict,                             # type: Dict
         package_dict["steps"][step["name"]]["run"] = package_name
         step_packages[step["name"]] = package_name
 
-    # fix I/O to preserve ordering from dump/load
+    # fix I/O to preserve ordering from dump/load, and normalize them to consistent list of objects
     process_offering_hint = process_offering or {}
     package_input_hint = process_offering_hint.get("inputs", [])
     package_output_hint = process_offering_hint.get("outputs", [])

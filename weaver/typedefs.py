@@ -31,9 +31,12 @@ if TYPE_CHECKING:
         FileSystemPathType = AnyStr
 
     Number = Union[int, float]
-    AnyValue = Optional[Union[AnyStr, Number, bool]]
+    ValueType = Union[AnyStr, Number, bool]
+    AnyValue = Optional[ValueType]
     AnyKey = Union[AnyStr, int]
-    JSON = Dict[AnyKey, Union[AnyValue, Dict[AnyKey, "JSON"], List["JSON"]]]
+    JsonList = List["JSON"]
+    JsonObject = Dict[AnyStr, "JSON"]
+    JSON = Union[AnyValue, JsonObject, JsonList]
     CWL = TypedDict("CWL", {"cwlVersion": AnyStr, "class": AnyStr, "inputs": JSON, "outputs": JSON})
     XML = lxml.etree._Element  # noqa: W0212
 
