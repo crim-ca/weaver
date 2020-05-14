@@ -32,7 +32,6 @@ services:
   - docker
 before_install:
   - source tests/travis-ci/weaver.env
-  - cp -f tests/travis-ci/custom.cfg ./
   - cp -f tests/travis-ci/data_sources.json ./
   - make --version
   - make info
@@ -70,10 +69,15 @@ jobs:
       os: windows
       language: bash
       python: "3.8"
+      env: TEST_TARGET=test
       before_install:
-        - choco install python3
+        - choco install python3 make
         - export PATH="/c/Python38:/c/Python38/Scripts:$PATH"
         - python -m pip install --upgrade pip wheel
+        - source tests/travis-ci/weaver.env
+        - cp -f tests/travis-ci/data_sources.json ./
+        - make --version
+        - make info
   allow_failures:
     - python: "2.7"   # deprecated support
     - python: "3.8"   # experimental packages
