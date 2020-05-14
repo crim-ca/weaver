@@ -80,7 +80,6 @@ jobs:
         - make info
   allow_failures:
     - python: "2.7"   # deprecated support
-    - python: "3.8"   # experimental packages
     - os: windows     # experimental support
   fast_finish: true   # required jobs will indicate success as soon as possible
 notifications:
