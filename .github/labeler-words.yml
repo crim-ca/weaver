@@ -12,3 +12,13 @@ feature:
 
 bug:
   - 'bug'
+
+ci:
+  - 'ci'
+  - 'travis'
+  - 'github'
+
+tests:
+  - 'coverage'
+  - 'functional test[s]*'
+  - 'unittest[s]*'
