@@ -30,3 +30,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           LABEL_MAPPINGS_FILE: .github/labeler-files.yml
+  wip:
+    # reference: https://github.com/wip/action
+    # mark PRs with 'WIP' in title as pending
+    # then, block merge of these branches using [settings->branches->master->status check with 'WIP' action]
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: wip/action@v1.0.0
