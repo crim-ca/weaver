@@ -33,6 +33,11 @@ db:
   - weaver/store/**/*
   - weaver/sort.py
 
+oas: 
+  - weaver/wps_restapi/templates/swagger_ui.mako
+  - weaver/wps_restapi/colander_extras.py
+  - weaver/wps_restapi/swagger_definitions.py
+
 security:
   - weaver/visibility.py
 
