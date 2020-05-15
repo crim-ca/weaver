@@ -19,7 +19,10 @@ ci:
   - 'github'
 
 oas: 
-  - '(OpenAPI|Swagger)'
+  - '(OpenAPI|openapi)'
+  - '(Swagger|swagger)'
+  - cornice
+  - colander
 
 tests:
   - 'coverage'
