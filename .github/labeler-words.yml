@@ -18,6 +18,9 @@ ci:
   - 'travis'
   - 'github'
 
+oas: 
+  - '(OpenAPI|Swagger)'
+
 tests:
   - 'coverage'
   - 'functional test[s]*'
