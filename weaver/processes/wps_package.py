@@ -31,6 +31,7 @@ from owslib.wps import ComplexData
 from owslib.wps import Metadata as OwsMetadata
 from owslib.wps import WebProcessingService
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
+from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
 from pywps import Process
 from pywps.app.Common import Metadata
@@ -95,7 +96,7 @@ from weaver.utils import (
     get_settings,
     get_url_without_query,
     null,
-    request_retry,
+    request_extra,
     str2bytes
 )
 from weaver.wps import get_wps_output_dir
@@ -280,7 +281,7 @@ def _fetch_process_info(process_info_url, fetch_error):
 
     if not isinstance(process_info_url, six.string_types):
         raise _info_not_found_error()
-    verify = get_settings(app).get("weaver.ssl_verify", True)
+    verify = asbool(get_settings(app).get("weaver.ssl_verify", True))
     resp = requests.get(process_info_url, headers={"Accept": CONTENT_TYPE_APP_JSON}, verify=verify)
     if resp.status_code != HTTPOk.code:
         raise _info_not_found_error()
@@ -1572,7 +1573,7 @@ def _generate_process_with_cwl_from_reference(reference):
 
     # match against WPS-1/2 reference
     else:
-        response = request_retry("GET", reference, retries=3)
+        response = request_extra("GET", reference, retries=3)
         if response.status_code != HTTPOk.code:
             raise HTTPServiceUnavailable("Couldn't obtain a valid response from [{}]. Service response: [{} {}]"
                                          .format(reference, response.status_code, response.reason))
@@ -1976,6 +1977,7 @@ class WpsPackage(Process):
                                                                                 eoimage_data_sources,
                                                                                 accept_mime_types)
 
+                ssl_verify = asbool(get_settings(app).get("weaver.ssl_verify", True))
                 cwl_inputs = dict()
                 for input_id in request.inputs:
                     # skip empty inputs (if that is even possible...)

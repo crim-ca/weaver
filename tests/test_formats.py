@@ -98,12 +98,12 @@ def test_get_cwl_file_format_retry_attempts():
     """Verifies that failing request will not immediately fail the MIME-type validation."""
     codes = {"codes": [HTTPOk.code, HTTPRequestTimeout.code]}  # note: used in reverse order
 
-    def mock_request_retry(*args, **kwargs):  # noqa: E811
+    def mock_request_extra(*args, **kwargs):  # noqa: E811
         m_resp = Response()
         m_resp.status_code = codes["codes"].pop()
         return m_resp
 
-    with mock.patch("requests.request", side_effect=mock_request_retry) as mocked_request:
+    with mock.patch("requests.request", side_effect=mock_request_extra) as mocked_request:
         _, fmt = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
         assert fmt == "{}:{}".format(IANA_NAMESPACE, CONTENT_TYPE_APP_JSON)
         assert mocked_request.call_count == 2

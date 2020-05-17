@@ -20,7 +20,7 @@ from weaver.processes.constants import (
     WPS_LITERAL
 )
 from weaver.processes.sources import fetch_data_sources
-from weaver.utils import get_any_id, request_retry
+from weaver.utils import get_any_id, request_extra
 
 if TYPE_CHECKING:
     from weaver.typedefs import XML                                 # noqa: F401
@@ -256,7 +256,7 @@ class OpenSearchQuery(object):
         base_url, query_params = self._prepare_query_url(template_url, params)
         while True:
             query_params["startRecord"] = start_index
-            response = request_retry("get", base_url, params=query_params,
+            response = request_extra("get", base_url, params=query_params,
                                      intervals=list(range(1, 5)), allowed_codes=[HTTPOk.code])
             if not response.status_code == 200:
                 break

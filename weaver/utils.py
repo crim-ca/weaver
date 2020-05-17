@@ -19,8 +19,11 @@ from pyramid.config import Configurator
 from pyramid.httpexceptions import HTTPError as PyramidHTTPError, HTTPGatewayTimeout
 from pyramid.registry import Registry
 from pyramid.request import Request
+from pyramid.settings import asbool, aslist
 from requests import HTTPError as RequestsHTTPError
 from requests.structures import CaseInsensitiveDict
+from requests_file import FileAdapter
+from urlmatch import urlmatch
 from six.moves.urllib.parse import ParseResult, parse_qs, urlparse, urlunsplit
 from webob.headers import EnvironHeaders, ResponseHeaders
 
@@ -425,17 +428,55 @@ def make_dirs(path, mode=0o755, exist_ok=False):
             raise
 
 
-def request_retry(method,                       # type: AnyStr
+def get_ssl_verify_option(url, settings):
+    # type: (AnyStr, AnySettingsContainer) -> bool
+    """
+    Verifies the provided settings and indicates if SSL verification should be used when doing requests on it.
+
+    By default, SSL verification is enabled. Following settings can affect is deactivation:
+        - `weaver.ssl_verify = True|False`
+        - `weaver.ssl_verify_exceptions = [<url-regex>]`
+
+    .. seealso::
+        - :func:`urlmatch`
+
+    :param url: URL to be evaluated.
+    :param settings: any settings container where to retrieve options.
+    :return: SSL verification enabled/disabled for requests on this URL.
+    """
+    ssl_verify = True
+    settings = get_settings(settings)  # ensure settings, could be any container
+    if not settings:
+        return ssl_verify
+    ssl_verify = asbool(settings.get("weaver.ssl_verify", True))
+    if not ssl_verify:
+        return ssl_verify
+    ssl_verify_except = settings.get("weaver.ssl_verify_exceptions", None)
+    if ssl_verify_except:
+        ssl_verify_except = ",".join(aslist(ssl_verify_except))
+        if urlmatch(ssl_verify_except, url):
+            ssl_verify = False
+    return ssl_verify
+
+
+def request_extra(method,                       # type: AnyStr
                   url,                          # type: AnyStr
                   retries=0,                    # type: int
                   backoff=0,                    # type: Number
                   intervals=None,               # type: Optional[List[Union[float, int]]]
                   allowed_codes=None,           # type: Optional[List[int]]
                   only_server_errors=True,      # type: bool
+                  ssl_verify=True,              # type: bool
+                  settings=None,                # type: Optional[AnySettingsContainer]
                   **request_kwargs,             # type: Any
                   ):                            # type: (...) -> AnyResponseType
     """
-    Implements basic request retry operation if the previous request failed, up to the specified number of retries.
+    Standard library :mod:`requests` with additional functional utilities.
+
+    Retry operation
+    ---------------
+
+    Implements request retry if the previous request failed, up to the specified number of retries.
 
     Using :paramref:`backoff` factor, you can control the interval between request attempts such as::
 
@@ -450,6 +491,36 @@ def request_retry(method,                       # type: AnyStr
         - Both variants of ``backoff`` and ``backoff_factor`` are accepted.
         - All variants of ``retires``, ``retry`` and ``max_retries`` are accepted.
 
+    File Transport Scheme
+    ---------------------
+
+    Any request with ``file://`` scheme or empty scheme (no scheme specified) will be automatically handled as potential
+    local file path. The path should be absolute to ensure it to be correctly resolved.
+
+    All access errors due to file permissions return 403 status code, and missing file returns 404.
+    Any other :py:exc:`IOError` types are converted to a 400 responses.
+
+    .. seealso::
+        - :class:`FileAdapter`
+
+    SSL Verification
+    ----------------
+
+    Allows SSL verify option to be enabled or disabled according to configuration settings or explicit parameters.
+    Any variation of ``verify`` or ``ssl_verify`` keyword arguments are considered. If they all resolve to ``True``,
+    then application settings are retrieved from ``weaver.ini`` to parse additional SSL options that could disable it.
+
+    Following :mod:`weaver` settings are considered :
+        - `weaver.ssl_verify = True|False`
+        - `weaver.ssl_verify_exceptions = [<url-regex>]`
+
+    .. note::
+        Argument :paramref:`settings` must also be provided through any supported container by :func:`get_settings`
+        to retrieve and apply any :mod:`weaver`-specific configurations.
+
+    .. seealso::
+        - :func:`get_ssl_verify_option`
+
     :param method: HTTP method to set request.
     :param url: URL of the request to execute.
     :param retries: number of retries to attempt.
@@ -458,6 +529,8 @@ def request_retry(method,                       # type: AnyStr
         Explicit intervals in seconds between retries.
         (note: amount of request attempts will be +1 the number of interval items as first request is done immediately)
     :param allowed_codes: HTTP status codes that are considered valid to stop retrying (default: any non-4xx/5xx code).
+    :param ssl_verify: Explicit parameter to disable SSL verification (overrides any settings, default: True).
+    :param settings: Additional settings from which to retrieve configuration details for requests.
     :param only_server_errors:
         Only HTTP status codes in the 5xx values will be considered for retrying the request (default: True).
         This catches sporadic server timeout, connection error, etc., but 4xx errors are still considered valid results.
@@ -473,6 +546,14 @@ def request_retry(method,                       # type: AnyStr
         intervals = [0] + intervals
         retries = len(intervals)
         backoff = 0  # disable first part of delay calculation
+    # SSL verification settings
+    # ON by default, disable accordingly with any variant if matched
+    kw_ssl_verify = request_kwargs.pop("ssl_verify", request_kwargs.pop("verify", True))
+    ssl_verify = False if not kw_ssl_verify or not ssl_verify else True
+    if settings and ssl_verify:
+        ssl_verify = get_ssl_verify_option(url, settings)
+    request_kwargs.update({"verify": ssl_verify})
+    # process request
     resp = None
     failures = []
     for retry in range(retries):
@@ -480,7 +561,11 @@ def request_retry(method,                       # type: AnyStr
             delay = (backoff * (2 ** (retry + 1))) or intervals[retry]
             time.sleep(delay)
         try:
-            resp = requests.request(method, url, **request_kwargs)
+            with requests.Session() as request_session:
+                if urlparse(url).scheme in ["", "file"]:
+                    url = "file://{}".format(os.path.abspath(url)) if not url.startswith("file://") else url
+                    request_session.mount("file://", FileAdapter())
+                resp = request_session.request(method, url, **request_kwargs)
             if allowed_codes and len(allowed_codes):
                 if resp.status_code in allowed_codes:
                     return resp
@@ -501,8 +586,8 @@ def request_retry(method,                       # type: AnyStr
     return HTTPGatewayTimeout(detail=detail)
 
 
-def fetch_file(file_reference, file_outdir, **request_kwargs):
-    # type: (AnyStr, AnyStr, **Any) -> AnyStr
+def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
+    # type: (AnyStr, AnyStr, Optional[AnySettingsContainer], **Any) -> AnyStr
     """
     Fetches a file from a local path or remote URL and dumps it's content to the specified output directory.
 
@@ -510,7 +595,8 @@ def fetch_file(file_reference, file_outdir, **request_kwargs):
 
     :param file_reference: Local filesystem path or remote URL file reference.
     :param file_outdir: Output directory path of the fetched file.
-    :param request_kwargs: additional keywords to forward to request call (if needed).
+    :param settings: Additional request setting details from the application configuration.
+    :param request_kwargs: Additional keywords to forward to request call (if needed).
     :return: Path of the local copy of the fetched file.
     """
     file_href = file_reference
@@ -533,7 +619,7 @@ def fetch_file(file_reference, file_outdir, **request_kwargs):
     else:
         request_kwargs.pop("stream", None)
         with open(file_path, "wb") as file:
-            resp = request_retry("get", file_reference, stream=True, retries=3, **request_kwargs)
+            resp = request_extra("get", file_reference, stream=True, retries=3, settings=settings, **request_kwargs)
             if resp.status_code >= 400:
                 raise resp
             # NOTE:

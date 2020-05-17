@@ -28,14 +28,23 @@ mongodb.db_name = weaver
 #   amongst other things, secured access points or other advanced server-side behaviour, but it then becomes your
 #   responsibility to correctly map your server routes to internal routes after applying the server-side operation.
 
-# weaver
+# --- Weaver Configuration ---
 weaver.configuration = ems
 weaver.url = http://localhost:4001
-weaver.username =
-weaver.password =
-weaver.workdir =
-weaver.prefix =
-# WPS settings
+# --- Weaver requests extension flags ---
+# SSL verification should be enabled for secured connections
+# this setting is available for convenience for debug purposes and local environments
+weaver.ssl_verify = true
+# list of regex locations from which to allow failing SSL verification during requests
+# allows preserving SSL checks for secured connections except for specifically matched URLs
+# although still not great, this should be preferred over fully disabling SSL verification
+# it is recommend to make provided regex(es) as restrictive as possible to limit insecure connections
+#   can be any combination of comma/space/row-delimited list URL
+#   supported regex rules as defined by: https://pypi.org/project/urlmatch/
+weaver.ssl_verify_exceptions =
+    https://my-trusted-domain.com/*
+    https://problem-domain.org/on-this-path/*,https://problem-domain.org/also-that/*
+# --- WPS settings ---
 weaver.wps = true
 weaver.wps_url =
 weaver.wps_path = /ows/wps
@@ -43,20 +52,20 @@ weaver.wps_output = true
 weaver.wps_output_dir = /tmp
 weaver.wps_output_url =
 weaver.wps_output_path = /wpsoutputs
-# WPS metadata
+# --- WPS metadata ---
 weaver.wps_metadata_identification_title=Weaver
 weaver.wps_metadata_identification_abstract=Weaver internal WPS used for demo and testing.
 weaver.wps_metadata_identification_keywords=Weaver,WPS,OGC
 weaver.wps_metadata_identification_accessconstraints=NONE
 weaver.wps_metadata_provider_name=CRIM
 weaver.wps_metadata_provider_url=http://pavics-weaver.readthedocs.org/en/latest/
-# WPS REST API
+# --- WPS REST API ---
 weaver.wps_restapi = true
 weaver.wps_restapi_url =
 weaver.wps_restapi_path = /
 weaver.wps_restapi_ref = https://app.swaggerhub.com/apis/geoprocessing/WPS/
 weaver.wps_restapi_doc = https://raw.githubusercontent.com/opengeospatial/wps-rest-binding/develop/docs/18-062.pdf
-# email notification
+# --- Job email notification ---
 weaver.wps_email_encrypt_salt = salty-email
 weaver.wps_email_encrypt_rounds = 100000
 weaver.wps_email_notify_smtp_host =
@@ -66,9 +75,13 @@ weaver.wps_email_notify_port = 25
 weaver.wps_email_notify_ssl = true
 weaver.wps_email_notify_template_dir =
 weaver.wps_email_notify_template_default =
-# other configurations
+# --- other configurations ---
+# additional processes to load at startup (see 'wps_processes.yml.example')
 weaver.wps_processes_file = wps_processes.yml
+# known remote ADES for processes redirection based on data-sources when using EMS configuration
+# (see 'data_sources.json.example' and 'weaver.processes.sources' for more details)
 weaver.data_sources = data_sources.json
+# comma-separated list of key=value options to add to settings
 weaver.extra_options =
 
 ###

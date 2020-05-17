@@ -7,7 +7,7 @@ from requests.exceptions import ConnectionError
 from six.moves.urllib.error import HTTPError
 from six.moves.urllib.request import urlopen
 
-from weaver.utils import request_retry
+from weaver.utils import request_extra
 
 if TYPE_CHECKING:
     from weaver.typedefs import JSON                # noqa: F401
@@ -111,13 +111,13 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=False):
     def _make_if_ref(_map, _key, _fmt):
         return os.path.join(_map[_key], _fmt) if make_reference else (_map, "{}:{}".format(_key, _fmt))
 
-    def _request_retry_various(_mime_type):
+    def _request_extra_various(_mime_type):
         """
         Attempts multiple request-retry variants to be as permissive as possible to sporadic temporary failures.
         """
         _mime_type_url = "{}{}".format(IANA_NAMESPACE_DEFINITION[IANA_NAMESPACE], _mime_type)
         try:
-            resp = request_retry("get", _mime_type_url, retries=3, allowed_codes=[HTTPOk.code, HTTPNotFound.code])
+            resp = request_extra("get", _mime_type_url, retries=3, allowed_codes=[HTTPOk.code, HTTPNotFound.code])
             if resp.status_code == HTTPOk.code:
                 return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _mime_type)
         except ConnectionError:
@@ -131,7 +131,7 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=False):
         return None
 
     mime_type = clean_mime_type_format(mime_type, strip_parameters=True)
-    result = _request_retry_various(mime_type)
+    result = _request_extra_various(mime_type)
     if result is not None:
         return result
     if mime_type in EDAM_MAPPING:

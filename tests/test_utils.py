@@ -27,7 +27,7 @@ from six.moves.urllib.parse import urlparse
 from tests.compat import contextlib
 from tests.utils import mocked_file_response
 from weaver import status, utils
-from weaver.utils import _NullType, null, fetch_file, make_dirs, request_retry  # noqa: W0212
+from weaver.utils import _NullType, null, fetch_file, get_ssl_verify_option, make_dirs, request_extra  # noqa: W0212
 
 
 def test_null_operators():
@@ -362,7 +362,12 @@ def test_fetch_file_local_with_protocol():
             shutil.rmtree(res_dir, ignore_errors=True)
 
 
-def test_request_retry_allowed_codes():
+def test_get_ssl_verify_option():
+    # get_ssl_verify_option()
+    pass
+
+
+def test_request_extra_allowed_codes():
     """Verifies that ``allowed_codes`` only are considered as valid status instead of any non-error HTTP code."""
     mocked_codes = {"codes": [HTTPCreated.code, HTTPOk.code, HTTPCreated.code]}  # note: used in reverse order
 
@@ -372,12 +377,12 @@ def test_request_retry_allowed_codes():
         return mocked_resp
 
     with mock.patch("requests.request", side_effect=mocked_request) as mocked:
-        resp = request_retry("get", "http://whatever", retries=3, allowed_codes=[HTTPOk.code])
+        resp = request_extra("get", "http://whatever", retries=3, allowed_codes=[HTTPOk.code])
         assert resp.status_code == HTTPOk.code
         assert mocked.call_count == 2
 
 
-def test_request_retry_intervals():
+def test_request_extra_intervals():
     """Verifies that ``intervals`` are used for calling the retry operations instead of ``backoff``/``retries``."""
 
     def mock_request(*args, **kwargs):  # noqa: E811
@@ -392,7 +397,7 @@ def test_request_retry_intervals():
         with mock.patch("weaver.utils.time.sleep", side_effect=mock_sleep) as mocked_sleep:
             intervals = [1e6, 3e6, 5e6]  # random values that shouldn't normally be used with sleep() (too big)
             # values will not match if backoff/retries are not automatically corrected by internals parameter
-            resp = request_retry("get", "http://whatever", only_server_errors=False,
+            resp = request_extra("get", "http://whatever", only_server_errors=False,
                                  intervals=intervals, backoff=1000, retries=10)
             assert resp.status_code == HTTPGatewayTimeout.code
             assert mocked_request.call_count == 4

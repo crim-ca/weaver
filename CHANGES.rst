@@ -4,6 +4,20 @@ Changes
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
 
+Changes:
+--------
+
+- Modify ``weaver.utils.request_retry`` to ``weaver.utils.request_extra`` to include more requests functionality and
+  reuse it across the whole code base.
+- Add ``requests_extra`` SSL verification option using specific URL regex(es) matches from configuration settings.
+- Add ``file://`` transport scheme support directly to utility ``requests_extra`` to handle local file paths.
+
+Fixes:
+------
+
+- Modify ``Dockerfile-manager`` to run web application using ``pserve`` as ``gunicorn`` doesn't correctly handles
+  worker options anymore when loaded form ``weaver.ini``.
+
 `1.7.0 <https://github.com/crim-ca/weaver/tree/1.7.0>`_ (2020-05-15)
 ========================================================================
 
