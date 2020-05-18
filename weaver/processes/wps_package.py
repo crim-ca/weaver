@@ -281,8 +281,7 @@ def _fetch_process_info(process_info_url, fetch_error):
 
     if not isinstance(process_info_url, six.string_types):
         raise _info_not_found_error()
-    verify = asbool(get_settings(app).get("weaver.ssl_verify", True))
-    resp = requests.get(process_info_url, headers={"Accept": CONTENT_TYPE_APP_JSON}, verify=verify)
+    resp = request_extra("get", process_info_url, headers={"Accept": CONTENT_TYPE_APP_JSON}, settings=get_settings(app))
     if resp.status_code != HTTPOk.code:
         raise _info_not_found_error()
     body = resp.json()
@@ -387,7 +386,7 @@ def _check_package_file(cwl_file_path_or_url):
     is_url = False
     if urlparse(cwl_file_path_or_url).scheme != "":
         cwl_path = cwl_file_path_or_url
-        cwl_resp = requests.head(cwl_path)
+        cwl_resp = request_extra("head", cwl_path, settings=get_settings(app))
         is_url = True
         if cwl_resp.status_code != HTTPOk.code:
             raise PackageRegistrationError("Cannot find CWL file at: '{}'.".format(cwl_path))
@@ -411,7 +410,8 @@ def _load_package_file(file_path):
     # yaml properly loads json as well, error can print out the parsing error location
     try:
         if is_url:
-            cwl_resp = requests.get(file_path, headers={"Accept": CONTENT_TYPE_TEXT_PLAIN})
+            settings = get_settings(app)
+            cwl_resp = request_extra("get", file_path, headers={"Accept": CONTENT_TYPE_TEXT_PLAIN}, settings=settings)
             return yaml.safe_load(cwl_resp.content)
         with open(file_path, "r") as f:
             return yaml.safe_load(f)
@@ -1573,7 +1573,7 @@ def _generate_process_with_cwl_from_reference(reference):
 
     # match against WPS-1/2 reference
     else:
-        response = request_extra("GET", reference, retries=3)
+        response = request_extra("GET", reference, retries=3, settings=get_settings(app))
         if response.status_code != HTTPOk.code:
             raise HTTPServiceUnavailable("Couldn't obtain a valid response from [{}]. Service response: [{} {}]"
                                          .format(reference, response.status_code, response.reason))
@@ -1975,9 +1975,9 @@ class WpsPackage(Process):
                     opensearch.insert_max_occurs(self.payload, request.inputs)
                     request.inputs = opensearch.query_eo_images_from_wps_inputs(request.inputs,
                                                                                 eoimage_data_sources,
-                                                                                accept_mime_types)
+                                                                                accept_mime_types,
+                                                                                settings=settings)
 
-                ssl_verify = asbool(get_settings(app).get("weaver.ssl_verify", True))
                 cwl_inputs = dict()
                 for input_id in request.inputs:
                     # skip empty inputs (if that is even possible...)

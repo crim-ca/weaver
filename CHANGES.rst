@@ -11,12 +11,14 @@ Changes:
   reuse it across the whole code base.
 - Add ``requests_extra`` SSL verification option using specific URL regex(es) matches from configuration settings.
 - Add ``file://`` transport scheme support directly to utility ``requests_extra`` to handle local file paths.
+* Add file ``weaver.request_options`` INI configuration setting to specify per-request method/URL options.
 
 Fixes:
 ------
 
 - Modify ``Dockerfile-manager`` to run web application using ``pserve`` as ``gunicorn`` doesn't correctly handles
-  worker options anymore when loaded form ``weaver.ini``.
+  worker options anymore when loaded form ``weaver.ini`` with ``--paste`` argument. Also simplifies the command which
+  already required multiple patches such as reapplying the host/port binding from INI file.
 
 `1.7.0 <https://github.com/crim-ca/weaver/tree/1.7.0>`_ (2020-05-15)
 ========================================================================

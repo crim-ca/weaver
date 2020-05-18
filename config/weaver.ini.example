@@ -33,17 +33,12 @@ weaver.configuration = ems
 weaver.url = http://localhost:4001
 # --- Weaver requests extension flags ---
 # SSL verification should be enabled for secured connections
-# this setting is available for convenience for debug purposes and local environments
+# setting is available for convenience, debug purposes and local environments
+# preferably, use specific request options
 weaver.ssl_verify = true
-# list of regex locations from which to allow failing SSL verification during requests
-# allows preserving SSL checks for secured connections except for specifically matched URLs
-# although still not great, this should be preferred over fully disabling SSL verification
-# it is recommend to make provided regex(es) as restrictive as possible to limit insecure connections
-#   can be any combination of comma/space/row-delimited list URL
-#   supported regex rules as defined by: https://pypi.org/project/urlmatch/
-weaver.ssl_verify_exceptions =
-    https://my-trusted-domain.com/*
-    https://problem-domain.org/on-this-path/*,https://problem-domain.org/also-that/*
+# file with request options to be used with 'weaver.utils.request_extra'
+# see 'requests_options.yml.example'
+weaver.request_options =
 # --- WPS settings ---
 weaver.wps = true
 weaver.wps_url =

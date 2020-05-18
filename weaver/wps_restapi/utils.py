@@ -1,16 +1,16 @@
 import logging
 from distutils.version import LooseVersion
-from typing import TYPE_CHECKING, AnyStr
+from typing import TYPE_CHECKING
 
-import requests
 from lxml import etree
 from pyramid.httpexceptions import HTTPSuccessful
 
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
-from weaver.utils import get_settings, get_weaver_url, parse_request_query
+from weaver.utils import get_settings, get_weaver_url, parse_request_query, request_extra
 
 if TYPE_CHECKING:
     from pyramid.request import Request                 # noqa: F401
+    from typing import AnyStr, Optional                 # noqa: F401
     from weaver.typedefs import AnySettingsContainer    # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
@@ -45,6 +45,7 @@ def get_wps_restapi_base_url(container):
     return weaver_rest_url
 
 
+# FIXME: deprecated? unused?
 def get_wps_output_format(request, service_url=None):
     # type: (Request, AnyStr) -> AnyStr
     """
@@ -74,8 +75,8 @@ def get_wps_output_format(request, service_url=None):
     if service_url:
         getcap_url_100 = "{}?service=WPS&request=GetCapabilities"
         getcap_url_200 = "{}/processes".format(service_url)
-        getcap_resp_100 = requests.get(getcap_url_100)
-        getcap_resp_200 = requests.get(getcap_url_200)
+        getcap_resp_100 = request_extra("get", getcap_url_100, settings=request)
+        getcap_resp_200 = request_extra("get", getcap_url_200, settings=request)
 
         # analyse JSON response
         if isinstance(getcap_resp_200, HTTPSuccessful):

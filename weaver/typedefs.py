@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     XML = lxml.etree._Element  # noqa: W0212
 
     AnyContainer = Union[Configurator, Registry, PyramidRequest, Celery]
-    SettingValue = AnyValue
+    SettingValue = Optional[JSON]
     SettingsType = Dict[AnyStr, SettingValue]
     AnySettingsContainer = Union[AnyContainer, SettingsType]
     AnyRegistryContainer = AnyContainer

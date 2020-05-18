@@ -1,0 +1,31 @@
+# List of request URL(s) from which to apply additional options
+#
+#   url:
+#       URL(s) for which to apply other specified options
+#       can be any combination of comma/space-delimited single or list of regex string URL
+#       supported regex rules as defined by: https://pypi.org/project/urlmatch/
+#   method:
+#       request method (GET, POST, etc.) to further filter which request should apply the provided options
+#   *options*:
+#       any keyword/value combination supported by 'requests' module or function 'weaver.utils.request_extra'
+#       value of the option must match the expected format (e.g.: bool parameter should be one of true|false)
+#       corresponding options will be applied to the request if it matches the URL(s) regex(es) and optionally method
+#       (e.g.: 'timeout', 'verify', 'retries', etc.)
+#
+# Notes:
+#   1. Options provided in this file are ignored if a corresponding keyword is explicitly specified in the source code.
+#   2. Processing will stop at the first match following the sequence order. Ensure patterns are sufficiently explicit.
+#
+# Although still not great, this specification should be preferred over fully disabling SSL verification
+# (i.e.: 'weaver.ssl_verify = false')
+# It is recommend to make provided regex(es)/method as restrictive as possible to limit insecure connections.
+#
+requests:
+  #- url:
+  #    - https://my-trusted-domain.com/*
+  #    - https://problem-domain.org/on-this-path/*,https://problem-domain.org/also-that/*
+  #  method: get
+  #  verify: false
+  #  timeout: 10
+  #  [...] (other options)
+  #- url: [...] (other entries)

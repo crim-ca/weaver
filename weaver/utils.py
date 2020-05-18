@@ -1,13 +1,15 @@
 import errno
+import inspect
 import logging
 import os
 import re
 import shutil
+import sys
 import time
 import types
 import warnings
+from copy import deepcopy
 from datetime import datetime
-from inspect import isclass, isfunction
 from typing import TYPE_CHECKING
 
 import pytz
@@ -58,7 +60,7 @@ class _NullType(six.with_metaclass(_Singleton)):
         return (isinstance(other, _NullType)                                    # noqa: W503
                 or other is null                                                # noqa: W503
                 or other is self.__instance__                                   # noqa: W503
-                or (isclass(other) and issubclass(other, _NullType)))           # noqa: W503
+                or (inspect.isclass(other) and issubclass(other, _NullType)))   # noqa: W503
 
     def __repr__(self):
         return "<null>"
@@ -211,7 +213,7 @@ def parse_extra_options(option_str):
 def fully_qualified_name(obj):
     # type: (Union[Any, Type[Any]]) -> str
     """Obtains the ``'<module>.<name>'`` full path definition of the object to allow finding and importing it."""
-    cls = obj if isclass(obj) or isfunction(obj) else type(obj)
+    cls = obj if inspect.isclass(obj) or inspect.isfunction(obj) else type(obj)
     return ".".join([obj.__module__, cls.__name__])
 
 
@@ -428,45 +430,128 @@ def make_dirs(path, mode=0o755, exist_ok=False):
             raise
 
 
-def get_ssl_verify_option(url, settings):
-    # type: (AnyStr, AnySettingsContainer) -> bool
-    """
-    Verifies the provided settings and indicates if SSL verification should be used when doing requests on it.
+def get_caller_name(skip=2, base_class=False):
+    """Returns the name of a caller in the format ``module.class.method``.
 
-    By default, SSL verification is enabled. Following settings can affect is deactivation:
-        - `weaver.ssl_verify = True|False`
-        - `weaver.ssl_verify_exceptions = [<url-regex>]`
+    :param skip: specifies how many levels of stack to skip while getting the caller.
+    :param base_class:
+        Specified if the base class should be returned or the top-most class in case of inheritance
+        If the caller is not a class, this doesn't do anything.
+    :returns: An empty string if skipped levels exceed stack height; otherwise, the requested caller name.
+    """
+    # reference: https://gist.github.com/techtonik/2151727
+
+    def stack_(frame):
+        frame_list = []
+        while frame:
+            frame_list.append(frame)
+            frame = frame.f_back
+        return frame_list
+
+    stack = stack_(sys._getframe(1))  # noqa: W0212
+    start = 0 + skip
+    if len(stack) < start + 1:
+        return ""
+    parent_frame = stack[start]
+    name = []
+    module = inspect.getmodule(parent_frame)
+    # `modname` can be None when frame is executed directly in console
+    if module:
+        # frame module in case of inherited classes will point to base class
+        # but frame local will still refer to top-most class when checking for 'self'
+        # (stack: top(mid).__init__ -> mid(base).__init__ -> base.__init__)
+        name.append(module.__name__)
+    # detect class name
+    if "self" in parent_frame.f_locals:
+        # I don't know any way to detect call from the object method
+        # XXX: there seems to be no way to detect static method call - it will
+        #      be just a function call
+        cls = parent_frame.f_locals["self"].__class__
+        if not base_class and module and inspect.isclass(cls):
+            name[0] = cls.__module__
+        name.append(cls.__name__)
+    codename = parent_frame.f_code.co_name
+    if codename != "<module>":  # top level usually
+        name.append(codename)  # function or a method
+    del parent_frame
+    return ".".join(name)
+
+
+def get_ssl_verify_option(method, url, settings, request_options=None):
+    # type: (AnyStr, AnyStr, AnySettingsContainer, Optional[SettingsType]) -> bool
+    """
+    Obtains the SSL verification option from combined settings from ``weaver.ssl_verify`` and parsed
+    ``weaver.request_options`` file for the corresponding request.
+
+    :param method: request method (GET, POST, etc.).
+    :param url: request URL.
+    :param settings: application setting container with pre-loaded *request options* specifications.
+    :param request_options: pre-processed *request options* for method/URL to avoid re-parsing the settings.
+    :returns: SSL ``verify`` option to be passed down to some ``request`` function.
+    """
+    if not settings:
+        return True
+    settings = get_settings(settings)
+    if not asbool(settings.get("weaver.ssl_verify", True)):
+        return False
+    req_opts = request_options or get_request_options(method, url, settings)
+    if not req_opts.get("ssl_verify", req_opts.get("verify", True)):
+        return False
+    return True
+
+
+def get_request_options(method, url, settings):
+    # type: (AnyStr, AnyStr, AnySettingsContainer) -> SettingsType
+    """
+    Obtains the *request options* corresponding to the request according to configuration file specified by pre-loaded
+    setting ``weaver.request_options``.
+
+    If no file was pre-loaded or no match is found for the request, an empty options dictionary is returned.
 
     .. seealso::
-        - :func:`urlmatch`
+        - :func:`get_ssl_verify_option`
 
-    :param url: URL to be evaluated.
-    :param settings: any settings container where to retrieve options.
-    :return: SSL verification enabled/disabled for requests on this URL.
+    :param method: request method (GET, POST, etc.).
+    :param url: request URL.
+    :param settings: application setting container with pre-loaded *request options* specifications.
+    :returns: dictionary with keyword options to be applied to the corresponding request if matched.
     """
-    ssl_verify = True
-    settings = get_settings(settings)  # ensure settings, could be any container
     if not settings:
-        return ssl_verify
-    ssl_verify = asbool(settings.get("weaver.ssl_verify", True))
-    if not ssl_verify:
-        return ssl_verify
-    ssl_verify_except = settings.get("weaver.ssl_verify_exceptions", None)
-    if ssl_verify_except:
-        ssl_verify_except = ",".join(aslist(ssl_verify_except))
-        if urlmatch(ssl_verify_except, url):
-            ssl_verify = False
-    return ssl_verify
+        LOGGER.warning("No settings container provided by [%s], request options might not be applied as expected.",
+                       get_caller_name(skip=2))
+        return {}
+    settings = get_settings(settings)  # ensure settings, could be any container
+    req_opts_specs = settings.get("weaver.request_options", None)
+    if not isinstance(req_opts_specs, dict):
+        # empty request options is valid (no file specified),
+        # but none pre-processed by app means the settings come from unexpected source
+        LOGGER.warning("Settings container provided by [%s] missing request options specification. "
+                       "Request might not be executed with expected configuration.", get_caller_name(skip=2))
+        return {}
+    request_options = {}
+    for req_opts in req_opts_specs.get("requests", []):
+        if not req_opts.get("method", "").upper() in ["", method.upper()]:
+            continue
+        req_urls = req_opts.get("url")
+        req_urls = [req_urls] if not isinstance(req_urls, list) else req_urls
+        req_urls = ",".join([aslist(req_url) for req_url in req_urls])
+        if not urlmatch(req_urls, url):
+            continue
+        req_opts = deepcopy(req_opts)
+        req_opts.pop("url", None)
+        req_opts.pop("method", None)
+        request_options.update(req_opts)
+    return request_options
 
 
 def request_extra(method,                       # type: AnyStr
                   url,                          # type: AnyStr
-                  retries=0,                    # type: int
-                  backoff=0,                    # type: Number
-                  intervals=None,               # type: Optional[List[Union[float, int]]]
+                  retries=None,                 # type: Optional[int]
+                  backoff=None,                 # type: Optional[Number]
+                  intervals=None,               # type: Optional[List[Number]]
                   allowed_codes=None,           # type: Optional[List[int]]
                   only_server_errors=True,      # type: bool
-                  ssl_verify=True,              # type: bool
+                  ssl_verify=None,              # type: Optional[bool]
                   settings=None,                # type: Optional[AnySettingsContainer]
                   **request_kwargs,             # type: Any
                   ):                            # type: (...) -> AnyResponseType
@@ -512,13 +597,14 @@ def request_extra(method,                       # type: AnyStr
 
     Following :mod:`weaver` settings are considered :
         - `weaver.ssl_verify = True|False`
-        - `weaver.ssl_verify_exceptions = [<url-regex>]`
+        - `weaver.request_options = request_options.yml`
 
     .. note::
         Argument :paramref:`settings` must also be provided through any supported container by :func:`get_settings`
         to retrieve and apply any :mod:`weaver`-specific configurations.
 
     .. seealso::
+        - :func:`get_request_options`
         - :func:`get_ssl_verify_option`
 
     :param method: HTTP method to set request.
@@ -537,22 +623,26 @@ def request_extra(method,                       # type: AnyStr
         This parameter is ignored if allowed codes are explicitly specified.
     :param request_kwargs: All other keyword arguments are passed down to the request call.
     """
+    # obtain file request-options arguments, then override any explicitly provided source-code keywords
+    settings = get_settings(settings) if settings else {}
+    request_options = get_request_options(method, url, settings)
+    request_options.update(request_kwargs)
     # catch kw passed to request corresponding to retries parameters
-    kw_retries = request_kwargs.pop("retries", request_kwargs.pop("retry", request_kwargs.pop("max_retries", 1)))
-    kw_backoff = request_kwargs.pop("backoff", request_kwargs.pop("backoff_factor", 0.3))
-    retries = retries or kw_retries
-    backoff = backoff or kw_backoff
+    kw_retries = request_options.pop("retries", request_options.pop("retry", request_options.pop("max_retries", None)))
+    kw_backoff = request_options.pop("backoff", request_options.pop("backoff_factor", None))
+    kw_intervals = request_options.pop("intervals", None)
+    retries = retries or kw_retries or 0
+    backoff = backoff or kw_backoff or 0.3
+    intervals = intervals or kw_intervals
     if intervals and len(intervals) and all(isinstance(i, (int, float)) for i in intervals):
         intervals = [0] + intervals
         retries = len(intervals)
         backoff = 0  # disable first part of delay calculation
     # SSL verification settings
     # ON by default, disable accordingly with any variant if matched
-    kw_ssl_verify = request_kwargs.pop("ssl_verify", request_kwargs.pop("verify", True))
+    kw_ssl_verify = get_ssl_verify_option(method, url, settings, request_options=request_options)
     ssl_verify = False if not kw_ssl_verify or not ssl_verify else True
-    if settings and ssl_verify:
-        ssl_verify = get_ssl_verify_option(url, settings)
-    request_kwargs.update({"verify": ssl_verify})
+    request_options.update({"verify": ssl_verify})
     # process request
     resp = None
     failures = []

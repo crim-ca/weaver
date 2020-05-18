@@ -4,7 +4,6 @@ from copy import deepcopy
 from time import sleep
 from typing import TYPE_CHECKING
 
-import requests
 from pyramid.httpexceptions import (
     HTTPConflict,
     HTTPForbidden,
@@ -29,7 +28,8 @@ from weaver.utils import (
     get_any_value,
     get_job_log_msg,
     get_log_monitor_msg,
-    pass_http_error
+    pass_http_error,
+    request_extra
 )
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.warning import MissingParameterWarning
@@ -122,7 +122,8 @@ class Wps3Process(WpsProcessInterface):
             }
             ades_headers = {"Content-Type": CONTENT_TYPE_APP_FORM, "Accept": CONTENT_TYPE_APP_JSON}
             ades_access_token_url = "{}/oauth2/token".format(ades_url)
-            cred_resp = requests.post(ades_access_token_url, data=ades_body, headers=ades_headers)
+            cred_resp = request_extra("post", ades_access_token_url,
+                                      data=ades_body, headers=ades_headers, settings=self.settings)
             cred_resp.raise_for_status()
             if CONTENT_TYPE_APP_JSON not in cred_resp.headers.get("Content-Type"):
                 raise HTTPUnauthorized("Cannot retrieve valid access token using credential or ADES configurations.")
@@ -317,7 +318,7 @@ class Wps3Process(WpsProcessInterface):
                 dst_fn = "/".join([out_dir.rstrip("/"), expected_outputs[get_any_id(result)]])
 
                 # TODO Should we handle other type than File reference?
-                resp = requests.get(get_any_value(result), allow_redirects=True)
+                resp = request_extra("get", get_any_value(result), allow_redirects=True, settings=self.settings)
                 LOGGER.debug("Fetching result output from [%s] to cwl output destination: [%s]",
                              get_any_value(result), dst_fn)
                 with open(dst_fn, mode="wb") as dst_fh:
