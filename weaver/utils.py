@@ -510,6 +510,7 @@ def get_request_options(method, url, settings):
 
     .. seealso::
         - :func:`get_ssl_verify_option`
+        - `config/request_options.yml.example <../../config/config/request_options.yml.example>`_
 
     :param method: request method (GET, POST, etc.).
     :param url: request URL.
@@ -530,17 +531,25 @@ def get_request_options(method, url, settings):
         return {}
     request_options = {}
     for req_opts in req_opts_specs.get("requests", []):
-        if not req_opts.get("method", "").upper() in ["", method.upper()]:
-            continue
+        req_meth = req_opts.get("method", "")
+        if req_meth:
+            methods = [meth.upper() for meth in (req_meth if isinstance(req_meth, list) else [req_meth])]
+            if method.upper() not in methods:
+                continue
         req_urls = req_opts.get("url")
         req_urls = [req_urls] if not isinstance(req_urls, list) else req_urls
-        req_urls = ",".join([aslist(req_url) for req_url in req_urls])
-        if not urlmatch(req_urls, url):
+        req_regex = []
+        for req_url in req_urls:
+            req_regex.extend(aslist(req_url))
+        req_regex = ",".join(req_regex)
+        if not url.endswith("/"):
+            url = url + "/"  # allow 'domain.com' match since 'urlmatch' requires slash in 'domain.com/*'
+        if not urlmatch(req_regex, url, path_required=False):
             continue
         req_opts = deepcopy(req_opts)
         req_opts.pop("url", None)
         req_opts.pop("method", None)
-        request_options.update(req_opts)
+        return req_opts
     return request_options
 
 

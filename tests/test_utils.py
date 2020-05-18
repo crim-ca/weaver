@@ -27,7 +27,15 @@ from six.moves.urllib.parse import urlparse
 from tests.compat import contextlib
 from tests.utils import mocked_file_response
 from weaver import status, utils
-from weaver.utils import _NullType, null, fetch_file, get_ssl_verify_option, make_dirs, request_extra  # noqa: W0212
+from weaver.utils import (
+    _NullType,  # noqa: W0212
+    null,
+    fetch_file,
+    get_ssl_verify_option,
+    get_request_options,
+    make_dirs,
+    request_extra
+)
 
 
 def test_null_operators():
@@ -363,8 +371,71 @@ def test_fetch_file_local_with_protocol():
 
 
 def test_get_ssl_verify_option():
-    # get_ssl_verify_option()
-    pass
+    assert get_ssl_verify_option("get", "http://test.com", {}) is True
+    assert get_ssl_verify_option("get", "http://test.com", {"weaver.ssl_verify": False}) is False
+    assert get_ssl_verify_option("get", "http://test.com", {"weaver.ssl_verify": True}) is True
+    assert get_ssl_verify_option("get", "http://test.com", {"weaver.request_options": {
+        "requests": [{"url": "http://test.com/", "method": "get"}]}
+    }) is True
+    assert get_ssl_verify_option("get", "http://test.com", {"weaver.request_options": {
+        "requests": [{"url": "http://test.com/", "method": "get", "verify": False}]}
+    }) is False
+    assert get_ssl_verify_option("get", "http://test.com", {"weaver.request_options": {
+        "requests": [{"url": "http://other.com/", "method": "get", "verify": False}]}
+    }) is True
+    assert get_ssl_verify_option("get", "http://test.com/valid-path", {"weaver.request_options": {
+        "requests": [{"url": "http://test.com/*", "method": "get", "verify": False}]}
+    }) is False
+    assert get_ssl_verify_option("get", "http://test.com/invalid", {"weaver.request_options": {
+        "requests": [{"url": "http://test.com/valid*", "method": "get", "verify": False}]}
+    }) is True
+    assert get_ssl_verify_option("get", "http://test.com/invalid/other", {"weaver.request_options": {
+        "requests": [{"url": ["http://test.com/valid*", "http://test.com/*/other"], "method": "get", "verify": False}]}
+    }) is False
+    assert get_ssl_verify_option("get", "http://test.com/valid", {"weaver.request_options": {
+        "requests": [{"url": ["http://test.com/valid*"], "method": "post", "verify": False}]}
+    }) is True
+    assert get_ssl_verify_option("get", "http://test.com/invalid", {
+        "weaver.ssl_verify": False,
+        "weaver.request_options": {
+            "requests": [{"url": "http://test.com/valid*", "method": "get", "verify": True}]}
+    }) is False
+    assert get_ssl_verify_option("get", "http://test.com/invalid", {
+        "weaver.ssl_verify": True,
+        "weaver.request_options": {
+            "requests": [{"url": "http://test.com/valid*", "method": "get", "verify": False}]}
+    }) is True
+    assert get_ssl_verify_option("get", "http://test.com/valid/good-path", {
+        "weaver.ssl_verify": True,
+        "weaver.request_options": {
+            "requests": [{"url": "http://test.com/valid/*", "method": "get", "verify": False}]}
+    }) is False
+
+
+def test_get_request_options():
+    assert get_request_options("get", "http://test.com", {
+        "weaver.request_options": {"requests": [
+            {"url": "http://test.com/*", "verify": False}
+        ]}
+    }) == {"verify": False}
+    assert get_request_options("get", "http://test.com", {
+        "weaver.request_options": {"requests": [
+            {"url": "http://other.com/*", "verify": False},
+            {"url": "http://test.com/*", "verify": True, "timeout": 30}
+        ]}
+    }) == {"verify": True, "timeout": 30}
+    assert get_request_options("get", "http://test.com/random", {
+        "weaver.request_options": {"requests": [
+            {"url": "http://*/random", "verify": False},  # stop at first match
+            {"url": "http://test.com/*", "verify": True, "timeout": 30}
+        ]}
+    }) == {"verify": False}
+    assert get_request_options("get", "http://test.com", {
+        "weaver.request_options": {"requests": [
+            {"url": "http://*.com", "method": "post", "verify": False},
+            {"url": "http://test.com/*", "timeout": 30}
+        ]}
+    }) == {"timeout": 30}
 
 
 def test_request_extra_allowed_codes():
