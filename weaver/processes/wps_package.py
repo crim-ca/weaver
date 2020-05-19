@@ -112,6 +112,7 @@ if TYPE_CHECKING:
     from pywps.app import WPSRequest                                                    # noqa: F401
     from pywps.response.execute import ExecuteResponse                                  # noqa: F401
     from owslib.wps import Input, Output, WPSExecution                                  # noqa: F401
+    from requests.models import Response                                                # noqa: F401
 
     # typing shortcuts
     # pylint: disable=C0103,invalid-name
@@ -1481,7 +1482,7 @@ def _any2cwl_io(wps_io, io_select):
 
 
 def _xml_wps2cwl(wps_process_response):
-    # type: (requests.models.Response) -> Tuple[CWL, JSON]
+    # type: (Response) -> Tuple[CWL, JSON]
     """
     Converts a `WPS-1 ProcessDescription XML` tree structure to an equivalent `WPS-3 Process JSON` and builds the
     associated `CWL` package in conformance to :ref:`weaver.processes.wps_package.CWL_REQUIREMENT_APP_WPS1`.
