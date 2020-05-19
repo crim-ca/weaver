@@ -22,7 +22,7 @@ from pyramid.httpexceptions import HTTPError as PyramidHTTPError, HTTPGatewayTim
 from pyramid.registry import Registry
 from pyramid.request import Request
 from pyramid.settings import asbool, aslist
-from requests import HTTPError as RequestsHTTPError
+from requests import HTTPError as RequestsHTTPError, Response
 from requests.structures import CaseInsensitiveDict
 from requests_file import FileAdapter
 from urlmatch import urlmatch
@@ -684,7 +684,10 @@ def request_extra(method,                       # type: AnyStr
     if not retries and resp:
         return resp
     detail = "Request ran out of retries. Attempts generated following errors: {}".format(failures)
-    return HTTPGatewayTimeout(detail=detail)
+    err = HTTPGatewayTimeout(detail=detail)
+    setattr(err, "reason", err.explanation)
+    setattr(err, "raise_for_status", lambda: Response.raise_for_status(err))  # noqa
+    return err
 
 
 def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
