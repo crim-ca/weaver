@@ -26,8 +26,9 @@
                 <LiteralData>
                     <ows:DataType ows:reference="urn:ogc:def:dataType:OGC:1.1:string">string</ows:DataType>
                     <ows:AnyValue />
-                </LiteralData></Input>
-            </DataInputs>
+                </LiteralData>
+            </Input>
+        </DataInputs>
         <ProcessOutputs>
             <Output>
                 <ows:Identifier>output</ows:Identifier>

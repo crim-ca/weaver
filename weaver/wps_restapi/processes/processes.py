@@ -4,7 +4,6 @@ from time import sleep
 from typing import TYPE_CHECKING
 
 import colander
-import requests
 import six
 from celery.utils.log import get_task_logger
 from lxml import etree

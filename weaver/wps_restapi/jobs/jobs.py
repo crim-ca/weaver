@@ -1,7 +1,6 @@
 import os
 from typing import TYPE_CHECKING
 
-import requests
 import six
 from celery.utils.log import get_task_logger
 from lxml import etree
@@ -10,7 +9,6 @@ from pyramid.httpexceptions import HTTPBadRequest, HTTPNotFound, HTTPOk, HTTPUna
 from pyramid.request import Request
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
-from requests_file import FileAdapter
 from six.moves.urllib.parse import urlparse
 
 from weaver import sort, status
@@ -52,7 +50,7 @@ def check_status(url=None, response=None, sleep_secs=2, verify=False, settings=N
     :param settings: Application settings to retrieve any additional request parameters as applicable.
     :return: OWSLib.wps.WPSExecution object.
     """
-    def _retry_file(nothrow=False):
+    def _retry_file():
         LOGGER.warning("Failed retrieving status-location, attempting with local file.")
         if url and not urlparse(url).scheme in ["", "file://"]:
             dir_path = get_wps_output_dir(app)

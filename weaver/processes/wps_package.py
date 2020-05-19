@@ -23,7 +23,6 @@ from typing import TYPE_CHECKING
 import cwltool
 import cwltool.factory
 import lxml.etree
-import requests
 import six
 import yaml
 from cwltool.context import LoadingContext, RuntimeContext
@@ -31,7 +30,6 @@ from owslib.wps import ComplexData
 from owslib.wps import Metadata as OwsMetadata
 from owslib.wps import WebProcessingService
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
-from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
 from pywps import Process
 from pywps.app.Common import Metadata
@@ -902,8 +900,14 @@ def _json2wps_io(io_info, io_select):
     # convert by type, add missing required arguments and
     # remove additional arguments according to each case
     io_type = io_info.pop("type", WPS_COMPLEX)  # only ComplexData doesn't have "type"
+    # attempt to identify defined data-type directly in 'type' field instead of 'data_type'
+    if io_type not in [WPS_LITERAL, WPS_BOUNDINGBOX, WPS_COMPLEX, WPS_COMPLEX_DATA]:
+        io_type_guess = _any2wps_literal_datatype(io_type, is_value=False)
+        if io_type_guess is not null:
+            io_type = WPS_LITERAL
+            io_info["data_type"] = io_type_guess
     if io_select == WPS_INPUT:
-        if io_type in (WPS_REFERENCE, WPS_COMPLEX):
+        if io_type in (WPS_REFERENCE, WPS_COMPLEX, WPS_COMPLEX_DATA):
             io_info.pop("data_type", None)
             if "supported_formats" not in io_info:
                 io_info["supported_formats"] = [DEFAULT_FORMAT]
@@ -927,7 +931,7 @@ def _json2wps_io(io_info, io_select):
         io_info.pop("allowed_values", None)
         io_info.pop("data_format", None)
         io_info.pop("default", None)
-        if io_type in (WPS_REFERENCE, WPS_COMPLEX):
+        if io_type in (WPS_REFERENCE, WPS_COMPLEX, WPS_COMPLEX_DATA):
             io_info.pop("supported_values", None)
             return ComplexOutput(**io_info)
         if io_type == WPS_BOUNDINGBOX:
@@ -1155,7 +1159,6 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
         cwl_identifier = _get_field(cwl_io_json, "identifier", search_variations=True)
         cwl_title = _get_field(wps_io_json, "title", search_variations=True)
         wps_io_json.update({
-            "type": _get_field(cwl_io_json, "type"),
             "identifier": cwl_identifier,
             "title": cwl_title if cwl_title is not null else cwl_identifier
         })

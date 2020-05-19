@@ -530,10 +530,12 @@ def get_request_options(method, url, settings):
                        "Request might not be executed with expected configuration.", get_caller_name(skip=2))
         return {}
     request_options = {}
-    for req_opts in req_opts_specs.get("requests", []):
+    request_entries = req_opts_specs.get("requests", []) or []
+    for req_opts in request_entries:
         req_meth = req_opts.get("method", "")
         if req_meth:
-            methods = [meth.upper() for meth in (req_meth if isinstance(req_meth, list) else [req_meth])]
+            methods = req_meth if isinstance(req_meth, list) else [req_meth]
+            methods = [meth.upper() for meth in methods]
             if method.upper() not in methods:
                 continue
         req_urls = req_opts.get("url")
@@ -650,7 +652,7 @@ def request_extra(method,                       # type: AnyStr
     # SSL verification settings
     # ON by default, disable accordingly with any variant if matched
     kw_ssl_verify = get_ssl_verify_option(method, url, settings, request_options=request_options)
-    ssl_verify = False if not kw_ssl_verify or not ssl_verify else True
+    ssl_verify = False if not kw_ssl_verify or not ssl_verify else True  # pylint: disable=R1719
     request_options.update({"verify": ssl_verify})
     # process request
     resp = None
