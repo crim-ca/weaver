@@ -103,7 +103,7 @@ def test_get_cwl_file_format_retry_attempts():
         m_resp.status_code = codes["codes"].pop()
         return m_resp
 
-    with mock.patch("requests.request", side_effect=mock_request_extra) as mocked_request:
+    with mock.patch("requests.Session.request", side_effect=mock_request_extra) as mocked_request:
         _, fmt = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
         assert fmt == "{}:{}".format(IANA_NAMESPACE, CONTENT_TYPE_APP_JSON)
         assert mocked_request.call_count == 2
@@ -117,7 +117,7 @@ def test_get_cwl_file_format_retry_fallback_urlopen():
     def mock_urlopen(*args, **kwargs):  # noqa: E811
         return HTTPOk()
 
-    with mock.patch("requests.request", side_effect=mock_connect_error) as mocked_request:
+    with mock.patch("requests.Session.request", side_effect=mock_connect_error) as mocked_request:
         with mock.patch("weaver.formats.urlopen", side_effect=mock_urlopen) as mocked_urlopen:
             _, fmt = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
             assert fmt == "{}:{}".format(IANA_NAMESPACE, CONTENT_TYPE_APP_JSON)

@@ -464,7 +464,7 @@ def test_request_extra_intervals():
     def mock_sleep(delay):  # noqa: E811
         return
 
-    with mock.patch("requests.request", side_effect=mock_request) as mocked_request:
+    with mock.patch("requests.Session.request", side_effect=mock_request) as mocked_request:
         with mock.patch("weaver.utils.time.sleep", side_effect=mock_sleep) as mocked_sleep:
             intervals = [1e6, 3e6, 5e6]  # random values that shouldn't normally be used with sleep() (too big)
             # values will not match if backoff/retries are not automatically corrected by internals parameter
@@ -504,6 +504,7 @@ def test_fetch_file_remote_with_request():
 
         m_request = stack.enter_context(mock.patch("requests.request", side_effect=mocked_request))
         stack.enter_context(mock.patch("requests.sessions.Session.request", side_effect=mocked_request))
+        stack.enter_context(mock.patch("requests.Session.request", side_effect=mocked_request))
 
         res_dir = os.path.join(tmp_dir, inspect.currentframe().f_code.co_name)
         res_path = os.path.join(res_dir, tmp_name)

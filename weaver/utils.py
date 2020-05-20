@@ -112,7 +112,7 @@ def get_registry(container):
     # type: (AnyRegistryContainer) -> Registry
     """Retrieves the application ``registry`` from various containers referencing to it."""
     if isinstance(container, Celery):
-        return container.conf["PYRAMID_REGISTRY"]
+        return container.conf.get("PYRAMID_REGISTRY", {})
     if isinstance(container, (Configurator, Request)):
         return container.registry
     if isinstance(container, Registry):
