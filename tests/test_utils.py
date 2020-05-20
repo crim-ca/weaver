@@ -447,7 +447,7 @@ def test_request_extra_allowed_codes():
         mocked_resp.status_code = mocked_codes["codes"].pop()
         return mocked_resp
 
-    with mock.patch("requests.request", side_effect=mocked_request) as mocked:
+    with mock.patch("requests.Session.request", side_effect=mocked_request) as mocked:
         resp = request_extra("get", "http://whatever", retries=3, allowed_codes=[HTTPOk.code])
         assert resp.status_code == HTTPOk.code
         assert mocked.call_count == 2

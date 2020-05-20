@@ -12,6 +12,8 @@ Changes:
 - Add ``requests_extra`` SSL verification option using specific URL regex(es) matches from configuration settings.
 - Add ``file://`` transport scheme support directly to utility ``requests_extra`` to handle local file paths.
 - Add file ``weaver.request_options`` INI configuration setting to specify per-request method/URL options.
+- Add ``requests_extra`` support of ``Retry-After`` response header (if any available on ``429`` status) which indicates
+  how long to wait until next request to avoid automatically defined response right after.
 
 Fixes:
 ------
