@@ -502,9 +502,9 @@ def test_fetch_file_remote_with_request():
             resp = HTTPInternalServerError()  # internal retry expect at least a 5xx code to retry
             return resp  # will be available on next call (to test retries)
 
-        m_request = stack.enter_context(mock.patch("requests.request", side_effect=mocked_request))
+        stack.enter_context(mock.patch("requests.request", side_effect=mocked_request))
         stack.enter_context(mock.patch("requests.sessions.Session.request", side_effect=mocked_request))
-        stack.enter_context(mock.patch("requests.Session.request", side_effect=mocked_request))
+        m_request = stack.enter_context(mock.patch("requests.Session.request", side_effect=mocked_request))
 
         res_dir = os.path.join(tmp_dir, inspect.currentframe().f_code.co_name)
         res_path = os.path.join(res_dir, tmp_name)

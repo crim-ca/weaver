@@ -121,7 +121,7 @@ def test_get_cwl_file_format_retry_fallback_urlopen():
         with mock.patch("weaver.formats.urlopen", side_effect=mock_urlopen) as mocked_urlopen:
             _, fmt = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
             assert fmt == "{}:{}".format(IANA_NAMESPACE, CONTENT_TYPE_APP_JSON)
-            assert mocked_request.call_count == 3   # internally attempted 3 times
+            assert mocked_request.call_count == 4   # internally attempted 4 times (1 attempt + 3 retries)
             assert mocked_urlopen.call_count == 1
 
 

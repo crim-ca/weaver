@@ -1,3 +1,4 @@
+import logging
 import unittest
 from copy import deepcopy
 
@@ -32,6 +33,8 @@ EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_TEXT_PLAIN]
 EDAM_NETCDF = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_APP_NETCDF]
 IANA_TAR = IANA_NAMESPACE + ":" + CONTENT_TYPE_APP_TAR
 IANA_ZIP = IANA_NAMESPACE + ":" + CONTENT_TYPE_APP_ZIP
+
+LOGGER = logging.getLogger(__name__)
 
 
 @pytest.mark.functional
@@ -505,8 +508,13 @@ class WpsPackageAppTest(unittest.TestCase):
         for output in desc["process"]["outputs"]:
             for field in ["minOccurs", "maxOccurs", "default"]:
                 assert field not in output
-            # for format_spec in output["formats"]:
-            #     assert "default" not in format_spec
+            for format_spec in output["formats"]:
+                # FIXME: not breaking for now, but should be fixed eventually (doesn't make sense to have defaults)
+                #   https://github.com/crim-ca/weaver/issues/17
+                #   https://github.com/crim-ca/weaver/issues/50
+                if "default" in format_spec:
+                    LOGGER.warning("Output [%s] has 'default' key but shouldn't (non-breaking).", output["id"])
+                # assert "default" not in format_spec
         assert desc["process"]["outputs"][0]["id"] == "single_value_single_format"
         assert len(desc["process"]["outputs"][0]["formats"]) == 1
         assert desc["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
@@ -928,16 +936,19 @@ class WpsPackageAppTest(unittest.TestCase):
             "inputs": [
                 {
                     "id": "complex_input_only_cwl_minimal",
+                    "label": "Complex Input Only CWL Minimal",
                     "type": "File"
                 },
                 {
                     "id": "complex_input_both_cwl_and_wps",
+                    "label": "Complex Input Both CWL and WPS - From CWL",
                     "type": "File"
                 },
             ],
             "outputs": [
                 {
                     "id": "complex_output_only_cwl_minimal",
+                    "label": "Complex Output Only CWL Minimal",
                     "type": "File",
                 },
                 {
