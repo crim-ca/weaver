@@ -30,7 +30,7 @@ pyramid_celery
 pyramid_mako
 pytz
 pywps
-pyyaml>=4.2b4
+pyyaml==5.2
 requests
 requests_file
 # let cwltool define ruamel.yaml version (<=0.16.5)
@@ -38,7 +38,7 @@ requests_file
 # (https://bitbucket.org/ruamel/yaml/issues/261/error-while-installing-ruamelyaml-setuppy)
 # let cwltool fully define the version if python 2 is used
 ruamel.yaml>=0.15.78,<=0.16.5; python_version >= "3"
-ruamel.yaml; python_version < "3"
+ruamel.yaml<=0.16.5; python_version < "3"
 shapely
 six
 simplejson
