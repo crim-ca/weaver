@@ -154,6 +154,11 @@ def load_pywps_cfg(container, config=None):
             output_url = pywps_config.get_config_value("server", "outputurl")
         settings["weaver.wps_output_url"] = output_url
 
+    # apply workdir if provided, otherwise use default
+    if "weaver.wps_workdir" in settings:
+        make_dirs(settings["weaver.wps_workdir"], exist_ok=True)
+        WEAVER_PYWPS_CFG.set("server", "workdir", settings["weaver.wps_workdir"])
+
     # enforce back resolved values onto PyWPS config
     WEAVER_PYWPS_CFG.set("server", "setworkdir", "true")
     WEAVER_PYWPS_CFG.set("server", "sethomedir", "true")
