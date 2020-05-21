@@ -14,6 +14,7 @@ Changes:
 - Add file ``weaver.request_options`` INI configuration setting to specify per-request method/URL options.
 - Add ``requests_extra`` support of ``Retry-After`` response header (if any available on ``429`` status) which indicates
   how long to wait until next request to avoid automatically defined response right after.
+- Add ``weaver.wps_workdir`` configuration setting with allow setting corresponding ``pywps.workdir`` directory.
 
 Fixes:
 ------
@@ -29,6 +30,7 @@ Fixes:
 - Fix invalid handling of ``wps_processes.yml`` reference in ``weaver.ini`` when specified as relative path to
   configuration directory.
 - Fix handling of ``WPS<->CWL`` I/O merge of ``data_format`` field against ``supported_formats`` with ``pywps>=4.2.4``.
+- Fix installation of ``yaml``-related packages for Python 2 backward compatibility.
 
 `1.7.0 <https://github.com/crim-ca/weaver/tree/1.7.0>`_ (2020-05-15)
 ========================================================================
