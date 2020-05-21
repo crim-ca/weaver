@@ -22,6 +22,10 @@ Fixes:
   worker options anymore when loaded form ``weaver.ini`` with ``--paste`` argument. Also simplifies the command which
   already required multiple patches such as reapplying the host/port binding from INI file.
 - Fix handling of Literal Data I/O ``type`` when retrieved from ``OWSLib.wps`` object with remote WPS XML body.
+- Adjust ``make start`` target to use new ``make install-run`` target which installs the dependencies and package in
+  edition mode so that configuration files present locally can be employed for running the application.
+  Previously, one would have to move their configurations to the ``site-package`` install location of the active Python.
+- Fix ``celery>4.2`` not found because of application path modification.
 
 `1.7.0 <https://github.com/crim-ca/weaver/tree/1.7.0>`_ (2020-05-15)
 ========================================================================

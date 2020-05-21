@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 import pytz
 import requests
 import six
-from celery import Celery
+from celery.app import Celery
 from lxml import etree
 from pyramid.config import Configurator
 from pyramid.httpexceptions import HTTPError as PyramidHTTPError, HTTPGatewayTimeout, HTTPTooManyRequests

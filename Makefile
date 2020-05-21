@@ -164,10 +164,13 @@ conda-env-export:		## export the conda environment
 ## -- Build targets -- ##
 
 .PHONY: install
-install: install-all	## alias for 'install-all' target
+install: install-all    ## alias for 'install-all' target
+
+.PHONY: install-run
+install-run: install-sys install-pkg install-raw 	## install requirements and application to run it locally
 
 .PHONY: install-all
-install-all: install-sys install-pip install-pkg install-dev  ## install application with all its dependencies
+install-all: install-sys install-pkg install-pip install-dev  ## install application with all its dependencies
 
 .PHONY: install-dev
 install-dev: install-pip	## install development and test dependencies
@@ -451,7 +454,7 @@ docker-push: docker-push-base docker-push-manager docker-push-worker	## push all
 ## --- Launchers targets --- ##
 
 .PHONY: start
-start: install	## start application instance(s) with gunicorn (pserve)
+start: install-run	## start application instance(s) with gunicorn (pserve)
 	@echo "Starting $(APP_NAME)..."
 	@bash -c '$(CONDA_CMD) exec pserve "$(APP_INI)" &'
 
