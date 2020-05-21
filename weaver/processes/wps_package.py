@@ -1198,6 +1198,13 @@ def _merge_package_io(wps_io_list, cwl_io_list, io_select):
                 # list of formats are updated by comparing format items since information can be partially complementary
                 if field_type in ["supported_formats"]:
                     wps_field = _merge_io_formats(wps_field, cwl_field)
+                # default 'data_format' must be one of the 'supported_formats'
+                # avoid setting something invalid in this case, or it will cause problem after
+                # note: 'supported_formats' must have been processed before
+                if field_type == "data_format":
+                    if wps_field not in _get_field(updated_io_list[-1], "supported_formats",
+                                                   search_variations=False, default=[]):
+                        continue
                 _set_field(updated_io_list[-1], field_type, wps_field)
     return updated_io_list
 
