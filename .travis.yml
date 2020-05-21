@@ -53,7 +53,12 @@ jobs:
       name: "Linter Checks"
       python: "3.7"
       os: linux
-      script: make check docs
+      script: make check
+    - stage: check
+      name: "Documentation Checks"
+      python: "3.7"
+      os: linux
+      script: make docs
     # run some additional 'test' stage commands simultaneously to others (job/env matrix expansion),
     # but only executed once with specific os/python version
     - stage: test
