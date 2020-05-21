@@ -1,3 +1,5 @@
+# Defines a list of WPS-1 processes references from remote service provider to register under Weaver at startup.
+#
 # Details:
 #   - if only the WPS-1 URL endpoint is provided, all processes found by `GetCapabilities` will be added
 #   - if query `identifier=<process-id>` is provided, only matched process(es) will be added.

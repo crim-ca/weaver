@@ -51,16 +51,22 @@ def get_weaver_configuration(container):
     return weaver_config_up
 
 
-def get_weaver_config_file(file_path, default_config_file):
-    # type: (AnyStr, AnyStr) -> AnyStr
+def get_weaver_config_file(file_path, default_config_file, generate_default_from_example=True):
+    # type: (AnyStr, AnyStr, bool) -> AnyStr
     """Validates that the specified configuration file can be found, or falls back to the default one.
 
     Handles 'relative' paths for settings in ``WEAVER_DEFAULT_INI_CONFIG`` referring to other configuration files.
     Default file must be one of ``WEAVER_DEFAULT_CONFIGS``.
-    If the default file cannot be found, it is auto-generated from the corresponding example file.
+
+    If both the specified file and the default file cannot be found, default file under ``WEAVER_DEFAULT_INI_CONFIG`` is
+    auto-generated from the corresponding ``.example`` file if :paramref:`generate_default_from_example` is ``True``.
+    If it is ``False``, an empty string is returned instead without generation since no existing file can be guaranteed,
+    and it is up to the caller to handle this situation as it explicitly disabled generation.
 
     :param file_path: path to a configuration file (can be relative if resolvable or matching a default file name)
     :param default_config_file: one of :py:data:`WEAVER_DEFAULT_CONFIGS`.
+    :param generate_default_from_example: enable fallback copy of default configuration file from corresponding example.
+    :returns: absolue path of the resolved file.
     """
     if default_config_file not in WEAVER_DEFAULT_CONFIGS:
         raise ValueError("Invalid default configuration file [{}] is not one of {}"
@@ -78,8 +84,11 @@ def get_weaver_config_file(file_path, default_config_file):
         return default_path
     example_file = default_config_file + ".example"
     example_path = default_path + ".example"
-    LOGGER.warning("Could not find default configuration file: [%s]. "
-                   "Using generated file copied from: [%s]", file_path, example_file)
+    LOGGER.warning("Could not find default configuration file: [%s]. ", file_path)
+    if not generate_default_from_example:
+        LOGGER.warning("Default file generation from default disabled. No file returned.")
+        return ""
+    LOGGER.warning("Using generated file copied from: [%s]", example_file)
     if not os.path.isfile(example_path):
         raise RuntimeError("Could not find expected example configuration file: [{}]".format(example_path))
     shutil.copyfile(example_path, default_path)

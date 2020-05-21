@@ -26,6 +26,8 @@ Fixes:
   edition mode so that configuration files present locally can be employed for running the application.
   Previously, one would have to move their configurations to the ``site-package`` install location of the active Python.
 - Fix ``celery>4.2`` not found because of application path modification.
+- Fix invalid handling of ``wps_processes.yml`` reference in ``weaver.ini`` when specified as relative path to
+  configuration directory.
 
 `1.7.0 <https://github.com/crim-ca/weaver/tree/1.7.0>`_ (2020-05-15)
 ========================================================================
