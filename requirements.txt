@@ -1,7 +1,7 @@
 alembic
 argcomplete
 backports.tempfile; python_version < "3"
-celery
+celery<5
 cffi
 colander
 cornice
