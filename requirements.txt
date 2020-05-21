@@ -37,7 +37,7 @@ requests_file
 # ensure minimal 0.15.78 to solve install issue (python 3.8)
 # (https://bitbucket.org/ruamel/yaml/issues/261/error-while-installing-ruamelyaml-setuppy)
 # let cwltool fully define the version if python 2 is used
-ruamel.yaml>=0.15.78,<=0.16.5; python_version >= "3"
+ruamel.yaml>=0.15.78,<=0.16.5
 shapely
 six
 simplejson
