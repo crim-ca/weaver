@@ -42,14 +42,19 @@ before_install:
 install:
   - make install
 stages:
-  - check     # run linting checks and don't bother with the rest if invalid
-  - test      # use default stage to run job matrix variations
+  - check           # run linting checks and don't bother with the rest if invalid
+  - test            # use default stage to run job matrix variations
+  - deploy-docker   # deploy to dockerhub if successful master/tag tests
 script:
   # start as required as sleep a bit to let application boot before tests
   - if [ "${START_TARGET}" == "start" ]; then make start; sleep 5; fi
   # script executed for each job matrix variation in 'test' stage
   - make ${TEST_TARGET}
 jobs:
+  allow_failures:
+    - python: "2.7"   # deprecated support
+    - os: windows     # experimental support
+  fast_finish: true   # required jobs will indicate success/failure as soon as possible
   include:
     # use different stages to quick fail faster before 'test' stage
     - stage: check
@@ -87,27 +92,28 @@ jobs:
         - cp -f tests/travis-ci/data_sources.json ./
         - make --version
         - make info
-  allow_failures:
-    - python: "2.7"   # deprecated support
-    - os: windows     # experimental support
-  fast_finish: true   # required jobs will indicate success/failure as soon as possible
+    - stage: deploy-docker
+      name: "Deploy Docker"
+      python: "3.7"
+      os: linux
+      # 'latest' is always pushed, tag is additionally push if applicable
+      script:
+        - |
+          if [ "$TRAVIS_BRANCH" == "master" ];
+            then export TAG_VERSION=latest;
+            else export TAG_VERSION=$TRAVIS_TAG;
+          fi
+          if [ -z "${TAG_VERSION}" ] || [ "$TRAVIS_PULL_REQUEST" != "false" ];
+          then
+            echo "Nothing to build for '$TRAVIS_BRANCH' (PR: $TRAVIS_PULL_REQUEST)";
+          else
+            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+            make DOCKER_REPO=pavics/weaver APP_VERSION=$TAG_VERSION docker-info docker-build docker-push
+          fi
 notifications:
   email: false
 after_success:
+  # coverage will exist only under 'coverage' test job, send it to get reports
   - bash <(curl -s https://codecov.io/bash) || echo "Codecov did not collect coverage reports"
   - source $(HOME)/conda/bin/activate weaver && python-codacy-coverage -r reports/coverage.xml
-  - make stop
-  - |
-    if [ "$TRAVIS_BRANCH" == "master" ];
-    then export TAG_VERSION=latest;
-    else export TAG_VERSION=$TRAVIS_TAG;
-    fi
-  - |
-    if [ "${TRAVIS_PYTHON_VERSION}" == "3.7" ]; then
-      if [ -z "${TAG_VERSION}" ] || [ "$TRAVIS_PULL_REQUEST" != "false" ];
-      then echo "Nothing to build for '$TRAVIS_BRANCH' (PR: $TRAVIS_PULL_REQUEST)";
-      else
-        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-        make DOCKER_REPO=pavics/weaver APP_VERSION=$TAG_VERSION docker-info docker-build docker-push
-      fi
-    fi
+  - make stop   # make sure no more app is running
