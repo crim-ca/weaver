@@ -2,7 +2,6 @@ import logging
 from time import sleep
 from typing import TYPE_CHECKING, AnyStr
 
-import requests
 from owslib.wps import ComplexDataInput, WebProcessingService
 
 from weaver import status
@@ -17,6 +16,7 @@ from weaver.utils import (
     get_job_log_msg,
     get_log_monitor_msg,
     raise_on_xml_exception,
+    request_extra,
     wait_secs
 )
 from weaver.wps_restapi.jobs.jobs import check_status
@@ -54,7 +54,7 @@ class Wps1Process(WpsProcessInterface):
         try:
             try:
                 wps = WebProcessingService(url=self.provider, headers=self.cookies, verify=self.verify)
-                raise_on_xml_exception(wps._capabilities)
+                raise_on_xml_exception(wps._capabilities)  # noqa: W0212
             except Exception as ex:
                 raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
             try:
@@ -160,7 +160,7 @@ class Wps1Process(WpsProcessInterface):
 
                     # TODO Should we handle other type than File reference?
 
-                    resp = requests.get(result_val, allow_redirects=True)
+                    resp = request_extra("get", result_val, allow_redirects=True, settings=self.settings)
                     LOGGER.debug("Fetching result output from [%s] to cwl output destination: [%s]", result_val, dst_fn)
                     with open(dst_fn, mode="wb") as dst_fh:
                         dst_fh.write(resp.content)

@@ -27,7 +27,15 @@ from six.moves.urllib.parse import urlparse
 from tests.compat import contextlib
 from tests.utils import mocked_file_response
 from weaver import status, utils
-from weaver.utils import _NullType, null, fetch_file, make_dirs, request_retry  # noqa: W0212
+from weaver.utils import (
+    _NullType,  # noqa: W0212
+    null,
+    fetch_file,
+    get_ssl_verify_option,
+    get_request_options,
+    make_dirs,
+    request_extra
+)
 
 
 def test_null_operators():
@@ -362,7 +370,75 @@ def test_fetch_file_local_with_protocol():
             shutil.rmtree(res_dir, ignore_errors=True)
 
 
-def test_request_retry_allowed_codes():
+def test_get_ssl_verify_option():
+    assert get_ssl_verify_option("get", "http://test.com", {}) is True
+    assert get_ssl_verify_option("get", "http://test.com", {"weaver.ssl_verify": False}) is False
+    assert get_ssl_verify_option("get", "http://test.com", {"weaver.ssl_verify": True}) is True
+    assert get_ssl_verify_option("get", "http://test.com", {"weaver.request_options": {
+        "requests": [{"url": "http://test.com/", "method": "get"}]}
+    }) is True
+    assert get_ssl_verify_option("get", "http://test.com", {"weaver.request_options": {
+        "requests": [{"url": "http://test.com/", "method": "get", "verify": False}]}
+    }) is False
+    assert get_ssl_verify_option("get", "http://test.com", {"weaver.request_options": {
+        "requests": [{"url": "http://other.com/", "method": "get", "verify": False}]}
+    }) is True
+    assert get_ssl_verify_option("get", "http://test.com/valid-path", {"weaver.request_options": {
+        "requests": [{"url": "http://test.com/*", "method": "get", "verify": False}]}
+    }) is False
+    assert get_ssl_verify_option("get", "http://test.com/invalid", {"weaver.request_options": {
+        "requests": [{"url": "http://test.com/valid*", "method": "get", "verify": False}]}
+    }) is True
+    assert get_ssl_verify_option("get", "http://test.com/invalid/other", {"weaver.request_options": {
+        "requests": [{"url": ["http://test.com/valid*", "http://test.com/*/other"], "method": "get", "verify": False}]}
+    }) is False
+    assert get_ssl_verify_option("get", "http://test.com/valid", {"weaver.request_options": {
+        "requests": [{"url": ["http://test.com/valid*"], "method": "post", "verify": False}]}
+    }) is True
+    assert get_ssl_verify_option("get", "http://test.com/invalid", {
+        "weaver.ssl_verify": False,
+        "weaver.request_options": {
+            "requests": [{"url": "http://test.com/valid*", "method": "get", "verify": True}]}
+    }) is False
+    assert get_ssl_verify_option("get", "http://test.com/invalid", {
+        "weaver.ssl_verify": True,
+        "weaver.request_options": {
+            "requests": [{"url": "http://test.com/valid*", "method": "get", "verify": False}]}
+    }) is True
+    assert get_ssl_verify_option("get", "http://test.com/valid/good-path", {
+        "weaver.ssl_verify": True,
+        "weaver.request_options": {
+            "requests": [{"url": "http://test.com/valid/*", "method": "get", "verify": False}]}
+    }) is False
+
+
+def test_get_request_options():
+    assert get_request_options("get", "http://test.com", {
+        "weaver.request_options": {"requests": [
+            {"url": "http://test.com/*", "verify": False}
+        ]}
+    }) == {"verify": False}
+    assert get_request_options("get", "http://test.com", {
+        "weaver.request_options": {"requests": [
+            {"url": "http://other.com/*", "verify": False},
+            {"url": "http://test.com/*", "verify": True, "timeout": 30}
+        ]}
+    }) == {"verify": True, "timeout": 30}
+    assert get_request_options("get", "http://test.com/random", {
+        "weaver.request_options": {"requests": [
+            {"url": "http://*/random", "verify": False},  # stop at first match
+            {"url": "http://test.com/*", "verify": True, "timeout": 30}
+        ]}
+    }) == {"verify": False}
+    assert get_request_options("get", "http://test.com", {
+        "weaver.request_options": {"requests": [
+            {"url": "http://*.com", "method": "post", "verify": False},
+            {"url": "http://test.com/*", "timeout": 30}
+        ]}
+    }) == {"timeout": 30}
+
+
+def test_request_extra_allowed_codes():
     """Verifies that ``allowed_codes`` only are considered as valid status instead of any non-error HTTP code."""
     mocked_codes = {"codes": [HTTPCreated.code, HTTPOk.code, HTTPCreated.code]}  # note: used in reverse order
 
@@ -371,13 +447,13 @@ def test_request_retry_allowed_codes():
         mocked_resp.status_code = mocked_codes["codes"].pop()
         return mocked_resp
 
-    with mock.patch("requests.request", side_effect=mocked_request) as mocked:
-        resp = request_retry("get", "http://whatever", retries=3, allowed_codes=[HTTPOk.code])
+    with mock.patch("requests.Session.request", side_effect=mocked_request) as mocked:
+        resp = request_extra("get", "http://whatever", retries=3, allowed_codes=[HTTPOk.code])
         assert resp.status_code == HTTPOk.code
         assert mocked.call_count == 2
 
 
-def test_request_retry_intervals():
+def test_request_extra_intervals():
     """Verifies that ``intervals`` are used for calling the retry operations instead of ``backoff``/``retries``."""
 
     def mock_request(*args, **kwargs):  # noqa: E811
@@ -388,11 +464,11 @@ def test_request_retry_intervals():
     def mock_sleep(delay):  # noqa: E811
         return
 
-    with mock.patch("requests.request", side_effect=mock_request) as mocked_request:
+    with mock.patch("requests.Session.request", side_effect=mock_request) as mocked_request:
         with mock.patch("weaver.utils.time.sleep", side_effect=mock_sleep) as mocked_sleep:
             intervals = [1e6, 3e6, 5e6]  # random values that shouldn't normally be used with sleep() (too big)
             # values will not match if backoff/retries are not automatically corrected by internals parameter
-            resp = request_retry("get", "http://whatever", only_server_errors=False,
+            resp = request_extra("get", "http://whatever", only_server_errors=False,
                                  intervals=intervals, backoff=1000, retries=10)
             assert resp.status_code == HTTPGatewayTimeout.code
             assert mocked_request.call_count == 4
@@ -426,8 +502,9 @@ def test_fetch_file_remote_with_request():
             resp = HTTPInternalServerError()  # internal retry expect at least a 5xx code to retry
             return resp  # will be available on next call (to test retries)
 
-        m_request = stack.enter_context(mock.patch("requests.request", side_effect=mocked_request))
+        stack.enter_context(mock.patch("requests.request", side_effect=mocked_request))
         stack.enter_context(mock.patch("requests.sessions.Session.request", side_effect=mocked_request))
+        m_request = stack.enter_context(mock.patch("requests.Session.request", side_effect=mocked_request))
 
         res_dir = os.path.join(tmp_dir, inspect.currentframe().f_code.co_name)
         res_path = os.path.join(res_dir, tmp_name)

@@ -4,7 +4,6 @@ from time import sleep
 from typing import TYPE_CHECKING
 
 import colander
-import requests
 import six
 from celery.utils.log import get_task_logger
 from lxml import etree
@@ -45,7 +44,15 @@ from weaver.processes.types import PROCESS_BUILTIN, PROCESS_WORKFLOW
 from weaver.processes.utils import convert_process_wps_to_db, deploy_process_from_payload, jsonify_output
 from weaver.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_STARTED, STATUS_SUCCEEDED, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
-from weaver.utils import get_any_id, get_any_value, get_cookie_headers, get_settings, raise_on_xml_exception, wait_secs
+from weaver.utils import (
+    get_any_id,
+    get_any_value,
+    get_cookie_headers,
+    get_settings,
+    raise_on_xml_exception,
+    request_extra,
+    wait_secs,
+)
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps import get_wps_output_dir, get_wps_output_path, get_wps_output_url, load_pywps_cfg
 from weaver.wps_restapi import swagger_definitions as sd
@@ -501,18 +508,20 @@ def get_processes(request):
         response_body = {"processes": processes if detail else [get_any_id(p) for p in processes]}
 
         # if 'EMS' and '?providers=True', also fetch each provider's processes
-        if get_weaver_configuration(get_settings(request)) == WEAVER_CONFIGURATION_EMS:
+        settings = get_settings(request)
+        if get_weaver_configuration(settings) == WEAVER_CONFIGURATION_EMS:
             queries = parse_request_query(request)
             if "providers" in queries and asbool(queries["providers"][0]) is True:
-                providers_response = requests.request("GET", "{host}/providers".format(host=request.host_url),
-                                                      headers=request.headers, cookies=request.cookies)
+                prov_url = "{host}/providers".format(host=request.host_url)
+                providers_response = request_extra("GET", prov_url, settings=settings,
+                                                   headers=request.headers, cookies=request.cookies)
                 providers = providers_response.json()
                 response_body.update({"providers": providers})
                 for i, provider in enumerate(providers):
                     provider_id = get_any_id(provider)
-                    response = requests.request("GET", "{host}/providers/{provider_id}/processes"
-                                                .format(host=request.host_url, provider_id=provider_id),
-                                                headers=request.headers, cookies=request.cookies)
+                    proc_url = "{host}/providers/{prov}/processes".format(host=request.host_url, prov=provider_id)
+                    response = request_extra("GET", proc_url, settings=settings,
+                                             headers=request.headers, cookies=request.cookies)
                     processes = response.json().get("processes", [])
                     response_body["providers"][i].update({
                         "processes": processes if detail else [get_any_id(p) for p in processes]

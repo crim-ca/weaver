@@ -1,26 +1,31 @@
 import errno
+import inspect
 import logging
 import os
 import re
 import shutil
+import sys
 import time
 import types
 import warnings
+from copy import deepcopy
 from datetime import datetime
-from inspect import isclass, isfunction
 from typing import TYPE_CHECKING
 
 import pytz
 import requests
 import six
-from celery import Celery
+from celery.app import Celery
 from lxml import etree
 from pyramid.config import Configurator
-from pyramid.httpexceptions import HTTPError as PyramidHTTPError, HTTPGatewayTimeout
+from pyramid.httpexceptions import HTTPError as PyramidHTTPError, HTTPGatewayTimeout, HTTPTooManyRequests
 from pyramid.registry import Registry
 from pyramid.request import Request
-from requests import HTTPError as RequestsHTTPError
+from pyramid.settings import asbool, aslist
+from requests import HTTPError as RequestsHTTPError, Response
 from requests.structures import CaseInsensitiveDict
+from requests_file import FileAdapter
+from urlmatch import urlmatch
 from six.moves.urllib.parse import ParseResult, parse_qs, urlparse, urlunsplit
 from webob.headers import EnvironHeaders, ResponseHeaders
 
@@ -55,7 +60,7 @@ class _NullType(six.with_metaclass(_Singleton)):
         return (isinstance(other, _NullType)                                    # noqa: W503
                 or other is null                                                # noqa: W503
                 or other is self.__instance__                                   # noqa: W503
-                or (isclass(other) and issubclass(other, _NullType)))           # noqa: W503
+                or (inspect.isclass(other) and issubclass(other, _NullType)))   # noqa: W503
 
     def __repr__(self):
         return "<null>"
@@ -107,7 +112,7 @@ def get_registry(container):
     # type: (AnyRegistryContainer) -> Registry
     """Retrieves the application ``registry`` from various containers referencing to it."""
     if isinstance(container, Celery):
-        return container.conf["PYRAMID_REGISTRY"]
+        return container.conf.get("PYRAMID_REGISTRY", {})
     if isinstance(container, (Configurator, Request)):
         return container.registry
     if isinstance(container, Registry):
@@ -208,7 +213,7 @@ def parse_extra_options(option_str):
 def fully_qualified_name(obj):
     # type: (Union[Any, Type[Any]]) -> str
     """Obtains the ``'<module>.<name>'`` full path definition of the object to allow finding and importing it."""
-    cls = obj if isclass(obj) or isfunction(obj) else type(obj)
+    cls = obj if inspect.isclass(obj) or inspect.isfunction(obj) else type(obj)
     return ".".join([obj.__module__, cls.__name__])
 
 
@@ -425,18 +430,150 @@ def make_dirs(path, mode=0o755, exist_ok=False):
             raise
 
 
-def request_retry(method,                       # type: AnyStr
+def get_caller_name(skip=2, base_class=False):
+    """Returns the name of a caller in the format ``module.class.method``.
+
+    :param skip: specifies how many levels of stack to skip while getting the caller.
+    :param base_class:
+        Specified if the base class should be returned or the top-most class in case of inheritance
+        If the caller is not a class, this doesn't do anything.
+    :returns: An empty string if skipped levels exceed stack height; otherwise, the requested caller name.
+    """
+    # reference: https://gist.github.com/techtonik/2151727
+
+    def stack_(frame):
+        frame_list = []
+        while frame:
+            frame_list.append(frame)
+            frame = frame.f_back
+        return frame_list
+
+    stack = stack_(sys._getframe(1))  # noqa: W0212
+    start = 0 + skip
+    if len(stack) < start + 1:
+        return ""
+    parent_frame = stack[start]
+    name = []
+    module = inspect.getmodule(parent_frame)
+    # `modname` can be None when frame is executed directly in console
+    if module:
+        # frame module in case of inherited classes will point to base class
+        # but frame local will still refer to top-most class when checking for 'self'
+        # (stack: top(mid).__init__ -> mid(base).__init__ -> base.__init__)
+        name.append(module.__name__)
+    # detect class name
+    if "self" in parent_frame.f_locals:
+        # I don't know any way to detect call from the object method
+        # XXX: there seems to be no way to detect static method call - it will
+        #      be just a function call
+        cls = parent_frame.f_locals["self"].__class__
+        if not base_class and module and inspect.isclass(cls):
+            name[0] = cls.__module__
+        name.append(cls.__name__)
+    codename = parent_frame.f_code.co_name
+    if codename != "<module>":  # top level usually
+        name.append(codename)  # function or a method
+    del parent_frame
+    return ".".join(name)
+
+
+def get_ssl_verify_option(method, url, settings, request_options=None):
+    # type: (AnyStr, AnyStr, AnySettingsContainer, Optional[SettingsType]) -> bool
+    """
+    Obtains the SSL verification option from combined settings from ``weaver.ssl_verify`` and parsed
+    ``weaver.request_options`` file for the corresponding request.
+
+    :param method: request method (GET, POST, etc.).
+    :param url: request URL.
+    :param settings: application setting container with pre-loaded *request options* specifications.
+    :param request_options: pre-processed *request options* for method/URL to avoid re-parsing the settings.
+    :returns: SSL ``verify`` option to be passed down to some ``request`` function.
+    """
+    if not settings:
+        return True
+    settings = get_settings(settings)
+    if not asbool(settings.get("weaver.ssl_verify", True)):
+        return False
+    req_opts = request_options or get_request_options(method, url, settings)
+    if not req_opts.get("ssl_verify", req_opts.get("verify", True)):
+        return False
+    return True
+
+
+def get_request_options(method, url, settings):
+    # type: (AnyStr, AnyStr, AnySettingsContainer) -> SettingsType
+    """
+    Obtains the *request options* corresponding to the request according to configuration file specified by pre-loaded
+    setting ``weaver.request_options``.
+
+    If no file was pre-loaded or no match is found for the request, an empty options dictionary is returned.
+
+    .. seealso::
+        - :func:`get_ssl_verify_option`
+        - `config/request_options.yml.example <../../config/config/request_options.yml.example>`_
+
+    :param method: request method (GET, POST, etc.).
+    :param url: request URL.
+    :param settings: application setting container with pre-loaded *request options* specifications.
+    :returns: dictionary with keyword options to be applied to the corresponding request if matched.
+    """
+    if not settings:
+        LOGGER.warning("No settings container provided by [%s], request options might not be applied as expected.",
+                       get_caller_name(skip=2))
+        return {}
+    settings = get_settings(settings)  # ensure settings, could be any container
+    req_opts_specs = settings.get("weaver.request_options", None)
+    if not isinstance(req_opts_specs, dict):
+        # empty request options is valid (no file specified),
+        # but none pre-processed by app means the settings come from unexpected source
+        LOGGER.warning("Settings container provided by [%s] missing request options specification. "
+                       "Request might not be executed with expected configuration.", get_caller_name(skip=2))
+        return {}
+    request_options = {}
+    request_entries = req_opts_specs.get("requests", []) or []
+    for req_opts in request_entries:
+        req_meth = req_opts.get("method", "")
+        if req_meth:
+            methods = req_meth if isinstance(req_meth, list) else [req_meth]
+            methods = [meth.upper() for meth in methods]
+            if method.upper() not in methods:
+                continue
+        req_urls = req_opts.get("url")
+        req_urls = [req_urls] if not isinstance(req_urls, list) else req_urls
+        req_regex = []
+        for req_url in req_urls:
+            req_regex.extend(aslist(req_url))
+        req_regex = ",".join(req_regex)
+        if not url.endswith("/"):
+            url = url + "/"  # allow 'domain.com' match since 'urlmatch' requires slash in 'domain.com/*'
+        if not urlmatch(req_regex, url, path_required=False):
+            continue
+        req_opts = deepcopy(req_opts)
+        req_opts.pop("url", None)
+        req_opts.pop("method", None)
+        return req_opts
+    return request_options
+
+
+def request_extra(method,                       # type: AnyStr
                   url,                          # type: AnyStr
-                  retries=0,                    # type: int
-                  backoff=0,                    # type: Number
-                  intervals=None,               # type: Optional[List[Union[float, int]]]
+                  retries=None,                 # type: Optional[int]
+                  backoff=None,                 # type: Optional[Number]
+                  intervals=None,               # type: Optional[List[Number]]
+                  retry_after=True,             # type: bool
                   allowed_codes=None,           # type: Optional[List[int]]
                   only_server_errors=True,      # type: bool
+                  ssl_verify=None,              # type: Optional[bool]
+                  settings=None,                # type: Optional[AnySettingsContainer]
                   **request_kwargs,             # type: Any
                   ):                            # type: (...) -> AnyResponseType
     """
-    Implements basic request retry operation if the previous request failed, up to the specified number of retries.
+    Standard library :mod:`requests` with additional functional utilities.
 
+    Retry operation
+    ---------------
+
+    Implements request retry if the previous request failed, up to the specified number of retries.
     Using :paramref:`backoff` factor, you can control the interval between request attempts such as::
 
         delay = backoff * (2 ^ retry)
@@ -445,42 +582,111 @@ def request_retry(method,                       # type: AnyStr
     wait between each request attempt. In this case, :paramref:`backoff` is ignored and :paramref:`retries` is
     overridden accordingly with the number of items specified in the list.
 
+    Furthermore, :paramref:`retry_after` (default: ``True``) indicates if HTTP status code ``429 (Too Many Requests)``
+    should be automatically handled during retries. If enabled and provided in the previously failed request response
+    through the ``Retry-After`` header, the next request attempt will be executed only after the server-specified delay
+    instead of following the calculated delay from :paramref:`retries` and :paramref:`backoff`, or from corresponding
+    index of :paramref:`interval`, accordingly to specified parameters. This will avoid uselessly calling the server and
+    automatically receive a denied response. You can disable this feature by passing ``False``, which will result into
+    requests being retried blindly without consideration of the called server instruction.
+
     Because different request implementations use different parameter naming conventions, all following keywords are
     looked for:
         - Both variants of ``backoff`` and ``backoff_factor`` are accepted.
         - All variants of ``retires``, ``retry`` and ``max_retries`` are accepted.
 
+    .. note::
+        Total amount of executed request attempts will be +1 the number of :paramref:`retries` or :paramref:`intervals`
+        items as first request is done immediately, and following attempts are done with the appropriate delay.
+
+    File Transport Scheme
+    ---------------------
+
+    Any request with ``file://`` scheme or empty scheme (no scheme specified) will be automatically handled as potential
+    local file path. The path should be absolute to ensure it to be correctly resolved.
+
+    All access errors due to file permissions return 403 status code, and missing file returns 404.
+    Any other :py:exc:`IOError` types are converted to a 400 responses.
+
+    .. seealso::
+        - :class:`FileAdapter`
+
+    SSL Verification
+    ----------------
+
+    Allows SSL verify option to be enabled or disabled according to configuration settings or explicit parameters.
+    Any variation of ``verify`` or ``ssl_verify`` keyword arguments are considered. If they all resolve to ``True``,
+    then application settings are retrieved from ``weaver.ini`` to parse additional SSL options that could disable it.
+
+    Following :mod:`weaver` settings are considered :
+        - `weaver.ssl_verify = True|False`
+        - `weaver.request_options = request_options.yml`
+
+    .. note::
+        Argument :paramref:`settings` must also be provided through any supported container by :func:`get_settings`
+        to retrieve and apply any :mod:`weaver`-specific configurations.
+
+    .. seealso::
+        - :func:`get_request_options`
+        - :func:`get_ssl_verify_option`
+
     :param method: HTTP method to set request.
     :param url: URL of the request to execute.
-    :param retries: number of retries to attempt.
-    :param backoff: factor by which to multiply delays between retries.
-    :param intervals:
-        Explicit intervals in seconds between retries.
-        (note: amount of request attempts will be +1 the number of interval items as first request is done immediately)
+    :param retries: Number of request retries to attempt if first attempt failed (according to allowed codes or error).
+    :param backoff: Factor by which to multiply delays between retries.
+    :param intervals: Explicit intervals in seconds between retries.
     :param allowed_codes: HTTP status codes that are considered valid to stop retrying (default: any non-4xx/5xx code).
+    :param ssl_verify: Explicit parameter to disable SSL verification (overrides any settings, default: True).
+    :param settings: Additional settings from which to retrieve configuration details for requests.
     :param only_server_errors:
         Only HTTP status codes in the 5xx values will be considered for retrying the request (default: True).
         This catches sporadic server timeout, connection error, etc., but 4xx errors are still considered valid results.
         This parameter is ignored if allowed codes are explicitly specified.
     :param request_kwargs: All other keyword arguments are passed down to the request call.
     """
+    # obtain file request-options arguments, then override any explicitly provided source-code keywords
+    settings = get_settings(settings) if settings else {}
+    request_options = get_request_options(method, url, settings)
+    request_options.update(request_kwargs)
     # catch kw passed to request corresponding to retries parameters
-    kw_retries = request_kwargs.pop("retries", request_kwargs.pop("retry", request_kwargs.pop("max_retries", 1)))
-    kw_backoff = request_kwargs.pop("backoff", request_kwargs.pop("backoff_factor", 0.3))
-    retries = retries or kw_retries
-    backoff = backoff or kw_backoff
+    kw_retries = request_options.pop("retries", request_options.pop("retry", request_options.pop("max_retries", None)))
+    kw_backoff = request_options.pop("backoff", request_options.pop("backoff_factor", None))
+    kw_intervals = request_options.pop("intervals", None)
+    retries = retries or kw_retries or 0
+    backoff = backoff or kw_backoff or 0.3
+    intervals = intervals or kw_intervals
     if intervals and len(intervals) and all(isinstance(i, (int, float)) for i in intervals):
         intervals = [0] + intervals
-        retries = len(intervals)
+        retries = list(range(len(intervals)))
         backoff = 0  # disable first part of delay calculation
+    else:
+        retries = [0] + list(range(retries))
+    no_retries = len(retries) == 1
+    # SSL verification settings
+    # ON by default, disable accordingly with any variant if matched
+    kw_ssl_verify = get_ssl_verify_option(method, url, settings, request_options=request_options)
+    ssl_verify = False if not kw_ssl_verify or not ssl_verify else True  # pylint: disable=R1719
+    request_options.update({"verify": ssl_verify})
+    # process request
     resp = None
     failures = []
-    for retry in range(retries):
+    for retry in retries:
         if retry:
-            delay = (backoff * (2 ** (retry + 1))) or intervals[retry]
+            delay = 0
+            if retry_after and resp and resp.status_code in [HTTPTooManyRequests.code]:
+                after = resp.headers.get("Retry-After", "")
+                delay = int(after) if str(after).isdigit() else 0
+                LOGGER.debug("Received header [Retry-After=%ss] for [%s %s]", after, method, url)
+            if not delay:
+                delay = (backoff * (2 ** (retry + 1))) or intervals[retry]
+            LOGGER.debug("Retrying failed request after delay=%s for [%s %s]", delay, method, url)
             time.sleep(delay)
         try:
-            resp = requests.request(method, url, **request_kwargs)
+            with requests.Session() as request_session:
+                if urlparse(url).scheme in ["", "file"]:
+                    url = "file://{}".format(os.path.abspath(url)) if not url.startswith("file://") else url
+                    request_session.mount("file://", FileAdapter())
+                resp = request_session.request(method, url, **request_kwargs)
             if allowed_codes and len(allowed_codes):
                 if resp.status_code in allowed_codes:
                     return resp
@@ -491,18 +697,23 @@ def request_retry(method,                       # type: AnyStr
         # function called without retries raises original error
         # as if calling requests module directly
         except requests.ConnectionError as exc:
-            if not retries:
+            if no_retries:
                 raise
             failures.append(type(exc).__name__)
     # also pass-through here if no retries
-    if not retries and resp:
+    if no_retries and resp:
         return resp
     detail = "Request ran out of retries. Attempts generated following errors: {}".format(failures)
-    return HTTPGatewayTimeout(detail=detail)
+    err = HTTPGatewayTimeout(detail=detail)
+    # make 'raise_for_status' method available for convenience
+    setattr(err, "url", url)
+    setattr(err, "reason", err.explanation)
+    setattr(err, "raise_for_status", lambda: Response.raise_for_status(err))  # noqa
+    return err
 
 
-def fetch_file(file_reference, file_outdir, **request_kwargs):
-    # type: (AnyStr, AnyStr, **Any) -> AnyStr
+def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
+    # type: (AnyStr, AnyStr, Optional[AnySettingsContainer], **Any) -> AnyStr
     """
     Fetches a file from a local path or remote URL and dumps it's content to the specified output directory.
 
@@ -510,7 +721,8 @@ def fetch_file(file_reference, file_outdir, **request_kwargs):
 
     :param file_reference: Local filesystem path or remote URL file reference.
     :param file_outdir: Output directory path of the fetched file.
-    :param request_kwargs: additional keywords to forward to request call (if needed).
+    :param settings: Additional request setting details from the application configuration.
+    :param request_kwargs: Additional keywords to forward to request call (if needed).
     :return: Path of the local copy of the fetched file.
     """
     file_href = file_reference
@@ -533,7 +745,7 @@ def fetch_file(file_reference, file_outdir, **request_kwargs):
     else:
         request_kwargs.pop("stream", None)
         with open(file_path, "wb") as file:
-            resp = request_retry("get", file_reference, stream=True, retries=3, **request_kwargs)
+            resp = request_extra("get", file_reference, stream=True, retries=3, settings=settings, **request_kwargs)
             if resp.status_code >= 400:
                 raise resp
             # NOTE:

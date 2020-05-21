@@ -69,7 +69,7 @@ def notify_job_complete(job, to_email_recipient, container):
     from_addr = settings.get("weaver.wps_email_notify_from_addr")
     password = settings.get("weaver.wps_email_notify_password")
     port = settings.get("weaver.wps_email_notify_port")
-    ssl = asbool(settings.get("weaver.wps_email_notify_ssl"))
+    ssl = asbool(settings.get("weaver.wps_email_notify_ssl", True))
     # an example template is located in
     # weaver/wps_restapi/templates/notification_email_example.mako
     template_dir = settings.get("weaver.wps_email_notify_template_dir")

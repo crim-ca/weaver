@@ -4,6 +4,32 @@ Changes
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
 
+Changes:
+--------
+
+- Modify ``weaver.utils.request_retry`` to ``weaver.utils.request_extra`` to include more requests functionality and
+  reuse it across the whole code base.
+- Add ``requests_extra`` SSL verification option using specific URL regex(es) matches from configuration settings.
+- Add ``file://`` transport scheme support directly to utility ``requests_extra`` to handle local file paths.
+- Add file ``weaver.request_options`` INI configuration setting to specify per-request method/URL options.
+- Add ``requests_extra`` support of ``Retry-After`` response header (if any available on ``429`` status) which indicates
+  how long to wait until next request to avoid automatically defined response right after.
+
+Fixes:
+------
+
+- Modify ``Dockerfile-manager`` to run web application using ``pserve`` as ``gunicorn`` doesn't correctly handles
+  worker options anymore when loaded form ``weaver.ini`` with ``--paste`` argument. Also simplifies the command which
+  already required multiple patches such as reapplying the host/port binding from INI file.
+- Fix handling of Literal Data I/O ``type`` when retrieved from ``OWSLib.wps`` object with remote WPS XML body.
+- Adjust ``make start`` target to use new ``make install-run`` target which installs the dependencies and package in
+  edition mode so that configuration files present locally can be employed for running the application.
+  Previously, one would have to move their configurations to the ``site-package`` install location of the active Python.
+- Fix ``celery>4.2`` not found because of application path modification.
+- Fix invalid handling of ``wps_processes.yml`` reference in ``weaver.ini`` when specified as relative path to
+  configuration directory.
+- Fix handling of ``WPS<->CWL`` I/O merge of ``data_format`` field against ``supported_formats`` with ``pywps>=4.2.4``.
+
 `1.7.0 <https://github.com/crim-ca/weaver/tree/1.7.0>`_ (2020-05-15)
 ========================================================================
 

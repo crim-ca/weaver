@@ -31,8 +31,12 @@ services:
   - mongodb
   - docker
 before_install:
+  # setup config files for travis tests
   - source tests/travis-ci/weaver.env
-  - cp -f tests/travis-ci/data_sources.json ./
+  - cp -f tests/travis-ci/data_sources.json config/
+  - cp -f tests/travis-ci/wps_processes.yml config/
+  - cp -f config/weaver.ini.example config/weaver.ini   # for 'make start' when needed
+  # display details
   - make --version
   - make info
 install:
@@ -40,8 +44,6 @@ install:
 stages:
   - check     # run linting checks and don't bother with the rest if invalid
   - test      # use default stage to run job matrix variations
-  - extra     # extra tests that did not belong to any other category
-  - coverage  # only run once after everything else
 script:
   # start as required as sleep a bit to let application boot before tests
   - if [ "${START_TARGET}" == "start" ]; then make start; sleep 5; fi
@@ -49,18 +51,25 @@ script:
   - make ${TEST_TARGET}
 jobs:
   include:
-    # use stages to quick fail faster tests
+    # use different stages to quick fail faster before 'test' stage
     - stage: check
       name: "Linter Checks"
       python: "3.7"
       os: linux
-      script: make check docs
-    - stage: coverage
-      name: "Coverage"
+      script: make check
+    - stage: check
+      name: "Documentation Checks"
+      python: "3.7"
+      os: linux
+      script: make docs
+    # run some additional 'test' stage commands simultaneously to others (job/env matrix expansion),
+    # but only executed once with specific os/python version
+    - stage: test
+      name: "Coverage Test"
       python: "3.7"
       os: linux
       script: make coverage
-    - stage: extra
+    - stage: test
       name: "Extra Tests"
       script:
         - make TESTS='(slow or testbed14) and not functional' test-spec
@@ -81,7 +90,7 @@ jobs:
   allow_failures:
     - python: "2.7"   # deprecated support
     - os: windows     # experimental support
-  fast_finish: true   # required jobs will indicate success as soon as possible
+  fast_finish: true   # required jobs will indicate success/failure as soon as possible
 notifications:
   email: false
 after_success:

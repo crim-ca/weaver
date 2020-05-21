@@ -291,6 +291,7 @@ def mocked_sub_requests(app, function, *args, **kwargs):
 
     with contextlib.ExitStack() as stack:
         stack.enter_context(mock.patch("requests.request", side_effect=mocked_app_request))
+        stack.enter_context(mock.patch("requests.Session.request", side_effect=mocked_app_request))
         stack.enter_context(mock.patch("requests.sessions.Session.request", side_effect=mocked_app_request))
         request_func = getattr(app, function)
         kwargs.setdefault("expect_errors", True)

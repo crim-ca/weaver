@@ -29,7 +29,7 @@ from weaver.status import (
     STATUS_RUNNING,
     STATUS_SUCCEEDED
 )
-from weaver.utils import get_weaver_url, make_dirs, now, request_retry
+from weaver.utils import get_weaver_url, make_dirs, now, request_extra
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
@@ -204,6 +204,7 @@ class End2EndEMSTestCase(TestCase):
                 "weaver.url": weaver_url,
                 "weaver.configuration": WEAVER_CONFIGURATION_EMS,
                 "weaver.wps_restapi_path": cls.WEAVER_TEST_SERVER_API_PATH,
+                "weaver.request_options": {},
             })
         return cls.__settings__
 
@@ -472,7 +473,7 @@ class End2EndEMSTestCase(TestCase):
         if with_requests:
             kw.update({"verify": False, "timeout": cls.WEAVER_TEST_REQUEST_TIMEOUT})
             # retry request if the error was caused by some connection error
-            resp = request_retry(method, url, json=json_body, data=data_body, retries=3, **kw)
+            resp = request_extra(method, url, json=json_body, data=data_body, retries=3, settings=cls.settings(), **kw)
 
             # add some properties similar to `webtest.TestApp`
             resp_body = getattr(resp, "body", None)  # if error is pyramid HTTPException, body is byte only

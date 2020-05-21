@@ -2,13 +2,12 @@ from abc import abstractmethod
 from time import sleep
 from typing import TYPE_CHECKING
 
-import requests
 from pyramid.httpexceptions import HTTPBadGateway
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
 
 from weaver.formats import CONTENT_TYPE_APP_JSON
-from weaver.utils import get_cookie_headers, get_settings
+from weaver.utils import get_cookie_headers, get_settings, request_extra
 from weaver.wps import get_wps_output_dir, get_wps_output_url
 
 if TYPE_CHECKING:
@@ -48,12 +47,8 @@ class WpsProcessInterface(object):
         self.verify = asbool(self.settings.get("weaver.ows_proxy_ssl_verify", True))
 
     def make_request(self, method, url, retry, status_code_mock=None, **kwargs):
-        response = requests.request(method,
-                                    url=url,
-                                    headers=self.headers,
-                                    cookies=self.cookies,
-                                    verify=self.verify,
-                                    **kwargs)
+        response = request_extra(method, url=url, settings=self.settings,
+                                 headers=self.headers, cookies=self.cookies, verify=self.verify, **kwargs)
         # TODO: Remove patch for Geomatys unreliable server
         if response.status_code == HTTPBadGateway.code and retry:
             sleep(10)

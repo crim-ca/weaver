@@ -4,7 +4,6 @@ from copy import deepcopy
 from typing import TYPE_CHECKING
 
 import lxml.etree
-import requests
 import shapely.wkt
 from pyramid.httpexceptions import HTTPOk
 from pyramid.settings import asbool
@@ -20,11 +19,11 @@ from weaver.processes.constants import (
     WPS_LITERAL
 )
 from weaver.processes.sources import fetch_data_sources
-from weaver.utils import get_any_id, request_retry
+from weaver.utils import get_any_id, request_extra
 
 if TYPE_CHECKING:
-    from weaver.typedefs import XML                                 # noqa: F401
-    from typing import AnyStr, Deque, Dict, Iterable, List, Tuple   # noqa: F401
+    from weaver.typedefs import AnySettingsContainer, XML                       # noqa: F401
+    from typing import AnyStr, Deque, Dict, Iterable, List, Optional, Tuple     # noqa: F401
 
 LOGGER = logging.getLogger("PACKAGE")
 
@@ -52,8 +51,11 @@ def validate_bbox(bbox):
         raise ValueError("Could not parse bbox as a list of 4 floats: {}".format(bbox))
 
 
-def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info, accept_mime_types):
-    # type: (Dict[str, Deque], Dict[str, Dict], Dict[str, List[str]]) -> Dict[str, Deque]
+def query_eo_images_from_wps_inputs(wps_inputs,             # type: Dict[str, Deque]
+                                    eoimage_source_info,    # type: Dict[str, Dict]
+                                    accept_mime_types,      # type: Dict[str, List[str]]
+                                    settings=None,          # type: Optional[AnySettingsContainer]
+                                    ):                      # type: (...) -> Dict[str, Deque]
     """Query OpenSearch using parameters in inputs and return file links.
 
     eoimage_ids is used to identify if a certain input is an eoimage.
@@ -61,6 +63,7 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info, accept_mime
     :param wps_inputs: inputs containing info to query
     :param eoimage_source_info: data source info of eoimages
     :param accept_mime_types: dict of list of accepted mime types, ordered by preference
+    :param settings: application settings to retrieve request options as necessary.
     """
     new_inputs = {}
 
@@ -117,9 +120,7 @@ def query_eo_images_from_wps_inputs(wps_inputs, eoimage_source_info, accept_mime
                 osdd_url = eoimage_source_info[input_id]["osdd_url"]
                 accept_schemes = eoimage_source_info[input_id]["accept_schemes"]
                 mime_types = accept_mime_types[input_id]
-                osq = OpenSearchQuery(
-                    collection_identifier=collection_id, osdd_url=osdd_url
-                )
+                osq = OpenSearchQuery(collection_identifier=collection_id, osdd_url=osdd_url, settings=settings)
                 for link in osq.query_datasets(params,
                                                accept_schemes=accept_schemes,
                                                accept_mime_types=mime_types):
@@ -171,13 +172,15 @@ class OpenSearchQuery(object):
         collection_identifier,                      # type: str
         osdd_url,                                   # type: str
         catalog_search_field="parentIdentifier",    # type: str
+        settings=None,                              # type: Optional[AnySettingsContainer]
     ):
         """
         :param collection_identifier: Collection ID to query
         :param osdd_url: Global OSDD url for opensearch queries.
-        :param catalog_search_field: Name of the field for the collection
-                identifier.
+        :param catalog_search_field: Name of the field for the collection identifier.
+        :param settings: application settings to retrieve request options as necessary.
         """
+        self.settings = settings
         self.collection_identifier = collection_identifier
         self.osdd_url = osdd_url
         self.params = {
@@ -191,7 +194,7 @@ class OpenSearchQuery(object):
             )
 
     def get_template_url(self):
-        resp = requests.get(self.osdd_url, params=self.params)
+        resp = request_extra("get", self.osdd_url, params=self.params, settings=self.settings)
         resp.raise_for_status()
 
         xml = lxml.etree.fromstring(resp.content)
@@ -231,12 +234,11 @@ class OpenSearchQuery(object):
 
         return base_url, query_params
 
-    @staticmethod
-    def _fetch_datatsets_from_alternates_links(alternate_links):
+    def _fetch_datatsets_from_alternates_links(self, alternate_links):
         # Try loading from atom alternate link
         for link in alternate_links:
             if link["type"] == "application/atom+xml":
-                resp = requests.get(link["href"])
+                resp = request_extra("get", link["href"], settings=self.settings)
                 resp.raise_for_status()
 
                 xml = lxml.etree.fromstring(resp.content)
@@ -256,8 +258,9 @@ class OpenSearchQuery(object):
         base_url, query_params = self._prepare_query_url(template_url, params)
         while True:
             query_params["startRecord"] = start_index
-            response = request_retry("get", base_url, params=query_params,
-                                     intervals=list(range(1, 5)), allowed_codes=[HTTPOk.code])
+            response = request_extra("get", base_url, params=query_params,
+                                     intervals=list(range(1, 5)), allowed_codes=[HTTPOk.code],
+                                     settings=self.settings)
             if not response.status_code == 200:
                 break
             json_body = response.json()
@@ -278,8 +281,8 @@ class OpenSearchQuery(object):
     def query_datasets(self, params, accept_schemes, accept_mime_types):
         # type: (Dict, Tuple, List) -> Iterable[AnyStr]
         """
-        Loop on every opensearch result feature and yield url matching required mimetype and scheme.
-        Log a warning if a feature cannot yield a valid url (either no compatible mimetype or scheme)
+        Loop on every opensearch result feature and yield url matching required mime-type and scheme.
+        Log a warning if a feature cannot yield a valid url (either no compatible mime-type or scheme)
 
         :param params: query parameters
         :param accept_schemes: only return links of this scheme

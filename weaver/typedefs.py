@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from pyramid.registry import Registry
     from pyramid.request import Request as PyramidRequest
     from pyramid.config import Configurator
-    from celery import Celery
+    from celery.app import Celery
     from requests.structures import CaseInsensitiveDict
     from cwltool.factory import Callable as CWLFactoryCallable  # noqa: F401  # provide alias name, not used here
     from webtest.response import TestResponse
@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     XML = lxml.etree._Element  # noqa: W0212
 
     AnyContainer = Union[Configurator, Registry, PyramidRequest, Celery]
-    SettingValue = AnyValue
+    SettingValue = Optional[JSON]
     SettingsType = Dict[AnyStr, SettingValue]
     AnySettingsContainer = Union[AnyContainer, SettingsType]
     AnyRegistryContainer = AnyContainer

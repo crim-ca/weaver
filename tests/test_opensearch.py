@@ -239,8 +239,16 @@ def test_get_additional_parameters():
 
 
 def get_template_urls(collection_id):
+    settings = {
+        "weaver.request_options": {
+            "requests": [
+                # description schema can be *extremely* slow to respond, but it does eventually
+                {"url": "http://geo.spacebel.be/opensearch/description.xml", "method": "get", "timeout": 180}
+            ]
+        }
+    }
     all_fields = set()
-    opq = opensearch.OpenSearchQuery(collection_id, osdd_url=OSDD_URL)
+    opq = opensearch.OpenSearchQuery(collection_id, osdd_url=OSDD_URL, settings=settings)
     template = opq.get_template_url()
     params = parse_qsl(urlparse(template).query)
     param_names = list(sorted(p[0] for p in params))
@@ -268,6 +276,7 @@ def get_template_urls(collection_id):
     assert not set(expected) - set(fields_in_all_queries)
 
 
+@pytest.mark.slow
 @pytest.mark.online
 @pytest.mark.testbed14
 def test_get_template_sentinel2():

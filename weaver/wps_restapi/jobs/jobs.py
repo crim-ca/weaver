@@ -1,7 +1,6 @@
 import os
 from typing import TYPE_CHECKING
 
-import requests
 import six
 from celery.utils.log import get_task_logger
 from lxml import etree
@@ -10,7 +9,6 @@ from pyramid.httpexceptions import HTTPBadRequest, HTTPNotFound, HTTPOk, HTTPUna
 from pyramid.request import Request
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
-from requests_file import FileAdapter
 from six.moves.urllib.parse import urlparse
 
 from weaver import sort, status
@@ -26,7 +24,7 @@ from weaver.exceptions import (
     log_unhandled_exceptions
 )
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
-from weaver.utils import get_any_id, get_any_value, get_settings, get_url_without_query
+from weaver.utils import get_any_id, get_any_value, get_settings, get_url_without_query, request_extra
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps import get_wps_output_dir, get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
@@ -40,8 +38,8 @@ if TYPE_CHECKING:
 LOGGER = get_task_logger(__name__)
 
 
-def check_status(url=None, response=None, sleep_secs=2, verify=False):
-    # type: (Optional[AnyStr], Optional[etree.ElementBase], int, bool) -> WPSExecution
+def check_status(url=None, response=None, sleep_secs=2, verify=False, settings=None):
+    # type: (Optional[AnyStr], Optional[etree.ElementBase], int, bool, Optional[AnySettingsContainer]) -> WPSExecution
     """
     Run :func:`owslib.wps.WPSExecution.checkStatus` with additional exception handling.
 
@@ -49,9 +47,10 @@ def check_status(url=None, response=None, sleep_secs=2, verify=False):
     :param response: WPS response document of job status.
     :param sleep_secs: number of seconds to sleep before returning control to the caller.
     :param verify: Flag to enable SSL verification.
+    :param settings: Application settings to retrieve any additional request parameters as applicable.
     :return: OWSLib.wps.WPSExecution object.
     """
-    def _retry_file(nothrow=False):
+    def _retry_file():
         LOGGER.warning("Failed retrieving status-location, attempting with local file.")
         if url and not urlparse(url).scheme in ["", "file://"]:
             dir_path = get_wps_output_dir(app)
@@ -72,9 +71,7 @@ def check_status(url=None, response=None, sleep_secs=2, verify=False):
         xml_resp = HTTPNotFound()
         try:
             LOGGER.debug("using status-location url...")
-            request_session = requests.Session()
-            request_session.mount("file://", FileAdapter())
-            xml_resp = request_session.get(url, verify=verify)
+            xml_resp = request_extra("get", url, verify=verify, settings=settings)
             xml = xml_resp.content
         except Exception as ex:
             LOGGER.debug("Got exception during get status: [%r]", ex)

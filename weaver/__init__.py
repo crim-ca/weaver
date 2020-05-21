@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import yaml
 
 logging.captureWarnings(True)
 LOGGER = logging.getLogger("weaver")
@@ -35,7 +36,7 @@ def main(global_config, **settings):
     """
     LOGGER.info("Initiating weaver application")
 
-    from weaver.config import get_weaver_configuration
+    from weaver.config import WEAVER_DEFAULT_REQUEST_OPTIONS_CONFIG, get_weaver_configuration, get_weaver_config_file
     from weaver.processes.builtin import register_builtin_processes
     from weaver.processes.utils import register_wps_processes_from_config
     from weaver.utils import parse_extra_options, get_settings
@@ -48,12 +49,15 @@ def main(global_config, **settings):
     # Parse extra_options and add each of them in the settings dict
     settings.update(parse_extra_options(settings.get("weaver.extra_options", "")))
 
-    local_config = Configurator(settings=settings)
+    # load requests options
+    req_file = get_weaver_config_file(settings.get("weaver.request_options", ""), WEAVER_DEFAULT_REQUEST_OPTIONS_CONFIG)
+    with open(req_file, "r") as f:
+        settings.update({"weaver.request_options": yaml.safe_load(f)})
 
+    local_config = Configurator(settings=settings)
     if global_config.get("__file__") is not None:
         local_config.include("pyramid_celery")
         local_config.configure_celery(global_config["__file__"])
-
     local_config.include("weaver")
 
     LOGGER.info("Registering builtin processes...")
