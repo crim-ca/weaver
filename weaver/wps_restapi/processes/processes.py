@@ -51,7 +51,7 @@ from weaver.utils import (
     get_settings,
     raise_on_xml_exception,
     request_extra,
-    wait_secs,
+    wait_secs
 )
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps import get_wps_output_dir, get_wps_output_path, get_wps_output_url, load_pywps_cfg

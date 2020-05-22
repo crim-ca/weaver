@@ -74,11 +74,12 @@ def get_weaver_config_file(file_path, default_config_file, generate_default_from
     default_path = os.path.abspath(os.path.join(WEAVER_CONFIG_DIR, default_config_file))
     if file_path in [default_config_file, os.path.join(os.curdir, default_config_file)]:
         file_path = default_path
-    file_path = os.path.abspath(file_path)
+    if str(file_path).strip() != "":
+        file_path = os.path.abspath(file_path)
     if os.path.isfile(file_path):
         LOGGER.info("Resolved specified configuration file: [%s]", file_path)
         return file_path
-    LOGGER.warning("Cannot find configuration file: [%s]. Falling back to default.", file_path)
+    LOGGER.warning("Cannot find configuration file: [%s]. Falling back to default.", file_path or "<empty>")
     if os.path.isfile(default_path):
         LOGGER.info("Resolved default configuration file: [%s]", default_path)
         return default_path

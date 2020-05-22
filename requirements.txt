@@ -30,7 +30,7 @@ pyramid_celery
 pyramid_mako
 pytz
 pywps
-pyyaml==5.2
+pyyaml>=5.2
 requests
 requests_file
 # let cwltool define ruamel.yaml version (<=0.16.5)

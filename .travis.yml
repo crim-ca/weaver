@@ -44,6 +44,7 @@ install:
 stages:
   - check           # run linting checks and don't bother with the rest if invalid
   - test            # use default stage to run job matrix variations
+  - smoke-test      # minimal verifications that docker images work before deploying them
   - deploy-docker   # deploy to dockerhub if successful master/tag tests
 script:
   # start as required as sleep a bit to let application boot before tests
@@ -92,6 +93,11 @@ jobs:
         - cp -f tests/travis-ci/data_sources.json ./
         - make --version
         - make info
+    - stage: smoke-test
+      name: "Docker Smoke Test"
+      python: "3.7"
+      os: linux
+      script: make docker-test
     - stage: deploy-docker
       name: "Deploy Docker"
       python: "3.7"

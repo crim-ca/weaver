@@ -23,7 +23,7 @@ from weaver.formats import (
     clean_mime_type_format,
     get_cwl_file_format,
     get_extension,
-    get_format,
+    get_format
 )
 
 

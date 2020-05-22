@@ -4,6 +4,24 @@ Changes
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
 
+Changes:
+--------
+
+- Add `Travis-CI` smoke test of built docker images for early detection of invalid setup or breaking code to boot them.
+- Add `Travis-CI` checks for imports. This check was not validated previously although available.
+- Adjust ``weaver.ini.example`` to reflect working demo server configuration (employed by smoke test).
+- Move ``weaver`` web application to ``weaver.app`` to reduce chances of breaking ``setup.py`` installation from import
+  errors due to ``weaver`` dependencies not yet installed. Redirect to new location makes this change transparent when
+  loaded with the usual ``weaver.ini`` configuration.
+
+Fixes:
+------
+
+- Fix base docker image to install Python 3 development dependencies in order to compile requirements with expected
+  environment Python version. Package ``python-dev`` for Python 2 was being installed instead.
+- Fix failing docker image boot due to incorrectly placed ``yaml`` import during setup installation.
+- Fix imports according to ``Makefile`` targets ``check-imports`` and ``fix-imports``.
+
 `1.8.0 <https://github.com/crim-ca/weaver/tree/1.8.0>`_ (2020-05-21)
 ========================================================================
 

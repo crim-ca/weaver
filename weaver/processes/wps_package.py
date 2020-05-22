@@ -56,7 +56,7 @@ from weaver.formats import (
     CONTENT_TYPE_TEXT_PLAIN,
     get_cwl_file_format,
     get_extension,
-    get_format,
+    get_format
 )
 from weaver.processes import opensearch
 from weaver.processes.constants import (
