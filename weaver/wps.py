@@ -120,7 +120,7 @@ def load_pywps_cfg(container, config=None):
         # update metadata
         for setting_name, setting_value in settings.items():
             if setting_name.startswith("weaver.wps_metadata"):
-                WEAVER_PYWPS_CFG.set("metadata:main", setting_name.replace("weaver.wps_metadata", ""), setting_value)
+                WEAVER_PYWPS_CFG.set("metadata:main", setting_name.replace("weaver.wps_metadata_", ""), setting_value)
         # add weaver configuration keyword if not already provided
         wps_keywords = WEAVER_PYWPS_CFG.get("metadata:main", "identification_keywords")
         weaver_mode = get_weaver_configuration(settings)

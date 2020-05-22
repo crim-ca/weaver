@@ -21,6 +21,7 @@ Fixes:
   environment Python version. Package ``python-dev`` for Python 2 was being installed instead.
 - Fix failing docker image boot due to incorrectly placed ``yaml`` import during setup installation.
 - Fix imports according to ``Makefile`` targets ``check-imports`` and ``fix-imports``.
+- Fix parsing of ``PyWPS`` metadata to correctly employ values provided by ``weaver.ini``.
 
 `1.8.0 <https://github.com/crim-ca/weaver/tree/1.8.0>`_ (2020-05-21)
 ========================================================================

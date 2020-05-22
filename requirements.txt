@@ -43,4 +43,5 @@ shapely
 six
 simplejson
 urlmatch
+xmltodict
 webob
