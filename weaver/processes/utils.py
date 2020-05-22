@@ -29,8 +29,7 @@ from weaver.config import (
     get_weaver_configuration
 )
 from weaver.database import get_db
-from weaver.datatype import Process as ProcessDB
-from weaver.datatype import Service
+from weaver.datatype import Process as ProcessDB, Service
 from weaver.exceptions import (
     InvalidIdentifierValue,
     PackageNotFound,

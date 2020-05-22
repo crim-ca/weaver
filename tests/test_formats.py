@@ -9,8 +9,8 @@ from requests.exceptions import ConnectionError
 
 from weaver.formats import (
     CONTENT_TYPE_ANY,
-    CONTENT_TYPE_APP_JSON,
     CONTENT_TYPE_APP_GEOJSON,
+    CONTENT_TYPE_APP_JSON,
     CONTENT_TYPE_APP_NETCDF,
     CONTENT_TYPE_APP_XML,
     CONTENT_TYPE_IMAGE_GEOTIFF,

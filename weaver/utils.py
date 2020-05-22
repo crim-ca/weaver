@@ -25,8 +25,8 @@ from pyramid.settings import asbool, aslist
 from requests import HTTPError as RequestsHTTPError, Response
 from requests.structures import CaseInsensitiveDict
 from requests_file import FileAdapter
-from urlmatch import urlmatch
 from six.moves.urllib.parse import ParseResult, parse_qs, urlparse, urlunsplit
+from urlmatch import urlmatch
 from webob.headers import EnvironHeaders, ResponseHeaders
 
 from weaver.exceptions import InvalidIdentifierValue

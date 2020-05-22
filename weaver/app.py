@@ -9,10 +9,10 @@ import logging
 import yaml
 from pyramid.config import Configurator
 
-from weaver.config import WEAVER_DEFAULT_REQUEST_OPTIONS_CONFIG, get_weaver_configuration, get_weaver_config_file
+from weaver.config import WEAVER_DEFAULT_REQUEST_OPTIONS_CONFIG, get_weaver_config_file, get_weaver_configuration
 from weaver.processes.builtin import register_builtin_processes
 from weaver.processes.utils import register_wps_processes_from_config
-from weaver.utils import parse_extra_options, get_settings
+from weaver.utils import get_settings, parse_extra_options
 
 LOGGER = logging.getLogger(__name__)
 

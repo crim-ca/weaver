@@ -26,9 +26,7 @@ import lxml.etree
 import six
 import yaml
 from cwltool.context import LoadingContext, RuntimeContext
-from owslib.wps import ComplexData
-from owslib.wps import Metadata as OwsMetadata
-from owslib.wps import WebProcessingService
+from owslib.wps import ComplexData, Metadata as OwsMetadata, WebProcessingService
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
 from pyramid_celery import celery_app as app
 from pywps import Process

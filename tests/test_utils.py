@@ -11,17 +11,17 @@ import mock
 import pytest
 from lxml import etree
 from pyramid.httpexceptions import (
-    HTTPOk,
-    HTTPCreated,
-    HTTPNotFound,
     HTTPConflict,
+    HTTPCreated,
     HTTPError as PyramidHTTPError,
-    HTTPInternalServerError,
     HTTPGatewayTimeout,
+    HTTPInternalServerError,
+    HTTPNotFound,
+    HTTPOk
 )
 from pywps.response.status import WPS_STATUS
-from requests.exceptions import HTTPError as RequestsHTTPError
 from requests import Response
+from requests.exceptions import HTTPError as RequestsHTTPError
 from six.moves.urllib.parse import urlparse
 
 from tests.compat import contextlib
