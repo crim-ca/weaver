@@ -14,8 +14,14 @@ from cwltool.context import LoadingContext, RuntimeContext, getdefault
 from cwltool.errors import WorkflowException
 from cwltool.job import JobBase, relink_initialworkdir
 from cwltool.pathmapper import adjustDirObjs, adjustFileObjs, get_listing, trim_listing, visit_class
-from cwltool.process import Process as ProcessCWL
-from cwltool.process import compute_checksums, normalizeFilesDirs, shortname, supportedProcessRequirements, uniquename
+from cwltool.process import (
+    Process as ProcessCWL,
+    compute_checksums,
+    normalizeFilesDirs,
+    shortname,
+    supportedProcessRequirements,
+    uniquename
+)
 from cwltool.stdfsaccess import StdFsAccess
 from cwltool.utils import aslist, bytes2str_in_dicts, onWindows
 from cwltool.workflow import Workflow

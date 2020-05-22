@@ -303,6 +303,9 @@ test-spec: install-dev		## run tests with custom input specification (pytest for
 	@[ "${TESTS}" ] || ( echo ">> 'TESTS' is not set"; exit 1 )
 	@bash -c "$(CONDA_CMD) pytest tests -v -m '${TESTS}' --junitxml $(APP_ROOT)/tests/results.xml"
 
+.PHONY: test-smoke
+test-smoke: docker-test    ## alias to 'docker-test' executing smoke test of built docker images
+
 .PHONY: coverage
 coverage: mkdir-reports install-dev		## run all tests using coverage analysis
 	@echo "Running coverage analysis..."
@@ -321,7 +324,7 @@ mkdir-reports:
 check: check-all	## alias for 'check-all' target
 
 .PHONY: check-all
-check-all: install-dev check-pep8 check-lint check-security check-doc8 check-links	## run every code style checks
+check-all: install-dev check-pep8 check-lint check-imports check-security check-doc8 check-links ## run all code checks
 
 .PHONY: check-pep8
 check-pep8: mkdir-reports install-dev 	## run PEP8 code style checks
@@ -415,20 +418,23 @@ docker-info:		## obtain docker image information
 .PHONY: docker-build-base
 docker-build-base:							## build the base docker image
 	docker build "$(APP_ROOT)" -f "$(APP_ROOT)/docker/Dockerfile-base" -t "$(APP_NAME):base"
-	docker tag "$(APP_NAME):base" "$(DOCKER_REPO):$(APP_VERSION)"
+	docker tag "$(APP_NAME):base" "$(APP_NAME):latest"
 	docker tag "$(APP_NAME):base" "$(DOCKER_REPO):latest"
+	docker tag "$(APP_NAME):base" "$(DOCKER_REPO):$(APP_VERSION)"
 
 .PHONY: docker-build-manager
 docker-build-manager: docker-build-base		## build the manager docker image
 	docker build "$(APP_ROOT)" -f "$(APP_ROOT)/docker/Dockerfile-manager" -t "$(APP_NAME):$(APP_VERSION)-manager"
-	docker tag "$(APP_NAME):$(APP_VERSION)-manager" "$(DOCKER_REPO):$(APP_VERSION)-manager"
+	docker tag "$(APP_NAME):$(APP_VERSION)-manager" "$(APP_NAME):latest-manager"
 	docker tag "$(APP_NAME):$(APP_VERSION)-manager" "$(DOCKER_REPO):latest-manager"
+	docker tag "$(APP_NAME):$(APP_VERSION)-manager" "$(DOCKER_REPO):$(APP_VERSION)-manager"
 
 .PHONY: docker-build-worker
 docker-build-worker: docker-build-base		## build the worker docker image
 	docker build "$(APP_ROOT)" -f "$(APP_ROOT)/docker/Dockerfile-worker" -t "$(APP_NAME):$(APP_VERSION)-worker"
-	docker tag "$(APP_NAME):$(APP_VERSION)-worker" "$(DOCKER_REPO):$(APP_VERSION)-worker"
+	docker tag "$(APP_NAME):$(APP_VERSION)-worker" "$(APP_NAME):latest-worker"
 	docker tag "$(APP_NAME):$(APP_VERSION)-worker" "$(DOCKER_REPO):latest-worker"
+	docker tag "$(APP_NAME):$(APP_VERSION)-worker" "$(DOCKER_REPO):$(APP_VERSION)-worker"
 
 .PHONY: docker-build
 docker-build: docker-build-base docker-build-manager docker-build-worker		## build all docker images
@@ -449,7 +455,41 @@ docker-push-worker: docker-build-worker		## push the worker docker image
 	docker push "$(DOCKER_REPO):latest-worker"
 
 .PHONY: docker-push
-docker-push: docker-push-base docker-push-manager docker-push-worker	## push all docker images
+docker-push: docker-push-base docker-push-manager docker-push-worker  ## push all docker images
+
+# if compose up fails, print the logs and force stop
+# if compose up succeeds, query weaver to get frontpage response
+DOCKER_TEST_COMPOSES := -f "$(APP_ROOT)/tests/travis-ci/docker-compose.smoke-test.yml"
+.PHONY: docker-test
+docker-test: docker-build stop	## execute smoke test of the built images (validate that they boots and reply)
+	@echo "Smoke test of built application docker images"
+	docker-compose $(DOCKER_TEST_COMPOSES) up -d
+	sleep 10  ## leave some time to boot
+	curl localhost:4001 | grep "Weaver Information" || \
+		( docker-compose $(DOCKER_TEST_COMPOSES) logs weaver worker || true && \
+		  docker-compose $(DOCKER_TEST_COMPOSES) stop; exit 1 )
+	docker-compose $(DOCKER_TEST_COMPOSES) stop
+
+.PHONY: docker-stat
+docker-stat:  ## query docker-compose images status (from 'docker-test')
+	docker-compose $(DOCKER_TEST_COMPOSES) ps
+
+.PHONY: docker-clean
+docker-clean:  ## remove all built docker images (only matching current/latest versions)
+	docker-compose $(DOCKER_TEST_COMPOSES) down || true
+	docker rmi -f "$(DOCKER_REPO):$(APP_VERSION)-manager" || true
+	docker rmi -f "$(DOCKER_REPO):latest-manager" || true
+	docker rmi -f "$(APP_NAME):$(APP_VERSION)-manager" || true
+	docker rmi -f "$(APP_NAME):latest-manager" || true
+	docker rmi -f "$(DOCKER_REPO):$(APP_VERSION)-worker" || true
+	docker rmi -f "$(DOCKER_REPO):latest-worker" || true
+	docker rmi -f "$(APP_NAME):$(APP_VERSION)-worker" || true
+	docker rmi -f "$(APP_NAME):latest-worker" || true
+	docker rmi -f "$(DOCKER_REPO):$(APP_VERSION)" || true
+	docker rmi -f "$(DOCKER_REPO):latest" || true
+	docker rmi -f "$(APP_NAME):$(APP_VERSION)" || true
+	docker rmi -f "$(APP_NAME):latest" || true
+	docker rmi -f "$(APP_NAME):base" || true
 
 ## --- Launchers targets --- ##
 

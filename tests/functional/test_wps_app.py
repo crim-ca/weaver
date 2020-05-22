@@ -8,9 +8,9 @@ Based on tests from:
 """
 import unittest
 
-from lxml import etree
 import pyramid.testing
 import pytest
+from lxml import etree
 
 from tests.utils import (
     get_test_weaver_app,

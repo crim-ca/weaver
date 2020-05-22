@@ -1,3 +1,5 @@
+# NOTE: This configuration file is employed by Travis-CI smoke test to immediately identify any problematic setting.
+
 ###
 # app configuration
 # http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/environment.html
@@ -13,7 +15,7 @@ pyramid.debug_routematch = false
 pyramid.default_locale_name = en
 
 # mongodb
-mongodb.host = localhost
+mongodb.host = mongodb
 mongodb.port = 27017
 mongodb.db_name = weaver
 
@@ -88,7 +90,7 @@ weaver.extra_options =
 ###
 [celery]
 #USE_CELERYCONFIG = True
-BROKER_URL = mongodb://localhost:27017/celery
+BROKER_URL = mongodb://mongodb:27017/celery
 
 ###
 # wsgi server configuration
@@ -96,8 +98,8 @@ BROKER_URL = mongodb://localhost:27017/celery
 
 [server:main]
 use = egg:gunicorn#main
-bind = localhost:4001
-workers = 1
+bind = 0.0.0.0:4001
+workers = 5
 timeout = 10
 
 ###

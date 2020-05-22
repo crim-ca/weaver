@@ -4,11 +4,18 @@ so that one can update the swagger without touching any other files after the in
 """
 # pylint: disable=C0103,invalid-name
 
-from colander import Boolean, DateTime, Float, Integer
-from colander import MappingSchema as MapSchema
-from colander import OneOf, Range
-from colander import SequenceSchema as SeqSchema
-from colander import String, drop
+from colander import (
+    Boolean,
+    DateTime,
+    Float,
+    Integer,
+    MappingSchema as MapSchema,
+    OneOf,
+    Range,
+    SequenceSchema as SeqSchema,
+    String,
+    drop
+)
 from cornice import Service
 
 from weaver import __meta__

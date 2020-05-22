@@ -1,8 +1,8 @@
 import os
 from typing import TYPE_CHECKING
 
+from pyramid.httpexceptions import HTTPNotFound, HTTPOk
 from pywps.inout.formats import FORMATS, Format
-from pyramid.httpexceptions import HTTPOk, HTTPNotFound
 from requests.exceptions import ConnectionError
 from six.moves.urllib.error import HTTPError
 from six.moves.urllib.request import urlopen
