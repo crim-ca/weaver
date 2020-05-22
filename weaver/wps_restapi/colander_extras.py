@@ -1,7 +1,6 @@
 from typing import TYPE_CHECKING
 
 import colander
-
 from cornice_swagger.converters import schema
 from cornice_swagger.converters.exceptions import NoSuchConverter
 
