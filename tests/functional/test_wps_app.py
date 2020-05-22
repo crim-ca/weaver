@@ -10,6 +10,7 @@ import unittest
 
 import pyramid.testing
 import pytest
+import xmltodict
 from lxml import etree
 
 from tests.utils import (
@@ -34,7 +35,9 @@ class WpsAppTest(unittest.TestCase):
         settings = {
             "weaver.url": "",
             "weaver.wps": True,
-            "weaver.wps_path": self.wps_path
+            "weaver.wps_path": self.wps_path,
+            "weaver.wps_metadata_identification_title": "Weaver WPS Test Server",
+            "weaver.wps_metadata_provider_name": WpsAppTest.__name__
         }
         config = get_test_weaver_config(settings=settings)
         config = setup_config_with_mongodb(config)
@@ -61,14 +64,20 @@ class WpsAppTest(unittest.TestCase):
     def make_url(self, params):
         return "{}?{}".format(self.wps_path, params)
 
-    @pytest.mark.online
     def test_getcaps(self):
         resp = self.app.get(self.make_url("service=wps&request=getcapabilities"))
         assert resp.status_code == 200
         assert resp.content_type in CONTENT_TYPE_ANY_XML
         resp.mustcontain("</wps:Capabilities>")
 
-    @pytest.mark.online
+    def test_getcaps_metadata(self):
+        resp = self.app.get(self.make_url("service=wps&request=getcapabilities"))
+        assert resp.status_code == 200
+        assert resp.content_type in CONTENT_TYPE_ANY_XML
+        xml_dict = xmltodict.parse(resp.text)
+        assert xml_dict["wps:Capabilities"]["ows:ServiceIdentification"]["ows:Title"] == "Weaver WPS Test Server"
+        assert xml_dict["wps:Capabilities"]["ows:ServiceProvider"]["ows:ProviderName"] == WpsAppTest.__name__
+
     def test_getcaps_filtered_processes_by_visibility(self):
         resp = self.app.get(self.make_url("service=wps&request=getcapabilities"))
         assert resp.status_code == 200
@@ -82,7 +91,6 @@ class WpsAppTest(unittest.TestCase):
         assert self.process_private.identifier not in ids
         assert self.process_public.identifier in ids
 
-    @pytest.mark.online
     def test_describeprocess(self):
         template = "service=wps&request=describeprocess&version=1.0.0&identifier={}"
         params = template.format(HelloWPS.identifier)
@@ -91,7 +99,6 @@ class WpsAppTest(unittest.TestCase):
         assert resp.content_type in CONTENT_TYPE_ANY_XML
         resp.mustcontain("</wps:ProcessDescriptions>")
 
-    @pytest.mark.online
     def test_describeprocess_filtered_processes_by_visibility(self):
         param_template = "service=wps&request=describeprocess&version=1.0.0&identifier={}"
 
@@ -107,7 +114,6 @@ class WpsAppTest(unittest.TestCase):
         assert resp.content_type in CONTENT_TYPE_ANY_XML
         resp.mustcontain("<ows:ExceptionText>Unknown process")
 
-    @pytest.mark.online
     def test_execute_allowed(self):
         template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=name=tux"
         params = template.format(HelloWPS.identifier)
@@ -118,7 +124,6 @@ class WpsAppTest(unittest.TestCase):
         status = "<wps:ProcessSucceeded>PyWPS Process {} finished</wps:ProcessSucceeded>".format(HelloWPS.title)
         resp.mustcontain(status)
 
-    @pytest.mark.online
     def test_execute_with_visibility(self):
         params_template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=test_input=test"
         url = self.make_url(params_template.format(self.process_public.identifier, ))
