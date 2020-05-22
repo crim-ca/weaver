@@ -635,6 +635,7 @@ def request_extra(method,                       # type: AnyStr
     :param retries: Number of request retries to attempt if first attempt failed (according to allowed codes or error).
     :param backoff: Factor by which to multiply delays between retries.
     :param intervals: Explicit intervals in seconds between retries.
+    :param retry_after: If enabled, honor ``Retry-After`` response header of provided by a failing request attempt.
     :param allowed_codes: HTTP status codes that are considered valid to stop retrying (default: any non-4xx/5xx code).
     :param ssl_verify: Explicit parameter to disable SSL verification (overrides any settings, default: True).
     :param settings: Additional settings from which to retrieve configuration details for requests.
