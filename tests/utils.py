@@ -26,7 +26,6 @@ from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_XML
 from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
 from weaver.utils import get_url_without_query, null
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
-from weaver.wps import get_wps_output_dir, get_wps_output_url, get_wps_url
 from weaver.wps_restapi.processes.processes import execute_process
 
 if TYPE_CHECKING:
@@ -136,15 +135,13 @@ def setup_mongodb_jobstore(config=None):
 
 def setup_config_with_pywps(config):
     # type: (Configurator) -> Configurator
+    # flush any PyWPS config (global) to make sure we restart from clean state
+    import pywps.configuration  # isort: skip
+    pywps.configuration.CONFIG = None
     settings = config.get_settings()
-    settings.update({
-        "PYWPS_CFG": {
-            "server.url": get_wps_url(settings),
-            "server.outputurl": get_wps_output_url(settings),
-            "server.outputpath": get_wps_output_dir(settings),
-        },
-    })
-    config.registry.settings.update(settings)
+    settings.pop("PYWPS_CONFIG", None)
+    settings["weaver.wps_configured"] = False
+    os.environ.pop("PYWPS_CONFIG", None)
     config.include("weaver.wps")
     return config
 
