@@ -1,16 +1,17 @@
 # reference: https://github.com/github/issue-labeler
 
-name: "Issue Labeler"
-on:
-  issues:
-    types: [opened, edited]
-
-jobs:
-  triage:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: github/issue-labeler@v2.0
-      with:
-        repo-token: "${{ secrets.GITHUB_TOKEN }}"
-        configuration-path: .github/labeler-words.yml
-        enable-versioned-regex: 0
+# FIXME: find a way to avoid the label to remove tags...
+#name: "Issue Labeler"
+#on:
+#  issues:
+#    types: [opened, edited]
+#
+#jobs:
+#  triage:
+#    runs-on: ubuntu-latest
+#    steps:
+#    - uses: github/issue-labeler@v2.0
+#      with:
+#        repo-token: "${{ secrets.GITHUB_TOKEN }}"
+#        configuration-path: .github/labeler-words.yml
+#        enable-versioned-regex: 0
