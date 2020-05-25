@@ -15,4 +15,4 @@ outputs:
   output:
     type:
       type: array
-      items: String
+      items: string
