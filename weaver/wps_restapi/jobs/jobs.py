@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 LOGGER = get_task_logger(__name__)
 
 
-def check_status(url=None, response=None, sleep_secs=2, verify=False, settings=None):
+def check_status(url=None, response=None, sleep_secs=2, verify=True, settings=None):
     # type: (Optional[AnyStr], Optional[etree.ElementBase], int, bool, Optional[AnySettingsContainer]) -> WPSExecution
     """
     Run :func:`owslib.wps.WPSExecution.checkStatus` with additional exception handling.

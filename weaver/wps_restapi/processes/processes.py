@@ -49,6 +49,7 @@ from weaver.utils import (
     get_any_value,
     get_cookie_headers,
     get_settings,
+    get_ssl_verify_option,
     raise_on_xml_exception,
     request_extra,
     wait_secs
@@ -89,7 +90,6 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
     settings = get_settings(app)
     task_logger = get_task_logger(__name__)
     load_pywps_cfg(settings)
-    ssl_verify = asbool(settings.get("weaver.ssl_verify", True))
     wps_out_dir = get_wps_output_dir(settings)
 
     task_logger.debug("Job task setup.")
@@ -104,6 +104,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
         try:
             job.progress = JOB_PROGRESS_DESCRIBE
             job.save_log(logger=task_logger, message="Execute WPS request for process [{!s}]".format(job.process))
+            ssl_verify = get_ssl_verify_option("get", url, settings=settings)
             wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), verify=ssl_verify)
             set_wps_language(wps, accept_language=job.accept_language)
             raise_on_xml_exception(wps._capabilities)   # noqa
@@ -190,7 +191,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
                 #   WPS execution logs can be inserted within the current job log and appear continuously.
                 #   Only update internal job fields in case they get referenced elsewhere.
                 job.progress = JOB_PROGRESS_EXECUTE_MONITOR_LOOP
-                execution = check_status(url=wps_status_path, verify=ssl_verify, sleep_secs=wait_secs(run_step))
+                execution = check_status(url=wps_status_path, settings=settings, sleep_secs=wait_secs(run_step))
                 job_msg = (execution.statusMessage or "").strip()
                 job.response = etree.tostring(execution.response)
                 job.status = map_status(execution.getStatus())
@@ -375,7 +376,7 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
     result = execute_process.delay(
         job_id=job.id,
         url=clean_ows_url(service_url),
-        # Convert EnvironHeaders to a simple dict (should cherrypick the required headers)
+        # Convert EnvironHeaders to a simple dict (should cherry-pick the required headers)
         headers={k: v for k, v in request.headers.items()},
         notification_email=notification_email)
     LOGGER.debug("Celery pending task [%s] for job [%s].", result.id, job.id)

@@ -4,6 +4,22 @@ Changes
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
 
+Changes:
+--------
+
+- Add ``weaver.wps_workdir`` configuration setting to define the location where the underlying ``cwltool`` application
+  should be executed under.
+- Use ``weaver.request_options`` for `WPS GetCapabilities` and `WPS Check Status` requests under the running job.
+- Change default ``DOCKER_REPO`` value defined in ``Makefile`` to point to reference mentioned in ``README.md`` and
+  considered as official deployment location.
+
+Fixes:
+------
+
+- Set ``get_cwl_file_format`` default argument ``must_exist=True`` instead of ``False`` to retrieve original default
+  behaviour of the function. Since `CWL` usually doesn't need to add ``File.format`` field when no corresponding
+  reference actually exists, this default also makes more sense.
+
 `1.8.1 <https://github.com/crim-ca/weaver/tree/1.8.1>`_ (2020-05-22)
 ========================================================================
 

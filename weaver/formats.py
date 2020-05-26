@@ -85,13 +85,13 @@ EDAM_MAPPING = {
 FORMAT_NAMESPACES = frozenset([IANA_NAMESPACE, EDAM_NAMESPACE])
 
 
-def get_cwl_file_format(mime_type, make_reference=False, must_exist=False):
+def get_cwl_file_format(mime_type, make_reference=False, must_exist=True):
     # type: (AnyStr, bool, bool) -> Union[Tuple[Union[JSON, None], Union[AnyStr, None]], Union[AnyStr, None]]
     """
     Obtains the corresponding `IANA`/`EDAM` ``format`` value to be applied under a `CWL` I/O ``File`` from
     the ``mime_type`` (`Content-Type` header) using the first matched one.
 
-    If ``make_reference=False``:
+    - If ``make_reference=False``:
         - If there is a match, returns ``tuple({<namespace-name: namespace-url>}, <format>)``:
             1) corresponding namespace mapping to be applied under ``$namespaces`` in the `CWL`.
             2) value of ``format`` adjusted according to the namespace to be applied to ``File`` in the `CWL`.
@@ -99,14 +99,17 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=False):
             returns a literal and non-existing definition as ``tuple({"iana": <iana-url>}, <format>)``
         - Otherwise, returns ``(None, None)``
 
-    If ``make_reference=True``:
+    - If ``make_reference=True``:
         - If there is a match, returns the explicit format reference as ``<namespace-url>/<format>``.
         - If there is no match but ``must_exist=False``, returns the literal reference as ``<iana-url>/<format>``.
         - Otherwise, returns a single ``None``.
 
     Note:
-        In situations where ``must_exist=False`` and the default non-existing namespace is returned, the `CWL`
-        behaviour is to evaluate corresponding ``format`` for literal matching strings.
+        In situations where ``must_exist=False`` is used and that the namespace and/or full format URL cannot be
+        resolved to an existing reference, `CWL` will raise a validation error as it cannot confirm the ``format``.
+        You must therefore make sure that the returned reference really exists when using ``must_exist=False`` before
+        providing it to the `CWL` I/O definition. This parameter should be used only for literal string comparison or
+        pre-processing steps to evaluate formats.
     """
     def _make_if_ref(_map, _key, _fmt):
         return os.path.join(_map[_key], _fmt) if make_reference else (_map, "{}:{}".format(_key, _fmt))

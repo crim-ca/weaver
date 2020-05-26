@@ -248,6 +248,111 @@ class WpsPackageAppTest(unittest.TestCase):
         # assert pkg["outputs"][1]["label"] == "Additional detail only within WPS output", \
         #     "WPS I/O title should be converted to CWL label of corresponding I/O from additional details"
 
+    def test_complex_io_format_references(self):
+        """
+        Test validates that known `WPS` I/O formats (i.e.: `MIME-type`) considered as valid, but not corresponding
+        to any *real* `IANA/EDAM` reference for `CWL` are preserved on the `WPS` side and dropped on `CWL` side to
+        avoid validation error.
+
+        We also validate a `MIME-type` that should be found for both `CWL` and `WPS` formats to make sure that `CWL`
+        formats are only dropped when necessary.
+        """
+        ns_json, type_json = get_cwl_file_format(CONTENT_TYPE_APP_JSON, must_exist=True)
+        assert "iana" in ns_json  # just to make sure
+        ct_not_exists = "x-ogc-dods"    # OpenDAP, still doesn't exist at moment of test creation
+        ns_not_exists, type_not_exists = get_cwl_file_format(ct_not_exists, must_exist=False)
+        assert "iana" in ns_not_exists
+        body = {
+            "processDescription": {
+                "process": {
+                    "id": self._testMethodName,
+                    "inputs": [
+                        {
+                            "id": "wps_only_format_exists",
+                            "formats": [
+                                {
+                                    "mimeType": CONTENT_TYPE_APP_JSON,
+                                    "default": True,
+                                }
+                            ]
+                        },
+                        {
+                            "id": "wps_only_format_not_exists",
+                            "formats": [
+                                {
+                                    "mimeType": ct_not_exists,
+                                    "default": True,
+                                }
+                            ]
+                        },
+                        {
+                            "id": "wps_only_format_both",
+                            "formats": [
+                                {"mimeType": CONTENT_TYPE_APP_JSON},
+                                {"mimeType": ct_not_exists, "default": True},
+                            ]
+                        }
+                    ],
+                    # NOTE:
+                    #   Don't care about outputs here since we cannot have an array of formats
+                    #   as CWL output, so there isn't much to compare against from the WPS list.
+                },
+            },
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": {
+                "cwlVersion": "v1.0",
+                "class": "CommandLineTool",
+                "inputs": {
+                    # minimal info only to match IDs, check that formats are added only when CWL can resolve references
+                    # FIXME: no format is back-propagated from WPS format to CWL at the moment
+                    #  (https://github.com/crim-ca/weaver/issues/50)
+                    "wps_only_format_exists": "File",
+                    "wps_only_format_not_exists": "File",
+                    "wps_only_format_both": "File",
+                    "cwl_only_format_exists": {"type": "File", "format": type_json},
+                    # non-existing schema references should not be provided directly in CWL
+                    # since these would enforce raising the validation error directly...
+                    # "cwl_only_format_not_exists": {"type": "File", "format": ct_not_exists}
+                },
+                "outputs": {"dont_care": "File"},
+                "$namespaces": dict(list(ns_json.items()))
+            }}],
+        }
+        desc, pkg = self.deploy_process(body)
+
+        assert desc["process"]["inputs"][0]["id"] == "wps_only_format_exists"
+        assert len(desc["process"]["inputs"][0]["formats"]) == 1
+        assert desc["process"]["inputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
+        assert pkg["inputs"][0]["id"] == "wps_only_format_exists"
+        assert pkg["inputs"][0]["type"] == "File"
+        # FIXME: back-propagate WPS format to CWL without format specified
+        #  (https://github.com/crim-ca/weaver/issues/50)
+        # assert pkg["inputs"][0]["format"] == type_json
+
+        assert desc["process"]["inputs"][1]["id"] == "wps_only_format_not_exists"
+        assert len(desc["process"]["inputs"][1]["formats"]) == 1
+        assert desc["process"]["inputs"][1]["formats"][0]["mimeType"] == ct_not_exists
+        assert pkg["inputs"][1]["id"] == "wps_only_format_not_exists"
+        assert pkg["inputs"][1]["type"] == "File"
+        assert "format" not in pkg["inputs"][1], "Non-existing CWL format reference should have been dropped."
+
+        assert desc["process"]["inputs"][2]["id"] == "wps_only_format_both"
+        assert len(desc["process"]["inputs"][2]["formats"]) == 2
+        assert desc["process"]["inputs"][2]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
+        assert desc["process"]["inputs"][2]["formats"][1]["mimeType"] == ct_not_exists
+        assert pkg["inputs"][2]["id"] == "wps_only_format_both"
+        assert pkg["inputs"][2]["type"] == "File"
+        # FIXME: for now we don't even back-propagate, but if we did, must be none because one is unknown reference
+        #   (https://github.com/crim-ca/weaver/issues/50)
+        assert "format" not in pkg["inputs"][2], "Any non-existing CWL format reference should drop all entries."
+
+        assert desc["process"]["inputs"][3]["id"] == "cwl_only_format_exists"
+        assert len(desc["process"]["inputs"][3]["formats"]) == 1
+        assert desc["process"]["inputs"][3]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_JSON
+        assert pkg["inputs"][3]["id"] == "cwl_only_format_exists"
+        assert pkg["inputs"][3]["type"] == "File"
+        assert pkg["inputs"][3]["format"] == type_json
+
     def test_complex_io_with_multiple_formats_and_defaults(self):
         """
         Test validates that different format types are set on different input variations simultaneously:

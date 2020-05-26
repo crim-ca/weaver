@@ -101,26 +101,31 @@ def get_wps_output_url(container):
 
 def load_pywps_cfg(container, config=None):
     # type: (AnySettingsContainer, Optional[Union[AnyStr, Dict[AnyStr, AnyStr]]]) -> ConfigParser
-    """Loads and updates the PyWPS configuration using Weaver settings."""
+    """
+    Loads and updates the PyWPS configuration using Weaver settings.
+    """
     settings = get_settings(container)
-    if not settings.get("weaver.wps_configured"):
-        # initial setup of PyWPS config
-        pywps_config.load_configuration([])  # load defaults
-        # must be set to INFO to disable sqlalchemy trace.
-        # see : https://github.com/geopython/pywps/blob/master/pywps/dblog.py#L169
-        if logging.getLevelName(pywps_config.CONFIG.get("logging", "level")) <= logging.DEBUG:
-            pywps_config.CONFIG.set("logging", "level", "INFO")
-        # update metadata
-        for setting_name, setting_value in settings.items():
-            if setting_name.startswith("weaver.wps_metadata"):
-                pywps_setting = setting_name.replace("weaver.wps_metadata_", "")
-                pywps_config.CONFIG.set("metadata:main", pywps_setting, setting_value)
-        # add weaver configuration keyword if not already provided
-        wps_keywords = pywps_config.CONFIG.get("metadata:main", "identification_keywords")
-        weaver_mode = get_weaver_configuration(settings)
-        if weaver_mode not in wps_keywords:
-            wps_keywords += ("," if wps_keywords else "") + weaver_mode
-            pywps_config.CONFIG.set("metadata:main", "identification_keywords", wps_keywords)
+    if settings.get("weaver.wps_configured"):
+        LOGGER.debug("Using preloaded internal Weaver WPS configuration.")
+        return pywps_config.CONFIG
+
+    LOGGER.info("Initial load of internal Weaver WPS configuration.")
+    pywps_config.load_configuration([])  # load defaults
+    # must be set to INFO to disable sqlalchemy trace.
+    # see : https://github.com/geopython/pywps/blob/master/pywps/dblog.py#L169
+    if logging.getLevelName(pywps_config.CONFIG.get("logging", "level")) <= logging.DEBUG:
+        pywps_config.CONFIG.set("logging", "level", "INFO")
+    # update metadata
+    for setting_name, setting_value in settings.items():
+        if setting_name.startswith("weaver.wps_metadata"):
+            pywps_setting = setting_name.replace("weaver.wps_metadata_", "")
+            pywps_config.CONFIG.set("metadata:main", pywps_setting, setting_value)
+    # add weaver configuration keyword if not already provided
+    wps_keywords = pywps_config.CONFIG.get("metadata:main", "identification_keywords")
+    weaver_mode = get_weaver_configuration(settings)
+    if weaver_mode not in wps_keywords:
+        wps_keywords += ("," if wps_keywords else "") + weaver_mode
+        pywps_config.CONFIG.set("metadata:main", "identification_keywords", wps_keywords)
 
     # add additional config passed as dictionary of {'section.key': 'value'}
     if isinstance(config, dict):

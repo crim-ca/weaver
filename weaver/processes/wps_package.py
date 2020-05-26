@@ -1422,7 +1422,7 @@ def _any2cwl_io(wps_io, io_select):
         if not _wps_io_fmt:
             return None, None, None
         _cwl_io_ext = get_extension(_wps_io_fmt)
-        _cwl_io_ref, _cwl_io_fmt = get_cwl_file_format(_wps_io_fmt)
+        _cwl_io_ref, _cwl_io_fmt = get_cwl_file_format(_wps_io_fmt, must_exist=True)
         return _cwl_io_ref, _cwl_io_fmt, _cwl_io_ext
 
     wps_io_type = _get_field(wps_io, "type", search_variations=True)
@@ -1459,6 +1459,11 @@ def _any2cwl_io(wps_io, io_select):
                     break  # don't use any format because we cannot enforce one
                 cwl_io_fmt = []
                 for fmt_i in fmt:
+                    # FIXME: (?)
+                    #   when multiple formats are specified, but at least one schema/namespace reference can't be found,
+                    #   should we drop all since that unknown format is still allowed but cannot be validated?
+                    #   avoid potential validation error if that format was the one provided during execute...
+                    #   (see: https://github.com/crim-ca/weaver/issues/50)
                     cwl_io_ref_i, cwl_io_fmt_i, _ = _get_cwl_fmt_details(fmt_i)
                     if cwl_io_ref_i and cwl_io_fmt_i:
                         cwl_io_fmt.append(cwl_io_fmt_i)
@@ -1900,42 +1905,6 @@ class WpsPackage(Process):
         """
         return map_progress(100 * step_index / steps_total, PACKAGE_PROGRESS_CWL_RUN, PACKAGE_PROGRESS_CWL_DONE)
 
-    @staticmethod
-    def make_location_input(input_type, input_definition):
-        # type: (AnyStr, ComplexInput) -> JSON
-        """Generates the JSON content required to specify a CWL File input definition from a location."""
-        # We don't want auto fetch because we pass down value to CWL which will handle it accordingly
-        input_location = None
-        # cannot rely only on 'as_reference' as sometime it is not provided by the request although it's an href
-        if input_definition.as_reference:
-            input_location = input_definition.url
-        # FIXME: PyWPS bug - calling 'file' method fetches it, and it is always called during type validation
-        #   (https://github.com/geopython/pywps/issues/526)
-        #   (https://github.com/crim-ca/weaver/issues/91)
-        #   since href is already handled (pulled and staged locally), use it directly to avoid double fetch with CWL
-        #   validate using the internal '_file' instead of 'file' otherwise we trigger the fetch
-        #   normally, file should be pulled an this check should fail
-        if input_definition._file and os.path.isfile(input_definition._file):     # noqa: W0212
-            input_location = input_definition._file                               # noqa: W0212
-        # if source type is data, we actually need to call 'data' (without fetch of remote file, already fetched)
-        # value of 'file' in this case points to a local file path where the wanted link was dumped as raw data
-        if input_definition.source_type == SOURCE_TYPE.DATA:
-            input_location = input_definition.data
-        if not input_location:
-            url = getattr(input_definition, "url")
-            if isinstance(url, six.string_types) and any([url.startswith(p) for p in ["http", "file"]]):
-                input_location = url
-            else:
-                # last option, could not resolve 'lazily' so will fetch data if needed
-                input_location = input_definition.data
-
-        location = {"location": input_location, "class": input_type}
-        if input_definition.data_format is not None and input_definition.data_format.mime_type:
-            fmt = get_cwl_file_format(input_definition.data_format.mime_type, make_reference=True)
-            if fmt is not None:
-                location["format"] = fmt
-        return location
-
     def _handler(self, request, response):
         # type: (WPSRequest, ExecuteResponse) -> ExecuteResponse
         LOGGER.debug("HOME=%s, Current Dir=%s", os.environ.get("HOME"), os.path.abspath(os.curdir))
@@ -1952,8 +1921,8 @@ class WpsPackage(Process):
 
             self.update_status("Launching package...", PACKAGE_PROGRESS_LAUNCHING, STATUS_RUNNING)
 
-            settings = get_settings(app)
-            is_ems = get_weaver_configuration(settings) == WEAVER_CONFIGURATION_EMS
+            self.settings = get_settings(app)
+            is_ems = get_weaver_configuration(self.settings) == WEAVER_CONFIGURATION_EMS
             if is_ems:
                 # EMS dispatch the execution to the ADES
                 loading_context = LoadingContext()
@@ -1962,9 +1931,14 @@ class WpsPackage(Process):
                 # ADES execute the cwl locally
                 loading_context = None
 
-            wps_out_dir_prefix = os.path.join(get_wps_output_dir(settings), "tmp")
-            runtime_args = {"no_read_only": True, "outdir": self.workdir, "tmp_outdir_prefix": wps_out_dir_prefix}
-            runtime_context = RuntimeContext(kwargs=runtime_args)
+            ##wps_out_dir_prefix = os.path.join(get_wps_output_dir(settings), "tmp")
+            wps_workdir = self.settings.get("weaver.wps_workdir", self.workdir)
+            runtime_context = RuntimeContext(kwargs={
+                "no_read_only": True,
+                "outdir": wps_workdir,         # if using any other than docker app
+                "docker_outdir": wps_workdir,  # if using docker app
+                #"tmp_outdir_prefix": wps_out_dir_prefix,   ## FIXME: old-location
+            })
             try:
                 package_inst, _, self.step_packages = _load_package_content(self.package,
                                                                             package_name=self.package_id,
@@ -1996,7 +1970,7 @@ class WpsPackage(Process):
                     request.inputs = opensearch.query_eo_images_from_wps_inputs(request.inputs,
                                                                                 eoimage_data_sources,
                                                                                 accept_mime_types,
-                                                                                settings=settings)
+                                                                                settings=self.settings)
 
                 cwl_inputs = dict()
                 for input_id in request.inputs:
@@ -2046,15 +2020,7 @@ class WpsPackage(Process):
             # FIXME: this won't be necessary using async routine (https://github.com/crim-ca/weaver/issues/131)
             self.insert_package_log(result)
             try:
-                for output in request.outputs:
-                    # TODO: adjust output for glob patterns (https://github.com/crim-ca/weaver/issues/24)
-                    if isinstance(result[output], list) and not isinstance(self.response.outputs[output], list):
-                        result[output] = result[output][0]  # expect only one output
-                    if "location" in result[output]:
-                        self.response.outputs[output].as_reference = True
-                        self.response.outputs[output].file = result[output]["location"].replace("file://", "")
-                    else:
-                        self.response.outputs[output].data = result[output]
+                self.make_location_outputs(result)
                 self.update_status("Generate package outputs done.", PACKAGE_PROGRESS_PREP_OUT, STATUS_RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed to save package outputs.")
@@ -2066,6 +2032,70 @@ class WpsPackage(Process):
         else:
             self.update_status("Package complete.", PACKAGE_PROGRESS_DONE, STATUS_SUCCEEDED)
         return self.response
+
+    @staticmethod
+    def make_location_input(input_type, input_definition):
+        # type: (AnyStr, ComplexInput) -> JSON
+        """Generates the JSON content required to specify a CWL File input definition from a location."""
+        # We don't want auto fetch because we pass down value to CWL which will handle it accordingly
+        input_location = None
+        # cannot rely only on 'as_reference' as sometime it is not provided by the request although it's an href
+        if input_definition.as_reference:
+            input_location = input_definition.url
+        # FIXME: PyWPS bug - calling 'file' method fetches it, and it is always called during type validation
+        #   (https://github.com/geopython/pywps/issues/526)
+        #   (https://github.com/crim-ca/weaver/issues/91)
+        #   since href is already handled (pulled and staged locally), use it directly to avoid double fetch with CWL
+        #   validate using the internal '_file' instead of 'file' otherwise we trigger the fetch
+        #   normally, file should be pulled an this check should fail
+        if input_definition._file and os.path.isfile(input_definition._file):     # noqa: W0212
+            input_location = input_definition._file                               # noqa: W0212
+        # if source type is data, we actually need to call 'data' (without fetch of remote file, already fetched)
+        # value of 'file' in this case points to a local file path where the wanted link was dumped as raw data
+        if input_definition.source_type == SOURCE_TYPE.DATA:
+            input_location = input_definition.data
+        if not input_location:
+            url = getattr(input_definition, "url")
+            if isinstance(url, six.string_types) and any([url.startswith(p) for p in ["http", "file"]]):
+                input_location = url
+            else:
+                # last option, could not resolve 'lazily' so will fetch data if needed
+                input_location = input_definition.data
+
+        location = {"location": input_location, "class": input_type}
+        if input_definition.data_format is not None and input_definition.data_format.mime_type:
+            fmt = get_cwl_file_format(input_definition.data_format.mime_type, make_reference=True)
+            if fmt is not None:
+                location["format"] = fmt
+        return location
+
+    def make_location_outputs(self, cwl_result):
+        """
+        Maps `CWL` result outputs to corresponding `WPS` outputs under required location.
+        """
+        wps_out_dir = get_wps_output_dir(self.settings)
+        for output_id in self.request.outputs:
+            # TODO: adjust output for glob patterns (https://github.com/crim-ca/weaver/issues/24)
+            if isinstance(cwl_result[output_id], list) and not isinstance(self.response.outputs[output_id], list):
+                cwl_result[output_id] = cwl_result[output_id][0]  # expect only one output
+            if "location" in cwl_result[output_id]:
+                result_loc = cwl_result[output_id]["location"].replace("file://", "")
+                result_wps = os.path.join(wps_out_dir, os.path.split(result_loc)[-1])
+                if os.path.realpath(result_loc) != os.path.realpath(result_wps):
+                    LOGGER.info("Moving [%s]: [%s] -> [%s]", output_id, result_loc, result_wps)
+                    shutil.move(result_loc, result_wps)
+                self.response.outputs[output_id].as_reference = True
+                self.response.outputs[output_id].file = result_wps
+                LOGGER.info("Resolved WPS output [%s]: [%s]", output_id, result_wps)
+            else:
+                result_loc = cwl_result[output_id]
+                result_wps = os.path.join(wps_out_dir, os.path.split(result_loc)[-1])
+                if os.path.realpath(result_loc) != os.path.realpath(result_wps):
+                    LOGGER.info("Moving: [%s] -> [%s]", result_loc, result_wps)
+                    shutil.move(result_loc, result_wps)
+                LOGGER.info("Moving [%s]: [%s] -> [%s]", output_id, result_loc, result_wps)
+                self.response.outputs[output_id].data = result_wps
+                LOGGER.info("Resolved WPS output [%s]: [%s]", output_id, result_wps)
 
     def make_tool(self, toolpath_object, loading_context):
         # type: (ToolPathObjectType, LoadingContext) -> ProcessCWL
