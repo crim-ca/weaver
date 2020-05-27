@@ -62,6 +62,7 @@ def check_status(url=None, response=None, sleep_secs=2, verify=True, settings=No
         LOGGER.debug("WPS status reference [%s] will be parsed as local file path [%s].", url, out_path)
         if not os.path.isfile(out_path):
             raise HTTPNotFound("Could not find file resource from [{}].".format(url))
+        LOGGER.info("Resolved WPS status-location using local file reference.")
         return open(out_path, "r").read()
 
     execution = WPSExecution()

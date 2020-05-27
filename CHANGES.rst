@@ -8,8 +8,13 @@ Changes:
 --------
 
 - Add ``weaver.wps_workdir`` configuration setting to define the location where the underlying ``cwltool`` application
-  should be executed under.
+  should be executed under. This can allow more control over the scope of the mounted volumes for *Application Package*
+  running a docker image.
+- Add *experimental* configuration settings ``weaver.cwl_euid`` and ``weaver.cwl_egid`` to provide effective user/group
+  identifiers to employ when running the CWL *Application Package*. Using these require good control of the directory
+  and process I/O locations as invalid permissions could break a previously working job execution.
 - Use ``weaver.request_options`` for `WPS GetCapabilities` and `WPS Check Status` requests under the running job.
+- Enforced removal of some invalid `CWL` hints/requirements that would break the behaviour offered by ``Weaver``.
 - Change default ``DOCKER_REPO`` value defined in ``Makefile`` to point to reference mentioned in ``README.md`` and
   considered as official deployment location.
 

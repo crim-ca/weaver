@@ -21,6 +21,7 @@ from copy import deepcopy
 from typing import TYPE_CHECKING
 
 import cwltool
+import cwltool.docker
 import cwltool.factory
 import lxml.etree
 import six
@@ -58,6 +59,7 @@ from weaver.formats import (
 )
 from weaver.processes import opensearch
 from weaver.processes.constants import (
+    CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_APP_ESGF_CWT,
     CWL_REQUIREMENT_APP_TYPES,
     CWL_REQUIREMENT_APP_WPS1,
@@ -1855,6 +1857,48 @@ class WpsPackage(Process):
             self.exception_message(PackageExecutionError, exception=exc, level=logging.WARNING, status=STATUS_RUNNING,
                                    message="Error occurred when retrieving internal application log.")
 
+    def update_requirements(self):
+        """
+        Inplace modification of :attr:`package` to remove invalid items that would break behaviour we must enforce.
+        """
+        for req_type in ["hints", "requirements"]:
+            req_items = self.package.get(req_type, {})
+            for req_cls in req_items:
+                if not isinstance(req_cls, dict):
+                    req_def = req_items[req_cls]
+                else:
+                    req_def = req_cls
+                    req_cls = req_cls["class"]
+                if req_cls != CWL_REQUIREMENT_APP_DOCKER:
+                    continue
+                # remove build-related parameters because we forbid this in our case
+                # remove output directory since we must explicitly defined it to match with WPS
+                for req_rm in ["dockerFile", "dockerOutputDirectory"]:
+                    is_rm = req_def.pop(req_rm, None)
+                    if is_rm:
+                        self.logger.warning("Removed CWL [%s.%s] %s parameter from [%s] package definition (forced).",
+                                            req_cls, req_rm, req_type[:-1], self.package_id)
+
+    def update_effective_user(self):
+        """ Update effective user/group for the `Application Package` to be executed.
+
+        FIXME: (experimental) update user/group permissions
+
+        Reducing permissions is safer inside docker application since weaver/cwltool could be running as root
+        but this requires that mounted volumes have the required permissions so euid:egid can use them.
+
+        Overrides :mod:`cwltool`'s function to retrieve user/group id for ones we enforce.
+        """
+        cfg_euid = str(self.settings.get("weaver.cwl_euid", ""))
+        cfg_egid = str(self.settings.get("weaver.cwl_egid", ""))
+        app_euid, app_egid = str(os.geteuid()), str(os.getgid())
+        if cfg_euid not in ["", "0", app_euid] and cfg_egid not in ["", "0", app_egid]:
+            LOGGER.info("Enforcing CWL euid:egid [%s,%s]", cfg_euid, cfg_egid)
+            cwltool.docker.docker_vm_id = lambda *_, **__: (int(cfg_euid), int(cfg_egid))
+        else:
+            LOGGER.log(logging.WARNING if (app_euid == "0" or app_egid == "0") else logging.INFO,
+                       "Visible application CWL euid:egid [%s:%s]", app_euid, app_egid)
+
     def update_status(self, message, progress, status):
         # type: (AnyStr, Number, AnyStatusType) -> None
         """Updates the `PyWPS` real job status from a specified parameters."""
@@ -1931,14 +1975,29 @@ class WpsPackage(Process):
                 # ADES execute the cwl locally
                 loading_context = None
 
+            self.update_effective_user()
+            self.update_requirements()
+
             ##wps_out_dir_prefix = os.path.join(get_wps_output_dir(settings), "tmp")
             wps_workdir = self.settings.get("weaver.wps_workdir", self.workdir)
-            runtime_context = RuntimeContext(kwargs={
-                "no_read_only": True,
-                "outdir": wps_workdir,         # if using any other than docker app
-                "docker_outdir": wps_workdir,  # if using docker app
-                #"tmp_outdir_prefix": wps_out_dir_prefix,   ## FIXME: old-location
-            })
+            # cwltool will add additional unique characters after prefix paths
+            cwl_workdir = os.path.join(wps_workdir, "cwltool_tmp_")
+            cwl_outdir = os.path.join(wps_workdir, "cwltool_out_")
+            runtime_params = {
+                # force explicit staging if write needed (InitialWorkDirRequirement in CWL package)
+                # protect input paths that can be re-used to avoid potential in-place modifications
+                "no_read_only": False,
+                # employ enforced from provided config or auto-resolved user/group
+                "no_match_user": False,
+                #"outdir": wps_workdir,         # if using any other than docker app
+                #"tmpdir": cwl_workdir,
+                #"docker_outdir": wps_workdir,  # if using docker app
+                #"docker_tmpdir": cwl_workdir,
+                "tmpdir_prefix": cwl_workdir,
+                "tmp_outdir_prefix": cwl_outdir,
+            }
+            LOGGER.debug("Using cwltool.RuntimeContext args:\n%s", json.dumps(runtime_params, indent=2))
+            runtime_context = RuntimeContext(kwargs=runtime_params)
             try:
                 package_inst, _, self.step_packages = _load_package_content(self.package,
                                                                             package_name=self.package_id,
@@ -2012,7 +2071,7 @@ class WpsPackage(Process):
                 # Inputs starting with file:// will be interpreted as ems local files
                 # If OpenSearch obtain file:// references that must be passed to the ADES use an uri starting
                 # with OPENSEARCH_LOCAL_FILE_SCHEME://
-                LOGGER.debug("Launching process package with inputs:\n%s", cwl_inputs)
+                LOGGER.debug("Launching process package with inputs:\n%s", json.dumps(cwl_inputs, indent=2))
                 result = package_inst(**cwl_inputs)
                 self.update_status("Package execution done.", PACKAGE_PROGRESS_CWL_DONE, STATUS_RUNNING)
             except Exception as exc:

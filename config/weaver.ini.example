@@ -33,6 +33,7 @@ mongodb.db_name = weaver
 # --- Weaver Configuration ---
 weaver.configuration = ems
 weaver.url = http://localhost:4001
+
 # --- Weaver requests extension flags ---
 # SSL verification should be enabled for secured connections
 # setting is available for convenience, debug purposes and local environments
@@ -41,7 +42,16 @@ weaver.ssl_verify = true
 # file with request options to be used with 'weaver.utils.request_extra'
 # see 'requests_options.yml.example'
 weaver.request_options =
-# --- WPS settings ---
+
+# --- Weaver CWL settings ---
+# NOTE: [experimental]
+# enforce provided effective user/group identifiers for Application Package execution
+# values must be resolved as integers
+# (default: use cwltool auto-resolution according to running machine and current user/group)
+weaver.cwl_euid =
+weaver.cwl_egid =
+
+# --- Weaver WPS settings ---
 weaver.wps = true
 weaver.wps_url =
 weaver.wps_path = /ows/wps
@@ -50,7 +60,8 @@ weaver.wps_output_dir = /tmp
 weaver.wps_output_url =
 weaver.wps_output_path = /wpsoutputs
 weaver.wps_workdir =
-# --- WPS metadata ---
+
+# --- Weaver WPS metadata ---
 # all attributes under "metadata:main" can be specified as 'weaver.wps_metadata_<field>'
 # (reference: https://pywps.readthedocs.io/en/master/configuration.html#metadata-main)
 weaver.wps_metadata_identification_title=Weaver
@@ -59,13 +70,15 @@ weaver.wps_metadata_identification_keywords=Weaver,WPS,OGC
 weaver.wps_metadata_identification_accessconstraints=NONE
 weaver.wps_metadata_provider_name=CRIM
 weaver.wps_metadata_provider_url=http://pavics-weaver.readthedocs.org/en/latest/
-# --- WPS REST API ---
+
+# --- Weaver WPS REST API ---
 weaver.wps_restapi = true
 weaver.wps_restapi_url =
 weaver.wps_restapi_path = /
 weaver.wps_restapi_ref = https://app.swaggerhub.com/apis/geoprocessing/WPS/
 weaver.wps_restapi_doc = https://raw.githubusercontent.com/opengeospatial/wps-rest-binding/develop/docs/18-062.pdf
-# --- Job email notification ---
+
+# --- Weaver job email notification ---
 weaver.wps_email_encrypt_salt = salty-email
 weaver.wps_email_encrypt_rounds = 100000
 weaver.wps_email_notify_smtp_host =
@@ -75,7 +88,8 @@ weaver.wps_email_notify_port = 25
 weaver.wps_email_notify_ssl = true
 weaver.wps_email_notify_template_dir =
 weaver.wps_email_notify_template_default =
-# --- other configurations ---
+
+# --- Weaver other configurations ---
 # additional processes to load at startup (see 'wps_processes.yml.example')
 weaver.wps_processes_file = wps_processes.yml
 # known remote ADES for processes redirection based on data-sources when using EMS configuration
