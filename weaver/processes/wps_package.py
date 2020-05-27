@@ -1746,7 +1746,8 @@ class WpsPackage(Process):
             **kw
         )
 
-    def setup_logger(self):
+    def setup_logger(self, log_stdout_stderr=True):
+        # type: (bool) -> None
         """
         Configures useful loggers to catch most of the common output and/or error messages during package execution.
 
@@ -1776,16 +1777,17 @@ class WpsPackage(Process):
 
         # add stderr/stdout CWL hook to capture logs/prints/echos from subprocess execution
         # using same file so all kind of message are kept in chronological order of generation
-        self.package_log_hook_stderr = PACKAGE_OUTPUT_HOOK_LOG_UUID.format(str(uuid.uuid4()))
-        self.package_log_hook_stdout = PACKAGE_OUTPUT_HOOK_LOG_UUID.format(str(uuid.uuid4()))
-        package_outputs = self.package.get("outputs")
-        if isinstance(package_outputs, list):
-            package_outputs.extend([{"id": self.package_log_hook_stderr, "type": "stderr"},
-                                    {"id": self.package_log_hook_stdout, "type": "stdout"}])
-        else:
-            package_outputs.update({self.package_log_hook_stderr: {"type": "stderr"},
-                                    self.package_log_hook_stdout: {"type": "stdout"}})
-        self.package.update({"stderr": "stderr.log", "stdout": "stdout.log"})
+        if log_stdout_stderr:
+            self.package_log_hook_stderr = PACKAGE_OUTPUT_HOOK_LOG_UUID.format(str(uuid.uuid4()))
+            self.package_log_hook_stdout = PACKAGE_OUTPUT_HOOK_LOG_UUID.format(str(uuid.uuid4()))
+            package_outputs = self.package.get("outputs")
+            if isinstance(package_outputs, list):
+                package_outputs.extend([{"id": self.package_log_hook_stderr, "type": "stderr"},
+                                        {"id": self.package_log_hook_stdout, "type": "stdout"}])
+            else:
+                package_outputs.update({self.package_log_hook_stderr: {"type": "stderr"},
+                                        self.package_log_hook_stdout: {"type": "stdout"}})
+            self.package.update({"stderr": "stderr.log", "stdout": "stdout.log"})
 
         # add weaver Tweens logger to current package logger
         weaver_tweens_logger = logging.getLogger("weaver.tweens")
@@ -1945,7 +1947,10 @@ class WpsPackage(Process):
 
         try:
             try:
-                self.setup_logger()
+                # workflows do not support stdout/stderr
+                package_type = _get_package_type(self.package)
+                log_stdout_stderr = package_type != PROCESS_WORKFLOW
+                self.setup_logger(log_stdout_stderr)
                 self.update_status("Preparing package logs done.", PACKAGE_PROGRESS_PREP_LOG, STATUS_RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed preparing package logging.")
