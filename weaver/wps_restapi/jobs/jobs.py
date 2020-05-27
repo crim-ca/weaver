@@ -51,7 +51,7 @@ def check_status(url=None, response=None, sleep_secs=2, verify=True, settings=No
     :return: OWSLib.wps.WPSExecution object.
     """
     def _retry_file():
-        LOGGER.warning("Failed retrieving status-location, attempting with local file.")
+        LOGGER.warning("Failed retrieving WPS status-location, attempting with local file.")
         if url and not urlparse(url).scheme in ["", "file://"]:
             dir_path = get_wps_output_dir(app)
             wps_out_url = get_wps_output_url(app)
@@ -59,6 +59,7 @@ def check_status(url=None, response=None, sleep_secs=2, verify=True, settings=No
             out_path = os.path.join(dir_path, req_out_url.replace(wps_out_url, "").lstrip("/"))
         else:
             out_path = url.replace("file:://", "")
+        LOGGER.debug("WPS status reference [%s] will be parsed as local file path [%s].", url, out_path)
         if not os.path.isfile(out_path):
             raise HTTPNotFound("Could not find file resource from [{}].".format(url))
         return open(out_path, "r").read()
