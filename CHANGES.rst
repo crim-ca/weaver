@@ -4,6 +4,15 @@ Changes
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
 
+Changes:
+--------
+
+
+Fixes:
+------
+
+- Add condition make sure stdout/stderr logging is not applied for workflows.
+
 `1.8.1 <https://github.com/crim-ca/weaver/tree/1.8.1>`_ (2020-05-22)
 ========================================================================
 
