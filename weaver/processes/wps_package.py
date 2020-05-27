@@ -1776,16 +1776,18 @@ class WpsPackage(Process):
 
         # add stderr/stdout CWL hook to capture logs/prints/echos from subprocess execution
         # using same file so all kind of message are kept in chronological order of generation
-        self.package_log_hook_stderr = PACKAGE_OUTPUT_HOOK_LOG_UUID.format(str(uuid.uuid4()))
-        self.package_log_hook_stdout = PACKAGE_OUTPUT_HOOK_LOG_UUID.format(str(uuid.uuid4()))
-        package_outputs = self.package.get("outputs")
-        if isinstance(package_outputs, list):
-            package_outputs.extend([{"id": self.package_log_hook_stderr, "type": "stderr"},
-                                    {"id": self.package_log_hook_stdout, "type": "stdout"}])
-        else:
-            package_outputs.update({self.package_log_hook_stderr: {"type": "stderr"},
-                                    self.package_log_hook_stdout: {"type": "stdout"}})
-        self.package.update({"stderr": "stderr.log", "stdout": "stdout.log"})
+        # Note that workflows do not support stdout/stderr.
+        if self.package["class"] != "Workflow":
+            self.package_log_hook_stderr = PACKAGE_OUTPUT_HOOK_LOG_UUID.format(str(uuid.uuid4()))
+            self.package_log_hook_stdout = PACKAGE_OUTPUT_HOOK_LOG_UUID.format(str(uuid.uuid4()))
+            package_outputs = self.package.get("outputs")
+            if isinstance(package_outputs, list):
+                package_outputs.extend([{"id": self.package_log_hook_stderr, "type": "stderr"},
+                                        {"id": self.package_log_hook_stdout, "type": "stdout"}])
+            else:
+                package_outputs.update({self.package_log_hook_stderr: {"type": "stderr"},
+                                        self.package_log_hook_stdout: {"type": "stdout"}})
+            self.package.update({"stderr": "stderr.log", "stdout": "stdout.log"})
 
         # add weaver Tweens logger to current package logger
         weaver_tweens_logger = logging.getLogger("weaver.tweens")
