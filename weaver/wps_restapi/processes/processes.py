@@ -150,7 +150,9 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
 
         mode = EXECUTE_MODE_ASYNC if job.execute_async else EXECUTE_MODE_SYNC
         job.progress = JOB_PROGRESS_EXECUTE_REQUEST
-        job.save_log(logger=task_logger, message="Starting job process execution")
+        job.save_log(logger=task_logger, message="Starting job process execution.")
+        job.save_log(logger=task_logger,
+                     message="Following updates could take a while until the Application Package answers...")
         execution = wps.execute(job.process, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
         if not execution.process and execution.errors:
             raise execution.errors[0]

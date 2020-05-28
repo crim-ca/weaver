@@ -122,7 +122,7 @@ timeout = 10
 ###
 
 [loggers]
-keys = root, weaver, celery
+keys = root, weaver, celery, cwltool
 
 [handlers]
 keys = console
@@ -131,19 +131,25 @@ keys = console
 keys = generic
 
 [logger_root]
-level = DEBUG
+level = INFO
 handlers = console
 
 [logger_weaver]
-level = DEBUG
+level = INFO
 handlers = console
 qualname = weaver
 propagate = 0
 
 [logger_celery]
-level = DEBUG
+level = INFO
 handlers = console
 qualname = celery
+propagate = 0
+
+[logger_cwltool]
+level = INFO
+handlers = console
+qualname = cwltool
 propagate = 0
 
 [handler_console]

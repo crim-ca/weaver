@@ -67,12 +67,12 @@ def check_status(url=None, response=None, sleep_secs=2, verify=True, settings=No
 
     execution = WPSExecution()
     if response:
-        LOGGER.debug("using response document...")
+        LOGGER.debug("Retrieving WPS status from XML response document...")
         xml = response
     elif url:
         xml_resp = HTTPNotFound()
         try:
-            LOGGER.debug("using status-location url...")
+            LOGGER.debug("Attempt to retrieve WPS status-location from URL...")
             xml_resp = request_extra("get", url, verify=verify, settings=settings)
             xml = xml_resp.content
         except Exception as ex:
@@ -82,7 +82,7 @@ def check_status(url=None, response=None, sleep_secs=2, verify=True, settings=No
             LOGGER.debug("Got not-found during get status: [%r]", xml)
             xml = _retry_file()
     else:
-        raise Exception("you need to provide a status-location url or response object.")
+        raise Exception("Missing status-location URL/file reference or response with XML object.")
     if isinstance(xml, six.string_types):
         xml = xml.encode("utf8", errors="ignore")
     execution.checkStatus(response=xml, sleepSecs=sleep_secs)

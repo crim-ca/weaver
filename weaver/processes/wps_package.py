@@ -1711,7 +1711,7 @@ class WpsPackage(Process):
     package_log_hook_stdout = None  # type: Optional[AnyStr]
     percent = None                  # type: Optional[Number]
     log_file = None                 # type: Optional[AnyStr]
-    log_level = logging.INFO        # type: int
+    log_level = None                # type: Optional[int]
     logger = None                   # type: Optional[logging.Logger]
     step_packages = None            # type: Optional[List[CWL]]
     step_launched = None            # type: Optional[List[AnyStr]]
@@ -1761,6 +1761,8 @@ class WpsPackage(Process):
             :meth:`insert_package_log`
             :func:`retrieve_package_job_log`
         """
+        self.log_level = self.log_level or logging.getLogger("weaver").level
+
         # file logger for output
         self.log_file = get_status_location_log_path(self.status_location)
         log_file_handler = logging.FileHandler(self.log_file)
@@ -1995,6 +1997,7 @@ class WpsPackage(Process):
                 #"docker_tmpdir": cwl_workdir,
                 "tmpdir_prefix": cwl_workdir,
                 "tmp_outdir_prefix": cwl_outdir,
+                "debug": LOGGER.isEnabledFor(logging.DEBUG)
             }
             LOGGER.debug("Using cwltool.RuntimeContext args:\n%s", json.dumps(runtime_params, indent=2))
             runtime_context = RuntimeContext(kwargs=runtime_params)
