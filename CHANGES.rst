@@ -13,8 +13,16 @@ Changes:
 - Add *experimental* configuration settings ``weaver.cwl_euid`` and ``weaver.cwl_egid`` to provide effective user/group
   identifiers to employ when running the CWL *Application Package*. Using these require good control of the directory
   and process I/O locations as invalid permissions could break a previously working job execution.
+- Add more logging configuration and apply them to ``cwltool`` before execution of *Application Package*.
+- Enforce ``no_match_user=False`` and ``no_read_only=False`` of ``cwltool``'s ``RuntimeContext`` to ensure that docker
+  application is executed with same user as ``weaver`` and that process input files are not modified inplace (readonly)
+  where potentially inaccessible (according to settings). Definition of `CWL` package will need to add
+  `InitialWorkDirRequirement <https://www.commonwl.org/v1.0/CommandLineTool.html#InitialWorkDirRequirement>`_ as per
+  defined by reference specification to stage those files if they need to be accessed with write permissions
+  (see: `example <https://www.commonwl.org/user_guide/15-staging/>`_). Addresses some issues listed in
+  `#155 <https://github.com/crim-ca/weaver/issues/155>`_.
+- Enforce removal of some invalid `CWL` hints/requirements that would break the behaviour offered by ``Weaver``.
 - Use ``weaver.request_options`` for `WPS GetCapabilities` and `WPS Check Status` requests under the running job.
-- Enforced removal of some invalid `CWL` hints/requirements that would break the behaviour offered by ``Weaver``.
 - Change default ``DOCKER_REPO`` value defined in ``Makefile`` to point to reference mentioned in ``README.md`` and
   considered as official deployment location.
 
