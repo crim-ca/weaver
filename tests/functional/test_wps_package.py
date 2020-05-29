@@ -1209,3 +1209,158 @@ class WpsPackageAppTest(unittest.TestCase):
     @pytest.mark.skip(reason="not implemented")
     def test_multi_outputs_file_from_wps_xml_reference(self):
         raise NotImplementedError
+
+    # WIP
+    def test_stdout_stderr_logging_for_commandline_tool(self):
+        import os
+        import json
+        import uuid
+        from weaver.processes.wps_package import WpsPackage
+        from pywps.app import WPSRequest
+        from pywps.response.execute import ExecuteResponse
+
+        # -> test/test_opensearch.py
+        from weaver.datatype import Process
+
+        def get_test_file(*args):
+            return os.path.join(os.path.dirname(__file__), *args)
+
+        def load_json_test_file(filename):
+            return json.load(open(get_test_file("../json_examples", filename)))
+
+        def get_opensearch_payload():
+            return load_json_test_file("opensearch_deploy.json")
+
+        def get_opensearch_process():
+            return Process(load_json_test_file("opensearch_process.json"))
+
+        payload = get_opensearch_payload()
+        process = get_opensearch_process()
+        package = process["package"]
+        title = process["title"]
+        identifier = process["id"]
+
+        wps_package_instance = WpsPackage(identifier=identifier, title=title, payload=payload, package=package)           # process_info = weaver.datatype.Process
+        wps_request = WPSRequest()
+        wps_request.json = {
+           "operation":"execute",
+           "version":"1.0.0",
+           "language":"null",
+           "identifier":"End2EndEMSTestCase_WorkflowSimpleChain",
+           "identifiers":"null",
+           "store_execute":"true",
+           "status":"true",
+           "lineage":"true",
+           "inputs":{
+              "StartDate":[
+                 {
+                    "identifier":"StartDate",
+                    "title":"Time of Interest",
+                    "abstract":"Time of Interest (defined as Start date - End date)",
+                    "keywords":[
+
+                    ],
+                    "metadata":[
+
+                    ],
+                    "type":"literal",
+                    "data_type":"string",
+                    "workdir":"/tmp/pywps_process_qnrlve4y",
+                    "allowed_values":[
+
+                    ],
+                    "any_value":"false",
+                    "mode":1,
+                    "min_occurs":1,
+                    "max_occurs":1,
+                    "data":"2018-01-30T00:00:00.000Z"
+                 }
+              ],
+              "EndDate":[
+                 {
+                    "identifier":"EndDate",
+                    "title":"Time of Interest",
+                    "abstract":"Time of Interest (defined as Start date - End date)",
+                    "keywords":[
+
+                    ],
+                    "metadata":[
+
+                    ],
+                    "type":"literal",
+                    "data_type":"string",
+                    "workdir":"/tmp/pywps_process_qnrlve4y",
+                    "allowed_values":[
+
+                    ],
+                    "any_value":"false",
+                    "mode":1,
+                    "min_occurs":1,
+                    "max_occurs":1,
+                    "data":"2018-01-31T23:59:59.999Z"
+                 }
+              ],
+              "aoi":[
+                 {
+                    "identifier":"aoi",
+                    "title":"Area of Interest",
+                    "abstract":"Area of Interest (Bounding Box)",
+                    "keywords":[
+
+                    ],
+                    "metadata":[
+
+                    ],
+                    "type":"literal",
+                    "data_type":"string",
+                    "workdir":"/tmp/pywps_process_qnrlve4y",
+                    "allowed_values":[
+
+                    ],
+                    "any_value":"false",
+                    "mode":1,
+                    "min_occurs":1,
+                    "max_occurs":1,
+                    "data":"100.4,15.3,104.6,19.3"
+                 }
+              ],
+              "collection":[
+                 {
+                    "identifier":"collection",
+                    "title":"Collection of the data.",
+                    "abstract":"Collection of the data.",
+                    "keywords":[
+
+                    ],
+                    "metadata":[
+
+                    ],
+                    "type":"literal",
+                    "data_type":"string",
+                    "workdir":"/tmp/pywps_process_qnrlve4y",
+                    "allowed_values":[
+
+                    ],
+                    "any_value":"false",
+                    "mode":1,
+                    "min_occurs":1,
+                    "max_occurs":9223372036854775807,
+                    "data":"EOP:IPT:Sentinel2"
+                 }
+              ]
+           },
+           "outputs":{
+              "classout":{
+                 "classout":"",
+                 "mimetype":"",
+                 "encoding":"",
+                 "schema":"",
+                 "uom":"",
+                 "asReference":"true"
+              }
+           },
+           "raw":"false"
+        }
+
+        wps_response = ExecuteResponse(wps_request, uuid.uuid4(), process=process)
+        wps_package_instance.handler(wps_request, wps_response)         # (WPSRequest, ExecuteResponse)
