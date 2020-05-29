@@ -1980,8 +1980,12 @@ class WpsPackage(Process):
             self.update_effective_user()
             self.update_requirements()
 
-            ##wps_out_dir_prefix = os.path.join(get_wps_output_dir(settings), "tmp")
-            wps_workdir = self.settings.get("weaver.wps_workdir", self.workdir)
+            # note:
+            #   Parameter 'weaver.wps_workdir' is the base-dir where sub-dir per application packages will be generated.
+            #   Parameter 'self.workdir' is the actual location PyWPS reserved for this process (already with sub-dir).
+            #   If no 'weaver.workdir' was provided, reuse PyWps parent workdir since we got access to it.
+            #   Other steps handling outputs need to consider that CWL<->WPS out dirs could match because of this.
+            wps_workdir = self.settings.get("weaver.wps_workdir", os.path.dirname(self.workdir))
             # cwltool will add additional unique characters after prefix paths
             cwl_workdir = os.path.join(wps_workdir, "cwltool_tmp_")
             cwl_outdir = os.path.join(wps_workdir, "cwltool_out_")
@@ -1989,14 +1993,14 @@ class WpsPackage(Process):
                 # force explicit staging if write needed (InitialWorkDirRequirement in CWL package)
                 # protect input paths that can be re-used to avoid potential in-place modifications
                 "no_read_only": False,
-                # employ enforced from provided config or auto-resolved user/group
+                # employ enforced user/group from provided config or auto-resolved ones from running user
                 "no_match_user": False,
-                #"outdir": wps_workdir,         # if using any other than docker app
-                #"tmpdir": cwl_workdir,
-                #"docker_outdir": wps_workdir,  # if using docker app
-                #"docker_tmpdir": cwl_workdir,
+                # directories for CWL to move files around, auto cleaned up by cwltool when finished processing
+                # (paths used are according to DockerRequirement and InitialWorkDirRequirement)
                 "tmpdir_prefix": cwl_workdir,
                 "tmp_outdir_prefix": cwl_outdir,
+                # ask CWL to move tmp outdir results to the WPS process workdir (otherwise we loose them on cleanup)
+                "outdir": self.workdir,
                 "debug": LOGGER.isEnabledFor(logging.DEBUG)
             }
             LOGGER.debug("Using cwltool.RuntimeContext args:\n%s", json.dumps(runtime_params, indent=2))
@@ -2135,8 +2139,8 @@ class WpsPackage(Process):
         """
         Maps `CWL` result outputs to corresponding `WPS` outputs under required location.
         """
-        wps_out_dir = get_wps_output_dir(self.settings)
-        for output_id in self.request.outputs:
+        wps_out_dir = self.workdir  # pywps will resolve file paths for us using its WPS request UUID
+        for output_id in self.request.outputs:  # iterate over original WPS outputs, extra such as logs are dropped
             # TODO: adjust output for glob patterns (https://github.com/crim-ca/weaver/issues/24)
             if isinstance(cwl_result[output_id], list) and not isinstance(self.response.outputs[output_id], list):
                 cwl_result[output_id] = cwl_result[output_id][0]  # expect only one output
@@ -2155,7 +2159,6 @@ class WpsPackage(Process):
                 if os.path.realpath(result_loc) != os.path.realpath(result_wps):
                     LOGGER.info("Moving: [%s] -> [%s]", result_loc, result_wps)
                     shutil.move(result_loc, result_wps)
-                LOGGER.info("Moving [%s]: [%s] -> [%s]", output_id, result_loc, result_wps)
                 self.response.outputs[output_id].data = result_wps
                 LOGGER.info("Resolved WPS output [%s]: [%s]", output_id, result_wps)
 
