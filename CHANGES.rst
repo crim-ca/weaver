@@ -10,6 +10,7 @@ Changes:
 - Add ``weaver.wps_workdir`` configuration setting to define the location where the underlying ``cwltool`` application
   should be executed under. This can allow more control over the scope of the mounted volumes for *Application Package*
   running a docker image.
+- Add mapping of WPS results from the ``Job``'s UUID to generated `PyWPS` UUID for outputs, status and log locations.
 - Add *experimental* configuration settings ``weaver.cwl_euid`` and ``weaver.cwl_egid`` to provide effective user/group
   identifiers to employ when running the CWL *Application Package*. Using these require good control of the directory
   and process I/O locations as invalid permissions could break a previously working job execution.

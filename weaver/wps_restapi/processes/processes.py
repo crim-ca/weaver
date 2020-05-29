@@ -57,15 +57,15 @@ from weaver.utils import (
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps import get_wps_output_dir, get_wps_output_path, get_wps_output_url, load_pywps_cfg
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.jobs.jobs import check_status
+from weaver.wps_restapi.jobs.jobs import check_status, get_local_status_location
 from weaver.wps_restapi.jobs.notify import encrypt_email, notify_job_complete
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, get_wps_restapi_base_url, parse_request_query
 
 if TYPE_CHECKING:
     # pylint: disable=W0611,unused-import
-    from weaver.datatype import Process as ProcessDB    # noqa: F401
-    from weaver.typedefs import JSON, SettingsType      # noqa: F401
-    from typing import AnyStr, List, Tuple, Optional    # noqa: F401
+    from weaver.datatype import Job, Process as ProcessDB   # noqa: F401
+    from weaver.typedefs import JSON, SettingsType          # noqa: F401
+    from typing import AnyStr, List, Tuple, Optional        # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 
@@ -219,11 +219,13 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
                         job.status_message = "Job failed{}.".format(msg_progress)
                         wps_package.retrieve_package_job_log(execution, job)
                         job.save_log(errors=execution.errors, logger=task_logger)
+                    task_logger.debug("Mapping Job references with generated WPS locations.")
+                    map_locations(job, settings)
 
             except Exception as exc:
                 num_retries += 1
                 task_logger.debug("Exception raised: %s", repr(exc))
-                job.status_message = "Could not read status xml document for {!s}. Trying again...".format(job)
+                job.status_message = "Could not read status XML document for {!s}. Trying again...".format(job)
                 job.save_log(errors=execution.errors, logger=task_logger)
                 sleep(1)
             else:
@@ -288,6 +290,31 @@ def make_results_relative(results, settings):
                 ref = ref.replace(wps_path, "", 1)
             res["reference"] = ref
     return results
+
+
+def map_locations(job, settings):
+    # type: (Job, SettingsType) -> None
+    """
+    Generates symlink references from the Job UUID to PyWPS UUID results (outputs directory, status and log locations).
+    Update the Job's WPS ID if applicable (job executed locally).
+    Assumes that all results are located under the same reference UUID.
+    """
+    local_path = get_local_status_location(job.status_location, settings)
+    if not local_path:
+        LOGGER.debug("Not possible to map Job to WPS locations.")
+        return
+    base_dir, status_xml = os.path.split(local_path)
+    job.wps_id = os.path.splitext(status_xml)[0]
+    wps_loc = os.path.join(base_dir, job.wps_id)
+    job_loc = os.path.join(base_dir, job.id)
+    if wps_loc == job_loc:
+        LOGGER.debug("Job already refers to WPS locations.")
+        return
+    for loc_ext in ["", ".log", ".xml"]:
+        wps_ref = wps_loc + loc_ext
+        job_ref = job_loc + loc_ext
+        if os.path.exists(wps_ref):  # possible that there are no results (e.g.: failed job)
+            os.symlink(wps_ref, job_ref)
 
 
 def set_wps_language(wps, accept_language=None, request=None):
