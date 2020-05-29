@@ -1729,6 +1729,7 @@ class WpsPackage(Process):
         """
         self.payload = kw.pop("payload")
         self.package = kw.pop("package")
+        self.settings = get_settings(app)
         if not self.package:
             raise PackageRegistrationError("Missing required package definition for package process.")
         if not isinstance(self.package, dict):
@@ -1967,7 +1968,6 @@ class WpsPackage(Process):
 
             self.update_status("Launching package...", PACKAGE_PROGRESS_LAUNCHING, STATUS_RUNNING)
 
-            self.settings = get_settings(app)
             is_ems = get_weaver_configuration(self.settings) == WEAVER_CONFIGURATION_EMS
             if is_ems:
                 # EMS dispatch the execution to the ADES

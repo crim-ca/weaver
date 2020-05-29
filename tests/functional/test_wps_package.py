@@ -260,7 +260,7 @@ class WpsPackageAppTest(unittest.TestCase):
         ns_json, type_json = get_cwl_file_format(CONTENT_TYPE_APP_JSON, must_exist=True)
         assert "iana" in ns_json  # just to make sure
         ct_not_exists = "x-ogc-dods"    # OpenDAP, still doesn't exist at moment of test creation
-        ns_not_exists, type_not_exists = get_cwl_file_format(ct_not_exists, must_exist=False)
+        ns_not_exists, _ = get_cwl_file_format(ct_not_exists, must_exist=False)
         assert "iana" in ns_not_exists
         body = {
             "processDescription": {
