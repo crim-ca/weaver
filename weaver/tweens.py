@@ -13,6 +13,7 @@ OWS_TWEEN_HANDLED = "OWS_TWEEN_HANDLED"
 
 
 def ows_response_tween(request, handler):
+    """Tween that wraps any API request with appropriate dispatch of error conversion to handle formatting."""
     try:
         result = handler(request)
         if hasattr(handler, OWS_TWEEN_HANDLED):
@@ -26,23 +27,27 @@ def ows_response_tween(request, handler):
         raised_error._json_formatter = OWSException.json_formatter
         return_error = raised_error
         exc_info_err = sys.exc_info()
+        exc_log_lvl = logging.WARNING
     except OWSException as err:
         LOGGER.debug("direct ows exception response")
-        LOGGER.exception("Raised exception: [%r]\nReturned exception: [%r]", err, err)
         raised_error = err
         return_error = err
         exc_info_err = sys.exc_info()
+        exc_log_lvl = logging.WARNING
     except NotImplementedError as err:
         LOGGER.debug("not implemented error -> ows exception response")
         raised_error = err
         return_error = OWSNotImplemented(str(err))
         exc_info_err = sys.exc_info()
+        exc_log_lvl = logging.ERROR
     except Exception as err:
         LOGGER.debug("unhandled %s exception -> ows exception response", type(err).__name__)
         raised_error = err
         return_error = OWSException(detail=str(err), status=HTTPInternalServerError)
         exc_info_err = sys.exc_info()
-    LOGGER.error("Raised exception: [%r]\nReturned exception: [%r]", raised_error, return_error, exc_info=exc_info_err)
+        exc_log_lvl = logging.ERROR
+    LOGGER.log(exc_log_lvl, "Handled request exception:\n  Raised exception: [%r]\n  Returned exception: [%r]",
+               raised_error, return_error, exc_info=exc_info_err)
     return return_error
 
 
