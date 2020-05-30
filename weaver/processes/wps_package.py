@@ -1450,12 +1450,14 @@ def _any2cwl_io(wps_io, io_select):
             fmt = _get_field(wps_io, field, search_variations=True)
             if isinstance(fmt, dict):
                 cwl_io_ref, cwl_io_fmt, cwl_io_ext = _get_cwl_fmt_details(fmt)
-                cwl_ns.update(cwl_io_ref)
+                if cwl_io_ref and cwl_io_fmt:
+                    cwl_ns.update(cwl_io_ref)
                 break
             if isinstance(fmt, list):
                 if len(fmt) == 1:
                     cwl_io_ref, cwl_io_fmt, cwl_io_ext = _get_cwl_fmt_details(fmt[0])
-                    cwl_ns.update(cwl_io_ref)
+                    if cwl_io_ref and cwl_io_fmt:
+                        cwl_ns.update(cwl_io_ref)
                     break
                 if io_select == WPS_OUTPUT and len(fmt) > 1:
                     break  # don't use any format because we cannot enforce one

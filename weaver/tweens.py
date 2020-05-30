@@ -26,13 +26,14 @@ def ows_response_tween(request, handler):
         raised_error = err
         raised_error._json_formatter = OWSException.json_formatter
         return_error = raised_error
-        exc_info_err = sys.exc_info()
-        exc_log_lvl = logging.WARNING
+
+        exc_info_err = False
+        exc_log_lvl = logging.WARNING if err.status_code < 500 else logging.ERROR
     except OWSException as err:
         LOGGER.debug("direct ows exception response")
         raised_error = err
         return_error = err
-        exc_info_err = sys.exc_info()
+        exc_info_err = False
         exc_log_lvl = logging.WARNING
     except NotImplementedError as err:
         LOGGER.debug("not implemented error -> ows exception response")
@@ -46,8 +47,11 @@ def ows_response_tween(request, handler):
         return_error = OWSException(detail=str(err), status=HTTPInternalServerError)
         exc_info_err = sys.exc_info()
         exc_log_lvl = logging.ERROR
-    LOGGER.log(exc_log_lvl, "Handled request exception:\n  Raised exception: [%r]\n  Returned exception: [%r]",
-               raised_error, return_error, exc_info=exc_info_err)
+    if raised_error != return_error:
+        err_msg = "\n  Raised: [{!r}]\n  Return: [{!r}]".format(raised_error, return_error)
+    else:
+        err_msg = " [{!r}]".format(raised_error)
+    LOGGER.log(exc_log_lvl, "Handled request exception:%s", err_msg, exc_info=exc_info_err)
     return return_error
 
 
