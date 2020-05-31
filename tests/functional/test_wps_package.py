@@ -1339,11 +1339,16 @@ class WpsPackageAppTest(unittest.TestCase):
                 "baseCommand": "echo",
                 "inputs": {
                     "message": {
-                        "type": "string"
+                        "type": "string",
+                        "inputBinding": {
+                            "position": 1
+                        }
                     }
                 },
                 "outputs": {
-                    "output": "string[]"
+                    "output": {
+                        "type": "stdout"
+                    }
                 }
             }
         })
@@ -1380,9 +1385,9 @@ class WpsPackageAppTest(unittest.TestCase):
                  }
               ]
             },
-            "outputs":[
+            "outputs":{
 
-            ]
+            }
         }
 
         # ExecuteResponse mock
