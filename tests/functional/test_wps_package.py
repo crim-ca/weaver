@@ -1260,17 +1260,17 @@ class WpsPackageAppTest(unittest.TestCase):
             "raw": "false",
             "inputs": {
                 "message":[
-                 {
-                    "identifier":"message",
-                    "title":"A dummy message",
-                    "type":"literal",
-                    "data_type":"string",
-                    "data":"Dummy message",
-                    "allowed_values": [
+                     {
+                        "identifier":"message",
+                        "title":"A dummy message",
+                        "type":"literal",
+                        "data_type":"string",
+                        "data":"Dummy message",
+                        "allowed_values": [
 
-                    ],
-                 }
-              ]
+                        ],
+                     }
+                ]
             },
             "outputs":{
 
