@@ -1212,33 +1212,10 @@ class WpsPackageAppTest(unittest.TestCase):
 
     # WIP
     def test_stdout_stderr_logging_for_commandline_tool(self):
-        import os
-        import json
-        import uuid
         import tempfile
         from weaver.processes.wps_package import WpsPackage
         from pywps.app import WPSRequest
-        from pywps.response.execute import ExecuteResponse
-
-        # -> test/test_opensearch.py
         from weaver.datatype import Process
-
-        # def get_test_file(*args):
-        #     return os.path.join(os.path.dirname(__file__), *args)
-        #
-        # def load_json_test_file(filename):
-        #     return json.load(open(get_test_file("../json_examples", filename)))
-        #
-        # def get_opensearch_payload():
-        #     return load_json_test_file("opensearch_deploy.json")
-        #
-        # def get_opensearch_process():
-        #     return Process(load_json_test_file("opensearch_process.json"))
-
-        # WPSPackage
-        # payload = get_opensearch_payload()
-        # process = get_opensearch_process()
-        # package = process["package"]
 
         process = Process({
             "title": "test-stdout-stderr",
@@ -1248,58 +1225,21 @@ class WpsPackageAppTest(unittest.TestCase):
                 "class": "CommandLineTool",
                 "baseCommand": "echo",
                 "inputs": {
-                    "message": None,
-                    "type": "string",
-                    "inputBinding": None,
-                    "position": 1
+                    "message": {
+                        "type": "string"
+                    }
                 },
                 "outputs": {
-                    "output": {
-                        "outputBinding": {
-                            "glob": "output_netcdf.nc"
-                        },
-                        "type": "File"
-                    }
+                    "output": "string[]"
                 }
-            },
-            "outputs": [
-                {
-                    "abstract": "",
-                    "asreference": True,
-                    "data_format": {
-                        "encoding": "",
-                        "extension": "",
-                        "mime_type": "text/plain",
-                        "schema": ""
-                    },
-                    "file": None,
-                    "identifier": "output",
-                    "keywords": [],
-                    "max_occurs": 1,
-                    "mimetype": "text/plain",
-                    "min_occurs": 1,
-                    "mode": 0,
-                    "supported_formats": [
-                        {
-                            "encoding": "",
-                            "extension": "",
-                            "mime_type": "text/plain",
-                            "schema": ""
-                        }
-                    ],
-                    "title": "output",
-                    "type": "complex",
-                    "workdir": None
-                }
-            ]
+            }
         })
 
         payload = process
         package = process["package"]
-
         title = process["title"]
         identifier = process["id"]
-        wps_package_instance = WpsPackage(identifier=identifier, title=title, payload=payload, package=package)           # process_info = weaver.datatype.Process
+        wps_package_instance = WpsPackage(identifier=identifier, title=title, payload=payload, package=package)
 
         # WPSRequest mock
         wps_request = WPSRequest()
@@ -1320,34 +1260,28 @@ class WpsPackageAppTest(unittest.TestCase):
                     "title":"A dummy message",
                     "type":"literal",
                     "data_type":"string",
-                    "data":"aaa",
+                    "data":"Dummy message",
                     "allowed_values": [
 
                     ],
                  }
               ]
             },
-            "outputs":{
-              "classout":{
-                 "classout":"",
-                 "mimetype":"",
-                 "encoding":"",
-                 "schema":"",
-                 "uom":"",
-                 "asReference":"true"
-              }
-            }
+            "outputs":[
+
+            ]
         }
 
         # ExecuteResponse mock
-        wps_response = ExecuteResponse(wps_request, uuid.uuid4(), process=process)
+        wps_response = type('',(object,),{"_update_status": lambda w,x,y,z: 1 })()
 
         # WPSPackage._handle()
-        log_file = tempfile.TemporaryFile()
-        status_location = log_file
+        log_file = tempfile.NamedTemporaryFile()
+        status_location = log_file.name
         wps_package_instance.status_location = status_location          # to retrieve logs
         wps_package_instance._handler(wps_request, wps_response)        # (WPSRequest, ExecuteResponse)
 
+        print("AAAA")
         # log assertions
-        with open(status_location, "wb") as file:
-            pass
+        with open(status_location + ".log", "r") as file:
+            print(file.read())
