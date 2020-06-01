@@ -439,7 +439,7 @@ def assert_formats_equal_any_order(format_result, format_expect):
             if r_fmt.json == e_fmt.json:
                 format_expect.remove(e_fmt)
                 break
-    assert not format_expect, "Not all expected formats matched {}".format([f.json for f in format_expect])
+    assert not format_expect, "Not all expected formats matched {}".format([fmt.json for fmt in format_expect])
 
 
 def test_merge_io_formats_no_wps():

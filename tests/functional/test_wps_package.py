@@ -31,8 +31,10 @@ from weaver.visibility import VISIBILITY_PUBLIC
 
 EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_TEXT_PLAIN]
 EDAM_NETCDF = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_APP_NETCDF]
-IANA_TAR = IANA_NAMESPACE + ":" + CONTENT_TYPE_APP_TAR
-IANA_ZIP = IANA_NAMESPACE + ":" + CONTENT_TYPE_APP_ZIP
+# note: x-tar cannot be mapped during CWL format resolution (not official schema),
+#       it remains explicit tar definition in WPS context
+IANA_TAR = IANA_NAMESPACE + ":" + CONTENT_TYPE_APP_TAR  # noqa # pylint: disable=unused-variable
+IANA_ZIP = IANA_NAMESPACE + ":" + CONTENT_TYPE_APP_ZIP  # noqa # pylint: disable=unused-variable
 
 LOGGER = logging.getLogger(__name__)
 
@@ -1267,11 +1269,16 @@ class WpsPackageAppTest(unittest.TestCase):
         assert "default" not in pkg["inputs"][2]
         assert pkg["inputs"][2]["type"]["type"] == "array"
         assert pkg["inputs"][2]["type"]["items"] == "File"
-        assert isinstance(pkg["inputs"][2]["format"], list)
-        assert len(pkg["inputs"][2]["format"]) == 3
-        assert pkg["inputs"][2]["format"][0] == EDAM_NETCDF
-        assert pkg["inputs"][2]["format"][1] == IANA_TAR
-        assert pkg["inputs"][2]["format"][2] == IANA_ZIP
+        # FIXME: TAR cannot be resolved in the CWL context (not official, disable mapping to GZIP)
+        #        this makes all formats to not be resolved (see code: wps_package._any2cwl_io)
+        #        (see issue: https://github.com/crim-ca/weaver/issues/50)
+        assert "format" not in pkg["inputs"][2], \
+            "CWL formats should all be dropped because (x-tar) cannot be resolved to an existing schema reference"
+        # assert isinstance(pkg["inputs"][2]["format"], list)
+        # assert len(pkg["inputs"][2]["format"]) == 3
+        # assert pkg["inputs"][2]["format"][0] == EDAM_NETCDF
+        # assert pkg["inputs"][2]["format"][1] == IANA_TAR
+        # assert pkg["inputs"][2]["format"][2] == IANA_ZIP
 
         # process description I/O validation
         assert len(desc["process"]["inputs"]) == 3
@@ -1296,6 +1303,7 @@ class WpsPackageAppTest(unittest.TestCase):
         assert desc["process"]["inputs"][2]["keywords"] == []
         assert desc["process"]["inputs"][2]["minOccurs"] == "1"
         assert desc["process"]["inputs"][2]["maxOccurs"] == "1000"
+        # note: TAR should remain as literal format in the WPS context (not mapped/added as GZIP when resolved for CWL)
         assert len(desc["process"]["inputs"][2]["formats"]) == 3
         assert desc["process"]["inputs"][2]["formats"][0]["default"] is True
         assert desc["process"]["inputs"][2]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF

@@ -1424,7 +1424,7 @@ def _any2cwl_io(wps_io, io_select):
         if not _wps_io_fmt:
             return None, None, None
         _cwl_io_ext = get_extension(_wps_io_fmt)
-        _cwl_io_ref, _cwl_io_fmt = get_cwl_file_format(_wps_io_fmt, must_exist=True)
+        _cwl_io_ref, _cwl_io_fmt = get_cwl_file_format(_wps_io_fmt, must_exist=True, allow_synonym=False)
         return _cwl_io_ref, _cwl_io_fmt, _cwl_io_ext
 
     wps_io_type = _get_field(wps_io, "type", search_variations=True)
@@ -1461,17 +1461,25 @@ def _any2cwl_io(wps_io, io_select):
                     break
                 if io_select == WPS_OUTPUT and len(fmt) > 1:
                     break  # don't use any format because we cannot enforce one
-                cwl_io_fmt = []
+                cwl_ns_multi = {}
+                cwl_fmt_multi = []
                 for fmt_i in fmt:
                     # FIXME: (?)
                     #   when multiple formats are specified, but at least one schema/namespace reference can't be found,
-                    #   should we drop all since that unknown format is still allowed but cannot be validated?
+                    #   we must drop all since that unknown format is still allowed but cannot be validated
                     #   avoid potential validation error if that format was the one provided during execute...
                     #   (see: https://github.com/crim-ca/weaver/issues/50)
                     cwl_io_ref_i, cwl_io_fmt_i, _ = _get_cwl_fmt_details(fmt_i)
                     if cwl_io_ref_i and cwl_io_fmt_i:
-                        cwl_io_fmt.append(cwl_io_fmt_i)
-                        cwl_ns.update(cwl_io_ref_i)
+                        cwl_ns_multi.update(cwl_io_ref_i)
+                        cwl_fmt_multi.append(cwl_io_fmt_i)
+                    else:
+                        # reset all since at least one format could not be mapped to an official schema
+                        cwl_ns_multi = {}
+                        cwl_fmt_multi = None
+                        break
+                cwl_io_fmt = cwl_fmt_multi  # all formats or none of them
+                cwl_ns.update(cwl_ns_multi)
                 break
         if cwl_io_fmt:
             cwl_io["format"] = cwl_io_fmt
