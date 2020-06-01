@@ -1985,7 +1985,7 @@ class WpsPackage(Process):
             # note:
             #   Parameter 'weaver.wps_workdir' is the base-dir where sub-dir per application packages will be generated.
             #   Parameter 'self.workdir' is the actual location PyWPS reserved for this process (already with sub-dir).
-            #   If no 'weaver.workdir' was provided, reuse PyWps parent workdir since we got access to it.
+            #   If no 'weaver.wps_workdir' was provided, reuse PyWps parent workdir since we got access to it.
             #   Other steps handling outputs need to consider that CWL<->WPS out dirs could match because of this.
             wps_workdir = self.settings.get("weaver.wps_workdir", os.path.dirname(self.workdir))
             # cwltool will add additional unique characters after prefix paths
