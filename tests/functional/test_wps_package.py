@@ -1322,3 +1322,84 @@ class WpsPackageAppTest(unittest.TestCase):
     @pytest.mark.skip(reason="not implemented")
     def test_multi_outputs_file_from_wps_xml_reference(self):
         raise NotImplementedError
+
+    # WIP
+    def test_stdout_stderr_logging_for_commandline_tool(self):
+        import tempfile
+        from weaver.processes.wps_package import WpsPackage
+        from pywps.app import WPSRequest
+        from weaver.datatype import Process
+
+        process = Process({
+            "title": "test-stdout-stderr",
+            "id": "test-stdout-stderr",
+            "package": {
+                "cwlVersion": "v1.0",
+                "class": "CommandLineTool",
+                "baseCommand": "echo",
+                "inputs": {
+                    "message": {
+                        "type": "string",
+                        "inputBinding": {
+                            "position": 1
+                        }
+                    }
+                },
+                "outputs": {
+                    "output": {
+                        "type": "stdout"
+                    }
+                }
+            }
+        })
+
+        payload = process
+        package = process["package"]
+        title = process["title"]
+        identifier = process["id"]
+        wps_package_instance = WpsPackage(identifier=identifier, title=title, payload=payload, package=package)
+
+        # WPSRequest mock
+        wps_request = WPSRequest()
+        wps_request.json = {
+            "identifier": "test-stdout-stderr",
+            "operation": "execute",
+            "version": "1.0.0",
+            "language": "null",
+            "identifiers": "null",
+            "store_execute": "true",
+            "status": "true",
+            "lineage": "true",
+            "raw": "false",
+            "inputs": {
+                "message":[
+                     {
+                        "identifier":"message",
+                        "title":"A dummy message",
+                        "type":"literal",
+                        "data_type":"string",
+                        "data":"Dummy message",
+                        "allowed_values": [
+
+                        ],
+                     }
+                ]
+            },
+            "outputs":{
+
+            }
+        }
+
+        # ExecuteResponse mock
+        wps_response = type('',(object,),{"_update_status": lambda w,x,y,z: 1 })()
+
+        # WPSPackage._handle()
+        log_file = tempfile.NamedTemporaryFile()
+        status_location = log_file.name
+        wps_package_instance.status_location = status_location          # to retrieve logs
+        wps_package_instance._handler(wps_request, wps_response)        # (WPSRequest, ExecuteResponse)
+
+        print("AAAA")
+        # log assertions
+        with open(status_location + ".log", "r") as file:
+            print(file.read())
