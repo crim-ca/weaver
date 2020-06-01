@@ -650,3 +650,91 @@ def test_stdout_stderr_logging_for_commandline_tool_failure():
     with open(status_location + ".log", "r") as file:
         log_data = file.read()
         assert "Completed permanentFail" in log_data
+
+
+def test_stdout_stderr_logging_for_workflow_success():
+    process = Process({
+        "title": "test-stdout-stderr",
+        "id": "test-stdout-stderr",
+        "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": "echo",
+            "inputs": {
+                "message": {
+                    "type": "string",
+                    "inputBinding": {
+                        "position": 1
+                    }
+                }
+            },
+            "outputs": {
+
+            }
+        }
+    })
+
+    payload = process
+    package = process["package"]
+    title = process["title"]
+    identifier = process["id"]
+    wps_package_instance = WpsPackage(identifier=identifier, title=title, payload=payload, package=package)
+
+    # WPSRequest mock
+    wps_request = WPSRequest()
+    wps_request.json = {
+        "identifier": "test-stdout-stderr",
+        "operation": "execute",
+        "version": "1.0.0",
+        "language": "null",
+        "identifiers": "null",
+        "store_execute": "true",
+        "status": "true",
+        "lineage": "true",
+        "raw": "false",
+        "inputs": {
+            "messageA":[
+                 {
+                    "identifier":"message",
+                    "title":"A first dummy message",
+                    "type":"literal",
+                    "data_type":"string",
+                    "data":"Dummy message A",
+                    "allowed_values": [
+
+                    ],
+                 }
+            ],
+            "messageB": [
+                {
+                    "identifier": "message",
+                    "title": "A second dummy message",
+                    "type": "literal",
+                    "data_type": "string",
+                    "data": "Dummy message B",
+                    "allowed_values": [
+
+                    ],
+                }
+            ]
+        },
+        "outputs":{
+
+        }
+    }
+
+    # ExecuteResponse mock
+    wps_response = type('',(object,),{"_update_status": lambda w,x,y,z: 1 })()
+
+    # WPSPackage._handle()
+    log_file = tempfile.NamedTemporaryFile()
+    status_location = log_file.name
+    workdir = tempfile.TemporaryDirectory()
+    wps_package_instance.status_location = status_location          # to retrieve logs
+    wps_package_instance.workdir = workdir.name
+    wps_package_instance._handler(wps_request, wps_response)        # (WPSRequest, ExecuteResponse)
+
+    # log assertions
+    with open(status_location + ".log", "r") as file:
+        log_data = file.read()
+        assert "Completed permanentFail" in log_data
