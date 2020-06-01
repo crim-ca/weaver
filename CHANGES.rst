@@ -4,6 +4,40 @@ Changes
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
 
+Changes:
+--------
+
+- Add ``weaver.wps_workdir`` configuration setting to define the location where the underlying ``cwltool`` application
+  should be executed under. This can allow more control over the scope of the mounted volumes for *Application Package*
+  running a docker image.
+- Add mapping of WPS results from the ``Job``'s UUID to generated `PyWPS` UUID for outputs, status and log locations.
+- Add *experimental* configuration settings ``weaver.cwl_euid`` and ``weaver.cwl_egid`` to provide effective user/group
+  identifiers to employ when running the CWL *Application Package*. Using these require good control of the directory
+  and process I/O locations as invalid permissions could break a previously working job execution.
+- Add more logging configuration and apply them to ``cwltool`` before execution of *Application Package*.
+- Enforce ``no_match_user=False`` and ``no_read_only=False`` of ``cwltool``'s ``RuntimeContext`` to ensure that docker
+  application is executed with same user as ``weaver`` and that process input files are not modified inplace (readonly)
+  where potentially inaccessible (according to settings). Definition of `CWL` package will need to add
+  `InitialWorkDirRequirement <https://www.commonwl.org/v1.0/CommandLineTool.html#InitialWorkDirRequirement>`_ as per
+  defined by reference specification to stage those files if they need to be accessed with write permissions
+  (see: `example <https://www.commonwl.org/user_guide/15-staging/>`_). Addresses some issues listed in
+  `#155 <https://github.com/crim-ca/weaver/issues/155>`_.
+- Enforce removal of some invalid `CWL` hints/requirements that would break the behaviour offered by ``Weaver``.
+- Use ``weaver.request_options`` for `WPS GetCapabilities` and `WPS Check Status` requests under the running job.
+- Change default ``DOCKER_REPO`` value defined in ``Makefile`` to point to reference mentioned in ``README.md`` and
+  considered as official deployment location.
+- Add ``application/x-cwl`` MIME-type supported with updated ``EDAM 1.24`` onthology.
+- Add ``application/x-yaml``  MIME-type to known formats.
+- Add ``application/x-tar`` and ``application/tar+gzip`` MIME-type (not official) but resolved as *synonym*
+  ``application/gzip`` (official) to preserve compressed file support during `CWL` format validation.
+
+Fixes:
+------
+
+- Set ``get_cwl_file_format`` default argument ``must_exist=True`` instead of ``False`` to retrieve original default
+  behaviour of the function. Since `CWL` usually doesn't need to add ``File.format`` field when no corresponding
+  reference actually exists, this default also makes more sense.
+
 `1.8.1 <https://github.com/crim-ca/weaver/tree/1.8.1>`_ (2020-05-22)
 ========================================================================
 

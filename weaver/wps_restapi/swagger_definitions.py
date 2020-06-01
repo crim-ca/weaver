@@ -1161,6 +1161,7 @@ class ExecutionUnitList(SequenceSchema):
 class ProcessOffering(MappingSchema):
     process = Process()
     processVersion = SchemaNode(String(), missing=drop)
+    processEndpointWPS1 = SchemaNode(String(), missing=drop, format=URL)
     jobControlOptions = JobControlOptionsList(missing=drop)
     outputTransmission = TransmissionModeList(missing=drop)
 

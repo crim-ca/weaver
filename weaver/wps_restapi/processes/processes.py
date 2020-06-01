@@ -49,6 +49,7 @@ from weaver.utils import (
     get_any_value,
     get_cookie_headers,
     get_settings,
+    get_ssl_verify_option,
     raise_on_xml_exception,
     request_extra,
     wait_secs
@@ -56,15 +57,15 @@ from weaver.utils import (
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps import get_wps_output_dir, get_wps_output_path, get_wps_output_url, load_pywps_cfg
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.jobs.jobs import check_status
+from weaver.wps_restapi.jobs.jobs import check_status, get_local_status_location
 from weaver.wps_restapi.jobs.notify import encrypt_email, notify_job_complete
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, get_wps_restapi_base_url, parse_request_query
 
 if TYPE_CHECKING:
     # pylint: disable=W0611,unused-import
-    from weaver.datatype import Process as ProcessDB    # noqa: F401
-    from weaver.typedefs import JSON, SettingsType      # noqa: F401
-    from typing import AnyStr, List, Tuple, Optional    # noqa: F401
+    from weaver.datatype import Job, Process as ProcessDB   # noqa: F401
+    from weaver.typedefs import JSON, SettingsType          # noqa: F401
+    from typing import AnyStr, List, Tuple, Optional        # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 
@@ -89,7 +90,6 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
     settings = get_settings(app)
     task_logger = get_task_logger(__name__)
     load_pywps_cfg(settings)
-    ssl_verify = asbool(settings.get("weaver.ssl_verify", True))
     wps_out_dir = get_wps_output_dir(settings)
 
     task_logger.debug("Job task setup.")
@@ -104,6 +104,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
         try:
             job.progress = JOB_PROGRESS_DESCRIBE
             job.save_log(logger=task_logger, message="Execute WPS request for process [{!s}]".format(job.process))
+            ssl_verify = get_ssl_verify_option("get", url, settings=settings)
             wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), verify=ssl_verify)
             set_wps_language(wps, accept_language=job.accept_language)
             raise_on_xml_exception(wps._capabilities)   # noqa
@@ -149,7 +150,9 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
 
         mode = EXECUTE_MODE_ASYNC if job.execute_async else EXECUTE_MODE_SYNC
         job.progress = JOB_PROGRESS_EXECUTE_REQUEST
-        job.save_log(logger=task_logger, message="Starting job process execution")
+        job.save_log(logger=task_logger, message="Starting job process execution.")
+        job.save_log(logger=task_logger,
+                     message="Following updates could take a while until the Application Package answers...")
         execution = wps.execute(job.process, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
         if not execution.process and execution.errors:
             raise execution.errors[0]
@@ -190,7 +193,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
                 #   WPS execution logs can be inserted within the current job log and appear continuously.
                 #   Only update internal job fields in case they get referenced elsewhere.
                 job.progress = JOB_PROGRESS_EXECUTE_MONITOR_LOOP
-                execution = check_status(url=wps_status_path, verify=ssl_verify, sleep_secs=wait_secs(run_step))
+                execution = check_status(url=wps_status_path, settings=settings, sleep_secs=wait_secs(run_step))
                 job_msg = (execution.statusMessage or "").strip()
                 job.response = etree.tostring(execution.response)
                 job.status = map_status(execution.getStatus())
@@ -216,11 +219,13 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
                         job.status_message = "Job failed{}.".format(msg_progress)
                         wps_package.retrieve_package_job_log(execution, job)
                         job.save_log(errors=execution.errors, logger=task_logger)
+                    task_logger.debug("Mapping Job references with generated WPS locations.")
+                    map_locations(job, settings)
 
             except Exception as exc:
                 num_retries += 1
                 task_logger.debug("Exception raised: %s", repr(exc))
-                job.status_message = "Could not read status xml document for {!s}. Trying again...".format(job)
+                job.status_message = "Could not read status XML document for {!s}. Trying again...".format(job)
                 job.save_log(errors=execution.errors, logger=task_logger)
                 sleep(1)
             else:
@@ -285,6 +290,31 @@ def make_results_relative(results, settings):
                 ref = ref.replace(wps_path, "", 1)
             res["reference"] = ref
     return results
+
+
+def map_locations(job, settings):
+    # type: (Job, SettingsType) -> None
+    """
+    Generates symlink references from the Job UUID to PyWPS UUID results (outputs directory, status and log locations).
+    Update the Job's WPS ID if applicable (job executed locally).
+    Assumes that all results are located under the same reference UUID.
+    """
+    local_path = get_local_status_location(job.status_location, settings)
+    if not local_path:
+        LOGGER.debug("Not possible to map Job to WPS locations.")
+        return
+    base_dir, status_xml = os.path.split(local_path)
+    job.wps_id = os.path.splitext(status_xml)[0]
+    wps_loc = os.path.join(base_dir, job.wps_id)
+    job_loc = os.path.join(base_dir, job.id)
+    if wps_loc == job_loc:
+        LOGGER.debug("Job already refers to WPS locations.")
+        return
+    for loc_ext in ["", ".log", ".xml"]:
+        wps_ref = wps_loc + loc_ext
+        job_ref = job_loc + loc_ext
+        if os.path.exists(wps_ref):  # possible that there are no results (e.g.: failed job)
+            os.symlink(wps_ref, job_ref)
 
 
 def set_wps_language(wps, accept_language=None, request=None):
@@ -375,7 +405,7 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
     result = execute_process.delay(
         job_id=job.id,
         url=clean_ows_url(service_url),
-        # Convert EnvironHeaders to a simple dict (should cherrypick the required headers)
+        # Convert EnvironHeaders to a simple dict (should cherry-pick the required headers)
         headers={k: v for k, v in request.headers.items()},
         notification_email=notification_email)
     LOGGER.debug("Celery pending task [%s] for job [%s].", result.id, job.id)

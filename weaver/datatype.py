@@ -75,6 +75,10 @@ class Base(dict):
     def id(self):
         raise NotImplementedError()
 
+    @property
+    def uuid(self):
+        return self.id
+
     def json(self):
         # type: () -> JSON
         """
@@ -223,6 +227,7 @@ class Job(Base):
     @property
     def id(self):
         # type: () -> AnyStr
+        """Job UUID to retrieve the details from storage."""
         job_id = self.get("id")
         if not job_id:
             job_id = str(uuid.uuid4())
@@ -231,8 +236,9 @@ class Job(Base):
 
     @property
     def task_id(self):
-        # type: () -> AnyStr
-        return self["task_id"]
+        # type: () -> Optional[AnyStr]
+        """Reference Task UUID attributed by the ``Celery`` worker that monitors and executes this job."""
+        return self.get("task_id", None)
 
     @task_id.setter
     def task_id(self, task_id):
@@ -242,8 +248,34 @@ class Job(Base):
         self["task_id"] = task_id
 
     @property
+    def wps_id(self):
+        # type: () -> Optional[AnyStr]
+        """Reference WPS Request/Response UUID attributed by the executed ``PyWPS`` process.
+
+        This UUID matches the status-location, log and output directory of the WPS process.
+        This parameter is only available when the process is executed on this local instance.
+
+        .. seealso::
+            - :attr:`Job.request`
+            - :attr:`Job.response`
+        """
+        return self.get("wps_id", None)
+
+    @wps_id.setter
+    def wps_id(self, wps_id):
+        # type: (AnyStr) -> None
+        if not isinstance(wps_id, six.string_types):
+            raise TypeError("Type 'str' is required for '{}.wps_id'".format(type(self)))
+        self["wps_id"] = wps_id
+
+    @property
     def service(self):
         # type: () -> Optional[AnyStr]
+        """Service identifier of the corresponding remote process.
+
+        .. seealso::
+            - :attr:`Service.id`
+        """
         return self.get("service", None)
 
     @service.setter
@@ -256,6 +288,11 @@ class Job(Base):
     @property
     def process(self):
         # type: () -> Optional[AnyStr]
+        """Process identifier of the corresponding remote process.
+
+        .. seealso::
+            - :attr:`Process.id`
+        """
         return self.get("process", None)
 
     @process.setter
@@ -569,6 +606,7 @@ class Job(Base):
         return {
             "id": self.id,
             "task_id": self.task_id,
+            "wps_id": self.wps_id,
             "service": self.service,
             "process": self.process,
             "inputs": self.inputs,

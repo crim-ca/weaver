@@ -42,10 +42,11 @@ class MongoDatabase(DatabaseInterface):
     _stores = None
     type = "mongodb"
 
-    def __init__(self, registry):
-        super(MongoDatabase, self).__init__(registry)
-        self._database = get_mongodb_engine(registry)
-        self._settings = registry.settings
+    def __init__(self, container):
+        # type: (AnySettingsContainer) -> None
+        super(MongoDatabase, self).__init__(container)
+        self._database = get_mongodb_engine(container)
+        self._settings = get_settings(container)
         self._stores = dict()
 
     def is_ready(self):

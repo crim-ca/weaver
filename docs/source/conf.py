@@ -334,7 +334,10 @@ linkcheck_ignore = [
     # might not exist yet (we are generating it!)
     "https://pavics-weaver.readthedocs.io/en/latest/api.html",
     # ignore requires.io which just fails periodically - not critical link
-    "https://requires.io/github/crim-ca/weaver/.*"
+    "https://requires.io/github/crim-ca/weaver/.*",
+    # FIXME: tmp disable due to Retry-After header for rate-limiting by Github not respected
+    #        (see: https://github.com/sphinx-doc/sphinx/issues/7388)
+    "https://github.com/crim-ca/weaver/*",  # limit only our repo so others are still checked
 ]
 
 linkcheck_timeout = 30

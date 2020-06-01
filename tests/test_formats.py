@@ -7,54 +7,37 @@ from pyramid.response import Response
 from pywps.inout.formats import Format
 from requests.exceptions import ConnectionError
 
-from weaver.formats import (
-    CONTENT_TYPE_ANY,
-    CONTENT_TYPE_APP_GEOJSON,
-    CONTENT_TYPE_APP_JSON,
-    CONTENT_TYPE_APP_NETCDF,
-    CONTENT_TYPE_APP_XML,
-    CONTENT_TYPE_IMAGE_GEOTIFF,
-    EDAM_MAPPING,
-    EDAM_NAMESPACE,
-    EDAM_NAMESPACE_DEFINITION,
-    FORMAT_NAMESPACES,
-    IANA_NAMESPACE,
-    IANA_NAMESPACE_DEFINITION,
-    clean_mime_type_format,
-    get_cwl_file_format,
-    get_extension,
-    get_format
-)
+from weaver import formats as f
 
 
 def test_get_extension():
-    assert get_extension(CONTENT_TYPE_APP_JSON) == ".json"  # basic
-    assert get_extension(CONTENT_TYPE_APP_JSON + "; charset=UTF-8") == ".json"  # ignore extra parameters
-    assert get_extension(CONTENT_TYPE_APP_GEOJSON) == ".geojson"  # pywps definition
-    assert get_extension(CONTENT_TYPE_IMAGE_GEOTIFF) == ".tiff"  # pywps definition
-    assert get_extension("application/x-custom") == ".custom"
-    assert get_extension("application/unknown") == ".unknown"
+    assert f.get_extension(f.CONTENT_TYPE_APP_JSON) == ".json"  # basic
+    assert f.get_extension(f.CONTENT_TYPE_APP_JSON + "; charset=UTF-8") == ".json"  # ignore extra parameters
+    assert f.get_extension(f.CONTENT_TYPE_APP_GEOJSON) == ".geojson"  # pywps definition
+    assert f.get_extension(f.CONTENT_TYPE_IMAGE_GEOTIFF) == ".tiff"  # pywps definition
+    assert f.get_extension("application/x-custom") == ".custom"
+    assert f.get_extension("application/unknown") == ".unknown"
 
 
 def test_get_extension_glob_any():
-    assert get_extension(CONTENT_TYPE_ANY) == ".*"
+    assert f.get_extension(f.CONTENT_TYPE_ANY) == ".*"
 
 
 def test_get_format():
-    assert get_format(CONTENT_TYPE_APP_JSON) == Format(CONTENT_TYPE_APP_JSON)  # basic
-    assert get_format(CONTENT_TYPE_APP_JSON + "; charset=UTF-8") == Format(CONTENT_TYPE_APP_JSON)
-    assert get_format(CONTENT_TYPE_APP_GEOJSON) == Format(CONTENT_TYPE_APP_GEOJSON)  # pywps vendor MIME-type
-    assert get_format(CONTENT_TYPE_APP_NETCDF).encoding == "base64"  # extra encoding data available
+    assert f.get_format(f.CONTENT_TYPE_APP_JSON) == Format(f.CONTENT_TYPE_APP_JSON)  # basic
+    assert f.get_format(f.CONTENT_TYPE_APP_JSON + "; charset=UTF-8") == Format(f.CONTENT_TYPE_APP_JSON)
+    assert f.get_format(f.CONTENT_TYPE_APP_GEOJSON) == Format(f.CONTENT_TYPE_APP_GEOJSON)  # pywps vendor MIME-type
+    assert f.get_format(f.CONTENT_TYPE_APP_NETCDF).encoding == "base64"  # extra encoding data available
 
 
 def test_get_cwl_file_format_tuple():
-    tested = set(FORMAT_NAMESPACES)
-    for mime_type in [CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF]:
-        res = get_cwl_file_format(mime_type, make_reference=False)
+    tested = set(f.FORMAT_NAMESPACES)
+    for mime_type in [f.CONTENT_TYPE_APP_JSON, f.CONTENT_TYPE_APP_NETCDF]:
+        res = f.get_cwl_file_format(mime_type, make_reference=False)
         assert isinstance(res, tuple) and len(res) == 2
         ns, fmt = res
         assert isinstance(ns, dict) and len(ns) == 1
-        assert any(f in ns for f in FORMAT_NAMESPACES)
+        assert any(fmt in ns for fmt in f.FORMAT_NAMESPACES)
         assert list(ns.values())[0].startswith("http")
         ns_name = list(ns.keys())[0]
         assert fmt.startswith("{}:".format(ns_name))
@@ -63,10 +46,11 @@ def test_get_cwl_file_format_tuple():
 
 
 def test_get_cwl_file_format_reference():
-    tested = set(FORMAT_NAMESPACES)
-    tests = [(IANA_NAMESPACE_DEFINITION, CONTENT_TYPE_APP_JSON), (EDAM_NAMESPACE_DEFINITION, CONTENT_TYPE_APP_NETCDF)]
+    tested = set(f.FORMAT_NAMESPACES)
+    tests = [(f.IANA_NAMESPACE_DEFINITION, f.CONTENT_TYPE_APP_JSON),
+             (f.EDAM_NAMESPACE_DEFINITION, f.CONTENT_TYPE_APP_NETCDF)]
     for ns, mime_type in tests:
-        res = get_cwl_file_format(mime_type, make_reference=True)
+        res = f.get_cwl_file_format(mime_type, make_reference=True)
         ns_name, ns_url = list(ns.items())[0]
         assert isinstance(res, six.string_types)
         assert res.startswith(ns_url)
@@ -75,28 +59,28 @@ def test_get_cwl_file_format_reference():
 
 
 def test_get_cwl_file_format_unknown():
-    res = get_cwl_file_format("application/unknown", make_reference=False, must_exist=True)
+    res = f.get_cwl_file_format("application/unknown", make_reference=False, must_exist=True)
     assert isinstance(res, tuple)
     assert res == (None, None)
-    res = get_cwl_file_format("application/unknown", make_reference=True, must_exist=True)
+    res = f.get_cwl_file_format("application/unknown", make_reference=True, must_exist=True)
     assert res is None
 
 
 def test_get_cwl_file_format_default():
     fmt = "application/unknown"
-    iana_url = IANA_NAMESPACE_DEFINITION[IANA_NAMESPACE]
-    iana_fmt = "{}:{}".format(IANA_NAMESPACE, fmt)
-    res = get_cwl_file_format("application/unknown", make_reference=False, must_exist=False)
+    iana_url = f.IANA_NAMESPACE_DEFINITION[f.IANA_NAMESPACE]
+    iana_fmt = "{}:{}".format(f.IANA_NAMESPACE, fmt)
+    res = f.get_cwl_file_format("application/unknown", make_reference=False, must_exist=False)
     assert isinstance(res, tuple)
-    assert res[0] == {IANA_NAMESPACE: iana_url}
+    assert res[0] == {f.IANA_NAMESPACE: iana_url}
     assert res[1] == iana_fmt
-    res = get_cwl_file_format("application/unknown", make_reference=True, must_exist=False)
+    res = f.get_cwl_file_format("application/unknown", make_reference=True, must_exist=False)
     assert res == iana_url + fmt
 
 
 def test_get_cwl_file_format_retry_attempts():
     """Verifies that failing request will not immediately fail the MIME-type validation."""
-    codes = {"codes": [HTTPOk.code, HTTPRequestTimeout.code]}  # note: used in reverse order
+    codes = {"codes": [HTTPOk.code, HTTPRequestTimeout.code]}  # note: used in reverse order (pop)
 
     def mock_request_extra(*args, **kwargs):  # noqa: E811
         m_resp = Response()
@@ -104,8 +88,8 @@ def test_get_cwl_file_format_retry_attempts():
         return m_resp
 
     with mock.patch("requests.Session.request", side_effect=mock_request_extra) as mocked_request:
-        _, fmt = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
-        assert fmt == "{}:{}".format(IANA_NAMESPACE, CONTENT_TYPE_APP_JSON)
+        _, fmt = f.get_cwl_file_format(f.CONTENT_TYPE_APP_JSON)
+        assert fmt == "{}:{}".format(f.IANA_NAMESPACE, f.CONTENT_TYPE_APP_JSON)
         assert mocked_request.call_count == 2
 
 
@@ -119,65 +103,85 @@ def test_get_cwl_file_format_retry_fallback_urlopen():
 
     with mock.patch("requests.Session.request", side_effect=mock_connect_error) as mocked_request:
         with mock.patch("weaver.formats.urlopen", side_effect=mock_urlopen) as mocked_urlopen:
-            _, fmt = get_cwl_file_format(CONTENT_TYPE_APP_JSON)
-            assert fmt == "{}:{}".format(IANA_NAMESPACE, CONTENT_TYPE_APP_JSON)
+            _, fmt = f.get_cwl_file_format(f.CONTENT_TYPE_APP_JSON)
+            assert fmt == "{}:{}".format(f.IANA_NAMESPACE, f.CONTENT_TYPE_APP_JSON)
             assert mocked_request.call_count == 4   # internally attempted 4 times (1 attempt + 3 retries)
             assert mocked_urlopen.call_count == 1
 
 
+def test_get_cwl_file_format_synonym():
+    """Test handling of special non-official MIME-type that have a synonym redirection to an official one."""
+    res = f.get_cwl_file_format(f.CONTENT_TYPE_APP_TAR_GZ, make_reference=False, must_exist=True, allow_synonym=False)
+    assert res == (None, None), "Non-official MIME-type without allowed synonym should resolve as not-found"
+    res = f.get_cwl_file_format(f.CONTENT_TYPE_APP_TAR_GZ, make_reference=False, must_exist=True, allow_synonym=True)
+    assert isinstance(res, tuple)
+    assert res != (None, None), "Synonym type should have been mapped to its base reference"
+    assert res[1].split(":")[1] == f.CONTENT_TYPE_APP_GZIP, "Synonym type should have been mapped to its base reference"
+    assert f.get_extension(f.CONTENT_TYPE_APP_TAR_GZ) == ".tar.gz", "Original extension resolution needed, not synonym"
+    fmt = f.get_format(f.CONTENT_TYPE_APP_TAR_GZ)
+    assert fmt.extension == ".tar.gz"
+    assert fmt.mime_type == f.CONTENT_TYPE_APP_TAR_GZ
+    # above tests validated that synonym is defined and works, so following must not use that synonym
+    res = f.get_cwl_file_format(f.CONTENT_TYPE_APP_TAR_GZ, make_reference=True, must_exist=False, allow_synonym=True)
+    assert res.endswith(f.CONTENT_TYPE_APP_TAR_GZ), \
+        "Literal MIME-type expected instead of its existing synonym since non-official is allowed (must_exist=False)"
+
+
 def test_clean_mime_type_format_iana():
-    iana_fmt = "{}:{}".format(IANA_NAMESPACE, CONTENT_TYPE_APP_JSON)  # "iana:mime_type"
-    res_type = clean_mime_type_format(iana_fmt)
-    assert res_type == CONTENT_TYPE_APP_JSON
-    iana_fmt = os.path.join(list(IANA_NAMESPACE_DEFINITION.values())[0], CONTENT_TYPE_APP_JSON)  # "iana-url/mime_type"
-    res_type = clean_mime_type_format(iana_fmt)
-    assert res_type == CONTENT_TYPE_APP_JSON  # application/json
+    iana_fmt = "{}:{}".format(f.IANA_NAMESPACE, f.CONTENT_TYPE_APP_JSON)  # "iana:mime_type"
+    res_type = f.clean_mime_type_format(iana_fmt)
+    assert res_type == f.CONTENT_TYPE_APP_JSON
+    iana_url = list(f.IANA_NAMESPACE_DEFINITION.values())[0]
+    iana_fmt = os.path.join(iana_url, f.CONTENT_TYPE_APP_JSON)
+    res_type = f.clean_mime_type_format(iana_fmt)
+    assert res_type == f.CONTENT_TYPE_APP_JSON  # application/json
 
 
 def test_clean_mime_type_format_edam():
-    mime_type, fmt = list(EDAM_MAPPING.items())[0]
-    edam_fmt = "{}:{}".format(EDAM_NAMESPACE, fmt)  # "edam:format_####"
-    res_type = clean_mime_type_format(edam_fmt)
+    mime_type, fmt = list(f.EDAM_MAPPING.items())[0]
+    edam_fmt = "{}:{}".format(f.EDAM_NAMESPACE, fmt)  # "edam:format_####"
+    res_type = f.clean_mime_type_format(edam_fmt)
     assert res_type == mime_type
-    edam_fmt = os.path.join(list(EDAM_NAMESPACE_DEFINITION.values())[0], fmt)  # "edam-url/format_####"
-    res_type = clean_mime_type_format(edam_fmt)
+    edam_fmt = os.path.join(list(f.EDAM_NAMESPACE_DEFINITION.values())[0], fmt)  # "edam-url/format_####"
+    res_type = f.clean_mime_type_format(edam_fmt)
     assert res_type == mime_type  # application/x-type
 
 
 def test_clean_mime_type_format_io_remove_extra_parameters():
     test_input_formats = [
-        (CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_JSON),
-        (CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_JSON + "; charset=UTF-8"),
-        (CONTENT_TYPE_APP_XML, CONTENT_TYPE_APP_XML + "; charset=UTF-8; version=1.0"),
+        (f.CONTENT_TYPE_APP_JSON, f.CONTENT_TYPE_APP_JSON),
+        (f.CONTENT_TYPE_APP_JSON, f.CONTENT_TYPE_APP_JSON + "; charset=UTF-8"),
+        (f.CONTENT_TYPE_APP_XML, f.CONTENT_TYPE_APP_XML + "; charset=UTF-8; version=1.0"),
         ("application/vnd.api+json", "application/vnd.api+json; charset=UTF-8"),
         ("application/vnd.api+json", "application/vnd.api+json"),
     ]
     for expect_fmt, test_fmt in test_input_formats:
-        res_type = clean_mime_type_format(test_fmt, strip_parameters=True)
+        res_type = f.clean_mime_type_format(test_fmt, strip_parameters=True)
         assert res_type == expect_fmt
 
 
 def test_clean_mime_type_format_io_strip_base_type():
     test_input_formats = [
-        (CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_JSON),
-        (CONTENT_TYPE_APP_JSON + "; charset=UTF-8", CONTENT_TYPE_APP_JSON + "; charset=UTF-8"),
-        (CONTENT_TYPE_APP_XML + "; charset=UTF-8; version=1.0", CONTENT_TYPE_APP_XML + "; charset=UTF-8; version=1.0"),
-        (CONTENT_TYPE_APP_JSON + "; charset=UTF-8", "application/vnd.api+json; charset=UTF-8"),
-        (CONTENT_TYPE_APP_JSON, "application/vnd.api+json"),
+        (f.CONTENT_TYPE_APP_JSON, f.CONTENT_TYPE_APP_JSON),
+        (f.CONTENT_TYPE_APP_JSON + "; charset=UTF-8", f.CONTENT_TYPE_APP_JSON + "; charset=UTF-8"),
+        (f.CONTENT_TYPE_APP_XML + "; charset=UTF-8; version=1.0",
+         f.CONTENT_TYPE_APP_XML + "; charset=UTF-8; version=1.0"),
+        (f.CONTENT_TYPE_APP_JSON + "; charset=UTF-8", "application/vnd.api+json; charset=UTF-8"),
+        (f.CONTENT_TYPE_APP_JSON, "application/vnd.api+json"),
     ]
     for expect_fmt, test_fmt in test_input_formats:
-        res_type = clean_mime_type_format(test_fmt, base_subtype=True)
+        res_type = f.clean_mime_type_format(test_fmt, suffix_subtype=True)
         assert res_type == expect_fmt
 
 
 def test_clean_mime_type_format_io_strip_base_and_remove_parameters():
     test_input_formats = [
-        (CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_JSON),
-        (CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_JSON + "; charset=UTF-8"),
-        (CONTENT_TYPE_APP_XML, CONTENT_TYPE_APP_XML + "; charset=UTF-8; version=1.0"),
-        (CONTENT_TYPE_APP_JSON, "application/vnd.api+json; charset=UTF-8"),
-        (CONTENT_TYPE_APP_JSON, "application/vnd.api+json"),
+        (f.CONTENT_TYPE_APP_JSON, f.CONTENT_TYPE_APP_JSON),
+        (f.CONTENT_TYPE_APP_JSON, f.CONTENT_TYPE_APP_JSON + "; charset=UTF-8"),
+        (f.CONTENT_TYPE_APP_XML, f.CONTENT_TYPE_APP_XML + "; charset=UTF-8; version=1.0"),
+        (f.CONTENT_TYPE_APP_JSON, "application/vnd.api+json; charset=UTF-8"),
+        (f.CONTENT_TYPE_APP_JSON, "application/vnd.api+json"),
     ]
     for expect_fmt, test_fmt in test_input_formats:
-        res_type = clean_mime_type_format(test_fmt, base_subtype=True, strip_parameters=True)
+        res_type = f.clean_mime_type_format(test_fmt, suffix_subtype=True, strip_parameters=True)
         assert res_type == expect_fmt

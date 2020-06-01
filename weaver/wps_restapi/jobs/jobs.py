@@ -38,7 +38,30 @@ if TYPE_CHECKING:
 LOGGER = get_task_logger(__name__)
 
 
-def check_status(url=None, response=None, sleep_secs=2, verify=False, settings=None):
+def get_local_status_location(url_status_location, container, must_exist=True):
+    # type: (AnyStr, AnySettingsContainer, bool) -> Optional[AnyStr]
+    """Attempts to retrieve the local file path corresponding to the WPS status location as URL.
+
+    :param url_status_location: URL reference pointing to some WPS status location XML.
+    :param container: any settings container to map configured local paths.
+    :param must_exist: return only existing path if enabled, otherwise return the parsed value without validation.
+    :returns: found local file path if it exists, ``None`` otherwise.
+    """
+    if url_status_location and not urlparse(url_status_location).scheme in ["", "file://"]:
+        dir_path = get_wps_output_dir(container)
+        wps_out_url = get_wps_output_url(container)
+        req_out_url = get_url_without_query(url_status_location)
+        out_path = os.path.join(dir_path, req_out_url.replace(wps_out_url, "").lstrip("/"))
+    else:
+        out_path = url_status_location.replace("file:://", "")
+    if must_exist and not os.path.isfile(out_path):
+        LOGGER.debug("Could not map WPS status reference [%s] to local file path [%s].", url_status_location, out_path)
+        return None
+    LOGGER.debug("Resolved WPS status reference [%s] as local file path [%s].", url_status_location, out_path)
+    return out_path
+
+
+def check_status(url=None, response=None, sleep_secs=2, verify=True, settings=None):
     # type: (Optional[AnyStr], Optional[etree.ElementBase], int, bool, Optional[AnySettingsContainer]) -> WPSExecution
     """
     Run :func:`owslib.wps.WPSExecution.checkStatus` with additional exception handling.
@@ -51,26 +74,21 @@ def check_status(url=None, response=None, sleep_secs=2, verify=False, settings=N
     :return: OWSLib.wps.WPSExecution object.
     """
     def _retry_file():
-        LOGGER.warning("Failed retrieving status-location, attempting with local file.")
-        if url and not urlparse(url).scheme in ["", "file://"]:
-            dir_path = get_wps_output_dir(app)
-            wps_out_url = get_wps_output_url(app)
-            req_out_url = get_url_without_query(url)
-            out_path = os.path.join(dir_path, req_out_url.replace(wps_out_url, "").lstrip("/"))
-        else:
-            out_path = url.replace("file:://", "")
-        if not os.path.isfile(out_path):
+        LOGGER.warning("Failed retrieving WPS status-location, attempting with local file.")
+        out_path = get_local_status_location(url, settings)
+        if not out_path:
             raise HTTPNotFound("Could not find file resource from [{}].".format(url))
+        LOGGER.info("Resolved WPS status-location using local file reference.")
         return open(out_path, "r").read()
 
     execution = WPSExecution()
     if response:
-        LOGGER.debug("using response document...")
+        LOGGER.debug("Retrieving WPS status from XML response document...")
         xml = response
     elif url:
         xml_resp = HTTPNotFound()
         try:
-            LOGGER.debug("using status-location url...")
+            LOGGER.debug("Attempt to retrieve WPS status-location from URL...")
             xml_resp = request_extra("get", url, verify=verify, settings=settings)
             xml = xml_resp.content
         except Exception as ex:
@@ -80,7 +98,7 @@ def check_status(url=None, response=None, sleep_secs=2, verify=False, settings=N
             LOGGER.debug("Got not-found during get status: [%r]", xml)
             xml = _retry_file()
     else:
-        raise Exception("you need to provide a status-location url or response object.")
+        raise Exception("Missing status-location URL/file reference or response with XML object.")
     if isinstance(xml, six.string_types):
         xml = xml.encode("utf8", errors="ignore")
     execution.checkStatus(response=xml, sleepSecs=sleep_secs)

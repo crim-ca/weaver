@@ -11,7 +11,8 @@ APP_ROOT    := $(abspath $(lastword $(MAKEFILE_NAME))/..)
 APP_NAME    := $(shell basename $(APP_ROOT))
 APP_VERSION ?= 1.8.1
 APP_INI     ?= $(APP_ROOT)/config/$(APP_NAME).ini
-DOCKER_REPO ?= docker-registry.crim.ca/ogc/weaver
+DOCKER_REPO ?= pavics/weaver
+#DOCKER_REPO ?= docker-registry.crim.ca/ogc/weaver
 
 # guess OS (Linux, Darwin,...)
 OS_NAME := $(shell uname -s 2>/dev/null || echo "unknown")
