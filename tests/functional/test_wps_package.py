@@ -1323,7 +1323,6 @@ class WpsPackageAppTest(unittest.TestCase):
     def test_multi_outputs_file_from_wps_xml_reference(self):
         raise NotImplementedError
 
-    # WIP
     def test_stdout_stderr_logging_for_commandline_tool(self):
         import tempfile
         from weaver.processes.wps_package import WpsPackage
@@ -1346,9 +1345,7 @@ class WpsPackageAppTest(unittest.TestCase):
                     }
                 },
                 "outputs": {
-                    "output": {
-                        "type": "stdout"
-                    }
+
                 }
             }
         })
@@ -1396,10 +1393,12 @@ class WpsPackageAppTest(unittest.TestCase):
         # WPSPackage._handle()
         log_file = tempfile.NamedTemporaryFile()
         status_location = log_file.name
+        workdir = tempfile.TemporaryDirectory()
         wps_package_instance.status_location = status_location          # to retrieve logs
+        wps_package_instance.workdir = workdir.name
         wps_package_instance._handler(wps_request, wps_response)        # (WPSRequest, ExecuteResponse)
 
-        print("AAAA")
         # log assertions
         with open(status_location + ".log", "r") as file:
-            print(file.read())
+            log_data = file.read()
+            assert "Dummy message" in log_data
