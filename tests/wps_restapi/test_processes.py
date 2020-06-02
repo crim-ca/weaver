@@ -2,6 +2,7 @@ import os
 import unittest
 from copy import deepcopy
 
+import colander
 import mock
 import pyramid.testing
 import pytest
@@ -33,6 +34,7 @@ from weaver.status import STATUS_ACCEPTED
 from weaver.utils import fully_qualified_name, ows_context_href
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 from weaver.wps import get_wps_url
+from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.processes import set_wps_language
 
 # simulated remote server with remote processes (mocked with `responses` package)
@@ -685,3 +687,33 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         resp = self.app.post_json(uri, params=data, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 405
         assert resp.content_type == CONTENT_TYPE_APP_JSON
+
+    def test_process_description_metadata_href_or_value_valid(self):
+        """Validates that metadata is accepted as either hyperlink reference or literal string value."""
+        sd.Process().deserialize({
+            "id": self._testMethodName,
+            "metadata": [
+                {"type": "value-typed", "value": "some-value", "lang": "en-US"},
+                {"type": "link-typed", "href": "https://example.com", "hreflang": "en-US", "rel": "example"}
+            ]
+        })
+
+    def test_process_description_metadata_href_or_value_invalid(self):
+        """Validates that various invalid metadata definitions are indicated as such."""
+        test_meta = [
+            [{"type": "value", "lang": "en-US"}],  # missing 'value'
+            [{"href": "https://example.com", "hreflang": "en-US"}],  # missing 'rel'
+            [{"value": "https://example.com", "rel": "value-type"}],  # incorrect 'rel' with 'value' type
+            [{"href": "https://example.com", "lang": "en-US"}],  # incorrect 'lang' instead of 'hreflang' with 'href'
+            [{"value": "https://example.com", "hreflang": "en-US"}],  # incorrect 'hreflang' with 'value'
+        ]
+        for i, meta in enumerate(test_meta):
+            try:
+                sd.Process().deserialize({
+                    "id": "{}_meta_{}".format(self._testMethodName, i),
+                    "metadata": meta,
+                })
+            except colander.Invalid:
+                pass
+            else:
+                self.fail("Metadata is expected to be raised as invalid: (test: {}, metadata: {})".format(i, test_meta))

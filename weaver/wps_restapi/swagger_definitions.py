@@ -275,16 +275,30 @@ class KeywordList(SequenceSchema):
 
 
 class JsonLink(MappingSchema):
-    href = SchemaNode(String(), format=URL)
-    rel = SchemaNode(String(), missing=drop)
+    href = SchemaNode(String(), format=URL, description="Reference URL.")
+    rel = SchemaNode(String(), description="Relationship of the contained link respective to the current element.")
     type = SchemaNode(String(), missing=drop)
     hreflang = SchemaNode(String(), missing=drop)
     title = SchemaNode(String(), missing=drop)
 
 
-class Metadata(JsonLink):
+class MetadataBase(MappingSchema):
+    title = SchemaNode(String(), missing=drop)
     role = SchemaNode(String(), format=URL, missing=drop)
-    value = SchemaNode(String(), missing=drop)
+    type = SchemaNode(String(), description="Type of metadata entry.")
+
+
+class MetadataLink(MetadataBase, JsonLink):
+    pass
+
+
+class MetadataValue(MetadataBase):
+    value = SchemaNode(String())
+    lang = SchemaNode(String())
+
+
+class Metadata(OneOfMappingSchema):
+    _one_of = (MetadataLink, MetadataValue)
 
 
 class MetadataList(SequenceSchema):
