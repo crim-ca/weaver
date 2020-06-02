@@ -13,7 +13,7 @@ Changes:
 
 Fixes:
 ------
-- No changes.
+- Add more examples of supported WPS endpoint metadata (fixes `#84 <https://github.com/crim-ca/weaver/issues/84>`_).
 
 `1.9.0 <https://github.com/crim-ca/weaver/tree/1.9.0>`_ (2020-06-01)
 ========================================================================
