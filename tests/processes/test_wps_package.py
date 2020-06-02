@@ -657,13 +657,53 @@ def test_stdout_stderr_logging_for_workflow_success():
         "title": "test-stdout-stderr",
         "id": "test-stdout-stderr",
         "package": {
-            "cwlVersion": "v1.0",
+          "cwlVersion": "v1.0",
+          "class": "Workflow",
+          "steps": {
+            "stepA": {
+              "run": "echo.cwl",
+              "in": {
+                "message": "Dummy message A"
+              },
+              "out": []
+            },
+            "stepB": {
+              "run": "echo.cwl",
+              "in": {
+                "message": "Dummy message B"
+              },
+              "out": []
+            }
+          }
         }
     })
 
     from unittest import mock
     from cwltool.context import LoadingContext, RuntimeContext
+    def mock_fetch_process_info(process_info_url, fetch_error):
+        process_json_body = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": "echo",
+            "inputs": {
+                "message": {
+                    "type": "string",
+                    "inputBinding": {
+                        "position": 1
+                    }
+                }
+            },
+            "outputs": {
+
+            }
+        }
+
+        return process_json_body
+
     def mock_load_package_content(package, package_name, data_source=None, loading_context=LoadingContext(), runtime_context=RuntimeContext()):
+        # tmp_dir = tmp_dir or tempfile.mkdtemp()
+        # tmp_json_cwl = os.path.join(tmp_dir, package_name)
+
         package = {
             "cwlVersion": "v1.0",
             "class": "CommandLineTool",
@@ -743,7 +783,8 @@ def test_stdout_stderr_logging_for_workflow_success():
     workdir = tempfile.TemporaryDirectory()
     wps_package_instance.status_location = status_location          # to retrieve logs
     wps_package_instance.workdir = workdir.name
-    with mock.patch('weaver.processes.wps_package._load_package_content', side_effect=mock_load_package_content):
+    # with mock.patch('weaver.processes.wps_package._load_package_content', side_effect=mock_load_package_content):
+    with mock.patch('weaver.processes.wps_package._fetch_process_info', side_effect=mock_fetch_process_info):
         wps_package_instance._handler(wps_request, wps_response)        # (WPSRequest, ExecuteResponse)
 
     # log assertions
