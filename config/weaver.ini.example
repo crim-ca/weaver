@@ -67,9 +67,23 @@ weaver.wps_workdir =
 weaver.wps_metadata_identification_title=Weaver
 weaver.wps_metadata_identification_abstract=Weaver internal WPS used for demo and testing.
 weaver.wps_metadata_identification_keywords=Weaver,WPS,OGC
+# access constraints can be comma-separated
 weaver.wps_metadata_identification_accessconstraints=NONE
+weaver.wps_metadata_identification_fees=NONE
 weaver.wps_metadata_provider_name=CRIM
 weaver.wps_metadata_provider_url=http://pavics-weaver.readthedocs.org/en/latest/
+weaver.wps_metadata_contact_name=Francis Charette-Migneault
+weaver.wps_metadata_contact_position=Research Software Developer
+weaver.wps_metadata_contact_phone=1-514-840-1234
+weaver.wps_metadata_contact_fax=1-514-840-1244
+weaver.wps_metadata_contact_deliveryPoint=405, Ogilvy Avenue, suite 101
+weaver.wps_metadata_contact_city=Montréal
+weaver.wps_metadata_contact_stateorprovince=Québec
+weaver.wps_metadata_contact_country=Canada
+weaver.wps_metadata_contact_postalcode=H3N 1M3
+weaver.wps_metadata_contact_email=info@crim.ca
+weaver.wps_metadata_contact_url=https://www.crim.ca/en/contact-us
+weaver.wps_metadata_contact_role=Information
 
 # --- Weaver WPS REST API ---
 weaver.wps_restapi = true
