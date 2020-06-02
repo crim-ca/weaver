@@ -570,7 +570,7 @@ def test_stdout_stderr_logging_for_commandline_tool_success():
     workdir = tempfile.TemporaryDirectory()
     wps_package_instance.status_location = status_location          # to retrieve logs
     wps_package_instance.workdir = workdir.name
-    wps_package_instance._handler(wps_request, wps_response)        # (WPSRequest, ExecuteResponse)
+    wps_package_instance._handler(wps_request, wps_response)
 
     # log assertions
     with open(status_location + ".log", "r") as file:
@@ -646,7 +646,7 @@ def test_stdout_stderr_logging_for_commandline_tool_failure():
     workdir = tempfile.TemporaryDirectory()
     wps_package_instance.status_location = status_location          # to retrieve logs
     wps_package_instance.workdir = workdir.name
-    wps_package_instance._handler(wps_request, wps_response)        # (WPSRequest, ExecuteResponse)
+    wps_package_instance._handler(wps_request, wps_response)
 
     # log assertions
     with open(status_location + ".log", "r") as file:
@@ -774,7 +774,7 @@ def test_stdout_stderr_logging_for_workflow_success():
     wps_package_instance.workdir = workdir.name
 
     with mock.patch('weaver.processes.wps_package._fetch_process_info', side_effect=mock_fetch_process_info):
-        wps_package_instance._handler(wps_request, wps_response)        # (WPSRequest, ExecuteResponse)
+        wps_package_instance._handler(wps_request, wps_response)
 
     # log assertions
     with open(status_location + ".log", "r") as file:
