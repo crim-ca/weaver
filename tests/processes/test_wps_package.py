@@ -1,5 +1,6 @@
 from collections import OrderedDict
 from copy import deepcopy
+from unittest import mock
 
 import pytest
 import tempfile
@@ -657,29 +658,38 @@ def test_stdout_stderr_logging_for_workflow_success():
         "title": "test-stdout-stderr",
         "id": "test-stdout-stderr",
         "package": {
-          "cwlVersion": "v1.0",
-          "class": "Workflow",
-          "steps": {
-            "stepA": {
-              "run": "echo.cwl",
-              "in": {
-                "message": "Dummy message A"
-              },
-              "out": []
+            "cwlVersion": "v1.0",
+            "class": "Workflow",
+            "inputs": {
+                "messageA": {
+                    "type": "string"
+                },
+                "messageB": {
+                    "type": "string"
+                }
             },
-            "stepB": {
-              "run": "echo.cwl",
-              "in": {
-                "message": "Dummy message B"
-              },
-              "out": []
+            "outputs": {
+
+            },
+            "steps": {
+                "stepA": {
+                  "run": "echo.cwl",
+                  "in": {
+                    "message": "messageA"
+                  },
+                  "out": []
+                },
+                "stepB": {
+                  "run": "echo.cwl",
+                  "in": {
+                    "message": "messageB"
+                  },
+                  "out": []
+                }
             }
-          }
         }
     })
 
-    from unittest import mock
-    from cwltool.context import LoadingContext, RuntimeContext
     def mock_fetch_process_info(process_info_url, fetch_error):
         process_json_body = {
             "cwlVersion": "v1.0",
@@ -699,31 +709,6 @@ def test_stdout_stderr_logging_for_workflow_success():
         }
 
         return process_json_body
-
-    def mock_load_package_content(package, package_name, data_source=None, loading_context=LoadingContext(), runtime_context=RuntimeContext()):
-        # tmp_dir = tmp_dir or tempfile.mkdtemp()
-        # tmp_json_cwl = os.path.join(tmp_dir, package_name)
-
-        package = {
-            "cwlVersion": "v1.0",
-            "class": "CommandLineTool",
-            "baseCommand": "echo",
-            "inputs": {
-                "message": {
-                    "type": "string",
-                    "inputBinding": {
-                        "position": 1
-                    }
-                }
-            },
-            "outputs": {
-
-            }
-        }
-        package_type = "package"
-        step_packages = {}
-
-        return package, package_type, step_packages
 
     payload = process
     package = process["package"]
@@ -783,11 +768,12 @@ def test_stdout_stderr_logging_for_workflow_success():
     workdir = tempfile.TemporaryDirectory()
     wps_package_instance.status_location = status_location          # to retrieve logs
     wps_package_instance.workdir = workdir.name
-    # with mock.patch('weaver.processes.wps_package._load_package_content', side_effect=mock_load_package_content):
+
     with mock.patch('weaver.processes.wps_package._fetch_process_info', side_effect=mock_fetch_process_info):
         wps_package_instance._handler(wps_request, wps_response)        # (WPSRequest, ExecuteResponse)
 
     # log assertions
     with open(status_location + ".log", "r") as file:
         log_data = file.read()
-        assert "Completed permanentFail" in log_data
+        assert "Dummy message A" in log_data
+        assert "Dummy message B" in log_data
