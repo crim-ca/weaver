@@ -658,6 +658,14 @@ def test_stdout_stderr_logging_for_workflow_success():
         "id": "test-stdout-stderr",
         "package": {
             "cwlVersion": "v1.0",
+        }
+    })
+
+    from unittest import mock
+    from cwltool.context import LoadingContext, RuntimeContext
+    def mock_load_package_content(package, package_name, data_source=None, loading_context=LoadingContext(), runtime_context=RuntimeContext()):
+        package = {
+            "cwlVersion": "v1.0",
             "class": "CommandLineTool",
             "baseCommand": "echo",
             "inputs": {
@@ -672,7 +680,10 @@ def test_stdout_stderr_logging_for_workflow_success():
 
             }
         }
-    })
+        package_type = "package"
+        step_packages = {}
+
+        return package, package_type, step_packages
 
     payload = process
     package = process["package"]
@@ -732,7 +743,8 @@ def test_stdout_stderr_logging_for_workflow_success():
     workdir = tempfile.TemporaryDirectory()
     wps_package_instance.status_location = status_location          # to retrieve logs
     wps_package_instance.workdir = workdir.name
-    wps_package_instance._handler(wps_request, wps_response)        # (WPSRequest, ExecuteResponse)
+    with mock.patch('weaver.processes.wps_package._load_package_content', side_effect=mock_load_package_content):
+        wps_package_instance._handler(wps_request, wps_response)        # (WPSRequest, ExecuteResponse)
 
     # log assertions
     with open(status_location + ".log", "r") as file:
