@@ -2,6 +2,7 @@ from collections import OrderedDict
 from copy import deepcopy
 from unittest import mock
 
+import os
 import pytest
 import tempfile
 from pywps.app import WPSRequest
@@ -694,7 +695,10 @@ def test_stdout_stderr_logging_for_workflow_success():
         process_json_body = {
             "cwlVersion": "v1.0",
             "class": "CommandLineTool",
-            "baseCommand": "echo",
+            "baseCommand": "sh",
+            "arguments": [
+                os.path.dirname(os.path.abspath(__file__)) + "/echo.sh"
+            ],
             "inputs": {
                 "message": {
                     "type": "string",
