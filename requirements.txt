@@ -1,7 +1,9 @@
 alembic
 argcomplete
 backports.tempfile; python_version < "3"
-celery<5
+# celery 5 to be released in near future
+# celery >=4.4.3 breaks on 'future.utils' import
+celery==4.4.2
 cffi
 colander
 cornice
