@@ -12,6 +12,17 @@ Changes:
 
 Fixes:
 ------
+- No change.
+
+`1.10.1 <https://github.com/crim-ca/weaver/tree/1.10.1>`_ (2020-06-03)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
 - Pin ``celery==4.4.2`` to avoid import error on missing ``futures.utils`` called internally in following versions.
 
 `1.10.0 <https://github.com/crim-ca/weaver/tree/1.10.0>`_ (2020-06-03)
