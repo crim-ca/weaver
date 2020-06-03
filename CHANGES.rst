@@ -1,8 +1,19 @@
 Changes
 *******
 
+.. **REPLACE AND/OR ADD SECTION ENTRIES ACCORDINGLY WITH APPLIED CHANGES**
+
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
+
+Changes:
+--------
+- Add support of value-typed metadata fields for process description.
+- Enforce ``rel`` field when specifying an ``href`` JSON link to match corresponding XML requirement.
+
+Fixes:
+------
+- Add more examples of supported WPS endpoint metadata (fixes `#84 <https://github.com/crim-ca/weaver/issues/84>`_).
 
 `1.9.0 <https://github.com/crim-ca/weaver/tree/1.9.0>`_ (2020-06-01)
 ========================================================================
