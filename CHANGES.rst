@@ -8,6 +8,17 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+`1.10.0 <https://github.com/crim-ca/weaver/tree/1.10.0>`_ (2020-06-03)
+========================================================================
+
+Changes:
+--------
 - Add support of value-typed metadata fields for process description.
 - Enforce ``rel`` field when specifying an ``href`` JSON link to match corresponding XML requirement.
 
