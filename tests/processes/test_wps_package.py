@@ -691,6 +691,27 @@ def test_stdout_stderr_logging_for_workflow_success():
         }
     })
 
+    from weaver.processes.sources import fetch_data_sources
+    from six.moves.urllib.parse import urlparse
+
+    @staticmethod
+    def mock_get_data_source_from_url(data_url):
+        forbidden_data_source = ["probav-l1-ades.vgt.vito.be",
+                                 "probav-l2-ades.vgt.vito.be",
+                                 "deimos-cubewerx"]
+        data_sources = fetch_data_sources()
+        try:
+            parsed = urlparse(data_url)
+            netloc, _, _ = parsed.netloc, parsed.path, parsed.scheme
+            if netloc:
+                for src, val in data_sources.items():
+                    if src not in forbidden_data_source and val["netloc"] == netloc:
+                        return src
+        except Exception:  # noqa: W0703 # nosec: B110
+            pass
+        # Default mocked data source
+        return "ipt-poland"
+
     def mock_fetch_process_info(process_info_url, fetch_error):
         process_json_body = {
             "cwlVersion": "v1.0",
@@ -721,7 +742,12 @@ def test_stdout_stderr_logging_for_workflow_success():
     wps_package_instance = WpsPackage(identifier=identifier, title=title, payload=payload, package=package)
 
     # WPSRequest mock
+    class DummyRequest():
+        method = "get"
+        headers = {}
+
     wps_request = WPSRequest()
+    wps_request.http_request = DummyRequest()
     wps_request.json = {
         "identifier": "test-stdout-stderr",
         "operation": "execute",
@@ -772,6 +798,10 @@ def test_stdout_stderr_logging_for_workflow_success():
     workdir = tempfile.TemporaryDirectory()
     wps_package_instance.status_location = status_location          # to retrieve logs
     wps_package_instance.workdir = workdir.name
+    wps_package_instance.settings = {
+        "weaver.configuration": "ems",
+        "weaver.data_sources": get_data
+    }
 
     with mock.patch('weaver.processes.wps_package._fetch_process_info', side_effect=mock_fetch_process_info):
         wps_package_instance._handler(wps_request, wps_response)
