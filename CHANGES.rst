@@ -69,6 +69,8 @@ Changes:
 - Add ``application/x-yaml``  MIME-type to known formats.
 - Add ``application/x-tar`` and ``application/tar+gzip`` MIME-type (not official) but resolved as *synonym*
   ``application/gzip`` (official) to preserve compressed file support during `CWL` format validation.
+- Avoid logging ``stdout/stderr`` in workflows
+- Add tests to make sure processes ``stdout/stderr`` are logged
 
 Fixes:
 ------
