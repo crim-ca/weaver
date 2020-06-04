@@ -97,7 +97,7 @@ For more details, see `Configuration`_ and `Documentation`_ sections.
 Links
 ----------------
 
-Docker image repositories: 
+Docker image repositories:
 
 - CRIM registry: `ogc/weaver <https://docker-registry.crim.ca/repositories/3463>`_
 - OGC processes: `ogc-public <https://docker-registry.crim.ca/namespaces/39>`_
@@ -140,13 +140,15 @@ For more configuration details, please refer to Documentation_.
 Documentation
 ----------------
 
-The REST API documentation is auto-generated and served under ``{WEAVER_URL}/api/`` using
-Swagger-UI with tag ``latest``.
+The REST API documentation is auto-generated and served under any running `Weaver` application on route
+``{WEAVER_URL}/api/``. This documentation will correspond to the version of the executed `Weaver` application.
+For the latest documentation, you can refer to the `OpenAPI Specification <rtd_oas>`_ served directly on `readthedocs`_.
 
-More ample details about installation, configuration and usage are provided on `readthedocs`_.
-These are generated from corresponding information provided in `docs`_.
+More ample details about installation, configuration and usage are also provided on `readthedocs`_.
+These are generated from corresponding information provided in `docs`_ source directory.
 
 .. _readthedocs: https://pavics-weaver.readthedocs.io
+.. _rtd_oas: https://pavics-weaver.readthedocs.io/en/latest/api.html
 .. _docs: ./docs
 
 ----------------

@@ -12,15 +12,26 @@ Tutorial
 Using the WPS application included in Weaver
 ==============================================
 
-Install Weaver (see: :ref:`installation`) and make sure all required components
+Install `Weaver` (see: :ref:`installation`) and make sure all required components
 are started and running (see: :ref:`configuration`).
 
-Then, execute the desired `WPS`_ request according to desired operation mode and version.
+Then, execute the desired `WPS`_ or `WPS-REST`_ request according to desired operation mode and version.
 
 For all following examples, ``${WEAVER_URL}`` is used to specify your application URL endpoint configuration.
 By default, this value should be ``localhost:4001``.
 
-.. _`WPS`: https://www.opengeospatial.org/standards/wps
+.. _WPS: https://www.opengeospatial.org/standards/wps
+.. _WPS-REST: https://github.com/opengeospatial/wps-rest-binding
+
+.. note::
+    This tutorial section is a minimal introduction to available requests and endpoints. Please refer to
+    `processes`_ for further details, such as detailed request payload contents, types of processes and additional
+    operations that compose a typical process execution workflow. Similarly, refer to
+    `Application Package <package>`_ for further details about the definition of the reference application executed
+    by the deployed processes.
+
+.. _processes: ./processes.rst
+.. _package: ./package.rst
 
 WPS-1/2 requests
 --------------------
@@ -60,6 +71,10 @@ Then, run the WPS-1/WPS-2 ``Execute`` request (built-in process ``jsonarray2netc
 
 The execution of the process should read the JSON list with our dummy NetCDF file and make it available (as a copy)
 on the output parameter named ``output`` with a path matching the configured output WPS path of the application.
+
+.. note::
+    All above WPS-1/2 requests suppose that configuration setting ``weaver.wps_path /ows/wps`` (default value).
+    The request URL have to be adjusted accordingly if this parameter is modified.
 
 WPS-3 requests
 --------------
@@ -101,19 +116,11 @@ For all available operations and specific details about them, please refer to th
 rendered on route ``${WEAVER_URL}/api`` when running `Weaver` application.
 
 
-Managing WPS processes included in Weaver ADES/EMS
-==================================================
+Endpoint Content-Type
+------------------------
 
-Register a new WPS process
---------------------------
-
-.. todo:: complete demo docs
-
-
-Access a registered process
----------------------------
-
-.. todo:: complete demo docs, stuff about process visibility
-
-
-
+.. todo:: wps-1/2 xml default, json supported wps-2
+.. todo::
+    wps-rest json only (for now, xml also if implemented)
+    https://github.com/crim-ca/weaver/issues/125
+    https://github.com/crim-ca/weaver/issues/126

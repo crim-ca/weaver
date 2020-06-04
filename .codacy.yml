@@ -1,4 +1,4 @@
 ---
 exclude_paths:
   - 'tests/**'
-  - 'docs/conf.py'
+  - 'docs/source/conf.py'

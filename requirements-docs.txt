@@ -1,6 +1,6 @@
 # these are doc-only requirements
 # we actually need to install all requirements during docs build because of OpenAPI generation
-# (see 'docs/conf.py')
+# (see 'docs/source/conf.py')
 pycodestyle
 pycodestyle
 # required for pywps.ext_autodoc
