@@ -16,36 +16,88 @@
 #   as they refer to valid setting names defined by sphinx
 # pylint: disable=C0103
 
+import json
 import os
+import re
 import sys
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-sys.path.insert(0, os.path.abspath(".."))
-sys.path.insert(0, os.path.abspath("../.."))
-sys.path.insert(0, os.path.abspath("../../.."))
+DOC_SRC_ROOT = os.path.abspath(os.path.dirname(__file__))
+DOC_DIR_ROOT = os.path.abspath(os.path.dirname(DOC_SRC_ROOT))
+DOC_PRJ_ROOT = os.path.abspath(os.path.dirname(DOC_DIR_ROOT))
+sys.path.insert(0, os.path.abspath(DOC_SRC_ROOT))
+sys.path.insert(0, os.path.abspath(DOC_DIR_ROOT))
+sys.path.insert(0, os.path.abspath(DOC_PRJ_ROOT))
 
 from weaver import __meta__  # isort:skip # noqa: E402 # pylint: disable=C0413
 
-# -- General configuration ------------------------------------------------
+# for api generation
+from weaver.wps_restapi.api import get_swagger_json  # isort:skip # noqa: E402
+from pyramid.config import Configurator  # isort:skip # noqa: E402
+
+# -- General configuration ---------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
-needs_sphinx = "1.6"
+# needs_sphinx = "1.0"
 
 # Add any Sphinx extension module names here, as strings. They can be
-# extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
-# ones.
+# extensions coming with Sphinx (named "sphinx.ext.*") or your custom ones.
+sys.path.append(os.path.abspath(os.path.join(DOC_DIR_ROOT, "_extensions")))
 extensions = [
+    "doc_redirect",
+    "sphinxcontrib.redoc",
     "sphinx.ext.autodoc",
-    "sphinx.ext.intersphinx",
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
-    "sphinx.ext.napoleon",
+    "sphinx.ext.intersphinx",
+    "autoapi.extension",
     "sphinx_autodoc_typehints",
     "pywps.ext_autodoc",
-    "autoapi.extension",
+    "sphinx_paramlinks",
 ]
+
+# note: see custom extension documentation
+doc_redirect_ignores = [
+    re.compile(r"weaver\..*"),  # autoapi generated files
+    re.compile(r"index.*"),
+]
+
+
+def doc_redirect_include(file_path):
+    return file_path.endswith(".rst") and not any(re.match(regex, file_path) for regex in doc_redirect_ignores)
+
+
+doc_redirect_map = {
+    "docs/{}".format(file_name): file_name
+    for file_name in os.listdir(DOC_DIR_ROOT)
+    if doc_redirect_include(file_name)
+}
+doc_redirect_map.update({
+    file_name: file_name
+    for file_name in os.listdir(DOC_PRJ_ROOT)
+    if doc_redirect_include(file_name)
+})
+
+# generate openapi
+config = Configurator(settings={"weaver.wps": False, "weaver.wps_restapi": True})
+config.include("weaver")  # need to include package to apply decorators and parse routes
+api_spec_file = os.path.join(DOC_DIR_ROOT, "api.json")
+api_spec_json = get_swagger_json(http_host="example", http_scheme="https")
+with open(api_spec_file, "w") as f:
+    json.dump(api_spec_json, f)
+
+redoc = [{
+    "name": __meta__.__title__,
+    "page": "api",  # rendered under '{root}/api.html'
+    "spec": api_spec_file,
+    "embed": True,
+    "opts": {
+        "lazy-rendering": True,
+        "hide-hostname": True
+    }
+}]
 
 autoapi_type = "python"
 autoapi_dirs = ["../../weaver"]
