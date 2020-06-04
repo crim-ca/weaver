@@ -8,7 +8,7 @@ Changes
 
 Changes:
 --------
-- No change.
+- Generate Weaver OpenAPI specification for readthedocs publication.
 
 Fixes:
 ------

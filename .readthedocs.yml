@@ -1,7 +1,7 @@
 # configuration to setup readthedocs
 version: 2
 sphinx:
-  configuration: docs/source/conf.py
+  configuration: docs/conf.py
 formats: all
 python:
   version: 3.7
