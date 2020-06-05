@@ -1,7 +1,7 @@
+import tempfile
 from collections import OrderedDict
 from copy import deepcopy
 
-import tempfile
 import pytest
 from pytest import fail
 from pywps.app import WPSRequest
@@ -9,6 +9,7 @@ from pywps.inout.formats import Format
 from pywps.inout.literaltypes import AnyValue
 from pywps.validator.mode import MODE
 
+from weaver.datatype import Process
 from weaver.exceptions import PackageTypeError
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
 from weaver.processes.constants import WPS_LITERAL
@@ -18,10 +19,8 @@ from weaver.processes.wps_package import _is_cwl_array_type  # noqa: W0212
 from weaver.processes.wps_package import _is_cwl_enum_type  # noqa: W0212
 from weaver.processes.wps_package import _json2wps_datatype  # noqa: W0212
 from weaver.processes.wps_package import _merge_io_formats  # noqa: W0212
-from weaver.processes.wps_package import DEFAULT_FORMAT
+from weaver.processes.wps_package import DEFAULT_FORMAT, WpsPackage
 from weaver.utils import null
-from weaver.datatype import Process
-from weaver.processes.wps_package import WpsPackage
 
 
 class ObjectWithEqProperty(object):
