@@ -69,6 +69,7 @@ Managing processes included in Weaver ADES/EMS
 Following steps represent the typical steps applied to deploy a process, execute it and retrieve the results.
 
 .. _Deploy:
+
 Register a new process (Deploy)
 -----------------------------------------
 
@@ -105,6 +106,7 @@ interfaces, but it is recommended to use the WPS-REST one because of the added f
 
 .. _GetCapabilities:
 .. _DescribeProcess:
+
 Access registered process(es) (GetCapabilities, DescribeProcess)
 ------------------------------------------------------------------------
 
@@ -132,18 +134,21 @@ that define the process references and expected inputs/outputs.
 .. _`Process requests`: https://pavics-weaver.readthedocs.io/en/setup-docs/api.html#tag/Processes
 
 .. _Execute:
+
 Execution of a process (Execute, Job)
 ---------------------------------------------------------------------
 
 .. todo::
 
 .. _GetStatus:
+
 Monitoring of a process (GetStatus)
 ---------------------------------------------------------------------
 
 .. todo::
 
 .. _GetResult:
+
 Obtaining output results, logs or errors
 ---------------------------------------------------------------------
 

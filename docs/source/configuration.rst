@@ -42,6 +42,8 @@ Configuration of Request Options
 
 .. todo:: complete docs
 
+.. versionadded:: 1.8.0
+
 
 `request_options.yml.example`_
 

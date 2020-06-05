@@ -571,7 +571,7 @@ def request_extra(method,                       # type: AnyStr
     Standard library :mod:`requests` with additional functional utilities.
 
     Retry operation
-    ---------------
+    ~~~~~~~~~~~~~~~~~~~~~~
 
     Implements request retry if the previous request failed, up to the specified number of retries.
     Using :paramref:`backoff` factor, you can control the interval between request attempts such as::
@@ -601,7 +601,7 @@ def request_extra(method,                       # type: AnyStr
         items as first request is done immediately, and following attempts are done with the appropriate delay.
 
     File Transport Scheme
-    ---------------------
+    ~~~~~~~~~~~~~~~~~~~~~~
 
     Any request with ``file://`` scheme or empty scheme (no scheme specified) will be automatically handled as potential
     local file path. The path should be absolute to ensure it to be correctly resolved.
@@ -613,7 +613,7 @@ def request_extra(method,                       # type: AnyStr
         - :class:`FileAdapter`
 
     SSL Verification
-    ----------------
+    ~~~~~~~~~~~~~~~~~~~~~~
 
     Allows SSL verify option to be enabled or disabled according to configuration settings or explicit parameters.
     Any variation of ``verify`` or ``ssl_verify`` keyword arguments are considered. If they all resolve to ``True``,
