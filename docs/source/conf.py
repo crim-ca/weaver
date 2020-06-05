@@ -83,6 +83,9 @@ doc_redirect_map.update({
 })
 
 # generate openapi
+# note:
+#   setting 'weaver.build_docs' allows to ignore part of code that cause problem or require unnecessary
+#   configuration for the purpose of parsing the source to generate the OpenAPI
 config = Configurator(settings={"weaver.wps": False, "weaver.wps_restapi": True, "weaver.build_docs": True})
 config.include("weaver")  # need to include package to apply decorators and parse routes
 api_spec_file = os.path.join(DOC_BLD_ROOT, "api.json")
