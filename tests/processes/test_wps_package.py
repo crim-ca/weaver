@@ -1,10 +1,8 @@
 from collections import OrderedDict
 from copy import deepcopy
-from unittest import mock
 
-import os
-import pytest
 import tempfile
+import pytest
 from pywps.app import WPSRequest
 from pywps.inout.formats import Format
 from pywps.inout.literaltypes import AnyValue
@@ -546,26 +544,26 @@ def test_stdout_stderr_logging_for_commandline_tool_success():
         "lineage": "true",
         "raw": "false",
         "inputs": {
-            "message":[
+            "message": [
                  {
-                    "identifier":"message",
-                    "title":"A dummy message",
-                    "type":"literal",
-                    "data_type":"string",
-                    "data":"Dummy message",
+                    "identifier": "message",
+                    "title": "A dummy message",
+                    "type": "literal",
+                    "data_type": "string",
+                    "data": "Dummy message",
                     "allowed_values": [
 
                     ],
                  }
             ]
         },
-        "outputs":{
+        "outputs": {
 
         }
     }
 
     # ExecuteResponse mock
-    wps_response = type('',(object,),{"_update_status": lambda *_, **__: 1 })()
+    wps_response = type("", (object,), {"_update_status": lambda *_, **__: 1})()
 
     # WPSPackage._handle()
     log_file = tempfile.NamedTemporaryFile()
@@ -625,26 +623,26 @@ def test_stdout_stderr_logging_for_commandline_tool_failure():
         "lineage": "true",
         "raw": "false",
         "inputs": {
-            "message":[
+            "message": [
                  {
-                    "identifier":"message",
-                    "title":"A dummy message",
-                    "type":"literal",
-                    "data_type":"string",
-                    "data":"Dummy message",
+                    "identifier": "message",
+                    "title": "A dummy message",
+                    "type": "literal",
+                    "data_type": "string",
+                    "data": "Dummy message",
                     "allowed_values": [
 
                     ],
                  }
             ]
         },
-        "outputs":{
+        "outputs": {
 
         }
     }
 
     # ExecuteResponse mock
-    wps_response = type('',(object,),{"_update_status": lambda *_, **__: 1 })()
+    wps_response = type("", (object,), {"_update_status": lambda *_, **__: 1})()
 
     # WPSPackage._handle()
     log_file = tempfile.NamedTemporaryFile()
