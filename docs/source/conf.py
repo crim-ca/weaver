@@ -24,9 +24,9 @@ import sys
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-DOC_DIR_ROOT = os.path.abspath(os.path.dirname(__file__))
-DOC_PRJ_ROOT = os.path.abspath(os.path.dirname(DOC_DIR_ROOT))
-DOC_SRC_ROOT = os.path.join(DOC_DIR_ROOT, "source")
+DOC_SRC_ROOT = os.path.abspath(os.path.dirname(__file__))
+DOC_DIR_ROOT = os.path.dirname(DOC_SRC_ROOT)
+DOC_PRJ_ROOT = os.path.dirname(DOC_DIR_ROOT)
 DOC_BLD_ROOT = os.path.join(DOC_DIR_ROOT, "build")
 DOC_PKG_ROOT = os.path.join(DOC_PRJ_ROOT, "weaver")
 sys.path.insert(0, os.path.abspath(DOC_SRC_ROOT))
