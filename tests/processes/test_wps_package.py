@@ -644,7 +644,7 @@ def test_stdout_stderr_logging_for_commandline_tool_failure():
     }
 
     # ExecuteResponse mock
-    wps_response = type('',(object,),{"_update_status": lambda w,x,y,z: 1 })()
+    wps_response = type('',(object,),{"_update_status": lambda *_, **__: 1 })()
 
     # WPSPackage._handle()
     log_file = tempfile.NamedTemporaryFile()
