@@ -569,8 +569,8 @@ def test_stdout_stderr_logging_for_commandline_tool_success():
     log_file = tempfile.NamedTemporaryFile()
     status_location = log_file.name
     workdir = tempfile.TemporaryDirectory()
-    wps_package_instance.status_location = status_location          # to retrieve logs
-    wps_package_instance.workdir = workdir.name
+    setattr(wps_package_instance, "status_location", status_location)       # to retrieve logs
+    setattr(wps_package_instance, "workdir", workdir.name)
     wps_package_instance._handler(wps_request, wps_response)
 
     # log assertions
@@ -648,8 +648,8 @@ def test_stdout_stderr_logging_for_commandline_tool_failure():
     log_file = tempfile.NamedTemporaryFile()
     status_location = log_file.name
     workdir = tempfile.TemporaryDirectory()
-    wps_package_instance.status_location = status_location          # to retrieve logs
-    wps_package_instance.workdir = workdir.name
+    setattr(wps_package_instance, "status_location", status_location)  # to retrieve logs
+    setattr(wps_package_instance, "workdir", workdir.name)
 
     from weaver.exceptions import PackageExecutionError
 
