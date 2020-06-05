@@ -7,5 +7,7 @@
    configuration
    running
    tutorial
+   processes
+   package
    changes
    appendix

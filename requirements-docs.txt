@@ -1,7 +1,13 @@
+# these are doc-only requirements
+# we actually need to install all requirements during docs build because of OpenAPI generation
+# (see 'docs/source/conf.py')
+-r requirements.txt
 pycodestyle
 # required for pywps.ext_autodoc
 pywps
-# FIXME: bug when using 1.2 (https://github.com/readthedocs/sphinx-autoapi/issues/186)
-sphinx-autoapi<1.2
-sphinx>=1.6
+sphinx>=2.4
+sphinx-autoapi>=1.3.0
+sphinx-paramlinks>=0.4.1
+# adds redoc OpenAPI directly served on readthedocs
+sphinxcontrib-redoc>=1.6.0
 sphinx_autodoc_typehints[type_comments]

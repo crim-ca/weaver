@@ -1,7 +1,9 @@
 import logging
 from typing import TYPE_CHECKING
 
-from weaver.utils import get_registry
+from pyramid.settings import asbool
+
+from weaver.utils import get_registry, get_settings
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
@@ -16,6 +18,11 @@ def get_db(container):
 
 
 def includeme(config):
+    settings = get_settings(config)
+    if asbool(settings.get("weaver.build_docs", False)):
+        LOGGER.info("Skipping database when building docs...")
+        return
+
     LOGGER.info("Adding database...")
     from weaver.database.mongodb import MongoDatabase
     config.registry.db = MongoDatabase(config.registry)

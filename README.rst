@@ -97,7 +97,7 @@ For more details, see `Configuration`_ and `Documentation`_ sections.
 Links
 ----------------
 
-Docker image repositories: 
+Docker image repositories:
 
 - CRIM registry: `ogc/weaver <https://docker-registry.crim.ca/repositories/3463>`_
 - OGC processes: `ogc-public <https://docker-registry.crim.ca/namespaces/39>`_
@@ -140,28 +140,44 @@ For more configuration details, please refer to Documentation_.
 Documentation
 ----------------
 
-The REST API documentation is auto-generated and served under ``{WEAVER_URL}/api/`` using
-Swagger-UI with tag ``latest``.
+The REST API documentation is auto-generated and served under any running `Weaver` application on route
+``{WEAVER_URL}/api/``. This documentation will correspond to the version of the executed `Weaver` application.
+For the latest documentation, you can refer to the `OpenAPI Specification <rtd_oas>`_ served directly on `readthedocs`_.
 
-More ample details about installation, configuration and usage are provided on `readthedocs`_.
-These are generated from corresponding information provided in `docs`_.
+More ample details about installation, configuration and usage are also provided on `readthedocs`_.
+These are generated from corresponding information provided in `docs`_ source directory.
 
 .. _readthedocs: https://pavics-weaver.readthedocs.io
+.. _rtd_oas: https://pavics-weaver.readthedocs.io/en/latest/api.html
 .. _docs: ./docs
 
-----------------
-Extra Details
-----------------
+-------------------------
+Extra Details & Sponsors
+-------------------------
 
-The project is developed upon *OGC Testbed-14 – ESA Sponsored Threads – Exploitation Platform* findings and
+The project was initially developed upon *OGC Testbed-14 – ESA Sponsored Threads – Exploitation Platform* findings and
 following improvements. It is also advanced with sponsorship of *U.S. Department of Energy* to support common
-API of the *Earth System Grid Federation* (`ESGF`_).
+API of the *Earth System Grid Federation* (`ESGF`_). The findings are reported on the
+`OGC Testbed-14 <ogc-tb14>`_ thread, and more explicitly in the
+`ADES & EMS Results and Best Practices Engineering Report <ogc-tb14-platform-er>`_.
+
+The project as been employed for `OGC Testbed-15 - ML Thread <ogc-tb15-ml>`_ to demonstrate the use of Machine Learning
+interactions with OGC web standards in the context of natural resources applications. The advancements are reported
+through the `OGC Testbed-15: Machine Learning Engineering Report <ogc-tb15-ml-er>`_.
+
+Developments are continued in `OGC Testbed-16 <ogc-tb16>`_ to improve methodologies in order to provide better
+interoperable geospatial data processing in the areas of Earth Observation Application Packages.
 
 The project is furthermore developed through the *Data Analytics for Canadian Climate Services* (`DACCS`_) initiative.
 
 Weaver is a **prototype** implemented in Python with the `Pyramid`_ web framework.
 It is part of `PAVICS`_ and `Birdhouse`_ ecosystems.
 
+.. _ogc-tb14: https://www.ogc.org/projects/initiatives/testbed14
+.. _ogc-tb14-platform-er: http://docs.opengeospatial.org/per/18-050r1.html
+.. _ogc-tb15-ml: https://www.ogc.org/projects/initiatives/testbed15#MachineLearning
+.. _ogc-tb15-ml-er: http://docs.opengeospatial.org/per/19-027r2.html
+.. _ogc-tb16: https://www.ogc.org/projects/initiatives/t-16
 .. _PAVICS: https://ouranosinc.github.io/pavics-sdi/index.html
 .. _Birdhouse: http://bird-house.github.io/
 .. _ESGF: https://esgf.llnl.gov/

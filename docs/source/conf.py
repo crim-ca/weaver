@@ -16,39 +16,98 @@
 #   as they refer to valid setting names defined by sphinx
 # pylint: disable=C0103
 
+import json
 import os
+import re
 import sys
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-sys.path.insert(0, os.path.abspath(".."))
-sys.path.insert(0, os.path.abspath("../.."))
-sys.path.insert(0, os.path.abspath("../../.."))
+DOC_SRC_ROOT = os.path.abspath(os.path.dirname(__file__))
+DOC_DIR_ROOT = os.path.dirname(DOC_SRC_ROOT)
+DOC_PRJ_ROOT = os.path.dirname(DOC_DIR_ROOT)
+DOC_BLD_ROOT = os.path.join(DOC_DIR_ROOT, "build")
+DOC_PKG_ROOT = os.path.join(DOC_PRJ_ROOT, "weaver")
+sys.path.insert(0, os.path.abspath(DOC_SRC_ROOT))
+sys.path.insert(0, os.path.abspath(DOC_DIR_ROOT))
+sys.path.insert(0, os.path.abspath(DOC_PRJ_ROOT))
 
 from weaver import __meta__  # isort:skip # noqa: E402 # pylint: disable=C0413
 
-# -- General configuration ------------------------------------------------
+# for api generation
+from weaver.wps_restapi.api import get_swagger_json  # isort:skip # noqa: E402
+from pyramid.config import Configurator  # isort:skip # noqa: E402
+
+# -- General configuration ---------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
-needs_sphinx = "1.6"
+needs_sphinx = "2.4"    # see requirements-docs.txt
 
 # Add any Sphinx extension module names here, as strings. They can be
-# extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
-# ones.
+# extensions coming with Sphinx (named "sphinx.ext.*") or your custom ones.
+sys.path.append(os.path.join(DOC_DIR_ROOT, "_extensions"))
 extensions = [
+    "doc_redirect",
+    "sphinxcontrib.redoc",
     "sphinx.ext.autodoc",
-    "sphinx.ext.intersphinx",
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
-    "sphinx.ext.napoleon",
+    "sphinx.ext.intersphinx",
+    "autoapi.extension",
     "sphinx_autodoc_typehints",
     "pywps.ext_autodoc",
-    "autoapi.extension",
+    "sphinx_paramlinks",
 ]
 
+# note: see custom extension documentation
+doc_redirect_ignores = [
+    re.compile(r"weaver\..*"),  # autoapi generated files
+    re.compile(r"index.*"),
+]
+
+
+def doc_redirect_include(file_path):
+    return file_path.endswith(".rst") and not any(re.match(regex, file_path) for regex in doc_redirect_ignores)
+
+
+doc_redirect_map = {
+    "docs/{}".format(file_name): file_name
+    for file_name in os.listdir(DOC_DIR_ROOT)
+    if doc_redirect_include(file_name)
+}
+doc_redirect_map.update({
+    file_name: file_name
+    for file_name in os.listdir(DOC_PRJ_ROOT)
+    if doc_redirect_include(file_name)
+})
+
+# generate openapi
+# note:
+#   setting 'weaver.build_docs' allows to ignore part of code that cause problem or require unnecessary
+#   configuration for the purpose of parsing the source to generate the OpenAPI
+config = Configurator(settings={"weaver.wps": False, "weaver.wps_restapi": True, "weaver.build_docs": True})
+config.include("weaver")  # need to include package to apply decorators and parse routes
+api_spec_file = os.path.join(DOC_BLD_ROOT, "api.json")
+api_spec_json = get_swagger_json(http_host="example", http_scheme="https")
+if not os.path.isdir(DOC_BLD_ROOT):
+    os.makedirs(DOC_BLD_ROOT)
+with open(api_spec_file, "w") as f:
+    json.dump(api_spec_json, f)
+
+redoc = [{
+    "name": __meta__.__title__,
+    "page": "api",  # rendered under '{root}/api.html'
+    "spec": api_spec_file,
+    "embed": True,
+    "opts": {
+        "lazy-rendering": True,
+        "hide-hostname": True
+    }
+}]
+
 autoapi_type = "python"
-autoapi_dirs = ["../../weaver"]
+autoapi_dirs = [DOC_PKG_ROOT]
 autoapi_file_pattern = "*.py"
 autoapi_options = ["members", "undoc-members", "private-members"]
 autoapi_python_class_content = "both"   # class|both|init
@@ -136,7 +195,8 @@ todo_include_todos = True
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = "alabaster"
+# html_theme = "alabaster"
+html_theme = "nature"
 
 # otherwise, readthedocs.org uses their theme by default, so no need to specify it
 
@@ -168,7 +228,7 @@ html_theme = "alabaster"
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = [
-    # "_static"
+    "_static"
 ]
 
 # Add any extra paths that contain custom files (such as robots.txt or
@@ -185,7 +245,10 @@ html_static_path = [
 # html_use_smartypants = True
 
 # Custom sidebar templates, maps document names to template names.
-# html_sidebars = {}
+html_sidebars = {
+    # add full TOC of the doc
+    "**": ["globaltoc.html", "relations.html", "sourcelink.html", "searchbox.html"]
+}
 
 # Additional templates that should be rendered to pages, maps page names to
 # template names.

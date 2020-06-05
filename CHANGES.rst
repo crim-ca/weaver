@@ -8,7 +8,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Generate Weaver OpenAPI specification for readthedocs publication.
+- Add some sections for documentation (`#61 <https://github.com/crim-ca/weaver/issues/61>`_).
 
 Fixes:
 ------

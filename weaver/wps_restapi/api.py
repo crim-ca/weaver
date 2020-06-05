@@ -123,31 +123,48 @@ def api_conformance(request):  # noqa: F811
     return HTTPOk(json=conformance)
 
 
-@sd.api_swagger_json_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
-                                 schema=sd.SwaggerJSONEndpoint(), response_schemas=sd.get_api_swagger_json_responses)
-def api_swagger_json(request, use_docstring_summary=True):
-    # type: (Request, bool) -> dict
-    """weaver REST API schema generation in JSON format."""
+def get_swagger_json(http_scheme="http", http_host="localhost", base_url=None, use_docstring_summary=True):
+    # type: (AnyStr, AnyStr, Optional[AnyStr], bool) -> dict
+    """Obtains the JSON schema of weaver API from request and response views schemas.
+
+    :param http_scheme: Protocol scheme to use for building the API base if not provided by base URL parameter.
+    :param http_host: Hostname to use for building the API base if not provided by base URL parameter.
+    :param base_url: Explicit base URL to employ of as API base instead of HTTP scheme/host parameters.
+    :param use_docstring_summary:
+        Setting that controls if function docstring should be used to auto-generate the summary field of responses.
+
+    .. seealso::
+        - :mod:`weaver.wps_restapi.swagger_definitions`
+    """
     CorniceSwagger.type_converter = CustomTypeConversionDispatcher
     swagger = CorniceSwagger(get_services())
     # function docstrings are used to create the route's summary in Swagger-UI
     swagger.summary_docstrings = use_docstring_summary
-    swagger_base_spec = {"schemes": [request.scheme]}
+    swagger_base_spec = {"schemes": [http_scheme]}
 
+    if base_url:
+        weaver_parsed_url = urlparse(base_url)
+        swagger_base_spec["host"] = weaver_parsed_url.netloc
+        swagger_base_path = weaver_parsed_url.path
+    else:
+        swagger_base_spec["host"] = http_host
+        swagger_base_path = sd.api_frontpage_uri
+    swagger.swagger = swagger_base_spec
+    return swagger.generate(title=sd.API_TITLE, version=weaver_version, base_path=swagger_base_path)
+
+
+@sd.api_swagger_json_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
+                                 schema=sd.SwaggerJSONEndpoint(), response_schemas=sd.get_api_swagger_json_responses)
+def api_swagger_json(request):  # noqa: F811
+    # type: (Request) -> dict
+    """weaver REST API schema generation in JSON format."""
     # obtain 'server' host and api-base-path, which doesn't correspond necessarily to the app's host and path
     # ex: 'server' adds '/weaver' with proxy redirect before API routes
     weaver_server_url = get_weaver_url(request)
     LOGGER.debug("Request app URL:   [%s]", request.url)
     LOGGER.debug("Weaver config URL: [%s]", weaver_server_url)
-    if weaver_server_url:
-        weaver_parsed_url = urlparse(weaver_server_url)
-        swagger_base_spec["host"] = weaver_parsed_url.netloc
-        swagger_base_path = weaver_parsed_url.path
-    else:
-        swagger_base_spec["host"] = request.host
-        swagger_base_path = sd.api_frontpage_uri
-    swagger.swagger = swagger_base_spec
-    return swagger.generate(title=sd.API_TITLE, version=weaver_version, base_path=swagger_base_path)
+    # http_scheme=request.scheme, http_host=request.host
+    return get_swagger_json(base_url=weaver_server_url, use_docstring_summary=True)
 
 
 @sd.api_swagger_ui_service.get(tags=[sd.TAG_API],

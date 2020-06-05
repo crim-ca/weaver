@@ -1,0 +1,3 @@
+# make this directory available as it is referenced by some extensions
+*.*
+!.gitignore
