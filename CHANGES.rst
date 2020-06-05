@@ -6,6 +6,9 @@ Changes
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
 
+- Avoid logging ``stdout/stderr`` in workflows
+- Add tests to make sure processes ``stdout/stderr`` are logged
+
 Changes:
 --------
 - Generate Weaver OpenAPI specification for readthedocs publication.
@@ -69,8 +72,6 @@ Changes:
 - Add ``application/x-yaml``  MIME-type to known formats.
 - Add ``application/x-tar`` and ``application/tar+gzip`` MIME-type (not official) but resolved as *synonym*
   ``application/gzip`` (official) to preserve compressed file support during `CWL` format validation.
-- Avoid logging ``stdout/stderr`` in workflows
-- Add tests to make sure processes ``stdout/stderr`` are logged
 
 Fixes:
 ------

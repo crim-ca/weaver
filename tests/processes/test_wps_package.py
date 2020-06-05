@@ -503,6 +503,9 @@ def test_merge_io_formats_wps_overlaps_cwl():
 
 
 def test_stdout_stderr_logging_for_commandline_tool_success():
+    """
+    Execute a process and assert that stdout is correctly logged to log file.
+    """
     process = Process({
         "title": "test-stdout-stderr",
         "id": "test-stdout-stderr",
@@ -562,7 +565,7 @@ def test_stdout_stderr_logging_for_commandline_tool_success():
     }
 
     # ExecuteResponse mock
-    wps_response = type('',(object,),{"_update_status": lambda w,x,y,z: 1 })()
+    wps_response = type('',(object,),{"_update_status": lambda *_, **__: 1 })()
 
     # WPSPackage._handle()
     log_file = tempfile.NamedTemporaryFile()
@@ -579,6 +582,9 @@ def test_stdout_stderr_logging_for_commandline_tool_success():
 
 
 def test_stdout_stderr_logging_for_commandline_tool_failure():
+    """
+    Execute a process and assert that stderr is correctly logged to log file.
+    """
     process = Process({
         "title": "test-stdout-stderr",
         "id": "test-stdout-stderr",

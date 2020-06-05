@@ -422,7 +422,7 @@ class End2EndEMSTestCase(TestCase):
     def log_dict_format(cls, dictionary, indent_level):
         """Logs dictionary (key, value) pairs in a YAML-like format."""
         if dictionary is None:
-            return ""
+            return None
 
         tab = cls.get_indent(indent_level)
         return tab + "\n{tab}".format(tab=tab).join(["{}: {}".format(k, dictionary[k]) for k in sorted(dictionary)])
