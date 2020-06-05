@@ -529,7 +529,19 @@ def test_stdout_stderr_logging_for_commandline_tool_success():
     package = process["package"]
     title = process["title"]
     identifier = process["id"]
-    wps_package_instance = WpsPackage(identifier=identifier, title=title, payload=payload, package=package)
+
+    # WPSPackage._handle()
+    log_file = tempfile.NamedTemporaryFile()
+    status_location = log_file.name
+    workdir = tempfile.TemporaryDirectory()
+
+    class TestWpsPackage(WpsPackage):
+        @property
+        def status_location(self):
+            return status_location
+
+    wps_package_instance = TestWpsPackage(identifier=identifier, title=title, payload=payload, package=package)
+    wps_package_instance.set_workdir(workdir.name)
 
     # WPSRequest mock
     wps_request = WPSRequest()
@@ -565,12 +577,6 @@ def test_stdout_stderr_logging_for_commandline_tool_success():
     # ExecuteResponse mock
     wps_response = type("", (object,), {"_update_status": lambda *_, **__: 1})()
 
-    # WPSPackage._handle()
-    log_file = tempfile.NamedTemporaryFile()
-    status_location = log_file.name
-    workdir = tempfile.TemporaryDirectory()
-    setattr(wps_package_instance, "status_location", status_location)       # to retrieve logs
-    setattr(wps_package_instance, "workdir", workdir.name)
     wps_package_instance._handler(wps_request, wps_response)
 
     # log assertions
@@ -608,7 +614,19 @@ def test_stdout_stderr_logging_for_commandline_tool_failure():
     package = process["package"]
     title = process["title"]
     identifier = process["id"]
-    wps_package_instance = WpsPackage(identifier=identifier, title=title, payload=payload, package=package)
+
+    # WPSPackage._handle()
+    log_file = tempfile.NamedTemporaryFile()
+    status_location = log_file.name
+    workdir = tempfile.TemporaryDirectory()
+
+    class TestWpsPackage(WpsPackage):
+        @property
+        def status_location(self):
+            return status_location
+
+    wps_package_instance = TestWpsPackage(identifier=identifier, title=title, payload=payload, package=package)
+    wps_package_instance.set_workdir(workdir.name)
 
     # WPSRequest mock
     wps_request = WPSRequest()
@@ -643,13 +661,6 @@ def test_stdout_stderr_logging_for_commandline_tool_failure():
 
     # ExecuteResponse mock
     wps_response = type("", (object,), {"_update_status": lambda *_, **__: 1})()
-
-    # WPSPackage._handle()
-    log_file = tempfile.NamedTemporaryFile()
-    status_location = log_file.name
-    workdir = tempfile.TemporaryDirectory()
-    setattr(wps_package_instance, "status_location", status_location)  # to retrieve logs
-    setattr(wps_package_instance, "workdir", workdir.name)
 
     from weaver.exceptions import PackageExecutionError
 
