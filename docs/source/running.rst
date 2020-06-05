@@ -12,7 +12,7 @@ Running Weaver
 Running Weaver Service
 ========================
 
-Before running Weaver, you must make sure that the required ``MongoDB`_ connection is accessible (according to
+Before running Weaver, you must make sure that the required `MongoDB`_ connection is accessible (according to
 specified connection settings in ``weaver/config/weaver.ini``).
 
 The Weaver installation comes with a ``Makefile`` which provides a shortcut command to start the application with

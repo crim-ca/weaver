@@ -1,17 +1,18 @@
 .. package
 
 *************************
-Application Package (CWL)
+Application Package
 *************************
 
 .. todo:: demo docs
 
-Based on `Common Workflow Language <CWL>`_ (CWL) `specification <cwl-spec>`_.
+Based on |CWL|_ (CWL) |cwl-spec|_.
 
 
-
+.. |CWL| replace:: Common Workflow Language
 .. _CWL: https://www.commonwl.org/
-.. _cwl_spec: https://www.commonwl.org/#Specification
+.. |cwl-spec| replace:: specification
+.. _cwl-spec: https://www.commonwl.org/#Specification
 
 
 Typical CWL Package Definition

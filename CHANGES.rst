@@ -10,6 +10,8 @@ Changes:
 --------
 - Generate Weaver OpenAPI specification for readthedocs publication.
 - Add some sections for documentation (`#61 <https://github.com/crim-ca/weaver/issues/61>`_).
+- Add support of documentation RST file redirection to generated HTML for reference resolution in both Github source
+  and Readthedocs served pages.
 
 Fixes:
 ------

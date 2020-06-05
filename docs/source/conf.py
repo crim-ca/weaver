@@ -71,16 +71,18 @@ def doc_redirect_include(file_path):
     return file_path.endswith(".rst") and not any(re.match(regex, file_path) for regex in doc_redirect_ignores)
 
 
-doc_redirect_map = {
-    "docs/{}".format(file_name): file_name
-    for file_name in os.listdir(DOC_DIR_ROOT)
-    if doc_redirect_include(file_name)
-}
-doc_redirect_map.update({
-    file_name: file_name
-    for file_name in os.listdir(DOC_PRJ_ROOT)
-    if doc_redirect_include(file_name)
-})
+doc_redirect_map = {}
+for _dir in [DOC_SRC_ROOT, DOC_PRJ_ROOT]:
+    doc_redirect_map.update({
+        "docs/source/{}".format(file_name): file_name
+        for file_name in os.listdir(_dir)
+        if doc_redirect_include(file_name)
+    })
+    doc_redirect_map.update({
+        file_name: file_name
+        for file_name in os.listdir(_dir)
+        if doc_redirect_include(file_name)
+    })
 
 # generate openapi
 # note:

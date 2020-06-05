@@ -592,8 +592,9 @@ def request_extra(method,                       # type: AnyStr
 
     Because different request implementations use different parameter naming conventions, all following keywords are
     looked for:
-        - Both variants of ``backoff`` and ``backoff_factor`` are accepted.
-        - All variants of ``retires``, ``retry`` and ``max_retries`` are accepted.
+
+    - Both variants of ``backoff`` and ``backoff_factor`` are accepted.
+    - All variants of ``retires``, ``retry`` and ``max_retries`` are accepted.
 
     .. note::
         Total amount of executed request attempts will be +1 the number of :paramref:`retries` or :paramref:`intervals`
