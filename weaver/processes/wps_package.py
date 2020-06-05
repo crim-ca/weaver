@@ -2112,8 +2112,7 @@ class WpsPackage(Process):
             raise
         else:
             self.update_status("Package complete.", PACKAGE_PROGRESS_DONE, STATUS_SUCCEEDED)
-        finally:
-            return self.response
+        return self.response
 
     @staticmethod
     def make_location_input(input_type, input_definition):

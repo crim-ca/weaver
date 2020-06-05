@@ -3,6 +3,7 @@ from copy import deepcopy
 
 import tempfile
 import pytest
+from pytest import fail
 from pywps.app import WPSRequest
 from pywps.inout.formats import Format
 from pywps.inout.literaltypes import AnyValue
@@ -650,9 +651,12 @@ def test_stdout_stderr_logging_for_commandline_tool_failure():
     workdir = tempfile.TemporaryDirectory()
     wps_package_instance.status_location = status_location          # to retrieve logs
     wps_package_instance.workdir = workdir.name
-    wps_package_instance._handler(wps_request, wps_response)
 
-    # log assertions
-    with open(status_location + ".log", "r") as file:
-        log_data = file.read()
-        assert "Completed permanentFail" in log_data
+    from weaver.exceptions import PackageExecutionError
+
+    try:
+        wps_package_instance._handler(wps_request, wps_response)
+    except PackageExecutionError as exception:
+        assert "Completed permanentFail" in exception.args[0]
+    else:
+        fail("\"wps_package._handler()\" was expected to throw \"PackageExecutionError\" exception")
