@@ -19,7 +19,7 @@ def get_db(container):
 
 def includeme(config):
     settings = get_settings(config)
-    if asbool(settings.get("weaver.build_docs", True)):
+    if asbool(settings.get("weaver.build_docs", False)):
         LOGGER.info("Skipping database when building docs...")
         return
 
