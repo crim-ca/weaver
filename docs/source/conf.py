@@ -83,7 +83,7 @@ doc_redirect_map.update({
 })
 
 # generate openapi
-config = Configurator(settings={"weaver.wps": False, "weaver.wps_restapi": True})
+config = Configurator(settings={"weaver.wps": False, "weaver.wps_restapi": True, "weaver.build_docs": True})
 config.include("weaver")  # need to include package to apply decorators and parse routes
 api_spec_file = os.path.join(DOC_BLD_ROOT, "api.json")
 api_spec_json = get_swagger_json(http_host="example", http_scheme="https")
