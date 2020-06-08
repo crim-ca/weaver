@@ -1,4 +1,5 @@
 .. _running:
+.. include:: references.rst
 
 ****************
 Running Weaver
@@ -29,8 +30,6 @@ It will be available under the configured URL endpoint in ``weaver/config/weaver
 If everything was configured correctly, calling this URL (default: ``http://localhost:4001``) should
 provide a response containing a JSON body with basic information about Weaver.
 
-.. _Gunicorn: http://gunicorn.org/
-.. _MongoDB: https://www.mongodb.com/
 
 Using WPS Application
 =====================

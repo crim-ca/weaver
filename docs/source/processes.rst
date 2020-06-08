@@ -244,6 +244,14 @@ Execution of a process (Execute, Job)
 
 .. todo::
 
+
+
+When a job is executed by specifying the ``notification_email`` field, the resulting process execution will send an
+email to the specified address with successful or failure details. The format of the email is configurable from
+`weaver.ini.example`_ file
+
+.. _exec-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes~1{process_id}~1jobs%2Fpost
+
 .. _GetStatus:
 
 Monitoring of a process (GetStatus)
