@@ -1,11 +1,15 @@
+import tempfile
 from collections import OrderedDict
 from copy import deepcopy
 
 import pytest
+from pytest import fail
+from pywps.app import WPSRequest
 from pywps.inout.formats import Format
 from pywps.inout.literaltypes import AnyValue
 from pywps.validator.mode import MODE
 
+from weaver.datatype import Process
 from weaver.exceptions import PackageTypeError
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
 from weaver.processes.constants import WPS_LITERAL
@@ -15,7 +19,7 @@ from weaver.processes.wps_package import _is_cwl_array_type  # noqa: W0212
 from weaver.processes.wps_package import _is_cwl_enum_type  # noqa: W0212
 from weaver.processes.wps_package import _json2wps_datatype  # noqa: W0212
 from weaver.processes.wps_package import _merge_io_formats  # noqa: W0212
-from weaver.processes.wps_package import DEFAULT_FORMAT
+from weaver.processes.wps_package import DEFAULT_FORMAT, WpsPackage
 from weaver.utils import null
 
 
@@ -494,3 +498,175 @@ def test_merge_io_formats_wps_overlaps_cwl():
         Format(CONTENT_TYPE_APP_XML),
         Format(CONTENT_TYPE_TEXT_PLAIN),
     ])
+
+
+def test_stdout_stderr_logging_for_commandline_tool_success():
+    """
+    Execute a process and assert that stdout is correctly logged to log file.
+    """
+    process = Process({
+        "title": "test-stdout-stderr",
+        "id": "test-stdout-stderr",
+        "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": "echo",
+            "inputs": {
+                "message": {
+                    "type": "string",
+                    "inputBinding": {
+                        "position": 1
+                    }
+                }
+            },
+            "outputs": {
+
+            }
+        }
+    })
+
+    payload = process
+    package = process["package"]
+    title = process["title"]
+    identifier = process["id"]
+
+    # WPSPackage._handle()
+    log_file = tempfile.NamedTemporaryFile()
+    status_location = log_file.name
+    workdir = tempfile.TemporaryDirectory()
+
+    class TestWpsPackage(WpsPackage):
+        @property
+        def status_location(self):
+            return status_location
+
+    wps_package_instance = TestWpsPackage(identifier=identifier, title=title, payload=payload, package=package)
+    wps_package_instance.set_workdir(workdir.name)
+
+    # WPSRequest mock
+    wps_request = WPSRequest()
+    wps_request.json = {
+        "identifier": "test-stdout-stderr",
+        "operation": "execute",
+        "version": "1.0.0",
+        "language": "null",
+        "identifiers": "null",
+        "store_execute": "true",
+        "status": "true",
+        "lineage": "true",
+        "raw": "false",
+        "inputs": {
+            "message": [
+                 {
+                    "identifier": "message",
+                    "title": "A dummy message",
+                    "type": "literal",
+                    "data_type": "string",
+                    "data": "Dummy message",
+                    "allowed_values": [
+
+                    ],
+                 }
+            ]
+        },
+        "outputs": {
+
+        }
+    }
+
+    # ExecuteResponse mock
+    wps_response = type("", (object,), {"_update_status": lambda *_, **__: 1})()
+
+    wps_package_instance._handler(wps_request, wps_response)
+
+    # log assertions
+    with open(status_location + ".log", "r") as file:
+        log_data = file.read()
+        assert "Dummy message" in log_data
+
+
+def test_stdout_stderr_logging_for_commandline_tool_failure():
+    """
+    Execute a process and assert that stderr is correctly logged to log file.
+    """
+    process = Process({
+        "title": "test-stdout-stderr",
+        "id": "test-stdout-stderr",
+        "package": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": "not_existing_command",
+            "inputs": {
+                "message": {
+                    "type": "string",
+                    "inputBinding": {
+                        "position": 1
+                    }
+                }
+            },
+            "outputs": {
+
+            }
+        }
+    })
+
+    payload = process
+    package = process["package"]
+    title = process["title"]
+    identifier = process["id"]
+
+    # WPSPackage._handle()
+    log_file = tempfile.NamedTemporaryFile()
+    status_location = log_file.name
+    workdir = tempfile.TemporaryDirectory()
+
+    class TestWpsPackage(WpsPackage):
+        @property
+        def status_location(self):
+            return status_location
+
+    wps_package_instance = TestWpsPackage(identifier=identifier, title=title, payload=payload, package=package)
+    wps_package_instance.set_workdir(workdir.name)
+
+    # WPSRequest mock
+    wps_request = WPSRequest()
+    wps_request.json = {
+        "identifier": "test-stdout-stderr",
+        "operation": "execute",
+        "version": "1.0.0",
+        "language": "null",
+        "identifiers": "null",
+        "store_execute": "true",
+        "status": "true",
+        "lineage": "true",
+        "raw": "false",
+        "inputs": {
+            "message": [
+                 {
+                    "identifier": "message",
+                    "title": "A dummy message",
+                    "type": "literal",
+                    "data_type": "string",
+                    "data": "Dummy message",
+                    "allowed_values": [
+
+                    ],
+                 }
+            ]
+        },
+        "outputs": {
+
+        }
+    }
+
+    # ExecuteResponse mock
+    wps_response = type("", (object,), {"_update_status": lambda *_, **__: 1})()
+
+    from weaver.exceptions import PackageExecutionError
+
+    try:
+        wps_package_instance._handler(wps_request, wps_response)
+    except PackageExecutionError as exception:
+        assert "Completed permanentFail" in exception.args[0]
+    else:
+        fail("\"wps_package._handler()\" was expected to throw \"PackageExecutionError\" exception")

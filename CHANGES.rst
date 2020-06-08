@@ -13,6 +13,8 @@ Changes:
 - Add support of documentation RST file redirection to generated HTML for reference resolution in both Github source
   and Readthedocs served pages.
 - Improve documentation links, ReadTheDocs format and TOC references.
+- Avoid logging ``stdout/stderr`` in workflows
+- Add tests to make sure processes ``stdout/stderr`` are logged
 
 Fixes:
 ------
