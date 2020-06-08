@@ -27,10 +27,15 @@ Theses processes typically correspond to utility operations. They are specifical
 `step` within a `Workflow`_ process that requires data-type conversion between input/output of similar, but not
 perfectly, compatible definitions.
 
-For example, the process :py:mod:`weaver.processes.builtin.jsonarray2netcdf` takes a single input JSON file which
-contains an array-list of NetCDF file references, and returns them directly as the corresponding list of output files.
-These two different file formats (single JSON to multiple NetCDF) can then be used to map two processes with these
-respective output and inputs.
+For example, process :py:mod:`weaver.processes.builtin.jsonarray2netcdf` takes a single input JSON file which its
+content contains an array-list of NetCDF file references, and returns them directly as the corresponding list of output
+files. These two different file formats (single JSON to multiple NetCDF) can then be used to map two processes with
+these respective output and inputs.
+
+As of the latest release, following `builtin` processes are available:
+
+- :py:mod:`weaver.processes.builtin.jsonarray2netcdf`
+
 
 WPS-1/2
 -------
