@@ -23,8 +23,13 @@ The configuration file tell the application runner (e.g. `Gunicorn`_, ``pserve``
 execute `Weaver` as well as all settings to provide in order to personalize the application. All settings specific to
 `Weaver` employ the format ``weaver.<setting>``.
 
-Following is a partial list of most predominant settings. Note that all following settings should be applied under
-section ``[app:main]`` of `weaver.ini.example`_ for the application to resolve them.
+Most configuration parameters for the *manager* portion of `Weaver` (i.e.: WSGI HTTP server for API endpoints) are
+defined in the ``[app:main]`` section of `weaver.ini.example`_, while parameters specific to the *worker* (task queue
+handler) are within ``[celery]`` section. Note that multiple settings are shared between the two applications, such as
+the ``mongodb.[...]`` configuration or ``weaver.configuration`` options. When parameters are shared, they are usually
+expected to be placed in ``[app:main]`` section.
+
+Following is a partial list of most predominant settings specific to `Weaver`.
 
 - | ``weaver.configuration = ADES|EMS``
   |
@@ -124,6 +129,18 @@ section ``[app:main]`` of `weaver.ini.example`_ for the application to resolve t
 
     Refer to `weaver.ini.example`_ for the extended list of applicable settings.
     Some advanced configuration settings are also described in the below sections.
+
+.. note::
+
+    Since `Weaver` employs `Celery`_ as task queue manager and `MongoDB`_ as backend, relevant settings for the
+    |celery-config|_ and the |celery-mongo|_ should be referred to. Processing of task jobs and results reporting
+    is accomplished according to the specific implementation of these services. Therefore, all applicable settings
+    and extensions should be available for custom server configuration and scaling as needed.
+
+.. |celery-config| replace:: configuration of Celery
+.. _celery-config: https://docs.celeryproject.org/en/latest/userguide/configuration.html#configuration
+.. |celery-mongo| replace:: configuration of MongoDB Backend
+.. _celery-mongo: https://docs.celeryproject.org/en/latest/userguide/configuration.html#mongodb-backend-settings
 
 
 Configuration of Data Sources

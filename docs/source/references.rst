@@ -25,5 +25,6 @@
 .. |ogc-proc-api| replace:: OGC API - Processes
 .. _ogc-proc-api: https://github.com/opengeospatial/wps-rest-binding
 
-.. _Gunicorn: http://gunicorn.org/
+.. _Celery: https://docs.celeryproject.org/en/latest/
+.. _Gunicorn: https://gunicorn.org/
 .. _MongoDB: https://www.mongodb.com/
