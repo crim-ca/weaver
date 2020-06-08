@@ -10,7 +10,7 @@
         "tasmax": {
             "type": {
                 "type": "array",
-                "items": "File"
+                "items": "string"
             }
         },
         "lat0": "float",
