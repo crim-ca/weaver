@@ -1,5 +1,5 @@
-.. package:
-.. application-package:
+.. _package:
+.. _application-package:
 .. include:: references.rst
 
 *************************
@@ -19,16 +19,66 @@ internal execution of the process allows it to run multiple type of applications
     section and existing `Weaver Issues`_. Ultimately if no solution can be found, open an new issue about your specific
     problem.
 
-.. |pkg-req| replace:: ``GET /processes/{id}/package``
+
+All processes deployed locally into `Weaver` using a `CWL` package definition will have their full package definition
+available with ``GET /processes/{id}/package`` |pkg-req|_ request.
+
+.. |pkg-req| replace:: Package
 .. _pkg-req: https://pavics-weaver.readthedocs.io/en/setup-docs/api.html#tag/Processes%2Fpaths%2F~1processes~1%7Bprocess_id%7D~1package%2Fget
+
+.. note::
+
+    |pkg-req|_ is `Weaver`-specific implementation, and therefore, is not necessarily available on other `ADES`/`EMS`
+    implementation as this feature is not part of |ogc-proc-api|_ specification.
+
 
 Typical CWL Package Definition
 ===========================================
 
-.. todo:: CommandLineTool
+CWL CommandLineTool
+------------------------
+
+Following CWL package definition represents the :py:mod:`weaver.processes.builtin.jsonarray2netcdf` process.
+
+
+.. literalinclude:: ../../weaver/processes/builtin/jsonarray2netcdf.cwl
+   :language: YAML
+
+
+
+
+CWL Workflow
+------------------------
+
 
 Correspondance between CWL and WPS fields
 ===========================================
+
+Because `CWL` definition and `WPS` process description inherently provide "duplicate" information, many fields can be
+mapped between one another. In order to handle any provided metadata in the various supported location by both
+specifications, as well as to extend details of deployed processes, each `Application Package` get its details merged
+with complementary `WPS` description.
+
+In some cases, complementary details are only documentation-related, but some information directly affect the format or
+execution behaviour of some parameters. A common example is the ``maxOccurs`` field provided by `WPS` that does not
+have a corresponding specification in `CWL` (any-sized array). On the other hand, `CWL` also provides data preparation
+steps such as initial staging (i.e.: ``InitialWorkDirRequirement``) that doesn't have an equivalent under the `WPS`
+process description. For this reason, complementary details are merged and reflected on both sides (as applicable),
+when non-ambiguous resolution is possible.
+
+In case of conflicting metadata, the `CWL` specification will most of the time prevail over the `WPS` metadata fields
+simply because it is expected that a strict `CWL` specification is provided upon deployment. The only exceptions to this
+situation are when `WPS` specification help resolve some ambiguity or when `WPS` reinforce the parametrisation of some
+elements, such as with ``maxOccurs`` field.
+
+.. note::
+
+    Metadata merge operation between `CWL` and `WPS` is accomplished on *per-mapped-field* basis. In other words, more
+    explicit details such as ``abstract`` could be obtained from `WPS` *while* an input file format could be obtained
+    from the `CWL` side. Merge occurs bidirectionally for corresponding information.
+
+In order to help understand the resolution methodology, following sub-section cover the supported mapping between the
+two specifications, and more specifically, how each field impacts the mapped equivalent metadata.
 
 Input / Outputs
 -----------------------

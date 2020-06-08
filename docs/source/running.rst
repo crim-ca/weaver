@@ -32,8 +32,8 @@ It will be available under the configured URL endpoint in ``weaver/config/weaver
 If everything was configured correctly, calling this URL (default: ``http://localhost:4001``) should
 provide a response containing a JSON body with basic information about Weaver.
 
-Details
-----------------
+Execution Details
+----------------------
 
 To execute, `Weaver` requires two type of application executed in parallel. First, it requires a WSGI HTTP server
 that will run the application to provide API endpoints. This is referred to as ``weaver-manager`` in the provided

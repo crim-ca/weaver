@@ -38,6 +38,9 @@ As of the latest release, following `builtin` processes are available:
 - :py:mod:`weaver.processes.builtin.jsonarray2netcdf`
 
 
+All `builtin` processes are marked with :py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_BUILTIN` in the `CWL`
+hints* section.
+
 WPS-1/2
 -------
 
@@ -55,6 +58,7 @@ A minimal `Deploy`_ request body for this kind of process could be as follows:
       "processDescription": {
         "process": {
           "id": "my-process-reference"
+        }
       },
       "executionUnit": [
         {
@@ -84,7 +88,47 @@ Please refer to `Configuration of WPS Processes`_ section for more details on th
 WPS-REST
 --------
 
-.. todo:: wps-rest process doc
+This process type is the main component of `Weaver`. All other process types are converted to this one either
+through some parsing (e.g.: `WPS-1/2`_) or with some requirement indicators (e.g.: `Builtin`_, `Workflow`_) for
+special handling.
+
+When deploying one such process directly, it is expected to have a reference to a CWL `Application Package`_. This is
+most of the time employed to wrap a reference docker image process. The reference package can be provided in multiple
+ways as presented below.
+
+.. note::
+
+    When a process is deployed with any of the below supported `Application Package` formats, additional parsing of
+    this `CWL` as well as complementary details directly within the `WPS` deployment body is accomplished.
+    See `Correspondance between CWL and WPS fields`_ section for more details.
+
+
+Package as Literal Unit Block
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In this situation, the `CWL` definition is provided as is using tje JSON-formatted package embedded within the
+|deploy-req|_ request. The request payload would take the following shape:
+
+.. code-block:: json
+
+    {
+      "processDescription": {
+        "process": {
+          "id": "my-process-reference"
+        }
+      },
+      "executionUnit": [
+        {
+          "unit": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "inputs": [<...>],
+            "outputs": [<...>],
+            [<...>]
+          }
+        }
+      ]
+    }
 
 
 ESGF-CWT
@@ -177,13 +221,13 @@ Following steps represent the typical steps applied to deploy a process, execute
 Register a new process (Deploy)
 -----------------------------------------
 
-Deployment of a new process is accomplished through the ``POST {WEAVER_URL}/processes`` |deploy-req|_.
+Deployment of a new process is accomplished through the ``POST {WEAVER_URL}/processes`` |deploy-req|_ request.
 The request body requires mainly two components:
 
 - ``processDescription``: defines the process identifier, metadata, inputs, outputs, and some execution specifications.
 - ``executionUnit``: defines the main core details of the `Application Package`_.
 
-.. |deploy-req| replace:: request
+.. |deploy-req| replace:: Deploy
 .. _deploy-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes%2Fpost
 .. _Application Package: docs/source/package.rst
 

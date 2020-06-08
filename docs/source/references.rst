@@ -28,3 +28,11 @@
 .. _Celery: https://docs.celeryproject.org/en/latest/
 .. _Gunicorn: https://gunicorn.org/
 .. _MongoDB: https://www.mongodb.com/
+
+.. _weaver.config: ../../../config
+.. _weaver.ini.example: ../../../config/weaver.ini.example
+.. _data_sources.json.example: ../../../config/data_sources.json.example
+.. _wps_processes.yml.example: ../../../config/wps_processes.yml.example
+.. _request_options.yml.example: ../../../config/request_options.yml.example
+.. _Dockerfile-manager: ../../../docker/Dockerfile-manager
+.. _Dockerfile-worker: ../../../docker/Dockerfile-worker
