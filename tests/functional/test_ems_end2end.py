@@ -620,10 +620,10 @@ class End2EndEMSTestCase(TestCase):
     #                          [self.PROCESS_SUBSET_BBOX_ID],
     #                          log_full_trace=True)
 
-    # def test_workflow_esgf_requirements(self):
-    #     self.workflow_runner(self.PROCESS_WORKFLOW_SUBSETNASAESGF_SUBSETCRIM,
-    #                          [self.PROCESS_SUBSET_NASAESGF, self.PROCESS_SUBSET_BBOX_ID],
-    #                          log_full_trace=True)
+    def test_workflow_esgf_requirements(self):
+        self.workflow_runner(self.PROCESS_WORKFLOW_SUBSETNASAESGF_SUBSETCRIM,
+                             [self.PROCESS_SUBSET_NASAESGF, self.PROCESS_SUBSET_BBOX_ID],
+                             log_full_trace=True)
 
     def test_workflow_wps3_requirements(self):
         self.workflow_runner(self.PROCESS_WORKFLOW_ID,
