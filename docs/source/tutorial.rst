@@ -12,8 +12,8 @@ Tutorial
 Using the WPS application included in Weaver
 ==============================================
 
-Install `Weaver` (see: :ref:`installation`) and make sure all required components
-are started and running (see: :ref:`configuration`).
+Install `Weaver` (see: `Installation`_) and make sure all required components
+are started and running (see: `Configuration`_).
 
 Then, execute the desired `WPS`_ or `WPS-REST`_ request according to desired operation mode and version.
 
@@ -30,8 +30,10 @@ By default, this value should be ``localhost:4001``.
     `Application Package <package>`_ for further details about the definition of the reference application executed
     by the deployed processes.
 
-.. _processes: ./processes.rst
-.. _package: ./package.rst
+.. _configuration: docs/source/configuration.rst
+.. _installation: docs/source/installation.rst
+.. _processes: docs/source/processes.rst
+.. _package: docs/source/package.rst
 
 WPS-1/2 requests
 --------------------
@@ -76,6 +78,10 @@ on the output parameter named ``output`` with a path matching the configured out
     All above WPS-1/2 requests suppose that configuration setting ``weaver.wps_path /ows/wps`` (default value).
     The request URL have to be adjusted accordingly if this parameter is modified.
 
+    Also, the provided file reference is relative where `Weaver` application is running. If you want to employ a
+    remote server instance, you will have to either place the file on this server file system at a location `Weaver`
+    has access to, or provide the file through an HTTP URL.
+
 WPS-3 requests
 --------------
 
@@ -112,9 +118,10 @@ the WPS-1/2 example.
 
 
 The WPS-3 interface allows further operations such as job monitoring, specific output listing, log reporting, etc.
-For all available operations and specific details about them, please refer to the *OpenAPI* schemas that will be
-rendered on route ``${WEAVER_URL}/api`` when running `Weaver` application.
+For all available operations and specific details about them, please refer to `OpenAPI schemas`_ (they will also be
+rendered on route ``${WEAVER_URL}/api`` when running `Weaver` application).
 
+.. _`OpenAPI schemas`: https://pavics-weaver.readthedocs.io/en/latest/api.html
 
 Endpoint Content-Type
 ------------------------

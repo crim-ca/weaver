@@ -1,6 +1,29 @@
 .. _appendix:
+.. include:: references.rst
+
+************
+Glossary
+************
+
+.. glossary::
+    :sorted:
+
+    ADES: Application Deployment and Execution Service
+    `CWL`_: Common Workflow Language
+    EMS: Execution Management Service
+    `OGC`_: Open Geospatial Consortium
+    WPS: Web Processing Service
 
 ************
 Useful Links
 ************
 
+- |cwl-home|_
+- |cwl-spec|_
+- |cwl-guide|_
+- |cwl-cmdtool|_
+- |cwl-workflow|_
+- |oas|_
+- |ogc|_
+- |ogc-proc-api|_
+- `Weaver Issues`_

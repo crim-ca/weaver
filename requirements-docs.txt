@@ -2,6 +2,7 @@
 # we actually need to install all requirements during docs build because of OpenAPI generation
 # (see 'docs/source/conf.py')
 -r requirements.txt
+cloud_sptheme
 pycodestyle
 # required for pywps.ext_autodoc
 pywps
@@ -11,3 +12,4 @@ sphinx-paramlinks>=0.4.1
 # adds redoc OpenAPI directly served on readthedocs
 sphinxcontrib-redoc>=1.6.0
 sphinx_autodoc_typehints[type_comments]
+sphinx_rtd_theme
