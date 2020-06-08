@@ -28,7 +28,7 @@ For more details, see `Configuration`_ section.
     :stub-columns: 1
 
     * - dependencies
-      - | |py_ver| |requires|
+      - | |py_ver| |requires| |pyup|
     * - build status
       - | |travis_latest| |travis_tagged| |readthedocs| |coverage| |codacy|
     * - releases
@@ -49,6 +49,10 @@ For more details, see `Configuration`_ section.
 .. |requires| image:: https://requires.io/github/crim-ca/weaver/requirements.svg?branch=master
     :alt: Requirements Status
     :target: https://requires.io/github/crim-ca/weaver/requirements/?branch=master
+
+.. |pyup| image:: https://pyup.io/repos/github/crim-ca/weaver/shield.svg
+    :alt: Dependencies Status
+    :target: https://pyup.io/account/repos/github/crim-ca/weaver/
 
 .. |travis_latest| image:: https://img.shields.io/travis/com/crim-ca/weaver/master.svg?label=master
     :alt: Travis-CI Build Status (master branch)
@@ -80,18 +84,29 @@ For more details, see `Configuration`_ section.
 Summary
 ----------------
 
-Weaver is primarily an *Execution Management Service (EMS)* that allows the execution of workflows chaining various
+`Weaver` is primarily an *Execution Management Service (EMS)* that allows the execution of workflows chaining various
 applications and *Web Processing Services (WPS)* inputs and outputs. Remote execution of each process in a workflow
 chain is dispatched by the *EMS* to one or many registered *Application Deployment and Execution Service (ADES)* by
 ensuring the transfer of files accordingly between instances when located across multiple remote locations.
 
-Weaver can also accomplish the *ADES* role in order to perform application deployment at the data source using
+`Weaver` can also accomplish the *ADES* role in order to perform application deployment at the data source using
 the application definition provided by *Common Workflow Language* (`CWL`_) configuration. It can then directly execute
 a registered process execution with received inputs from a WPS request to expose output results for a following *ADES*
 in a *EMS* workflow execution chain.
 
-Weaver can be launched either as an *EMS* or an *ADES* according to configuration values it is deployed with.
+`Weaver` **extends** the |ogc-proc-api|_ by providing additional functionalities such as more detailed job log routes,
+adding more process management request options than required by the standard, and supporting *remote providers* to name
+a few. Because of this, not all features offered in `Weaver` are guaranteed to be applicable on other similarly
+behaving `ADES` and/or `EMS` instances. The reference specification is tracked to preserve the minimal conformance
+requirements and provide feedback to |ogc|_ in this effect.
+
+Weaver can be launched either as an `EMS` or an `ADES` according to configuration values it is deployed with.
 For more details, see `Configuration`_ and `Documentation`_ sections.
+
+.. |ogc| replace:: Open Geospatial Consortium (OGC)
+.. _ogc: https://www.ogc.org/
+.. |ogc-proc-api| replace:: `OGC API - Processes` (WPS-REST bindings)
+.. _ogc-proc-api: https://github.com/opengeospatial/wps-rest-binding
 
 ----------------
 Links
@@ -142,13 +157,13 @@ Documentation
 
 The REST API documentation is auto-generated and served under any running `Weaver` application on route
 ``{WEAVER_URL}/api/``. This documentation will correspond to the version of the executed `Weaver` application.
-For the latest documentation, you can refer to the `OpenAPI Specification <rtd_oas>`_ served directly on `readthedocs`_.
+For the latest documentation, you can refer to the `OpenAPI Specification`_ served directly on `readthedocs`_.
 
 More ample details about installation, configuration and usage are also provided on `readthedocs`_.
 These are generated from corresponding information provided in `docs`_ source directory.
 
 .. _readthedocs: https://pavics-weaver.readthedocs.io
-.. _rtd_oas: https://pavics-weaver.readthedocs.io/en/latest/api.html
+.. _`OpenAPI Specification`: https://pavics-weaver.readthedocs.io/en/latest/api.html
 .. _docs: ./docs
 
 -------------------------
