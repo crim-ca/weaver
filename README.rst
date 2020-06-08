@@ -28,7 +28,7 @@ For more details, see `Configuration`_ section.
     :stub-columns: 1
 
     * - dependencies
-      - | |py_ver| |requires|
+      - | |py_ver| |requires| |pyup|
     * - build status
       - | |travis_latest| |travis_tagged| |readthedocs| |coverage| |codacy|
     * - releases
@@ -49,6 +49,10 @@ For more details, see `Configuration`_ section.
 .. |requires| image:: https://requires.io/github/crim-ca/weaver/requirements.svg?branch=master
     :alt: Requirements Status
     :target: https://requires.io/github/crim-ca/weaver/requirements/?branch=master
+
+.. |pyup| image:: https://pyup.io/repos/github/crim-ca/weaver/shield.svg
+    :alt: Dependencies Status
+    :target: https://pyup.io/account/repos/github/crim-ca/weaver/
 
 .. |travis_latest| image:: https://img.shields.io/travis/com/crim-ca/weaver/master.svg?label=master
     :alt: Travis-CI Build Status (master branch)
