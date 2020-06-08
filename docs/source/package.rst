@@ -40,15 +40,68 @@ CWL CommandLineTool
 
 Following CWL package definition represents the :py:mod:`weaver.processes.builtin.jsonarray2netcdf` process.
 
-
 .. literalinclude:: ../../weaver/processes/builtin/jsonarray2netcdf.cwl
-   :language: YAML
+    :language: YAML
+    :linenos:
 
+The first main components is the ``class: CommandLineTool`` that tells `Weaver` it will be a *base* process
+(contrarily to `CWL Workflow`_ presented later).
 
 
 
 CWL Workflow
 ------------------------
+
+`Weaver` also supports `CWL` ``class: Workflow``. When an `Application Package` is defined this way, the process
+deployment operation will attempt to resolve each ``step`` as another process.
+
+
+The following `CWL` definition demonstrates an example ``Workflow`` process that would resolve each ``step`` with
+local processes of match IDs. For instance, the ``jsonarray2netcdf`` middle step corresponds to the `builtin`_
+process presented in the previous section. Other processes referenced here
+
+.. raw:: html
+   <details>
+   <summary><a>CWL Workflow Example</a></summary>
+
+.. literalinclude:: ../../tests/functional/application-packages/workflow_subset_ice_days.cwl
+    :language: JSON
+    :linenos:
+
+.. raw:: html
+   </details>
+
+Step Reference
+~~~~~~~~~~~~~~~~~
+
+In order to resolve referenced processes as steps, `Weaver` supports 3 formats.
+
+1. Process ID explicitly given
+   (e.g.: ``jsonarray2netcdf`` resolved to :py:mod:`weaver.processes.builtin.jsonarray2netcdf`).
+   Any *visible* process from |getcap-req|_ response should be resolved this way.
+2. Full URL to the process description endpoint, provided that it also offers a |pkg-req|_ endpoint (`Weaver`-specific).
+3. Full URL to the explicit `CWL` file (usually corresponding to (2) or the ``href`` provided in deployment body).
+
+When an URL to the `CWL` process "file" is provided with an extension, it must be one of the supported values defined
+in :py:data:`weaver.processes.wps_package.PACKAGE_EXTENSIONS`. Otherwise, `Weaver` will refuse it as it cannot figure
+out how to parse it.
+
+Because `Weaver` and the underlying `CWL` executor need to resolve all steps in order to validate their input and
+output definitions correspond (id, format, type, etc.) in order to chain them, all intermediate processes **MUST**
+be available. This means that you cannot `Deploy`_ nor `Execute`_ a ``Workflow``-flavored `Application Package` until
+all referenced steps have themselves been deployed and made visible.
+
+.. warning::
+
+    Because `Weaver` needs to convert given `CWL` documents into equivalent `WPS` process definition, embedded `CWL`
+    processes within a ``Workflow`` step are not supported currently. This is a known limitation of the implementation,
+    but not much can be done against it without major modifications to the code base.
+    See also issue `#56 <https://github.com/crim-ca/weaver/issues/56>`_.
+
+.. seealso::
+
+    - :py:func:`weaver.processes.wps_package.get_package_workflow_steps`
+    - `Deploy`_ request details.
 
 
 Correspondance between CWL and WPS fields
