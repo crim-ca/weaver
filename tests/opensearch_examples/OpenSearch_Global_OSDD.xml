@@ -1,11 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/" xmlns:dc="http://purl.org/dc/elements/1.1/"
-                       xmlns:eo="http://a9.com/-/opensearch/extensions/eo/1.0/"
-                       xmlns:geo="http://a9.com/-/opensearch/extensions/geo/1.0/"
-                       xmlns:param="http://a9.com/-/spec/opensearch/extensions/parameters/1.0/"
-                       xmlns:semantic="http://a9.com/-/opensearch/extensions/semantic/1.0/"
-                       xmlns:sru="http://a9.com/-/opensearch/extensions/sru/2.0/"
-                       xmlns:time="http://a9.com/-/opensearch/extensions/time/1.0/">
+<?xml version="1.0" encoding="UTF-8"?><OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:eo="http://a9.com/-/opensearch/extensions/eo/1.0/" xmlns:geo="http://a9.com/-/opensearch/extensions/geo/1.0/" xmlns:os="http://a9.com/-/spec/opensearch/1.1/" xmlns:param="http://a9.com/-/spec/opensearch/extensions/parameters/1.0/" xmlns:semantic="http://a9.com/-/opensearch/extensions/semantic/1.0/" xmlns:sru="http://a9.com/-/opensearch/extensions/sru/2.0/" xmlns:time="http://a9.com/-/opensearch/extensions/time/1.0/">
 <ShortName>FEDEO</ShortName>
 <Description>Provides interoperable access, following ISO/OGC interface guidelines, to Earth Observation metadata.</Description>
 <Tags>FEDEO, ESA, Earth Observation, Digital Repository, HMA, HMA-S, HMA-SE, CEOS-OS-BP-V1.1/L1.</Tags>
