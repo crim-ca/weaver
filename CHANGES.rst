@@ -6,9 +6,6 @@ Changes
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
 ========================================================================
 
-- Avoid logging ``stdout/stderr`` in workflows
-- Add tests to make sure processes ``stdout/stderr`` are logged
-
 Changes:
 --------
 - Generate Weaver OpenAPI specification for readthedocs publication.
