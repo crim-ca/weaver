@@ -22,5 +22,5 @@
 .. _ogc: https://www.ogc.org/
 .. |ogc-home| replace:: |ogc| Homepage
 .. _ogc-home: `ogc`_
-.. |ogc-proc-api| replace:: OGC API - Processes (WPS-REST bindings)
+.. |ogc-proc-api| replace:: OGC API - Processes
 .. _ogc-proc-api: https://github.com/opengeospatial/wps-rest-binding

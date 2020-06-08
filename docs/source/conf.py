@@ -395,6 +395,7 @@ intersphinx_mapping = {
 # http://www.sphinx-doc.org/en/stable/config.html?highlight=linkchecker#options-for-the-linkcheck-builder
 linkcheck_ignore = [
     r"http[s]*://localhost.*/",
+    r"http[s]*://example.com.*",
     "https://mouflon.dkrz.de/",
     "https://esgf-data.dkrz.de/",
     "https://indico.egi.eu/",
