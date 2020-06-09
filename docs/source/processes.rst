@@ -188,7 +188,7 @@ An example body of the `register provider`_ request could be as follows:
 
     {
       "id": "my-service",
-      "url": "https://example.com/wps,
+      "url": "https://example.com/wps",
       "public": true
     }
 
