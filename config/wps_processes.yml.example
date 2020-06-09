@@ -2,17 +2,28 @@
 #
 # Details:
 #   - if only the WPS-1 URL endpoint is provided, all processes found by `GetCapabilities` will be added
-#   - if query `identifier=<process-id>` is provided, only matched process(es) will be added.
+#   - if query `identifier=<process-id>` is provided, only matched process will be added.
 #     alternatively, a list of processes can be specified with `id` sub-field of a given URL reference
-#   - if `name` is not provided, a "clean" variation of the hostname will be used
+#   - if `name` is not provided, a "clean" (slug) variation of the hostname will be used as service base name
+#   - all processes are deployed using identifier `<service-name>_<process-id>`, with name resolved from above
 # Result:
-#   - for each process, `DescribeProcess` request will indicate how to generate and register a WPS-2 equivalent
+#   - for each process, `DescribeProcess` request will indicate how to generate and register a WPS-REST equivalent
 #   - each process name will combine the service `name` and process `identifier` to reduce chances of conflicts
 processes:
+  # will deploy all processes returned by the default `GetCapabilities` operation (missing query parameters are added)
+  # all deployed processes will be prefixed by `service-endpoint_`
   - https://service-endpoint/wps
+  # same a previous, but with explicit query parameters specified
+  - https://service-endpoint/wps?service=wps&request=GetCapabilities
+  # will deploy only this specific process if ID matches an existing process
+  # resulting name would be `another-endpoint_some-process`
   - https://another-endpoint/wps?service=wps&request=describeprocess&identifier=some-process
+  # more verbose `name` to use instead of the default `named-endpoint` that would be resolved from the hostname
   - url: https://named-endpoint/wps
-    name: named-endpoint
+    name: named-endpoint-with-a-twist
+  # explicit list of processes to deploy from all retrieved from `GetCapabilities` response
+  # this is essentially equivalent to two `DescribeProcess` URL with specific `identifier` query parameter
+  # (this variant saves some request operations and is easier to read)
   - url: https://named-processes/wps
     id:
       - process-1

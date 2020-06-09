@@ -51,6 +51,7 @@ extensions = [
     "doc_redirect",         # redirect literal RST references -> built HTML page
     "sphinxcontrib.redoc",  # generate live OpenAPI with this doc
     "sphinx.ext.autodoc",   # document code docstrings
+    "sphinx.ext.autosectionlabel",  # help make cross-references to title/sections
     "cloud_sptheme.ext.autodoc_sections",   # allow sections in docstrings code
     "sphinx.ext.githubpages",   # for publishing the doc to github pages
     "sphinx.ext.todo",          # support directives
@@ -395,6 +396,7 @@ intersphinx_mapping = {
 # http://www.sphinx-doc.org/en/stable/config.html?highlight=linkchecker#options-for-the-linkcheck-builder
 linkcheck_ignore = [
     r"http[s]*://localhost.*/",
+    r"http[s]*://example.com.*",
     "https://mouflon.dkrz.de/",
     "https://esgf-data.dkrz.de/",
     "https://indico.egi.eu/",
