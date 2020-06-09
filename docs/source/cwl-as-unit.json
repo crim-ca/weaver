@@ -1,0 +1,18 @@
+{
+  "processDescription": {
+    "process": {
+      "id": "my-process-reference"
+    }
+  },
+  "executionUnit": [
+    {
+      "unit": {
+        "cwlVersion": "v1.0",
+        "class": "CommandLineTool",
+        "inputs": [<...>],
+        "outputs": [<...>],
+        [<...>]
+      }
+    }
+  ]
+}

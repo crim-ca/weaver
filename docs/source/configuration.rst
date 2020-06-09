@@ -33,13 +33,15 @@ Following is a partial list of most predominant settings specific to `Weaver`.
 
 - | ``weaver.configuration = ADES|EMS``
   |
-  | Tells the application in which mode to run. Enabling `ADES` for instance will disable some `EMS`-specific
-  | operations such as dispatching `Workflow`_ process steps to known remote `ADES` servers.
+  | Tells the application in which mode to run.
+  |
+  | Enabling `ADES` for instance will disable some `EMS`-specific
+    operations such as dispatching :ref:`Workflow` process steps to known remote `ADES` servers.
 
 - | ``weaver.url = <url>``
   |
   | Defines the full URL (including HTTP protocol/scheme, hostname and optionally additional path suffix) that will
-  | be used as base URL for all other URL settings of `Weaver`.
+    be used as base URL for all other URL settings of `Weaver`.
 
 .. note::
 
@@ -64,13 +66,14 @@ Following is a partial list of most predominant settings specific to `Weaver`.
   | It can either be the explicit *full URL* to use or the *path* relative to ``weaver.url``.
   | Setting ``weaver.wps_path`` is ignored if its URL equivalent is defined.
   | The *path* variant **SHOULD** start with ``/`` for appropriate concatenation with ``weaver.url``, although this is
-  | not strictly enforced.
+    not strictly enforced.
 
 - | ``weaver.wps_output_dir = <directory-path>``
   | (default: ``/tmp``)
   |
-  | Location where WPS outputs (results from jobs) will be stored for stage-out. This directory should be mapped to
-  | `Weaver`'s WPS output URL to serve them externally as needed.
+  | Location where WPS outputs (results from jobs) will be stored for stage-out.
+  |
+  | This directory should be mapped to `Weaver`'s WPS output URL to serve them externally as needed.
 
 - | ``weaver.wps_output_path = <url-path>``
   | ``weaver.wps_output_url = <full-url>``
@@ -81,7 +84,7 @@ Following is a partial list of most predominant settings specific to `Weaver`.
   | It can either be the explicit *full URL* to use or the *path* relative to ``weaver.url``.
   | Setting ``weaver.wps_output_path`` is ignored if its URL equivalent is defined.
   | The *path* variant **SHOULD** start with ``/`` for appropriate concatenation with ``weaver.url``, although this is
-  | not strictly enforced.
+    not strictly enforced.
 
 - | ``weaver.wps_workdir = <directory-path>``
   | (default: uses automatically generated temporary directory if none specified)
@@ -108,18 +111,18 @@ Following is a partial list of most predominant settings specific to `Weaver`.
   | It can either be the explicit *full URL* to use or the *path* relative to ``weaver.url``.
   | Setting ``weaver.wps_restapi_path`` is ignored if its URL equivalent is defined.
   | The *path* variant **SHOULD** start with ``/`` for appropriate concatenation with ``weaver.url``, although this is
-  | not strictly enforced.
+    not strictly enforced.
 
 - | ``weaver.wps_metadata_[...]`` settings group
   |
-  | Metadata fields that will be rendered by either or both the WPS-1/2 and WPS-REST endpoints (`GetCapabilities`_).
+  | Metadata fields that will be rendered by either or both the WPS-1/2 and WPS-REST endpoints (:ref:`GetCapabilities`).
 
 - | ``weaver.wps_email_[...]`` settings group
   |
   | Defines configuration email notification functionality on job completion.
   |
   | Encryption settings as well as custom email templates are available. Email notifications are sent only on job
-  | completion if an email was provided in the `Execute`_ request body.
+    completion if an email was provided in the :ref:`Execute` request body.
 
 .. seealso::
     - `Execute`_ request details.

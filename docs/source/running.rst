@@ -40,7 +40,7 @@ that will run the application to provide API endpoints. This is referred to as `
 docker images. Second, `Weaver` requires a `Celery`_ task queue handler to execute submitted process jobs. This
 is referred to as ``weaver-worker`` in built docker images.
 
-For specific details about configuration of both applications, please refer to `Configuration`_ section.
+For specific details about configuration of both applications, please refer to :ref:`Configuration` section.
 
 The typical commands that need to be executed for the *manager* and *worker* applications should be similar to the
 following calls. Obviously, additional arguments supported by the corresponding applications can be provided.
@@ -57,7 +57,6 @@ following calls. Obviously, additional arguments supported by the corresponding 
 Using WPS Application
 =====================
 
-See the `tutorial`_.
+See :ref:`tutorial`.
 
-.. _tutorial: ./tutorial.rst
 .. _Makefile: ../../../Makefile

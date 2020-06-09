@@ -55,7 +55,7 @@ CWL Workflow
 `Weaver` also supports `CWL` ``class: Workflow``. When an `Application Package` is defined this way, the process
 deployment operation will attempt to resolve each ``step`` as another process. The reference to the `CWL` definition
 can be placed in any location supported as for the case of atomic processes
-(see details about `supported package locations <wps-rest>`_).
+(see details about :ref:`supported package locations <WPS-REST>`).
 
 The following `CWL` definition demonstrates an example ``Workflow`` process that would resolve each ``step`` with
 local processes of match IDs.
@@ -64,7 +64,7 @@ local processes of match IDs.
     :language: JSON
     :linenos:
 
-For instance, the ``jsonarray2netcdf`` (`Builtin`_) middle step in this example corresponds to the
+For instance, the ``jsonarray2netcdf`` (:ref:`Builtin`) middle step in this example corresponds to the
 `CWL CommandLineTool`_ process presented in previous section. Other processes referenced in this ``Workflow`` can be
 found in |test-res|_. Steps are solved using the variations presented below.
 
@@ -89,8 +89,8 @@ out how to parse it.
 
 Because `Weaver` and the underlying `CWL` executor need to resolve all steps in order to validate their input and
 output definitions correspond (id, format, type, etc.) in order to chain them, all intermediate processes **MUST**
-be available. This means that you cannot `Deploy`_ nor `Execute`_ a ``Workflow``-flavored `Application Package` until
-all referenced steps have themselves been deployed and made visible.
+be available. This means that you cannot :ref:`Deploy` nor :ref:`Execute` a ``Workflow``-flavored `Application Package`
+until all referenced steps have themselves been deployed and made visible.
 
 .. warning::
 
@@ -102,7 +102,7 @@ all referenced steps have themselves been deployed and made visible.
 .. seealso::
 
     - :py:func:`weaver.processes.wps_package.get_package_workflow_steps`
-    - `Deploy`_ request details.
+    - :ref:`Deploy` request details.
 
 
 Correspondance between CWL and WPS fields
@@ -179,7 +179,7 @@ inputs or generation of temporary files as when unpacking a compressed file.
 .. |cwl-wd-ref| replace:: reference
 .. _cwl-wd-ref: `cwl-workdir-req`_
 .. |cwl-wd-ex| replace:: example
-.. _cwl-wd-ex: `cwl-workdir-req`_
+.. _cwl-wd-ex: `cwl-workdir-ex`_
 
 As example, the CWL definition could be similar to the following:
 

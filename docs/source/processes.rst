@@ -53,7 +53,7 @@ them through `Weaver`.
 
 A minimal `Deploy`_ request body for this kind of process could be as follows:
 
-.. code-block:: json
+.. code-block:: JSON
 
     {
       "processDescription": {
@@ -68,13 +68,14 @@ A minimal `Deploy`_ request body for this kind of process could be as follows:
       ]
     }
 
+
 This would tell `Weaver` to locally deploy the ``my-process-reference`` process using the WPS-1 URL reference that is
 expected to return a ``DescribeProcess`` XML schema. Provided that this endpoint can be resolved and parsed according
 to typical WPS specification, this should result into a successful process registration. The deployed process would
 then be accessible with `DescribeProcess`_  requests.
 
 The above deployment procedure can be automated on startup using `Weaver`'s ``wps_processes.yml`` configuration file.
-Please refer to `Configuration of WPS Processes`_ section for more details on this matter.
+Please refer to :ref:`Configuration of WPS Processes` section for more details on this matter.
 
 .. warning::
 
@@ -110,26 +111,10 @@ Package as Literal Unit Block
 In this situation, the `CWL` definition is provided as is using tje JSON-formatted package embedded within the
 |deploy-req|_ request. The request payload would take the following shape:
 
-.. code-block:: json
-
-    {
-      "processDescription": {
-        "process": {
-          "id": "my-process-reference"
-        }
-      },
-      "executionUnit": [
-        {
-          "unit": {
-            "cwlVersion": "v1.0",
-            "class": "CommandLineTool",
-            "inputs": [<...>],
-            "outputs": [<...>],
-            [<...>]
-          }
-        }
-      ]
-    }
+.. need to use literal block because we got a pseudo-json (breaks json pygment lexer)
+.. literalinclude:: ./cwl-as-unit.json
+   :language: json
+   :linenos:
 
 
 ESGF-CWT
