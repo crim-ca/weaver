@@ -18,6 +18,7 @@ Each one of them are accessible through the same API interface, but they have di
 - `Workflow`_
 - `Remote Provider`_
 
+
 Builtin
 -------
 
@@ -227,8 +228,6 @@ The request body requires mainly two components:
 - ``processDescription``: defines the process identifier, metadata, inputs, outputs, and some execution specifications.
 - ``executionUnit``: defines the main core details of the `Application Package`_.
 
-.. |deploy-req| replace:: Deploy
-.. _deploy-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes%2Fpost
 .. _Application Package: docs/source/package.rst
 
 Upon deploy request, `Weaver` will either respond with a successful result, or with the appropriate error message,
@@ -238,10 +237,7 @@ result in this process to become available for following steps.
 .. warning::
     When a process is deployed, it is not necessarily available immediately. This is because process *visibility* also
     needs to be updated. The process must be made *public* to allow its discovery. For updating visibility, please
-    refer to the ``PUT {WEAVER_URL}/processes/{id}/visibility`` |vis-req|_.
-
-.. |vis-req| replace:: request
-.. _vis-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes~1%7Bprocess_id%7D~1visibility%2Fput
+    refer to the |vis-req|_ request.
 
 After deployment and visibility preconditions have been met, the corresponding process should become available
 through `DescribeProcess`_ requests and other routes that depend on an existing process.
@@ -262,11 +258,6 @@ Available processes can all be listed using |getcap-req|_ request. This request 
 process summaries. Other return formats and filters are also available according to provided request query parameters.
 Note that processes not marked with *public visibility* will not be listed in this result.
 
-.. |getcap-req| replace:: ``GET /processes`` (``GetCapabilities``)
-.. _getcap-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes%2Fget
-.. |describe-req| replace:: ``GET /processes/{id}`` (``DescribeProcess``)
-.. _describe-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes~1%7Bprocess_id%7D~1package%2Fget
-
 For more specific process details, the |describe-req|_ request should be used. This will return all information
 that define the process references and expected inputs/outputs.
 
@@ -283,11 +274,11 @@ that define the process references and expected inputs/outputs.
 
 .. _Execute:
 
-Execution of a process (Execute, Job)
+Execution of a process (Execute)
 ---------------------------------------------------------------------
 
 .. todo::
-
+    execute body example
 
 
 When a job is executed by specifying the ``notification_email`` field, the resulting process execution will send an
@@ -302,6 +293,7 @@ Monitoring of a process (GetStatus)
 ---------------------------------------------------------------------
 
 .. todo::
+    job status body example (success vs fail)
 
 .. _GetResult:
 
@@ -309,7 +301,11 @@ Obtaining output results, logs or errors
 ---------------------------------------------------------------------
 
 .. todo::
+    job logs/exceptions body example
 
+
+.. note::
+    Job logs and exceptions are a `Weaver`-specific implementation. They are not part of traditional |ogc-proc-api|_.
 
 
 Special Weaver EMS use-cases

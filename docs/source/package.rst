@@ -7,8 +7,8 @@ Application Package
 *************************
 
 The `Application Package` defines the internal script definition and configuration that will be executed by a process.
-This package is based on |CWL|_ (`CWL`) |cwl-spec|_. Using the extensive specification of `CWL` as backbone for
-internal execution of the process allows it to run multiple type of applications, whether they are referenced to by
+This package is based on |CWL|_ (`CWL`) |cwl-spec|_. Using the extensive specification of `CWL` as backbone
+for internal execution of the process allows it to run multiple type of applications, whether they are referenced to by
 `docker image`, `bash script` or more.
 
 .. note::
@@ -53,23 +53,24 @@ CWL Workflow
 ------------------------
 
 `Weaver` also supports `CWL` ``class: Workflow``. When an `Application Package` is defined this way, the process
-deployment operation will attempt to resolve each ``step`` as another process.
-
+deployment operation will attempt to resolve each ``step`` as another process. The reference to the `CWL` definition
+can be placed in any location supported as for the case of atomic processes
+(see details about `supported package locations <wps-rest>`_).
 
 The following `CWL` definition demonstrates an example ``Workflow`` process that would resolve each ``step`` with
-local processes of match IDs. For instance, the ``jsonarray2netcdf`` middle step corresponds to the `builtin`_
-process presented in the previous section. Other processes referenced here
-
-.. raw:: html
-   <details>
-   <summary><a>CWL Workflow Example</a></summary>
+local processes of match IDs.
 
 .. literalinclude:: ../../tests/functional/application-packages/workflow_subset_ice_days.cwl
     :language: JSON
     :linenos:
 
-.. raw:: html
-   </details>
+For instance, the ``jsonarray2netcdf`` (`Builtin`_) middle step in this example corresponds to the
+`CWL CommandLineTool`_ process presented in previous section. Other processes referenced in this ``Workflow`` can be
+found in |test-res|_. Steps are solved using the variations presented below.
+
+
+.. |test-res| replace:: Weaver Test Resources
+.. _test-res: https://github.com/crim-ca/weaver/tree/master/tests/functional/application-packages
 
 Step Reference
 ~~~~~~~~~~~~~~~~~
