@@ -163,8 +163,8 @@ of corresponding processes locally. Given that the resources can be correctly re
 available from `Weaver`'s API without further request needed.
 
 For convenience, every reference URL in the configuration file can either refer to explicit process definition
-(i.e.: endpoint and query parameters that resolve to `DescribeProcess`_ response), or a group of processes under a
-common WPS server to iteratively deploy, using a `GetCapabilities`_ WPS endpoint. Please refer to
+(i.e.: endpoint and query parameters that resolve to :ref:`DescribeProcess` response), or a group of processes under a
+common WPS server to iteratively deploy, using a :ref:`GetCapabilities` WPS endpoint. Please refer to
 `wps_processes.yml.example`_ for explicit format, keywords supported, and their resulting behaviour.
 
 To specify a custom YAML file, you can define the setting named ``weaver.wps_processes_file`` with the appropriate path
