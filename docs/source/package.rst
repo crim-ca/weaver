@@ -187,7 +187,7 @@ In most situations, the ``CommonLineTool`` process will need to run a docker ima
         "DockerRequirement": {
           "dockerPull": "<docker-url>"
         }
-      }
+      },
       "inputs": ["<...>"],
       "outputs": ["<...>"],
     }
