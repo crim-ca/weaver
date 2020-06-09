@@ -24,7 +24,7 @@ All processes deployed locally into `Weaver` using a `CWL` package definition wi
 available with ``GET /processes/{id}/package`` |pkg-req|_ request.
 
 .. |pkg-req| replace:: Package
-.. _pkg-req: https://pavics-weaver.readthedocs.io/en/setup-docs/api.html#tag/Processes%2Fpaths%2F~1processes~1%7Bprocess_id%7D~1package%2Fget
+.. _pkg-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes~1%7Bprocess_id%7D~1package%2Fget
 
 .. note::
 
