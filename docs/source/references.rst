@@ -16,6 +16,7 @@
 .. _cwl-workflow: https://www.commonwl.org/v1.1/Workflow.html
 .. _cwl-workdir-req: https://www.commonwl.org/v1.1/CommandLineTool.html#InitialWorkDirRequirement
 .. _cwl-workdir-ex: https://www.commonwl.org/user_guide/15-staging/
+.. _cwl-docker-req: https://www.commonwl.org/v1.1/CommandLineTool.html#DockerRequirement
 .. _`Weaver Issues`: https://github.com/crim-ca/weaver/issues
 .. |oas| replace:: OpenAPI Specification
 .. _oas: https://pavics-weaver.readthedocs.io/en/latest/api.html

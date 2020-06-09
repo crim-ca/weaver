@@ -15,7 +15,7 @@ for internal execution of the process allows it to run multiple type of applicat
     The large community and use cases covered by `CWL` makes it extremely versatile. If you encounter any issue running
     your `Application Package` in `Weaver` (such as file permissions for example), chances are that there exists a
     workaround somewhere in the |cwl-spec|_. Most typical problems are usually handled by some flag or argument in the
-    `CWL` definition, so this reference should be explored first. Please also refer to `Common Problems and Solutions`_
+    `CWL` definition, so this reference should be explored first. Please also refer to `Common Use-Cases and Solutions`_
     section and existing `Weaver Issues`_. Ultimately if no solution can be found, open an new issue about your specific
     problem.
 
@@ -47,6 +47,15 @@ Following CWL package definition represents the :py:mod:`weaver.processes.builti
 The first main components is the ``class: CommandLineTool`` that tells `Weaver` it will be a *base* process
 (contrarily to `CWL Workflow`_ presented later).
 
+The other important sections are ``inputs`` and ``outputs``. These define which parameters will be expected and
+produced by the described application. `Weaver` supports most formats and types as specified by |cwl-spec|_.
+
+
+.. warning::
+
+    `Weaver` has one unsupported `CWL` ``type``, namely the ``Directory``. This limitation is intentional as `WPS`
+    doesn't not offer an equivalent. Furthermore, since most processes expect remote file references, providing a
+    ``Directory`` doesn't provide an explicit reference to which files to retrieve during stage-in operation.
 
 
 CWL Workflow
@@ -158,10 +167,37 @@ Multiple Values
 
 .. todo:: minOccurs/maxOccurs + array + WPS repeats IDs vs CWL as list
 
-Common Problems and Solutions
+Common Use-Cases and Solutions
 ===========================================
 
 This section present some commonly encountered use-cases and basic solutions.
+
+
+How to tell the Docker image reference
+----------------------------------------------
+
+In most situations, the ``CommonLineTool`` process will need to run a docker image. Doing so is as simple as adding the
+``DockerRequirement`` (`reference <cwl-docker-req>`_) as follows to the `Application Package` definition:
+
+.. code-block:: json
+
+    {
+      "cwlVersion": "v1.0",
+      "requirements": {
+        "DockerRequirement": {
+          "dockerPull": "<docker-url>"
+        }
+      }
+      "inputs": ["<...>"],
+      "outputs": ["<...>"],
+    }
+
+
+.. note::
+    The docker image reference must be publicly accessible to allow `CWL` to pull it. Alternatively, a private
+    docker reference can be used if the image is locally available. The process will fail to execute if it cannot
+    resolve the reference.
+
 
 Permission error on input files
 ----------------------------------------------

@@ -102,7 +102,7 @@ ways as presented below.
 
     When a process is deployed with any of the below supported `Application Package` formats, additional parsing of
     this `CWL` as well as complementary details directly within the `WPS` deployment body is accomplished.
-    See `Correspondance between CWL and WPS fields`_ section for more details.
+    See :ref:`Correspondance between CWL and WPS fields` section for more details.
 
 
 Package as Literal Unit Block
@@ -111,10 +111,26 @@ Package as Literal Unit Block
 In this situation, the `CWL` definition is provided as is using tje JSON-formatted package embedded within the
 |deploy-req|_ request. The request payload would take the following shape:
 
-.. need to use literal block because we got a pseudo-json (breaks json pygment lexer)
-.. literalinclude:: ./cwl-as-unit.json
-   :language: json
-   :linenos:
+.. code-block:: json
+
+    {
+      "processDescription": {
+        "process": {
+          "id": "my-process-reference"
+        }
+      },
+      "executionUnit": [
+        {
+          "unit": {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "inputs": ["<...>"],
+            "outputs": ["<...>"],
+            "<...>": "<...>"
+          }
+        }
+      ]
+    }
 
 
 ESGF-CWT
