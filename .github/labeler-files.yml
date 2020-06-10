@@ -74,6 +74,9 @@ process/wps2:
 
 process/wps3:
   - weaver/wps_restapi/**/*
-  
+
+process/esgf-cwt:
+  - weaver/processes/esgf*
+
 process/workflow:
   - weaver/processes/wps_workflow.py
