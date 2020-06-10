@@ -23,6 +23,10 @@ process/wps3:
   - 'OGC API - Processes'
   - 'OGC-API-Processes'
   
+process/esgf-cwt:
+  - 'ESGF'
+  - 'ESGF-CWT'
+  
 process/workflow:
   - 'workflow'
 
