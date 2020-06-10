@@ -119,10 +119,12 @@ Following is a partial list of most predominant settings specific to `Weaver`.
 
 - | ``weaver.wps_email_[...]`` settings group
   |
-  | Defines configuration email notification functionality on job completion.
+  | Defines configuration of email notification functionality on job completion.
   |
-  | Encryption settings as well as custom email templates are available. Email notifications are sent only on job
+  | Encryption settings as well as custom email templates are available. Default email template defined in
+    `email-template`_ is employed if none is provided. Email notifications are sent only on job
     completion if an email was provided in the :ref:`Execute` request body.
+
 
 .. seealso::
     - `Execute`_ request details.

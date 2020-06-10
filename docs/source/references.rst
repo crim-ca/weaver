@@ -17,6 +17,11 @@
 .. _cwl-workdir-req: https://www.commonwl.org/v1.1/CommandLineTool.html#InitialWorkDirRequirement
 .. _cwl-workdir-ex: https://www.commonwl.org/user_guide/15-staging/
 .. _cwl-docker-req: https://www.commonwl.org/v1.1/CommandLineTool.html#DockerRequirement
+.. _cwl-io-map: https://www.commonwl.org/v1.1/CommandLineTool.html#map
+.. _cwl-io-type: https://www.commonwl.org/v1.1/CommandLineTool.html#CWLType
+.. _cwl-metadata: https://www.commonwl.org/user_guide/17-metadata/index.html
+.. _wkt-example: https://en.wikipedia.org/wiki/Well-known_text_representation_of_geometry
+.. _wkt-format: https://docs.geotools.org/stable/javadocs/org/opengis/referencing/doc-files/WKT.html
 .. _weaver-issues: https://github.com/crim-ca/weaver/issues
 .. |oas| replace:: OpenAPI Specification
 .. _oas: https://pavics-weaver.readthedocs.io/en/latest/api.html
@@ -41,6 +46,7 @@
 .. _request_options.yml.example: ../../../config/request_options.yml.example
 .. _Dockerfile-manager: ../../../docker/Dockerfile-manager
 .. _Dockerfile-worker: ../../../docker/Dockerfile-worker
+.. _email-template: ../../../weaver/wps_restapi/templates/notification_email_example.mako
 
 .. API requests
 .. |deploy-req| replace:: ``POST {WEAVER_URL}/processes`` (Deploy)

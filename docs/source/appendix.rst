@@ -8,11 +8,13 @@ Glossary
 .. glossary::
     :sorted:
 
-    ADES: Application Deployment and Execution Service
+    `ADES`: Application Deployment and Execution Service
     `CWL`_: Common Workflow Language
-    EMS: Execution Management Service
+    `EMS`: Execution Management Service
+    I/O: Inputs and/or Outputs of CWL and/or WPS depending on context
     `OGC`_: Open Geospatial Consortium
-    WPS: Web Processing Service
+    `WKT`: Well-Known Text geometry representation
+    `WPS`: Web Processing Service
 
 ************
 Useful Links

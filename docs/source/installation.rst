@@ -5,6 +5,10 @@
 Installation
 ************
 
+.. contents::
+    :local:
+    :depth: 2
+
 The installation is using the Python distribution system `Miniconda`_ (default installation of no ``conda`` found)
 to maintain software dependencies. Any ``conda`` installation should work the same. To use a pre-installed ``conda``
 distribution, simply make sure that it can be found on the shell path.
