@@ -167,9 +167,8 @@ To summarize, the following `CWL` and `WPS` I/O definitions are all equivalent a
 definition after deployment. For simplification purpose, below examples omit all but mandatory fields to produce the
 same result and only list the I/O portion of the full deployment body. Other fields are discussed afterward.
 
-.. literalinclude::
-    :caption: CWL I/O as array
-    :language: JSON
+.. code-block:: json
+    :caption: CWL I/O as array list of objects
     :linenos:
 
     {
@@ -195,9 +194,8 @@ same result and only list the I/O portion of the full deployment body. Other fie
       ]
     }
 
-.. literalinclude::
-    :caption: CWL I/O as mapping
-    :language: JSON
+.. code-block:: json
+    :caption: CWL I/O as key-value mapping
     :linenos:
 
     {
@@ -219,9 +217,8 @@ same result and only list the I/O portion of the full deployment body. Other fie
       }
     }
 
-.. literalinclude::
-    :caption: WPS I/O repeating
-    :language: json
+.. code-block:: json
+    :caption: WPS I/O equivalent to CWL definitions
     :linenos:
 
     {
@@ -292,9 +289,8 @@ A ``crs`` field would otherwise indicate a ``BoundingBox`` I/O (see :ref:`note <
 schemas are matched, the I/O type resolution falls back to ``Literal`` data of ``string`` type. To employ another
 primitive data type such as ``Integer``, an explicit indication needs to be provided as follows.
 
-.. literalinclude::
+.. code-block:: json
     :caption: WPS Literal Data Type
-    :language: json
     :lineno:
 
     {
@@ -304,7 +300,7 @@ primitive data type such as ``Integer``, an explicit indication needs to be prov
       ]
     }
 
-Obviously, the `CWL` definition is simpler in this case (i.e.: only ``type: int`` required). It is therefore
+Obviously, the equivalent `CWL` definition is simpler in this case (i.e.: only ``type: int`` required). It is therefore
 recommended to take advantage of `Weaver`'s merging strategy in this case by providing only the details through the
 `CWL` definition and have the corresponding `WPS` I/O type automatically deduced by the generated process.
 
