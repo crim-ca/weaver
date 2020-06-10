@@ -26,4 +26,4 @@ Useful Links
 - |oas|_
 - |ogc|_
 - |ogc-proc-api|_
-- `Weaver Issues`_
+- `Weaver Issues <weaver-issues>`_
