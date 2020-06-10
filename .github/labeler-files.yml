@@ -38,7 +38,7 @@ oas:
   - weaver/wps_restapi/colander_extras.py
   - weaver/wps_restapi/swagger_definitions.py
 
-security:
+triage/security:
   - weaver/visibility.py
 
 tests:
@@ -56,21 +56,24 @@ job:
 
 ## -- WPS processes --
 
-builtin:
-  - weaver/processes/builtin/**/*
-
 CWL:
   - weaver/processes/wps_process_base.py
   - weaver/processes/wps_package.py
   - weaver/processes/wps_workflow.py
 
-WPS1:
+process/builtin:
+  - weaver/processes/builtin/**/*
+  
+process/wps1:
   - weaver/wps.py
   - weaver/processes/wps1*
 
-WPS2:
+process/wps2:
   - weaver/wps.py
   - weaver/processes/wps2*
 
-WPS3:
+process/wps3:
   - weaver/wps_restapi/**/*
+  
+process/workflow:
+  - weaver/processes/wps_workflow.py
