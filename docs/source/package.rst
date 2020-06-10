@@ -285,9 +285,9 @@ of the type from one of ``Literal``, ``BoundingBox`` and ``Complex`` data. Inste
 matched API schema of the I/O. For instance, ``Complex`` I/O (i.e.: file reference) requires the ``formats`` field to
 distinguish it from a plain ``string``. Therefore, specifying either ``format`` in `CWL` or ``formats`` in `WPS`
 immediately provides all needed information for `Weaver` to understand that this I/O is expected to be a file reference.
-A ``crs`` field would otherwise indicate a ``BoundingBox`` I/O (see :ref:`note <bbox-note>`). If none of the two previous
-schemas are matched, the I/O type resolution falls back to ``Literal`` data of ``string`` type. To employ another
-primitive data type such as ``Integer``, an explicit indication needs to be provided as follows.
+A ``crs`` field would otherwise indicate a ``BoundingBox`` I/O (see :ref:`note <bbox-note>`). If none of the two
+previous schemas are matched, the I/O type resolution falls back to ``Literal`` data of ``string`` type. To employ
+another primitive data type such as ``Integer``, an explicit indication needs to be provided as follows.
 
 .. code-block:: json
     :caption: WPS Literal Data Type
@@ -315,7 +315,7 @@ recommended to take advantage of `Weaver`'s merging strategy in this case by pro
     type ``string`` corresponding to `WKT` [#]_, [#]_ in the meantime.
 
 .. [#] `WKT Examples <wkt-example>`_
-.. [#] `WKT Formats wkt-format`_
+.. [#] `WKT Formats <wkt-format>`_
 
 File Format
 -----------------------

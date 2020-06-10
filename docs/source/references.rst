@@ -35,6 +35,7 @@
 .. External references
 .. _Celery: https://docs.celeryproject.org/en/latest/
 .. _Gunicorn: https://gunicorn.org/
+.. _Miniconda: https://docs.conda.io/en/latest/miniconda.html
 .. _MongoDB: https://www.mongodb.com/
 
 .. Weaver Configurations

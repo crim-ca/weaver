@@ -20,7 +20,7 @@ The installation works on Linux 64 bit distributions (tested on Ubuntu 16.04).
 
 .. note::
     Windows is *not officially supported*, but some patches have been applied to help using it.
-    If you find some problems, please submit an `issue <weaver-issues`_ or open a pull request with fixes.
+    If you find some problems, please submit an `issue <weaver-issues>`_ or open a pull request with fixes.
 
 From GitHub Sources
 ===================
