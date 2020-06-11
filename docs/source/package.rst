@@ -6,8 +6,12 @@
 Application Package
 *************************
 
+.. contents::
+    :local:
+    :depth: 2
+
 The `Application Package` defines the internal script definition and configuration that will be executed by a process.
-This package is based on |CWL|_ (`CWL`) |cwl-spec|_. Using the extensive specification of `CWL` as backbone
+This package is based on |CWL|_ (`CWL`). Using the extensive |cwl-spec|_ as backbone
 for internal execution of the process allows it to run multiple type of applications, whether they are referenced to by
 `docker image`, `bash script` or more.
 
@@ -16,15 +20,12 @@ for internal execution of the process allows it to run multiple type of applicat
     your `Application Package` in `Weaver` (such as file permissions for example), chances are that there exists a
     workaround somewhere in the |cwl-spec|_. Most typical problems are usually handled by some flag or argument in the
     `CWL` definition, so this reference should be explored first. Please also refer to `Common Use-Cases and Solutions`_
-    section and existing `Weaver Issues`_. Ultimately if no solution can be found, open an new issue about your specific
-    problem.
+    section and existing `Weaver issue <weaver-issues>`_. Ultimately if no solution can be found, open an new issue
+    about your specific problem.
 
 
 All processes deployed locally into `Weaver` using a `CWL` package definition will have their full package definition
-available with ``GET /processes/{id}/package`` |pkg-req|_ request.
-
-.. |pkg-req| replace:: Package
-.. _pkg-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes~1%7Bprocess_id%7D~1package%2Fget
+available with |pkg-req|_ request.
 
 .. note::
 
@@ -49,13 +50,7 @@ The first main components is the ``class: CommandLineTool`` that tells `Weaver` 
 
 The other important sections are ``inputs`` and ``outputs``. These define which parameters will be expected and
 produced by the described application. `Weaver` supports most formats and types as specified by |cwl-spec|_.
-
-
-.. warning::
-
-    `Weaver` has one unsupported `CWL` ``type``, namely the ``Directory``. This limitation is intentional as `WPS`
-    doesn't not offer an equivalent. Furthermore, since most processes expect remote file references, providing a
-    ``Directory`` doesn't provide an explicit reference to which files to retrieve during stage-in operation.
+See `Inputs/Outputs Type`_ for more details.
 
 
 CWL Workflow
@@ -86,9 +81,9 @@ Step Reference
 
 In order to resolve referenced processes as steps, `Weaver` supports 3 formats.
 
-1. Process ID explicitly given
-   (e.g.: ``jsonarray2netcdf`` resolved to :py:mod:`weaver.processes.builtin.jsonarray2netcdf`).
-   Any *visible* process from |getcap-req|_ response should be resolved this way.
+1. | Process ID explicitly given.
+   | Any *visible* process from |getcap-req|_ response should be resolved this way.
+   | (e.g.: ``jsonarray2netcdf`` resolves to pre-deployed :py:mod:`weaver.processes.builtin.jsonarray2netcdf`).
 2. Full URL to the process description endpoint, provided that it also offers a |pkg-req|_ endpoint (`Weaver`-specific).
 3. Full URL to the explicit `CWL` file (usually corresponding to (2) or the ``href`` provided in deployment body).
 
@@ -118,16 +113,16 @@ Correspondance between CWL and WPS fields
 ===========================================
 
 Because `CWL` definition and `WPS` process description inherently provide "duplicate" information, many fields can be
-mapped between one another. In order to handle any provided metadata in the various supported location by both
+mapped between one another. In order to handle any provided metadata in the various supported locations by both
 specifications, as well as to extend details of deployed processes, each `Application Package` get its details merged
 with complementary `WPS` description.
 
 In some cases, complementary details are only documentation-related, but some information directly affect the format or
 execution behaviour of some parameters. A common example is the ``maxOccurs`` field provided by `WPS` that does not
-have a corresponding specification in `CWL` (any-sized array). On the other hand, `CWL` also provides data preparation
-steps such as initial staging (i.e.: ``InitialWorkDirRequirement``) that doesn't have an equivalent under the `WPS`
-process description. For this reason, complementary details are merged and reflected on both sides (as applicable),
-when non-ambiguous resolution is possible.
+have an exactly corresponding specification in `CWL` (any-sized array). On the other hand, `CWL` also provides data
+preparation steps such as initial staging (i.e.: ``InitialWorkDirRequirement``) that doesn't have an equivalent under
+the `WPS` process description. For this reason, complementary details are merged and reflected on both sides
+(as applicable), when non-ambiguous resolution is possible.
 
 In case of conflicting metadata, the `CWL` specification will most of the time prevail over the `WPS` metadata fields
 simply because it is expected that a strict `CWL` specification is provided upon deployment. The only exceptions to this
@@ -137,23 +132,197 @@ elements, such as with ``maxOccurs`` field.
 .. note::
 
     Metadata merge operation between `CWL` and `WPS` is accomplished on *per-mapped-field* basis. In other words, more
-    explicit details such as ``abstract`` could be obtained from `WPS` *while* an input file format could be obtained
-    from the `CWL` side. Merge occurs bidirectionally for corresponding information.
+    explicit details such as ``maxOccurs`` could be obtained from `WPS` and **simultaneously** the same input's
+    ``format`` could be obtained from the `CWL` side. Merge occurs bidirectionally for corresponding information.
 
-In order to help understand the resolution methodology, following sub-section cover the supported mapping between the
-two specifications, and more specifically, how each field impacts the mapped equivalent metadata.
+The merging strategy of process specifications also implies that some details can be omitted from one context if they
+can be inferred from corresponding elements in the other. For example, the `CWL` and `WPS` context both define
+``keywords`` (with minor naming variation) as a list of strings. Specifying this metadata in both locations is redundant
+and only makes the process description longer. Therefore, the user is allowed to provide only one of the two and
+`Weaver` will take care to propagate the information to the lacking location.
 
-Input / Outputs
+In order to help understand the resolution methodology between the contexts, following sub-section will cover supported
+mapping between the two specifications, and more specifically, how each field impacts the mapped equivalent metadata.
+
+.. warning::
+
+    Merging of corresponding fields between `CWL` and `WPS` is a `Weaver`-specific implementation. The same behaviour
+    is not necessarily supported by other implementations. For this reason, any converted information between the two
+    contexts will be transferred to the other context if missing in order for both specification to reflect the similar
+    details as closely as possible, wherever context the metadata originated from.
+
+
+Inputs/Outputs ID
 -----------------------
 
-.. todo:: mapping with 'id'
-.. todo:: CWL Lit. <-> WPS Literal
-.. todo:: CWL File <-> WPS Complex
+Inputs and outputs (I/O) ``id`` from the `CWL` context will be respectively matched against corresponding ``id`` or
+``identifier`` field from I/O of `WPS` context. In the `CWL` definition, all of the allowed I/O structures are
+supported, whether they are specified using an array list with explicit definitions, using "shortcut" variant, or using
+key-value pairs (see `CWL Mapping <cwl-io-map>`_ for more details). Regardless of array or mapping format, `CWL`
+requires that all I/O have unique ``id``. On the `WPS` side, a list of I/O is *always* expected. This is because
+`WPS` I/O with multiple values (array in `CWL`) are specified by repeating the ``id`` with each value instead of
+defining the value as a list of those values during :ref:`Execute` request (see also :ref:`Multiple Inputs`).
+
+To summarize, the following `CWL` and `WPS` I/O definitions are all equivalent and will result into the same process
+definition after deployment. For simplification purpose, below examples omit all but mandatory fields to produce the
+same result and only list the I/O portion of the full deployment body. Other fields are discussed afterward.
+
+.. code-block:: json
+    :caption: CWL I/O as array list of objects
+    :linenos:
+
+    {
+      "inputs": [
+        {
+          "id": "single-str",
+          "type": "string"
+        },
+        {
+          "id": "multi-file",
+          "type": "File[]"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "process-output-1",
+          "type": "File"
+        },
+        {
+          "id": "process-output-2",
+          "type": "File"
+        }
+      ]
+    }
+
+.. code-block:: json
+    :caption: CWL I/O as key-value mapping
+    :linenos:
+
+    {
+      "inputs": {
+        "single-str": {
+          "type": "string"
+        },
+        "multi-file": {
+          "type": "File[]"
+        }
+      },
+      "outputs": {
+        "process-output-1": {
+          "type": "File"
+        },
+        "process-output-2": {
+          "type": "File"
+        }
+      }
+    }
+
+.. code-block:: json
+    :caption: WPS I/O equivalent to CWL definitions
+    :linenos:
+
+    {
+      "inputs": [
+        {
+          "id": "single-str"
+        },
+        {
+          "id": "multi-file",
+          "formats": []
+        }
+      ],
+      "outputs": [
+        {
+          "id": "process-output-1",
+          "formats": []
+        },
+        {
+          "id": "process-output-2",
+          "formats": []
+        }
+      ]
+    }
+
+
+The `WPS` example above requires a ``format`` field for the corresponding `CWL` ``File`` type in order to distinguish
+it from a plain string. More details are available in `Inputs/Outputs Type`_ below about this requirement.
+
+Finally, it is to be noted that above `CWL` and `WPS` definitions can be specified in the :ref:`Deploy` request body
+with any of the following variations:
+
+1. Both are simultaneously fully specified (valid although extremely verbose).
+2. Both partially specified as long as sufficient complementary information is provided.
+3. Only `CWL` I/O is fully provided (with empty or even unspecified ``inputs`` or ``outputs`` section from `WPS`).
+
+.. warning::
+    `Weaver` assumes that its main purpose is to eventually execute an `Application Package` and will therefore
+    prioritize specification in `CWL` over `WPS`. Because of this, any unmatched ``id`` from the `WPS` context against
+    provided `CWL` ``id``\s of the same I/O section **will be dropped**, as they ultimately would have no purpose during
+    `CWL` execution.
+
+    This does not apply in the case of referenced :ref:`WPS-1/2` processes since no `CWL` is available in the
+    first place.
+
+
+Inputs/Outputs Type
+-----------------------
+
+In the `CWL` context, the ``type`` field indicates the type of I/O. Available types are presented in the
+`CWLType Symbols <cwl-io-type>`_ portion of the specification.
+
+.. warning::
+
+    `Weaver` has two unsupported `CWL` ``type``, namely ``Any`` and ``Directory``. This limitation is **intentional**
+    as `WPS` does not offer equivalents. Furthermore, both of these types make the process description too ambiguous.
+    For instance, most processes expect remote file references, and providing a ``Directory`` doesn't indicate an
+    explicit reference to which files to retrieve during stage-in operation of a job execution.
+
+
+In the `WPS` context, three data types exist, namely ``Literal``, ``BoundingBox`` and ``Complex`` data.
+
+As presented in the example of the previous section, I/O in the `WPS` context does not require an explicit indication
+of the type from one of ``Literal``, ``BoundingBox`` and ``Complex`` data. Instead, `WPS` type is inferred using the
+matched API schema of the I/O. For instance, ``Complex`` I/O (i.e.: file reference) requires the ``formats`` field to
+distinguish it from a plain ``string``. Therefore, specifying either ``format`` in `CWL` or ``formats`` in `WPS`
+immediately provides all needed information for `Weaver` to understand that this I/O is expected to be a file reference.
+A ``crs`` field would otherwise indicate a ``BoundingBox`` I/O (see :ref:`note <bbox-note>`). If none of the two
+previous schemas are matched, the I/O type resolution falls back to ``Literal`` data of ``string`` type. To employ
+another primitive data type such as ``Integer``, an explicit indication needs to be provided as follows.
+
+.. code-block:: json
+    :caption: WPS Literal Data Type
+    :lineno:
+
+    {
+      "id": "input",
+      "literalDataDomains": [
+        {"dataType": {"name": "integer"}}
+      ]
+    }
+
+Obviously, the equivalent `CWL` definition is simpler in this case (i.e.: only ``type: int`` required). It is therefore
+recommended to take advantage of `Weaver`'s merging strategy in this case by providing only the details through the
+`CWL` definition and have the corresponding `WPS` I/O type automatically deduced by the generated process.
+
+
+
+.. _bbox-note:
+
+.. note::
+    As of the current version of `Weaver`, `WPS` data type ``BoundingBox`` is not supported. The schema definition
+    exists in `WPS` context but is not handled by any `CWL` type conversion yet. This feature is reflected
+    by issue `#51 <https://github.com/crim-ca/weaver/issues/51>`_. It is possible to use a ``Literal`` data of
+    type ``string`` corresponding to `WKT` [#]_, [#]_ in the meantime.
+
+.. [#] `WKT Examples <wkt-example>`_
+.. [#] `WKT Formats <wkt-format>`_
 
 File Format
 -----------------------
 
 .. todo:: demo docs
+
+.. todo:: WPS 'formats' required to infer 'ComplexData' == CWL File
 
 Allowed Values
 -----------------------
@@ -166,6 +335,14 @@ Multiple Values
 -----------------------
 
 .. todo:: minOccurs/maxOccurs + array + WPS repeats IDs vs CWL as list
+
+Metadata
+-----------------------
+
+.. todo:: (s:)keywords field, doc/label vs abstract/title per-I/O and overall process, etc?
+
+Example: `cwl-metadata`_
+
 
 Common Use-Cases and Solutions
 ===========================================

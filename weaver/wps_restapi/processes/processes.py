@@ -658,11 +658,11 @@ def set_process_visibility(request):
     visibility_value = request.json.get("value")
     process_id = request.matchdict.get("process_id")
     if not isinstance(process_id, six.string_types):
-        raise HTTPUnprocessableEntity("Invalid parameter 'process_id'.")
+        raise HTTPUnprocessableEntity("Invalid process identifier.")
     if not isinstance(visibility_value, six.string_types):
-        raise HTTPUnprocessableEntity("Invalid visibility value specified.")
+        raise HTTPUnprocessableEntity("Invalid visibility value specified. String expected.")
     if visibility_value not in VISIBILITY_VALUES:
-        raise HTTPBadRequest("Invalid visibility value specified.")
+        raise HTTPBadRequest("Invalid visibility value specified: {!s}".format(visibility_value))
 
     try:
         store = get_db(request).get_store(StoreProcesses)

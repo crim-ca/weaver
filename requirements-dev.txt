@@ -4,7 +4,7 @@ bump2version
 codacy-coverage
 contextlib2; python_version < "3"
 coverage
-doc8
+doc8>=0.8.1
 flake8
 isort>=4.3.21,<5
 mock

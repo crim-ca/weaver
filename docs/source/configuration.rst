@@ -119,10 +119,12 @@ Following is a partial list of most predominant settings specific to `Weaver`.
 
 - | ``weaver.wps_email_[...]`` settings group
   |
-  | Defines configuration email notification functionality on job completion.
+  | Defines configuration of email notification functionality on job completion.
   |
-  | Encryption settings as well as custom email templates are available. Email notifications are sent only on job
+  | Encryption settings as well as custom email templates are available. Default email template defined in
+    `email-template`_ is employed if none is provided. Email notifications are sent only on job
     completion if an email was provided in the :ref:`Execute` request body.
+
 
 .. seealso::
     - `Execute`_ request details.
@@ -170,7 +172,7 @@ common WPS server to iteratively deploy, using a :ref:`GetCapabilities` WPS endp
 To specify a custom YAML file, you can define the setting named ``weaver.wps_processes_file`` with the appropriate path
 within the employed ``weaver.ini`` file that starts your application. By default, this setting will look for the
 provided path as absolute location, then will attempt to resolve relative path (corresponding to where the application
-is started from), and will also look within the `weaver.config`_ directory. If none of the files can be found, it will
+is started from), and will also look within the |weaver-config|_ directory. If none of the files can be found, it will
 try to use a copy of `wps_processes.yml.example`_.
 
 To disable this feature and avoid any auto-deployment provided by this functionality, simply set setting

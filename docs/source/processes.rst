@@ -108,7 +108,7 @@ ways as presented below.
 Package as Literal Unit Block
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In this situation, the `CWL` definition is provided as is using tje JSON-formatted package embedded within the
+In this situation, the `CWL` definition is provided as is using JSON-formatted package embedded within the
 |deploy-req|_ request. The request payload would take the following shape:
 
 .. code-block:: json
@@ -142,8 +142,30 @@ ESGF-CWT
 Workflow
 ----------
 
-.. todo:: workflow process doc
+Processes categorized as ``Workflow`` are very similar to `WPS-REST`_ processes. From the API standpoint, they
+actually look exactly the same as an atomic process when calling `DescribeProcess`_ or `Execute`_ requests.
+The difference lies within the referenced :ref:`Application Package` which uses a :ref:`CWL Workflow` instead of
+typical :ref:`CWL CommandLineTool`, and therefore, modifies how the process is internally executed.
 
+For ``Workflow`` processes to be deploy-able and executable, it is **mandatory** that `Weaver` is configured as `EMS`
+(see: :ref:`Configuration Settings`). This requirement is due to the nature of workflows that chain processes that
+need to be dispatched to known remote `ADES` servers (see: :ref:`Configuration of Data Sources` and
+`Workflow Operations`_).
+
+Given that a ``Workflow`` process was successfully deployed and that all process steps can be resolved, calling
+its `Execute`_ request will tell `Weaver` to parse the chain of operations and send step process execution requests
+to relevant `ADES` picked according to data sources. Each step's job will then gradually be monitored from the remote
+`ADES` until completion, and upon successful result, the `EMS` will retrieve the data references to pass it down to
+the following step. When the complete chain succeeds, the final results of the last step will be provide as
+``Workflow`` output as for atomic processes. In case of failure, the error will be indicated in the log with the
+appropriate step and message where the error occurred.
+
+.. note::
+
+    Although chaining sub-workflow(s) within a bigger scoped workflow is technically possible, this have not yet
+    been fully explored (tested) in `Weaver`. There is a chance that data-source resolution fails to identify where
+    to dispatch the step in this situation. If this impacts you, please vote and indicate your concern on issue
+    `#171 <https://github.com/crim-ca/weaver/issues/171>`_.
 
 Remote Provider
 --------------------
@@ -224,10 +246,15 @@ Register a new process (Deploy)
 -----------------------------------------
 
 Deployment of a new process is accomplished through the ``POST {WEAVER_URL}/processes`` |deploy-req|_ request.
+
 The request body requires mainly two components:
 
-- ``processDescription``: defines the process identifier, metadata, inputs, outputs, and some execution specifications.
-- ``executionUnit``: defines the main core details of the `Application Package`_.
+- | ``processDescription``:
+  | Defines the process identifier, metadata, inputs, outputs, and some execution specifications. This mostly
+    corresponds to information that corresponds to a traditional `WPS` definition.
+- | ``executionUnit``:
+  | Defines the core details of the `Application Package`_. This corresponds to the explicit `CWL` definition
+    that indicates how to execute the given application.
 
 .. _Application Package: docs/source/package.rst
 
@@ -278,15 +305,49 @@ that define the process references and expected inputs/outputs.
 Execution of a process (Execute)
 ---------------------------------------------------------------------
 
-.. todo::
-    execute body example
+Process execution (i.e.: submitting a job) is accomplished using the |exec-req|_ request.
+
+.. todo:: detail execute I/O (basic example)
+
+.. todo:: detail returned location + example
+
+This location can then be employed to call `GetStatus`_ monitoring request.
 
 
-When a job is executed by specifying the ``notification_email`` field, the resulting process execution will send an
-email to the specified address with successful or failure details. The format of the email is configurable from
-`weaver.ini.example`_ file
+Process Operations
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. _exec-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes~1{process_id}~1jobs%2Fpost
+.. todo:: detail 'operations' accomplished (stage-in, exec-cwl, stage-out)
+
+
+Workflow Operations
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. todo:: same as prev + 'operations' (deploy, visibility, exec-remote for each step)
+
+
+
+
+Multiple Inputs
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. todo:: repeating IDs example for WPS multi-inputs
+
+
+Multiple Outputs
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. todo:: unsupported + issue ref
+
+
+Email Notification
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When submitting a job for execution, it is possible to provide the ``notification_email`` field.
+Doing so will tell `Weaver` to send an email to the specified address with successful or failure details upon job
+completion. The format of the email is configurable from `weaver.ini.example`_ file with email-specific settings
+(see: :ref:`Configuration`).
+
 
 .. _GetStatus:
 
