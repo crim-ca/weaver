@@ -2,6 +2,8 @@
 .. Don't place any 'visible/rendered' documentation here (only links), or it will appear everywhere it is included
 
 .. Util text/reference replace
+.. _aws-credentials: https://boto3.amazonaws.com/v1/documentation/api/latest/guide/configuration.html#configuration
+.. _aws-config: https://boto3.amazonaws.com/v1/documentation/api/latest/guide/configuration.html#configuration
 .. |cwl| replace:: Common Workflow Language
 .. _cwl: `cwl-home`_
 .. |cwl-home| replace:: CWL Homepage

@@ -9,6 +9,7 @@ Glossary
     :sorted:
 
     `ADES`: Application Deployment and Execution Service
+    `AWS`: Amazon Web Services
     `CWL`_: Common Workflow Language
     `EMS`: Execution Management Service
     `HREF`: Hyperlink Reference

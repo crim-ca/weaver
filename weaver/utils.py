@@ -12,6 +12,8 @@ from copy import deepcopy
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+import boto3
+import botocore
 import pytz
 import requests
 import six
@@ -717,24 +719,31 @@ def request_extra(method,                       # type: AnyStr
 def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
     # type: (AnyStr, AnyStr, Optional[AnySettingsContainer], **Any) -> AnyStr
     """
-    Fetches a file from a local path or remote URL and dumps it's content to the specified output directory.
+    Fetches a file from a local path, an AWS-S3 bucket or remote URL, and dumps it's content to the specified output
+    directory.
 
     The output directory is expected to exist prior to this function call.
+    The file reference scheme (protocol) determines from where to fetch the content.
+    Output file name and extension will be the same as the original.
 
-    :param file_reference: Local filesystem path or remote URL file reference.
-    :param file_outdir: Output directory path of the fetched file.
-    :param settings: Additional request setting details from the application configuration.
+    :param file_reference:
+        Local filesystem path (optionally prefixed with ``file://``), ``s3://`` bucket location or ``http[s]://``
+        remote URL file reference.
+    :param file_outdir: Output local directory path under which to place the fetched file.
+    :param settings: Additional request-related settings from the application configuration.
     :param request_kwargs: Additional keywords to forward to request call (if needed).
     :return: Path of the local copy of the fetched file.
     """
     file_href = file_reference
-    file_path = os.path.join(file_outdir, os.path.basename(file_reference))
+    file_name = os.path.basename(file_reference)
+    file_path = os.path.join(file_outdir, file_name)
     if file_reference.startswith("file://"):
         file_reference = file_reference[7:]
     LOGGER.debug("Fetch file resolved:\n"
                  "  Reference: [%s]\n"
                  "  File Path: [%s]", file_href, file_path)
     if os.path.isfile(file_reference):
+        LOGGER.debug("Fetch file resolved as local reference.")
         # NOTE:
         #   If file is available locally and referenced as a system link, disabling follow symlink
         #   creates a copy of the symlink instead of an extra hard-copy of the linked file.
@@ -744,7 +753,13 @@ def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
             os.symlink(os.readlink(file_reference), file_path)
         else:
             shutil.copyfile(file_reference, file_path)
-    else:
+    elif file_reference.startswith("s3://"):
+        LOGGER.debug("Fetch file resolved as S3 bucket reference.")
+        bucket_name, file_key = file_reference[7:].split("/")
+        s3 = boto3.resource("s3")
+        bucket = s3.Bucket(bucket_name)
+    elif file_reference.startwith("http"):
+        LOGGER.debug("Fetch file resolved as remote URL reference.")
         request_kwargs.pop("stream", None)
         with open(file_path, "wb") as file:
             resp = request_extra("get", file_reference, stream=True, retries=3, settings=settings, **request_kwargs)
@@ -755,6 +770,10 @@ def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
             #   available memory. Without this, it defaults to 1 which is extremely slow.
             for chunk in resp.iter_content(chunk_size=None):
                 file.write(chunk)
+    else:
+        scheme = file_reference.split("://")
+        scheme = "<none>" if len(scheme) < 2 else scheme[0]
+        raise ValueError("Unresolved fetch file scheme: {!s}".format(scheme))
     LOGGER.debug("Fetch file written")
     return file_path
 
