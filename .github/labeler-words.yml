@@ -6,11 +6,34 @@
 CWL:
   - '(CWL|cwl)'
   - 'workflow'
+  
+process/wps1:
+  - 'WPS-1'
+  - 'WPS1'
 
-feature:
+process/wps1:
+  - 'WPS-2'
+  - 'WPS2'
+
+process/wps3:
+  - 'WPS-3'
+  - 'WPS3'
+  - 'WPS-REST'
+  - 'rest bindings'
+  - 'OGC API - Processes'
+  - 'OGC-API-Processes'
+  
+process/esgf-cwt:
+  - 'ESGF'
+  - 'ESGF-CWT'
+  
+process/workflow:
+  - 'workflow'
+
+triage/feature:
   - 'feature'
 
-bug:
+triage/bug:
   - 'bug'
 
 ci:
