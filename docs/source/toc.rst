@@ -15,4 +15,5 @@ Table of Contents
     OpenAPI Specification <api.rst>
     Source Code Documentation <autoapi/index.rst>
     changes
+    faq
     appendix

@@ -1,3 +1,5 @@
+.. include:: references.rst
+
 ********
 Tutorial
 ********
@@ -129,3 +131,11 @@ Endpoint Content-Type
     wps-rest json only (for now, xml also if implemented)
     https://github.com/crim-ca/weaver/issues/125
     https://github.com/crim-ca/weaver/issues/126
+
+
+Next Steps
+================================
+
+Have a look to the :ref:`Processes`,  :ref:`Package` and :ref:`FAQ` sections.
+
+The full |oas|_ is also available for request details.
