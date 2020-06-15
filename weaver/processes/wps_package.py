@@ -287,7 +287,8 @@ def _fetch_process_info(process_info_url, fetch_error):
 
     if not isinstance(process_info_url, six.string_types):
         raise _info_not_found_error()
-    resp = request_extra("get", process_info_url, headers={"Accept": CONTENT_TYPE_APP_JSON}, settings=get_settings(app))
+    resp = request_extra("get", process_info_url, headers={"Accept": CONTENT_TYPE_APP_JSON}, settings=get_settings(app),
+                         retries=5, intervals=[3, 3, 3, 3, 3])
     if resp.status_code != HTTPOk.code:
         raise _info_not_found_error()
     body = resp.json()
