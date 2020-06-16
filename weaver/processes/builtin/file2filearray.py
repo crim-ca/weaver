@@ -1,5 +1,5 @@
 """
-Transforms a CWL NetCDF file input into a NetCDF cwl output of a list of strings
+Transforms a CWL NetCDF file input into a NetCDF cwl output of a list of File
 """
 import argparse
 import logging
