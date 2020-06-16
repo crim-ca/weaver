@@ -1,0 +1,96 @@
+"""
+Extracts and fetches NetCDF files from a Metalink file containing an URL, and 
+outputs the NetCDF file at a given index of the list.
+"""
+import argparse
+import json
+import logging
+import os
+import sys
+from typing import Any, AnyStr
+
+import six
+from six.moves.urllib.parse import urlparse
+
+if six.PY3:
+    from tempfile import TemporaryDirectory
+else:
+    from backports.tempfile import TemporaryDirectory  # noqa # py2
+
+CUR_DIR = os.path.abspath(os.path.dirname(__file__))
+sys.path.insert(0, CUR_DIR)
+# root to allow 'from weaver import <...>'
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(CUR_DIR))))
+
+# place weaver specific imports after sys path fixing to ensure they are found from external call
+# pylint: disable=C0413,wrong-import-order
+from weaver.formats import get_extension, CONTENT_TYPE_APP_NETCDF  # isort:skip # noqa: E402
+from weaver.utils import fetch_file  # isort:skip # noqa: E402
+
+PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]
+
+# setup logger since it is not run from the main 'weaver' app
+LOGGER = logging.getLogger(__name__)
+LOGGER.addHandler(logging.StreamHandler(sys.stdout))
+LOGGER.setLevel(logging.INFO)
+
+# process details
+__version__ = "1.0"
+__title__ = "Metalink to NetCDF"
+__abstract__ = __doc__  # NOTE: '__doc__' is fetched directly, this is mostly to be informative
+
+
+def _is_netcdf_url(url):
+    # type: (Any) -> bool
+    if not isinstance(url, six.string_types):
+        return False
+    if urlparse(url).scheme == "":
+        return False
+    return os.path.splitext(url)[-1] == get_extension(CONTENT_TYPE_APP_NETCDF)
+
+
+def m2n(metalink_reference, index, output_dir):
+    # type: (AnyStr, int, AnyStr) -> None
+    LOGGER.info(
+        "Got arguments: metalink_reference={} index={} output_dir={}".format(metalink_reference, index, output_dir)
+    )
+    LOGGER.info("Process '%s' execution starting...", PACKAGE_NAME)
+    LOGGER.debug("Process '%s' output directory: [%s].", PACKAGE_NAME, output_dir)
+    try:
+        if not os.path.isdir(output_dir):
+            raise ValueError("Output dir [{}] does not exist.".format(output_dir))
+        with TemporaryDirectory(prefix="wps_process_{}_".format(PACKAGE_NAME)) as tmp_dir:
+            LOGGER.debug("Fetching Metalink file: [%s]", metalink_reference)
+            metalink_path = fetch_file(metalink_reference, tmp_dir, timeout=10, retry=3)
+            LOGGER.debug("Reading Metalink file: [%s]", metalink_path)
+            with open(metalink_path) as metalink_file:
+                metalink_content = json.load(metalink_file)
+            if not isinstance(metalink_content, list) or any(not _is_netcdf_url(f) for f in metalink_content):
+                LOGGER.error("Invalid Metalink: [%s]", metalink_content)
+                raise ValueError("Invalid Metalink file format, expected a plain array of NetCDF file URL strings.")
+            LOGGER.debug("Parsing Metalink file references.")
+            for file_url in metalink_content:
+                LOGGER.debug("Fetching NetCDF reference from Metalink file: [%s]", file_url)
+                fetch_file(file_url, output_dir, timeout=10, retry=3)
+    except Exception as exc:
+        # log only debug for tracking, re-raise and actual error wil be logged by top process monitor
+        LOGGER.debug("Process '%s' raised an exception: [%s]", PACKAGE_NAME, exc)
+        raise
+    LOGGER.info("Process '%s' execution completed.", PACKAGE_NAME)
+
+
+def main():
+    LOGGER.info("Parsing inputs of '%s' process.", PACKAGE_NAME)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("-i", metavar="metalink", type=str,
+                        help="Metalink file to be parsed for NetCDF file names.")
+    parser.add_argument("-idx", metavar="index", type=int,
+                        help="Index of the specific NetCDF file to extract.")
+    parser.add_argument("-o", metavar="outdir", default=CUR_DIR,
+                        help="Output directory of the retrieved NetCDF files extracted by name from the Metalink file.")
+    args = parser.parse_args()
+    sys.exit(m2n(args.i, args.idx, args.o))
+
+
+if __name__ == "__main__":
+    main()

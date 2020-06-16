@@ -1,0 +1,26 @@
+#!/usr/bin/env cwl-runner
+cwlVersion: v1.0
+class: CommandLineTool
+# target the installed python pointing to weaver conda env to allow imports
+baseCommand: python
+arguments: ["${WEAVER_ROOT_DIR}/weaver/processes/builtin/metalink2netcdf.py", "-o", $(runtime.outdir)]
+inputs:
+ input:
+   type: File
+   inputBinding:
+     position: 1
+     prefix: "-i"
+ index:
+   type: integer
+   inputBinding:
+     position: 2
+     prefix: "-idx"
+outputs:
+ output:
+   type:
+     items: File
+   outputBinding:
+     glob: "*.nc"
+$namespaces:
+  iana: "https://www.iana.org/assignments/media-types/"
+  edam: "http://edamontology.org/"

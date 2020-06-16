@@ -237,6 +237,7 @@ class End2EndEMSTestCase(TestCase):
         cls.PROCESS_WORKFLOW_CUSTOM_ID = "CustomWorkflow"
         cls.PROCESS_WORKFLOW_FLOOD_DETECTION_ID = "WorkflowFloodDetection"
         cls.PROCESS_WORKFLOW_SUBSET_ICE_DAYS = "WorkflowSubsetIceDays"
+        cls.PROCESS_WORKFLOW_SUBSET_PICKER = "WorkflowSubsetPicker"
         cls.PROCESS_WORKFLOW_SUBSETLLNL_SUBSETCRIM = "WorkflowSubsetLLNL_SubsetCRIM"
         cls.PROCESS_WORKFLOW_SUBSETNASAESGF_SUBSETCRIM = "WorkflowSubsetNASAESGF_SubsetCRIM"
         cls.PROCESS_WORKFLOW_FILE_TO_SUBSETCRIM = "WorkflowFile_To_SubsetCRIM"
@@ -253,6 +254,7 @@ class End2EndEMSTestCase(TestCase):
                         cls.PROCESS_WORKFLOW_CUSTOM_ID,
                         cls.PROCESS_WORKFLOW_FLOOD_DETECTION_ID,
                         cls.PROCESS_WORKFLOW_SUBSET_ICE_DAYS,
+                        cls.PROCESS_WORKFLOW_SUBSET_PICKER,
                         cls.PROCESS_WORKFLOW_SUBSETLLNL_SUBSETCRIM,
                         cls.PROCESS_WORKFLOW_SUBSETNASAESGF_SUBSETCRIM,
                         cls.PROCESS_WORKFLOW_FILE_TO_SUBSETCRIM}
@@ -613,9 +615,14 @@ class End2EndEMSTestCase(TestCase):
         cls.assert_test(lambda: resp.json.get("configuration") == WEAVER_CONFIGURATION_EMS,
                         message="weaver must be configured as EMS.")
 
-    def test_workflow_wps1_requirements(self):
-        self.workflow_runner(self.PROCESS_WORKFLOW_SUBSET_ICE_DAYS,
-                             [self.PROCESS_SUBSET_BBOX_ID, self.PROCESS_ICE_DAYS_ID],
+    # def test_workflow_wps1_requirements(self):
+    #     self.workflow_runner(self.PROCESS_WORKFLOW_SUBSET_ICE_DAYS,
+    #                          [self.PROCESS_SUBSET_BBOX_ID, self.PROCESS_ICE_DAYS_ID],
+    #                          log_full_trace=True)
+
+    def test_workflow_subset_picker(self):
+        self.workflow_runner(self.PROCESS_WORKFLOW_SUBSET_PICKER,
+                             [self.PROCESS_SUBSET_BBOX_ID],
                              log_full_trace=True)
 
     # def test_workflow_llnl_subset_esgf(self):
