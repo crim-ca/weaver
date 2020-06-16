@@ -69,7 +69,7 @@ class End2EndEMSTestCase(TestCase):
     logger_separator_steps = ""     # type: AnyStr
     logger_separator_tests = ""     # type: AnyStr
     logger_separator_cases = ""     # type: AnyStr
-    logger_level = logging.INFO     # type: Union[int, AnyStr]
+    logger_level = logging.INFO     # type: int
     logger_enabled = True           # type: bool
     logger = None                   # type: Optional[logging.Logger]
     # setting indent to `None` disables pretty-printing of JSON payload
@@ -117,8 +117,6 @@ class End2EndEMSTestCase(TestCase):
 
         # logging parameter overrides
         cls.logger_level = os.getenv("WEAVER_TEST_LOGGER_LEVEL", cls.logger_level)
-        if not isinstance(cls.logger_level, int):
-            cls.logger_level = logging.getLevelName(cls.logger_level)
         cls.logger_enabled = asbool(os.getenv("WEAVER_TEST_LOGGER_ENABLED", cls.logger_enabled))
         cls.logger_result_dir = os.getenv("WEAVER_TEST_LOGGER_RESULT_DIR", os.path.join(WEAVER_ROOT_DIR))
         cls.logger_json_indent = os.getenv("WEAVER_TEST_LOGGER_JSON_INDENT", cls.logger_json_indent)
