@@ -311,7 +311,7 @@ another primitive data type such as ``Integer``, an explicit indication needs to
 
 .. code-block:: json
     :caption: WPS Literal Data Type
-    :lineno:
+    :linenos:
 
     {
       "id": "input",
@@ -348,7 +348,7 @@ For example, the following input definitions are equivalent in both contexts.
 
 .. code-block:: json
     :caption: WPS Format with MIME-type
-    :lineno:
+    :linenos:
 
     {
       "id": "input",
@@ -360,7 +360,7 @@ For example, the following input definitions are equivalent in both contexts.
 
 .. code-block:: json
     :caption: CWL Format with Namespace
-    :lineno:
+    :linenos:
 
     {
       "inputs": [
@@ -435,14 +435,111 @@ each case.
 Allowed Values
 -----------------------
 
+Allowed values in the context of `WPS` ``LiteralData`` provides a mean for the application developer to restrict inputs
+to a specific set of values. In `CWL`, the same can be achieved using an ``enum`` definition. Therefore, the following
+two variants are equivalent and completely interchangeable.
 
-.. todo:: cwl enum vs allowed/supported WPS
+.. code-block:: json
+    :caption: WPS AllowedValues Input
+    :linenos:
+
+    {
+      "id": "input",
+      "literalDataDomains": [
+        {"allowedValues": ["value-1", "value-2"]}
+      ]
+    }
 
 
-Multiple Values
------------------------
+.. code-block:: json
+    :caption: CWL Enum Values
+    :linenos:
+
+    {
+      "id": "input",
+      "type": {
+        "type": "enum",
+        "symbols": ["value-1", "value-2"]
+      }
+    }
+
+
+
+`Weaver` will ensure to propagate such definitions bidirectionally in order to update the `CWL` or `WPS`
+correspondingly with the provided information in the other context if missing. The primitive type to apply to a missing
+`WPS` specification when resolving it from a `CWL` definition is automatically inferred with the best matching type
+from provided values in the ``enum`` list.
+
+Note that ``enum`` such as these will also be applied on top of :ref:`Multiple and Optional Values` definitions
+presented next.
+
+
+Multiple and Optional Values
+--------------------------------------------
+
+Inputs that take *multiple* values or references can be specified using ``minOccurs`` and ``maxOccurs`` in `WPS`
+context, while they are specified using the ``array`` type in `CWL`. While the same ``minOccurs`` parameter with a
+value of zero (0) can be employed to indicate an *optional* input, `CWL` requires the type to specify ``null`` or to
+use the shortcut ``?`` character suffixed to the base type to indicate optional input. Resolution between `WPS` and
+`CWL` for the merging strategy implies all corresponding parameter combinations and checks in this case.
+
+Because `CWL` does not take an explicit amount of maximum occurrences, information in this case are not necessarily
+completely interchangeable. In fact, `WPS` is slightly more verbose and easier to define in this case than `CWL`
+because all details are contained within the same two parameters. Because of this, it is often preferable to provide
+the ``minOccurs`` and ``maxOccurs`` in the `WSP` context, and let `Weaver` infer the ``array`` and/or ``null`` type
+requirements automatically. Also, because of all implied parameters in this situation to specify the similar details,
+it is important to avoid providing contradicting specifications as `Weaver` will have trouble guessing the intended
+result when merging specifications. If unambiguous guess can be made, `CWL` will be employed as deciding definition to
+resolve erroneous mismatches (as for any other corresponding fields).
+
+.. warning::
+    Parameters ``minOccurs`` and ``maxOccurs`` are not permitted for outputs in the `WPS` context. Native `WPS`
+    therefore does not permit multiple output reference files. This can be worked around using a |metalink|_ file,
+    but this use case is not covered by `Weaver` yet as it requires special mapping with `CWL` that does support
+    ``array`` type as output (see issue `#25 <https://github.com/crim-ca/weaver/issues/25>`_).
+
+.. note::
+    Although `WPS` multi-value inputs are defined as a single entity during deployment, special care must be taken
+    to the format in which to specify these values during execution. Please refer to :ref:`Multiple Inputs` section
+    of :ref:`Execute` request.
+
+Following are a few examples of equivalent `WPS` and `CWL` definitions to represent multiple values under a given input.
+Some parts of the following definitions are purposely omitted to better highlight the concise details of *multiple* and
+*optional* information.
+
+.. table::
+    :align: center
+    :widths: 50,50
+
+    +---------------------------------------------------+-----------------------------------------------------------+
+    | .. code-block:: json                              | .. code-block:: json                                      |
+    |    :caption: WPS Multi-Value Input (required)     |    :caption: CWL Multi-Value Input (required)             |
+    |    :linenos:                                      |    :linenos:                                              |
+    |                                                   |                                                           |
+    |    {                                              |    {                                                      |
+    |      "id": "input-multi-required",                |      "id": "input-multi-required",                        |
+    |      "format": "application/json",                |      "format": "iana:application/json",                   |
+    |      "minOccurs": 1,                              |      "type": {                                            |
+    |      "maxOccurs": "unbounded"                     |        "type": "array", "items": "File"                   |
+    |    }                                              |      }                                                    |
+    |                                                   |    }                                                      |
+    |                                                   |                                                           |
+    +---------------------------------------------------+-----------------------------------------------------------+
+
 
 .. todo:: minOccurs/maxOccurs + array + WPS repeats IDs vs CWL as list
+
+
+.. todo:: example multi-value + enum
+
+It can be noted from the examples that ``minOccurs`` and ``maxOccurs`` can be either an ``integer`` or a ``string``
+representing one. This is to support backward compatibility of older `WPS` specification that always employed strings
+although representing numbers. `Weaver` understands and handles both cases. Also, ``maxOccurs`` can have the special
+value ``"unbounded"``, in which case the input is considered to be allowed an unlimited amount if entries (although
+often capped by another implicit machine-level limitation such as memory capacity). In the case of `CWL`, an ``array``
+is always considered as *unbounded*, therefore `WPS` is the only context that can limit this amount.
+
+
 
 Metadata
 -----------------------

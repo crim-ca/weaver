@@ -1,14 +1,20 @@
 .. _faq:
+.. include:: references.rst
 
+*************************
 FAQ
-===========================================
+*************************
 
 This section present some commonly encountered use-cases and basic solutions regarding `ADES`/`EMS` operation or
 more specifically related to `CWL` specification.
 
+.. contents::
+    :local:
+    :depth: 2
 
-How to specify the Docker image reference
-----------------------------------------------
+
+How to specify the Docker image reference?
+==================================================
 
 In most situations, the ``CommonLineTool`` process will need to run a docker image. Doing so is as simple as adding the
 ``DockerRequirement`` (`reference <cwl-docker-req>`_) as follows to the `Application Package` definition:
@@ -40,8 +46,8 @@ The `Application Package` can be provided during process deployment. Please refe
     - :ref:`Deploy` request
 
 
-Permission error on input files
-----------------------------------------------
+Fixing permission error on input files
+==========================================
 
 Some processes expect their inputs to be writable (e.g.: ZIP files). When running an *Application Package* based on a
 `docker image`, `Weaver` mounts the input files as `volumes` in read-only mode for security reasons. This causes these
@@ -90,7 +96,7 @@ directory of the executed docker container.
 
 
 Problem connecting workflow steps together
-----------------------------------------------
+==================================================
 
 
 .. seealso::
@@ -99,8 +105,8 @@ Problem connecting workflow steps together
     - :ref:`Output File Format`
 
 
-Where can I find references to CWL specification and example
----------------------------------------------------------------------
+Where can I find references to CWL specification and examples?
+================================================================
 
 There exist multiple sources, but official ones provided below have a create amount of examples and are being
 continuously improved by the developers (including being updated according to changes).

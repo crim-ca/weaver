@@ -30,14 +30,14 @@
                 <ows:Title>Frequency</ows:Title>
                 <ows:Abstract>Resampling frequency</ows:Abstract>
                 <LiteralData>
-                <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
-                <ows:AllowedValues>
-                    <ows:Value>YS</ows:Value>
-                    <ows:Value>MS</ows:Value>
-                    <ows:Value>QS-DEC</ows:Value>
-                    <ows:Value>AS-JUL</ows:Value>
-                </ows:AllowedValues>
-                <DefaultValue>YS</DefaultValue>
+                    <ows:DataType ows:reference="http://www.w3.org/TR/xmlschema-2/#string">string</ows:DataType>
+                    <ows:AllowedValues>
+                        <ows:Value>YS</ows:Value>
+                        <ows:Value>MS</ows:Value>
+                        <ows:Value>QS-DEC</ows:Value>
+                        <ows:Value>AS-JUL</ows:Value>
+                    </ows:AllowedValues>
+                    <DefaultValue>YS</DefaultValue>
                 </LiteralData>
             </Input>
         </DataInputs>
