@@ -2,7 +2,6 @@
 Transforms a CWL NetCDF file input into a NetCDF cwl output of a list of strings
 """
 import argparse
-import json
 import logging
 import os
 import sys
@@ -53,7 +52,6 @@ def f2fa(input_file, output_dir):
     try:
         if not os.path.isdir(output_dir):
             raise ValueError("Output dir [{}] does not exist.".format(output_dir))
-        LOGGER.debug("Fetching NetCDF reference from JSON file: [%s]", input_file)
         fetch_file(input_file, output_dir, timeout=10, retry=3)
     except Exception as exc:
         # log only debug for tracking, re-raise and actual error wil be logged by top process monitor
@@ -65,7 +63,7 @@ def f2fa(input_file, output_dir):
 def main():
     LOGGER.info("Parsing inputs of '%s' process.", PACKAGE_NAME)
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("-i", metavar="json", type=str,
+    parser.add_argument("-i", metavar="input", type=str,
                         help="NetCDF input file.")
     parser.add_argument("-o", metavar="outdir", default=CUR_DIR,
                         help="Output directory of the retrieved NetCDF file.")
