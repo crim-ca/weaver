@@ -613,9 +613,14 @@ class End2EndEMSTestCase(TestCase):
         cls.assert_test(lambda: resp.json.get("configuration") == WEAVER_CONFIGURATION_EMS,
                         message="weaver must be configured as EMS.")
 
-    # def test_workflow_wps1_requirements(self):
-    #     self.workflow_runner(self.PROCESS_WORKFLOW_SUBSET_ICE_DAYS,
-    #                          [self.PROCESS_SUBSET_BBOX_ID, self.PROCESS_ICE_DAYS_ID],
+    def test_workflow_wps1_requirements(self):
+        self.workflow_runner(self.PROCESS_WORKFLOW_SUBSET_ICE_DAYS,
+                             [self.PROCESS_SUBSET_BBOX_ID, self.PROCESS_ICE_DAYS_ID],
+                             log_full_trace=True)
+
+    # def test_workflow_llnl_subset_esgf(self):
+    #     self.workflow_runner(self.PROCESS_WORKFLOW_SUBSETLLNL_SUBSETCRIM,
+    #                          [self.PROCESS_SUBSET_ESGF, self.PROCESS_SUBSET_BBOX_ID],
     #                          log_full_trace=True)
 
     # def test_workflow_file_to_string_array(self):

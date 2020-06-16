@@ -43,8 +43,8 @@
             },
             "out": ["output"]
         },
-        "file2filearray": {
-            "run": "file2filearray",
+        "json2nc": {
+            "run": "jsonarray2netcdf",
             "in": {
                 "input": "subset/output"
             },
@@ -53,7 +53,7 @@
         "ice_days": {
             "run": "Finch_IceDays.cwl",
             "in": {
-                "tasmax": "file2filearray/output",
+                "tasmax": "json2nc/output",
                 "freq": "freq"
             },
             "out": ["output_netcdf"]
