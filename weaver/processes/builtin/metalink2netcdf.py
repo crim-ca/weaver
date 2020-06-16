@@ -1,16 +1,14 @@
 """
-Extracts and fetches NetCDF files from a Metalink file containing an URL, and outputs the NetCDF file at a given index
- of the list.
+Extracts and fetches NetCDF files from a Metalink file containing an URL, and outputs the NetCDF file at a given
+index of the list.
 """
 import argparse
-import json
 import logging
 import os
 import sys
-from typing import Any, AnyStr
+from typing import AnyStr
 
 import six
-from six.moves.urllib.parse import urlparse
 from lxml import etree
 
 if six.PY3:
@@ -25,7 +23,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(CUR_DIR))))
 
 # place weaver specific imports after sys path fixing to ensure they are found from external call
 # pylint: disable=C0413,wrong-import-order
-from weaver.formats import get_extension, CONTENT_TYPE_APP_NETCDF  # isort:skip # noqa: E402
 from weaver.utils import fetch_file  # isort:skip # noqa: E402
 
 PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]
@@ -33,7 +30,7 @@ PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]
 # setup logger since it is not run from the main 'weaver' app
 LOGGER = logging.getLogger(__name__)
 LOGGER.addHandler(logging.StreamHandler(sys.stdout))
-LOGGER.setLevel(logging.DEBUG)
+LOGGER.setLevel(logging.INFO)
 
 # process details
 __version__ = "1.0"
@@ -41,19 +38,10 @@ __title__ = "Metalink to NetCDF"
 __abstract__ = __doc__  # NOTE: '__doc__' is fetched directly, this is mostly to be informative
 
 
-def _is_netcdf_url(url):
-    # type: (Any) -> bool
-    if not isinstance(url, six.string_types):
-        return False
-    if urlparse(url).scheme == "":
-        return False
-    return os.path.splitext(url)[-1] == get_extension(CONTENT_TYPE_APP_NETCDF)
-
-
 def m2n(metalink_reference, index, output_dir):
     # type: (AnyStr, int, AnyStr) -> None
     LOGGER.info(
-        "Got arguments: metalink_reference={} index={} output_dir={}".format(metalink_reference, index, output_dir)
+        "Got arguments: metalink_reference=%s index=%s output_dir=%s", metalink_reference, index, output_dir
     )
     LOGGER.info("Process '%s' execution starting...", PACKAGE_NAME)
     LOGGER.debug("Process '%s' output directory: [%s].", PACKAGE_NAME, output_dir)
@@ -67,9 +55,9 @@ def m2n(metalink_reference, index, output_dir):
             parser = etree.HTMLParser()
             xml_data = etree.parse(metalink_path, parser)
             LOGGER.debug("Parsing Metalink file references.")
-            nc_file_url = xml_data.xpath('string(//metalink/file[' + str(index) + ']/metaurl)')
+            nc_file_url = xml_data.xpath("string(//metalink/file[" + str(index) + "]/metaurl)")
             LOGGER.debug("Fetching NetCDF reference from Metalink file: [%s]", metalink_reference)
-            LOGGER.debug("NetCDF file URL : " + nc_file_url)
+            LOGGER.debug("NetCDF file URL : %s", nc_file_url)
             fetch_file(nc_file_url, output_dir)
     except Exception as exc:
         # log only debug for tracking, re-raise and actual error wil be logged by top process monitor
@@ -83,12 +71,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("-i", metavar="metalink", type=str,
                         help="Metalink file to be parsed for NetCDF file names.")
-    parser.add_argument("-idx", metavar="index", type=int,
+    parser.add_argument("-n", metavar="index", type=int,
                         help="Index of the specific NetCDF file to extract. First element's index is 1.")
     parser.add_argument("-o", metavar="outdir", default=CUR_DIR,
                         help="Output directory of the retrieved NetCDF files extracted by name from the Metalink file.")
     args = parser.parse_args()
-    sys.exit(m2n(args.i, args.idx, args.o))
+    sys.exit(m2n(args.i, args.n, args.o))
 
 
 if __name__ == "__main__":
