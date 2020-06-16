@@ -1,0 +1,36 @@
+{
+  "mode": "async",
+  "response": "document",
+  "inputs": [
+    {
+      "id": "tasmax",
+      "href": "https://pavics.ouranos.ca/twitcher/ows/proxy/thredds/fileServer/birdhouse/nrcan/nrcan_canada_daily_v2/tasmax/nrcan_canada_daily_tasmax_2017.nc"
+    },
+    {
+      "id": "lat0",
+      "data": 43
+    },
+    {
+      "id": "lat1",
+      "data": 50
+    },
+    {
+      "id": "lon0",
+      "data": -80
+    },
+    {
+      "id": "lon1",
+      "data": -65
+    },
+    {
+      "id": "index",
+      "data": 0
+    }
+  ],
+  "outputs": [
+    {
+      "id": "output",
+      "transmissionMode": "reference"
+    }
+  ]
+}
