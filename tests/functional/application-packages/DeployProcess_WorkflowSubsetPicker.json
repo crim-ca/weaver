@@ -1,0 +1,15 @@
+{
+    "processDescription": {
+        "process": {
+            "id": "WorkflowSubsetPicker",
+            "title": "Workflow of Subset and Metalink Picker",
+            "abstract": "Workflow that first executes a bounding box subset of a region and afterwards returns a specific NetCDF at a given index."
+        }
+    },
+    "executionUnit": [
+        {
+            "href": "tests/functional/application-packages/workflow_subset_picker.cwl"
+        }
+    ],
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow"
+}
