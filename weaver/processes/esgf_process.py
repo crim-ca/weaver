@@ -1,7 +1,7 @@
 from collections import defaultdict
 from os.path import join
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from weaver.status import STATUS_RUNNING, STATUS_SUCCEEDED, STATUS_FAILED
 from weaver.processes.wps1_process import Wps1Process
