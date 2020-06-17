@@ -11,6 +11,7 @@ from typing import Any, AnyStr
 
 import six
 from six.moves.urllib.parse import urlparse
+from lxml import etree
 
 if six.PY3:
     from tempfile import TemporaryDirectory
@@ -32,7 +33,7 @@ PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]
 # setup logger since it is not run from the main 'weaver' app
 LOGGER = logging.getLogger(__name__)
 LOGGER.addHandler(logging.StreamHandler(sys.stdout))
-LOGGER.setLevel(logging.INFO)
+LOGGER.setLevel(logging.DEBUG)
 
 # process details
 __version__ = "1.0"
@@ -63,15 +64,13 @@ def m2n(metalink_reference, index, output_dir):
             LOGGER.debug("Fetching Metalink file: [%s]", metalink_reference)
             metalink_path = fetch_file(metalink_reference, tmp_dir, timeout=10, retry=3)
             LOGGER.debug("Reading Metalink file: [%s]", metalink_path)
-            with open(metalink_path) as metalink_file:
-                metalink_content = json.load(metalink_file)
-            if not isinstance(metalink_content, list) or any(not _is_netcdf_url(f) for f in metalink_content):
-                LOGGER.error("Invalid Metalink: [%s]", metalink_content)
-                raise ValueError("Invalid Metalink file format, expected a plain array of NetCDF file URL strings.")
+            parser = etree.HTMLParser()
+            xml_data = etree.parse(metalink_path, parser)
             LOGGER.debug("Parsing Metalink file references.")
-            for file_url in metalink_content:
-                LOGGER.debug("Fetching NetCDF reference from Metalink file: [%s]", file_url)
-                fetch_file(file_url, output_dir, timeout=10, retry=3)
+            nc_file_url = xml_data.xpath('string(//metalink/file[' + str(index) + ']/metaurl)')
+            LOGGER.debug("Fetching NetCDF reference from Metalink file: [%s]", metalink_reference)
+            LOGGER.debug("NetCDF file URL : " + nc_file_url)
+            fetch_file(nc_file_url, output_dir)
     except Exception as exc:
         # log only debug for tracking, re-raise and actual error wil be logged by top process monitor
         LOGGER.debug("Process '%s' raised an exception: [%s]", PACKAGE_NAME, exc)
@@ -85,7 +84,7 @@ def main():
     parser.add_argument("-i", metavar="metalink", type=str,
                         help="Metalink file to be parsed for NetCDF file names.")
     parser.add_argument("-idx", metavar="index", type=int,
-                        help="Index of the specific NetCDF file to extract.")
+                        help="Index of the specific NetCDF file to extract. First element's index is 1.")
     parser.add_argument("-o", metavar="outdir", default=CUR_DIR,
                         help="Output directory of the retrieved NetCDF files extracted by name from the Metalink file.")
     args = parser.parse_args()

@@ -17,7 +17,7 @@
         "lat1": "float",
         "lon0": "float",
         "lon1": "float",
-        "metaindex": "integer"
+        "metaindex": "int"
     },
     "outputs": {
         "output": {
@@ -35,12 +35,12 @@
                 "lon0": "lon0",
                 "lon1": "lon1"
             },
-            "out": ["output"]
+            "out": ["metalink"]
         },
         "metalink_picker": {
             "run": "metalink2netcdf",
             "in": {
-                "input": "subset/output",
+                "input": "subset/metalink",
                 "index": "metaindex"
             },
             "out": ["output"]
