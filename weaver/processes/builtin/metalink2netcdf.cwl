@@ -11,14 +11,13 @@ inputs:
      position: 1
      prefix: "-i"
  index:
-   type: integer
+   type: int
    inputBinding:
      position: 2
      prefix: "-idx"
 outputs:
  output:
-   type:
-     items: File
+   type: File
    outputBinding:
      glob: "*.nc"
 $namespaces:
