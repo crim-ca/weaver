@@ -2076,9 +2076,9 @@ class WpsPackage(Process):
                     elif isinstance(input_i, (LiteralInput, BoundingBoxInput)):
                         # extend array data that allow max_occur > 1
                         if is_array:
-                            input_data = [i.url if input_i.prop == 'url' else i.data for i in input_occurs]
+                            input_data = [i.url if input_i.prop == "url" else i.data for i in input_occurs]
                         else:
-                            input_data = input_i.url if input_i.prop == 'url' else input_i.data
+                            input_data = input_i.url if input_i.prop == "url" else input_i.data
                         cwl_inputs[input_id] = input_data
                     else:
                         raise self.exception_message(
@@ -2229,39 +2229,39 @@ class WpsPackage(Process):
         if len(app_hints) > 1:
             raise ValueError("Package 'requirements' and/or 'hints' define too many conflicting values: {}, "
                              "only one permitted amongst {}.".format(list(app_hints), CWL_REQUIREMENT_APP_TYPES))
-        requirement = app_hints[0] if app_hints else {'class': ""}
+        requirement = app_hints[0] if app_hints else {"class": ""}
 
         def _get_wps1_params(_requirement):
             params = {}
 
-            required_params = ['provider', 'process']
+            required_params = ["provider", "process"]
             for param in required_params:
                 if param not in _requirement:
-                    raise ValueError("Missing requirement detail [{}]: {}".format(_requirement['class'], param))
+                    raise ValueError("Missing requirement detail [{}]: {}".format(_requirement["class"], param))
                 params[param] = _requirement[param]
             return params
 
-        if requirement['class'].endswith(CWL_REQUIREMENT_APP_WPS1):
+        if requirement["class"].endswith(CWL_REQUIREMENT_APP_WPS1):
             from weaver.processes.wps1_process import Wps1Process
             params = _get_wps1_params(requirement)
             return Wps1Process(
-                provider=params['provider'],
-                process=params['process'],
+                provider=params["provider"],
+                process=params["process"],
                 request=self.request,
                 update_status=_update_status_dispatch,
             )
-        elif requirement['class'].endswith(CWL_REQUIREMENT_APP_ESGF_CWT):
+        elif requirement["class"].endswith(CWL_REQUIREMENT_APP_ESGF_CWT):
             from weaver.processes.esgf_process import ESGFProcess
             params = _get_wps1_params(requirement)
             return ESGFProcess(
-                provider=params['provider'],
-                process=params['process'],
+                provider=params["provider"],
+                process=params["process"],
                 request=self.request,
                 update_status=_update_status_dispatch,
             )
         else:
             # implements both `PROCESS_APPLICATION` with `CWL_REQUIREMENT_APP_DOCKER` and `PROCESS_WORKFLOW`
-            LOGGER.info("WPS-3 Package resolved from requirement/hint: %s", requirement['class'])
+            LOGGER.info("WPS-3 Package resolved from requirement/hint: %s", requirement["class"])
             from weaver.processes.wps3_process import Wps3Process
             return Wps3Process(step_payload=step_payload,
                                joborder=joborder,
