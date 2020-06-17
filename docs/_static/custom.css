@@ -1,0 +1,12 @@
+
+/* override readthedocs theme to enforce using full-screen width for content */
+.wy-nav-content {
+    max-width: none;
+}
+
+/* force code-table to align their cells to top (align code line numbers between columns)
+    note: class attribute must be applied to match this specific type of table
+*/
+.code-table tbody tr td {
+   vertical-align: top !important;
+}

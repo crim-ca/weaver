@@ -184,85 +184,93 @@ requires that all I/O have unique ``id``. On the `WPS` side, a list of I/O is *a
 defining the value as a list of those values during :ref:`Execute` request (see also :ref:`Multiple Inputs`).
 
 To summarize, the following `CWL` and `WPS` I/O definitions are all equivalent and will result into the same process
-definition after deployment. For simplification purpose, below examples omit all but mandatory fields to produce the
-same result and only list the I/O portion of the full deployment body. Other fields are discussed afterward.
+definition after deployment. For simplification purpose, below examples omit all but mandatory fields (only of the
+inputs portion) to produce the same result and only list the I/O portion of the full deployment body.
+Other fields are discussed afterward in specific sections.
 
-.. code-block:: json
-    :caption: CWL I/O as array list of objects
-    :linenos:
 
-    {
-      "inputs": [
+.. table::
+    :class: code-table
+    :align: center
+
+    +-------------------------------------------------------------------------+ \
+    -------------------------------------------------------------------------+ \
+    | .. code-block:: json
+        :caption: CWL I/O as array list of objects
+        :linenos:
+
         {
-          "id": "single-str",
-          "type": "string"
-        },
-        {
-          "id": "multi-file",
-          "type": "File[]"
+          "inputs": [
+            {
+              "id": "single-str",
+              "type": "string"
+            },
+            {
+              "id": "multi-file",
+              "type": "File[]"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "process-output-1",
+              "type": "File"
+            },
+            {
+              "id": "process-output-2",
+              "type": "File"
+            }
+          ]
         }
-      ],
-      "outputs": [
-        {
-          "id": "process-output-1",
-          "type": "File"
-        },
-        {
-          "id": "process-output-2",
-          "type": "File"
-        }
-      ]
-    }
+    | .. code-block:: json
+        :caption: CWL I/O as key-value mapping
+        :linenos:
 
-.. code-block:: json
-    :caption: CWL I/O as key-value mapping
-    :linenos:
-
-    {
-      "inputs": {
-        "single-str": {
-          "type": "string"
-        },
-        "multi-file": {
-          "type": "File[]"
-        }
-      },
-      "outputs": {
-        "process-output-1": {
-          "type": "File"
-        },
-        "process-output-2": {
-          "type": "File"
-        }
-      }
-    }
-
-.. code-block:: json
-    :caption: WPS I/O equivalent to CWL definitions
-    :linenos:
-
-    {
-      "inputs": [
         {
-          "id": "single-str"
-        },
-        {
-          "id": "multi-file",
-          "formats": []
+          "inputs": {
+            "single-str": {
+              "type": "string"
+            },
+            "multi-file": {
+              "type": "File[]"
+            }
+          },
+          "outputs": {
+            "process-output-1": {
+              "type": "File"
+            },
+            "process-output-2": {
+              "type": "File"
+            }
+          }
         }
-      ],
-      "outputs": [
-        {
-          "id": "process-output-1",
-          "formats": []
-        },
-        {
-          "id": "process-output-2",
-          "formats": []
-        }
-      ]
-    }
+    | .. code-block:: json
+        :caption: WPS I/O equivalent to CWL definitions
+        :linenos:
 
+        {
+          "inputs": [
+            {
+              "id": "single-str"
+            },
+            {
+              "id": "multi-file",
+              "formats": []
+            }
+          ],
+          "outputs": [
+            {
+              "id": "process-output-1",
+              "formats": []
+            },
+            {
+              "id": "process-output-2",
+              "formats": []
+            }
+          ]
+        }
+    |
+    +-------------------------------------------------------------------------+ \
+    -------------------------------------------------------------------------+ \
 
 The `WPS` example above requires a ``format`` field for the corresponding `CWL` ``File`` type in order to distinguish
 it from a plain string. More details are available in `Inputs/Outputs Type`_ below about this requirement.
@@ -324,10 +332,7 @@ Obviously, the equivalent `CWL` definition is simpler in this case (i.e.: only `
 recommended to take advantage of `Weaver`'s merging strategy in this case by providing only the details through the
 `CWL` definition and have the corresponding `WPS` I/O type automatically deduced by the generated process.
 
-
-
 .. _bbox-note:
-
 .. note::
     As of the current version of `Weaver`, `WPS` data type ``BoundingBox`` is not supported. The schema definition
     exists in `WPS` context but is not handled by any `CWL` type conversion yet. This feature is reflected
@@ -346,54 +351,49 @@ corresponding *namespaced* ``format`` of `CWL`.
 
 For example, the following input definitions are equivalent in both contexts.
 
-.. code-block:: json
-    :caption: WPS Format with MIME-type
-    :linenos:
+.. table::
+    :class: code-table
+    :align: center
+    :widths: 50,50
 
-    {
-      "id": "input",
-      "formats": [
-        {"mimeType": "application/x-netcdf"},
-        {"mimeType": "application/json"}
-      ]
-    }
-
-.. code-block:: json
-    :caption: CWL Format with Namespace
-    :linenos:
-
-    {
-      "inputs": [
-        {
-          "id": "input",
-          "format": [
-            "edam:format_3650",
-            "iana:application/json"
-          ]
-        }
-      ]
-      "$namespaces": {
-        "edam": "http://edamontology.org/",
-        "iana": "https://www.iana.org/assignments/media-types/"
-      }
-    }
+    +-----------------------------------------------+-----------------------------------------------------------------+
+    | .. code-block:: json                          | .. code-block:: json                                            |
+    |    :caption: WPS Format with MIME-type        |    :caption: CWL Format with Namespace                          |
+    |    :linenos:                                  |    :linenos:                                                    |
+    |                                               |                                                                 |
+    |    {                                          |    {                                                            |
+    |      "id": "input",                           |      "inputs": [                                                |
+    |      "formats": [                             |        {                                                        |
+    |        {"mimeType": "application/x-netcdf"},  |          "id": "input",                                         |
+    |        {"mimeType": "application/json"}       |          "format": [                                            |
+    |      ]                                        |            "edam:format_3650",                                  |
+    |    }                                          |            "iana:application/json"                              |
+    |                                               |          ]                                                      |
+    |                                               |        }                                                        |
+    |                                               |      ],                                                         |
+    |                                               |      "$namespaces": {                                           |
+    |                                               |        "edam": "http://edamontology.org/",                      |
+    |                                               |        "iana": "https://www.iana.org/assignments/media-types/"  |
+    |                                               |      }                                                          |
+    |                                               |    }                                                            |
+    +-----------------------------------------------+-----------------------------------------------------------------+
 
 
 As demonstrated, both contexts accept multiple formats for inputs. These effectively represent *supported formats* by
 the underlying application. The two MIME-types selected for this example are chosen specifically to demonstrate how
 `CWL` formats must be specified. More precisely, `CWL` requires a real schema definition referencing to an existing
-onthology to validate formats, specified through the ``$namespaces`` section. Each format entry is then defined as a
-mapping of the appropriate namespace to the identifier of the onthology. Alternatively, you can also provide the full
-URL of the onthology reference in the format string.
+ontology to validate formats, specified through the ``$namespaces`` section. Each format entry is then defined as a
+mapping of the appropriate namespace to the identifier of the ontology. Alternatively, you can also provide the full
+URL of the ontology reference in the format string.
 
 Like many other fields, this information can become quite rapidly redundant and difficult to maintain. For this reason,
 `Weaver` will automatically fill the missing detail if only one of the two corresponding information between `CWL` and
 `WPS` is provided. In other words, an application developer could only specify the I/O's ``formats`` in the `WPS`
 portion during process deployment, and `Weaver` will take care to update the matching `CWL` definition without any user
 intervention. This makes it also easier for the user to specify supported formats since it is generally easier to
-remember MIME-type names than onthology references. `Weaver` has a large set of common MIME-types that it knows how to
-convert to corresponding onthologies. Also, `Weaver` will look for any new MIME-type it doesn't explicitly know about
-onto the IANA onthology in order to attempt automatically resolving it.
+remember MIME-type names than ontology references. `Weaver` has a large set of common MIME-types that it knows how to
+convert to corresponding ontologies. Also, `Weaver` will look for any new MIME-type it doesn't explicitly know about
+onto the IANA ontology in order to attempt automatically resolving it.
 
 When formats are resolved between the two contexts, `Weaver` applies information in a complimentary fashion. This means
 for example that if the user provided ``application/x-netcdf`` on the `WPS` side and ``iana:application/json`` on the
@@ -425,7 +425,7 @@ any execution operation with `CWL`, but it will remove the additional validation
 deteriorates process resolution when chaining processes inside a :ref:`CWL Workflow`).
 
 If the `WPS` output only specifies a single MIME-type, then the equivalent format (after being resolved to a valid
-onthology) will be preserved on the `CWL` side since the result is ensured to be the unique one provided. For this
+ontology) will be preserved on the `CWL` side since the result is ensured to be the unique one provided. For this
 reason, processes with specific single-format output are be preferred whenever possible. This also removes ambiguity
 in the expected output format, which usually requires a *toggle* input specifying the desired type for processes
 providing a multi-format output. It is instead recommended to produce multiple processes with a fixed output format for
@@ -439,31 +439,24 @@ Allowed values in the context of `WPS` ``LiteralData`` provides a mean for the a
 to a specific set of values. In `CWL`, the same can be achieved using an ``enum`` definition. Therefore, the following
 two variants are equivalent and completely interchangeable.
 
-.. code-block:: json
-    :caption: WPS AllowedValues Input
-    :linenos:
+.. table::
+    :class: code-table
+    :align: center
+    :widths: 50,50
 
-    {
-      "id": "input",
-      "literalDataDomains": [
-        {"allowedValues": ["value-1", "value-2"]}
-      ]
-    }
-
-
-.. code-block:: json
-    :caption: CWL Enum Values
-    :linenos:
-
-    {
-      "id": "input",
-      "type": {
-        "type": "enum",
-        "symbols": ["value-1", "value-2"]
-      }
-    }
-
-
+    +---------------------------------------------------+-----------------------------------------------+
+    | .. code-block:: json                              | .. code-block:: json                          |
+    |    :caption: WPS AllowedValues Input              |    :caption: CWL Enum Values                  |
+    |    :linenos:                                      |    :linenos:                                  |
+    |                                                   |                                               |
+    |    {                                              |    {                                          |
+    |      "id": "input",                               |      "id": "input",                           |
+    |      "literalDataDomains": [                      |      "type": {                                |
+    |        {"allowedValues": ["value-1", "value-2"]}  |        "type": "enum",                        |
+    |      ]                                            |        "symbols": ["value-1", "value-2"]      |
+    |    }                                              |      }                                        |
+    |                                                   |    }                                          |
+    +---------------------------------------------------+-----------------------------------------------+
 
 `Weaver` will ensure to propagate such definitions bidirectionally in order to update the `CWL` or `WPS`
 correspondingly with the provided information in the other context if missing. The primitive type to apply to a missing
@@ -508,6 +501,7 @@ Some parts of the following definitions are purposely omitted to better highligh
 *optional* information.
 
 .. table::
+    :class: code-table
     :align: center
     :widths: 50,50
 

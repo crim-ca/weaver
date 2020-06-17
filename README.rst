@@ -26,6 +26,7 @@ For more details, see `Configuration`_ section.
 
 .. list-table::
     :stub-columns: 1
+    :widths: 20,80
 
     * - dependencies
       - | |py_ver| |requires| |pyup|
@@ -34,8 +35,8 @@ For more details, see `Configuration`_ section.
     * - releases
       - | |version| |commits-since| |license|
 
-.. |py_ver| image:: https://img.shields.io/badge/python-2.7%2C%203.6%2B-blue.svg
-    :alt: Requires Python 2.7, 3.6+
+.. |py_ver| image:: https://img.shields.io/badge/python-3.6%2B-blue.svg
+    :alt: Requires Python 3.6+
     :target: https://www.python.org/getit
 
 .. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/1.10.1.svg
