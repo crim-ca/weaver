@@ -1,6 +1,6 @@
 """
-Extracts and fetches NetCDF files from a Metalink file containing an URL, and 
-outputs the NetCDF file at a given index of the list.
+Extracts and fetches NetCDF files from a Metalink file containing an URL, and outputs the NetCDF file at a given index
+ of the list.
 """
 import argparse
 import json
