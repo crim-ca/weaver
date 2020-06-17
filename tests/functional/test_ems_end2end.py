@@ -632,12 +632,6 @@ class End2EndEMSTestCase(TestCase):
                              log_full_trace=True)
 
     @pytest.mark.xfail(reason="Workflow not working anymore. IO to be repaired.")
-    def test_workflow_file_to_string_array(self):
-        self.workflow_runner(self.PROCESS_WORKFLOW_FILE_TO_SUBSETCRIM,
-                             [self.PROCESS_SUBSET_BBOX_ID],
-                             log_full_trace=True)
-
-    @pytest.mark.xfail(reason="Workflow not working anymore. IO to be repaired.")
     def test_workflow_esgf_requirements(self):
         self.workflow_runner(self.PROCESS_WORKFLOW_SUBSETNASAESGF_SUBSETCRIM,
                              [self.PROCESS_SUBSET_NASAESGF, self.PROCESS_SUBSET_BBOX_ID],
