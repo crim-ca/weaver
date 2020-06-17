@@ -49,7 +49,6 @@ class ProcessInfo(object):
 
 # pylint: disable=C0103,invalid-name
 @pytest.mark.slow
-@pytest.mark.debug
 @pytest.mark.functional
 @pytest.mark.skipif(condition=not len(str(os.getenv("WEAVER_TEST_SERVER_HOSTNAME", ""))),
                     reason="Test server not defined!")
@@ -615,35 +614,39 @@ class End2EndEMSTestCase(TestCase):
         cls.assert_test(lambda: resp.json.get("configuration") == WEAVER_CONFIGURATION_EMS,
                         message="weaver must be configured as EMS.")
 
-    # def test_workflow_wps1_requirements(self):
-    #     self.workflow_runner(self.PROCESS_WORKFLOW_SUBSET_ICE_DAYS,
-    #                          [self.PROCESS_SUBSET_BBOX_ID, self.PROCESS_ICE_DAYS_ID],
-    #                          log_full_trace=True)
+    @pytest.mark.xfail(reason="Workflow not working anymore. To repair.")
+    def test_workflow_wps1_requirements(self):
+        self.workflow_runner(self.PROCESS_WORKFLOW_SUBSET_ICE_DAYS,
+                             [self.PROCESS_SUBSET_BBOX_ID, self.PROCESS_ICE_DAYS_ID],
+                             log_full_trace=True)
 
     def test_workflow_subset_picker(self):
         self.workflow_runner(self.PROCESS_WORKFLOW_SUBSET_PICKER,
                              [self.PROCESS_SUBSET_BBOX_ID],
                              log_full_trace=True)
 
-    # def test_workflow_llnl_subset_esgf(self):
-    #     self.workflow_runner(self.PROCESS_WORKFLOW_SUBSETLLNL_SUBSETCRIM,
-    #                          [self.PROCESS_SUBSET_ESGF, self.PROCESS_SUBSET_BBOX_ID],
-    #                          log_full_trace=True)
+    @pytest.mark.xfail(reason="Workflow not working anymore. IO to be repaired.")
+    def test_workflow_llnl_subset_esgf(self):
+        self.workflow_runner(self.PROCESS_WORKFLOW_SUBSETLLNL_SUBSETCRIM,
+                             [self.PROCESS_SUBSET_ESGF, self.PROCESS_SUBSET_BBOX_ID],
+                             log_full_trace=True)
 
-    # def test_workflow_file_to_string_array(self):
-    #     self.workflow_runner(self.PROCESS_WORKFLOW_FILE_TO_SUBSETCRIM,
-    #                          [self.PROCESS_SUBSET_BBOX_ID],
-    #                          log_full_trace=True)
+    @pytest.mark.xfail(reason="Workflow not working anymore. IO to be repaired.")
+    def test_workflow_file_to_string_array(self):
+        self.workflow_runner(self.PROCESS_WORKFLOW_FILE_TO_SUBSETCRIM,
+                             [self.PROCESS_SUBSET_BBOX_ID],
+                             log_full_trace=True)
 
-    # def test_workflow_esgf_requirements(self):
-    #     self.workflow_runner(self.PROCESS_WORKFLOW_SUBSETNASAESGF_SUBSETCRIM,
-    #                          [self.PROCESS_SUBSET_NASAESGF, self.PROCESS_SUBSET_BBOX_ID],
-    #                          log_full_trace=True)
+    @pytest.mark.xfail(reason="Workflow not working anymore. IO to be repaired.")
+    def test_workflow_esgf_requirements(self):
+        self.workflow_runner(self.PROCESS_WORKFLOW_SUBSETNASAESGF_SUBSETCRIM,
+                             [self.PROCESS_SUBSET_NASAESGF, self.PROCESS_SUBSET_BBOX_ID],
+                             log_full_trace=True)
 
-    # def test_workflow_file_to_string_array(self):
-    #     self.workflow_runner(self.PROCESS_WORKFLOW_FILE_TO_SUBSETCRIM,
-    #                          [self.PROCESS_SUBSET_BBOX_ID],
-    #                          log_full_trace=True)
+    def test_workflow_file_to_string_array(self):
+        self.workflow_runner(self.PROCESS_WORKFLOW_FILE_TO_SUBSETCRIM,
+                             [self.PROCESS_SUBSET_BBOX_ID],
+                             log_full_trace=True)
 
     def test_workflow_wps3_requirements(self):
         self.workflow_runner(self.PROCESS_WORKFLOW_ID,
