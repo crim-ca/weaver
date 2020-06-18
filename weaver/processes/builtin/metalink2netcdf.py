@@ -3,7 +3,6 @@ Extracts and fetches NetCDF files from a Metalink file containing an URL, and ou
  of the list.
 """
 import argparse
-import json
 import logging
 import os
 import sys
@@ -53,7 +52,7 @@ def _is_netcdf_url(url):
 def m2n(metalink_reference, index, output_dir):
     # type: (AnyStr, int, AnyStr) -> None
     LOGGER.info(
-        "Got arguments: metalink_reference={} index={} output_dir={}".format(metalink_reference, index, output_dir)
+        "Got arguments: metalink_reference=%s index=%s output_dir=%s", metalink_reference, index, output_dir
     )
     LOGGER.info("Process '%s' execution starting...", PACKAGE_NAME)
     LOGGER.debug("Process '%s' output directory: [%s].", PACKAGE_NAME, output_dir)
@@ -67,9 +66,9 @@ def m2n(metalink_reference, index, output_dir):
             parser = etree.HTMLParser()
             xml_data = etree.parse(metalink_path, parser)
             LOGGER.debug("Parsing Metalink file references.")
-            nc_file_url = xml_data.xpath('string(//metalink/file[' + str(index) + ']/metaurl)')
+            nc_file_url = xml_data.xpath("string(//metalink/file[" + str(index) + "]/metaurl)")
             LOGGER.debug("Fetching NetCDF reference from Metalink file: [%s]", metalink_reference)
-            LOGGER.debug("NetCDF file URL : " + nc_file_url)
+            LOGGER.debug("NetCDF file URL : %s", nc_file_url)
             fetch_file(nc_file_url, output_dir)
     except Exception as exc:
         # log only debug for tracking, re-raise and actual error wil be logged by top process monitor

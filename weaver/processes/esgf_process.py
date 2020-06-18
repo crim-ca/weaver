@@ -12,7 +12,7 @@ from weaver.processes.wps1_process import Wps1Process
 from weaver.status import STATUS_FAILED, STATUS_RUNNING, STATUS_SUCCEEDED
 
 if TYPE_CHECKING:
-    from weaver.typedefs import JsonBody
+    from weaver.typedefs import JSON
     from typing import AnyStr, Dict, List, Tuple
 
 LOGGER = logging.getLogger(__name__)
@@ -39,10 +39,10 @@ class InputNames(object):
 class ESGFProcess(Wps1Process):
     required_inputs = ("variable", )
 
-    def execute(self, workflow_inputs, output_dir, expected_outputs):
-        # type: (JsonBody, AnyStr, Dict[AnyStr, AnyStr]) -> None
+    def execute(self, workflow_inputs, out_dir, expected_outputs):
+        # type: (JSON, AnyStr, Dict[AnyStr, AnyStr]) -> None
         """Execute an ESGF process from cwl inputs"""
-        LOGGER.debug("Executing ESGF process {}".format(self.process))
+        LOGGER.debug("Executing ESGF process %s", self.process)
 
         self._check_required_inputs(workflow_inputs)
 
@@ -51,10 +51,10 @@ class ESGFProcess(Wps1Process):
         domain = self._get_domain(workflow_inputs)
 
         esgf_process = self._run_process(api_key, inputs, domain)
-        self._process_results(esgf_process, output_dir, expected_outputs)
+        self._process_results(esgf_process, out_dir, expected_outputs)
 
     def _prepare_inputs(self, workflow_inputs):
-        # type: (JsonBody) -> List[cwt.Variable]
+        # type: (JSON) -> List[cwt.Variable]
         """Convert inputs from cwl inputs to ESGF format"""
         message = "Preparing execute request for remote ESGF provider."
         self.update_status(message, Percent.PREPARING, STATUS_RUNNING)
@@ -72,7 +72,7 @@ class ESGFProcess(Wps1Process):
 
     @staticmethod
     def _get_domain(workflow_inputs):
-        # type: (JsonBody) -> Optional[cwt.Domain]
+        # type: (JSON) -> Optional[cwt.Domain]
 
         dimensions_names = [
             InputNames.time,
@@ -133,7 +133,7 @@ class ESGFProcess(Wps1Process):
 
     @staticmethod
     def _get_files_urls(workflow_inputs):
-        # type: (JsonBody) -> List[Tuple[str, str]]
+        # type: (JSON) -> List[Tuple[str, str]]
         """Get all netcdf files from the cwl inputs"""
         urls = []
 
@@ -152,7 +152,7 @@ class ESGFProcess(Wps1Process):
 
     @staticmethod
     def _get_variable(workflow_inputs):
-        # type: (JsonBody) -> str
+        # type: (JSON) -> str
         """Get all netcdf files from the cwl inputs"""
         if InputNames.variable not in workflow_inputs:
             raise ValueError("Missing required input: variable")
@@ -240,16 +240,16 @@ class ESGFProcess(Wps1Process):
         if len(nc_outputs) > 1:
             raise NotImplementedError("Multiple outputs are not implemented")
 
-        LOGGER.debug("Downloading file: {}".format(url))
+        LOGGER.debug("Downloading file: %s", url)
 
         # Standard Thredds naming convention?
         url = url.replace("/dodsC/", "/fileServer/")
 
-        r = requests.get(url, allow_redirects=True, stream=True, verify=False)
+        req = requests.get(url, allow_redirects=True, stream=True, verify=False)
         output_file_name = nc_outputs[0]
 
         with open(join(output_dir, output_file_name), "wb") as f:
-            for chunk in r.iter_content(chunk_size=1024):
+            for chunk in req.iter_content(chunk_size=1024):
                 if chunk:
                     f.write(chunk)
 

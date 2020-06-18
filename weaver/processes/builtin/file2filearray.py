@@ -45,7 +45,7 @@ def _is_netcdf_url(url):
 def f2fa(input_file, output_dir):
     # type: (AnyStr, AnyStr) -> None
     LOGGER.info(
-        "Got arguments: input_file={} output_dir={}".format(input_file, output_dir)
+        "Got arguments: input_file=%s output_dir=%s", input_file, output_dir
     )
     LOGGER.info("Process '%s' execution starting...", PACKAGE_NAME)
     LOGGER.debug("Process '%s' output directory: [%s].", PACKAGE_NAME, output_dir)
