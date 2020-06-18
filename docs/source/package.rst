@@ -185,92 +185,41 @@ defining the value as a list of those values during :ref:`Execute` request (see 
 
 To summarize, the following `CWL` and `WPS` I/O definitions are all equivalent and will result into the same process
 definition after deployment. For simplification purpose, below examples omit all but mandatory fields (only of the
-inputs portion) to produce the same result and only list the I/O portion of the full deployment body.
+``inputs`` and ``outputs`` portion of the full deployment body) to produce the same result.
 Other fields are discussed afterward in specific sections.
-
 
 .. table::
     :class: code-table
     :align: center
 
-    +-------------------------------------------------------------------------+ \
-    -------------------------------------------------------------------------+ \
-    | .. code-block:: json
-        :caption: CWL I/O as array list of objects
-        :linenos:
-
-        {
-          "inputs": [
-            {
-              "id": "single-str",
-              "type": "string"
-            },
-            {
-              "id": "multi-file",
-              "type": "File[]"
-            }
-          ],
-          "outputs": [
-            {
-              "id": "process-output-1",
-              "type": "File"
-            },
-            {
-              "id": "process-output-2",
-              "type": "File"
-            }
-          ]
-        }
-    | .. code-block:: json
-        :caption: CWL I/O as key-value mapping
-        :linenos:
-
-        {
-          "inputs": {
-            "single-str": {
-              "type": "string"
-            },
-            "multi-file": {
-              "type": "File[]"
-            }
-          },
-          "outputs": {
-            "process-output-1": {
-              "type": "File"
-            },
-            "process-output-2": {
-              "type": "File"
-            }
-          }
-        }
-    | .. code-block:: json
-        :caption: WPS I/O equivalent to CWL definitions
-        :linenos:
-
-        {
-          "inputs": [
-            {
-              "id": "single-str"
-            },
-            {
-              "id": "multi-file",
-              "formats": []
-            }
-          ],
-          "outputs": [
-            {
-              "id": "process-output-1",
-              "formats": []
-            },
-            {
-              "id": "process-output-2",
-              "formats": []
-            }
-          ]
-        }
-    |
-    +-------------------------------------------------------------------------+ \
-    -------------------------------------------------------------------------+ \
+    +-----------------------------------+----------------------------------------+----------------------------------+
+    | .. code-block:: json              | .. code-block:: json                   | .. code-block:: json             |
+    |   :caption: CWL I/O objects array |   :caption: CWL I/O key-value mapping  |   :caption: WPS I/O definition   |
+    |   :linenos:                       |   :linenos:                            |   :linenos:                      |
+    |                                   |                                        |                                  |
+    |   {                               |   {                                    |   {                              |
+    |     "inputs": [                   |     "inputs": {                        |     "inputs": [                  |
+    |       {                           |       "single-str": {                  |       {                          |
+    |         "id": "single-str",       |         "type": "string"               |         "id": "single-str"       |
+    |         "type": "string"          |       },                               |       },                         |
+    |       },                          |       "multi-file": {                  |       {                          |
+    |       {                           |         "type": "File[]"               |         "id": "multi-file",      |
+    |         "id": "multi-file",       |       }                                |         "formats": []            |
+    |         "type": "File[]"          |     },                                 |       }                          |
+    |       }                           |     "outputs": {                       |     ],                           |
+    |     ],                            |       "output-1": {                    |     "outputs": [                 |
+    |     "outputs": [                  |         "type": "File"                 |       {                          |
+    |       {                           |       },                               |         "id": "output-1",        |
+    |         "id": "output-1",         |       "output-2": {                    |         "formats": []            |
+    |         "type": "File"            |         "type": "File"                 |       },                         |
+    |       },                          |       }                                |       {                          |
+    |       {                           |     }                                  |         "id": "output-2",        |
+    |         "id": "output-2",         |   }                                    |         "formats": []            |
+    |         "type": "File"            |                                        |       }                          |
+    |       }                           |                                        |     ]                            |
+    |     ]                             |                                        |   }                              |
+    |   }                               |                                        |                                  |
+    +-----------------------------------+----------------------------------------+----------------------------------+
 
 The `WPS` example above requires a ``format`` field for the corresponding `CWL` ``File`` type in order to distinguish
 it from a plain string. More details are available in `Inputs/Outputs Type`_ below about this requirement.
