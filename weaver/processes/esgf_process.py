@@ -71,7 +71,7 @@ class ESGFProcess(Wps1Process):
         return inputs
 
     @staticmethod
-    def _get_domain(self, workflow_inputs):
+    def _get_domain(workflow_inputs):
         # type: (JsonBody) -> Optional[cwt.Domain]
 
         dimensions_names = [
@@ -126,14 +126,13 @@ class ESGFProcess(Wps1Process):
             )
             return domain
 
-    @staticmethod
     def _check_required_inputs(self, workflow_inputs):
         for required_input in self.required_inputs:
             if required_input not in workflow_inputs:
                 raise ValueError("Missing required input: {}".format(required_input))
 
     @staticmethod
-    def _get_files_urls(self, workflow_inputs):
+    def _get_files_urls(workflow_inputs):
         # type: (JsonBody) -> List[Tuple[str, str]]
         """Get all netcdf files from the cwl inputs"""
         urls = []
@@ -152,14 +151,13 @@ class ESGFProcess(Wps1Process):
         return urls
 
     @staticmethod
-    def _get_variable(self, workflow_inputs):
+    def _get_variable(workflow_inputs):
         # type: (JsonBody) -> str
         """Get all netcdf files from the cwl inputs"""
         if InputNames.variable not in workflow_inputs:
             raise ValueError("Missing required input: variable")
         return workflow_inputs[InputNames.variable]
 
-    @staticmethod
     def _run_process(self, api_key, inputs, domain=None):
         # type: (str, List[cwt.Variable], Optional[cwt.Domain]) -> cwt.Process
         """Run an ESGF process"""
