@@ -26,7 +26,6 @@ def includeme(config):
         return
 
     LOGGER.info("Adding database...")
-    from weaver.database.mongodb import MongoDatabase
     config.registry.db = MongoDatabase(config.registry)
 
     def _add_db(request):
