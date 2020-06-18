@@ -1,16 +1,15 @@
-from collections import defaultdict
-from os.path import join
-
-from typing import TYPE_CHECKING, Optional
-
-from weaver.status import STATUS_RUNNING, STATUS_SUCCEEDED, STATUS_FAILED
-from weaver.processes.wps1_process import Wps1Process
-
 import logging
-import requests
-import cwt
 import re
 import time
+from collections import defaultdict
+from os.path import join
+from typing import TYPE_CHECKING, Optional
+
+import requests
+
+import cwt
+from weaver.processes.wps1_process import Wps1Process
+from weaver.status import STATUS_FAILED, STATUS_RUNNING, STATUS_SUCCEEDED
 
 if TYPE_CHECKING:
     from weaver.typedefs import JsonBody

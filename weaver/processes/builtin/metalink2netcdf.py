@@ -10,8 +10,8 @@ import sys
 from typing import Any, AnyStr
 
 import six
-from six.moves.urllib.parse import urlparse
 from lxml import etree
+from six.moves.urllib.parse import urlparse
 
 if six.PY3:
     from tempfile import TemporaryDirectory
