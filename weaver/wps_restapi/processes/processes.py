@@ -58,7 +58,6 @@ from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps import (
     check_wps_status,
     get_wps_local_status_location,
-    get_wps_output_dir,
     get_wps_output_path,
     get_wps_output_url,
     load_pywps_cfg
