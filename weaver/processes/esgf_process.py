@@ -163,7 +163,7 @@ class ESGFProcess(Wps1Process):
         """Run an ESGF process"""
         LOGGER.debug("Connecting to ESGF WPS")
 
-        wps = cwt.WPSClient(self.provider, api_key=api_key, verify=False)
+        wps = cwt.WPSClient(self.provider, api_key=api_key, verify=True)
         process = wps.processes(self.process)[0]
 
         message = "Sending request."
