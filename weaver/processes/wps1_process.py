@@ -82,13 +82,13 @@ class Wps1Process(WpsProcessInterface):
                 input_values = []
                 for val in workflow_input_val:
                     if isinstance(val, dict):
-                        val = val['location']
+                        val = val["location"]
 
                     # owslib only accepts strings, not numbers directly
                     if isinstance(val, (int, float)):
                         val = str(val)
 
-                    if val.startswith('file://'):
+                    if val.startswith("file://"):
                         # we need to host file starting with file:// scheme
                         val = self.host_file(val)
 

@@ -17,7 +17,7 @@ LOGGER = logging.getLogger(__name__)
 LOGGER.addHandler(logging.StreamHandler(sys.stdout))
 LOGGER.setLevel(logging.INFO)
 
-output_cwl_json = "cwl.output.json"
+OUTPUT_CWL_JSON = "cwl.output.json"
 
 
 def main(input_file, output_dir):
@@ -26,7 +26,7 @@ def main(input_file, output_dir):
         "Got arguments: input_file={} output_dir={}".format(input_file, output_dir)
     )
     output_data = {"output": [input_file]}
-    json.dump(output_data, open(os.path.join(output_dir, output_cwl_json), "w"))
+    json.dump(output_data, open(os.path.join(output_dir, OUTPUT_CWL_JSON), "w"))
 
 
 if __name__ == "__main__":
