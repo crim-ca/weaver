@@ -1,9 +1,9 @@
 import logging
 from typing import TYPE_CHECKING
-from weaver.database.mongodb import MongoDatabase
 
 from pyramid.settings import asbool
 
+from weaver.database.mongodb import MongoDatabase
 from weaver.utils import get_registry, get_settings
 
 LOGGER = logging.getLogger(__name__)

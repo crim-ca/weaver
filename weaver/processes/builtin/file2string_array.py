@@ -1,12 +1,12 @@
 __doc__ = """
 Transforms a CWL file input into a cwl output of a list of strings
 """
-from typing import AnyStr
 import argparse
-import logging
 import json
-import sys
+import logging
 import os
+import sys
+from typing import AnyStr
 
 CUR_DIR = os.path.abspath(os.path.dirname(__file__))
 
