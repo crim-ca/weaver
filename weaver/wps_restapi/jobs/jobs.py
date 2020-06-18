@@ -1,15 +1,10 @@
-import os
 from typing import TYPE_CHECKING
 
-import six
 from celery.utils.log import get_task_logger
-from lxml import etree
-from owslib.wps import WPSExecution
 from pyramid.httpexceptions import HTTPBadRequest, HTTPNotFound, HTTPOk, HTTPUnauthorized
 from pyramid.request import Request
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
-from six.moves.urllib.parse import urlparse
 
 from weaver import sort, status
 from weaver.database import get_db
@@ -24,9 +19,9 @@ from weaver.exceptions import (
     log_unhandled_exceptions
 )
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
-from weaver.utils import get_any_id, get_any_value, get_settings, get_url_without_query, request_extra
+from weaver.utils import get_any_id, get_any_value, get_settings
 from weaver.visibility import VISIBILITY_PUBLIC
-from weaver.wps import get_wps_output_dir, get_wps_output_url
+from weaver.wps import get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.notify import encrypt_email
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
@@ -36,77 +31,6 @@ if TYPE_CHECKING:
     from typing import AnyStr, Optional, Tuple, Union       # noqa: F401
 
 LOGGER = get_task_logger(__name__)
-
-
-def get_local_status_location(url_status_location, container, must_exist=True):
-    # type: (AnyStr, AnySettingsContainer, bool) -> Optional[AnyStr]
-    """Attempts to retrieve the local file path corresponding to the WPS status location as URL.
-
-    :param url_status_location: URL reference pointing to some WPS status location XML.
-    :param container: any settings container to map configured local paths.
-    :param must_exist: return only existing path if enabled, otherwise return the parsed value without validation.
-    :returns: found local file path if it exists, ``None`` otherwise.
-    """
-    if url_status_location and not urlparse(url_status_location).scheme in ["", "file://"]:
-        dir_path = get_wps_output_dir(container)
-        wps_out_url = get_wps_output_url(container)
-        req_out_url = get_url_without_query(url_status_location)
-        out_path = os.path.join(dir_path, req_out_url.replace(wps_out_url, "").lstrip("/"))
-    else:
-        out_path = url_status_location.replace("file:://", "")
-    if must_exist and not os.path.isfile(out_path):
-        LOGGER.debug("Could not map WPS status reference [%s] to local file path [%s].", url_status_location, out_path)
-        return None
-    LOGGER.debug("Resolved WPS status reference [%s] as local file path [%s].", url_status_location, out_path)
-    return out_path
-
-
-def check_status(url=None, response=None, sleep_secs=2, verify=True, settings=None):
-    # type: (Optional[AnyStr], Optional[etree.ElementBase], int, bool, Optional[AnySettingsContainer]) -> WPSExecution
-    """
-    Run :func:`owslib.wps.WPSExecution.checkStatus` with additional exception handling.
-
-    :param url: job URL where to look for job status.
-    :param response: WPS response document of job status.
-    :param sleep_secs: number of seconds to sleep before returning control to the caller.
-    :param verify: Flag to enable SSL verification.
-    :param settings: Application settings to retrieve any additional request parameters as applicable.
-    :return: OWSLib.wps.WPSExecution object.
-    """
-    def _retry_file():
-        LOGGER.warning("Failed retrieving WPS status-location, attempting with local file.")
-        out_path = get_local_status_location(url, settings)
-        if not out_path:
-            raise HTTPNotFound("Could not find file resource from [{}].".format(url))
-        LOGGER.info("Resolved WPS status-location using local file reference.")
-        return open(out_path, "r").read()
-
-    execution = WPSExecution()
-    if response:
-        LOGGER.debug("Retrieving WPS status from XML response document...")
-        xml = response
-    elif url:
-        xml_resp = HTTPNotFound()
-        try:
-            LOGGER.debug("Attempt to retrieve WPS status-location from URL...")
-            xml_resp = request_extra("get", url, verify=verify, settings=settings)
-            xml = xml_resp.content
-        except Exception as ex:
-            LOGGER.debug("Got exception during get status: [%r]", ex)
-            xml = _retry_file()
-        if xml_resp.status_code == HTTPNotFound.code:
-            LOGGER.debug("Got not-found during get status: [%r]", xml)
-            xml = _retry_file()
-    else:
-        raise Exception("Missing status-location URL/file reference or response with XML object.")
-    if isinstance(xml, six.string_types):
-        xml = xml.encode("utf8", errors="ignore")
-    execution.checkStatus(response=xml, sleepSecs=sleep_secs)
-    if execution.response is None:
-        raise Exception("Missing response, cannot check status.")
-    if not isinstance(execution.response, etree._Element):  # noqa: W0212
-        execution.response = etree.fromstring(execution.response)
-    return execution
 
 
 def get_job(request):
