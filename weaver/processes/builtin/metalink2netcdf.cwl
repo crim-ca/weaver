@@ -7,6 +7,7 @@ arguments: ["${WEAVER_ROOT_DIR}/weaver/processes/builtin/metalink2netcdf.py", "-
 inputs:
  input:
    type: File
+   format: iana:application/metalink4+xml
    inputBinding:
      position: 1
      prefix: "-i"
@@ -18,6 +19,7 @@ inputs:
 outputs:
  output:
    type: File
+   format: edam:format_3650
    outputBinding:
      glob: "*.nc"
 $namespaces:

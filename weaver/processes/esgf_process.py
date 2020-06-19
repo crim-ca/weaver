@@ -28,12 +28,12 @@ class Percent(object):
 
 
 class InputNames(object):
-    files = "files"
-    variable = "variable"
-    api_key = "api_key"
-    time = "time"
-    lat = "lat"
-    lon = "lon"
+    FILES = "files"
+    VARIABLE = "variable"
+    API_KEY = "api_key"
+    TIME = "time"
+    LAT = "lat"
+    LON = "lon"
 
 
 class ESGFProcess(Wps1Process):
@@ -46,7 +46,7 @@ class ESGFProcess(Wps1Process):
 
         self._check_required_inputs(workflow_inputs)
 
-        api_key = workflow_inputs.get(InputNames.api_key)
+        api_key = workflow_inputs.get(InputNames.API_KEY)
         inputs = self._prepare_inputs(workflow_inputs)
         domain = self._get_domain(workflow_inputs)
 
@@ -75,9 +75,9 @@ class ESGFProcess(Wps1Process):
         # type: (JSON) -> Optional[cwt.Domain]
 
         dimensions_names = [
-            InputNames.time,
-            InputNames.lat,
-            InputNames.lon,
+            InputNames.TIME,
+            InputNames.LAT,
+            InputNames.LON,
         ]
 
         grouped_inputs = defaultdict(dict)
@@ -137,13 +137,13 @@ class ESGFProcess(Wps1Process):
         """Get all netcdf files from the cwl inputs"""
         urls = []
 
-        files = workflow_inputs[InputNames.files]
+        files = workflow_inputs[InputNames.FILES]
         if not isinstance(files, list):
             files = [files]
 
         for cwl_file in files:
             if not cwl_file["class"] == "File":
-                raise ValueError("'{}' inputs must have a class named 'File'".format(InputNames.files))
+                raise ValueError("'{}' inputs must have a class named 'File'".format(InputNames.FILES))
             location = cwl_file["location"]
             if not location.startswith("http"):
                 raise ValueError("ESGF processes only support urls for files inputs.")
@@ -154,9 +154,9 @@ class ESGFProcess(Wps1Process):
     def _get_variable(workflow_inputs):
         # type: (JSON) -> str
         """Get all netcdf files from the cwl inputs"""
-        if InputNames.variable not in workflow_inputs:
+        if InputNames.VARIABLE not in workflow_inputs:
             raise ValueError("Missing required input: variable")
-        return workflow_inputs[InputNames.variable]
+        return workflow_inputs[InputNames.VARIABLE]
 
     def _run_process(self, api_key, inputs, domain=None):
         # type: (str, List[cwt.Variable], Optional[cwt.Domain]) -> cwt.Process
