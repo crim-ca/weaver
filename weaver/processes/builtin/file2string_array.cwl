@@ -13,6 +13,7 @@ inputs:
       valueFrom: $(self.location)
 outputs:
   output:
-    type:
-      type: array
-      items: string
+    type: File
+    format: iana:application/json
+$namespaces:
+  iana: "https://www.iana.org/assignments/media-types/"
