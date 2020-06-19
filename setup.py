@@ -51,7 +51,7 @@ setup(name=__meta__.__name__,
       python_requires=">=2.7, >=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*, <4",
       install_requires=requirements,
       dependency_links=[
-          "git+https://github.com/ESGF/esgf-compute-api.git@v2.1.0#egg=esgf_compute_api"
+          "git+https://github.com/ESGF/esgf-compute-api.git@v2.1.0#egg=cwt"
       ],
       entry_points={
           "paste.app_factory": [
