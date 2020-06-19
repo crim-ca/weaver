@@ -14,7 +14,7 @@ inputs:
    type: int
    inputBinding:
      position: 2
-     prefix: "-idx"
+     prefix: "-n"
 outputs:
  output:
    type: File
