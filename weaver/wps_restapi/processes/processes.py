@@ -172,7 +172,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
 =======
         job.save_log(logger=task_logger, message="Verifying job status location.")
         if not execution.statusLocation.startswith("http") and not os.path.isfile(execution.statusLocation):
-            wps_status_path = "file://{}".format(os.path.join(wps_out_dir, execution.statusLocation))
+            wps_status_path = os.path.join(wps_out_dir, execution.statusLocation.replace("/", ""))
             if os.path.isfile(wps_status_path):
                 execution.statusLocation = wps_status_path
                 job.save_log(logger=task_logger, level=logging.INFO,

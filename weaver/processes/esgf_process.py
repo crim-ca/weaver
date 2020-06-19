@@ -15,8 +15,6 @@ if TYPE_CHECKING:
     from weaver.typedefs import JSON
     from typing import AnyStr, Dict, List, Tuple
 
-LOGGER = logging.getLogger(__name__)
-
 LAST_PERCENT_REGEX = re.compile(r".+ (\d{1,3})$")
 
 
@@ -48,8 +46,6 @@ class ESGFProcess(WpsProcessInterface):
     def execute(self, workflow_inputs, out_dir, expected_outputs):
         # type: (JSON, AnyStr, Dict[AnyStr, AnyStr]) -> None
         """Execute an ESGF process from cwl inputs"""
-        LOGGER.debug("Executing ESGF process %s", self.process)
-
         self._check_required_inputs(workflow_inputs)
 
         api_key = workflow_inputs.get(InputNames.API_KEY)
@@ -65,12 +61,8 @@ class ESGFProcess(WpsProcessInterface):
         message = "Preparing execute request for remote ESGF provider."
         self.update_status(message, Percent.PREPARING, STATUS_RUNNING)
 
-        LOGGER.debug("Parsing inputs")
-
         files = self._get_files_urls(workflow_inputs)
         varname = self._get_variable(workflow_inputs)
-
-        LOGGER.debug("Creating esgf-compute-api inputs")
 
         inputs = [cwt.Variable(url, varname) for url in files]
 
@@ -167,18 +159,13 @@ class ESGFProcess(WpsProcessInterface):
     def _run_process(self, api_key, inputs, domain=None):
         # type: (str, List[cwt.Variable], Optional[cwt.Domain]) -> cwt.Process
         """Run an ESGF process"""
-        LOGGER.debug("Connecting to ESGF WPS")
-
         wps = cwt.WPSClient(self.provider, api_key=api_key, verify=True)
         process = wps.processes(self.process)[0]
 
         message = "Sending request."
-        LOGGER.debug(message)
         self.update_status(message, Percent.SENDING, STATUS_RUNNING)
 
         wps.execute(process, inputs=inputs, domain=domain)
-
-        LOGGER.debug("Waiting for result")
 
         self._wait(process)
 
@@ -203,7 +190,6 @@ class ESGFProcess(WpsProcessInterface):
                 status_history.add(status)
 
                 message = "ESGF status: " + status
-                LOGGER.debug(message)
                 self.update_status(message, status_percent[0], STATUS_RUNNING)
 
         update_history()
@@ -221,32 +207,26 @@ class ESGFProcess(WpsProcessInterface):
         """Process the result of the execution"""
         if not esgf_process.succeeded:
             message = "Process failed."
-            LOGGER.debug(message)
             self.update_status(message, Percent.FINISHED, STATUS_FAILED)
             return
 
         message = "Process successful."
-        LOGGER.debug(message)
         self.update_status(message, Percent.COMPUTE_DONE, STATUS_RUNNING)
         try:
             self._write_outputs(esgf_process.output.uri, output_dir, expected_outputs)
         except Exception:
             message = "Error while downloading files."
-            LOGGER.exception(message)
             self.update_status(message, Percent.FINISHED, STATUS_FAILED)
             raise
 
     def _write_outputs(self, url, output_dir, expected_outputs):
         """Write the output netcdf url to a local drive"""
         message = "Downloading outputs."
-        LOGGER.debug(message)
         self.update_status(message, Percent.COMPUTE_DONE, STATUS_RUNNING)
 
         nc_outputs = [v for v in expected_outputs.values() if v.lower().endswith(".nc")]
         if len(nc_outputs) > 1:
             raise NotImplementedError("Multiple outputs are not implemented")
-
-        LOGGER.debug("Downloading file: %s", url)
 
         # Standard Thredds naming convention?
         url = url.replace("/dodsC/", "/fileServer/")
@@ -259,6 +239,8 @@ class ESGFProcess(WpsProcessInterface):
                 if chunk:
                     f.write(chunk)
 
+        # from weaver.utils import fetch_file
+        # fetch_file(url, output_dir, settings=self.settings)
+
         message = "Download successful."
-        LOGGER.debug(message)
         self.update_status(message, Percent.FINISHED, STATUS_SUCCEEDED)

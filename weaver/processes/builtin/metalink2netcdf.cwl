@@ -7,7 +7,6 @@ arguments: ["${WEAVER_ROOT_DIR}/weaver/processes/builtin/metalink2netcdf.py", "-
 inputs:
  input:
    type: File
-   format: iana:application/metalink4+xml
    inputBinding:
      position: 1
      prefix: "-i"
