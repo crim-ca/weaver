@@ -33,15 +33,6 @@ __title__ = "NetCDF file to file array"
 __abstract__ = __doc__  # NOTE: '__doc__' is fetched directly, this is mostly to be informative
 
 
-def _is_netcdf_url(url):
-    # type: (Any) -> bool
-    if not isinstance(url, six.string_types):
-        return False
-    if urlparse(url).scheme == "":
-        return False
-    return os.path.splitext(url)[-1] == get_extension(CONTENT_TYPE_APP_NETCDF)
-
-
 def f2fa(input_file, output_dir):
     # type: (AnyStr, AnyStr) -> None
     LOGGER.info(

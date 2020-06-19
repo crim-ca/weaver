@@ -7,12 +7,14 @@ arguments: ["${WEAVER_ROOT_DIR}/weaver/processes/builtin/file2filearray.py", "-o
 inputs:
  input:
    type: File
+   format: edam:format_3650
    inputBinding:
       prefix: "-i"
       loadContents: false
       valueFrom: $(self.location)
 outputs:
  output:
+   format: edam:format_3650
    type:
      type: array
      items: File
