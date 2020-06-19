@@ -177,7 +177,7 @@ class ESGFProcess(WpsProcessInterface):
         """Wait for an ESGF process to finish, while reporting its status"""
         status_history = set()
 
-        status_percent = [0]  # python 2 can't mutate nonlocal
+        status_percent = 0  # python 2 can't mutate nonlocal
 
         def update_history():
             status = esgf_process.status
@@ -185,13 +185,13 @@ class ESGFProcess(WpsProcessInterface):
             if status not in status_history:
                 match = LAST_PERCENT_REGEX.match(status)
                 if match:
-                    status_percent[0] = int(match.group(1))
-                status_percent[0] = max(Percent.SENDING, status_percent[0])
+                    status_percent = int(match.group(1))
+                status_percent = max(Percent.SENDING, status_percent)
 
                 status_history.add(status)
 
                 message = "ESGF status: " + status
-                self.update_status(message, status_percent[0], STATUS_RUNNING)
+                self.update_status(message, status_percent, STATUS_RUNNING)
 
         update_history()
 
