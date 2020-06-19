@@ -1,11 +1,7 @@
-import logging
 import re
 import time
 from collections import defaultdict
-from os.path import join
 from typing import TYPE_CHECKING, Optional
-
-import requests
 
 import cwt
 from weaver.processes.wps_process_base import WpsProcessInterface
