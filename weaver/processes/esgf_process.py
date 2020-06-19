@@ -36,8 +36,14 @@ class InputNames(object):
     LON = "lon"
 
 
+class InputArguments(object):
+    START = "start"
+    END = "end"
+    CRS = "crs"
+
+
 class ESGFProcess(WpsProcessInterface):
-    required_inputs = ("variable", )
+    required_inputs = (InputNames.VARIABLE, )
 
     def execute(self, workflow_inputs, out_dir, expected_outputs):
         # type: (JSON, AnyStr, Dict[AnyStr, AnyStr]) -> None
@@ -94,30 +100,30 @@ class ESGFProcess(WpsProcessInterface):
         # ensure data is casted properly
         for dim_name, values in grouped_inputs.items():
             for value_name, value in values.items():
-                if value_name in ["start", "end"] and value:
+                if value_name in [InputArguments.START, InputArguments.END] and value:
                     values[value_name] = float(value)
 
         allowed_crs = {c.name: c for c in [cwt.VALUES, cwt.INDICES, cwt.TIMESTAMPS]}
         allowed_crs[None] = None
 
         # fix unintuitive latitude that must be given 'reversed' (start is larger than end)
-        if "lat" in grouped_inputs:
-            values = grouped_inputs["lat"]["start"], grouped_inputs["lat"]["end"]
-            grouped_inputs["lat"]["start"] = max(values)
-            grouped_inputs["lat"]["end"] = min(values)
+        if InputNames.LAT in grouped_inputs:
+            values = grouped_inputs[InputNames.LAT][InputArguments.START], grouped_inputs[InputNames.LAT][InputArguments.END]
+            grouped_inputs[InputNames.LAT][InputArguments.START] = max(values)
+            grouped_inputs[InputNames.LAT][InputArguments.END] = min(values)
 
         dimensions = []
         for param_name, values in grouped_inputs.items():
-            for start_end in ["start", "end"]:
+            for start_end in [InputArguments.START, InputArguments.END]:
                 if start_end not in values:
                     raise ValueError("Missing required parameter: {}_{}".format(param_name, start_end))
             crs = cwt.VALUES
-            if "crs" in values:
-                if values["crs"] not in allowed_crs:
+            if InputArguments.CRS in values:
+                if values[InputArguments.CRS] not in allowed_crs:
                     raise ValueError("CRS must be in {}".format(", ".join(map(str, allowed_crs))))
-                crs = allowed_crs[values["crs"]]
+                crs = allowed_crs[values[InputArguments.CRS]]
 
-            dimension = cwt.Dimension(param_name, values["start"], values["end"], crs=crs)
+            dimension = cwt.Dimension(param_name, values[InputArguments.START], values[InputArguments.END], crs=crs)
             dimensions.append(dimension)
 
         if dimensions:
@@ -155,7 +161,7 @@ class ESGFProcess(WpsProcessInterface):
         # type: (JSON) -> str
         """Get all netcdf files from the cwl inputs"""
         if InputNames.VARIABLE not in workflow_inputs:
-            raise ValueError("Missing required input: variable")
+            raise ValueError("Missing required input " + InputNames.VARIABLE)
         return workflow_inputs[InputNames.VARIABLE]
 
     def _run_process(self, api_key, inputs, domain=None):
