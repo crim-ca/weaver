@@ -2241,7 +2241,9 @@ class WpsPackage(Process):
                 params[param] = _requirement[param]
             return params
 
-        if requirement["class"].endswith(CWL_REQUIREMENT_APP_WPS1):
+        req_class = requirement["class"]
+
+        if req_class.endswith(CWL_REQUIREMENT_APP_WPS1):
             from weaver.processes.wps1_process import Wps1Process
             params = _get_wps1_params(requirement)
             return Wps1Process(
@@ -2250,7 +2252,7 @@ class WpsPackage(Process):
                 request=self.request,
                 update_status=_update_status_dispatch,
             )
-        elif requirement["class"].endswith(CWL_REQUIREMENT_APP_ESGF_CWT):
+        elif req_class.endswith(CWL_REQUIREMENT_APP_ESGF_CWT):
             from weaver.processes.esgf_process import ESGFProcess
             params = _get_wps1_params(requirement)
             return ESGFProcess(
@@ -2261,7 +2263,7 @@ class WpsPackage(Process):
             )
         else:
             # implements both `PROCESS_APPLICATION` with `CWL_REQUIREMENT_APP_DOCKER` and `PROCESS_WORKFLOW`
-            LOGGER.info("WPS-3 Package resolved from requirement/hint: %s", requirement["class"])
+            LOGGER.info("WPS-3 Package resolved from requirement/hint: %s", req_class)
             from weaver.processes.wps3_process import Wps3Process
             return Wps3Process(step_payload=step_payload,
                                joborder=joborder,
