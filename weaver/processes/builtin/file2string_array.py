@@ -1,5 +1,5 @@
 __doc__ = """
-Transforms a CWL file input into a cwl output of a list of strings
+Transforms a file input into JSON file containing an array of file references as value.
 """
 import argparse
 import json

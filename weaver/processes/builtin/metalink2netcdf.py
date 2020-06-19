@@ -1,6 +1,6 @@
 """
-Extracts and fetches NetCDF files from a Metalink file containing an URL, and outputs the NetCDF file at a given index
- of the list.
+Extracts and fetches NetCDF files from a Metalink file containing an URL, and outputs the NetCDF file at a given
+index of the list.
 """
 import argparse
 import logging
@@ -32,7 +32,7 @@ PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]
 # setup logger since it is not run from the main 'weaver' app
 LOGGER = logging.getLogger(__name__)
 LOGGER.addHandler(logging.StreamHandler(sys.stdout))
-LOGGER.setLevel(logging.DEBUG)
+LOGGER.setLevel(logging.INFO)
 
 # process details
 __version__ = "1.0"
@@ -82,12 +82,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("-i", metavar="metalink", type=str,
                         help="Metalink file to be parsed for NetCDF file names.")
-    parser.add_argument("-idx", metavar="index", type=int,
+    parser.add_argument("-n", metavar="index", type=int,
                         help="Index of the specific NetCDF file to extract. First element's index is 1.")
     parser.add_argument("-o", metavar="outdir", default=CUR_DIR,
                         help="Output directory of the retrieved NetCDF files extracted by name from the Metalink file.")
     args = parser.parse_args()
-    sys.exit(m2n(args.i, args.idx, args.o))
+    sys.exit(m2n(args.i, args.n, args.o))
 
 
 if __name__ == "__main__":
