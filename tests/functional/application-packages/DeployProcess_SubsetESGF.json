@@ -1,7 +1,8 @@
 {
     "processDescription": {
         "process": {
-            "id": "esgf_subset"
+            "id": "esgf_subset",
+            "abstract": "Process that does subsets using Climate Data Analysis Tool (CDAT)."
         }
     },
     "executionUnit": [

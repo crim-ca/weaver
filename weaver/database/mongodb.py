@@ -95,7 +95,7 @@ class MongoDatabase(DatabaseInterface):
 
 
 def get_mongodb_connection(container, reset_connection=False):
-    # type: (AnySettingsContainer, Optional[bool]) -> Database
+    # type: (AnySettingsContainer, bool) -> Database
     """Obtains the basic database connection from settings."""
     global MongoDB  # pylint: disable=W0603,global-statement
     if reset_connection:
