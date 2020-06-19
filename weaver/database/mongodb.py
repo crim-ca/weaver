@@ -43,6 +43,7 @@ class MongoDatabase(DatabaseInterface):
     type = "mongodb"
 
     def __init__(self, registry, reset_connection=False):
+        # type: (AnySettingsContainer, bool) -> None
         super(MongoDatabase, self).__init__(registry)
         self._database = get_mongodb_engine(registry, reset_connection)
         self._settings = registry.settings
@@ -113,7 +114,7 @@ def get_mongodb_connection(container, reset_connection=False):
 
 
 def get_mongodb_engine(container, reset_connection=False):
-    # type: (AnySettingsContainer, Optional[bool]) -> Database
+    # type: (AnySettingsContainer, bool) -> Database
     """Obtains the database with configuration ready for usage."""
     db = get_mongodb_connection(container, reset_connection)
     db.services.create_index("name", unique=True)
