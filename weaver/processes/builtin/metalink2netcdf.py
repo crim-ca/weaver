@@ -6,11 +6,10 @@ import argparse
 import logging
 import os
 import sys
-from typing import Any, AnyStr
+from typing import AnyStr
 
 import six
 from lxml import etree
-from six.moves.urllib.parse import urlparse
 
 if six.PY3:
     from tempfile import TemporaryDirectory
@@ -24,7 +23,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(CUR_DIR))))
 
 # place weaver specific imports after sys path fixing to ensure they are found from external call
 # pylint: disable=C0413,wrong-import-order
-from weaver.formats import get_extension, CONTENT_TYPE_APP_NETCDF  # isort:skip # noqa: E402
 from weaver.utils import fetch_file  # isort:skip # noqa: E402
 
 PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]
@@ -38,15 +36,6 @@ LOGGER.setLevel(logging.INFO)
 __version__ = "1.0"
 __title__ = "Metalink to NetCDF"
 __abstract__ = __doc__  # NOTE: '__doc__' is fetched directly, this is mostly to be informative
-
-
-def _is_netcdf_url(url):
-    # type: (Any) -> bool
-    if not isinstance(url, six.string_types):
-        return False
-    if urlparse(url).scheme == "":
-        return False
-    return os.path.splitext(url)[-1] == get_extension(CONTENT_TYPE_APP_NETCDF)
 
 
 def m2n(metalink_reference, index, output_dir):
