@@ -1,7 +1,8 @@
 {
     "processDescription": {
         "process": {
-            "id": "nasa_esgf_subset"
+            "id": "nasa_esgf_subset",
+            "abstract": "Process that does NASA dataset subsets using xarray."
         }
     },
     "executionUnit": [

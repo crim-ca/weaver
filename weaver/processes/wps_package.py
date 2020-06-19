@@ -2076,9 +2076,9 @@ class WpsPackage(Process):
                     elif isinstance(input_i, (LiteralInput, BoundingBoxInput)):
                         # extend array data that allow max_occur > 1
                         if is_array:
-                            input_data = [i.url if input_i.prop == "url" else i.data for i in input_occurs]
+                            input_data = [i.url if i.as_reference else i.data for i in input_occurs]
                         else:
-                            input_data = input_i.url if input_i.prop == "url" else input_i.data
+                            input_data = input_i.url if input_i.as_reference else input_i.data
                         cwl_inputs[input_id] = input_data
                     else:
                         raise self.exception_message(

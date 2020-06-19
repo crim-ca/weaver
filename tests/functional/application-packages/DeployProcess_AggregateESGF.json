@@ -1,7 +1,8 @@
 {
     "processDescription": {
         "process": {
-            "id": "esgf_aggregate"
+            "id": "esgf_aggregate",
+            "abstract": "Process that aggregates multiple NetCDF files using Climate Data Analysis Tool (CDAT)."
         }
     },
     "executionUnit": [
