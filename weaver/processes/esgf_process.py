@@ -10,6 +10,7 @@ import requests
 import cwt
 from weaver.processes.wps_process_base import WpsProcessInterface
 from weaver.status import STATUS_FAILED, STATUS_RUNNING, STATUS_SUCCEEDED
+from weaver.utils import fetch_file
 
 if TYPE_CHECKING:
     from weaver.typedefs import JSON
@@ -228,19 +229,7 @@ class ESGFProcess(WpsProcessInterface):
         if len(nc_outputs) > 1:
             raise NotImplementedError("Multiple outputs are not implemented")
 
-        # Standard Thredds naming convention?
-        url = url.replace("/dodsC/", "/fileServer/")
-
-        req = requests.get(url, allow_redirects=True, stream=True, verify=True)
-        output_file_name = nc_outputs[0]
-
-        with open(join(output_dir, output_file_name), "wb") as f:
-            for chunk in req.iter_content(chunk_size=1024):
-                if chunk:
-                    f.write(chunk)
-
-        # from weaver.utils import fetch_file
-        # fetch_file(url, output_dir, settings=self.settings)
+        fetch_file(url, output_dir, settings=self.settings)
 
         message = "Download successful."
         self.update_status(message, Percent.FINISHED, STATUS_SUCCEEDED)
