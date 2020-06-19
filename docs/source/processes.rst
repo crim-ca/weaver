@@ -381,5 +381,9 @@ OpenSearch data source
 Workflow (Chaining Step Processes)
 --------------------------------------
 
-.. todo:: reference IDs of steps
+.. todo:: add details, explanation done in below reference
+
+.. seealso::
+
+    - :ref:`CWL Workflow`
 

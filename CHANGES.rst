@@ -13,8 +13,9 @@ Changes:
 - Add support of documentation RST file redirection to generated HTML for reference resolution in both Github source
   and Readthedocs served pages.
 - Improve documentation links, ReadTheDocs format and TOC references.
-- Avoid logging ``stdout/stderr`` in workflows
-- Add tests to make sure processes ``stdout/stderr`` are logged
+- Avoid logging ``stdout/stderr`` in workflows.
+- Add tests to make sure processes ``stdout/stderr`` are logged.
+- Remove Python 2.7 version as not *officially* supported.
 
 Fixes:
 ------
@@ -68,7 +69,7 @@ Changes:
 - Use ``weaver.request_options`` for `WPS GetCapabilities` and `WPS Check Status` requests under the running job.
 - Change default ``DOCKER_REPO`` value defined in ``Makefile`` to point to reference mentioned in ``README.md`` and
   considered as official deployment location.
-- Add ``application/x-cwl`` MIME-type supported with updated ``EDAM 1.24`` onthology.
+- Add ``application/x-cwl`` MIME-type supported with updated ``EDAM 1.24`` ontology.
 - Add ``application/x-yaml``  MIME-type to known formats.
 - Add ``application/x-tar`` and ``application/tar+gzip`` MIME-type (not official) but resolved as *synonym*
   ``application/gzip`` (official) to preserve compressed file support during `CWL` format validation.

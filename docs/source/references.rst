@@ -23,6 +23,8 @@
 .. _wkt-example: https://en.wikipedia.org/wiki/Well-known_text_representation_of_geometry
 .. _wkt-format: https://docs.geotools.org/stable/javadocs/org/opengis/referencing/doc-files/WKT.html
 .. _weaver-issues: https://github.com/crim-ca/weaver/issues
+.. |metalink| replace:: Metalink
+.. _metalink: https://tools.ietf.org/html/rfc5854
 .. |oas| replace:: OpenAPI Specification
 .. _oas: https://pavics-weaver.readthedocs.io/en/latest/api.html
 .. |ogc| replace:: Open Geospatial Consortium (OGC)
