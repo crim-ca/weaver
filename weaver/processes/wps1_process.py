@@ -47,7 +47,7 @@ class Wps1Process(WpsProcessInterface):
         self.update_status = lambda _message, _progress, _status: update_status(
             self.provider, _message, _progress, _status)
 
-    def execute(self, workflow_inputs, out_dir, expected_outputs):
+    def execute(self, inputs, out_dir, expected_outputs):
         self.update_status("Preparing execute request for remote WPS1 provider.",
                            REMOTE_JOB_PROGRESS_REQ_PREP, status.STATUS_RUNNING)
         LOGGER.debug("Execute process WPS request for %s", self.process)
@@ -69,18 +69,18 @@ class Wps1Process(WpsProcessInterface):
                     complex_inputs.append(process_input.identifier)
 
             # remove any 'null' input, should employ the 'default' of the remote WPS process
-            workflow_inputs_provided_keys = filter(lambda i: workflow_inputs[i] != "null", workflow_inputs)
+            inputs_provided_keys = filter(lambda i: inputs[i] != "null", inputs)
 
             wps_inputs = []
-            for workflow_input_key in workflow_inputs_provided_keys:
-                workflow_input_val = workflow_inputs[workflow_input_key]
+            for input_key in inputs_provided_keys:
+                input_val = inputs[input_key]
                 # in case of array inputs, must repeat (id,value)
                 # in case of complex input (File), obtain location, otherwise get data value
-                if not isinstance(workflow_input_val, list):
-                    workflow_input_val = [workflow_input_val]
+                if not isinstance(input_val, list):
+                    input_val = [input_val]
 
                 input_values = []
-                for val in workflow_input_val:
+                for val in input_val:
                     if isinstance(val, dict):
                         val = val["location"]
 
@@ -97,10 +97,10 @@ class Wps1Process(WpsProcessInterface):
                 # need to use ComplexDataInput structure for complex input
                 # TODO: BoundingBox not supported
                 for input_value in input_values:
-                    if workflow_input_key in complex_inputs:
+                    if input_key in complex_inputs:
                         input_value = ComplexDataInput(input_value)
 
-                    wps_inputs.append((workflow_input_key, input_value))
+                    wps_inputs.append((input_key, input_value))
 
             # prepare outputs
             outputs = [(o.identifier, o.dataType == WPS_COMPLEX_DATA) for o in process.processOutputs
