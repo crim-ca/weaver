@@ -177,7 +177,7 @@ install-all: install-sys install-pkg install-pip install-dev  ## install applica
 install-dev: install-pip	## install development and test dependencies
 	@echo "Installing development packages with pip..."
 	@-bash -c '$(CONDA_CMD) pip install -r $(APP_ROOT)/requirements-dev.txt'
-	@echo "Install with pip complete. Test service with \`make test*' variations."
+	@echo "Install with pip complete. Test service with 'make test*' variations."
 
 .PHONY: install-pkg
 install-pkg: install-pip	## install application package dependencies
