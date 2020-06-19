@@ -1,4 +1,7 @@
 -r requirements-docs.txt
+# pylint>=2.5 requires astroid>=2.4
+# install/update sometime fails randomly, so enforce it
+astroid>=2.4
 bandit
 bump2version
 codacy-coverage
@@ -10,7 +13,7 @@ isort>=4.3.21,<5
 mock
 pluggy>=0.7
 pytest
-pylint>=2.4,<2.5
+pylint>=2.5.3
 pylint_quotes
 responses
 # typing extension required for TypedDict
