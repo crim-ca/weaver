@@ -97,7 +97,8 @@ class ESGFProcess(WpsProcessInterface):
 
         # fix unintuitive latitude that must be given 'reversed' (start is larger than end)
         if InputNames.LAT in grouped_inputs:
-            values = grouped_inputs[InputNames.LAT][InputArguments.START], grouped_inputs[InputNames.LAT][InputArguments.END]
+            values = grouped_inputs[InputNames.LAT][InputArguments.START], \
+                     grouped_inputs[InputNames.LAT][InputArguments.END]
             grouped_inputs[InputNames.LAT][InputArguments.START] = max(values)
             grouped_inputs[InputNames.LAT][InputArguments.END] = min(values)
 
@@ -173,10 +174,9 @@ class ESGFProcess(WpsProcessInterface):
         """Wait for an ESGF process to finish, while reporting its status"""
         status_history = set()
 
-        status_percent = 0  # python 2 can't mutate nonlocal
-
         def update_history():
             status = esgf_process.status
+            status_percent = 0  # python 2 can't mutate nonlocal
 
             if status not in status_history:
                 match = LAST_PERCENT_REGEX.match(status)
