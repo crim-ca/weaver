@@ -16,10 +16,11 @@ Changes:
 - Avoid logging ``stdout/stderr`` in workflows.
 - Add tests to make sure processes ``stdout/stderr`` are logged.
 - Remove Python 2.7 version as not *officially* supported.
+- Move and update WPS status location and status check functions into ``weaver.wps`` module.
 
 Fixes:
 ------
-- No change.
+- Fix reported WPS status location to handle when starting with ``/`` although not representing an absolute path.
 
 `1.10.1 <https://github.com/crim-ca/weaver/tree/1.10.1>`_ (2020-06-03)
 ========================================================================

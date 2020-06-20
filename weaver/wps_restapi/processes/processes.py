@@ -55,9 +55,14 @@ from weaver.utils import (
     wait_secs
 )
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
-from weaver.wps import get_wps_output_dir, get_wps_output_path, get_wps_output_url, load_pywps_cfg
+from weaver.wps import (
+    check_wps_status,
+    get_wps_local_status_location,
+    get_wps_output_path,
+    get_wps_output_url,
+    load_pywps_cfg
+)
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.jobs.jobs import check_status, get_local_status_location
 from weaver.wps_restapi.jobs.notify import encrypt_email, notify_job_complete
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, get_wps_restapi_base_url, parse_request_query
 
@@ -90,7 +95,6 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
     settings = get_settings(app)
     task_logger = get_task_logger(__name__)
     load_pywps_cfg(settings)
-    wps_out_dir = get_wps_output_dir(settings)
 
     task_logger.debug("Job task setup.")
     store = get_db(app).get_store(StoreJobs)
@@ -158,19 +162,13 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
             raise execution.errors[0]
 
         # adjust status location
-        wps_status_path = execution.statusLocation
+        wps_status_path = get_wps_local_status_location(execution.statusLocation, settings)
         job.progress = JOB_PROGRESS_EXECUTE_STATUS_LOCATION
-        job.save_log(logger=task_logger, message="Verifying job status location.")
-        if not execution.statusLocation.startswith("http") and not os.path.isfile(execution.statusLocation):
-            wps_status_path = "file://{}".format(os.path.join(wps_out_dir, execution.statusLocation))
-            if os.path.isfile(wps_status_path):
-                execution.statusLocation = wps_status_path
-                job.save_log(logger=task_logger, level=logging.INFO,
-                             message="WPS status location has been corrected using internal server location.")
-            else:
-                job.save_log(logger=task_logger, level=logging.WARNING,
-                             message="WPS status location could not be found")
         LOGGER.debug("WPS status location that will be queried: [%s]", wps_status_path)
+        if not wps_status_path.startswith("http") and not os.path.isfile(wps_status_path):
+            LOGGER.warning("WPS status location not resolved to local path: [%s]", wps_status_path)
+        job.save_log(logger=task_logger, level=logging.DEBUG,
+                     message="Updated job status location: [{}].".format(wps_status_path))
 
         job.status = map_status(STATUS_STARTED)
         job.status_message = execution.statusMessage or "{} initiation done.".format(str(job))
@@ -193,7 +191,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
                 #   WPS execution logs can be inserted within the current job log and appear continuously.
                 #   Only update internal job fields in case they get referenced elsewhere.
                 job.progress = JOB_PROGRESS_EXECUTE_MONITOR_LOOP
-                execution = check_status(url=wps_status_path, settings=settings, sleep_secs=wait_secs(run_step))
+                execution = check_wps_status(url=wps_status_path, settings=settings, sleep_secs=wait_secs(run_step))
                 job_msg = (execution.statusMessage or "").strip()
                 job.response = etree.tostring(execution.response)
                 job.status = map_status(execution.getStatus())
@@ -299,7 +297,7 @@ def map_locations(job, settings):
     Update the Job's WPS ID if applicable (job executed locally).
     Assumes that all results are located under the same reference UUID.
     """
-    local_path = get_local_status_location(job.status_location, settings)
+    local_path = get_wps_local_status_location(job.status_location, settings)
     if not local_path:
         LOGGER.debug("Not possible to map Job to WPS locations.")
         return
