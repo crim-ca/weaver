@@ -136,8 +136,35 @@ In this situation, the `CWL` definition is provided as is using JSON-formatted p
 ESGF-CWT
 ----------
 
-.. todo:: esgf-cwt process doc
+For *traditional* WPS-1 process type, Weaver adds default values to CWL definition. As we can see in
+`weaver/processes/wps_package.py`, the following default values for the CWL package are:
 
+.. code-block:: json
+
+    cwl_package = OrderedDict([
+        ("cwlVersion", "v1.0"),
+        ("class", "CommandLineTool"),
+        ("hints", {
+            CWL_REQUIREMENT_APP_WPS1: {
+                "provider": get_url_without_query(wps_service_url),
+                "process": process_id,
+            }}),
+    ])
+
+In ESGF-CWT, `ESGF-CWTRequirement` hint is used instead of default `WPS1Requirement`, contained in the
+`CWL_REQUIREMENT_APP_WPS1` variable up here. The handling of this technicality is handled in
+`weaver/processes/wps_package.py`. We can define ESGF-CWT processes using this syntax:
+
+.. code-block:: json
+
+    "cwlVersion": "v1.0",
+    "class": "CommandLineTool",
+    "hints": {
+        "ESGF-CWTRequirement": {
+            "provider": "https://edas.nccs.nasa.gov/wps/cwt",
+            "process": "xarray.subset"
+        }
+    }
 
 Workflow
 ----------
