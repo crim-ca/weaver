@@ -168,19 +168,6 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
         # adjust status location
         wps_status_path = get_wps_local_status_location(execution.statusLocation, settings)
         job.progress = JOB_PROGRESS_EXECUTE_STATUS_LOCATION
-<<<<<<< HEAD
-=======
-        job.save_log(logger=task_logger, message="Verifying job status location.")
-        if not execution.statusLocation.startswith("http") and not os.path.isfile(execution.statusLocation):
-            wps_status_path = os.path.join(wps_out_dir, execution.statusLocation.replace("/", ""))
-            if os.path.isfile(wps_status_path):
-                execution.statusLocation = wps_status_path
-                job.save_log(logger=task_logger, level=logging.INFO,
-                             message="WPS status location has been corrected using internal server location.")
-            else:
-                job.save_log(logger=task_logger, level=logging.WARNING,
-                             message="WPS status location could not be found")
->>>>>>> revertes status-location change, fixed some check-style highlights
         LOGGER.debug("WPS status location that will be queried: [%s]", wps_status_path)
         if not wps_status_path.startswith("http") and not os.path.isfile(wps_status_path):
             LOGGER.warning("WPS status location not resolved to local path: [%s]", wps_status_path)
