@@ -4,6 +4,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Optional
 
 import cwt
+
 from weaver.processes.wps_process_base import WpsProcessInterface
 from weaver.status import STATUS_FAILED, STATUS_RUNNING, STATUS_SUCCEEDED
 from weaver.utils import fetch_file
