@@ -325,7 +325,7 @@ mkdir-reports:
 check: check-all	## alias for 'check-all' target
 
 .PHONY: check-all
-check-all: install-dev check-pep8 check-lint check-imports check-security check-doc8 check-links ## run all code checks
+check-all: install-dev check-pep8 check-lint check-imports check-security check-doc8 ## run all code checks
 
 .PHONY: check-pep8
 check-pep8: mkdir-reports install-dev 	## run PEP8 code style checks
