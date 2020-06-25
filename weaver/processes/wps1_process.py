@@ -47,7 +47,7 @@ class Wps1Process(WpsProcessInterface):
         self.update_status = lambda _message, _progress, _status: update_status(
             self.provider, _message, _progress, _status)
 
-    def execute(self, inputs, out_dir, expected_outputs):
+    def execute(self, workflow_inputs, out_dir, expected_outputs):
         self.update_status("Preparing execute request for remote WPS1 provider.",
                            REMOTE_JOB_PROGRESS_REQ_PREP, status.STATUS_RUNNING)
         LOGGER.debug("Execute process WPS request for %s", self.process)
@@ -69,11 +69,11 @@ class Wps1Process(WpsProcessInterface):
                     complex_inputs.append(process_input.identifier)
 
             # remove any 'null' input, should employ the 'default' of the remote WPS process
-            inputs_provided_keys = filter(lambda i: inputs[i] != "null", inputs)
+            inputs_provided_keys = filter(lambda i: workflow_inputs[i] != "null", workflow_inputs)
 
             wps_inputs = []
             for input_key in inputs_provided_keys:
-                input_val = inputs[input_key]
+                input_val = workflow_inputs[input_key]
                 # in case of array inputs, must repeat (id,value)
                 # in case of complex input (File), obtain location, otherwise get data value
                 if not isinstance(input_val, list):

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Optional
 
 import cwt
 
-from weaver.processes.wps_process_base import WpsProcessInterface
+from weaver.processes.wps1_process import Wps1Process
 from weaver.status import STATUS_FAILED, STATUS_RUNNING, STATUS_SUCCEEDED
 from weaver.utils import fetch_file
 
@@ -38,7 +38,7 @@ class InputArguments(object):
     CRS = "crs"
 
 
-class ESGFProcess(WpsProcessInterface):
+class ESGFProcess(Wps1Process):
     required_inputs = (InputNames.VARIABLE, )
 
     def execute(self, workflow_inputs, out_dir, expected_outputs):
