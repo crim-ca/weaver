@@ -74,6 +74,7 @@ class BuiltinAppTest(unittest.TestCase):
         assert len(resp.json["process"]["outputs"][0]["formats"]) == 1
         assert resp.json["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_APP_NETCDF
 
+    @pytest.mark.skip
     def test_jsonarray2netcdf_execute(self):
         dirname = tempfile.gettempdir()
         nc_data = "Hello NetCDF!"
