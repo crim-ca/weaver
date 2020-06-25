@@ -5,6 +5,7 @@ Table of Contents
 .. toctree::
     :maxdepth: 4
 
+    Contents <index>
     installation
     configuration
     running
