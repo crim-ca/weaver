@@ -137,9 +137,9 @@ ESGF-CWT
 ----------
 
 For *traditional* WPS-1 process type, Weaver adds default values to CWL definition. As we can see in
-`weaver/processes/wps_package.py`, the following default values for the CWL package are:
+:mod:`weaver/processes/wps_package.py`, the following default values for the CWL package are:
 
-.. code-block:: json
+.. code-block:: python
 
     cwl_package = OrderedDict([
         ("cwlVersion", "v1.0"),
@@ -152,8 +152,8 @@ For *traditional* WPS-1 process type, Weaver adds default values to CWL definiti
     ])
 
 In ESGF-CWT, `ESGF-CWTRequirement` hint is used instead of default `WPS1Requirement`, contained in the
-`CWL_REQUIREMENT_APP_WPS1` variable up here. The handling of this technicality is handled in
-`weaver/processes/wps_package.py`. We can define ESGF-CWT processes using this syntax:
+:py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_WPS1` variable up here. The handling of this technicality is
+handled in :mod:`weaver/processes/wps_package.py`. We can define ESGF-CWT processes using this syntax:
 
 .. code-block:: json
 
