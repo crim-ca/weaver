@@ -2228,7 +2228,7 @@ class WpsPackage(Process):
         app_hints = list(filter(lambda h: any(h["class"].endswith(t) for t in CWL_REQUIREMENT_APP_TYPES), all_hints))
         if len(app_hints) > 1:
             raise ValueError("Package 'requirements' and/or 'hints' define too many conflicting values: {}, "
-                             "only one permitted amongst {}.".format(list(app_hints), CWL_REQUIREMENT_APP_TYPES))
+                             "only one permitted amongst {}.".format(list(app_hints), list(CWL_REQUIREMENT_APP_TYPES)))
         requirement = app_hints[0] if app_hints else {"class": ""}
 
         def _get_wps1_params(_requirement):
