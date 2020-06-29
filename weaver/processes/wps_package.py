@@ -2244,6 +2244,7 @@ class WpsPackage(Process):
         req_class = requirement["class"]
 
         if req_class.endswith(CWL_REQUIREMENT_APP_WPS1):
+            LOGGER.info("WPS-1 Package resolved from requirement/hint: %s", req_class)
             from weaver.processes.wps1_process import Wps1Process
             params = _get_wps1_params(requirement)
             return Wps1Process(
@@ -2253,6 +2254,7 @@ class WpsPackage(Process):
                 update_status=_update_status_dispatch,
             )
         elif req_class.endswith(CWL_REQUIREMENT_APP_ESGF_CWT):
+            LOGGER.info("ESGF-CWT Package resolved from requirement/hint: %s", req_class)
             from weaver.processes.esgf_process import ESGFProcess
             params = _get_wps1_params(requirement)
             return ESGFProcess(
