@@ -46,7 +46,7 @@ class MongoDatabase(DatabaseInterface):
         # type: (AnySettingsContainer, bool) -> None
         super(MongoDatabase, self).__init__(registry)
         self._database = get_mongodb_engine(registry, reset_connection)
-        self._settings = registry.settings
+        self._settings = get_settings(registry)
         self._stores = dict()
 
     def is_ready(self):
