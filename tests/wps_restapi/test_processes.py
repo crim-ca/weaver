@@ -27,7 +27,7 @@ from weaver.execute import (
     EXECUTE_TRANSMISSION_MODE_REFERENCE,
     EXECUTE_TRANSMISSION_MODE_VALUE
 )
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, ACCEPT_LANGUAGE_FR_CA, ACCEPT_LANGUAGE_EN_US
+from weaver.formats import ACCEPT_LANGUAGE_EN_US, ACCEPT_LANGUAGE_FR_CA, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import STATUS_ACCEPTED
 from weaver.utils import fully_qualified_name, ows_context_href

@@ -7,8 +7,8 @@ Weaver Web Application (``weaver-manager``).
 import logging
 
 import yaml
-from pyramid_beaker import set_cache_regions_from_settings
 from pyramid.config import Configurator
+from pyramid_beaker import set_cache_regions_from_settings
 
 from weaver import __meta__
 from weaver.config import WEAVER_DEFAULT_REQUEST_OPTIONS_CONFIG, get_weaver_config_file, get_weaver_configuration

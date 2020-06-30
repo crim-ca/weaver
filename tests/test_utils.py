@@ -28,13 +28,13 @@ from requests.exceptions import HTTPError as RequestsHTTPError
 from tests.utils import mocked_aws_credentials, mocked_aws_s3, mocked_aws_s3_bucket_test_file, mocked_file_response
 from weaver import status, utils
 from weaver.utils import (
+    NullType,
     fetch_file,
     get_path_kvp,
     get_request_options,
     get_ssl_verify_option,
     make_dirs,
     null,
-    NullType,
     request_extra
 )
 
