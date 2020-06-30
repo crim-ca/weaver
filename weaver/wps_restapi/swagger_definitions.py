@@ -100,7 +100,7 @@ TAG_EXCEPTIONS = "Exceptions"
 TAG_LOGS = "Logs"
 TAG_WPS = "WPS"
 
-#########################################################################
+###############################################################################
 # API endpoints
 # These "services" are wrappers that allow Cornice to generate the JSON API
 ###############################################################################
@@ -1058,15 +1058,15 @@ class AnyDataTypeFormats(ExtendedMappingSchema):
         DataInteger(),
         DataBoolean(),
         DataString(),
-        ##ExtendedSchemaNode(Float()),  # before Integer because more restrictive Number format
-        ##ExtendedSchemaNode(Integer()),  # before Boolean because bool can be interpreted using int
-        ##ExtendedSchemaNode(Boolean()),
-        ##ExtendedSchemaNode(String())
+        # ###ExtendedSchemaNode(Float()),  # before Integer because more restrictive Number format
+        # ###ExtendedSchemaNode(Integer()),  # before Boolean because bool can be interpreted using int
+        # ###ExtendedSchemaNode(Boolean()),
+        # ###ExtendedSchemaNode(String())
     )
 
 
-#class DataType(DataEncodingAttributes):
-#    data = DataTypeFormats(description="Value provided by one of the accepted types.")
+# ##class DataType(DataEncodingAttributes):
+# ##   data = DataTypeFormats(description="Value provided by one of the accepted types.")
 
 
 class DefaultFloat(ExtendedMappingSchema):
@@ -1085,8 +1085,8 @@ class DefaultString(ExtendedMappingSchema):
     default = ExtendedSchemaNode(String())
 
 
+# ###class ValueTypeFormats(OneOfKeywordSchema):
 class AnyDefaultTypeFormats(AnyOfKeywordSchema):
-    ##class ValueTypeFormats(OneOfKeywordSchema):
     """Default format, always 'default' key regardless of content."""
     _any_of = (
         DefaultString(),
@@ -1112,8 +1112,8 @@ class ValueString(ExtendedMappingSchema):
     value = ExtendedSchemaNode(String())
 
 
+# ###class ValueTypeFormats(OneOfKeywordSchema):
 class AnyValueTypeFormats(AnyOfKeywordSchema):
-##class ValueTypeFormats(OneOfKeywordSchema):
     """OGC-specific format, always 'value' key regardless of content.
 
     .. seealso::
@@ -1125,28 +1125,28 @@ class AnyValueTypeFormats(AnyOfKeywordSchema):
         ValueBoolean(),
         ValueInteger(),
         ValueFloat(),
-        ##ExtendedSchemaNode(Float()),  # before Integer because more restrictive Number format
-        ##ExtendedSchemaNode(Integer()),  # before Boolean because bool can be interpreted using int
-        ##ExtendedSchemaNode(Boolean()),
-        ##ExtendedSchemaNode(String()),
-        ##URL(),  # any-of will override previous string if URL validator succeeds because they have the same keys
+        # ###ExtendedSchemaNode(Float()),  # before Integer because more restrictive Number format
+        # ###ExtendedSchemaNode(Integer()),  # before Boolean because bool can be interpreted using int
+        # ###ExtendedSchemaNode(Boolean()),
+        # ###ExtendedSchemaNode(String()),
+        # ###URL(),  # any-of will override previous string if URL validator succeeds because they have the same keys
     )
 
 
-##class ValueType(ExtendedMappingSchema):
-##    value = ValueTypeFormats(description="Value provided by one of the accepted types.")
+# ###class ValueType(ExtendedMappingSchema):
+# ###    value = ValueTypeFormats(description="Value provided by one of the accepted types.")
 
 
-##class AnyType(OneOfKeywordSchema):
+# ###class AnyType(OneOfKeywordSchema):
 class AnyType(AnyOfKeywordSchema):
     """Permissive variants that we attempt to parse automatically."""
     _any_of = (
         # literal data with 'data' key
         AnyDataTypeFormats(),
-        ##DataType,
+        # ### DataType,
         # same with 'value' key (OGC specification)
         AnyValueTypeFormats(),
-        ##ValueType,
+        # ###ValueType,
         # HTTP references with various keywords
         LiteralReference(),
         Reference(),
@@ -1533,9 +1533,9 @@ class ConformanceSchema(ExtendedMappingSchema):
     conformsTo = ConformanceList()
 
 
-#################################
+# #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### ####
 # Local Processes schemas
-#################################
+# #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### ####
 
 
 class PackageBody(ExtendedMappingSchema):
@@ -1668,9 +1668,9 @@ class PostProcessQuoteRequestEndpoint(ProcessPath, QuotePath):
     body = QuoteProcessParametersSchema()
 
 
-#################################
+# #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### ####
 # Provider Processes schemas
-#################################
+# #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### ####
 
 
 class GetProviders(ExtendedMappingSchema):
@@ -1697,9 +1697,9 @@ class PostProviderProcessJobRequest(ExtendedMappingSchema):
     body = Execute()
 
 
-#################################
+# #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### ####
 # Responses schemas
-#################################
+# #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### ####
 
 class ErrorDetail(ExtendedMappingSchema):
     code = ExtendedSchemaNode(Integer(), description="HTTP status code.", example=400)

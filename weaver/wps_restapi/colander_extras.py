@@ -524,8 +524,8 @@ class KeywordMapper(colander.MappingSchema):
     """
     schema_type = colander.MappingSchema.schema_type
     _keyword_objects_only = False   # override validation as needed
-    _keywords = frozenset(['_one_of', '_all_of', '_any_of', '_not'])
-    _keyword_map = {_kw: _kw.replace('_of', 'Of').replace('_', '') for _kw in _keywords}  # kw->name
+    _keywords = frozenset(["_one_of", "_all_of", "_any_of", "_not"])
+    _keyword_map = {_kw: _kw.replace("_of", "Of").replace("_", "") for _kw in _keywords}  # kw->name
     _keyword_inv = {_kn: _kw for _kw, _kn in _keyword_map.items()}                        # name->kw
     _keyword = None  # type: str
 
@@ -554,7 +554,7 @@ class KeywordMapper(colander.MappingSchema):
 
     def _validate_keyword_unique(self):
         kw_items = self.get_keyword_items()
-        if not hasattr(kw_items, '__iter__') or not len(kw_items):  # noqa
+        if not hasattr(kw_items, "__iter__") or not len(kw_items):  # noqa
             raise ConversionValueError("Element '{}' of '{!s}' must be iterable with at least 1 value. "
                                        "Instead it was '{!s}'".format(self._keyword, type(self).__name__, kw_items))
         total = 0
@@ -741,7 +741,7 @@ class OneOfKeywordSchema(KeywordMapper):
         - :class:`NotKeywordSchema`
     """
     _keyword_objects_only = False
-    _keyword = '_one_of'
+    _keyword = "_one_of"
     _discriminator = "discriminator"
 
     @classmethod
@@ -779,12 +779,12 @@ class OneOfKeywordSchema(KeywordMapper):
                 return valid_one_of[0]
 
             # return the format which didn't change the input data
-            #keep_valid = []
-            #for valid in valid_one_of:
-            #    if _dict_nested_contained(cstruct, valid):
-            #        keep_valid.append(valid)
-            #if len(keep_valid) == 1:
-            #    return keep_valid[0]
+            # ##keep_valid = []
+            # ##for valid in valid_one_of:
+            # ## if _dict_nested_contained(cstruct, valid):
+            # ##     keep_valid.append(valid)
+            # ##if len(keep_valid) == 1:
+            # ##   return keep_valid[0]
             discriminator = getattr(self, self._discriminator, None)
             if isinstance(discriminator, dict):
                 # try last resort solve
@@ -794,7 +794,7 @@ class OneOfKeywordSchema(KeywordMapper):
                     node = valid_nodes[i]
                     node_name = getattr(node, "name", None) or \
                                 getattr(node, "title", None) or \
-                                type(node).__name__
+                                type(node).__name__  # noqa: E127
                     if all(getattr(obj, d_key, None) == d_val
                            for d_key, d_val in discriminator.items()):
                         valid_discriminated.append(obj)
@@ -829,7 +829,7 @@ class AllOfKeywordSchema(KeywordMapper):
         - :class:`NotKeywordSchema`
     """
     _keyword_objects_only = True
-    _keyword = '_all_of'
+    _keyword = "_all_of"
 
     @classmethod
     @abstractmethod
@@ -846,7 +846,7 @@ class AllOfKeywordSchema(KeywordMapper):
         required_all_of = dict()
         missing_all_of = dict()
         merged_all_of = dict()
-        for schema_class in self._one_of:  # noqa
+        for schema_class in self._all_of:  # noqa
             try:
                 schema_class = _make_node_instance(schema_class)
                 # update items with new ones
@@ -884,7 +884,7 @@ class AnyOfKeywordSchema(KeywordMapper):
         - :class:`NotKeywordSchema`
     """
     _keyword_objects_only = True
-    _keyword = '_any_of'
+    _keyword = "_any_of"
 
     @classmethod
     @abstractmethod
@@ -918,7 +918,7 @@ class AnyOfKeywordSchema(KeywordMapper):
 
 
 class NotKeywordSchema(KeywordMapper):
-    def __init__(self):
+    def __init__(self):  # noqa: W0231
         raise NotImplementedError  # TODO
 
 
@@ -956,7 +956,7 @@ class OneOfKeywordTypeConverter(KeywordTypeConverter):
             item_obj = _make_node_instance(item_schema)
             # shortcut definition of oneOf/allOf mix, see OneOfKeywordSchema docstring)
             # (eg: other schema fields always needed regardless of additional ones by oneOf)
-            if len(getattr(schema_node, 'children', [])):
+            if len(getattr(schema_node, "children", [])):
                 obj_no_one_of = item_obj.clone()  # type: OneOfKeywordSchema
                 # un-specialize the keyword schema to base schema (otherwise we recurse)
                 # other item can only be an object, otherwise something wrong happened
@@ -964,7 +964,7 @@ class OneOfKeywordTypeConverter(KeywordTypeConverter):
                     obj_no_one_of = colander.MappingSchema(obj_no_one_of)
                 else:
                     raise ConversionTypeError(
-                        'Unknown base type to convert oneOf schema item: {}'.format(type(obj_no_one_of)))
+                        "Unknown base type to convert oneOf schema item: {}".format(type(obj_no_one_of)))
                 all_of = AllOfKeywordSchema(_all_of=[obj_no_one_of, item_obj])
                 obj_converted = self.dispatcher(all_of)
             else:
@@ -993,15 +993,15 @@ class VariableObjectTypeConverter(ObjectTypeConverter):
     """
     def convert_type(self, schema_node):
         converted = super(VariableObjectTypeConverter, self).convert_type(schema_node)
-        converted.setdefault('additionalProperties', {})
+        converted.setdefault("additionalProperties", {})
         if self.openapi_spec == 3:
             for sub_node in schema_node.children:
                 if VariableSchemaNode.is_variable(sub_node):
-                    converted['additionalProperties'].update(
-                        {sub_node.name: converted['properties'].pop(sub_node.name)}
+                    converted["additionalProperties"].update(
+                        {sub_node.name: converted["properties"].pop(sub_node.name)}
                     )
-                    if sub_node.name in converted.get('required', []):
-                        converted['required'].remove(sub_node.name)
+                    if sub_node.name in converted.get("required", []):
+                        converted["required"].remove(sub_node.name)
         return converted
 
 
@@ -1073,15 +1073,15 @@ class CustomTypeConversionDispatcher(TypeConversionDispatcher):
         if schema_node.title:
             # ignore the names key use as useful keywords to define location
             if schema_node.name in ["header", "body", "querystring", "path"]:
-                converted['title'] = schema_node.title
+                converted["title"] = schema_node.title
             else:
                 # otherwise use either the explicitly provided title or name
                 # colander capitalizes the title, which makes it wrong most of the time
                 # when using CamelCase or camelBack schema definitions
                 if isinstance(schema_node.raw_title, str):
-                    converted['title'] = schema_node.title
+                    converted["title"] = schema_node.title
                 else:
-                    converted['title'] = schema_node.name
+                    converted["title"] = schema_node.name
 
         return converted
 

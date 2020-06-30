@@ -10,8 +10,7 @@ from copy import deepcopy
 import sys
 
 import mock
-
-from pytest import fail
+import pytest
 from pywps.app import WPSRequest
 
 from weaver.datatype import Process
@@ -329,4 +328,4 @@ def test_stdout_stderr_logging_for_commandline_tool_failure():
     except PackageExecutionError as exception:
         assert "Completed permanentFail" in exception.args[0]
     else:
-        fail("\"wps_package._handler()\" was expected to throw \"PackageExecutionError\" exception")
+        pytest.fail("\"wps_package._handler()\" was expected to throw \"PackageExecutionError\" exception")
