@@ -121,7 +121,7 @@ def test_check_package_file_with_url():
 
 def test_check_package_file_with_file_scheme():
     with mock.patch("requests.head", return_value=MockResponseOk()) as mock_request:
-        with tempfile.NamedTemporaryFile(mode='r', suffix="test-package.cwl") as tmp_file:
+        with tempfile.NamedTemporaryFile(mode="r", suffix="test-package.cwl") as tmp_file:
             package_file = "file://{}".format(tmp_file.name)
             res_path, is_url = _check_package_file(package_file)
             mock_request.assert_not_called()
@@ -130,7 +130,7 @@ def test_check_package_file_with_file_scheme():
 
 
 def test_check_package_file_with_posix_path():
-    with tempfile.NamedTemporaryFile(mode='r', suffix="test-package.cwl") as tmp_file:
+    with tempfile.NamedTemporaryFile(mode="r", suffix="test-package.cwl") as tmp_file:
         res_path, is_url = _check_package_file(tmp_file.name)
         assert res_path == tmp_file.name
         assert is_url is False
@@ -155,7 +155,7 @@ def test_get_package_ordered_io_when_direct_type_string():
     assert isinstance(result, list)
     assert len(result) == len(inputs_as_strings)
     assert all([isinstance(res_i, dict) for res_i in result])
-    assert all([i in [res_i["id"] for res_i in result] for i in inputs_as_strings.keys()])
+    assert all([i in [res_i["id"] for res_i in result] for i in inputs_as_strings])
     assert all(["type" in res_i and res_i["type"] == inputs_as_strings[res_i["id"]] for res_i in result])
 
 

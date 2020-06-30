@@ -887,7 +887,7 @@ class WpsPackage(Process):
 
         cfg_euid = str(self.settings.get("weaver.cwl_euid", ""))
         cfg_egid = str(self.settings.get("weaver.cwl_egid", ""))
-        app_euid, app_egid = str(os.geteuid()), str(os.getgid())  # noqa: E1101
+        app_euid, app_egid = str(os.geteuid()), str(os.getgid())  # pylint: disable=E1101
         if cfg_euid not in ["", "0", app_euid] and cfg_egid not in ["", "0", app_egid]:
             self.logger.info("Enforcing CWL euid:egid [%s,%s]", cfg_euid, cfg_egid)
             cwltool.docker.docker_vm_id = lambda *_, **__: (int(cfg_euid), int(cfg_egid))

@@ -919,7 +919,7 @@ class AnyOfKeywordSchema(KeywordMapper):
 
 
 class NotKeywordSchema(KeywordMapper):
-    def __init__(self):  # noqa: W0231
+    def __init__(self):  # pylint: disable=W0231
         raise NotImplementedError  # TODO
 
 
@@ -995,7 +995,7 @@ class VariableObjectTypeConverter(ObjectTypeConverter):
     def convert_type(self, schema_node):
         converted = super(VariableObjectTypeConverter, self).convert_type(schema_node)
         converted.setdefault("additionalProperties", {})
-        if self.openapi_spec == 3:
+        if self.dispatcher.openapi_spec == 3:
             for sub_node in schema_node.children:
                 if VariableSchemaNode.is_variable(sub_node):
                     converted["additionalProperties"].update(
