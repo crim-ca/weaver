@@ -44,7 +44,9 @@ def main(global_config, **settings):
 
     # load requests options
     LOGGER.info("Loading request options...")
-    req_file = get_weaver_config_file(settings.get("weaver.request_options", ""), WEAVER_DEFAULT_REQUEST_OPTIONS_CONFIG)
+    req_file = get_weaver_config_file(settings.get("weaver.request_options", ""),
+                                      WEAVER_DEFAULT_REQUEST_OPTIONS_CONFIG,
+                                      generate_default_from_example=False)
     with open(req_file, "r") as f:
         settings.update({"weaver.request_options": yaml.safe_load(f)})
 

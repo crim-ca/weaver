@@ -373,7 +373,8 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
     """
     if wps_processes_file_path is None:
         warnings.warn("No file specified for WPS-1 providers registration.", RuntimeWarning)
-        wps_processes_file_path = get_weaver_config_file("", WEAVER_DEFAULT_WPS_PROCESSES_CONFIG)
+        wps_processes_file_path = get_weaver_config_file("", WEAVER_DEFAULT_WPS_PROCESSES_CONFIG,
+                                                         generate_default_from_example=False)
     elif wps_processes_file_path == "":
         warnings.warn("Configuration file for WPS-1 providers registration explicitly defined as empty in settings. "
                       "Not loading anything.", RuntimeWarning)

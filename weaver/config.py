@@ -66,7 +66,7 @@ def get_weaver_config_file(file_path, default_config_file, generate_default_from
     :param file_path: path to a configuration file (can be relative if resolvable or matching a default file name)
     :param default_config_file: one of :py:data:`WEAVER_DEFAULT_CONFIGS`.
     :param generate_default_from_example: enable fallback copy of default configuration file from corresponding example.
-    :returns: absolue path of the resolved file.
+    :returns: absolute path of the resolved file.
     """
     if default_config_file not in WEAVER_DEFAULT_CONFIGS:
         raise ValueError("Invalid default configuration file [{}] is not one of {}"

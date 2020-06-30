@@ -116,6 +116,9 @@ Changes:
 - Add `fmigneault/cornice.ext.swagger@openapi-3 <https://github.com/fmigneault/cornice.ext.swagger/tree/openapi-3>`_
   as ``cornice_swagger`` requirement to allow OpenAPI-3 definitions support of schema generation and deserialization
   validation of JSON payloads.
+- Disable default auto-generation of ``request-options.yml`` and ``wps_processes.yml`` configuration files from a copy
+  of their respective ``.example`` files as these have many demo (and invalid values) that fail real execution of tests
+  when no actual file was provided.
 
 Fixes:
 ------
