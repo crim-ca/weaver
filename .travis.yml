@@ -21,9 +21,9 @@ env:
     - START_TARGET=start  TEST_TARGET=test-func
     - START_TARGET=       TEST_TARGET=test-online
 cache:
-  - pip
+  # - pip
   - directories:
-      - $HOME/conda
+      # - $HOME/conda
       - $HOME/downloads
 # includes PR when base branch = master
 if: branch = master OR tag IS present
