@@ -69,7 +69,7 @@ class NullType(six.with_metaclass(_Singleton)):
         return (isinstance(other, NullType)                                     # noqa: W503
                 or other is null                                                # noqa: W503
                 or other is self.__instance__                                   # noqa: W503
-                or (inspect.isclass(other) and issubclass(other, _NullType)))   # noqa: W503
+                or (inspect.isclass(other) and issubclass(other, NullType)))    # noqa: W503
 
     def __getattr__(self, item):
         # type: (Any) -> NullType

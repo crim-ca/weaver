@@ -24,6 +24,7 @@ __pycache__
 *.lock
 .cache
 .coverage
+.pylint.d/
 .pytest_cache
 .tox
 coverage.xml

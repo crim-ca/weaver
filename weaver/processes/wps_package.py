@@ -14,6 +14,7 @@ import logging
 import os
 import posixpath
 import shutil
+import sys
 import tempfile
 import time
 import uuid
@@ -100,6 +101,7 @@ from weaver.utils import (
     get_url_without_query,
     null,
     NullType,
+    request_extra,
     str2bytes,
     transform_json
 )
@@ -1885,9 +1887,12 @@ class WpsPackage(Process):
 
         Overrides :mod:`cwltool`'s function to retrieve user/group id for ones we enforce.
         """
+        if sys.platform == "win32":
+            return
+
         cfg_euid = str(self.settings.get("weaver.cwl_euid", ""))
         cfg_egid = str(self.settings.get("weaver.cwl_egid", ""))
-        app_euid, app_egid = str(os.geteuid()), str(os.getgid())
+        app_euid, app_egid = str(os.geteuid()), str(os.getgid())  # noqa: E1101
         if cfg_euid not in ["", "0", app_euid] and cfg_egid not in ["", "0", app_egid]:
             self.logger.info("Enforcing CWL euid:egid [%s,%s]", cfg_euid, cfg_egid)
             cwltool.docker.docker_vm_id = lambda *_, **__: (int(cfg_euid), int(cfg_egid))
