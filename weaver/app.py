@@ -35,8 +35,10 @@ def main(global_config, **settings):
     settings.update(parse_extra_options(settings.get("weaver.extra_options", "")))
 
     # load requests options if found, otherwise skip
+    LOGGER.info("Checking for request options file...")
     req_file = get_weaver_config_file(settings.get("weaver.request_options", ""),
-                                      WEAVER_DEFAULT_REQUEST_OPTIONS_CONFIG, generate_default_from_example=False)
+                                      WEAVER_DEFAULT_REQUEST_OPTIONS_CONFIG,
+                                      generate_default_from_example=False)
     if req_file:
         LOGGER.info("Loading request options...")
         with open(req_file, "r") as f:
