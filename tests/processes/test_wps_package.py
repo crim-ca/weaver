@@ -4,14 +4,13 @@ Unit tests of functions within :mod:`weaver.processes.wps_package`.
 .. seealso::
     - :mod:`tests.functional.wps_package`.
 """
+import sys
 import tempfile
 from collections import OrderedDict
 from copy import deepcopy
-import sys
 
 import mock
 import pytest
-
 from pytest import fail
 from pywps.app import WPSRequest
 from pywps.inout.formats import Format

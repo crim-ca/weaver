@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, AnyStr, Optional
 import six
 from beaker.cache import cache_region
 from cornice.service import get_services
-from cornice_swagger import CorniceSwagger
 from pyramid.authentication import Authenticated, IAuthenticationPolicy
 from pyramid.exceptions import PredicateMismatch
 from pyramid.httpexceptions import (
@@ -23,13 +22,9 @@ from pyramid.settings import asbool
 from simplejson import JSONDecodeError
 from six.moves.urllib.parse import urlparse
 
+from cornice_swagger import CorniceSwagger
 from weaver import __meta__
-from weaver.formats import (
-    CONTENT_TYPE_APP_JSON,
-    CONTENT_TYPE_APP_PDF,
-    CONTENT_TYPE_APP_XML,
-    CONTENT_TYPE_TEXT_HTML
-)
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_PDF, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_HTML
 from weaver.owsexceptions import OWSException
 from weaver.utils import get_header, get_settings, get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd

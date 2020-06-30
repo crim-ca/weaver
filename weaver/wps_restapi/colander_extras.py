@@ -44,10 +44,11 @@ complementary support of one-another features.
 
 """
 import inspect
-from typing import TYPE_CHECKING
 from abc import abstractmethod
+from typing import TYPE_CHECKING
 
 import colander
+
 from cornice_swagger.converters.exceptions import ConversionError, NoSuchConverter
 from cornice_swagger.converters.schema import ObjectTypeConverter, TypeConversionDispatcher, TypeConverter
 

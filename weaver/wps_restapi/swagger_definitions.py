@@ -4,9 +4,7 @@ so that one can update the swagger without touching any other files after the in
 """
 # pylint: disable=C0103,invalid-name
 
-from colander import Boolean, DateTime, Float, Integer, Time
-from colander import OneOf, Range
-from colander import String, drop
+from colander import Boolean, DateTime, Float, Integer, OneOf, Range, String, Time, drop
 from cornice import Service
 
 from weaver import __meta__
@@ -23,12 +21,12 @@ from weaver.execute import (
     EXECUTE_TRANSMISSION_MODE_REFERENCE
 )
 from weaver.formats import (
+    ACCEPT_LANGUAGE_EN_CA,
+    ACCEPT_LANGUAGES,
     CONTENT_TYPE_APP_JSON,
     CONTENT_TYPE_APP_XML,
     CONTENT_TYPE_TEXT_HTML,
-    CONTENT_TYPE_TEXT_PLAIN,
-    ACCEPT_LANGUAGE_EN_CA,
-    ACCEPT_LANGUAGES
+    CONTENT_TYPE_TEXT_PLAIN
 )
 from weaver.owsexceptions import OWSMissingParameterValue
 from weaver.sort import JOB_SORT_VALUES, QUOTE_SORT_VALUES, SORT_CREATED, SORT_ID, SORT_PROCESS
@@ -37,13 +35,12 @@ from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps_restapi.colander_extras import (
     AnyOfKeywordSchema,
     ExtendedMappingSchema,
-    ExtendedSequenceSchema,
     ExtendedSchemaNode,
+    ExtendedSequenceSchema,
     OneOfKeywordSchema,
     PermissiveMappingSchema
 )
 from weaver.wps_restapi.utils import wps_restapi_base_path
-
 
 API_TITLE = "Weaver REST API"
 API_INFO = {

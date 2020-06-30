@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 from typing import Set
+
 from setuptools import find_packages, setup
 
 CUR_DIR = os.path.abspath(os.path.dirname(__file__))

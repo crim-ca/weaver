@@ -89,6 +89,7 @@ from weaver.status import (
 )
 from weaver.utils import (
     SUPPORTED_FILE_SCHEMES,
+    NullType,
     bytes2str,
     fetch_file,
     get_any_id,
@@ -100,7 +101,6 @@ from weaver.utils import (
     get_settings,
     get_url_without_query,
     null,
-    NullType,
     request_extra,
     str2bytes,
     transform_json

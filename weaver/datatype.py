@@ -14,7 +14,7 @@ from owslib.wps import WPSException
 from pywps import Process as ProcessWPS
 
 from weaver.exceptions import ProcessInstanceError
-from weaver.formats import CONTENT_TYPE_APP_JSON, ACCEPT_LANGUAGE_EN_US
+from weaver.formats import ACCEPT_LANGUAGE_EN_US, CONTENT_TYPE_APP_JSON
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_BUILTIN, PROCESS_TEST, PROCESS_WORKFLOW, PROCESS_WPS
 from weaver.status import (
     JOB_STATUS_CATEGORIES,
