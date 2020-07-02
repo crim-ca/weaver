@@ -10,6 +10,7 @@ from typing import AnyStr
 
 import six
 from lxml import etree
+from six.moves.urllib.parse import urlparse
 
 if six.PY3:
     from tempfile import TemporaryDirectory
