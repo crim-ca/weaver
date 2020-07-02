@@ -3,17 +3,19 @@ from typing import TYPE_CHECKING
 
 from pyramid.settings import asbool
 
+from weaver.database.mongodb import MongoDatabase
 from weaver.utils import get_registry, get_settings
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from weaver.database.mongodb import MongoDatabase   # noqa: F401
     from weaver.typedefs import AnyDatabaseContainer    # noqa: F401
 
 
-def get_db(container):
-    # type: (AnyDatabaseContainer) -> MongoDatabase
+def get_db(container, reset_connection=False):
+    # type: (AnyDatabaseContainer, bool) -> MongoDatabase
     registry = get_registry(container)
+    if reset_connection:
+        registry.db = MongoDatabase(registry, reset_connection=reset_connection)
     return registry.db
 
 
@@ -24,7 +26,6 @@ def includeme(config):
         return
 
     LOGGER.info("Adding database...")
-    from weaver.database.mongodb import MongoDatabase
     config.registry.db = MongoDatabase(config.registry)
 
     def _add_db(request):

@@ -49,6 +49,9 @@ setup(name=__meta__.__name__,
       test_suite="tests",
       python_requires=">=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*, <4",
       install_requires=requirements,
+      dependency_links=[
+          "git+https://github.com/ESGF/esgf-compute-api.git@v2.1.0#egg=cwt"
+      ],
       entry_points={
           "paste.app_factory": [
               "main = {}:main".format(__meta__.__name__)

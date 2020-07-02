@@ -1,0 +1,15 @@
+{
+    "processDescription": {
+        "process": {
+            "id": "WorkflowFileToSubsetCRIM",
+            "title": "Workflow to test transforming a file to a satring array",
+            "abstract": "Workflow to test transforming a file to a satring array"
+        }
+    },
+    "executionUnit": [
+        {
+            "href": "tests/functional/application-packages/workflow_file_to_subset_crim.cwl"
+        }
+    ],
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/workflow"
+}

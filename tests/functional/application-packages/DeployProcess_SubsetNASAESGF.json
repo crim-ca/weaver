@@ -1,0 +1,73 @@
+{
+    "processDescription": {
+        "process": {
+            "id": "nasa_esgf_subset",
+            "abstract": "Process that does NASA dataset subsets using xarray."
+        }
+    },
+    "executionUnit": [
+        {
+            "unit": {
+                "cwlVersion": "v1.0",
+                "class": "CommandLineTool",
+                "hints": {
+                    "ESGF-CWTRequirement": {
+                        "provider": "https://edas.nccs.nasa.gov/wps/cwt",
+                        "process": "xarray.subset"
+                    }
+                },
+                "inputs": {
+                    "files": "File",
+                    "variable": {
+                        "type": "string"
+                    },
+                    "time_start": {
+                        "type": "float",
+                        "default": null
+                    },
+                    "time_end": {
+                        "type": "float",
+                        "default": null
+                    },
+                    "time_crs": {
+                        "type": "string",
+                        "default": null
+                    },
+                    "lat_start": {
+                        "type": "float",
+                        "default": null
+                    },
+                    "lat_end": {
+                        "type": "float",
+                        "default": null
+                    },
+                    "lat_crs": {
+                        "type": "string",
+                        "default": null
+                    },
+                    "lon_start": {
+                        "type": "float",
+                        "default": null
+                    },
+                    "lon_end": {
+                        "type": "float",
+                        "default": null
+                    },
+                    "lon_crs": {
+                        "type": "string",
+                        "default": null
+                    }
+                },
+                "outputs": {
+                    "output": {
+                        "outputBinding": {
+                            "glob": "output_netcdf.nc"
+                        },
+                        "type": "File"
+                    }
+                }
+            }
+        }
+    ],
+    "deploymentProfileName": "http://www.opengis.net/profiles/eoc/ESGFWpsApplication"
+}

@@ -1,0 +1,32 @@
+{
+  "mode": "async",
+  "response": "document",
+  "inputs": [
+    {
+      "id": "file",
+      "href": "https://github.com/Ouranosinc/xclim/raw/124634490800a954f827d6595b125efcd5a0643c/tests/testdata/HadGEM2-CC_360day/tasmax_day_HadGEM2-CC_rcp85_r1i1p1_na10kgrid_qm-moving-50bins-detrend_2095.nc"
+    },
+    {
+      "id": "crim_lat0",
+      "data": "40"
+    },
+    {
+      "id": "crim_lat1",
+      "data": "60"
+    },
+    {
+      "id": "crim_lon0",
+      "data": "-80"
+    },
+    {
+      "id": "crim_lon1",
+      "data": "-60"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "output",
+      "transmissionMode": "reference"
+    }
+  ]
+}

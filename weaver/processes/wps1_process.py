@@ -69,32 +69,38 @@ class Wps1Process(WpsProcessInterface):
                     complex_inputs.append(process_input.identifier)
 
             # remove any 'null' input, should employ the 'default' of the remote WPS process
-            workflow_inputs_provided_keys = filter(lambda i: workflow_inputs[i] != "null", workflow_inputs)
+            inputs_provided_keys = filter(lambda i: workflow_inputs[i] != "null", workflow_inputs)
 
-            try:
-                wps_inputs = list()
-                for workflow_input_key in workflow_inputs_provided_keys:
-                    workflow_input_val = workflow_inputs[workflow_input_key]
-                    # in case of array inputs, must repeat (id,value)
-                    # in case of complex input (File), obtain location, otherwise get data value
-                    input_values = [val["location"] if isinstance(val, dict) else val
-                                    for val in (workflow_input_val
-                                                if isinstance(workflow_input_val, list)
-                                                else [workflow_input_val])]
+            wps_inputs = []
+            for input_key in inputs_provided_keys:
+                input_val = workflow_inputs[input_key]
+                # in case of array inputs, must repeat (id,value)
+                # in case of complex input (File), obtain location, otherwise get data value
+                if not isinstance(input_val, list):
+                    input_val = [input_val]
 
-                    # we need to host file starting with file:// scheme
-                    input_values = [self.host_file(val) if str(val).startswith("file://") else val
-                                    for val in input_values]
+                input_values = []
+                for val in input_val:
+                    if isinstance(val, dict):
+                        val = val["location"]
 
-                    # need to use ComplexDataInput structure for complex input
-                    # need to use literal String for anything else than complex
-                    # TODO: BoundingBox not supported
-                    wps_inputs.extend([
-                        (workflow_input_key,
-                         ComplexDataInput(input_value) if workflow_input_key in complex_inputs else str(input_value))
-                        for input_value in input_values])
-            except KeyError:
-                wps_inputs = []
+                    # owslib only accepts strings, not numbers directly
+                    if isinstance(val, (int, float)):
+                        val = str(val)
+
+                    if val.startswith("file://"):
+                        # we need to host file starting with file:// scheme
+                        val = self.host_file(val)
+
+                    input_values.append(val)
+
+                # need to use ComplexDataInput structure for complex input
+                # TODO: BoundingBox not supported
+                for input_value in input_values:
+                    if input_key in complex_inputs:
+                        input_value = ComplexDataInput(input_value)
+
+                    wps_inputs.append((input_key, input_value))
 
             # prepare outputs
             outputs = [(o.identifier, o.dataType == WPS_COMPLEX_DATA) for o in process.processOutputs
@@ -168,6 +174,7 @@ class Wps1Process(WpsProcessInterface):
         except Exception as exc:
             exception_class = "{}.{}".format(type(exc).__module__, type(exc).__name__)
             errors = "{0}: {1!s}".format(exception_class, exc)
+            LOGGER.exception(exc)
             raise Exception(errors)
 
         self.update_status("Execution on remote WPS1 provider completed.",
