@@ -8,7 +8,12 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add multiple CWL ESGF processes and workflows, namely ``SubsetNASAESGF``, ``SubsetNASAESGF`` and many more.
+- Add tests for ESGF processes and workflows.
+- Add documentation for ``ESGF-CWTRequirement`` processes.
+- Reset ``MongoDatabase`` connection when we are in a forked process.
+- Add ``file2string_array`` and ``metalink2netcdf`` builtins.
+- Add ``esgf_process`` ``Wps1Process`` extension, to handle ``ESGF-CWTRequirement`` processes and workflows.
 
 Fixes:
 ------
