@@ -8,6 +8,21 @@ Changes
 
 Changes:
 --------
+- Add multiple CWL ESGF processes and workflows, namely ``SubsetNASAESGF``, ``SubsetNASAESGF`` and many more.
+- Add tests for ESGF processes and workflows.
+- Add documentation for ``ESGF-CWTRequirement`` processes.
+- Add ``file2string_array`` and ``metalink2netcdf`` builtins.
+- Add ``esgf_process`` ``Wps1Process`` extension, to handle ``ESGF-CWTRequirement`` processes and workflows.
+
+Fixes:
+------
+- Reset ``MongoDatabase`` connection when we are in a forked process.
+
+`1.11.0 <https://github.com/crim-ca/weaver/tree/1.11.0>`_ (2020-07-02)
+========================================================================
+
+Changes:
+--------
 - Generate Weaver OpenAPI specification for readthedocs publication.
 - Add some sections for documentation (`#61 <https://github.com/crim-ca/weaver/issues/61>`_).
 - Add support of documentation RST file redirection to generated HTML for reference resolution in both Github source
