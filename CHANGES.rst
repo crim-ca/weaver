@@ -8,6 +8,17 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+`1.12.0 <https://github.com/crim-ca/weaver/tree/1.12.0>`_ (2020-07-03)
+========================================================================
+
+Changes:
+--------
 - Add multiple CWL ESGF processes and workflows, namely ``SubsetNASAESGF``, ``SubsetNASAESGF`` and many more.
 - Add tests for ESGF processes and workflows.
 - Add documentation for ``ESGF-CWTRequirement`` processes.
