@@ -11,13 +11,12 @@ Changes:
 - Add multiple CWL ESGF processes and workflows, namely ``SubsetNASAESGF``, ``SubsetNASAESGF`` and many more.
 - Add tests for ESGF processes and workflows.
 - Add documentation for ``ESGF-CWTRequirement`` processes.
-- Reset ``MongoDatabase`` connection when we are in a forked process.
 - Add ``file2string_array`` and ``metalink2netcdf`` builtins.
 - Add ``esgf_process`` ``Wps1Process`` extension, to handle ``ESGF-CWTRequirement`` processes and workflows.
 
 Fixes:
 ------
-- No change.
+- Reset ``MongoDatabase`` connection when we are in a forked process.
 
 `1.11.0 <https://github.com/crim-ca/weaver/tree/1.11.0>`_ (2020-07-02)
 ========================================================================
