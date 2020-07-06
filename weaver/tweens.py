@@ -1,5 +1,6 @@
 import logging
 import sys
+from typing import TYPE_CHECKING
 
 from pyramid.httpexceptions import HTTPException, HTTPInternalServerError, HTTPRedirection, HTTPSuccessful
 from pyramid.tweens import EXCVIEW, INGRESS
@@ -7,9 +8,23 @@ from pyramid.tweens import EXCVIEW, INGRESS
 from weaver.owsexceptions import OWSException, OWSNotImplemented
 from weaver.utils import fully_qualified_name
 
+if TYPE_CHECKING:
+    from typing import Union
+
 LOGGER = logging.getLogger(__name__)
 
 OWS_TWEEN_HANDLED = "OWS_TWEEN_HANDLED"
+
+
+def error_repr(http_err):
+    # type: (Union[HTTPException, OWSException, Exception]) -> str
+    """
+    Returns a cleaned up representation string of the HTTP error, but with similar and even extended details to 
+    facilitate later debugging.
+    """
+    if not isinstance(http_err, (HTTPException, OWSException)):
+        return "{!r}".format(http_err)
+    return "{} [{}] {!s}".format(type(http_err).__name__, http_err.code, http_err)
 
 
 def ows_response_tween(request, handler):
@@ -45,10 +60,11 @@ def ows_response_tween(request, handler):
         return_error = OWSException(detail=str(err), status=HTTPInternalServerError)
         exc_info_err = sys.exc_info()
         exc_log_lvl = logging.ERROR
+    err_msg = "\n  Cause:  [{} {}]".format(request.method, request.url)
     if raised_error != return_error:
-        err_msg = "\n  Raised: [{!r}]\n  Return: [{!r}]".format(raised_error, return_error)
+        err_msg += "\n  Raised: [{}]\n  Return: [{}]".format(error_repr(raised_error), error_repr(return_error))
     else:
-        err_msg = " [{!r}]".format(raised_error)
+        err_msg += "\n  Raised: [{}]".format(error_repr(raised_error))
     LOGGER.log(exc_log_lvl, "Handled request exception:%s", err_msg, exc_info=exc_info_err)
     return return_error
 
