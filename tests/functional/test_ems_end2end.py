@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 
 import mock
 import pytest
+import six
 from pyramid import testing
 from pyramid.httpexceptions import HTTPCreated, HTTPNotFound, HTTPOk, HTTPUnauthorized
 from pyramid.settings import asbool
@@ -117,7 +118,9 @@ class End2EndEMSTestCase(TestCase):
             pass
 
         # logging parameter overrides
-        cls.logger_level = os.getenv("WEAVER_TEST_LOGGER_LEVEL", cls.logger_level)
+        cls.logger_level = os.getenv("WEAVER_TEST_LOGGER_LEVEL", cls.logger_level) or cls.logger_level
+        if isinstance(cls.logger_level, six.string_types):
+            cls.logger_level = logging.getLevelName(cls.logger_level)
         cls.logger_enabled = asbool(os.getenv("WEAVER_TEST_LOGGER_ENABLED", cls.logger_enabled))
         cls.logger_result_dir = os.getenv("WEAVER_TEST_LOGGER_RESULT_DIR", os.path.join(WEAVER_ROOT_DIR))
         cls.logger_json_indent = os.getenv("WEAVER_TEST_LOGGER_JSON_INDENT", cls.logger_json_indent)
@@ -437,8 +440,8 @@ class End2EndEMSTestCase(TestCase):
         if dictionary is None:
             return None
 
-        tab = cls.get_indent(indent_level)
-        return tab + "\n{tab}".format(tab=tab).join(["{}: {}".format(k, dictionary[k]) for k in sorted(dictionary)])
+        tab = "\n" + cls.get_indent(indent_level)
+        return tab + "{tab}".format(tab=tab).join(["{}: {}".format(k, dictionary[k]) for k in sorted(dictionary)])
 
     @classmethod
     def request(cls, method, url, ignore_errors=False, force_requests=False, log_enabled=True, **kw):

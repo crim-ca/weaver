@@ -325,6 +325,10 @@ class VariableSchemaNode(colander.SchemaNode):
     def deserialize(self, cstruct):
         if cstruct in (colander.drop, colander.null):
             return cstruct
+        # skip step in case operation was called as subnode from another schema but doesn't
+        # correspond to a valid variable map container (e.g.: SequenceSchema)
+        if not isinstance(self, VariableSchemaNode):
+            return cstruct
         var_map = getattr(self, self._variable_map, {})
         if not isinstance(var_map, dict) or not len(var_map):
             return super(VariableSchemaNode, self).deserialize(cstruct)

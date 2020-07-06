@@ -449,7 +449,7 @@ def test_request_extra_intervals():
             intervals = [1e6, 3e6, 5e6]  # random values that shouldn't normally be used with sleep() (too big)
             # values will not match if backoff/retries are not automatically corrected by internals parameter
             resp = request_extra("get", "http://whatever", only_server_errors=False,
-                                 intervals=intervals, backoff=1000, retries=10)
+                                 intervals=intervals, backoff=1000, retries=10)  # backoff/retries must be ignored here
             assert resp.status_code == HTTPGatewayTimeout.code
             assert mocked_request.call_count == 4  # first called directly, then 3 times, one for each interval
             # WARNING:
