@@ -280,7 +280,7 @@ def _fetch_process_info(process_info_url, fetch_error):
     """
     Fetches the JSON process information from the specified URL and validates that it contains something.
 
-    :raises: provided exception with URL message if the process information could not be retrieved.
+    :raises fetch_error: provided exception with URL message if the process information could not be retrieved.
     """
     def _info_not_found_error():
         return fetch_error("Could not find reference: '{!s}'".format(process_info_url))
@@ -387,7 +387,7 @@ def _check_package_file(cwl_file_path_or_url):
 
     :param cwl_file_path_or_url: one of allowed file types path on disk, or an URL pointing to one served somewhere.
     :return: absolute_path, is_url: absolute path or URL, and boolean indicating if it is a remote URL file.
-    :raises: PackageRegistrationError in case of missing file, invalid format or invalid HTTP status code.
+    :raises PackageRegistrationError: in case of missing file, invalid format or invalid HTTP status code.
     """
     is_url = False
     if urlparse(cwl_file_path_or_url).scheme != "":

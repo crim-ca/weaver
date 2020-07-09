@@ -221,7 +221,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         :param process: process to retrieve the field from.
         :param function_dict: lambda or dict of lambda of process type
         :return: retrieved field if the type was supported
-        :raises: ProcessInstanceError on invalid process type
+        :raises ProcessInstanceError: invalid process type
         """
         if isinstance(process, Process):
             if islambda(function_dict):
@@ -344,7 +344,8 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         :param visibility: One value amongst `weaver.visibility`.
         :param process_id:
         :param request: <unused>
-        :raises: ``TypeError`` or ``ValueError`` in case of invalid parameter.
+        :raises TypeError: when :paramref:`visibility` is not :class:`str`.
+        :raises ValueError: when :paramref:`visibility` is not one of :py:data:`weaver.visibility.VISIBILITY_VALUES`.
         """
         process = self.fetch_by_id(process_id)
         process.visibility = visibility

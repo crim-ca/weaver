@@ -1,6 +1,6 @@
 alembic
 backports.tempfile; python_version < "3"
-# AWS-S3 buckets support
+# AWS support (S3 buckets)
 boto3
 # celery 5 to be released in near future
 # celery >=4.4.3 breaks on 'future.utils' import

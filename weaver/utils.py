@@ -733,6 +733,7 @@ def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
     :param settings: Additional request-related settings from the application configuration.
     :param request_kwargs: Additional keywords to forward to request call (if needed).
     :return: Path of the local copy of the fetched file.
+    :raises
     """
     file_href = file_reference
     file_name = os.path.basename(file_reference)
@@ -755,9 +756,10 @@ def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
             shutil.copyfile(file_reference, file_path)
     elif file_reference.startswith("s3://"):
         LOGGER.debug("Fetch file resolved as S3 bucket reference.")
-        bucket_name, file_key = file_reference[7:].split("/")
+        bucket_name, file_key = file_reference[5:].split("/")
         s3 = boto3.resource("s3")
         bucket = s3.Bucket(bucket_name)
+        bucket.download_file(file_key, file_path)
     elif file_reference.startwith("http"):
         LOGGER.debug("Fetch file resolved as remote URL reference.")
         request_kwargs.pop("stream", None)

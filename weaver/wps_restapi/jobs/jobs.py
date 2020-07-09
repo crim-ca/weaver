@@ -39,7 +39,7 @@ def get_job(request):
     Obtain a job from request parameters.
 
     :returns: Job information if found.
-    :raises: HTTPNotFound with JSON body details on missing/non-matching job, process, provider IDs.
+    :raise HTTPNotFound: with JSON body details on missing/non-matching job, process, provider IDs.
     """
     job_id = request.matchdict.get("job_id")
     store = get_db(request).get_store(StoreJobs)

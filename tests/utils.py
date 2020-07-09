@@ -2,13 +2,17 @@
 Utility methods for various TestCase setup operations.
 """
 import os
+import tempfile
 import uuid
 import warnings
 from inspect import isclass
 from typing import TYPE_CHECKING
 
+import boto3
 import mock
+import moto
 import pyramid_celery
+import pytest
 import six
 from pyramid import testing
 from pyramid.config import Configurator
@@ -29,6 +33,7 @@ from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 from weaver.wps_restapi.processes.processes import execute_process
 
 if TYPE_CHECKING:
+    import botocore.client  # noqa
     from weaver.typedefs import (  # noqa: F401
         Any, AnyResponseType, AnyStr, Callable, List, Optional, SettingsType, Type, Union
     )
@@ -355,3 +360,36 @@ def mocked_process_package():
         mock.patch("weaver.processes.wps_package._get_package_inputs_outputs", return_value=(None, None)),
         mock.patch("weaver.processes.wps_package._merge_package_inputs_outputs", return_value=([], [])),
     )
+
+
+@pytest.fixture(scope="function")
+def mocked_aws_credentials():
+    """Mocked AWS Credentials for :py:mod:`moto`."""
+    os.environ["AWS_ACCESS_KEY_ID"] = "testing"
+    os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
+    os.environ["AWS_SECURITY_TOKEN"] = "testing"
+    os.environ["AWS_SESSION_TOKEN"] = "testing"
+
+
+@pytest.fixture(scope="function")
+def mocked_aws_s3(mocked_aws_credentials):
+    """Mocked AWS S3 bucket for :py:mod:`boto3` over mocked AWS credentials using :py:mod:`moto`."""
+    with moto.mock_s3():
+        yield boto3.client("s3", region_name="us-east-1")
+
+
+@pytest.fixture(scope="function")
+def mocked_test_bucket_file(mocked_aws_s3):
+    # type: (...) -> Callable[[str, str, str], str]
+    """
+    Provides a callable that takes as input the test bucket, file name and optionally its content, and
+    returns the mocked S3 bucket reference.
+    """
+    def _bucket_file_creator(bucket_name, file_name, file_content="Test file inside test S3 bucket"):
+        mocked_aws_s3.create_bucket(Bucket=bucket_name)
+        with tempfile.NamedTemporaryFile(mode="w") as tmp_file:
+            tmp_file.write(file_content)
+            tmp_file.flush()
+            mocked_aws_s3.upload_file(Bucket=bucket_name, Filename=tmp_file.name, Key=file_name)
+        return "s3://{}/{}".format(bucket_name, file_name)
+    return _bucket_file_creator

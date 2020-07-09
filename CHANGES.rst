@@ -8,11 +8,12 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add AWS S3 bucket support for process inputs references.
+- Add ``weaver.wps_output_bucket`` configuration to upload results to AWS S3 bucket instead of local directory.
 
 Fixes:
 ------
-- No change.
+- Adjust some docstrings to better indicated raised errors.
 
 `1.12.0 <https://github.com/crim-ca/weaver/tree/1.12.0>`_ (2020-07-03)
 ========================================================================

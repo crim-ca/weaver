@@ -83,7 +83,7 @@ they are optional and which default value or operation is applied in each situat
 
 - | ``weaver.wps_output_bucket = <s3-bucket>``
   | (default: unused)
-  | .. versionadded:: 1.11.0
+  | .. versionadded:: 1.13.0
   |
   | AWS-S3 bucket where to store WPS outputs.
   |
