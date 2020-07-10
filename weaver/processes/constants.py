@@ -12,7 +12,7 @@ OPENSEARCH_END_DATE = "EndDate"
 OPENSEARCH_AOI = "aoi"
 OPENSEARCH_COLLECTION = "collection"
 # data source cache
-OPENSEARCH_LOCAL_FILE_SCHEME = "opensearchfile"  # must be a valid url scheme parsable by urlparse
+OPENSEARCH_LOCAL_FILE_SCHEME = "opensearch"  # must be a valid url scheme parsable by urlparse
 
 # CWL package (requirements/hints) corresponding to `PROCESS_APPLICATION`
 CWL_REQUIREMENT_APP_BUILTIN = "BuiltinRequirement"

@@ -332,7 +332,9 @@ that define the process references and expected inputs/outputs.
 Execution of a process (Execute)
 ---------------------------------------------------------------------
 
-Process execution (i.e.: submitting a job) is accomplished using the |exec-req|_ request.
+Process execution (i.e.: submitting a job) is accomplished using the |exec-req|_ request. This section will first
+describe the basics of this request format, and after go into details for specific use cases and parametrization of
+various input/output combinations.
 
 .. todo:: detail execute I/O (basic example)
 
@@ -369,7 +371,7 @@ an input string and parses the unusual reference from the literal data to proces
 
 - ``http(s)://``
 - ``file://``
-- ``opensearchfile://`` [experimental]
+- ``opensearch://`` [experimental]
 - ``s3://`` [experimental]
 
 The method in which `Weaver` will handle such references depends on its configuration, in other words, whether it is
@@ -379,22 +381,22 @@ These use-cases are described below.
 When `Weaver` is able to figure out that the process needs to be executed locally in `ADES` mode, it will fetch all
 necessary files prior to process execution in order to make them available to the `CWL` package. When `Weaver` is in
 `EMS` configuration, it will **always** forward the references (regardless of scheme) exactly as provided as input
-of the process execution request, since it assumes it needs to dispatch the execution to another `ADES` remote server.
-In this case, it becomes the responsibility of this remote instance to handle the reference appropriately. This also
-avoids potential problems such as if `Weaver` as `EMS` doesn't have authorized access to a link that only the target
-`ADES` would have access to.
+of the process execution request, since it assumes it needs to dispatch the execution to another `ADES` remote server,
+and therefore only needs to verify that the file reference is reachable remotely. In this case, it becomes the
+responsibility of this remote instance to handle the reference appropriately. This also avoids potential problems such
+as if `Weaver` as `EMS` doesn't have authorized access to a link that only the target `ADES` would have access to.
 
 When ``CWL`` package defines ``WPS1Requirement`` under ``hints`` for corresponding `WPS-1/2`_ remote processes being
 monitored by `Weaver`, it will skip fetching of ``http(s)``-based references since that would otherwise lead to useless
 double downloads (one on `Weaver` and the other on the `WPS` side). It is the same in case of ``ESGF-CWTRequirement``
 employed for `ESGF-CWT`_ processes. Because these processes do not normally
 
-.. todo::
-    method to indicate explicit fetch? (https://github.com/crim-ca/weaver/issues/183)
-
 When using `S3` references, `Weaver` expects the reference to be formatted as ``s3://<bucket>/<filename.ext>``.
 Provided that the corresponding `S3` bucket can be accessed by the running `Weaver` application, it will fetch the
 file and store it locally temporarily for ``CWL`` execution.
+
+When using `OpenSearch` references, additional parameters are necessary to handle retrieval of specific file URL.
+Please refer to :ref:`OpenSearch Data Source` for more details.
 
 .. note::
     When `Weaver` is fetching remote files, it can take advantage of additional request options to support unusual or
@@ -406,6 +408,60 @@ file and store it locally temporarily for ``CWL`` execution.
     means that `AWS` access must be granted to the application in order to allow it fetching the file.
     Please refer to :ref:`Configuration of AWS S3 Buckets` for more details.
 
+Following table summarize the default behaviour of input file reference handling of different situations when received
+as input argument of process execution. For simplification, keyword *<any>* is used to indicate that any other value in
+the corresponding column can be substituted for a given row when applied with conditions of other columns, which results
+to same operational behaviour. Elements that behave similarly are also presented together in rows to reduce displayed
+combinations.
+
+.. todo::
+    method to indicate explicit fetch to override these? (https://github.com/crim-ca/weaver/issues/183)
+
+.. todo::
+    add tests that validate each combination of operation
+
+.. table:: Summary of input file reference handling
+    :align-center:
+
+    +======================+====================+===================+=============================================+
+    | Weaver Configuration | Process Type       | File Scheme       | Applied Operation                           |
+    +======================+====================+===================+=============================================+
+    | *<any>*              | *<any>*            | ``opensearch://`` | Query and re-process [#openseach]_          |
+    +----------------------+--------------------+-------------------+---------------------------------------------+
+    | `ADES`               | `WSP-1/2`          | ``file://``       | Convert to ``http(s)://`` [#file2http]_     |
+    |                      | `ESGF-CWT`         +-------------------+---------------------------------------------+
+    |                      | `WPS-REST` (other) | ``http(s)://``    | Nothing (left unmodified)                   |
+    |                      |                    +-------------------+---------------------------------------------+
+    |                      |                    | ``s3://``         | Fetch and convert to ``http(s)://`` [#s3]_  |
+    |                      +--------------------+-------------------+---------------------------------------------+
+    |                      | `WSP-REST` (`CWL`) | ``file://``       | Nothing (file already local)                |
+    |                      |                    +-------------------+---------------------------------------------+
+    |                      |                    | ``http(s)://``    | Fetch and convert to ``file://``            |
+    |                      |                    | ``s3://``         |                                             |
+    +----------------------+--------------------+-------------------+---------------------------------------------+
+    | `EMS`                | *<any>*            | ``file://``       | Convert to ``http(s)://`` [#file2http]_     |
+    |                      |                    +-------------------+---------------------------------------------+
+    |                      |                    | ``http(s)://``    | Nothing (left unmodified)                   |
+    |                      |                    | ``s3://``         |                                             |
+    +----------------------+--------------------+-------------------+---------------------------------------------+
+
+.. [#file2http]: When a ``file://`` (or empty scheme) maps to a local file that needs to be exposed externally for
+   another remote process, the conversion to ``http(s)://`` scheme employs setting ``weaver.wps_outputs_url`` to form
+   the result URL reference. The file is placed in ``weaver.wps_outputs_dir`` to expose it as HTTP(S) endpoint.
+
+.. [#s3]: When an ``s3://`` file is fetched, is gets downloaded to a temporary ``file://`` location, which is **NOT**
+   necessarily exposed as ``http(s)://``. If execution is transferred to a remove process that is expected to not
+   support `S3` references, only then the file gets converted as in [#file2http]_.
+
+.. [#openseach]: References defined by ``opensearch://`` will trigger an `OpenSearch` query using the provided URL as
+   well as other input additional parameters (see :ref:`OpenSearch Data Source`). After processing of this query,
+   retrieved file references will be re-processed using the summarized logic in the table for the given use case.
+
+.. warning::
+    Missing schemes in URL reference are considered identical as if ``file://`` was used. In most cases, if not always,
+    an execution request should not employ this scheme unless the file is ensured to be at the specific location where
+    the running `Weaver` application can find it. This scheme is usually only employed as byproduct of the fetch
+    operation that `Weaver` uses to provide the file locally to underlying `CWL` application package to be executed.
 
 Multiple Inputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -478,7 +534,7 @@ etc.
 Special Weaver EMS use-cases
 ==================================================
 
-OpenSearch data source
+OpenSearch Data Source
 --------------------------------------
 
 .. todo:: EOImage with AOI/TOI/CollectionId for OpenSearch

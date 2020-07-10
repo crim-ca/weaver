@@ -2062,7 +2062,6 @@ class WpsPackage(Process):
                     # process single occurrences
                     input_i = input_occurs[0]
                     # handle as reference/data
-                    # NOTE: must not call data/file methods if URL reference, otherwise contents get fetched
                     is_array, elem_type, _, _ = _is_cwl_array_type(cwl_input_info[input_id])
                     if isinstance(input_i, ComplexInput) or elem_type == "File":
                         # extend array data that allow max_occur > 1
@@ -2089,10 +2088,6 @@ class WpsPackage(Process):
 
             try:
                 self.update_status("Running package...", PACKAGE_PROGRESS_CWL_RUN, STATUS_RUNNING)
-
-                # Inputs starting with file:// will be interpreted as ems local files
-                # If OpenSearch obtain file:// references that must be passed to the ADES use an uri starting
-                # with OPENSEARCH_LOCAL_FILE_SCHEME://
                 LOGGER.debug("Launching process package with inputs:\n%s", json.dumps(cwl_inputs, indent=2))
                 result = package_inst(**cwl_inputs)
                 self.update_status("Package execution done.", PACKAGE_PROGRESS_CWL_DONE, STATUS_RUNNING)
@@ -2115,17 +2110,40 @@ class WpsPackage(Process):
         return self.response
 
     @staticmethod
-    def make_location_input(input_type, input_definition):
-        # type: (AnyStr, ComplexInput) -> JSON
-        """Generates the JSON content required to specify a CWL File input definition from a location."""
-        # We don't want auto fetch because we pass down value to CWL which will handle it accordingly
+    def make_location_input(input_type, input_definition, fetch=False):
+        # type: (AnyStr, ComplexInput, bool) -> JSON
+        """
+        Generates the JSON content required to specify a CWL File input definition from a location.
+
+        If :paramref:`fetch` is ``True``, we pre-fetch all reference as local files.
+        Otherwise, we leave them as plain reference and it will be up to either ``CWL``, the executed application by it,
+        or the remote server that gets called (e.g.: in case of EMS dispatch to ADES) to fetch the referenced file.
+
+        .. note::
+            If the process requires ``OpenSearch`` references that should be preserved as is, use scheme defined by
+            :py:data:`weaver.processes.constants.OPENSEARCH_LOCAL_FILE_SCHEME` prefix instead of ``http(s)://``.
+
+        .. seealso::
+            - :py:data:`
+        """
+        # NOTE:
+        #   When running as EMS, must not call data/file methods if URL reference, otherwise contents
+        #   get fetched automatically by PyWPS objects.
+        #
+        #   Inputs starting with file:// will be interpreted as EMS local files
+        #   If ``OpenSearch`` obtain file:// references that must be passed to the ADES use an URI starting
+        #   with ``{OPENSEARCH_LOCAL_FILE_SCHEME}://``.
+        #
         input_location = None
-        # cannot rely only on 'as_reference' as sometime it is not provided by the request although it's an href
+        # cannot rely only on 'as_reference' as often it is not provided by the request although it's an href
         if input_definition.as_reference:
             input_location = input_definition.url
-        # FIXME: PyWPS bug - calling 'file' method fetches it, and it is always called during type validation
-        #   (https://github.com/geopython/pywps/issues/526)
-        #   (https://github.com/crim-ca/weaver/issues/91)
+        # FIXME: PyWPS bug
+        #   Calling 'file' method fetches it, and it is always called by the package itself
+        #   during type validation if the MODE is anything else than disabled.
+        #   MODE.SIMPLE is needed minimally to check MIME-TYPE of input against supported formats.
+        #       - https://github.com/geopython/pywps/issues/526
+        #       - https://github.com/crim-ca/weaver/issues/91
         #   since href is already handled (pulled and staged locally), use it directly to avoid double fetch with CWL
         #   validate using the internal '_file' instead of 'file' otherwise we trigger the fetch
         #   normally, file should be pulled an this check should fail

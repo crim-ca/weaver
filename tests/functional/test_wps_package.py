@@ -7,6 +7,7 @@ Local test web application is employed to run operations by mocking external req
 .. seealso::
     - :mod:`tests.processes.wps_package`.
 """
+import contextlib
 import logging
 import os
 import unittest
@@ -24,8 +25,10 @@ from tests.utils import (
     get_test_weaver_config,
     mocked_aws_credentials,     # noqa: F401 # must be included so that fixture can be found
     mocked_aws_s3,              # noqa: F401 # must be included so that fixture can be found
+    mocked_execute_process,
     mocked_sub_requests,
     mocked_test_bucket_file,    # noqa: F401 # must be included so that fixture can be found
+    setup_config_with_celery,
     setup_config_with_mongodb,
     setup_config_with_pywps,
     setup_mongodb_processstore
@@ -65,12 +68,14 @@ class WpsPackageConfigBase(unittest.TestCase):
         setattr(self, "__test__", self is WpsPackageConfigBase)
         super(WpsPackageConfigBase, self).__init__(*args, **kwargs)
 
-    def setUp(self):
-        config = setup_config_with_mongodb(settings=self.settings)
+    @classmethod
+    def setUpClass(cls):
+        config = setup_config_with_mongodb(settings=cls.settings)
         config = setup_config_with_pywps(config)
+        config = setup_config_with_celery(config)
         config = get_test_weaver_config(config)
         setup_mongodb_processstore(config)  # force reset
-        self.app = get_test_weaver_app(config=config, settings=self.settings)
+        cls.app = get_test_weaver_app(config=config, settings=cls.settings)
 
     def deploy_process(self, payload):
         """
@@ -94,13 +99,14 @@ class WpsPackageConfigBase(unittest.TestCase):
 
 @pytest.mark.functional
 class WpsPackageAppTest(WpsPackageConfigBase):
-    def setUp(self):
-        self.settings = {
+    @classmethod
+    def setUpClass(cls):
+        cls.settings = {
             "weaver.wps": True,
             "weaver.wps_path": "/ows/wps",
             "weaver.wps_restapi_path": "/",
         }
-        super(WpsPackageAppTest, self).setUp()
+        super(WpsPackageAppTest, cls).setUpClass()
 
     def test_cwl_label_as_process_title(self):
         title = "This process title comes from the CWL label"
@@ -1356,8 +1362,9 @@ class WpsPackageAppTest(WpsPackageConfigBase):
 
 @pytest.mark.functional
 class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
-    def setUp(self):
-        self.settings = {
+    @classmethod
+    def setUpClass(cls):
+        cls.settings = {
             "weaver.wps": True,
             "weaver.wps_output": True,
             "weaver.wps_output_path": "/wpsoutputs",
@@ -1366,7 +1373,7 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
             "weaver.wps_path": "/ows/wps",
             "weaver.wps_restapi_path": "/",
         }
-        super(WpsPackageAppWithS3BucketTest, self).setUp()
+        super(WpsPackageAppWithS3BucketTest, cls).setUpClass()
 
     @pytest.fixture(autouse=True)
     def test_execute_with_bucket(self, mocked_aws_s3, mocked_test_bucket_file, tmpdir):
@@ -1419,11 +1426,14 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
             {"id": "output_from_s3", "transmissionMode": "reference"},
           ]
         }
-        proc_url = "/processes/{}/jobs".format(self._testMethodName)
-        resp = self.app.post_json(proc_url, params=exec_body, headers=self.json_headers)
-        assert resp.status_code in [200, 201]
-        status_url = resp.json["location"]
-        job_id = resp.json["jobID"]
+        with contextlib.ExitStack() as stack_proc:
+            for process in mocked_execute_process():
+                stack_proc.enter_context(process)
+            proc_url = "/processes/{}/jobs".format(self._testMethodName)
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, params=exec_body, headers=self.json_headers)
+            assert resp.status_code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(resp.status_code, resp.json)
+            status_url = resp.json["location"]
+            job_id = resp.json["jobID"]
         monitor_timeout = 60
         time.sleep(1)  # small delay to ensure process started
         while monitor_timeout >= 0:

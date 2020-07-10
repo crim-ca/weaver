@@ -95,6 +95,7 @@ def setup_config_from_settings(settings=None):
 
 def setup_config_with_mongodb(config=None, settings=None):
     # type: (Optional[Configurator], Optional[SettingsType]) -> Configurator
+    """Prepares the configuration in order to allow calls to a ``MongoDB`` test database."""
     settings = settings or {}
     settings.update({
         "mongodb.host":     os.getenv("WEAVER_TEST_DB_HOST", "127.0.0.1"),      # noqa: E241
@@ -140,6 +141,7 @@ def setup_mongodb_jobstore(config=None):
 
 def setup_config_with_pywps(config):
     # type: (Configurator) -> Configurator
+    """Prepares the ``PyWPS`` interface, usually needed to call the WPS route (not API), or when executing processes."""
     # flush any PyWPS config (global) to make sure we restart from clean state
     import pywps.configuration  # isort: skip
     pywps.configuration.CONFIG = None
@@ -153,6 +155,17 @@ def setup_config_with_pywps(config):
 
 def setup_config_with_celery(config):
     # type: (Configurator) -> Configurator
+    """Prepares the configuration to define ``Celery`` settings needed to execute processes from mocked
+    :class:`webtest.TestApp` application.
+
+    This is also needed when using :func:`mocked_execute_process` since it will prepare underlying ``Celery``
+    application object, multiple of its settings and the database connection reference, although ``Celery`` worker
+    still *wouldn't actually be running*. This is because :class:`celery.app.Celery` is often employed in the code
+    to retrieve ``Weaver`` settings from it when the process is otherwise executed by a worker.
+
+    .. seealso::
+        - :func:`mocked_execute_process`
+    """
     settings = config.get_settings()
 
     # override celery loader to specify configuration directly instead of ini file
@@ -311,7 +324,8 @@ def mocked_execute_process():
     **Note**: since ``delay`` and ``Celery`` are bypassed, the process execution becomes blocking (not asynchronous).
 
     .. seealso::
-        :func:`mocked_process_job_runner` to completely skip process execution.
+        - :func:`mocked_process_job_runner` to completely skip process execution.
+        - :func:`setup_config_with_celery`
     """
     class MockTask(object):
         """
@@ -341,7 +355,7 @@ def mocked_process_job_runner(job_task_id="mocked-job-id"):
     Provides a mock that will no execute the process execution when call during job creation.
 
     .. seealso::
-        :func:`mocked_execute_process` to still execute the process, but without `Celery` connection.
+        - :func:`mocked_execute_process` to still execute the process, but without `Celery` connection.
     """
     result = mock.MagicMock()
     result.id = job_task_id
