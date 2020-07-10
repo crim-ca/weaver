@@ -110,21 +110,24 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
     Obtains the corresponding `IANA`/`EDAM` ``format`` value to be applied under a `CWL` I/O ``File`` from
     the :paramref:`mime_type` (`Content-Type` header) using the first matched one.
 
+    Lookup procedure is as follows:
+
     - If ``make_reference=False``:
         - If there is a match, returns ``tuple({<namespace-name: namespace-url>}, <format>)`` with:
             1) corresponding namespace mapping to be applied under ``$namespaces`` in the `CWL`.
             2) value of ``format`` adjusted according to the namespace to be applied to ``File`` in the `CWL`.
         - If there is no match but ``must_exist=False``, returns a literal and non-existing definition as
           ``tuple({"iana": <iana-url>}, <format>)``.
-        -
+        - If there is no match but ``must_exist=True`` **AND** ``allow_synonym=True``, retry the call with the
+          synonym if available, or move to next step. Skip this step if ``allow_synonym=False``.
         - Otherwise, returns ``(None, None)``
 
     - If ``make_reference=True``:
         - If there is a match, returns the explicit format reference as ``<namespace-url>/<format>``.
         - If there is no match but ``must_exist=False``, returns the literal reference as ``<iana-url>/<format>``
           (N.B.: literal non-official MIME-type reference will be returned even if an official synonym exists).
-        - If there is no match but ``must_exist=True`` **AND** ``allow_reference=True``, retry the call with the
-          synonym if available, or move to next step. Skip this step if ``allow_reference=False``.
+        - If there is no match but ``must_exist=True`` **AND** ``allow_synonym=True``, retry the call with the
+          synonym if available, or move to next step. Skip this step if ``allow_synonym=False``.
         - Returns a single ``None`` as there is not match (directly or synonym).
 
     Note:
