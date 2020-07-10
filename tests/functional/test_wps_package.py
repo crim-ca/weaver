@@ -8,13 +8,14 @@ Local test web application is employed to run operations by mocking external req
     - :mod:`tests.processes.wps_package`.
 """
 import logging
+import os
 import unittest
+import time
 from copy import deepcopy
 
 import colander
 import pytest
 import six
-import time
 from pyramid.httpexceptions import HTTPBadRequest
 
 from tests import resources
@@ -1368,7 +1369,7 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
         super(WpsPackageAppWithS3BucketTest, self).setUp()
 
     @pytest.fixture(autouse=True)
-    def test_execute_with_bucket(self, mocked_test_bucket_file, tmpdir):
+    def test_execute_with_bucket(self, mocked_aws_s3, mocked_test_bucket_file, tmpdir):
         """
         Test validates:
             - Both S3 bucket and HTTP file references can be used simultaneously as inputs.
@@ -1390,7 +1391,7 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
                 {"id": "output_from_http", "type": "File",
                  "outputBinding": {"glob": "$(inputs.input_with_http.basename)"}},
                 {"id": "output_from_s3", "type": "File",
-                 "outputBinding": {"glob": "$(inputs.input_with_http.basename)"}}
+                 "outputBinding": {"glob": "$(inputs.input_with_s3.basename)"}}
             ]
         }
         body = {
@@ -1403,7 +1404,7 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
         self.deploy_process(body)
 
         input_file_s3 = "input-s3.txt"
-        input_file_http = "media-types.txt"
+        input_file_http = "media-types.txt"  # use some random HTTP location that actually exists (will be fetched)
         test_http_ref = "https://www.iana.org/assignments/media-types/{}".format(input_file_http)
         test_bucket_ref = mocked_test_bucket_file("wps-process-test-bucket", input_file_s3, "data in test S3 bucket")
         exec_body = {
@@ -1422,6 +1423,7 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
         resp = self.app.post_json(proc_url, params=exec_body, headers=self.json_headers)
         assert resp.status_code in [200, 201]
         status_url = resp.json["location"]
+        job_id = resp.json["jobID"]
         monitor_timeout = 60
         time.sleep(1)  # small delay to ensure process started
         while monitor_timeout >= 0:
@@ -1434,9 +1436,23 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
         assert resp.json["status"] == STATUS_SUCCEEDED
         resp = self.app.get("{}/results".format(status_url), headers=self.json_headers)
         assert resp.status_code == 200
+
+        # check that outputs are S3 bucket references
         output_values = {out["id"]: out["value"] for out in resp.json["outputs"]}
         output_bucket = self.settings["weaver.wps_output_bucket"]
-        output_from_s3 = "s3://{}/{}".format(output_bucket, input_file_s3)
-        output_from_http = "s3://{}/{}".format(output_bucket, input_file_http)
-        assert output_values["output_from_http"] == output_from_s3
-        assert output_values["output_from_http"] == output_from_http
+        for out_key, out_file in [("output_from_s3", input_file_s3), ("output_from_http", input_file_http)]:
+            output_ref = "s3://{}/{}".format(output_bucket, out_file)
+            assert output_values[out_key] == output_ref
+
+        # check that outputs are indeed stored in S3 buckets
+        resp_json = mocked_aws_s3.list_objects_v2(output_bucket)
+        bucket_file_keys = [obj["Key"] for obj in resp_json["Contents"]]
+        for out_file in [input_file_s3, input_file_http]:
+            assert out_file in bucket_file_keys
+
+        # check that outputs are NOT copied locally, but that XML status does exist (to counter validate path)
+        wps_outdir = self.settings["weaver.wps_output_dir"]
+        for out_file in [input_file_s3, input_file_http]:
+            assert not os.path.exists(os.path.join(wps_outdir, out_file))
+            assert not os.path.exists(os.path.join(wps_outdir, job_id, out_file))
+        assert os.path.isfile(os.path.join(wps_outdir, "{}.xml".format(job_id)))
