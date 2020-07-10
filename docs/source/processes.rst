@@ -151,9 +151,9 @@ For *traditional* WPS-1 process type, Weaver adds default values to CWL definiti
             }}),
     ])
 
-In ESGF-CWT, `ESGF-CWTRequirement` hint is used instead of default `WPS1Requirement`, contained in the
+In `ESGF-CWT`, ``ESGF-CWTRequirement`` hint is used instead of default ``WPS1Requirement``, contained in the
 :py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_WPS1` variable up here. The handling of this technicality is
-handled in :mod:`weaver/processes/wps_package.py`. We can define ESGF-CWT processes using this syntax:
+handled in :mod:`weaver/processes/wps_package.py`. We can define `ESGF-CWT` processes using this syntax:
 
 .. code-block:: json
 
@@ -353,6 +353,58 @@ Workflow Operations
 .. todo:: same as prev + 'operations' (deploy, visibility, exec-remote for each step)
 
 
+File Reference Types
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Most inputs can be categorized into two of the most commonly employed types, namely ``LiteralData`` and ``ComplexData``.
+The former represents basic values such as integers or strings, while the other represents a file reference.
+Files in `Weaver` (and `WPS` in general) can be specified with any ``formats`` as MIME-type.
+
+.. seealso::
+    - :ref:`Correspondance between CWL and WPS fields`
+
+As for *standard* `WPS`, remote file references are *usually* limited to ``http(s)`` scheme, unless the process takes
+an input string and parses the unusual reference from the literal data to process it by itself. On the other hand,
+`Weaver` supports all following reference schemes.
+
+- ``http(s)://``
+- ``file://``
+- ``opensearchfile://`` [experimental]
+- ``s3://`` [experimental]
+
+The method in which `Weaver` will handle such references depends on its configuration, in other words, whether it is
+running as `ADES` or `EMS` (see: :ref:`Configuration`), as well as depending on some other ``CWL`` package requirements.
+These use-cases are described below.
+
+When `Weaver` is able to figure out that the process needs to be executed locally in `ADES` mode, it will fetch all
+necessary files prior to process execution in order to make them available to the `CWL` package. When `Weaver` is in
+`EMS` configuration, it will **always** forward the references (regardless of scheme) exactly as provided as input
+of the process execution request, since it assumes it needs to dispatch the execution to another `ADES` remote server.
+In this case, it becomes the responsibility of this remote instance to handle the reference appropriately. This also
+avoids potential problems such as if `Weaver` as `EMS` doesn't have authorized access to a link that only the target
+`ADES` would have access to.
+
+When ``CWL`` package defines ``WPS1Requirement`` under ``hints`` for corresponding `WPS-1/2`_ remote processes being
+monitored by `Weaver`, it will skip fetching of ``http(s)``-based references since that would otherwise lead to useless
+double downloads (one on `Weaver` and the other on the `WPS` side). It is the same in case of ``ESGF-CWTRequirement``
+employed for `ESGF-CWT`_ processes. Because these processes do not normally
+
+.. todo::
+    method to indicate explicit fetch? (https://github.com/crim-ca/weaver/issues/183)
+
+When using `S3` references, `Weaver` expects the reference to be formatted as ``s3://<bucket>/<filename.ext>``.
+Provided that the corresponding `S3` bucket can be accessed by the running `Weaver` application, it will fetch the
+file and store it locally temporarily for ``CWL`` execution.
+
+.. note::
+    When `Weaver` is fetching remote files, it can take advantage of additional request options to support unusual or
+    server-specific handling of remote reference as necessary. This could be employed for instance to attribute access
+    permissions only to some given `ADES` server by providing additional authorization tokens to the requests.
+    Please refer to :ref:`Configuration of Request Options` for this matter.
+
+    When using `S3` buckets, authorization are handled through typical `AWS` credentials and role permissions. This
+    means that `AWS` access must be granted to the application in order to allow it fetching the file.
+    Please refer to :ref:`Configuration of AWS S3 Buckets` for more details.
 
 
 Multiple Inputs
@@ -360,12 +412,27 @@ Multiple Inputs
 
 .. todo:: repeating IDs example for WPS multi-inputs
 
+.. seealso::
+    - :ref:`Multiple and Optional Values`
 
 Multiple Outputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: unsupported + issue ref
+Although ``CWL`` allows output arrays, ``WPS`` does not support it directly, as only single values are allowed for
+``WPS`` outputs according to original specification. To work around this, |metalink|_ files can be used to provide
+a single output reference that embeds other references. This approach is also employed and preferred as described
+in |pywps-multi-output|_.
 
+.. todo:: fix doc when Multiple Output is supported with metalink (https://github.com/crim-ca/weaver/issues/25)
+.. todo:: add example of multi-output process definition
+.. todo:: and how CWL maps them with WPS
+
+.. warning::
+    This feature is being worked on (`Weaver Issue #25 <https://github.com/crim-ca/weaver/issues/25>`_).
+    Direct support between
+
+.. seealso::
+    - :ref:`Multiple and Optional Values`
 
 Email Notification
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -392,6 +459,17 @@ Obtaining output results, logs or errors
 .. todo::
     job logs/exceptions body example
 
+Any job executed on `Weaver` will provide minimal log information, such as process job setup, moment when it started
+execution and final status. The extent of other log entries will more often than not depend on the verbosity of the
+underlying process being executed. When executing an `Application Package`, `Weaver` tries as best as possible to
+collect standard output and error steams to report them through log and exception lists.
+
+Since `Weaver` can only report as much details as provided by the running application, it is recommended to provide
+progressive status updates when developing applications in order to help understand problematic steps in event of
+process execution failures. In the case of remote `WPS` processes monitored by `Weaver`, this means gradually reporting
+process status updates (e.g.: calling ``WPSResponse.update_status`` if you are using |pywps|_, see: |pywps-status|_),
+using ``print`` and/or ``logging`` operation in scripts or docker images executed through `CWL` ``CommandLineTool``,
+etc.
 
 .. note::
     Job logs and exceptions are a `Weaver`-specific implementation. They are not part of traditional |ogc-proc-api|_.

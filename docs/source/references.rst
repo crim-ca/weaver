@@ -2,6 +2,7 @@
 .. Don't place any 'visible/rendered' documentation here (only links), or it will appear everywhere it is included
 
 .. Util text/reference replace
+.. |ades| replace:: Application Deployment and Execution Service
 .. _aws-credentials: https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html
 .. _aws-config: https://boto3.amazonaws.com/v1/documentation/api/latest/guide/configuration.html
 .. |cwl| replace:: Common Workflow Language
@@ -22,19 +23,30 @@
 .. _cwl-io-map: https://www.commonwl.org/v1.1/CommandLineTool.html#map
 .. _cwl-io-type: https://www.commonwl.org/v1.1/CommandLineTool.html#CWLType
 .. _cwl-metadata: https://www.commonwl.org/user_guide/17-metadata/index.html
-.. _wkt-example: https://en.wikipedia.org/wiki/Well-known_text_representation_of_geometry
-.. _wkt-format: https://docs.geotools.org/stable/javadocs/org/opengis/referencing/doc-files/WKT.html
-.. _weaver-issues: https://github.com/crim-ca/weaver/issues
+.. |ems| replace:: Execution Management Service
+.. |esgf| replace:: Earth System Grid Federation
+.. _esgf: https://esgf.llnl.gov/
+.. |esgf-cwt| replace:: ESGF Compute API
+.. _esgf-cwt: https://github.com/ESGF/esgf-compute-api
 .. |metalink| replace:: Metalink
 .. _metalink: https://tools.ietf.org/html/rfc5854
 .. |oas| replace:: OpenAPI Specification
 .. _oas: https://pavics-weaver.readthedocs.io/en/latest/api.html
-.. |ogc| replace:: Open Geospatial Consortium (OGC)
+.. |ogc| replace:: Open Geospatial Consortium
 .. _ogc: https://www.ogc.org/
 .. |ogc-home| replace:: |ogc| Homepage
 .. _ogc-home: `ogc`_
 .. |ogc-proc-api| replace:: OGC API - Processes
 .. _ogc-proc-api: https://github.com/opengeospatial/wps-rest-binding
+.. |pywps| replace:: PyWPS
+.. _pywps: https://github.com/geopython/pywps/
+.. |pywps-status| replace:: Progress and Status Report
+.. _pywps-status: https://pywps.readthedocs.io/en/master/process.html#progress-and-status-report
+.. |pywps-multi-output| replace:: PyWPS Multiple Outputs
+.. _pywps-multi-output: https://pywps.readthedocs.io/en/master/process.html#returning-multiple-files
+.. _wkt-example: https://en.wikipedia.org/wiki/Well-known_text_representation_of_geometry
+.. _wkt-format: https://docs.geotools.org/stable/javadocs/org/opengis/referencing/doc-files/WKT.html
+.. _weaver-issues: https://github.com/crim-ca/weaver/issues
 
 .. External references
 .. _Celery: https://docs.celeryproject.org/en/latest/

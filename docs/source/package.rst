@@ -434,6 +434,8 @@ it is important to avoid providing contradicting specifications as `Weaver` will
 result when merging specifications. If unambiguous guess can be made, `CWL` will be employed as deciding definition to
 resolve erroneous mismatches (as for any other corresponding fields).
 
+.. todo:: update warning according to Weaver issue #25
+
 .. warning::
     Parameters ``minOccurs`` and ``maxOccurs`` are not permitted for outputs in the `WPS` context. Native `WPS`
     therefore does not permit multiple output reference files. This can be worked around using a |metalink|_ file,
