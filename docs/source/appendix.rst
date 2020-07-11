@@ -10,7 +10,7 @@ Glossary
 
     `ADES`: |ades|
     `AWS`: Amazon Web Services
-    `CWL`_: Common Workflow Language
+    `CWL`_: |cwl|
     `EMS`: |ems|
     `ESGF`_: |esgf|
     `ESGF-CWT`_: |esgf-cwt|

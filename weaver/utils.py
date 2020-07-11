@@ -725,15 +725,17 @@ def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
     The output directory is expected to exist prior to this function call.
     The file reference scheme (protocol) determines from where to fetch the content.
     Output file name and extension will be the same as the original.
+    Requests will consider ``weaver.request_options`` when using ``http(s)://`` scheme.
 
     :param file_reference:
-        Local filesystem path (optionally prefixed with ``file://``), ``s3://`` bucket location or ``http[s]://``
+        Local filesystem path (optionally prefixed with ``file://``), ``s3://`` bucket location or ``http(s)://``
         remote URL file reference.
     :param file_outdir: Output local directory path under which to place the fetched file.
-    :param settings: Additional request-related settings from the application configuration.
+    :param settings: Additional request-related settings from the application configuration (notably request-options).
     :param request_kwargs: Additional keywords to forward to request call (if needed).
     :return: Path of the local copy of the fetched file.
-    :raises
+    :raises HTTPException: applicable HTTP-based exception if any occurred during the operation.
+    :raises ValueError: when the reference scheme cannot be identified.
     """
     file_href = file_reference
     file_name = os.path.basename(file_reference)

@@ -59,6 +59,7 @@ from weaver.formats import (
 )
 from weaver.processes import opensearch
 from weaver.processes.constants import (
+    CWL_REQUIREMENT_APP_BUILTIN,
     CWL_REQUIREMENT_APP_DOCKER,
     CWL_REQUIREMENT_APP_ESGF_CWT,
     CWL_REQUIREMENT_APP_TYPES,
@@ -85,6 +86,7 @@ from weaver.status import (
 )
 from weaver.utils import (
     bytes2str,
+    fetch_file,
     get_any_id,
     get_header,
     get_job_log_msg,
@@ -2054,6 +2056,7 @@ class WpsPackage(Process):
                                                                                 settings=self.settings)
 
                 cwl_inputs = dict()
+                app_req = self.get_application_requirement()
                 for input_id in request.inputs:
                     # skip empty inputs (if that is even possible...)
                     input_occurs = request.inputs[input_id]
@@ -2064,14 +2067,21 @@ class WpsPackage(Process):
                     # handle as reference/data
                     is_array, elem_type, _, _ = _is_cwl_array_type(cwl_input_info[input_id])
                     if isinstance(input_i, ComplexInput) or elem_type == "File":
+                        # figure out if file should be fetched immediately for local execution
+                        # if anything else than local script/docker application, remote ADES/WPS process will fetch it
+                        must_fetch = True
+                        if is_ems or package_type == PROCESS_WORKFLOW:
+                            must_fetch = False
+                        elif app_req["class"] not in [CWL_REQUIREMENT_APP_BUILTIN, CWL_REQUIREMENT_APP_DOCKER]:
+                            must_fetch = False
                         # extend array data that allow max_occur > 1
                         if is_array:
                             input_type = elem_type
-                            cwl_inputs[input_id] = [self.make_location_input(input_type, input_def)
+                            cwl_inputs[input_id] = [self.make_location_input(input_type, input_def, fetch=must_fetch)
                                                     for input_def in input_occurs]
                         else:
                             input_type = cwl_input_info[input_id]["type"]
-                            cwl_inputs[input_id] = self.make_location_input(input_type, input_i)
+                            cwl_inputs[input_id] = self.make_location_input(input_type, input_i, fetch=must_fetch)
                     elif isinstance(input_i, (LiteralInput, BoundingBoxInput)):
                         # extend array data that allow max_occur > 1
                         if is_array:
@@ -2109,31 +2119,22 @@ class WpsPackage(Process):
             self.update_status("Package complete.", PACKAGE_PROGRESS_DONE, STATUS_SUCCEEDED)
         return self.response
 
-    @staticmethod
-    def make_location_input(input_type, input_definition, fetch=False):
+    def make_location_input(self, input_type, input_definition, fetch=False):
         # type: (AnyStr, ComplexInput, bool) -> JSON
         """
-        Generates the JSON content required to specify a CWL File input definition from a location.
+        Generates the JSON content required to specify a `CWL` ``File`` input definition from a location.
 
         If :paramref:`fetch` is ``True``, we pre-fetch all reference as local files.
-        Otherwise, we leave them as plain reference and it will be up to either ``CWL``, the executed application by it,
-        or the remote server that gets called (e.g.: in case of EMS dispatch to ADES) to fetch the referenced file.
+        Otherwise, we leave them as plain reference and it will be up to either `CWL`, the executed application by it,
+        or the remote server that gets called (e.g.: in case of `EMS` dispatch to `ADES`) to fetch the referenced file.
 
         .. note::
             If the process requires ``OpenSearch`` references that should be preserved as is, use scheme defined by
             :py:data:`weaver.processes.constants.OPENSEARCH_LOCAL_FILE_SCHEME` prefix instead of ``http(s)://``.
-
-        .. seealso::
-            - :py:data:`
         """
         # NOTE:
         #   When running as EMS, must not call data/file methods if URL reference, otherwise contents
         #   get fetched automatically by PyWPS objects.
-        #
-        #   Inputs starting with file:// will be interpreted as EMS local files
-        #   If ``OpenSearch`` obtain file:// references that must be passed to the ADES use an URI starting
-        #   with ``{OPENSEARCH_LOCAL_FILE_SCHEME}://``.
-        #
         input_location = None
         # cannot rely only on 'as_reference' as often it is not provided by the request although it's an href
         if input_definition.as_reference:
@@ -2160,7 +2161,8 @@ class WpsPackage(Process):
             else:
                 # last option, could not resolve 'lazily' so will fetch data if needed
                 input_location = input_definition.data
-
+        if fetch:
+            input_location = fetch_file(input_location, input_definition.workdir, settings=self.settings)
         location = {"location": input_location, "class": input_type}
         if input_definition.data_format is not None and input_definition.data_format.mime_type:
             fmt = get_cwl_file_format(input_definition.data_format.mime_type, make_reference=True)
@@ -2199,6 +2201,25 @@ class WpsPackage(Process):
         # type: (ToolPathObjectType, LoadingContext) -> ProcessCWL
         from weaver.processes.wps_workflow import default_make_tool
         return default_make_tool(toolpath_object, loading_context, self.get_job_process_definition)
+
+    def get_application_requirement(self):
+        # type: () -> Dict[AnyStr, Any]
+        """
+        Obtains the first item in `CWL` package ``requirements`` or ``hints`` that corresponds to a `Weaver`-specific
+        application type as defined in :py:data:`CWL_REQUIREMENT_APP_TYPES`.
+
+        :returns: dictionary that minimally has ``class`` field, and optionally other parameters from that requirement.
+        """
+        # package can define requirements and/or hints, if it's an application, only one is allowed, workflow can have
+        # multiple, but they are not explicitly handled
+        all_hints = list(dict(req) for req in self.package.get("requirements", {}))
+        all_hints.extend(dict(req) for req in self.package.get("hints", {}))
+        app_hints = list(filter(lambda h: any(h["class"].endswith(t) for t in CWL_REQUIREMENT_APP_TYPES), all_hints))
+        if len(app_hints) > 1:
+            raise ValueError("Package 'requirements' and/or 'hints' define too many conflicting values: {}, "
+                             "only one permitted amongst {}.".format(list(app_hints), list(CWL_REQUIREMENT_APP_TYPES)))
+        requirement = app_hints[0] if app_hints else {"class": ""}
+        return requirement
 
     def get_job_process_definition(self, jobname, joborder, tool):
         # type: (AnyStr, JSON, CWL) -> WpsPackage
@@ -2239,26 +2260,16 @@ class WpsPackage(Process):
                 _message, _progress, start_step_progress, end_step_progress, jobname, _provider, _status
             )
 
-        # package can define requirements and/or hints, if it's an application, only one is allowed, workflow can have
-        # multiple, but they are not explicitly handled
-        all_hints = list(dict(req) for req in tool.get("requirements", {}))
-        all_hints.extend(dict(req) for req in tool.get("hints", {}))
-        app_hints = list(filter(lambda h: any(h["class"].endswith(t) for t in CWL_REQUIREMENT_APP_TYPES), all_hints))
-        if len(app_hints) > 1:
-            raise ValueError("Package 'requirements' and/or 'hints' define too many conflicting values: {}, "
-                             "only one permitted amongst {}.".format(list(app_hints), list(CWL_REQUIREMENT_APP_TYPES)))
-        requirement = app_hints[0] if app_hints else {"class": ""}
-
         def _get_wps1_params(_requirement):
-            params = {}
-
+            _wps_params = {}
             required_params = ["provider", "process"]
-            for param in required_params:
-                if param not in _requirement:
-                    raise ValueError("Missing requirement detail [{}]: {}".format(_requirement["class"], param))
-                params[param] = _requirement[param]
-            return params
+            for _param in required_params:
+                if _param not in _requirement:
+                    raise ValueError("Missing requirement detail [{}]: {}".format(_requirement["class"], _param))
+                _wps_params[_param] = _requirement[_param]
+            return _wps_params
 
+        requirement = self.get_application_requirement()
         req_class = requirement["class"]
 
         if req_class.endswith(CWL_REQUIREMENT_APP_WPS1):

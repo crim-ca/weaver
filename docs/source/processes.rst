@@ -197,7 +197,7 @@ appropriate step and message where the error occurred.
 Remote Provider
 --------------------
 
-Remote provider correspond to a remote service that provides similar interfaces as supported by `Weaver` (WPS-like).
+Remote provider correspond to a remote service that provides similar interfaces as supported by `Weaver` (`WPS`-like).
 For example, a remote WPS-1 XML endpoint can be referenced as a provider. When an API `Providers`_-scoped request is
 executed, for example to list is processes capabilities (see `GetCapabilities`_), `Weaver` will send the corresponding
 request using the registered reference URL to access the remote server and reply with parsed response, as if they
@@ -423,27 +423,27 @@ combinations.
 .. table:: Summary of input file reference handling
     :align-center:
 
-    +======================+====================+===================+=============================================+
-    | Weaver Configuration | Process Type       | File Scheme       | Applied Operation                           |
-    +======================+====================+===================+=============================================+
-    | *<any>*              | *<any>*            | ``opensearch://`` | Query and re-process [#openseach]_          |
-    +----------------------+--------------------+-------------------+---------------------------------------------+
-    | `ADES`               | `WSP-1/2`          | ``file://``       | Convert to ``http(s)://`` [#file2http]_     |
-    |                      | `ESGF-CWT`         +-------------------+---------------------------------------------+
-    |                      | `WPS-REST` (other) | ``http(s)://``    | Nothing (left unmodified)                   |
-    |                      |                    +-------------------+---------------------------------------------+
-    |                      |                    | ``s3://``         | Fetch and convert to ``http(s)://`` [#s3]_  |
-    |                      +--------------------+-------------------+---------------------------------------------+
-    |                      | `WSP-REST` (`CWL`) | ``file://``       | Nothing (file already local)                |
-    |                      |                    +-------------------+---------------------------------------------+
-    |                      |                    | ``http(s)://``    | Fetch and convert to ``file://``            |
-    |                      |                    | ``s3://``         |                                             |
-    +----------------------+--------------------+-------------------+---------------------------------------------+
-    | `EMS`                | *<any>*            | ``file://``       | Convert to ``http(s)://`` [#file2http]_     |
-    |                      |                    +-------------------+---------------------------------------------+
-    |                      |                    | ``http(s)://``    | Nothing (left unmodified)                   |
-    |                      |                    | ``s3://``         |                                             |
-    +----------------------+--------------------+-------------------+---------------------------------------------+
+    +===============+===============================+===================+=============================================+
+    | Configuration | Process Type                  | File Scheme       | Applied Operation                           |
+    +===============+===============================+===================+=============================================+
+    | *<any>*       | *<any>*                       | ``opensearch://`` | Query and re-process [#openseach]_          |
+    +---------------+-------------------------------+-------------------+---------------------------------------------+
+    | `ADES`        | `WPS-1/2`_                    | ``file://``       | Convert to ``http(s)://`` [#file2http]_     |
+    |               | `ESGF-CWT`_                   +-------------------+---------------------------------------------+
+    |               | `WPS-REST`_ [#wps3]_          | ``http(s)://``    | Nothing (left unmodified)                   |
+    |               | `Remote Provider`_            +-------------------+---------------------------------------------+
+    |               |                               | ``s3://``         | Fetch and convert to ``http(s)://`` [#s3]_  |
+    |               +-------------------------------+-------------------+---------------------------------------------+
+    |               | `WPS-REST`_ (`CWL`) [#wps3]_  | ``file://``       | Nothing (file already local)                |
+    |               |                               +-------------------+---------------------------------------------+
+    |               |                               | ``http(s)://``    | Fetch and convert to ``file://``            |
+    |               |                               | ``s3://``         |                                             |
+    +---------------+-------------------------------+-------------------+---------------------------------------------+
+    | `EMS`         | *<any>*                       | ``file://``       | Convert to ``http(s)://`` [#file2http]_     |
+    |               | `Workflow`_ (`CWL`) [#wf]_    +-------------------+---------------------------------------------+
+    |               |                               | ``http(s)://``    | Nothing (left unmodified)                   |
+    |               |                               | ``s3://``         |                                             |
+    +---------------+-------------------------------+-------------------+---------------------------------------------+
 
 .. [#file2http]: When a ``file://`` (or empty scheme) maps to a local file that needs to be exposed externally for
    another remote process, the conversion to ``http(s)://`` scheme employs setting ``weaver.wps_outputs_url`` to form
@@ -453,15 +453,31 @@ combinations.
    necessarily exposed as ``http(s)://``. If execution is transferred to a remove process that is expected to not
    support `S3` references, only then the file gets converted as in [#file2http]_.
 
+.. [#wps3]: When the process refers to a remote `WPS-REST` process (i.e.: remote `WPS` instance that supports
+   REST bindings but that is not necessarily an `ADES`), `Weaver` simply *wraps* and monitor its remote execution,
+   therefore files are handled just as for any other type of remote `WPS`-like servers. When the process contains an
+   actual `CWL` :ref:`Application Package` that defines a ``CommandLineTool`` (including docker images), files are
+   fetched as it will be executed locally. See :ref:`CWL CommandLineTool`, :ref:`WPS-REST` and :ref:`Remote Providers`
+   for further details.
+
 .. [#openseach]: References defined by ``opensearch://`` will trigger an `OpenSearch` query using the provided URL as
    well as other input additional parameters (see :ref:`OpenSearch Data Source`). After processing of this query,
    retrieved file references will be re-processed using the summarized logic in the table for the given use case.
+
+.. [#wf]: Workflows are only available on `EMS` instances. Since they chain processes, no fetch is needed as the first
+   sub-step process will do it instead. See `section about workflows <workflows>`_ as well as :ref:`CWL Workflow`for
+   more details.
 
 .. warning::
     Missing schemes in URL reference are considered identical as if ``file://`` was used. In most cases, if not always,
     an execution request should not employ this scheme unless the file is ensured to be at the specific location where
     the running `Weaver` application can find it. This scheme is usually only employed as byproduct of the fetch
     operation that `Weaver` uses to provide the file locally to underlying `CWL` application package to be executed.
+
+OpenSearch Data Source
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. todo:: EOImage with AOI/TOI/CollectionId for OpenSearch
 
 Multiple Inputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -534,10 +550,8 @@ etc.
 Special Weaver EMS use-cases
 ==================================================
 
-OpenSearch Data Source
---------------------------------------
-
-.. todo:: EOImage with AOI/TOI/CollectionId for OpenSearch
+This section highlight the additional behaviour available only through an `EMS`-configured `Weaver` instance.
+Some other points are already described in other sections, but are briefly indicated here for conciseness.
 
 Workflow (Chaining Step Processes)
 --------------------------------------
@@ -547,4 +561,5 @@ Workflow (Chaining Step Processes)
 .. seealso::
 
     - :ref:`CWL Workflow`
+    - `Workflow Process Type <Workflow>`_
 
