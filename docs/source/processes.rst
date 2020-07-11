@@ -553,6 +553,14 @@ Special Weaver EMS use-cases
 This section highlight the additional behaviour available only through an `EMS`-configured `Weaver` instance.
 Some other points are already described in other sections, but are briefly indicated here for conciseness.
 
+ADES dispatching using Data Sources
+--------------------------------------
+
+
+.. todo:: add details, data-source defines where to send request of *known* ADES
+.. todo:: reference config ``weaver.data_sources``
+
+
 Workflow (Chaining Step Processes)
 --------------------------------------
 
