@@ -19,6 +19,8 @@ Changes:
 Fixes:
 ------
 - Adjust some docstrings to better indicated raised errors.
+- Adjust ``weaver.processes.wps_package.WpsPackage`` to use it internal logger when running the process in order to
+  preserve log entries under its job execution. They were otherwise lost over time across all process executions.
 
 `1.12.0 <https://github.com/crim-ca/weaver/tree/1.12.0>`_ (2020-07-03)
 ========================================================================

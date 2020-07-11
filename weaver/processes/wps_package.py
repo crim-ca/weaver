@@ -134,6 +134,9 @@ if TYPE_CHECKING:
     ANY_Metadata_Type = Union[OwsMetadata, Metadata, Dict[AnyStr, AnyStr]]
 
 
+# NOTE:
+#   Only use this logger for 'utility' methods (not residing under WpsPackage).
+#   In that case, employ 'self.logger' instead so that the executed process has its self-contained job log entries.
 LOGGER = logging.getLogger(__name__)
 
 __all__ = [
@@ -1717,11 +1720,13 @@ def get_process_definition(process_offering, reference=None, package=None, data_
 class WpsPackage(Process):
     # defined on __init__ call
     package = None                  # type: Optional[CWL]
-    # defined only after _handler is called (or sub-methods)
+    # defined only after/while _handler is called (or sub-methods)
     package_id = None               # type: Optional[AnyStr]
+    package_type = None             # type: Optional[AnyStr]
     package_log_hook_stderr = None  # type: Optional[AnyStr]
     package_log_hook_stdout = None  # type: Optional[AnyStr]
     percent = None                  # type: Optional[Number]
+    is_ems = None                   # type: Optional[bool]
     log_file = None                 # type: Optional[AnyStr]
     log_level = None                # type: Optional[int]
     logger = None                   # type: Optional[logging.Logger]
@@ -1910,11 +1915,11 @@ class WpsPackage(Process):
         cfg_egid = str(self.settings.get("weaver.cwl_egid", ""))
         app_euid, app_egid = str(os.geteuid()), str(os.getgid())
         if cfg_euid not in ["", "0", app_euid] and cfg_egid not in ["", "0", app_egid]:
-            LOGGER.info("Enforcing CWL euid:egid [%s,%s]", cfg_euid, cfg_egid)
+            self.logger.info("Enforcing CWL euid:egid [%s,%s]", cfg_euid, cfg_egid)
             cwltool.docker.docker_vm_id = lambda *_, **__: (int(cfg_euid), int(cfg_egid))
         else:
-            LOGGER.log(logging.WARNING if (app_euid == "0" or app_egid == "0") else logging.INFO,
-                       "Visible application CWL euid:egid [%s:%s]", app_euid, app_egid)
+            self.logger.log(logging.WARNING if (app_euid == "0" or app_egid == "0") else logging.INFO,
+                            "Visible application CWL euid:egid [%s:%s]", app_euid, app_egid)
 
     def update_status(self, message, progress, status):
         # type: (AnyStr, Number, AnyStatusType) -> None
@@ -1968,6 +1973,11 @@ class WpsPackage(Process):
 
     def _handler(self, request, response):
         # type: (WPSRequest, ExecuteResponse) -> ExecuteResponse
+        """
+        Method called when process receives the WPS execution request.
+        """
+
+        # note: only 'LOGGER' call allowed here, since 'setup_logger' not called yet
         LOGGER.debug("HOME=%s, Current Dir=%s", os.environ.get("HOME"), os.path.abspath(os.curdir))
         self.request = request
         self.response = response
@@ -1976,8 +1986,8 @@ class WpsPackage(Process):
         try:
             try:
                 # workflows do not support stdout/stderr
-                package_type = _get_package_type(self.package)
-                log_stdout_stderr = package_type != PROCESS_WORKFLOW
+                self.package_type = _get_package_type(self.package)
+                log_stdout_stderr = self.package_type != PROCESS_WORKFLOW
                 self.setup_logger(log_stdout_stderr)
                 self.update_status("Preparing package logs done.", PACKAGE_PROGRESS_PREP_LOG, STATUS_RUNNING)
             except Exception as exc:
@@ -1985,8 +1995,8 @@ class WpsPackage(Process):
 
             self.update_status("Launching package...", PACKAGE_PROGRESS_LAUNCHING, STATUS_RUNNING)
 
-            is_ems = get_weaver_configuration(self.settings) == WEAVER_CONFIGURATION_EMS
-            if is_ems:
+            self.is_ems = get_weaver_configuration(self.settings) == WEAVER_CONFIGURATION_EMS
+            if self.is_ems:
                 # EMS dispatch the execution to the ADES
                 loading_context = LoadingContext()
                 loading_context.construct_tool_object = self.make_tool
@@ -2018,9 +2028,9 @@ class WpsPackage(Process):
                 "tmp_outdir_prefix": cwl_outdir,
                 # ask CWL to move tmp outdir results to the WPS process workdir (otherwise we loose them on cleanup)
                 "outdir": self.workdir,
-                "debug": LOGGER.isEnabledFor(logging.DEBUG)
+                "debug": self.logger.isEnabledFor(logging.DEBUG)
             }
-            LOGGER.debug("Using cwltool.RuntimeContext args:\n%s", json.dumps(runtime_params, indent=2))
+            self.logger.debug("Using cwltool.RuntimeContext args:\n%s", json.dumps(runtime_params, indent=2))
             runtime_context = RuntimeContext(kwargs=runtime_params)
             try:
                 package_inst, _, self.step_packages = _load_package_content(self.package,
@@ -2056,7 +2066,6 @@ class WpsPackage(Process):
                                                                                 settings=self.settings)
 
                 cwl_inputs = dict()
-                app_req = self.get_application_requirement()
                 for input_id in request.inputs:
                     # skip empty inputs (if that is even possible...)
                     input_occurs = request.inputs[input_id]
@@ -2067,21 +2076,15 @@ class WpsPackage(Process):
                     # handle as reference/data
                     is_array, elem_type, _, _ = _is_cwl_array_type(cwl_input_info[input_id])
                     if isinstance(input_i, ComplexInput) or elem_type == "File":
-                        # figure out if file should be fetched immediately for local execution
-                        # if anything else than local script/docker application, remote ADES/WPS process will fetch it
-                        must_fetch = True
-                        if is_ems or package_type == PROCESS_WORKFLOW:
-                            must_fetch = False
-                        elif app_req["class"] not in [CWL_REQUIREMENT_APP_BUILTIN, CWL_REQUIREMENT_APP_DOCKER]:
-                            must_fetch = False
                         # extend array data that allow max_occur > 1
                         if is_array:
                             input_type = elem_type
-                            cwl_inputs[input_id] = [self.make_location_input(input_type, input_def, fetch=must_fetch)
-                                                    for input_def in input_occurs]
+                            cwl_inputs[input_id] = [
+                                self.make_location_input(input_type, input_def) for input_def in input_occurs
+                            ]
                         else:
                             input_type = cwl_input_info[input_id]["type"]
-                            cwl_inputs[input_id] = self.make_location_input(input_type, input_i, fetch=must_fetch)
+                            cwl_inputs[input_id] = self.make_location_input(input_type, input_i)
                     elif isinstance(input_i, (LiteralInput, BoundingBoxInput)):
                         # extend array data that allow max_occur > 1
                         if is_array:
@@ -2098,7 +2101,7 @@ class WpsPackage(Process):
 
             try:
                 self.update_status("Running package...", PACKAGE_PROGRESS_CWL_RUN, STATUS_RUNNING)
-                LOGGER.debug("Launching process package with inputs:\n%s", json.dumps(cwl_inputs, indent=2))
+                self.logger.debug("Launching process package with inputs:\n%s", json.dumps(cwl_inputs, indent=2))
                 result = package_inst(**cwl_inputs)
                 self.update_status("Package execution done.", PACKAGE_PROGRESS_CWL_DONE, STATUS_RUNNING)
             except Exception as exc:
@@ -2119,14 +2122,29 @@ class WpsPackage(Process):
             self.update_status("Package complete.", PACKAGE_PROGRESS_DONE, STATUS_SUCCEEDED)
         return self.response
 
-    def make_location_input(self, input_type, input_definition, fetch=False):
-        # type: (AnyStr, ComplexInput, bool) -> JSON
+    def must_fetch(self, input_ref):
+        # type: (AnyStr) -> bool
+        """
+        Figures out if file reference should be fetched immediately for local execution.
+        If anything else than local script/docker, remote ADES/WPS process will fetch it.
+        S3 are handled here to avoid error on remote WPS not supporting it.
+
+        .. seealso::
+            - :ref:`File Reference Types`
+        """
+        if self.is_ems or self.package_type == PROCESS_WORKFLOW:
+            return False
+        app_req = self.get_application_requirement()
+        if app_req["class"] not in [CWL_REQUIREMENT_APP_BUILTIN, CWL_REQUIREMENT_APP_DOCKER]:
+            if input_ref.startswith("s3://"):
+                return True
+            return False
+        return True
+
+    def make_location_input(self, input_type, input_definition):
+        # type: (AnyStr, ComplexInput) -> JSON
         """
         Generates the JSON content required to specify a `CWL` ``File`` input definition from a location.
-
-        If :paramref:`fetch` is ``True``, we pre-fetch all reference as local files.
-        Otherwise, we leave them as plain reference and it will be up to either `CWL`, the executed application by it,
-        or the remote server that gets called (e.g.: in case of `EMS` dispatch to `ADES`) to fetch the referenced file.
 
         .. note::
             If the process requires ``OpenSearch`` references that should be preserved as is, use scheme defined by
@@ -2161,8 +2179,11 @@ class WpsPackage(Process):
             else:
                 # last option, could not resolve 'lazily' so will fetch data if needed
                 input_location = input_definition.data
-        if fetch:
+        if self.must_fetch(input_location):
+            self.logger.info("File input (%s) ATTEMPT fetch: [%s]", input_definition.identifier, input_location)
             input_location = fetch_file(input_location, input_definition.workdir, settings=self.settings)
+        else:
+            self.logger.info("File input (%s) SKIPPED fetch: [%s]", input_definition.identifier, input_location)
         location = {"location": input_location, "class": input_type}
         if input_definition.data_format is not None and input_definition.data_format.mime_type:
             fmt = get_cwl_file_format(input_definition.data_format.mime_type, make_reference=True)
@@ -2183,19 +2204,19 @@ class WpsPackage(Process):
                 result_loc = cwl_result[output_id]["location"].replace("file://", "")
                 result_wps = os.path.join(wps_out_dir, os.path.split(result_loc)[-1])
                 if os.path.realpath(result_loc) != os.path.realpath(result_wps):
-                    LOGGER.info("Moving [%s]: [%s] -> [%s]", output_id, result_loc, result_wps)
+                    self.logger.info("Moving [%s]: [%s] -> [%s]", output_id, result_loc, result_wps)
                     shutil.move(result_loc, result_wps)
                 self.response.outputs[output_id].as_reference = True
                 self.response.outputs[output_id].file = result_wps
-                LOGGER.info("Resolved WPS output [%s]: [%s]", output_id, result_wps)
+                self.logger.info("Resolved WPS output [%s]: [%s]", output_id, result_wps)
             else:
                 result_loc = cwl_result[output_id]
                 result_wps = os.path.join(wps_out_dir, os.path.split(result_loc)[-1])
                 if os.path.realpath(result_loc) != os.path.realpath(result_wps):
-                    LOGGER.info("Moving: [%s] -> [%s]", result_loc, result_wps)
+                    self.logger.info("Moving: [%s] -> [%s]", result_loc, result_wps)
                     shutil.move(result_loc, result_wps)
                 self.response.outputs[output_id].data = result_wps
-                LOGGER.info("Resolved WPS output [%s]: [%s]", output_id, result_wps)
+                self.logger.info("Resolved WPS output [%s]: [%s]", output_id, result_wps)
 
     def make_tool(self, toolpath_object, loading_context):
         # type: (ToolPathObjectType, LoadingContext) -> ProcessCWL
@@ -2273,7 +2294,7 @@ class WpsPackage(Process):
         req_class = requirement["class"]
 
         if req_class.endswith(CWL_REQUIREMENT_APP_WPS1):
-            LOGGER.info("WPS-1 Package resolved from requirement/hint: %s", req_class)
+            self.logger.info("WPS-1 Package resolved from requirement/hint: %s", req_class)
             from weaver.processes.wps1_process import Wps1Process
             params = _get_wps1_params(requirement)
             return Wps1Process(
@@ -2283,7 +2304,7 @@ class WpsPackage(Process):
                 update_status=_update_status_dispatch,
             )
         elif req_class.endswith(CWL_REQUIREMENT_APP_ESGF_CWT):
-            LOGGER.info("ESGF-CWT Package resolved from requirement/hint: %s", req_class)
+            self.logger.info("ESGF-CWT Package resolved from requirement/hint: %s", req_class)
             from weaver.processes.esgf_process import ESGFProcess
             params = _get_wps1_params(requirement)
             return ESGFProcess(
@@ -2294,7 +2315,7 @@ class WpsPackage(Process):
             )
         else:
             # implements both `PROCESS_APPLICATION` with `CWL_REQUIREMENT_APP_DOCKER` and `PROCESS_WORKFLOW`
-            LOGGER.info("WPS-3 Package resolved from requirement/hint: %s", req_class)
+            self.logger.info("WPS-3 Package resolved from requirement/hint: %s", req_class)
             from weaver.processes.wps3_process import Wps3Process
             return Wps3Process(step_payload=step_payload,
                                joborder=joborder,
