@@ -45,7 +45,9 @@ from weaver.formats import (
     IANA_NAMESPACE,
     get_cwl_file_format
 )
+from weaver.processes.constants import CWL_REQUIREMENT_APP_BUILTIN
 from weaver.status import STATUS_RUNNING, STATUS_SUCCEEDED
+from weaver.utils import get_any_value
 from weaver.visibility import VISIBILITY_PUBLIC
 
 EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_TEXT_PLAIN]
@@ -1386,7 +1388,18 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
         cwl = {
             "cwlVersion": "v1.0",
             "class": "CommandLineTool",
-            "baseCommand": "echo test",
+            "baseCommand": "echo",
+            "arguments": ["$(runtime.outdir)"],
+            "requirements": {
+                "InitialWorkDirRequirement": {
+                    # directly copy files to output dir in order to retrieve them by glob
+                    "listing": [
+                        {"entry": "$(inputs.input_with_http)"},
+                        {"entry": "$(inputs.input_with_s3)"},
+                    ]
+                }
+            },
+            "hints": {CWL_REQUIREMENT_APP_BUILTIN: {}},  # ensure remote files are downloaded prior to CWL execution
             "inputs": [
                 # regardless of reference type, they must be fetched as file before CWL call
                 {"id": "input_with_http", "type": "File"},
@@ -1395,6 +1408,7 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
             "outputs": [
                 # both process result references will be S3 buckets, but CWL will see them as file on disk after fetch
                 # we simply forward the input to outputs using the same name for this test
+                # it is Weaver that does the S3 upload after process completed successfully
                 {"id": "output_from_http", "type": "File",
                  "outputBinding": {"glob": "$(inputs.input_with_http.basename)"}},
                 {"id": "output_from_s3", "type": "File",
@@ -1430,7 +1444,8 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
             for process in mocked_execute_process():
                 stack_proc.enter_context(process)
             proc_url = "/processes/{}/jobs".format(self._testMethodName)
-            resp = mocked_sub_requests(self.app, "post_json", proc_url, params=exec_body, headers=self.json_headers)
+            resp = mocked_sub_requests(self.app, "post_json", proc_url,
+                                       params=exec_body, headers=self.json_headers, only_local=True)
             assert resp.status_code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(resp.status_code, resp.json)
             status_url = resp.json["location"]
             job_id = resp.json["jobID"]
@@ -1444,11 +1459,11 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
                 break
             time.sleep(2)
         assert resp.json["status"] == STATUS_SUCCEEDED
-        resp = self.app.get("{}/results".format(status_url), headers=self.json_headers)
+        resp = self.app.get("{}/result".format(status_url), headers=self.json_headers)
         assert resp.status_code == 200
 
         # check that outputs are S3 bucket references
-        output_values = {out["id"]: out["value"] for out in resp.json["outputs"]}
+        output_values = {out["id"]: get_any_value(out) for out in resp.json["outputs"]}
         output_bucket = self.settings["weaver.wps_output_bucket"]
         for out_key, out_file in [("output_from_s3", input_file_s3), ("output_from_http", input_file_http)]:
             output_ref = "s3://{}/{}".format(output_bucket, out_file)
@@ -1460,7 +1475,8 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
         for out_file in [input_file_s3, input_file_http]:
             assert out_file in bucket_file_keys
 
-        # check that outputs are NOT copied locally, but that XML status does exist (to counter validate path)
+        # check that outputs are NOT copied locally, but that XML status does exist
+        # counter validate path with file always present to ensure outputs are not 'missing' just because of wrong dir
         wps_outdir = self.settings["weaver.wps_output_dir"]
         for out_file in [input_file_s3, input_file_http]:
             assert not os.path.exists(os.path.join(wps_outdir, out_file))

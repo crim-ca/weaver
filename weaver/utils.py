@@ -13,7 +13,6 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 import boto3
-import botocore
 import pytz
 import requests
 import six
@@ -43,6 +42,13 @@ if TYPE_CHECKING:
     from typing import Union, Any, Dict, List, AnyStr, Iterable, Optional, Type                 # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
+
+SUPPORTED_FILE_SCHEMES = frozenset([
+    "file",
+    "http",
+    "https",
+    "s3"
+])
 
 
 class _Singleton(type):
@@ -762,7 +768,7 @@ def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
         s3 = boto3.resource("s3")
         bucket = s3.Bucket(bucket_name)
         bucket.download_file(file_key, file_path)
-    elif file_reference.startwith("http"):
+    elif file_reference.startswith("http"):
         LOGGER.debug("Fetch file resolved as remote URL reference.")
         request_kwargs.pop("stream", None)
         with open(file_path, "wb") as file:
@@ -777,7 +783,8 @@ def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
     else:
         scheme = file_reference.split("://")
         scheme = "<none>" if len(scheme) < 2 else scheme[0]
-        raise ValueError("Unresolved fetch file scheme: {!s}".format(scheme))
+        raise ValueError("Unresolved fetch file scheme: '{!s}', supported: {}"
+                         .format(scheme, list(SUPPORTED_FILE_SCHEMES)))
     LOGGER.debug("Fetch file written")
     return file_path
 

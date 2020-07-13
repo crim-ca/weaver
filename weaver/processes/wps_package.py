@@ -85,6 +85,7 @@ from weaver.status import (
     map_status
 )
 from weaver.utils import (
+    SUPPORTED_FILE_SCHEMES,
     bytes2str,
     fetch_file,
     get_any_id,
@@ -132,6 +133,10 @@ if TYPE_CHECKING:
     ANY_IO_Type = Union[CWL_IO_Type, JSON_IO_Type, WPS_IO_Type, OWS_IO_Type]
     ANY_Format_Type = Union[Dict[AnyStr, Optional[AnyStr]], Format]
     ANY_Metadata_Type = Union[OwsMetadata, Metadata, Dict[AnyStr, AnyStr]]
+    # note: below requirements also include 'hints'
+    DictCWLRequirements = Dict[AnyStr, Dict[AnyStr, Any]]  # {'<req>': {<param>: <val>}}
+    ListCWLRequirements = List[Dict[AnyStr, Any]]  # [{'class': <req>, <param>: <val>}]
+    AnyCWLRequirements = Union[DictCWLRequirements, ListCWLRequirements]
 
 
 # NOTE:
@@ -332,6 +337,21 @@ def _get_process_payload(process_url):
 def _get_package_type(package_dict):
     # type: (CWL) -> Union[PROCESS_APPLICATION, PROCESS_WORKFLOW]
     return PROCESS_WORKFLOW if package_dict.get("class").lower() == "workflow" else PROCESS_APPLICATION
+
+
+def _get_package_requirements_as_class_list(requirements):
+    # type: (AnyCWLRequirements) -> ListCWLRequirements
+    """
+    Converts `CWL` package ``requirements`` or ``hints`` sometime defined as ``Dict[<req>: {<params>}]`` to an
+    explicit list of dictionary requirements with ``class`` key.
+    """
+    if isinstance(requirements, dict):
+        reqs = []
+        for req in requirements:
+            reqs.append({"class": req})
+            reqs[-1].update(requirements[req] or {})
+        return reqs
+    return [dict(req) for req in requirements]  # ensure list-of-dict instead of sequence of dict-like
 
 
 def _get_package_ordered_io(io_section, order_hints=None):
@@ -2174,7 +2194,8 @@ class WpsPackage(Process):
             input_location = input_definition.data
         if not input_location:
             url = getattr(input_definition, "url")
-            if isinstance(url, six.string_types) and any([url.startswith(p) for p in ["http", "file"]]):
+            if isinstance(url, six.string_types) and \
+                    any([url.startswith("{}://".format(p)) for p in SUPPORTED_FILE_SCHEMES]):
                 input_location = url
             else:
                 # last option, could not resolve 'lazily' so will fetch data if needed
@@ -2194,11 +2215,17 @@ class WpsPackage(Process):
     def make_location_outputs(self, cwl_result):
         """
         Maps `CWL` result outputs to corresponding `WPS` outputs under required location.
+        Uploads the results directly to `S3` if `Weaver` is configured to do so.
         """
         wps_out_dir = self.workdir  # pywps will resolve file paths for us using its WPS request UUID
         for output_id in self.request.outputs:  # iterate over original WPS outputs, extra such as logs are dropped
             # TODO: adjust output for glob patterns (https://github.com/crim-ca/weaver/issues/24)
             if isinstance(cwl_result[output_id], list) and not isinstance(self.response.outputs[output_id], list):
+                if len(cwl_result[output_id]) > 1:
+                    self.logger.warning(
+                        "Dropping additional output values (%s total), only 1 supported per identifier.",
+                        len(cwl_result[output_id])
+                    )
                 cwl_result[output_id] = cwl_result[output_id][0]  # expect only one output
             if "location" in cwl_result[output_id]:
                 result_loc = cwl_result[output_id]["location"].replace("file://", "")
@@ -2212,9 +2239,14 @@ class WpsPackage(Process):
             else:
                 result_loc = cwl_result[output_id]
                 result_wps = os.path.join(wps_out_dir, os.path.split(result_loc)[-1])
-                if os.path.realpath(result_loc) != os.path.realpath(result_wps):
-                    self.logger.info("Moving: [%s] -> [%s]", result_loc, result_wps)
-                    shutil.move(result_loc, result_wps)
+                # FIXME: instead raise error for non-file output, (don't allow hacking output using string type)?
+                #       if any process provides an explicit URL, it should be handled by itself (we don't rewrite)
+                if os.path.isfile(str(result_loc)):
+                    self.logger.warning("[DEPRECATED] Process output '%s' defined as CWL type other than File will "
+                                        "be unsupported in a future release.", output_id)
+                    if os.path.realpath(result_loc) != os.path.realpath(result_wps):
+                        self.logger.info("Moving: [%s] -> [%s]", result_loc, result_wps)
+                        shutil.move(result_loc, result_wps)
                 self.response.outputs[output_id].data = result_wps
                 self.logger.info("Resolved WPS output [%s]: [%s]", output_id, result_wps)
 
@@ -2231,10 +2263,12 @@ class WpsPackage(Process):
 
         :returns: dictionary that minimally has ``class`` field, and optionally other parameters from that requirement.
         """
-        # package can define requirements and/or hints, if it's an application, only one is allowed, workflow can have
-        # multiple, but they are not explicitly handled
-        all_hints = list(dict(req) for req in self.package.get("requirements", {}))
-        all_hints.extend(dict(req) for req in self.package.get("hints", {}))
+        # package can define requirements and/or hints,
+        # if it's an application, only one CWL_REQUIREMENT_APP_TYPES is allowed,
+        # workflow can have multiple, but they are not explicitly handled
+        reqs = self.package.get("requirements", {})
+        hints = self.package.get("hints", {})
+        all_hints = _get_package_requirements_as_class_list(reqs) + _get_package_requirements_as_class_list(hints)
         app_hints = list(filter(lambda h: any(h["class"].endswith(t) for t in CWL_REQUIREMENT_APP_TYPES), all_hints))
         if len(app_hints) > 1:
             raise ValueError("Package 'requirements' and/or 'hints' define too many conflicting values: {}, "
@@ -2242,7 +2276,7 @@ class WpsPackage(Process):
         requirement = app_hints[0] if app_hints else {"class": ""}
         return requirement
 
-    def get_job_process_definition(self, jobname, joborder, tool):
+    def get_job_process_definition(self, jobname, joborder, tool):  # noqa: E811
         # type: (AnyStr, JSON, CWL) -> WpsPackage
         """
         This function is called before running an ADES job (either from a workflow step or a simple EMS dispatch).

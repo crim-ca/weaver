@@ -28,7 +28,7 @@ from weaver.database import get_db
 from weaver.datatype import Service
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_XML
 from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
-from weaver.utils import get_url_without_query, null
+from weaver.utils import get_url_without_query, get_weaver_url, null
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 from weaver.wps_restapi.processes.processes import execute_process
 
@@ -276,21 +276,40 @@ def mocked_file_response(path, url):
     return resp
 
 
-def mocked_sub_requests(app, function, *args, **kwargs):
-    # type: (TestApp, AnyStr, *Any, **Any) -> AnyResponseType
+def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
+    # type: (TestApp, AnyStr, *Any, bool, **Any) -> AnyResponseType
     """
     Executes ``app.function(*args, **kwargs)`` with a mock of every underlying :func:`requests.request` call
     to relay their execution to the :class:`webTest.TestApp`.
 
     Generates a `fake` response from a file if the URL scheme is ``mock://``.
-    """
 
-    def mocked_app_request(method, url=None, headers=None, verify=None, cert=None, **req_kwargs):  # noqa: E811
+    Executes the *real* request if :paramref:`only_local` is ``True`` and that the request URL (expected as first
+    argument of :paramref:`args`) doesn't correspond to the base URL of :paramref:`app`.
+
+    :param app: application employed for the test
+    :param function: test application method to call (i.e.: ``post``, ``post_json``, ``get``, etc.)
+    :param only_local:
+        When ``True``, only mock requests targeted at :paramref:`app` based on request URL hostname (ignore external).
+        Otherwise, mock every underlying request regardless of hostname, including ones not targeting the application.
+    """
+    from requests.sessions import Session as RealSession
+    real_request = RealSession.request
+
+    def mocked_app_request(method, url=None, **req_kwargs):
         """
-        Request corresponding to :func:`requests.request` that instead gets executed by :class:`webTest.TestApp`.
+        Request corresponding to :func:`requests.request` that instead gets executed by :class:`webTest.TestApp`,
+        unless permitted to call real external requests.
         """
+        # if URL starts with '/' directly, it is the shorthand path for this test app, always mock
+        # otherwise, filter according to full URL hostname
+        url_test_app = get_weaver_url(app.app.registry)
+        if only_local and not url.startswith("/") and not url.startswith(url_test_app):
+            with RealSession() as session:
+                return real_request(session, method, url, **req_kwargs)
+
         method = method.lower()
-        headers = headers or req_kwargs.get("headers")
+        headers = req_kwargs.get("headers")
         req = getattr(app, method)
         url = req_kwargs.get("base_url", url)
         query = req_kwargs.get("params")
