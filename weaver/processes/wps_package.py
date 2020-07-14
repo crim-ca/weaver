@@ -99,8 +99,7 @@ from weaver.utils import (
     get_url_without_query,
     null,
     request_extra,
-    str2bytes,
-    upload_s3
+    str2bytes
 )
 from weaver.wps import get_wps_output_dir
 from weaver.wps_restapi.swagger_definitions import process_uri
@@ -2249,8 +2248,11 @@ class WpsPackage(Process):
         Rewrite the `WPS` output with required location using result path from `CWL` execution.
 
         Configures the parameters such that `PyWPS` will either auto-resolve the local paths to match with URL
-        defined by ``weaver.wps_output_url`` or upload it to `S3` bucket from ``weaver.wps_output_bucket`` and
+        defined by ``weaver.wps_output_url`` or upload it to `S3` bucket from ``weaver.wps_output_s3_bucket`` and
         provide reference directly.
+
+        .. seealso::
+            - :func:`weaver.wps.load_pywps_config`
         """
         wps_out_dir = self.workdir  # pywps will resolve file paths for us using its WPS request UUID
         s3_bucket = self.settings.get("weaver.wps_output_s3_bucket")
@@ -2260,9 +2262,12 @@ class WpsPackage(Process):
         if s3_bucket:
             # result_wps = "s3://{}/{}".format(s3_bucket, result_fn)
             # when 'url' is directly enforced, 'ComplexOutput.json' will use it instead of 'file' from temp workdir
-            # self.response.outputs[output_id].prop = "url"
             # self.response.outputs[output_id].url = result_wps
-            self.response.outputs[output_id].storage = S3StorageBuilder().build()
+
+            # override builder only here so that only results are uploaded to S3, and not XML status also
+            # settings are retrieved from PyWPS server config
+            self.response.outputs[output_id]._storage = S3StorageBuilder().build()  # noqa: W0212
+            self.response.outputs[output_id].storage.prefix = str(self.response.uuid)
 
         result_wps = os.path.join(wps_out_dir, result_fn)
         if os.path.realpath(result_loc) != os.path.realpath(result_wps):

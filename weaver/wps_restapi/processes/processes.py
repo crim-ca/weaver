@@ -60,7 +60,7 @@ from weaver.wps import (
     get_wps_local_status_location,
     get_wps_output_path,
     get_wps_output_url,
-    load_pywps_cfg
+    load_pywps_config
 )
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.notify import encrypt_email, notify_job_complete
@@ -94,7 +94,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
     LOGGER.debug("Job execute process called.")
     settings = get_settings(app)
     task_logger = get_task_logger(__name__)
-    load_pywps_cfg(settings)
+    load_pywps_config(settings)
 
     task_logger.debug("Job task setup.")
 

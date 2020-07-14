@@ -802,18 +802,6 @@ def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
     return file_path
 
 
-def upload_s3(file_path, s3_bucket):
-    # type: (AnyStr, AnyStr) -> None
-    """
-    Uploads the provided file to the `S3` bucket reference formatted as ``s3://{bucket}/{file-key-name}``.
-
-    :param file_path: Path to file to be uploaded to the S3 bucket.
-    :param s3_bucket: Reference to S3 bucket where to upload data.
-    """
-
-
-
-
 REGEX_SEARCH_INVALID_CHARACTERS = re.compile(r"[^a-zA-Z0-9_\-]")
 REGEX_ASSERT_INVALID_CHARACTERS = re.compile(r"^[a-zA-Z0-9_\-]+$")
 

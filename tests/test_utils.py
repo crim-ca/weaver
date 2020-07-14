@@ -25,8 +25,7 @@ from requests.exceptions import HTTPError as RequestsHTTPError
 from six.moves.urllib.parse import urlparse
 
 from tests.compat import contextlib
-# note: must import all fixtures even if not directly used here, otherwise ones used cannot find other child fixtures
-from tests.utils import mocked_aws_s3, mocked_aws_credentials, mocked_file_response, mocked_test_bucket_file  # noqa
+from tests.utils import mocked_aws_credentials, mocked_aws_s3, mocked_aws_s3_bucket_test_file, mocked_file_response
 from weaver import status, utils
 from weaver.utils import _NullType  # noqa: W0212
 from weaver.utils import fetch_file, get_request_options, get_ssl_verify_option, make_dirs, null, request_extra
@@ -514,11 +513,13 @@ def test_fetch_file_remote_with_request():
             shutil.rmtree(res_dir, ignore_errors=True)
 
 
-def test_fetch_file_remote_s3_bucket(mocked_test_bucket_file, tmpdir):
+@mocked_aws_credentials
+@mocked_aws_s3
+def test_fetch_file_remote_s3_bucket(tmpdir):
     test_file_name = "test-file.txt"
     test_file_data = "dummy file"
     test_bucket_name = "test-fake-bucket"
-    test_bucket_ref = mocked_test_bucket_file(test_bucket_name, test_file_name, test_file_data)
+    test_bucket_ref = mocked_aws_s3_bucket_test_file(test_bucket_name, test_file_name, test_file_data)
     result = fetch_file(test_bucket_ref, tmpdir)
     assert result == os.path.join(tmpdir, test_file_name)
     assert os.path.isfile(result)

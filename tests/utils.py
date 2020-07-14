@@ -38,6 +38,8 @@ if TYPE_CHECKING:
         Any, AnyResponseType, AnyStr, Callable, List, Optional, SettingsType, Type, Union
     )
 
+MOCK_AWS_REGION = "us-central-1"
+
 
 def ignore_warning_regex(func, warning_message_regex, warning_categories=DeprecationWarning):
     # type: (Callable, Union[AnyStr, List[AnyStr]], Union[Type[Warning], List[Type[Warning]]]) -> Callable
@@ -395,34 +397,56 @@ def mocked_process_package():
     )
 
 
-@pytest.fixture(scope="function")
-def mocked_aws_credentials():
-    """Mocked AWS Credentials for :py:mod:`moto`."""
-    os.environ["AWS_ACCESS_KEY_ID"] = "testing"
-    os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
-    os.environ["AWS_SECURITY_TOKEN"] = "testing"
-    os.environ["AWS_SESSION_TOKEN"] = "testing"
+# @pytest.fixture(scope="function", autouse=True)
+def mocked_aws_credentials(test_func):
+    """Mocked AWS Credentials for :py:mod:`moto`.
+
+    When using this fixture, ensures that if other mocks fail, at least credentials should be invalid to avoid
+    mistakenly overriding real bucket files.
+    """
+    def wrapped(*args, **kwargs):
+        with mock.patch.dict(os.environ, {
+            "AWS_ACCESS_KEY_ID": "testing",
+            "AWS_SECRET_ACCESS_KEY": "testing",
+            "AWS_SECURITY_TOKEN": "testing",
+            "AWS_SESSION_TOKEN": "testing"
+        }):
+            return test_func(*args, **kwargs)
+    return wrapped
 
 
-@pytest.fixture(scope="function")
-def mocked_aws_s3(mocked_aws_credentials):
-    """Mocked AWS S3 bucket for :py:mod:`boto3` over mocked AWS credentials using :py:mod:`moto`."""
-    with moto.mock_s3():
-        yield boto3.client("s3", region_name="us-east-1")
+#@pytest.fixture(scope="function", autouse=True)
+#def mocked_aws_s3(mocked_aws_credentials):
+def mocked_aws_s3(test_func):
+    """
+    Mocked AWS S3 bucket for :py:mod:`boto3` over mocked AWS credentials using :py:mod:`moto`.
+
+    .. warning::
+        Make sure to employ the same :py:data:`MOCK_AWS_REGION` otherwise mock will not work and S3 operations will
+        attempt writing to real bucket.
+    """
+    def wrapped(*args, **kwargs):
+        with moto.mock_s3():
+            return test_func(*args, **kwargs)
+            #yield boto3.client("s3", region_name=MOCK_AWS_REGION)
+    return wrapped
 
 
-@pytest.fixture(scope="function")
-def mocked_test_bucket_file(mocked_aws_s3):
-    # type: (...) -> Callable[[str, str, str], str]
+#@pytest.fixture(scope="function", autouse=True)
+#def mocked_test_bucket_file(mocked_aws_s3):
+def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="Test file inside test S3 bucket"):
+    #### type: (...) -> Callable[[str, str, str], str]
     """
     Provides a callable that takes as input the test bucket, file name and optionally its content, and
     returns the mocked S3 bucket reference.
     """
-    def _bucket_file_creator(bucket_name, file_name, file_content="Test file inside test S3 bucket"):
-        mocked_aws_s3.create_bucket(Bucket=bucket_name)
-        with tempfile.NamedTemporaryFile(mode="w") as tmp_file:
-            tmp_file.write(file_content)
-            tmp_file.flush()
-            mocked_aws_s3.upload_file(Bucket=bucket_name, Filename=tmp_file.name, Key=file_name)
-        return "s3://{}/{}".format(bucket_name, file_name)
-    return _bucket_file_creator
+    #def _bucket_file_creator(bucket_name, file_name, file_content="Test file inside test S3 bucket"):
+    import boto3
+    s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
+    s3.create_bucket(Bucket=bucket_name)
+    with tempfile.NamedTemporaryFile(mode="w") as tmp_file:
+        tmp_file.write(file_content)
+        tmp_file.flush()
+        s3.upload_file(Bucket=bucket_name, Filename=tmp_file.name, Key=file_name)
+    return "s3://{}/{}".format(bucket_name, file_name)
+    #return _bucket_file_creator

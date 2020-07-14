@@ -202,7 +202,7 @@ def get_results(job, container):
     for result in job.results:
         rtype = "data" if any(k in result for k in ["data", "value"]) else "href"
         value = get_any_value(result)
-        if rtype == "href":
+        if rtype == "href" and "://" not in value:
             value = wps_url + str(value).lstrip("/")
         outputs.append({"id": get_any_id(result), rtype: value})
     return {"outputs": outputs}

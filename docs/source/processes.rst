@@ -423,7 +423,6 @@ combinations.
     add tests that validate each combination of operation
 
 .. table:: Summary of input file reference handling
-    :align-center:
 
     +===============+===============================+===================+=============================================+
     | Configuration | Process Type                  | File Scheme       | Applied Operation                           |

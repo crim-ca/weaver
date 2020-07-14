@@ -8,8 +8,9 @@ Changes
 
 Changes:
 --------
-- Add AWS S3 bucket support for process input references.
-- Add ``weaver.wps_output_s3_bucket`` configuration to upload results to AWS S3 bucket instead of local directory.
+- Add AWS S3 bucket support for process input reference files.
+- Add ``weaver.wps_output_s3_bucket`` setting to upload results to AWS S3 bucket instead of local directory.
+- Add ``weaver.wps_output_s3_region`` setting to allow override parameter extracted from `AWS` profile otherwise.
 - Add more documentation about supported file reference schemes.
 - Add documentation references to `ESGF-CWT Compute API`.
 - Add conditional input file reference fetching (depending on `ADES`/`EMS`, process *type*  from `CWL` ``hints``)
@@ -18,7 +19,7 @@ Changes:
 
 Fixes:
 ------
-- Adjust some docstrings to better indicated raised errors.
+- Adjust some docstrings to better indicate raised errors.
 - Adjust ``weaver.processes.wps_package.WpsPackage`` to use it internal logger when running the process in order to
   preserve log entries under its job execution. They were otherwise lost over time across all process executions.
 
