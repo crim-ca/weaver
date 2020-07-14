@@ -231,6 +231,23 @@ def load_pywps_cfg(container, config=None):
             output_url = pywps_config.get_config_value("server", "outputurl")
         settings["weaver.wps_output_url"] = output_url
 
+    # configure S3 bucket if requested, storage of all process outputs
+    # note: region and credentials are picked up automatically by 'boto3' form local AWS configs
+    # warning:
+    #   if we set (server, storagetype, s3), ALL status (including XML) are stored to S3
+    #   to preserve status locally, we set 'file' and override the storage instance during output rewrite in WpsPackage
+    #   we can still make use of the server configurations here to make this overridden storage auto-find its configs
+    wps_bucket = settings.get("weaver.wps_output_s3_bucket")
+    pywps_config.CONFIG.set("server", "storagetype", "file")
+    # pywps_config.CONFIG.set("server", "storagetype", "s3")
+    if wps_bucket:
+        import boto3
+        s3 = boto3.client("s3")
+        pywps_config.CONFIG.set("s3", "region", s3.meta.region_name)
+        pywps_config.CONFIG.set("s3", "bucket", wps_bucket)
+        pywps_config.CONFIG.set("s3", "public", "false")  # don't automatically push results as publicly accessible
+        pywps_config.CONFIG.set("s3", "encrypt", "true")  # encrypts data server-side, transparent from this side
+
     # apply workdir if provided, otherwise use default
     if "weaver.wps_workdir" in settings:
         make_dirs(settings["weaver.wps_workdir"], exist_ok=True)

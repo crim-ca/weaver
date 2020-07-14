@@ -56,10 +56,10 @@ weaver.wps = true
 weaver.wps_url =
 weaver.wps_path = /ows/wps
 weaver.wps_output = true
-weaver.wps_output_bucket =
 weaver.wps_output_dir = /tmp
 weaver.wps_output_url =
 weaver.wps_output_path = /wpsoutputs
+weaver.wps_output_s3_bucket =
 weaver.wps_workdir =
 
 # --- Weaver WPS metadata ---

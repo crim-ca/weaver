@@ -17,7 +17,7 @@ Glossary
     `HREF`: Hyperlink Reference
     I/O: Inputs and/or Outputs of CWL and/or WPS depending on context
     `OGC`_: |ogc|
-    `S3`: AWS S3 bucket file storage
+    `S3`: Simple Storage Service (AWS S3), bucket file storage
     `WKT`: Well-Known Text geometry representation
     `WPS`: Web Processing Service
 

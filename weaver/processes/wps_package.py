@@ -36,6 +36,7 @@ from pywps.inout import BoundingBoxInput, BoundingBoxOutput, ComplexInput, Compl
 from pywps.inout.basic import SOURCE_TYPE, BasicIO
 from pywps.inout.formats import Format
 from pywps.inout.literaltypes import ALLOWEDVALUETYPE, AllowedValue, AnyValue
+from pywps.inout.storage.s3 import S3StorageBuilder
 from pywps.validator.mode import MODE
 from six.moves.urllib.parse import urlparse
 from yaml.scanner import ScannerError
@@ -98,7 +99,8 @@ from weaver.utils import (
     get_url_without_query,
     null,
     request_extra,
-    str2bytes
+    str2bytes,
+    upload_s3
 )
 from weaver.wps import get_wps_output_dir
 from weaver.wps_restapi.swagger_definitions import process_uri
@@ -137,6 +139,8 @@ if TYPE_CHECKING:
     DictCWLRequirements = Dict[AnyStr, Dict[AnyStr, Any]]  # {'<req>': {<param>: <val>}}
     ListCWLRequirements = List[Dict[AnyStr, Any]]  # [{'class': <req>, <param>: <val>}]
     AnyCWLRequirements = Union[DictCWLRequirements, ListCWLRequirements]
+    CWLResultEntry = Dict[AnyStr, Union[AnyValueType, List[AnyValueType]]]
+    CWLResults = Dict[AnyStr, CWLResultEntry]
 
 
 # NOTE:
@@ -2122,14 +2126,14 @@ class WpsPackage(Process):
             try:
                 self.update_status("Running package...", PACKAGE_PROGRESS_CWL_RUN, STATUS_RUNNING)
                 self.logger.debug("Launching process package with inputs:\n%s", json.dumps(cwl_inputs, indent=2))
-                result = package_inst(**cwl_inputs)
+                result = package_inst(**cwl_inputs)  # type: CWLResults
                 self.update_status("Package execution done.", PACKAGE_PROGRESS_CWL_DONE, STATUS_RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed package execution.")
             # FIXME: this won't be necessary using async routine (https://github.com/crim-ca/weaver/issues/131)
             self.insert_package_log(result)
             try:
-                self.make_location_outputs(result)
+                self.make_outputs(result)
                 self.update_status("Generate package outputs done.", PACKAGE_PROGRESS_PREP_OUT, STATUS_RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed to save package outputs.")
@@ -2212,12 +2216,11 @@ class WpsPackage(Process):
                 location["format"] = fmt
         return location
 
-    def make_location_outputs(self, cwl_result):
+    def make_outputs(self, cwl_result):
+        # type: (CWLResults) -> None
         """
-        Maps `CWL` result outputs to corresponding `WPS` outputs under required location.
-        Uploads the results directly to `S3` if `Weaver` is configured to do so.
+        Maps `CWL` result outputs to corresponding `WPS` outputs.
         """
-        wps_out_dir = self.workdir  # pywps will resolve file paths for us using its WPS request UUID
         for output_id in self.request.outputs:  # iterate over original WPS outputs, extra such as logs are dropped
             # TODO: adjust output for glob patterns (https://github.com/crim-ca/weaver/issues/24)
             if isinstance(cwl_result[output_id], list) and not isinstance(self.response.outputs[output_id], list):
@@ -2227,28 +2230,49 @@ class WpsPackage(Process):
                         len(cwl_result[output_id])
                     )
                 cwl_result[output_id] = cwl_result[output_id][0]  # expect only one output
+
+            if "location" not in cwl_result[output_id] and os.path.isfile(str(cwl_result[output_id])):
+                raise PackageTypeError("Process output '{}' defines CWL type other than 'File'. ".format(output_id) +
+                                       "Application output results must use 'File' type to return file references.")
             if "location" in cwl_result[output_id]:
-                result_loc = cwl_result[output_id]["location"].replace("file://", "")
-                result_wps = os.path.join(wps_out_dir, os.path.split(result_loc)[-1])
-                if os.path.realpath(result_loc) != os.path.realpath(result_wps):
-                    self.logger.info("Moving [%s]: [%s] -> [%s]", output_id, result_loc, result_wps)
-                    shutil.move(result_loc, result_wps)
-                self.response.outputs[output_id].as_reference = True
-                self.response.outputs[output_id].file = result_wps
-                self.logger.info("Resolved WPS output [%s]: [%s]", output_id, result_wps)
-            else:
-                result_loc = cwl_result[output_id]
-                result_wps = os.path.join(wps_out_dir, os.path.split(result_loc)[-1])
-                # FIXME: instead raise error for non-file output, (don't allow hacking output using string type)?
-                #       if any process provides an explicit URL, it should be handled by itself (we don't rewrite)
-                if os.path.isfile(str(result_loc)):
-                    self.logger.warning("[DEPRECATED] Process output '%s' defined as CWL type other than File will "
-                                        "be unsupported in a future release.", output_id)
-                    if os.path.realpath(result_loc) != os.path.realpath(result_wps):
-                        self.logger.info("Moving: [%s] -> [%s]", result_loc, result_wps)
-                        shutil.move(result_loc, result_wps)
-                self.response.outputs[output_id].data = result_wps
-                self.logger.info("Resolved WPS output [%s]: [%s]", output_id, result_wps)
+                self.make_location_output(cwl_result, output_id)
+                continue
+
+            # data output
+            self.response.outputs[output_id].data = cwl_result[output_id]
+            self.response.outputs[output_id].as_reference = False
+            self.logger.info("Resolved WPS output [%s] as literal data", output_id)
+
+    def make_location_output(self, cwl_result, output_id):
+        # type: (CWLResults, AnyStr) -> None
+        """
+        Rewrite the `WPS` output with required location using result path from `CWL` execution.
+
+        Configures the parameters such that `PyWPS` will either auto-resolve the local paths to match with URL
+        defined by ``weaver.wps_output_url`` or upload it to `S3` bucket from ``weaver.wps_output_bucket`` and
+        provide reference directly.
+        """
+        wps_out_dir = self.workdir  # pywps will resolve file paths for us using its WPS request UUID
+        s3_bucket = self.settings.get("weaver.wps_output_s3_bucket")
+        result_loc = cwl_result[output_id]["location"].replace("file://", "")
+        result_fn = os.path.split(result_loc)[-1]
+
+        if s3_bucket:
+            # result_wps = "s3://{}/{}".format(s3_bucket, result_fn)
+            # when 'url' is directly enforced, 'ComplexOutput.json' will use it instead of 'file' from temp workdir
+            # self.response.outputs[output_id].prop = "url"
+            # self.response.outputs[output_id].url = result_wps
+            self.response.outputs[output_id].storage = S3StorageBuilder().build()
+
+        result_wps = os.path.join(wps_out_dir, result_fn)
+        if os.path.realpath(result_loc) != os.path.realpath(result_wps):
+            self.logger.info("Moving [%s]: [%s] -> [%s]", output_id, result_loc, result_wps)
+            shutil.move(result_loc, result_wps)
+        # params 'as_reference + file' triggers 'ComplexOutput.json' to map the WPS-output URL from the WPS workdir
+        self.response.outputs[output_id].as_reference = True
+        self.response.outputs[output_id].file = result_wps
+
+        self.logger.info("Resolved WPS output [%s] as file reference: [%s]", output_id, result_wps)
 
     def make_tool(self, toolpath_object, loading_context):
         # type: (ToolPathObjectType, LoadingContext) -> ProcessCWL

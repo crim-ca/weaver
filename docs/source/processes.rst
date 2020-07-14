@@ -391,9 +391,9 @@ monitored by `Weaver`, it will skip fetching of ``http(s)``-based references sin
 double downloads (one on `Weaver` and the other on the `WPS` side). It is the same in case of ``ESGF-CWTRequirement``
 employed for `ESGF-CWT`_ processes. Because these processes do not normally
 
-When using `S3` references, `Weaver` expects the reference to be formatted as ``s3://<bucket>/<filename.ext>``.
-Provided that the corresponding `S3` bucket can be accessed by the running `Weaver` application, it will fetch the
-file and store it locally temporarily for ``CWL`` execution.
+When using `S3` references, `Weaver` will attempt to retrieve the file using server configuration and credentials.
+Provided that the corresponding `S3` bucket can be accessed by the running `Weaver` application, it will fetch the file
+and store it locally temporarily for ``CWL`` execution.
 
 When using `OpenSearch` references, additional parameters are necessary to handle retrieval of specific file URL.
 Please refer to :ref:`OpenSearch Data Source` for more details.
@@ -404,8 +404,10 @@ Please refer to :ref:`OpenSearch Data Source` for more details.
     permissions only to some given `ADES` server by providing additional authorization tokens to the requests.
     Please refer to :ref:`Configuration of Request Options` for this matter.
 
+.. note::
     When using `S3` buckets, authorization are handled through typical `AWS` credentials and role permissions. This
-    means that `AWS` access must be granted to the application in order to allow it fetching the file.
+    means that `AWS` access must be granted to the application in order to allow it fetching the file. There are also
+    different formats of `S3` reference formats handled by `Weaver`.
     Please refer to :ref:`Configuration of AWS S3 Buckets` for more details.
 
 Following table summarize the default behaviour of input file reference handling of different situations when received

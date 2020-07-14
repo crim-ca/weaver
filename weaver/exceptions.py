@@ -115,35 +115,35 @@ class PackageException(WeaverException):
 
 class PackageTypeError(PackageException):
     """
-    Error indicating that an instance of :class:`weaver.processes.wps_package.Package`
+    Error indicating that an instance of :class:`weaver.processes.wps_package.WpsPackage`
     could not properly parse input/output type(s) for package deployment or execution.
     """
 
 
 class PackageRegistrationError(PackageException):
     """
-    Error indicating that an instance of :class:`weaver.processes.wps_package.Package`
+    Error indicating that an instance of :class:`weaver.processes.wps_package.WpsPackage`
     could not properly be registered for package deployment because of invalid prerequisite.
     """
 
 
 class PackageExecutionError(PackageException):
     """
-    Error indicating that an instance of :class:`weaver.processes.wps_package.Package`
+    Error indicating that an instance of :class:`weaver.processes.wps_package.WpsPackage`
     could not properly execute the package using provided inputs and package definition.
     """
 
 
 class PackageNotFound(PackageException):
     """
-    Error indicating that an instance of :class:`weaver.processes.wps_package.Package`
+    Error indicating that an instance of :class:`weaver.processes.wps_package.WpsPackage`
     could not properly retrieve the package definition using provided references.
     """
 
 
 class PayloadNotFound(PackageException):
     """
-    Error indicating that an instance of :class:`weaver.processes.wps_package.Package`
+    Error indicating that an instance of :class:`weaver.processes.wps_package.WpsPackage`
     could not properly retrieve the package deploy payload using provided references.
     """
 

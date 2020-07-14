@@ -34,7 +34,7 @@ pyramid>=1.7.3
 pyramid_celery
 pyramid_mako
 pytz
-pywps
+pywps>=4.2.4
 pyyaml>=5.2
 requests
 requests_file

@@ -81,7 +81,7 @@ they are optional and which default value or operation is applied in each situat
   | The *path* variant **SHOULD** start with ``/`` for appropriate concatenation with ``weaver.url``, although this is
     not strictly enforced.
 
-- | ``weaver.wps_output_bucket = <s3-bucket>``
+- | ``weaver.wps_output_s3_bucket = <s3-bucket>``
   | (default: ``None``)
   | .. versionadded:: 1.13.0
   |
@@ -99,7 +99,7 @@ they are optional and which default value or operation is applied in each situat
   |
   | Location where WPS outputs (results from jobs) will be stored for stage-out.
   |
-  | When ``weaver.wps_output_bucket`` is specified, only WPS XML status and log files are stored under this path.
+  | When ``weaver.wps_output_s3_bucket`` is specified, only WPS XML status and log files are stored under this path.
     Otherwise, job results are also located under this directory with a sub-directory named with the job ID.
   | This directory should be mapped to `Weaver`'s WPS output URL to serve them externally as needed.
 
@@ -172,8 +172,36 @@ Configuration of AWS S3 Buckets
 
 Any `AWS` `S3` bucket accessed by `Weaver` needs to be accessible by the application, whether it is to fetch input
 files or to store output results. This can require from the server administrator to specify credentials by one of
-reference `supported methodologies <aws-credentials>`_ to provide necessary role or permissions. See also reference
+reference `supported methodologies <aws-credentials>`_ to provide necessary role and/or permissions. See also reference
 `AWS Configuration <aws-config>`_ which list various options that will be considered when working with `S3` buckets.
+
+Note that `Weaver` expects the `AWS Configuration <aws-config>`_ to define a *default profile* from which the AWS
+client can infer which *region* it needs to connect to. The `S3` bucket to store files should be defined by
+``weaver.wps_output_s3_bucket`` setting as presented in the previous section.
+
+The `S3` file references for input and output in `Weaver` are expected to be formatted as::
+
+    s3://<bucket>/<file-key>
+
+This implicitly tells `Weaver` to employ the `S3` bucket it was configured with as well as the automatically retrieved
+region from the `AWS` server configuration.
+
+Alternatively, the reference can be provided with the more explicit `AWS` `S3` link such as::
+
+    https://s3.[region-name.]amazonaws.com/<bucket>/<file-key>
+
+In this situation, `Weaver` will parse it as equivalent to the prior shorthand reference format, as long as the `AWS`
+server configuration matches with all associated details from the HTTP URL variant. If this is not the case, `Weaver`
+will still attempt to fetch the file as *standard* HTTP reference, but read access should be granted accordingly to the
+corresponding bucket and file such that `Weaver` can access it.
+
+Finally, in the above references, ``file-key`` is used as *anything after* the bucket name. In other words, this value
+can contain any amount of ``/`` separators and details. For example, `Weaver` will store process output results to `S3`
+using ``file-key`` as a combination of ``<jobID>/<output-id>.<ext>``, therefore forming the full job results references
+as::
+
+    s3://<bucket>/<jobID>/<output-id>.<ext>
+
 
 Configuration of Data Sources
 =======================================

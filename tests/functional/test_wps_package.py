@@ -1371,7 +1371,7 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
             "weaver.wps_output": True,
             "weaver.wps_output_path": "/wpsoutputs",
             "weaver.wps_output_dir": "/tmp",  # nosec: B108 # don't care hardcoded for test
-            "weaver.wps_output_bucket": "test-bucket",
+            "weaver.wps_output_s3_bucket": "test-bucket",
             "weaver.wps_path": "/ows/wps",
             "weaver.wps_restapi_path": "/",
         }
@@ -1464,7 +1464,7 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
 
         # check that outputs are S3 bucket references
         output_values = {out["id"]: get_any_value(out) for out in resp.json["outputs"]}
-        output_bucket = self.settings["weaver.wps_output_bucket"]
+        output_bucket = self.settings["weaver.wps_output_s3_bucket"]
         for out_key, out_file in [("output_from_s3", input_file_s3), ("output_from_http", input_file_http)]:
             output_ref = "s3://{}/{}".format(output_bucket, out_file)
             assert output_values[out_key] == output_ref

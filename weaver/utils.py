@@ -735,7 +735,7 @@ def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
 
     :param file_reference:
         Local filesystem path (optionally prefixed with ``file://``), ``s3://`` bucket location or ``http(s)://``
-        remote URL file reference.
+        remote URL file reference. Reference ``https://s3.[...]`` are also considered as ``s3://``.
     :param file_outdir: Output local directory path under which to place the fetched file.
     :param settings: Additional request-related settings from the application configuration (notably request-options).
     :param request_kwargs: Additional keywords to forward to request call (if needed).
@@ -764,11 +764,24 @@ def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
             shutil.copyfile(file_reference, file_path)
     elif file_reference.startswith("s3://"):
         LOGGER.debug("Fetch file resolved as S3 bucket reference.")
-        bucket_name, file_key = file_reference[5:].split("/")
         s3 = boto3.resource("s3")
+        bucket_name, file_key = file_reference[5:].split("/", 1)
         bucket = s3.Bucket(bucket_name)
         bucket.download_file(file_key, file_path)
     elif file_reference.startswith("http"):
+        if file_reference.startswith("https://s3."):
+            s3 = boto3.resource("s3")
+            # endpoint in the form: "https://s3.[region-name.]amazonaws.com/<bucket>/<file-key>"
+            if not file_reference.startswith(s3.meta.endpoint_url):
+                LOGGER.warning("Detected HTTP file reference to AWS S3 bucket that mismatches server configuration. "
+                               "Will consider it as plain HTTP with read access.")
+            else:
+                file_ref_updated = "s3://{}".format(file_reference.replace(s3.meta.endpoint_url, ""))
+                LOGGER.debug("Adjusting file reference to S3 shorthand for further parsing:\n"
+                             "  Initial: [%s]\n"
+                             "  Updated: [%s]", file_reference, file_ref_updated)
+                return fetch_file(file_ref_updated, file_outdir, settings=settings, **request_kwargs)
+
         LOGGER.debug("Fetch file resolved as remote URL reference.")
         request_kwargs.pop("stream", None)
         with open(file_path, "wb") as file:
@@ -787,6 +800,18 @@ def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
                          .format(scheme, list(SUPPORTED_FILE_SCHEMES)))
     LOGGER.debug("Fetch file written")
     return file_path
+
+
+def upload_s3(file_path, s3_bucket):
+    # type: (AnyStr, AnyStr) -> None
+    """
+    Uploads the provided file to the `S3` bucket reference formatted as ``s3://{bucket}/{file-key-name}``.
+
+    :param file_path: Path to file to be uploaded to the S3 bucket.
+    :param s3_bucket: Reference to S3 bucket where to upload data.
+    """
+
+
 
 
 REGEX_SEARCH_INVALID_CHARACTERS = re.compile(r"[^a-zA-Z0-9_\-]")
