@@ -515,13 +515,14 @@ def test_fetch_file_remote_with_request():
 
 @mocked_aws_credentials
 @mocked_aws_s3
-def test_fetch_file_remote_s3_bucket(tmpdir):
-    test_file_name = "test-file.txt"
-    test_file_data = "dummy file"
-    test_bucket_name = "test-fake-bucket"
-    test_bucket_ref = mocked_aws_s3_bucket_test_file(test_bucket_name, test_file_name, test_file_data)
-    result = fetch_file(test_bucket_ref, tmpdir)
-    assert result == os.path.join(tmpdir, test_file_name)
-    assert os.path.isfile(result)
-    with open(result, mode="r") as test_file:
-        assert test_file.read() == test_file_data
+def test_fetch_file_remote_s3_bucket():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        test_file_name = "test-file.txt"
+        test_file_data = "dummy file"
+        test_bucket_name = "test-fake-bucket"
+        test_bucket_ref = mocked_aws_s3_bucket_test_file(test_bucket_name, test_file_name, test_file_data)
+        result = fetch_file(test_bucket_ref, tmpdir)
+        assert result == os.path.join(tmpdir, test_file_name)
+        assert os.path.isfile(result)
+        with open(result, mode="r") as test_file:
+            assert test_file.read() == test_file_data

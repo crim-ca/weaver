@@ -582,6 +582,8 @@ class End2EndEMSTestCase(TestCase):
     @classmethod
     def setup_logger(cls):
         if cls.logger_enabled:
+            if not isinstance(cls.logger_level, int):
+                cls.logger_level = logging.getLevelName(cls.logger_level)
             make_dirs(cls.logger_result_dir, exist_ok=True)
             log_path = os.path.abspath(os.path.join(cls.logger_result_dir, cls.__name__ + ".log"))
             log_fmt = logging.Formatter("%(message)s")      # only message to avoid 'log-name INFO' offsetting outputs
