@@ -4,8 +4,6 @@
 -r requirements.txt
 cloud_sptheme
 pycodestyle
-# required for pywps.ext_autodoc
-pywps
 sphinx>=2.4
 sphinx-autoapi>=1.3.0
 sphinx-paramlinks>=0.4.1
