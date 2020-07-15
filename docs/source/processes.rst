@@ -479,7 +479,7 @@ combinations.
 
 .. [#wf]
     Workflows are only available on `EMS` instances. Since they chain processes, no fetch is needed as the first
-    sub-step process will do it instead. See `section about workflows <workflows>`_ as well as :ref:`CWL Workflow`for
+    sub-step process will do it instead. See `section about workflows <workflows>`_ as well as :ref:`CWL Workflow` for
     more details.
 
 .. todo::

@@ -8,11 +8,10 @@ import warnings
 from inspect import isclass
 from typing import TYPE_CHECKING
 
-import boto3
+# Note: do NOT import 'boto3' here otherwise 'moto' will not be able to mock it effectively
 import mock
 import moto
 import pyramid_celery
-import pytest
 import six
 from pyramid import testing
 from pyramid.config import Configurator
@@ -397,7 +396,6 @@ def mocked_process_package():
     )
 
 
-# @pytest.fixture(scope="function", autouse=True)
 def mocked_aws_credentials(test_func):
     """Mocked AWS Credentials for :py:mod:`moto`.
 
@@ -415,8 +413,6 @@ def mocked_aws_credentials(test_func):
     return wrapped
 
 
-#@pytest.fixture(scope="function", autouse=True)
-#def mocked_aws_s3(mocked_aws_credentials):
 def mocked_aws_s3(test_func):
     """
     Mocked AWS S3 bucket for :py:mod:`boto3` over mocked AWS credentials using :py:mod:`moto`.
@@ -428,19 +424,21 @@ def mocked_aws_s3(test_func):
     def wrapped(*args, **kwargs):
         with moto.mock_s3():
             return test_func(*args, **kwargs)
-            #yield boto3.client("s3", region_name=MOCK_AWS_REGION)
     return wrapped
 
 
-#@pytest.fixture(scope="function", autouse=True)
-#def mocked_test_bucket_file(mocked_aws_s3):
 def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="Test file inside test S3 bucket"):
-    #### type: (...) -> Callable[[str, str, str], str]
+    # type: (AnyStr,AnyStr, AnyStr) -> AnyStr
     """
-    Provides a callable that takes as input the test bucket, file name and optionally its content, and
-    returns the mocked S3 bucket reference.
+    Generates a test file reference from dummy data that will be uploaded to the specified S3 bucket name using the
+    provided file key.
+
+    The S3 interface employed is completely dependent of the wrapping context. For instance, calling this function
+    with :func:`mocked_aws_s3` decorator will effectively employ the mocked S3 interface.
+
+    .. seealso::
+        - :func:`mocked_aws_s3`
     """
-    #def _bucket_file_creator(bucket_name, file_name, file_content="Test file inside test S3 bucket"):
     import boto3
     s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
     s3.create_bucket(Bucket=bucket_name)
@@ -449,4 +447,3 @@ def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="Test fi
         tmp_file.flush()
         s3.upload_file(Bucket=bucket_name, Filename=tmp_file.name, Key=file_name)
     return "s3://{}/{}".format(bucket_name, file_name)
-    #return _bucket_file_creator

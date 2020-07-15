@@ -437,7 +437,7 @@ def test_request_extra_intervals():
             sleep_counter["called_with"].append(delay)
 
     with mock.patch("requests.Session.request", side_effect=mock_request) as mocked_request:
-        with mock.patch("weaver.utils.time.sleep", side_effect=mock_sleep) as mocked_sleep:
+        with mock.patch("weaver.utils.time.sleep", side_effect=mock_sleep):
             intervals = [1e6, 3e6, 5e6]  # random values that shouldn't normally be used with sleep() (too big)
             # values will not match if backoff/retries are not automatically corrected by internals parameter
             resp = request_extra("get", "http://whatever", only_server_errors=False,

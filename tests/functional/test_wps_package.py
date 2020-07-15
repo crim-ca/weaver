@@ -10,12 +10,11 @@ Local test web application is employed to run operations by mocking external req
 import contextlib
 import logging
 import os
-import unittest
 import time
+import unittest
 from copy import deepcopy
 
 import colander
-import mock
 import pytest
 import six
 from pyramid.httpexceptions import HTTPBadRequest
@@ -1435,16 +1434,16 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
         test_http_ref = "https://www.iana.org/assignments/media-types/{}".format(input_file_http)
         test_bucket_ref = mocked_aws_s3_bucket_test_file("wps-process-test-bucket", input_file_s3)
         exec_body = {
-          "mode": EXECUTE_MODE_ASYNC,
-          "response": EXECUTE_RESPONSE_DOCUMENT,
-          "inputs": [
-              {"id": "input_with_http", "href": test_http_ref},
-              {"id": "input_with_s3", "href": test_bucket_ref},
-          ],
-          "outputs": [
-            {"id": "output_from_http", "transmissionMode": "reference"},
-            {"id": "output_from_s3", "transmissionMode": "reference"},
-          ]
+            "mode": EXECUTE_MODE_ASYNC,
+            "response": EXECUTE_RESPONSE_DOCUMENT,
+            "inputs": [
+                {"id": "input_with_http", "href": test_http_ref},
+                {"id": "input_with_s3", "href": test_bucket_ref},
+            ],
+            "outputs": [
+                {"id": "output_from_http", "transmissionMode": "reference"},
+                {"id": "output_from_s3", "transmissionMode": "reference"},
+            ]
         }
         with contextlib.ExitStack() as stack_proc:
             for process in mocked_execute_process():
@@ -1482,12 +1481,12 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
         #   can validate manually that files exists in ouput bucket, but cannot seem to retrieve it here
         #   problem due to fixture setup or moto limitation via boto3.resource interface used by pywps?
         # check that outputs are indeed stored in S3 buckets
-        #import boto3
-        #mocked_s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
-        #resp_json = mocked_s3.list_objects_v2(Bucket=output_bucket)
-        #bucket_file_keys = [obj["Key"] for obj in resp_json["Contents"]]
-        #for out_file in [input_file_s3, input_file_http]:
-        #    assert out_file in bucket_file_keys
+        #   import boto3
+        #   mocked_s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
+        #   resp_json = mocked_s3.list_objects_v2(Bucket=output_bucket)
+        #   bucket_file_keys = [obj["Key"] for obj in resp_json["Contents"]]
+        #   for out_file in [input_file_s3, input_file_http]:
+        #       assert out_file in bucket_file_keys
 
         # check that outputs are NOT copied locally, but that XML status does exist
         # counter validate path with file always present to ensure outputs are not 'missing' just because of wrong dir
