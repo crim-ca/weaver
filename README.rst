@@ -104,7 +104,7 @@ requirements and provide feedback to |ogc|_ (OGC) in this effect.
 Weaver can be launched either as an `EMS` or an `ADES` according to configuration values it is deployed with.
 For more details, see `Configuration`_ and `Documentation`_ sections.
 
-.. |ogc| replace:: Open Geospatial Consortium (OGC)
+.. |ogc| replace:: Open Geospatial Consortium
 .. _ogc: https://www.ogc.org/
 .. |ogc-proc-api| replace:: `OGC API - Processes` (WPS-REST bindings)
 .. _ogc-proc-api: https://github.com/opengeospatial/wps-rest-binding
