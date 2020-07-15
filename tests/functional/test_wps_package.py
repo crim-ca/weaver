@@ -1,4 +1,16 @@
+"""
+Functional tests of operations implemented by :mod:`weaver.processes.wps_package`.
+
+Validates that CWL package definitions are parsed and executes the process as intended.
+Local test web application is employed to run operations by mocking external requests.
+
+.. seealso::
+    - :mod:`tests.processes.wps_package`.
+"""
+import contextlib
 import logging
+import os
+import time
 import unittest
 from copy import deepcopy
 
@@ -9,13 +21,21 @@ from pyramid.httpexceptions import HTTPBadRequest
 
 from tests import resources
 from tests.utils import (
+    MOCK_AWS_REGION,
     get_test_weaver_app,
     get_test_weaver_config,
+    mocked_aws_credentials,
+    mocked_aws_s3,
+    mocked_aws_s3_bucket_test_file,
+    mocked_execute_process,
     mocked_sub_requests,
+    setup_config_with_celery,
     setup_config_with_mongodb,
     setup_config_with_pywps,
+    setup_mongodb_jobstore,
     setup_mongodb_processstore
 )
+from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT
 from weaver.formats import (
     CONTENT_TYPE_APP_JSON,
     CONTENT_TYPE_APP_NETCDF,
@@ -27,6 +47,9 @@ from weaver.formats import (
     IANA_NAMESPACE,
     get_cwl_file_format
 )
+from weaver.processes.constants import CWL_REQUIREMENT_APP_BUILTIN
+from weaver.status import STATUS_RUNNING, STATUS_SUCCEEDED
+from weaver.utils import get_any_value
 from weaver.visibility import VISIBILITY_PUBLIC
 
 EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_TEXT_PLAIN]
@@ -40,37 +63,55 @@ LOGGER = logging.getLogger(__name__)
 
 
 @pytest.mark.functional
-class WpsPackageAppTest(unittest.TestCase):
-    def setUp(self):
-        settings = {
+class WpsPackageConfigBase(unittest.TestCase):
+    json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
+    settings = {}
+
+    def __init__(self, *args, **kwargs):
+        # won't run this as a test suite, only its derived classes
+        setattr(self, "__test__", self is WpsPackageConfigBase)
+        super(WpsPackageConfigBase, self).__init__(*args, **kwargs)
+
+    @classmethod
+    def setUpClass(cls):
+        config = setup_config_with_mongodb(settings=cls.settings)
+        config = setup_config_with_pywps(config)
+        config = setup_config_with_celery(config)
+        config = get_test_weaver_config(config)
+        setup_mongodb_processstore(config)  # force reset
+        cls.job_store = setup_mongodb_jobstore(config)
+        cls.app = get_test_weaver_app(config=config, settings=cls.settings)
+
+    def deploy_process(self, payload):
+        """
+        Deploys a process with :paramref:`payload`.
+
+        :returns: resulting tuple of ``(process-description, package)`` JSON responses.
+        """
+        resp = mocked_sub_requests(self.app, "post_json", "/processes", params=payload, headers=self.json_headers)
+        assert resp.status_code == 200  # TODO: status should be 201 when properly modified to match API conformance
+        path = resp.json["processSummary"]["processDescriptionURL"]
+        body = {"value": VISIBILITY_PUBLIC}
+        resp = self.app.put_json("{}/visibility".format(path), params=body, headers=self.json_headers)
+        assert resp.status_code == 200
+        info = []
+        for pkg_url in [path, "{}/package".format(path)]:
+            resp = self.app.get(pkg_url, headers=self.json_headers)
+            assert resp.status_code == 200
+            info.append(deepcopy(resp.json))
+        return info
+
+
+@pytest.mark.functional
+class WpsPackageAppTest(WpsPackageConfigBase):
+    @classmethod
+    def setUpClass(cls):
+        cls.settings = {
             "weaver.wps": True,
             "weaver.wps_path": "/ows/wps",
             "weaver.wps_restapi_path": "/",
         }
-        config = setup_config_with_mongodb(settings=settings)
-        config = setup_config_with_pywps(config)
-        config = get_test_weaver_config(config)
-        setup_mongodb_processstore(config)  # force reset
-        self.app = get_test_weaver_app(config=config, settings=settings)
-
-    def deploy_process(self, payload):
-        """
-        Deploys a process with ``payload``.
-        :returns: resulting (process-description, package) JSON responses.
-        """
-        json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
-        resp = mocked_sub_requests(self.app, "post_json", "/processes", params=payload, headers=json_headers)
-        assert resp.status_code == 200  # TODO: status should be 201 when properly modified to match API conformance
-        path = resp.json["processSummary"]["processDescriptionURL"]
-        body = {"value": VISIBILITY_PUBLIC}
-        resp = self.app.put_json("{}/visibility".format(path), params=body, headers=json_headers)
-        assert resp.status_code == 200
-        info = []
-        for pkg_url in [path, "{}/package".format(path)]:
-            resp = self.app.get(pkg_url, headers=json_headers)
-            assert resp.status_code == 200
-            info.append(deepcopy(resp.json))
-        return info
+        super(WpsPackageAppTest, cls).setUpClass()
 
     def test_cwl_label_as_process_title(self):
         title = "This process title comes from the CWL label"
@@ -1322,3 +1363,140 @@ class WpsPackageAppTest(unittest.TestCase):
     @pytest.mark.skip(reason="not implemented")
     def test_multi_outputs_file_from_wps_xml_reference(self):
         raise NotImplementedError
+
+
+@pytest.mark.functional
+class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
+    @classmethod
+    def setUpClass(cls):
+        cls.settings = {
+            "weaver.wps": True,
+            "weaver.wps_output": True,
+            "weaver.wps_output_path": "/wpsoutputs",
+            "weaver.wps_output_dir": "/tmp",  # nosec: B108 # don't care hardcoded for test
+            "weaver.wps_output_s3_bucket": "wps-output-test-bucket",
+            "weaver.wps_output_s3_region": MOCK_AWS_REGION,  # must match exactly, or mock will not work
+            "weaver.wps_path": "/ows/wps",
+            "weaver.wps_restapi_path": "/",
+        }
+        super(WpsPackageAppWithS3BucketTest, cls).setUpClass()
+
+    @mocked_aws_credentials
+    @mocked_aws_s3
+    def test_execute_application_package_process_with_bucket(self):
+        """
+        Test validates:
+            - Both S3 bucket and HTTP file references can be used simultaneously as inputs.
+            - Process results are uploaded to the configured S3 bucket.
+            - Process results are not accessible locally (not referenced as WPS-outputs URL, but as S3 reference).
+
+        .. note::
+            Input resolution will be different in case of `Workflow Process`, see :ref:`File Type References`.
+            This test is intended for `Application Process` executed locally as `CWL` package (script).
+        """
+        cwl = {
+            "cwlVersion": "v1.0",
+            "class": "CommandLineTool",
+            "baseCommand": "echo",
+            "arguments": ["$(runtime.outdir)"],
+            "requirements": {
+                "InitialWorkDirRequirement": {
+                    # directly copy files to output dir in order to retrieve them by glob
+                    "listing": [
+                        {"entry": "$(inputs.input_with_http)"},
+                        {"entry": "$(inputs.input_with_s3)"},
+                    ]
+                }
+            },
+            "hints": {CWL_REQUIREMENT_APP_BUILTIN: {}},  # ensure remote files are downloaded prior to CWL execution
+            "inputs": [
+                # regardless of reference type, they must be fetched as file before CWL call
+                {"id": "input_with_http", "type": "File"},
+                {"id": "input_with_s3", "type": "File"},
+            ],
+            "outputs": [
+                # both process result references will be S3 buckets, but CWL will see them as file on disk after fetch
+                # we simply forward the input to outputs using the same name for this test
+                # it is Weaver that does the S3 upload after process completed successfully
+                {"id": "output_from_http", "type": "File",
+                 "outputBinding": {"glob": "$(inputs.input_with_http.basename)"}},
+                {"id": "output_from_s3", "type": "File",
+                 "outputBinding": {"glob": "$(inputs.input_with_s3.basename)"}}
+            ]
+        }
+        body = {
+            "processDescription": {
+                "process": {"id": self._testMethodName}
+            },
+            "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
+            "executionUnit": [{"unit": cwl}],
+        }
+        self.deploy_process(body)
+
+        input_file_s3 = "input-s3.txt"
+        input_file_http = "media-types.txt"  # use some random HTTP location that actually exists (will be fetched)
+        test_http_ref = "https://www.iana.org/assignments/media-types/{}".format(input_file_http)
+        test_bucket_ref = mocked_aws_s3_bucket_test_file("wps-process-test-bucket", input_file_s3)
+        exec_body = {
+            "mode": EXECUTE_MODE_ASYNC,
+            "response": EXECUTE_RESPONSE_DOCUMENT,
+            "inputs": [
+                {"id": "input_with_http", "href": test_http_ref},
+                {"id": "input_with_s3", "href": test_bucket_ref},
+            ],
+            "outputs": [
+                {"id": "output_from_http", "transmissionMode": "reference"},
+                {"id": "output_from_s3", "transmissionMode": "reference"},
+            ]
+        }
+        with contextlib.ExitStack() as stack_proc:
+            for process in mocked_execute_process():
+                stack_proc.enter_context(process)
+            proc_url = "/processes/{}/jobs".format(self._testMethodName)
+            resp = mocked_sub_requests(self.app, "post_json", proc_url,
+                                       params=exec_body, headers=self.json_headers, only_local=True)
+            assert resp.status_code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(resp.status_code, resp.json)
+            status_url = resp.json["location"]
+            job_id = resp.json["jobID"]
+        monitor_timeout = 60
+        time.sleep(1)  # small delay to ensure process started
+        while monitor_timeout >= 0:
+            resp = self.app.get(status_url, headers=self.json_headers)
+            assert resp.status_code == 200
+            assert resp.json["status"] in [STATUS_RUNNING, STATUS_SUCCEEDED]
+            if resp.json["status"] == STATUS_SUCCEEDED:
+                break
+            time.sleep(2)
+        assert resp.json["status"] == STATUS_SUCCEEDED
+        resp = self.app.get("{}/result".format(status_url), headers=self.json_headers)
+        assert resp.status_code == 200
+
+        # check that outputs are S3 bucket references
+        output_values = {out["id"]: get_any_value(out) for out in resp.json["outputs"]}
+        output_bucket = self.settings["weaver.wps_output_s3_bucket"]
+        wps_uuid = self.job_store.fetch_by_id(job_id).wps_id
+        for out_key, out_file in [("output_from_s3", input_file_s3), ("output_from_http", input_file_http)]:
+            output_ref = "{}/{}/{}".format(output_bucket, wps_uuid, out_file)
+            output_ref_abbrev = "s3://{}".format(output_ref)
+            output_ref_full = "https://s3.{}.amazonaws.com/{}".format(MOCK_AWS_REGION, output_ref)
+            assert output_values[out_key] in [output_ref_abbrev, output_ref_full]  # allow any variant weaver can parse
+
+        # FIXME:
+        #   can validate manually that files exists in output bucket, but cannot seem to retrieve it here
+        #   problem due to fixture setup or moto limitation via boto3.resource interface used by pywps?
+        # check that outputs are indeed stored in S3 buckets
+        #   import boto3
+        #   mocked_s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
+        #   resp_json = mocked_s3.list_objects_v2(Bucket=output_bucket)
+        #   bucket_file_keys = [obj["Key"] for obj in resp_json["Contents"]]
+        #   for out_file in [input_file_s3, input_file_http]:
+        #       assert out_file in bucket_file_keys
+
+        # check that outputs are NOT copied locally, but that XML status does exist
+        # counter validate path with file always present to ensure outputs are not 'missing' just because of wrong dir
+        wps_outdir = self.settings["weaver.wps_output_dir"]
+        for out_file in [input_file_s3, input_file_http]:
+            assert not os.path.exists(os.path.join(wps_outdir, out_file))
+            assert not os.path.exists(os.path.join(wps_outdir, job_id, out_file))
+            assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, out_file))
+        assert os.path.isfile(os.path.join(wps_outdir, "{}.xml".format(job_id)))

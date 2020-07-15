@@ -25,7 +25,7 @@ from requests.exceptions import HTTPError as RequestsHTTPError
 from six.moves.urllib.parse import urlparse
 
 from tests.compat import contextlib
-from tests.utils import mocked_file_response
+from tests.utils import mocked_aws_credentials, mocked_aws_s3, mocked_aws_s3_bucket_test_file, mocked_file_response
 from weaver import status, utils
 from weaver.utils import _NullType  # noqa: W0212
 from weaver.utils import fetch_file, get_request_options, get_ssl_verify_option, make_dirs, null, request_extra
@@ -338,31 +338,6 @@ def test_bytes2str():
     assert utils.bytes2str(u"test-unicode") == u"test-unicode"
 
 
-def test_fetch_file_local_with_protocol():
-    """
-    Test function :func:`weaver.utils.fetch_file` when the reference is a pre-fetched local file.
-    """
-    tmp_dir = tempfile.gettempdir()
-    with tempfile.NamedTemporaryFile(dir=tmp_dir, mode="w", suffix=".json") as tmp_json:
-        tmp_data = {"message": "fetch-file-protocol"}
-        tmp_json.write(json.dumps(tmp_data))
-        tmp_json.seek(0)
-        tmp_name = os.path.split(tmp_json.name)[-1]
-        res_dir = os.path.join(tmp_dir, inspect.currentframe().f_code.co_name)
-        res_path = os.path.join(res_dir, tmp_name)
-        try:
-            make_dirs(res_dir, exist_ok=True)
-            for protocol in ["", "file://"]:
-                tmp_path = protocol + tmp_json.name
-                fetch_file(tmp_path, res_dir)
-                assert os.path.isfile(res_path), "File [{}] should be accessible under [{}]".format(tmp_path, res_path)
-                assert json.load(open(res_path)) == tmp_data, "File should be properly copied/referenced from original"
-        except Exception:
-            raise
-        finally:
-            shutil.rmtree(res_dir, ignore_errors=True)
-
-
 def test_get_ssl_verify_option():
     assert get_ssl_verify_option("get", "http://test.com", {}) is True
     assert get_ssl_verify_option("get", "http://test.com", {"weaver.ssl_verify": False}) is False
@@ -405,6 +380,21 @@ def test_get_ssl_verify_option():
     }) is False
 
 
+def test_request_extra_allowed_codes():
+    """Verifies that ``allowed_codes`` only are considered as valid status instead of any non-error HTTP code."""
+    mocked_codes = {"codes": [HTTPCreated.code, HTTPOk.code, HTTPCreated.code]}  # note: used in reverse order
+
+    def mocked_request(*args, **kwargs):  # noqa: E811
+        mocked_resp = Response()
+        mocked_resp.status_code = mocked_codes["codes"].pop()
+        return mocked_resp
+
+    with mock.patch("requests.Session.request", side_effect=mocked_request) as mocked:
+        resp = request_extra("get", "http://whatever", retries=3, allowed_codes=[HTTPOk.code])
+        assert resp.status_code == HTTPOk.code
+        assert mocked.call_count == 2
+
+
 def test_get_request_options():
     assert get_request_options("get", "http://test.com", {
         "weaver.request_options": {"requests": [
@@ -431,21 +421,6 @@ def test_get_request_options():
     }) == {"timeout": 30}
 
 
-def test_request_extra_allowed_codes():
-    """Verifies that ``allowed_codes`` only are considered as valid status instead of any non-error HTTP code."""
-    mocked_codes = {"codes": [HTTPCreated.code, HTTPOk.code, HTTPCreated.code]}  # note: used in reverse order
-
-    def mocked_request(*args, **kwargs):  # noqa: E811
-        mocked_resp = Response()
-        mocked_resp.status_code = mocked_codes["codes"].pop()
-        return mocked_resp
-
-    with mock.patch("requests.Session.request", side_effect=mocked_request) as mocked:
-        resp = request_extra("get", "http://whatever", retries=3, allowed_codes=[HTTPOk.code])
-        assert resp.status_code == HTTPOk.code
-        assert mocked.call_count == 2
-
-
 def test_request_extra_intervals():
     """Verifies that ``intervals`` are used for calling the retry operations instead of ``backoff``/``retries``."""
 
@@ -454,20 +429,52 @@ def test_request_extra_intervals():
         m_resp.status_code = HTTPNotFound.code
         return m_resp
 
+    sleep_counter = {"called_count": 0, "called_with": []}
+
     def mock_sleep(delay):  # noqa: E811
-        return
+        if delay > 1e5:
+            sleep_counter["called_count"] += 1
+            sleep_counter["called_with"].append(delay)
 
     with mock.patch("requests.Session.request", side_effect=mock_request) as mocked_request:
-        with mock.patch("weaver.utils.time.sleep", side_effect=mock_sleep) as mocked_sleep:
+        with mock.patch("weaver.utils.time.sleep", side_effect=mock_sleep):
             intervals = [1e6, 3e6, 5e6]  # random values that shouldn't normally be used with sleep() (too big)
             # values will not match if backoff/retries are not automatically corrected by internals parameter
             resp = request_extra("get", "http://whatever", only_server_errors=False,
                                  intervals=intervals, backoff=1000, retries=10)
             assert resp.status_code == HTTPGatewayTimeout.code
-            assert mocked_request.call_count == 4
-            # NOTE: below could fail if using debugger/breakpoints that uses more calls to sleep()
-            assert mocked_sleep.call_count == 3
-            mocked_sleep.assert_has_calls([mock.call(i) for i in intervals])
+            assert mocked_request.call_count == 4  # first called directly, then 3 times, one for each interval
+            # WARNING:
+            #   cannot safely use mock counter since everything can increase it
+            #   notably debugger/breakpoints that uses more calls to sleep()
+            #   instead use our custom counter that employs unrealistic values
+            assert sleep_counter["called_count"] == 3  # first direct call doesn't have any sleep interval
+            assert all(called == expect for called, expect in zip(sleep_counter["called_with"], intervals))
+
+
+def test_fetch_file_local_with_protocol():
+    """
+    Test function :func:`weaver.utils.fetch_file` when the reference is a pre-fetched local file.
+    """
+    tmp_dir = tempfile.gettempdir()
+    with tempfile.NamedTemporaryFile(dir=tmp_dir, mode="w", suffix=".json") as tmp_json:
+        tmp_data = {"message": "fetch-file-protocol"}
+        tmp_json.write(json.dumps(tmp_data))
+        tmp_json.seek(0)
+        tmp_name = os.path.split(tmp_json.name)[-1]
+        res_dir = os.path.join(tmp_dir, inspect.currentframe().f_code.co_name)
+        res_path = os.path.join(res_dir, tmp_name)
+        try:
+            make_dirs(res_dir, exist_ok=True)
+            for protocol in ["", "file://"]:
+                tmp_path = protocol + tmp_json.name
+                fetch_file(tmp_path, res_dir)
+                assert os.path.isfile(res_path), "File [{}] should be accessible under [{}]".format(tmp_path, res_path)
+                assert json.load(open(res_path)) == tmp_data, "File should be properly copied/referenced from original"
+        except Exception:
+            raise
+        finally:
+            shutil.rmtree(res_dir, ignore_errors=True)
 
 
 def test_fetch_file_remote_with_request():
@@ -511,3 +518,18 @@ def test_fetch_file_remote_with_request():
             raise
         finally:
             shutil.rmtree(res_dir, ignore_errors=True)
+
+
+@mocked_aws_credentials
+@mocked_aws_s3
+def test_fetch_file_remote_s3_bucket():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        test_file_name = "test-file.txt"
+        test_file_data = "dummy file"
+        test_bucket_name = "test-fake-bucket"
+        test_bucket_ref = mocked_aws_s3_bucket_test_file(test_bucket_name, test_file_name, test_file_data)
+        result = fetch_file(test_bucket_ref, tmpdir)
+        assert result == os.path.join(tmpdir, test_file_name)
+        assert os.path.isfile(result)
+        with open(result, mode="r") as test_file:
+            assert test_file.read() == test_file_data

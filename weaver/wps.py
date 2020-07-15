@@ -44,7 +44,7 @@ def _get_settings_or_wps_config(container,                  # type: AnySettingsC
     found = settings.get(weaver_setting_name)
     if not found:
         if not settings.get("weaver.wps_configured"):
-            load_pywps_cfg(container)
+            load_pywps_config(container)
         found = pywps_config.CONFIG.get(config_setting_section, config_setting_name)
     if not isinstance(found, six.string_types):
         LOGGER.warning("%s not set in settings or WPS configuration, using default value.", message_not_found)
@@ -177,7 +177,7 @@ def check_wps_status(url=None, response=None, sleep_secs=2, verify=True, setting
     return execution
 
 
-def load_pywps_cfg(container, config=None):
+def load_pywps_config(container, config=None):
     # type: (AnySettingsContainer, Optional[Union[AnyStr, Dict[AnyStr, AnyStr]]]) -> ConfigParser
     """
     Loads and updates the PyWPS configuration using Weaver settings.
@@ -189,11 +189,12 @@ def load_pywps_cfg(container, config=None):
 
     LOGGER.info("Initial load of internal Weaver WPS configuration.")
     pywps_config.load_configuration([])  # load defaults
-    # must be set to INFO to disable sqlalchemy trace.
-    # see : https://github.com/geopython/pywps/blob/master/pywps/dblog.py#L169
+    pywps_config.CONFIG.set("logging", "db_echo", "false")
     if logging.getLevelName(pywps_config.CONFIG.get("logging", "level")) <= logging.DEBUG:
         pywps_config.CONFIG.set("logging", "level", "INFO")
+
     # update metadata
+    LOGGER.debug("Updating WPS metadata configuration.")
     for setting_name, setting_value in settings.items():
         if setting_name.startswith("weaver.wps_metadata"):
             pywps_setting = setting_name.replace("weaver.wps_metadata_", "")
@@ -204,7 +205,6 @@ def load_pywps_cfg(container, config=None):
     if weaver_mode not in wps_keywords:
         wps_keywords += ("," if wps_keywords else "") + weaver_mode
         pywps_config.CONFIG.set("metadata:main", "identification_keywords", wps_keywords)
-
     # add additional config passed as dictionary of {'section.key': 'value'}
     if isinstance(config, dict):
         for key, value in config.items():
@@ -214,6 +214,7 @@ def load_pywps_cfg(container, config=None):
         if isinstance(settings.get("PYWPS_CFG"), dict):
             del settings["PYWPS_CFG"]
 
+    LOGGER.debug("Updating WPS output configuration.")
     # find output directory from app config or wps config
     if "weaver.wps_output_dir" not in settings:
         output_dir = pywps_config.get_config_value("server", "outputpath")
@@ -221,8 +222,8 @@ def load_pywps_cfg(container, config=None):
     # ensure the output dir exists if specified
     output_dir = get_wps_output_dir(settings)
     make_dirs(output_dir, exist_ok=True)
-
     # find output url from app config (path/url) or wps config (url only)
+    # note: needs to be configured even when using S3 bucket since XML status is provided locally
     if "weaver.wps_output_url" not in settings:
         output_path = settings.get("weaver.wps_output_path", "")
         if isinstance(output_path, six.string_types):
@@ -230,11 +231,41 @@ def load_pywps_cfg(container, config=None):
         else:
             output_url = pywps_config.get_config_value("server", "outputurl")
         settings["weaver.wps_output_url"] = output_url
-
     # apply workdir if provided, otherwise use default
     if "weaver.wps_workdir" in settings:
         make_dirs(settings["weaver.wps_workdir"], exist_ok=True)
         pywps_config.CONFIG.set("server", "workdir", settings["weaver.wps_workdir"])
+
+    # configure S3 bucket if requested, storage of all process outputs
+    # note:
+    #   credentials and default profile are picked up automatically by 'boto3' from local AWS configs or env vars
+    #   region can also be picked from there unless explicitly provided by weaver config
+    # warning:
+    #   if we set `(server, storagetype, s3)`, ALL status (including XML) are stored to S3
+    #   to preserve status locally, we set 'file' and override the storage instance during output rewrite in WpsPackage
+    #   we can still make use of the server configurations here to make this overridden storage auto-find its configs
+    s3_bucket = settings.get("weaver.wps_output_s3_bucket")
+    pywps_config.CONFIG.set("server", "storagetype", "file")
+    # pywps_config.CONFIG.set("server", "storagetype", "s3")
+    if s3_bucket:
+        LOGGER.debug("Updating WPS S3 bucket configuration.")
+        import boto3
+        from botocore.exceptions import ClientError
+        s3 = boto3.client("s3")
+        s3_region = settings.get("weaver.wps_output_s3_region", s3.meta.region_name)
+        LOGGER.info("Validating that S3 [Bucket=%s, Region=%s] exists or creating it.", s3_bucket, s3_region)
+        try:
+            s3.create_bucket(Bucket=s3_bucket, CreateBucketConfiguration={"LocationConstraint": s3_region})
+            LOGGER.info("S3 bucket for WPS output created.")
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") != "BucketAlreadyExists":
+                LOGGER.error("Failed setup of S3 bucket for WPS output: [%s]", exc)
+                raise
+            LOGGER.info("S3 bucket for WPS output already exists.")
+        pywps_config.CONFIG.set("s3", "region", s3_region)
+        pywps_config.CONFIG.set("s3", "bucket", s3_bucket)
+        pywps_config.CONFIG.set("s3", "public", "false")  # don't automatically push results as publicly accessible
+        pywps_config.CONFIG.set("s3", "encrypt", "true")  # encrypts data server-side, transparent from this side
 
     # enforce back resolved values onto PyWPS config
     pywps_config.CONFIG.set("server", "setworkdir", "true")
@@ -258,7 +289,7 @@ def pywps_view(environ, start_response):
         settings = get_settings(app)
         pywps_cfg = environ.get("PYWPS_CFG") or settings.get("PYWPS_CFG") or os.getenv("PYWPS_CFG")
         if not isinstance(pywps_cfg, ConfigParser) or not settings.get("weaver.wps_configured"):
-            load_pywps_cfg(app, config=pywps_cfg)
+            load_pywps_config(app, config=pywps_cfg)
 
         # call pywps application with processes filtered according to the adapter"s definition
         process_store = get_db(app).get_store(StoreProcesses)

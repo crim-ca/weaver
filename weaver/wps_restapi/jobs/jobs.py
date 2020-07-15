@@ -39,7 +39,7 @@ def get_job(request):
     Obtain a job from request parameters.
 
     :returns: Job information if found.
-    :raises: HTTPNotFound with JSON body details on missing/non-matching job, process, provider IDs.
+    :raise HTTPNotFound: with JSON body details on missing/non-matching job, process, provider IDs.
     """
     job_id = request.matchdict.get("job_id")
     store = get_db(request).get_store(StoreJobs)
@@ -202,7 +202,7 @@ def get_results(job, container):
     for result in job.results:
         rtype = "data" if any(k in result for k in ["data", "value"]) else "href"
         value = get_any_value(result)
-        if rtype == "href":
+        if rtype == "href" and "://" not in value:
             value = wps_url + str(value).lstrip("/")
         outputs.append({"id": get_any_id(result), rtype: value})
     return {"outputs": outputs}

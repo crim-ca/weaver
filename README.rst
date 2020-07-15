@@ -99,7 +99,7 @@ in a *EMS* workflow execution chain.
 adding more process management request options than required by the standard, and supporting *remote providers* to name
 a few. Because of this, not all features offered in `Weaver` are guaranteed to be applicable on other similarly
 behaving `ADES` and/or `EMS` instances. The reference specification is tracked to preserve the minimal conformance
-requirements and provide feedback to |ogc|_ in this effect.
+requirements and provide feedback to |ogc|_ (OGC) in this effect.
 
 Weaver can be launched either as an `EMS` or an `ADES` according to configuration values it is deployed with.
 For more details, see `Configuration`_ and `Documentation`_ sections.

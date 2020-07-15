@@ -12,6 +12,7 @@ from copy import deepcopy
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+import boto3
 import pytz
 import requests
 import six
@@ -41,6 +42,13 @@ if TYPE_CHECKING:
     from typing import Union, Any, Dict, List, AnyStr, Iterable, Optional, Type                 # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
+
+SUPPORTED_FILE_SCHEMES = frozenset([
+    "file",
+    "http",
+    "https",
+    "s3"
+])
 
 
 class _Singleton(type):
@@ -717,24 +725,34 @@ def request_extra(method,                       # type: AnyStr
 def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
     # type: (AnyStr, AnyStr, Optional[AnySettingsContainer], **Any) -> AnyStr
     """
-    Fetches a file from a local path or remote URL and dumps it's content to the specified output directory.
+    Fetches a file from a local path, an AWS-S3 bucket or remote URL, and dumps it's content to the specified output
+    directory.
 
     The output directory is expected to exist prior to this function call.
+    The file reference scheme (protocol) determines from where to fetch the content.
+    Output file name and extension will be the same as the original.
+    Requests will consider ``weaver.request_options`` when using ``http(s)://`` scheme.
 
-    :param file_reference: Local filesystem path or remote URL file reference.
-    :param file_outdir: Output directory path of the fetched file.
-    :param settings: Additional request setting details from the application configuration.
+    :param file_reference:
+        Local filesystem path (optionally prefixed with ``file://``), ``s3://`` bucket location or ``http(s)://``
+        remote URL file reference. Reference ``https://s3.[...]`` are also considered as ``s3://``.
+    :param file_outdir: Output local directory path under which to place the fetched file.
+    :param settings: Additional request-related settings from the application configuration (notably request-options).
     :param request_kwargs: Additional keywords to forward to request call (if needed).
     :return: Path of the local copy of the fetched file.
+    :raises HTTPException: applicable HTTP-based exception if any occurred during the operation.
+    :raises ValueError: when the reference scheme cannot be identified.
     """
     file_href = file_reference
-    file_path = os.path.join(file_outdir, os.path.basename(file_reference))
+    file_name = os.path.basename(file_reference)
+    file_path = os.path.join(file_outdir, file_name)
     if file_reference.startswith("file://"):
         file_reference = file_reference[7:]
     LOGGER.debug("Fetch file resolved:\n"
                  "  Reference: [%s]\n"
                  "  File Path: [%s]", file_href, file_path)
     if os.path.isfile(file_reference):
+        LOGGER.debug("Fetch file resolved as local reference.")
         # NOTE:
         #   If file is available locally and referenced as a system link, disabling follow symlink
         #   creates a copy of the symlink instead of an extra hard-copy of the linked file.
@@ -744,7 +762,27 @@ def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
             os.symlink(os.readlink(file_reference), file_path)
         else:
             shutil.copyfile(file_reference, file_path)
-    else:
+    elif file_reference.startswith("s3://"):
+        LOGGER.debug("Fetch file resolved as S3 bucket reference.")
+        s3 = boto3.resource("s3")
+        bucket_name, file_key = file_reference[5:].split("/", 1)
+        bucket = s3.Bucket(bucket_name)
+        bucket.download_file(file_key, file_path)
+    elif file_reference.startswith("http"):
+        if file_reference.startswith("https://s3."):
+            s3 = boto3.resource("s3")
+            # endpoint in the form: "https://s3.[region-name.]amazonaws.com/<bucket>/<file-key>"
+            if not file_reference.startswith(s3.meta.endpoint_url):
+                LOGGER.warning("Detected HTTP file reference to AWS S3 bucket that mismatches server configuration. "
+                               "Will consider it as plain HTTP with read access.")
+            else:
+                file_ref_updated = "s3://{}".format(file_reference.replace(s3.meta.endpoint_url, ""))
+                LOGGER.debug("Adjusting file reference to S3 shorthand for further parsing:\n"
+                             "  Initial: [%s]\n"
+                             "  Updated: [%s]", file_reference, file_ref_updated)
+                return fetch_file(file_ref_updated, file_outdir, settings=settings, **request_kwargs)
+
+        LOGGER.debug("Fetch file resolved as remote URL reference.")
         request_kwargs.pop("stream", None)
         with open(file_path, "wb") as file:
             resp = request_extra("get", file_reference, stream=True, retries=3, settings=settings, **request_kwargs)
@@ -755,6 +793,11 @@ def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
             #   available memory. Without this, it defaults to 1 which is extremely slow.
             for chunk in resp.iter_content(chunk_size=None):
                 file.write(chunk)
+    else:
+        scheme = file_reference.split("://")
+        scheme = "<none>" if len(scheme) < 2 else scheme[0]
+        raise ValueError("Unresolved fetch file scheme: '{!s}', supported: {}"
+                         .format(scheme, list(SUPPORTED_FILE_SCHEMES)))
     LOGGER.debug("Fetch file written")
     return file_path
 

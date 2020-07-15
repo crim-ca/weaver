@@ -151,9 +151,9 @@ For *traditional* WPS-1 process type, Weaver adds default values to CWL definiti
             }}),
     ])
 
-In ESGF-CWT, `ESGF-CWTRequirement` hint is used instead of default `WPS1Requirement`, contained in the
+In `ESGF-CWT`, ``ESGF-CWTRequirement`` hint is used instead of default ``WPS1Requirement``, contained in the
 :py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_WPS1` variable up here. The handling of this technicality is
-handled in :mod:`weaver/processes/wps_package.py`. We can define ESGF-CWT processes using this syntax:
+handled in :mod:`weaver/processes/wps_package.py`. We can define `ESGF-CWT` processes using this syntax:
 
 .. code-block:: json
 
@@ -197,7 +197,7 @@ appropriate step and message where the error occurred.
 Remote Provider
 --------------------
 
-Remote provider correspond to a remote service that provides similar interfaces as supported by `Weaver` (WPS-like).
+Remote provider correspond to a remote service that provides similar interfaces as supported by `Weaver` (`WPS`-like).
 For example, a remote WPS-1 XML endpoint can be referenced as a provider. When an API `Providers`_-scoped request is
 executed, for example to list is processes capabilities (see `GetCapabilities`_), `Weaver` will send the corresponding
 request using the registered reference URL to access the remote server and reply with parsed response, as if they
@@ -332,7 +332,9 @@ that define the process references and expected inputs/outputs.
 Execution of a process (Execute)
 ---------------------------------------------------------------------
 
-Process execution (i.e.: submitting a job) is accomplished using the |exec-req|_ request.
+Process execution (i.e.: submitting a job) is accomplished using the |exec-req|_ request. This section will first
+describe the basics of this request format, and after go into details for specific use cases and parametrization of
+various input/output combinations.
 
 .. todo:: detail execute I/O (basic example)
 
@@ -353,19 +355,171 @@ Workflow Operations
 .. todo:: same as prev + 'operations' (deploy, visibility, exec-remote for each step)
 
 
+File Reference Types
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+Most inputs can be categorized into two of the most commonly employed types, namely ``LiteralData`` and ``ComplexData``.
+The former represents basic values such as integers or strings, while the other represents a file reference.
+Files in `Weaver` (and `WPS` in general) can be specified with any ``formats`` as MIME-type.
+
+.. seealso::
+    - :ref:`Correspondance between CWL and WPS fields`
+
+As for *standard* `WPS`, remote file references are *usually* limited to ``http(s)`` scheme, unless the process takes
+an input string and parses the unusual reference from the literal data to process it by itself. On the other hand,
+`Weaver` supports all following reference schemes.
+
+- |http_scheme|
+- |file_scheme|
+- |os_scheme| [experimental]
+- |s3_scheme| [experimental]
+
+The method in which `Weaver` will handle such references depends on its configuration, in other words, whether it is
+running as `ADES` or `EMS` (see: :ref:`Configuration`), as well as depending on some other ``CWL`` package requirements.
+These use-cases are described below.
+
+.. warning::
+    Missing schemes in URL reference are considered identical as if ``file://`` was used. In most cases, if not always,
+    an execution request should not employ this scheme unless the file is ensured to be at the specific location where
+    the running `Weaver` application can find it. This scheme is usually only employed as byproduct of the fetch
+    operation that `Weaver` uses to provide the file locally to underlying `CWL` application package to be executed.
+
+When `Weaver` is able to figure out that the process needs to be executed locally in `ADES` mode, it will fetch all
+necessary files prior to process execution in order to make them available to the `CWL` package. When `Weaver` is in
+`EMS` configuration, it will **always** forward the references (regardless of scheme) exactly as provided as input
+of the process execution request, since it assumes it needs to dispatch the execution to another `ADES` remote server,
+and therefore only needs to verify that the file reference is reachable remotely. In this case, it becomes the
+responsibility of this remote instance to handle the reference appropriately. This also avoids potential problems such
+as if `Weaver` as `EMS` doesn't have authorized access to a link that only the target `ADES` would have access to.
+
+When ``CWL`` package defines ``WPS1Requirement`` under ``hints`` for corresponding `WPS-1/2`_ remote processes being
+monitored by `Weaver`, it will skip fetching of ``http(s)``-based references since that would otherwise lead to useless
+double downloads (one on `Weaver` and the other on the `WPS` side). It is the same in case of ``ESGF-CWTRequirement``
+employed for `ESGF-CWT`_ processes. Because these processes do not normally
+
+.. note::
+    When `Weaver` is fetching remote files with |http_scheme|, it can take advantage of additional request options to
+    support unusual or server-specific handling of remote reference as necessary. This could be employed for instance
+    to attribute access permissions only to some given `ADES` server by providing additional authorization tokens to
+    the requests. Please refer to :ref:`Configuration of Request Options` for this matter.
+
+When using `S3` references, `Weaver` will attempt to retrieve the file using server configuration and credentials.
+Provided that the corresponding `S3` bucket can be accessed by the running `Weaver` application, it will fetch the file
+and store it locally temporarily for ``CWL`` execution.
+
+.. note::
+    When using `S3` buckets, authorization are handled through typical `AWS` credentials and role permissions. This
+    means that `AWS` access must be granted to the application in order to allow it fetching the file. There are also
+    different formats of `S3` reference formats handled by `Weaver`.
+    Please refer to :ref:`Configuration of AWS S3 Buckets` for more details.
+
+When using `OpenSearch` references, additional parameters are necessary to handle retrieval of specific file URL.
+Please refer to :ref:`OpenSearch Data Source` for more details.
+
+Following table summarize the default behaviour of input file reference handling of different situations when received
+as input argument of process execution. For simplification, keyword *<any>* is used to indicate that any other value in
+the corresponding column can be substituted for a given row when applied with conditions of other columns, which results
+to same operational behaviour. Elements that behave similarly are also presented together in rows to reduce displayed
+combinations.
+
++-----------+-------------------------------+---------------+-------------------------------------------+
+| |cfg|     | Process Type                  | File Scheme   | Applied Operation                         |
++===========+===============================+===============+===========================================+
+| *<any>*   | *<any>*                       | |os_scheme|   | Query and re-process [#openseach]_        |
++-----------+-------------------------------+---------------+-------------------------------------------+
+| `ADES`    | - `WPS-1/2`_                  | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
+|           | - `ESGF-CWT`_                 +---------------+-------------------------------------------+
+|           | - `WPS-REST`_ [#wps3]_        | |http_scheme| | Nothing (left unmodified)                 |
+|           | - `Remote Provider`_          +---------------+-------------------------------------------+
+|           |                               | |s3_scheme|   | Fetch and convert to |http_scheme| [#s3]_ |
+|           +-------------------------------+---------------+-------------------------------------------+
+|           | `WPS-REST`_ (`CWL`) [#wps3]_  | |file_scheme| | Nothing (file already local)              |
+|           |                               +---------------+-------------------------------------------+
+|           |                               | |http_scheme| | Fetch and convert to |file_scheme|        |
+|           |                               +---------------+                                           |
+|           |                               | |s3_scheme|   |                                           |
++-----------+-------------------------------+---------------+-------------------------------------------+
+| `EMS`     | - *<any>*                     | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
+|           | - `Workflow`_ (`CWL`) [#wf]_  +---------------+-------------------------------------------+
+|           |                               | |http_scheme| | Nothing (left unmodified)                 |
+|           |                               +---------------+                                           |
+|           |                               | |s3_scheme|   |                                           |
++-----------+-------------------------------+---------------+-------------------------------------------+
+
+.. |cfg| replace:: Configuration
+.. |os_scheme| replace:: ``opensearchfile://``
+.. |http_scheme| replace:: ``http(s)://``
+.. |s3_scheme| replace:: ``s3://``
+.. |file_scheme| replace:: ``file://``
+
+.. rubric:: Footnotes
+
+.. [#openseach]
+    References defined by ``opensearch://`` will trigger an `OpenSearch` query using the provided URL as
+    well as other input additional parameters (see :ref:`OpenSearch Data Source`). After processing of this query,
+    retrieved file references will be re-processed using the summarized logic in the table for the given use case.
+
+.. [#file2http]
+    When a ``file://`` (or empty scheme) maps to a local file that needs to be exposed externally for
+    another remote process, the conversion to ``http(s)://`` scheme employs setting ``weaver.wps_outputs_url`` to form
+    the result URL reference. The file is placed in ``weaver.wps_outputs_dir`` to expose it as HTTP(S) endpoint.
+
+.. [#wps3]
+    When the process refers to a remote `WPS-REST` process (i.e.: remote `WPS` instance that supports
+    REST bindings but that is not necessarily an `ADES`), `Weaver` simply *wraps* and monitor its remote execution,
+    therefore files are handled just as for any other type of remote `WPS`-like servers. When the process contains an
+    actual `CWL` :ref:`Application Package` that defines a ``CommandLineTool`` (including docker images), files are
+    fetched as it will be executed locally. See :ref:`CWL CommandLineTool`, :ref:`WPS-REST` and :ref:`Remote Providers`
+    for further details.
+
+.. [#s3]
+    When an ``s3://`` file is fetched, is gets downloaded to a temporary ``file://`` location, which is **NOT**
+    necessarily exposed as ``http(s)://``. If execution is transferred to a remove process that is expected to not
+    support `S3` references, only then the file gets converted as in [#file2http]_.
+
+.. [#wf]
+    Workflows are only available on `EMS` instances. Since they chain processes, no fetch is needed as the first
+    sub-step process will do it instead. See `section about workflows <workflows>`_ as well as :ref:`CWL Workflow` for
+    more details.
+
+.. todo::
+    method to indicate explicit fetch to override these? (https://github.com/crim-ca/weaver/issues/183)
+
+.. todo::
+    add tests that validate each combination of operation
+
+
+OpenSearch Data Source
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. todo:: EOImage with AOI/TOI/CollectionId for OpenSearch
 
 Multiple Inputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. todo:: repeating IDs example for WPS multi-inputs
 
+.. seealso::
+    - :ref:`Multiple and Optional Values`
 
 Multiple Outputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: unsupported + issue ref
+Although ``CWL`` allows output arrays, ``WPS`` does not support it directly, as only single values are allowed for
+``WPS`` outputs according to original specification. To work around this, |metalink|_ files can be used to provide
+a single output reference that embeds other references. This approach is also employed and preferred as described
+in |pywps-multi-output|_.
 
+.. todo:: fix doc when Multiple Output is supported with metalink (https://github.com/crim-ca/weaver/issues/25)
+.. todo:: add example of multi-output process definition
+.. todo:: and how CWL maps them with WPS
+
+.. warning::
+    This feature is being worked on (`Weaver Issue #25 <https://github.com/crim-ca/weaver/issues/25>`_).
+    Direct support between
+
+.. seealso::
+    - :ref:`Multiple and Optional Values`
 
 Email Notification
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -392,6 +546,17 @@ Obtaining output results, logs or errors
 .. todo::
     job logs/exceptions body example
 
+Any job executed on `Weaver` will provide minimal log information, such as process job setup, moment when it started
+execution and final status. The extent of other log entries will more often than not depend on the verbosity of the
+underlying process being executed. When executing an `Application Package`, `Weaver` tries as best as possible to
+collect standard output and error steams to report them through log and exception lists.
+
+Since `Weaver` can only report as much details as provided by the running application, it is recommended to provide
+progressive status updates when developing applications in order to help understand problematic steps in event of
+process execution failures. In the case of remote `WPS` processes monitored by `Weaver`, this means gradually reporting
+process status updates (e.g.: calling ``WPSResponse.update_status`` if you are using |pywps|_, see: |pywps-status|_),
+using ``print`` and/or ``logging`` operation in scripts or docker images executed through `CWL` ``CommandLineTool``,
+etc.
 
 .. note::
     Job logs and exceptions are a `Weaver`-specific implementation. They are not part of traditional |ogc-proc-api|_.
@@ -400,10 +565,16 @@ Obtaining output results, logs or errors
 Special Weaver EMS use-cases
 ==================================================
 
-OpenSearch data source
+This section highlight the additional behaviour available only through an `EMS`-configured `Weaver` instance.
+Some other points are already described in other sections, but are briefly indicated here for conciseness.
+
+ADES dispatching using Data Sources
 --------------------------------------
 
-.. todo:: EOImage with AOI/TOI/CollectionId for OpenSearch
+
+.. todo:: add details, data-source defines where to send request of *known* ADES
+.. todo:: reference config ``weaver.data_sources``
+
 
 Workflow (Chaining Step Processes)
 --------------------------------------
@@ -413,4 +584,5 @@ Workflow (Chaining Step Processes)
 .. seealso::
 
     - :ref:`CWL Workflow`
+    - `Workflow Process Type <Workflow>`_
 

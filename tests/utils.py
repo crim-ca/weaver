@@ -2,12 +2,15 @@
 Utility methods for various TestCase setup operations.
 """
 import os
+import tempfile
 import uuid
 import warnings
 from inspect import isclass
 from typing import TYPE_CHECKING
 
+# Note: do NOT import 'boto3' here otherwise 'moto' will not be able to mock it effectively
 import mock
+import moto
 import pyramid_celery
 import six
 from pyramid import testing
@@ -24,14 +27,17 @@ from weaver.database import get_db
 from weaver.datatype import Service
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_XML
 from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
-from weaver.utils import get_url_without_query, null
+from weaver.utils import get_url_without_query, get_weaver_url, null
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 from weaver.wps_restapi.processes.processes import execute_process
 
 if TYPE_CHECKING:
+    import botocore.client  # noqa
     from weaver.typedefs import (  # noqa: F401
         Any, AnyResponseType, AnyStr, Callable, List, Optional, SettingsType, Type, Union
     )
+
+MOCK_AWS_REGION = "us-central-1"
 
 
 def ignore_warning_regex(func, warning_message_regex, warning_categories=DeprecationWarning):
@@ -90,6 +96,7 @@ def setup_config_from_settings(settings=None):
 
 def setup_config_with_mongodb(config=None, settings=None):
     # type: (Optional[Configurator], Optional[SettingsType]) -> Configurator
+    """Prepares the configuration in order to allow calls to a ``MongoDB`` test database."""
     settings = settings or {}
     settings.update({
         "mongodb.host":     os.getenv("WEAVER_TEST_DB_HOST", "127.0.0.1"),      # noqa: E241
@@ -135,6 +142,7 @@ def setup_mongodb_jobstore(config=None):
 
 def setup_config_with_pywps(config):
     # type: (Configurator) -> Configurator
+    """Prepares the ``PyWPS`` interface, usually needed to call the WPS route (not API), or when executing processes."""
     # flush any PyWPS config (global) to make sure we restart from clean state
     import pywps.configuration  # isort: skip
     pywps.configuration.CONFIG = None
@@ -148,6 +156,17 @@ def setup_config_with_pywps(config):
 
 def setup_config_with_celery(config):
     # type: (Configurator) -> Configurator
+    """Prepares the configuration to define ``Celery`` settings needed to execute processes from mocked
+    :class:`webtest.TestApp` application.
+
+    This is also needed when using :func:`mocked_execute_process` since it will prepare underlying ``Celery``
+    application object, multiple of its settings and the database connection reference, although ``Celery`` worker
+    still *wouldn't actually be running*. This is because :class:`celery.app.Celery` is often employed in the code
+    to retrieve ``Weaver`` settings from it when the process is otherwise executed by a worker.
+
+    .. seealso::
+        - :func:`mocked_execute_process`
+    """
     settings = config.get_settings()
 
     # override celery loader to specify configuration directly instead of ini file
@@ -258,21 +277,40 @@ def mocked_file_response(path, url):
     return resp
 
 
-def mocked_sub_requests(app, function, *args, **kwargs):
-    # type: (TestApp, AnyStr, *Any, **Any) -> AnyResponseType
+def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
+    # type: (TestApp, AnyStr, *Any, bool, **Any) -> AnyResponseType
     """
     Executes ``app.function(*args, **kwargs)`` with a mock of every underlying :func:`requests.request` call
     to relay their execution to the :class:`webTest.TestApp`.
 
     Generates a `fake` response from a file if the URL scheme is ``mock://``.
-    """
 
-    def mocked_app_request(method, url=None, headers=None, verify=None, cert=None, **req_kwargs):  # noqa: E811
+    Executes the *real* request if :paramref:`only_local` is ``True`` and that the request URL (expected as first
+    argument of :paramref:`args`) doesn't correspond to the base URL of :paramref:`app`.
+
+    :param app: application employed for the test
+    :param function: test application method to call (i.e.: ``post``, ``post_json``, ``get``, etc.)
+    :param only_local:
+        When ``True``, only mock requests targeted at :paramref:`app` based on request URL hostname (ignore external).
+        Otherwise, mock every underlying request regardless of hostname, including ones not targeting the application.
+    """
+    from requests.sessions import Session as RealSession
+    real_request = RealSession.request
+
+    def mocked_app_request(method, url=None, **req_kwargs):
         """
-        Request corresponding to :func:`requests.request` that instead gets executed by :class:`webTest.TestApp`.
+        Request corresponding to :func:`requests.request` that instead gets executed by :class:`webTest.TestApp`,
+        unless permitted to call real external requests.
         """
+        # if URL starts with '/' directly, it is the shorthand path for this test app, always mock
+        # otherwise, filter according to full URL hostname
+        url_test_app = get_weaver_url(app.app.registry)
+        if only_local and not url.startswith("/") and not url.startswith(url_test_app):
+            with RealSession() as session:
+                return real_request(session, method, url, **req_kwargs)
+
         method = method.lower()
-        headers = headers or req_kwargs.get("headers")
+        headers = req_kwargs.get("headers")
         req = getattr(app, method)
         url = req_kwargs.get("base_url", url)
         query = req_kwargs.get("params")
@@ -306,7 +344,8 @@ def mocked_execute_process():
     **Note**: since ``delay`` and ``Celery`` are bypassed, the process execution becomes blocking (not asynchronous).
 
     .. seealso::
-        :func:`mocked_process_job_runner` to completely skip process execution.
+        - :func:`mocked_process_job_runner` to completely skip process execution.
+        - :func:`setup_config_with_celery`
     """
     class MockTask(object):
         """
@@ -336,7 +375,7 @@ def mocked_process_job_runner(job_task_id="mocked-job-id"):
     Provides a mock that will no execute the process execution when call during job creation.
 
     .. seealso::
-        :func:`mocked_execute_process` to still execute the process, but without `Celery` connection.
+        - :func:`mocked_execute_process` to still execute the process, but without `Celery` connection.
     """
     result = mock.MagicMock()
     result.id = job_task_id
@@ -355,3 +394,56 @@ def mocked_process_package():
         mock.patch("weaver.processes.wps_package._get_package_inputs_outputs", return_value=(None, None)),
         mock.patch("weaver.processes.wps_package._merge_package_inputs_outputs", return_value=([], [])),
     )
+
+
+def mocked_aws_credentials(test_func):
+    """Mocked AWS Credentials for :py:mod:`moto`.
+
+    When using this fixture, ensures that if other mocks fail, at least credentials should be invalid to avoid
+    mistakenly overriding real bucket files.
+    """
+    def wrapped(*args, **kwargs):
+        with mock.patch.dict(os.environ, {
+            "AWS_ACCESS_KEY_ID": "testing",
+            "AWS_SECRET_ACCESS_KEY": "testing",
+            "AWS_SECURITY_TOKEN": "testing",
+            "AWS_SESSION_TOKEN": "testing"
+        }):
+            return test_func(*args, **kwargs)
+    return wrapped
+
+
+def mocked_aws_s3(test_func):
+    """
+    Mocked AWS S3 bucket for :py:mod:`boto3` over mocked AWS credentials using :py:mod:`moto`.
+
+    .. warning::
+        Make sure to employ the same :py:data:`MOCK_AWS_REGION` otherwise mock will not work and S3 operations will
+        attempt writing to real bucket.
+    """
+    def wrapped(*args, **kwargs):
+        with moto.mock_s3():
+            return test_func(*args, **kwargs)
+    return wrapped
+
+
+def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="Test file inside test S3 bucket"):
+    # type: (AnyStr,AnyStr, AnyStr) -> AnyStr
+    """
+    Generates a test file reference from dummy data that will be uploaded to the specified S3 bucket name using the
+    provided file key.
+
+    The S3 interface employed is completely dependent of the wrapping context. For instance, calling this function
+    with :func:`mocked_aws_s3` decorator will effectively employ the mocked S3 interface.
+
+    .. seealso::
+        - :func:`mocked_aws_s3`
+    """
+    import boto3
+    s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
+    s3.create_bucket(Bucket=bucket_name)
+    with tempfile.NamedTemporaryFile(mode="w") as tmp_file:
+        tmp_file.write(file_content)
+        tmp_file.flush()
+        s3.upload_file(Bucket=bucket_name, Filename=tmp_file.name, Key=file_name)
+    return "s3://{}/{}".format(bucket_name, file_name)

@@ -1,3 +1,9 @@
+"""
+Unit tests of functions within :mod:`weaver.processes.wps_package`.
+
+.. seealso::
+    - :mod:`tests.functional.wps_package`.
+"""
 import tempfile
 from collections import OrderedDict
 from copy import deepcopy
