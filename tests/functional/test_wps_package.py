@@ -1383,12 +1383,16 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
 
     @mocked_aws_credentials
     @mocked_aws_s3
-    def test_execute_with_bucket(self):
+    def test_execute_application_package_process_with_bucket(self):
         """
         Test validates:
             - Both S3 bucket and HTTP file references can be used simultaneously as inputs.
             - Process results are uploaded to the configured S3 bucket.
             - Process results are not accessible locally (not referenced as WPS-outputs URL, but as S3 reference).
+
+        .. note::
+            Input resolution will be different in case of `Workflow Process`, see :ref:`File Type References`.
+            This test is intended for `Application Process` executed locally as `CWL` package (script).
         """
         cwl = {
             "cwlVersion": "v1.0",
@@ -1478,7 +1482,7 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
             assert output_values[out_key] in [output_ref_abbrev, output_ref_full]  # allow any variant weaver can parse
 
         # FIXME:
-        #   can validate manually that files exists in ouput bucket, but cannot seem to retrieve it here
+        #   can validate manually that files exists in output bucket, but cannot seem to retrieve it here
         #   problem due to fixture setup or moto limitation via boto3.resource interface used by pywps?
         # check that outputs are indeed stored in S3 buckets
         #   import boto3
