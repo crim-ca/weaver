@@ -23,7 +23,7 @@ A clear and concise description of what you expected to happen.
 **Screenshots**
 If applicable, add screenshots to help explain your problem.
 
-**Desktop (please complete the following information):**
+**Context (please complete the following information):**
  - OS: [e.g. Linux|Windows] (if running locally)
  - Browser [e.g. chrome, safari] (if running as a service)
  - Instance: [ADES|EMS] and URL
