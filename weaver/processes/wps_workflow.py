@@ -7,8 +7,8 @@ import os
 import shutil
 import tempfile
 from functools import cmp_to_key, partial
-from typing import TYPE_CHECKING, Callable, MutableMapping, Text, cast  # these are actually used in the code
 from pathlib import Path
+from typing import TYPE_CHECKING, Callable, MutableMapping, Text, cast  # these are actually used in the code
 
 from cwltool import command_line_tool
 from cwltool.builder import CONTENT_LIMIT, Builder, substitute
