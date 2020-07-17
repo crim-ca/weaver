@@ -273,7 +273,7 @@ class WpsWorkflow(ProcessCWL):
                             key = cmp_to_key(cast(Callable[[Text, Text], int], locale.strcoll))
 
                             # In case of stdout.log or stderr.log file not created
-                            if glob in ("stdout.log", "stderr.log"):
+                            if glob in (self.tool["stdout"], self.tool["stderr"]):
                                 filepath = Path(fs_access.join(outdir, glob))
                                 if not filepath.is_file():
                                     Path(filepath).touch()
