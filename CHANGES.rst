@@ -12,7 +12,7 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Create an ``stdout.log`` or ``stderr.log`` file in case ``cwltool`` hasn't created it.
 
 `1.13.0 <https://github.com/crim-ca/weaver/tree/1.13.0>`_ (2020-07-15)
 ========================================================================
