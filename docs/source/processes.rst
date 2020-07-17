@@ -386,7 +386,7 @@ These use-cases are described below.
 
 When `Weaver` is able to figure out that the process needs to be executed locally in `ADES` mode, it will fetch all
 necessary files prior to process execution in order to make them available to the `CWL` package. When `Weaver` is in
-`EMS` configuration, it will **always** forward the references (regardless of scheme) exactly as provided as input
+`EMS` configuration, it will **always** forward remote references (regardless of scheme) exactly as provided as input
 of the process execution request, since it assumes it needs to dispatch the execution to another `ADES` remote server,
 and therefore only needs to verify that the file reference is reachable remotely. In this case, it becomes the
 responsibility of this remote instance to handle the reference appropriately. This also avoids potential problems such
@@ -395,7 +395,9 @@ as if `Weaver` as `EMS` doesn't have authorized access to a link that only the t
 When ``CWL`` package defines ``WPS1Requirement`` under ``hints`` for corresponding `WPS-1/2`_ remote processes being
 monitored by `Weaver`, it will skip fetching of ``http(s)``-based references since that would otherwise lead to useless
 double downloads (one on `Weaver` and the other on the `WPS` side). It is the same in case of ``ESGF-CWTRequirement``
-employed for `ESGF-CWT`_ processes. Because these processes do not normally
+employed for `ESGF-CWT`_ processes. Because these processes do not always support `S3` buckets, and because `Weaver`
+supports many variants of `S3` reference formats, it will first fetch the `S3` reference using its internal `AWS`
+configuration, and then expose this downloaded file as ``https(s)`` reference accessible by the remote `WPS` process.
 
 .. note::
     When `Weaver` is fetching remote files with |http_scheme|, it can take advantage of additional request options to
