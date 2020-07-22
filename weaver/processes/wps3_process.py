@@ -253,15 +253,16 @@ class Wps3Process(WpsProcessInterface):
                                                 execute_req_input_val: workflow_input_value_item["location"]})
             else:
                 execute_body_inputs.append({execute_req_id: workflow_input_key,
-                                            execute_req_input_val: workflow_input_value["location"]})
+                                            "data": workflow_input_value})
         for exec_input in execute_body_inputs:
-            if exec_input[execute_req_input_val].startswith("{0}://".format(OPENSEARCH_LOCAL_FILE_SCHEME)):
-                exec_input[execute_req_input_val] = "file{0}".format(
-                    exec_input[execute_req_input_val][len(OPENSEARCH_LOCAL_FILE_SCHEME):])
-            elif exec_input[execute_req_input_val].startswith("file://"):
-                exec_input[execute_req_input_val] = self.host_file(exec_input[execute_req_input_val])
-                LOGGER.debug("Hosting intermediate input [%s] : [%s]",
-                             exec_input[execute_req_id], exec_input[execute_req_input_val])
+            if execute_req_input_val in exec_input and isinstance(exec_input[execute_req_input_val], str):
+                if exec_input[execute_req_input_val].startswith("{0}://".format(OPENSEARCH_LOCAL_FILE_SCHEME)):
+                    exec_input[execute_req_input_val] = "file{0}".format(
+                        exec_input[execute_req_input_val][len(OPENSEARCH_LOCAL_FILE_SCHEME):])
+                elif exec_input[execute_req_input_val].startswith("file://"):
+                    exec_input[execute_req_input_val] = self.host_file(exec_input[execute_req_input_val])
+                    LOGGER.debug("Hosting intermediate input [%s] : [%s]",
+                                 exec_input[execute_req_id], exec_input[execute_req_input_val])
 
         execute_body_outputs = [{execute_req_id: output,
                                  execute_req_out_trans_mode: "reference"} for output in expected_outputs]
