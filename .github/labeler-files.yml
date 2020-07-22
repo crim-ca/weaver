@@ -3,8 +3,10 @@
 #   original: https://github.com/actions/labeler
 #   extended: https://github.com/ilyam8/periodic-pr-labeler
 
-# label 'ci' all automation-related steps and files
-ci:
+## CI
+# all automation-related steps and files
+
+ci/operations:
   - .*  # all '.<>' files
   - ".github/**"
   - MANIFEST.in
@@ -15,7 +17,7 @@ ci:
   - requirements*
   - tests/travis-ci/**/*
 
-doc:
+ci/doc:
   - "*.rst"
   # ignore changelog as doc would almost always be tagged
   - "!CHANGES.rst"
@@ -27,28 +29,41 @@ doc:
   - weaver/wps_restapi/swagger_definitions.py
   - weaver/wps_restapi/templates/swagger_ui.mako
 
-db:
+ci/tests:
+  - tests/**/*
+  - weaver/processes/wps_default.py
+  - weaver/processes/wps_testing.py
+
+## Triage
+
+triage/security:
+  - weaver/visibility.py
+  - SECURITY.rst
+
+## Features
+# specific components of the code base
+
+feature/db:
   - weaver/datatype.py
   - weaver/database/**/*
   - weaver/store/**/*
   - weaver/sort.py
 
-oas: 
+feature/oas:
   - weaver/wps_restapi/templates/swagger_ui.mako
   - weaver/wps_restapi/colander_extras.py
   - weaver/wps_restapi/swagger_definitions.py
 
-triage/security:
-  - weaver/visibility.py
+feature/CWL:
+  - weaver/processes/wps_process_base.py
+  - weaver/processes/wps_package.py
+  - weaver/processes/wps_workflow.py
 
-tests:
-  - tests/**/*
-  - weaver/processes/wps_default.py
-  - weaver/processes/wps_testing.py
+feature/opensearch:
+  - weaver/processes/opensearch.py
 
-## -- Files that *always* impact jobs --
-
-job:
+# -- Files that *always* impact jobs --
+feature/job:
   - weaver/execute.py
   - weaver/sort.py
   - weaver/wps_restapi/jobs/**/*
@@ -56,14 +71,9 @@ job:
 
 ## -- WPS processes --
 
-CWL:
-  - weaver/processes/wps_process_base.py
-  - weaver/processes/wps_package.py
-  - weaver/processes/wps_workflow.py
-
 process/builtin:
   - weaver/processes/builtin/**/*
-  
+
 process/wps1:
   - weaver/wps.py
   - weaver/processes/wps1*

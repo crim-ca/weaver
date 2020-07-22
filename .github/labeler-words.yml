@@ -3,15 +3,24 @@
 #   - https://github.com/github/issue-labeler
 
 
-CWL:
+feature/CWL:
   - '(CWL|cwl)'
   - 'workflow'
-  
+
+feature/oas:
+  - '(OpenAPI|openapi)'
+  - '(Swagger|swagger)'
+  - cornice
+  - colander
+
+feature/docker:
+  - '(Docker|docker)'
+
 process/wps1:
   - 'WPS-1'
   - 'WPS1'
 
-process/wps1:
+process/wps2:
   - 'WPS-2'
   - 'WPS2'
 
@@ -22,11 +31,11 @@ process/wps3:
   - 'rest bindings'
   - 'OGC API - Processes'
   - 'OGC-API-Processes'
-  
+
 process/esgf-cwt:
   - 'ESGF'
   - 'ESGF-CWT'
-  
+
 process/workflow:
   - 'workflow'
 
@@ -36,18 +45,17 @@ triage/feature:
 triage/bug:
   - 'bug'
 
-ci:
+ci/operations:
   - 'ci'
   - 'travis'
   - 'github'
 
-oas: 
-  - '(OpenAPI|openapi)'
-  - '(Swagger|swagger)'
-  - cornice
-  - colander
-
-tests:
+ci/tests:
   - 'coverage'
   - 'functional test[s]*'
   - 'unittest[s]*'
+
+ci/doc:
+  - 'documentation'
+  - 'readthedocs'
+  - 'rtd'
