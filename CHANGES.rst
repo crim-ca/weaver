@@ -12,7 +12,7 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Add ``data`` as a ``workflow_input_value`` data type.
 
 `1.13.1 <https://github.com/crim-ca/weaver/tree/1.13.1>`_ (2020-07-17)
 ========================================================================

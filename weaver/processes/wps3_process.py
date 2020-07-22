@@ -251,7 +251,7 @@ class Wps3Process(WpsProcessInterface):
                 for workflow_input_value_item in workflow_input_value:
                     execute_body_inputs.append({execute_req_id: workflow_input_key,
                                                 execute_req_input_val: workflow_input_value_item["location"]})
-            else:
+            elif workflow_input_value != "null":
                 execute_body_inputs.append({execute_req_id: workflow_input_key,
                                             "data": workflow_input_value})
         for exec_input in execute_body_inputs:
