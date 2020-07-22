@@ -13,6 +13,7 @@ Changes:
 Fixes:
 ------
 - Add ``data`` as a ``workflow_input_value`` data type.
+- Fix stdout/stderr log file not present in workflow.
 
 `1.13.1 <https://github.com/crim-ca/weaver/tree/1.13.1>`_ (2020-07-17)
 ========================================================================

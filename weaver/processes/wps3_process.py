@@ -244,25 +244,26 @@ class Wps3Process(WpsProcessInterface):
 
         execute_body_inputs = []
         execute_req_id = "id"
-        execute_req_input_val = "href"
+        execute_req_input_val_href = "href"
+        execute_req_input_val_data = "data"
         execute_req_out_trans_mode = "transmissionMode"
         for workflow_input_key, workflow_input_value in workflow_inputs.items():
             if isinstance(workflow_input_value, list):
                 for workflow_input_value_item in workflow_input_value:
                     execute_body_inputs.append({execute_req_id: workflow_input_key,
-                                                execute_req_input_val: workflow_input_value_item["location"]})
+                                                execute_req_input_val_href: workflow_input_value_item["location"]})
             else:
                 execute_body_inputs.append({execute_req_id: workflow_input_key,
-                                            "data": workflow_input_value})
+                                            execute_req_input_val_data: workflow_input_value})
         for exec_input in execute_body_inputs:
-            if execute_req_input_val in exec_input and isinstance(exec_input[execute_req_input_val], str):
-                if exec_input[execute_req_input_val].startswith("{0}://".format(OPENSEARCH_LOCAL_FILE_SCHEME)):
-                    exec_input[execute_req_input_val] = "file{0}".format(
-                        exec_input[execute_req_input_val][len(OPENSEARCH_LOCAL_FILE_SCHEME):])
-                elif exec_input[execute_req_input_val].startswith("file://"):
-                    exec_input[execute_req_input_val] = self.host_file(exec_input[execute_req_input_val])
+            if execute_req_input_val_href in exec_input and isinstance(exec_input[execute_req_input_val_href], str):
+                if exec_input[execute_req_input_val_href].startswith("{0}://".format(OPENSEARCH_LOCAL_FILE_SCHEME)):
+                    exec_input[execute_req_input_val_href] = "file{0}".format(
+                        exec_input[execute_req_input_val_href][len(OPENSEARCH_LOCAL_FILE_SCHEME):])
+                elif exec_input[execute_req_input_val_href].startswith("file://"):
+                    exec_input[execute_req_input_val_href] = self.host_file(exec_input[execute_req_input_val_href])
                     LOGGER.debug("Hosting intermediate input [%s] : [%s]",
-                                 exec_input[execute_req_id], exec_input[execute_req_input_val])
+                                 exec_input[execute_req_id], exec_input[execute_req_input_val_href])
 
         execute_body_outputs = [{execute_req_id: output,
                                  execute_req_out_trans_mode: "reference"} for output in expected_outputs]
