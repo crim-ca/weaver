@@ -250,11 +250,19 @@ class Wps3Process(WpsProcessInterface):
         for workflow_input_key, workflow_input_value in workflow_inputs.items():
             if isinstance(workflow_input_value, list):
                 for workflow_input_value_item in workflow_input_value:
-                    execute_body_inputs.append({execute_req_id: workflow_input_key,
-                                                execute_req_input_val_href: workflow_input_value_item["location"]})
+                    if isinstance(workflow_input_value_item, dict) and "location" in workflow_input_value_item:
+                        execute_body_inputs.append({execute_req_id: workflow_input_key,
+                                                    execute_req_input_val_href: workflow_input_value_item["location"]})
+                    else:
+                        execute_body_inputs.append({execute_req_id: workflow_input_key,
+                                                    execute_req_input_val_data: workflow_input_value_item})
             else:
-                execute_body_inputs.append({execute_req_id: workflow_input_key,
-                                            execute_req_input_val_data: workflow_input_value})
+                if isinstance(workflow_input_value, dict) and  "location" in workflow_input_value:
+                    execute_body_inputs.append({execute_req_id: workflow_input_key,
+                                                execute_req_input_val_href: workflow_input_value["location"]})
+                else:
+                    execute_body_inputs.append({execute_req_id: workflow_input_key,
+                                                execute_req_input_val_data: workflow_input_value})
         for exec_input in execute_body_inputs:
             if execute_req_input_val_href in exec_input and isinstance(exec_input[execute_req_input_val_href], str):
                 if exec_input[execute_req_input_val_href].startswith("{0}://".format(OPENSEARCH_LOCAL_FILE_SCHEME)):
