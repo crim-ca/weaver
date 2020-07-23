@@ -257,7 +257,7 @@ class Wps3Process(WpsProcessInterface):
                         execute_body_inputs.append({execute_req_id: workflow_input_key,
                                                     execute_req_input_val_data: workflow_input_value_item})
             else:
-                if isinstance(workflow_input_value, dict) and  "location" in workflow_input_value:
+                if isinstance(workflow_input_value, dict) and "location" in workflow_input_value:
                     execute_body_inputs.append({execute_req_id: workflow_input_key,
                                                 execute_req_input_val_href: workflow_input_value["location"]})
                 else:
