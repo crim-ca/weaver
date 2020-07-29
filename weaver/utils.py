@@ -39,7 +39,7 @@ if TYPE_CHECKING:
         AnyValue, AnyKey, AnySettingsContainer, AnyRegistryContainer, AnyHeadersContainer,
         AnyResponseType, HeadersType, SettingsType, JSON, XML, Number
     )
-    from typing import Union, Any, Callable, Dict, List, AnyStr, Iterable, Optional, Type       # noqa: F401
+    from typing import Union, Any, Callable, Dict, List, AnyStr, Iterable, NoReturn, Optional, Type  # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 
@@ -204,6 +204,7 @@ def is_valid_url(url):
 
 
 def parse_extra_options(option_str):
+    # type: (AnyStr) -> Dict[AnyStr, AnyStr]
     """
     Parses the extra options parameter.
 
@@ -341,6 +342,7 @@ def pass_http_error(exception, expected_http_error):
 
 
 def raise_on_xml_exception(xml_node):
+    # type: (XML) -> Optional[NoReturn]
     """
     Raises an exception with the description if the XML response document defines an ExceptionReport.
     :param xml_node: instance of :class:`etree.Element`
