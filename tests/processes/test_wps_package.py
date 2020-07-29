@@ -5,6 +5,7 @@ Unit tests of functions within :mod:`weaver.processes.wps_package`.
     - :mod:`tests.functional.wps_package`.
 """
 import contextlib
+import os
 import shutil
 import sys
 import tempfile
@@ -243,12 +244,12 @@ def test_stdout_stderr_logging_for_commandline_tool_success():
     Execute a process and assert that stdout is correctly logged to log file upon successful process execution.
     """
     with contextlib.ExitStack() as stack:
-        log_file = stack.enter_context(tempfile.NamedTemporaryFile())
+        xml_file = stack.enter_context(tempfile.NamedTemporaryFile(suffix=".xml"))
         workdir = stack.enter_context(tempfile.TemporaryDirectory())
         process = MockProcess(shell_command="echo")
         wps_package_instance = MockWpsPackage(identifier=process["id"], title=process["title"],
                                               payload=process, package=process["package"])
-        wps_package_instance.mock_status_location = log_file.name
+        wps_package_instance.mock_status_location = xml_file.name
         wps_package_instance.set_workdir(workdir)
 
         # ExecuteResponse mock
@@ -257,8 +258,10 @@ def test_stdout_stderr_logging_for_commandline_tool_success():
         wps_package_instance._handler(wps_request, wps_response)
 
         # log assertions
-        with open(wps_package_instance.mock_status_location + ".log", "r") as file:
+        expect_log = os.path.splitext(wps_package_instance.mock_status_location)[0] + ".log"
+        with open(expect_log, "r") as file:
             log_data = file.read()
+            # FIXME: add more specific asserts... validate CWL command called and sub-operations logged
             assert "Dummy message" in log_data
 
 
@@ -267,16 +270,18 @@ def test_stdout_stderr_logging_for_commandline_tool_failure():
     Execute a process and assert that stderr is correctly logged to log file upon failing process execution.
     """
     with contextlib.ExitStack() as stack:
-        stack.enter_context(tempfile.NamedTemporaryFile())  # noqa
+        xml_file = stack.enter_context(tempfile.NamedTemporaryFile(suffix=".xml"))
         workdir = stack.enter_context(tempfile.TemporaryDirectory())
         process = MockProcess(shell_command="not_existing_command")
     wps_package_instance = MockWpsPackage(identifier=process["id"], title=process["title"],
                                           payload=process, package=process["package"])
+    wps_package_instance.mock_status_location = xml_file.name
     wps_package_instance.set_workdir(workdir.name)
 
     # ExecuteResponse mock
     wps_request = MockWpsRequest()
     wps_response = type("", (object,), {"_update_status": lambda *_, **__: 1})()
+    # FIXME: add more specific asserts... validate CWL command called but as some execution error entry logged
     try:
         wps_package_instance._handler(wps_request, wps_response)
     except PackageExecutionError as exception:

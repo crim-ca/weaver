@@ -386,6 +386,21 @@ def test_get_ssl_verify_option():
         "weaver.request_options": {
             "requests": [{"url": "http://test.com/valid/*", "method": "get", "verify": False}]}
     }) is False
+    any_wps_url = "http://test.com/wps"
+    any_wps_conf = {
+        "weaver.ssl_verify": True,
+        "weaver.request_options": {
+            "requests": [{"url": any_wps_url, "verify": False}]
+        }
+    }
+    tests = [
+        ("GET", "service=WPS&request=GetCapabilities&version=1.0.0"),
+        ("GET", "service=WPS&request=DescribeProcess&version=1.3.0&identifier=test"),
+        ("POST", "service=WPS&request=Execute&version=2.0.0&identifier=test"),
+    ]
+    for method, queries in tests:
+        url = "{}?{}".format(any_wps_url, queries)
+        assert get_ssl_verify_option(method, url, any_wps_conf)
 
 
 def test_request_extra_allowed_codes():

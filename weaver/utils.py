@@ -33,7 +33,7 @@ from weaver.typedefs import XML
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, List, Iterable, Optional, Type, Union
+    from typing import Any, Callable, Dict, List, Iterable, NoReturn, Optional, Type, Union
 
     from weaver.typedefs import (
         AnyKey,
@@ -227,6 +227,7 @@ def is_uuid(maybe_uuid):
 
 
 def parse_extra_options(option_str):
+    # type: (str) -> Dict[str, str]
     """
     Parses the extra options parameter.
 
@@ -242,7 +243,7 @@ def parse_extra_options(option_str):
         try:
             # pylint: disable=R1717,consider-using-dict-comprehension
             extra_options = option_str.split(",")
-            extra_options = dict([("=" in opt) and opt.split("=", 1) for opt in extra_options])
+            extra_options = dict([("=" in opt) and opt.split("=", 1) for opt in extra_options])  # noqa
         except Exception:
             msg = "Can not parse extra-options: {}".format(option_str)
             from pyramid.exceptions import ConfigurationError
@@ -364,6 +365,7 @@ def pass_http_error(exception, expected_http_error):
 
 
 def raise_on_xml_exception(xml_node):
+    # type: (XML) -> Optional[NoReturn]
     """
     Raises an exception with the description if the XML response document defines an ExceptionReport.
     :param xml_node: instance of :class:`XML`

@@ -98,6 +98,7 @@ def execute_process(self, job_id, url, headers=None):
     try:
         try:
             job.progress = JOB_PROGRESS_DESCRIBE
+            job.save_log(logger=task_logger, message="Employed WPS URL: [{!s}]".format(url), level=logging.DEBUG)
             job.save_log(logger=task_logger, message="Execute WPS request for process [{!s}]".format(job.process))
             ssl_verify = get_ssl_verify_option("get", url, settings=settings)
             wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), verify=ssl_verify)
