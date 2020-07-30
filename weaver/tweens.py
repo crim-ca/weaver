@@ -19,7 +19,7 @@ OWS_TWEEN_HANDLED = "OWS_TWEEN_HANDLED"
 def error_repr(http_err):
     # type: (Union[HTTPException, OWSException, Exception]) -> str
     """
-    Returns a cleaned up representation string of the HTTP error, but with similar and even extended details to 
+    Returns a cleaned up representation string of the HTTP error, but with similar and even extended details to
     facilitate later debugging.
     """
     if not isinstance(http_err, (HTTPException, OWSException)):
