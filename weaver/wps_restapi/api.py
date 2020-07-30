@@ -34,8 +34,9 @@ from weaver.owsexceptions import OWSException
 from weaver.utils import get_header, get_settings, get_weaver_url
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.colander_extras import CustomTypeConversionDispatcher
+from weaver.wps_restapi.colander_extras import OAS3TypeConversionDispatcher
 from weaver.wps_restapi.utils import get_wps_restapi_base_url, wps_restapi_base_path
+
 
 if TYPE_CHECKING:
     from typing import Optional
@@ -180,7 +181,7 @@ def get_swagger_json(http_scheme="http", http_host="localhost", base_url=None, u
     .. seealso::
         - :mod:`weaver.wps_restapi.swagger_definitions`
     """
-    CorniceSwagger.type_converter = CustomTypeConversionDispatcher
+    CorniceSwagger.type_converter = OAS3TypeConversionDispatcher
     swagger = CorniceSwagger(get_services())
     # function docstrings are used to create the route's summary in Swagger-UI
     swagger.summary_docstrings = use_docstring_summary

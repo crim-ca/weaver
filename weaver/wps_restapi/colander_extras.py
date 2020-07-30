@@ -1012,7 +1012,9 @@ class VariableObjectTypeConverter(ObjectTypeConverter):
 
 # TODO: replace directly in original cornice_swagger
 #  (see: https://github.com/Cornices/cornice.ext.swagger/issues/133)
-class CustomTypeConversionDispatcher(TypeConversionDispatcher):
+class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
+    openapi_spec = 3
+
     def __init__(self, custom_converters=None, default_converter=None):
         self.keyword_converters = {
             OneOfKeywordSchema: OneOfKeywordTypeConverter,
@@ -1035,7 +1037,7 @@ class CustomTypeConversionDispatcher(TypeConversionDispatcher):
         custom_converters.update(extra_converters)
 
         custom_converters.update(self.keyword_converters)
-        super(CustomTypeConversionDispatcher, self).__init__(custom_converters, default_converter)
+        super(OAS3TypeConversionDispatcher, self).__init__(custom_converters, default_converter)
 
     def __call__(self, schema_node):
         schema_type = schema_node.typ
