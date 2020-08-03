@@ -48,7 +48,6 @@ from abc import abstractmethod
 from typing import TYPE_CHECKING
 
 import colander
-
 from cornice_swagger.converters.exceptions import ConversionError, NoSuchConverter
 from cornice_swagger.converters.schema import ObjectTypeConverter, TypeConversionDispatcher, TypeConverter
 

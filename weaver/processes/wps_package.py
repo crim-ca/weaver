@@ -12,7 +12,7 @@ Functions and classes that offer interoperability and conversion between corresp
 import json
 import logging
 import os
-import posixpath
+import posixpath  # pylint: disable=C0411,wrong-import-order
 import shutil
 import sys
 import tempfile

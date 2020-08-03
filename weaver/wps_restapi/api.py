@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 
 from beaker.cache import cache_region
 from cornice.service import get_services
+from cornice_swagger import CorniceSwagger
 from pyramid.authentication import Authenticated, IAuthenticationPolicy
 from pyramid.exceptions import PredicateMismatch
 from pyramid.httpexceptions import (
@@ -21,7 +22,6 @@ from pyramid.response import Response
 from pyramid.settings import asbool
 from simplejson import JSONDecodeError
 
-from cornice_swagger import CorniceSwagger
 from weaver import __meta__
 from weaver.formats import (
     CONTENT_TYPE_APP_JSON,
