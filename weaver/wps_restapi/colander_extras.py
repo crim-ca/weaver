@@ -52,7 +52,7 @@ from cornice_swagger.converters.exceptions import ConversionError, NoSuchConvert
 from cornice_swagger.converters.schema import ObjectTypeConverter, TypeConversionDispatcher, TypeConverter
 
 if TYPE_CHECKING:
-    from typing import Iterable
+    from typing import Iterable, Union, Type
 
 
 class SchemaNodeTypeError(TypeError):
@@ -82,7 +82,14 @@ class OneOfCaseInsensitive(colander.OneOf):
             return super(OneOfCaseInsensitive, self).__call__(node, value)
 
 
-class DropableSchemaNode(colander.SchemaNode):
+class ExtendedNode(object):
+    _extension = None  # type: str
+
+    def _deserialize_impl(self, cstruct):
+        raise NotImplementedError("ExtendedNode deserialize implementation missing")
+
+
+class DropableSchemaNode(ExtendedNode, colander.SchemaNode):
     """
     Drops the underlying schema node if ``missing=drop`` was specified and that the value
     representing it represents an *empty* value.
@@ -125,26 +132,37 @@ class DropableSchemaNode(colander.SchemaNode):
         - :class:`DropableMappingSchema`
         - :class:`DropableSequenceSchema`
     """
+    _extension = "_ext_dropable"
+
+    def __init__(self, *args, **kwargs):
+        super(DropableSchemaNode, self).__init__(*args, **kwargs)
+        setattr(self, DropableSchemaNode._extension, True)
+
     @staticmethod
     def schema_type():
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
     # pylint: disable=W0222,signature-differs
     def deserialize(self, cstruct):
+        return ExtendedSchemaNode.deserialize(self, cstruct)
+
+    def _deserialize_impl(self, cstruct):
+        if not getattr(self, DropableSchemaNode._extension, False):
+            return cstruct
         if self.default is colander.null and self.missing is colander.drop:
             if cstruct is colander.drop:
-                return colander.drop
+                return colander.null
             containers = (colander.SequenceSchema.schema_type,
                           colander.MappingSchema.schema_type,
                           colander.TupleSchema.schema_type)
             if self.schema_type in containers and not cstruct:
-                return colander.drop
+                return colander.null
             elif cstruct in (None, colander.null):
-                return colander.drop
-        return super(DropableSchemaNode, self).deserialize(cstruct)
+                return colander.null
+        return cstruct
 
 
-class DefaultSchemaNode(colander.SchemaNode):
+class DefaultSchemaNode(ExtendedNode, colander.SchemaNode):
     """
     If ``default`` keyword is provided during :class:`colander.SchemaNode` creation, overrides the
     returned value by this default if missing from the structure during :meth:`deserialize` call.
@@ -157,22 +175,35 @@ class DefaultSchemaNode(colander.SchemaNode):
         - :class:`DefaultSequenceSchema`
     """
 
+    _extension = "_ext_default"
+
+    def __init__(self, *args, **kwargs):
+        super(DefaultSchemaNode, self).__init__(*args, **kwargs)
+        setattr(self, DefaultSequenceSchema._extension, True)
+
     @staticmethod
     def schema_type():
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
     # pylint: disable=W0222,signature-differs
     def deserialize(self, cstruct):
+        return ExtendedSchemaNode.deserialize(self, cstruct)
+
+    def _deserialize_impl(self, cstruct):
+        if not getattr(self, DefaultSchemaNode._extension, False):
+            return cstruct
+        #if cstruct is colander.null and self.required and self.default in (colander.null, colander.drop):
+        #    raise colander.Invalid(node=self, msg="Missing value for required field without any default.")
         # if nothing to process in structure, ask to remove (unless picked by default)
         result = colander.drop
         if cstruct is not colander.null:
-            result = super(DefaultSchemaNode, self).deserialize(cstruct)
+            result = cstruct
         if not isinstance(self.default, type(colander.null)) and result is colander.drop:
             result = self.default
         return result
 
 
-class VariableSchemaNode(colander.SchemaNode):
+class VariableSchemaNode(ExtendedNode, colander.SchemaNode):
     """
     Object schema that allows defining a field key as *variable* by name supporting deserialization validation.
 
@@ -243,6 +274,7 @@ class VariableSchemaNode(colander.SchemaNode):
         - :class:`ExtendedMappingSchema`
     """
 
+    _extension = "_ext_variable"
     _variable = "variable"          # name of property containing variable name
     _variable_map = "variable_map"  # name of property containing variable => real node/key matched
 
@@ -270,6 +302,7 @@ class VariableSchemaNode(colander.SchemaNode):
                 self.raw_title = var
             setattr(self, self._variable, var)
         self._mark_variable_children()
+        setattr(self, VariableSchemaNode._extension, True)
 
     def _mark_variable_children(self):
         """
@@ -322,6 +355,11 @@ class VariableSchemaNode(colander.SchemaNode):
 
     # pylint: disable=W0222,signature-differs
     def deserialize(self, cstruct):
+        return ExtendedSchemaNode.deserialize(self, cstruct)
+
+    def _deserialize_impl(self, cstruct):
+        if not getattr(self, VariableSchemaNode._extension, False):
+            return cstruct
         if cstruct in (colander.drop, colander.null):
             return cstruct
         # skip step in case operation was called as subnode from another schema but doesn't
@@ -330,7 +368,7 @@ class VariableSchemaNode(colander.SchemaNode):
             return cstruct
         var_map = getattr(self, self._variable_map, {})
         if not isinstance(var_map, dict) or not len(var_map):
-            return super(VariableSchemaNode, self).deserialize(cstruct)
+            return cstruct
 
         var_children = self._get_sub_variable(self.children)
         const_child_keys = [child.name for child in self.children if child not in var_children]
@@ -402,14 +440,27 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
         - :class:`DropableSchemaNode`
         - :class:`VariableSchemaNode`
     """
+    _extension = "_ext_combined"
+
     @staticmethod
     def schema_type():
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
     def deserialize(self, cstruct):
-        result = DropableSchemaNode.deserialize(self, cstruct)
-        result = DefaultSchemaNode.deserialize(self, result)
-        result = VariableSchemaNode.deserialize(self, result)
+        schema_type = _get_schema_type(self)
+        # process extensions to infer alternative parameter/property values
+        # node extensions order is important as they can impact the following ones
+        result = cstruct
+        for node_ext in [DropableSchemaNode, DefaultSchemaNode, VariableSchemaNode]:  # type: ExtendedNode
+            if result not in (colander.null, colander.drop):  # skip if we already got a final result
+                result = node_ext._deserialize_impl(self, cstruct)
+        # process usual base operation with extended result
+        if isinstance(schema_type, colander.Mapping):
+            result = colander.MappingSchema.deserialize(self, result)
+        elif isinstance(schema_type, colander.Sequence):
+            result = colander.SequenceSchema.deserialize(self, result)
+        elif result is not colander.drop:
+            result = colander.SchemaNode.deserialize(self, result)
         return result
 
 
@@ -809,9 +860,21 @@ class OneOfKeywordSchema(KeywordMapper):
                     return valid_discriminated[0]
                 elif len(valid_discriminated) > 1:
                     invalid_one_of = error_discriminated
-            message = "Incorrect type, cannot discriminate between multiple valid schemas." \
-                      "Must be only one of: {}.".format(list(invalid_one_of.keys()))
-            raise colander.Invalid(node=self, msg=message, value=discriminator)
+                message = "Incorrect type, cannot discriminate between multiple valid schemas." \
+                          "Must be only one of: {}.".format(list(invalid_one_of.keys()))
+                raise colander.Invalid(node=self, msg=message, value=discriminator)
+
+            # because some schema nodes will convert types during deserialize without error,
+            # attempt to discriminate base-type values compared with tested value
+            # (e.g.: discriminate between float vs numerical string allowed schema variations)
+            if not isinstance(cstruct, (dict, set, list, tuple)):
+                valid_values = list(filter(lambda c: c == cstruct and type(c) == type(cstruct), valid_one_of))
+                if len(valid_values) == 1:
+                    return valid_values[0]
+                invalid_one_of = {}
+                message = "Incorrect type, cannot discriminate between multiple valid schemas." \
+                          "Must be only one of: {}.".format(valid_values)
+                raise colander.Invalid(node=self, msg=message)
 
         message = "Incorrect type, must be one of: {}. Errors for each case: {}" \
                   .format(list(invalid_one_of.keys()), invalid_one_of)
@@ -922,8 +985,41 @@ class AnyOfKeywordSchema(KeywordMapper):
 
 
 class NotKeywordSchema(KeywordMapper):
-    def __init__(self):  # pylint: disable=W0231
-        raise NotImplementedError  # TODO
+    """
+    Allows specifying specific schema conditions that fails underlying schema definition validation if present.
+    Corresponds to the ``not`` specifier of `OpenAPI` specification.
+
+    .. seealso::
+        - :class:`OneOfKeywordSchema`
+        - :class:`AllOfKeywordSchema`
+        - :class:`AnyOfKeywordSchema`
+    """
+    _keyword_objects_only = False
+    _keyword = "_not"
+
+    @classmethod
+    @abstractmethod
+    def _not(cls):
+        # type: () -> Iterable[colander._SchemaMeta]  # noqa: W0212
+        """This must be overridden in the schema definition using it."""
+        raise SchemaNodeTypeError("Missing '{}' keyword for schema '{}'.".format(cls._keyword, cls))
+
+    def _deserialize_keyword(self, cstruct):
+        """
+        Test each possible case, raise if any corresponding schema was successfully validated.
+        """
+        invalid_not = dict()
+        for schema_class in self._not:  # noqa
+            try:
+                schema_class = _make_node_instance(schema_class)
+                self._deserialize_subnode(schema_class, cstruct)
+                invalid_not.update({type(schema_class).__name__: str(schema_class)})
+            except colander.Invalid:
+                pass
+        if invalid_not:
+            message = "Value contains not allowed schema conditions: {}".format(invalid_not)
+            raise colander.Invalid(node=self, msg=message, value=cstruct)
+        return cstruct
 
 
 class KeywordTypeConverter(TypeConverter):
@@ -1122,6 +1218,7 @@ def _dict_nested_contained(parent, child):
 
 
 def _make_node_instance(schema_node_or_class):
+    # type: (Union[colander.SchemaNode, Type[colander.SchemaNode]]) -> colander.SchemaNode
     """Obtains a schema node instance in case it was specified only by type reference.
 
     This helps being more permissive of provided definitions while handling situations
@@ -1138,3 +1235,20 @@ def _make_node_instance(schema_node_or_class):
         raise ConversionTypeError(
             "Invalid item should be a SchemaNode, got: {!s}".format(type(schema_node_or_class)))
     return schema_node_or_class
+
+
+def _get_schema_type(schema_node):
+    # type: (Union[colander.SchemaNode, Type[colander.SchemaNode], ExtendedSchemaNode]) -> colander.SchemaType
+    """Obtains the schema-type from the provided node, supporting various intialization methods.
+
+
+    - ``typ`` is set by an instantiated node from specific schema (e.g.: ``colander.SchemaNode(colander.String())``)
+    - ``schema_type`` can also be provided, either by type or instance if using class definition with property
+    """
+    schema_node = _make_node_instance(schema_node)
+    schema_type = getattr(schema_node, "typ", getattr(schema_node, "schema_type"))
+    if isinstance(schema_type, type):
+        schema_type = schema_type()  # only type instead of object, instantiate with default since no parameters anyway
+    if not isinstance(schema_type, colander.SchemaType):
+        raise ConversionTypeError("Invalid schema type could not be detected: {!s}".format(type(schema_type)))
+    return schema_type

@@ -19,7 +19,7 @@ from pyramid.config import Configurator
 from pyramid.httpexceptions import HTTPException, HTTPNotFound, HTTPUnprocessableEntity
 from pyramid.registry import Registry
 from requests import Response
-from webtest import TestApp
+from webtest import TestApp, TestResponse
 
 from weaver.app import main as weaver_app
 from weaver.config import WEAVER_CONFIGURATION_DEFAULT, WEAVER_DEFAULT_INI_CONFIG, get_weaver_config_file
@@ -337,12 +337,12 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
 
         url, func, req_kwargs = _parse_for_app_req(method, url, **req_kwargs)
         if not url.startswith("mock://"):
-            resp = func(url, expect_errors=True, **req_kwargs)
-            setattr(resp, "content", resp.body)
+            _resp = func(url, expect_errors=True, **req_kwargs)
+            setattr(_resp, "content", _resp.body)
         else:
             path = get_url_without_query(url.replace("mock://", ""))
-            resp = mocked_file_response(path, url)
-        return resp
+            _resp = mocked_file_response(path, url)
+        return _resp
 
     with contextlib.ExitStack() as stack:
         stack.enter_context(mock.patch("requests.request", side_effect=mocked_app_request))
@@ -350,7 +350,11 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
         stack.enter_context(mock.patch("requests.sessions.Session.request", side_effect=mocked_app_request))
         req_url, req_func, kwargs = _parse_for_app_req(function, *args, **kwargs)
         kwargs.setdefault("expect_errors", True)
-        return req_func(req_url, **kwargs)
+        resp = req_func(req_url, **kwargs)
+        # add extra methods that 'real' response would have and that are employed by underlying code
+        if isinstance(resp, TestResponse):
+            setattr(resp, "raise_for_status", lambda: Response.raise_for_status(resp))
+        return resp
 
 
 def mocked_execute_process():
