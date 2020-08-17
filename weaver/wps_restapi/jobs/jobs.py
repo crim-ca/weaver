@@ -208,7 +208,9 @@ def get_job_status(request):
     Retrieve the status of a job.
     """
     job = get_job(request)
-    return HTTPOk(json=job.json(request, self_link="status"))
+    job_status = job.json(request, self_link="status")
+    job_status = sd.JobStatusInfo().deserialize(job_status)
+    return HTTPOk(json=job_status)
 
 
 @sd.provider_job_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,

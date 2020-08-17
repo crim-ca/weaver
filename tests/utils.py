@@ -19,7 +19,7 @@ from pyramid.httpexceptions import HTTPException, HTTPNotFound, HTTPUnprocessabl
 from pyramid.registry import Registry
 from requests import Response
 from six.moves.configparser import ConfigParser
-from webtest import TestApp
+from webtest import TestApp, TestResponse
 
 from tests.compat import contextlib
 from weaver import main as weaver_main
@@ -331,7 +331,11 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
         stack.enter_context(mock.patch("requests.sessions.Session.request", side_effect=mocked_app_request))
         request_func = getattr(app, function)
         kwargs.setdefault("expect_errors", True)
-        return request_func(*args, **kwargs)
+        resp = request_func(*args, **kwargs)
+        # add extra methods that 'real' response would have and that are employed by underlying code
+        if isinstance(resp, TestResponse):
+            setattr(resp, "raise_for_status", lambda: Response.raise_for_status(resp))
+        return resp
 
 
 def mocked_execute_process():

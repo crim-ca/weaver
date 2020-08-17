@@ -37,6 +37,7 @@ from weaver.wps_restapi.colander_extras import (
     ExtendedMappingSchema,
     ExtendedSchemaNode,
     ExtendedSequenceSchema,
+    NotKeywordSchema,
     OneOfKeywordSchema,
     PermissiveMappingSchema
 )
@@ -363,11 +364,15 @@ class InputDescriptionType(DescriptionType):
 
 
 class OutputDescriptionType(DescriptionType):
-    id = ExtendedSchemaNode(String(), description=IO_INFO_IDS.format(first="WPS", second="CWL", what="output"))
+    id = SLUG(description=IO_INFO_IDS.format(first="WPS", second="CWL", what="output"))
 
 
-class ComplexInputType(InputDescriptionType, WithMinMaxOccurs):
+class WithFormats(ExtendedMappingSchema):
     formats = FormatDescriptionList()
+
+
+class ComplexInputType(WithMinMaxOccurs, WithFormats):
+    pass
 
 
 class SupportedCRS(ExtendedMappingSchema):
@@ -379,7 +384,7 @@ class SupportedCRSList(ExtendedSequenceSchema):
     item = SupportedCRS(title="SupportedCRS")
 
 
-class BoundingBoxInputType(InputDescriptionType, WithMinMaxOccurs):
+class BoundingBoxInputType(WithMinMaxOccurs):
     supportedCRS = SupportedCRSList()
 
 
@@ -429,10 +434,12 @@ class ValuesReference(ExtendedMappingSchema):
 
 
 class LiteralDataDomainType(OneOfKeywordSchema):
-    _one_of = (AllowedValues,
-               AllowedRanges,
-               ValuesReference,
-               AnyValue)  # must be last because it"s the most permissive
+    _one_of = (
+        AllowedValues,
+        AllowedRanges,
+        ValuesReference,
+        AnyValue,  # must be last because it"s the most permissive (always valid)
+    )
     defaultValue = ExtendedSchemaNode(String(), missing=drop)
     dataType = DataTypeSchema(missing=drop)
     uom = UomSchema(missing=drop)
@@ -442,11 +449,12 @@ class LiteralDataDomainTypeList(ExtendedSequenceSchema):
     literalDataDomain = LiteralDataDomainType()
 
 
-class LiteralInputType(InputDescriptionType, WithMinMaxOccurs):
+class LiteralInputType(NotKeywordSchema, WithMinMaxOccurs):
+    _not = (WithFormats, )
     literalDataDomains = LiteralDataDomainTypeList(missing=drop)
 
 
-class InputType(OneOfKeywordSchema):
+class InputType(OneOfKeywordSchema, InputDescriptionType):
     _one_of = (
         BoundingBoxInputType,
         ComplexInputType,  # should be 2nd to last because very permissive, but requires format at least
@@ -458,7 +466,8 @@ class InputTypeList(ExtendedSequenceSchema):
     input = InputType()
 
 
-class LiteralOutputType(ExtendedMappingSchema):
+class LiteralOutputType(NotKeywordSchema, ExtendedMappingSchema):
+    _not = (WithFormats, )
     literalDataDomains = LiteralDataDomainTypeList(missing=drop)
 
 
@@ -466,15 +475,11 @@ class BoundingBoxOutputType(ExtendedMappingSchema):
     supportedCRS = SupportedCRSList()
 
 
-class ComplexOutputType(ExtendedMappingSchema):
-    formats = FormatDescriptionList()
-
-
-class OutputDataDescriptionType(OutputDescriptionType):
+class ComplexOutputType(WithFormats):
     pass
 
 
-class OutputType(OneOfKeywordSchema, OutputDataDescriptionType):
+class OutputType(OneOfKeywordSchema, OutputDescriptionType):
     _one_of = (
         BoundingBoxOutputType,
         ComplexOutputType,  # should be 2nd to last because very permission, but requires format at least
@@ -1470,8 +1475,7 @@ class ProcessOffering(ExtendedMappingSchema):
 
 
 class ProcessDescriptionChoiceType(OneOfKeywordSchema):
-    _one_of = (Reference,
-               ProcessOffering)
+    _one_of = (Reference, ProcessOffering)
 
 
 class Deploy(ExtendedMappingSchema):

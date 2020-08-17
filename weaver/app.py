@@ -5,6 +5,7 @@ Weaver Web Application (``weaver-manager``).
 """
 
 import logging
+import os
 
 import yaml
 from pyramid.config import Configurator
@@ -47,8 +48,11 @@ def main(global_config, **settings):
     req_file = get_weaver_config_file(settings.get("weaver.request_options", ""),
                                       WEAVER_DEFAULT_REQUEST_OPTIONS_CONFIG,
                                       generate_default_from_example=False)
-    with open(req_file, "r") as f:
-        settings.update({"weaver.request_options": yaml.safe_load(f)})
+    if req_file and os.path.isfile(req_file):
+        with open(req_file, "r") as f:
+            settings.update({"weaver.request_options": yaml.safe_load(f)})
+    else:
+        LOGGER.warning("No request options found.")
 
     # add default caching regions if they were omitted in config file
     LOGGER.info("Adding default caching options...")

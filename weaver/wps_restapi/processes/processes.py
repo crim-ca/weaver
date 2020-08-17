@@ -621,8 +621,7 @@ def get_local_process(request):
     try:
         process = get_process(request)
         process["inputs"] = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
-        sd.ProcessOffering().deserialize(process)  # validate
-        process_offering = process.offering()
+        process_offering = sd.ProcessOffering().deserialize(process.offering())  # validate
         return HTTPOk(json=process_offering)
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     except colander.Invalid as ex:
