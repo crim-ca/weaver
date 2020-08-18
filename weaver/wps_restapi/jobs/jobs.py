@@ -209,7 +209,6 @@ def get_job_status(request):
     """
     job = get_job(request)
     job_status = job.json(request, self_link="status")
-    job_status = sd.JobStatusInfo().deserialize(job_status)
     return HTTPOk(json=job_status)
 
 

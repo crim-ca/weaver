@@ -4,6 +4,10 @@
 Tests for :mod:`weaver.wps_restapi.colander_extras` operations applied
 on :mod:`weaver.wps_restapi.swagger_definitions` objects.
 """
+import colander
+import pytest
+
+from weaver.wps_restapi import colander_extras as ce
 from weaver.wps_restapi import swagger_definitions as sd
 
 
@@ -61,3 +65,42 @@ def test_any_of_under_variable():
     assert isinstance(result, dict)
     assert key in result
     assert result[key] == {"type": "float"}
+
+
+def test_oneof_nested_dict_list():
+    class Seq(ce.ExtendedSequenceSchema):
+        item = ce.ExtendedSchemaNode(colander.String())
+
+    class Obj(ce.ExtendedMappingSchema):
+        key = ce.ExtendedSchemaNode(colander.String())
+
+    class ObjSeq(ce.ExtendedMappingSchema):
+        items = Seq()
+
+    class ObjOneOf(ce.OneOfKeywordSchema):
+        _one_of = (Obj, ObjSeq)
+
+    for test_schema, test_value in [
+        (ObjOneOf, {"key": "value"}),
+        (ObjOneOf, {"items": ["value"]})
+    ]:
+        try:
+            assert test_schema().deserialize(test_value) == test_value
+        except colander.Invalid:
+            pytest.fail("Should not fail deserialize of '{!s}' with {!s}"
+                        .format(ce._get_node_name(test_schema), test_value))
+    for test_schema, test_value in [
+        (ObjOneOf, {"key": None}),
+        (ObjOneOf, {"items": None}),
+        (ObjOneOf, {"items": ["value"], "key": "value"}),  # cannot have both (oneOf)
+    ]:
+        try:
+            result = ObjOneOf().deserialize(test_value)
+        except colander.Invalid:
+            pass
+        except Exception:
+            raise AssertionError("Incorrect exception raised from deserialize of '{!s}' with {!s}"
+                                 .format(ce._get_node_name(test_schema), test_value))
+        else:
+            raise AssertionError("Should have raised invalid schema from deserialize of '{!s}' with {!s}, but got {!s}"
+                                 .format(ce._get_node_name(test_schema), test_value, result))

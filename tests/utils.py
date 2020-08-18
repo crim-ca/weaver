@@ -274,8 +274,12 @@ def mocked_file_response(path, url):
         def read(self, chuck_size=None):  # noqa: E811
             return self._data.pop(-1)
 
+    # add extra methods that 'real' response would have and that are employed by underlying code
     setattr(resp, "raw", StreamReader())
-    resp.url = url
+    if isinstance(resp, TestResponse):
+        setattr(resp, "url", url)
+        setattr(resp, "reason", getattr(resp, "explanation", ""))
+        setattr(resp, "raise_for_status", lambda: Response.raise_for_status(resp))
     return resp
 
 
@@ -351,9 +355,6 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
         req_url, req_func, kwargs = _parse_for_app_req(function, *args, **kwargs)
         kwargs.setdefault("expect_errors", True)
         resp = req_func(req_url, **kwargs)
-        # add extra methods that 'real' response would have and that are employed by underlying code
-        if isinstance(resp, TestResponse):
-            setattr(resp, "raise_for_status", lambda: Response.raise_for_status(resp))
         return resp
 
 

@@ -2,8 +2,8 @@
 This module offers multiple utility schema definitions to be employed with
 :mod:`colander` and :mod:`cornice_swagger`.
 
-The SchemaNodes provided here can be used in-place of :mod:`colander` ones, but
-giving you extended behaviour according to provided keywords. You can therefore
+The :class:`colander.SchemaNode` provided here can be used in-place of :mod:`colander`
+ones, but giving you extended behaviour according to provided keywords. You can therefore
 do the following and all will be applied without modifying your code base.
 
 .. code-block:: python
@@ -17,7 +17,14 @@ can generate OpenAPI-3 specifications. The original package support is limited
 to Swagger-2. You will also need additional in-place modifications provided
 `here <https://github.com/fmigneault/cornice.ext.swagger/tree/openapi-3>`_.
 
-The main classes are:
+Since the intended usage is to generate JSON-deserialized data structures, the
+base :class:`colander.SchemaNode` have some additional patches needed to handle
+JSON-native type conversion that are not directly offered by :mod:`colander`
+
+.. seealso::
+    - https://github.com/Pylons/colander/issues/80
+
+The main classes extensions are:
  - :class:`ExtendedSchemaNode`
  - :class:`ExtendedSequenceSchema`
  - :class:`ExtendedMappingSchema`
@@ -82,6 +89,30 @@ class OneOfCaseInsensitive(colander.OneOf):
             return super(OneOfCaseInsensitive, self).__call__(node, value)
 
 
+class ExtendedBoolean(colander.Boolean):
+    def serialize(self, node, cstruct):
+        result = super(ExtendedBoolean, self).serialize(node, cstruct)
+        if result is not colander.null:
+            result = result == 'true'
+        return result
+
+
+class ExtendedFloat(colander.Float):
+    def serialize(self, node, cstruct):
+        result = super(ExtendedFloat, self).serialize(node, cstruct)
+        if result is not colander.null:
+            result = float(result)
+        return result
+
+
+class ExtendedInteger(colander.Integer):
+    def serialize(self, node, cstruct):
+        result = super(ExtendedInteger, self).serialize(node, cstruct)
+        if result is not colander.null:
+            result = int(result)
+        return result
+
+
 class ExtendedNode(object):
     _extension = None  # type: str
 
@@ -144,21 +175,21 @@ class DropableSchemaNode(ExtendedNode, colander.SchemaNode):
 
     # pylint: disable=W0222,signature-differs
     def deserialize(self, cstruct):
-        return ExtendedSchemaNode.deserialize(self, cstruct)
+        return ExtendedSchemaNode.deserialize(self, cstruct)  # noqa
 
     def _deserialize_impl(self, cstruct):
         if not getattr(self, DropableSchemaNode._extension, False):
             return cstruct
         if self.default is colander.null and self.missing is colander.drop:
             if cstruct is colander.drop:
-                return colander.null
+                return colander.drop
             containers = (colander.SequenceSchema.schema_type,
                           colander.MappingSchema.schema_type,
                           colander.TupleSchema.schema_type)
             if self.schema_type in containers and not cstruct:
-                return colander.null
+                return colander.drop
             elif cstruct in (None, colander.null):
-                return colander.null
+                return colander.drop
         return cstruct
 
 
@@ -187,7 +218,7 @@ class DefaultSchemaNode(ExtendedNode, colander.SchemaNode):
 
     # pylint: disable=W0222,signature-differs
     def deserialize(self, cstruct):
-        return ExtendedSchemaNode.deserialize(self, cstruct)
+        return ExtendedSchemaNode.deserialize(self, cstruct)  # noqa
 
     def _deserialize_impl(self, cstruct):
         if not getattr(self, DefaultSchemaNode._extension, False):
@@ -355,7 +386,7 @@ class VariableSchemaNode(ExtendedNode, colander.SchemaNode):
 
     # pylint: disable=W0222,signature-differs
     def deserialize(self, cstruct):
-        return ExtendedSchemaNode.deserialize(self, cstruct)
+        return ExtendedSchemaNode.deserialize(self, cstruct)  # noqa
 
     def _deserialize_impl(self, cstruct):
         if not getattr(self, VariableSchemaNode._extension, False):
@@ -397,7 +428,6 @@ class VariableSchemaNode(ExtendedNode, colander.SchemaNode):
             if not var_map.get(var, None):
                 raise var_invalid
 
-        result = colander.null
         invalid_var = colander.Invalid(self, value=var_map)
         try:
             # Substitute real keys with matched variables to run full deserialize so
@@ -411,7 +441,7 @@ class VariableSchemaNode(ExtendedNode, colander.SchemaNode):
                     # if multiple objects corresponding to a variable sub-schema where provided,
                     # we only give one as this is what is expected for normal-mapping deserialize
                     cstruct[mapped[0]["node"]] = cstruct.pop(mapped[0]["name"])
-                result = super(VariableSchemaNode, self).deserialize(cstruct)
+                result = super(VariableSchemaNode, self).deserialize(cstruct)  # noqa
             for var, mapped in var_map.items():
                 for var_mapped in mapped:
                     result[var_mapped["name"]] = var_mapped["cstruct"]
@@ -451,16 +481,27 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
         # process extensions to infer alternative parameter/property values
         # node extensions order is important as they can impact the following ones
         result = cstruct
-        for node_ext in [DropableSchemaNode, DefaultSchemaNode, VariableSchemaNode]:  # type: ExtendedNode
-            if result not in (colander.null, colander.drop):  # skip if we already got a final result
-                result = node_ext._deserialize_impl(self, cstruct)
+        for node_ext in [DropableSchemaNode, DefaultSchemaNode, VariableSchemaNode]:  # type: Type[ExtendedNode]
+            if result in (colander.null, colander.drop):  # skip if we already got a final result
+                break
+            result = node_ext._deserialize_impl(self, result)
+
         # process usual base operation with extended result
-        if isinstance(schema_type, colander.Mapping):
-            result = colander.MappingSchema.deserialize(self, result)
-        elif isinstance(schema_type, colander.Sequence):
-            result = colander.SequenceSchema.deserialize(self, result)
-        elif result is not colander.drop:
-            result = colander.SchemaNode.deserialize(self, result)
+        if result not in (colander.drop, colander.null):
+            if isinstance(schema_type, colander.Mapping):
+                result = colander.MappingSchema.deserialize(self, result)
+            elif isinstance(schema_type, colander.Sequence):
+                result = colander.SequenceSchema.deserialize(self, result)
+            else:
+                # special cases for JSON conversion, invert of serialize/deserialize
+                #   deserialize causes Date/DateTime/Time to become Python datetime, and raise if not String
+                #   employ serialize instead which provides the desired conversion from predefined Python datetime
+                if isinstance(_get_schema_type(self), (colander.Date, colander.DateTime, colander.Time)):
+                    result = colander.SchemaNode.serialize(self, result)
+                else:
+                    result = colander.SchemaNode.deserialize(self, result)
+        if result is colander.null and self.missing is colander.required:
+            raise colander.Invalid(node=self, msg=self.missing_msg)
         return result
 
 
@@ -611,7 +652,7 @@ class KeywordMapper(colander.MappingSchema):
         kw_items = self.get_keyword_items()
         if not hasattr(kw_items, "__iter__") or not len(kw_items):  # noqa
             raise ConversionValueError("Element '{}' of '{!s}' must be iterable with at least 1 value. "
-                                       "Instead it was '{!s}'".format(self._keyword, type(self).__name__, kw_items))
+                                       "Instead it was '{!s}'".format(self._keyword, _get_node_name(self), kw_items))
         total = 0
         for kw in self._keywords:
             if hasattr(self, kw):
@@ -686,7 +727,7 @@ class KeywordMapper(colander.MappingSchema):
             - :meth:`_deserialize_keyword`
             - :class:`ExtendedSchemaNode`
         """
-        node.name = self.name  # pass down the parent name
+        node.name = _get_node_name(self)  # pass down the parent name
         if isinstance(node, KeywordMapper):
             return KeywordMapper.deserialize(node, cstruct)
         return ExtendedSchemaNode.deserialize(node, cstruct)
@@ -755,7 +796,7 @@ class OneOfKeywordSchema(KeywordMapper):
 
     In the event that you have very similar schemas that can sometime match except one identifier
     (e.g.: field ``type`` defining the type of object), consider adding a validator to that
-    schema node with explicit values to solve the discrimination problem. As a shorcut, the keyword
+    schema node with explicit values to solve the discrimination problem. As a shortcut, the keyword
     ``discriminator = {"field-name": "value"}`` can be provided to try matching as a last resort.
     For example::
 
@@ -802,7 +843,7 @@ class OneOfKeywordSchema(KeywordMapper):
     @classmethod
     @abstractmethod
     def _one_of(cls):
-        # type: () -> Iterable[colander._SchemaMeta]  # noqa: W0212
+        # type: () -> Iterable[Union[colander.SchemaNode, Type[colander.SchemaNode]]]  # noqa: W0212
         """This must be overridden in the schema definition using it."""
         raise SchemaNodeTypeError("Missing '{}' keyword for schema '{}'.".format(cls._keyword, cls))
 
@@ -826,20 +867,17 @@ class OneOfKeywordSchema(KeywordMapper):
                 valid_one_of.append(self._deserialize_subnode(schema_class, cstruct))
                 valid_nodes.append(schema_class)
             except colander.Invalid as invalid:
-                invalid_one_of.update({type(invalid.node).__name__: invalid.asdict()})
+                invalid_one_of.update({_get_node_name(invalid.node): invalid.asdict()})
+        message = "Incorrect type, must be one of: {}. Errors for each case: {}" \
+                  .format(list(invalid_one_of.keys()), invalid_one_of)
 
         if valid_one_of:
             # if found only one, return it, otherwise try to discriminate
             if len(valid_one_of) == 1:
                 return valid_one_of[0]
+            message = "Incorrect type, cannot distinguish between multiple valid schemas. " \
+                      "Must be only one of: {}.".format([_get_node_name(node) for node in valid_nodes])
 
-            # return the format which didn't change the input data
-            # ##keep_valid = []
-            # ##for valid in valid_one_of:
-            # ## if _dict_nested_contained(cstruct, valid):
-            # ##     keep_valid.append(valid)
-            # ##if len(keep_valid) == 1:
-            # ##   return keep_valid[0]
             discriminator = getattr(self, self._discriminator, None)
             if isinstance(discriminator, dict):
                 # try last resort solve
@@ -847,9 +885,7 @@ class OneOfKeywordSchema(KeywordMapper):
                 error_discriminated = {}
                 for i, obj in enumerate(valid_one_of):
                     node = valid_nodes[i]
-                    node_name = getattr(node, "name", None) or \
-                                getattr(node, "title", None) or \
-                                type(node).__name__  # noqa: E127
+                    node_name = _get_node_name(node)
                     if all(getattr(obj, d_key, None) == d_val
                            for d_key, d_val in discriminator.items()):
                         valid_discriminated.append(obj)
@@ -860,7 +896,7 @@ class OneOfKeywordSchema(KeywordMapper):
                     return valid_discriminated[0]
                 elif len(valid_discriminated) > 1:
                     invalid_one_of = error_discriminated
-                message = "Incorrect type, cannot discriminate between multiple valid schemas." \
+                message = "Incorrect type, cannot discriminate between multiple valid schemas. " \
                           "Must be only one of: {}.".format(list(invalid_one_of.keys()))
                 raise colander.Invalid(node=self, msg=message, value=discriminator)
 
@@ -871,13 +907,9 @@ class OneOfKeywordSchema(KeywordMapper):
                 valid_values = list(filter(lambda c: c == cstruct and type(c) == type(cstruct), valid_one_of))
                 if len(valid_values) == 1:
                     return valid_values[0]
-                invalid_one_of = {}
-                message = "Incorrect type, cannot discriminate between multiple valid schemas." \
+                message = "Incorrect type, cannot differentiate between multiple base-type valid schemas. " \
                           "Must be only one of: {}.".format(valid_values)
-                raise colander.Invalid(node=self, msg=message)
 
-        message = "Incorrect type, must be one of: {}. Errors for each case: {}" \
-                  .format(list(invalid_one_of.keys()), invalid_one_of)
         raise colander.Invalid(node=self, msg=message)
 
 
@@ -901,7 +933,7 @@ class AllOfKeywordSchema(KeywordMapper):
     @classmethod
     @abstractmethod
     def _all_of(cls):
-        # type: () -> Iterable[colander._SchemaMeta]  # noqa: W0212
+        # type: () -> Iterable[Union[colander.SchemaNode, Type[colander.SchemaNode]]]  # noqa: W0212
         """This must be overridden in the schema definition using it."""
         raise SchemaNodeTypeError("Missing '{}' keyword for schema '{}'.".format(cls._keyword, cls))
 
@@ -917,10 +949,10 @@ class AllOfKeywordSchema(KeywordMapper):
             try:
                 schema_class = _make_node_instance(schema_class)
                 # update items with new ones
-                required_all_of.update({type(schema_class).__name__: str(schema_class)})
+                required_all_of.update({_get_node_name(schema_class): str(schema_class)})
                 merged_all_of.update(self._deserialize_subnode(schema_class, cstruct))
             except colander.Invalid as invalid:
-                missing_all_of.update({type(invalid.node).__name__: str(invalid)})
+                missing_all_of.update({_get_node_name(invalid.node): str(invalid)})
 
         if missing_all_of:
             # if anything failed, the whole definition is invalid in this case
@@ -956,7 +988,7 @@ class AnyOfKeywordSchema(KeywordMapper):
     @classmethod
     @abstractmethod
     def _any_of(cls):
-        # type: () -> Iterable[colander._SchemaMeta]  # noqa: W0212
+        # type: () -> Iterable[Union[colander.SchemaNode, Type[colander.SchemaNode]]]  # noqa: W0212
         """This must be overridden in the schema definition using it."""
         raise SchemaNodeTypeError("Missing '{}' keyword for schema '{}'.".format(cls._keyword, cls))
 
@@ -971,7 +1003,7 @@ class AnyOfKeywordSchema(KeywordMapper):
             try:
                 schema_class = _make_node_instance(schema_class)
                 # update items with new ones
-                option_any_of.update({type(schema_class).__name__: str(schema_class)})
+                option_any_of.update({_get_node_name(schema_class): str(schema_class)})
                 merged_any_of.update(self._deserialize_subnode(schema_class, cstruct))
             except colander.Invalid as invalid:
                 invalid_any_of.add(invalid)
@@ -1000,7 +1032,7 @@ class NotKeywordSchema(KeywordMapper):
     @classmethod
     @abstractmethod
     def _not(cls):
-        # type: () -> Iterable[colander._SchemaMeta]  # noqa: W0212
+        # type: () -> Iterable[Union[colander.SchemaNode, Type[colander.SchemaNode]]]  # noqa: W0212
         """This must be overridden in the schema definition using it."""
         raise SchemaNodeTypeError("Missing '{}' keyword for schema '{}'.".format(cls._keyword, cls))
 
@@ -1013,7 +1045,7 @@ class NotKeywordSchema(KeywordMapper):
             try:
                 schema_class = _make_node_instance(schema_class)
                 self._deserialize_subnode(schema_class, cstruct)
-                invalid_not.update({type(schema_class).__name__: str(schema_class)})
+                invalid_not.update({_get_node_name(schema_class): str(schema_class)})
             except colander.Invalid:
                 pass
         if invalid_not:
@@ -1191,11 +1223,17 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
 def _dict_nested_contained(parent, child):
     """Tests that a dict is 'contained' within a parent dict
 
+<<<<<<< HEAD
     .. code-block:: python
 
         >>> parent = {"other": 2, "test": [{"inside": 1, "other_nested": 2}]}
         >>> child = {"test": [{"inside": 1}]}
         >>> _dict_nested_contained(parent, child)
+=======
+        >>> struct_parent = {"other": 2, "test": [{"inside": 1, "other_nested": 2}]}
+        >>> struct_child = {"test": [{"inside": 1}]}
+        >>> _dict_nested_contained(struct_parent, struct_child)
+>>>>>>> more work & tests on schema deserialization
         True
 
     :param dict parent: The dict that could contain the child
@@ -1239,7 +1277,7 @@ def _make_node_instance(schema_node_or_class):
 
 def _get_schema_type(schema_node):
     # type: (Union[colander.SchemaNode, Type[colander.SchemaNode], ExtendedSchemaNode]) -> colander.SchemaType
-    """Obtains the schema-type from the provided node, supporting various intialization methods.
+    """Obtains the schema-type from the provided node, supporting various initialization methods.
 
 
     - ``typ`` is set by an instantiated node from specific schema (e.g.: ``colander.SchemaNode(colander.String())``)
@@ -1252,3 +1290,7 @@ def _get_schema_type(schema_node):
     if not isinstance(schema_type, colander.SchemaType):
         raise ConversionTypeError("Invalid schema type could not be detected: {!s}".format(type(schema_type)))
     return schema_type
+
+
+def _get_node_name(schema_node):
+    return getattr(schema_node, "name", None) or getattr(schema_node, "title", None) or type(schema_node).__name__

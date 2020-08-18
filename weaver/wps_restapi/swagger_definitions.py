@@ -6,7 +6,7 @@ so that one can update the swagger without touching any other files after the in
 
 from typing import TYPE_CHECKING
 
-from colander import Boolean, DateTime, Float, Integer, OneOf, Range, String, Time, drop
+from colander import DateTime, OneOf, Range, String, drop
 from cornice import Service
 
 from weaver import __meta__
@@ -36,11 +36,14 @@ from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, STATUS_COMPLIA
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps_restapi.colander_extras import (
     AnyOfKeywordSchema,
-    OneOfCaseInsensitive,
+    ExtendedBoolean as Boolean,
+    ExtendedFloat as Float,
+    ExtendedInteger as Integer,
     ExtendedMappingSchema,
     ExtendedSchemaNode,
     ExtendedSequenceSchema,
     NotKeywordSchema,
+    OneOfCaseInsensitive,
     OneOfKeywordSchema,
     PermissiveMappingSchema
 )
@@ -289,6 +292,7 @@ class MetadataList(ExtendedSequenceSchema):
 
 
 class LinkList(ExtendedSequenceSchema):
+    description = "List of links relative to the applicable object."
     link = Link()
 
 
@@ -399,7 +403,7 @@ class WithFormats(ExtendedMappingSchema):
     formats = FormatDescriptionList()
 
 
-class ComplexInputType(WithMinMaxOccurs, WithFormats):
+class ComplexInputType(WithFormats):
     pass
 
 
@@ -412,7 +416,7 @@ class SupportedCRSList(ExtendedSequenceSchema):
     item = SupportedCRS(title="SupportedCRS")
 
 
-class BoundingBoxInputType(WithMinMaxOccurs):
+class BoundingBoxInputType(ExtendedMappingSchema):
     supportedCRS = SupportedCRSList()
 
 
@@ -477,12 +481,12 @@ class LiteralDataDomainTypeList(ExtendedSequenceSchema):
     literalDataDomain = LiteralDataDomainType()
 
 
-class LiteralInputType(NotKeywordSchema, WithMinMaxOccurs):
+class LiteralInputType(NotKeywordSchema, ExtendedMappingSchema):
     _not = (WithFormats, )
     literalDataDomains = LiteralDataDomainTypeList(missing=drop)
 
 
-class InputType(OneOfKeywordSchema, InputDescriptionType):
+class InputType(OneOfKeywordSchema, InputDescriptionType, WithMinMaxOccurs):
     _one_of = (
         BoundingBoxInputType,
         ComplexInputType,  # should be 2nd to last because very permissive, but requires format at least
@@ -916,13 +920,26 @@ class ProcessOutputDescriptionSchema(ExtendedMappingSchema):
 
 class JobStatusInfo(ExtendedMappingSchema):
     jobID = UUID(example="a9d14bf4-84e0-449a-bac8-16e598efe807", description="ID of the job.")
-    status = JobStatusEnum()
-    message = ExtendedSchemaNode(String(), missing=drop)
-    expirationDate = ExtendedSchemaNode(DateTime(), missing=drop)
+    status = JobStatusEnum(description="Last updated status.")
+    message = ExtendedSchemaNode(String(), missing=drop, description="Information about the last status update.")
+    created = ExtendedSchemaNode(DateTime(), missing=drop, default=None,
+                                 description="Timestamp when the process execution job was created.")
+    started = ExtendedSchemaNode(DateTime(), missing=drop, default=None,
+                                 description="Timestamp when the process started execution if applicable.")
+    finished = ExtendedSchemaNode(DateTime(), missing=drop, default=None,
+                                  description="Timestamp when the process completed execution if applicable.")
+    # note: using String instead of Time because timedelta object cannot be directly handled (missing parts at parsing)
+    duration = ExtendedSchemaNode(String(), missing=drop,
+                                  description="Duration since the start of the process execution.")
+    runningSeconds = ExtendedSchemaNode(Integer(), missing=drop,
+                                        description="Duration in seconds since the start of the process execution.")
+    expirationDate = ExtendedSchemaNode(DateTime(), missing=drop,
+                                        description="Timestamp when the job will be canceled if not yet completed.")
     estimatedCompletion = ExtendedSchemaNode(DateTime(), missing=drop)
-    duration = ExtendedSchemaNode(Time(), missing=drop, description="Duration of the process execution.")
-    nextPoll = ExtendedSchemaNode(DateTime(), missing=drop)
-    percentCompleted = ExtendedSchemaNode(Integer(), example=0, validator=Range(min=0, max=100))
+    nextPoll = ExtendedSchemaNode(DateTime(), missing=drop,
+                                  description="Timestamp when the job will prompted for updated status details.")
+    percentCompleted = ExtendedSchemaNode(Integer(), example=0, validator=Range(min=0, max=100),
+                                          description="Completion percentage of the job as indicated by the process.")
     links = LinkList(missing=drop)
 
 
@@ -1465,7 +1482,7 @@ class JobResultValue(AnyOfKeywordSchema):
 
 
 class JobException(ExtendedMappingSchema):
-    # note: test fields correspond exactly to 'owslib.wps.WPSException', they are serialized as is
+    # note: test fields correspond exactly to 'owslib.wps.WPSException', they are deserialized as is
     Code = ExtendedSchemaNode(String())
     Locator = ExtendedSchemaNode(String(), default=None)
     Text = ExtendedSchemaNode(String())
