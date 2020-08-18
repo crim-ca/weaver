@@ -323,6 +323,11 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
         else:
             path = get_url_without_query(url.replace("mock://", ""))
             resp = mocked_file_response(path, url)
+        # add extra methods that 'real' response would have and that are employed by underlying code
+        if isinstance(resp, TestResponse):
+            setattr(resp, "url", url)
+            setattr(resp, "reason", getattr(resp, "explanation", ""))
+            setattr(resp, "raise_for_status", lambda: Response.raise_for_status(resp))
         return resp
 
     with contextlib.ExitStack() as stack:
@@ -332,9 +337,6 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
         request_func = getattr(app, function)
         kwargs.setdefault("expect_errors", True)
         resp = request_func(*args, **kwargs)
-        # add extra methods that 'real' response would have and that are employed by underlying code
-        if isinstance(resp, TestResponse):
-            setattr(resp, "raise_for_status", lambda: Response.raise_for_status(resp))
         return resp
 
 
