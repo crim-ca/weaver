@@ -3,7 +3,7 @@ import time
 from collections import defaultdict
 from typing import TYPE_CHECKING, Optional
 
-import cwt
+import esgf_compute_api as cwt
 
 from weaver.processes.wps1_process import Wps1Process
 from weaver.status import STATUS_FAILED, STATUS_RUNNING, STATUS_SUCCEEDED
