@@ -27,7 +27,7 @@ By default, this value should be ``localhost:4001``.
     This tutorial section is a minimal introduction to available requests and endpoints. Please refer to
     `processes`_ for further details, such as detailed request payload contents, types of processes and additional
     operations that compose a typical process execution workflow. Similarly, refer to
-    `Application Package <package>`_ for further details about the definition of the reference application executed
+    :ref:`Application Package` for further details about the definition of the reference application executed
     by the deployed processes.
 
 .. _configuration: docs/source/configuration.rst
