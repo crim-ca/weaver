@@ -17,7 +17,10 @@ How to specify the Docker image reference?
 ==================================================
 
 In most situations, the ``CommonLineTool`` process will need to run a docker image. Doing so is as simple as adding the
-``DockerRequirement`` (`reference <cwl-docker-req>`_) as follows to the `Application Package` definition:
+``DockerRequirement`` (|cwl_docker-req-ref|_) as follows to the `Application Package` definition:
+
+.. |cwl_docker-req-ref| replace:: reference
+.. _cwl_docker-req-ref: `cwl-docker-req`_
 
 .. code-block:: json
 

@@ -16,4 +16,4 @@ Table of Contents
     Source Code Documentation <autoapi/index.rst>
     changes
     faq
-    appendix
+    Glossary and References <appendix>
