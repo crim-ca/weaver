@@ -10,26 +10,27 @@ Application Package
     :local:
     :depth: 2
 
-The `Application Package` defines the internal script definition and configuration that will be executed by a process.
-This package is based on |CWL|_ (`CWL`). Using the extensive |cwl-spec|_ as backbone
-for internal execution of the process allows it to run multiple type of applications, whether they are referenced to by
-`docker image`, `bash script` or more.
+The :term:`Application Package` defines the internal script definition and configuration that will be executed by a
+:term:`Process`. This package is based on |CWL|_ (:term:`CWL`). Using the extensive |cwl-spec|_ as backbone for
+internal execution of the process allows it to run multiple type of applications, whether they are referenced to
+by :term:`Docker` image, scripts (`bash`, `python`, etc.), some remote :term:`Process` and more.
 
 .. note::
-    The large community and use cases covered by `CWL` makes it extremely versatile. If you encounter any issue running
-    your `Application Package` in `Weaver` (such as file permissions for example), chances are that there exists a
-    workaround somewhere in the |cwl-spec|_. Most typical problems are usually handled by some flag or argument in the
-    `CWL` definition, so this reference should be explored first. Please also refer to :ref:`FAQ` section as well as
-    existing |Weaver issues|_. Ultimately if no solution can be found, open an new issue about your specific problem.
+    The large community and use cases covered by :term:`CWL` makes it extremely versatile. If you encounter any issue
+    running your :term:`Application Package` in `Weaver` (such as file permissions for example), chances are that there
+    exists a workaround somewhere in the |cwl-spec|_. Most typical problems are usually handled by some flag or argument
+    in the :term:`CWL` definition, so this reference should be explored first. Please also refer to :ref:`FAQ` section
+    as well as existing |Weaver-issues|_. Ultimately if no solution can be found, open an new issue about your specific
+    problem.
 
 
-All processes deployed locally into `Weaver` using a `CWL` package definition will have their full package definition
-available with |pkg-req|_ request.
+All processes deployed locally into `Weaver` using a :term:`CWL` package definition will have their full package
+definition available with |pkg-req|_ request.
 
 .. note::
 
-    |pkg-req|_ is `Weaver`-specific implementation, and therefore, is not necessarily available on other `ADES`/`EMS`
-    implementation as this feature is not part of |ogc-proc-api|_ specification.
+    The package request is a `Weaver`-specific implementation, and therefore, is not necessarily available on other
+    :term:`ADES`/:term:`EMS` implementation as this feature is not part of |ogc-proc-api|_ specification.
 
 
 Typical CWL Package Definition
