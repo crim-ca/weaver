@@ -16,7 +16,7 @@ operation or more specifically related to :term:`CWL` specification.
 How to specify the Docker image reference?
 ==================================================
 
-In most situations, the ``CommonLineTool`` process will need to run a :term:`Docker` image. Doing so is as simple as
+In most situations, the ``CommandLineTool`` process will need to run a :term:`Docker` image. Doing so is as simple as
 adding the ``DockerRequirement`` (|cwl-docker-req-ref|_) as follows to the :ref:`Application Package` definition:
 
 .. |cwl-docker-req-ref| replace:: reference

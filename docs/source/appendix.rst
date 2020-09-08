@@ -29,8 +29,8 @@ Glossary
           :ref:`application-package` section for further details.
 
     Docker
-        Image that packages all required dependencies of an application or software in order to correctly execute it
-        in a containerized and isolated virtualized environment.
+        Containerized and isolated environment platform that allows all required dependencies of an application or
+        software to be packaged in a single image in order to correctly execute the virtualized application.
 
     EDAM
         Ontology that regroups multiple definitions, amongst which `Weaver` looks up some of its known and supported
