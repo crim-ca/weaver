@@ -185,10 +185,13 @@ Configuration of AWS S3 Buckets
 
 Any `AWS` `S3` bucket accessed by `Weaver` needs to be accessible by the application, whether it is to fetch input
 files or to store output results. This can require from the server administrator to specify credentials by one of
-reference `supported methodologies <aws-credentials>`_ to provide necessary role and/or permissions. See also reference
-`AWS Configuration <aws-config>`_ which list various options that will be considered when working with `S3` buckets.
+reference |aws-cred-support|_ to provide necessary role and/or permissions. See also reference |aws-config|_ which
+list various options that will be considered when working with `S3` buckets.
 
-Note that `Weaver` expects the `AWS Configuration <aws-config>`_ to define a *default profile* from which the AWS
+.. |aws-cred-support| replace:: supported methodologies
+.. _aws-cred-support: `aws-credentials`_
+
+Note that `Weaver` expects the |aws-config|_ to define a *default profile* from which the AWS
 client can infer which *region* it needs to connect to. The `S3` bucket to store files should be defined by
 ``weaver.wps_output_s3_bucket`` setting as presented in the previous section.
 

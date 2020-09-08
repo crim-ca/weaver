@@ -26,7 +26,7 @@ These processes come pre-packaged with `Weaver`. They will be available directly
 re-updated on each boot to make sure internal database references are updated with any source code changes.
 
 Theses processes typically correspond to utility operations. They are specifically useful when employed as
-`step` within a `Workflow`_ process that requires data-type conversion between input/output of similar, but not
+``step`` within a `Workflow`_ process that requires data-type conversion between input/output of similar, but not
 perfectly, compatible definitions.
 
 For example, process :py:mod:`weaver.processes.builtin.jsonarray2netcdf` takes a single input JSON file which its
@@ -36,11 +36,13 @@ these respective output and inputs.
 
 As of the latest release, following `builtin` processes are available:
 
+- :py:mod:`weaver.processes.builtin.file2string_array`
 - :py:mod:`weaver.processes.builtin.jsonarray2netcdf`
+- :py:mod:`weaver.processes.builtin.metalink2netcdf`
 
 
-All `builtin` processes are marked with :py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_BUILTIN` in the `CWL`
-hints* section.
+All `builtin` processes are marked with :py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_BUILTIN` in the
+:term:`CWL` ``hints`` section and are all defined in :py:mod:`weaver.processes.builtin`.
 
 WPS-1/2
 -------
@@ -100,15 +102,15 @@ ways as presented below.
 
 .. note::
 
-    When a process is deployed with any of the below supported `Application Package` formats, additional parsing of
-    this `CWL` as well as complementary details directly within the `WPS` deployment body is accomplished.
-    See :ref:`Correspondance between CWL and WPS fields` section for more details.
+    When a process is deployed with any of the below supported :term:`Application Package` formats, additional parsing
+    of this :term:`CWL` as well as complementary details directly within the :term:`WPS` deployment body is
+    accomplished. See :ref:`Correspondance between CWL and WPS fields` section for more details.
 
 
 Package as Literal Unit Block
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In this situation, the `CWL` definition is provided as is using JSON-formatted package embedded within the
+In this situation, the :term:`CWL` definition is provided as is using JSON-formatted package embedded within the
 |deploy-req|_ request. The request payload would take the following shape:
 
 .. code-block:: json
@@ -136,8 +138,8 @@ In this situation, the `CWL` definition is provided as is using JSON-formatted p
 ESGF-CWT
 ----------
 
-For *traditional* WPS-1 process type, Weaver adds default values to CWL definition. As we can see in
-:mod:`weaver/processes/wps_package.py`, the following default values for the CWL package are:
+For *traditional* WPS-1 process type, Weaver adds default values to :term:`CWL` definition. As we can see in
+:mod:`weaver/processes/wps_package.py`, the following default values for the :term:`CWL` package are:
 
 .. code-block:: python
 
@@ -151,19 +153,21 @@ For *traditional* WPS-1 process type, Weaver adds default values to CWL definiti
             }}),
     ])
 
-In `ESGF-CWT`, ``ESGF-CWTRequirement`` hint is used instead of default ``WPS1Requirement``, contained in the
-:py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_WPS1` variable up here. The handling of this technicality is
-handled in :mod:`weaver/processes/wps_package.py`. We can define `ESGF-CWT` processes using this syntax:
+In :term:`ESGF-CWT` processes, ``ESGF-CWTRequirement`` hint must be used instead of usual ``WPS1Requirement``, contained
+in the :py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_WPS1` variable. The handling of this technicality is
+handled in :mod:`weaver/processes/wps_package.py`. We can define :term:`ESGF-CWT` processes using this syntax:
 
 .. code-block:: json
 
-    "cwlVersion": "v1.0",
-    "class": "CommandLineTool",
-    "hints": {
+    {
+      "cwlVersion": "v1.0",
+      "class": "CommandLineTool",
+      "hints": {
         "ESGF-CWTRequirement": {
-            "provider": "https://edas.nccs.nasa.gov/wps/cwt",
-            "process": "xarray.subset"
+          "provider": "https://edas.nccs.nasa.gov/wps/cwt",
+          "process": "xarray.subset"
         }
+      }
     }
 
 Workflow
@@ -174,34 +178,36 @@ actually look exactly the same as an atomic process when calling `DescribeProces
 The difference lies within the referenced :ref:`Application Package` which uses a :ref:`CWL Workflow` instead of
 typical :ref:`CWL CommandLineTool`, and therefore, modifies how the process is internally executed.
 
-For ``Workflow`` processes to be deploy-able and executable, it is **mandatory** that `Weaver` is configured as `EMS`
-(see: :ref:`Configuration Settings`). This requirement is due to the nature of workflows that chain processes that
-need to be dispatched to known remote `ADES` servers (see: :ref:`Configuration of Data Sources` and
-`Workflow Operations`_).
+For ``Workflow`` processes to be deploy-able and executable, it is **mandatory** that `Weaver` is configured as
+:term:`EMS` (see: :ref:`Configuration Settings`). This requirement is due to the nature of workflows that chain
+processes that need to be dispatched to known remote :term:`ADES` servers (see: :ref:`Configuration of Data Sources`
+and `Workflow Operations`_).
 
 Given that a ``Workflow`` process was successfully deployed and that all process steps can be resolved, calling
 its `Execute`_ request will tell `Weaver` to parse the chain of operations and send step process execution requests
-to relevant `ADES` picked according to data sources. Each step's job will then gradually be monitored from the remote
-`ADES` until completion, and upon successful result, the `EMS` will retrieve the data references to pass it down to
-the following step. When the complete chain succeeds, the final results of the last step will be provide as
-``Workflow`` output as for atomic processes. In case of failure, the error will be indicated in the log with the
-appropriate step and message where the error occurred.
+to relevant :term:`ADES` picked according to data sources. Each step's job will then gradually be monitored from the
+remote :term:`ADES` until completion, and upon successful result, the :term:`EMS` will retrieve the data references to
+pass it down to the following step. When the complete chain succeeds, the final results of the last step will be
+provided as ``Workflow`` output as for atomic processes. In case of failure, the error will be indicated in the log
+with the appropriate step and message where the error occurred.
 
 .. note::
 
     Although chaining sub-workflow(s) within a bigger scoped workflow is technically possible, this have not yet
-    been fully explored (tested) in `Weaver`. There is a chance that data-source resolution fails to identify where
+    been fully explored (tested) in `Weaver`. There is a chance that |data-source|_ resolution fails to identify where
     to dispatch the step in this situation. If this impacts you, please vote and indicate your concern on issue
     `#171 <https://github.com/crim-ca/weaver/issues/171>`_.
+
+.. _remote-provider:
 
 Remote Provider
 --------------------
 
-Remote provider correspond to a remote service that provides similar interfaces as supported by `Weaver` (`WPS`-like).
-For example, a remote WPS-1 XML endpoint can be referenced as a provider. When an API `Providers`_-scoped request is
-executed, for example to list is processes capabilities (see `GetCapabilities`_), `Weaver` will send the corresponding
-request using the registered reference URL to access the remote server and reply with parsed response, as if they
-its processes were registered locally.
+Remote provider correspond to a remote service that provides similar interfaces as supported by `Weaver`
+(:term:`WPS`-like). For example, a remote WPS-1 XML endpoint can be referenced as a provider. When an API
+`Providers`_-scoped request is executed, for example to list is processes capabilities (see `GetCapabilities`_),
+`Weaver` will send the corresponding request using the registered reference URL to access the remote server and
+reply with parsed response, as if they its processes were registered locally.
 
 Since remote providers obviously require access to the remote service, `Weaver` will only be able to provide results
 if the service is accessible with respect to standard implementation features and supported specifications.
@@ -242,8 +248,8 @@ An example body of the `register provider`_ request could be as follows:
     }
 
 
-Then, processes of this registered *remote provider* will be accessible. For example, if the referenced service by the
-above URL add a WPS process identified by `my-process`, its JSON description would be obtained with following
+Then, processes of this registered `remote-provider`_ will be accessible. For example, if the referenced service by
+the above URL add a WPS process identified by ``my-process``, its JSON description would be obtained with following
 request (`DescribeProviderProcess`_):
 
 .. code-block::
@@ -252,9 +258,9 @@ request (`DescribeProviderProcess`_):
 
 .. note::
 
-    Process `my-process` in the example is not registered locally. From the point of view of `Weaver`'s processes
-    (i.e.: route `/processes/{id}`), it does **NOT** exist. You must absolutely use the prefixed ``/providers/{id}``
-    route.
+    Process ``my-process`` in the example is not registered locally. From the point of view of `Weaver`'s processes
+    (i.e.: route ``/processes/{id}``), it does **NOT** exist. You must absolutely use the provider-prefixed route
+    ``/providers/{id}/processes/{id}`` to explicitly fetch and resolve this remote process definition.
 
 .. warning::
 
@@ -278,9 +284,9 @@ The request body requires mainly two components:
 
 - | ``processDescription``:
   | Defines the process identifier, metadata, inputs, outputs, and some execution specifications. This mostly
-    corresponds to information that corresponds to a traditional `WPS` definition.
+    corresponds to information that corresponds to a traditional :term:`WPS` definition.
 - | ``executionUnit``:
-  | Defines the core details of the `Application Package`_. This corresponds to the explicit `CWL` definition
+  | Defines the core details of the `Application Package`_. This corresponds to the explicit :term:`CWL` definition
     that indicates how to execute the given application.
 
 .. _Application Package: docs/source/package.rst
@@ -332,15 +338,98 @@ that define the process references and expected inputs/outputs.
 Execution of a process (Execute)
 ---------------------------------------------------------------------
 
-Process execution (i.e.: submitting a job) is accomplished using the |exec-req|_ request. This section will first
-describe the basics of this request format, and after go into details for specific use cases and parametrization of
-various input/output combinations.
+Process execution (i.e.: submitting a :term:`Job`) is accomplished using the |exec-req|_ request. This section will
+first describe the basics of this request format, and after go into details for specific use cases and parametrization
+of various input/output combinations. Let's employ the following example of JSON body sent to the :term:`Job` execution
+to better illustrate the requirements.
 
-.. todo:: detail execute I/O (basic example)
+.. code-block:: json
 
-.. todo:: detail returned location + example
+    {
+      "mode": "async",
+      "response": "document",
+      "inputs": [
+        {
+          "id": "input-file",
+          "href": "<some-file-reference"
+        },
+        {
+          "id": "input-value",
+          "data": 1,
+        }
+      ],
+      "outputs": [
+        {
+          "id": "output",
+          "transmissionMode": "reference"
+        }
+      ]
+    }
 
-This location can then be employed to call `GetStatus`_ monitoring request.
+Basic Details
+~~~~~~~~~~~~~~~~~
+
+The first field is ``mode``, it basically tells whether to run the :term:`Process` in a blocking (``sync``) or
+non-blocking (``async``) manner. Note that support is currently limited for mode ``sync`` as this use case is often more
+cumbersome than ``async`` execution. Effectively, ``sync`` mode requires to have a task worker executor available
+to run the :term:`Job` (otherwise it fails immediately due to lack of processing resource), and the requester must wait
+for the *whole* execution to complete to obtain the result. Given that :term:`Process` could take a very long time to
+complete, it is not practical to execute them in this manner and potentially have to wait hours to retrieve outputs.
+Instead, the preferred and default approach is to request an ``async`` :term:`Job` execution. When doing so, `Weaver`
+will add this to a task queue for processing, and will immediately return a :term:`Job` identifier and location where
+the user can probe for its status, using `GetStatus`_ monitoring request. As soon as any task worker becomes available,
+it will pick any leftover queued :term:`Job` to execute it.
+
+The second field is ``response``. At the time being, `Weaver` only supports ``document`` value. This parameter is
+present only for compatibility with other :term:`ADES` implementation, but does not actually affects `Weaver`'s
+response.
+
+Following are the ``inputs`` definition. This is the most important section of the request body. It defines which
+parameters to forward to the referenced :term:`Process` to be executed. All ``id`` elements in this :term:`Job` request
+body must correspond to valid ``inputs`` from the definition returned by `DescribeProcess`_ response. Obviously, all
+formatting requirements (i.e.: proper file :term:`MIME-types`), data types (e.g.: ``int``, ``string``, etc.) and
+validations rules (e.g.: ``minOccurs``, ``AllowedValues``, etc.) must also be fulfilled. When providing files as input,
+multiple protocols are supported. See later section :ref:`File Reference Types` for details.
+
+Finally, the ``outputs`` section defines, for each ``id`` corresponding to the :term:`Process` definition, how to
+report the produced outputs from a successful :term:`Job` completion. Again, `Weaver` only implement the
+``reference`` result for the time being as this is the most common variation. In this case, the produced file is
+stored locally and exposed externally with returned reference URL. The other (unimplemented) mode ``value`` would
+return the contents directly in the response instead of the URL.
+
+.. note::
+    Other parameters can be added to the request to provide further functionalities. Above fields are the minimum
+    requirements to request a :term:`Job`. Please refer to the |exec-api|_ definition for all applicable features.
+
+.. note::
+    Since most of the time, returned files are not human readable or are simply too large to be displayed, the
+    ``transmissionMode: value`` is rarely employed. Also, it is to be noted that outputs representing ``LiteralData``
+    (which is even more uncommon) would automatically be represented as ``value`` without explicitly requesting it,
+    as there would not be any file to return. If this poses problem or you encounter a valid use-case where ``value``
+    would be useful for your needs, please |submit-issue|_ to request the feature.
+
+.. |exec-api| replace:: OpenAPI Execute
+.. _exec-api: `exec-req`_
+
+
+Execution Steps
+~~~~~~~~~~~~~~~~~~~~~
+
+Once the :term:`Job` is submitted, its status should initially switch to ``accepted``. This effectively means that the
+:term:`Job` is pending execution (task queued), but is not yet executing. When a worker retrieves it for execution, the
+status will change to ``started`` for preparation steps (i.e.: allocation resources, retrieving required
+parametrization details, etc.), followed by ``running`` when effectively reaching the execution step of the underlying
+:term:`Application Package` operation. This status will remain as such until the operation completes, either with
+``succeeded`` or ``failed`` status.
+
+At any moment during ``async`` execution, the :term:`Job` status can be requested using |status-req|_. Note that
+depending on the timing at which the user executes this request and the availability of task workers, it could be
+possible that the :term:`Job` be already in ``running`` state, or even ``failed`` in case of early problem detected.
+
+When the :term:`Job` reaches its final state, multiple parameters will be adjusted in the status response to
+indicate its completion, notably the completed percentage, time it finished execution and full duration. At that
+moment, the requests for retrieving either error details or produced outputs become accessible. Examples are presented
+in `GetResult`_ section.
 
 
 Process Operations
@@ -352,7 +441,7 @@ Process Operations
 Workflow Operations
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: same as prev + 'operations' (deploy, visibility, exec-remote for each step)
+.. todo:: same as prev + 'operations' (deploy based on data-source, visibility, exec-remote for each step, pull-result)
 
 
 File Reference Types
@@ -360,13 +449,13 @@ File Reference Types
 
 Most inputs can be categorized into two of the most commonly employed types, namely ``LiteralData`` and ``ComplexData``.
 The former represents basic values such as integers or strings, while the other represents a file reference.
-Files in `Weaver` (and `WPS` in general) can be specified with any ``formats`` as MIME-type.
+Files in `Weaver` (and :term:`WPS` in general) can be specified with any ``formats`` as MIME-type.
 
 .. seealso::
     - :ref:`Correspondance between CWL and WPS fields`
 
-As for *standard* `WPS`, remote file references are *usually* limited to ``http(s)`` scheme, unless the process takes
-an input string and parses the unusual reference from the literal data to process it by itself. On the other hand,
+As for *standard* :term:`WPS`, remote file references are *usually* limited to ``http(s)`` scheme, unless the process
+takes an input string and parses the unusual reference from the literal data to process it by itself. On the other hand,
 `Weaver` supports all following reference schemes.
 
 - |http_scheme|
@@ -375,47 +464,50 @@ an input string and parses the unusual reference from the literal data to proces
 - |s3_scheme| [experimental]
 
 The method in which `Weaver` will handle such references depends on its configuration, in other words, whether it is
-running as `ADES` or `EMS` (see: :ref:`Configuration`), as well as depending on some other ``CWL`` package requirements.
-These use-cases are described below.
+running as :term:`ADES` or :term:`EMS` (see: :ref:`Configuration`), as well as depending on some other :term:`CWL`
+package requirements. These use-cases are described below.
 
 .. warning::
     Missing schemes in URL reference are considered identical as if ``file://`` was used. In most cases, if not always,
     an execution request should not employ this scheme unless the file is ensured to be at the specific location where
     the running `Weaver` application can find it. This scheme is usually only employed as byproduct of the fetch
-    operation that `Weaver` uses to provide the file locally to underlying `CWL` application package to be executed.
+    operation that `Weaver` uses to provide the file locally to underlying :term:`CWL` application package to be
+    executed.
 
-When `Weaver` is able to figure out that the process needs to be executed locally in `ADES` mode, it will fetch all
-necessary files prior to process execution in order to make them available to the `CWL` package. When `Weaver` is in
-`EMS` configuration, it will **always** forward remote references (regardless of scheme) exactly as provided as input
-of the process execution request, since it assumes it needs to dispatch the execution to another `ADES` remote server,
-and therefore only needs to verify that the file reference is reachable remotely. In this case, it becomes the
-responsibility of this remote instance to handle the reference appropriately. This also avoids potential problems such
-as if `Weaver` as `EMS` doesn't have authorized access to a link that only the target `ADES` would have access to.
+When `Weaver` is able to figure out that the process needs to be executed locally in :term:`ADES` mode, it will fetch
+all necessary files prior to process execution in order to make them available to the :term:`CWL` package. When `Weaver`
+is in :term:`EMS` configuration, it will **always** forward remote references (regardless of scheme) exactly as provided
+as input of the process execution request, since it assumes it needs to dispatch the execution to another :term:`ADES`
+remote server, and therefore only needs to verify that the file reference is reachable remotely. In this case, it
+becomes the responsibility of this remote instance to handle the reference appropriately. This also avoids potential
+problems such as if `Weaver` as :term:`EMS` doesn't have authorized access to a link that only the target :term:`ADES`
+would have access to.
 
-When ``CWL`` package defines ``WPS1Requirement`` under ``hints`` for corresponding `WPS-1/2`_ remote processes being
+When :term:`CWL` package defines ``WPS1Requirement`` under ``hints`` for corresponding `WPS-1/2`_ remote processes being
 monitored by `Weaver`, it will skip fetching of ``http(s)``-based references since that would otherwise lead to useless
-double downloads (one on `Weaver` and the other on the `WPS` side). It is the same in case of ``ESGF-CWTRequirement``
-employed for `ESGF-CWT`_ processes. Because these processes do not always support `S3` buckets, and because `Weaver`
-supports many variants of `S3` reference formats, it will first fetch the `S3` reference using its internal `AWS`
-configuration, and then expose this downloaded file as ``https(s)`` reference accessible by the remote `WPS` process.
+double downloads (one on `Weaver` and the other on the :term:`WPS` side). It is the same in case of
+``ESGF-CWTRequirement`` employed for `ESGF-CWT`_ processes. Because these processes do not always support :term:`S3`
+buckets, and because `Weaver` supports many variants of :term:`S3` reference formats, it will first fetch the :term:`S3`
+reference using its internal |aws-config|_, and then expose this downloaded file as ``https(s)`` reference
+accessible by the remote :term:`WPS` process.
 
 .. note::
     When `Weaver` is fetching remote files with |http_scheme|, it can take advantage of additional request options to
     support unusual or server-specific handling of remote reference as necessary. This could be employed for instance
-    to attribute access permissions only to some given `ADES` server by providing additional authorization tokens to
-    the requests. Please refer to :ref:`Configuration of Request Options` for this matter.
+    to attribute access permissions only to some given :term:`ADES` server by providing additional authorization tokens
+    to the requests. Please refer to :ref:`Configuration of Request Options` for this matter.
 
-When using `S3` references, `Weaver` will attempt to retrieve the file using server configuration and credentials.
-Provided that the corresponding `S3` bucket can be accessed by the running `Weaver` application, it will fetch the file
-and store it locally temporarily for ``CWL`` execution.
+When using :term:`S3` references, `Weaver` will attempt to retrieve the file using server |aws-config|_ and
+|aws-credentials|_. Provided that the corresponding :term:`S3` bucket can be accessed by the running `Weaver`
+application, it will fetch the file and store it locally temporarily for :term:`CWL` execution.
 
 .. note::
-    When using `S3` buckets, authorization are handled through typical `AWS` credentials and role permissions. This
-    means that `AWS` access must be granted to the application in order to allow it fetching the file. There are also
-    different formats of `S3` reference formats handled by `Weaver`.
+    When using :term:`S3` buckets, authorization are handled through typical :term:`AWS` credentials and role
+    permissions. This means that :term:`AWS` access must be granted to the application in order to allow it fetching
+    the file. There are also different formats of :term:`S3` reference formats handled by `Weaver`.
     Please refer to :ref:`Configuration of AWS S3 Buckets` for more details.
 
-When using `OpenSearch` references, additional parameters are necessary to handle retrieval of specific file URL.
+When using :term:`OpenSearch` references, additional parameters are necessary to handle retrieval of specific file URL.
 Please refer to :ref:`OpenSearch Data Source` for more details.
 
 Following table summarize the default behaviour of input file reference handling of different situations when received
@@ -432,7 +524,7 @@ combinations.
 | `ADES`    | - `WPS-1/2`_                  | |file_scheme| | Convert to |http_scheme| [#file2http]_    |
 |           | - `ESGF-CWT`_                 +---------------+-------------------------------------------+
 |           | - `WPS-REST`_ [#wps3]_        | |http_scheme| | Nothing (left unmodified)                 |
-|           | - `Remote Provider`_          +---------------+-------------------------------------------+
+|           | - `remote-provider`_          +---------------+-------------------------------------------+
 |           |                               | |s3_scheme|   | Fetch and convert to |http_scheme| [#s3]_ |
 |           +-------------------------------+---------------+-------------------------------------------+
 |           | `WPS-REST`_ (`CWL`) [#wps3]_  | |file_scheme| | Nothing (file already local)              |
@@ -457,7 +549,7 @@ combinations.
 .. rubric:: Footnotes
 
 .. [#openseach]
-    References defined by ``opensearch://`` will trigger an `OpenSearch` query using the provided URL as
+    References defined by ``opensearch://`` will trigger an :term:`OpenSearch` query using the provided URL as
     well as other input additional parameters (see :ref:`OpenSearch Data Source`). After processing of this query,
     retrieved file references will be re-processed using the summarized logic in the table for the given use case.
 
@@ -467,20 +559,20 @@ combinations.
     the result URL reference. The file is placed in ``weaver.wps_outputs_dir`` to expose it as HTTP(S) endpoint.
 
 .. [#wps3]
-    When the process refers to a remote `WPS-REST` process (i.e.: remote `WPS` instance that supports
-    REST bindings but that is not necessarily an `ADES`), `Weaver` simply *wraps* and monitor its remote execution,
-    therefore files are handled just as for any other type of remote `WPS`-like servers. When the process contains an
-    actual `CWL` :ref:`Application Package` that defines a ``CommandLineTool`` (including docker images), files are
-    fetched as it will be executed locally. See :ref:`CWL CommandLineTool`, :ref:`WPS-REST` and :ref:`Remote Providers`
-    for further details.
+    When the process refers to a remote :ref:`WPS-REST` process (i.e.: remote :term:`WPS` instance that supports
+    REST bindings but that is not necessarily an :term:`ADES`), `Weaver` simply *wraps* and monitor its remote
+    execution, therefore files are handled just as for any other type of remote :term:`WPS`-like servers. When the
+    process contains an actual :term:`CWL` :ref:`Application Package` that defines a ``CommandLineTool``
+    (including :term:`Docker` images), files are fetched as it will be executed locally. See :ref:`CWL CommandLineTool`,
+    :ref:`WPS-REST` and :ref:`Remote Providers` for further details.
 
 .. [#s3]
     When an ``s3://`` file is fetched, is gets downloaded to a temporary ``file://`` location, which is **NOT**
     necessarily exposed as ``http(s)://``. If execution is transferred to a remove process that is expected to not
-    support `S3` references, only then the file gets converted as in [#file2http]_.
+    support :term:`S3` references, only then the file gets converted as in [#file2http]_.
 
 .. [#wf]
-    Workflows are only available on `EMS` instances. Since they chain processes, no fetch is needed as the first
+    Workflows are only available on :term:`EMS` instances. Since they chain processes, no fetch is needed as the first
     sub-step process will do it instead. See `section about workflows <workflows>`_ as well as :ref:`CWL Workflow` for
     more details.
 
@@ -507,10 +599,10 @@ Multiple Inputs
 Multiple Outputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Although ``CWL`` allows output arrays, ``WPS`` does not support it directly, as only single values are allowed for
-``WPS`` outputs according to original specification. To work around this, |metalink|_ files can be used to provide
-a single output reference that embeds other references. This approach is also employed and preferred as described
-in |pywps-multi-output|_.
+Although :term:`CWL` allows output arrays, :term:`WPS` does not support it directly, as only single values are allowed
+for :term:`WPS` outputs according to original specification. To work around this, |metalink|_ files can be used to
+provide a single output reference that embeds other references. This approach is also employed and preferred as
+described in |pywps-multi-output|_.
 
 .. todo:: fix doc when Multiple Output is supported with metalink (https://github.com/crim-ca/weaver/issues/25)
 .. todo:: add example of multi-output process definition
@@ -545,32 +637,101 @@ Monitoring of a process (GetStatus)
 Obtaining output results, logs or errors
 ---------------------------------------------------------------------
 
-.. todo::
-    job logs/exceptions body example
+In the case of successful :term:`Job` execution, the outputs can be retrieved with |result-req|_ request to list
+each corresponding output ``id`` with the generated file reference URL. Keep in mind that those URL's purpose are
+only to fetch the results (not persistent storage), and could therefore be purged after some reasonable amount of time.
+The format should be similar to the following example, with minor variations according to :ref:`Configurations`:
 
-Any job executed on `Weaver` will provide minimal log information, such as process job setup, moment when it started
-execution and final status. The extent of other log entries will more often than not depend on the verbosity of the
-underlying process being executed. When executing an `Application Package`, `Weaver` tries as best as possible to
-collect standard output and error steams to report them through log and exception lists.
+.. code-block:: json
 
-Since `Weaver` can only report as much details as provided by the running application, it is recommended to provide
-progressive status updates when developing applications in order to help understand problematic steps in event of
-process execution failures. In the case of remote `WPS` processes monitored by `Weaver`, this means gradually reporting
-process status updates (e.g.: calling ``WPSResponse.update_status`` if you are using |pywps|_, see: |pywps-status|_),
-using ``print`` and/or ``logging`` operation in scripts or docker images executed through `CWL` ``CommandLineTool``,
-etc.
+    {
+      "outputs": [
+        {
+          "id": "output",
+          "href": "{WEAVER_URL}/wpsoutputs/f93a15be-6e16-11ea-b667-08002752172a/output_netcdf.nc"
+        }
+      ]
+    }
+
+In situations where the :term:`Job` resulted into ``failed`` status, the |except-req|_ can be use to retrieve
+the potential cause of failure, by capturing any raised exception. Below is an example of such exception details.
+
+.. code-block:: json
+
+    [
+      "builtins.Exception: Could not read status document after 5 retries. Giving up."
+    ]
+
+The returned exception are often better understood when compared against, or in conjunction with, the logs that
+provide details over each step of the operation.
+
+Any :term:`Job` executed by `Weaver` will provide minimal information log, such as operation setup, the moment
+when it started execution and latest status. The extent of other log entries will more often than not depend on the
+verbosity of the underlying process being executed. When executing an :ref:`Application Package`, `Weaver` tries as
+best as possible to collect standard output and error steams to report them through log and exception lists.
+
+Since `Weaver` can only report as much details as provided by the running application, it is recommended by
+:term:`Application Package` implementers to provide progressive status updates when developing their package
+in order to help understand problematic steps in event of process execution failures. In the case of remote :term:`WPS`
+processes monitored by `Weaver` for example, this means gradually reporting process status updates
+(e.g.: calling ``WPSResponse.update_status`` if you are using |pywps|_, see: |pywps-status|_), while using ``print``
+and/or ``logging`` operation for scripts or :term:`Docker` images executed through :term:`CWL` ``CommandLineTool``.
 
 .. note::
-    Job logs and exceptions are a `Weaver`-specific implementation. They are not part of traditional |ogc-proc-api|_.
+    :term:`Job` logs and exceptions are a `Weaver`-specific implementation.
+    They are not part of traditional |ogc-proc-api|_.
+
+A minimalistic example of logging output is presented below. This can be retrieved using |log-req|_ request, at any
+moment during :term:`Job` execution (with logs up to that point in time) or after its completion (for full output).
+Note again that the more the :term:`Process` is verbose, the more tracking will be provided here.
+
+.. code-block:: json
+
+    [
+      "[2020-03-24 21:32:32] INFO     [weaver.datatype.Job] 0:00:00   1% accepted   Job task setup completed.",
+      "[2020-03-24 21:32:32] INFO     [weaver.datatype.Job] 0:00:00   2% accepted   Execute WPS request for process [jsonarray2netcdf]",
+      "[2020-03-24 21:32:33] INFO     [weaver.datatype.Job] 0:00:01   4% accepted   Fetching job input definitions.",
+      "[2020-03-24 21:32:33] INFO     [weaver.datatype.Job] 0:00:01   6% accepted   Fetching job output definitions.",
+      "[2020-03-24 21:32:33] INFO     [weaver.datatype.Job] 0:00:01   8% accepted   Starting job process execution",
+      "[2020-03-24 21:32:34] INFO     [weaver.datatype.Job] 0:00:01  10% accepted   Verifying job status location.",
+      "[2020-03-24 21:32:34] WARNING  [weaver.datatype.Job] 0:00:01  10% accepted   WPS status location could not be found",
+      "[2020-03-24 21:32:34] INFO     [weaver.datatype.Job] 0:00:01  20% running    Starting monitoring of job execution.",
+      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:34] INFO     [wps_package.jsonarray2netcdf]    1% running    Preparing package logs done.",
+      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:34] INFO     [wps_package.jsonarray2netcdf]    2% running    Launching package...",
+      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:34] INFO     [cwltool] Resolved '/tmp/tmpse3pi1gj/jsonarray2netcdf' to 'file:///tmp/tmpse3pi1gj/jsonarray2netcdf'",
+      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:34] INFO     [cwltool] ../../../../../tmp/tmpse3pi1gj/jsonarray2netcdf:1:1: Unknown hint",
+      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded                                                       file:///tmp/tmpse3pi1gj/BuiltinRequirement",
+      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:34] INFO     [wps_package.jsonarray2netcdf]    5% running    Loading package content done.",
+      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:34] INFO     [wps_package.jsonarray2netcdf]    6% running    Retrieve package inputs done.",
+      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:34] INFO     [wps_package.jsonarray2netcdf]    8% running    Convert package inputs done.",
+      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:34] INFO     [wps_package.jsonarray2netcdf]   10% running    Running package...",
+      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:34] INFO     [cwltool] [job jsonarray2netcdf] /tmp/tmpqy1t8dp3$ python \\",
+      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded      /opt/weaver/processes/builtin/jsonarray2netcdf.py \\",
+      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded      -o \\",
+      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded      /tmp/tmpqy1t8dp3 \\",
+      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded      -i \\",
+      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded      /tmp/tmpla2utn2c/stgb5787338-4a34-4771-88c0-cae95f4d82dd/test_nc_array.json",
+      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:41] INFO     [cwltool] [job jsonarray2netcdf] Max memory used: 36MiB",
+      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:41] INFO     [cwltool] [job jsonarray2netcdf] completed success",
+      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:32:41] INFO     [wps_package.jsonarray2netcdf]   95% running    Package execution done.",
+      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:33:53] INFO     [wps_package.jsonarray2netcdf]   98% running    Generate package outputs done.",
+      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  [2020-03-24 17:33:55] INFO     [wps_package.jsonarray2netcdf]  100% succeeded  Package complete.",
+      "[2020-03-24 21:33:59] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  Job succeeded (status: Package complete.).",
+      "[2020-03-24 21:34:45] INFO     [weaver.datatype.Job] 0:01:26  90% succeeded  Job succeeded.",
+      "[2020-03-24 21:34:45] INFO     [weaver.datatype.Job] 0:01:26 100% succeeded  Job task complete."
+    ]
 
 
 Special Weaver EMS use-cases
 ==================================================
 
-This section highlight the additional behaviour available only through an `EMS`-configured `Weaver` instance.
+This section highlight the additional behaviour available only through an :term:`EMS`-configured `Weaver` instance.
 Some other points are already described in other sections, but are briefly indicated here for conciseness.
 
-ADES dispatching using Data Sources
+.. |data-source| replace:: Data-Source
+.. _data-source:
+
+ADES dispatching using Data-Sources
 --------------------------------------
 
 

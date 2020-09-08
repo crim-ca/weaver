@@ -24,7 +24,7 @@ specified connection settings in ``weaver/config/weaver.ini``.
 
 .. code-block:: sh
 
-    $ make start    # start weaver WSGI application server
+    $ make start    # start Weaver WSGI application server
 
 
 Weaver should be running after this operation.
@@ -38,7 +38,7 @@ Execution Details
 To execute, `Weaver` requires two type of application executed in parallel. First, it requires a WSGI HTTP server
 that will run the application to provide API endpoints. This is referred to as ``weaver-manager`` in the provided
 docker images. Second, `Weaver` requires a `Celery`_ task queue handler to execute submitted process jobs. This
-is referred to as ``weaver-worker`` in built docker images.
+is referred to as ``weaver-worker`` in built :term:`Docker` images.
 
 For specific details about configuration of both applications, please refer to :ref:`Configuration` section.
 
