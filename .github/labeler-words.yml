@@ -39,6 +39,12 @@ process/esgf-cwt:
 process/workflow:
   - 'workflow'
 
+triage/conformance:
+  - 'conforms'
+  - 'conformance'
+  - 'complies'
+  - 'compliance'
+
 triage/feature:
   - 'feature'
 
