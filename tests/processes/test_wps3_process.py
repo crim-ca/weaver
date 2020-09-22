@@ -1,8 +1,9 @@
 import json
+
 import mock
 import pytest
-from requests.models import Request, Response
 from pywps.app import WPSRequest
+from requests.models import Request, Response
 
 from weaver.formats import CONTENT_TYPE_APP_NETCDF
 from weaver.processes.wps3_process import Wps3Process
