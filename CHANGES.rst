@@ -8,12 +8,12 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add ``data`` input support for `CWL` `Workflow` step referring to `WPS-3 Process`.
 
 Fixes:
 ------
-- Add ``data`` as a ``workflow_input_value`` data type.
-- Fix stdout/stderr log file not present in workflow.
+- Fix ``stdout``/``stderr`` log file not permitted directly within `CWL` `Workflow` (must be inside intermediate steps).
+- Fix missing `S3` bucket location constraint within unittests.
 
 `1.13.1 <https://github.com/crim-ca/weaver/tree/1.13.1>`_ (2020-07-17)
 ========================================================================
@@ -31,14 +31,14 @@ Fixes:
 
 Changes:
 --------
-- Add AWS S3 bucket support for process input reference files.
+- Add `AWS` `S3` bucket support for process input reference files.
 - Add ``weaver.wps_output_s3_bucket`` setting to upload results to AWS S3 bucket instead of local directory.
 - Add ``weaver.wps_output_s3_region`` setting to allow override parameter extracted from `AWS` profile otherwise.
 - Add more documentation about supported file reference schemes.
 - Add documentation references to `ESGF-CWT Compute API`.
 - Add conditional input file reference fetching (depending on `ADES`/`EMS`, process *type*  from `CWL` ``hints``)
-  to take advantage of *request-options* and all supported scheme formats by `Weaver`, instead of relying on ``PyWPS``
-  and/or ``CWL`` wherever how far downstream the URL reference was reaching.
+  to take advantage of *request-options* and all supported scheme formats by `Weaver`, instead of relying on `PyWPS`
+  and/or `CWL` wherever how far downstream the URL reference was reaching.
 
 Fixes:
 ------
