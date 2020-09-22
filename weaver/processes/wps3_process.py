@@ -16,6 +16,7 @@ from pyramid.settings import asbool
 
 from weaver import status
 from weaver.exceptions import PackageExecutionError
+from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_REFERENCE
 from weaver.formats import CONTENT_TYPE_APP_FORM, CONTENT_TYPE_APP_JSON
 from weaver.processes import opensearch
 from weaver.processes.constants import OPENSEARCH_LOCAL_FILE_SCHEME
@@ -244,31 +245,40 @@ class Wps3Process(WpsProcessInterface):
 
         execute_body_inputs = []
         execute_req_id = "id"
-        execute_req_input_val = "href"
-        execute_req_out_trans_mode = "transmissionMode"
+        execute_req_input_val_href = "href"
+        execute_req_input_val_data = "data"
         for workflow_input_key, workflow_input_value in workflow_inputs.items():
             if isinstance(workflow_input_value, list):
                 for workflow_input_value_item in workflow_input_value:
-                    execute_body_inputs.append({execute_req_id: workflow_input_key,
-                                                execute_req_input_val: workflow_input_value_item["location"]})
+                    if isinstance(workflow_input_value_item, dict) and "location" in workflow_input_value_item:
+                        execute_body_inputs.append({execute_req_id: workflow_input_key,
+                                                    execute_req_input_val_href: workflow_input_value_item["location"]})
+                    else:
+                        execute_body_inputs.append({execute_req_id: workflow_input_key,
+                                                    execute_req_input_val_data: workflow_input_value_item})
             else:
-                execute_body_inputs.append({execute_req_id: workflow_input_key,
-                                            execute_req_input_val: workflow_input_value["location"]})
+                if isinstance(workflow_input_value, dict) and "location" in workflow_input_value:
+                    execute_body_inputs.append({execute_req_id: workflow_input_key,
+                                                execute_req_input_val_href: workflow_input_value["location"]})
+                else:
+                    execute_body_inputs.append({execute_req_id: workflow_input_key,
+                                                execute_req_input_val_data: workflow_input_value})
         for exec_input in execute_body_inputs:
-            if exec_input[execute_req_input_val].startswith("{0}://".format(OPENSEARCH_LOCAL_FILE_SCHEME)):
-                exec_input[execute_req_input_val] = "file{0}".format(
-                    exec_input[execute_req_input_val][len(OPENSEARCH_LOCAL_FILE_SCHEME):])
-            elif exec_input[execute_req_input_val].startswith("file://"):
-                exec_input[execute_req_input_val] = self.host_file(exec_input[execute_req_input_val])
-                LOGGER.debug("Hosting intermediate input [%s] : [%s]",
-                             exec_input[execute_req_id], exec_input[execute_req_input_val])
+            if execute_req_input_val_href in exec_input and isinstance(exec_input[execute_req_input_val_href], str):
+                if exec_input[execute_req_input_val_href].startswith("{0}://".format(OPENSEARCH_LOCAL_FILE_SCHEME)):
+                    exec_input[execute_req_input_val_href] = "file{0}".format(
+                        exec_input[execute_req_input_val_href][len(OPENSEARCH_LOCAL_FILE_SCHEME):])
+                elif exec_input[execute_req_input_val_href].startswith("file://"):
+                    exec_input[execute_req_input_val_href] = self.host_file(exec_input[execute_req_input_val_href])
+                    LOGGER.debug("Hosting intermediate input [%s] : [%s]",
+                                 exec_input[execute_req_id], exec_input[execute_req_input_val_href])
 
-        execute_body_outputs = [{execute_req_id: output,
-                                 execute_req_out_trans_mode: "reference"} for output in expected_outputs]
+        execute_body_outputs = [{execute_req_id: output, "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE}
+                                for output in expected_outputs]
         self.update_status("Executing job on remote ADES.", REMOTE_JOB_PROGRESS_EXECUTION, status.STATUS_RUNNING)
 
-        execute_body = dict(mode="async",
-                            response="document",
+        execute_body = dict(mode=EXECUTE_MODE_ASYNC,
+                            response=EXECUTE_RESPONSE_DOCUMENT,
                             inputs=execute_body_inputs,
                             outputs=execute_body_outputs)
         request_url = self.url + process_jobs_uri.format(process_id=self.process)

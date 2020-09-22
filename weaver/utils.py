@@ -306,7 +306,7 @@ def ows_context_href(href, partial=False):
 
 
 def pass_http_error(exception, expected_http_error):
-    # type: (Exception, Union[PyramidHTTPError, Iterable[PyramidHTTPError]]) -> None
+    # type: (Exception, Union[Type[PyramidHTTPError], Iterable[Type[PyramidHTTPError]]]) -> None
     """
     Given an `HTTPError` of any type (pyramid, requests), ignores (pass) the exception if the actual
     error matches the status code. Other exceptions are re-raised.

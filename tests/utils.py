@@ -440,8 +440,13 @@ def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="Test fi
         - :func:`mocked_aws_s3`
     """
     import boto3
-    s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
-    s3.create_bucket(Bucket=bucket_name)
+    if not MOCK_AWS_REGION:
+        s3 = boto3.client("s3")
+        s3.create_bucket(Bucket=bucket_name)
+    else:
+        s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
+        s3_location = {"LocationConstraint": MOCK_AWS_REGION}
+        s3.create_bucket(Bucket=bucket_name, CreateBucketConfiguration=s3_location)
     with tempfile.NamedTemporaryFile(mode="w") as tmp_file:
         tmp_file.write(file_content)
         tmp_file.flush()

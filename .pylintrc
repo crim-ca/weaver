@@ -77,6 +77,7 @@ disable=C0111,missing-docstring,
         R1705,no-else-return,
         R1710,inconsistent-return-statements,
         R1721,unnecessary-comprehension,
+        R1725,super-with-arguments,
         W0108,unnecessary-lambda,
         W0212,protected-access,
         W0232,no-init,
@@ -86,6 +87,7 @@ disable=C0111,missing-docstring,
         W0640,cell-var-from-loop,
         W0703,broad-except,
         W0706,try-except-raise,
+        W0707,raise-missing-from,
         W1508,invalid-envvar-default
 
 # note: (C0412, ungrouped-imports) is managed via isort tool, ignore false positives
