@@ -16,6 +16,7 @@ from pyramid.settings import asbool
 
 from weaver import status
 from weaver.exceptions import PackageExecutionError
+from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_REFERENCE
 from weaver.formats import CONTENT_TYPE_APP_FORM, CONTENT_TYPE_APP_JSON
 from weaver.processes import opensearch
 from weaver.processes.constants import OPENSEARCH_LOCAL_FILE_SCHEME
@@ -246,7 +247,6 @@ class Wps3Process(WpsProcessInterface):
         execute_req_id = "id"
         execute_req_input_val_href = "href"
         execute_req_input_val_data = "data"
-        execute_req_out_trans_mode = "transmissionMode"
         for workflow_input_key, workflow_input_value in workflow_inputs.items():
             if isinstance(workflow_input_value, list):
                 for workflow_input_value_item in workflow_input_value:
@@ -273,12 +273,12 @@ class Wps3Process(WpsProcessInterface):
                     LOGGER.debug("Hosting intermediate input [%s] : [%s]",
                                  exec_input[execute_req_id], exec_input[execute_req_input_val_href])
 
-        execute_body_outputs = [{execute_req_id: output,
-                                 execute_req_out_trans_mode: "reference"} for output in expected_outputs]
+        execute_body_outputs = [{execute_req_id: output, "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE}
+                                for output in expected_outputs]
         self.update_status("Executing job on remote ADES.", REMOTE_JOB_PROGRESS_EXECUTION, status.STATUS_RUNNING)
 
-        execute_body = dict(mode="async",
-                            response="document",
+        execute_body = dict(mode=EXECUTE_MODE_ASYNC,
+                            response=EXECUTE_RESPONSE_DOCUMENT,
                             inputs=execute_body_inputs,
                             outputs=execute_body_outputs)
         request_url = self.url + process_jobs_uri.format(process_id=self.process)
