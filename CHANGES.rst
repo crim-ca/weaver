@@ -9,6 +9,7 @@ Changes
 Changes:
 --------
 - Add ``data`` input support for `CWL` `Workflow` step referring to `WPS-3 Process`.
+- Add documentation example references to `Application Package` and `Process` ``Deploy``/``Execute`` repositories.
 
 Fixes:
 ------

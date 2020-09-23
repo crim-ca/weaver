@@ -12,6 +12,7 @@ Table of Contents
     tutorial
     processes
     package
+    Examples <examples.rst>
     OpenAPI Specification <api.rst>
     Source Code Documentation <autoapi/index.rst>
     changes

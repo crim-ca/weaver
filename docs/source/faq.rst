@@ -121,4 +121,10 @@ continuously improved by the developers (including being updated according to ch
 - |cwl-guide|_
 - |cwl-cmdtool|_
 - |cwl-workflow|_
+- See also below.
 
+
+Where can I find examples of Process Deployment, Execution and Application Package definitions?
+=====================================================================================================
+
+Many examples are reported in detail in the |examples|_ chapter.
