@@ -1,4 +1,4 @@
-.. _examples:
+.. _examples-page:
 .. include:: references.rst
 
 ********************************************
