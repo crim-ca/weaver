@@ -61,6 +61,14 @@
 .. |submit-issue| replace:: submit a new issue
 .. _submit-issue: https://github.com/crim-ca/weaver/issues/new/choose
 
+.. Example references
+.. |examples| replace:: Examples
+.. _examples: examples.rst
+.. |weaver-func-test-apps| replace:: Weaver functional tests
+.. _weaver-func-test-apps: https://github.com/crim-ca/weaver/tree/master/tests/functional/application-packages
+.. |ogc-testbeds-apps| replace:: OGC-Testbeds Applications
+.. _ogc-testbeds-apps: https://github.com/crim-ca/application-packages
+
 .. External references
 .. _Celery: https://docs.celeryproject.org/en/latest/
 .. _Gunicorn: https://gunicorn.org/
@@ -79,12 +87,17 @@
 .. _email-template: ../../../weaver/wps_restapi/templates/notification_email_example.mako
 
 .. API requests
+.. Full path displayed, otherwise use '-name' suffixed reference for same link with only the general name (no path)
+.. |deploy-req-name| replace:: Deploy
+.. _deploy-req-name: `deploy-req`_
 .. |deploy-req| replace:: ``POST {WEAVER_URL}/processes`` (Deploy)
 .. _deploy-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes%2Fpost
 .. |getcap-req| replace:: ``GET {WEAVER_URL}/processes`` (GetCapabilities)
 .. _getcap-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes%2Fget
 .. |describe-req| replace:: ``GET {WEAVER_URL}/processes/{id}`` (DescribeProcess)
 .. _describe-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes~1%7Bprocess_id%7D~1package%2Fget
+.. |exec-req-name| replace:: Execute
+.. _exec-req-name: `exec-req`_
 .. |exec-req| replace:: ``POST {WEAVER_URL}/processes/{id}/jobs`` (Execute)
 .. _exec-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes%2Fpaths%2F~1processes~1{process_id}~1jobs%2Fpost
 .. |vis-req| replace:: ``PUT {WEAVER_URL}/processes/{id}/visibility`` (Visibility)

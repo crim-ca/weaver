@@ -132,7 +132,7 @@ preserve and enforce matching input/output ``format`` definition in both :term:`
 not introduce ambiguous results (see :ref:`File Format` for more details).
 
 
-Correspondance between CWL and WPS fields
+Correspondence between CWL and WPS fields
 ===========================================
 
 Because :term:`CWL` definition and :term:`WPS` process description inherently provide "duplicate" information, many

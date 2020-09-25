@@ -19,6 +19,11 @@ Each one of them are accessible through the same API interface, but they have di
 - `Remote Provider`_
 
 
+.. seealso::
+    Section |examples|_ provides multiple concrete use cases of `Deploy`_ and `Execute`_ request payloads
+    for diverse set of applications.
+
+
 Builtin
 -------
 
