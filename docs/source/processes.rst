@@ -139,6 +139,7 @@ In this situation, the :term:`CWL` definition is provided as is using JSON-forma
       ]
     }
 
+.. _process-esgf-cwt:
 
 ESGF-CWT
 ----------

@@ -46,7 +46,7 @@ Glossary
         |esgf|_
 
     ESGF-CWT
-        |esgf-cwt|_
+        |esgf-cwt-git|_
 
     HREF
         | Hyperlink Reference
@@ -114,7 +114,7 @@ Useful Links
 - |cwl-guide|_
 - |cwl-cmdtool|_
 - |cwl-workflow|_
-- |esgf-cwt|_
+- |esgf-cwt-git|_
 - |edam-link|_
 - |iana-link|_
 - |oas|_

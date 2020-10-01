@@ -32,8 +32,8 @@
 .. |ems| replace:: Execution Management Service
 .. |esgf| replace:: Earth System Grid Federation
 .. _esgf: https://esgf.llnl.gov/
-.. |esgf-cwt| replace:: ESGF Compute API
-.. _esgf-cwt: https://github.com/ESGF/esgf-compute-api
+.. |esgf-cwt-git| replace:: ESGF Compute API
+.. _esgf-cwt-git: https://github.com/ESGF/esgf-compute-api
 .. |edam-link| replace:: EDAM media types
 .. _edam-link: http://edamontology.org/
 .. |iana-link| replace:: IANA media types
