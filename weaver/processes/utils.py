@@ -393,7 +393,7 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
     When the reference is a service (provider), registration of each WPS process is done individually
     for each of the specified providers with ID ``[service]_[process]`` per listed process by ``GetCapabilities``.
 
-    .. versionchanged:: 1.14.0
+    .. versionadded:: 1.14.0
         When references are specified using ``providers`` section instead of ``processes``, the registration
         only saves the remote WPS provider endpoint to dynamically populate WPS processes on demand.
 
