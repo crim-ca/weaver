@@ -47,7 +47,7 @@ def get_providers(request):
             warnings.warn("Exception occurred while fetching wps {0} : {1!r}".format(service.url, exc),
                           NonBreakingExceptionWarning)
 
-    return HTTPOk(json=providers)
+    return HTTPOk(json={"providers": providers})
 
 
 def get_capabilities(service, request):

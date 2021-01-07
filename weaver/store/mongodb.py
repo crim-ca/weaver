@@ -1,5 +1,5 @@
 """
-Stores to read/write data to from/to mongodb using pymongo.
+Stores to read/write data to from/to `MongoDB` using pymongo.
 """
 
 import logging
@@ -86,7 +86,7 @@ class MongodbStore(object):
 
 class MongodbServiceStore(StoreServices, MongodbStore):
     """
-    Registry for OWS services. Uses mongodb to store service url and attributes.
+    Registry for OWS services. Uses `MongoDB` to store service url and attributes.
     """
 
     def __init__(self, *args, **kwargs):
@@ -123,15 +123,15 @@ class MongodbServiceStore(StoreServices, MongodbStore):
     def delete_service(self, name, request=None):  # noqa: E811
         # type: (AnyStr, Optional[Request]) -> bool
         """
-        Removes service from mongodb storage.
+        Removes service from `MongoDB` storage.
         """
         self.collection.delete_one({"name": name})
         return True
 
-    def list_services(self, request=None):  # noqa: E811  # noqa: E811
+    def list_services(self, request=None):  # noqa: E811
         # type: (Optional[Request]) -> List[Service]
         """
-        Lists all services in mongodb storage.
+        Lists all services in `MongoDB` storage.
         """
         my_services = []
         for service in self.collection.find().sort("name", pymongo.ASCENDING):
@@ -141,7 +141,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
     def fetch_by_name(self, name, visibility=None, request=None):  # noqa: E811
         # type: (AnyStr, Optional[AnyStr], Optional[Request]) -> Service
         """
-        Gets service for given ``name`` from mongodb storage.
+        Gets service for given ``name`` from `MongoDB` storage.
         """
         service = self.collection.find_one({"name": name})
         if not service:
@@ -156,7 +156,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
     def fetch_by_url(self, url, request=None):  # noqa: E811
         # type: (AnyStr, Optional[Request]) -> Service
         """
-        Gets service for given ``url`` from mongodb storage.
+        Gets service for given ``url`` from `MongoDB` storage.
         """
         service = self.collection.find_one({"url": get_base_url(url)})
         if not service:
@@ -166,7 +166,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
     def clear_services(self, request=None):  # noqa: E811
         # type: (Optional[Request]) -> bool
         """
-        Removes all OWS services from mongodb storage.
+        Removes all OWS services from `MongoDB` storage.
         """
         self.collection.drop()
         return True
@@ -174,7 +174,7 @@ class MongodbServiceStore(StoreServices, MongodbStore):
 
 class MongodbProcessStore(StoreProcesses, MongodbStore):
     """
-    Registry for processes. Uses mongodb to store processes and attributes.
+    Registry for processes. Uses `MongoDB` to store processes and attributes.
     """
     def __init__(self, *args, **kwargs):
         db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
@@ -364,7 +364,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
 
 class MongodbJobStore(StoreJobs, MongodbStore):
     """
-    Registry for process jobs tracking. Uses mongodb to store job attributes.
+    Registry for process jobs tracking. Uses `MongoDB` to store job attributes.
     """
     def __init__(self, *args, **kwargs):
         db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
@@ -426,7 +426,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
     def update_job(self, job):
         # type: (Job) -> Job
         """
-        Updates a job parameters in mongodb storage.
+        Updates a job parameters in `MongoDB` storage.
         :param job: instance of ``weaver.datatype.Job``.
         """
         try:
@@ -440,7 +440,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
     def delete_job(self, job_id, request=None):  # noqa: E811
         # type: (AnyStr, Optional[Request]) -> bool
         """
-        Removes job from mongodb storage.
+        Removes job from `MongoDB` storage.
         """
         self.collection.delete_one({"id": job_id})
         return True
@@ -448,7 +448,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
     def fetch_by_id(self, job_id, request=None):  # noqa: E811
         # type: (AnyStr, Optional[Request]) -> Job
         """
-        Gets job for given ``job_id`` from mongodb storage.
+        Gets job for given ``job_id`` from `MongoDB` storage.
         """
         job = self.collection.find_one({"id": job_id})
         if not job:
@@ -458,7 +458,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
     def list_jobs(self, request=None):  # noqa: E811
         # type: (Optional[Request]) -> List[Job]
         """
-        Lists all jobs in mongodb storage.
+        Lists all jobs in `MongoDB` storage.
         For user-specific access to available jobs, use :meth:`MongodbJobStore.find_jobs` instead.
         """
         jobs = []
@@ -480,7 +480,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                   group_by=None,            # type: Optional[Union[AnyStr, List[AnyStr]]]
                   ):                        # type: (...) -> Union[JobListAndCount, JobCategoriesAndCount]
         """
-        Finds all jobs in mongodb storage matching search filters and obtain results with requested paging or grouping.
+        Finds all jobs in `MongoDB` storage matching search filters and obtain results with requested paging or grouping.
 
         :param request: request that lead to this call to obtain permissions and user id.
         :param process: process name to filter matching jobs.
@@ -601,7 +601,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
     def clear_jobs(self, request=None):  # noqa: E811
         # type: (Optional[Request]) -> bool
         """
-        Removes all jobs from mongodb storage.
+        Removes all jobs from `MongoDB` storage.
         """
         self.collection.drop()
         return True
@@ -609,7 +609,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
 
 class MongodbQuoteStore(StoreQuotes, MongodbStore):
     """
-    Registry for quotes. Uses mongodb to store quote attributes.
+    Registry for quotes. Uses `MongoDB` to store quote attributes.
     """
     def __init__(self, *args, **kwargs):
         db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
@@ -635,7 +635,7 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
     def fetch_by_id(self, quote_id):
         # type: (AnyStr) -> Quote
         """
-        Gets quote for given ``quote_id`` from mongodb storage.
+        Gets quote for given ``quote_id`` from `MongoDB` storage.
         """
         quote = self.collection.find_one({"id": quote_id})
         if not quote:
@@ -645,7 +645,7 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
     def list_quotes(self):
         # type: (...) -> List[Quote]
         """
-        Lists all quotes in mongodb storage.
+        Lists all quotes in `MongoDB` storage.
         """
         quotes = []
         for quote in self.collection.find().sort("id", ASCENDING):
@@ -655,7 +655,7 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
     def find_quotes(self, process_id=None, page=0, limit=10, sort=None):
         # type: (Optional[AnyStr], int, int, Optional[AnyStr]) -> Tuple[List[Quote], int]
         """
-        Finds all quotes in mongodb storage matching search filters.
+        Finds all quotes in `MongoDB` storage matching search filters.
 
         Returns a tuple of filtered ``items`` and their ``count``, where ``items`` can have paging and be limited
         to a maximum per page, but ``count`` always indicate the `total` number of matches.
@@ -680,7 +680,7 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
 
 class MongodbBillStore(StoreBills, MongodbStore):
     """
-    Registry for bills. Uses mongodb to store bill attributes.
+    Registry for bills. Uses `MongoDB` to store bill attributes.
     """
     def __init__(self, *args, **kwargs):
         db_args, db_kwargs = MongodbStore.get_args_kwargs(*args, **kwargs)
@@ -706,7 +706,7 @@ class MongodbBillStore(StoreBills, MongodbStore):
     def fetch_by_id(self, bill_id):
         # type: (AnyStr) -> Bill
         """
-        Gets bill for given ``bill_id`` from mongodb storage.
+        Gets bill for given ``bill_id`` from `MongoDB` storage.
         """
         bill = self.collection.find_one({"id": bill_id})
         if not bill:
@@ -716,7 +716,7 @@ class MongodbBillStore(StoreBills, MongodbStore):
     def list_bills(self):
         # type: (...) -> List[Bill]
         """
-        Lists all bills in mongodb storage.
+        Lists all bills in `MongoDB` storage.
         """
         bills = []
         for bill in self.collection.find().sort("id", ASCENDING):
@@ -726,7 +726,7 @@ class MongodbBillStore(StoreBills, MongodbStore):
     def find_bills(self, quote_id=None, page=0, limit=10, sort=None):
         # type: (Optional[AnyStr], int, int, Optional[AnyStr]) -> Tuple[List[Bill], int]
         """
-        Finds all bills in mongodb storage matching search filters.
+        Finds all bills in `MongoDB` storage matching search filters.
 
         Returns a tuple of filtered ``items`` and their ``count``, where ``items`` can have paging and be limited
         to a maximum per page, but ``count`` always indicate the `total` number of matches.

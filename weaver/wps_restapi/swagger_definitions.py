@@ -147,7 +147,6 @@ TAG_API = "API"
 TAG_JOBS = "Jobs"
 TAG_VISIBILITY = "Visibility"
 TAG_BILL_QUOTE = "Billing & Quoting"
-TAG_PROVIDER_PROCESS = "Provider Processes"
 TAG_PROVIDERS = "Providers"
 TAG_PROCESSES = "Processes"
 TAG_GETCAPABILITIES = "GetCapabilities"
@@ -606,8 +605,14 @@ class LaunchJobQuerystring(MappingSchema):
     field_string.name = "tags"
 
 
+class VisibilityValue(SchemaNode):
+    schema_type = String
+    validator = OneOf(list(VISIBILITY_VALUES))
+    example = VISIBILITY_PUBLIC
+
+
 class Visibility(MappingSchema):
-    value = SchemaNode(String(), validator=OneOf(list(VISIBILITY_VALUES)), example=VISIBILITY_PUBLIC)
+    value = VisibilityValue()
 
 
 #########################################################
@@ -787,6 +792,7 @@ class ProcessCollection(MappingSchema):
 class Process(DescriptionType):
     inputs = InputTypeList(missing=drop)
     outputs = OutputDescriptionList(missing=drop)
+    visibility = VisibilityValue(missing=drop)
     executeEndpoint = SchemaNode(String(), format=URL, missing=drop)
 
 
@@ -1057,10 +1063,6 @@ class ProcessDescriptionBodySchema(MappingSchema):
 
 class ProvidersSchema(SequenceSchema):
     providers_service = ProviderSummarySchema()
-
-
-class ProcessesSchema(SequenceSchema):
-    provider_processes_service = Process()
 
 
 class JobOutputSchema(MappingSchema):
@@ -1392,7 +1394,7 @@ class NotImplementedDeleteProviderResponse(MappingSchema):
 
 class OkGetProviderProcessesSchema(MappingSchema):
     header = JsonHeader()
-    body = ProcessesSchema()
+    body = ProcessCollection()
 
 
 class InternalServerErrorGetProviderProcessesListResponse(MappingSchema):
@@ -1467,7 +1469,7 @@ class InternalServerErrorGetProcessPayloadResponse(MappingSchema):
 
 
 class ProcessVisibilityResponseBodySchema(MappingSchema):
-    value = SchemaNode(String(), validator=OneOf(list(VISIBILITY_VALUES)), example=VISIBILITY_PUBLIC)
+    value = VisibilityValue()
 
 
 class OkGetProcessVisibilitySchema(MappingSchema):
