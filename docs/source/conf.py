@@ -405,6 +405,7 @@ linkcheck_ignore = [
     r"./docs.*",
     r"docs/source/.*",
     # inter-reference between document page and section headers
+    # when link is itself a documentation reference, they are not resolved correctly, but this works with text replaces
     r":ref:`.*`",
     # dummy values
     r"http[s]*://localhost.*/",
