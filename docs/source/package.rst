@@ -61,8 +61,9 @@ CWL Workflow
 definition can be placed in any location supported as for the case of atomic processes
 (see details about :ref:`supported package locations <WPS-REST>`).
 
-.. |process-deploy-op| replace:: Process deployment operation
+.. inter-reference to 'process', but cannot be a link since not included
 .. _process-deploy-op: :ref:`Deploy`
+.. |process-deploy-op| replace:: Process deployment operation
 
 The following :term:`CWL` definition demonstrates an example ``Workflow`` process that would resolve each ``step`` with
 local processes of match IDs.
@@ -298,8 +299,8 @@ it gets parsed as intended type.
     by issue `#51 <https://github.com/crim-ca/weaver/issues/51>`_. It is possible to use a ``Literal`` data of
     type ``string`` corresponding to :term:`WKT` [#]_, [#]_ in the meantime.
 
-.. [#] `WKT Examples <wkt-example>`_
-.. [#] `WKT Formats <wkt-format>`_
+.. [#] |wkt-example|_
+.. [#] |wkt-format|_
 
 File Format
 -----------------------

@@ -173,15 +173,13 @@ Extra Details & Sponsors
 
 The project was initially developed upon *OGC Testbed-14 – ESA Sponsored Threads – Exploitation Platform* findings and
 following improvements. It is also advanced with sponsorship of *U.S. Department of Energy* to support common
-API of the *Earth System Grid Federation* (`ESGF`_). The findings are reported on the
-`OGC Testbed-14 <ogc-tb14>`_ thread, and more explicitly in the
-`ADES & EMS Results and Best Practices Engineering Report <ogc-tb14-platform-er>`_.
+API of the *Earth System Grid Federation* (`ESGF`_). The findings are reported on the |ogc-tb14|_ thread, and more
+explicitly in the |ogc-tb14-platform-er|_.
 
-The project as been employed for `OGC Testbed-15 - ML Thread <ogc-tb15-ml>`_ to demonstrate the use of Machine Learning
-interactions with OGC web standards in the context of natural resources applications. The advancements are reported
-through the `OGC Testbed-15: Machine Learning Engineering Report <ogc-tb15-ml-er>`_.
+The project as been employed for |ogc-tb15-ml|_ to demonstrate the use of Machine Learning interactions withOGC web
+standards in the context of natural resources applications. The advancements are reported through the |ogc-tb15-ml-er|_.
 
-Developments are continued in `OGC Testbed-16 <ogc-tb16>`_ to improve methodologies in order to provide better
+Developments are continued in |ogc-tb16|_ to improve methodologies in order to provide better
 interoperable geospatial data processing in the areas of Earth Observation Application Packages.
 
 The project is furthermore developed through the *Data Analytics for Canadian Climate Services* (`DACCS`_) initiative.
@@ -189,10 +187,17 @@ The project is furthermore developed through the *Data Analytics for Canadian Cl
 Weaver is a **prototype** implemented in Python with the `Pyramid`_ web framework.
 It is part of `PAVICS`_ and `Birdhouse`_ ecosystems.
 
+.. NOTE: all references in this file must remain local (instead of imported from 'references.rst')
+..       to allow Github to directly referring to them from the repository HTML page.
+.. |ogc-tb14| replace:: OGC Testbed-14
 .. _ogc-tb14: https://www.ogc.org/projects/initiatives/testbed14
+.. |ogc-tb14-platform-er| replace:: ADES & EMS Results and Best Practices Engineering Report
 .. _ogc-tb14-platform-er: http://docs.opengeospatial.org/per/18-050r1.html
+.. |ogc-tb15-ml| replace:: OGC Testbed-15 - ML Thread
 .. _ogc-tb15-ml: https://www.ogc.org/projects/initiatives/testbed15#MachineLearning
+.. |ogc-tb15-ml-er| replace:: OGC Testbed-15: Machine Learning Engineering Report
 .. _ogc-tb15-ml-er: http://docs.opengeospatial.org/per/19-027r2.html
+.. |ogc-tb16| replace:: OGC Testbed-16
 .. _ogc-tb16: https://www.ogc.org/projects/initiatives/t-16
 .. _PAVICS: https://ouranosinc.github.io/pavics-sdi/index.html
 .. _Birdhouse: http://bird-house.github.io/

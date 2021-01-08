@@ -54,7 +54,9 @@
 .. _pywps-status: https://pywps.readthedocs.io/en/master/process.html#progress-and-status-report
 .. |pywps-multi-output| replace:: PyWPS Multiple Outputs
 .. _pywps-multi-output: https://pywps.readthedocs.io/en/master/process.html#returning-multiple-files
+.. |wkt-example| replace:: WKT Examples
 .. _wkt-example: https://en.wikipedia.org/wiki/Well-known_text_representation_of_geometry
+.. |wkt-format| replace:: WKT Formats
 .. _wkt-format: https://docs.geotools.org/stable/javadocs/org/opengis/referencing/doc-files/WKT.html
 .. |weaver-issues| replace:: Weaver issues
 .. _weaver-issues: https://github.com/crim-ca/weaver/issues

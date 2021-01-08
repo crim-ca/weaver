@@ -398,12 +398,22 @@ intersphinx_mapping = {
 # linkcheck options
 # http://www.sphinx-doc.org/en/stable/config.html?highlight=linkchecker#options-for-the-linkcheck-builder
 linkcheck_ignore = [
+    # paths to local repository files directly referenced in doc (different root dir when built)
+    # path links are handled by 'doc_redirect' extension
+    r"../../../.*",
+    r"./config.*",
+    r"./docs.*",
+    r"docs/source/.*",
+    # inter-reference between document page and section headers
+    r":ref:`.*`",
+    # dummy values
     r"http[s]*://localhost.*/",
     r"http[s]*://example.com.*",
     "https://mouflon.dkrz.de/",
+    # following have sporadic downtimes
     "https://esgf-data.dkrz.de/",
     "https://indico.egi.eu/",
-    "https://docker-registry.crim.ca.*",
+    ".*docker-registry.crim.ca.*",  # protected
     # might not exist yet (we are generating it!)
     "https://pavics-weaver.readthedocs.io/en/latest/api.html",
     # ignore requires.io which just fails periodically - not critical link

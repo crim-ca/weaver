@@ -1,3 +1,4 @@
+
 .. _processes:
 .. include:: references.rst
 
@@ -93,6 +94,7 @@ Please refer to :ref:`Configuration of WPS Processes` section for more details o
 .. seealso::
     - `Remote Provider`_
 
+.. _process-wps-rest:
 
 WPS-REST
 --------

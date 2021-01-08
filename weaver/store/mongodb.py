@@ -480,7 +480,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                   group_by=None,            # type: Optional[Union[AnyStr, List[AnyStr]]]
                   ):                        # type: (...) -> Union[JobListAndCount, JobCategoriesAndCount]
         """
-        Finds all jobs in `MongoDB` storage matching search filters and obtain results with requested paging or grouping.
+        Finds all jobs in `MongoDB` storage matching search filters to obtain results with requested paging or grouping.
 
         :param request: request that lead to this call to obtain permissions and user id.
         :param process: process name to filter matching jobs.
