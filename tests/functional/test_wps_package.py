@@ -59,6 +59,10 @@ EDAM_NETCDF = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_APP_NETCDF]
 IANA_TAR = IANA_NAMESPACE + ":" + CONTENT_TYPE_APP_TAR  # noqa # pylint: disable=unused-variable
 IANA_ZIP = IANA_NAMESPACE + ":" + CONTENT_TYPE_APP_ZIP  # noqa # pylint: disable=unused-variable
 
+KNOWN_PROCESS_DESCRIPTION_FIELDS = {
+    "id", "title", "abstract", "inputs", "outputs", "executeEndpoint", "keywords", "metadata", "visibility"
+}
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -181,8 +185,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert "minOccurs" not in desc["process"]["outputs"][0]
         assert "maxOccurs" not in desc["process"]["outputs"][0]
         assert "format" not in desc["process"]["outputs"][0]
-        expected_fields = {"id", "title", "abstract", "inputs", "outputs", "executeEndpoint", "keywords", "metadata"}
-        assert len(set(desc["process"].keys()) - expected_fields) == 0
+        assert len(set(desc["process"].keys()) - KNOWN_PROCESS_DESCRIPTION_FIELDS) == 0
 
     def test_literal_io_from_package_and_offering(self):
         """
@@ -1063,8 +1066,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert isinstance(desc["process"]["outputs"][0]["formats"][0], dict)
         assert desc["process"]["outputs"][0]["formats"][0]["mimeType"] == CONTENT_TYPE_TEXT_PLAIN
         assert desc["process"]["outputs"][0]["formats"][0]["default"] is True
-        expected_fields = {"id", "title", "abstract", "inputs", "outputs", "executeEndpoint", "keywords", "metadata"}
-        assert len(set(desc["process"].keys()) - expected_fields) == 0
+        assert len(set(desc["process"].keys()) - KNOWN_PROCESS_DESCRIPTION_FIELDS) == 0
 
     def test_complex_io_from_package_and_offering(self):
         """
