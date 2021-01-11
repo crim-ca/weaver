@@ -186,10 +186,11 @@ install-pkg: install-pip	## install application package dependencies
 	@-bash -c "$(CONDA_CMD) pip install $(PIP_XARGS) -r $(APP_ROOT)/requirements.txt --no-cache-dir"
 	@echo "Install with pip complete."
 
+# don't use 'PIP_XARGS' in this case since extra features could not yet be supported by pip being installed/updated
 .PHONY: install-sys
 install-sys: conda-env	## install system dependencies and required installers/runners
 	@echo "Installing system dependencies..."
-	@bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) --upgrade $(APP_ROOT)/requirements-sys.txt'
+	@bash -c '$(CONDA_CMD) pip install --upgrade -r $(APP_ROOT)/requirements-sys.txt'
 
 .PHONY: install-pip
 install-pip:	## install application as a package to allow import from another python package
@@ -227,14 +228,14 @@ clean-cache:	## remove caches such as DOWNLOAD_CACHE
 
 .PHONY: clean-docs
 clean-docs:	install-dev clean-docs-dirs		## remove documentation artefacts
-	@echo "Removing documenation build files..."
+	@echo "Removing documentation build files..."
 	@$(MAKE) -C "$(APP_ROOT)/docs" clean || true
 
 # extensive cleanup is possible only using sphinx-build
 # allow minimal cleanup when it could not *yet* be installed (dev)
 .PHONY: clean-docs-dirs
 clean-docs-dirs:	## remove documentation artefacts (minimal)
-	@echo "Removing documenation directories..."
+	@echo "Removing documentation directories..."
 	@-rm -fr "$(APP_ROOT)/docs/build"
 	@-rm -fr "$(APP_ROOT)/docs/html"
 	@-rm -fr "$(APP_ROOT)/docs/xml"
