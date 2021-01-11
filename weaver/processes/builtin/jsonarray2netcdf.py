@@ -15,7 +15,7 @@ from six.moves.urllib.parse import urlparse
 if six.PY3:
     from tempfile import TemporaryDirectory
 else:
-    from backports.tempfile import TemporaryDirectory  # noqa # py2
+    from backports.tempfile import TemporaryDirectory  # pylint: disable=E0611  # noqa # py2
 
 CUR_DIR = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, CUR_DIR)
