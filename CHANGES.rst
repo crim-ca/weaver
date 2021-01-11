@@ -8,6 +8,17 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+`1.14.0 <https://github.com/crim-ca/weaver/tree/1.14.0>`_ (2021-01-11)
+========================================================================
+
+Changes:
+--------
 - Add ``data`` input support for `CWL` `Workflow` step referring to `WPS-3 Process`.
 - Add documentation example references to `Application Package` and `Process` ``Deploy``/``Execute`` repositories.
 - Add parsing of ``providers`` in ``wps_processes.yml`` to directly register remote WPS providers that will dynamically
