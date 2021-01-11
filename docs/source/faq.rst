@@ -46,11 +46,10 @@ Please refer to below references for more details.
 
 .. seealso::
 
-    - |wps-rest-support|_
+    - |process-wps-rest|_
     - :ref:`Deploy` request
 
-.. |wps-rest-support| replace:: Supported :term:`Application Package` locations
-.. _wps-rest-support: :ref:`WPS-REST`
+.. |process-wps-rest| replace:: Supported :term:`Application Package` locations
 
 
 Fixing permission error on input files

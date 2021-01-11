@@ -1,3 +1,4 @@
+
 .. _processes:
 .. include:: references.rst
 
@@ -93,6 +94,7 @@ Please refer to :ref:`Configuration of WPS Processes` section for more details o
 .. seealso::
     - `Remote Provider`_
 
+.. _process-wps-rest:
 
 WPS-REST
 --------
@@ -579,8 +581,7 @@ combinations.
 
 .. [#wf]
     Workflows are only available on :term:`EMS` instances. Since they chain processes, no fetch is needed as the first
-    sub-step process will do it instead. See `section about workflows <workflows>`_ as well as :ref:`CWL Workflow` for
-    more details.
+    sub-step process will do it instead. See :ref:`Workflow` process as well as :ref:`CWL Workflow` for more details.
 
 .. todo::
     method to indicate explicit fetch to override these? (https://github.com/crim-ca/weaver/issues/183)
@@ -753,5 +754,5 @@ Workflow (Chaining Step Processes)
 .. seealso::
 
     - :ref:`CWL Workflow`
-    - `Workflow Process Type <Workflow>`_
+    - :ref:`Workflow` process type
 

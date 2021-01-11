@@ -1,13 +1,16 @@
 # Defines a list of WPS-1 processes references from remote service provider to register under Weaver at startup.
-#
+# Can also refer to any other remote WPS using providers.
+
 # Details:
 #   - if only the WPS-1 URL endpoint is provided, all processes found by `GetCapabilities` will be added
-#   - if query `identifier=<process-id>` is provided, only matched process will be added.
-#     alternatively, a list of processes can be specified with `id` sub-field of a given URL reference
+#   - if query `identifier=<process-id>` is provided in the URL, only matched process will be added.
+#   - alternatively, a filtered list of processes to register can be specified with `id` under a given URL reference
 #   - if `name` is not provided, a "clean" (slug) variation of the hostname will be used as service base name
 #   - all processes are deployed using identifier `<service-name>_<process-id>`, with name resolved from above
+#   - processes registered this way are static and local, in the sense that they will only save a snapshot of
+#     the remote service at startup time (see 'providers' alternative).
 # Result:
-#   - for each process, `DescribeProcess` request will indicate how to generate and register a WPS-REST equivalent
+#   - for each process, `DescribeProcess` request will indicate how to generate and register an equivalent WPS-REST
 #   - each process name will combine the service `name` and process `identifier` to reduce chances of conflicts
 processes:
   # will deploy all processes returned by the default `GetCapabilities` operation (missing query parameters are added)
@@ -21,6 +24,9 @@ processes:
   # more verbose `name` to use instead of the default `named-endpoint` that would be resolved from the hostname
   - url: https://named-endpoint/wps
     name: named-endpoint-with-a-twist
+    # directly set visibility to make process publicly available
+    # otherwise it is private by default and cannot be listed nor executed until visibility is updated
+    visible: true
   # explicit list of processes to deploy from all retrieved from `GetCapabilities` response
   # this is essentially equivalent to two `DescribeProcess` URL with specific `identifier` query parameter
   # (this variant saves some request operations and is easier to read)
@@ -28,3 +34,15 @@ processes:
     id:
       - process-1
       - process-2
+
+# When using providers, only the remote service definition (name and remote URL endpoint) are stored.
+# WPS processes under that service will be fetched each time they are requested, making responses dynamic to the
+# referenced service offering response, but prone to unpredictable requests failure if the service becomes unavailable.
+providers:
+  # Without an explicit name, the service will be registered using an appropriate name from the URL reference
+  - https://remote-service/wps
+  # otherwise, the service is registered as is
+  - url: https://other-service/wps
+    name: OverrideName
+    # visibility dictates accessibility of every underlying process (all or nothing)
+    visible: true

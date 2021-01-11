@@ -10,6 +10,10 @@ Changes:
 --------
 - Add ``data`` input support for `CWL` `Workflow` step referring to `WPS-3 Process`.
 - Add documentation example references to `Application Package` and `Process` ``Deploy``/``Execute`` repositories.
+- Add parsing of ``providers`` in ``wps_processes.yml`` to directly register remote WPS providers that will dynamically
+  fetch underlying WPS processes, instead of static per-service processes stored locally.
+- Add field ``visible`` to ``wps_processes.yml`` entries to allow directly defining the registered processes visibility.
+- Adjust response of remote provider processes to return the same format as local processes.
 
 Fixes:
 ------

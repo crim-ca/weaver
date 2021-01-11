@@ -18,6 +18,7 @@ from pyramid.httpexceptions import (
     HTTPOk,
     HTTPUnprocessableEntity
 )
+from pyramid.settings import asbool
 from six.moves.urllib.error import URLError
 from six.moves.urllib.parse import parse_qs, urlparse
 from six.moves.urllib.request import urlopen
@@ -37,21 +38,22 @@ from weaver.exceptions import (
     PackageTypeError,
     ProcessNotFound,
     ProcessRegistrationError,
+    ServiceNotFound,
     log_unhandled_exceptions
 )
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN
 from weaver.processes.constants import WPS_COMPLEX_DATA
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
-from weaver.store.base import StoreProcesses
+from weaver.store.base import StoreProcesses, StoreServices
 from weaver.utils import get_sane_name, get_settings, get_url_without_query
+from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 from weaver.wps import get_wps_output_dir
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
     from weaver.typedefs import AnyContainer, AnySettingsContainer, FileSystemPathType, JSON, Number
-    from weaver.store.mongodb import MongodbProcessStore
-    from typing import Any, AnyStr, List, Optional
+    from typing import Any, AnyStr, List, Optional, Tuple, Union
     from pywps import Process as ProcessWPS
     import owslib.wps
 LOGGER = logging.getLogger(__name__)
@@ -349,11 +351,51 @@ def deploy_process_from_payload(payload, container):
     return HTTPOk(json=json_response)   # FIXME: should be 201 (created), update swagger accordingly
 
 
+def parse_wps_process_config(config_entry):
+    # type: (Union[JSON, AnyStr]) -> Tuple[AnyStr, AnyStr, List[AnyStr], bool]
+    """
+    Parses the available WPS provider or process entry to retrieve its relevant information.
+
+    :return: WPS provider name, WPS service URL, and list of process identifier(s).
+    :raise ValueError: if the entry cannot be parsed correctly.
+    """
+    if isinstance(config_entry, dict):
+        svc_url = config_entry["url"]
+        svc_name = config_entry.get("name")
+        svc_proc = config_entry.get("id", [])
+        svc_vis = asbool(config_entry.get("visible", False))
+    elif isinstance(config_entry, six.string_types):
+        svc_url = config_entry
+        svc_name = None
+        svc_proc = []
+        svc_vis = False
+    else:
+        raise ValueError("Invalid service value: [{!s}].".format(config_entry))
+    url_p = urlparse(svc_url)
+    qs_p = parse_qs(url_p.query)
+    svc_url = get_url_without_query(url_p)
+    svc_name = svc_name or get_sane_name(url_p.hostname)
+    svc_proc = svc_proc or qs_p.get("identifier", [])
+    if not isinstance(svc_name, six.string_types):
+        raise ValueError("Invalid service value: [{!s}].".format(svc_name))
+    if not isinstance(svc_proc, list):
+        raise ValueError("Invalid process value: [{!s}].".format(svc_proc))
+    return svc_name, svc_url, svc_proc, svc_vis
+
+
 def register_wps_processes_from_config(wps_processes_file_path, container):
     # type: (Optional[FileSystemPathType], AnySettingsContainer) -> None
     """
     Loads a `wps_processes.yml` file and registers `WPS-1` providers processes to the
     current `Weaver` instance as equivalent `WPS-2` processes.
+
+    References listed under ``processes`` are registered.
+    When the reference is a service (provider), registration of each WPS process is done individually
+    for each of the specified providers with ID ``[service]_[process]`` per listed process by ``GetCapabilities``.
+
+    .. versionadded:: 1.14.0
+        When references are specified using ``providers`` section instead of ``processes``, the registration
+        only saves the remote WPS provider endpoint to dynamically populate WPS processes on demand.
 
     .. seealso::
         - `weaver.wps_processes.yml.example` for additional file format details
@@ -375,34 +417,20 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
     try:
         with open(wps_processes_file_path, "r") as f:
             processes_config = yaml.safe_load(f)
-        processes = processes_config.get("processes")
-        if not processes:
+        processes = processes_config.get("processes") or []
+        providers = processes_config.get("providers") or []
+        if not processes and not providers:
             LOGGER.warning("Nothing to process from file: [%s]", wps_processes_file_path)
             return
 
-        process_store = get_db(container).get_store(StoreProcesses)  # type: MongodbProcessStore
+        db = get_db(container)
+        process_store = db.get_store(StoreProcesses)
+        service_store = db.get_store(StoreServices)
 
+        # either 'service' references to register every underlying 'process' individually
+        # or explicit 'process' references to register by themselves
         for cfg_service in processes:
-            # parse info
-            if isinstance(cfg_service, dict):
-                svc_url = cfg_service["url"]
-                svc_name = cfg_service.get("name")
-                svc_proc = cfg_service.get("id", [])
-            elif isinstance(cfg_service, six.string_types):
-                svc_url = cfg_service
-                svc_name = None
-                svc_proc = []
-            else:
-                raise ValueError("Invalid service value: [{!s}].".format(cfg_service))
-            url_p = urlparse(svc_url)
-            qs_p = parse_qs(url_p.query)
-            svc_url = get_url_without_query(url_p)
-            svc_name = svc_name or get_sane_name(url_p.hostname)
-            svc_proc = svc_proc or qs_p.get("identifier", [])
-            if not isinstance(svc_name, six.string_types):
-                raise ValueError("Invalid service value: [{!s}].".format(svc_name))
-            if not isinstance(svc_proc, list):
-                raise ValueError("Invalid process value: [{!s}].".format(svc_proc))
+            svc_name, svc_url, svc_proc, svc_vis = parse_wps_process_config(cfg_service)
 
             # fetch data
             LOGGER.info("Fetching WPS-1: [%s]", svc_url)
@@ -422,8 +450,9 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
                     continue
                 proc_url = "{}?service=WPS&request=DescribeProcess&identifier={}&version={}" \
                            .format(svc_url, wps_process.identifier, wps.version)
+                svc_vis = VISIBILITY_PUBLIC if svc_vis else VISIBILITY_PRIVATE
                 payload = {
-                    "processDescription": {"process": {"id": proc_id}},
+                    "processDescription": {"process": {"id": proc_id, "visibility": svc_vis}},
                     "executionUnit": [{"href": proc_url}],
                     "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
                 }
@@ -434,9 +463,28 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
                     else:
                         raise RuntimeError("Process registration failed: [{}]".format(proc_id))
                 except Exception as ex:
-                    LOGGER.exception("Exception during process registration: [%r]", ex)
+                    LOGGER.exception("Exception during process registration: [%r]. Skipping...", ex)
                     continue
 
+        # direct WPS providers to register
+        for cfg_service in providers:
+            svc_name, svc_url, _, svc_vis = parse_wps_process_config(cfg_service)
+            LOGGER.info("Register WPS-1 provider: [%s]", svc_url)
+            WebProcessingService(url=svc_url)  # only attempt fetch to validate it exists
+            try:
+                service_store.fetch_by_name(svc_name)
+            except ServiceNotFound:
+                pass
+            else:
+                LOGGER.warning("Provider already registered: [%s]. Skipping...", svc_name)
+                continue
+            try:
+                service_store.save_service(Service(name=svc_name, url=svc_url, public=svc_vis))
+            except Exception as ex:
+                LOGGER.exception("Exception during provider registration: [%r]. Skipping...", ex)
+                continue
+
+        LOGGER.info("Finished processing configuration file [%s].", wps_processes_file_path)
     except Exception as exc:
         msg = "Invalid WPS-1 providers configuration file [{!r}].".format(exc)
         LOGGER.exception(msg)

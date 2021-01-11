@@ -47,6 +47,7 @@ ifeq ("$(CONDA_ENV_REAL_ACTIVE_PATH)", "")
 endif
 DOWNLOAD_CACHE ?= $(APP_ROOT)/downloads
 PYTHON_VERSION ?= `python -c 'import platform; print(platform.python_version())'`
+PIP_XARGS ?= --use-feature=2020-resolver
 
 # choose conda installer depending on your OS
 CONDA_URL = https://repo.continuum.io/miniconda
@@ -176,30 +177,31 @@ install-all: install-sys install-pkg install-pip install-dev  ## install applica
 .PHONY: install-dev
 install-dev: install-pip	## install development and test dependencies
 	@echo "Installing development packages with pip..."
-	@-bash -c '$(CONDA_CMD) pip install -r $(APP_ROOT)/requirements-dev.txt'
+	@-bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -r $(APP_ROOT)/requirements-dev.txt'
 	@echo "Install with pip complete. Test service with 'make test*' variations."
 
 .PHONY: install-pkg
 install-pkg: install-pip	## install application package dependencies
 	@echo "Installing base packages with pip..."
-	@-bash -c "$(CONDA_CMD) pip install -r $(APP_ROOT)/requirements.txt --no-cache-dir"
+	@-bash -c "$(CONDA_CMD) pip install $(PIP_XARGS) -r $(APP_ROOT)/requirements.txt --no-cache-dir"
 	@echo "Install with pip complete."
 
+# don't use 'PIP_XARGS' in this case since extra features could not yet be supported by pip being installed/updated
 .PHONY: install-sys
 install-sys: conda-env	## install system dependencies and required installers/runners
 	@echo "Installing system dependencies..."
-	@bash -c '$(CONDA_CMD) pip install --upgrade pip setuptools'
+	@bash -c '$(CONDA_CMD) pip install --upgrade -r $(APP_ROOT)/requirements-sys.txt'
 
 .PHONY: install-pip
 install-pip:	## install application as a package to allow import from another python package
 	@echo "Installing package with pip..."
-	@-bash -c '$(CONDA_CMD) pip install $(APP_ROOT)'
+	@-bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) $(APP_ROOT)'
 	@echo "Install with pip complete."
 
 .PHONY: install-raw
 install-raw:	## install without any requirements or dependencies (suppose everything is setup)
 	@echo "Installing package without dependencies..."
-	@-bash -c '$(CONDA_CMD) pip install -e "$(APP_ROOT)" --no-deps'
+	@-bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -e "$(APP_ROOT)" --no-deps'
 	@echo "Install package complete."
 
 ## -- Cleanup targets -- ##
@@ -226,14 +228,14 @@ clean-cache:	## remove caches such as DOWNLOAD_CACHE
 
 .PHONY: clean-docs
 clean-docs:	install-dev clean-docs-dirs		## remove documentation artefacts
-	@echo "Removing documenation build files..."
+	@echo "Removing documentation build files..."
 	@$(MAKE) -C "$(APP_ROOT)/docs" clean || true
 
 # extensive cleanup is possible only using sphinx-build
 # allow minimal cleanup when it could not *yet* be installed (dev)
 .PHONY: clean-docs-dirs
 clean-docs-dirs:	## remove documentation artefacts (minimal)
-	@echo "Removing documenation directories..."
+	@echo "Removing documentation directories..."
 	@-rm -fr "$(APP_ROOT)/docs/build"
 	@-rm -fr "$(APP_ROOT)/docs/html"
 	@-rm -fr "$(APP_ROOT)/docs/xml"

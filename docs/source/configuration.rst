@@ -236,14 +236,26 @@ Configuration of WPS Processes
 =======================================
 
 `Weaver` allows the configuration of services or processes auto-deployment using definitions from a file formatted
-as `wps_processes.yml.example`_. On application startup, provided references will be employed to attempt deployment
-of corresponding processes locally. Given that the resources can be correctly resolved, they will immediately be
-available from `Weaver`'s API without further request needed.
+as `wps_processes.yml.example`_. On application startup, provided references in ``processes`` list will be employed
+to attempt deployment of corresponding processes locally. Given that the resources can be correctly resolved, they
+will immediately be available from `Weaver`'s API without further request needed.
 
 For convenience, every reference URL in the configuration file can either refer to explicit process definition
-(i.e.: endpoint and query parameters that resolve to :ref:`DescribeProcess` response), or a group of processes under a
-common WPS server to iteratively deploy, using a :ref:`GetCapabilities` WPS endpoint. Please refer to
+(i.e.: endpoint and query parameters that resolve to :ref:`DescribeProcess` response), or a group of processes
+under a common WPS server to iteratively register, using a :ref:`GetCapabilities` WPS endpoint. Please refer to
 `wps_processes.yml.example`_ for explicit format, keywords supported, and their resulting behaviour.
+
+.. note::
+    Processes defined under ``processes`` section registered into `Weaver` will correspond to a local snapshot of
+    the remote resource at that point in time, and will not update if the reference changes. On the other hand, their
+    listing and description offering will not require the remote service to be available at all time until execution.
+
+.. versionadded:: 1.14.0
+    When references are specified using ``providers`` section instead of ``processes``, the registration
+    only saves the remote WPS provider endpoint to dynamically populate WPS processes on demand.
+
+    Using this registration method, the processes will always reflect the latest modification from the
+    remote WPS provider.
 
 To specify a custom YAML file, you can define the setting named ``weaver.wps_processes_file`` with the appropriate path
 within the employed ``weaver.ini`` file that starts your application. By default, this setting will look for the

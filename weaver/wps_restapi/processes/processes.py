@@ -427,7 +427,7 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
     return HTTPCreated(location=location, json=body_data)
 
 
-@sd.jobs_full_service.post(tags=[sd.TAG_PROVIDER_PROCESS, sd.TAG_PROVIDERS, sd.TAG_EXECUTE, sd.TAG_JOBS],
+@sd.jobs_full_service.post(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
                            renderer=OUTPUT_FORMAT_JSON, schema=sd.PostProviderProcessJobRequest(),
                            response_schemas=sd.post_provider_process_job_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostProviderProcessJobResponse.description)
@@ -454,7 +454,7 @@ def list_remote_processes(service, request):
     return [convert_process_wps_to_db(service, process, settings) for process in wps.processes]
 
 
-@sd.provider_processes_service.get(tags=[sd.TAG_PROVIDER_PROCESS, sd.TAG_PROVIDERS, sd.TAG_GETCAPABILITIES],
+@sd.provider_processes_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_PROVIDERS, sd.TAG_GETCAPABILITIES],
                                    renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderEndpoint(),
                                    response_schemas=sd.get_provider_processes_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProviderProcessesListResponse.description)
@@ -466,7 +466,7 @@ def get_provider_processes(request):
     store = get_db(request).get_store(StoreServices)
     service = store.fetch_by_name(provider_id, request=request)
     processes = list_remote_processes(service, request=request)
-    return HTTPOk(json=[p.json() for p in processes])
+    return HTTPOk(json={"processes": [p.process_summary() for p in processes]})
 
 
 def describe_provider_process(request):
@@ -486,7 +486,7 @@ def describe_provider_process(request):
     return convert_process_wps_to_db(service, process, get_settings(request))
 
 
-@sd.provider_process_service.get(tags=[sd.TAG_PROVIDER_PROCESS, sd.TAG_PROVIDERS, sd.TAG_DESCRIBEPROCESS],
+@sd.provider_process_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_PROVIDERS, sd.TAG_DESCRIBEPROCESS],
                                  renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderProcessEndpoint(),
                                  response_schemas=sd.get_provider_process_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetProviderProcessResponse.description)
