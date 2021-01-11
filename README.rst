@@ -176,7 +176,7 @@ following improvements. It is also advanced with sponsorship of *U.S. Department
 API of the *Earth System Grid Federation* (`ESGF`_). The findings are reported on the |ogc-tb14|_ thread, and more
 explicitly in the |ogc-tb14-platform-er|_.
 
-The project as been employed for |ogc-tb15-ml|_ to demonstrate the use of Machine Learning interactions withOGC web
+The project has been employed for |ogc-tb15-ml|_ to demonstrate the use of Machine Learning interactions with OGC web
 standards in the context of natural resources applications. The advancements are reported through the |ogc-tb15-ml-er|_.
 
 Developments are continued in |ogc-tb16|_ to improve methodologies in order to provide better
