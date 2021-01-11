@@ -189,7 +189,7 @@ install-pkg: install-pip	## install application package dependencies
 .PHONY: install-sys
 install-sys: conda-env	## install system dependencies and required installers/runners
 	@echo "Installing system dependencies..."
-	@bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) --upgrade pip setuptools'
+	@bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) --upgrade $(APP_ROOT)/requirements-sys.txt'
 
 .PHONY: install-pip
 install-pip:	## install application as a package to allow import from another python package
