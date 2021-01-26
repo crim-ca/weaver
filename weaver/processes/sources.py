@@ -1,7 +1,7 @@
 import os
-import yaml
 from typing import TYPE_CHECKING
 
+import yaml
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
 from six.moves.urllib.parse import urlparse
