@@ -1,5 +1,5 @@
-import json
 import os
+import yaml
 from typing import TYPE_CHECKING
 
 from pyramid.settings import asbool
@@ -19,7 +19,7 @@ DATA_SOURCES = {}
 """Data sources configuration.
 
 Unless explicitly overridden, the configuration will be loaded from file as specified by
-``weaver.data_sources`` setting. Following schema format is expected:
+``weaver.data_sources`` setting. Following JSON schema format is expected (corresponding YAML also supported):
 
 .. code-block:: json
 
@@ -65,7 +65,7 @@ def fetch_data_sources():
             data_source_config = os.path.normpath(os.path.join(WEAVER_ROOT_DIR, data_source_config))
         try:
             with open(data_source_config) as f:
-                DATA_SOURCES = json.load(f)
+                DATA_SOURCES = yaml.safe_load(f)  # both JSON/YAML
         except Exception as exc:
             raise ValueError("Data sources file [{0}] cannot be loaded due to error: [{1!r}]."
                              .format(data_source_config, exc))
