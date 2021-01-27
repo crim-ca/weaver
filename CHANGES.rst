@@ -8,7 +8,7 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add support of YAML format for loading ``weaver.data_sources`` definition.
 
 Fixes:
 ------
