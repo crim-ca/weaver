@@ -16,6 +16,8 @@ cwltool>=1.0.20180820141117,<2; python_version < "3"
 #        remove properly as per https://github.com/crim-ca/weaver/issues/154
 cwltool>=2,<=3.0.20200324120055; python_version >= "3"
 duration
+git+https://github.com/ESGF/esgf-compute-api.git@v2.1.0#egg=cwt ; python_version < "3"
+git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7#egg=esgf-compute-api ; python_version > "3"
 flufl.enum; python_version < "3"
 # gunicorn >20 breaks some config.ini loading parameters (paste)
 # it is also only available for Python >=3.5
@@ -32,7 +34,11 @@ pyramid>=1.7.3
 pyramid_celery
 pyramid_mako
 pytz
-pywps>=4.2.4
+# no viable pywps version with Python>3.5 dependencies
+# use '4.2.4' plus a few commits that provide fix, but not yet released
+# FIXME: https://github.com/geopython/pywps/issues/568
+git+https://github.com/geopython/pywps.git@dd7db7b#egg=pywps ; python_version >= "3"
+pywps==4.2.4; python_version < "3"
 pyyaml>=5.2
 requests
 requests_file

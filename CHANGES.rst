@@ -12,7 +12,8 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Address multiple invalid dependency requirements breaking installed packages over builtin Python packages
+  (see also `geopython/pywps #568 <https://github.com/geopython/pywps/issues/568>`_).
 
 `1.14.0 <https://github.com/crim-ca/weaver/tree/1.14.0>`_ (2021-01-11)
 ========================================================================

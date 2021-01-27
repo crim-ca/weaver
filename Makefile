@@ -28,26 +28,33 @@ CONDA_ENV_REAL_TARGET_PATH := $(realpath $(CONDA_ENV_PATH))
 CONDA_ENV_REAL_ACTIVE_PATH := $(realpath ${CONDA_PREFIX})
 # environment already active - use it directly
 ifneq ("$(CONDA_ENV_REAL_ACTIVE_PATH)", "")
-	CONDA_ENV_MODE := [using active environment]
-	CONDA_ENV := $(notdir $(CONDA_ENV_REAL_ACTIVE_PATH))
-	CONDA_CMD :=
+  CONDA_ENV_MODE := [using active environment]
+  CONDA_ENV := $(notdir $(CONDA_ENV_REAL_ACTIVE_PATH))
+  CONDA_CMD :=
 endif
 # environment not active but it exists - activate and use it
 ifneq ($(CONDA_ENV_REAL_TARGET_PATH), "")
-	CONDA_ENV := $(notdir $(CONDA_ENV_REAL_TARGET_PATH))
+  CONDA_ENV := $(notdir $(CONDA_ENV_REAL_TARGET_PATH))
 endif
 # environment not active and not found - create, activate and use it
 ifeq ("$(CONDA_ENV)", "")
-	CONDA_ENV := $(APP_NAME)
+  CONDA_ENV := $(APP_NAME)
 endif
 # update paths for environment activation
 ifeq ("$(CONDA_ENV_REAL_ACTIVE_PATH)", "")
-	CONDA_ENV_MODE := [will activate environment]
-	CONDA_CMD := source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)";
+  CONDA_ENV_MODE := [will activate environment]
+  CONDA_CMD := source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)";
 endif
 DOWNLOAD_CACHE ?= $(APP_ROOT)/downloads
 PYTHON_VERSION ?= `python -c 'import platform; print(platform.python_version())'`
-PIP_XARGS ?= --use-feature=2020-resolver
+PIP_USE_FEATURE := `python -c '\
+	import pip; \
+	from distutils.version import LooseVersion; \
+	print(LooseVersion(pip.__version__) < LooseVersion("21.0"))'`
+PIP_XARGS ?=
+ifeq ("$(PIP_USE_FEATURE)", "True")
+  PIP_XARGS := --use-feature=2020-resolver $(PIP_XARGS)
+endif
 
 # choose conda installer depending on your OS
 CONDA_URL = https://repo.continuum.io/miniconda
