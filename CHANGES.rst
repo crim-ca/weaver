@@ -9,6 +9,7 @@ Changes
 Changes:
 --------
 - Add support of YAML format for loading ``weaver.data_sources`` definition.
+- Pre-install ``Docker`` CLI in ``worker`` image to avoid bad practice of mounting it from the host.
 
 Fixes:
 ------
