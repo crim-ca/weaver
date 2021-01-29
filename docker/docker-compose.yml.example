@@ -1,0 +1,121 @@
+version: "3.4"
+
+x-logging:
+  &default-logging
+  driver: "json-file"
+  options:
+    max-size: "200k"
+    max-file: "10"
+
+services:
+  # FIXME:
+  #   Weaver API shouldn't be one doing docker run (jobs), but it is actually the one
+  #   running the cwltool app from the received WPS Execute request sent by the worker.
+  #   Configs must be moved to the 'worker' with implementation of direct job monitoring.
+  #   (https://github.com/crim-ca/weaver/issues/21)
+  weaver:
+    image: pavics/weaver:latest-manager
+    container_name: weaver-api
+    ports:
+      - "4001:4001"
+    environment:
+      HOSTNAME: localhost
+      FORWARDED_ALLOW_IPS: "*"
+      DOCKER_HOST: "tcp://docker-proxy:2375"   # FIXME: see above docker-sibling note
+    #env_file:
+    #  - ./config/mongodb/credentials.env
+    # ensure other referenced services are created beforehand to avoid booting timing issues
+    depends_on:
+      - worker
+    links:
+      - mongodb
+    volumes:
+      - ./components/weaver/config/weaver/weaver.ini:/opt/local/src/weaver/config/weaver.ini
+      - ./components/weaver/config/weaver/data_sources.json:/opt/local/src/weaver/config/data_sources.json
+      - ./components/weaver/config/weaver/request_options.yml:/opt/local/src/weaver/config/request_options.yml
+      - ./components/weaver/config/weaver/wps_processes.yml:/opt/local/src/weaver/config/wps_processes.yml
+      - /usr/bin/docker:/usr/bin/docker   # FIXME: see above docker-sibling note
+      - ~/.docker/config.json:/root/.docker/config.json   # FIXME: see above docker-sibling note
+      # WARNING: see detail in 'worker' definition
+      - ${WEAVER_WPS_WORKDIR}:${WEAVER_WPS_WORKDIR}     # FIXME: with fix WPS-execute inside worker, shouldn't be required anymore
+      - ${WEAVER_WPS_OUTPUTS_DIR}:${WEAVER_WPS_OUTPUTS_DIR}
+    networks:
+      - default
+      - docker-proxy  # FIXME: see above docker-sibling note
+    restart: always
+    logging: *default-logging
+
+  worker:
+    image: pavics/weaver:latest-worker
+    container_name: weaver-worker
+    links:
+      - mongodb
+    volumes:
+      - ./config/weaver.ini:/opt/local/src/weaver/config/weaver.ini
+      - ./config/data_sources.json:/opt/local/src/weaver/config/data_sources.json
+      - ./config/request_options.yml:/opt/local/src/weaver/config/request_options.yml
+      # NOTE:
+      #   Working and output directories must be mounted as exact same path (e.g.: /some/path:/some/path)
+      #   to avoid mismatching locations between container-side path resolution of cwltool stagedir/tmpdir/outdir
+      #   and corresponding server-side (host) runtime docker directories since Docker Application Packages will
+      #   not be running inside this docker (not docker-in-docker), but next to it (sibling-dockers).
+      #   Mapping of paths is needed because some part of the code runs inside Weaver/Worker containers, but actual
+      #   execution of the children Application Package of CWL processes calls 'docker run' from the host machine
+      #   and will expect to find the same directory locations.
+      - /tmp/weaver/wps-outputs:/tmp/weaver/wps-outputs
+      - /tmp/weaver/wps-workdir:/tmp/weaver/wps-workdir
+    restart: always
+    logging: *default-logging
+
+  docker-proxy:
+    # | Giving access to your Docker socket could mean giving root access to your host, or even to your whole swarm,
+    # | but some services require hooking into that socket to react to events, etc.
+    # | Using this proxy lets you block anything you consider those services should not do.
+    #     https://github.com/Tecnativa/docker-socket-proxy
+    # Other references:
+    #   https://stackoverflow.com/a/47293798/5936364
+    #   https://docs.docker.com/engine/api/
+    image: tecnativa/docker-socket-proxy
+    container_name: docker-proxy
+    environment:
+      # Docker API permissions
+      # WARNING:
+      #   These variables control which operations the docker-proxy allows from other containers.
+      #   See above references and make sure you understand what you enable. Potential security risk.
+      - SERVICES=0
+      - TASKS=0
+      - NETWORKS=0
+      - NODES=0
+      - INFO=1
+      - EXEC=1
+      - IMAGES=1
+      - VOLUMES=1
+      - CONTAINERS=1
+      - POST=1
+    # access to docker for sibling execution
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    # WARNING:
+    #   Never expose this container's port to a public network.
+    #   Other containers that require docker (weaver-worker) should communicate only through 'docker-proxy' network.
+    networks:
+      - docker-proxy
+    logging: *default-logging
+    # NOTE: Remote swarm as needed (requires more Docker API permissions above)
+    #deploy:
+    #  placement:
+    #    constraints: [node.role == manager]
+
+  mongodb:
+    image: mongo:3.4.0
+    container_name: mongodb
+    volumes:
+      - /data/mongodb_persist:/data/db
+    # MongoDB crash with permission denied errors if the command is not overridden like this
+    command: bash -c 'chown -R mongodb:mongodb /data && chmod -R 755 /data && mongod'
+    restart: always
+    logging: *default-logging
+
+networks:
+  docker-proxy:
+    driver: bridge
