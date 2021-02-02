@@ -287,13 +287,16 @@ class WorkerService(Service):
     When receiving ``Execute`` request, convert the XML payload to corresponding JSON and
     dispatch it to some Celery Worker to actually process it.
     """
-    def __init__(self, *_, is_worker=False, **__):
+    def __init__(self, *_, is_worker=False, settings=None, **__):
         super(WorkerService, self).__init__(*_, **__)
         self.is_worker = is_worker
+        self.settings = settings or get_settings(app)
 
     def execute(self, identifier, wps_request, uuid):
         """
-        Dispatch operation to WPS-REST endpoint, which it turn should call back the real Celery Worker for execution.
+        Dispatch operation to WPS-REST endpoint, which in turn should call back the real Celery Worker for execution.
+
+        Overrides the original execute operation, that instead will get handled by :meth:`execute_job`.
         """
         # FIXME: !!!
         # XML -> JSON
@@ -319,7 +322,7 @@ class WorkerService(Service):
         wps_response = super(WorkerService, self).execute(process_id, wps_request, job_uuid)
         wps_response.store_status_file = True
         # update execution status with actual status file and apply required references
-        execution = check_wps_status(location=wps_response.process.status_location)
+        execution = check_wps_status(location=wps_response.process.status_location, settings=self.settings)
         execution.request = xml_request
         return execution
 
@@ -340,7 +343,7 @@ def get_pywps_service(environ=None, is_worker=False):
         process_store = get_db(app).get_store(StoreProcesses)
         processes_wps = [process.wps() for process in
                          process_store.list_processes(visibility=VISIBILITY_PUBLIC, request=get_current_request())]
-        service = WorkerService(processes_wps, is_worker=is_worker)
+        service = WorkerService(processes_wps, is_worker=is_worker, settings=settings)
     except Exception as ex:
         LOGGER.exception("Error occurred during PyWPS Service and/or Processes setup.")
         raise OWSNoApplicableCode("Failed setup of PyWPS Service and/or Processes. Error [{!r}]".format(ex))
