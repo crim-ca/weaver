@@ -360,8 +360,8 @@ def mocked_execute_process():
 
     task = MockTask()
 
-    def mock_execute_process(job_id, url, headers, notification_email):
-        execute_process(job_id, url, headers, notification_email)
+    def mock_execute_process(job_id, url, headers):
+        execute_process(job_id, url, headers)
         return task
 
     return (

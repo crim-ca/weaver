@@ -125,7 +125,7 @@ class Wps1Process(WpsProcessInterface):
                 if num_retries >= max_retries:
                     raise Exception("Could not read status document after {} retries. Giving up.".format(max_retries))
                 try:
-                    execution = check_wps_status(url=execution.statusLocation, verify=self.verify,
+                    execution = check_wps_status(location=execution.statusLocation, verify=self.verify,
                                                  sleep_secs=wait_secs(run_step))
                     job_id = execution.statusLocation.replace(".xml", "").split("/")[-1]
                     LOGGER.debug(get_log_monitor_msg(job_id, status.map_status(execution.getStatus()),

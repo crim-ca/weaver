@@ -377,6 +377,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                  service=None,              # type: Optional[AnyStr]
                  inputs=None,               # type: Optional[List[Any]]
                  is_workflow=False,         # type: bool
+                 is_local=False,            # type: bool
                  user_id=None,              # type: Optional[int]
                  execute_async=True,        # type: bool
                  custom_tags=None,          # type: Optional[List[AnyStr]]
@@ -409,6 +410,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                 "status": map_status(STATUS_ACCEPTED),
                 "execute_async": execute_async,
                 "is_workflow": is_workflow,
+                "is_local": is_local,
                 "created": now(),
                 "tags": list(set(tags)),
                 "access": access,

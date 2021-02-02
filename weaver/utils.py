@@ -748,9 +748,7 @@ def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
     file_path = os.path.join(file_outdir, file_name)
     if file_reference.startswith("file://"):
         file_reference = file_reference[7:]
-    LOGGER.debug("Fetch file resolved:\n"
-                 "  Reference: [%s]\n"
-                 "  File Path: [%s]", file_href, file_path)
+    LOGGER.debug("Fetching file reference: [%s]", file_href)
     if os.path.isfile(file_reference):
         LOGGER.debug("Fetch file resolved as local reference.")
         # NOTE:
@@ -760,7 +758,8 @@ def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
         #   Do symlink operation by hand instead of with argument to have Python-2 compatibility.
         if os.path.islink(file_reference):
             os.symlink(os.readlink(file_reference), file_path)
-        else:
+        # otherwise copy the file if not already available
+        elif not os.path.isfile(file_path) or os.path.realpath(file_path) != os.path.realpath(file_reference):
             shutil.copyfile(file_reference, file_path)
     elif file_reference.startswith("s3://"):
         LOGGER.debug("Fetch file resolved as S3 bucket reference.")
@@ -798,7 +797,9 @@ def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
         scheme = "<none>" if len(scheme) < 2 else scheme[0]
         raise ValueError("Unresolved fetch file scheme: '{!s}', supported: {}"
                          .format(scheme, list(SUPPORTED_FILE_SCHEMES)))
-    LOGGER.debug("Fetch file written")
+    LOGGER.debug("Fetch file resolved:\n"
+                 "  Reference: [%s]\n"
+                 "  File Path: [%s]", file_href, file_path)
     return file_path
 
 

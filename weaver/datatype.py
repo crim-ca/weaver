@@ -8,6 +8,7 @@ from logging import ERROR, INFO, Logger, getLevelName, getLogger
 from typing import TYPE_CHECKING
 
 import six
+import lxml.etree
 from dateutil.parser import parse as dt_parse  # noqa
 from owslib.wps import WPSException
 from pywps import Process as ProcessWPS
@@ -545,25 +546,29 @@ class Job(Base):
     @property
     def request(self):
         # type: () -> Optional[AnyStr]
-        """XML request for WPS execution submission as string."""
+        """XML request for WPS execution submission as string (binary)."""
         return self.get("request", None)
 
     @request.setter
     def request(self, request):
         # type: (Optional[AnyStr]) -> None
-        """XML request for WPS execution submission as string."""
+        """XML request for WPS execution submission as string (binary)."""
+        if isinstance(request, lxml.etree._Element):  # noqa
+            request = lxml.etree.tostring(request)
         self["request"] = request
 
     @property
     def response(self):
         # type: () -> Optional[AnyStr]
-        """XML status response from WPS execution submission as string."""
+        """XML status response from WPS execution submission as string (binary)."""
         return self.get("response", None)
 
     @response.setter
     def response(self, response):
         # type: (Optional[AnyStr]) -> None
-        """XML status response from WPS execution submission as string."""
+        """XML status response from WPS execution submission as string (binary)."""
+        if isinstance(response, lxml.etree._Element):  # noqa
+            response = lxml.etree.tostring(response)
         self["response"] = response
 
     def _job_url(self, settings):

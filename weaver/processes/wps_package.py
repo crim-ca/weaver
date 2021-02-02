@@ -1953,6 +1953,12 @@ class WpsPackage(Process):
         pywps_status = map_status(status, STATUS_COMPLIANT_PYWPS)
         pywps_status_id = STATUS_PYWPS_IDS[pywps_status]
 
+        # NOTE:
+        #   When running process in sync (because executed within celery worker already async),
+        #   pywps reverts status file output flag. Re-enforce it for our needs.
+        #   (see: 'wevaer.wps.WorkerService.execute_job')
+        self.response.store_status_file = True
+
         # pywps overrides 'status' by 'accepted' in 'update_status', so use the '_update_status' to enforce the status
         # using protected method also avoids weird overrides of progress percent on failure and final 'success' status
         self.response._update_status(pywps_status_id, message, self.percent)  # noqa: W0212

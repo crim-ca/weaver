@@ -15,6 +15,7 @@ from pyramid.threadlocal import get_current_request
 from pyramid.wsgi import wsgiapp2
 from pyramid_celery import celery_app as app
 from pywps import configuration as pywps_config
+from pywps.app import WPSRequest
 from pywps.app.Service import Service
 from six.moves.configparser import ConfigParser
 from six.moves.urllib.parse import urlparse
@@ -129,12 +130,12 @@ def get_wps_local_status_location(url_status_location, container, must_exist=Tru
     return out_path
 
 
-def check_wps_status(url=None, response=None, sleep_secs=2, verify=True, settings=None):
+def check_wps_status(location=None, response=None, sleep_secs=2, verify=True, settings=None):
     # type: (Optional[AnyStr], Optional[etree.ElementBase], int, bool, Optional[AnySettingsContainer]) -> WPSExecution
     """
     Run :func:`owslib.wps.WPSExecution.checkStatus` with additional exception handling.
 
-    :param url: job URL where to look for job status.
+    :param location: job URL or file path where to look for job status.
     :param response: WPS response document of job status.
     :param sleep_secs: number of seconds to sleep before returning control to the caller.
     :param verify: Flag to enable SSL verification.
@@ -143,9 +144,9 @@ def check_wps_status(url=None, response=None, sleep_secs=2, verify=True, setting
     """
     def _retry_file():
         LOGGER.warning("Failed retrieving WPS status-location, attempting with local file.")
-        out_path = get_wps_local_status_location(url, settings)
+        out_path = get_wps_local_status_location(location, settings)
         if not out_path:
-            raise HTTPNotFound("Could not find file resource from [{}].".format(url))
+            raise HTTPNotFound("Could not find file resource from [{}].".format(location))
         LOGGER.info("Resolved WPS status-location using local file reference.")
         return open(out_path, "r").read()
 
@@ -153,11 +154,11 @@ def check_wps_status(url=None, response=None, sleep_secs=2, verify=True, setting
     if response:
         LOGGER.debug("Retrieving WPS status from XML response document...")
         xml = response
-    elif url:
+    elif location:
         xml_resp = HTTPNotFound()
         try:
             LOGGER.debug("Attempt to retrieve WPS status-location from URL...")
-            xml_resp = request_extra("get", url, verify=verify, settings=settings)
+            xml_resp = request_extra("get", location, verify=verify, settings=settings)
             xml = xml_resp.content
         except Exception as ex:
             LOGGER.debug("Got exception during get status: [%r]", ex)
@@ -276,14 +277,58 @@ def load_pywps_config(container, config=None):
     return pywps_config.CONFIG
 
 
-# @app.task(bind=True)
-@wsgiapp2
-def pywps_view(environ, start_response):
+class WorkerService(Service):
     """
-    * TODO: add xml response renderer
-    """
-    LOGGER.debug("pywps env: %s", environ.keys())
+    Dispatches PyWPS requests from *older* WPS-1/2 XML endpoint to WPS-REST as appropriate.
 
+    When ``GetCapabilities`` or ``DescribeProcess`` requests are received, directly return to result
+    (no need to subprocess as Celery task that gets resolved quickly with only the process(es) details).
+
+    When receiving ``Execute`` request, convert the XML payload to corresponding JSON and
+    dispatch it to some Celery Worker to actually process it.
+    """
+    def __init__(self, *_, is_worker=False, **__):
+        super(WorkerService, self).__init__(*_, **__)
+        self.is_worker = is_worker
+
+    def execute(self, identifier, wps_request, uuid):
+        """
+        Dispatch operation to WPS-REST endpoint, which it turn should call back the real Celery Worker for execution.
+        """
+        # FIXME: !!!
+        # XML -> JSON
+        # submit_job_handler()
+
+    def execute_job(self, process_id, wps_inputs, wps_outputs, mode, job_uuid):
+        """
+        Real execution of the process by active Celery Worker.
+        """
+        execution = WPSExecution(version="2.0", url="localhost")
+        xml_request = execution.buildRequest(process_id, wps_inputs, wps_outputs, mode=mode, lineage=True)
+        wps_request = WPSRequest()
+        wps_request.identifier = process_id
+        wps_request.set_version("2.0.0")
+        request_parser = wps_request._post_request_parser(wps_request.WPS.Execute().tag)
+        request_parser(xml_request)
+        # NOTE:
+        #  Setting 'status = false' will disable async execution of 'pywps.app.Process.Process'
+        #  but this is needed since this job is running within Celery already async
+        #  (daemon process can't have children processes)
+        #  Because if how the code in PyWPS is made, we have to re-enable creation of status file
+        wps_request.status = "false"
+        wps_response = super(WorkerService, self).execute(process_id, wps_request, job_uuid)
+        wps_response.store_status_file = True
+        # update execution status with actual status file and apply required references
+        execution = check_wps_status(location=wps_response.process.status_location)
+        execution.request = xml_request
+        return execution
+
+
+def get_pywps_service(environ=None, is_worker=False):
+    """
+    Generates the PyWPS Service that provides *older* WPS-1/2 XML endpoint.
+    """
+    environ = environ or {}
     try:
         # get config file
         settings = get_settings(app)
@@ -291,15 +336,25 @@ def pywps_view(environ, start_response):
         if not isinstance(pywps_cfg, ConfigParser) or not settings.get("weaver.wps_configured"):
             load_pywps_config(app, config=pywps_cfg)
 
-        # call pywps application with processes filtered according to the adapter"s definition
+        # call pywps application with processes filtered according to the adapter's definition
         process_store = get_db(app).get_store(StoreProcesses)
         processes_wps = [process.wps() for process in
                          process_store.list_processes(visibility=VISIBILITY_PUBLIC, request=get_current_request())]
-        service = Service(processes_wps)
+        service = WorkerService(processes_wps, is_worker=is_worker)
     except Exception as ex:
         LOGGER.exception("Error occurred during PyWPS Service and/or Processes setup.")
         raise OWSNoApplicableCode("Failed setup of PyWPS Service and/or Processes. Error [{!r}]".format(ex))
+    return service
 
+
+# @app.task(bind=True)
+@wsgiapp2
+def pywps_view(environ, start_response):
+    """
+    Served location for PyWPS Service that provides *older* WPS-1/2 XML endpoint.
+    """
+    LOGGER.debug("pywps env: %s", environ.keys())
+    service = get_pywps_service(environ)
     return service(environ, start_response)
 
 

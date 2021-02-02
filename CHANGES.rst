@@ -10,6 +10,8 @@ Changes:
 --------
 - Add support of YAML format for loading ``weaver.data_sources`` definition.
 - Pre-install ``Docker`` CLI in ``worker`` image to avoid bad practice of mounting it from the host.
+- Adjust WPS request dispatching such that process jobs get executed by ``Celery`` worker as intended
+  (see `#21 <https://github.com/crim-ca/weaver/issues/21>`_ and `#126 <https://github.com/crim-ca/weaver/issues/126>`_).
 
 Fixes:
 ------

@@ -45,6 +45,7 @@ from weaver.processes.utils import convert_process_wps_to_db, deploy_process_fro
 from weaver.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_STARTED, STATUS_SUCCEEDED, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import (
+    bytes2str,
     get_any_id,
     get_any_value,
     get_cookie_headers,
@@ -57,9 +58,11 @@ from weaver.utils import (
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps import (
     check_wps_status,
+    get_pywps_service,
     get_wps_local_status_location,
     get_wps_output_path,
     get_wps_output_url,
+    get_wps_url,
     load_pywps_config
 )
 from weaver.wps_restapi import swagger_definitions as sd
@@ -90,7 +93,7 @@ JOB_PROGRESS_DONE = 100
 
 
 @app.task(bind=True)
-def execute_process(self, job_id, url, headers=None, notification_email=None):
+def execute_process(self, job_id, url, headers=None):
     LOGGER.debug("Job execute process called.")
     settings = get_settings(app)
     task_logger = get_task_logger(__name__)
@@ -154,14 +157,18 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
         # prepare outputs
         job.progress = JOB_PROGRESS_GET_OUTPUTS
         job.save_log(logger=task_logger, message="Fetching job output definitions.")
-        outputs = [(o.identifier, o.dataType == WPS_COMPLEX_DATA) for o in process.processOutputs]
+        wps_outputs = [(o.identifier, o.dataType == WPS_COMPLEX_DATA) for o in process.processOutputs]
 
         mode = EXECUTE_MODE_ASYNC if job.execute_async else EXECUTE_MODE_SYNC
         job.progress = JOB_PROGRESS_EXECUTE_REQUEST
         job.save_log(logger=task_logger, message="Starting job process execution.")
         job.save_log(logger=task_logger,
                      message="Following updates could take a while until the Application Package answers...")
-        execution = wps.execute(job.process, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
+
+        wps_worker = get_pywps_service(environ=settings, is_worker=True)
+        execution = wps_worker.execute_job(job.process, wps_inputs=wps_inputs, wps_outputs=wps_outputs,
+                                           mode=mode, job_uuid=job.id)
+        ###execution = wps.execute(job.process, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
         if not execution.process and execution.errors:
             raise execution.errors[0]
 
@@ -178,7 +185,7 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
         job.status_message = execution.statusMessage or "{} initiation done.".format(str(job))
         job.status_location = wps_status_path
         job.request = execution.request
-        job.response = etree.tostring(execution.response)
+        job.response = execution.response
         job.progress = JOB_PROGRESS_EXECUTE_MONITOR_START
         job.save_log(logger=task_logger, message="Starting monitoring of job execution.")
         job = store.update_job(job)
@@ -195,9 +202,10 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
                 #   WPS execution logs can be inserted within the current job log and appear continuously.
                 #   Only update internal job fields in case they get referenced elsewhere.
                 job.progress = JOB_PROGRESS_EXECUTE_MONITOR_LOOP
-                execution = check_wps_status(url=wps_status_path, settings=settings, sleep_secs=wait_secs(run_step))
+                execution = check_wps_status(location=wps_status_path, settings=settings,
+                                             sleep_secs=wait_secs(run_step))
                 job_msg = (execution.statusMessage or "").strip()
-                job.response = etree.tostring(execution.response)
+                job.response = execution.response
                 job.status = map_status(execution.getStatus())
                 job.status_message = "Job execution monitoring (progress: {}%, status: {})."\
                                      .format(execution.percentCompleted, job_msg or "n/a")
@@ -252,10 +260,10 @@ def execute_process(self, job_id, url, headers=None, notification_email=None):
         job.save_log(logger=task_logger)
 
         # Send email if requested
-        if notification_email is not None:
+        if job.notification_email is not None:
             job.progress = JOB_PROGRESS_NOTIFY
             try:
-                notify_job_complete(job, notification_email, settings)
+                notify_job_complete(job, job.notification_email, settings)
                 message = "Notification email sent successfully."
                 job.save_log(logger=task_logger, message=message)
             except Exception as exc:
@@ -407,9 +415,7 @@ def submit_job_handler(request, service_url, is_workflow=False, visibility=None)
     result = execute_process.delay(
         job_id=job.id,
         url=clean_ows_url(service_url),
-        # Convert EnvironHeaders to a simple dict (should cherry-pick the required headers)
-        headers={k: v for k, v in request.headers.items()},
-        notification_email=notification_email)
+        headers=dict(request.headers))
     LOGGER.debug("Celery pending task [%s] for job [%s].", result.id, job.id)
 
     # local/provider process location
