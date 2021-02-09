@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 import yaml
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
-from six.moves.urllib.parse import urlparse
+from urllib.parse import urlparse
 
 from weaver import WEAVER_ROOT_DIR
 from weaver.config import WEAVER_DEFAULT_DATA_SOURCES_CONFIG, get_weaver_config_file

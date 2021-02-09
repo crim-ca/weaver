@@ -1,17 +1,16 @@
+import contextlib
 import json
 import unittest
 import warnings
 from collections import OrderedDict
-from typing import TYPE_CHECKING, AnyStr, List, Tuple, Union
+from typing import TYPE_CHECKING
 
 import mock
 import pyramid.testing
 import pytest
-import six
 import webtest
 from owslib.wps import WebProcessingService
 
-from tests.compat import contextlib
 from tests.utils import (
     mocked_process_job_runner,
     setup_config_with_mongodb,
@@ -35,9 +34,11 @@ from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.wps_restapi.swagger_definitions import jobs_full_uri, jobs_short_uri, process_jobs_uri
 
 if TYPE_CHECKING:
-    # pylint: disable=W0611,unused-import
-    from owslib.wps import Process as ProcessOWSWPS  # noqa: F401
-    from pywps.app import Process as ProcessPyWPS    # noqa: F401
+    from typing import List, Tuple, Union
+
+    from owslib.wps import Process as ProcessOWSWPS
+    from pywps.app import Process as ProcessPyWPS
+
     # pylint: disable=C0103,invalid-name,E1101,no-member
     MockPatch = mock._patch  # noqa: W0212
 
@@ -157,16 +158,16 @@ class WpsRestApiJobsTest(unittest.TestCase):
     @staticmethod
     def check_job_format(job):
         assert isinstance(job, dict)
-        assert "jobID" in job and isinstance(job["jobID"], six.string_types)
-        assert "status" in job and isinstance(job["status"], six.string_types)
-        assert "message" in job and isinstance(job["message"], six.string_types)
+        assert "jobID" in job and isinstance(job["jobID"], str)
+        assert "status" in job and isinstance(job["status"], str)
+        assert "message" in job and isinstance(job["message"], str)
         assert "percentCompleted" in job and isinstance(job["percentCompleted"], int)
-        assert "logs" in job and isinstance(job["logs"], six.string_types)
+        assert "logs" in job and isinstance(job["logs"], str)
         assert job["status"] in JOB_STATUS_VALUES
         if job["status"] == STATUS_SUCCEEDED:
-            assert "result" in job and isinstance(job["result"], six.string_types)
+            assert "result" in job and isinstance(job["result"], str)
         elif job["status"] == STATUS_FAILED:
-            assert "exceptions" in job and isinstance(job["exceptions"], six.string_types)
+            assert "exceptions" in job and isinstance(job["exceptions"], str)
 
     @staticmethod
     def check_basic_jobs_info(response):
@@ -181,7 +182,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     @staticmethod
     def check_basic_jobs_grouped_info(response, groups):
-        if isinstance(groups, six.string_types):
+        if isinstance(groups, str):
             groups = [groups]
         assert response.status_code == 200
         assert response.content_type == CONTENT_TYPE_APP_JSON
@@ -209,14 +210,14 @@ class WpsRestApiJobsTest(unittest.TestCase):
         resp = self.app.get(jobs_short_uri, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
         for job_id in resp.json["jobs"]:
-            assert isinstance(job_id, six.string_types)
+            assert isinstance(job_id, str)
 
         for detail in ("false", 0, "False", "no", "None", "null", None, ""):
             path = self.add_params(jobs_short_uri, detail=detail)
             resp = self.app.get(path, headers=self.json_headers)
             self.check_basic_jobs_info(resp)
             for job_id in resp.json["jobs"]:
-                assert isinstance(job_id, six.string_types)
+                assert isinstance(job_id, str)
 
     def test_get_jobs_detail_paged(self):
         for detail in ("true", 1, "True", "yes"):
@@ -234,7 +235,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
             self.check_basic_jobs_grouped_info(resp, groups=groups)
             for grouped_jobs in resp.json["groups"]:
                 for job in grouped_jobs["jobs"]:
-                    assert isinstance(job, six.string_types)
+                    assert isinstance(job, str)
 
     def test_get_jobs_detail_grouped(self):
         for detail in ("true", 1, "True", "yes"):
@@ -497,7 +498,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
             (uri_provider_jobs, VISIBILITY_PUBLIC,  self.user_editor1_id,   filter_service(editor1_public_jobs)),       # noqa: E241,E501
             (uri_provider_jobs, VISIBILITY_PUBLIC,  self.user_admin_id,     filter_service(self.job_info)),             # noqa: E241,E501
 
-        ]   # type: List[Tuple[AnyStr, AnyStr, Union[None, int], List[AnyStr]]]
+        ]   # type: List[Tuple[str, str, Union[None, int], List[str]]]
 
         for i, (path, access, user_id, expected_jobs) in enumerate(path_jobs_user_req_tests):
             patches = self.get_job_request_auth_mock(user_id) + self.get_job_remote_service_mock([self.process_public])

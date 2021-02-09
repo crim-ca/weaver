@@ -4,7 +4,6 @@ from importlib import import_module
 from string import Template
 from typing import TYPE_CHECKING
 
-import six
 from cwltool.command_line_tool import CommandLineTool
 from cwltool.docker import DockerCommandLineJob
 from cwltool.job import CommandLineJob, JobBase
@@ -21,13 +20,13 @@ from weaver.processes.wps_package import PACKAGE_EXTENSIONS, get_process_definit
 from weaver.store.base import StoreProcesses
 from weaver.utils import clean_json_text_body, ows_context_href
 from weaver.visibility import VISIBILITY_PUBLIC
-from weaver.wps import get_wps_url
+from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from weaver.typedefs import AnyDatabaseContainer, CWL   # noqa: F401
-    from cwltool.context import RuntimeContext              # noqa: F401
-    from typing import Any, AnyStr, Dict, Type, Union       # noqa: F401
+    from weaver.typedefs import AnyDatabaseContainer, CWL
+    from cwltool.context import RuntimeContext
+    from typing import Any, Dict, Type, Union
 
 LOGGER = logging.getLogger(__name__)
 
@@ -39,7 +38,7 @@ __all__ = [
 
 
 def _get_builtin_reference_mapping(root):
-    # type: (AnyStr) -> Dict[AnyStr, AnyStr]
+    # type: (str) -> Dict[str, str]
     """Generates a mapping of `reference` to actual ``builtin`` package file path."""
     builtin_names = [_pkg for _pkg in os.listdir(root)
                      if os.path.splitext(_pkg)[-1].replace(".", "") in PACKAGE_EXTENSIONS]
@@ -47,7 +46,7 @@ def _get_builtin_reference_mapping(root):
 
 
 def _get_builtin_metadata(process_id, process_path, meta_field, clean=False):
-    # type: (AnyStr, AnyStr, AnyStr, bool) -> Union[AnyStr, None]
+    # type: (str, str, str, bool) -> Union[str, None]
     """
     Retrieves the ``builtin`` process ``meta_field`` from its definition if it exists.
     """
@@ -56,7 +55,7 @@ def _get_builtin_metadata(process_id, process_path, meta_field, clean=False):
         try:
             mod = import_module("{}.{}".format(__name__, process_id))
             meta = getattr(mod, meta_field, None)
-            if meta and isinstance(meta, six.string_types):
+            if meta and isinstance(meta, str):
                 return clean_json_text_body(meta) if clean else meta
         except ImportError:
             pass
@@ -64,20 +63,20 @@ def _get_builtin_metadata(process_id, process_path, meta_field, clean=False):
 
 
 def _replace_template(pkg, var, val):
-    # type: (CWL, AnyStr, AnyStr) -> CWL
-    if isinstance(pkg, six.string_types):
+    # type: (CWL, str, str) -> CWL
+    if isinstance(pkg, str):
         return Template(pkg).safe_substitute({var: val})
     for k in pkg:
         if isinstance(pkg[k], list):
             for i, _ in enumerate(pkg[k]):
                 pkg[k][i] = _replace_template(pkg[k][i], var, val)
-        elif isinstance(pkg[k], (dict, six.string_types)):
+        elif isinstance(pkg[k], (dict, str)):
             pkg[k] = _replace_template(pkg[k], var, val)
     return pkg
 
 
 def _get_builtin_package(process_id, package):
-    # type: (AnyStr, CWL) -> CWL
+    # type: (str, CWL) -> CWL
     """
     Updates the `CWL` with following requirements to allow running a ``PROCESS_BUILTIN``:
         - add `hints` section with ``CWL_REQUIREMENT_APP_BUILTIN``

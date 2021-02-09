@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING
 import boto3
 import pytz
 import requests
-import six
 from celery.app import Celery
 from lxml import etree
 from pyramid.config import Configurator
@@ -26,7 +25,7 @@ from pyramid.settings import asbool, aslist
 from requests import HTTPError as RequestsHTTPError, Response
 from requests.structures import CaseInsensitiveDict
 from requests_file import FileAdapter
-from six.moves.urllib.parse import ParseResult, parse_qs, urlparse, urlunsplit
+from urllib.parse import ParseResult, parse_qs, urlparse, urlunsplit
 from urlmatch import urlmatch
 from webob.headers import EnvironHeaders, ResponseHeaders
 
@@ -35,11 +34,21 @@ from weaver.status import map_status
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 
 if TYPE_CHECKING:
-    from weaver.typedefs import (                                                               # noqa: F401
-        AnyValue, AnyKey, AnySettingsContainer, AnyRegistryContainer, AnyHeadersContainer,
-        AnyResponseType, HeadersType, SettingsType, JSON, XML, Number
+    from typing import Any, Dict, List, Iterable, Optional, Type, Union
+
+    from weaver.typedefs import (
+        AnyKey,
+        AnyHeadersContainer,
+        AnySettingsContainer,
+        AnyRegistryContainer,
+        AnyResponseType,
+        AnyValue,
+        HeadersType,
+        JSON,
+        Number,
+        SettingsType,
+        XML
     )
-    from typing import Union, Any, Dict, List, AnyStr, Iterable, Optional, Type                 # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 
@@ -60,7 +69,7 @@ class _Singleton(type):
         return cls.__instance__
 
 
-class _NullType(six.with_metaclass(_Singleton)):
+class _NullType(metaclass=_Singleton):
     """Represents a ``null`` value to differentiate from ``None``."""
 
     # pylint: disable=E1101,no-member
@@ -86,14 +95,14 @@ null = _NullType()
 
 
 def get_weaver_url(container):
-    # type: (AnySettingsContainer) -> AnyStr
+    # type: (AnySettingsContainer) -> str
     """Retrieves the home URL of the `weaver` application."""
     value = get_settings(container).get("weaver.url", "") or ""  # handle explicit None
     return value.rstrip("/").strip()
 
 
 def get_any_id(info):
-    # type: (JSON) -> Union[AnyStr, None]
+    # type: (JSON) -> Union[str, None]
     """Retrieves a dictionary `id-like` key using multiple common variations ``[id, identifier, _id]``.
     :param info: dictionary that potentially contains an `id-like` key.
     :returns: value of the matched `id-like` key or ``None`` if not found."""
@@ -109,7 +118,7 @@ def get_any_value(info):
 
 
 def get_any_message(info):
-    # type: (JSON) -> AnyStr
+    # type: (JSON) -> str
     """Retrieves a dictionary 'value'-like key using multiple common variations [message].
     :param info: dictionary that potentially contains a 'message'-like key.
     :returns: value of the matched 'message'-like key or an empty string if not found. """
@@ -141,7 +150,7 @@ def get_settings(container):
 
 
 def get_header(header_name, header_container):
-    # type: (AnyStr, AnyHeadersContainer) -> Union[AnyStr, None]
+    # type: (str, AnyHeadersContainer) -> Union[str, None]
     """
     Searches for the specified header by case/dash/underscore-insensitive ``header_name`` inside ``header_container``.
     """
@@ -160,7 +169,7 @@ def get_header(header_name, header_container):
 
 
 def get_cookie_headers(header_container, cookie_header_name="Cookie"):
-    # type: (AnyHeadersContainer, Optional[AnyStr]) -> HeadersType
+    # type: (AnyHeadersContainer, Optional[str]) -> HeadersType
     """
     Looks for ``cookie_header_name`` header within ``header_container``.
     :returns: new header container in the form ``{'Cookie': <found_cookie>}`` if it was matched, or empty otherwise.
@@ -175,9 +184,9 @@ def get_cookie_headers(header_container, cookie_header_name="Cookie"):
 
 
 def get_url_without_query(url):
-    # type: (Union[AnyStr, ParseResult]) -> AnyStr
+    # type: (Union[str, ParseResult]) -> str
     """Removes the query string part of an URL."""
-    if isinstance(url, six.string_types):
+    if isinstance(url, str):
         url = urlparse(url)
     if not isinstance(url, ParseResult):
         raise TypeError("Expected a parsed URL.")
@@ -185,7 +194,7 @@ def get_url_without_query(url):
 
 
 def is_valid_url(url):
-    # type: (Union[AnyStr, None]) -> bool
+    # type: (Union[str, None]) -> bool
     try:
         return bool(urlparse(url).scheme)
     except Exception:  # noqa: W0703 # nosec: B110
@@ -251,7 +260,7 @@ def expires_at(hours=1):
 
 
 def localize_datetime(dt, tz_name="UTC"):
-    # type: (datetime, Optional[AnyStr]) -> datetime
+    # type: (datetime, Optional[str]) -> datetime
     """
     Provide a timezone-aware object for a given datetime and timezone name
     """
@@ -267,7 +276,7 @@ def localize_datetime(dt, tz_name="UTC"):
 
 
 def get_base_url(url):
-    # type: (AnyStr) -> AnyStr
+    # type: (str) -> str
     """
     Obtains the base URL from the given ``url``.
     """
@@ -279,7 +288,7 @@ def get_base_url(url):
 
 
 def xml_path_elements(path):
-    # type: (AnyStr) -> List[AnyStr]
+    # type: (str) -> List[str]
     elements = [el.strip() for el in path.split("/")]
     elements = [el for el in elements if len(el) > 0]
     return elements
@@ -297,7 +306,7 @@ def xml_strip_ns(tree):
 
 
 def ows_context_href(href, partial=False):
-    # type: (AnyStr, Optional[bool]) -> JSON
+    # type: (str, Optional[bool]) -> JSON
     """Returns the complete or partial dictionary defining an ``OWSContext`` from a reference."""
     context = {"offering": {"content": {"href": href}}}
     if partial:
@@ -345,9 +354,9 @@ def raise_on_xml_exception(xml_node):
 
 
 def str2bytes(string):
-    # type: (Union[AnyStr, bytes]) -> bytes
+    # type: (Union[str, bytes]) -> bytes
     """Obtains the bytes representation of the string."""
-    if not isinstance(string, (six.string_types, bytes)):
+    if not isinstance(string, (str, bytes)):
         raise TypeError("Cannot convert item to bytes: {!r}".format(type(string)))
     if isinstance(string, bytes):
         return string
@@ -355,9 +364,9 @@ def str2bytes(string):
 
 
 def bytes2str(string):
-    # type: (Union[AnyStr, bytes]) -> str
+    # type: (Union[str, bytes]) -> str
     """Obtains the unicode representation of the string."""
-    if not isinstance(string, (six.string_types, bytes)):
+    if not isinstance(string, (str, bytes)):
         raise TypeError("Cannot convert item to unicode: {!r}".format(type(string)))
     if not isinstance(string, bytes):
         return string
@@ -374,13 +383,13 @@ all_cap_re = re.compile(r"([a-z0-9])([A-Z])")
 
 
 def convert_snake_case(name):
-    # type: (AnyStr) -> AnyStr
+    # type: (str) -> str
     s1 = first_cap_re.sub(r"\1_\2", name)
     return all_cap_re.sub(r"\1_\2", s1).lower()
 
 
 def parse_request_query(request):
-    # type: (Request) -> Dict[AnyStr, Dict[AnyKey, AnyStr]]
+    # type: (Request) -> Dict[str, Dict[AnyKey, str]]
     """
     :param request:
     :return: dict of dict where k=v are accessible by d[k][0] == v and q=k=v are accessible by d[q][k] == v, lowercase
@@ -399,24 +408,24 @@ def parse_request_query(request):
 
 
 def get_log_fmt():
-    # type: (...) -> AnyStr
+    # type: (...) -> str
     return "[%(asctime)s] %(levelname)-8s [%(name)s] %(message)s"
 
 
 def get_log_date_fmt():
-    # type: (...) -> AnyStr
+    # type: (...) -> str
     return "%Y-%m-%d %H:%M:%S"
 
 
 def get_log_monitor_msg(job_id, status, percent, message, location):
-    # type: (AnyStr, AnyStr, Number, AnyStr, AnyStr) -> AnyStr
+    # type: (str, str, Number, str, str) -> str
     return "Monitoring job {jobID} : [{status}] {percent} - {message} [{location}]".format(
         jobID=job_id, status=status, percent=percent, message=message, location=location
     )
 
 
 def get_job_log_msg(status, message, progress=0, duration=None):
-    # type: (AnyStr, AnyStr, Optional[Number], Optional[AnyStr]) -> AnyStr
+    # type: (str, str, Optional[Number], Optional[str]) -> str
     return "{d} {p:3d}% {s:10} {m}".format(d=duration or "", p=int(progress or 0), s=map_status(status), m=message)
 
 
@@ -486,7 +495,7 @@ def get_caller_name(skip=2, base_class=False):
 
 
 def get_ssl_verify_option(method, url, settings, request_options=None):
-    # type: (AnyStr, AnyStr, AnySettingsContainer, Optional[SettingsType]) -> bool
+    # type: (str, str, AnySettingsContainer, Optional[SettingsType]) -> bool
     """
     Obtains the SSL verification option from combined settings from ``weaver.ssl_verify`` and parsed
     ``weaver.request_options`` file for the corresponding request.
@@ -509,7 +518,7 @@ def get_ssl_verify_option(method, url, settings, request_options=None):
 
 
 def get_request_options(method, url, settings):
-    # type: (AnyStr, AnyStr, AnySettingsContainer) -> SettingsType
+    # type: (str, str, AnySettingsContainer) -> SettingsType
     """
     Obtains the *request options* corresponding to the request according to configuration file specified by pre-loaded
     setting ``weaver.request_options``.
@@ -563,8 +572,8 @@ def get_request_options(method, url, settings):
     return request_options
 
 
-def request_extra(method,                       # type: AnyStr
-                  url,                          # type: AnyStr
+def request_extra(method,                       # type: str
+                  url,                          # type: str
                   retries=None,                 # type: Optional[int]
                   backoff=None,                 # type: Optional[Number]
                   intervals=None,               # type: Optional[List[Number]]
@@ -723,7 +732,7 @@ def request_extra(method,                       # type: AnyStr
 
 
 def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
-    # type: (AnyStr, AnyStr, Optional[AnySettingsContainer], **Any) -> AnyStr
+    # type: (str, str, Optional[AnySettingsContainer], **Any) -> str
     """
     Fetches a file from a local path, an AWS-S3 bucket or remote URL, and dumps it's content to the specified output
     directory.
@@ -808,7 +817,7 @@ REGEX_ASSERT_INVALID_CHARACTERS = re.compile(r"^[a-zA-Z0-9_\-]+$")
 
 
 def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_character="_"):
-    # type: (AnyStr, Optional[int], Optional[Union[int, None]], Optional[bool], Optional[AnyStr]) -> Union[AnyStr, None]
+    # type: (str, Optional[int], Optional[Union[int, None]], Optional[bool], Optional[str]) -> Union[str, None]
     """
     Returns a cleaned-up version of the input name, replacing invalid characters matched with
     ``REGEX_SEARCH_INVALID_CHARACTERS`` by ``replace_character``.
@@ -822,7 +831,7 @@ def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_ch
     :param assert_invalid: If ``True``, fail conditions or invalid characters will raise an error instead of replacing.
     :param replace_character: Single character to use for replacement of invalid ones if ``assert_invalid=False``.
     """
-    if not isinstance(replace_character, six.string_types) and not len(replace_character) == 1:
+    if not isinstance(replace_character, str) and not len(replace_character) == 1:
         raise ValueError("Single replace character is expected, got invalid [{!s}]".format(replace_character))
     max_len = max_len or len(name)
     if assert_invalid:
@@ -855,7 +864,7 @@ def assert_sane_name(name, min_len=3, max_len=None):
 
 
 def clean_json_text_body(body):
-    # type: (AnyStr) -> AnyStr
+    # type: (str) -> str
     """
     Cleans a textual body field of superfluous characters to provide a better human-readable text in a JSON response.
     """

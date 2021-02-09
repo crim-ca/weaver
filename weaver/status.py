@@ -3,8 +3,9 @@ from typing import TYPE_CHECKING
 from pywps.response.status import _WPS_STATUS, WPS_STATUS  # noqa: W0212
 
 if TYPE_CHECKING:
-    from typing import AnyStr, Union    # noqa: F401
-    AnyStatusType = Union[AnyStr, int]  # noqa: F401
+    from typing import Union
+
+    AnyStatusType = Union[str, int]
 
 STATUS_COMPLIANT_OGC = "STATUS_COMPLIANT_OGC"
 STATUS_COMPLIANT_PYWPS = "STATUS_COMPLIANT_PYWPS"
@@ -58,7 +59,7 @@ STATUS_PYWPS_IDS = {k.lower(): v for v, k in STATUS_PYWPS_MAP.items()}
 
 
 def map_status(wps_status, compliant=STATUS_COMPLIANT_OGC):
-    # type: (AnyStatusType, AnyStr) -> AnyStr
+    # type: (AnyStatusType, str) -> str
     """
     Maps WPS statuses (weaver.status, OWSLib or PyWPS) to OWSLib/PyWPS compatible values.
     For each compliant combination, unsupported statuses are changed to corresponding ones (with closest logical match).

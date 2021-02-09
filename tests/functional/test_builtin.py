@@ -1,3 +1,4 @@
+import contextlib
 import json
 import os
 import tempfile
@@ -7,9 +8,7 @@ from time import sleep
 import mock
 import pyramid.testing
 import pytest
-import six
 
-from tests.compat import contextlib
 from tests.utils import (
     get_settings_from_testapp,
     get_test_weaver_app,
@@ -113,7 +112,7 @@ class BuiltinAppTest(unittest.TestCase):
                     assert resp.json["outputs"][0]["id"] == "output"
                     nc_path = resp.json["outputs"][0]["href"]
                     break
-            assert isinstance(nc_path, six.string_types) and len(nc_path)
+            assert isinstance(nc_path, str) and len(nc_path)
             settings = get_settings_from_testapp(self.app)
             wps_out = "{}{}".format(settings.get("weaver.url"), settings.get("weaver.wps_output_path"))
             nc_real_path = nc_path.replace(wps_out, settings.get("weaver.wps_output_dir"))

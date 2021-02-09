@@ -1,3 +1,4 @@
+import contextlib
 import json
 import os
 import unittest
@@ -10,9 +11,8 @@ import pytest
 from pyramid import testing
 from pyramid.testing import DummyRequest
 from pywps.inout.inputs import LiteralInput
-from six.moves.urllib.parse import parse_qsl, urlparse
+from urllib.parse import parse_qsl, urlparse
 
-from tests.compat import contextlib
 from tests.utils import setup_mongodb_processstore
 from weaver.datatype import Process
 from weaver.processes import opensearch

@@ -2,14 +2,14 @@ import logging
 
 from pyramid.settings import asbool
 
-from weaver.wps_restapi import api
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
 
 LOGGER = logging.getLogger(__name__)
 
 
 def includeme(config):
-    from weaver.wps_restapi import swagger_definitions as sd
+    from weaver.wps_restapi import api, swagger_definitions as sd
+
     settings = config.registry.settings
     if asbool(settings.get("weaver.wps_restapi", True)):
         LOGGER.info("Adding WPS REST API...")

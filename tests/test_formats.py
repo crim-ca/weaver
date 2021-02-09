@@ -1,7 +1,6 @@
 import os
 
 import mock
-import six
 from pyramid.httpexceptions import HTTPOk, HTTPRequestTimeout
 from pyramid.response import Response
 from pywps.inout.formats import Format
@@ -52,7 +51,7 @@ def test_get_cwl_file_format_reference():
     for ns, mime_type in tests:
         res = f.get_cwl_file_format(mime_type, make_reference=True)
         ns_name, ns_url = list(ns.items())[0]
-        assert isinstance(res, six.string_types)
+        assert isinstance(res, str)
         assert res.startswith(ns_url)
         tested.remove(ns_name)
     assert len(tested) == 0, "test did not evaluate every namespace variation"

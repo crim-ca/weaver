@@ -1,6 +1,7 @@
 """
 Utility methods for various TestCase setup operations.
 """
+import contextlib
 import os
 import tempfile
 import uuid
@@ -12,16 +13,14 @@ from typing import TYPE_CHECKING
 import mock
 import moto
 import pyramid_celery
-import six
+from configparser import ConfigParser
 from pyramid import testing
 from pyramid.config import Configurator
 from pyramid.httpexceptions import HTTPException, HTTPNotFound, HTTPUnprocessableEntity
 from pyramid.registry import Registry
 from requests import Response
-from six.moves.configparser import ConfigParser
 from webtest import TestApp
 
-from tests.compat import contextlib
 from weaver.config import WEAVER_CONFIGURATION_DEFAULT, WEAVER_DEFAULT_INI_CONFIG, get_weaver_config_file
 from weaver.database import get_db
 from weaver.datatype import Service
@@ -29,26 +28,25 @@ from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_XML
 from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
 from weaver.utils import get_url_without_query, get_weaver_url, null
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
-from weaver.wps_restapi.processes.processes import execute_process
+from weaver.processes.execution import execute_process
 
 if TYPE_CHECKING:
     import botocore.client  # noqa
-    from weaver.typedefs import (  # noqa: F401
-        Any, AnyResponseType, AnyStr, Callable, List, Optional, SettingsType, Type, Union
-    )
+
+    from weaver.typedefs import Any, AnyResponseType, Callable, List, Optional, SettingsType, Type, Union
 
 MOCK_AWS_REGION = "us-central-1"
 
 
 def ignore_warning_regex(func, warning_message_regex, warning_categories=DeprecationWarning):
-    # type: (Callable, Union[AnyStr, List[AnyStr]], Union[Type[Warning], List[Type[Warning]]]) -> Callable
+    # type: (Callable, Union[str, List[str]], Union[Type[Warning], List[Type[Warning]]]) -> Callable
     """Wrapper that eliminates any warning matching ``warning_regex`` during testing logging.
 
     **NOTE**:
         Wrapper should be applied on method (not directly on :class:`unittest.TestCase`
         as it can disable the whole test suite.
     """
-    if isinstance(warning_message_regex, six.string_types):
+    if isinstance(warning_message_regex, str):
         warning_message_regex = [warning_message_regex]
     if not isinstance(warning_message_regex, list):
         raise NotImplementedError("Argument 'warning_message_regex' must be a string or a list of string.")
@@ -80,7 +78,7 @@ def ignore_wps_warnings(func):
 
 
 def get_settings_from_config_ini(config_ini_path=None, ini_section_name="app:main"):
-    # type: (Optional[AnyStr], AnyStr) -> SettingsType
+    # type: (Optional[str], str) -> SettingsType
     parser = ConfigParser()
     parser.read([get_weaver_config_file(config_ini_path, WEAVER_DEFAULT_INI_CONFIG)])
     settings = dict(parser.items(ini_section_name))
@@ -213,7 +211,7 @@ def get_settings_from_testapp(testapp):
 
 
 def get_setting(env_var_name, app=None, setting_name=None):
-    # type: (AnyStr, Optional[TestApp], Optional[AnyStr]) -> Any
+    # type: (str, Optional[TestApp], Optional[str]) -> Any
     val = os.getenv(env_var_name, null)
     if val != null:
         return val
@@ -245,7 +243,7 @@ def init_weaver_service(registry):
 
 
 def mocked_file_response(path, url):
-    # type: (AnyStr, AnyStr) -> Union[Response, HTTPException]
+    # type: (str, str) -> Union[Response, HTTPException]
     """
     Generates a mocked response from the provided file path, and represented as if coming from the specified URL.
 
@@ -278,7 +276,7 @@ def mocked_file_response(path, url):
 
 
 def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
-    # type: (TestApp, AnyStr, *Any, bool, **Any) -> AnyResponseType
+    # type: (TestApp, str, *Any, bool, **Any) -> AnyResponseType
     """
     Executes ``app.function(*args, **kwargs)`` with a mock of every underlying :func:`requests.request` call
     to relay their execution to the :class:`webTest.TestApp`.
@@ -428,7 +426,7 @@ def mocked_aws_s3(test_func):
 
 
 def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="Test file inside test S3 bucket"):
-    # type: (AnyStr,AnyStr, AnyStr) -> AnyStr
+    # type: (str,str, str) -> str
     """
     Generates a test file reference from dummy data that will be uploaded to the specified S3 bucket name using the
     provided file key.

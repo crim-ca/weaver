@@ -126,7 +126,7 @@ class WpsAppTest(unittest.TestCase):
 
     def test_execute_with_visibility(self):
         params_template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=test_input=test"
-        url = self.make_url(params_template.format(self.process_public.identifier, ))
+        url = self.make_url(params_template.format(self.process_public.identifier))
         resp = self.app.get(url)
         assert resp.status_code == 200
         assert resp.content_type in CONTENT_TYPE_ANY_XML

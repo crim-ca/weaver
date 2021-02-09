@@ -6,7 +6,6 @@ import logging
 from typing import TYPE_CHECKING
 
 import pymongo
-import six
 from pymongo import ASCENDING, DESCENDING
 from pyramid.request import Request
 from pywps import Process as ProcessWPS
@@ -295,7 +294,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         search_filters = {}
         if visibility is None:
             visibility = VISIBILITY_VALUES
-        if isinstance(visibility, six.string_types):
+        if isinstance(visibility, str):
             visibility = [visibility]
         for v in visibility:
             if v not in VISIBILITY_VALUES:
@@ -390,7 +389,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
         """
         try:
             tags = ["dev"]
-            tags.extend(list(filter(lambda t: t, custom_tags or [])))
+            tags.extend(list(filter(lambda t: bool(t), custom_tags or [])))  # remove empty tags
             if is_workflow:
                 tags.append(PROCESS_WORKFLOW)
             else:
@@ -412,7 +411,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                 "is_workflow": is_workflow,
                 "is_local": is_local,
                 "created": now(),
-                "tags": list(set(tags)),
+                "tags": list(set(tags)),  # remove duplicates
                 "access": access,
                 "notification_email": notification_email,
                 "accept_language": accept_language,
@@ -572,7 +571,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
 
         # results by group categories
         if group_by:
-            group_by = [group_by] if isinstance(group_by, six.string_types) else group_by  # type: List[AnyStr]
+            group_by = [group_by] if isinstance(group_by, str) else group_by  # type: List[AnyStr]
             group_categories = {field: "$" + field for field in group_by}   # fields that can generate groups
             pipeline.extend([{
                 "$group": {
@@ -664,7 +663,7 @@ class MongodbQuoteStore(StoreQuotes, MongodbStore):
         """
         search_filters = {}
 
-        if isinstance(process_id, six.string_types):
+        if isinstance(process_id, str):
             search_filters["process"] = process_id
 
         if sort is None:
@@ -735,7 +734,7 @@ class MongodbBillStore(StoreBills, MongodbStore):
         """
         search_filters = {}
 
-        if isinstance(quote_id, six.string_types):
+        if isinstance(quote_id, str):
             search_filters["quote"] = quote_id
 
         if sort is None:

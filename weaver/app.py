@@ -21,9 +21,9 @@ def includeme(config):
     LOGGER.info("Adding Web Application")
     config.include("weaver.config")
     config.include("weaver.database")
+    config.include("weaver.processes")
     config.include("weaver.wps")
     config.include("weaver.wps_restapi")
-    config.include("weaver.processes")
     config.include("weaver.tweens")
 
 

@@ -7,7 +7,6 @@ import os
 import smtplib
 from typing import TYPE_CHECKING
 
-import six
 from mako.template import Template
 from pyramid.settings import asbool
 
@@ -122,7 +121,7 @@ def notify_job_complete(job, to_email_recipient, container):
 
 
 def encrypt_email(email, settings):
-    if not email or not isinstance(email, six.string_types):
+    if not email or not isinstance(email, str):
         raise TypeError("Invalid email: {!s}".format(email))
     LOGGER.debug("Job email setup.")
     try:

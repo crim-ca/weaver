@@ -6,15 +6,9 @@ import argparse
 import logging
 import os
 import sys
-from typing import AnyStr
 
-import six
 from lxml import etree
-
-if six.PY3:
-    from tempfile import TemporaryDirectory
-else:
-    from backports.tempfile import TemporaryDirectory  # pylint: disable=E0611  # noqa # py2
+from tempfile import TemporaryDirectory
 
 CUR_DIR = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, CUR_DIR)
@@ -39,7 +33,7 @@ __abstract__ = __doc__  # NOTE: '__doc__' is fetched directly, this is mostly to
 
 
 def m2n(metalink_reference, index, output_dir):
-    # type: (AnyStr, int, AnyStr) -> None
+    # type: (str, int, str) -> None
     LOGGER.info(
         "Got arguments: metalink_reference=%s index=%s output_dir=%s", metalink_reference, index, output_dir
     )

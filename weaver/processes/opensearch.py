@@ -7,7 +7,7 @@ import lxml.etree
 import shapely.wkt
 from pyramid.httpexceptions import HTTPOk
 from pyramid.settings import asbool
-from six.moves.urllib.parse import parse_qsl, urlparse
+from urllib.parse import parse_qsl, urlparse
 
 from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
 from weaver.processes.constants import (
@@ -23,7 +23,7 @@ from weaver.utils import get_any_id, request_extra
 
 if TYPE_CHECKING:
     from weaver.typedefs import AnySettingsContainer, XML                       # noqa: F401
-    from typing import AnyStr, Deque, Dict, Iterable, List, Optional, Tuple     # noqa: F401
+    from typing import Deque, Dict, Iterable, List, Optional, Tuple     # noqa: F401
 
 LOGGER = logging.getLogger("PACKAGE")
 
@@ -279,7 +279,7 @@ class OpenSearchQuery(object):
             start_index += n_received_features
 
     def query_datasets(self, params, accept_schemes, accept_mime_types):
-        # type: (Dict, Tuple, List) -> Iterable[AnyStr]
+        # type: (Dict, Tuple, List) -> Iterable[str]
         """
         Loop on every opensearch result feature and yield url matching required mime-type and scheme.
         Log a warning if a feature cannot yield a valid url (either no compatible mime-type or scheme)

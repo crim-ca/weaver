@@ -12,11 +12,19 @@ Changes:
 - Pre-install ``Docker`` CLI in ``worker`` image to avoid bad practice of mounting it from the host.
 - Adjust WPS request dispatching such that process jobs get executed by ``Celery`` worker as intended
   (see `#21 <https://github.com/crim-ca/weaver/issues/21>`_ and `#126 <https://github.com/crim-ca/weaver/issues/126>`_).
+- Move WPS XML endpoint functions under separate ``weaver.wps.utils`` and ``weaver.wps.views`` to remove the need to
+  constantly handle circular imports issues due to processing related operations that share some code.
+- Move core processing of job operation by ``Celery`` worker under ``weaver.processes.execution`` in order to separate
+  those components from functions specific for producing WPS-REST API responses.
+- Handle WPS requests submitted to XML endpoint with ``application/json`` in ``Accept`` header to return the same body
+  content as if directly calling their corresponding WPS-REST endpoints.
+- Remove every Python 2 backward compatibility references and operations.
 
 Fixes:
 ------
-- Address multiple invalid dependency requirements breaking installed packages over builtin Python packages
-  (see also `geopython/pywps #568 <https://github.com/geopython/pywps/issues/568>`_).
+- Target ``PyWPS-4.4`` to resolve multiple invalid dependency requirements breaking installed packages over builtin
+  Python packages and other compatibility fixes
+  (see `geopython/pywps #568 <https://github.com/geopython/pywps/issues/568>`_).
 
 `1.14.0 <https://github.com/crim-ca/weaver/tree/1.14.0>`_ (2021-01-11)
 ========================================================================

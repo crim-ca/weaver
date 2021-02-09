@@ -6,7 +6,6 @@ import json
 import logging
 import os
 import sys
-from typing import AnyStr
 
 CUR_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -21,7 +20,7 @@ OUTPUT_CWL_JSON = "cwl.output.json"
 
 
 def main(input_file, output_dir):
-    # type: (argparse.FileType, AnyStr) -> None
+    # type: (argparse.FileType, str) -> None
     LOGGER.info(
         "Got arguments: input_file=%s output_dir=%s", input_file, output_dir
     )

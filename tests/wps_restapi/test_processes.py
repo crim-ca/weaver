@@ -1,16 +1,14 @@
+import contextlib
 import os
 import unittest
 from copy import deepcopy
 
 import colander
-import mock
 import pyramid.testing
 import pytest
 import responses
-import six
 import webtest
 
-from tests.compat import contextlib
 from tests.utils import (
     get_test_weaver_app,
     mocked_process_job_runner,
@@ -33,9 +31,8 @@ from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import STATUS_ACCEPTED
 from weaver.utils import fully_qualified_name, ows_context_href
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
-from weaver.wps import get_wps_url
+from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.processes.processes import set_wps_language
 
 # simulated remote server with remote processes (mocked with `responses` package)
 TEST_REMOTE_SERVER_URL = "https://remote-server.com"
@@ -155,9 +152,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         assert resp.content_type == CONTENT_TYPE_APP_JSON
         assert "processes" in resp.json and isinstance(resp.json["processes"], list) and len(resp.json["processes"]) > 0
         for process in resp.json["processes"]:
-            assert "id" in process and isinstance(process["id"], six.string_types)
-            assert "title" in process and isinstance(process["title"], six.string_types)
-            assert "version" in process and isinstance(process["version"], six.string_types)
+            assert "id" in process and isinstance(process["id"], str)
+            assert "title" in process and isinstance(process["title"], str)
+            assert "version" in process and isinstance(process["version"], str)
             assert "keywords" in process and isinstance(process["keywords"], list)
             assert "metadata" in process and isinstance(process["metadata"], list)
 
@@ -290,7 +287,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
         weaver_wps_path = get_wps_url(self.config.registry.settings)
         process_wps_endpoint = self.process_store.fetch_by_id(process_name).processEndpointWPS1
-        assert isinstance(process_wps_endpoint, six.string_types) and len(process_wps_endpoint)
+        assert isinstance(process_wps_endpoint, str) and len(process_wps_endpoint)
         assert process_wps_endpoint == weaver_wps_path
 
     @staticmethod
@@ -509,16 +506,6 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 self.fail("Job should have been created and be retrievable.")
             assert job.id == resp.json["jobID"]
             assert job.accept_language == "fr-CA"
-
-    def test_set_wps_language(self):    # noqa
-        wps = mock.Mock()
-        languages = mock.Mock()
-        wps.languages = languages
-        languages.default = "en-US"
-        languages.supported = ["en-US", "fr-CA"]
-
-        set_wps_language(wps, "ru, fr;q=0.5")
-        assert wps.language == "fr-CA"
 
     def test_execute_process_no_json_body(self):
         uri = "/processes/{}/jobs".format(self.process_public.identifier)

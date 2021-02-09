@@ -6,10 +6,10 @@ import os
 import tempfile
 from typing import TYPE_CHECKING
 
-import six
-from lxml import etree
+import lxml.etree
+from configparser import ConfigParser
 from owslib.wps import WPSExecution
-from pyramid.httpexceptions import HTTPNotFound
+from pyramid.httpexceptions import HTTPBadRequest, HTTPNotFound, HTTPSeeOther
 from pyramid.settings import asbool
 from pyramid.threadlocal import get_current_request
 from pyramid.wsgi import wsgiapp2
@@ -17,20 +17,20 @@ from pyramid_celery import celery_app as app
 from pywps import configuration as pywps_config
 from pywps.app import WPSRequest
 from pywps.app.Service import Service
-from six.moves.configparser import ConfigParser
-from six.moves.urllib.parse import urlparse
+from pywps.response import WPSResponse
+from pywps.response.execute import ExecuteResponse
+from urllib.parse import urlparse
 
 from weaver.config import get_weaver_configuration
-from weaver.database import get_db
-from weaver.owsexceptions import OWSNoApplicableCode
-from weaver.store.base import StoreProcesses
-from weaver.utils import get_settings, get_url_without_query, get_weaver_url, make_dirs, request_extra
-from weaver.visibility import VISIBILITY_PUBLIC
+from weaver.utils import get_header, get_settings, get_url_without_query, get_weaver_url, make_dirs, request_extra
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from weaver.typedefs import AnySettingsContainer        # noqa: F401
-    from typing import AnyStr, Dict, Union, Optional        # noqa: F401
+    from typing import AnyStr, Dict, Union, Optional
+
+    from owslib.wps import WebProcessingService
+
+    from weaver.typedefs import AnySettingsContainer
 
 
 def _get_settings_or_wps_config(container,                  # type: AnySettingsContainer
@@ -47,7 +47,7 @@ def _get_settings_or_wps_config(container,                  # type: AnySettingsC
         if not settings.get("weaver.wps_configured"):
             load_pywps_config(container)
         found = pywps_config.CONFIG.get(config_setting_section, config_setting_name)
-    if not isinstance(found, six.string_types):
+    if not isinstance(found, str):
         LOGGER.warning("%s not set in settings or WPS configuration, using default value.", message_not_found)
         found = default_not_found
     return found.strip()
@@ -130,8 +130,12 @@ def get_wps_local_status_location(url_status_location, container, must_exist=Tru
     return out_path
 
 
-def check_wps_status(location=None, response=None, sleep_secs=2, verify=True, settings=None):
-    # type: (Optional[AnyStr], Optional[etree.ElementBase], int, bool, Optional[AnySettingsContainer]) -> WPSExecution
+def check_wps_status(location=None,     # type: Optional[AnyStr]
+                     response=None,     # type: Optional[etree.ElementBase]
+                     sleep_secs=2,      # type: int
+                     verify=True,       # type: bool
+                     settings=None,     # type: Optional[AnySettingsContainer]
+                     ):                 # type: (...) -> WPSExecution
     """
     Run :func:`owslib.wps.WPSExecution.checkStatus` with additional exception handling.
 
@@ -168,13 +172,13 @@ def check_wps_status(location=None, response=None, sleep_secs=2, verify=True, se
             xml = _retry_file()
     else:
         raise Exception("Missing status-location URL/file reference or response with XML object.")
-    if isinstance(xml, six.string_types):
+    if isinstance(xml, str):
         xml = xml.encode("utf8", errors="ignore")
     execution.checkStatus(response=xml, sleepSecs=sleep_secs)
     if execution.response is None:
         raise Exception("Missing response, cannot check status.")
-    if not isinstance(execution.response, etree._Element):  # noqa: W0212
-        execution.response = etree.fromstring(execution.response)
+    if not isinstance(execution.response, lxml.etree._Element):  # noqa: W0212
+        execution.response = lxml.etree.fromstring(execution.response)
     return execution
 
 
@@ -227,7 +231,7 @@ def load_pywps_config(container, config=None):
     # note: needs to be configured even when using S3 bucket since XML status is provided locally
     if "weaver.wps_output_url" not in settings:
         output_path = settings.get("weaver.wps_output_path", "")
-        if isinstance(output_path, six.string_types):
+        if isinstance(output_path, str):
             output_url = os.path.join(get_weaver_url(settings), output_path.strip("/"))
         else:
             output_url = pywps_config.get_config_value("server", "outputurl")
@@ -277,95 +281,38 @@ def load_pywps_config(container, config=None):
     return pywps_config.CONFIG
 
 
-class WorkerService(Service):
+def set_wps_language(wps, accept_language=None, request=None):
+    # type: (WebProcessingService, Optional[str], Optional[Request]) -> None
+    """Set the :attr:`language` property on the :class:`WebProcessingService` object.
+
+    Given the `Accept-Language` header value, match the best language
+    to the supported languages.
+
+    By default, and if no match is found, the :attr:`WebProcessingService.language`
+    property is set to None.
+
+    https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Accept-Language
+    (q-factor weighting is ignored, only order is considered)
+
+    :param wps: process for which to set the language header if it is accepted
+    :param str accept_language: the value of the Accept-Language header
+    :param request: request from which to extract Accept-Language header if not provided directly
     """
-    Dispatches PyWPS requests from *older* WPS-1/2 XML endpoint to WPS-REST as appropriate.
+    if not accept_language and request:
+        accept_language = request.accept_language.header_value
 
-    When ``GetCapabilities`` or ``DescribeProcess`` requests are received, directly return to result
-    (no need to subprocess as Celery task that gets resolved quickly with only the process(es) details).
+    if not accept_language:
+        return
 
-    When receiving ``Execute`` request, convert the XML payload to corresponding JSON and
-    dispatch it to some Celery Worker to actually process it.
-    """
-    def __init__(self, *_, is_worker=False, settings=None, **__):
-        super(WorkerService, self).__init__(*_, **__)
-        self.is_worker = is_worker
-        self.settings = settings or get_settings(app)
+    if not hasattr(wps, "languages"):
+        # owslib version doesn't support setting a language
+        return
 
-    def execute(self, identifier, wps_request, uuid):
-        """
-        Dispatch operation to WPS-REST endpoint, which in turn should call back the real Celery Worker for execution.
+    accepted_languages = [lang.strip().split(";")[0] for lang in accept_language.lower().split(",")]
 
-        Overrides the original execute operation, that instead will get handled by :meth:`execute_job`.
-        """
-        # FIXME: !!!
-        # XML -> JSON
-        # submit_job_handler()
-
-    def execute_job(self, process_id, wps_inputs, wps_outputs, mode, job_uuid):
-        """
-        Real execution of the process by active Celery Worker.
-        """
-        execution = WPSExecution(version="2.0", url="localhost")
-        xml_request = execution.buildRequest(process_id, wps_inputs, wps_outputs, mode=mode, lineage=True)
-        wps_request = WPSRequest()
-        wps_request.identifier = process_id
-        wps_request.set_version("2.0.0")
-        request_parser = wps_request._post_request_parser(wps_request.WPS.Execute().tag)
-        request_parser(xml_request)
-        # NOTE:
-        #  Setting 'status = false' will disable async execution of 'pywps.app.Process.Process'
-        #  but this is needed since this job is running within Celery already async
-        #  (daemon process can't have children processes)
-        #  Because if how the code in PyWPS is made, we have to re-enable creation of status file
-        wps_request.status = "false"
-        wps_response = super(WorkerService, self).execute(process_id, wps_request, job_uuid)
-        wps_response.store_status_file = True
-        # update execution status with actual status file and apply required references
-        execution = check_wps_status(location=wps_response.process.status_location, settings=self.settings)
-        execution.request = xml_request
-        return execution
-
-
-def get_pywps_service(environ=None, is_worker=False):
-    """
-    Generates the PyWPS Service that provides *older* WPS-1/2 XML endpoint.
-    """
-    environ = environ or {}
-    try:
-        # get config file
-        settings = get_settings(app)
-        pywps_cfg = environ.get("PYWPS_CFG") or settings.get("PYWPS_CFG") or os.getenv("PYWPS_CFG")
-        if not isinstance(pywps_cfg, ConfigParser) or not settings.get("weaver.wps_configured"):
-            load_pywps_config(app, config=pywps_cfg)
-
-        # call pywps application with processes filtered according to the adapter's definition
-        process_store = get_db(app).get_store(StoreProcesses)
-        processes_wps = [process.wps() for process in
-                         process_store.list_processes(visibility=VISIBILITY_PUBLIC, request=get_current_request())]
-        service = WorkerService(processes_wps, is_worker=is_worker, settings=settings)
-    except Exception as ex:
-        LOGGER.exception("Error occurred during PyWPS Service and/or Processes setup.")
-        raise OWSNoApplicableCode("Failed setup of PyWPS Service and/or Processes. Error [{!r}]".format(ex))
-    return service
-
-
-# @app.task(bind=True)
-@wsgiapp2
-def pywps_view(environ, start_response):
-    """
-    Served location for PyWPS Service that provides *older* WPS-1/2 XML endpoint.
-    """
-    LOGGER.debug("pywps env: %s", environ.keys())
-    service = get_pywps_service(environ)
-    return service(environ, start_response)
-
-
-def includeme(config):
-    settings = get_settings(config)
-    if asbool(settings.get("weaver.wps", True)):
-        LOGGER.debug("Weaver WPS enabled.")
-        config.include("weaver.config")
-        wps_path = get_wps_path(settings)
-        config.add_route("wps", wps_path)
-        config.add_view(pywps_view, route_name="wps")
+    for accept in accepted_languages:
+        for language in wps.languages.supported:    # noqa
+            # Accept-Language header could be only 'fr' instead of 'fr-CA'
+            if language.lower().startswith(accept):
+                wps.language = language
+                return

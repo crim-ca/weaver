@@ -9,7 +9,7 @@ from weaver import WEAVER_CONFIG_DIR
 from weaver.utils import get_settings
 
 if TYPE_CHECKING:
-    from weaver.typedefs import AnyStr, AnySettingsContainer  # noqa: F401
+    from weaver.typedefs import AnySettingsContainer
 
 LOGGER = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ WEAVER_DEFAULT_CONFIGS = frozenset([
 
 
 def get_weaver_configuration(container):
-    # type: (AnySettingsContainer) -> AnyStr
+    # type: (AnySettingsContainer) -> str
     """Obtains the defined operation configuration mode.
 
     :returns: one value amongst :py:data:`weaver.config.WEAVER_CONFIGURATIONS`.
@@ -52,7 +52,7 @@ def get_weaver_configuration(container):
 
 
 def get_weaver_config_file(file_path, default_config_file, generate_default_from_example=True):
-    # type: (AnyStr, AnyStr, bool) -> AnyStr
+    # type: (str, str, bool) -> str
     """Validates that the specified configuration file can be found, or falls back to the default one.
 
     Handles 'relative' paths for settings in ``WEAVER_DEFAULT_INI_CONFIG`` referring to other configuration files.

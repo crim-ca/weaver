@@ -8,15 +8,23 @@ from weaver.utils import get_registry, get_settings
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from weaver.typedefs import AnyDatabaseContainer    # noqa: F401
+    from weaver.typedefs import AnySettingsContainer    # noqa: F401
 
 
 def get_db(container, reset_connection=False):
-    # type: (AnyDatabaseContainer, bool) -> MongoDatabase
-    registry = get_registry(container)
+    # type: (AnySettingsContainer, bool) -> MongoDatabase
+    """
+    Obtains the database connection from configured application settings.
+
+    If :paramref:`reset_connection` is ``True``, the :paramref:`container` must be the application :class:`Registry` or
+    any container that can retrieve it to accomplish the reset. Otherwise, any settings container can be provided.
+    """
+    settings = get_settings(container)
+    database = MongoDatabase(settings, reset_connection=reset_connection)
     if reset_connection:
-        registry.db = MongoDatabase(registry, reset_connection=reset_connection)
-    return registry.db
+        registry = get_registry(container)
+        registry.db = database
+    return database
 
 
 def includeme(config):

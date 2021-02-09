@@ -8,7 +8,7 @@ from pyramid_celery import celery_app as app
 
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.utils import get_cookie_headers, get_settings, request_extra
-from weaver.wps import get_wps_output_dir, get_wps_output_url
+from weaver.wps.utils import get_wps_output_dir, get_wps_output_url
 
 if TYPE_CHECKING:
     from weaver.typedefs import CWL     # noqa: F401

@@ -1446,6 +1446,11 @@ class OkGetProcessInfoResponse(MappingSchema):
     body = ProcessOffering()
 
 
+class BadRequestGetProcessInfoResponse(MappingSchema):
+    description = "Missing process identifier."
+    body = MappingSchema(default={})
+
+
 class InternalServerErrorGetProcessResponse(MappingSchema):
     description = "Unhandled error occurred during process description."
 
@@ -1708,6 +1713,7 @@ post_processes_responses = {
 }
 get_process_responses = {
     "200": OkGetProcessInfoResponse(description="success"),
+    "400": BadRequestGetProcessInfoResponse(),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
     "500": InternalServerErrorGetProcessResponse(),
 }

@@ -17,7 +17,6 @@ from copy import deepcopy
 
 import colander
 import pytest
-import six
 from pyramid.httpexceptions import HTTPBadRequest
 
 from tests import resources
@@ -1304,7 +1303,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert pkg["inputs"][0]["type"]["items"]["type"] == "enum"
         assert isinstance(pkg["inputs"][0]["type"]["items"]["symbols"], list)
         assert len(pkg["inputs"][0]["type"]["items"]["symbols"]) == 220
-        assert all(isinstance(s, six.string_types) for s in pkg["inputs"][0]["type"]["items"]["symbols"])
+        assert all(isinstance(s, str) for s in pkg["inputs"][0]["type"]["items"]["symbols"])
         assert pkg["inputs"][1]["id"] == "mosaic"
         assert pkg["inputs"][1]["default"] == "null"
         assert "format" not in pkg["inputs"][1]
@@ -1314,7 +1313,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert pkg["inputs"][2]["type"]["type"] == "array"
         assert pkg["inputs"][2]["type"]["items"] == "File"
         # FIXME: TAR cannot be resolved in the CWL context (not official, disable mapping to GZIP)
-        #        this makes all formats to not be resolved (see code: wps_package._any2cwl_io)
+        #        this makes all formats to not be resolved (see code: wps_package.any2cwl_io)
         #        (see issue: https://github.com/crim-ca/weaver/issues/50)
         assert "format" not in pkg["inputs"][2], \
             "CWL formats should all be dropped because (x-tar) cannot be resolved to an existing schema reference"

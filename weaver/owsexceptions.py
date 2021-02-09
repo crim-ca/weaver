@@ -6,10 +6,8 @@ See also: https://github.com/geopython/pywps/blob/master/pywps/exceptions.py
 import json
 import warnings
 from string import Template
-from typing import TYPE_CHECKING, AnyStr
+from typing import TYPE_CHECKING
 
-import six
-from pyramid.compat import text_type
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPException,
@@ -57,7 +55,7 @@ class OWSException(Response, Exception):
         status = kw.pop("status", None)
         if isinstance(status, type) and issubclass(status, HTTPException):
             status = status().status
-        elif isinstance(status, six.class_types):
+        elif isinstance(status, str):
             try:
                 int(status.split()[0])
             except Exception:
@@ -83,7 +81,7 @@ class OWSException(Response, Exception):
 
     @staticmethod
     def json_formatter(status, body, title, environ):  # noqa: F811
-        # type: (AnyStr, AnyStr, AnyStr, SettingsType) -> JSON
+        # type: (str, str, str, SettingsType) -> JSON
         body = clean_json_text_body(body)
         return {"description": body, "code": int(status.split()[0]), "status": status, "title": title}
 
@@ -122,7 +120,7 @@ class OWSException(Response, Exception):
                 "message": _html_escape(self.message or ""),
             }
             page = page_template.substitute(**args)
-            if isinstance(page, text_type):
+            if isinstance(page, str):
                 page = page.encode(self.charset if self.charset else "UTF-8")
             self.app_iter = [page]
             self.body = page

@@ -21,7 +21,7 @@ from weaver.exceptions import (
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import get_any_id, get_any_value, get_settings
 from weaver.visibility import VISIBILITY_PUBLIC
-from weaver.wps import get_wps_output_url
+from weaver.wps.utils import get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.notify import encrypt_email
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON

@@ -17,9 +17,9 @@ from weaver.store.mongodb import (
 from weaver.utils import get_settings
 
 if TYPE_CHECKING:
-    from weaver.typedefs import AnySettingsContainer, JSON      # noqa: F401
-    from typing import Any, AnyStr, Optional, Union             # noqa: F401
-    from pymongo.database import Database                       # noqa: F401
+    from weaver.typedefs import AnySettingsContainer, JSON
+    from typing import Any, Optional, Union
+    from pymongo.database import Database
 
 # pylint: disable=C0103,invalid-name
 MongoDB = None  # type: Optional[Database]
@@ -54,7 +54,7 @@ class MongoDatabase(DatabaseInterface):
         return self._database is not None and self._settings is not None
 
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (Union[AnyStr, StoreInterface, MongodbStores], *Any, **Any) -> AnyStoreType
+        # type: (Union[str, StoreInterface, MongodbStores], *Any, **Any) -> AnyStoreType
         """
         Retrieve a store from the database.
 

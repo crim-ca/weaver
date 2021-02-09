@@ -30,7 +30,6 @@ from cwltool.workflow import Workflow
 from pyramid_celery import celery_app as app
 from schema_salad import validate
 from schema_salad.sourceline import SourceLine
-from six import string_types
 
 from weaver.processes.builtin import BuiltinProcess
 from weaver.processes.constants import (
@@ -40,7 +39,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_WPS1
 )
 from weaver.utils import get_settings, make_dirs, now
-from weaver.wps import get_wps_output_dir
+from weaver.wps.utils import get_wps_output_dir
 
 if TYPE_CHECKING:
     from weaver.typedefs import (   # noqa: F401
@@ -357,7 +356,7 @@ class WpsWorkflow(ProcessCWL):
                                     sfpath = file
                                     subst = True
                                 for sfitem in aslist(sfpath):
-                                    if isinstance(sfitem, string_types):
+                                    if isinstance(sfitem, str):
                                         if subst:
                                             sfitem = {"path": substitute(primary["path"], sfitem)}
                                         else:

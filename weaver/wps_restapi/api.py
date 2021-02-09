@@ -1,7 +1,6 @@
 import logging
 from typing import TYPE_CHECKING, AnyStr, Optional
 
-import six
 from cornice.service import get_services
 from cornice_swagger import CorniceSwagger
 from pyramid.authentication import Authenticated, IAuthenticationPolicy
@@ -20,18 +19,19 @@ from pyramid.request import Request
 from pyramid.response import Response
 from pyramid.settings import asbool
 from simplejson import JSONDecodeError
-from six.moves.urllib.parse import urlparse
+from urllib.parse import urlparse
 
 from weaver.__meta__ import __version__ as weaver_version
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN
 from weaver.owsexceptions import OWSException
 from weaver.utils import get_header, get_settings, get_weaver_url
+from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.colander_extras import CustomTypeConversionDispatcher
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, get_wps_restapi_base_url, wps_restapi_base_path
 
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON    # noqa: F401
+    from weaver.typedefs import JSON
 
 LOGGER = logging.getLogger(__name__)
 
@@ -43,7 +43,6 @@ def api_frontpage(request):
 
     # import here to avoid circular import errors
     from weaver.config import get_weaver_configuration
-    from weaver.wps import get_wps_url
 
     settings = get_settings(request)
     weaver_url = get_weaver_url(settings)
@@ -66,7 +65,7 @@ def api_frontpage(request):
     if weaver_api_def:
         weaver_links.append({"href": weaver_api_def, "rel": "service", "type": CONTENT_TYPE_APP_JSON,
                              "title": "API definition of this service."})
-    if isinstance(weaver_api_doc, six.string_types):
+    if isinstance(weaver_api_doc, str):
         if "." in weaver_api_doc:   # pylint: disable=E1135,unsupported-membership-test
             ext_type = weaver_api_doc.split(".")[-1]
             doc_type = "application/{}".format(ext_type)
@@ -181,7 +180,7 @@ def get_request_info(request, detail=None):
     # type: (Request, Optional[AnyStr]) -> JSON
     """Provided additional response details based on the request and execution stack on failure."""
     content = {u"route": str(request.upath_info), u"url": str(request.url), u"method": request.method}
-    if isinstance(detail, six.string_types):
+    if isinstance(detail, str):
         content.update({"detail": detail})
     if hasattr(request, "exception"):
         # handle error raised simply by checking for 'json' property in python 3 when body is invalid

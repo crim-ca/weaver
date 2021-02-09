@@ -9,6 +9,7 @@ from pyramid.httpexceptions import HTTPException, HTTPInternalServerError
 from pyramid.request import Request as PyramidRequest
 from pyramid.testing import DummyRequest
 from requests import Request as RequestsRequest
+from werkzeug.wrappers import Request as WerkzeugRequest
 
 LOGGER = logging.getLogger(__name__)
 
@@ -233,7 +234,8 @@ def log_unhandled_exceptions(logger=LOGGER, message="Unhandled exception occurre
             try:
                 # handle input arguments that are extended by various pyramid operations
                 if is_request:
-                    while len(args) and not isinstance(args[0], (RequestsRequest, PyramidRequest, DummyRequest)):
+                    any_request_type = (RequestsRequest, PyramidRequest, DummyRequest, WerkzeugRequest)
+                    while len(args) and not isinstance(args[0], any_request_type):
                         args = args[1:]
                 return function(*args, **kwargs)
             except Exception as exc:
