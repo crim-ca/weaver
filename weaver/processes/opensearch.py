@@ -22,8 +22,8 @@ from weaver.processes.sources import fetch_data_sources
 from weaver.utils import get_any_id, request_extra
 
 if TYPE_CHECKING:
-    from weaver.typedefs import AnySettingsContainer, XML                       # noqa: F401
-    from typing import Deque, Dict, Iterable, List, Optional, Tuple     # noqa: F401
+    from weaver.typedefs import AnySettingsContainer, XML
+    from typing import Deque, Dict, Iterable, List, Optional, Tuple
 
 LOGGER = logging.getLogger("PACKAGE")
 

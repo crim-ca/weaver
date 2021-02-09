@@ -20,6 +20,7 @@ from tests.utils import (
     setup_config_with_pywps
 )
 from weaver.database import get_db
+from weaver.execute import EXECUTE_TRANSMISSION_MODE_REFERENCE
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF
 from weaver.processes.builtin import register_builtin_processes
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_CATEGORY_RUNNING, STATUS_SUCCEEDED
@@ -87,7 +88,7 @@ class BuiltinAppTest(unittest.TestCase):
                 "mode": "async",
                 "response": "document",
                 "inputs": [{"id": "input", "href": os.path.join(dirname, tmp_json.name)}],
-                "outputs": [{"id": "output", "transmissionMode": "reference"}],
+                "outputs": [{"id": "output", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE}],
             }
             with contextlib.ExitStack() as stack_proc:
                 for process in mocked_execute_process():

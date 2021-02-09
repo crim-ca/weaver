@@ -29,7 +29,7 @@ from weaver.utils import clean_json_text_body
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON, SettingsType  # noqa: F401
+    from weaver.typedefs import JSON, SettingsType
 
 
 @implementer(IExceptionResponse)

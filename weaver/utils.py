@@ -125,8 +125,8 @@ def get_any_message(info):
     return info.get("message", "").strip()
 
 
-def get_registry(container):
-    # type: (AnyRegistryContainer) -> Registry
+def get_registry(container, nothrow=False):
+    # type: (AnyRegistryContainer, bool) -> Optional[Registry]
     """Retrieves the application ``registry`` from various containers referencing to it."""
     if isinstance(container, Celery):
         return container.conf.get("PYRAMID_REGISTRY", {})
@@ -134,6 +134,8 @@ def get_registry(container):
         return container.registry
     if isinstance(container, Registry):
         return container
+    if nothrow:
+        return None
     raise TypeError("Could not retrieve registry from container object of type [{}].".format(type(container)))
 
 

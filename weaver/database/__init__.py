@@ -1,6 +1,8 @@
 import logging
 from typing import TYPE_CHECKING
 
+from pyramid.request import Request
+from pyramid.registry import Registry
 from pyramid.settings import asbool
 
 from weaver.database.mongodb import MongoDatabase
@@ -8,7 +10,7 @@ from weaver.utils import get_registry, get_settings
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from weaver.typedefs import AnySettingsContainer    # noqa: F401
+    from weaver.typedefs import AnySettingsContainer
 
 
 def get_db(container, reset_connection=False):
@@ -17,10 +19,12 @@ def get_db(container, reset_connection=False):
     Obtains the database connection from configured application settings.
 
     If :paramref:`reset_connection` is ``True``, the :paramref:`container` must be the application :class:`Registry` or
-    any container that can retrieve it to accomplish the reset. Otherwise, any settings container can be provided.
+    any container that can retrieve it to accomplish reference reset. Otherwise, any settings container can be provided.
     """
-    settings = get_settings(container)
-    database = MongoDatabase(settings, reset_connection=reset_connection)
+    registry = get_registry(container, nothrow=True)
+    if not reset_connection and registry and registry.db:
+        return registry.db
+    database = MongoDatabase(container)
     if reset_connection:
         registry = get_registry(container)
         registry.db = database
@@ -34,11 +38,8 @@ def includeme(config):
         return
 
     LOGGER.info("Adding database...")
-    config.registry.db = MongoDatabase(config.registry)
 
     def _add_db(request):
-        db = request.registry.db
-        # if db_url.username and db_url.password:
-        #     db.authenticate(db_url.username, db_url.password)
-        return db
+        return MongoDatabase(request.registry)
+
     config.add_request_method(_add_db, "db", reify=True)

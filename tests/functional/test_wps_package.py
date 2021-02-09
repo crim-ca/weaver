@@ -35,7 +35,7 @@ from tests.utils import (
     setup_mongodb_jobstore,
     setup_mongodb_processstore
 )
-from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT
+from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_REFERENCE
 from weaver.formats import (
     CONTENT_TYPE_APP_JSON,
     CONTENT_TYPE_APP_NETCDF,
@@ -1447,8 +1447,8 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
                 {"id": "input_with_s3", "href": test_bucket_ref},
             ],
             "outputs": [
-                {"id": "output_from_http", "transmissionMode": "reference"},
-                {"id": "output_from_s3", "transmissionMode": "reference"},
+                {"id": "output_from_http", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE},
+                {"id": "output_from_s3", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE},
             ]
         }
         with contextlib.ExitStack() as stack_proc:
@@ -1566,7 +1566,7 @@ class WpsPackageDockerAppTest(WpsPackageConfigBase):
                     {"id": "file", "href": tmp_file.name},
                 ],
                 "outputs": [
-                    {"id": out_key, "transmissionMode": "reference"},
+                    {"id": out_key, "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE},
                 ]
             }
             for process in mocked_execute_process():

@@ -9,9 +9,9 @@ from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
 from weaver.utils import get_settings, get_weaver_url, parse_request_query, request_extra
 
 if TYPE_CHECKING:
-    from pyramid.request import Request                 # noqa: F401
-    from typing import AnyStr, Optional                 # noqa: F401
-    from weaver.typedefs import AnySettingsContainer    # noqa: F401
+    from typing import AnyStr, Optional
+    from pyramid.request import Request
+    from weaver.typedefs import AnySettingsContainer
 
 LOGGER = logging.getLogger(__name__)
 

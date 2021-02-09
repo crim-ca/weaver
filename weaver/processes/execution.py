@@ -1,5 +1,6 @@
 import logging
 import os
+from time import sleep
 from typing import TYPE_CHECKING
 
 import colander
@@ -11,16 +12,23 @@ from pyramid_celery import celery_app as app
 
 from weaver.database import get_db
 from weaver.datatype import Process, Service
-from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_MODE_SYNC, EXECUTE_TRANSMISSION_MODE_REFERENCE
+from weaver.execute import (
+    EXECUTE_MODE_ASYNC,
+    EXECUTE_MODE_AUTO,
+    EXECUTE_MODE_SYNC,
+    EXECUTE_RESPONSE_DOCUMENT,
+    EXECUTE_TRANSMISSION_MODE_OPTIONS
+)
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.owsexceptions import OWSNoApplicableCode
+from weaver.notify import encrypt_email, notify_job_complete
 from weaver.processes.constants import WPS_COMPLEX_DATA
 from weaver.processes.convert import ows2json_output
 from weaver.processes import wps_package
 from weaver.processes.types import PROCESS_WORKFLOW
-from weaver.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_SUCCEEDED, map_status
+from weaver.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_STARTED, STATUS_SUCCEEDED, map_status
 from weaver.store.base import StoreJobs
-from weaver.utils import get_any_id, get_any_value, get_cookie_headers, get_settings, get_ssl_verify_option
+from weaver.utils import get_any_id, get_any_value, get_cookie_headers, get_settings, get_ssl_verify_option, wait_secs
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps.utils import (
     check_wps_status,
@@ -30,18 +38,15 @@ from weaver.wps.utils import (
     load_pywps_config,
     set_wps_language
 )
-from weaver.wps.views import get_pywps_service
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
-from weaver.wps_restapi.jobs.notify import encrypt_email
 from weaver.wps_restapi import swagger_definitions as sd
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing import List, Optional, Union
-
     from pyramid.request import Request
-
-    from weaver.typedefs import JSON
+    from weaver.datatype import Job
+    from weaver.typedefs import HeaderCookiesType, JSON, SettingsType
 
 # job process execution progress
 JOB_PROGRESS_SETUP = 1
@@ -60,6 +65,8 @@ JOB_PROGRESS_DONE = 100
 
 @app.task(bind=True)
 def execute_process(self, job_id, url, headers=None):
+    from weaver.wps.service import get_pywps_service
+
     LOGGER.debug("Job execute process called.")
     settings = get_settings(app)
     task_logger = get_task_logger(__name__)
@@ -310,7 +317,7 @@ def submit_job(request, reference, tags=None):
     except Exception as ex:
         raise HTTPBadRequest("Invalid JSON body cannot be decoded for job submission. [{}]".format(ex))
     provider_id = None  # None OK if local
-    process_id = None   # None OK if remote, but can be found as well
+    process_id = None   # None OK if remote, but can be found as well if available from WPS-REST path
     tags = tags or []
     if isinstance(reference, Process):
         service_url = reference.processEndpointWPS1
@@ -324,7 +331,7 @@ def submit_job(request, reference, tags=None):
         provider_id = reference.id
         process_id = request.matchdict.get("process_id")
         visibility = VISIBILITY_PUBLIC
-        is_worflow = False
+        is_workflow = False
         is_local = False
         tags += "remote"
     else:
@@ -340,6 +347,7 @@ def submit_job(request, reference, tags=None):
                               visibility, language=lang, auth=headers, tags=tags, user=user)
 
 
+# FIXME: this should not be necessary if schema validators correctly implement OneOf(values)
 def _validate_job_parameters(json_body):
     """
     Tests supported parameters not automatically validated by colander deserialize.
@@ -351,9 +359,9 @@ def _validate_job_parameters(json_body):
         raise HTTPNotImplemented(detail="Execution response type '{}' not supported.".format(json_body["response"]))
 
     for job_output in json_body["outputs"]:
-        if job_output["transmissionMode"] != EXECUTE_TRANSMISSION_MODE_REFERENCE:
-            raise HTTPNotImplemented(detail="Execute transmissionMode '{}' not supported."
-                                     .format(job_output["transmissionMode"]))
+        mode = job_output["transmissionMode"]
+        if mode not in EXECUTE_TRANSMISSION_MODE_OPTIONS:
+            raise HTTPNotImplemented(detail="Execute transmissionMode '{}' not supported.".format(mode))
 
 
 def submit_job_handler(payload,             # type: JSON

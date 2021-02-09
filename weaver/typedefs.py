@@ -13,8 +13,9 @@ if TYPE_CHECKING:
     else:
         FileSystemPathType = str
 
+    import lxml.etree
     from celery.app import Celery
-    from lxml.etree import _Element as XML  # noqa: W0212  # make available for use elsewhere
+    from pyramid.httpexceptions import HTTPSuccessful, HTTPRedirection
     from pyramid.registry import Registry
     from pyramid.request import Request as PyramidRequest
     from pyramid.response import Response as PyramidResponse
@@ -29,11 +30,11 @@ if TYPE_CHECKING:
     from webtest.response import TestResponse
     from werkzeug.wrappers import Request as WerkzeugRequest
 
-    # pylint: disable=W0611,unused-import,C0103,invalid-name
     from weaver.processes.wps_process_base import WpsProcessInterface
     from weaver.datatype import Process
     from weaver.status import AnyStatusType
 
+    # pylint: disable=C0103,invalid-name
     Number = Union[int, float]
     ValueType = Union[str, Number, bool]
     AnyValue = Optional[ValueType]
@@ -42,6 +43,7 @@ if TYPE_CHECKING:
     JsonObject = Dict[str, "JSON"]
     JSON = Union[AnyValue, JsonObject, JsonList]
     CWL = TypedDict("CWL", {"cwlVersion": str, "class": str, "inputs": JSON, "outputs": JSON})
+    XML = lxml.etree._Element  # noqa
 
     AnyContainer = Union[Configurator, Registry, PyramidRequest, Celery]
     SettingValue = Optional[JSON]
@@ -62,6 +64,7 @@ if TYPE_CHECKING:
     AnyCookiesContainer = Union[CookiesBaseType, WPSRequest, PyramidRequest, AnyHeadersContainer]
     AnyResponseType = Union[PyramidResponse, WebobResponse, TestResponse]
     AnyRequestType = Union[PyramidRequest, WerkzeugRequest, RequestsRequest, DummyRequest]
+    HTTPValid = Union[HTTPSuccessful, HTTPRedirection]
 
     AnyProcess = Union[Process, ProcessWPS]
     AnyProcessType = Union[Type[Process], Type[ProcessWPS]]

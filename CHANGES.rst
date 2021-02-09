@@ -25,6 +25,7 @@ Fixes:
 - Target ``PyWPS-4.4`` to resolve multiple invalid dependency requirements breaking installed packages over builtin
   Python packages and other compatibility fixes
   (see `geopython/pywps #568 <https://github.com/geopython/pywps/issues/568>`_).
+- Fix retrieval of database connexion to avoid warning of ``MongoClient`` opened before fork of processes.
 
 `1.14.0 <https://github.com/crim-ca/weaver/tree/1.14.0>`_ (2021-01-11)
 ========================================================================

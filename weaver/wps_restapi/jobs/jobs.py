@@ -23,12 +23,12 @@ from weaver.utils import get_any_id, get_any_value, get_settings
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps.utils import get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.jobs.notify import encrypt_email
+from notify import encrypt_email
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
 
 if TYPE_CHECKING:
-    from weaver.typedefs import AnySettingsContainer, JSON  # noqa: F401
-    from typing import AnyStr, Optional, Tuple, Union       # noqa: F401
+    from typing import AnyStr, Tuple, Union
+    from weaver.typedefs import AnySettingsContainer, JSON
 
 LOGGER = get_task_logger(__name__)
 

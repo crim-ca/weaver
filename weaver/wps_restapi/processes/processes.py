@@ -1,21 +1,15 @@
 import logging
-import os
-from time import sleep
 from typing import TYPE_CHECKING
 
 import colander
-from owslib.util import clean_ows_url
-from owslib.wps import ComplexDataInput, WebProcessingService
+from owslib.wps import WebProcessingService
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPCreated,
     HTTPForbidden,
     HTTPNotFound,
-    HTTPNotImplemented,
     HTTPOk,
     HTTPServiceUnavailable,
-    HTTPSuccessful,
-    HTTPUnauthorized,
     HTTPUnprocessableEntity
 )
 from pyramid.request import Request
@@ -24,47 +18,20 @@ from pyramid.settings import asbool
 from weaver.config import WEAVER_CONFIGURATION_EMS, get_weaver_configuration
 from weaver.database import get_db
 from weaver.datatype import Service, Process
-from weaver.exceptions import InvalidIdentifierValue, ProcessNotAccessible, ProcessNotFound, log_unhandled_exceptions
-from weaver.execute import (
-    EXECUTE_MODE_ASYNC,
-    EXECUTE_MODE_AUTO,
-    EXECUTE_MODE_SYNC,
-    EXECUTE_RESPONSE_DOCUMENT,
-    EXECUTE_TRANSMISSION_MODE_REFERENCE
-)
-from weaver.formats import CONTENT_TYPE_APP_JSON
+from weaver.exceptions import ProcessNotFound, log_unhandled_exceptions
 from weaver.processes import opensearch
 from weaver.processes.execution import submit_job
 from weaver.processes.types import PROCESS_BUILTIN
 from weaver.processes.utils import deploy_process_from_payload, get_process
-from weaver.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_STARTED, STATUS_SUCCEEDED, map_status
-from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
-from weaver.utils import (
-    get_any_id,
-    get_any_value,
-    get_cookie_headers,
-    get_settings,
-    get_ssl_verify_option,
-    raise_on_xml_exception,
-    request_extra,
-    wait_secs
-)
+from weaver.store.base import StoreProcesses, StoreServices
+from weaver.utils import get_any_id, get_cookie_headers, get_settings, request_extra
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
-from weaver.wps.utils import (
-    check_wps_status,
-    get_wps_local_status_location,
-    get_wps_output_path,
-    get_wps_output_url,
-    load_pywps_config
-)
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.jobs.notify import encrypt_email, notify_job_complete
-from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, get_wps_restapi_base_url, parse_request_query
+from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, parse_request_query
 
 if TYPE_CHECKING:
-    from weaver.datatype import Job
-    from weaver.typedefs import HeaderCookiesType, JSON, SettingsType
-    from typing import List, Tuple, Optional, Union
+    from weaver.typedefs import JSON
+    from typing import List, Tuple
 
 LOGGER = logging.getLogger(__name__)
 

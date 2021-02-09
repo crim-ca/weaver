@@ -42,14 +42,12 @@ from weaver.utils import get_settings, make_dirs, now
 from weaver.wps.utils import get_wps_output_dir
 
 if TYPE_CHECKING:
-    from weaver.typedefs import (   # noqa: F401
-        ExpectedOutputType, GetJobProcessDefinitionFunction, ToolPathObjectType, AnyValue
-    )
-    from weaver.processes.wps_process_base import WpsProcessInterface       # noqa: F401
-    from typing import Any, Dict, Generator, List, Optional, Set, Union     # noqa: F401
-    from cwltool.command_line_tool import OutputPorts                       # noqa: F401
+    from typing import Any, Dict, Generator, List, Optional, Set, Union
+    from cwltool.command_line_tool import OutputPorts
     from cwltool.provenance import ProvenanceProfile
-    import threading    # noqa: F401
+    from threading import Lock as ThreadLock
+    from weaver.typedefs import AnyValue, ExpectedOutputType, GetJobProcessDefinitionFunction, ToolPathObjectType
+    from weaver.processes.wps_process_base import WpsProcessInterface
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_TMP_PREFIX = "tmp"
@@ -418,7 +416,7 @@ class WpsWorkflowJob(JobBase):  # noqa: N802
 
     def run(self,
             runtimeContext,     # type: RuntimeContext
-            tmpdir_lock=None,   # type: Optional[threading.Lock]
+            tmpdir_lock=None,   # type: Optional[ThreadLock]
             ):                  # type: (...) -> None
 
         make_dirs(self.tmpdir, exist_ok=True)

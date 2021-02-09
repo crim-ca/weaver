@@ -18,7 +18,7 @@ from weaver.utils import get_settings
 
 if TYPE_CHECKING:
     from weaver.typedefs import AnySettingsContainer, JSON
-    from typing import Any, Optional, Union
+    from typing import Any, Optional, Type, Union
     from pymongo.database import Database
 
 # pylint: disable=C0103,invalid-name
@@ -33,7 +33,14 @@ MongodbStores = frozenset([
 
 if TYPE_CHECKING:
     # pylint: disable=E0601,used-before-assignment
-    AnyStoreType = Union[MongodbStores]     # noqa: F401
+    AnyStore = Union[MongodbStores]
+    AnyStoreType = Union[
+        Type[MongodbServiceStore],
+        Type[MongodbProcessStore],
+        Type[MongodbJobStore],
+        Type[MongodbQuoteStore],
+        Type[MongodbBillStore],
+    ]
 
 
 class MongoDatabase(DatabaseInterface):
@@ -42,11 +49,11 @@ class MongoDatabase(DatabaseInterface):
     _stores = None
     type = "mongodb"
 
-    def __init__(self, registry, reset_connection=False):
-        # type: (AnySettingsContainer, bool) -> None
-        super(MongoDatabase, self).__init__(registry)
-        self._database = get_mongodb_engine(registry, reset_connection)
-        self._settings = get_settings(registry)
+    def __init__(self, container):
+        # type: (AnySettingsContainer) -> None
+        super(MongoDatabase, self).__init__(container)
+        self._database = get_mongodb_engine(container)
+        self._settings = get_settings(container)
         self._stores = dict()
 
     def is_ready(self):
@@ -54,7 +61,7 @@ class MongoDatabase(DatabaseInterface):
         return self._database is not None and self._settings is not None
 
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (Union[str, StoreInterface, MongodbStores], *Any, **Any) -> AnyStoreType
+        # type: (Union[str, Type[StoreInterface], AnyStoreType], *Any, **Any) -> AnyStoreType
         """
         Retrieve a store from the database.
 
@@ -95,28 +102,23 @@ class MongoDatabase(DatabaseInterface):
         warnings.warn("Not implemented {}.run_migration implementation.".format(self.type))
 
 
-def get_mongodb_connection(container, reset_connection=False):
-    # type: (AnySettingsContainer, bool) -> Database
+def get_mongodb_connection(container):
+    # type: (AnySettingsContainer) -> Database
     """Obtains the basic database connection from settings."""
-    global MongoDB  # pylint: disable=W0603,global-statement
-    if reset_connection:
-        MongoDB = None
-    if not MongoDB:
-        settings = get_settings(container)
-        settings_default = [("mongodb.host", "localhost"), ("mongodb.port", 27017), ("mongodb.db_name", "weaver")]
-        for setting, default in settings_default:
-            if settings.get(setting, None) is None:
-                warnings.warn("Setting '{}' not defined in registry, using default [{}].".format(setting, default))
-                settings[setting] = default
-        client = pymongo.MongoClient(settings["mongodb.host"], int(settings["mongodb.port"]))
-        MongoDB = client[settings["mongodb.db_name"]]
-    return MongoDB
+    settings = get_settings(container)
+    settings_default = [("mongodb.host", "localhost"), ("mongodb.port", 27017), ("mongodb.db_name", "weaver")]
+    for setting, default in settings_default:
+        if settings.get(setting, None) is None:
+            warnings.warn("Setting '{}' not defined in registry, using default [{}].".format(setting, default))
+            settings[setting] = default
+    client = pymongo.MongoClient(settings["mongodb.host"], int(settings["mongodb.port"]), connect=False)
+    return client[settings["mongodb.db_name"]]
 
 
-def get_mongodb_engine(container, reset_connection=False):
-    # type: (AnySettingsContainer, bool) -> Database
+def get_mongodb_engine(container):
+    # type: (AnySettingsContainer) -> Database
     """Obtains the database with configuration ready for usage."""
-    db = get_mongodb_connection(container, reset_connection)
+    db = get_mongodb_connection(container)
     db.services.create_index("name", unique=True)
     db.services.create_index("url", unique=True)
     db.processes.create_index("identifier", unique=True)

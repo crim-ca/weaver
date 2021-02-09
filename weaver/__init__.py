@@ -15,7 +15,7 @@ sys.path.insert(0, WEAVER_ROOT_DIR)
 sys.path.insert(0, WEAVER_MODULE_DIR)
 
 # provide standard package version location
-from __meta__ import __version__  # noqa: E402,F401 # isort:skip # pylint: disable=C0413
+from __meta__ import __version__  # noqa: E402 # isort:skip # pylint: disable=C0413
 
 
 def main(global_config, **settings):

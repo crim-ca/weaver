@@ -177,7 +177,7 @@ def check_wps_status(location=None,     # type: Optional[AnyStr]
     execution.checkStatus(response=xml, sleepSecs=sleep_secs)
     if execution.response is None:
         raise Exception("Missing response, cannot check status.")
-    if not isinstance(execution.response, lxml.etree._Element):  # noqa: W0212
+    if not isinstance(execution.response, lxml.etree._Element):  # noqa
         execution.response = lxml.etree.fromstring(execution.response)
     return execution
 

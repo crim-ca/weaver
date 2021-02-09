@@ -46,12 +46,14 @@ from weaver.utils import get_base_url, get_sane_name, get_weaver_url, islambda, 
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC, VISIBILITY_VALUES
 
 if TYPE_CHECKING:
-    from weaver.typedefs import AnyValue, AnyProcess, AnyProcessType                # noqa: F401
-    from pymongo.collection import Collection                                       # noqa: F401
-    from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, Union    # noqa: F401
-    JobListAndCount = Tuple[List[Job], int]                                         # noqa: F401
-    JobCategory = Dict[AnyStr, Union[AnyValue, Job]]                                # noqa: F401
-    JobCategoriesAndCount = Tuple[List[JobCategory], int]                           # noqa: F401
+    from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, Union
+    from pymongo.collection import Collection
+
+    from weaver.typedefs import AnyValue, AnyProcess, AnyProcessType
+
+    JobListAndCount = Tuple[List[Job], int]
+    JobCategory = Dict[AnyStr, Union[AnyValue, Job]]
+    JobCategoriesAndCount = Tuple[List[JobCategory], int]
 
 LOGGER = logging.getLogger(__name__)
 

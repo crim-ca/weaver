@@ -97,12 +97,17 @@ from weaver.wps.utils import get_wps_output_dir
 from weaver.wps_restapi.swagger_definitions import process_uri
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional, Union
+    from typing import Any, Dict, List, Optional, Type, Union
 
-    from cwltool.factory import Callable as CWLFactoryCallable  # noqa: F401
+    from cwltool.factory import Callable as CWLFactoryCallable
+    from owslib.wps import WPSExecution
+    from pywps.app import WPSRequest
+    from pywps.response.execute import ExecuteResponse
 
+    from weaver.datatype import Job
     from weaver.processes.convert import CWL_Input_Type, WPS_Input_Type
-    from weaver.typedefs import CWL, JSON, Optional, ToolPathObjectType, ValueType  # noqa: F401
+    from weaver.status import AnyStatusType
+    from weaver.typedefs import CWL, JSON, Number, ToolPathObjectType, ValueType
 
 # NOTE:
 #   Only use this logger for 'utility' methods (not residing under WpsPackage).

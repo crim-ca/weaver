@@ -31,6 +31,12 @@ from urllib.parse import urlparse
 from urllib.request import urlopen
 
 from weaver.exceptions import PackageTypeError
+from weaver.execute import (
+    EXECUTE_MODE_ASYNC,
+    EXECUTE_RESPONSE_DOCUMENT,
+    EXECUTE_TRANSMISSION_MODE_REFERENCE,
+    EXECUTE_TRANSMISSION_MODE_VALUE,
+)
 from weaver.formats import (
     CONTENT_TYPE_ANY,
     CONTENT_TYPE_TEXT_PLAIN,
@@ -49,22 +55,21 @@ from weaver.processes.constants import (
     WPS_OUTPUT,
     WPS_REFERENCE
 )
-from weaver.utils import bytes2str, fetch_file, null, str2bytes
+from weaver.utils import bytes2str, fetch_file, get_any_id, null, str2bytes
 
 
 if TYPE_CHECKING:
-    from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, Type, Union  # noqa: F401
+    from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, Type, Union
 
-    from cwltool.process import Process as ProcessCWL           # noqa: F401
-    from pywps.app import WPSRequest                            # noqa: F401
-    from pywps.response.execute import ExecuteResponse          # noqa: F401
-    from owslib.wps import Process as ProcessOWS, WPSExecution  # noqa: F401
-    from requests.models import Response                        # noqa: F401
+    from cwltool.process import Process as ProcessCWL
+    from pywps.app import WPSRequest
+    from pywps.response.execute import ExecuteResponse
+    from owslib.wps import Process as ProcessOWS, WPSExecution
+    from requests.models import Response
 
-    # pylint: disable=W0611,unused-import
-    from weaver.datatype import Job             # noqa: F401
-    from weaver.status import AnyStatusType     # noqa: F401
-    from weaver.typedefs import (               # noqa: F401
+    from weaver.datatype import Job
+    from weaver.status import AnyStatusType
+    from weaver.typedefs import (
         AnyKey,
         AnySettingsContainer,
         AnyValue as AnyValueType,
@@ -1058,6 +1063,46 @@ def wps2json_io(io_wps):
             io_wps_json["formats"][0]["default"] = (io_default_mime_type == io_single_fmt_mime_type)
 
     return io_wps_json
+
+
+def wps2json_job_payload(wps_request, wps_process):
+    # type: (WPSRequest, ProcessWPS) -> JSON
+    """
+    Converts the input and output values of a :mod:`pywps` WPS ``Execute`` request to corresponding WPS-REST job.
+
+    The inputs and outputs must be parsed from XML POST payload or KVP GET query parameters, and converted to data
+    container defined by :mod:`pywps` based on the process definition.
+    """
+    data = {
+        "inputs": [],
+        "outputs": list(wps_request.outputs.values()),
+        "response": EXECUTE_RESPONSE_DOCUMENT,
+        "mode": EXECUTE_MODE_ASYNC,
+    }
+    multi_inputs = list(wps_request.inputs.values())
+    for input_list in multi_inputs:
+        iid = get_any_id(input_list[0])
+        for input_value in input_list:
+            input_data = input_value.get("data")
+            input_href = input_value.get("href")
+            if input_data:
+                data["inputs"].append({"id": iid, "data": input_data})
+            elif input_href:
+                data["inputs"].append({"id": iid, "href": input_href})
+    output_ids = [get_any_id(output) for output in data["outputs"]]
+    for output in wps_process.outputs:
+        oid = output.identifier
+        if oid not in output_ids:
+            data_output = {"identifier": oid}
+            data["outputs"].append(data_output)
+        else:
+            data_output = next(filter(lambda o: get_any_id(o) == oid, data["outputs"]))
+        if isinstance(output, ComplexOutput):
+            data_output["transmissionMode"] = EXECUTE_TRANSMISSION_MODE_REFERENCE
+        else:
+            data_output["transmissionMode"] = EXECUTE_TRANSMISSION_MODE_VALUE
+        data_output["id"] = oid
+    return data
 
 
 def get_field(io_object, field, search_variations=False, pop_found=False, default=null):

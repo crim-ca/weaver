@@ -11,9 +11,9 @@ from weaver.utils import get_cookie_headers, get_settings, request_extra
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url
 
 if TYPE_CHECKING:
-    from weaver.typedefs import CWL     # noqa: F401
-    from typing import AnyStr, Dict     # noqa: F401
-    from pywps.app import WPSRequest    # noqa: F401
+    from weaver.typedefs import CWL
+    from typing import AnyStr, Dict
+    from pywps.app import WPSRequest
 
 
 class WpsProcessInterface(object):
