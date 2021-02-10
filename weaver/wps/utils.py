@@ -1,36 +1,27 @@
-"""
-pywps 4.x wrapper
-"""
 import logging
 import os
 import tempfile
+from distutils.version import LooseVersion
 from typing import TYPE_CHECKING
 
 import lxml.etree
 from configparser import ConfigParser
 from owslib.wps import WPSExecution
-from pyramid.httpexceptions import HTTPBadRequest, HTTPNotFound, HTTPSeeOther
-from pyramid.settings import asbool
-from pyramid.threadlocal import get_current_request
-from pyramid.wsgi import wsgiapp2
-from pyramid_celery import celery_app as app
+from pyramid.httpexceptions import HTTPNotFound
 from pywps import configuration as pywps_config
-from pywps.app import WPSRequest
-from pywps.app.Service import Service
-from pywps.response import WPSResponse
-from pywps.response.execute import ExecuteResponse
 from urllib.parse import urlparse
 
 from weaver.config import get_weaver_configuration
-from weaver.utils import get_header, get_settings, get_url_without_query, get_weaver_url, make_dirs, request_extra
+from weaver.utils import get_settings, get_url_without_query, get_weaver_url, make_dirs, request_extra
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing import AnyStr, Dict, Union, Optional
 
+    from pyramid.request import Request
     from owslib.wps import WebProcessingService
 
-    from weaver.typedefs import AnySettingsContainer
+    from weaver.typedefs import AnySettingsContainer, XML
 
 
 def _get_settings_or_wps_config(container,                  # type: AnySettingsContainer
@@ -57,6 +48,7 @@ def get_wps_path(container):
     # type: (AnySettingsContainer) -> AnyStr
     """
     Retrieves the WPS path (without hostname).
+
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
     """
     return _get_settings_or_wps_config(container, "weaver.wps_path", "server", "url", "/ows/wps", "WPS path")
@@ -65,7 +57,8 @@ def get_wps_path(container):
 def get_wps_url(container):
     # type: (AnySettingsContainer) -> AnyStr
     """
-    Retrieves the full WPS URL (hostname + WPS path).
+    Retrieves the full WPS URL (hostname + WPS path)
+
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
     """
     return get_settings(container).get("weaver.wps_url") or get_weaver_url(container) + get_wps_path(container)
@@ -131,7 +124,7 @@ def get_wps_local_status_location(url_status_location, container, must_exist=Tru
 
 
 def check_wps_status(location=None,     # type: Optional[AnyStr]
-                     response=None,     # type: Optional[etree.ElementBase]
+                     response=None,     # type: Optional[XML]
                      sleep_secs=2,      # type: int
                      verify=True,       # type: bool
                      settings=None,     # type: Optional[AnySettingsContainer]

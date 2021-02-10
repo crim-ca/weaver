@@ -401,12 +401,32 @@ def parse_request_query(request):
     for q in queries:
         queries_dict[q] = dict()
         for i, kv in enumerate(queries[q]):
-            kvs = kv.split("=")
-            if len(kvs) > 1:
-                queries_dict[q][kvs[0]] = kvs[1]
+            kvp = kv.split("=")
+            if len(kvp) > 1:
+                queries_dict[q][kvp[0]] = kvp[1]
             else:
-                queries_dict[q][i] = kvs[0]
+                queries_dict[q][i] = kvp[0]
     return queries_dict
+
+
+def get_path_kvp(path, sep=",", **params):
+    # type: (str, str, KVP) -> str
+    """
+    Generates the WPS URL with Key-Value-Pairs (KVP) query parameters.
+
+    :param path: WPS URL or Path
+    :param sep: separator to employ when multiple values are provided.
+    :param params: keyword parameters and their corresponding single or multi values to generate KVP.
+    :return: combined path and query parameters as KVP.
+    """
+
+    def _value(_v):
+        if isinstance(_v, (list, set, tuple)):
+            return sep.join([str(_) for _ in _v])
+        return str(_v)
+
+    kvp = ["{}={}".format(k, _value(v) for k, v in params.items()]
+    return path + "?" + "&".join(kvp)
 
 
 def get_log_fmt():

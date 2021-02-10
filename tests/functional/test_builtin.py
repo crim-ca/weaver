@@ -94,7 +94,7 @@ class BuiltinAppTest(unittest.TestCase):
                 for process in mocked_execute_process():
                     stack_proc.enter_context(process)
                 path = "/processes/jsonarray2netcdf/jobs"
-                resp = mocked_sub_requests(self.app, "post_json", path, params=data, headers=self.json_headers)
+                resp = mocked_sub_requests(self.app, "post_json", path, data=data, headers=self.json_headers)
 
             assert resp.status_code == 201
             assert resp.content_type in CONTENT_TYPE_APP_JSON

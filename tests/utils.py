@@ -25,10 +25,10 @@ from weaver.config import WEAVER_CONFIGURATION_DEFAULT, WEAVER_DEFAULT_INI_CONFI
 from weaver.database import get_db
 from weaver.datatype import Service
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_XML
-from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
-from weaver.utils import get_url_without_query, get_weaver_url, null
-from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 from weaver.processes.execution import execute_process
+from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
+from weaver.utils import get_path_kvp, get_url_without_query, get_weaver_url, null
+from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 
 if TYPE_CHECKING:
     import botocore.client  # noqa
@@ -311,9 +311,12 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
         headers = req_kwargs.get("headers")
         req = getattr(app, method)
         url = req_kwargs.get("base_url", url)
-        query = req_kwargs.get("params")
+        query = req_kwargs.get("query")
+        params = req_kwargs.get("params", {})
         if query:
-            url = url + "?" + query
+            url += ("" if query.startswith("?") else "?") + query
+        elif params:
+            url = get_path_kvp(url, **params)
         if not url.startswith("mock://"):
             resp = req(url, params=req_kwargs.get("data"), headers=headers, expect_errors=True)
             setattr(resp, "content", resp.body)
@@ -363,22 +366,22 @@ def mocked_execute_process():
         return task
 
     return (
-        mock.patch("weaver.wps_restapi.processes.processes.execute_process.delay", side_effect=mock_execute_process),
+        mock.patch("weaver.processes.execution.execute_process.delay", side_effect=mock_execute_process),
         mock.patch("celery.app.task.Context", return_value=task)
     )
 
 
 def mocked_process_job_runner(job_task_id="mocked-job-id"):
     """
-    Provides a mock that will no execute the process execution when call during job creation.
+    Provides a mock that will bypass execution of the process when called during job submission.
 
     .. seealso::
-        - :func:`mocked_execute_process` to still execute the process, but without `Celery` connection.
+        - :func:`mocked_execute_process` to still execute the process, but directly instead of within ``Celery`` worker.
     """
     result = mock.MagicMock()
     result.id = job_task_id
     return (
-        mock.patch("weaver.wps_restapi.processes.processes.execute_process.delay", return_value=result),
+        mock.patch("weaver.processes.execution.execute_process.delay", return_value=result),
     )
 
 

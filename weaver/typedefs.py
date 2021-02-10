@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import os
     import typing
-    from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+    from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
     if hasattr(typing, "TypedDict"):
         from typing import TypedDict  # pylint: disable=E0611,no-name-in-module
     else:
@@ -43,6 +43,8 @@ if TYPE_CHECKING:
     JsonObject = Dict[str, "JSON"]
     JSON = Union[AnyValue, JsonObject, JsonList]
     CWL = TypedDict("CWL", {"cwlVersion": str, "class": str, "inputs": JSON, "outputs": JSON})
+    _VP = Union[ValueType, Sequence[ValueType]]
+    KVP = Union[Sequence[Tuple[str, _VP]], Dict[str, _VP]]
     XML = lxml.etree._Element  # noqa
 
     AnyContainer = Union[Configurator, Registry, PyramidRequest, Celery]
