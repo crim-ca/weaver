@@ -59,7 +59,7 @@ class MongoDatabase(DatabaseInterface):
         self._settings = get_settings(container)
         self._stores = dict()
 
-    def reset_store(self,  store_type):
+    def reset_store(self, store_type):
         store_type = self._get_store_type(store_type)
         return self._stores.pop(store_type, None)
 

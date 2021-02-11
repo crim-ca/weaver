@@ -8,12 +8,17 @@ from logging import ERROR, INFO, Logger, getLevelName, getLogger
 from typing import TYPE_CHECKING
 
 import lxml.etree
-from dateutil.parser import parse as dt_parse  # noqa
+from dateutil.parser import parse as dt_parse
 from owslib.wps import WPSException
 from pywps import Process as ProcessWPS
 
 from weaver.exceptions import ProcessInstanceError
-from weaver.processes.convert import get_field, ows2json_io, ows2json_io_FIXME, wps2json_io  # FIXME: duplicate functions
+from weaver.processes.convert import (
+    get_field,
+    ows2json_io,
+    ows2json_io_FIXME,  # FIXME: duplicate functions
+    wps2json_io
+)
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_BUILTIN, PROCESS_TEST, PROCESS_WORKFLOW, PROCESS_WPS
 from weaver.status import (
     JOB_STATUS_CATEGORIES,

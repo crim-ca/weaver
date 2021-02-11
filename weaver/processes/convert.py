@@ -55,7 +55,7 @@ from weaver.processes.constants import (
     WPS_OUTPUT,
     WPS_REFERENCE
 )
-from weaver.utils import bytes2str, fetch_file, get_any_id, null, str2bytes
+from weaver.utils import bytes2str, fetch_file, get_any_id, get_url_without_query, null, str2bytes
 
 
 if TYPE_CHECKING:
@@ -94,11 +94,6 @@ if TYPE_CHECKING:
     ANY_IO_Type = Union[CWL_IO_Type, JSON_IO_Type, WPS_IO_Type, OWS_IO_Type]
     ANY_Format_Type = Union[Dict[str, Optional[str]], Format]
     ANY_Metadata_Type = Union[OWS_Metadata, WPS_Metadata, Dict[str, str]]
-    # note: below requirements also include 'hints'
-    CWLRequirement = TypedDict("CWLRequirement", {"class": str}, total=False)
-    DictCWLRequirements = Dict[str, Dict[str, str]]  # {'<req>': {<param>: <val>}}
-    ListCWLRequirements = List[CWLRequirement]       # [{'class': <req>, <param>: <val>}]
-    AnyCWLRequirements = Union[DictCWLRequirements, ListCWLRequirements]
 
 # CWL package types and extensions
 PACKAGE_BASE_TYPES = frozenset(["string", "boolean", "float", "int", "integer", "long", "double"])

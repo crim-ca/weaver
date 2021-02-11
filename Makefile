@@ -374,6 +374,9 @@ mkdir-reports:
 .PHONY: check
 check: check-all    ## alias for 'check-all' target
 
+.PHONY: check-only
+check-only: $(addsuffix -only, $(CHECKS))
+
 .PHONY: check-all
 check-all: install-dev $(CHECKS) 	## run all code checks
 

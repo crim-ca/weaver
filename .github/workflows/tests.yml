@@ -47,6 +47,11 @@ jobs:
             python-version: 3.7
             allow-failure: false
             test-case: check
+          # documentation build
+          - os: ubuntu-latest
+            python-version: 3.7
+            allow-failure: false
+            test-case: docs
           # coverage test
           - os: ubuntu-latest
             python-version: 3.7
@@ -74,10 +79,10 @@ jobs:
         run: make install-pkg install-dev version
       - name: Display Packages
         run: pip freeze
-      - name: Setup Environment Variables
-        uses: c-py/action-dotenv-to-setenv@v2
-        with:
-          env-file: ./ci/magpie.env
+      #- name: Setup Environment Variables
+      #  uses: c-py/action-dotenv-to-setenv@v2
+      #  with:
+      #    env-file: ./ci/weaver.env
       - name: Display Environment Variables
         run: |
           hash -r

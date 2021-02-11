@@ -98,18 +98,32 @@ from weaver.wps.utils import get_wps_output_dir
 from weaver.wps_restapi.swagger_definitions import process_uri
 
 if TYPE_CHECKING:
-    from typing import Any, Deque, Dict, List, Optional, Type, Union
+    from typing import Any, Deque, Dict, List, Optional, Tuple, Type, TypedDict, Union
 
     from cwltool.factory import Callable as CWLFactoryCallable
+    from cwltool.process import Process as ProcessCWL
     from owslib.wps import WPSExecution
     from pywps.app import WPSRequest
     from pywps.response.execute import ExecuteResponse
 
     from weaver.datatype import Job
-    from weaver.processes.convert import CWL_Input_Type, WPS_Input_Type
+    from weaver.processes.convert import (
+        ANY_IO_Type,
+        CWL_Input_Type,
+        JSON_IO_Type,
+        PKG_IO_Type,
+        WPS_Input_Type,
+        WPS_Output_Type
+    )
     from weaver.status import AnyStatusType
     from weaver.typedefs import AnyValueType, CWL, JSON, Number, ToolPathObjectType, ValueType
 
+    # note: below requirements also include 'hints'
+    CWLRequirement = TypedDict("CWLRequirement", {"class": str}, total=False)
+    DictCWLRequirements = Dict[str, Dict[str, str]]  # {'<req>': {<param>: <val>}}
+    ListCWLRequirements = List[CWLRequirement]       # [{'class': <req>, <param>: <val>}]
+    AnyCWLRequirements = Union[DictCWLRequirements, ListCWLRequirements]
+    # results from CWL execution
     CWLResultEntry = Dict[str, Union[AnyValueType, List[AnyValueType]]]
     CWLResults = Dict[str, CWLResultEntry]
 

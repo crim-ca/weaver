@@ -27,6 +27,7 @@ pymongo
 pyramid>=1.7.3
 pyramid_celery
 pyramid_mako
+python-dateutil
 pytz
 # no viable pywps version with Python>3.5 dependencies
 # use '4.2.4' plus a few commits that provide fix, but not yet released
