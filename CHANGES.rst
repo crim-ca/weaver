@@ -16,11 +16,14 @@ Changes:
   constantly handle circular imports issues due to processing related operations that share some code.
 - Move core processing of job operation by ``Celery`` worker under ``weaver.processes.execution`` in order to separate
   those components from functions specific for producing WPS-REST API responses.
-- Handle WPS requests submitted to XML endpoint with ``application/json`` in ``Accept`` header to return the same body
-  content as if directly calling their corresponding WPS-REST endpoints.
+- Handle WPS-1/2 requests submitted by GET KVP or POST XML request with ``application/json`` in ``Accept`` header to
+  return the same body content as if directly calling their corresponding WPS-REST endpoints.
 - Remove every Python 2 backward compatibility references and operations.
-- Remove ``request`` parameter of every store methods since they were not used nor provided most of the time.
-- Add more tests and test suite execution with Github Actions.
+- Remove ``request`` parameter of every database store methods since they were not used nor provided most of the time.
+- Changed all forbidden access responses related to visibility status to return ``403`` instead of ``401``.
+- Add more tests for Docker applications and test suite execution with Github Actions.
+- Add more details in sample configurations and provide an example ``docker-compose.yml`` configuration that defines a
+  *typical* `Weaver` API / Worker combination with ``docker-proxy`` for sibling container execution.
 
 Fixes:
 ------

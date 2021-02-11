@@ -67,7 +67,8 @@ from weaver.processes.convert import (
     json2wps_field,
     json2wps_io,
     merge_package_io,
-    wps2json_io
+    wps2json_io,
+    xml_wps2cwl
 )
 from weaver.processes.sources import retrieve_data_source_url
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW

@@ -27,7 +27,7 @@ from notify import encrypt_email
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
 
 if TYPE_CHECKING:
-    from typing import AnyStr, Tuple, Union
+    from typing import Optional, Tuple
     from weaver.typedefs import AnySettingsContainer, JSON
 
 LOGGER = get_task_logger(__name__)
@@ -59,7 +59,7 @@ def get_job(request):
 
 
 def validate_service_process(request):
-    # type: (Request) -> Tuple[Union[None, AnyStr], Union[None, AnyStr]]
+    # type: (Request) -> Tuple[Optional[str], Optional[str]]
     """
     Verifies that service or process specified by path or query will raise the appropriate error if applicable.
     """
@@ -74,7 +74,7 @@ def validate_service_process(request):
             item_type = "Service"
             item_test = service_name
             store = get_db(request).get_store(StoreServices)
-            service = store.fetch_by_name(service_name, visibility=VISIBILITY_PUBLIC, request=request)
+            service = store.fetch_by_name(service_name, visibility=VISIBILITY_PUBLIC)
         if process_name:
             item_type = "Process"
             item_test = process_name

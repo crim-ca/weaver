@@ -12,7 +12,7 @@ from weaver.wps.utils import get_wps_output_dir, get_wps_output_url
 
 if TYPE_CHECKING:
     from weaver.typedefs import CWL
-    from typing import AnyStr, Dict
+    from typing import Dict
     from pywps.app import WPSRequest
 
 
@@ -24,8 +24,8 @@ class WpsProcessInterface(object):
     @abstractmethod
     def execute(self,
                 workflow_inputs,        # type: CWL
-                out_dir,                # type: AnyStr
-                expected_outputs,       # type: Dict[AnyStr, AnyStr]
+                out_dir,                # type: str
+                expected_outputs,       # type: Dict[str, str]
                 ):
         """
         Execute a remote process using the given inputs.

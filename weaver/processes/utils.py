@@ -50,7 +50,7 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from typing import AnyStr, List, Optional, Tuple, Union
+    from typing import List, Optional, Tuple, Union
 
     from pyramid.request import Request
 
@@ -59,7 +59,7 @@ if TYPE_CHECKING:
 
 
 def get_process(process_id=None, request=None, settings=None, store=None):
-    # type: (Optional[AnyStr], Optional[Request], Optional[SettingsType], Optional[StoreProcesses]) -> Process
+    # type: (Optional[str], Optional[Request], Optional[SettingsType], Optional[StoreProcesses]) -> Process
     """
     Obtain the specified process and validate information, returning appropriate HTTP error if invalid.
 
@@ -229,7 +229,7 @@ def deploy_process_from_payload(payload, container):
 
 
 def parse_wps_process_config(config_entry):
-    # type: (Union[JSON, AnyStr]) -> Tuple[AnyStr, AnyStr, List[AnyStr], bool]
+    # type: (Union[JSON, str]) -> Tuple[str, str, List[str], bool]
     """
     Parses the available WPS provider or process entry to retrieve its relevant information.
 

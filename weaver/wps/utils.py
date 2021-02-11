@@ -16,7 +16,7 @@ from weaver.utils import get_settings, get_url_without_query, get_weaver_url, ma
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from typing import AnyStr, Dict, Union, Optional
+    from typing import Dict, Union, Optional
 
     from pyramid.request import Request
     from owslib.wps import WebProcessingService
@@ -25,12 +25,12 @@ if TYPE_CHECKING:
 
 
 def _get_settings_or_wps_config(container,                  # type: AnySettingsContainer
-                                weaver_setting_name,        # type: AnyStr
-                                config_setting_section,     # type: AnyStr
-                                config_setting_name,        # type: AnyStr
-                                default_not_found,          # type: AnyStr
-                                message_not_found,          # type: AnyStr
-                                ):                          # type: (...) -> AnyStr
+                                weaver_setting_name,        # type: str
+                                config_setting_section,     # type: str
+                                config_setting_name,        # type: str
+                                default_not_found,          # type: str
+                                message_not_found,          # type: str
+                                ):                          # type: (...) -> str
 
     settings = get_settings(container)
     found = settings.get(weaver_setting_name)
@@ -45,7 +45,7 @@ def _get_settings_or_wps_config(container,                  # type: AnySettingsC
 
 
 def get_wps_path(container):
-    # type: (AnySettingsContainer) -> AnyStr
+    # type: (AnySettingsContainer) -> str
     """
     Retrieves the WPS path (without hostname).
 
@@ -55,7 +55,7 @@ def get_wps_path(container):
 
 
 def get_wps_url(container):
-    # type: (AnySettingsContainer) -> AnyStr
+    # type: (AnySettingsContainer) -> str
     """
     Retrieves the full WPS URL (hostname + WPS path)
 
@@ -65,7 +65,7 @@ def get_wps_url(container):
 
 
 def get_wps_output_dir(container):
-    # type: (AnySettingsContainer) -> AnyStr
+    # type: (AnySettingsContainer) -> str
     """
     Retrieves the WPS output directory path where to write XML and result files.
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
@@ -76,7 +76,7 @@ def get_wps_output_dir(container):
 
 
 def get_wps_output_path(container):
-    # type: (AnySettingsContainer) -> AnyStr
+    # type: (AnySettingsContainer) -> str
     """
     Retrieves the WPS output path (without hostname) for staging XML status, logs and process outputs.
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
@@ -85,7 +85,7 @@ def get_wps_output_path(container):
 
 
 def get_wps_output_url(container):
-    # type: (AnySettingsContainer) -> AnyStr
+    # type: (AnySettingsContainer) -> str
     """
     Retrieves the WPS output URL that maps to WPS output directory path.
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
@@ -97,7 +97,7 @@ def get_wps_output_url(container):
 
 
 def get_wps_local_status_location(url_status_location, container, must_exist=True):
-    # type: (AnyStr, AnySettingsContainer, bool) -> Optional[AnyStr]
+    # type: (str, AnySettingsContainer, bool) -> Optional[str]
     """Attempts to retrieve the local file path corresponding to the WPS status location as URL.
 
     :param url_status_location: URL reference pointing to some WPS status location XML.
@@ -123,7 +123,7 @@ def get_wps_local_status_location(url_status_location, container, must_exist=Tru
     return out_path
 
 
-def check_wps_status(location=None,     # type: Optional[AnyStr]
+def check_wps_status(location=None,     # type: Optional[str]
                      response=None,     # type: Optional[XML]
                      sleep_secs=2,      # type: int
                      verify=True,       # type: bool
@@ -176,7 +176,7 @@ def check_wps_status(location=None,     # type: Optional[AnyStr]
 
 
 def load_pywps_config(container, config=None):
-    # type: (AnySettingsContainer, Optional[Union[AnyStr, Dict[AnyStr, AnyStr]]]) -> ConfigParser
+    # type: (AnySettingsContainer, Optional[Union[str, Dict[str, str]]]) -> ConfigParser
     """
     Loads and updates the PyWPS configuration using Weaver settings.
     """

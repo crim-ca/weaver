@@ -35,7 +35,7 @@ from weaver.utils import get_path_kvp
 from weaver.wps_restapi.swagger_definitions import jobs_full_uri, jobs_short_uri, process_jobs_uri
 
 if TYPE_CHECKING:
-    from typing import List, Tuple, Union
+    from typing import Iterable, List, Tuple, Union
 
     from owslib.wps import Process as ProcessOWSWPS
     from pywps.app import Process as ProcessPyWPS
@@ -148,7 +148,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     @staticmethod
     def get_job_remote_service_mock(processes):
-        # type: (List[Union[ProcessPyWPS, ProcessOWSWPS]]) -> Tuple[MockPatch]
+        # type: (List[Union[ProcessPyWPS, ProcessOWSWPS]]) -> Iterable[MockPatch]
         mock_processes = mock.PropertyMock
         mock_processes.return_value = processes
         return tuple([
@@ -403,8 +403,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     def test_get_jobs_private_service_public_process_unauthorized_in_query(self):
         path = get_path_kvp(jobs_short_uri,
-                               service=self.service_private.name,
-                               process=self.process_public.identifier)
+                            service=self.service_private.name,
+                            process=self.process_public.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 401
         assert resp.content_type == CONTENT_TYPE_APP_JSON
@@ -416,8 +416,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
             if the process is visible, the a job can be executed and it is automatically considered public
         """
         path = get_path_kvp(jobs_short_uri,
-                               service=self.service_public.name,
-                               process=self.process_private.identifier)
+                            service=self.service_public.name,
+                            process=self.process_private.identifier)
         with contextlib.ExitStack() as stack:
             for runner in self.get_job_remote_service_mock([self.process_private]):  # process visible on remote
                 stack.enter_context(runner)
@@ -432,8 +432,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
             if the process is invisible, no job should have been executed nor can be fetched
         """
         path = get_path_kvp(jobs_short_uri,
-                               service=self.service_public.name,
-                               process=self.process_private.identifier)
+                            service=self.service_public.name,
+                            process=self.process_private.identifier)
         with contextlib.ExitStack() as stack:
             for job in self.get_job_remote_service_mock([]):    # process invisible (not returned by remote)
                 stack.enter_context(job)
@@ -455,10 +455,10 @@ class WpsRestApiJobsTest(unittest.TestCase):
         editor1_private_jobs = list(filter(lambda j: VISIBILITY_PRIVATE in j.access, editor1_all_jobs))
         public_jobs = list(filter(lambda j: VISIBILITY_PUBLIC in j.access, self.job_info))
 
-        def filter_process(jobs):
+        def filter_process(jobs):  # type: (Iterable[Job]) -> List[Job]
             return list(filter(lambda j: j.process == self.process_public.identifier, jobs))
 
-        def filter_service(jobs):
+        def filter_service(jobs):  # type: (Iterable[Job]) -> List[Job]
             return list(filter(lambda j: j.service == self.service_public.name, jobs))
 
         # test variations of [paths, query, user-id, expected-job-ids]
@@ -495,12 +495,13 @@ class WpsRestApiJobsTest(unittest.TestCase):
             (uri_provider_jobs, VISIBILITY_PUBLIC,  self.user_editor1_id,   filter_service(editor1_public_jobs)),       # noqa: E241,E501
             (uri_provider_jobs, VISIBILITY_PUBLIC,  self.user_admin_id,     filter_service(self.job_info)),             # noqa: E241,E501
 
-        ]   # type: List[Tuple[str, str, Union[None, int], List[str]]]
+        ]   # type: List[Tuple[str, str, Union[None, int], List[Job]]]
 
         for i, (path, access, user_id, expected_jobs) in enumerate(path_jobs_user_req_tests):
-            patches = self.get_job_request_auth_mock(user_id) + self.get_job_remote_service_mock([self.process_public])
             with contextlib.ExitStack() as stack:
-                for patch in patches:
+                for patch in self.get_job_request_auth_mock(user_id):
+                    stack.enter_context(patch)
+                for patch in self.get_job_remote_service_mock([self.process_public]):
                     stack.enter_context(patch)
                 test = get_path_kvp(path, access=access) if access else path
                 resp = self.app.get(test, headers=self.json_headers)

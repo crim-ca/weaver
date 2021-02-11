@@ -119,7 +119,7 @@ def get_processes_filtered_by_valid_schemas(request):
     :returns: list of valid process summaries and invalid processes IDs for manual cleanup.
     """
     store = get_db(request).get_store(StoreProcesses)
-    processes = store.list_processes(visibility=VISIBILITY_PUBLIC, request=request)
+    processes = store.list_processes(visibility=VISIBILITY_PUBLIC)
     valid_processes = list()
     invalid_processes_ids = list()
     for process in processes:

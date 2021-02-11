@@ -1,6 +1,7 @@
 """
 Unit tests of functions within :mod:`weaver.processes.convert`.
 """
+from copy import deepcopy
 
 import pytest
 from pywps.inout.formats import Format

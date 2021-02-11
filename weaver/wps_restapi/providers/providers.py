@@ -103,7 +103,7 @@ def add_provider(request):
         new_service["auth"] = request.json["auth"]
 
     try:
-        store.save_service(new_service, request=request)
+        store.save_service(new_service)
     except NotImplementedError:
         raise OWSNotImplemented(sd.NotImplementedPostProviderResponse.description, value=new_service)
 

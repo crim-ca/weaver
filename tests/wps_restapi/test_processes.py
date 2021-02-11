@@ -197,7 +197,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     def test_describe_process_visibility_private(self):
         uri = "/processes/{}".format(self.process_private.identifier)
         resp = self.app.get(uri, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 401
+        assert resp.status_code == 403
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_deploy_process_success(self):
@@ -452,7 +452,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     def test_delete_process_not_accessible(self):
         uri = "/processes/{}".format(self.process_private.identifier)
         resp = self.app.delete_json(uri, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 401
+        assert resp.status_code == 403
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_delete_process_not_found(self):
@@ -605,17 +605,20 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         uri = "/processes/{}/jobs".format(self.process_private.identifier)
         data = self.get_process_execute_template()
         resp = self.app.post_json(uri, params=data, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 401
+        assert resp.status_code == 403
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
-    def test_get_process_visibility_success(self):
-        for wps_process in [self.process_private, self.process_public]:
+    def test_get_process_visibility_expected_response(self):
+        for http_code, wps_process in [(403, self.process_private), (200, self.process_public)]:
             process = self.process_store.fetch_by_id(wps_process.identifier)
             uri = "/processes/{}/visibility".format(process.identifier)
-            resp = self.app.get(uri, headers=self.json_headers)
-            assert resp.status_code == 200
+            resp = self.app.get(uri, headers=self.json_headers, expect_errors=True)
+            assert resp.status_code == http_code
             assert resp.content_type == CONTENT_TYPE_APP_JSON
-            assert resp.json["value"] == process.visibility
+            if http_code == 200:
+                assert resp.json["value"] == process.visibility
+            else:
+                assert "value" not in resp.json
 
     def test_get_process_visibility_not_found(self):
         uri = "/processes/{}/visibility".format(self.fully_qualified_test_process_name())
@@ -630,7 +633,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
         # validate cannot be found before
         resp = self.app.get(uri_describe, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 401
+        assert resp.status_code == 403
 
         # make public
         data = {"value": VISIBILITY_PUBLIC}
@@ -653,7 +656,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
         # validate cannot be found anymore
         resp = self.app.get(uri_describe, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 401
+        assert resp.status_code == 403
 
     def test_set_process_visibility_bad_formats(self):
         uri = "/processes/{}/visibility".format(self.process_private.identifier)
