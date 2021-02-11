@@ -1,11 +1,11 @@
 import os
 from typing import TYPE_CHECKING
+from urllib.error import HTTPError
+from urllib.request import urlopen
 
 from pyramid.httpexceptions import HTTPNotFound, HTTPOk
 from pywps.inout.formats import FORMATS, Format
 from requests.exceptions import ConnectionError
-from urllib.error import HTTPError
-from urllib.request import urlopen
 
 from weaver.utils import request_extra
 

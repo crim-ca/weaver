@@ -29,9 +29,9 @@ from weaver.status import (
     STATUS_FAILED,
     STATUS_SUCCEEDED
 )
+from weaver.utils import get_path_kvp
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 from weaver.warning import TimeZoneInfoAlreadySetWarning
-from weaver.utils import get_path_kvp
 from weaver.wps_restapi.swagger_definitions import jobs_full_uri, jobs_short_uri, process_jobs_uri
 
 if TYPE_CHECKING:

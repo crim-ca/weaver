@@ -5,6 +5,7 @@ import warnings
 from copy import deepcopy
 from distutils.version import LooseVersion
 from typing import TYPE_CHECKING
+from urllib.parse import parse_qs, urlparse
 
 import colander
 import yaml
@@ -20,7 +21,6 @@ from pyramid.httpexceptions import (
     HTTPUnprocessableEntity
 )
 from pyramid.settings import asbool
-from urllib.parse import parse_qs, urlparse
 
 from weaver.config import (
     WEAVER_CONFIGURATION_EMS,

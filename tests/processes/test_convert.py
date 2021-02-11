@@ -11,6 +11,7 @@ from pywps.validator.mode import MODE
 from weaver.exceptions import PackageTypeError
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
 from weaver.processes.constants import WPS_LITERAL
+from weaver.processes.convert import _are_different_and_set  # noqa: W0212
 from weaver.processes.convert import (
     DEFAULT_FORMAT,
     is_cwl_array_type,
@@ -18,7 +19,6 @@ from weaver.processes.convert import (
     json2wps_datatype,
     merge_io_formats
 )
-from weaver.processes.convert import _are_different_and_set  # noqa: W0212
 from weaver.utils import null
 
 

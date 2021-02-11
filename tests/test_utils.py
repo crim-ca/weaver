@@ -7,6 +7,7 @@ import os
 import shutil
 import tempfile
 from typing import Type
+from urllib.parse import urlparse
 
 import mock
 import pytest
@@ -23,7 +24,6 @@ from pyramid.httpexceptions import (
 from pywps.response.status import WPS_STATUS
 from requests import Response
 from requests.exceptions import HTTPError as RequestsHTTPError
-from urllib.parse import urlparse
 
 from tests.utils import mocked_aws_credentials, mocked_aws_s3, mocked_aws_s3_bucket_test_file, mocked_file_response
 from weaver import status, utils

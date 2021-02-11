@@ -1,15 +1,15 @@
 import logging
 import os
 import tempfile
+from configparser import ConfigParser
 from distutils.version import LooseVersion
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 import lxml.etree
-from configparser import ConfigParser
 from owslib.wps import WPSExecution
 from pyramid.httpexceptions import HTTPNotFound
 from pywps import configuration as pywps_config
-from urllib.parse import urlparse
 
 from weaver.config import get_weaver_configuration
 from weaver.utils import get_settings, get_url_without_query, get_weaver_url, make_dirs, request_extra

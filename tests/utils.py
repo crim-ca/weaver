@@ -6,6 +6,7 @@ import os
 import tempfile
 import uuid
 import warnings
+from configparser import ConfigParser
 from inspect import isclass
 from typing import TYPE_CHECKING
 
@@ -13,7 +14,6 @@ from typing import TYPE_CHECKING
 import mock
 import moto
 import pyramid_celery
-from configparser import ConfigParser
 from pyramid import testing
 from pyramid.config import Configurator
 from pyramid.httpexceptions import HTTPException, HTTPNotFound, HTTPUnprocessableEntity

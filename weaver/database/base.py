@@ -1,5 +1,6 @@
 import abc
 from typing import TYPE_CHECKING
+
 from weaver.store.base import StoreInterface
 
 if TYPE_CHECKING:

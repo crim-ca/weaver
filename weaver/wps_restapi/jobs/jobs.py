@@ -6,6 +6,7 @@ from pyramid.request import Request
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
 
+from notify import encrypt_email
 from weaver import sort, status
 from weaver.database import get_db
 from weaver.datatype import Job
@@ -23,7 +24,6 @@ from weaver.utils import get_any_id, get_any_value, get_settings
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps.utils import get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
-from notify import encrypt_email
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
 
 if TYPE_CHECKING:

@@ -19,6 +19,7 @@ import uuid
 from collections import OrderedDict  # pylint: disable=E0611,no-name-in-module   # moved to .abc in Python 3
 from copy import deepcopy
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 import cwltool
 import cwltool.docker
@@ -32,7 +33,6 @@ from pywps.inout import BoundingBoxInput, ComplexInput, LiteralInput
 from pywps.inout.basic import SOURCE_TYPE
 from pywps.inout.literaltypes import AnyValue
 from pywps.inout.storage.s3 import S3StorageBuilder
-from urllib.parse import urlparse
 from yaml.scanner import ScannerError
 
 from weaver.config import WEAVER_CONFIGURATION_EMS, get_weaver_configuration
@@ -44,12 +44,7 @@ from weaver.exceptions import (
     PackageTypeError,
     PayloadNotFound
 )
-from weaver.formats import (
-    CONTENT_TYPE_ANY_XML,
-    CONTENT_TYPE_APP_JSON,
-    CONTENT_TYPE_TEXT_PLAIN,
-    get_cwl_file_format
-)
+from weaver.formats import CONTENT_TYPE_ANY_XML, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN, get_cwl_file_format
 from weaver.processes import opensearch
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_BUILTIN,
@@ -61,8 +56,8 @@ from weaver.processes.constants import (
     WPS_OUTPUT
 )
 from weaver.processes.convert import (
-    get_field,
     cwl2wps_io,
+    get_field,
     is_cwl_array_type,
     json2wps_field,
     json2wps_io,

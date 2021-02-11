@@ -1,13 +1,17 @@
 """
 Conversion functions between corresponding data structures.
 """
-import logging
 import json
+import logging
 import os
 import sys
 from collections import Hashable, OrderedDict  # pylint: disable=E0611,no-name-in-module   # moved to .abc in Python 3
 from copy import deepcopy
+from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
+from urllib.error import URLError
+from urllib.parse import urlparse
+from urllib.request import urlopen
 
 import lxml.etree
 from owslib.wps import (
@@ -25,22 +29,18 @@ from pywps.inout.basic import SOURCE_TYPE, BasicIO
 from pywps.inout.formats import Format
 from pywps.inout.literaltypes import ALLOWEDVALUETYPE, RANGECLOSURETYPE, AllowedValue, AnyValue  # FIXME: #211 (range)
 from pywps.validator.mode import MODE
-from tempfile import TemporaryDirectory
-from urllib.error import URLError
-from urllib.parse import urlparse
-from urllib.request import urlopen
 
 from weaver.exceptions import PackageTypeError
 from weaver.execute import (
     EXECUTE_MODE_ASYNC,
     EXECUTE_RESPONSE_DOCUMENT,
     EXECUTE_TRANSMISSION_MODE_REFERENCE,
-    EXECUTE_TRANSMISSION_MODE_VALUE,
+    EXECUTE_TRANSMISSION_MODE_VALUE
 )
 from weaver.formats import (
     CONTENT_TYPE_ANY,
-    CONTENT_TYPE_TEXT_PLAIN,
     CONTENT_TYPE_APP_JSON,
+    CONTENT_TYPE_TEXT_PLAIN,
     get_cwl_file_format,
     get_extension,
     get_format
@@ -56,7 +56,6 @@ from weaver.processes.constants import (
     WPS_REFERENCE
 )
 from weaver.utils import bytes2str, fetch_file, get_any_id, get_url_without_query, null, str2bytes
-
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union

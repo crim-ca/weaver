@@ -2,6 +2,7 @@
 pywps 4.x wrapper
 """
 import logging
+
 from pyramid.wsgi import wsgiapp2
 
 from weaver.wps.service import get_pywps_service

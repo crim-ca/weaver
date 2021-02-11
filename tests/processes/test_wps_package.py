@@ -12,8 +12,8 @@ from pytest import fail
 from pywps.app import WPSRequest
 
 from weaver.datatype import Process
-from weaver.processes.wps_package import WpsPackage
 from weaver.processes.wps_package import _get_package_ordered_io  # noqa: W0212
+from weaver.processes.wps_package import WpsPackage
 
 
 def test_get_package_ordered_io_with_builtin_dict_and_hints():

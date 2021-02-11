@@ -5,13 +5,13 @@ import unittest
 from collections import deque
 from copy import deepcopy
 from pprint import pformat
+from urllib.parse import parse_qsl, urlparse
 
 import mock
 import pytest
 from pyramid import testing
 from pyramid.testing import DummyRequest
 from pywps.inout.inputs import LiteralInput
-from urllib.parse import parse_qsl, urlparse
 
 from tests.utils import setup_mongodb_processstore
 from weaver.datatype import Process

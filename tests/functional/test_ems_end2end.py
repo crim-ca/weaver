@@ -5,13 +5,13 @@ import time
 from copy import deepcopy
 from typing import TYPE_CHECKING
 from unittest import TestCase
+from urllib.parse import urlparse
 
 import mock
 import pytest
 from pyramid import testing
 from pyramid.httpexceptions import HTTPCreated, HTTPNotFound, HTTPOk, HTTPUnauthorized
 from pyramid.settings import asbool
-from urllib.parse import urlparse
 # use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
 from webtest import TestApp as WebTestApp
 

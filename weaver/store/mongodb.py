@@ -43,8 +43,8 @@ from weaver.sort import (
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, map_status
 from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices
 from weaver.utils import get_base_url, get_sane_name, get_weaver_url, islambda, now
-from weaver.wps.utils import get_wps_url
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC, VISIBILITY_VALUES
+from weaver.wps.utils import get_wps_url
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Tuple, Union

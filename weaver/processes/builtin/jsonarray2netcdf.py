@@ -7,8 +7,9 @@ import json
 import logging
 import os
 import sys
-
 from tempfile import TemporaryDirectory
+
+from weaver.processes.builtin.utils import is_netcdf_url
 
 CUR_DIR = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, CUR_DIR)
@@ -19,7 +20,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(CUR_DIR))))
 # pylint: disable=C0413,wrong-import-order
 from weaver.formats import get_extension, CONTENT_TYPE_APP_NETCDF  # isort:skip # noqa: E402
 from weaver.utils import fetch_file  # isort:skip # noqa: E402
-from weaver.processes.builtin.utils import is_netcdf_url
 
 PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]
 

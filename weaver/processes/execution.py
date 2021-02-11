@@ -20,11 +20,11 @@ from weaver.execute import (
     EXECUTE_TRANSMISSION_MODE_OPTIONS
 )
 from weaver.formats import CONTENT_TYPE_APP_JSON
-from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.notify import encrypt_email, notify_job_complete
+from weaver.owsexceptions import OWSNoApplicableCode
+from weaver.processes import wps_package
 from weaver.processes.constants import WPS_COMPLEX_DATA
 from weaver.processes.convert import ows2json_output
-from weaver.processes import wps_package
 from weaver.processes.types import PROCESS_WORKFLOW
 from weaver.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_STARTED, STATUS_SUCCEEDED, map_status
 from weaver.store.base import StoreJobs
@@ -46,8 +46,8 @@ from weaver.wps.utils import (
     load_pywps_config,
     set_wps_language
 )
-from weaver.wps_restapi.utils import get_wps_restapi_base_url
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:

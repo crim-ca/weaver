@@ -2,12 +2,12 @@ import logging
 from collections import deque
 from copy import deepcopy
 from typing import TYPE_CHECKING
+from urllib.parse import parse_qsl, urlparse
 
 import lxml.etree
 import shapely.wkt
 from pyramid.httpexceptions import HTTPOk
 from pyramid.settings import asbool
-from urllib.parse import parse_qsl, urlparse
 
 from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
 from weaver.processes.constants import (

@@ -1,5 +1,6 @@
 import logging
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 from cornice.service import get_services
 from cornice_swagger import CorniceSwagger
@@ -19,7 +20,6 @@ from pyramid.request import Request
 from pyramid.response import Response
 from pyramid.settings import asbool
 from simplejson import JSONDecodeError
-from urllib.parse import urlparse
 
 from weaver.__meta__ import __version__ as weaver_version
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN

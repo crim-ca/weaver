@@ -1,8 +1,8 @@
 import logging
 from typing import TYPE_CHECKING
 
-from pyramid.request import Request
 from pyramid.registry import Registry
+from pyramid.request import Request
 from pyramid.settings import asbool
 
 from weaver.database.mongodb import MongoDatabase

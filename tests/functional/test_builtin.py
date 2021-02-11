@@ -9,6 +9,7 @@ import mock
 import pyramid.testing
 import pytest
 
+from tests.functional.utils import WpsPackageConfigBase
 from tests.utils import (
     get_settings_from_testapp,
     get_test_weaver_app,
@@ -19,7 +20,6 @@ from tests.utils import (
     setup_config_with_mongodb,
     setup_config_with_pywps
 )
-from tests.functional.utils import WpsPackageConfigBase
 from weaver.database import get_db
 from weaver.execute import EXECUTE_TRANSMISSION_MODE_REFERENCE
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF

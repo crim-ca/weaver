@@ -11,6 +11,7 @@ import warnings
 from copy import deepcopy
 from datetime import datetime
 from typing import TYPE_CHECKING
+from urllib.parse import ParseResult, parse_qs, urlparse, urlunsplit
 
 import boto3
 import pytz
@@ -25,7 +26,6 @@ from pyramid.settings import asbool, aslist
 from requests import HTTPError as RequestsHTTPError, Response
 from requests.structures import CaseInsensitiveDict
 from requests_file import FileAdapter
-from urllib.parse import ParseResult, parse_qs, urlparse, urlunsplit
 from urlmatch import urlmatch
 from webob.headers import EnvironHeaders, ResponseHeaders
 

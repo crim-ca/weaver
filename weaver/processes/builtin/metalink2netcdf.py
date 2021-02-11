@@ -6,9 +6,9 @@ import argparse
 import logging
 import os
 import sys
+from tempfile import TemporaryDirectory
 
 from lxml import etree
-from tempfile import TemporaryDirectory
 
 CUR_DIR = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, CUR_DIR)

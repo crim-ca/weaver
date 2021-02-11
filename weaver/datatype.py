@@ -13,12 +13,8 @@ from owslib.wps import WPSException
 from pywps import Process as ProcessWPS
 
 from weaver.exceptions import ProcessInstanceError
-from weaver.processes.convert import (
-    get_field,
-    ows2json_io,
-    ows2json_io_FIXME,  # FIXME: duplicate functions
-    wps2json_io
-)
+from weaver.processes.convert import ows2json_io_FIXME  # FIXME: duplicate functions
+from weaver.processes.convert import get_field, ows2json_io, wps2json_io
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_BUILTIN, PROCESS_TEST, PROCESS_WORKFLOW, PROCESS_WPS
 from weaver.status import (
     JOB_STATUS_CATEGORIES,
@@ -28,15 +24,8 @@ from weaver.status import (
     STATUS_UNKNOWN,
     map_status
 )
-from weaver.utils import (
-    fully_qualified_name,
-    get_job_log_msg,
-    get_log_date_fmt,
-    get_log_fmt,
-    get_settings,
-    localize_datetime,  # for backward compatibility of previously saved jobs not time-locale-aware
-    now
-)
+from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
+from weaver.utils import fully_qualified_name, get_job_log_msg, get_log_date_fmt, get_log_fmt, get_settings, now
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_VALUES
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url

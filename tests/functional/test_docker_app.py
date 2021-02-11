@@ -6,8 +6,8 @@ import lxml.etree
 import pytest
 from owslib.wps import ComplexDataInput, WPSExecution
 
-from tests.utils import mocked_execute_process, mocked_sub_requests
 from tests.functional.utils import WpsPackageConfigBase
+from tests.utils import mocked_execute_process, mocked_sub_requests
 from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_REFERENCE
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
 from weaver.processes.wps_package import CWL_REQUIREMENT_APP_DOCKER

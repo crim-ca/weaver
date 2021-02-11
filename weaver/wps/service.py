@@ -1,8 +1,8 @@
 import logging
 import os
+from configparser import ConfigParser
 from typing import TYPE_CHECKING
 
-from configparser import ConfigParser
 from owslib.wps import WPSExecution
 from pyramid.httpexceptions import HTTPBadRequest, HTTPSeeOther
 from pyramid.threadlocal import get_current_request
@@ -21,9 +21,9 @@ from weaver.processes.types import PROCESS_WORKFLOW
 from weaver.processes.utils import get_job_submission_response, get_process
 from weaver.store.base import StoreProcesses
 from weaver.utils import get_header, get_settings, get_weaver_url
+from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps.utils import check_wps_status, load_pywps_config
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.visibility import VISIBILITY_PUBLIC
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
