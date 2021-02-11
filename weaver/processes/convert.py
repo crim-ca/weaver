@@ -3,15 +3,12 @@ Conversion functions between corresponding data structures.
 """
 import json
 import logging
-import os
 import sys
 from collections import Hashable, OrderedDict  # pylint: disable=E0611,no-name-in-module   # moved to .abc in Python 3
 from copy import deepcopy
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
-from urllib.error import URLError
 from urllib.parse import urlparse
-from urllib.request import urlopen
 
 import lxml.etree
 from owslib.wps import (
@@ -25,9 +22,10 @@ from owslib.wps import (
 from pywps import Process as ProcessWPS
 from pywps.app.Common import Metadata as WPS_Metadata
 from pywps.inout import BoundingBoxInput, BoundingBoxOutput, ComplexInput, ComplexOutput, LiteralInput, LiteralOutput
-from pywps.inout.basic import SOURCE_TYPE, BasicIO
+from pywps.inout.basic import BasicIO
 from pywps.inout.formats import Format
-from pywps.inout.literaltypes import ALLOWEDVALUETYPE, RANGECLOSURETYPE, AllowedValue, AnyValue  # FIXME: #211 (range)
+from pywps.inout.literaltypes import ALLOWEDVALUETYPE, AllowedValue, AnyValue
+# FIXME: #211 (range): pywps.inout.literaltypes.RANGECLOSURETYPE
 from pywps.validator.mode import MODE
 
 from weaver.exceptions import PackageTypeError
@@ -71,7 +69,7 @@ if TYPE_CHECKING:
     from weaver.typedefs import (
         AnyKey,
         AnySettingsContainer,
-        AnyValue as AnyValueType,
+        AnyValueType,
         CWL,
         JSON,
         Number,
@@ -246,7 +244,7 @@ def ows2json_io(ows_io):
 #   resulting fields should conform to OGC WPS-REST bindings specifications:
 #   https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/inputDescription.yaml
 #   (https://github.com/crim-ca/weaver/issues/211)
-def ows2json_io_FIXME(ows_io):
+def ows2json_io_FIXME(ows_io):  # pylint: disable=C0103
     # type: (OWS_IO_Type) -> JSON_IO_Type
     default_format = {"mimeType": CONTENT_TYPE_TEXT_PLAIN}
     if isinstance(ows_io, OWS_Input_Type):

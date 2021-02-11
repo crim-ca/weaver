@@ -82,7 +82,7 @@ def test_get_cwl_file_format_retry_attempts():
     """Verifies that failing request will not immediately fail the MIME-type validation."""
     codes = {"codes": [HTTPOk.code, HTTPRequestTimeout.code]}  # note: used in reverse order (pop)
 
-    def mock_request_extra(*args, **kwargs):  # noqa: E811
+    def mock_request_extra(*_, **__):
         m_resp = Response()
         m_resp.status_code = codes["codes"].pop()
         return m_resp
@@ -95,10 +95,10 @@ def test_get_cwl_file_format_retry_attempts():
 
 def test_get_cwl_file_format_retry_fallback_urlopen():
     """Verifies that failing request because of critical error still validate the MIME-type using the fallback."""
-    def mock_connect_error(*args, **kwargs):  # noqa: E811
+    def mock_connect_error(*_, **__):
         raise ConnectionError()
 
-    def mock_urlopen(*args, **kwargs):  # noqa: E811
+    def mock_urlopen(*_, **__):
         return HTTPOk()
 
     with mock.patch("requests.Session.request", side_effect=mock_connect_error) as mocked_request:

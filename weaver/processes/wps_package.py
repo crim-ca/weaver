@@ -93,7 +93,7 @@ from weaver.wps.utils import get_wps_output_dir
 from weaver.wps_restapi.swagger_definitions import process_uri
 
 if TYPE_CHECKING:
-    from typing import Any, Deque, Dict, List, Optional, Tuple, Type, TypedDict, Union
+    from typing import Any, Deque, Dict, List, Optional, Tuple, Type, Union
 
     from cwltool.factory import Callable as CWLFactoryCallable
     from cwltool.process import Process as ProcessCWL
@@ -111,7 +111,7 @@ if TYPE_CHECKING:
         WPS_Output_Type
     )
     from weaver.status import AnyStatusType
-    from weaver.typedefs import AnyValueType, CWL, JSON, Number, ToolPathObjectType, ValueType
+    from weaver.typedefs import AnyValueType, CWL, JSON, Number, ToolPathObjectType, TypedDict, ValueType
 
     # note: below requirements also include 'hints'
     CWLRequirement = TypedDict("CWLRequirement", {"class": str}, total=False)

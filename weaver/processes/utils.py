@@ -1,6 +1,4 @@
-import json
 import logging
-import os
 import warnings
 from copy import deepcopy
 from distutils.version import LooseVersion
@@ -29,7 +27,7 @@ from weaver.config import (
     get_weaver_configuration
 )
 from weaver.database import get_db
-from weaver.datatype import Process as ProcessDB, Service
+from weaver.datatype import Process, Service
 from weaver.exceptions import (
     InvalidIdentifierValue,
     PackageNotFound,
@@ -55,7 +53,6 @@ if TYPE_CHECKING:
     from pyramid.request import Request
 
     from weaver.typedefs import AnyContainer, AnySettingsContainer, FileSystemPathType, JSON, Number, SettingsType
-    from weaver.datatype import Process
 
 
 def get_process(process_id=None, request=None, settings=None, store=None):
@@ -217,7 +214,7 @@ def deploy_process_from_payload(payload, container):
 
     try:
         store = get_db(container).get_store(StoreProcesses)
-        saved_process = store.save_process(ProcessDB(process_info), overwrite=False)
+        saved_process = store.save_process(Process(process_info), overwrite=False)
     except ProcessRegistrationError as ex:
         raise HTTPConflict(detail=str(ex))
     except ValueError as ex:

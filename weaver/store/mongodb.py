@@ -50,7 +50,7 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Tuple, Union
     from pymongo.collection import Collection
 
-    from weaver.database.base import JobCategoriesAndCount, JobListAndCount
+    from weaver.store.base import JobCategoriesAndCount, JobListAndCount
     from weaver.typedefs import AnyProcess, AnyProcessType
 
 LOGGER = logging.getLogger(__name__)

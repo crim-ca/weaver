@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 
 from owslib.wps import WPSExecution
 from pyramid.httpexceptions import HTTPBadRequest, HTTPSeeOther
-from pyramid.threadlocal import get_current_request
 from pyramid_celery import celery_app as app
 from pywps.app import WPSRequest
 from pywps.app.Service import Service

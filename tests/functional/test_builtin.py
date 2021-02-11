@@ -2,7 +2,6 @@ import contextlib
 import json
 import os
 import tempfile
-import unittest
 from time import sleep
 
 import mock
@@ -10,16 +9,7 @@ import pyramid.testing
 import pytest
 
 from tests.functional.utils import WpsPackageConfigBase
-from tests.utils import (
-    get_settings_from_testapp,
-    get_test_weaver_app,
-    get_test_weaver_config,
-    mocked_execute_process,
-    mocked_sub_requests,
-    setup_config_with_celery,
-    setup_config_with_mongodb,
-    setup_config_with_pywps
-)
+from tests.utils import get_settings_from_testapp, mocked_execute_process, mocked_sub_requests
 from weaver.database import get_db
 from weaver.execute import EXECUTE_TRANSMISSION_MODE_REFERENCE
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF
@@ -42,7 +32,7 @@ class BuiltinAppTest(WpsPackageConfigBase):
             "weaver.wps_path": "/ows/wps",
             "weaver.wps_restapi_path": "/",
         }
-        super(BuiltinAppTest, self).setUpClass(self)  # noqa
+        super(BuiltinAppTest, self).setUpClass()
         db = get_db(self.settings)
         with mock.patch("weaver.processes.builtin.get_db", return_value=db):
             db.reset_store("processes")  # ensure reset of process store to register builtin processes from scratch
@@ -75,8 +65,10 @@ class BuiltinAppTest(WpsPackageConfigBase):
         dirname = tempfile.gettempdir()
         nc_data = "Hello NetCDF!"
         with contextlib.ExitStack() as stack_files:
-            tmp_ncdf = stack_files.enter_context(tempfile.NamedTemporaryFile(dir=dirname, mode="w", suffix=".nc"))
-            tmp_json = stack_files.enter_context(tempfile.NamedTemporaryFile(dir=dirname, mode="w", suffix=".json"))
+            tmp_ncdf = tempfile.NamedTemporaryFile(dir=dirname, mode="w", suffix=".nc")
+            tmp_json = tempfile.NamedTemporaryFile(dir=dirname, mode="w", suffix=".json")
+            tmp_ncdf = stack_files.enter_context(tmp_ncdf)  # noqa
+            tmp_json = stack_files.enter_context(tmp_json)  # noqa
             tmp_ncdf.write(nc_data)
             tmp_ncdf.seek(0)
             tmp_json.write(json.dumps(["file://{}".format(os.path.join(dirname, tmp_ncdf.name))]))

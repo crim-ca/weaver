@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     Number = Union[int, float]
     ValueType = Union[str, Number, bool]
     AnyValue = Optional[ValueType]
+    AnyValueType = AnyValue  # alias
     AnyKey = Union[str, int]
     JsonList = List["JSON"]
     JsonObject = Dict[str, "JSON"]

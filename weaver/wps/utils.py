@@ -2,7 +2,6 @@ import logging
 import os
 import tempfile
 from configparser import ConfigParser
-from distutils.version import LooseVersion
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 

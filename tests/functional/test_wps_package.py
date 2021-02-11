@@ -38,7 +38,6 @@ from weaver.formats import (
     get_cwl_file_format
 )
 from weaver.processes.constants import CWL_REQUIREMENT_APP_BUILTIN
-from weaver.status import STATUS_RUNNING, STATUS_SUCCEEDED
 from weaver.utils import get_any_value
 
 EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_TEXT_PLAIN]
