@@ -45,7 +45,7 @@ if TYPE_CHECKING:
         AnyValue,
         HeadersType,
         JSON,
-        KVPType,
+        KVP,
         Number,
         SettingsType,
         XML
@@ -411,7 +411,7 @@ def parse_request_query(request):
 
 
 def get_path_kvp(path, sep=",", **params):
-    # type: (str, str, KVPType) -> str
+    # type: (str, str, KVP) -> str
     """
     Generates the WPS URL with Key-Value-Pairs (KVP) query parameters.
 
@@ -432,11 +432,17 @@ def get_path_kvp(path, sep=",", **params):
 
 def get_log_fmt():
     # type: (...) -> str
+    """
+    Logging format employed for job output reporting.
+    """
     return "[%(asctime)s] %(levelname)-8s [%(name)s] %(message)s"
 
 
 def get_log_date_fmt():
     # type: (...) -> str
+    """
+    Logging date format employed for job output reporting.
+    """
     return "%Y-%m-%d %H:%M:%S"
 
 
@@ -451,6 +457,23 @@ def get_job_log_msg(status, message, progress=0, duration=None):
     # type: (str, str, Optional[Number], Optional[str]) -> str
     return "{d} {p:3d}% {s:10} {m}".format(d=duration or "", p=int(progress or 0), s=map_status(status), m=message)
 
+
+def setup_logger(logger, settings):
+    # type: (logging.Logger, AnySettingsContainer) -> None
+    """
+    Update :paramref:`logger` configuration based on application settings.
+    """
+    log_level = settings.get("weaver.log_level")
+    if log_level:
+        if not isinstance(log_level, int):
+            log_level = logging.getLevelName(log_level)
+        logger.setLevel(log_level.upper())
+    # define basic formatter/handler if config INI did not provide it
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter(get_log_fmt())
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
 
 def make_dirs(path, mode=0o755, exist_ok=False):
     """

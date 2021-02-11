@@ -34,6 +34,11 @@ mongodb.db_name = weaver
 weaver.configuration = ems
 weaver.url = http://localhost:4001
 
+# --- Weaver Logging ---
+# When provided, this value will override every weaver-specific level defined in other section logging configuration
+# Otherwise, their individual levels are employed as is
+weaver.log_level =
+
 # --- Weaver requests extension flags ---
 # SSL verification should be enabled for secured connections
 # setting is available for convenience, debug purposes and local environments

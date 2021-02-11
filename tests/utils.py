@@ -184,6 +184,8 @@ def get_test_weaver_config(config=None, settings=None):
         config = setup_config_from_settings(settings=settings)
     if "weaver.configuration" not in config.registry.settings:
         config.registry.settings["weaver.configuration"] = WEAVER_CONFIGURATION_DEFAULT
+    if not config.registry.settings.get("weaver.log_level"):
+        config.registry.settings["weaver.log_level"] = "DEBUG"
     if "weaver.url" not in config.registry.settings:
         config.registry.settings["weaver.url"] = "https://localhost"
     # ignore example config files that would be auto-generated when missing
