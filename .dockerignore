@@ -82,9 +82,8 @@ workflows
 **/*.zip
 
 # Project local configurations
-config/weaver.ini
-config/wps_processes.yml
-config/data_sources.json
+!config/*.example
+config/*
 
 # Old project sources
 [Bb]in

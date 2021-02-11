@@ -1,0 +1,24 @@
+# List Data-Source known locations such that Weaver configured in EMS mode can dispatch processes execution to
+# corresponding ADES when input data references match the provided locations.
+#
+# For the expected Schema Definition, see module:
+#   weaver.processes.sources
+#
+# NOTE:
+#   This configuration can be formatted in YAML or JSON at your convenience.
+#
+crim:
+  netloc: "ogc-ades.crim.ca"
+  ades: "https://ogc-ades.crim.ca/weaver"
+
+localhost:
+  netloc: "localhost"
+  ades: "https://localhost:4001"
+  default: true
+
+opensearchdefault:
+  ades: "http://localhost:4001"
+  collection_id: ""
+  accept_schemes: ["http", "https"]
+  rootdir: ""
+  osdd_url: "http://example.com/opensearchdescription.xml"

@@ -18,8 +18,8 @@ if TYPE_CHECKING:
 DATA_SOURCES = {}
 """Data sources configuration.
 
-Unless explicitly overridden, the configuration will be loaded from file as specified by
-``weaver.data_sources`` setting. Following JSON schema format is expected (corresponding YAML also supported):
+Unless explicitly overridden, the configuration will be loaded from file as specified by``weaver.data_sources`` setting. 
+Following JSON schema format is expected (corresponding YAML also supported):
 
 .. code-block:: json
 

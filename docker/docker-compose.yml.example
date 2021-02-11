@@ -8,11 +8,7 @@ x-logging:
     max-file: "10"
 
 services:
-  # FIXME:
-  #   Weaver API shouldn't be one doing docker run (jobs), but it is actually the one
-  #   running the cwltool app from the received WPS Execute request sent by the worker.
-  #   Configs must be moved to the 'worker' with implementation of direct job monitoring.
-  #   (https://github.com/crim-ca/weaver/issues/21)
+
   weaver:
     image: pavics/weaver:latest-manager
     container_name: weaver-api
@@ -21,39 +17,48 @@ services:
     environment:
       HOSTNAME: localhost
       FORWARDED_ALLOW_IPS: "*"
-      DOCKER_HOST: "tcp://docker-proxy:2375"   # FIXME: see above docker-sibling note
-    #env_file:
-    #  - ./config/mongodb/credentials.env
     # ensure other referenced services are created beforehand to avoid booting timing issues
     depends_on:
       - worker
     links:
       - mongodb
     volumes:
+      # Weaver configuration
       - ./components/weaver/config/weaver/weaver.ini:/opt/local/src/weaver/config/weaver.ini
-      - ./components/weaver/config/weaver/data_sources.json:/opt/local/src/weaver/config/data_sources.json
+      - ./components/weaver/config/weaver/data_sources.yml:/opt/local/src/weaver/config/data_sources.yml
       - ./components/weaver/config/weaver/request_options.yml:/opt/local/src/weaver/config/request_options.yml
       - ./components/weaver/config/weaver/wps_processes.yml:/opt/local/src/weaver/config/wps_processes.yml
-      - /usr/bin/docker:/usr/bin/docker   # FIXME: see above docker-sibling note
-      - ~/.docker/config.json:/root/.docker/config.json   # FIXME: see above docker-sibling note
       # WARNING: see detail in 'worker' definition
-      - ${WEAVER_WPS_WORKDIR}:${WEAVER_WPS_WORKDIR}     # FIXME: with fix WPS-execute inside worker, shouldn't be required anymore
-      - ${WEAVER_WPS_OUTPUTS_DIR}:${WEAVER_WPS_OUTPUTS_DIR}
+      - /tmp/weaver/wps-outputs:/tmp/weaver/wps-outputs
     networks:
       - default
-      - docker-proxy  # FIXME: see above docker-sibling note
     restart: always
     logging: *default-logging
 
   worker:
     image: pavics/weaver:latest-worker
     container_name: weaver-worker
+    environment:
+      # WARNING:
+      #   Only the Worker should have access to docker to be able to execute docker run, pull, etc.
+      #   Allowed commands will depend of provided Docker API permissions in 'docker-proxy'
+      DOCKER_HOST: "tcp://docker-proxy:2375"
+    networks:
+      # WARNING:
+      #   Only the Worker should be able to connect to docker-proxy network to obtain access to Docker API.
+      #   This avoids Weaver-API to be able to run Docker commands directly.
+      #   Furthermore, only the Worker has the 'docker-cli' preinstalled.
+      - docker-proxy
     links:
       - mongodb
     volumes:
+      # Weaver configuration
       - ./config/weaver.ini:/opt/local/src/weaver/config/weaver.ini
-      - ./config/data_sources.json:/opt/local/src/weaver/config/data_sources.json
+      - ./config/data_sources.yml:/opt/local/src/weaver/config/data_sources.yml
       - ./config/request_options.yml:/opt/local/src/weaver/config/request_options.yml
+      # WARNING:
+      #   If you need to provide some credentials to provide access to protected docker repositories
+      - ~/.docker/config.json:/root/.docker/config.json
       # NOTE:
       #   Working and output directories must be mounted as exact same path (e.g.: /some/path:/some/path)
       #   to avoid mismatching locations between container-side path resolution of cwltool stagedir/tmpdir/outdir

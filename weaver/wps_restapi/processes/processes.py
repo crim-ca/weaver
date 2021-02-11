@@ -255,7 +255,7 @@ def set_process_visibility(request):
         process = store.fetch_by_id(process_id)
         if process.type == PROCESS_BUILTIN:
             raise HTTPForbidden("Cannot change the visibility of builtin process.")
-        store.set_visibility(process_id, visibility_value, request=request)
+        store.set_visibility(process_id, visibility_value)
         return HTTPOk(json={u"value": visibility_value})
     except TypeError:
         raise HTTPBadRequest("Value of visibility must be a string.")

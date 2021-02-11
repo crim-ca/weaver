@@ -109,8 +109,8 @@ weaver.wps_email_notify_template_default =
 # additional processes to load at startup (see 'wps_processes.yml.example')
 weaver.wps_processes_file = wps_processes.yml
 # known remote ADES for processes redirection based on data-sources when using EMS configuration
-# (see 'data_sources.json.example' and 'weaver.processes.sources' for more details)
-weaver.data_sources = data_sources.json
+# (see 'data_sources.yml.example' and 'weaver.processes.sources' for more details)
+weaver.data_sources = data_sources.yml
 # comma-separated list of key=value options to add to settings
 weaver.extra_options =
 

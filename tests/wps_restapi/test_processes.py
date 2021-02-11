@@ -11,6 +11,7 @@ import webtest
 
 from tests.utils import (
     get_test_weaver_app,
+    mocked_execute_process,
     mocked_process_job_runner,
     mocked_process_package,
     setup_config_with_mongodb,
@@ -593,7 +594,10 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         execute_data = self.get_process_execute_template(fully_qualified_name(self))
         execute_data["outputs"][0]["transmissionMode"] = EXECUTE_TRANSMISSION_MODE_VALUE
         uri = "/processes/{}/jobs".format(self.process_public.identifier)
-        resp = self.app.post_json(uri, params=execute_data, headers=self.json_headers, expect_errors=True)
+        with contextlib.ExitStack() as stack_proc:
+            for process in mocked_execute_process():
+                stack_proc.enter_context(process)
+            resp = self.app.post_json(uri, params=execute_data, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 501
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
