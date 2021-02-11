@@ -14,7 +14,7 @@ from werkzeug.wrappers import Request as WerkzeugRequest
 LOGGER = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from typing import Any, AnyStr, Callable, Type
+    from typing import Any, Callable, Type
 
 
 class WeaverException(Exception):
@@ -201,7 +201,7 @@ class BillInstanceError(BillException):
 
 def log_unhandled_exceptions(logger=LOGGER, message="Unhandled exception occurred.", exception=Exception,
                              force=False, require_http=True, is_request=True):
-    # type: (logging.Logger, AnyStr, Type[Exception], bool, bool, bool) -> Callable
+    # type: (logging.Logger, str, Type[Exception], bool, bool, bool) -> Callable
     """
     Decorator that will raise ``exception`` with specified ``message`` if an exception is caught while execution the
     wrapped function, after logging relevant details about the caught exception with ``logger``.

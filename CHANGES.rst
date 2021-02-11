@@ -19,6 +19,8 @@ Changes:
 - Handle WPS requests submitted to XML endpoint with ``application/json`` in ``Accept`` header to return the same body
   content as if directly calling their corresponding WPS-REST endpoints.
 - Remove every Python 2 backward compatibility references and operations.
+- Remove ``request`` parameter of every store methods since they were not used nor provided most of the time.
+- Add more tests and test suite execution with Github Actions.
 
 Fixes:
 ------
@@ -26,6 +28,7 @@ Fixes:
   Python packages and other compatibility fixes
   (see `geopython/pywps #568 <https://github.com/geopython/pywps/issues/568>`_).
 - Fix retrieval of database connexion to avoid warning of ``MongoClient`` opened before fork of processes.
+- Fix many typing definitions.
 
 `1.14.0 <https://github.com/crim-ca/weaver/tree/1.14.0>`_ (2021-01-11)
 ========================================================================

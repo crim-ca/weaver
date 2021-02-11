@@ -12,7 +12,8 @@ from weaver import formats as f
 def test_get_extension():
     assert f.get_extension(f.CONTENT_TYPE_APP_JSON) == ".json"  # basic
     assert f.get_extension(f.CONTENT_TYPE_APP_JSON + "; charset=UTF-8") == ".json"  # ignore extra parameters
-    assert f.get_extension(f.CONTENT_TYPE_APP_GEOJSON) == ".geojson"  # pywps definition
+    assert f.get_extension(f.CONTENT_TYPE_APP_GEOJSON) == ".geojson"      # pywps <4.4 definition
+    assert f.get_extension(f.CONTENT_TYPE_APP_VDN_GEOJSON) == ".geojson"  # pywps>=4.4 definition
     assert f.get_extension(f.CONTENT_TYPE_IMAGE_GEOTIFF) == ".tiff"  # pywps definition
     assert f.get_extension("application/x-custom") == ".custom"
     assert f.get_extension("application/unknown") == ".unknown"

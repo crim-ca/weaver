@@ -1,5 +1,5 @@
 import logging
-from typing import TYPE_CHECKING, AnyStr, Optional
+from typing import TYPE_CHECKING
 
 from cornice.service import get_services
 from cornice_swagger import CorniceSwagger
@@ -31,6 +31,7 @@ from weaver.wps_restapi.colander_extras import CustomTypeConversionDispatcher
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, get_wps_restapi_base_url, wps_restapi_base_path
 
 if TYPE_CHECKING:
+    from typing import Optional
     from weaver.typedefs import JSON
 
 LOGGER = logging.getLogger(__name__)
@@ -123,7 +124,7 @@ def api_conformance(request):  # noqa: F811
 
 
 def get_swagger_json(http_scheme="http", http_host="localhost", base_url=None, use_docstring_summary=True):
-    # type: (AnyStr, AnyStr, Optional[AnyStr], bool) -> dict
+    # type: (str, str, Optional[str], bool) -> JSON
     """Obtains the JSON schema of weaver API from request and response views schemas.
 
     :param http_scheme: Protocol scheme to use for building the API base if not provided by base URL parameter.
@@ -177,7 +178,7 @@ def api_swagger_ui(request):
 
 
 def get_request_info(request, detail=None):
-    # type: (Request, Optional[AnyStr]) -> JSON
+    # type: (Request, Optional[str]) -> JSON
     """Provided additional response details based on the request and execution stack on failure."""
     content = {u"route": str(request.upath_info), u"url": str(request.url), u"method": request.method}
     if isinstance(detail, str):

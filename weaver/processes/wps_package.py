@@ -97,7 +97,7 @@ from weaver.wps.utils import get_wps_output_dir
 from weaver.wps_restapi.swagger_definitions import process_uri
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional, Type, Union
+    from typing import Any, Deque, Dict, List, Optional, Type, Union
 
     from cwltool.factory import Callable as CWLFactoryCallable
     from owslib.wps import WPSExecution
@@ -107,7 +107,10 @@ if TYPE_CHECKING:
     from weaver.datatype import Job
     from weaver.processes.convert import CWL_Input_Type, WPS_Input_Type
     from weaver.status import AnyStatusType
-    from weaver.typedefs import CWL, JSON, Number, ToolPathObjectType, ValueType
+    from weaver.typedefs import AnyValueType, CWL, JSON, Number, ToolPathObjectType, ValueType
+
+    CWLResultEntry = Dict[str, Union[AnyValueType, List[AnyValueType]]]
+    CWLResults = Dict[str, CWLResultEntry]
 
 # NOTE:
 #   Only use this logger for 'utility' methods (not residing under WpsPackage).
@@ -1017,7 +1020,7 @@ class WpsPackage(Process):
         return True
 
     def make_inputs(self,
-                    wps_inputs,         # type: Dict[str, WPS_Input_Type]
+                    wps_inputs,         # type: Dict[str, Deque[WPS_Input_Type]]
                     cwl_inputs_info,    # type: Dict[str, CWL_Input_Type]
                     ):                  # type: (...) -> Dict[str, ValueType]
         """
@@ -1040,7 +1043,7 @@ class WpsPackage(Process):
             # process single occurrences
             input_i = input_occurs[0]
             # handle as reference/data
-            is_array, elem_type, _, _ = is_cwl_array_type(cwl_input_info[input_id])
+            is_array, elem_type, _, _ = is_cwl_array_type(cwl_inputs_info[input_id])
             if isinstance(input_i, ComplexInput) or elem_type == "File":
                 # extend array data that allow max_occur > 1
                 if is_array:
@@ -1049,7 +1052,7 @@ class WpsPackage(Process):
                         self.make_location_input(input_type, input_def) for input_def in input_occurs
                     ]
                 else:
-                    input_type = cwl_input_info[input_id]["type"]
+                    input_type = cwl_inputs_info[input_id]["type"]
                     cwl_inputs[input_id] = self.make_location_input(input_type, input_i)
             elif isinstance(input_i, (LiteralInput, BoundingBoxInput)):
                 # extend array data that allow max_occur > 1

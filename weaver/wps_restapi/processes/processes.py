@@ -5,7 +5,6 @@ import colander
 from owslib.wps import WebProcessingService
 from pyramid.httpexceptions import (
     HTTPBadRequest,
-    HTTPCreated,
     HTTPForbidden,
     HTTPNotFound,
     HTTPOk,
@@ -22,10 +21,11 @@ from weaver.exceptions import ProcessNotFound, log_unhandled_exceptions
 from weaver.processes import opensearch
 from weaver.processes.execution import submit_job
 from weaver.processes.types import PROCESS_BUILTIN
-from weaver.processes.utils import deploy_process_from_payload, get_process
+from weaver.processes.utils import deploy_process_from_payload, get_job_submission_response, get_process
 from weaver.store.base import StoreProcesses, StoreServices
 from weaver.utils import get_any_id, get_cookie_headers, get_settings, request_extra
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
+from weaver.wps.utils import set_wps_language
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, parse_request_query
 
@@ -34,11 +34,6 @@ if TYPE_CHECKING:
     from typing import List, Tuple
 
 LOGGER = logging.getLogger(__name__)
-
-
-def get_job_submission_response(body):
-    # type: (JSON) -> HTTPCreated
-    return HTTPCreated(location=body["location"], json=body)
 
 
 @sd.jobs_full_service.post(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS],
@@ -51,7 +46,7 @@ def submit_provider_job(request):
     """
     store = get_db(request).get_store(StoreServices)
     provider_id = request.matchdict.get("provider_id")
-    service = store.fetch_by_name(provider_id, request=request)
+    service = store.fetch_by_name(provider_id)
     body = submit_job(request, service, tags=["wps-rest"])
     return get_job_submission_response(body)
 
@@ -79,8 +74,8 @@ def get_provider_processes(request):
     """
     provider_id = request.matchdict.get("provider_id")
     store = get_db(request).get_store(StoreServices)
-    service = store.fetch_by_name(provider_id, request=request)
-    processes = list_remote_processes(service, request=request)
+    service = store.fetch_by_name(provider_id)
+    processes = list_remote_processes(service, request)
     return HTTPOk(json={"processes": [p.process_summary() for p in processes]})
 
 
@@ -94,7 +89,7 @@ def describe_provider_process(request):
     provider_id = request.matchdict.get("provider_id")
     process_id = request.matchdict.get("process_id")
     store = get_db(request).get_store(StoreServices)
-    service = store.fetch_by_name(provider_id, request=request)
+    service = store.fetch_by_name(provider_id)
     wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
     set_wps_language(wps, request=request)
     process = wps.describeprocess(process_id)
@@ -282,7 +277,7 @@ def delete_local_process(request):
     process_id = process.id
     if process.type == PROCESS_BUILTIN:
         raise HTTPForbidden("Cannot delete a builtin process.")
-    if store.delete_process(process_id, visibility=VISIBILITY_PUBLIC, request=request):
+    if store.delete_process(process_id, visibility=VISIBILITY_PUBLIC):
         return HTTPOk(json={"undeploymentDone": True, "identifier": process_id})
     LOGGER.error("Existing process [%s] should have been deleted with success status.", process_id)
     raise HTTPForbidden("Deletion of process has been refused by the database or could not have been validated.")
@@ -297,6 +292,6 @@ def submit_local_job(request):
     """
     process_id = request.matchdict.get("process_id")
     store = get_db(request).get_store(StoreProcesses)
-    process = store.fetch_by_id(process_id, visibility=VISIBILITY_PUBLIC, request=request)
+    process = store.fetch_by_id(process_id, visibility=VISIBILITY_PUBLIC)
     body = submit_job(request, process, tags=["wps-rest"])
     return get_job_submission_response(body)

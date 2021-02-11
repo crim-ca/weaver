@@ -59,7 +59,7 @@ from weaver.utils import bytes2str, fetch_file, get_any_id, null, str2bytes
 
 
 if TYPE_CHECKING:
-    from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, Type, Union
+    from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
     from cwltool.process import Process as ProcessCWL
     from pywps.app import WPSRequest
@@ -87,19 +87,18 @@ if TYPE_CHECKING:
     WPS_IO_Type = Union[WPS_Input_Type, WPS_Output_Type]
     OWS_IO_Type = Union[OWS_Input_Type, OWS_Output_Type]
     JSON_IO_Type = JSON
-    CWL_Input_Type = TypedDict("CWL_Input_Type", {"id": AnyStr, "type": AnyStr})
-    CWL_Output_Type = TypedDict("CWL_Output_Type", {"id": AnyStr, "type": AnyStr})
+    CWL_Input_Type = TypedDict("CWL_Input_Type", {"id": str, "type": str}, total=False)
+    CWL_Output_Type = TypedDict("CWL_Output_Type", {"id": str, "type": str}, total=False)
     CWL_IO_Type = Union[CWL_Input_Type, CWL_Output_Type]
     PKG_IO_Type = Union[JSON_IO_Type, WPS_IO_Type]
     ANY_IO_Type = Union[CWL_IO_Type, JSON_IO_Type, WPS_IO_Type, OWS_IO_Type]
-    ANY_Format_Type = Union[Dict[AnyStr, Optional[AnyStr]], Format]
-    ANY_Metadata_Type = Union[OWS_Metadata, WPS_Metadata, Dict[AnyStr, AnyStr]]
+    ANY_Format_Type = Union[Dict[str, Optional[str]], Format]
+    ANY_Metadata_Type = Union[OWS_Metadata, WPS_Metadata, Dict[str, str]]
     # note: below requirements also include 'hints'
-    DictCWLRequirements = Dict[AnyStr, Dict[AnyStr, Any]]  # {'<req>': {<param>: <val>}}
-    ListCWLRequirements = List[Dict[AnyStr, Any]]  # [{'class': <req>, <param>: <val>}]
+    CWLRequirement = TypedDict("CWLRequirement", {"class": str}, total=False)
+    DictCWLRequirements = Dict[str, Dict[str, str]]  # {'<req>': {<param>: <val>}}
+    ListCWLRequirements = List[CWLRequirement]       # [{'class': <req>, <param>: <val>}]
     AnyCWLRequirements = Union[DictCWLRequirements, ListCWLRequirements]
-    CWLResultEntry = Dict[AnyStr, Union[AnyValueType, List[AnyValueType]]]
-    CWLResults = Dict[AnyStr, CWLResultEntry]
 
 # CWL package types and extensions
 PACKAGE_BASE_TYPES = frozenset(["string", "boolean", "float", "int", "integer", "long", "double"])
@@ -366,7 +365,7 @@ def _get_multi_json_references(output, container):
 
 
 def any2cwl_io(wps_io, io_select):
-    # type: (Union[JSON_IO_Type, WPS_IO_Type, OWS_IO_Type], AnyStr) -> Tuple[CWL_IO_Type, Dict[AnyStr, AnyStr]]
+    # type: (Union[JSON_IO_Type, WPS_IO_Type, OWS_IO_Type], str) -> Tuple[CWL_IO_Type, Dict[str, str]]
     """
     Converts a `WPS`-like I/O to `CWL` corresponding I/O.
     Because of `CWL` I/O of type `File` with `format` field, the applicable namespace is also returned.
@@ -374,7 +373,7 @@ def any2cwl_io(wps_io, io_select):
     :returns: converted I/O and namespace dictionary with corresponding format references as required
     """
     def _get_cwl_fmt_details(wps_fmt):
-        # type: (ANY_Format_Type) -> Union[Tuple[Tuple[AnyStr, AnyStr], AnyStr, AnyStr], Tuple[None, None, None]]
+        # type: (ANY_Format_Type) -> Union[Tuple[Tuple[str, str], str, str], Tuple[None, None, None]]
         _wps_io_fmt = get_field(wps_fmt, "mime_type", search_variations=True)
         if not _wps_io_fmt:
             return None, None, None
@@ -478,7 +477,7 @@ def xml_wps2cwl(wps_process_response):
     :param wps_process_response: valid response (XML, 200) from a `WPS-1 ProcessDescription`.
     """
     def _tag_name(_xml):
-        # type: (Union[XML, AnyStr]) -> AnyStr
+        # type: (Union[XML, str]) -> str
         """Obtains ``tag`` from a ``{namespace}Tag`` `XML` element."""
         if hasattr(_xml, "tag"):
             _xml = _xml.tag
@@ -548,7 +547,7 @@ def xml_wps2cwl(wps_process_response):
 
 
 def is_cwl_array_type(io_info):
-    # type: (CWL_IO_Type) -> Tuple[bool, AnyStr, MODE, Union[AnyValue, List[Any]]]
+    # type: (CWL_IO_Type) -> Tuple[bool, str, MODE, Union[AnyValue, List[Any]]]
     """Verifies if the specified I/O corresponds to one of various CWL array type definitions.
 
     returns ``tuple(is_array, io_type, io_mode, io_allow)`` where:
@@ -618,7 +617,7 @@ def is_cwl_array_type(io_info):
 
 
 def is_cwl_enum_type(io_info):
-    # type: (CWL_IO_Type) -> Tuple[bool, AnyStr, int, Union[List[AnyStr], None]]
+    # type: (CWL_IO_Type) -> Tuple[bool, str, int, Union[List[str], None]]
     """Verifies if the specified I/O corresponds to a CWL enum definition.
 
     returns ``tuple(is_enum, io_type, io_allow)`` where:
@@ -658,7 +657,7 @@ def is_cwl_enum_type(io_info):
 
 
 def cwl2wps_io(io_info, io_select):
-    # type:(CWL_IO_Type, AnyStr) -> WPS_IO_Type
+    # type:(CWL_IO_Type, str) -> WPS_IO_Type
     """Converts input/output parameters from CWL types to WPS types.
 
     :param io_info: parsed IO of a CWL file
@@ -787,7 +786,7 @@ def cwl2wps_io(io_info, io_select):
 
 
 def any2cwl_literal_datatype(io_type):
-    # type: (AnyStr) -> Union[AnyStr, Type[null]]
+    # type: (str) -> Union[str, Type[null]]
     """
     Solves common literal data-type names to supported ones for `CWL`.
     """
@@ -804,7 +803,7 @@ def any2cwl_literal_datatype(io_type):
 
 
 def any2wps_literal_datatype(io_type, is_value):
-    # type: (AnyValueType, bool) -> Union[AnyStr, Type[null]]
+    # type: (AnyValueType, bool) -> Union[str, Type[null]]
     """
     Solves common literal data-type names to supported ones for `WPS`.
     Verification is accomplished by name when ``is_value=False``, otherwise with python ``type`` when ``is_value=True``.
@@ -830,7 +829,7 @@ def any2wps_literal_datatype(io_type, is_value):
 
 
 def json2wps_datatype(io_info):
-    # type: (JSON_IO_Type) -> AnyStr
+    # type: (JSON_IO_Type) -> str
     """
     Guesses the literal data-type from I/O JSON information in order to allow creation of the corresponding I/O WPS.
     Defaults to ``string`` if no suitable guess can be accomplished.
@@ -859,7 +858,7 @@ def json2wps_datatype(io_info):
 
 
 def json2wps_field(field_info, field_category):
-    # type: (JSON_IO_Type, AnyStr) -> Any
+    # type: (JSON_IO_Type, str) -> Any
     """
     Converts an I/O field from a JSON literal data, list, or dictionary to corresponding WPS types.
 
@@ -1106,7 +1105,7 @@ def wps2json_job_payload(wps_request, wps_process):
 
 
 def get_field(io_object, field, search_variations=False, pop_found=False, default=null):
-    # type: (Union[ANY_IO_Type, ANY_Format_Type], AnyStr, bool, bool, Any) -> Any
+    # type: (Union[ANY_IO_Type, ANY_Format_Type], str, bool, bool, Any) -> Any
     """
     Gets a field by name from various I/O object types.
 
@@ -1137,7 +1136,7 @@ def get_field(io_object, field, search_variations=False, pop_found=False, defaul
 
 
 def set_field(io_object, field, value, force=False):
-    # type: (Union[ANY_IO_Type, ANY_Format_Type], AnyStr, Any, bool) -> None
+    # type: (Union[ANY_IO_Type, ANY_Format_Type], str, Any, bool) -> None
     """
     Sets a field by name into various I/O object types.
     Field value is set only if not ``null`` to avoid inserting data considered `invalid`.

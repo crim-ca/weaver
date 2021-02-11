@@ -10,10 +10,11 @@ from pyramid.settings import asbool
 
 from weaver.utils import get_settings
 from weaver.wps.utils import get_wps_path
-from weaver.wps.views import pywps_view
 
 
 def includeme(config):
+    from weaver.wps.views import pywps_view
+
     settings = get_settings(config)
     logger = logging.getLogger(__name__)
     if not asbool(settings.get("weaver.wps", True)):

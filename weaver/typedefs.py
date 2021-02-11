@@ -42,9 +42,10 @@ if TYPE_CHECKING:
     JsonList = List["JSON"]
     JsonObject = Dict[str, "JSON"]
     JSON = Union[AnyValue, JsonObject, JsonList]
-    CWL = TypedDict("CWL", {"cwlVersion": str, "class": str, "inputs": JSON, "outputs": JSON})
-    _VP = Union[ValueType, Sequence[ValueType]]
-    KVP = Union[Sequence[Tuple[str, _VP]], Dict[str, _VP]]
+    CWL = TypedDict("CWL", {"cwlVersion": str, "class": str, "inputs": JSON, "outputs": JSON,
+                            "requirements": JSON, "hints": JSON})
+    KVPType = Union[ValueType, Sequence[ValueType]]
+    KVP = Union[Sequence[Tuple[str, KVPType]], Dict[str, KVPType]]
     XML = lxml.etree._Element  # noqa
 
     AnyContainer = Union[Configurator, Registry, PyramidRequest, Celery]

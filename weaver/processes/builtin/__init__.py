@@ -24,7 +24,7 @@ from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from weaver.typedefs import AnyDatabaseContainer, CWL
+    from weaver.typedefs import AnySettingsContainer, CWL
     from cwltool.context import RuntimeContext
     from typing import Any, Dict, Type, Union
 
@@ -66,7 +66,7 @@ def _replace_template(pkg, var, val):
     # type: (CWL, str, str) -> CWL
     if isinstance(pkg, str):
         return Template(pkg).safe_substitute({var: val})
-    for k in pkg:
+    for k in pkg:  # type: str
         if isinstance(pkg[k], list):
             for i, _ in enumerate(pkg[k]):
                 pkg[k][i] = _replace_template(pkg[k][i], var, val)
@@ -93,7 +93,7 @@ def _get_builtin_package(process_id, package):
 
 
 def register_builtin_processes(container):
-    # type: (AnyDatabaseContainer) -> None
+    # type: (AnySettingsContainer) -> None
     """Registers every ``builtin`` CWL package to the processes database.
 
     CWL definitions must be located within the :mod:`weaver.processes.builtin` module.

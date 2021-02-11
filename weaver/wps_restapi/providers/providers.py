@@ -29,7 +29,7 @@ def get_providers(request):
     store = get_db(request).get_store(StoreServices)
     providers = []
 
-    for service in store.list_services(request=request):
+    for service in store.list_services():
         try:
             if service.type.lower() != "wps":
                 continue
@@ -77,7 +77,7 @@ def get_service(request):
     store = get_db(request).get_store(StoreServices)
     provider_id = request.matchdict.get("provider_id")
     try:
-        service = store.fetch_by_name(provider_id, request=request)
+        service = store.fetch_by_name(provider_id)
     except ServiceNotFound:
         raise HTTPNotFound("Provider {0} cannot be found.".format(provider_id))
     return service, store
@@ -120,7 +120,7 @@ def remove_provider(request):
     service, store = get_service(request)
 
     try:
-        store.delete_service(service.name, request=request)
+        store.delete_service(service.name)
     except NotImplementedError:
         raise OWSNotImplemented(sd.NotImplementedDeleteProviderResponse.description)
 

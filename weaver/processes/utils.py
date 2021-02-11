@@ -12,6 +12,7 @@ from owslib.wps import WebProcessingService
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPConflict,
+    HTTPCreated,
     HTTPException,
     HTTPForbidden,
     HTTPNotFound,
@@ -85,6 +86,17 @@ def get_process(process_id=None, request=None, settings=None, store=None):
         raise HTTPNotFound("Process with ID '{!s}' does not exist.".format(process_id))
     except colander.Invalid as ex:
         raise HTTPBadRequest("Invalid schema:\n[{0!r}].".format(ex))
+
+
+def get_job_submission_response(body):
+    # type: (JSON) -> HTTPCreated
+    """
+    Generates the successful response from contents returned by job submission process.
+
+    .. seealso::
+        :func:`weaver.processes.execution.submit_job`
+    """
+    return HTTPCreated(location=body["location"], json=body)
 
 
 def map_progress(progress, range_min, range_max):

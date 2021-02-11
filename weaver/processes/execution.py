@@ -28,7 +28,15 @@ from weaver.processes import wps_package
 from weaver.processes.types import PROCESS_WORKFLOW
 from weaver.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_STARTED, STATUS_SUCCEEDED, map_status
 from weaver.store.base import StoreJobs
-from weaver.utils import get_any_id, get_any_value, get_cookie_headers, get_settings, get_ssl_verify_option, wait_secs
+from weaver.utils import (
+    get_any_id,
+    get_any_value,
+    get_cookie_headers,
+    get_settings,
+    get_ssl_verify_option,
+    raise_on_xml_exception,
+    wait_secs
+)
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps.utils import (
     check_wps_status,
@@ -141,7 +149,6 @@ def execute_process(self, job_id, url, headers=None):
         wps_worker = get_pywps_service(environ=settings, is_worker=True)
         execution = wps_worker.execute_job(job.process, wps_inputs=wps_inputs, wps_outputs=wps_outputs,
                                            mode=mode, job_uuid=job.id)
-        ###execution = wps.execute(job.process, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
         if not execution.process and execution.errors:
             raise execution.errors[0]
 
@@ -342,7 +349,6 @@ def submit_job(request, reference, tags=None):
     lang = request.accept_language.header_value
     headers = dict(request.headers)
     settings = get_settings(request)
-    process_id = request.matchdict.get("process_id")
     return submit_job_handler(json_body, settings, service_url, provider_id, process_id, is_workflow, is_local,
                               visibility, language=lang, auth=headers, tags=tags, user=user)
 

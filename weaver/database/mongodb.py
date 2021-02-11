@@ -17,9 +17,10 @@ from weaver.store.mongodb import (
 from weaver.utils import get_settings
 
 if TYPE_CHECKING:
-    from weaver.typedefs import AnySettingsContainer, JSON
     from typing import Any, Optional, Type, Union
     from pymongo.database import Database
+    from weaver.typedefs import AnySettingsContainer, JSON
+    from weaver.database.base import StoreSelector
 
 # pylint: disable=C0103,invalid-name
 MongoDB = None  # type: Optional[Database]
@@ -33,8 +34,10 @@ MongodbStores = frozenset([
 
 if TYPE_CHECKING:
     # pylint: disable=E0601,used-before-assignment
-    AnyStore = Union[MongodbStores]
-    AnyStoreType = Union[
+    AnyMongodbStore = Union[MongodbStores]
+    AnyMongodbStoreType = Union[
+        StoreSelector,
+        AnyMongodbStore,
         Type[MongodbServiceStore],
         Type[MongodbProcessStore],
         Type[MongodbJobStore],
@@ -56,12 +59,12 @@ class MongoDatabase(DatabaseInterface):
         self._settings = get_settings(container)
         self._stores = dict()
 
-    def is_ready(self):
-        # type: (...) -> bool
-        return self._database is not None and self._settings is not None
+    def reset_store(self,  store_type):
+        store_type = self._get_store_type(store_type)
+        return self._stores.pop(store_type, None)
 
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (Union[str, Type[StoreInterface], AnyStoreType], *Any, **Any) -> AnyStoreType
+        # type: (Union[str, Type[StoreInterface], AnyMongodbStoreType], *Any, **Any) -> AnyMongodbStore
         """
         Retrieve a store from the database.
 
@@ -69,8 +72,7 @@ class MongoDatabase(DatabaseInterface):
         :param store_args: additional arguments to pass down to the store.
         :param store_kwargs: additional keyword arguments to pass down to the store.
         """
-        if isinstance(store_type, StoreInterface) or issubclass(store_type, StoreInterface):
-            store_type = store_type.type
+        store_type = self._get_store_type(store_type)
 
         for store in MongodbStores:
             if store.type == store_type:
@@ -96,6 +98,10 @@ class MongoDatabase(DatabaseInterface):
         result = list(self._database.version.find().limit(1))[0]
         db_version = result["version_num"]
         return {"version": db_version, "type": self.type}
+
+    def is_ready(self):
+        # type: (...) -> bool
+        return self._database is not None and self._settings is not None
 
     def run_migration(self):
         # type: (...) -> None

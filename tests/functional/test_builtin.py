@@ -19,6 +19,7 @@ from tests.utils import (
     setup_config_with_mongodb,
     setup_config_with_pywps
 )
+from tests.functional.utils import WpsPackageConfigBase
 from weaver.database import get_db
 from weaver.execute import EXECUTE_TRANSMISSION_MODE_REFERENCE
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF
@@ -27,13 +28,13 @@ from weaver.status import JOB_STATUS_CATEGORIES, STATUS_CATEGORY_RUNNING, STATUS
 
 
 @pytest.mark.functional
-class BuiltinAppTest(unittest.TestCase):
+class BuiltinAppTest(WpsPackageConfigBase):
     @classmethod
     def setUpClass(cls):
         cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
 
     def setUp(self):
-        settings = {
+        self.settings = {
             "weaver.wps": True,
             "weaver.wps_output": True,
             "weaver.wps_output_path": "/wpsoutputs",
@@ -41,15 +42,11 @@ class BuiltinAppTest(unittest.TestCase):
             "weaver.wps_path": "/ows/wps",
             "weaver.wps_restapi_path": "/",
         }
-        config = setup_config_with_mongodb(settings=settings)
-        config = setup_config_with_pywps(config)
-        config = setup_config_with_celery(config)
-        config = get_test_weaver_config(config)
-        self.app = get_test_weaver_app(config=config, settings=settings)
-        db = get_db(config)
+        super(BuiltinAppTest, self).setUpClass(self)  # noqa
+        db = get_db(self.settings)
         with mock.patch("weaver.processes.builtin.get_db", return_value=db):
-            db._stores = {}  # ensure reset of process store to register builtin processes from scratch
-            register_builtin_processes(config)
+            db.reset_store("processes")  # ensure reset of process store to register builtin processes from scratch
+            register_builtin_processes(self.settings)
 
     def tearDown(self):
         pyramid.testing.tearDown()

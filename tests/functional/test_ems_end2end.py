@@ -50,6 +50,7 @@ class ProcessInfo(object):
 # pylint: disable=C0103,invalid-name
 @pytest.mark.slow
 @pytest.mark.functional
+@pytest.mark.workflow
 @pytest.mark.skipif(condition=not len(str(os.getenv("WEAVER_TEST_SERVER_HOSTNAME", ""))),
                     reason="Test server not defined!")
 class End2EndEMSTestCase(TestCase):

@@ -29,7 +29,8 @@ CONTENT_TYPE_TEXT_HTML = "text/html"
 CONTENT_TYPE_TEXT_PLAIN = "text/plain"
 CONTENT_TYPE_APP_PDF = "application/pdf"
 CONTENT_TYPE_APP_JSON = "application/json"
-CONTENT_TYPE_APP_GEOJSON = "application/vnd.geo+json"
+CONTENT_TYPE_APP_GEOJSON = "application/geo+json"
+CONTENT_TYPE_APP_VDN_GEOJSON = "application/vnd.geo+json"
 CONTENT_TYPE_APP_XML = "application/xml"
 CONTENT_TYPE_IMAGE_GEOTIFF = "image/tiff; subtype=geotiff"
 CONTENT_TYPE_TEXT_XML = "text/xml"
@@ -38,6 +39,7 @@ CONTENT_TYPE_ANY = "*/*"
 
 # explicit mime-type to extension when not literally written in item after '/' (excluding 'x-' prefix)
 _CONTENT_TYPE_EXTENSION_MAPPING = {
+    CONTENT_TYPE_APP_VDN_GEOJSON: ".geojson",  # pywps 4.4 default extension without vdn prefix
     CONTENT_TYPE_APP_NETCDF: ".nc",
     CONTENT_TYPE_APP_GZIP: ".gz",
     CONTENT_TYPE_APP_TAR_GZ: ".tar.gz",

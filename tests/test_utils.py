@@ -28,7 +28,15 @@ from urllib.parse import urlparse
 from tests.utils import mocked_aws_credentials, mocked_aws_s3, mocked_aws_s3_bucket_test_file, mocked_file_response
 from weaver import status, utils
 from weaver.utils import _NullType  # noqa: W0212
-from weaver.utils import fetch_file, get_request_options, get_ssl_verify_option, make_dirs, null, request_extra
+from weaver.utils import (
+    fetch_file,
+    get_path_kvp,
+    get_request_options,
+    get_ssl_verify_option,
+    make_dirs,
+    null,
+    request_extra
+)
 
 
 def test_null_operators():
@@ -533,3 +541,8 @@ def test_fetch_file_remote_s3_bucket():
         assert os.path.isfile(result)
         with open(result, mode="r") as test_file:
             assert test_file.read() == test_file_data
+
+
+def test_get_path_kvp():
+    res = get_path_kvp("http://localhost", test1="value1", test2=["sub1", "sub2"])
+    assert res == "http://localhost?test1=value1&test2=sub1,sub2"

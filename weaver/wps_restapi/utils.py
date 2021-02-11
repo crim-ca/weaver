@@ -9,7 +9,7 @@ from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
 from weaver.utils import get_settings, get_weaver_url, parse_request_query, request_extra
 
 if TYPE_CHECKING:
-    from typing import AnyStr, Optional
+    from typing import Optional
     from pyramid.request import Request
     from weaver.typedefs import AnySettingsContainer
 
@@ -28,14 +28,14 @@ OUTPUT_FORMATS = {
 
 
 def wps_restapi_base_path(container):
-    # type: (AnySettingsContainer) -> AnyStr
+    # type: (AnySettingsContainer) -> str
     settings = get_settings(container)
     restapi_path = settings.get("weaver.wps_restapi_path", "").rstrip("/").strip()
     return restapi_path
 
 
 def get_wps_restapi_base_url(container):
-    # type: (AnySettingsContainer) -> AnyStr
+    # type: (AnySettingsContainer) -> str
     settings = get_settings(container)
     weaver_rest_url = settings.get("weaver.wps_restapi_url")
     if not weaver_rest_url:
@@ -47,7 +47,7 @@ def get_wps_restapi_base_url(container):
 
 # FIXME: deprecated? unused?
 def get_wps_output_format(request, service_url=None):
-    # type: (Request, AnyStr) -> AnyStr
+    # type: (Request, str) -> str
     """
     Get the preferred output format from WPS after checking various hints:
         - 'version' in query string

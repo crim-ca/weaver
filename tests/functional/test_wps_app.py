@@ -6,6 +6,7 @@ Based on tests from:
 * http://webtest.pythonpaste.org/en/latest/
 * http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/testing.html
 """
+import contextlib
 import unittest
 
 import pyramid.testing
@@ -16,6 +17,7 @@ from lxml import etree
 from tests.utils import (
     get_test_weaver_app,
     get_test_weaver_config,
+    mocked_execute_process,
     setup_config_with_celery,
     setup_config_with_mongodb,
     setup_config_with_pywps,
@@ -118,7 +120,10 @@ class WpsAppTest(unittest.TestCase):
         template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=name=tux"
         params = template.format(HelloWPS.identifier)
         url = self.make_url(params)
-        resp = self.app.get(url)
+        with contextlib.ExitStack() as stack_proc:
+            for process in mocked_execute_process():
+                stack_proc.enter_context(process)
+            resp = self.app.get(url)
         assert resp.status_code == 200
         assert resp.content_type in CONTENT_TYPE_ANY_XML
         status = "<wps:ProcessSucceeded>PyWPS Process {} finished</wps:ProcessSucceeded>".format(HelloWPS.title)

@@ -49,7 +49,7 @@ def request_quote(request):
     process_id = request.matchdict.get("process_id")
     process_store = get_db(request).get_store("processes")
     try:
-        process = process_store.fetch_by_id(process_id, request=request)
+        process = process_store.fetch_by_id(process_id)
     except ProcessNotFound:
         raise HTTPNotFound("Could not find process with specified 'process_id'.")
 

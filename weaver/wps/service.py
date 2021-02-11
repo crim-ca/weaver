@@ -18,12 +18,11 @@ from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes.convert import wps2json_job_payload
 from weaver.processes.execution import submit_job_handler
 from weaver.processes.types import PROCESS_WORKFLOW
-from weaver.processes.utils import get_process
+from weaver.processes.utils import get_job_submission_response, get_process
 from weaver.store.base import StoreProcesses
 from weaver.utils import get_header, get_settings, get_weaver_url
 from weaver.wps.utils import check_wps_status, load_pywps_config
-from weaver.wps_restapi.processes.processes import get_job_submission_response
-from weaver.wps_restapi.swagger_definitions import BadRequestGetProcessInfoResponse, process_uri, processes_uri
+from weaver.wps_restapi import swagger_definitions as sd
 from weaver.visibility import VISIBILITY_PUBLIC
 
 LOGGER = logging.getLogger(__name__)
@@ -61,7 +60,7 @@ class WorkerService(Service):
         accept_type = get_header("Accept", req.headers)
         if accept_type == CONTENT_TYPE_APP_JSON:
             url = get_weaver_url(self.settings)
-            resp = HTTPSeeOther(location="{}{}".format(url, processes_uri))  # redirect
+            resp = HTTPSeeOther(location="{}{}".format(url, sd.processes_uri))  # redirect
             setattr(resp, "_update_status", lambda *_, **__: None)  # patch to avoid pywps server raising
             return resp
         return super(WorkerService, self).get_capabilities(wps_request, *_, **__)
@@ -77,10 +76,10 @@ class WorkerService(Service):
             url = get_weaver_url(self.settings)
             proc = wps_request.identifiers
             if not proc:
-                raise HTTPBadRequest(BadRequestGetProcessInfoResponse.description)
+                raise HTTPBadRequest(sd.BadRequestGetProcessInfoResponse.description)
             if len(proc) > 1:
                 raise HTTPBadRequest("Unsupported multi-process ID for description. Only provide one.")
-            path = process_uri.format(process_id=proc[0])
+            path = sd.process_uri.format(process_id=proc[0])
             resp = HTTPSeeOther(location="{}{}".format(url, path))  # redirect
             setattr(resp, "_update_status", lambda *_, **__: None)  # patch to avoid pywps server raising
             return resp
@@ -94,6 +93,7 @@ class WorkerService(Service):
         Overrides the original execute operation, that instead will get handled by :meth:`execute_job` following
         callback from Celery Worker that will handle process job creation and monitoring.
         """
+
         req = wps_request.http_request
         pid = wps_request.identifier
         proc = get_process(process_id=pid, settings=self.settings)  # raises if invalid or missing
@@ -180,7 +180,7 @@ def get_pywps_service(environ=None, is_worker=False):
         # call pywps application with processes filtered according to the adapter's definition
         process_store = get_db(app).get_store(StoreProcesses)
         processes_wps = [process.wps() for process in
-                         process_store.list_processes(visibility=VISIBILITY_PUBLIC, request=get_current_request())]
+                         process_store.list_processes(visibility=VISIBILITY_PUBLIC)]
         service = WorkerService(processes_wps, is_worker=is_worker, settings=settings)
     except Exception as ex:
         LOGGER.exception("Error occurred during PyWPS Service and/or Processes setup.")

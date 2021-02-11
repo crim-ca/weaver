@@ -37,7 +37,7 @@ class WpsPackageConfigBase(unittest.TestCase):
         config = setup_config_with_pywps(config)
         config = setup_config_with_celery(config)
         config = get_test_weaver_config(config)
-        setup_mongodb_processstore(config)  # force reset
+        cls.process_store = setup_mongodb_processstore(config)  # force reset
         cls.job_store = setup_mongodb_jobstore(config)
         cls.app = get_test_weaver_app(config=config, settings=cls.settings)
 
@@ -49,11 +49,12 @@ class WpsPackageConfigBase(unittest.TestCase):
         :returns: resulting tuple of ``(process-description, package)`` JSON responses.
         """
         resp = mocked_sub_requests(cls.app, "post_json", "/processes", data=payload, headers=cls.json_headers)
-        assert resp.status_code == 200  # TODO: status should be 201 when properly modified to match API conformance
+        # TODO: status should be 201 when properly modified to match API conformance
+        assert resp.status_code == 200, "Expected successful deployment.\nError:\n{}".format(resp.text)
         path = resp.json["processSummary"]["processDescriptionURL"]
         body = {"value": VISIBILITY_PUBLIC}
         resp = cls.app.put_json("{}/visibility".format(path), params=body, headers=cls.json_headers)
-        assert resp.status_code == 200
+        assert resp.status_code == 200, "Expected successful visibility.\nError:\n{}".format(resp.text)
         info = []
         for pkg_url in [path, "{}/package".format(path)]:
             resp = cls.app.get(pkg_url, headers=cls.json_headers)
@@ -76,7 +77,7 @@ class WpsPackageConfigBase(unittest.TestCase):
         while left >= 0 or once:
             resp = self.app.get(status_url, headers=self.json_headers)
             assert resp.status_code == 200
-            assert resp.json["status"] in [STATUS_RUNNING, STATUS_SUCCEEDED]
+            assert resp.json["status"] in [STATUS_RUNNING, STATUS_SUCCEEDED], "Error job info:\n{}".format(resp.json)
             if resp.json["status"] == STATUS_SUCCEEDED:
                 break
             time.sleep(delta)
@@ -84,5 +85,5 @@ class WpsPackageConfigBase(unittest.TestCase):
             left -= delta
         assert resp.json["status"] == STATUS_SUCCEEDED
         resp = self.app.get("{}/result".format(status_url), headers=self.json_headers)
-        assert resp.status_code == 200
+        assert resp.status_code == 200, "Error job info:\n{}".format(resp.json)
         return resp.json

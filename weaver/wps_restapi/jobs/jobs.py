@@ -44,7 +44,7 @@ def get_job(request):
     job_id = request.matchdict.get("job_id")
     store = get_db(request).get_store(StoreJobs)
     try:
-        job = store.fetch_by_id(job_id, request=request)
+        job = store.fetch_by_id(job_id)
     except JobNotFound:
         raise HTTPNotFound("Could not find job with specified 'job_id'.")
 
@@ -81,11 +81,11 @@ def validate_service_process(request):
             # local process
             if not service:
                 store = get_db(request).get_store(StoreProcesses)
-                store.fetch_by_id(process_name, visibility=VISIBILITY_PUBLIC, request=request)
+                store.fetch_by_id(process_name, visibility=VISIBILITY_PUBLIC)
             # remote process
             else:
                 from weaver.wps_restapi.processes.processes import list_remote_processes
-                processes = list_remote_processes(service, request=request)
+                processes = list_remote_processes(service, request)
                 if process_name not in [p.id for p in processes]:
                     raise ProcessNotFound
     except (ServiceNotFound, ProcessNotFound):
@@ -131,7 +131,7 @@ def get_queried_jobs(request):
     groups = request.params.get("groups", "")
     groups = groups.split(",") if groups else None
     store = get_db(request).get_store(StoreJobs)
-    items, total = store.find_jobs(request, group_by=groups, **filters)
+    items, total = store.find_jobs(request=request, group_by=groups, **filters)
     body = {"total": total}
 
     def _job_list(jobs):

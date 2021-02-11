@@ -25,7 +25,6 @@ from weaver.config import WEAVER_CONFIGURATION_DEFAULT, WEAVER_DEFAULT_INI_CONFI
 from weaver.database import get_db
 from weaver.datatype import Service
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_XML
-from weaver.processes.execution import execute_process
 from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
 from weaver.utils import get_path_kvp, get_url_without_query, get_weaver_url, null
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
@@ -121,11 +120,12 @@ def setup_mongodb_processstore(config=None):
     # type: (Optional[Configurator]) -> MongodbProcessStore
     """Setup store using mongodb, will be enforced if not configured properly."""
     config = setup_config_with_mongodb(config)
-    store = get_db(config).get_store(MongodbProcessStore)
+    db = get_db(config)
+    store = db.get_store(MongodbProcessStore)
     store.clear_processes()
     # store must be recreated after clear because processes are added automatically on __init__
-    get_db(config)._stores.pop(MongodbProcessStore.type)  # noqa: W0212
-    store = get_db(config).get_store(MongodbProcessStore)
+    db.reset_store(MongodbProcessStore.type)
+    store = db.get_store(MongodbProcessStore)
     return store
 
 
@@ -295,6 +295,30 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
     from requests.sessions import Session as RealSession
     real_request = RealSession.request
 
+    def _parse_for_app_req(method, url, **req_kwargs):
+        """
+        WebTest application employs ``params`` instead of ``data``/``json``.
+        Actual query parameters must be pre-appended to ``url``.
+        """
+        method = method.lower()
+        url = req_kwargs.pop("base_url", url)
+        body = req_kwargs.pop("data", None)
+        query = req_kwargs.pop("query", None)
+        params = req_kwargs.pop("params", {})
+        if query:
+            url += ("" if query.startswith("?") else "?") + query
+        elif params:
+            if isinstance(params, str):
+                url += ("" if params.startswith("?") else "?") + params
+            else:
+                url = get_path_kvp(url, **params)
+        req_kwargs["params"] = body
+        # remove unsupported parameters that cannot be passed down to TestApp
+        for key in ["timeout", "cert", "auth", "ssl_verify", "verify", "language"]:
+            req_kwargs.pop(key, None)
+        req = getattr(app, method)
+        return url, req, req_kwargs
+
     def mocked_app_request(method, url=None, **req_kwargs):
         """
         Request corresponding to :func:`requests.request` that instead gets executed by :class:`webTest.TestApp`,
@@ -307,18 +331,9 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
             with RealSession() as session:
                 return real_request(session, method, url, **req_kwargs)
 
-        method = method.lower()
-        headers = req_kwargs.get("headers")
-        req = getattr(app, method)
-        url = req_kwargs.get("base_url", url)
-        query = req_kwargs.get("query")
-        params = req_kwargs.get("params", {})
-        if query:
-            url += ("" if query.startswith("?") else "?") + query
-        elif params:
-            url = get_path_kvp(url, **params)
+        url, func, req_kwargs = _parse_for_app_req(method, url, **req_kwargs)
         if not url.startswith("mock://"):
-            resp = req(url, params=req_kwargs.get("data"), headers=headers, expect_errors=True)
+            resp = func(url, expect_errors=True, **req_kwargs)
             setattr(resp, "content", resp.body)
         else:
             path = get_url_without_query(url.replace("mock://", ""))
@@ -329,9 +344,9 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
         stack.enter_context(mock.patch("requests.request", side_effect=mocked_app_request))
         stack.enter_context(mock.patch("requests.Session.request", side_effect=mocked_app_request))
         stack.enter_context(mock.patch("requests.sessions.Session.request", side_effect=mocked_app_request))
-        request_func = getattr(app, function)
+        req_url, req_func, kwargs = _parse_for_app_req(function, *args, **kwargs)
         kwargs.setdefault("expect_errors", True)
-        return request_func(*args, **kwargs)
+        return req_func(req_url, **kwargs)
 
 
 def mocked_execute_process():
@@ -348,6 +363,8 @@ def mocked_execute_process():
         - :func:`mocked_process_job_runner` to completely skip process execution.
         - :func:`setup_config_with_celery`
     """
+    from weaver.processes.execution import execute_process as real_execute_process
+
     class MockTask(object):
         """
         Mocks call ``self.request.id`` in :func:`weaver.wps_restapi.processes.processes.execute_process` and
@@ -362,7 +379,7 @@ def mocked_execute_process():
     task = MockTask()
 
     def mock_execute_process(job_id, url, headers):
-        execute_process(job_id, url, headers)
+        real_execute_process(job_id, url, headers)
         return task
 
     return (

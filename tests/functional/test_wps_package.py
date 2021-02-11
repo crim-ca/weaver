@@ -10,7 +10,6 @@ Local test web application is employed to run operations by mocking external req
 import contextlib
 import logging
 import os
-import time
 
 import colander
 import pytest
