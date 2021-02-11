@@ -23,11 +23,11 @@ from weaver.processes.execution import submit_job
 from weaver.processes.types import PROCESS_BUILTIN
 from weaver.processes.utils import deploy_process_from_payload, get_job_submission_response, get_process
 from weaver.store.base import StoreProcesses, StoreServices
-from weaver.utils import get_any_id, get_cookie_headers, get_settings, request_extra
+from weaver.utils import get_any_id, get_cookie_headers, get_settings, parse_request_query, request_extra
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps.utils import set_wps_language
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, parse_request_query
+from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
 
 if TYPE_CHECKING:
     from weaver.typedefs import JSON
@@ -290,8 +290,6 @@ def submit_local_job(request):
     """
     Execute a local process.
     """
-    process_id = request.matchdict.get("process_id")
-    store = get_db(request).get_store(StoreProcesses)
-    process = store.fetch_by_id(process_id, visibility=VISIBILITY_PUBLIC)
+    process = get_process(request=request)
     body = submit_job(request, process, tags=["wps-rest"])
     return get_job_submission_response(body)
