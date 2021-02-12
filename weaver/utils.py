@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import ParseResult, parse_qs, urlparse, urlunsplit
 
 import boto3
+import colander
 import pytz
 import requests
 from celery.app import Celery
@@ -29,7 +30,6 @@ from requests_file import FileAdapter
 from urlmatch import urlmatch
 from webob.headers import EnvironHeaders, ResponseHeaders
 
-from weaver.exceptions import InvalidIdentifierValue
 from weaver.status import map_status
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 
@@ -197,11 +197,24 @@ def get_url_without_query(url):
 
 
 def is_valid_url(url):
-    # type: (Union[str, None]) -> bool
+    # type: (Optional[str]) -> bool
     try:
         return bool(urlparse(url).scheme)
     except Exception:  # noqa: W0703 # nosec: B110
         return False
+
+
+UUID_PATTERN = re.compile(colander.UUID_REGEX, re.IGNORECASE)
+
+
+def is_uuid(maybe_uuid):
+    # type: (Any) -> bool
+    """
+    Evaluates if the provided input is a UUID-like string.
+    """
+    if not isinstance(maybe_uuid, str):
+        return False
+    return re.match(UUID_PATTERN, str(maybe_uuid)) is not None
 
 
 def parse_extra_options(option_str):
@@ -474,6 +487,7 @@ def setup_logger(logger, settings):
         formatter = logging.Formatter(get_log_fmt())
         handler.setFormatter(formatter)
         logger.addHandler(handler)
+
 
 def make_dirs(path, mode=0o755, exist_ok=False):
     """
@@ -897,8 +911,10 @@ def assert_sane_name(name, min_len=3, max_len=None):
     .. seealso::
         - argument details in :func:`get_sane_name`
     """
-    if name is None:
-        raise InvalidIdentifierValue("Invalid name : {0}".format(name))
+    from weaver.exceptions import InvalidIdentifierValue, MissingIdentifierValue
+
+    if name is None or len(name) == 0:
+        raise MissingIdentifierValue("Invalid name : {0}".format(name))
     name = name.strip()
     if "--" in name \
        or name.startswith("-") \

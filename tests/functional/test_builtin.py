@@ -2,29 +2,21 @@ import contextlib
 import json
 import os
 import tempfile
-from time import sleep
 
-import mock
-import pyramid.testing
 import pytest
 
 from tests.functional.utils import WpsPackageConfigBase
 from tests.utils import get_settings_from_testapp, mocked_execute_process, mocked_sub_requests
-from weaver.database import get_db
 from weaver.execute import EXECUTE_TRANSMISSION_MODE_REFERENCE
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF
 from weaver.processes.builtin import register_builtin_processes
-from weaver.status import JOB_STATUS_CATEGORIES, STATUS_CATEGORY_RUNNING, STATUS_SUCCEEDED
 
 
 @pytest.mark.functional
 class BuiltinAppTest(WpsPackageConfigBase):
     @classmethod
     def setUpClass(cls):
-        cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
-
-    def setUp(self):
-        self.settings = {
+        cls.settings = {
             "weaver.wps": True,
             "weaver.wps_output": True,
             "weaver.wps_output_path": "/wpsoutputs",
@@ -32,14 +24,13 @@ class BuiltinAppTest(WpsPackageConfigBase):
             "weaver.wps_path": "/ows/wps",
             "weaver.wps_restapi_path": "/",
         }
-        super(BuiltinAppTest, self).setUpClass()
-        db = get_db(self.settings)
-        with mock.patch("weaver.processes.builtin.get_db", return_value=db):
-            db.reset_store("processes")  # ensure reset of process store to register builtin processes from scratch
-            register_builtin_processes(self.settings)
+        cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
+        super(BuiltinAppTest, cls).setUpClass()
 
-    def tearDown(self):
-        pyramid.testing.tearDown()
+    def setUp(self):
+        # register builtin processes from scratch to have clean state
+        self.process_store.clear_processes()
+        register_builtin_processes(self.settings)
 
     def test_jsonarray2netcdf_describe(self):
         resp = self.app.get("/processes/jsonarray2netcdf", headers=self.json_headers)
@@ -64,11 +55,11 @@ class BuiltinAppTest(WpsPackageConfigBase):
     def test_jsonarray2netcdf_execute(self):
         dirname = tempfile.gettempdir()
         nc_data = "Hello NetCDF!"
-        with contextlib.ExitStack() as stack_files:
+        with contextlib.ExitStack() as stack_exec:
             tmp_ncdf = tempfile.NamedTemporaryFile(dir=dirname, mode="w", suffix=".nc")
             tmp_json = tempfile.NamedTemporaryFile(dir=dirname, mode="w", suffix=".json")
-            tmp_ncdf = stack_files.enter_context(tmp_ncdf)  # noqa
-            tmp_json = stack_files.enter_context(tmp_json)  # noqa
+            tmp_ncdf = stack_exec.enter_context(tmp_ncdf)  # noqa
+            tmp_json = stack_exec.enter_context(tmp_json)  # noqa
             tmp_ncdf.write(nc_data)
             tmp_ncdf.seek(0)
             tmp_json.write(json.dumps(["file://{}".format(os.path.join(dirname, tmp_ncdf.name))]))
@@ -79,35 +70,24 @@ class BuiltinAppTest(WpsPackageConfigBase):
                 "inputs": [{"id": "input", "href": os.path.join(dirname, tmp_json.name)}],
                 "outputs": [{"id": "output", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE}],
             }
-            with contextlib.ExitStack() as stack_proc:
-                for process in mocked_execute_process():
-                    stack_proc.enter_context(process)
-                path = "/processes/jsonarray2netcdf/jobs"
-                resp = mocked_sub_requests(self.app, "post_json", path, data=data, headers=self.json_headers)
 
-            assert resp.status_code == 201
-            assert resp.content_type in CONTENT_TYPE_APP_JSON
-            job_url = resp.json["location"]
-            nc_path = None
-            for delay in range(5):
-                sleep(delay)
-                resp = self.app.get(job_url, headers=self.json_headers)
-                if resp.status_code == 200:
-                    if resp.json["status"] in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_RUNNING]:
-                        continue
-                    assert resp.json["status"] == STATUS_SUCCEEDED, \
-                        "Process execution failed. Response body:\n{}".format(resp.json)
-                    resp = self.app.get("{}/result".format(job_url), headers=self.json_headers)
-                    assert resp.status_code == 200
-                    assert resp.json["outputs"][0]["id"] == "output"
-                    nc_path = resp.json["outputs"][0]["href"]
-                    break
-            assert isinstance(nc_path, str) and len(nc_path)
-            settings = get_settings_from_testapp(self.app)
-            wps_out = "{}{}".format(settings.get("weaver.url"), settings.get("weaver.wps_output_path"))
-            nc_real_path = nc_path.replace(wps_out, settings.get("weaver.wps_output_dir"))
-            assert nc_path.startswith(wps_out)
-            assert os.path.split(nc_real_path)[-1] == os.path.split(nc_path)[-1]
-            assert os.path.isfile(nc_real_path)
-            with open(nc_real_path, "r") as f:
-                assert f.read() == nc_data
+            for mock_exec in mocked_execute_process():
+                stack_exec.enter_context(mock_exec)
+            path = "/processes/jsonarray2netcdf/jobs"
+            resp = mocked_sub_requests(self.app, "post_json", path, data=data, headers=self.json_headers)
+
+        assert resp.status_code == 201, "Error: {}".format(resp.json)
+        assert resp.content_type in CONTENT_TYPE_APP_JSON
+        job_url = resp.json["location"]
+        results = self.monitor_job(job_url)
+        assert results["outputs"][0]["id"] == "output"
+        nc_path = results["outputs"][0]["href"]
+        assert isinstance(nc_path, str) and len(nc_path)
+        settings = get_settings_from_testapp(self.app)
+        wps_out = "{}{}".format(settings.get("weaver.url"), settings.get("weaver.wps_output_path"))
+        nc_real_path = nc_path.replace(wps_out, settings.get("weaver.wps_output_dir"))
+        assert nc_path.startswith(wps_out)
+        assert os.path.split(nc_real_path)[-1] == os.path.split(nc_path)[-1]
+        assert os.path.isfile(nc_real_path)
+        with open(nc_real_path, "r") as f:
+            assert f.read() == nc_data

@@ -11,7 +11,7 @@ from pyramid.httpexceptions import HTTPNotFound
 from pywps import configuration as pywps_config
 
 from weaver.config import get_weaver_configuration
-from weaver.utils import get_settings, get_url_without_query, get_weaver_url, make_dirs, request_extra
+from weaver.utils import get_settings, get_url_without_query, get_weaver_url, is_uuid, make_dirs, request_extra
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
@@ -97,7 +97,7 @@ def get_wps_output_url(container):
 
 def get_wps_local_status_location(url_status_location, container, must_exist=True):
     # type: (str, AnySettingsContainer, bool) -> Optional[str]
-    """Attempts to retrieve the local file path corresponding to the WPS status location as URL.
+    """Attempts to retrieve the local XML file path corresponding to the WPS status location as URL.
 
     :param url_status_location: URL reference pointing to some WPS status location XML.
     :param container: any settings container to map configured local paths.
@@ -111,7 +111,15 @@ def get_wps_local_status_location(url_status_location, container, must_exist=Tru
         out_path = os.path.join(dir_path, req_out_url.replace(wps_out_url, "").lstrip("/"))
     else:
         out_path = url_status_location.replace("file://", "")
-    if must_exist and not os.path.isfile(out_path):
+    found = os.path.isfile(out_path)
+    if not found and "/jobs/" in url_status_location:
+        job_uuid = url_status_location.rsplit("/jobs/", 1)[-1].split("/", 1)[0]
+        if is_uuid(job_uuid):
+            out_path_join = os.path.join(dir_path, "{}.xml".format(job_uuid))
+            found = os.path.isfile(out_path_join)
+            if found or not must_exist:
+                out_path = out_path_join
+    if not found and must_exist:
         out_path_join = os.path.join(dir_path, out_path[1:] if out_path.startswith("/") else out_path)
         if not os.path.isfile(out_path_join):
             LOGGER.debug("Could not map WPS status reference [%s] to input local file path [%s].",

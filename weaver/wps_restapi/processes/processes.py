@@ -18,6 +18,7 @@ from weaver.config import WEAVER_CONFIGURATION_EMS, get_weaver_configuration
 from weaver.database import get_db
 from weaver.datatype import Process, Service
 from weaver.exceptions import ProcessNotFound, log_unhandled_exceptions
+from weaver.formats import OUTPUT_FORMAT_JSON
 from weaver.processes import opensearch
 from weaver.processes.execution import submit_job
 from weaver.processes.types import PROCESS_BUILTIN
@@ -27,7 +28,6 @@ from weaver.utils import get_any_id, get_cookie_headers, get_settings, parse_req
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps.utils import set_wps_language
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
 
 if TYPE_CHECKING:
     from weaver.typedefs import JSON

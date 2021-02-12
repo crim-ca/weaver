@@ -1,24 +1,12 @@
 import logging
 from typing import TYPE_CHECKING
 
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
 from weaver.utils import get_settings, get_weaver_url
 
 if TYPE_CHECKING:
     from weaver.typedefs import AnySettingsContainer
 
 LOGGER = logging.getLogger(__name__)
-
-WPS_VERSION_100 = "1.0.0"
-WPS_VERSION_200 = "2.0.0"
-OUTPUT_FORMAT_JSON = "json"
-OUTPUT_FORMAT_XML = "xml"
-OUTPUT_FORMATS = {
-    WPS_VERSION_100: OUTPUT_FORMAT_XML,
-    WPS_VERSION_200: OUTPUT_FORMAT_JSON,
-    CONTENT_TYPE_APP_XML: OUTPUT_FORMAT_XML,
-    CONTENT_TYPE_APP_JSON: OUTPUT_FORMAT_JSON,
-}
 
 
 def wps_restapi_base_path(container):

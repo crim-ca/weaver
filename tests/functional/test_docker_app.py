@@ -9,9 +9,9 @@ from owslib.wps import ComplexDataInput, WPSExecution
 from tests.functional.utils import WpsPackageConfigBase
 from tests.utils import mocked_execute_process, mocked_sub_requests
 from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_REFERENCE
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
+from weaver.formats import CONTENT_TYPE_ANY_XML, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
 from weaver.processes.wps_package import CWL_REQUIREMENT_APP_DOCKER
-from weaver.utils import get_any_value
+from weaver.utils import get_any_value, str2bytes
 from weaver.wps.utils import get_wps_url
 
 
@@ -105,11 +105,11 @@ class WpsPackageDockerAppTest(WpsPackageConfigBase):
         """
 
         test_content = "Test file in Docker - WPS-REST job endpoint"
-        with contextlib.ExitStack() as stack_proc:
+        with contextlib.ExitStack() as stack_exec:
             # setup
             dir_name = tempfile.gettempdir()
             tmp_path = tempfile.NamedTemporaryFile(dir=dir_name, mode="w", suffix=".txt")
-            tmp_file = stack_proc.enter_context(tmp_path)  # noqa
+            tmp_file = stack_exec.enter_context(tmp_path)  # noqa
             tmp_file.write(test_content)
             tmp_file.seek(0)
             exec_body = {
@@ -122,8 +122,8 @@ class WpsPackageDockerAppTest(WpsPackageConfigBase):
                     {"id": self.out_key, "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE},
                 ]
             }
-            for process in mocked_execute_process():
-                stack_proc.enter_context(process)
+            for mock_exec in mocked_execute_process():
+                stack_exec.enter_context(mock_exec)
 
             # execute
             proc_url = "/processes/{}/jobs".format(self.process_id)
@@ -150,15 +150,15 @@ class WpsPackageDockerAppTest(WpsPackageConfigBase):
             raise ValueError("Invalid WPS version: {}".format(version))
         test_content += " {} request - Accept {}".format(wps_method, accept.split("/")[-1].upper())
 
-        with contextlib.ExitStack() as stack_proc:
+        with contextlib.ExitStack() as stack_exec:
             # setup
             dir_name = tempfile.gettempdir()
             tmp_path = tempfile.NamedTemporaryFile(dir=dir_name, mode="w", suffix=".txt")
-            tmp_file = stack_proc.enter_context(tmp_path)  # noqa
+            tmp_file = stack_exec.enter_context(tmp_path)  # noqa
             tmp_file.write(test_content)
             tmp_file.seek(0)
-            for process in mocked_execute_process():
-                stack_proc.enter_context(process)
+            for mock_exec in mocked_execute_process():
+                stack_exec.enter_context(mock_exec)
 
             # execute
             if version == "1.0.0":
@@ -187,14 +187,16 @@ class WpsPackageDockerAppTest(WpsPackageConfigBase):
 
             # parse response status
             if accept == CONTENT_TYPE_APP_XML:
-                assert resp.content_type == CONTENT_TYPE_APP_XML, test_content
-                xml = lxml.etree.fromstring(resp.text)
+                assert resp.content_type in CONTENT_TYPE_ANY_XML, test_content
+                xml = lxml.etree.fromstring(str2bytes(resp.text))
                 status_url = xml.get("statusLocation")
                 job_id = status_url.split("/")[-1]
             elif accept == CONTENT_TYPE_APP_JSON:
                 assert resp.content_type == CONTENT_TYPE_APP_JSON, test_content
                 status_url = resp.json["location"]
                 job_id = resp.json["jobID"]
+            assert status_url
+            assert job_id
 
             # job monitoring
             result = self.monitor_job(status_url)

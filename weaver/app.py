@@ -18,16 +18,6 @@ from weaver.utils import get_settings, parse_extra_options, setup_logger
 LOGGER = logging.getLogger(__name__)
 
 
-def includeme(config):
-    LOGGER.info("Adding Web Application")
-    config.include("weaver.config")
-    config.include("weaver.database")
-    config.include("weaver.processes")
-    config.include("weaver.wps")
-    config.include("weaver.wps_restapi")
-    config.include("weaver.tweens")
-
-
 def main(global_config, **settings):
     """
     Creates a Pyramid WSGI application for Weaver.

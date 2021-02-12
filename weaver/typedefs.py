@@ -40,9 +40,12 @@ if TYPE_CHECKING:
     AnyValue = Optional[ValueType]
     AnyValueType = AnyValue  # alias
     AnyKey = Union[str, int]
-    JsonList = List["JSON"]
-    JsonObject = Dict[str, "JSON"]
-    JSON = Union[AnyValue, JsonObject, JsonList]
+    # add more levels of explicit definitions than necessary to simulate JSON recursive structure better than 'Any'
+    # amount of repeated equivalent definition makes typing analysis 'work well enough' for most use cases
+    _JsonObjectItem = Dict[str, Union["JSON", "_JsonListItem"]]
+    _JsonListItem = List[Union[AnyValue, _JsonObjectItem, "_JsonListItem", "JSON"]]
+    _JsonItem = Union[AnyValue, _JsonObjectItem, _JsonListItem]
+    JSON = Union[Dict[str, _JsonItem], List[_JsonItem]]
     CWL = TypedDict("CWL", {"cwlVersion": str, "class": str, "inputs": JSON, "outputs": JSON,
                             "requirements": JSON, "hints": JSON})
     KVPType = Union[ValueType, Sequence[ValueType]]
@@ -50,7 +53,7 @@ if TYPE_CHECKING:
     XML = lxml.etree._Element  # noqa
 
     AnyContainer = Union[Configurator, Registry, PyramidRequest, Celery]
-    SettingValue = Optional[JSON]
+    SettingValue = Optional[Union[JSON, AnyValue]]
     SettingsType = Dict[str, SettingValue]
     AnySettingsContainer = Union[AnyContainer, SettingsType]
     AnyRegistryContainer = AnyContainer

@@ -10,7 +10,6 @@ from weaver.wps.service import get_pywps_service
 LOGGER = logging.getLogger(__name__)
 
 
-# @app.task(bind=True)
 @wsgiapp2
 def pywps_view(environ, start_response):
     """

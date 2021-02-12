@@ -30,6 +30,7 @@ from weaver.database import get_db
 from weaver.datatype import Process, Service
 from weaver.exceptions import (
     InvalidIdentifierValue,
+    MissingIdentifierValue,
     PackageNotFound,
     PackageRegistrationError,
     PackageTypeError,
@@ -68,14 +69,12 @@ def get_process(process_id=None, request=None, settings=None, store=None):
     """
     if process_id is None and request is not None:
         process_id = request.matchdict.get("process_id")
-    if not isinstance(process_id, str):
-        raise HTTPUnprocessableEntity("Invalid value for process identifier..")
     if store is None:
         store = get_db(settings or request).get_store(StoreProcesses)
     try:
         process = store.fetch_by_id(process_id, visibility=VISIBILITY_PUBLIC)
         return process
-    except InvalidIdentifierValue as ex:
+    except (InvalidIdentifierValue, MissingIdentifierValue) as ex:
         raise HTTPBadRequest(str(ex))
     except ProcessNotAccessible:
         raise HTTPForbidden("Process with ID '{!s}' is not accessible.".format(process_id))

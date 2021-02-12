@@ -1,8 +1,11 @@
 """
-Errors raised during the weaver flow.
+Errors raised during the Weaver flow.
+
+Some of these error inherit from :class:`weaver.owsexceptions.OWSException` and its other derived classes to allow
+:mod:`pywps` to automatically understand and render those exception if raised by an underlying :mod:`weaver` operation.
 """
+import functools
 import logging
-from functools import wraps
 from typing import TYPE_CHECKING
 
 from pyramid.httpexceptions import HTTPException, HTTPInternalServerError
@@ -11,8 +14,15 @@ from pyramid.testing import DummyRequest
 from requests import Request as RequestsRequest
 from werkzeug.wrappers import Request as WerkzeugRequest
 
-LOGGER = logging.getLogger(__name__)
+from weaver.owsexceptions import (
+    OWSAccessForbidden,
+    OWSException,
+    OWSInvalidParameterValue,
+    OWSMissingParameterValue,
+    OWSNotFound
+)
 
+LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing import Any, Callable, Type
 
@@ -21,25 +31,35 @@ class WeaverException(Exception):
     """Base class of exceptions defined by :mod:`weaver` package."""
 
 
-class InvalidIdentifierValue(WeaverException, ValueError):
+class InvalidIdentifierValue(WeaverException, ValueError, OWSInvalidParameterValue):
     """
-    Error indicating that an id to be employed for following operations
+    Error indicating that an ID to be employed for following operations
     is not considered as valid to allow further processed or usage.
     """
+    locator = "identifier"
 
 
-class ServiceException(WeaverException):
+class MissingIdentifierValue(WeaverException, ValueError, OWSMissingParameterValue):
+    """
+    Error indicating that an ID to be employed for following operations
+    was missing and cannot continue further processing or usage.
+    """
+    locator = "identifier"
+
+
+class ServiceException(WeaverException, OWSException):
     """Base exception related to a :class:`weaver.datatype.Service`."""
+    locator = "service"
 
 
-class ServiceNotAccessible(ServiceException):
+class ServiceNotAccessible(ServiceException, OWSAccessForbidden):
     """
     Error indicating that a WPS service exists but is not visible to retrieve
     from the storage backend of an instance of :class:`weaver.store.ServiceStore`.
     """
 
 
-class ServiceNotFound(ServiceException):
+class ServiceNotFound(ServiceException, OWSNotFound):
     """
     Error indicating that an OWS service could not be read from the
     storage backend by an instance of :class:`weaver.store.ServiceStore`.
@@ -53,18 +73,19 @@ class ServiceRegistrationError(ServiceException):
     """
 
 
-class ProcessException(WeaverException):
+class ProcessException(WeaverException, OWSException):
     """Base exception related to a :class:`weaver.datatype.Process`."""
+    locator = "process"
 
 
-class ProcessNotAccessible(ProcessException):
+class ProcessNotAccessible(ProcessException, OWSAccessForbidden):
     """
     Error indicating that a local WPS process exists but is not visible to retrieve
     from the storage backend of an instance of :class:`weaver.store.ProcessStore`.
     """
 
 
-class ProcessNotFound(ProcessException):
+class ProcessNotFound(ProcessException, OWSNotFound):
     """
     Error indicating that a local WPS process could not be read from the
     storage backend by an instance of :class:`weaver.store.ProcessStore`.
@@ -199,6 +220,32 @@ class BillInstanceError(BillException):
     """
 
 
+def handle_known_exceptions(function):
+    # type: (Callable[[Any, Any], Any]) -> Callable
+    """
+    Decorator that catches lower-level raised exception that are known to :mod:`weaver` but not by :mod:`pywps`.
+
+    .. seealso::
+        :class:`weaver.wps.service.WorkerService`
+
+        Without prior handling of known internal exception, :mod:`pywps` generates by default ``500`` internal server
+        error response since it doesn't know how to interpret more specific exceptions defined in :mod:`weaver`.
+
+    The decorator simply returns the known exception such that :func:`weaver.tweens.ows_response_tween` can later
+    handle it appropriately.
+    """
+
+    @functools.wraps(function)
+    def wrapped(*_, **__):
+        try:
+            return function(*_, **__)
+        except (WeaverException, OWSException, HTTPException) as exc:
+            return exc  # return to avoid raising, raise would be caught by parent pywps call wrapping 'function'
+        # any other unknown exception by weaver will be raised here as normal, and pywps should repackage them as 500
+
+    return wrapped
+
+
 def log_unhandled_exceptions(logger=LOGGER, message="Unhandled exception occurred.", exception=Exception,
                              force=False, require_http=True, is_request=True):
     # type: (logging.Logger, str, Type[Exception], bool, bool, bool) -> Callable
@@ -217,8 +264,6 @@ def log_unhandled_exceptions(logger=LOGGER, message="Unhandled exception occurre
     :raises exception: if an *unknown* exception was caught (or forced) during the decorated function's execution.
     :raises Exception: original exception if it is *known*.
     """
-    from weaver.owsexceptions import OWSException   # avoid circular import error
-
     known_exceptions = [WeaverException]
     known_http_exceptions = [HTTPException, OWSException]
     if require_http:
@@ -229,7 +274,7 @@ def log_unhandled_exceptions(logger=LOGGER, message="Unhandled exception occurre
 
     def wrap(function):
         # type: (Callable[[Any, Any], Any]) -> Callable
-        @wraps(function)
+        @functools.wraps(function)
         def call(*args, **kwargs):
             try:
                 # handle input arguments that are extended by various pyramid operations

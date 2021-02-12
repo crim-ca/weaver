@@ -1066,7 +1066,7 @@ def wps2json_job_payload(wps_request, wps_process):
     """
     data = {
         "inputs": [],
-        "outputs": list(wps_request.outputs.values()),
+        "outputs": [],
         "response": EXECUTE_RESPONSE_DOCUMENT,
         "mode": EXECUTE_MODE_ASYNC,
     }
@@ -1080,19 +1080,20 @@ def wps2json_job_payload(wps_request, wps_process):
                 data["inputs"].append({"id": iid, "data": input_data})
             elif input_href:
                 data["inputs"].append({"id": iid, "href": input_href})
-    output_ids = [get_any_id(output) for output in data["outputs"]]
+    output_ids = list(wps_request.outputs)
     for output in wps_process.outputs:
         oid = output.identifier
+        as_ref = isinstance(output, ComplexOutput)
         if oid not in output_ids:
-            data_output = {"identifier": oid}
-            data["outputs"].append(data_output)
+            data_output = {"identifier": oid, "asReference": str(as_ref).lower()}
         else:
-            data_output = next(filter(lambda o: get_any_id(o) == oid, data["outputs"]))
-        if isinstance(output, ComplexOutput):
+            data_output = wps_request.outputs[oid]
+        if as_ref:
             data_output["transmissionMode"] = EXECUTE_TRANSMISSION_MODE_REFERENCE
         else:
             data_output["transmissionMode"] = EXECUTE_TRANSMISSION_MODE_VALUE
         data_output["id"] = oid
+        data["outputs"].append(data_output)
     return data
 
 

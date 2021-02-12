@@ -10,13 +10,13 @@ from weaver.config import WEAVER_CONFIGURATION_ADES, WEAVER_CONFIGURATION_EMS, g
 from weaver.database import get_db
 from weaver.datatype import Bill, Quote
 from weaver.exceptions import ProcessNotFound, QuoteNotFound, log_unhandled_exceptions
+from weaver.formats import OUTPUT_FORMAT_JSON
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from weaver.processes.wps_package import get_package_workflow_steps, get_process_location
 from weaver.store.base import StoreBills, StoreQuotes
 from weaver.utils import get_settings, get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.processes import submit_local_job
-from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
 
 LOGGER = logging.getLogger(__name__)
 

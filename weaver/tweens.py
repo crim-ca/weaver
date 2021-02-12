@@ -20,13 +20,15 @@ def ows_response_tween(request, handler):
             if isinstance(result, Exception) and not isinstance(result, (HTTPSuccessful, HTTPRedirection)):
                 raise result    # let the previous tween handler handle this case
         return result
+    # NOTE:
+    #   Handle exceptions from most explicit definitions to least explicit.
+    #   Exceptions in 'weaver.exceptions' sometimes derive from 'OWSException' to provide additional details.
     except HTTPException as err:
         LOGGER.debug("http exception -> ows exception response.")
         # Use the same json formatter than OWSException
         raised_error = err
         raised_error._json_formatter = OWSException.json_formatter
         return_error = raised_error
-
         exc_info_err = False
         exc_log_lvl = logging.WARNING if err.status_code < 500 else logging.ERROR
     except OWSException as err:

@@ -22,13 +22,13 @@ from pyramid.settings import asbool
 from simplejson import JSONDecodeError
 
 from weaver.__meta__ import __version__ as weaver_version
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN
+from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN, OUTPUT_FORMAT_JSON
 from weaver.owsexceptions import OWSException
 from weaver.utils import get_header, get_settings, get_weaver_url
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.colander_extras import CustomTypeConversionDispatcher
-from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, get_wps_restapi_base_url, wps_restapi_base_path
+from weaver.wps_restapi.utils import get_wps_restapi_base_url, wps_restapi_base_path
 
 if TYPE_CHECKING:
     from typing import Optional

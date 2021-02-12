@@ -1399,9 +1399,9 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
                 {"id": "output_from_s3", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE},
             ]
         }
-        with contextlib.ExitStack() as stack_proc:
-            for process in mocked_execute_process():
-                stack_proc.enter_context(process)
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_process():
+                stack_exec.enter_context(mock_exec)
             proc_url = "/processes/{}/jobs".format(self._testMethodName)
             resp = mocked_sub_requests(self.app, "post_json", proc_url,
                                        data=exec_body, headers=self.json_headers, only_local=True)

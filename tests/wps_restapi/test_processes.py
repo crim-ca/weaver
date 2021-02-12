@@ -594,9 +594,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         execute_data = self.get_process_execute_template(fully_qualified_name(self))
         execute_data["outputs"][0]["transmissionMode"] = EXECUTE_TRANSMISSION_MODE_VALUE
         uri = "/processes/{}/jobs".format(self.process_public.identifier)
-        with contextlib.ExitStack() as stack_proc:
-            for process in mocked_execute_process():
-                stack_proc.enter_context(process)
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_process():
+                stack_exec.enter_context(mock_exec)
             resp = self.app.post_json(uri, params=execute_data, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 501
         assert resp.content_type == CONTENT_TYPE_APP_JSON

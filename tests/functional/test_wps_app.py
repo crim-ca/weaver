@@ -23,7 +23,7 @@ from tests.utils import (
     setup_config_with_pywps,
     setup_mongodb_processstore
 )
-from weaver.formats import CONTENT_TYPE_ANY_XML
+from weaver.formats import CONTENT_TYPE_ANY_XML, CONTENT_TYPE_APP_XML
 from weaver.processes.wps_default import HelloWPS
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.utils import str2bytes
@@ -120,32 +120,35 @@ class WpsAppTest(unittest.TestCase):
         template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=name=tux"
         params = template.format(HelloWPS.identifier)
         url = self.make_url(params)
-        with contextlib.ExitStack() as stack_proc:
-            for process in mocked_execute_process():
-                stack_proc.enter_context(process)
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_process():
+                stack_exec.enter_context(mock_exec)
             resp = self.app.get(url)
-        assert resp.status_code == 200
+        assert resp.status_code == 200  # FIXME: replace by 202 Accepted (?) https://github.com/crim-ca/weaver/issues/14
         assert resp.content_type in CONTENT_TYPE_ANY_XML
-        status = "<wps:ProcessSucceeded>PyWPS Process {} finished</wps:ProcessSucceeded>".format(HelloWPS.title)
-        resp.mustcontain(status)
+        resp.mustcontain("<wps:ExecuteResponse")
+        resp.mustcontain("<wps:ProcessAccepted")
+        resp.mustcontain("PyWPS Process {}".format(HelloWPS.identifier))
 
     def test_execute_with_visibility(self):
         params_template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=test_input=test"
+        headers = {"Accept": CONTENT_TYPE_APP_XML}
         url = self.make_url(params_template.format(self.process_public.identifier))
-        with contextlib.ExitStack() as stack_proc:
-            for process in mocked_execute_process():
-                stack_proc.enter_context(process)
-            resp = self.app.get(url)
-        assert resp.status_code == 200
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_process():
+                stack_exec.enter_context(mock_exec)
+            resp = self.app.get(url, headers=headers)
+        assert resp.status_code == 200  # FIXME: replace by 202 Accepted (?) https://github.com/crim-ca/weaver/issues/14
         assert resp.content_type in CONTENT_TYPE_ANY_XML
-        resp.mustcontain("<wps:ProcessSucceeded>PyWPS Process {} finished</wps:ProcessSucceeded>"
-                         .format(self.process_public.title))
+        resp.mustcontain("<wps:ExecuteResponse")
+        resp.mustcontain("<wps:ProcessAccepted")
+        resp.mustcontain("PyWPS Process {}".format(self.process_public.identifier))
 
         url = self.make_url(params_template.format(self.process_private.identifier))
-        with contextlib.ExitStack() as stack_proc:
-            for process in mocked_execute_process():
-                stack_proc.enter_context(process)
-            resp = self.app.get(url, expect_errors=True)
-        assert resp.status_code == 400
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_process():
+                stack_exec.enter_context(mock_exec)
+            resp = self.app.get(url, headers=headers, expect_errors=True)
+        assert resp.status_code == 403
         assert resp.content_type in CONTENT_TYPE_ANY_XML
         resp.mustcontain("<ows:ExceptionText>Unknown process")

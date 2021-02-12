@@ -1,7 +1,9 @@
 import time
 import unittest
 from copy import deepcopy
+from typing import TYPE_CHECKING
 
+import pyramid.testing
 import pytest
 
 from tests.utils import (
@@ -14,9 +16,14 @@ from tests.utils import (
     setup_mongodb_jobstore,
     setup_mongodb_processstore
 )
+from weaver.database import get_db
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.status import STATUS_RUNNING, STATUS_SUCCEEDED
 from weaver.visibility import VISIBILITY_PUBLIC
+
+if TYPE_CHECKING:
+    from typing import Optional
+    from weaver.typedefs import JSON, SettingsType
 
 
 @pytest.mark.functional
@@ -24,7 +31,7 @@ class WpsPackageConfigBase(unittest.TestCase):
     json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
     monitor_timeout = 30
     monitor_delta = 1
-    settings = {}
+    settings = {}  # type: SettingsType
 
     def __init__(self, *args, **kwargs):
         # won't run this as a test suite, only its derived classes
@@ -40,9 +47,17 @@ class WpsPackageConfigBase(unittest.TestCase):
         cls.process_store = setup_mongodb_processstore(config)  # force reset
         cls.job_store = setup_mongodb_jobstore(config)
         cls.app = get_test_weaver_app(config=config, settings=cls.settings)
+        cls.db = get_db(config)
+        cls.config = config
+        cls.settings.update(cls.config.registry.settings)  # back propagate changes
+
+    @classmethod
+    def tearDownClass(cls):
+        pyramid.testing.tearDown()
 
     @classmethod
     def deploy_process(cls, payload):
+        # type: (JSON) -> JSON
         """
         Deploys a process with :paramref:`payload`.
 
@@ -63,12 +78,20 @@ class WpsPackageConfigBase(unittest.TestCase):
         return info
 
     def monitor_job(self, status_url, timeout=None, delta=None):
+        # type: (str, Optional[int], Optional[int]) -> JSON
         """
         Job polling of status URL until completion or timeout.
 
         :return: result of the successful job
         :raises AssertionError: when job fails or took too long to complete.
         """
+        def check_job_status(_resp, running=False):
+            body = _resp.json
+            statuses = [STATUS_RUNNING, STATUS_SUCCEEDED] if running else [STATUS_SUCCEEDED]
+            assert _resp.status_code == 200, "Process execution failed. Response body:\n{}".format(body)
+            assert body["status"] in statuses, "Error job info:\n{}".format(body)
+            return body["status"] == STATUS_SUCCEEDED
+
         time.sleep(1)  # small delay to ensure process execution had a change to start before monitoring
         left = timeout or self.monitor_timeout
         delta = delta or self.monitor_delta
@@ -76,14 +99,12 @@ class WpsPackageConfigBase(unittest.TestCase):
         resp = None
         while left >= 0 or once:
             resp = self.app.get(status_url, headers=self.json_headers)
-            assert resp.status_code == 200
-            assert resp.json["status"] in [STATUS_RUNNING, STATUS_SUCCEEDED], "Error job info:\n{}".format(resp.json)
-            if resp.json["status"] == STATUS_SUCCEEDED:
+            if check_job_status(resp, running=True):
                 break
             time.sleep(delta)
             once = False
             left -= delta
-        assert resp.json["status"] == STATUS_SUCCEEDED
+        check_job_status(resp)
         resp = self.app.get("{}/result".format(status_url), headers=self.json_headers)
         assert resp.status_code == 200, "Error job info:\n{}".format(resp.json)
         return resp.json

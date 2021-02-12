@@ -68,7 +68,7 @@ class OWSException(Response, Exception):
         Exception.__init__(self, detail)
         self.message = detail or self.explanation
         self.content_type = CONTENT_TYPE_TEXT_XML
-        if value:
+        if value or kw.get("locator"):
             self.locator = value
 
     def __str__(self, skip_body=False):
@@ -104,9 +104,15 @@ class OWSException(Response, Exception):
                     def __init__(self, excobj):
                         self.excobj = excobj
 
-                    def substitute(self, code, locator, message):  # noqa: W0613
-                        return json.dumps(self.excobj.json_formatter(
-                            status=self.excobj.status, body=message, title=None, environ=environ))
+                    def substitute(self, code, locator, message):
+                        status = self.excobj.status
+                        data = self.excobj.json_formatter(status=status, body=message, title=None, environ=environ)
+                        data["exception"] = {
+                            "code": code or "",
+                            "locator": locator or "",
+                            "message": message or "",
+                        }
+                        return json.dumps(data)
 
                 page_template = JsonPageTemplate(self)
 
@@ -145,8 +151,9 @@ class OWSException(Response, Exception):
 
 
 class OWSAccessForbidden(OWSException):
-    locator = "AccessUnauthorized"
-    explanation = "Access to this service is unauthorized."
+    code = "AccessForbidden"
+    locator = ""
+    explanation = "Access to this service is forbidden."
 
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPUnauthorized
@@ -154,8 +161,9 @@ class OWSAccessForbidden(OWSException):
 
 
 class OWSNotFound(OWSException):
-    locator = "NotFound"
-    explanation = "This resource does not exist."
+    code = "NotFound"
+    locator = ""
+    explanation = "Resource does not exist."
 
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPNotFound
@@ -163,7 +171,8 @@ class OWSNotFound(OWSException):
 
 
 class OWSNotAcceptable(OWSException):
-    locator = "NotAcceptable"
+    code = "NotAcceptable"
+    locator = ""
     explanation = "Access to this service failed."
 
     def __init__(self, *args, **kwargs):
@@ -175,7 +184,7 @@ class OWSNoApplicableCode(OWSException):
     """WPS Bad Request Exception"""
     code = "NoApplicableCode"
     locator = ""
-    explanation = "Parameter value is missing"
+    explanation = "Unsupported Operation"
 
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPBadRequest

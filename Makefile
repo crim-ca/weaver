@@ -193,25 +193,25 @@ install-all: install-sys install-pkg install-pip install-dev  ## install applica
 .PHONY: install-dev
 install-dev: install-pip	## install development and test dependencies
 	@echo "Installing development packages with pip..."
-	@-bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -r $(APP_ROOT)/requirements-dev.txt'
+	@-bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements-dev.txt"'
 	@echo "Install with pip complete. Test service with 'make test*' variations."
 
 .PHONY: install-pkg
 install-pkg: install-pip	## install application package dependencies
 	@echo "Installing base packages with pip..."
-	@-bash -c "$(CONDA_CMD) pip install $(PIP_XARGS) -r $(APP_ROOT)/requirements.txt --no-cache-dir"
+	@-bash -c "$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements.txt" --no-cache-dir"
 	@echo "Install with pip complete."
 
 # don't use 'PIP_XARGS' in this case since extra features could not yet be supported by pip being installed/updated
 .PHONY: install-sys
 install-sys: conda-env	## install system dependencies and required installers/runners
 	@echo "Installing system dependencies..."
-	@bash -c '$(CONDA_CMD) pip install --upgrade -r $(APP_ROOT)/requirements-sys.txt'
+	@bash -c '$(CONDA_CMD) pip install --upgrade -r "$(APP_ROOT)/requirements-sys.txt"'
 
 .PHONY: install-pip
 install-pip:	## install application as a package to allow import from another python package
 	@echo "Installing package with pip..."
-	@-bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) $(APP_ROOT)'
+	@-bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) --upgrade -e "$(APP_ROOT)" --no-cache'
 	@echo "Install with pip complete."
 
 .PHONY: install-raw

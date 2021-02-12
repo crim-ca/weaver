@@ -4,6 +4,8 @@ so that one can update the swagger without touching any other files after the in
 """
 # pylint: disable=C0103,invalid-name
 
+from typing import TYPE_CHECKING
+
 from colander import (
     Boolean,
     DateTime,
@@ -38,11 +40,17 @@ from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, STATUS_COMPLIA
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps_restapi.colander_extras import (
     DropableNoneSchema,
+    OneOfCaseInsensitive,
     OneOfMappingSchema,
     SchemaNodeDefault,
     VariableMappingSchema
 )
 from weaver.wps_restapi.utils import wps_restapi_base_path
+
+if TYPE_CHECKING:
+    from weaver.typedefs import SettingsType, TypedDict
+
+    ViewInfo = TypedDict("ViewInfo", {"name": str, "pattern": str})
 
 
 class SchemaNode(SchemaNodeDefault):
@@ -158,6 +166,7 @@ TAG_DEPLOY = "Deploy"
 TAG_RESULTS = "Results"
 TAG_EXCEPTIONS = "Exceptions"
 TAG_LOGS = "Logs"
+TAG_WPS = "WPS"
 
 ###############################################################################
 # These "services" are wrappers that allow Cornice to generate the JSON API
@@ -589,7 +598,7 @@ class JobSortEnum(SchemaNode):
 class QuoteSortEnum(SchemaNode):
     schema_type = String
 
-    def __init__(self, *args, **kwargs):  # noqa: E811
+    def __init__(self, *args, **kwargs):    # noqa: E811
         kwargs.pop("validator", None)  # ignore passed argument and enforce the validator
         super(QuoteSortEnum, self).__init__(
             self.schema_type(),
@@ -600,9 +609,8 @@ class QuoteSortEnum(SchemaNode):
 
 
 class LaunchJobQuerystring(MappingSchema):
-    field_string = SchemaNode(String(), default=None, missing=drop,
-                              description="Comma separated tags that can be used to filter jobs later")
-    field_string.name = "tags"
+    tags = SchemaNode(String(), default=None, missing=drop,
+                      description="Comma separated tags that can be used to filter jobs later")
 
 
 class VisibilityValue(SchemaNode):
@@ -638,6 +646,47 @@ class SwaggerJSONEndpoint(MappingSchema):
 
 class SwaggerUIEndpoint(MappingSchema):
     pass
+
+
+class WPSParameters(MappingSchema):
+    service = SchemaNode(String(), example="WPS", description="Service selection.",
+                         validator=OneOfCaseInsensitive(["WPS"]))
+    request = SchemaNode(String(), example="GetCapabilities", description="WPS operation to accomplish",
+                         validator=OneOfCaseInsensitive(["GetCapabilities", "DescribeProcess", "Execute"]))
+    version = SchemaNode(String(), exaple="1.0.0", default="1.0.0", validator=OneOf(["1.0.0", "2.0.0"]))
+    identifier = SchemaNode(String(), exaple="hello", description="Process identifier.", missing=drop)
+    data_inputs = SchemaNode(String(), name="DataInputs", missing=drop, example="message=hi",
+                             description="Process execution inputs provided as Key-Value Pairs (KVP).")
+
+
+class WPSBody(MappingSchema):
+    content = SchemaNode(String(), description="XML data inputs provided for WPS POST request.")
+
+
+class WPSEndpoint(MappingSchema):
+    header = AcceptHeader()
+    querystring = WPSParameters()
+    body = WPSBody()
+
+
+class WPSXMLSuccessBodySchema(MappingSchema):
+    pass
+
+
+class OkWPSResponse(MappingSchema):
+    description = "WPS operation successful"
+    header = XmlHeader()
+    body = WPSXMLSuccessBodySchema()
+
+
+class WPSXMLErrorBodySchema(MappingSchema):
+    pass
+
+
+class ErrorWPSResponse(MappingSchema):
+    description = "Unhandled error occurred on WPS endpoint."
+    header = XmlHeader()
+    body = WPSXMLErrorBodySchema()
 
 
 class ProviderEndpoint(ProviderPath):
@@ -1326,12 +1375,26 @@ class PostProviderProcessJobRequest(MappingSchema):
 #################################
 
 
+class OWSExceptionResponse(MappingSchema):
+    code = SchemaNode(String(), description="OWS error code.", example="InvalidParameterValue")
+    locator = SchemaNode(String(), description="Indication of the element that caused the error.", example="identifier")
+    message = SchemaNode(String(), description="Specific description of the error.", example="Invalid process ID.")
+
+
 class ErrorJsonResponseBodySchema(MappingSchema):
-    code = SchemaNode(String(), example="NoApplicableCode")
-    description = SchemaNode(String(), example="Not authorized to access this resource.")
+    code = SchemaNode(Integer(), description="HTTP status code.", example=400)
+    status = SchemaNode(String(), description="HTTP status detail.", example="400 Bad Request")
+    title = SchemaNode(String(), description="HTTP status message.", example="Bad Request")
+    description = SchemaNode(String(), description="", example="Process identifier is invalid.")
+    exception = OWSExceptionResponse(missing=drop)
 
 
 class UnauthorizedJsonResponseSchema(MappingSchema):
+    header = JsonHeader()
+    body = ErrorJsonResponseBodySchema()
+
+
+class ForbiddenJsonResponseSchema(MappingSchema):
     header = JsonHeader()
     body = ErrorJsonResponseBodySchema()
 
@@ -1709,115 +1772,137 @@ post_processes_responses = {
     #   https://github.com/crim-ca/weaver/issues/14
     "200": OkPostProcessesResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorPostProcessesResponse(),
 }
 get_process_responses = {
     "200": OkGetProcessInfoResponse(description="success"),
     "400": BadRequestGetProcessInfoResponse(),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetProcessResponse(),
 }
 get_process_package_responses = {
     "200": OkGetProcessPackageSchema(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetProcessPackageResponse(),
 }
 get_process_payload_responses = {
     "200": OkGetProcessPayloadSchema(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetProcessPayloadResponse(),
 }
 get_process_visibility_responses = {
     "200": OkGetProcessVisibilitySchema(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetProcessVisibilityResponse(),
 }
 put_process_visibility_responses = {
     "200": OkPutProcessVisibilitySchema(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorPutProcessVisibilityResponse(),
 }
 delete_process_responses = {
     "200": OkDeleteProcessResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorDeleteProcessResponse(),
 }
 get_providers_list_responses = {
     "200": OkGetProvidersListResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetProvidersListResponse(),
 }
 get_provider_responses = {
     "200": OkGetProviderCapabilitiesSchema(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetProviderCapabilitiesResponse(),
 }
 delete_provider_responses = {
     "204": NoContentDeleteProviderSchema(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorDeleteProviderResponse(),
     "501": NotImplementedDeleteProviderResponse(),
 }
 get_provider_processes_responses = {
     "200": OkGetProviderProcessesSchema(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetProviderProcessesListResponse(),
 }
 get_provider_process_responses = {
     "200": OkGetProviderProcessDescriptionResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetProviderProcessResponse(),
 }
 post_provider_responses = {
     "201": CreatedPostProvider(description="success"),
     "400": MappingSchema(description=OWSMissingParameterValue.explanation),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorPostProviderResponse(),
     "501": NotImplementedPostProviderResponse(),
 }
 post_provider_process_job_responses = {
     "201": CreatedLaunchJobResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorPostProviderProcessJobResponse(),
 }
 post_process_jobs_responses = {
     "201": CreatedLaunchJobResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorPostProcessJobResponse(),
 }
 get_all_jobs_responses = {
     "200": OkGetQueriedJobsResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetJobsResponse(),
 }
 get_single_job_status_responses = {
     "200": OkGetJobStatusResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetJobStatusResponse(),
 }
 delete_job_responses = {
     "200": OkDismissJobResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorDeleteJobResponse(),
 }
 get_job_results_responses = {
     "200": OkGetJobResultsResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetJobResultsResponse(),
 }
 get_job_output_responses = {
     "200": OkGetOutputResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetJobOutputResponse(),
 }
 get_exceptions_responses = {
     "200": OkGetJobExceptionsResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetJobExceptionsResponse(),
 }
 get_logs_responses = {
     "200": OkGetJobLogsResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetJobLogsResponse(),
 }
 get_quote_list_responses = {
@@ -1850,6 +1935,10 @@ get_bill_responses = {
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
     "500": InternalServerErrorGetBillInfoResponse(),
 }
+wps_responses = {
+    "200": OkWPSResponse(),
+    "500": ErrorWPSResponse(),
+}
 
 
 #################################################################
@@ -1858,5 +1947,6 @@ get_bill_responses = {
 
 
 def service_api_route_info(service_api, settings):
+    # type: (Service, SettingsType) -> ViewInfo
     api_base = wps_restapi_base_path(settings)
     return {"name": service_api.name, "pattern": "{base}{path}".format(base=api_base, path=service_api.path)}

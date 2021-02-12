@@ -4,9 +4,9 @@ LOGGER = logging.getLogger(__name__)
 
 
 def includeme(config):
+    from weaver.formats import OUTPUT_FORMAT_JSON
     from weaver.wps_restapi import swagger_definitions as sd
     from weaver.wps_restapi.processes import processes as p
-    from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
 
     LOGGER.info("Adding WPS REST API processes...")
     settings = config.registry.settings

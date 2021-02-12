@@ -22,6 +22,8 @@ gunicorn>=20.0.4; python_version >= "3.5"
 jsonschema>=3.0.1
 lxml
 mako
+# esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
+oauthlib
 owslib>=0.19.2; python_version >= "3"
 pymongo
 pyramid>=1.7.3
