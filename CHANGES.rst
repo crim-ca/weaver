@@ -18,13 +18,14 @@ Changes:
   those components from functions specific for producing WPS-REST API responses.
 - Handle WPS-1/2 requests submitted by GET KVP or POST XML request with ``application/json`` in ``Accept`` header to
   return the same body content as if directly calling their corresponding WPS-REST endpoints.
-- Remove every Python 2 backward compatibility references and operations.
 - Remove ``request`` parameter of every database store methods since they were not used nor provided most of the time.
 - Changed all forbidden access responses related to visibility status to return ``403`` instead of ``401``.
 - Add more tests for Docker applications and test suite execution with Github Actions.
 - Add more details in sample configurations and provide an example ``docker-compose.yml`` configuration that defines a
   *typical* `Weaver` API / Worker combination with ``docker-proxy`` for sibling container execution.
 - Document the `WPS` KVP/XML endpoint within the generated OpenAPI specification.
+- Remove every Python 2 backward compatibility references and operations.
+- Drop Python 2 and Python 3.5 support.
 
 Fixes:
 ------
