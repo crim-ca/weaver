@@ -7,16 +7,27 @@
 # NOTE:
 #   This configuration can be formatted in YAML or JSON at your convenience.
 #
-crim:
-  netloc: "ogc-ades.crim.ca"
-  ades: "https://ogc-ades.crim.ca/weaver"
+example:
+  # since this is not the default (see localhost),
+  # only data matching that location will be forwarded to corresponding ADES
+  netloc: "example-data.com"
+  ades: "https://example.com/ADES"
 
 localhost:
+  # default is define here, so any unmatched data-source location will fallback to this ADES
+  # since that default is 'localhost', default in this case will indicate "run it locally"
+  # another ADES location could be set as default to dispatch unknown data-source executions to that specific instance
   netloc: "localhost"
   ades: "https://localhost:4001"
   default: true
 
 opensearchdefault:
+  # data-sources that require OpenSearch capabilities require more configuration details
+  # this applies to processes that employ OpenSearch query definitions to define process inputs
+  # see details and examples:
+  #   https://pavics-weaver.readthedocs.io/en/latest/processes.html#opensearch-data-source
+  #   tests/json_examples/opensearch_process.json
+  #   tests/json_examples/eoimage_inputs_example.json
   ades: "http://localhost:4001"
   collection_id: ""
   accept_schemes: ["http", "https"]
