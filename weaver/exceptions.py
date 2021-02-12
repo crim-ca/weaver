@@ -29,6 +29,7 @@ if TYPE_CHECKING:
 
 class WeaverException(Exception):
     """Base class of exceptions defined by :mod:`weaver` package."""
+    message = ""
 
 
 class InvalidIdentifierValue(WeaverException, ValueError, OWSInvalidParameterValue):
