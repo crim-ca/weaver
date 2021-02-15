@@ -40,6 +40,7 @@ from weaver.exceptions import (
     ServiceNotFound,
     log_unhandled_exceptions
 )
+from weaver.owsexceptions import OWSException
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from weaver.store.base import StoreProcesses, StoreServices
 from weaver.utils import get_sane_name, get_settings, get_url_without_query
@@ -74,8 +75,8 @@ def get_process(process_id=None, request=None, settings=None, store=None):
     try:
         process = store.fetch_by_id(process_id, visibility=VISIBILITY_PUBLIC)
         return process
-    except (InvalidIdentifierValue, MissingIdentifierValue) as ex:
-        raise HTTPBadRequest(str(ex))
+    except (InvalidIdentifierValue, MissingIdentifierValue):
+        raise
     except ProcessNotAccessible:
         raise HTTPForbidden("Process with ID '{!s}' is not accessible.".format(process_id))
     except ProcessNotFound:

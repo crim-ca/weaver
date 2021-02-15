@@ -13,6 +13,7 @@ import pyramid.testing
 import pytest
 import xmltodict
 from lxml import etree
+from werkzeug.utils import escape
 
 from tests.utils import (
     get_test_weaver_app,
@@ -116,7 +117,7 @@ class WpsAppTest(unittest.TestCase):
         assert resp.content_type in CONTENT_TYPE_ANY_XML
         resp.mustcontain("<ows:ExceptionText>Unknown process")
 
-    def test_execute_allowed(self):
+    def test_execute_allowed_demo(self):
         template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=name=tux"
         params = template.format(HelloWPS.identifier)
         url = self.make_url(params)
@@ -130,9 +131,9 @@ class WpsAppTest(unittest.TestCase):
         resp.mustcontain("<wps:ProcessAccepted")
         resp.mustcontain("PyWPS Process {}".format(HelloWPS.identifier))
 
-    def test_execute_with_visibility(self):
-        params_template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=test_input=test"
+    def test_execute_deployed_with_visibility_allowed(self):
         headers = {"Accept": CONTENT_TYPE_APP_XML}
+        params_template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=test_input=test"
         url = self.make_url(params_template.format(self.process_public.identifier))
         with contextlib.ExitStack() as stack_exec:
             for mock_exec in mocked_execute_process():
@@ -144,6 +145,9 @@ class WpsAppTest(unittest.TestCase):
         resp.mustcontain("<wps:ProcessAccepted")
         resp.mustcontain("PyWPS Process {}".format(self.process_public.identifier))
 
+    def test_execute_deployed_with_visibility_denied(self):
+        headers = {"Accept": CONTENT_TYPE_APP_XML}
+        params_template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=test_input=test"
         url = self.make_url(params_template.format(self.process_private.identifier))
         with contextlib.ExitStack() as stack_exec:
             for mock_exec in mocked_execute_process():
@@ -151,4 +155,6 @@ class WpsAppTest(unittest.TestCase):
             resp = self.app.get(url, headers=headers, expect_errors=True)
         assert resp.status_code == 403
         assert resp.content_type in CONTENT_TYPE_ANY_XML
-        resp.mustcontain("<ows:ExceptionText>Unknown process")
+        resp.mustcontain("<Exception exceptionCode=\"AccessForbidden\" locator=\"process\">")
+        err_desc = escape("Process 'process_private' cannot be accessed.")  # pywps encodes the quotes
+        resp.mustcontain("<ExceptionText>{}</ExceptionText>".format(err_desc))

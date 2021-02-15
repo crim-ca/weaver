@@ -23,6 +23,7 @@ def ows_response_tween(request, handler):
     # NOTE:
     #   Handle exceptions from most explicit definitions to least explicit.
     #   Exceptions in 'weaver.exceptions' sometimes derive from 'OWSException' to provide additional details.
+    #   Furthermore, 'OWSException' have extensive details with references to 'HTTPException' and 'pywps.exceptions'.
     except HTTPException as err:
         LOGGER.debug("http exception -> ows exception response.")
         # Use the same json formatter than OWSException
@@ -31,7 +32,7 @@ def ows_response_tween(request, handler):
         return_error = raised_error
         exc_info_err = False
         exc_log_lvl = logging.WARNING if err.status_code < 500 else logging.ERROR
-    except OWSException as err:
+    except OWSException as err:  # could be 'WeaverException' with 'OWSException' base
         LOGGER.debug("direct ows exception response")
         raised_error = err
         return_error = err

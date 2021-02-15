@@ -1,7 +1,12 @@
 """
-OWSExceptions are based on pyramid.httpexceptions.
+OWSExceptions definitions.
 
-See also: https://github.com/geopython/pywps/blob/master/pywps/exceptions.py
+Exceptions are based on :mod:`pyramid.httpexceptions` and :mod:`pywps.exceptions` to handle more cases where they can
+be caught whether the running process is via :mod:`weaver` or through :mod:`pywps` service.
+
+Furthermore, interrelation with :mod:`weaver.exceptions` classes (with base
+:exception:`weaver.exceptions.WeaverException`) also employ specific :exception:`OWSExceptions` definitions to provide
+specific error details.
 """
 import json
 import warnings
@@ -11,15 +16,16 @@ from typing import TYPE_CHECKING
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPException,
+    HTTPForbidden,
     HTTPInternalServerError,
     HTTPNotAcceptable,
     HTTPNotFound,
     HTTPNotImplemented,
     HTTPOk,
-    HTTPUnauthorized
 )
 from pyramid.interfaces import IExceptionResponse
 from pyramid.response import Response
+from pywps.exceptions import InvalidParameterValue, MissingParameterValue, NoApplicableCode
 from webob import html_escape as _html_escape
 from webob.acceptparse import create_accept_header
 from zope.interface import implementer
@@ -156,7 +162,7 @@ class OWSAccessForbidden(OWSException):
     explanation = "Access to this service is forbidden."
 
     def __init__(self, *args, **kwargs):
-        kwargs["status"] = HTTPUnauthorized
+        kwargs["status"] = HTTPForbidden
         super(OWSAccessForbidden, self).__init__(*args, **kwargs)
 
 
@@ -173,26 +179,26 @@ class OWSNotFound(OWSException):
 class OWSNotAcceptable(OWSException):
     code = "NotAcceptable"
     locator = ""
-    explanation = "Access to this service failed."
+    explanation = "Cannot produce requested Accept format."
 
     def __init__(self, *args, **kwargs):
         kwargs["status"] = HTTPNotAcceptable
         super(OWSNotAcceptable, self).__init__(*args, **kwargs)
 
 
-class OWSNoApplicableCode(OWSException):
+class OWSNoApplicableCode(OWSException, NoApplicableCode):
     """WPS Bad Request Exception"""
     code = "NoApplicableCode"
     locator = ""
-    explanation = "Unsupported Operation"
+    explanation = "Undefined error"
 
     def __init__(self, *args, **kwargs):
-        kwargs["status"] = HTTPBadRequest
+        kwargs["status"] = HTTPInternalServerError
         super(OWSNoApplicableCode, self).__init__(*args, **kwargs)
         warnings.warn(self.message, UnsupportedOperationWarning)
 
 
-class OWSMissingParameterValue(OWSException):
+class OWSMissingParameterValue(OWSException, MissingParameterValue):
     """MissingParameterValue WPS Exception"""
     code = "MissingParameterValue"
     locator = ""
@@ -204,14 +210,14 @@ class OWSMissingParameterValue(OWSException):
         warnings.warn(self.message, MissingParameterWarning)
 
 
-class OWSInvalidParameterValue(OWSException):
+class OWSInvalidParameterValue(OWSException, InvalidParameterValue):
     """InvalidParameterValue WPS Exception"""
     code = "InvalidParameterValue"
     locator = ""
     explanation = "Parameter value is not acceptable."
 
     def __init__(self, *args, **kwargs):
-        kwargs["status"] = HTTPNotAcceptable
+        kwargs["status"] = HTTPBadRequest
         super(OWSInvalidParameterValue, self).__init__(*args, **kwargs)
         warnings.warn(self.message, UnsupportedOperationWarning)
 
