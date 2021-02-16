@@ -23,6 +23,7 @@ Changes:
 - Add more tests for Docker applications and test suite execution with Github Actions.
 - Add more details in sample configurations and provide an example ``docker-compose.yml`` configuration that defines a
   *typical* `Weaver` API / Worker combination with ``docker-proxy`` for sibling container execution.
+- Add captured ``stdout`` and ``stderr`` details in job log following CWL execution error when retrievable.
 - Document the `WPS` KVP/XML endpoint within the generated OpenAPI specification.
 - Remove every Python 2 backward compatibility references and operations.
 - Drop Python 2 and Python 3.5 support.
@@ -34,6 +35,8 @@ Fixes:
   (see `geopython/pywps #568 <https://github.com/geopython/pywps/issues/568>`_).
 - Fix retrieval of database connexion to avoid warning of ``MongoClient`` opened before fork of processes.
 - Fix indirect dependency ``oauthlib`` missing from ``esgf-compute-api`` (``cwt``) package.
+- Fix inconsistent ``python`` reference resolution of ``builtin`` applications when executed locally and in tests
+  (using virtual/conda environment) compared to within Weaver Docker image (using OS python).
 - Fix many typing definitions.
 
 `1.14.0 <https://github.com/crim-ca/weaver/tree/1.14.0>`_ (2021-01-11)

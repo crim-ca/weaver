@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Extracts and fetches NetCDF files from a JSON file containing an URL string array,
 and provides them on the output directory.
@@ -9,8 +10,6 @@ import os
 import sys
 from tempfile import TemporaryDirectory
 
-from weaver.processes.builtin.utils import is_netcdf_url
-
 CUR_DIR = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, CUR_DIR)
 # root to allow 'from weaver import <...>'
@@ -18,6 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(CUR_DIR))))
 
 # place weaver specific imports after sys path fixing to ensure they are found from external call
 # pylint: disable=C0413,wrong-import-order
+from weaver.processes.builtin.utils import is_netcdf_url  # isort:skip # noqa: E402
 from weaver.utils import fetch_file  # isort:skip # noqa: E402
 
 PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]

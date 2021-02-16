@@ -74,7 +74,8 @@ class BuiltinAppTest(WpsPackageConfigBase):
             for mock_exec in mocked_execute_process():
                 stack_exec.enter_context(mock_exec)
             path = "/processes/jsonarray2netcdf/jobs"
-            resp = mocked_sub_requests(self.app, "post_json", path, data=data, headers=self.json_headers)
+            resp = mocked_sub_requests(self.app, "post_json", path,
+                                       data=data, headers=self.json_headers, only_local=True)
 
         assert resp.status_code == 201, "Error: {}".format(resp.json)
         assert resp.content_type in CONTENT_TYPE_APP_JSON

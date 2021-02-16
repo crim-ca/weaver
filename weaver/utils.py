@@ -471,22 +471,33 @@ def get_job_log_msg(status, message, progress=0, duration=None):
     return "{d} {p:3d}% {s:10} {m}".format(d=duration or "", p=int(progress or 0), s=map_status(status), m=message)
 
 
-def setup_logger(logger, settings):
-    # type: (logging.Logger, AnySettingsContainer) -> None
+def setup_loggers(settings, level=None):
+    # type: (AnySettingsContainer, Optional[Union[int, str]]) -> None
     """
-    Update :paramref:`logger` configuration based on application settings.
+    Update logging configuration known loggers based on application settings.
+
+    When ``weaver.log_level`` exists in settings, it **overrides** any other INI configuration logging levels.
+    Otherwise, undefined logger levels will be set according to whichever is found first between ``weaver.log_level``,
+    the :paramref:`level` parameter or default :py:data:`logging.INFO`.
     """
     log_level = settings.get("weaver.log_level")
+    override = False
     if log_level:
-        if not isinstance(log_level, int):
-            log_level = logging.getLevelName(log_level)
-        logger.setLevel(log_level.upper())
-    # define basic formatter/handler if config INI did not provide it
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        formatter = logging.Formatter(get_log_fmt())
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
+        override = True
+    else:
+        log_level = level or logging.INFO
+    if not isinstance(log_level, int):
+        log_level = logging.getLevelName(log_level.upper())
+    for logger_name in ["weaver", "cwltool"]:
+        logger = logging.getLogger(logger_name)
+        if override or logger.level == logging.NOTSET:
+            logger.setLevel(log_level)
+        # define basic formatter/handler if config INI did not provide it
+        if not logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter(get_log_fmt())
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
 
 
 def make_dirs(path, mode=0o755, exist_ok=False):

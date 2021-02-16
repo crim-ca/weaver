@@ -1,4 +1,5 @@
-__doc__ = """
+#!/usr/bin/env python
+"""
 Transforms a file input into JSON file containing an array of file references as value.
 """
 import argparse

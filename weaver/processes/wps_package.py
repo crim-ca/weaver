@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import shutil
+import sys
 import tempfile
 import time
 import uuid
@@ -23,9 +24,9 @@ from urllib.parse import urlparse
 
 import cwltool
 import cwltool.docker
-import cwltool.factory
 import yaml
 from cwltool.context import LoadingContext, RuntimeContext
+from cwltool.factory import Factory as CWLFactory, WorkflowStatus as CWLException
 from pyramid.httpexceptions import HTTPOk, HTTPServiceUnavailable
 from pyramid_celery import celery_app as app
 from pywps import Process
@@ -87,7 +88,8 @@ from weaver.utils import (
     get_log_fmt,
     get_sane_name,
     get_settings,
-    request_extra
+    request_extra,
+    setup_loggers
 )
 from weaver.wps.utils import get_wps_output_dir
 from weaver.wps_restapi.swagger_definitions import process_uri
@@ -95,7 +97,7 @@ from weaver.wps_restapi.swagger_definitions import process_uri
 if TYPE_CHECKING:
     from typing import Any, Deque, Dict, List, Optional, Tuple, Type, Union
 
-    from cwltool.factory import Callable as CWLFactoryCallable
+    from cwltool.factory import Callable as CWLFactoryCallable, WorkflowStatus as CWLException
     from cwltool.process import Process as ProcessCWL
     from owslib.wps import WPSExecution
     from pywps.app import WPSRequest
@@ -391,7 +393,7 @@ def _load_package_content(package_dict,                             # type: Dict
     :param package_name: name to use to create the package file.
     :param data_source: identifier of the data source to map to specific ADES, or map to localhost if ``None``.
     :param only_dump_file: specify if the ``CWLFactoryCallable`` should be validated and returned.
-    :param tmp_dir: location of the temporary directory to dump files (warning: will be deleted on exit).
+    :param tmp_dir: location of the temporary directory to dump files (deleted on exit).
     :param loading_context: cwltool context used to create the cwl package (required if ``only_dump_file=False``)
     :param runtime_context: cwltool context used to execute the cwl package (required if ``only_dump_file=False``)
     :param process_offering: JSON body of the process description payload (used as I/O hint ordering)
@@ -401,6 +403,9 @@ def _load_package_content(package_dict,                             # type: Dict
             - instance of ``CWLFactoryCallable``
             - package type (``PROCESS_WORKFLOW`` or ``PROCESS_APPLICATION``)
             - dict of each step with their package name that must be run
+
+    .. warning::
+        Specified :paramref:`tmp_dir` will be deleted on exit.
     """
 
     tmp_dir = tmp_dir or tempfile.mkdtemp()
@@ -431,8 +436,8 @@ def _load_package_content(package_dict,                             # type: Dict
     if only_dump_file:
         return
 
-    cwl_factory = cwltool.factory.Factory(loading_context=loading_context, runtime_context=runtime_context)
-    package = cwl_factory.make(tmp_json_cwl)  # type: CWLFactoryCallable
+    factory = CWLFactory(loading_context=loading_context, runtime_context=runtime_context)
+    package = factory.make(tmp_json_cwl)  # type: CWLFactoryCallable
     shutil.rmtree(tmp_dir)
     return package, package_type, step_packages
 
@@ -487,8 +492,12 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
     wps_package_metadata["title"] = wps_package_metadata.get("title", cwl_package_package.get("label", ""))
     wps_package_metadata["abstract"] = wps_package_metadata.get("abstract", cwl_package_package.get("doc", ""))
 
-    if "$schemas" in cwl_package_package and isinstance(cwl_package_package["$schemas"], list) \
-            and "$namespaces" in cwl_package_package and isinstance(cwl_package_package["$namespaces"], dict):
+    if (
+        "$schemas" in cwl_package_package
+        and isinstance(cwl_package_package["$schemas"], list)
+        and "$namespaces" in cwl_package_package
+        and isinstance(cwl_package_package["$namespaces"], dict)
+    ):
         metadata = wps_package_metadata.get("metadata", list())
         namespaces_inv = {v: k for k, v in cwl_package_package["$namespaces"]}
         for schema in cwl_package_package["$schemas"]:
@@ -573,11 +582,9 @@ def get_process_definition(process_offering, reference=None, package=None, data_
             raise exc_type("Invalid package/reference definition. {0} generated error: [{1!r}].".format(reason, exc))
 
     if not (isinstance(package, dict) or isinstance(reference, str)):
-        raise PackageRegistrationError(
-            "Invalid parameters amongst one of [package, reference].")
+        raise PackageRegistrationError("Invalid parameters amongst one of [package, reference].")
     if package and reference:
-        raise PackageRegistrationError(
-            "Simultaneous parameters [package, reference] not allowed.")
+        raise PackageRegistrationError("Simultaneous parameters [package, reference] not allowed.")
 
     process_info = process_offering
     if reference:
@@ -676,7 +683,7 @@ class WpsPackage(Process):
             **kw
         )
 
-    def setup_logger(self, log_stdout_stderr=True):
+    def setup_loggers(self, log_stdout_stderr=True):
         # type: (bool) -> None
         """
         Configures useful loggers to catch most of the common output and/or error messages during package execution.
@@ -685,7 +692,8 @@ class WpsPackage(Process):
             :meth:`insert_package_log`
             :func:`retrieve_package_job_log`
         """
-        self.log_level = self.log_level or logging.getLogger("weaver").level
+        setup_loggers(self.settings)
+        self.log_level = self.log_level or logging.getLogger("weaver").getEffectiveLevel()
 
         # file logger for output
         self.log_file = get_status_location_log_path(self.status_location)
@@ -727,32 +735,42 @@ class WpsPackage(Process):
         weaver_tweens_logger.setLevel(self.log_level)
 
     def insert_package_log(self, result):
+        # type: (Union[CWLResults, CWLException]) -> List[str]
         """Retrieves additional `CWL` sub-process logs captures to retrieve internal application output and/or errors.
 
         After execution of this method, the `WPS` output log (which can be obtained by :func:`retrieve_package_job_log`)
         will have additional ``stderr/stdout`` entries extracted from the underlying application package tool execution.
 
-        The outputs and errors are inserted as best as possible in the logical order to make reading of the merged
+        The outputs and errors are inserted *as best as possible* in the logical order to make reading of the merged
         logs appear as a natural and chronological order. In the event that both output and errors are available, they
         are appended one after another as merging in an orderly fashion cannot be guaranteed by outside `CWL` runner.
 
-        :param result: output results returned from the `CWL` package instance execution.
+        .. note::
+            In case of any exception, log reporting is aborted and ignored.
 
-        .. todo:: improve for realtime updates when using async routine (https://github.com/crim-ca/weaver/issues/131)
+        .. todo::
+            Improve for realtime updates when using async routine (https://github.com/crim-ca/weaver/issues/131)
 
         .. seealso::
-            :meth:`setup_logger`
+            :meth:`setup_loggers`
             :func:`retrieve_package_job_log`
+
+        :param result: output results returned by successful `CWL` package instance execution or raised CWL exception.
+        :returns:  captured execution log lines retrieved from files
         """
+        captured_log = []
         try:
+            status = STATUS_RUNNING
+            if isinstance(result, CWLException):
+                result = getattr(result, "out")
+                status = STATUS_FAILED
             stderr_file = result.get(self.package_log_hook_stderr, {}).get("location", "").replace("file://", "")
             stdout_file = result.get(self.package_log_hook_stdout, {}).get("location", "").replace("file://", "")
             with_stderr_file = os.path.isfile(stderr_file)
             with_stdout_file = os.path.isfile(stdout_file)
             if not with_stdout_file and not with_stderr_file:
-                self.log_message(STATUS_RUNNING, "Could not retrieve any internal application log.",
-                                 level=logging.WARNING)
-                return
+                self.log_message(status, "Could not retrieve any internal application log.", level=logging.WARNING)
+                return captured_log
             out_log = []
             if with_stdout_file:
                 with open(stdout_file) as app_log_fd:
@@ -766,8 +784,8 @@ class WpsPackage(Process):
                     if err_log:
                         err_log = ["----- Captured Log (stderr) -----\n"] + err_log
             if not out_log and not err_log:
-                self.log_message(STATUS_RUNNING, "Nothing captured from internal application logs.", level=logging.INFO)
-                return
+                self.log_message(status, "Nothing captured from internal application logs.", level=logging.INFO)
+                return captured_log
             with open(self.log_file, "r") as pkg_log_fd:
                 pkg_log = pkg_log_fd.readlines()
             cwl_end_index = -1
@@ -776,18 +794,21 @@ class WpsPackage(Process):
                 if cwl_end_search in pkg_log[i]:
                     cwl_end_index = i
                     break
-            merged_log = pkg_log[:cwl_end_index] + out_log + err_log + pkg_log[cwl_end_index:]
+            captured_log = out_log + err_log
+            merged_log = pkg_log[:cwl_end_index] + captured_log + pkg_log[cwl_end_index:]
             with open(self.log_file, "w") as pkg_log_fd:
                 pkg_log_fd.writelines(merged_log)
         except Exception as exc:
             # log exception, but non-failing
-            self.exception_message(PackageExecutionError, exception=exc, level=logging.WARNING, status=STATUS_RUNNING,
+            self.exception_message(PackageExecutionError, exception=exc, level=logging.WARNING, status=status,
                                    message="Error occurred when retrieving internal application log.")
+        return captured_log
 
     def update_requirements(self):
         """
-        Inplace modification of :attr:`package` to remove invalid items that would break behaviour we must enforce.
+        Inplace modification of :attr:`package` to adjust invalid items that would break behaviour we must enforce.
         """
+        is_builtin = False
         for req_type in ["hints", "requirements"]:
             req_items = self.package.get(req_type, {})
             for req_cls in req_items:
@@ -796,6 +817,8 @@ class WpsPackage(Process):
                 else:
                     req_def = req_cls
                     req_cls = req_cls["class"]
+                if req_cls == CWL_REQUIREMENT_APP_BUILTIN:
+                    is_builtin = True
                 if req_cls != CWL_REQUIREMENT_APP_DOCKER:
                     continue
                 # remove build-related parameters because we forbid this in our case
@@ -805,6 +828,33 @@ class WpsPackage(Process):
                     if is_rm:
                         self.logger.warning("Removed CWL [%s.%s] %s parameter from [%s] package definition (forced).",
                                             req_cls, req_rm, req_type[:-1], self.package_id)
+
+        # update python reference if builtin script
+        #   since subprocess is created by CWL, the default python detected is from the OS
+        #   when running from within Weaver Docker, this doesn't matter much as OS Python == Weaver Env Python
+        #   but running in any other situation (e.g.: local, tests) will not necessarily point to same instance
+        if is_builtin:
+            python_path = os.getenv("PYTHONPATH")
+            if not python_path:
+                return
+            req_items = self.package.get("requirements", {})
+            if not isinstance(req_items, dict):
+                # definition as list
+                req_env = {"class": "EnvVarRequirement", "envDef": {}}
+                for req in req_items:
+                    if req["class"] == "EnvVarRequirement":
+                        req_env = req
+                        break
+                req_items.append(req_env)
+            else:
+                # definition as mapping
+                req_items.setdefault("EnvVarRequirement", {"envDef": {}})
+                req_env = req_items.get("EnvVarRequirement")
+            active_python_path = os.path.join(sys.exec_prefix, "bin")
+            env_path = "{}:{}".format(active_python_path, os.getenv("PATH"))
+            req_env["envDef"].update({"PATH": env_path})
+            if self.package.get("baseCommand") == "python":
+                self.package["baseCommand"] = os.path.join(active_python_path, "python")
 
     def update_effective_user(self):
         """ Update effective user/group for the `Application Package` to be executed.
@@ -893,7 +943,7 @@ class WpsPackage(Process):
         Method called when process receives the WPS execution request.
         """
 
-        # note: only 'LOGGER' call allowed here, since 'setup_logger' not called yet
+        # note: only 'LOGGER' call allowed here, since 'setup_loggers' not called yet
         LOGGER.debug("HOME=%s, Current Dir=%s", os.environ.get("HOME"), os.path.abspath(os.curdir))
         self.request = request
         self.response = response
@@ -904,7 +954,7 @@ class WpsPackage(Process):
                 # workflows do not support stdout/stderr
                 self.package_type = _get_package_type(self.package)
                 log_stdout_stderr = self.package_type != PROCESS_WORKFLOW
-                self.setup_logger(log_stdout_stderr)
+                self.setup_loggers(log_stdout_stderr)
                 self.update_status("Preparing package logs done.", PACKAGE_PROGRESS_PREP_LOG, STATUS_RUNNING)
             except Exception as exc:
                 raise self.exception_message(PackageExecutionError, exc, "Failed preparing package logging.")
@@ -993,6 +1043,9 @@ class WpsPackage(Process):
                 result = package_inst(**cwl_inputs)  # type: CWLResults
                 self.update_status("Package execution done.", PACKAGE_PROGRESS_CWL_DONE, STATUS_RUNNING)
             except Exception as exc:
+                if isinstance(exc, CWLException):
+                    lines = self.insert_package_log(exc)
+                    LOGGER.debug("Captured logs:\n%s", "\n".join(lines))
                 raise self.exception_message(PackageExecutionError, exc, "Failed package execution.")
             # FIXME: this won't be necessary using async routine (https://github.com/crim-ca/weaver/issues/131)
             self.insert_package_log(result)

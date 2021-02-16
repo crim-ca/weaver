@@ -47,7 +47,8 @@ if TYPE_CHECKING:
     _JsonItem = Union[AnyValue, _JsonObjectItem, _JsonListItem]
     JSON = Union[Dict[str, _JsonItem], List[_JsonItem]]
     CWL = TypedDict("CWL", {"cwlVersion": str, "class": str, "inputs": JSON, "outputs": JSON,
-                            "requirements": JSON, "hints": JSON})
+                            "requirements": JSON, "hints": JSON, "label": str, "doc": str, "s:keywords": str,
+                            "$namespaces": Dict[str, str], "$schemas": Dict[str, str]}, total=False)
     KVPType = Union[ValueType, Sequence[ValueType]]
     KVP = Union[Sequence[Tuple[str, KVPType]], Dict[str, KVPType]]
     XML = lxml.etree._Element  # noqa

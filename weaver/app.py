@@ -13,7 +13,7 @@ from weaver import __meta__
 from weaver.config import WEAVER_DEFAULT_REQUEST_OPTIONS_CONFIG, get_weaver_config_file, get_weaver_configuration
 from weaver.processes.builtin import register_builtin_processes
 from weaver.processes.utils import register_wps_processes_from_config
-from weaver.utils import get_settings, parse_extra_options, setup_logger
+from weaver.utils import get_settings, parse_extra_options, setup_loggers
 
 LOGGER = logging.getLogger(__name__)
 
@@ -22,12 +22,12 @@ def main(global_config, **settings):
     """
     Creates a Pyramid WSGI application for Weaver.
     """
+    setup_loggers(settings)
     LOGGER.info("Initiating weaver application")
 
     # validate and fix configuration
     weaver_config = get_weaver_configuration(settings)
     settings.update({"weaver.configuration": weaver_config})
-    setup_logger(logging.getLogger(__meta__.__package__), settings)
 
     # Parse extra_options and add each of them in the settings dict
     settings.update(parse_extra_options(settings.get("weaver.extra_options", "")))

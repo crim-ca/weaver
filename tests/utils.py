@@ -184,6 +184,7 @@ def get_test_weaver_config(config=None, settings=None):
         config = setup_config_from_settings(settings=settings)
     if "weaver.configuration" not in config.registry.settings:
         config.registry.settings["weaver.configuration"] = WEAVER_CONFIGURATION_DEFAULT
+    # set default log level for tests to ease debugging failing test cases
     if not config.registry.settings.get("weaver.log_level"):
         config.registry.settings["weaver.log_level"] = "DEBUG"
     if "weaver.url" not in config.registry.settings:
@@ -353,24 +354,25 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
 
 def mocked_execute_process():
     """
-    Provides a mock to call :func:`weaver.wps_restapi.processes.processes.execute_process` safely within
-    a test employing a :class:`webTest.TestApp` without a running ``Celery`` app.
+    Provides a mock to call :func:`weaver.processes.execution.execute_process` safely within a test employing
+    :class:`webTest.TestApp` without a running ``Celery`` app.
+
     This avoids connection error from ``Celery`` during a job execution request.
 
-    Bypasses the ``execute_process.delay`` call by directly invoking the ``execute_process``.
+    Bypasses ``execute_process.delay`` call by directly invoking the ``execute_process``.
 
-    **Note**: since ``delay`` and ``Celery`` are bypassed, the process execution becomes blocking (not asynchronous).
+    .. note::
+        Since ``delay`` and ``Celery`` are bypassed, the process execution becomes blocking (not asynchronous).
 
     .. seealso::
         - :func:`mocked_process_job_runner` to completely skip process execution.
         - :func:`setup_config_with_celery`
     """
     from weaver.processes.execution import execute_process as real_execute_process
-
     class MockTask(object):
         """
-        Mocks call ``self.request.id`` in :func:`weaver.wps_restapi.processes.processes.execute_process` and
-        call ``result.id`` in :func:`weaver.wps_restapi.processes.processes.submit_job_handler`.
+        Mocks call ``self.request.id`` in :func:`weaver.processes.execution.execute_process` and
+        call ``result.id`` in :func:`weaver.processes.execution.submit_job_handler`.
         """
         _id = str(uuid.uuid4())
 
