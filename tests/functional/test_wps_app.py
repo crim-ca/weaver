@@ -13,7 +13,6 @@ import pyramid.testing
 import pytest
 import xmltodict
 from lxml import etree
-from werkzeug.utils import escape
 
 from tests.utils import (
     get_test_weaver_app,
@@ -154,7 +153,7 @@ class WpsAppTest(unittest.TestCase):
                 stack_exec.enter_context(mock_exec)
             resp = self.app.get(url, headers=headers, expect_errors=True)
         assert resp.status_code == 403
-        assert resp.content_type in CONTENT_TYPE_ANY_XML
-        resp.mustcontain("<Exception exceptionCode=\"AccessForbidden\" locator=\"process\">")
-        err_desc = escape("Process 'process_private' cannot be accessed.")  # pywps encodes the quotes
+        assert resp.content_type in CONTENT_TYPE_ANY_XML, "Error Response: {}".format(resp.text)
+        resp.mustcontain("<Exception exceptionCode=\"AccessForbidden\" locator=\"service\">")
+        err_desc = "Process with ID '{}' is not accessible.".format(self.process_private.identifier)
         resp.mustcontain("<ExceptionText>{}</ExceptionText>".format(err_desc))

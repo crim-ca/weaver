@@ -7,7 +7,7 @@ from owslib.wps import WPSExecution
 from pyramid.httpexceptions import HTTPBadRequest, HTTPSeeOther
 from pyramid_celery import celery_app as app
 from pywps.app import Process as ProcessWPS, WPSRequest
-from pywps.app.Service import Service
+from pywps.app.Service import Service as ServiceWPS
 from pywps.inout.storage import StorageAbstract
 from pywps.response import WPSResponse
 from pywps.response.execute import ExecuteResponse
@@ -82,7 +82,7 @@ class WorkerExecuteResponse(ExecuteResponse):
         self._update_status_doc()      # generate 'doc' property with XML content for response
 
 
-class WorkerService(Service):
+class WorkerService(ServiceWPS):
     """
     Dispatches PyWPS requests from *older* WPS-1/2 XML endpoint to WPS-REST as appropriate.
 

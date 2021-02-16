@@ -26,7 +26,6 @@ from pyramid.httpexceptions import (
 from pyramid.interfaces import IExceptionResponse
 from pyramid.response import Response
 from pywps.exceptions import InvalidParameterValue, MissingParameterValue, NoApplicableCode
-from webob import html_escape as _html_escape
 from webob.acceptparse import create_accept_header
 from zope.interface import implementer
 
@@ -74,7 +73,8 @@ class OWSException(Response, Exception):
         Exception.__init__(self, detail)
         self.message = detail or self.explanation
         self.content_type = CONTENT_TYPE_TEXT_XML
-        if value or kw.get("locator"):
+        value = kw.get("locator", value)
+        if value:
             self.locator = value
 
     def __str__(self, skip_body=False):
@@ -127,9 +127,9 @@ class OWSException(Response, Exception):
                 page_template = self.page_template
 
             args = {
-                "code": _html_escape(self.code),
-                "locator": _html_escape(self.locator),
-                "message": _html_escape(self.message or ""),
+                "code": self.code,
+                "locator": self.locator,
+                "message": self.message or "",
             }
             page = page_template.substitute(**args)
             if isinstance(page, str):

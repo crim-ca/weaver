@@ -12,6 +12,9 @@ LOGGER = logging.getLogger(__name__)
 OWS_TWEEN_HANDLED = "OWS_TWEEN_HANDLED"
 
 
+# FIXME:
+#   https://github.com/crim-ca/weaver/issues/215
+#   define common Exception classes that won't require this type of conversion
 def ows_response_tween(request, handler):
     """Tween that wraps any API request with appropriate dispatch of error conversion to handle formatting."""
     try:
@@ -55,6 +58,7 @@ def ows_response_tween(request, handler):
     else:
         err_msg = " [{!r}]".format(raised_error)
     LOGGER.log(exc_log_lvl, "Handled request exception:%s", err_msg, exc_info=exc_info_err)
+    LOGGER.debug("Handled request details:\n%s\n%s", str(raised_error), getattr(raised_error, "text", ""))
     return return_error
 
 

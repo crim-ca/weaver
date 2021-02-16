@@ -57,6 +57,9 @@ if TYPE_CHECKING:
     from weaver.typedefs import AnyContainer, AnySettingsContainer, FileSystemPathType, JSON, Number, SettingsType
 
 
+# FIXME:
+#   https://github.com/crim-ca/weaver/issues/215
+#   define common Exception classes that won't require this type of conversion
 def get_process(process_id=None, request=None, settings=None, store=None):
     # type: (Optional[str], Optional[Request], Optional[SettingsType], Optional[StoreProcesses]) -> Process
     """
@@ -75,8 +78,8 @@ def get_process(process_id=None, request=None, settings=None, store=None):
     try:
         process = store.fetch_by_id(process_id, visibility=VISIBILITY_PUBLIC)
         return process
-    except (InvalidIdentifierValue, MissingIdentifierValue):
-        raise
+    except (InvalidIdentifierValue, MissingIdentifierValue) as ex:
+        raise HTTPBadRequest(str(ex))
     except ProcessNotAccessible:
         raise HTTPForbidden("Process with ID '{!s}' is not accessible.".format(process_id))
     except ProcessNotFound:

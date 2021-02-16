@@ -442,7 +442,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     def test_delete_process_success(self):
         uri = "/processes/{}".format(self.process_public.identifier)
         resp = self.app.delete_json(uri, headers=self.json_headers)
-        assert resp.status_code == 200
+        assert resp.status_code == 200, "Error: {}".format(resp.text)
         assert resp.content_type == CONTENT_TYPE_APP_JSON
         assert resp.json["identifier"] == self.process_public.identifier
         assert isinstance(resp.json["undeploymentDone"], bool) and resp.json["undeploymentDone"]
@@ -452,19 +452,19 @@ class WpsRestApiProcessesTest(unittest.TestCase):
     def test_delete_process_not_accessible(self):
         uri = "/processes/{}".format(self.process_private.identifier)
         resp = self.app.delete_json(uri, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 403
+        assert resp.status_code == 403, "Error: {}".format(resp.text)
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_delete_process_not_found(self):
         uri = "/processes/{}".format(self.fully_qualified_test_process_name())
         resp = self.app.delete_json(uri, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 404
+        assert resp.status_code == 404, "Error: {}".format(resp.text)
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_delete_process_bad_name(self):
         uri = "/processes/{}".format(self.fully_qualified_test_process_name() + "...")
         resp = self.app.delete_json(uri, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 400
+        assert resp.status_code == 400, "Error: {}".format(resp.text)
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_execute_process_success(self):
@@ -477,7 +477,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             for exe in mock_execute:
                 stack.enter_context(exe)
             resp = self.app.post_json(uri, params=data, headers=self.json_headers)
-            assert resp.status_code == 201
+            assert resp.status_code == 201, "Error: {}".format(resp.text)
             assert resp.content_type == CONTENT_TYPE_APP_JSON
             assert resp.json["location"].endswith(resp.json["jobID"])
             assert resp.headers["Location"] == resp.json["location"]
@@ -500,7 +500,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             headers = self.json_headers.copy()
             headers["Accept-Language"] = "fr-CA"
             resp = self.app.post_json(uri, params=data, headers=headers)
-            assert resp.status_code == 201
+            assert resp.status_code == 201, "Error: {}".format(resp.text)
             try:
                 job = self.job_store.fetch_by_id(resp.json["jobID"])
             except JobNotFound:
