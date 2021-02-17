@@ -97,7 +97,7 @@ from weaver.wps_restapi.swagger_definitions import process_uri
 if TYPE_CHECKING:
     from typing import Any, Deque, Dict, List, Optional, Tuple, Type, Union
 
-    from cwltool.factory import Callable as CWLFactoryCallable, WorkflowStatus as CWLException
+    from cwltool.factory import Callable as CWLFactoryCallable
     from cwltool.process import Process as ProcessCWL
     from owslib.wps import WPSExecution
     from pywps.app import WPSRequest
@@ -507,8 +507,9 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
         wps_package_metadata["metadata"] = metadata
 
     if "s:keywords" in cwl_package_package and isinstance(cwl_package_package["s:keywords"], list):
-        wps_package_metadata["keywords"] = list(set(wps_package_metadata.get("keywords", list)) |
-                                                set(cwl_package_package.get("s:keywords")))
+        wps_package_metadata["keywords"] = list(
+            set(wps_package_metadata.get("keywords", list)) | set(cwl_package_package.get("s:keywords"))
+        )
 
 
 def _generate_process_with_cwl_from_reference(reference):

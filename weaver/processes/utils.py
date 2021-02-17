@@ -40,7 +40,6 @@ from weaver.exceptions import (
     ServiceNotFound,
     log_unhandled_exceptions
 )
-from weaver.owsexceptions import OWSException
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from weaver.store.base import StoreProcesses, StoreServices
 from weaver.utils import get_sane_name, get_settings, get_url_without_query

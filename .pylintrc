@@ -85,7 +85,6 @@ disable=C0111,missing-docstring,
         W0613,unused-argument,
         W0622,redefined-builtin,
         W0640,cell-var-from-loop,
-        W0703,broad-except,
         W0706,try-except-raise,
         W0707,raise-missing-from,
         W1508,invalid-envvar-default
@@ -532,5 +531,4 @@ min-public-methods=0
 
 # Exceptions that will emit a warning when being caught. Defaults to
 # "BaseException, Exception".
-overgeneral-exceptions=BaseException,
-                       Exception
+overgeneral-exceptions=BaseException

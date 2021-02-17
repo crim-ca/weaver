@@ -403,8 +403,9 @@ check-lint-only: mkdir-reports  	## run linting code style checks
 	@bash -c '$(CONDA_CMD) \
 		pylint \
 			--load-plugins pylint_quotes \
-			--rcfile="$(APP_ROOT)/.pylintrc" "$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" \
+			--rcfile="$(APP_ROOT)/.pylintrc" \
 			--reports y \
+			"$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" \
 		1> >(tee "$(REPORTS_DIR)/check-lint.txt")'
 
 .PHONY: check-security-only
@@ -436,11 +437,20 @@ check-imports-only: mkdir-reports	## run imports code checks
 		isort --check-only --diff --recursive $(APP_ROOT) \
 		1> >(tee "$(REPORTS_DIR)/check-imports.txt")'
 
+# autogen fix variants with pre-install of dependencies using the '-only' target references
+FIXES := imports lint docf
+FIXES := $(addprefix fix-, $(FIXES))
+
+$(FIXES): fix-%: install-dev fix-%-only
+
 .PHONY: fix
-fix: fix-all	## alias for 'fix-all' target
+fix: fix-all 	## alias for 'fix-all' target
+
+.PHONY: fix-only
+fix-only: $(addsuffix -only, $(FIXES))
 
 .PHONY: fix-all
-fix-all: install-dev fix-imports-only fix-lint-only fix-docf-only  ## fix all code check problems automatically
+fix-all: install-dev $(FIXES)  ## fix all code check problems automatically
 
 .PHONY: fix-imports-only
 fix-imports-only: mkdir-reports	## apply import code checks corrections
@@ -473,6 +483,22 @@ fix-docf-only: mkdir-reports  ## fix some PEP8 code documentation style problems
 			--recursive \
 			$(APP_ROOT) \
 		1> >(tee "$(REPORTS_DIR)/fixed-docf.txt")'
+
+.PHONY: fixme-list-only
+fixme-list-only: mkdir-reports  	## run linting code style checks
+	@echo "Listing code that requires fixes..."
+	@echo '[MISCELLANEOUS]\nnotes=FIXME,TODO,HACK' > "$(REPORTS_DIR)/fixmerc"
+	@bash -c '$(CONDA_CMD) \
+		pylint \
+			--disable=all,use-symbolic-message-instead --enable=miscellaneous,W0511 \
+			--score n --persistent n \
+			--rcfile="$(REPORTS_DIR)/fixmerc" \
+			-f colorized \
+			"$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" \
+		1> >(tee "$(REPORTS_DIR)/fixme.txt")'
+
+.PHONY: fixme-list
+fixme-list: install-dev fixme-list-only
 
 ## -- Documentation targets ----------------------------------------------------------------------------------------- ##
 

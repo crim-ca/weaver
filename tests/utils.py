@@ -369,6 +369,7 @@ def mocked_execute_process():
         - :func:`setup_config_with_celery`
     """
     from weaver.processes.execution import execute_process as real_execute_process
+
     class MockTask(object):
         """
         Mocks call ``self.request.id`` in :func:`weaver.processes.execution.execute_process` and
