@@ -261,7 +261,7 @@ class OpenSearchQuery(object):
             response = request_extra("get", base_url, params=query_params,
                                      intervals=list(range(1, 5)), allowed_codes=[HTTPOk.code],
                                      settings=self.settings)
-            if not response.status_code == 200:
+            if response.status_code != 200:
                 break
             json_body = response.json()
             features = json_body.get("features", [])
