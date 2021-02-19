@@ -1717,7 +1717,7 @@ class ErrorDetail(ExtendedMappingSchema):
 
 
 class OWSErrorCode(ExtendedSchemaNode):
-    schema_type = String()
+    schema_type = String
     example = "InvalidParameterValue"
     description = "OWS error code."
 

@@ -26,7 +26,7 @@ CONDA_ENV_PATH := $(CONDA_ENVS_DIR)/$(CONDA_ENV)
 # allow pre-installed conda in Windows bash-like shell
 ifeq ($(findstring MINGW,$(OS_NAME)),MINGW)
   CONDA_BIN_DIR ?= $(CONDA_HOME)/Scripts
-else:
+else
   CONDA_BIN_DIR ?= $(CONDA_HOME)/bin
 endif
 CONDA_BIN := $(CONDA_BIN_DIR)/conda
@@ -157,12 +157,12 @@ conda-base:		## obtain and install a missing conda distribution
 .PHONY: conda-clean
 clean-clean: 	## remove the conda environment
 	@echo "Removing conda env '$(CONDA_ENV)'"
-	@-test -d "$(CONDA_ENV_PATH)" && "$(CONDA_BIN)" remove -n $(CONDA_ENV) --yes --all
+	@-test -d "$(CONDA_ENV_PATH)" && "$(CONDA_BIN)" remove -n "$(CONDA_ENV)" --yes --all
 
 .PHONY: conda-config
 conda-config: conda-base	## setup configuration of the conda environment
 	@echo "Updating conda configuration..."
-	@ "$(CONDA_BIN)" config --add envs_dirs $(CONDA_ENVS_DIR)
+	@ "$(CONDA_BIN)" config --add envs_dirs "$(CONDA_ENVS_DIR)"
 	@ "$(CONDA_BIN)" config --set ssl_verify true
 	@ "$(CONDA_BIN)" config --set channel_priority true
 	@ "$(CONDA_BIN)" config --set auto_update_conda false
@@ -200,13 +200,13 @@ install-all: install-sys install-pkg install-pip install-dev  ## install applica
 .PHONY: install-dev
 install-dev: install-pip	## install development and test dependencies
 	@echo "Installing development packages with pip..."
-	@-bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements-dev.txt"'
+	@bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements-dev.txt"'
 	@echo "Install with pip complete. Test service with 'make test*' variations."
 
 .PHONY: install-pkg
 install-pkg: install-pip	## install application package dependencies
 	@echo "Installing base packages with pip..."
-	@-bash -c "$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements.txt" --no-cache-dir"
+	@bash -c "$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements.txt" --no-cache-dir"
 	@echo "Install with pip complete."
 
 # don't use 'PIP_XARGS' in this case since extra features could not yet be supported by pip being installed/updated
@@ -224,7 +224,7 @@ install-pip:	## install application as a package to allow import from another py
 .PHONY: install-raw
 install-raw:	## install without any requirements or dependencies (suppose everything is setup)
 	@echo "Installing package without dependencies..."
-	@-bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -e "$(APP_ROOT)" --no-deps'
+	@bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -e "$(APP_ROOT)" --no-deps'
 	@echo "Install package complete."
 
 ## -- Cleanup targets ----------------------------------------------------------------------------------------------- ##
@@ -332,7 +332,7 @@ test-func-only: mkdir-reports   	## run functional tests (online and usage speci
 test-workflow-only:	mkdir-reports	## run EMS workflow End-2-End tests
 	@echo "Running workflow tests..."
 	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
- 		-m "workflow" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+		-m "workflow" --junitxml "$(REPORTS_DIR)/test-results.xml"'
 
 .PHONY: test-online-only
 test-online-only: mkdir-reports  	## run online tests (running instance required)
@@ -344,7 +344,7 @@ test-online-only: mkdir-reports  	## run online tests (running instance required
 test-offline-only: mkdir-reports  	## run offline tests (not marked as online)
 	@echo "Running offline tests (not marked as online)..."
 	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
- 		-m "not online" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+		-m "not online" --junitxml "$(REPORTS_DIR)/test-results.xml"'
 
 .PHONY: test-no-tb14-only
 test-no-tb14-only: mkdir-reports  	## run all tests except ones marked for 'Testbed-14'

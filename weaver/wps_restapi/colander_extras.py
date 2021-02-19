@@ -1155,15 +1155,15 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
             colander.All: AllOfKeywordSchema,
             colander.NoneOf: NotKeywordSchema,
         }
-        # NOTE: we enforce some items to inherit variable functionality,
+        # NOTE: define items to inherit variable/extended functionalities,
         #   when merging in original cornice_swagger, it should be the 'default' behaviour of object converter
-        custom_converters = custom_converters or {}
-        extra_converters = {
+        #   user custom converters can override everything, but they must use extended classes to use extra features
+        extended_converters = {
             colander.Mapping: VariableObjectTypeConverter
         }
-        custom_converters.update(extra_converters)
-
-        custom_converters.update(self.keyword_converters)
+        extended_converters.update(self.keyword_converters)
+        if custom_converters:
+            extended_converters.update(custom_converters)
         super(OAS3TypeConversionDispatcher, self).__init__(custom_converters, default_converter)
 
     def __call__(self, schema_node):
@@ -1194,7 +1194,13 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
         if converter_class is None:
             converter_class = self.converters.get(schema_type)
             if converter_class is None:
-                if self.default_converter:
+                # find derived extended schema type
+                if any(issubclass(schema_type, s_type) for s_type in self.converters):
+                    for sub_type in inspect.getmro(schema_type)[1:]:
+                        converter_class = self.converters.get(sub_type)
+                        if converter_class is not None:
+                            break
+                elif self.default_converter:
                     converter_class = self.default_converter
                 else:
                     raise NoSuchConverter

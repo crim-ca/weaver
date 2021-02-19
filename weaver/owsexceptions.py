@@ -88,7 +88,7 @@ class OWSException(Response, Exception):
         return str(type(self))
 
     @staticmethod
-    def json_formatter(status, body, title, __environ):
+    def json_formatter(status, body, title, environ):  # noqa
         # type: (str, str, str, SettingsType) -> JSON
         body = clean_json_text_body(body)   # message/description
         code = int(status.split()[0])       # HTTP status code

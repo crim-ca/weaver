@@ -276,7 +276,7 @@ def test_stdout_stderr_logging_for_commandline_tool_failure():
     wps_package_instance = MockWpsPackage(identifier=process["id"], title=process["title"],
                                           payload=process, package=process["package"])
     wps_package_instance.mock_status_location = xml_file.name
-    wps_package_instance.set_workdir(workdir.name)
+    wps_package_instance.set_workdir(workdir)
 
     # ExecuteResponse mock
     wps_request = MockWpsRequest()
