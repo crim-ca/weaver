@@ -598,7 +598,7 @@ def get_request_options(method, url, settings):
 
     .. seealso::
         - :func:`get_ssl_verify_option`
-        - `config/request_options.yml.example <../../config/config/request_options.yml.example>`_
+        - `config/request_options.yml.example <../../../config/request_options.yml.example>`_
 
     :param method: request method (GET, POST, etc.).
     :param url: request URL.
