@@ -252,7 +252,9 @@ clean-docs:	install-dev clean-docs-dirs		## remove documentation artefacts
 .PHONY: clean-docs-dirs
 clean-docs-dirs:	## remove documentation artefacts (minimal)
 	@echo "Removing documentation directories..."
+	@-rm -fr "$(APP_ROOT)/docs/_build"
 	@-rm -fr "$(APP_ROOT)/docs/build"
+	@-rm -fr "$(APP_ROOT)/docs/source/autoapi"
 	@-rm -fr "$(APP_ROOT)/docs/html"
 	@-rm -fr "$(APP_ROOT)/docs/xml"
 
