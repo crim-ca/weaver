@@ -21,7 +21,7 @@ from pyramid.httpexceptions import (
     HTTPNotAcceptable,
     HTTPNotFound,
     HTTPNotImplemented,
-    HTTPOk,
+    HTTPOk
 )
 from pyramid.interfaces import IExceptionResponse
 from pyramid.response import Response
