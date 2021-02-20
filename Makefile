@@ -580,13 +580,14 @@ docker-push: docker-push-base docker-push-manager docker-push-worker  ## push al
 
 # if compose up fails, print the logs and force stop
 # if compose up succeeds, query weaver to get frontpage response
-DOCKER_TEST_COMPOSES := -f "$(APP_ROOT)/tests/travis-ci/docker-compose.smoke-test.yml"
+DOCKER_TEST_COMPOSES := -f "$(APP_ROOT)/tests/smoke/docker-compose.smoke-test.yml"
 .PHONY: docker-test
 docker-test: docker-build stop	## execute smoke test of the built images (validate that they boots and reply)
 	@echo "Smoke test of built application docker images"
 	docker-compose $(DOCKER_TEST_COMPOSES) up -d
 	sleep 10  ## leave some time to boot
-	curl localhost:4001 | grep "Weaver Information" || \
+	@echo "Pinging Weaver API entrypoint to validate response..."
+	@curl localhost:4001 | grep "Weaver Information" || \
 		( docker-compose $(DOCKER_TEST_COMPOSES) logs weaver worker || true && \
 		  docker-compose $(DOCKER_TEST_COMPOSES) stop; exit 1 )
 	docker-compose $(DOCKER_TEST_COMPOSES) stop

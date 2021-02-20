@@ -34,9 +34,9 @@ services:
   - docker
 before_install:
   # setup config files for travis tests
-  - source tests/travis-ci/weaver.env
-  - cp -f tests/travis-ci/data_sources.json config/
-  - cp -f tests/travis-ci/wps_processes.yml config/
+  - source tests/smoke/weaver.env
+  - cp -f tests/smoke/data_sources.json config/
+  - cp -f tests/smoke/wps_processes.yml config/
   - cp -f config/weaver.ini.example config/weaver.ini   # for 'make start' when needed
   # display details
   - make --version
@@ -91,8 +91,8 @@ jobs:
         - choco install python3 make
         - export PATH="/c/Python38:/c/Python38/Scripts:$PATH"
         - python -m pip install --upgrade pip wheel
-        - source tests/travis-ci/weaver.env
-        - cp -f tests/travis-ci/data_sources.json ./
+        - source tests/smoke/weaver.env
+        - cp -f tests/smoke/data_sources.json ./
         - make --version
         - make info
     - stage: smoke-test

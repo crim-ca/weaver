@@ -25,6 +25,8 @@ Changes:
   *typical* `Weaver` API / Worker combination with ``docker-proxy`` for sibling container execution.
 - Add captured ``stdout`` and ``stderr`` details in job log following CWL execution error when retrievable.
 - Document the `WPS` KVP/XML endpoint within the generated OpenAPI specification.
+- Disable auto-generation of ``request_options.yml`` file from corresponding empty example file and allow application
+  to start if no such configuration was provided.
 - Remove every Python 2 backward compatibility references and operations.
 - Drop Python 2 and Python 3.5 support.
 

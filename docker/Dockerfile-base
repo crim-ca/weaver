@@ -20,9 +20,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 		ca-certificates \
 		netbase \
 		gcc \
-	&& rm -rf /var/lib/apt/lists/* \
-    && pip install --no-cache-dir --upgrade pip setuptools \
-    && pip install --no-cache-dir -e ${APP_DIR}
+		git \
+	&& pip install --no-cache-dir --upgrade -r requirements-sys.txt \
+    && pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir -e ${APP_DIR} \
+    && apt-get remove -y \
+        gcc \
+        git \
+    && rm -rf /var/lib/apt/lists/*
 
 # install package
 COPY ./ ${APP_DIR}

@@ -15,7 +15,7 @@ ci/operations:
   - Dockerfile*
   - setup.*
   - requirements*
-  - tests/travis-ci/**/*
+  - tests/smoke/**/*
 
 ci/doc:
   - "*.rst"

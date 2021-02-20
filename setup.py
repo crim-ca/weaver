@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.join(CUR_DIR, os.path.split(CUR_DIR)[-1]))
 from weaver import __meta__  # isort:skip # noqa: E402
 
 requirements = {line.strip() for line in open("requirements.txt")}
-links = {line for line in requirements if "git+https" in line}
+links = {line for line in requirements if "git+https" in line or "@" in line}
 requirements = requirements - links
 
 setup(name=__meta__.__name__,

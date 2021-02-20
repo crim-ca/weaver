@@ -32,10 +32,12 @@ def main(global_config, **settings):
     # Parse extra_options and add each of them in the settings dict
     settings.update(parse_extra_options(settings.get("weaver.extra_options", "")))
 
-    # load requests options
-    req_file = get_weaver_config_file(settings.get("weaver.request_options", ""), WEAVER_DEFAULT_REQUEST_OPTIONS_CONFIG)
-    with open(req_file, "r") as f:
-        settings.update({"weaver.request_options": yaml.safe_load(f)})
+    # load requests options if found, otherwise skip
+    req_file = get_weaver_config_file(settings.get("weaver.request_options", ""),
+                                      WEAVER_DEFAULT_REQUEST_OPTIONS_CONFIG, generate_default_from_example=False)
+    if req_file:
+        with open(req_file, "r") as f:
+            settings.update({"weaver.request_options": yaml.safe_load(f)})
 
     local_config = Configurator(settings=settings)
     if global_config.get("__file__") is not None:
