@@ -2,8 +2,11 @@
 
 name: Tests
 on:
-  - pull_request
-  - push
+  push
+  pull_request:
+    types: [opened, synchronize, reopened]
+  release:
+    types: [created]
 
 jobs:
   # see: https://github.com/fkirc/skip-duplicate-actions
@@ -11,14 +14,14 @@ jobs:
     continue-on-error: true
     runs-on: ubuntu-latest
     outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+      should_skip: ${{ steps.skip_check.outputs.should_skip && ! contains(github.ref, "refs/tags") }}
     steps:
       - id: skip_check
         uses: fkirc/skip-duplicate-actions@master
         with:
           concurrent_skipping: "same_content"
           skip_after_successful_duplicate: "true"
-          do_not_skip: '["pull_request", "workflow_dispatch", "schedule"]'
+          do_not_skip: '["pull_request", "workflow_dispatch", "schedule", "release"]'
 
   # see: https://github.com/actions/setup-python
   tests:
