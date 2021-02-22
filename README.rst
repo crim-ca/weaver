@@ -33,7 +33,7 @@ For more details, see `Configuration`_ section.
     * - build status
       - | |readthedocs| |coverage| |codacy|
     * - tests status
-      - | |github_latest| |github_tagged| |travis_latest| |travis_tagged| |coverage| |codacy|
+      - | |github_latest| |github_tagged| |coverage| |codacy|
     * - releases
       - | |version| |commits-since| |license|
 
@@ -65,20 +65,12 @@ For more details, see `Configuration`_ section.
     :alt: Github Actions CI Build Status (latest tag)
     :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A2.0.0
 
-.. |travis_latest| image:: https://img.shields.io/travis/com/crim-ca/weaver/master.svg?label=master
-    :alt: Travis-CI Build Status (master branch)
-    :target: https://travis-ci.com/crim-ca/weaver
-
-.. |travis_tagged| image:: https://img.shields.io/travis/com/crim-ca/weaver/2.0.0.svg?label=2.0.0
-    :alt: Travis-CI Build Status (latest tag)
-    :target: https://github.com/crim-ca/weaver/tree/2.0.0
-
 .. |readthedocs| image:: https://img.shields.io/readthedocs/pavics-weaver
     :alt: Readthedocs Build Status (master branch)
     :target: `readthedocs`_
 
 .. |coverage| image:: https://img.shields.io/codecov/c/gh/crim-ca/weaver.svg?label=coverage
-    :alt: Travis-CI CodeCov Coverage
+    :alt: Code Coverage
     :target: https://codecov.io/gh/crim-ca/weaver
 
 .. |codacy| image:: https://api.codacy.com/project/badge/Grade/4f29419c9c91458ea3f0aa6aff11692c
