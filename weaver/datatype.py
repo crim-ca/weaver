@@ -670,7 +670,7 @@ class Job(Base):
         return "{base_job_url}{job_path}".format(base_job_url=base_job_url, job_path=job_path)
 
     def links(self, container=None, self_link=None):
-        # type: (Optional[AnySettingsContainer], Optional[AnyStr]) -> JSON
+        # type: (Optional[AnySettingsContainer], Optional[str]) -> JSON
         """Obtains the JSON links section of many response body for jobs.
 
         If :paramref:`self_link` is provided (e.g.: `"outputs"`) the link for that corresponding item will also
@@ -705,7 +705,7 @@ class Job(Base):
         return job_links_body
 
     def json(self, container=None, self_link=None):     # pylint: disable=W0221,arguments-differ
-        # type: (Optional[AnySettingsContainer], Optional[AnyStr]) -> JSON
+        # type: (Optional[AnySettingsContainer], Optional[str]) -> JSON
         """Obtains the JSON data representation for response body.
 
         .. note::

@@ -223,7 +223,7 @@ class DefaultSchemaNode(ExtendedNode, colander.SchemaNode):
     def _deserialize_impl(self, cstruct):
         if not getattr(self, DefaultSchemaNode._extension, False):
             return cstruct
-        #if cstruct is colander.null and self.required and self.default in (colander.null, colander.drop):
+        # if cstruct is colander.null and self.required and self.default in (colander.null, colander.drop):
         #    raise colander.Invalid(node=self, msg="Missing value for required field without any default.")
         # if nothing to process in structure, ask to remove (unless picked by default)
         result = colander.drop
