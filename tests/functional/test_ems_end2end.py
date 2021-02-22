@@ -5,13 +5,13 @@ import time
 from copy import deepcopy
 from typing import TYPE_CHECKING
 from unittest import TestCase
+from urllib.parse import urlparse
 
 import mock
 import pytest
 from pyramid import testing
 from pyramid.httpexceptions import HTTPCreated, HTTPNotFound, HTTPOk, HTTPUnauthorized
 from pyramid.settings import asbool
-from six.moves.urllib.parse import urlparse
 # use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
 from webtest import TestApp as WebTestApp
 
@@ -34,13 +34,13 @@ from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from weaver.typedefs import AnyResponseType, CookiesType, HeadersType, JSON, SettingsType   # noqa: F401
-    from typing import AnyStr, Dict, Optional, Any, Tuple, Iterable, Callable, Union            # noqa: F401
+    from weaver.typedefs import AnyResponseType, CookiesType, HeadersType, JSON, SettingsType
+    from typing import Dict, Optional, Any, Tuple, Iterable, Callable, Union
 
 
 class ProcessInfo(object):
     def __init__(self, process_id, test_id=None, deploy_payload=None, execute_payload=None):
-        # type: (AnyStr, Optional[AnyStr], Optional[JSON], Optional[JSON]) -> None
+        # type: (str, Optional[str], Optional[JSON], Optional[JSON]) -> None
         self.id = process_id
         self.test_id = test_id
         self.deploy_payload = deploy_payload
@@ -50,6 +50,7 @@ class ProcessInfo(object):
 # pylint: disable=C0103,invalid-name
 @pytest.mark.slow
 @pytest.mark.functional
+@pytest.mark.workflow
 @pytest.mark.skipif(condition=not len(str(os.getenv("WEAVER_TEST_SERVER_HOSTNAME", ""))),
                     reason="Test server not defined!")
 class End2EndEMSTestCase(TestCase):
@@ -57,18 +58,18 @@ class End2EndEMSTestCase(TestCase):
     Runs an end-2-end test procedure on weaver configured as EMS located on specified `WEAVER_TEST_SERVER_HOSTNAME`.
     """
     __settings__ = None
-    test_processes_info = dict()    # type: Dict[AnyStr, ProcessInfo]
+    test_processes_info = dict()    # type: Dict[str, ProcessInfo]
     headers = {
         "Accept": CONTENT_TYPE_APP_JSON,
         "Content-Type": CONTENT_TYPE_APP_JSON,
     }                               # type: HeadersType
     cookies = dict()                # type: CookiesType
     app = None                      # type: Optional[WebTestApp]
-    logger_result_dir = None        # type: Optional[AnyStr]
-    logger_separator_calls = ""     # type: AnyStr
-    logger_separator_steps = ""     # type: AnyStr
-    logger_separator_tests = ""     # type: AnyStr
-    logger_separator_cases = ""     # type: AnyStr
+    logger_result_dir = None        # type: Optional[str]
+    logger_separator_calls = ""     # type: str
+    logger_separator_steps = ""     # type: str
+    logger_separator_tests = ""     # type: str
+    logger_separator_cases = ""     # type: str
     logger_level = logging.INFO     # type: int
     logger_enabled = True           # type: bool
     logger = None                   # type: Optional[logging.Logger]
@@ -77,8 +78,8 @@ class End2EndEMSTestCase(TestCase):
     logger_field_indent = 2         # type: int
     log_full_trace = True           # type: bool
 
-    WEAVER_URL = None               # type: Optional[AnyStr]
-    WEAVER_RESTAPI_URL = None       # type: Optional[AnyStr]
+    WEAVER_URL = None               # type: Optional[str]
+    WEAVER_RESTAPI_URL = None       # type: Optional[str]
 
     @staticmethod
     def mock_get_data_source_from_url(data_url):
@@ -215,7 +216,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def get_test_process(cls, process_id):
-        # type: (AnyStr) -> ProcessInfo
+        # type: (str) -> ProcessInfo
         return cls.test_processes_info.get(process_id)
 
     @classmethod
@@ -288,7 +289,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def retrieve_process_info(cls, process_id):
-        # type: (AnyStr) -> ProcessInfo
+        # type: (str) -> ProcessInfo
         base = os.getenv("TEST_GITHUB_SOURCE_URL",
                          "https://raw.githubusercontent.com/crim-ca/testbed14/master/application-packages")
         deploy_path = "{base}/{proc}/DeployProcess_{proc}.json".format(base=base, proc=process_id)
@@ -308,7 +309,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def retrieve_payload(cls, url):
-        # type: (AnyStr) -> Dict
+        # type: (str) -> Dict
         local_path = os.path.join(os.path.dirname(__file__), "application-packages", url.split("/")[-1])
         try:
             # Try to find it locally, then fallback to remote
@@ -327,7 +328,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def get_test_process_id(cls, real_process_id):
-        # type: (AnyStr) -> AnyStr
+        # type: (str) -> str
         return "{}_{}".format(cls.__name__, real_process_id)
 
     @classmethod
@@ -358,7 +359,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def login(cls, username, password, force_magpie=False):
-        # type: (AnyStr, AnyStr, bool) -> Tuple[HeadersType, CookiesType]
+        # type: (str, str, bool) -> Tuple[HeadersType, CookiesType]
         """
         Login using WSO2 or Magpie according to ``WEAVER_TEST_PROTECTED_ENABLED`` to retrieve session cookies.
 
@@ -411,17 +412,17 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def get_indent(cls, indent_level):
-        # type: (int) -> AnyStr
+        # type: (int) -> str
         return " " * cls.logger_field_indent * indent_level
 
     @classmethod
     def indent(cls, field, indent_level):
-        # type: (AnyStr, int) -> AnyStr
+        # type: (str, int) -> str
         return cls.get_indent(indent_level) + field
 
     @classmethod
     def log_json_format(cls, payload, indent_level):
-        # type: (AnyStr, int) -> AnyStr
+        # type: (str, int) -> str
         """Logs an indented string representation of a JSON payload according to settings."""
         sub_indent = cls.get_indent(indent_level if cls.logger_json_indent else 0)
         log_payload = "\n" if cls.logger_json_indent else "" + json.dumps(payload, indent=cls.logger_json_indent)
@@ -441,7 +442,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def request(cls, method, url, ignore_errors=False, force_requests=False, log_enabled=True, **kw):
-        # type: (AnyStr, AnyStr, bool, bool, bool, Optional[Any]) -> AnyResponseType
+        # type: (str, str, bool, bool, bool, Optional[Any]) -> AnyResponseType
         """
         Executes the request, but following any server prior redirects as needed.
         Also prepares JSON body and obvious error handling according to a given status code.
@@ -541,7 +542,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def assert_response(cls, response, status=None, message=""):
-        # type: (AnyResponseType, Optional[Union[int, Iterable[int]]], AnyStr) -> None
+        # type: (AnyResponseType, Optional[Union[int, Iterable[int]]], str) -> None
         """Tests a response for expected status and raises an error if not matching."""
         code = response.status_code
         reason = getattr(response, "reason", "")
@@ -561,7 +562,7 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def assert_test(cls, assert_test, message=None, title="Test Assertion Failed"):
-        # type: (Callable[[], bool], Optional[AnyStr], AnyStr) -> None
+        # type: (Callable[[], bool], Optional[str], str) -> None
         """Tests a callable for assertion and logs the message if it fails, then re-raises to terminate execution."""
         try:
             assert assert_test(), message
@@ -762,7 +763,7 @@ class End2EndEMSTestCase(TestCase):
                              [self.PROCESS_STACKER_ID, self.PROCESS_SFS_ID])
 
     def workflow_runner(self, test_workflow_id, test_application_ids, log_full_trace=False):
-        # type: (AnyStr, Iterable[AnyStr], bool) -> None
+        # type: (str, Iterable[str], bool) -> None
         """Simplify test for demonstration purpose"""
 
         # test will log basic information
@@ -809,7 +810,7 @@ class End2EndEMSTestCase(TestCase):
             self.validate_test_job_execution(job_location, None, None)
 
     def validate_test_job_execution(self, job_location_url, user_headers=None, user_cookies=None):
-        # type: (AnyStr, Optional[HeadersType], Optional[CookiesType]) -> None
+        # type: (str, Optional[HeadersType], Optional[CookiesType]) -> None
         """
         Validates that the job is stated, running, and polls it until completed successfully.
         Then validates that results are accessible (no data integrity check).

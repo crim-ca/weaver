@@ -28,26 +28,33 @@ CONDA_ENV_REAL_TARGET_PATH := $(realpath $(CONDA_ENV_PATH))
 CONDA_ENV_REAL_ACTIVE_PATH := $(realpath ${CONDA_PREFIX})
 # environment already active - use it directly
 ifneq ("$(CONDA_ENV_REAL_ACTIVE_PATH)", "")
-	CONDA_ENV_MODE := [using active environment]
-	CONDA_ENV := $(notdir $(CONDA_ENV_REAL_ACTIVE_PATH))
-	CONDA_CMD :=
+  CONDA_ENV_MODE := [using active environment]
+  CONDA_ENV := $(notdir $(CONDA_ENV_REAL_ACTIVE_PATH))
+  CONDA_CMD :=
 endif
 # environment not active but it exists - activate and use it
 ifneq ($(CONDA_ENV_REAL_TARGET_PATH), "")
-	CONDA_ENV := $(notdir $(CONDA_ENV_REAL_TARGET_PATH))
+  CONDA_ENV := $(notdir $(CONDA_ENV_REAL_TARGET_PATH))
 endif
 # environment not active and not found - create, activate and use it
 ifeq ("$(CONDA_ENV)", "")
-	CONDA_ENV := $(APP_NAME)
+  CONDA_ENV := $(APP_NAME)
 endif
 # update paths for environment activation
 ifeq ("$(CONDA_ENV_REAL_ACTIVE_PATH)", "")
-	CONDA_ENV_MODE := [will activate environment]
-	CONDA_CMD := source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)";
+  CONDA_ENV_MODE := [will activate environment]
+  CONDA_CMD := source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)";
 endif
 DOWNLOAD_CACHE ?= $(APP_ROOT)/downloads
 PYTHON_VERSION ?= `python -c 'import platform; print(platform.python_version())'`
-PIP_XARGS ?= --use-feature=2020-resolver
+PIP_USE_FEATURE := `python -c '\
+	import pip; \
+	from distutils.version import LooseVersion; \
+	print(LooseVersion(pip.__version__) < LooseVersion("21.0"))'`
+PIP_XARGS ?=
+ifeq ("$(PIP_USE_FEATURE)", "True")
+  PIP_XARGS := --use-feature=2020-resolver $(PIP_XARGS)
+endif
 
 # choose conda installer depending on your OS
 CONDA_URL = https://repo.continuum.io/miniconda
@@ -66,7 +73,7 @@ REPORTS_DIR := $(APP_ROOT)/reports
 
 .DEFAULT_GOAL := help
 
-## --- Informative targets --- ##
+## -- Informative targets ------------------------------------------------------------------------------------------- ##
 
 .PHONY: all
 all: help
@@ -86,8 +93,14 @@ _NORMAL  := \033[0m
 .PHONY: help
 # note: use "\#\#" to escape results that would self-match in this target's search definition
 help:	## print this help message (default)
-	@echo "$(_SECTION)=== $(APP_NAME) help ===$(_NORMAL)"
-	@echo "Please use 'make <target>' where <target> is one of:"
+	@echo "$(_SECTION)=======================================$(_NORMAL)"
+	@echo "$(_SECTION) $(APP_NAME) help $(_NORMAL)"
+	@echo "$(_SECTION)=======================================$(_NORMAL)"
+	@echo "Please use 'make <target>' where <target> is one of below options."
+	@echo ""
+	@echo "NOTE:"
+	@echo "  Targets suffixed '<target>-only' can be called as '<target> to run setup before their main operation."
+	@echo ""
 #	@grep -E '^[a-zA-Z_-]+:.*?\#\# .*$$' $(MAKEFILE_LIST) \
 #		| awk 'BEGIN {FS = ":.*?\#\# "}; {printf "    $(_TARGET)%-24s$(_NORMAL) %s\n", $$1, $$2}'
 	@grep -E '\#\#.*$$' "$(APP_ROOT)/$(MAKEFILE_NAME)" \
@@ -95,6 +108,9 @@ help:	## print this help message (default)
 			/\--/ {printf "$(_SECTION)%s$(_NORMAL)\n", $$1;} \
 			/:/   {printf "    $(_TARGET)%-24s$(_NORMAL) %s\n", $$1, $$2} \
 		'
+
+.PHONY: targets
+targets: help
 
 .PHONY: version
 version:	## display current version
@@ -110,14 +126,14 @@ info:		## display make information
 	@echo "  Conda Env Name     $(CONDA_ENV)"
 	@echo "  Conda Env Path     $(CONDA_ENV_REAL_ACTIVE_PATH)"
 	@echo "  Conda Binary       $(CONDA_BIN)"
-	@echo "  Conda Actication   $(CONDA_ENV_MODE)"
+	@echo "  Conda Activation   $(CONDA_ENV_MODE)"
 	@echo "  Conda Command      $(CONDA_CMD)"
 	@echo "  Application Name   $(APP_NAME)"
 	@echo "  Application Root   $(APP_ROOT)"
-	@echo "  Donwload Cache     $(DOWNLOAD_CACHE)"
+	@echo "  Download Cache     $(DOWNLOAD_CACHE)"
 	@echo "  Docker Repository  $(DOCKER_REPO)"
 
-## -- Conda targets -- ##
+## -- Conda targets ------------------------------------------------------------------------------------------------- ##
 
 .PHONY: conda-base
 conda-base:		## obtain and install a missing conda distribution
@@ -160,10 +176,10 @@ conda-pinned: conda-env		## pin the conda version
 
 .PHONY: conda-env-export
 conda-env-export:		## export the conda environment
-	@echo "Exporting conda enviroment..."
+	@echo "Exporting conda environment..."
 	@test -d $(CONDA_ENV_PATH) && "$(CONDA_BIN)" env export -n $(CONDA_ENV) -f environment.yml
 
-## -- Build targets -- ##
+## -- Build targets ------------------------------------------------------------------------------------------------- ##
 
 .PHONY: install
 install: install-all    ## alias for 'install-all' target
@@ -177,25 +193,25 @@ install-all: install-sys install-pkg install-pip install-dev  ## install applica
 .PHONY: install-dev
 install-dev: install-pip	## install development and test dependencies
 	@echo "Installing development packages with pip..."
-	@-bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -r $(APP_ROOT)/requirements-dev.txt'
+	@-bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements-dev.txt"'
 	@echo "Install with pip complete. Test service with 'make test*' variations."
 
 .PHONY: install-pkg
 install-pkg: install-pip	## install application package dependencies
 	@echo "Installing base packages with pip..."
-	@-bash -c "$(CONDA_CMD) pip install $(PIP_XARGS) -r $(APP_ROOT)/requirements.txt --no-cache-dir"
+	@-bash -c "$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements.txt" --no-cache-dir"
 	@echo "Install with pip complete."
 
 # don't use 'PIP_XARGS' in this case since extra features could not yet be supported by pip being installed/updated
 .PHONY: install-sys
 install-sys: conda-env	## install system dependencies and required installers/runners
 	@echo "Installing system dependencies..."
-	@bash -c '$(CONDA_CMD) pip install --upgrade -r $(APP_ROOT)/requirements-sys.txt'
+	@bash -c '$(CONDA_CMD) pip install --upgrade -r "$(APP_ROOT)/requirements-sys.txt"'
 
 .PHONY: install-pip
 install-pip:	## install application as a package to allow import from another python package
 	@echo "Installing package with pip..."
-	@-bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) $(APP_ROOT)'
+	@-bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) --upgrade -e "$(APP_ROOT)" --no-cache'
 	@echo "Install with pip complete."
 
 .PHONY: install-raw
@@ -204,7 +220,7 @@ install-raw:	## install without any requirements or dependencies (suppose everyt
 	@-bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -e "$(APP_ROOT)" --no-deps'
 	@echo "Install package complete."
 
-## -- Cleanup targets -- ##
+## -- Cleanup targets ----------------------------------------------------------------------------------------------- ##
 
 .PHONY: clean
 clean: clean-all	## alias for 'clean-all' target
@@ -236,7 +252,9 @@ clean-docs:	install-dev clean-docs-dirs		## remove documentation artefacts
 .PHONY: clean-docs-dirs
 clean-docs-dirs:	## remove documentation artefacts (minimal)
 	@echo "Removing documentation directories..."
+	@-rm -fr "$(APP_ROOT)/docs/_build"
 	@-rm -fr "$(APP_ROOT)/docs/build"
+	@-rm -fr "$(APP_ROOT)/docs/source/autoapi"
 	@-rm -fr "$(APP_ROOT)/docs/html"
 	@-rm -fr "$(APP_ROOT)/docs/xml"
 
@@ -253,6 +271,8 @@ clean-test:		## remove files created by tests and coverage analysis
 	@-rm -f "$(APP_ROOT)/.coverage"
 	@-rm -f "$(APP_ROOT)/coverage.*"
 	@-rm -fr "$(APP_ROOT)/coverage"
+	@-rm -fr "$(REPORTS_DIR)/coverage"
+	@-rm -fr "$(REPORTS_DIR)/test-*.xml"
 
 .PHONY: clean-reports
 clean-reports:	## remove report files generated by code checks
@@ -261,137 +281,235 @@ clean-reports:	## remove report files generated by code checks
 .PHONY: clean-dist
 clean-dist: clean	## remove *all* files that are not controlled by 'git' except *.bak and makefile configuration
 	@echo "Cleaning distribution..."
-	@git diff --quiet HEAD || echo "There are uncommited changes! Not doing 'git clean'..."
+	@git diff --quiet HEAD || echo "There are uncommitted changes! Not doing 'git clean'..."
 	@-git clean -dfx -e *.bak -e Makefile.config
 
-## -- Testing targets -- ##
+## -- Testing targets ----------------------------------------------------------------------------------------------- ##
+## -- [variants '<target>-only' without '-only' suffix are also available with pre-install setup]
+
+# -v:  list of test names with PASS/FAIL/SKIP/ERROR/etc. next to it
+# -vv: extended collection of stdout/stderr on top of test results
+TEST_VERBOSITY ?= -v
+
+# autogen tests variants with pre-install of dependencies using the '-only' target references
+TESTS := unit func workflow online offline no-tb14 spec coverage
+TESTS := $(addprefix test-, $(TESTS))
+
+$(TESTS): test-%: install-dev test-%-only
 
 .PHONY: test
-test: clean-test test-all	## alias for 'test-all' target
+test: clean-test test-all   ## alias for 'test-all' target
 
 .PHONY: test-all
-test-all: install-dev		## run all tests (including long running tests)
+test-all: install-dev test-only		## run all tests (including long running tests)
+
+.PHONY: test-only
+test-only: mkdir-reports			## run all tests but without prior validation of installed dependencies
 	@echo "Running all tests (including slow and online tests)..."
-	@bash -c "$(CONDA_CMD) pytest tests -v --junitxml $(APP_ROOT)/tests/results.xml"
+	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
+		--junitxml "$(REPORTS_DIR)/test-results.xml"'
 
-.PHONY: test-unit
-test-unit: install-dev		## run unit tests (skip long running and online tests)
+.PHONY: test-unit-only
+test-unit-only: mkdir-reports 		## run unit tests (skip long running and online tests)
 	@echo "Running tests (skip slow and online tests)..."
-	@bash -c "$(CONDA_CMD) pytest tests -v -m 'not slow and not online and not functional' \
-	 	--junitxml $(APP_ROOT)/tests/results.xml"
+	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
+		-m "not slow and not online and not functional" --junitxml "$(REPORTS_DIR)/test-results.xml"'
 
-.PHONY: test-func
-test-func: install-dev		## run functional tests (online and usage specific)
+.PHONY: test-func-only
+test-func-only: mkdir-reports   	## run functional tests (online and usage specific)
 	@echo "Running functional tests..."
-	@bash -c "$(CONDA_CMD) pytest tests -v -m 'functional' --junitxml $(APP_ROOT)/tests/results.xml"
+	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
+		-m "functional" --junitxml "$(REPORTS_DIR)/test-results.xml"'
 
-.PHONY: test-online
-test-online: install-dev 	## run online tests (running instance required)
+.PHONY: test-workflow-only
+test-workflow-only:	mkdir-reports	## run EMS workflow End-2-End tests
+	@echo "Running workflow tests..."
+	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
+ 		-m "workflow" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+
+.PHONY: test-online-only
+test-online-only: mkdir-reports  	## run online tests (running instance required)
 	@echo "Running online tests (running instance required)..."
-	@bash -c "$(CONDA_CMD) pytest tests -v -m 'online' --junitxml $(APP_ROOT)/tests/results.xml"
+	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
+		-m "online" --junitxml "$(REPORTS_DIR)/test-results.xml"'
 
-.PHONY: test-offline
-test-offline: install-dev	## run offline tests (not marked as online)
+.PHONY: test-offline-only
+test-offline-only: mkdir-reports  	## run offline tests (not marked as online)
 	@echo "Running offline tests (not marked as online)..."
-	@bash -c "$(CONDA_CMD) pytest tests -v -m 'not online' --junitxml $(APP_ROOT)/tests/results.xml"
+	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
+ 		-m "not online" --junitxml "$(REPORTS_DIR)/test-results.xml"'
 
-.PHONY: test-no-tb14
-test-no-tb14: install-dev	## run all tests except ones marked for 'Testbed-14'
+.PHONY: test-no-tb14-only
+test-no-tb14-only: mkdir-reports  	## run all tests except ones marked for 'Testbed-14'
 	@echo "Running all tests except ones marked for 'Testbed-14'..."
-	@bash -c "$(CONDA_CMD) pytest tests -v -m 'not testbed14' --junitxml $(APP_ROOT)/tests/results.xml"
+	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
+		-m "not testbed14" --junitxml "$(REPORTS_DIR)/test-results.xml"'
 
-.PHONY: test-spec
-test-spec: install-dev		## run tests with custom input specification (pytest format) [make TESTS='<spec>' test-spec]
+.PHONY: test-spec-only
+test-spec-only:	mkdir-reports  ## run tests with custom specification (pytest format) [make SPEC='<spec>' test-spec]
 	@echo "Running custom tests from input specification..."
-	@[ "${TESTS}" ] || ( echo ">> 'TESTS' is not set"; exit 1 )
-	@bash -c "$(CONDA_CMD) pytest tests -v -m '${TESTS}' --junitxml $(APP_ROOT)/tests/results.xml"
+	@[ "${SPEC}" ] || ( echo ">> 'SPEC' is not set"; exit 1 )
+	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
+		-m "${SPEC}" --junitxml "$(REPORTS_DIR)/test-results.xml"'
 
 .PHONY: test-smoke
-test-smoke: docker-test    ## alias to 'docker-test' executing smoke test of built docker images
+test-smoke: docker-test     ## alias to 'docker-test' executing smoke test of built docker images
 
-.PHONY: coverage
-coverage: mkdir-reports install-dev		## run all tests using coverage analysis
+.PHONY: test-docker
+test-docker: docker-test    ## alias to 'docker-test' execution smoke test of built docker images
+
+.PHONY: test-coverage-only
+test-coverage-only: mkdir-reports  ## run all tests using coverage analysis
 	@echo "Running coverage analysis..."
 	@bash -c '$(CONDA_CMD) coverage run -m pytest "$(APP_ROOT)/tests" || true'
 	@bash -c '$(CONDA_CMD) coverage xml --rcfile="$(APP_ROOT)/setup.cfg" -i -o "$(REPORTS_DIR)/coverage.xml"'
 	@bash -c '$(CONDA_CMD) coverage report --rcfile="$(APP_ROOT)/setup.cfg" -i -m'
 	@bash -c '$(CONDA_CMD) coverage html --rcfile="$(APP_ROOT)/setup.cfg" -d "$(REPORTS_DIR)/coverage"'
 
-## -- Static code check targets -- ##
+.PHONY: coverage
+coverage: test-coverage  ## alias to run test with coverage analysis
+
+## -- Static code check targets ------------------------------------------------------------------------------------- ##
+## -- [variants '<target>-only' without '-only' suffix are also available with pre-install setup]
+
+# autogen check variants with pre-install of dependencies using the '-only' target references
+CHECKS := pep8 lint security doc8 links imports
+CHECKS := $(addprefix check-, $(CHECKS))
+
+$(CHECKS): check-%: install-dev check-%-only
 
 .PHONY: mkdir-reports
 mkdir-reports:
 	@mkdir -p "$(REPORTS_DIR)"
 
 .PHONY: check
-check: check-all	## alias for 'check-all' target
+check: check-all    ## alias for 'check-all' target
+
+.PHONY: check-only
+check-only: $(addsuffix -only, $(CHECKS))
 
 .PHONY: check-all
-check-all: install-dev check-pep8 check-lint check-imports check-security check-doc8 check-links ## run all code checks
+check-all: install-dev $(CHECKS) 	## run all code checks
 
-.PHONY: check-pep8
-check-pep8: mkdir-reports install-dev 	## run PEP8 code style checks
+.PHONY: check-pep8-only
+check-pep8-only: mkdir-reports 		## run PEP8 code style checks
 	@echo "Running pep8 code style checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-pep8.txt"
 	@bash -c '$(CONDA_CMD) \
 		flake8 --config="$(APP_ROOT)/setup.cfg" --output-file="$(REPORTS_DIR)/check-pep8.txt" --tee'
 
-.PHONY: check-lint
-check-lint: mkdir-reports install-dev	## run linting code style checks
+.PHONY: check-lint-only
+check-lint-only: mkdir-reports  	## run linting code style checks
 	@echo "Running linting code style checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-lint.txt"
 	@bash -c '$(CONDA_CMD) \
 		pylint \
 			--load-plugins pylint_quotes \
-			--rcfile="$(APP_ROOT)/.pylintrc" "$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" \
+			--rcfile="$(APP_ROOT)/.pylintrc" \
 			--reports y \
+			"$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" \
 		1> >(tee "$(REPORTS_DIR)/check-lint.txt")'
 
-.PHONY: check-security
-check-security: mkdir-reports install-dev	## run security code checks
+.PHONY: check-security-only
+check-security-only: mkdir-reports	## run security code checks
 	@echo "Running security code checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-security.txt"
 	@bash -c '$(CONDA_CMD) \
 		bandit -v --ini "$(APP_ROOT)/setup.cfg" -r \
 		1> >(tee "$(REPORTS_DIR)/check-security.txt")'
 
-.PHONY: check-doc8
-check-doc8: mkdir-reports install-dev	## run doc8 documentation style checks
+.PHONY: check-doc8-only
+check-doc8-only: mkdir-reports	## run doc8 documentation style checks
 	@echo "Running doc8 doc style checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-doc8.txt"
 	@bash -c '$(CONDA_CMD) \
 		doc8 "$(APP_ROOT)/docs" \
 		1> >(tee "$(REPORTS_DIR)/check-doc8.txt")'
 
-.PHONY: check-links
-check-links: install-dev	## check all external links in documentation for integrity
+.PHONY: check-links-only
+check-links-only:       	## check all external links in documentation for integrity
 	@echo "Running link checks on docs..."
 	@bash -c '$(CONDA_CMD) $(MAKE) -C "$(APP_ROOT)/docs" linkcheck'
 
-.PHONY: check-imports
-check-imports: mkdir-reports install-dev	## run imports code checks
+.PHONY: check-imports-only
+check-imports-only: mkdir-reports	## run imports code checks
 	@echo "Running import checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-imports.txt"
 	@bash -c '$(CONDA_CMD) \
 		isort --check-only --diff --recursive $(APP_ROOT) \
 		1> >(tee "$(REPORTS_DIR)/check-imports.txt")'
 
-.PHONY: fix-imports
-fix-imports: mkdir-reports install-dev	## apply import code checks corrections
+# autogen fix variants with pre-install of dependencies using the '-only' target references
+FIXES := imports lint docf
+FIXES := $(addprefix fix-, $(FIXES))
+
+$(FIXES): fix-%: install-dev fix-%-only
+
+.PHONY: fix
+fix: fix-all 	## alias for 'fix-all' target
+
+.PHONY: fix-only
+fix-only: $(addsuffix -only, $(FIXES))
+
+.PHONY: fix-all
+fix-all: install-dev $(FIXES)  ## fix all code check problems automatically
+
+.PHONY: fix-imports-only
+fix-imports-only: mkdir-reports	## apply import code checks corrections
 	@echo "Fixing flagged import checks..."
 	@-rm -fr "$(REPORTS_DIR)/fixed-imports.txt"
 	@bash -c '$(CONDA_CMD) \
 		isort --recursive $(APP_ROOT) \
 		1> >(tee "$(REPORTS_DIR)/fixed-imports.txt")'
 
-## -- Documentation targets -- ##
+.PHONY: fix-lint-only
+fix-lint-only: mkdir-reports  ## fix some PEP8 code style problems automatically
+	@echo "Fixing PEP8 code style problems..."
+	@-rm -fr "$(REPORTS_DIR)/fixed-lint.txt"
+	@bash -c '$(CONDA_CMD) \
+		autopep8 -v -j 0 -i -r $(APP_ROOT) \
+		1> >(tee "$(REPORTS_DIR)/fixed-lint.txt")'
+
+# FIXME: move parameters to setup.cfg when implemented (https://github.com/myint/docformatter/issues/10)
+.PHONY: fix-docf-only
+fix-docf-only: mkdir-reports  ## fix some PEP8 code documentation style problems automatically
+	@echo "Fixing PEP8 code documentation problems..."
+	@-rm -fr "$(REPORTS_DIR)/fixed-docf.txt"
+	@bash -c '$(CONDA_CMD) \
+		docformatter \
+			--pre-summary-newline \
+			--wrap-descriptions 0 \
+			--wrap-summaries 120 \
+			--make-summary-multi-line \
+			--in-place \
+			--recursive \
+			$(APP_ROOT) \
+		1> >(tee "$(REPORTS_DIR)/fixed-docf.txt")'
+
+.PHONY: fixme-list-only
+fixme-list-only: mkdir-reports  	## run linting code style checks
+	@echo "Listing code that requires fixes..."
+	@echo '[MISCELLANEOUS]\nnotes=FIXME,TODO,HACK' > "$(REPORTS_DIR)/fixmerc"
+	@bash -c '$(CONDA_CMD) \
+		pylint \
+			--disable=all,use-symbolic-message-instead --enable=miscellaneous,W0511 \
+			--score n --persistent n \
+			--rcfile="$(REPORTS_DIR)/fixmerc" \
+			-f colorized \
+			"$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" \
+		1> >(tee "$(REPORTS_DIR)/fixme.txt")'
+
+.PHONY: fixme-list
+fixme-list: install-dev fixme-list-only
+
+## -- Documentation targets ----------------------------------------------------------------------------------------- ##
 
 .PHONY: docs
 docs: install-dev clean-docs 	## generate HTML documentation with Sphinx
 	@echo "Generating docs with Sphinx..."
 	@bash -c '$(CONDA_CMD) $(MAKE) -C $@ html'
 
-## -- Versioning targets -- ##
+## -- Versioning targets -------------------------------------------------------------------------------------------- ##
 
 # Bumpversion 'dry' config
 # if 'dry' is specified as target, any bumpversion call using 'BUMP_XARGS' will not apply changes
@@ -409,7 +527,7 @@ bump:  ## bump version using VERSION specified as user input [make VERSION=<x.y.
 	@[ "${VERSION}" ] || ( echo ">> 'VERSION' is not set"; exit 1 )
 	@-bash -c '$(CONDA_CMD) bump2version $(BUMP_XARGS) --new-version "${VERSION}" patch;'
 
-## -- Docker targets -- ##
+## -- Docker targets ------------------------------------------------------------------------------------------------ ##
 
 .PHONY: docker-info
 docker-info:		## obtain docker image information
@@ -462,13 +580,14 @@ docker-push: docker-push-base docker-push-manager docker-push-worker  ## push al
 
 # if compose up fails, print the logs and force stop
 # if compose up succeeds, query weaver to get frontpage response
-DOCKER_TEST_COMPOSES := -f "$(APP_ROOT)/tests/travis-ci/docker-compose.smoke-test.yml"
+DOCKER_TEST_COMPOSES := -f "$(APP_ROOT)/tests/smoke/docker-compose.smoke-test.yml"
 .PHONY: docker-test
 docker-test: docker-build stop	## execute smoke test of the built images (validate that they boots and reply)
 	@echo "Smoke test of built application docker images"
 	docker-compose $(DOCKER_TEST_COMPOSES) up -d
 	sleep 10  ## leave some time to boot
-	curl localhost:4001 | grep "Weaver Information" || \
+	@echo "Pinging Weaver API entrypoint to validate response..."
+	@curl localhost:4001 | grep "Weaver Information" || \
 		( docker-compose $(DOCKER_TEST_COMPOSES) logs weaver worker || true && \
 		  docker-compose $(DOCKER_TEST_COMPOSES) stop; exit 1 )
 	docker-compose $(DOCKER_TEST_COMPOSES) stop
@@ -494,7 +613,7 @@ docker-clean:  ## remove all built docker images (only matching current/latest v
 	docker rmi -f "$(APP_NAME):latest" || true
 	docker rmi -f "$(APP_NAME):base" || true
 
-## --- Launchers targets --- ##
+## -- Launchers targets --------------------------------------------------------------------------------------------- ##
 
 .PHONY: start
 start: install-run	## start application instance(s) with gunicorn (pserve)

@@ -80,6 +80,15 @@ class SchemaNodeDefault(colander.SchemaNode):
         return result
 
 
+class OneOfCaseInsensitive(colander.OneOf):
+    """
+    Validator that ensures the given value matches one of the available choices, but allowing case insensitve values.
+    """
+    def __call__(self, node, value):
+        if str(value).lower() not in (choice.lower() for choice in self.choices):
+            return super(OneOfCaseInsensitive, self).__call__(node, value)
+
+
 class OneOfMappingSchema(colander.MappingSchema):
     """
     Allows specifying multiple supported mapping schemas variants for an underlying schema definition.

@@ -2,25 +2,22 @@ import logging
 
 from pyramid.settings import asbool
 
-from weaver.wps_restapi import api
-from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
+from weaver.formats import OUTPUT_FORMAT_JSON
 
 LOGGER = logging.getLogger(__name__)
 
 
 def includeme(config):
-    from weaver.wps_restapi import swagger_definitions as sd
+    from weaver.wps_restapi import api, swagger_definitions as sd
+
     settings = config.registry.settings
     if asbool(settings.get("weaver.wps_restapi", True)):
         LOGGER.info("Adding WPS REST API...")
         config.registry.settings["handle_exceptions"] = False  # avoid cornice conflicting views
-        config.include("cornice")
-        config.include("cornice_swagger")
         config.include("weaver.wps_restapi.jobs")
         config.include("weaver.wps_restapi.providers")
         config.include("weaver.wps_restapi.processes")
         config.include("weaver.wps_restapi.quotation")
-        config.include("pyramid_mako")
         config.add_route(**sd.service_api_route_info(sd.api_frontpage_service, settings))
         config.add_route(**sd.service_api_route_info(sd.api_swagger_json_service, settings))
         config.add_route(**sd.service_api_route_info(sd.api_swagger_ui_service, settings))

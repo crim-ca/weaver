@@ -31,7 +31,9 @@ For more details, see `Configuration`_ section.
     * - dependencies
       - | |py_ver| |requires| |pyup|
     * - build status
-      - | |travis_latest| |travis_tagged| |readthedocs| |coverage| |codacy|
+      - | |readthedocs| |coverage| |codacy|
+    * - tests status
+      - | |github_latest| |github_tagged| |travis_latest| |travis_tagged| |coverage| |codacy|
     * - releases
       - | |version| |commits-since| |license|
 
@@ -54,6 +56,14 @@ For more details, see `Configuration`_ section.
 .. |pyup| image:: https://pyup.io/repos/github/crim-ca/weaver/shield.svg
     :alt: Dependencies Status
     :target: https://pyup.io/account/repos/github/crim-ca/weaver/
+
+.. |github_latest| image:: https://img.shields.io/github/workflow/status/crim-ca/weaver/Tests/master?label=master
+    :alt: Github Actions CI Build Status (master branch)
+    :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3Amaster
+
+.. |github_tagged| image:: https://img.shields.io/github/workflow/status/crim-ca/weaver/Tests/1.14.0?label=1.14.0
+    :alt: Github Actions CI Build Status (latest tag)
+    :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A1.14.0
 
 .. |travis_latest| image:: https://img.shields.io/travis/com/crim-ca/weaver/master.svg?label=master
     :alt: Travis-CI Build Status (master branch)

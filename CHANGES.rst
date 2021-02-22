@@ -9,10 +9,37 @@ Changes
 Changes:
 --------
 - Add support of YAML format for loading ``weaver.data_sources`` definition.
+- Pre-install ``Docker`` CLI in ``worker`` image to avoid bad practice of mounting it from the host.
+- Adjust WPS request dispatching such that process jobs get executed by ``Celery`` worker as intended
+  (see `#21 <https://github.com/crim-ca/weaver/issues/21>`_ and `#126 <https://github.com/crim-ca/weaver/issues/126>`_).
+- Move WPS XML endpoint functions under separate ``weaver.wps.utils`` and ``weaver.wps.views`` to remove the need to
+  constantly handle circular imports issues due to processing related operations that share some code.
+- Move core processing of job operation by ``Celery`` worker under ``weaver.processes.execution`` in order to separate
+  those components from functions specific for producing WPS-REST API responses.
+- Handle WPS-1/2 requests submitted by GET KVP or POST XML request with ``application/json`` in ``Accept`` header to
+  return the same body content as if directly calling their corresponding WPS-REST endpoints.
+- Remove ``request`` parameter of every database store methods since they were not used nor provided most of the time.
+- Changed all forbidden access responses related to visibility status to return ``403`` instead of ``401``.
+- Add more tests for Docker applications and test suite execution with Github Actions.
+- Add more details in sample configurations and provide an example ``docker-compose.yml`` configuration that defines a
+  *typical* `Weaver` API / Worker combination with ``docker-proxy`` for sibling container execution.
+- Add captured ``stdout`` and ``stderr`` details in job log following CWL execution error when retrievable.
+- Document the `WPS` KVP/XML endpoint within the generated OpenAPI specification.
+- Disable auto-generation of ``request_options.yml`` file from corresponding empty example file and allow application
+  to start if no such configuration was provided.
+- Remove every Python 2 backward compatibility references and operations.
+- Drop Python 2 and Python 3.5 support.
 
 Fixes:
 ------
-- No change.
+- Target ``PyWPS-4.4`` to resolve multiple invalid dependency requirements breaking installed packages over builtin
+  Python packages and other compatibility fixes
+  (see `geopython/pywps #568 <https://github.com/geopython/pywps/issues/568>`_).
+- Fix retrieval of database connexion to avoid warning of ``MongoClient`` opened before fork of processes.
+- Fix indirect dependency ``oauthlib`` missing from ``esgf-compute-api`` (``cwt``) package.
+- Fix inconsistent ``python`` reference resolution of ``builtin`` applications when executed locally and in tests
+  (using virtual/conda environment) compared to within Weaver Docker image (using OS python).
+- Fix many typing definitions.
 
 `1.14.0 <https://github.com/crim-ca/weaver/tree/1.14.0>`_ (2021-01-11)
 ========================================================================

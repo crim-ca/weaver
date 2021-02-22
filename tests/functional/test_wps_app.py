@@ -6,6 +6,7 @@ Based on tests from:
 * http://webtest.pythonpaste.org/en/latest/
 * http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/testing.html
 """
+import contextlib
 import unittest
 
 import pyramid.testing
@@ -16,12 +17,13 @@ from lxml import etree
 from tests.utils import (
     get_test_weaver_app,
     get_test_weaver_config,
+    mocked_execute_process,
     setup_config_with_celery,
     setup_config_with_mongodb,
     setup_config_with_pywps,
     setup_mongodb_processstore
 )
-from weaver.formats import CONTENT_TYPE_ANY_XML
+from weaver.formats import CONTENT_TYPE_ANY_XML, CONTENT_TYPE_APP_XML
 from weaver.processes.wps_default import HelloWPS
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.utils import str2bytes
@@ -114,27 +116,44 @@ class WpsAppTest(unittest.TestCase):
         assert resp.content_type in CONTENT_TYPE_ANY_XML
         resp.mustcontain("<ows:ExceptionText>Unknown process")
 
-    def test_execute_allowed(self):
+    def test_execute_allowed_demo(self):
         template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=name=tux"
         params = template.format(HelloWPS.identifier)
         url = self.make_url(params)
-        resp = self.app.get(url)
-        assert resp.status_code == 200
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_process():
+                stack_exec.enter_context(mock_exec)
+            resp = self.app.get(url)
+        assert resp.status_code == 200  # FIXME: replace by 202 Accepted (?) https://github.com/crim-ca/weaver/issues/14
         assert resp.content_type in CONTENT_TYPE_ANY_XML
-        status = "<wps:ProcessSucceeded>PyWPS Process {} finished</wps:ProcessSucceeded>".format(HelloWPS.title)
-        resp.mustcontain(status)
+        resp.mustcontain("<wps:ExecuteResponse")
+        resp.mustcontain("<wps:ProcessAccepted")
+        resp.mustcontain("PyWPS Process {}".format(HelloWPS.identifier))
 
-    def test_execute_with_visibility(self):
+    def test_execute_deployed_with_visibility_allowed(self):
+        headers = {"Accept": CONTENT_TYPE_APP_XML}
         params_template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=test_input=test"
-        url = self.make_url(params_template.format(self.process_public.identifier, ))
-        resp = self.app.get(url)
-        assert resp.status_code == 200
+        url = self.make_url(params_template.format(self.process_public.identifier))
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_process():
+                stack_exec.enter_context(mock_exec)
+            resp = self.app.get(url, headers=headers)
+        assert resp.status_code == 200  # FIXME: replace by 202 Accepted (?) https://github.com/crim-ca/weaver/issues/14
         assert resp.content_type in CONTENT_TYPE_ANY_XML
-        resp.mustcontain("<wps:ProcessSucceeded>PyWPS Process {} finished</wps:ProcessSucceeded>"
-                         .format(self.process_public.title))
+        resp.mustcontain("<wps:ExecuteResponse")
+        resp.mustcontain("<wps:ProcessAccepted")
+        resp.mustcontain("PyWPS Process {}".format(self.process_public.identifier))
 
+    def test_execute_deployed_with_visibility_denied(self):
+        headers = {"Accept": CONTENT_TYPE_APP_XML}
+        params_template = "service=wps&request=execute&version=1.0.0&identifier={}&datainputs=test_input=test"
         url = self.make_url(params_template.format(self.process_private.identifier))
-        resp = self.app.get(url, expect_errors=True)
-        assert resp.status_code == 400
-        assert resp.content_type in CONTENT_TYPE_ANY_XML
-        resp.mustcontain("<ows:ExceptionText>Unknown process")
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_process():
+                stack_exec.enter_context(mock_exec)
+            resp = self.app.get(url, headers=headers, expect_errors=True)
+        assert resp.status_code == 403
+        assert resp.content_type in CONTENT_TYPE_ANY_XML, "Error Response: {}".format(resp.text)
+        resp.mustcontain("<Exception exceptionCode=\"AccessForbidden\" locator=\"service\">")
+        err_desc = "Process with ID '{}' is not accessible.".format(self.process_private.identifier)
+        resp.mustcontain("<ExceptionText>{}</ExceptionText>".format(err_desc))

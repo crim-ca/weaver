@@ -1,7 +1,6 @@
 import os
 
 import mock
-import six
 from pyramid.httpexceptions import HTTPOk, HTTPRequestTimeout
 from pyramid.response import Response
 from pywps.inout.formats import Format
@@ -13,7 +12,8 @@ from weaver import formats as f
 def test_get_extension():
     assert f.get_extension(f.CONTENT_TYPE_APP_JSON) == ".json"  # basic
     assert f.get_extension(f.CONTENT_TYPE_APP_JSON + "; charset=UTF-8") == ".json"  # ignore extra parameters
-    assert f.get_extension(f.CONTENT_TYPE_APP_GEOJSON) == ".geojson"  # pywps definition
+    assert f.get_extension(f.CONTENT_TYPE_APP_GEOJSON) == ".geojson"      # pywps <4.4 definition
+    assert f.get_extension(f.CONTENT_TYPE_APP_VDN_GEOJSON) == ".geojson"  # pywps>=4.4 definition
     assert f.get_extension(f.CONTENT_TYPE_IMAGE_GEOTIFF) == ".tiff"  # pywps definition
     assert f.get_extension("application/x-custom") == ".custom"
     assert f.get_extension("application/unknown") == ".unknown"
@@ -52,7 +52,7 @@ def test_get_cwl_file_format_reference():
     for ns, mime_type in tests:
         res = f.get_cwl_file_format(mime_type, make_reference=True)
         ns_name, ns_url = list(ns.items())[0]
-        assert isinstance(res, six.string_types)
+        assert isinstance(res, str)
         assert res.startswith(ns_url)
         tested.remove(ns_name)
     assert len(tested) == 0, "test did not evaluate every namespace variation"
@@ -82,7 +82,7 @@ def test_get_cwl_file_format_retry_attempts():
     """Verifies that failing request will not immediately fail the MIME-type validation."""
     codes = {"codes": [HTTPOk.code, HTTPRequestTimeout.code]}  # note: used in reverse order (pop)
 
-    def mock_request_extra(*args, **kwargs):  # noqa: E811
+    def mock_request_extra(*_, **__):
         m_resp = Response()
         m_resp.status_code = codes["codes"].pop()
         return m_resp
@@ -95,10 +95,10 @@ def test_get_cwl_file_format_retry_attempts():
 
 def test_get_cwl_file_format_retry_fallback_urlopen():
     """Verifies that failing request because of critical error still validate the MIME-type using the fallback."""
-    def mock_connect_error(*args, **kwargs):  # noqa: E811
+    def mock_connect_error(*_, **__):
         raise ConnectionError()
 
-    def mock_urlopen(*args, **kwargs):  # noqa: E811
+    def mock_urlopen(*_, **__):
         return HTTPOk()
 
     with mock.patch("requests.Session.request", side_effect=mock_connect_error) as mocked_request:

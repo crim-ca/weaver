@@ -16,7 +16,9 @@ sys.path.insert(0, os.path.join(CUR_DIR, os.path.split(CUR_DIR)[-1]))
 # pylint: disable=C0413,wrong-import-order
 from weaver import __meta__  # isort:skip # noqa: E402
 
-requirements = [line.strip() for line in open("requirements.txt")]
+requirements = {line.strip() for line in open("requirements.txt")}
+links = {line for line in requirements if "git+https" in line or "@" in line}
+requirements = requirements - links
 
 setup(name=__meta__.__name__,
       version=__meta__.__version__,
@@ -48,10 +50,8 @@ setup(name=__meta__.__name__,
       zip_safe=False,
       test_suite="tests",
       python_requires=">=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*, <4",
-      install_requires=requirements,
-      dependency_links=[
-          "git+https://github.com/ESGF/esgf-compute-api.git@v2.1.0#egg=cwt"
-      ],
+      install_requires=list(requirements),
+      dependency_links=list(links),
       entry_points={
           "paste.app_factory": [
               "main = {}:main".format(__meta__.__name__)

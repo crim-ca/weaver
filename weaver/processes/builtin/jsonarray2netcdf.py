@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Extracts and fetches NetCDF files from a JSON file containing an URL string array,
 and provides them on the output directory.
@@ -7,15 +8,7 @@ import json
 import logging
 import os
 import sys
-from typing import Any, AnyStr
-
-import six
-from six.moves.urllib.parse import urlparse
-
-if six.PY3:
-    from tempfile import TemporaryDirectory
-else:
-    from backports.tempfile import TemporaryDirectory  # pylint: disable=E0611  # noqa # py2
+from tempfile import TemporaryDirectory
 
 CUR_DIR = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, CUR_DIR)
@@ -24,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(CUR_DIR))))
 
 # place weaver specific imports after sys path fixing to ensure they are found from external call
 # pylint: disable=C0413,wrong-import-order
-from weaver.formats import get_extension, CONTENT_TYPE_APP_NETCDF  # isort:skip # noqa: E402
+from weaver.processes.builtin.utils import is_netcdf_url  # isort:skip # noqa: E402
 from weaver.utils import fetch_file  # isort:skip # noqa: E402
 
 PACKAGE_NAME = os.path.split(os.path.splitext(__file__)[0])[-1]
@@ -35,22 +28,13 @@ LOGGER.addHandler(logging.StreamHandler(sys.stdout))
 LOGGER.setLevel(logging.INFO)
 
 # process details
-__version__ = "1.0"
+__version__ = "1.1"
 __title__ = "JSON array to NetCDF"
 __abstract__ = __doc__  # NOTE: '__doc__' is fetched directly, this is mostly to be informative
 
 
-def _is_netcdf_url(url):
-    # type: (Any) -> bool
-    if not isinstance(url, six.string_types):
-        return False
-    if urlparse(url).scheme == "":
-        return False
-    return os.path.splitext(url)[-1] == get_extension(CONTENT_TYPE_APP_NETCDF)
-
-
 def j2n(json_reference, output_dir):
-    # type: (AnyStr, AnyStr) -> None
+    # type: (str, str) -> None
     LOGGER.info("Process '%s' execution starting...", PACKAGE_NAME)
     LOGGER.debug("Process '%s' output directory: [%s].", PACKAGE_NAME, output_dir)
     try:
@@ -62,7 +46,7 @@ def j2n(json_reference, output_dir):
             LOGGER.debug("Reading JSON file: [%s]", json_path)
             with open(json_path) as json_file:
                 json_content = json.load(json_file)
-            if not isinstance(json_content, list) or any(not _is_netcdf_url(f) for f in json_content):
+            if not isinstance(json_content, list) or any(not is_netcdf_url(f) for f in json_content):
                 LOGGER.error("Invalid JSON: [%s]", json_content)
                 raise ValueError("Invalid JSON file format, expected a plain array of NetCDF file URL strings.")
             LOGGER.debug("Parsing JSON file references.")

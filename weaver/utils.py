@@ -11,11 +11,12 @@ import warnings
 from copy import deepcopy
 from datetime import datetime
 from typing import TYPE_CHECKING
+from urllib.parse import ParseResult, parse_qs, urlparse, urlunsplit
 
 import boto3
+import colander
 import pytz
 import requests
-import six
 from celery.app import Celery
 from lxml import etree
 from pyramid.config import Configurator
@@ -26,20 +27,29 @@ from pyramid.settings import asbool, aslist
 from requests import HTTPError as RequestsHTTPError, Response
 from requests.structures import CaseInsensitiveDict
 from requests_file import FileAdapter
-from six.moves.urllib.parse import ParseResult, parse_qs, urlparse, urlunsplit
 from urlmatch import urlmatch
 from webob.headers import EnvironHeaders, ResponseHeaders
 
-from weaver.exceptions import InvalidIdentifierValue
 from weaver.status import map_status
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 
 if TYPE_CHECKING:
-    from weaver.typedefs import (                                                               # noqa: F401
-        AnyValue, AnyKey, AnySettingsContainer, AnyRegistryContainer, AnyHeadersContainer,
-        AnyResponseType, HeadersType, SettingsType, JSON, XML, Number
+    from typing import Any, Dict, List, Iterable, Optional, Type, Union
+
+    from weaver.typedefs import (
+        AnyKey,
+        AnyHeadersContainer,
+        AnySettingsContainer,
+        AnyRegistryContainer,
+        AnyResponseType,
+        AnyValue,
+        HeadersType,
+        JSON,
+        KVP,
+        Number,
+        SettingsType,
+        XML
     )
-    from typing import Union, Any, Dict, List, AnyStr, Iterable, Optional, Type                 # noqa: F401
 
 LOGGER = logging.getLogger(__name__)
 
@@ -60,7 +70,7 @@ class _Singleton(type):
         return cls.__instance__
 
 
-class _NullType(six.with_metaclass(_Singleton)):
+class _NullType(metaclass=_Singleton):
     """Represents a ``null`` value to differentiate from ``None``."""
 
     # pylint: disable=E1101,no-member
@@ -86,14 +96,14 @@ null = _NullType()
 
 
 def get_weaver_url(container):
-    # type: (AnySettingsContainer) -> AnyStr
+    # type: (AnySettingsContainer) -> str
     """Retrieves the home URL of the `weaver` application."""
     value = get_settings(container).get("weaver.url", "") or ""  # handle explicit None
     return value.rstrip("/").strip()
 
 
 def get_any_id(info):
-    # type: (JSON) -> Union[AnyStr, None]
+    # type: (JSON) -> Union[str, None]
     """Retrieves a dictionary `id-like` key using multiple common variations ``[id, identifier, _id]``.
     :param info: dictionary that potentially contains an `id-like` key.
     :returns: value of the matched `id-like` key or ``None`` if not found."""
@@ -109,15 +119,15 @@ def get_any_value(info):
 
 
 def get_any_message(info):
-    # type: (JSON) -> AnyStr
+    # type: (JSON) -> str
     """Retrieves a dictionary 'value'-like key using multiple common variations [message].
     :param info: dictionary that potentially contains a 'message'-like key.
     :returns: value of the matched 'message'-like key or an empty string if not found. """
     return info.get("message", "").strip()
 
 
-def get_registry(container):
-    # type: (AnyRegistryContainer) -> Registry
+def get_registry(container, nothrow=False):
+    # type: (AnyRegistryContainer, bool) -> Optional[Registry]
     """Retrieves the application ``registry`` from various containers referencing to it."""
     if isinstance(container, Celery):
         return container.conf.get("PYRAMID_REGISTRY", {})
@@ -125,6 +135,8 @@ def get_registry(container):
         return container.registry
     if isinstance(container, Registry):
         return container
+    if nothrow:
+        return None
     raise TypeError("Could not retrieve registry from container object of type [{}].".format(type(container)))
 
 
@@ -141,7 +153,7 @@ def get_settings(container):
 
 
 def get_header(header_name, header_container):
-    # type: (AnyStr, AnyHeadersContainer) -> Union[AnyStr, None]
+    # type: (str, AnyHeadersContainer) -> Union[str, None]
     """
     Searches for the specified header by case/dash/underscore-insensitive ``header_name`` inside ``header_container``.
     """
@@ -160,7 +172,7 @@ def get_header(header_name, header_container):
 
 
 def get_cookie_headers(header_container, cookie_header_name="Cookie"):
-    # type: (AnyHeadersContainer, Optional[AnyStr]) -> HeadersType
+    # type: (AnyHeadersContainer, Optional[str]) -> HeadersType
     """
     Looks for ``cookie_header_name`` header within ``header_container``.
     :returns: new header container in the form ``{'Cookie': <found_cookie>}`` if it was matched, or empty otherwise.
@@ -175,9 +187,9 @@ def get_cookie_headers(header_container, cookie_header_name="Cookie"):
 
 
 def get_url_without_query(url):
-    # type: (Union[AnyStr, ParseResult]) -> AnyStr
+    # type: (Union[str, ParseResult]) -> str
     """Removes the query string part of an URL."""
-    if isinstance(url, six.string_types):
+    if isinstance(url, str):
         url = urlparse(url)
     if not isinstance(url, ParseResult):
         raise TypeError("Expected a parsed URL.")
@@ -185,11 +197,24 @@ def get_url_without_query(url):
 
 
 def is_valid_url(url):
-    # type: (Union[AnyStr, None]) -> bool
+    # type: (Optional[str]) -> bool
     try:
         return bool(urlparse(url).scheme)
     except Exception:  # noqa: W0703 # nosec: B110
         return False
+
+
+UUID_PATTERN = re.compile(colander.UUID_REGEX, re.IGNORECASE)
+
+
+def is_uuid(maybe_uuid):
+    # type: (Any) -> bool
+    """
+    Evaluates if the provided input is a UUID-like string.
+    """
+    if not isinstance(maybe_uuid, str):
+        return False
+    return re.match(UUID_PATTERN, str(maybe_uuid)) is not None
 
 
 def parse_extra_options(option_str):
@@ -251,7 +276,7 @@ def expires_at(hours=1):
 
 
 def localize_datetime(dt, tz_name="UTC"):
-    # type: (datetime, Optional[AnyStr]) -> datetime
+    # type: (datetime, Optional[str]) -> datetime
     """
     Provide a timezone-aware object for a given datetime and timezone name
     """
@@ -267,7 +292,7 @@ def localize_datetime(dt, tz_name="UTC"):
 
 
 def get_base_url(url):
-    # type: (AnyStr) -> AnyStr
+    # type: (str) -> str
     """
     Obtains the base URL from the given ``url``.
     """
@@ -279,7 +304,7 @@ def get_base_url(url):
 
 
 def xml_path_elements(path):
-    # type: (AnyStr) -> List[AnyStr]
+    # type: (str) -> List[str]
     elements = [el.strip() for el in path.split("/")]
     elements = [el for el in elements if len(el) > 0]
     return elements
@@ -297,7 +322,7 @@ def xml_strip_ns(tree):
 
 
 def ows_context_href(href, partial=False):
-    # type: (AnyStr, Optional[bool]) -> JSON
+    # type: (str, Optional[bool]) -> JSON
     """Returns the complete or partial dictionary defining an ``OWSContext`` from a reference."""
     context = {"offering": {"content": {"href": href}}}
     if partial:
@@ -345,9 +370,9 @@ def raise_on_xml_exception(xml_node):
 
 
 def str2bytes(string):
-    # type: (Union[AnyStr, bytes]) -> bytes
+    # type: (Union[str, bytes]) -> bytes
     """Obtains the bytes representation of the string."""
-    if not isinstance(string, (six.string_types, bytes)):
+    if not isinstance(string, (str, bytes)):
         raise TypeError("Cannot convert item to bytes: {!r}".format(type(string)))
     if isinstance(string, bytes):
         return string
@@ -355,9 +380,9 @@ def str2bytes(string):
 
 
 def bytes2str(string):
-    # type: (Union[AnyStr, bytes]) -> str
+    # type: (Union[str, bytes]) -> str
     """Obtains the unicode representation of the string."""
-    if not isinstance(string, (six.string_types, bytes)):
+    if not isinstance(string, (str, bytes)):
         raise TypeError("Cannot convert item to unicode: {!r}".format(type(string)))
     if not isinstance(string, bytes):
         return string
@@ -374,13 +399,13 @@ all_cap_re = re.compile(r"([a-z0-9])([A-Z])")
 
 
 def convert_snake_case(name):
-    # type: (AnyStr) -> AnyStr
+    # type: (str) -> str
     s1 = first_cap_re.sub(r"\1_\2", name)
     return all_cap_re.sub(r"\1_\2", s1).lower()
 
 
 def parse_request_query(request):
-    # type: (Request) -> Dict[AnyStr, Dict[AnyKey, AnyStr]]
+    # type: (Request) -> Dict[str, Dict[AnyKey, str]]
     """
     :param request:
     :return: dict of dict where k=v are accessible by d[k][0] == v and q=k=v are accessible by d[q][k] == v, lowercase
@@ -390,34 +415,89 @@ def parse_request_query(request):
     for q in queries:
         queries_dict[q] = dict()
         for i, kv in enumerate(queries[q]):
-            kvs = kv.split("=")
-            if len(kvs) > 1:
-                queries_dict[q][kvs[0]] = kvs[1]
+            kvp = kv.split("=")
+            if len(kvp) > 1:
+                queries_dict[q][kvp[0]] = kvp[1]
             else:
-                queries_dict[q][i] = kvs[0]
+                queries_dict[q][i] = kvp[0]
     return queries_dict
 
 
+def get_path_kvp(path, sep=",", **params):
+    # type: (str, str, KVP) -> str
+    """
+    Generates the WPS URL with Key-Value-Pairs (KVP) query parameters.
+
+    :param path: WPS URL or Path
+    :param sep: separator to employ when multiple values are provided.
+    :param params: keyword parameters and their corresponding single or multi values to generate KVP.
+    :return: combined path and query parameters as KVP.
+    """
+
+    def _value(_v):
+        if isinstance(_v, (list, set, tuple)):
+            return sep.join([str(_) for _ in _v])
+        return str(_v)
+
+    kvp = ["{}={}".format(k, _value(v)) for k, v in params.items()]
+    return path + "?" + "&".join(kvp)
+
+
 def get_log_fmt():
-    # type: (...) -> AnyStr
+    # type: (...) -> str
+    """
+    Logging format employed for job output reporting.
+    """
     return "[%(asctime)s] %(levelname)-8s [%(name)s] %(message)s"
 
 
 def get_log_date_fmt():
-    # type: (...) -> AnyStr
+    # type: (...) -> str
+    """
+    Logging date format employed for job output reporting.
+    """
     return "%Y-%m-%d %H:%M:%S"
 
 
 def get_log_monitor_msg(job_id, status, percent, message, location):
-    # type: (AnyStr, AnyStr, Number, AnyStr, AnyStr) -> AnyStr
+    # type: (str, str, Number, str, str) -> str
     return "Monitoring job {jobID} : [{status}] {percent} - {message} [{location}]".format(
         jobID=job_id, status=status, percent=percent, message=message, location=location
     )
 
 
 def get_job_log_msg(status, message, progress=0, duration=None):
-    # type: (AnyStr, AnyStr, Optional[Number], Optional[AnyStr]) -> AnyStr
+    # type: (str, str, Optional[Number], Optional[str]) -> str
     return "{d} {p:3d}% {s:10} {m}".format(d=duration or "", p=int(progress or 0), s=map_status(status), m=message)
+
+
+def setup_loggers(settings, level=None):
+    # type: (AnySettingsContainer, Optional[Union[int, str]]) -> None
+    """
+    Update logging configuration known loggers based on application settings.
+
+    When ``weaver.log_level`` exists in settings, it **overrides** any other INI configuration logging levels.
+    Otherwise, undefined logger levels will be set according to whichever is found first between ``weaver.log_level``,
+    the :paramref:`level` parameter or default :py:data:`logging.INFO`.
+    """
+    log_level = settings.get("weaver.log_level")
+    override = False
+    if log_level:
+        override = True
+    else:
+        log_level = level or logging.INFO
+    if not isinstance(log_level, int):
+        log_level = logging.getLevelName(log_level.upper())
+    for logger_name in ["weaver", "cwltool"]:
+        logger = logging.getLogger(logger_name)
+        if override or logger.level == logging.NOTSET:
+            logger.setLevel(log_level)
+        # define basic formatter/handler if config INI did not provide it
+        if not logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter(get_log_fmt())
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
 
 
 def make_dirs(path, mode=0o755, exist_ok=False):
@@ -486,7 +566,7 @@ def get_caller_name(skip=2, base_class=False):
 
 
 def get_ssl_verify_option(method, url, settings, request_options=None):
-    # type: (AnyStr, AnyStr, AnySettingsContainer, Optional[SettingsType]) -> bool
+    # type: (str, str, AnySettingsContainer, Optional[SettingsType]) -> bool
     """
     Obtains the SSL verification option from combined settings from ``weaver.ssl_verify`` and parsed
     ``weaver.request_options`` file for the corresponding request.
@@ -509,7 +589,7 @@ def get_ssl_verify_option(method, url, settings, request_options=None):
 
 
 def get_request_options(method, url, settings):
-    # type: (AnyStr, AnyStr, AnySettingsContainer) -> SettingsType
+    # type: (str, str, AnySettingsContainer) -> SettingsType
     """
     Obtains the *request options* corresponding to the request according to configuration file specified by pre-loaded
     setting ``weaver.request_options``.
@@ -518,7 +598,7 @@ def get_request_options(method, url, settings):
 
     .. seealso::
         - :func:`get_ssl_verify_option`
-        - `config/request_options.yml.example <../../config/config/request_options.yml.example>`_
+        - `config/request_options.yml.example <../../../config/request_options.yml.example>`_
 
     :param method: request method (GET, POST, etc.).
     :param url: request URL.
@@ -563,8 +643,8 @@ def get_request_options(method, url, settings):
     return request_options
 
 
-def request_extra(method,                       # type: AnyStr
-                  url,                          # type: AnyStr
+def request_extra(method,                       # type: str
+                  url,                          # type: str
                   retries=None,                 # type: Optional[int]
                   backoff=None,                 # type: Optional[Number]
                   intervals=None,               # type: Optional[List[Number]]
@@ -723,7 +803,7 @@ def request_extra(method,                       # type: AnyStr
 
 
 def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
-    # type: (AnyStr, AnyStr, Optional[AnySettingsContainer], **Any) -> AnyStr
+    # type: (str, str, Optional[AnySettingsContainer], **Any) -> str
     """
     Fetches a file from a local path, an AWS-S3 bucket or remote URL, and dumps it's content to the specified output
     directory.
@@ -748,9 +828,7 @@ def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
     file_path = os.path.join(file_outdir, file_name)
     if file_reference.startswith("file://"):
         file_reference = file_reference[7:]
-    LOGGER.debug("Fetch file resolved:\n"
-                 "  Reference: [%s]\n"
-                 "  File Path: [%s]", file_href, file_path)
+    LOGGER.debug("Fetching file reference: [%s]", file_href)
     if os.path.isfile(file_reference):
         LOGGER.debug("Fetch file resolved as local reference.")
         # NOTE:
@@ -760,7 +838,8 @@ def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
         #   Do symlink operation by hand instead of with argument to have Python-2 compatibility.
         if os.path.islink(file_reference):
             os.symlink(os.readlink(file_reference), file_path)
-        else:
+        # otherwise copy the file if not already available
+        elif not os.path.isfile(file_path) or os.path.realpath(file_path) != os.path.realpath(file_reference):
             shutil.copyfile(file_reference, file_path)
     elif file_reference.startswith("s3://"):
         LOGGER.debug("Fetch file resolved as S3 bucket reference.")
@@ -798,7 +877,9 @@ def fetch_file(file_reference, file_outdir, settings=None, **request_kwargs):
         scheme = "<none>" if len(scheme) < 2 else scheme[0]
         raise ValueError("Unresolved fetch file scheme: '{!s}', supported: {}"
                          .format(scheme, list(SUPPORTED_FILE_SCHEMES)))
-    LOGGER.debug("Fetch file written")
+    LOGGER.debug("Fetch file resolved:\n"
+                 "  Reference: [%s]\n"
+                 "  File Path: [%s]", file_href, file_path)
     return file_path
 
 
@@ -807,7 +888,7 @@ REGEX_ASSERT_INVALID_CHARACTERS = re.compile(r"^[a-zA-Z0-9_\-]+$")
 
 
 def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_character="_"):
-    # type: (AnyStr, Optional[int], Optional[Union[int, None]], Optional[bool], Optional[AnyStr]) -> Union[AnyStr, None]
+    # type: (str, Optional[int], Optional[Union[int, None]], Optional[bool], Optional[str]) -> Union[str, None]
     """
     Returns a cleaned-up version of the input name, replacing invalid characters matched with
     ``REGEX_SEARCH_INVALID_CHARACTERS`` by ``replace_character``.
@@ -821,7 +902,7 @@ def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_ch
     :param assert_invalid: If ``True``, fail conditions or invalid characters will raise an error instead of replacing.
     :param replace_character: Single character to use for replacement of invalid ones if ``assert_invalid=False``.
     """
-    if not isinstance(replace_character, six.string_types) and not len(replace_character) == 1:
+    if not isinstance(replace_character, str) and not len(replace_character) == 1:
         raise ValueError("Single replace character is expected, got invalid [{!s}]".format(replace_character))
     max_len = max_len or len(name)
     if assert_invalid:
@@ -841,8 +922,10 @@ def assert_sane_name(name, min_len=3, max_len=None):
     .. seealso::
         - argument details in :func:`get_sane_name`
     """
-    if name is None:
-        raise InvalidIdentifierValue("Invalid name : {0}".format(name))
+    from weaver.exceptions import InvalidIdentifierValue, MissingIdentifierValue
+
+    if name is None or len(name) == 0:
+        raise MissingIdentifierValue("Invalid name : {0}".format(name))
     name = name.strip()
     if "--" in name \
        or name.startswith("-") \
@@ -854,7 +937,7 @@ def assert_sane_name(name, min_len=3, max_len=None):
 
 
 def clean_json_text_body(body):
-    # type: (AnyStr) -> AnyStr
+    # type: (str) -> str
     """
     Cleans a textual body field of superfluous characters to provide a better human-readable text in a JSON response.
     """

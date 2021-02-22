@@ -1,17 +1,17 @@
 import os
 from typing import TYPE_CHECKING
+from urllib.error import HTTPError
+from urllib.request import urlopen
 
 from pyramid.httpexceptions import HTTPNotFound, HTTPOk
 from pywps.inout.formats import FORMATS, Format
 from requests.exceptions import ConnectionError
-from six.moves.urllib.error import HTTPError
-from six.moves.urllib.request import urlopen
 
 from weaver.utils import request_extra
 
 if TYPE_CHECKING:
-    from weaver.typedefs import JSON                            # noqa: F401
-    from typing import AnyStr, Dict, Optional, Tuple, Union     # noqa: F401
+    from weaver.typedefs import JSON
+    from typing import Dict, Optional, Tuple, Union
 
 # Content-Types
 #   MIME-type nomenclature:
@@ -29,7 +29,8 @@ CONTENT_TYPE_TEXT_HTML = "text/html"
 CONTENT_TYPE_TEXT_PLAIN = "text/plain"
 CONTENT_TYPE_APP_PDF = "application/pdf"
 CONTENT_TYPE_APP_JSON = "application/json"
-CONTENT_TYPE_APP_GEOJSON = "application/vnd.geo+json"
+CONTENT_TYPE_APP_GEOJSON = "application/geo+json"
+CONTENT_TYPE_APP_VDN_GEOJSON = "application/vnd.geo+json"
 CONTENT_TYPE_APP_XML = "application/xml"
 CONTENT_TYPE_IMAGE_GEOTIFF = "image/tiff; subtype=geotiff"
 CONTENT_TYPE_TEXT_XML = "text/xml"
@@ -38,17 +39,18 @@ CONTENT_TYPE_ANY = "*/*"
 
 # explicit mime-type to extension when not literally written in item after '/' (excluding 'x-' prefix)
 _CONTENT_TYPE_EXTENSION_MAPPING = {
+    CONTENT_TYPE_APP_VDN_GEOJSON: ".geojson",  # pywps 4.4 default extension without vdn prefix
     CONTENT_TYPE_APP_NETCDF: ".nc",
     CONTENT_TYPE_APP_GZIP: ".gz",
     CONTENT_TYPE_APP_TAR_GZ: ".tar.gz",
     CONTENT_TYPE_APP_YAML: ".yml",
     CONTENT_TYPE_ANY: ".*",   # any for glob
-}  # type: Dict[AnyStr, AnyStr]
+}  # type: Dict[str, str]
 # extend with all known pywps formats
 _CONTENT_TYPE_FORMAT_MAPPING = {
     # content-types here are fully defined with extra parameters (e.g.: geotiff as subtype of tiff)
     fmt.mime_type: fmt for _, fmt in FORMATS._asdict().items()  # noqa: W0212
-}  # type: Dict[AnyStr, Format]
+}  # type: Dict[str, Format]
 _CONTENT_TYPE_EXTENSION_MAPPING.update({
     ctype: fmt.extension for ctype, fmt in _CONTENT_TYPE_FORMAT_MAPPING.items()  # noqa: W0212
 })
@@ -81,16 +83,28 @@ EDAM_MAPPING = {
 }
 FORMAT_NAMESPACES = frozenset([IANA_NAMESPACE, EDAM_NAMESPACE])
 
+# renderers output formats for OpenAPI generation
+WPS_VERSION_100 = "1.0.0"
+WPS_VERSION_200 = "2.0.0"
+OUTPUT_FORMAT_JSON = "json"
+OUTPUT_FORMAT_XML = "xml"
+OUTPUT_FORMATS = {
+    WPS_VERSION_100: OUTPUT_FORMAT_XML,
+    WPS_VERSION_200: OUTPUT_FORMAT_JSON,
+    CONTENT_TYPE_APP_XML: OUTPUT_FORMAT_XML,
+    CONTENT_TYPE_APP_JSON: OUTPUT_FORMAT_JSON,
+}
+
 
 def get_format(mime_type):
-    # type: (AnyStr) -> Format
+    # type: (str) -> Format
     """Obtains a :class:`Format` with predefined extension and encoding details from known MIME-types."""
     ctype = clean_mime_type_format(mime_type, strip_parameters=True)
     return _CONTENT_TYPE_FORMAT_MAPPING.get(mime_type, Format(ctype, extension=get_extension(ctype)))
 
 
 def get_extension(mime_type):
-    # type: (AnyStr) -> AnyStr
+    # type: (str) -> str
     """
     Retrieves the extension corresponding to :paramref:`mime_type` if explicitly defined, or by parsing it.
     """
@@ -105,7 +119,7 @@ def get_extension(mime_type):
 
 
 def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_synonym=True):
-    # type: (AnyStr, bool, bool, bool) -> Union[Tuple[Optional[JSON], Optional[AnyStr]], Optional[AnyStr]]
+    # type: (str, bool, bool, bool) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
     """
     Obtains the corresponding `IANA`/`EDAM` ``format`` value to be applied under a `CWL` I/O ``File`` from
     the :paramref:`mime_type` (`Content-Type` header) using the first matched one.
@@ -186,7 +200,7 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
 
 
 def clean_mime_type_format(mime_type, suffix_subtype=False, strip_parameters=False):
-    # type: (AnyStr, bool, bool) -> AnyStr
+    # type: (str, bool, bool) -> str
     """
     Removes any additional namespace key or URL from :paramref:`mime_type` so that it corresponds to the generic
     representation (e.g.: ``application/json``) instead of the ``<namespace-name>:<format>`` mapping variant used

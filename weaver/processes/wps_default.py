@@ -13,12 +13,9 @@ class HelloWPS(Process):
     title = "Say Hello"
     type = PROCESS_WPS
 
-    def __init__(self, *args, **kwargs):  # noqa: E811
-        inputs = [
-            LiteralInput("name", "Your name", data_type="string")]
-        outputs = [
-            LiteralOutput("output", "Output response",
-                          data_type="string")]
+    def __init__(self, *_, **__):
+        inputs = [LiteralInput("name", "Your name", data_type="string")]
+        outputs = [LiteralOutput("output", "Output response", data_type="string")]
 
         super(HelloWPS, self).__init__(
             self._handler,

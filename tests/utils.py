@@ -1,10 +1,12 @@
 """
 Utility methods for various TestCase setup operations.
 """
+import contextlib
 import os
 import tempfile
 import uuid
 import warnings
+from configparser import ConfigParser
 from inspect import isclass
 from typing import TYPE_CHECKING
 
@@ -12,43 +14,38 @@ from typing import TYPE_CHECKING
 import mock
 import moto
 import pyramid_celery
-import six
 from pyramid import testing
 from pyramid.config import Configurator
 from pyramid.httpexceptions import HTTPException, HTTPNotFound, HTTPUnprocessableEntity
 from pyramid.registry import Registry
 from requests import Response
-from six.moves.configparser import ConfigParser
 from webtest import TestApp
 
-from tests.compat import contextlib
 from weaver.config import WEAVER_CONFIGURATION_DEFAULT, WEAVER_DEFAULT_INI_CONFIG, get_weaver_config_file
 from weaver.database import get_db
 from weaver.datatype import Service
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_XML
 from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
-from weaver.utils import get_url_without_query, get_weaver_url, null
+from weaver.utils import get_path_kvp, get_url_without_query, get_weaver_url, null
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
-from weaver.wps_restapi.processes.processes import execute_process
 
 if TYPE_CHECKING:
     import botocore.client  # noqa
-    from weaver.typedefs import (  # noqa: F401
-        Any, AnyResponseType, AnyStr, Callable, List, Optional, SettingsType, Type, Union
-    )
+
+    from weaver.typedefs import Any, AnyResponseType, Callable, List, Optional, SettingsType, Type, Union
 
 MOCK_AWS_REGION = "us-central-1"
 
 
 def ignore_warning_regex(func, warning_message_regex, warning_categories=DeprecationWarning):
-    # type: (Callable, Union[AnyStr, List[AnyStr]], Union[Type[Warning], List[Type[Warning]]]) -> Callable
+    # type: (Callable, Union[str, List[str]], Union[Type[Warning], List[Type[Warning]]]) -> Callable
     """Wrapper that eliminates any warning matching ``warning_regex`` during testing logging.
 
     **NOTE**:
         Wrapper should be applied on method (not directly on :class:`unittest.TestCase`
         as it can disable the whole test suite.
     """
-    if isinstance(warning_message_regex, six.string_types):
+    if isinstance(warning_message_regex, str):
         warning_message_regex = [warning_message_regex]
     if not isinstance(warning_message_regex, list):
         raise NotImplementedError("Argument 'warning_message_regex' must be a string or a list of string.")
@@ -80,7 +77,7 @@ def ignore_wps_warnings(func):
 
 
 def get_settings_from_config_ini(config_ini_path=None, ini_section_name="app:main"):
-    # type: (Optional[AnyStr], AnyStr) -> SettingsType
+    # type: (Optional[str], str) -> SettingsType
     parser = ConfigParser()
     parser.read([get_weaver_config_file(config_ini_path, WEAVER_DEFAULT_INI_CONFIG)])
     settings = dict(parser.items(ini_section_name))
@@ -123,11 +120,12 @@ def setup_mongodb_processstore(config=None):
     # type: (Optional[Configurator]) -> MongodbProcessStore
     """Setup store using mongodb, will be enforced if not configured properly."""
     config = setup_config_with_mongodb(config)
-    store = get_db(config).get_store(MongodbProcessStore)
+    db = get_db(config)
+    store = db.get_store(MongodbProcessStore)
     store.clear_processes()
     # store must be recreated after clear because processes are added automatically on __init__
-    get_db(config)._stores.pop(MongodbProcessStore.type)  # noqa: W0212
-    store = get_db(config).get_store(MongodbProcessStore)
+    db.reset_store(MongodbProcessStore.type)
+    store = db.get_store(MongodbProcessStore)
     return store
 
 
@@ -186,6 +184,9 @@ def get_test_weaver_config(config=None, settings=None):
         config = setup_config_from_settings(settings=settings)
     if "weaver.configuration" not in config.registry.settings:
         config.registry.settings["weaver.configuration"] = WEAVER_CONFIGURATION_DEFAULT
+    # set default log level for tests to ease debugging failing test cases
+    if not config.registry.settings.get("weaver.log_level"):
+        config.registry.settings["weaver.log_level"] = "DEBUG"
     if "weaver.url" not in config.registry.settings:
         config.registry.settings["weaver.url"] = "https://localhost"
     # ignore example config files that would be auto-generated when missing
@@ -213,7 +214,7 @@ def get_settings_from_testapp(testapp):
 
 
 def get_setting(env_var_name, app=None, setting_name=None):
-    # type: (AnyStr, Optional[TestApp], Optional[AnyStr]) -> Any
+    # type: (str, Optional[TestApp], Optional[str]) -> Any
     val = os.getenv(env_var_name, null)
     if val != null:
         return val
@@ -245,7 +246,7 @@ def init_weaver_service(registry):
 
 
 def mocked_file_response(path, url):
-    # type: (AnyStr, AnyStr) -> Union[Response, HTTPException]
+    # type: (str, str) -> Union[Response, HTTPException]
     """
     Generates a mocked response from the provided file path, and represented as if coming from the specified URL.
 
@@ -278,7 +279,7 @@ def mocked_file_response(path, url):
 
 
 def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
-    # type: (TestApp, AnyStr, *Any, bool, **Any) -> AnyResponseType
+    # type: (TestApp, str, *Any, bool, **Any) -> AnyResponseType
     """
     Executes ``app.function(*args, **kwargs)`` with a mock of every underlying :func:`requests.request` call
     to relay their execution to the :class:`webTest.TestApp`.
@@ -297,6 +298,30 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
     from requests.sessions import Session as RealSession
     real_request = RealSession.request
 
+    def _parse_for_app_req(method, url, **req_kwargs):
+        """
+        WebTest application employs ``params`` instead of ``data``/``json``.
+        Actual query parameters must be pre-appended to ``url``.
+        """
+        method = method.lower()
+        url = req_kwargs.pop("base_url", url)
+        body = req_kwargs.pop("data", None)
+        query = req_kwargs.pop("query", None)
+        params = req_kwargs.pop("params", {})
+        if query:
+            url += ("" if query.startswith("?") else "?") + query
+        elif params:
+            if isinstance(params, str):
+                url += ("" if params.startswith("?") else "?") + params
+            else:
+                url = get_path_kvp(url, **params)
+        req_kwargs["params"] = body
+        # remove unsupported parameters that cannot be passed down to TestApp
+        for key in ["timeout", "cert", "auth", "ssl_verify", "verify", "language"]:
+            req_kwargs.pop(key, None)
+        req = getattr(app, method)
+        return url, req, req_kwargs
+
     def mocked_app_request(method, url=None, **req_kwargs):
         """
         Request corresponding to :func:`requests.request` that instead gets executed by :class:`webTest.TestApp`,
@@ -309,15 +334,9 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
             with RealSession() as session:
                 return real_request(session, method, url, **req_kwargs)
 
-        method = method.lower()
-        headers = req_kwargs.get("headers")
-        req = getattr(app, method)
-        url = req_kwargs.get("base_url", url)
-        query = req_kwargs.get("params")
-        if query:
-            url = url + "?" + query
+        url, func, req_kwargs = _parse_for_app_req(method, url, **req_kwargs)
         if not url.startswith("mock://"):
-            resp = req(url, params=req_kwargs.get("data"), headers=headers, expect_errors=True)
+            resp = func(url, expect_errors=True, **req_kwargs)
             setattr(resp, "content", resp.body)
         else:
             path = get_url_without_query(url.replace("mock://", ""))
@@ -328,29 +347,33 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
         stack.enter_context(mock.patch("requests.request", side_effect=mocked_app_request))
         stack.enter_context(mock.patch("requests.Session.request", side_effect=mocked_app_request))
         stack.enter_context(mock.patch("requests.sessions.Session.request", side_effect=mocked_app_request))
-        request_func = getattr(app, function)
+        req_url, req_func, kwargs = _parse_for_app_req(function, *args, **kwargs)
         kwargs.setdefault("expect_errors", True)
-        return request_func(*args, **kwargs)
+        return req_func(req_url, **kwargs)
 
 
 def mocked_execute_process():
     """
-    Provides a mock to call :func:`weaver.wps_restapi.processes.processes.execute_process` safely within
-    a test employing a :class:`webTest.TestApp` without a running ``Celery`` app.
+    Provides a mock to call :func:`weaver.processes.execution.execute_process` safely within a test employing
+    :class:`webTest.TestApp` without a running ``Celery`` app.
+
     This avoids connection error from ``Celery`` during a job execution request.
 
-    Bypasses the ``execute_process.delay`` call by directly invoking the ``execute_process``.
+    Bypasses ``execute_process.delay`` call by directly invoking the ``execute_process``.
 
-    **Note**: since ``delay`` and ``Celery`` are bypassed, the process execution becomes blocking (not asynchronous).
+    .. note::
+        Since ``delay`` and ``Celery`` are bypassed, the process execution becomes blocking (not asynchronous).
 
     .. seealso::
         - :func:`mocked_process_job_runner` to completely skip process execution.
         - :func:`setup_config_with_celery`
     """
+    from weaver.processes.execution import execute_process as real_execute_process
+
     class MockTask(object):
         """
-        Mocks call ``self.request.id`` in :func:`weaver.wps_restapi.processes.processes.execute_process` and
-        call ``result.id`` in :func:`weaver.wps_restapi.processes.processes.submit_job_handler`.
+        Mocks call ``self.request.id`` in :func:`weaver.processes.execution.execute_process` and
+        call ``result.id`` in :func:`weaver.processes.execution.submit_job_handler`.
         """
         _id = str(uuid.uuid4())
 
@@ -360,27 +383,27 @@ def mocked_execute_process():
 
     task = MockTask()
 
-    def mock_execute_process(job_id, url, headers, notification_email):
-        execute_process(job_id, url, headers, notification_email)
+    def mock_execute_process(job_id, url, headers):
+        real_execute_process(job_id, url, headers)
         return task
 
     return (
-        mock.patch("weaver.wps_restapi.processes.processes.execute_process.delay", side_effect=mock_execute_process),
+        mock.patch("weaver.processes.execution.execute_process.delay", side_effect=mock_execute_process),
         mock.patch("celery.app.task.Context", return_value=task)
     )
 
 
 def mocked_process_job_runner(job_task_id="mocked-job-id"):
     """
-    Provides a mock that will no execute the process execution when call during job creation.
+    Provides a mock that will bypass execution of the process when called during job submission.
 
     .. seealso::
-        - :func:`mocked_execute_process` to still execute the process, but without `Celery` connection.
+        - :func:`mocked_execute_process` to still execute the process, but directly instead of within ``Celery`` worker.
     """
     result = mock.MagicMock()
     result.id = job_task_id
     return (
-        mock.patch("weaver.wps_restapi.processes.processes.execute_process.delay", return_value=result),
+        mock.patch("weaver.processes.execution.execute_process.delay", return_value=result),
     )
 
 
@@ -428,7 +451,7 @@ def mocked_aws_s3(test_func):
 
 
 def mocked_aws_s3_bucket_test_file(bucket_name, file_name, file_content="Test file inside test S3 bucket"):
-    # type: (AnyStr,AnyStr, AnyStr) -> AnyStr
+    # type: (str,str, str) -> str
     """
     Generates a test file reference from dummy data that will be uploaded to the specified S3 bucket name using the
     provided file key.

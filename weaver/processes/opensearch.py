@@ -2,12 +2,12 @@ import logging
 from collections import deque
 from copy import deepcopy
 from typing import TYPE_CHECKING
+from urllib.parse import parse_qsl, urlparse
 
 import lxml.etree
 import shapely.wkt
 from pyramid.httpexceptions import HTTPOk
 from pyramid.settings import asbool
-from six.moves.urllib.parse import parse_qsl, urlparse
 
 from weaver.formats import CONTENT_TYPE_TEXT_PLAIN
 from weaver.processes.constants import (
@@ -22,8 +22,8 @@ from weaver.processes.sources import fetch_data_sources
 from weaver.utils import get_any_id, request_extra
 
 if TYPE_CHECKING:
-    from weaver.typedefs import AnySettingsContainer, XML                       # noqa: F401
-    from typing import AnyStr, Deque, Dict, Iterable, List, Optional, Tuple     # noqa: F401
+    from weaver.typedefs import AnySettingsContainer, XML
+    from typing import Deque, Dict, Iterable, List, Optional, Tuple
 
 LOGGER = logging.getLogger("PACKAGE")
 
@@ -261,7 +261,7 @@ class OpenSearchQuery(object):
             response = request_extra("get", base_url, params=query_params,
                                      intervals=list(range(1, 5)), allowed_codes=[HTTPOk.code],
                                      settings=self.settings)
-            if not response.status_code == 200:
+            if response.status_code != 200:
                 break
             json_body = response.json()
             features = json_body.get("features", [])
@@ -279,7 +279,7 @@ class OpenSearchQuery(object):
             start_index += n_received_features
 
     def query_datasets(self, params, accept_schemes, accept_mime_types):
-        # type: (Dict, Tuple, List) -> Iterable[AnyStr]
+        # type: (Dict, Tuple, List) -> Iterable[str]
         """
         Loop on every opensearch result feature and yield url matching required mime-type and scheme.
         Log a warning if a feature cannot yield a valid url (either no compatible mime-type or scheme)

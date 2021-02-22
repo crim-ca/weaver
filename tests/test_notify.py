@@ -1,6 +1,6 @@
 import pytest
 
-from weaver.wps_restapi.jobs.notify import encrypt_email
+from notify import encrypt_email
 
 
 def test_encrypt_email_valid():

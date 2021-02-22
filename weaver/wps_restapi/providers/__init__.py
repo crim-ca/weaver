@@ -1,8 +1,8 @@
 import logging
 
+from weaver.formats import OUTPUT_FORMAT_JSON
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.providers import providers as p
-from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
 
 LOGGER = logging.getLogger(__name__)
 

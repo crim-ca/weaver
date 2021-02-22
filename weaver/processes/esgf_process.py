@@ -3,7 +3,7 @@ import time
 from collections import defaultdict
 from typing import TYPE_CHECKING, Optional
 
-import cwt
+import cwt  # noqa  # package: esgf-compute-api
 
 from weaver.processes.wps1_process import Wps1Process
 from weaver.status import STATUS_FAILED, STATUS_RUNNING, STATUS_SUCCEEDED
@@ -11,7 +11,7 @@ from weaver.utils import fetch_file
 
 if TYPE_CHECKING:
     from weaver.typedefs import JSON
-    from typing import AnyStr, Dict, List, Tuple
+    from typing import Dict, List, Tuple
 
 LAST_PERCENT_REGEX = re.compile(r".+ (\d{1,3})$")
 
@@ -42,7 +42,7 @@ class ESGFProcess(Wps1Process):
     required_inputs = (InputNames.VARIABLE, )
 
     def execute(self, workflow_inputs, out_dir, expected_outputs):
-        # type: (JSON, AnyStr, Dict[AnyStr, AnyStr]) -> None
+        # type: (JSON, str, Dict[str, str]) -> None
         """Execute an ESGF process from cwl inputs"""
         self._check_required_inputs(workflow_inputs)
 
@@ -201,7 +201,7 @@ class ESGFProcess(Wps1Process):
         return esgf_process.succeeded
 
     def _process_results(self, esgf_process, output_dir, expected_outputs):
-        # type: (cwt.Process, AnyStr, Dict[AnyStr, AnyStr]) -> None
+        # type: (cwt.Process, str, Dict[str, str]) -> None
         """Process the result of the execution"""
         if not esgf_process.succeeded:
             message = "Process failed."

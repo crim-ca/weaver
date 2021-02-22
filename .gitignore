@@ -82,10 +82,5 @@ venv
 *.zip
 ./workflow[s]
 
-# project local configurations
-config/weaver.ini
-config/wps_processes.yml
-config/data_sources.json
-
 # old project sources
 [Bb]in

@@ -1,5 +1,4 @@
 alembic
-backports.tempfile; python_version < "3"
 # AWS support (S3 buckets)
 boto3
 # celery 5 to be released in near future
@@ -11,39 +10,40 @@ cornice
 cornice_swagger>=0.7.0
 # cwltool Python 2 support dropped on 2.x
 # enforce Python 3 with version >=2 to update existing 1.x installations
-cwltool>=1.0.20180820141117,<2; python_version < "3"
 # FIXME: avoid error invalid get_listing import location,
 #        remove properly as per https://github.com/crim-ca/weaver/issues/154
-cwltool>=2,<=3.0.20200324120055; python_version >= "3"
+cwltool>=2,<=3.0.20200324120055
 duration
-flufl.enum; python_version < "3"
+git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7#egg=esgf-compute-api
 # gunicorn >20 breaks some config.ini loading parameters (paste)
 # it is also only available for Python >=3.5
-gunicorn>=19.10,<20; python_version < "3"
 # use pserve to continue supporting config.ini with paste settings
-gunicorn>=20.0.4; python_version >= "3.5"
+gunicorn>=20.0.4
 jsonschema>=3.0.1
 lxml
 mako
-owslib<0.19.0; python_version < "3"
-owslib>=0.19.2; python_version >= "3"
+# esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
+oauthlib
+owslib>=0.19.2
 pymongo
 pyramid>=1.7.3
 pyramid_celery
 pyramid_mako
+python-dateutil
 pytz
-pywps>=4.2.4
+# no viable pywps version with Python>3.5 dependencies
+# use '4.2.4' plus a few commits that provide fix, but not yet released
+# FIXME: https://github.com/geopython/pywps/issues/568
+## git+https://github.com/fmigneault/pywps.git@799fb14f31533630ce08c171f844294730861b1a#egg=pywps
+git+https://github.com/geopython/pywps.git@pywps-4.4#egg=pywps
 pyyaml>=5.2
 requests
 requests_file
 # let cwltool define ruamel.yaml version (<=0.16.5)
 # ensure minimal 0.15.78 to solve install issue (python 3.8)
 # (https://bitbucket.org/ruamel/yaml/issues/261/error-while-installing-ruamelyaml-setuppy)
-# let cwltool fully define the version if python 2 is used
-ruamel.yaml>=0.15.78,<=0.16.5; python_version >= "3"
-ruamel.yaml<=0.16.5; python_version < "3"
+ruamel.yaml>=0.15.78,<=0.16.5
 shapely
-six
 simplejson
 urlmatch
 xmltodict

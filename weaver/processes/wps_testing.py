@@ -8,17 +8,17 @@ class WpsTestProcess(Process):
 
     def __init__(self, **kw):
         # remove duplicates/unsupported keywords
-        kw.pop("title", None)
+        title = kw.pop("title", kw.get("identifier"))
+        version = kw.pop("version", "0.0")
         kw.pop("inputs", None)
         kw.pop("outputs", None)
-        kw.pop("version", None)
         kw.pop("payload", None)
         kw.pop("package", None)
 
         super(WpsTestProcess, self).__init__(
             self._handler,
-            title="WpsTestProcess",
-            version="0.0",
+            title=title,
+            version=version,
             inputs=[LiteralInput("test_input", "Input Request", data_type="string")],
             outputs=[LiteralOutput("test_output", "Output response", data_type="string")],
             store_supported=True,

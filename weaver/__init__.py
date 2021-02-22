@@ -14,9 +14,6 @@ WEAVER_CONFIG_DIR = os.path.abspath(os.path.join(WEAVER_ROOT_DIR, "config"))
 sys.path.insert(0, WEAVER_ROOT_DIR)
 sys.path.insert(0, WEAVER_MODULE_DIR)
 
-# provide standard package version location
-from __meta__ import __version__  # noqa: E402,F401 # isort:skip # pylint: disable=C0413
-
 
 def main(global_config, **settings):
     import weaver.app
@@ -24,5 +21,15 @@ def main(global_config, **settings):
 
 
 def includeme(config):
-    LOGGER.info("Adding Weaver Package")
-    config.include("weaver.app")
+    LOGGER.info("Adding Weaver")
+    config.include("weaver.config")
+    config.include("weaver.database")
+    config.include("weaver.processes")
+    config.include("weaver.wps")
+    config.include("weaver.wps_restapi")
+    config.include("weaver.tweens")
+    # must be after views includes,
+    # otherwise can cause sporadic conflicts
+    config.include("cornice")
+    config.include("cornice_swagger")
+    config.include("pyramid_mako")

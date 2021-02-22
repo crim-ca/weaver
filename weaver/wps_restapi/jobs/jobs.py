@@ -6,6 +6,7 @@ from pyramid.request import Request
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
 
+from notify import encrypt_email
 from weaver import sort, status
 from weaver.database import get_db
 from weaver.datatype import Job
@@ -18,17 +19,16 @@ from weaver.exceptions import (
     ServiceNotFound,
     log_unhandled_exceptions
 )
+from weaver.formats import OUTPUT_FORMAT_JSON
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import get_any_id, get_any_value, get_settings
 from weaver.visibility import VISIBILITY_PUBLIC
-from weaver.wps import get_wps_output_url
+from weaver.wps.utils import get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.jobs.notify import encrypt_email
-from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
 
 if TYPE_CHECKING:
-    from weaver.typedefs import AnySettingsContainer, JSON  # noqa: F401
-    from typing import AnyStr, Optional, Tuple, Union       # noqa: F401
+    from typing import Optional, Tuple
+    from weaver.typedefs import AnySettingsContainer, JSON
 
 LOGGER = get_task_logger(__name__)
 
@@ -44,7 +44,7 @@ def get_job(request):
     job_id = request.matchdict.get("job_id")
     store = get_db(request).get_store(StoreJobs)
     try:
-        job = store.fetch_by_id(job_id, request=request)
+        job = store.fetch_by_id(job_id)
     except JobNotFound:
         raise HTTPNotFound("Could not find job with specified 'job_id'.")
 
@@ -59,7 +59,7 @@ def get_job(request):
 
 
 def validate_service_process(request):
-    # type: (Request) -> Tuple[Union[None, AnyStr], Union[None, AnyStr]]
+    # type: (Request) -> Tuple[Optional[str], Optional[str]]
     """
     Verifies that service or process specified by path or query will raise the appropriate error if applicable.
     """
@@ -74,18 +74,18 @@ def validate_service_process(request):
             item_type = "Service"
             item_test = service_name
             store = get_db(request).get_store(StoreServices)
-            service = store.fetch_by_name(service_name, visibility=VISIBILITY_PUBLIC, request=request)
+            service = store.fetch_by_name(service_name, visibility=VISIBILITY_PUBLIC)
         if process_name:
             item_type = "Process"
             item_test = process_name
             # local process
             if not service:
                 store = get_db(request).get_store(StoreProcesses)
-                store.fetch_by_id(process_name, visibility=VISIBILITY_PUBLIC, request=request)
+                store.fetch_by_id(process_name, visibility=VISIBILITY_PUBLIC)
             # remote process
             else:
                 from weaver.wps_restapi.processes.processes import list_remote_processes
-                processes = list_remote_processes(service, request=request)
+                processes = list_remote_processes(service, request)
                 if process_name not in [p.id for p in processes]:
                     raise ProcessNotFound
     except (ServiceNotFound, ProcessNotFound):
@@ -131,7 +131,7 @@ def get_queried_jobs(request):
     groups = request.params.get("groups", "")
     groups = groups.split(",") if groups else None
     store = get_db(request).get_store(StoreJobs)
-    items, total = store.find_jobs(request, group_by=groups, **filters)
+    items, total = store.find_jobs(request=request, group_by=groups, **filters)
     body = {"total": total}
 
     def _job_list(jobs):

@@ -229,7 +229,7 @@ Configuration of Data Sources
 
 .. todo:: complete docs
 
-`data_sources.json.example`_
+`data_sources.yml.example`_
 
 
 Configuration of WPS Processes

@@ -1,83 +1,119 @@
 """
-Errors raised during the weaver flow.
+Errors raised during the Weaver flow.
+
+Some of these error inherit from :class:`weaver.owsexceptions.OWSException` and their derived classes to allow
+:mod:`pywps` to automatically understand and render those exception if raised by an underlying :mod:`weaver` operation.
 """
+import functools
 import logging
-from functools import wraps
 from typing import TYPE_CHECKING
 
-from pyramid.httpexceptions import HTTPException, HTTPInternalServerError
+from pyramid.httpexceptions import (
+    HTTPBadRequest,
+    HTTPException,
+    HTTPForbidden,
+    HTTPInternalServerError,
+    HTTPNotFound,
+    HTTPUnprocessableEntity
+)
 from pyramid.request import Request as PyramidRequest
 from pyramid.testing import DummyRequest
 from requests import Request as RequestsRequest
+from werkzeug.wrappers import Request as WerkzeugRequest
+
+from weaver.formats import CONTENT_TYPE_TEXT_XML
+from weaver.owsexceptions import (
+    OWSAccessForbidden,
+    OWSException,
+    OWSInvalidParameterValue,
+    OWSMissingParameterValue,
+    OWSNoApplicableCode,
+    OWSNotFound
+)
 
 LOGGER = logging.getLogger(__name__)
-
 if TYPE_CHECKING:
-    from typing import Any, AnyStr, Callable, Type
+    from typing import Any, Callable, Type
 
 
 class WeaverException(Exception):
     """Base class of exceptions defined by :mod:`weaver` package."""
+    code = 500
+    title = "Internal Server Error"
+    detail = message = comment = explanation = "Unknown error"
 
 
-class InvalidIdentifierValue(WeaverException, ValueError):
+class InvalidIdentifierValue(WeaverException, ValueError, HTTPBadRequest, OWSInvalidParameterValue):
     """
-    Error indicating that an id to be employed for following operations
+    Error indicating that an ID to be employed for following operations
     is not considered as valid to allow further processed or usage.
     """
+    code = 400
+    locator = "identifier"
 
 
-class ServiceException(WeaverException):
+class MissingIdentifierValue(WeaverException, ValueError, HTTPBadRequest, OWSMissingParameterValue):
+    """
+    Error indicating that an ID to be employed for following operations
+    was missing and cannot continue further processing or usage.
+    """
+    code = 400
+    locator = "identifier"
+
+
+class ServiceException(WeaverException, OWSException):
     """Base exception related to a :class:`weaver.datatype.Service`."""
+    locator = "service"
 
 
-class ServiceNotAccessible(ServiceException):
+class ServiceNotAccessible(ServiceException, HTTPForbidden, OWSAccessForbidden):
     """
     Error indicating that a WPS service exists but is not visible to retrieve
     from the storage backend of an instance of :class:`weaver.store.ServiceStore`.
     """
 
 
-class ServiceNotFound(ServiceException):
+class ServiceNotFound(ServiceException, HTTPNotFound, OWSNotFound):
     """
     Error indicating that an OWS service could not be read from the
     storage backend by an instance of :class:`weaver.store.ServiceStore`.
     """
 
 
-class ServiceRegistrationError(ServiceException):
+class ServiceRegistrationError(ServiceException, HTTPInternalServerError, OWSNoApplicableCode):
     """
     Error indicating that an OWS service could not be registered in the
     storage backend by an instance of :class:`weaver.store.ServiceStore`.
     """
 
 
-class ProcessException(WeaverException):
+class ProcessException(WeaverException, OWSException):
     """Base exception related to a :class:`weaver.datatype.Process`."""
+    locator = "process"
 
 
-class ProcessNotAccessible(ProcessException):
+class ProcessNotAccessible(ProcessException, HTTPForbidden, OWSAccessForbidden):
     """
     Error indicating that a local WPS process exists but is not visible to retrieve
     from the storage backend of an instance of :class:`weaver.store.ProcessStore`.
     """
 
 
-class ProcessNotFound(ProcessException):
+class ProcessNotFound(ProcessException, HTTPNotFound, OWSNotFound):
     """
     Error indicating that a local WPS process could not be read from the
     storage backend by an instance of :class:`weaver.store.ProcessStore`.
     """
 
 
-class ProcessRegistrationError(ProcessException):
+class ProcessRegistrationError(ProcessException, HTTPInternalServerError, OWSNoApplicableCode):
     """
     Error indicating that a WPS process could not be registered in the
     storage backend by an instance of :class:`weaver.store.ProcessStore`.
     """
 
 
-class ProcessInstanceError(ProcessException):
+class ProcessInstanceError(ProcessException, HTTPInternalServerError, OWSNoApplicableCode):
     """
     Error indicating that the process instance passed is not supported with
     storage backend by an instance of :class:`weaver.store.ProcessStore`.
@@ -86,23 +122,24 @@ class ProcessInstanceError(ProcessException):
 
 class JobException(WeaverException):
     """Base exception related to a :class:`weaver.datatype.Job`."""
+    locator = "job"
 
 
-class JobNotFound(JobException):
+class JobNotFound(JobException, HTTPNotFound, OWSNotFound):
     """
     Error indicating that a job could not be read from the
     storage backend by an instance of :class:`weaver.store.JobStore`.
     """
 
 
-class JobRegistrationError(JobException):
+class JobRegistrationError(JobException, HTTPInternalServerError, OWSNoApplicableCode):
     """
     Error indicating that a job could not be registered in the
     storage backend by an instance of :class:`weaver.store.JobStore`.
     """
 
 
-class JobUpdateError(JobException):
+class JobUpdateError(JobException, HTTPInternalServerError, OWSNoApplicableCode):
     """
     Error indicating that a job could not be updated in the
     storage backend by an instance of :class:`weaver.store.JobStore`.
@@ -111,37 +148,38 @@ class JobUpdateError(JobException):
 
 class PackageException(WeaverException):
     """Base exception related to a :class:`weaver.processes.wps_package.Package`."""
+    locator = "package"
 
 
-class PackageTypeError(PackageException):
+class PackageTypeError(PackageException, HTTPUnprocessableEntity):
     """
     Error indicating that an instance of :class:`weaver.processes.wps_package.WpsPackage`
     could not properly parse input/output type(s) for package deployment or execution.
     """
 
 
-class PackageRegistrationError(PackageException):
+class PackageRegistrationError(PackageException, HTTPInternalServerError, OWSNoApplicableCode):
     """
     Error indicating that an instance of :class:`weaver.processes.wps_package.WpsPackage`
     could not properly be registered for package deployment because of invalid prerequisite.
     """
 
 
-class PackageExecutionError(PackageException):
+class PackageExecutionError(PackageException, HTTPInternalServerError, OWSNoApplicableCode):
     """
     Error indicating that an instance of :class:`weaver.processes.wps_package.WpsPackage`
     could not properly execute the package using provided inputs and package definition.
     """
 
 
-class PackageNotFound(PackageException):
+class PackageNotFound(PackageException, HTTPNotFound, OWSNotFound):
     """
     Error indicating that an instance of :class:`weaver.processes.wps_package.WpsPackage`
     could not properly retrieve the package definition using provided references.
     """
 
 
-class PayloadNotFound(PackageException):
+class PayloadNotFound(PackageException, HTTPNotFound, OWSNotFound):
     """
     Error indicating that an instance of :class:`weaver.processes.wps_package.WpsPackage`
     could not properly retrieve the package deploy payload using provided references.
@@ -150,23 +188,24 @@ class PayloadNotFound(PackageException):
 
 class QuoteException(WeaverException):
     """Base exception related to a :class:`weaver.datatype.Quote`."""
+    locator = "quote"
 
 
-class QuoteNotFound(QuoteException):
+class QuoteNotFound(QuoteException, HTTPNotFound, OWSNotFound):
     """
     Error indicating that a quote could not be read from the
     storage backend by an instance of :class:`weaver.store.QuoteStore`.
     """
 
 
-class QuoteRegistrationError(QuoteException):
+class QuoteRegistrationError(QuoteException, HTTPInternalServerError, OWSNoApplicableCode):
     """
     Error indicating that a quote could not be registered in the
     storage backend by an instance of :class:`weaver.store.QuoteStore`.
     """
 
 
-class QuoteInstanceError(QuoteException):
+class QuoteInstanceError(QuoteException, HTTPInternalServerError, OWSNoApplicableCode):
     """
     Error indicating that a given object doesn't correspond to an expected
     instance of :class:`weaver.datatype.Quote`.
@@ -175,32 +214,81 @@ class QuoteInstanceError(QuoteException):
 
 class BillException(WeaverException):
     """Base exception related to a :class:`weaver.datatype.Bill`."""
+    locator = "bill"
 
 
-class BillNotFound(BillException):
+class BillNotFound(BillException, HTTPNotFound, OWSNotFound):
     """
     Error indicating that a bill could not be read from the
     storage backend by an instance of :class:`weaver.store.BillStore`.
     """
 
 
-class BillRegistrationError(BillException):
+class BillRegistrationError(BillException, HTTPInternalServerError, OWSNoApplicableCode):
     """
     Error indicating that a bill could not be registered in the
     storage backend by an instance of :class:`weaver.store.BillStore`.
     """
 
 
-class BillInstanceError(BillException):
+class BillInstanceError(BillException, HTTPInternalServerError, OWSNoApplicableCode):
     """
     Error indicating that a given object doesn't correspond to an expected
     instance of :class:`weaver.datatype.Bill`.
     """
 
 
+# FIXME:
+#   https://github.com/crim-ca/weaver/issues/215
+#   define common Exception classes that won't require this type of conversion
+def handle_known_exceptions(function):
+    # type: (Callable[[Any, Any], Any]) -> Callable
+    """
+    Decorator that catches lower-level raised exception that are known to :mod:`weaver` but not by :mod:`pywps`.
+
+    .. seealso::
+        :class:`weaver.wps.service.WorkerService`
+
+        Without prior handling of known internal exception, :mod:`pywps` generates by default ``500`` internal server
+        error response since it doesn't know how to interpret more specific exceptions defined in :mod:`weaver`.
+
+    The decorator simply returns the known exception such that :func:`weaver.tweens.ows_response_tween` can later
+    handle it appropriately. Exceptions derived from :exception:`weaver.owsexceptions.OWSException` are employed since
+    they themselves have base references to :mod:`pywps.exceptions` classes that the service can understand.
+
+    .. warning::
+        In :mod:`pywps`, ``HTTPException`` refers to :exception:`werkzeug.exceptions.HTTPException` while in
+        :mod:`weaver`, it is :exception:`pyramid.httpexceptions.HTTPException`. They both offer similar interfaces and
+        functionalities (headers, body, status-code, etc.), but they are not intercepted in the same try/except blocks.
+    """
+
+    @functools.wraps(function)
+    def wrapped(*_, **__):
+        try:
+            return function(*_, **__)
+        except (WeaverException, OWSException, HTTPException) as exc:
+            if isinstance(exc, WeaverException) and not isinstance(exc, OWSException):
+                return OWSNoApplicableCode(str(exc), locator="service", content_type=CONTENT_TYPE_TEXT_XML)
+            if isinstance(exc, HTTPException):
+                # override default pre-generated plain text content-type such that
+                # resulting exception generates the response content with requested accept or XML by default
+                exc.headers.setdefault("Accept", CONTENT_TYPE_TEXT_XML)
+                exc.headers.pop("Content-Type", None)
+                if isinstance(exc, HTTPNotFound):
+                    exc = OWSNotFound(str(exc), locator="service", status=exc)
+                elif isinstance(exc, HTTPForbidden):
+                    exc = OWSAccessForbidden(str(exc), locator="service", status=exc)
+                else:
+                    exc = OWSException(str(exc), locator="service", status=exc)
+            return exc  # return to avoid raising, raise would be caught by parent pywps call wrapping 'function'
+        # any other unknown exception by weaver will be raised here as normal, and pywps should repackage them as 500
+
+    return wrapped
+
+
 def log_unhandled_exceptions(logger=LOGGER, message="Unhandled exception occurred.", exception=Exception,
                              force=False, require_http=True, is_request=True):
-    # type: (logging.Logger, AnyStr, Type[Exception], bool, bool, bool) -> Callable
+    # type: (logging.Logger, str, Type[Exception], bool, bool, bool) -> Callable
     """
     Decorator that will raise ``exception`` with specified ``message`` if an exception is caught while execution the
     wrapped function, after logging relevant details about the caught exception with ``logger``.
@@ -216,8 +304,6 @@ def log_unhandled_exceptions(logger=LOGGER, message="Unhandled exception occurre
     :raises exception: if an *unknown* exception was caught (or forced) during the decorated function's execution.
     :raises Exception: original exception if it is *known*.
     """
-    from weaver.owsexceptions import OWSException   # avoid circular import error
-
     known_exceptions = [WeaverException]
     known_http_exceptions = [HTTPException, OWSException]
     if require_http:
@@ -228,12 +314,13 @@ def log_unhandled_exceptions(logger=LOGGER, message="Unhandled exception occurre
 
     def wrap(function):
         # type: (Callable[[Any, Any], Any]) -> Callable
-        @wraps(function)
+        @functools.wraps(function)
         def call(*args, **kwargs):
             try:
                 # handle input arguments that are extended by various pyramid operations
                 if is_request:
-                    while len(args) and not isinstance(args[0], (RequestsRequest, PyramidRequest, DummyRequest)):
+                    any_request_type = (RequestsRequest, PyramidRequest, DummyRequest, WerkzeugRequest)
+                    while len(args) and not isinstance(args[0], any_request_type):
                         args = args[1:]
                 return function(*args, **kwargs)
             except Exception as exc:
@@ -245,7 +332,7 @@ def log_unhandled_exceptions(logger=LOGGER, message="Unhandled exception occurre
                     # unless specified to log any type, raise only known exceptions
                     if force or not isinstance(exc, known_exceptions):
                         setattr(exception, handle, True)    # mark as handled
-                        setattr(exception, "error", exc)    # make original exception available through new one raised
+                        setattr(exception, "cause", exc)    # make original exception available through new one raised
                         logger.exception("%s%s[%r]", message, (" " if message else "") + "Exception: ", exc)
                         raise exception(message)
                 raise exc

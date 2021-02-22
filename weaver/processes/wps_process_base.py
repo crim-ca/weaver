@@ -8,12 +8,12 @@ from pyramid_celery import celery_app as app
 
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.utils import get_cookie_headers, get_settings, request_extra
-from weaver.wps import get_wps_output_dir, get_wps_output_url
+from weaver.wps.utils import get_wps_output_dir, get_wps_output_url
 
 if TYPE_CHECKING:
-    from weaver.typedefs import CWL     # noqa: F401
-    from typing import AnyStr, Dict     # noqa: F401
-    from pywps.app import WPSRequest    # noqa: F401
+    from weaver.typedefs import CWL
+    from typing import Dict
+    from pywps.app import WPSRequest
 
 
 class WpsProcessInterface(object):
@@ -24,8 +24,8 @@ class WpsProcessInterface(object):
     @abstractmethod
     def execute(self,
                 workflow_inputs,        # type: CWL
-                out_dir,                # type: AnyStr
-                expected_outputs,       # type: Dict[AnyStr, AnyStr]
+                out_dir,                # type: str
+                expected_outputs,       # type: Dict[str, str]
                 ):
         """
         Execute a remote process using the given inputs.

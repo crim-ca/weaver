@@ -1,4 +1,4 @@
-# NOTE: This configuration file is employed by Travis-CI smoke test to immediately identify any problematic setting.
+# NOTE: This configuration file is employed by Docker smoke test to immediately identify any problematic setting.
 
 ###
 # app configuration
@@ -34,6 +34,11 @@ mongodb.db_name = weaver
 weaver.configuration = ems
 weaver.url = http://localhost:4001
 
+# --- Weaver Logging ---
+# When provided, this value will override every weaver-specific level defined in other section logging configuration
+# Otherwise, their individual levels are employed as provided by other logging sections from this configuration file
+weaver.log_level =
+
 # --- Weaver requests extension flags ---
 # SSL verification should be enabled for secured connections
 # setting is available for convenience, debug purposes and local environments
@@ -56,7 +61,7 @@ weaver.wps = true
 weaver.wps_url =
 weaver.wps_path = /ows/wps
 weaver.wps_output = true
-weaver.wps_output_dir = /tmp
+weaver.wps_output_dir = /tmp/weaver/wps-outputs
 weaver.wps_output_url =
 weaver.wps_output_path = /wpsoutputs
 weaver.wps_output_s3_bucket =
@@ -109,8 +114,8 @@ weaver.wps_email_notify_template_default =
 # additional processes to load at startup (see 'wps_processes.yml.example')
 weaver.wps_processes_file = wps_processes.yml
 # known remote ADES for processes redirection based on data-sources when using EMS configuration
-# (see 'data_sources.json.example' and 'weaver.processes.sources' for more details)
-weaver.data_sources = data_sources.json
+# (see 'data_sources.yml.example' and 'weaver.processes.sources' for more details)
+weaver.data_sources = data_sources.yml
 # comma-separated list of key=value options to add to settings
 weaver.extra_options =
 

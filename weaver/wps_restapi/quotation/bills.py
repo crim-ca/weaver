@@ -4,9 +4,9 @@ from pyramid.httpexceptions import HTTPNotFound, HTTPOk
 
 from weaver.database import get_db
 from weaver.exceptions import BillNotFound, log_unhandled_exceptions
+from weaver.formats import OUTPUT_FORMAT_JSON
 from weaver.store.base import StoreBills
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON
 
 LOGGER = logging.getLogger(__name__)
 

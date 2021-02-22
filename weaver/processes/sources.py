@@ -1,10 +1,10 @@
 import os
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 import yaml
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
-from six.moves.urllib.parse import urlparse
 
 from weaver import WEAVER_ROOT_DIR
 from weaver.config import WEAVER_DEFAULT_DATA_SOURCES_CONFIG, get_weaver_config_file
@@ -18,8 +18,8 @@ if TYPE_CHECKING:
 DATA_SOURCES = {}
 """Data sources configuration.
 
-Unless explicitly overridden, the configuration will be loaded from file as specified by
-``weaver.data_sources`` setting. Following JSON schema format is expected (corresponding YAML also supported):
+Unless explicitly overridden, the configuration will be loaded from file as specified by``weaver.data_sources`` setting.
+Following JSON schema format is expected (corresponding YAML also supported):
 
 .. code-block:: json
 

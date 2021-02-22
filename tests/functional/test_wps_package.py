@@ -10,32 +10,22 @@ Local test web application is employed to run operations by mocking external req
 import contextlib
 import logging
 import os
-import time
-import unittest
-from copy import deepcopy
 
 import colander
 import pytest
-import six
 from pyramid.httpexceptions import HTTPBadRequest
 
 from tests import resources
+from tests.functional.utils import WpsPackageConfigBase
 from tests.utils import (
     MOCK_AWS_REGION,
-    get_test_weaver_app,
-    get_test_weaver_config,
     mocked_aws_credentials,
     mocked_aws_s3,
     mocked_aws_s3_bucket_test_file,
     mocked_execute_process,
-    mocked_sub_requests,
-    setup_config_with_celery,
-    setup_config_with_mongodb,
-    setup_config_with_pywps,
-    setup_mongodb_jobstore,
-    setup_mongodb_processstore
+    mocked_sub_requests
 )
-from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT
+from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_RESPONSE_DOCUMENT, EXECUTE_TRANSMISSION_MODE_REFERENCE
 from weaver.formats import (
     CONTENT_TYPE_APP_JSON,
     CONTENT_TYPE_APP_NETCDF,
@@ -48,9 +38,7 @@ from weaver.formats import (
     get_cwl_file_format
 )
 from weaver.processes.constants import CWL_REQUIREMENT_APP_BUILTIN
-from weaver.status import STATUS_RUNNING, STATUS_SUCCEEDED
 from weaver.utils import get_any_value
-from weaver.visibility import VISIBILITY_PUBLIC
 
 EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_TEXT_PLAIN]
 EDAM_NETCDF = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_APP_NETCDF]
@@ -64,46 +52,6 @@ KNOWN_PROCESS_DESCRIPTION_FIELDS = {
 }
 
 LOGGER = logging.getLogger(__name__)
-
-
-@pytest.mark.functional
-class WpsPackageConfigBase(unittest.TestCase):
-    json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
-    settings = {}
-
-    def __init__(self, *args, **kwargs):
-        # won't run this as a test suite, only its derived classes
-        setattr(self, "__test__", self is WpsPackageConfigBase)
-        super(WpsPackageConfigBase, self).__init__(*args, **kwargs)
-
-    @classmethod
-    def setUpClass(cls):
-        config = setup_config_with_mongodb(settings=cls.settings)
-        config = setup_config_with_pywps(config)
-        config = setup_config_with_celery(config)
-        config = get_test_weaver_config(config)
-        setup_mongodb_processstore(config)  # force reset
-        cls.job_store = setup_mongodb_jobstore(config)
-        cls.app = get_test_weaver_app(config=config, settings=cls.settings)
-
-    def deploy_process(self, payload):
-        """
-        Deploys a process with :paramref:`payload`.
-
-        :returns: resulting tuple of ``(process-description, package)`` JSON responses.
-        """
-        resp = mocked_sub_requests(self.app, "post_json", "/processes", params=payload, headers=self.json_headers)
-        assert resp.status_code == 200  # TODO: status should be 201 when properly modified to match API conformance
-        path = resp.json["processSummary"]["processDescriptionURL"]
-        body = {"value": VISIBILITY_PUBLIC}
-        resp = self.app.put_json("{}/visibility".format(path), params=body, headers=self.json_headers)
-        assert resp.status_code == 200
-        info = []
-        for pkg_url in [path, "{}/package".format(path)]:
-            resp = self.app.get(pkg_url, headers=self.json_headers)
-            assert resp.status_code == 200
-            info.append(deepcopy(resp.json))
-        return info
 
 
 @pytest.mark.functional
@@ -1303,7 +1251,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert pkg["inputs"][0]["type"]["items"]["type"] == "enum"
         assert isinstance(pkg["inputs"][0]["type"]["items"]["symbols"], list)
         assert len(pkg["inputs"][0]["type"]["items"]["symbols"]) == 220
-        assert all(isinstance(s, six.string_types) for s in pkg["inputs"][0]["type"]["items"]["symbols"])
+        assert all(isinstance(s, str) for s in pkg["inputs"][0]["type"]["items"]["symbols"])
         assert pkg["inputs"][1]["id"] == "mosaic"
         assert pkg["inputs"][1]["default"] == "null"
         assert "format" not in pkg["inputs"][1]
@@ -1313,7 +1261,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert pkg["inputs"][2]["type"]["type"] == "array"
         assert pkg["inputs"][2]["type"]["items"] == "File"
         # FIXME: TAR cannot be resolved in the CWL context (not official, disable mapping to GZIP)
-        #        this makes all formats to not be resolved (see code: wps_package._any2cwl_io)
+        #        this makes all formats to not be resolved (see code: wps_package.any2cwl_io)
         #        (see issue: https://github.com/crim-ca/weaver/issues/50)
         assert "format" not in pkg["inputs"][2], \
             "CWL formats should all be dropped because (x-tar) cannot be resolved to an existing schema reference"
@@ -1447,34 +1395,23 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
                 {"id": "input_with_s3", "href": test_bucket_ref},
             ],
             "outputs": [
-                {"id": "output_from_http", "transmissionMode": "reference"},
-                {"id": "output_from_s3", "transmissionMode": "reference"},
+                {"id": "output_from_http", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE},
+                {"id": "output_from_s3", "transmissionMode": EXECUTE_TRANSMISSION_MODE_REFERENCE},
             ]
         }
-        with contextlib.ExitStack() as stack_proc:
-            for process in mocked_execute_process():
-                stack_proc.enter_context(process)
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_process():
+                stack_exec.enter_context(mock_exec)
             proc_url = "/processes/{}/jobs".format(self._testMethodName)
             resp = mocked_sub_requests(self.app, "post_json", proc_url,
-                                       params=exec_body, headers=self.json_headers, only_local=True)
+                                       data=exec_body, headers=self.json_headers, only_local=True)
             assert resp.status_code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(resp.status_code, resp.json)
             status_url = resp.json["location"]
             job_id = resp.json["jobID"]
-        monitor_timeout = 60
-        time.sleep(1)  # small delay to ensure process started
-        while monitor_timeout >= 0:
-            resp = self.app.get(status_url, headers=self.json_headers)
-            assert resp.status_code == 200
-            assert resp.json["status"] in [STATUS_RUNNING, STATUS_SUCCEEDED]
-            if resp.json["status"] == STATUS_SUCCEEDED:
-                break
-            time.sleep(2)
-        assert resp.json["status"] == STATUS_SUCCEEDED
-        resp = self.app.get("{}/result".format(status_url), headers=self.json_headers)
-        assert resp.status_code == 200
+        result = self.monitor_job(status_url)
 
         # check that outputs are S3 bucket references
-        output_values = {out["id"]: get_any_value(out) for out in resp.json["outputs"]}
+        output_values = {out["id"]: get_any_value(out) for out in result["outputs"]}
         output_bucket = self.settings["weaver.wps_output_s3_bucket"]
         wps_uuid = self.job_store.fetch_by_id(job_id).wps_id
         for out_key, out_file in [("output_from_s3", input_file_s3), ("output_from_http", input_file_http)]:

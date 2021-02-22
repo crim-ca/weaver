@@ -1,6 +1,6 @@
 import logging
 from time import sleep
-from typing import TYPE_CHECKING, AnyStr
+from typing import TYPE_CHECKING
 
 from owslib.wps import ComplexDataInput, WebProcessingService
 
@@ -8,7 +8,8 @@ from weaver import status
 from weaver.execute import EXECUTE_MODE_ASYNC
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes.constants import WPS_COMPLEX_DATA
-from weaver.processes.utils import jsonify_output, map_progress
+from weaver.processes.convert import ows2json_output
+from weaver.processes.utils import map_progress
 from weaver.processes.wps_process_base import WpsProcessInterface
 from weaver.utils import (
     get_any_id,
@@ -19,11 +20,11 @@ from weaver.utils import (
     request_extra,
     wait_secs
 )
-from weaver.wps import check_wps_status
+from weaver.wps.utils import check_wps_status
 
 if TYPE_CHECKING:
-    from weaver.typedefs import UpdateStatusPartialFunction     # noqa: F401
-    from pywps.app import WPSRequest                            # noqa: F401
+    from pywps.app import WPSRequest
+    from weaver.typedefs import UpdateStatusPartialFunction
 
 LOGGER = logging.getLogger(__name__)
 
@@ -36,8 +37,8 @@ REMOTE_JOB_PROGRESS_COMPLETED = 100
 
 class Wps1Process(WpsProcessInterface):
     def __init__(self,
-                 provider,          # type: AnyStr
-                 process,           # type: AnyStr
+                 provider,          # type: str
+                 process,           # type: str
                  request,           # type: WPSRequest
                  update_status,     # type: UpdateStatusPartialFunction
                  ):
@@ -125,7 +126,7 @@ class Wps1Process(WpsProcessInterface):
                 if num_retries >= max_retries:
                     raise Exception("Could not read status document after {} retries. Giving up.".format(max_retries))
                 try:
-                    execution = check_wps_status(url=execution.statusLocation, verify=self.verify,
+                    execution = check_wps_status(location=execution.statusLocation, verify=self.verify,
                                                  sleep_secs=wait_secs(run_step))
                     job_id = execution.statusLocation.replace(".xml", "").split("/")[-1]
                     LOGGER.debug(get_log_monitor_msg(job_id, status.map_status(execution.getStatus()),
@@ -155,7 +156,7 @@ class Wps1Process(WpsProcessInterface):
             self.update_status("Fetching job outputs from remote WPS1 provider.",
                                REMOTE_JOB_PROGRESS_FETCH_OUT, status.STATUS_RUNNING)
 
-            results = [jsonify_output(output, process) for output in execution.processOutputs]
+            results = [ows2json_output(output, process) for output in execution.processOutputs]
             for result in results:
                 result_id = get_any_id(result)
                 result_val = get_any_value(result)

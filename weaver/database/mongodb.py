@@ -17,9 +17,10 @@ from weaver.store.mongodb import (
 from weaver.utils import get_settings
 
 if TYPE_CHECKING:
-    from weaver.typedefs import AnySettingsContainer, JSON      # noqa: F401
-    from typing import Any, AnyStr, Optional, Union             # noqa: F401
-    from pymongo.database import Database                       # noqa: F401
+    from typing import Any, Optional, Type, Union
+    from pymongo.database import Database
+    from weaver.typedefs import AnySettingsContainer, JSON
+    from weaver.database.base import StoreSelector
 
 # pylint: disable=C0103,invalid-name
 MongoDB = None  # type: Optional[Database]
@@ -33,7 +34,16 @@ MongodbStores = frozenset([
 
 if TYPE_CHECKING:
     # pylint: disable=E0601,used-before-assignment
-    AnyStoreType = Union[MongodbStores]     # noqa: F401
+    AnyMongodbStore = Union[MongodbStores]
+    AnyMongodbStoreType = Union[
+        StoreSelector,
+        AnyMongodbStore,
+        Type[MongodbServiceStore],
+        Type[MongodbProcessStore],
+        Type[MongodbJobStore],
+        Type[MongodbQuoteStore],
+        Type[MongodbBillStore],
+    ]
 
 
 class MongoDatabase(DatabaseInterface):
@@ -42,19 +52,19 @@ class MongoDatabase(DatabaseInterface):
     _stores = None
     type = "mongodb"
 
-    def __init__(self, registry, reset_connection=False):
-        # type: (AnySettingsContainer, bool) -> None
-        super(MongoDatabase, self).__init__(registry)
-        self._database = get_mongodb_engine(registry, reset_connection)
-        self._settings = get_settings(registry)
+    def __init__(self, container):
+        # type: (AnySettingsContainer) -> None
+        super(MongoDatabase, self).__init__(container)
+        self._database = get_mongodb_engine(container)
+        self._settings = get_settings(container)
         self._stores = dict()
 
-    def is_ready(self):
-        # type: (...) -> bool
-        return self._database is not None and self._settings is not None
+    def reset_store(self, store_type):
+        store_type = self._get_store_type(store_type)
+        return self._stores.pop(store_type, None)
 
     def get_store(self, store_type, *store_args, **store_kwargs):
-        # type: (Union[AnyStr, StoreInterface, MongodbStores], *Any, **Any) -> AnyStoreType
+        # type: (Union[str, Type[StoreInterface], AnyMongodbStoreType], *Any, **Any) -> AnyMongodbStore
         """
         Retrieve a store from the database.
 
@@ -62,8 +72,7 @@ class MongoDatabase(DatabaseInterface):
         :param store_args: additional arguments to pass down to the store.
         :param store_kwargs: additional keyword arguments to pass down to the store.
         """
-        if isinstance(store_type, StoreInterface) or issubclass(store_type, StoreInterface):
-            store_type = store_type.type
+        store_type = self._get_store_type(store_type)
 
         for store in MongodbStores:
             if store.type == store_type:
@@ -90,33 +99,32 @@ class MongoDatabase(DatabaseInterface):
         db_version = result["version_num"]
         return {"version": db_version, "type": self.type}
 
+    def is_ready(self):
+        # type: (...) -> bool
+        return self._database is not None and self._settings is not None
+
     def run_migration(self):
         # type: (...) -> None
         warnings.warn("Not implemented {}.run_migration implementation.".format(self.type))
 
 
-def get_mongodb_connection(container, reset_connection=False):
-    # type: (AnySettingsContainer, bool) -> Database
+def get_mongodb_connection(container):
+    # type: (AnySettingsContainer) -> Database
     """Obtains the basic database connection from settings."""
-    global MongoDB  # pylint: disable=W0603,global-statement
-    if reset_connection:
-        MongoDB = None
-    if not MongoDB:
-        settings = get_settings(container)
-        settings_default = [("mongodb.host", "localhost"), ("mongodb.port", 27017), ("mongodb.db_name", "weaver")]
-        for setting, default in settings_default:
-            if settings.get(setting, None) is None:
-                warnings.warn("Setting '{}' not defined in registry, using default [{}].".format(setting, default))
-                settings[setting] = default
-        client = pymongo.MongoClient(settings["mongodb.host"], int(settings["mongodb.port"]))
-        MongoDB = client[settings["mongodb.db_name"]]
-    return MongoDB
+    settings = get_settings(container)
+    settings_default = [("mongodb.host", "localhost"), ("mongodb.port", 27017), ("mongodb.db_name", "weaver")]
+    for setting, default in settings_default:
+        if settings.get(setting, None) is None:
+            warnings.warn("Setting '{}' not defined in registry, using default [{}].".format(setting, default))
+            settings[setting] = default
+    client = pymongo.MongoClient(settings["mongodb.host"], int(settings["mongodb.port"]), connect=False)
+    return client[settings["mongodb.db_name"]]
 
 
-def get_mongodb_engine(container, reset_connection=False):
-    # type: (AnySettingsContainer, bool) -> Database
+def get_mongodb_engine(container):
+    # type: (AnySettingsContainer) -> Database
     """Obtains the database with configuration ready for usage."""
-    db = get_mongodb_connection(container, reset_connection)
+    db = get_mongodb_connection(container)
     db.services.create_index("name", unique=True)
     db.services.create_index("url", unique=True)
     db.processes.create_index("identifier", unique=True)

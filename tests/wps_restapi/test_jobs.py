@@ -1,17 +1,16 @@
+import contextlib
 import json
 import unittest
 import warnings
 from collections import OrderedDict
-from typing import TYPE_CHECKING, AnyStr, List, Tuple, Union
+from typing import TYPE_CHECKING
 
 import mock
 import pyramid.testing
 import pytest
-import six
 import webtest
 from owslib.wps import WebProcessingService
 
-from tests.compat import contextlib
 from tests.utils import (
     mocked_process_job_runner,
     setup_config_with_mongodb,
@@ -30,14 +29,17 @@ from weaver.status import (
     STATUS_FAILED,
     STATUS_SUCCEEDED
 )
+from weaver.utils import get_path_kvp
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.wps_restapi.swagger_definitions import jobs_full_uri, jobs_short_uri, process_jobs_uri
 
 if TYPE_CHECKING:
-    # pylint: disable=W0611,unused-import
-    from owslib.wps import Process as ProcessOWSWPS  # noqa: F401
-    from pywps.app import Process as ProcessPyWPS    # noqa: F401
+    from typing import Iterable, List, Tuple, Union
+
+    from owslib.wps import Process as ProcessOWSWPS
+    from pywps.app import Process as ProcessPyWPS
+
     # pylint: disable=C0103,invalid-name,E1101,no-member
     MockPatch = mock._patch  # noqa: W0212
 
@@ -146,7 +148,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     @staticmethod
     def get_job_remote_service_mock(processes):
-        # type: (List[Union[ProcessPyWPS, ProcessOWSWPS]]) -> Tuple[MockPatch]
+        # type: (List[Union[ProcessPyWPS, ProcessOWSWPS]]) -> Iterable[MockPatch]
         mock_processes = mock.PropertyMock
         mock_processes.return_value = processes
         return tuple([
@@ -157,16 +159,16 @@ class WpsRestApiJobsTest(unittest.TestCase):
     @staticmethod
     def check_job_format(job):
         assert isinstance(job, dict)
-        assert "jobID" in job and isinstance(job["jobID"], six.string_types)
-        assert "status" in job and isinstance(job["status"], six.string_types)
-        assert "message" in job and isinstance(job["message"], six.string_types)
+        assert "jobID" in job and isinstance(job["jobID"], str)
+        assert "status" in job and isinstance(job["status"], str)
+        assert "message" in job and isinstance(job["message"], str)
         assert "percentCompleted" in job and isinstance(job["percentCompleted"], int)
-        assert "logs" in job and isinstance(job["logs"], six.string_types)
+        assert "logs" in job and isinstance(job["logs"], str)
         assert job["status"] in JOB_STATUS_VALUES
         if job["status"] == STATUS_SUCCEEDED:
-            assert "result" in job and isinstance(job["result"], six.string_types)
+            assert "result" in job and isinstance(job["result"], str)
         elif job["status"] == STATUS_FAILED:
-            assert "exceptions" in job and isinstance(job["exceptions"], six.string_types)
+            assert "exceptions" in job and isinstance(job["exceptions"], str)
 
     @staticmethod
     def check_basic_jobs_info(response):
@@ -181,7 +183,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
     @staticmethod
     def check_basic_jobs_grouped_info(response, groups):
-        if isinstance(groups, six.string_types):
+        if isinstance(groups, str):
             groups = [groups]
         assert response.status_code == 200
         assert response.content_type == CONTENT_TYPE_APP_JSON
@@ -201,26 +203,22 @@ class WpsRestApiJobsTest(unittest.TestCase):
             total += grouped_jobs["count"]
         assert total == response.json["total"]
 
-    @staticmethod
-    def add_params(path, **kwargs):
-        return path + "?" + "&".join("{}={}".format(k, v) for k, v in kwargs.items())
-
     def test_get_jobs_normal_paged(self):
         resp = self.app.get(jobs_short_uri, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
         for job_id in resp.json["jobs"]:
-            assert isinstance(job_id, six.string_types)
+            assert isinstance(job_id, str)
 
         for detail in ("false", 0, "False", "no", "None", "null", None, ""):
-            path = self.add_params(jobs_short_uri, detail=detail)
+            path = get_path_kvp(jobs_short_uri, detail=detail)
             resp = self.app.get(path, headers=self.json_headers)
             self.check_basic_jobs_info(resp)
             for job_id in resp.json["jobs"]:
-                assert isinstance(job_id, six.string_types)
+                assert isinstance(job_id, str)
 
     def test_get_jobs_detail_paged(self):
         for detail in ("true", 1, "True", "yes"):
-            path = self.add_params(jobs_short_uri, detail=detail)
+            path = get_path_kvp(jobs_short_uri, detail=detail)
             resp = self.app.get(path, headers=self.json_headers)
             self.check_basic_jobs_info(resp)
             for job in resp.json["jobs"]:
@@ -229,17 +227,17 @@ class WpsRestApiJobsTest(unittest.TestCase):
     def test_get_jobs_normal_grouped(self):
         for detail in ("false", 0, "False", "no"):
             groups = ["process", "service"]
-            path = self.add_params(jobs_short_uri, detail=detail, groups=",".join(groups))
+            path = get_path_kvp(jobs_short_uri, detail=detail, groups=groups)
             resp = self.app.get(path, headers=self.json_headers)
             self.check_basic_jobs_grouped_info(resp, groups=groups)
             for grouped_jobs in resp.json["groups"]:
                 for job in grouped_jobs["jobs"]:
-                    assert isinstance(job, six.string_types)
+                    assert isinstance(job, str)
 
     def test_get_jobs_detail_grouped(self):
         for detail in ("true", 1, "True", "yes"):
             groups = ["process", "service"]
-            path = self.add_params(jobs_short_uri, detail=detail, groups=",".join(groups))
+            path = get_path_kvp(jobs_short_uri, detail=detail, groups=groups)
             resp = self.app.get(path, headers=self.json_headers)
             self.check_basic_jobs_grouped_info(resp, groups=groups)
             for grouped_jobs in resp.json["groups"]:
@@ -247,7 +245,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
                     self.check_job_format(job)
 
     def test_get_jobs_valid_grouping_by_process(self):
-        path = self.add_params(jobs_short_uri, detail="false", groups="process")
+        path = get_path_kvp(jobs_short_uri, detail="false", groups="process")
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_grouped_info(resp, groups="process")
 
@@ -274,7 +272,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
                 pytest.fail("Unknown job grouping 'process' value not expected.")
 
     def test_get_jobs_valid_grouping_by_service(self):
-        path = self.add_params(jobs_short_uri, detail="false", groups="service")
+        path = get_path_kvp(jobs_short_uri, detail="false", groups="service")
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_grouped_info(resp, groups="service")
 
@@ -324,7 +322,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert job.notification_email != email and job.notification_email is not None
         assert int(job.notification_email, 16) != 0  # email should be encrypted with hex string
 
-        path = self.add_params(jobs_short_uri, detail="true", notification_email=email)
+        path = get_path_kvp(jobs_short_uri, detail="true", notification_email=email)
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.content_type == CONTENT_TYPE_APP_JSON
@@ -332,14 +330,14 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.json["jobs"][0]["jobID"] == job_id
 
     def test_get_jobs_process_in_query_normal(self):
-        path = self.add_params(jobs_short_uri, process=self.job_info[0].process)
+        path = get_path_kvp(jobs_short_uri, process=self.job_info[0].process)
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
         assert self.job_info[0].id in resp.json["jobs"], self.message_with_jobs_mapping("expected in")
         assert self.job_info[1].id not in resp.json["jobs"], self.message_with_jobs_mapping("expected not in")
 
     def test_get_jobs_process_in_query_detail(self):
-        path = self.add_params(jobs_short_uri, process=self.job_info[0].process, detail="true")
+        path = get_path_kvp(jobs_short_uri, process=self.job_info[0].process, detail="true")
         resp = self.app.get(path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
         job_ids = [j["jobID"] for j in resp.json["jobs"]]
@@ -368,7 +366,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_get_jobs_process_unknown_in_query(self):
-        path = self.add_params(jobs_short_uri, process="unknown-process-id")
+        path = get_path_kvp(jobs_short_uri, process="unknown-process-id")
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
         assert resp.content_type == CONTENT_TYPE_APP_JSON
@@ -380,7 +378,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_get_jobs_private_process_not_returned_in_query(self):
-        path = self.add_params(jobs_short_uri, process=self.process_private.identifier)
+        path = get_path_kvp(jobs_short_uri, process=self.process_private.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 401
         assert resp.content_type == CONTENT_TYPE_APP_JSON
@@ -392,7 +390,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_get_jobs_service_and_process_unknown_in_query(self):
-        path = self.add_params(jobs_short_uri, service="unknown-service-id", process="unknown-process-id")
+        path = get_path_kvp(jobs_short_uri, service="unknown-service-id", process="unknown-process-id")
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
         assert resp.content_type == CONTENT_TYPE_APP_JSON
@@ -404,9 +402,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
     def test_get_jobs_private_service_public_process_unauthorized_in_query(self):
-        path = self.add_params(jobs_short_uri,
-                               service=self.service_private.name,
-                               process=self.process_public.identifier)
+        path = get_path_kvp(jobs_short_uri,
+                            service=self.service_private.name,
+                            process=self.process_public.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 401
         assert resp.content_type == CONTENT_TYPE_APP_JSON
@@ -417,9 +415,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
             it is up to the remote service to hide private processes
             if the process is visible, the a job can be executed and it is automatically considered public
         """
-        path = self.add_params(jobs_short_uri,
-                               service=self.service_public.name,
-                               process=self.process_private.identifier)
+        path = get_path_kvp(jobs_short_uri,
+                            service=self.service_public.name,
+                            process=self.process_private.identifier)
         with contextlib.ExitStack() as stack:
             for runner in self.get_job_remote_service_mock([self.process_private]):  # process visible on remote
                 stack.enter_context(runner)
@@ -433,9 +431,9 @@ class WpsRestApiJobsTest(unittest.TestCase):
             it is up to the remote service to hide private processes
             if the process is invisible, no job should have been executed nor can be fetched
         """
-        path = self.add_params(jobs_short_uri,
-                               service=self.service_public.name,
-                               process=self.process_private.identifier)
+        path = get_path_kvp(jobs_short_uri,
+                            service=self.service_public.name,
+                            process=self.process_private.identifier)
         with contextlib.ExitStack() as stack:
             for job in self.get_job_remote_service_mock([]):    # process invisible (not returned by remote)
                 stack.enter_context(job)
@@ -457,10 +455,10 @@ class WpsRestApiJobsTest(unittest.TestCase):
         editor1_private_jobs = list(filter(lambda j: VISIBILITY_PRIVATE in j.access, editor1_all_jobs))
         public_jobs = list(filter(lambda j: VISIBILITY_PUBLIC in j.access, self.job_info))
 
-        def filter_process(jobs):
+        def filter_process(jobs):  # type: (Iterable[Job]) -> List[Job]
             return list(filter(lambda j: j.process == self.process_public.identifier, jobs))
 
-        def filter_service(jobs):
+        def filter_service(jobs):  # type: (Iterable[Job]) -> List[Job]
             return list(filter(lambda j: j.service == self.service_public.name, jobs))
 
         # test variations of [paths, query, user-id, expected-job-ids]
@@ -497,14 +495,15 @@ class WpsRestApiJobsTest(unittest.TestCase):
             (uri_provider_jobs, VISIBILITY_PUBLIC,  self.user_editor1_id,   filter_service(editor1_public_jobs)),       # noqa: E241,E501
             (uri_provider_jobs, VISIBILITY_PUBLIC,  self.user_admin_id,     filter_service(self.job_info)),             # noqa: E241,E501
 
-        ]   # type: List[Tuple[AnyStr, AnyStr, Union[None, int], List[AnyStr]]]
+        ]   # type: List[Tuple[str, str, Union[None, int], List[Job]]]
 
         for i, (path, access, user_id, expected_jobs) in enumerate(path_jobs_user_req_tests):
-            patches = self.get_job_request_auth_mock(user_id) + self.get_job_remote_service_mock([self.process_public])
             with contextlib.ExitStack() as stack:
-                for patch in patches:
+                for patch in self.get_job_request_auth_mock(user_id):
                     stack.enter_context(patch)
-                test = self.add_params(path, access=access) if access else path
+                for patch in self.get_job_remote_service_mock([self.process_public]):
+                    stack.enter_context(patch)
+                test = get_path_kvp(path, access=access) if access else path
                 resp = self.app.get(test, headers=self.json_headers)
                 self.check_basic_jobs_info(resp)
                 job_ids = [job.id for job in expected_jobs]

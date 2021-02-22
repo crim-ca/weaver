@@ -12,6 +12,9 @@ LOGGER = logging.getLogger(__name__)
 OWS_TWEEN_HANDLED = "OWS_TWEEN_HANDLED"
 
 
+# FIXME:
+#   https://github.com/crim-ca/weaver/issues/215
+#   define common Exception classes that won't require this type of conversion
 def ows_response_tween(request, handler):
     """Tween that wraps any API request with appropriate dispatch of error conversion to handle formatting."""
     try:
@@ -20,16 +23,19 @@ def ows_response_tween(request, handler):
             if isinstance(result, Exception) and not isinstance(result, (HTTPSuccessful, HTTPRedirection)):
                 raise result    # let the previous tween handler handle this case
         return result
+    # NOTE:
+    #   Handle exceptions from most explicit definitions to least explicit.
+    #   Exceptions in 'weaver.exceptions' sometimes derive from 'OWSException' to provide additional details.
+    #   Furthermore, 'OWSException' have extensive details with references to 'HTTPException' and 'pywps.exceptions'.
     except HTTPException as err:
         LOGGER.debug("http exception -> ows exception response.")
         # Use the same json formatter than OWSException
         raised_error = err
         raised_error._json_formatter = OWSException.json_formatter
         return_error = raised_error
-
         exc_info_err = False
         exc_log_lvl = logging.WARNING if err.status_code < 500 else logging.ERROR
-    except OWSException as err:
+    except OWSException as err:  # could be 'WeaverException' with 'OWSException' base
         LOGGER.debug("direct ows exception response")
         raised_error = err
         return_error = err
@@ -47,11 +53,17 @@ def ows_response_tween(request, handler):
         return_error = OWSException(detail=str(err), status=HTTPInternalServerError)
         exc_info_err = sys.exc_info()
         exc_log_lvl = logging.ERROR
+    # FIXME:
+    #   https://github.com/crim-ca/weaver/issues/215
+    #   convivial generation of this repr format should be directly in common exception class
+    raised_err_code = getattr(raised_error, "code", getattr(raised_error, "status_code", 500))
+    raised_err_repr = "({}) <{}> {!s}".format(type(raised_error).__name__, raised_err_code, raised_error)
     if raised_error != return_error:
-        err_msg = "\n  Raised: [{!r}]\n  Return: [{!r}]".format(raised_error, return_error)
+        err_msg = "\n  Raised: [{}]\n  Return: [{!r}]".format(raised_err_repr, return_error)
     else:
-        err_msg = " [{!r}]".format(raised_error)
+        err_msg = " [{}]".format(raised_err_repr)
     LOGGER.log(exc_log_lvl, "Handled request exception:%s", err_msg, exc_info=exc_info_err)
+    LOGGER.debug("Handled request details:\n%s\n%s", raised_err_repr, getattr(raised_error, "text", ""))
     return return_error
 
 

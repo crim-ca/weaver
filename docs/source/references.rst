@@ -81,7 +81,7 @@
 .. |weaver-config| replace:: ``weaver/config``
 .. _weaver-config: ../../../config
 .. _weaver.ini.example: ../../../config/weaver.ini.example
-.. _data_sources.json.example: ../../../config/data_sources.json.example
+.. _data_sources.yml.example: ../../../config/data_sources.yml.example
 .. _wps_processes.yml.example: ../../../config/wps_processes.yml.example
 .. _request_options.yml.example: ../../../config/request_options.yml.example
 .. _Dockerfile-manager: ../../../docker/Dockerfile-manager

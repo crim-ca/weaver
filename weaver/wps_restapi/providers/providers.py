@@ -8,13 +8,14 @@ from utils import get_cookie_headers
 from weaver.database import get_db
 from weaver.datatype import Service
 from weaver.exceptions import ServiceNotFound, log_unhandled_exceptions
+from weaver.formats import OUTPUT_FORMAT_JSON
 from weaver.owsexceptions import OWSMissingParameterValue, OWSNotImplemented
 from weaver.processes.types import PROCESS_WPS
 from weaver.store.base import StoreServices
 from weaver.utils import get_any_id, get_settings
 from weaver.warning import NonBreakingExceptionWarning
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.utils import OUTPUT_FORMAT_JSON, get_wps_restapi_base_url
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 LOGGER = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ def get_providers(request):
     store = get_db(request).get_store(StoreServices)
     providers = []
 
-    for service in store.list_services(request=request):
+    for service in store.list_services():
         try:
             if service.type.lower() != "wps":
                 continue
@@ -77,7 +78,7 @@ def get_service(request):
     store = get_db(request).get_store(StoreServices)
     provider_id = request.matchdict.get("provider_id")
     try:
-        service = store.fetch_by_name(provider_id, request=request)
+        service = store.fetch_by_name(provider_id)
     except ServiceNotFound:
         raise HTTPNotFound("Provider {0} cannot be found.".format(provider_id))
     return service, store
@@ -103,7 +104,7 @@ def add_provider(request):
         new_service["auth"] = request.json["auth"]
 
     try:
-        store.save_service(new_service, request=request)
+        store.save_service(new_service)
     except NotImplementedError:
         raise OWSNotImplemented(sd.NotImplementedPostProviderResponse.description, value=new_service)
 
@@ -120,7 +121,7 @@ def remove_provider(request):
     service, store = get_service(request)
 
     try:
-        store.delete_service(service.name, request=request)
+        store.delete_service(service.name)
     except NotImplementedError:
         raise OWSNotImplemented(sd.NotImplementedDeleteProviderResponse.description)
 

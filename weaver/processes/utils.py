@@ -1,27 +1,24 @@
-import json
 import logging
-import os
 import warnings
 from copy import deepcopy
 from distutils.version import LooseVersion
 from typing import TYPE_CHECKING
+from urllib.parse import parse_qs, urlparse
 
 import colander
-import six
 import yaml
-from owslib.wps import WebProcessingService, is_reference
+from owslib.wps import WebProcessingService
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPConflict,
+    HTTPCreated,
     HTTPException,
+    HTTPForbidden,
     HTTPNotFound,
     HTTPOk,
     HTTPUnprocessableEntity
 )
 from pyramid.settings import asbool
-from six.moves.urllib.error import URLError
-from six.moves.urllib.parse import parse_qs, urlparse
-from six.moves.urllib.request import urlopen
 
 from weaver.config import (
     WEAVER_CONFIGURATION_EMS,
@@ -30,202 +27,81 @@ from weaver.config import (
     get_weaver_configuration
 )
 from weaver.database import get_db
-from weaver.datatype import Process as ProcessDB, Service
+from weaver.datatype import Process, Service
 from weaver.exceptions import (
     InvalidIdentifierValue,
+    MissingIdentifierValue,
     PackageNotFound,
     PackageRegistrationError,
     PackageTypeError,
+    ProcessNotAccessible,
     ProcessNotFound,
     ProcessRegistrationError,
     ServiceNotFound,
     log_unhandled_exceptions
 )
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN
-from weaver.processes.constants import WPS_COMPLEX_DATA
 from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from weaver.store.base import StoreProcesses, StoreServices
 from weaver.utils import get_sane_name, get_settings, get_url_without_query
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
-from weaver.wps import get_wps_output_dir
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
-if TYPE_CHECKING:
-    from weaver.typedefs import AnyContainer, AnySettingsContainer, FileSystemPathType, JSON, Number
-    from typing import Any, AnyStr, List, Optional, Tuple, Union
-    from pywps import Process as ProcessWPS
-    import owslib.wps
 LOGGER = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from typing import List, Optional, Tuple, Union
+
+    from pyramid.request import Request
+
+    from weaver.typedefs import AnyContainer, AnySettingsContainer, FileSystemPathType, JSON, Number, SettingsType
 
 
-def _get_data(output):
-    # type: (owslib.wps.Output) -> Optional[Any]
+# FIXME:
+#   https://github.com/crim-ca/weaver/issues/215
+#   define common Exception classes that won't require this type of conversion
+def get_process(process_id=None, request=None, settings=None, store=None):
+    # type: (Optional[str], Optional[Request], Optional[SettingsType], Optional[StoreProcesses]) -> Process
     """
-    Extract the data from the output value.
-    """
-    # process output data are append into a list and
-    # WPS standard v1.0.0 specify that Output data field has zero or one value
-    if output.data:
-        return output.data[0]
-    return None
+    Obtain the specified process and validate information, returning appropriate HTTP error if invalid.
 
+    Process identifier must be provided from either the request path definition or literal ID.
+    Database must be retrievable from either the request, underlying settings, or direct store reference.
 
-def _read_reference(url):
-    # type: (AnyStr) -> Optional[AnyStr]
+    Different parameter combinations are intended to be used as needed or more appropriate, such that redundant
+    operations can be reduced where some objects are already fetched from previous operations.
     """
-    Read a reference HTTP(S) URL and return the content.
-    """
-    if not isinstance(url, six.string_types):
-        return None
-    if not url.lower().startswith("http"):
-        LOGGER.warning("URL reading not allowed because of potentially insecure scheme: [%s]", url)
-        return None
+    if process_id is None and request is not None:
+        process_id = request.matchdict.get("process_id")
+    if store is None:
+        store = get_db(settings or request).get_store(StoreProcesses)
     try:
-        return urlopen(url).read()  # nosec: B310
-    except URLError:
-        return None
+        process = store.fetch_by_id(process_id, visibility=VISIBILITY_PUBLIC)
+        return process
+    except (InvalidIdentifierValue, MissingIdentifierValue) as ex:
+        raise HTTPBadRequest(str(ex))
+    except ProcessNotAccessible:
+        raise HTTPForbidden("Process with ID '{!s}' is not accessible.".format(process_id))
+    except ProcessNotFound:
+        raise HTTPNotFound("Process with ID '{!s}' does not exist.".format(process_id))
+    except colander.Invalid as ex:
+        raise HTTPBadRequest("Invalid schema:\n[{0!r}].".format(ex))
 
 
-def _get_multi_json_references(output, container):
-    # type: (owslib.wps.Output, Optional[AnySettingsContainer]) -> Optional[List[JSON]]
+def get_job_submission_response(body):
+    # type: (JSON) -> HTTPCreated
     """
-    Since WPS standard does not allow to return multiple values for a single output,
-    a lot of process actually return a json array containing references to these outputs.
+    Generates the successful response from contents returned by job submission process.
 
-    Because the multi-output references are contained within this JSON file, it is not very convenient to retrieve
-    the list of URLs as one always needs to open and read the file to get them. This function goal is to detect this
-    particular format and expand the references to make them quickly available in the job output response.
-
-    :return:
-        Array of HTTP(S) references if the specified output is effectively a JSON containing that, ``None`` otherwise.
+    .. seealso::
+        :func:`weaver.processes.execution.submit_job`
     """
-    # Check for the json datatype and mime-type
-    if output.dataType == WPS_COMPLEX_DATA and output.mimeType == CONTENT_TYPE_APP_JSON:
-        try:
-            # If the json data is referenced read it's content
-            if output.reference:
-                out_ref = output.reference
-                if container:
-                    if out_ref.startswith("file://"):
-                        out_ref = out_ref[7:]
-                    if out_ref.startswith("/"):
-                        wps_out_dir = get_wps_output_dir(container)
-                        out_ref = os.path.join(wps_out_dir, out_ref)
-                    if not os.path.isfile(out_ref):
-                        out_ref = output.reference
-                json_data_str = _read_reference(out_ref)
-            # Else get the data directly
-            else:
-                json_data_str = _get_data(output)
-
-            # Load the actual json dict
-            json_data = json.loads(json_data_str)
-        except Exception:
-            return None
-
-        if isinstance(json_data, list):
-            for data_value in json_data:
-                if not is_reference(data_value):
-                    return None
-            return json_data
-    return None
+    return HTTPCreated(location=body["location"], json=body)
 
 
 def map_progress(progress, range_min, range_max):
     # type: (Number, Number, Number) -> Number
     """Calculates the relative progression of the percentage process within min/max values."""
     return max(range_min, min(range_max, range_min + (progress * (range_max - range_min)) / 100))
-
-
-def jsonify_output(output, process_description, container=None):
-    # type: (owslib.wps.Output, owslib.wps.Process, Optional[AnySettingsContainer]) -> JSON
-    """
-    Utility method to jsonify an output element from a WPS1 process description.
-
-    In the case that a reference JSON output is specified and that it refers to a file that contains an array list of
-    URL references to simulate a multiple-output, this specific output gets expanded to contain both the original
-    URL ``reference`` field and the loaded URL list under ``data`` field for easier access from the response body.
-    """
-
-    if not output.dataType:
-        for process_output in getattr(process_description, "processOutputs", []):
-            if getattr(process_output, "identifier", "") == output.identifier:
-                output.dataType = process_output.dataType
-                break
-
-    json_output = dict(identifier=output.identifier,
-                       title=output.title,
-                       dataType=output.dataType)
-
-    # WPS standard v1.0.0 specify that either a reference or a data field has to be provided
-    if output.reference:
-        json_output["reference"] = output.reference
-
-        # Handle special case where we have a reference to a json array containing dataset reference
-        # Avoid reference to reference by fetching directly the dataset references
-        json_array = _get_multi_json_references(output, container)
-        if json_array and all(str(ref).startswith("http") for ref in json_array):
-            json_output["data"] = json_array
-    else:
-        # WPS standard v1.0.0 specify that Output data field has Zero or one value
-        json_output["data"] = output.data[0] if output.data else None
-
-    if json_output["dataType"] == WPS_COMPLEX_DATA:
-        json_output["mimeType"] = output.mimeType
-
-    return json_output
-
-
-def convert_process_wps_to_db(service, process, container):
-    # type: (Service, ProcessWPS, AnySettingsContainer) -> ProcessDB
-    """
-    Converts an owslib WPS Process to local storage Process.
-    """
-    from weaver.processes.wps_package import complex2json as jsonify_value
-
-    describe_process_url = "{base_url}/providers/{provider_id}/processes/{process_id}".format(
-        base_url=get_wps_restapi_base_url(container),
-        provider_id=service.get("name"),
-        process_id=process.identifier)
-    execute_process_url = "{describe_url}/jobs".format(describe_url=describe_process_url)
-
-    default_format = {"mimeType": CONTENT_TYPE_TEXT_PLAIN}
-    inputs = [dict(
-        id=getattr(dataInput, "identifier", ""),
-        title=getattr(dataInput, "title", ""),
-        abstract=getattr(dataInput, "abstract", ""),
-        minOccurs=str(getattr(dataInput, "minOccurs", 0)),
-        maxOccurs=str(getattr(dataInput, "maxOccurs", 0)),
-        dataType=dataInput.dataType,
-        defaultValue=jsonify_value(getattr(dataInput, "defaultValue", None)),
-        allowedValues=[jsonify_value(dataValue) for dataValue in getattr(dataInput, "allowedValues", [])],
-        supportedValues=[jsonify_value(dataValue) for dataValue in getattr(dataInput, "supportedValues", [])],
-        formats=[jsonify_value(dataValue) for dataValue in getattr(dataInput, "supportedValues", [default_format])],
-    ) for dataInput in getattr(process, "dataInputs", [])]
-
-    outputs = [dict(
-        id=getattr(processOutput, "identifier", ""),
-        title=getattr(processOutput, "title", ""),
-        abstract=getattr(processOutput, "abstract", ""),
-        dataType=processOutput.dataType,
-        defaultValue=jsonify_value(getattr(processOutput, "defaultValue", None)),
-        formats=[jsonify_value(dataValue) for dataValue in getattr(processOutput, "supportedValues", [default_format])],
-    ) for processOutput in getattr(process, "processOutputs", [])]
-
-    return ProcessDB(
-        id=process.identifier,
-        label=getattr(process, "title", ""),
-        title=getattr(process, "title", ""),
-        abstract=getattr(process, "abstract", ""),
-        inputs=inputs,
-        outputs=outputs,
-        url=describe_process_url,
-        processEndpointWPS1=service.get("url"),
-        processDescriptionURL=describe_process_url,
-        executeEndpoint=execute_process_url,
-        package=None,
-    )
 
 
 @log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during parsing of deploy payload.",
@@ -340,7 +216,7 @@ def deploy_process_from_payload(payload, container):
 
     try:
         store = get_db(container).get_store(StoreProcesses)
-        saved_process = store.save_process(ProcessDB(process_info), overwrite=False)
+        saved_process = store.save_process(Process(process_info), overwrite=False)
     except ProcessRegistrationError as ex:
         raise HTTPConflict(detail=str(ex))
     except ValueError as ex:
@@ -352,7 +228,7 @@ def deploy_process_from_payload(payload, container):
 
 
 def parse_wps_process_config(config_entry):
-    # type: (Union[JSON, AnyStr]) -> Tuple[AnyStr, AnyStr, List[AnyStr], bool]
+    # type: (Union[JSON, str]) -> Tuple[str, str, List[str], bool]
     """
     Parses the available WPS provider or process entry to retrieve its relevant information.
 
@@ -364,7 +240,7 @@ def parse_wps_process_config(config_entry):
         svc_name = config_entry.get("name")
         svc_proc = config_entry.get("id", [])
         svc_vis = asbool(config_entry.get("visible", False))
-    elif isinstance(config_entry, six.string_types):
+    elif isinstance(config_entry, str):
         svc_url = config_entry
         svc_name = None
         svc_proc = []
@@ -375,8 +251,8 @@ def parse_wps_process_config(config_entry):
     qs_p = parse_qs(url_p.query)
     svc_url = get_url_without_query(url_p)
     svc_name = svc_name or get_sane_name(url_p.hostname)
-    svc_proc = svc_proc or qs_p.get("identifier", [])
-    if not isinstance(svc_name, six.string_types):
+    svc_proc = svc_proc or qs_p.get("identifier", [])  # noqa
+    if not isinstance(svc_name, str):
         raise ValueError("Invalid service value: [{!s}].".format(svc_name))
     if not isinstance(svc_proc, list):
         raise ValueError("Invalid process value: [{!s}].".format(svc_proc))
