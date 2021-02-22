@@ -8,6 +8,17 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+`2.0.0 <https://github.com/crim-ca/weaver/tree/2.0.0>`_ (2021-02-22)
+========================================================================
+
+Changes:
+--------
 - Add support of YAML format for loading ``weaver.data_sources`` definition.
 - Pre-install ``Docker`` CLI in ``worker`` image to avoid bad practice of mounting it from the host.
 - Adjust WPS request dispatching such that process jobs get executed by ``Celery`` worker as intended
