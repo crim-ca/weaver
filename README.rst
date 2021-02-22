@@ -45,8 +45,8 @@ For more details, see `Configuration`_ section.
     :alt: Commits since latest release
     :target: https://github.com/crim-ca/weaver/compare/2.0.0...master
 
-.. |version| image:: https://img.shields.io/github/tag/crim-ca/weaver.svg?style=flat
-    :alt: Latest Tag
+.. |version| image:: https://img.shields.io/badge/latest%20version-2.0.0-blue
+    :alt: Latest Tagged Version
     :target: https://github.com/crim-ca/weaver/tree/2.0.0
 
 .. |requires| image:: https://requires.io/github/crim-ca/weaver/requirements.svg?branch=master
