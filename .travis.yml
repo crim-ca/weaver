@@ -80,7 +80,7 @@ jobs:
     - stage: test
       name: "Extra Tests"
       script:
-        - make TESTS='(slow or testbed14) and not functional' test-spec
+        - make SPEC='(slow or testbed14) and not functional' test-spec
     - stage: test
       name: "Windows Test (experimental)"
       os: windows

@@ -346,11 +346,11 @@ test-no-tb14-only: mkdir-reports  	## run all tests except ones marked for 'Test
 		-m "not testbed14" --junitxml "$(REPORTS_DIR)/test-results.xml"'
 
 .PHONY: test-spec-only
-test-spec-only:	mkdir-reports  ## run tests with custom specification (pytest format) [make TESTS='<spec>' test-spec]
+test-spec-only:	mkdir-reports  ## run tests with custom specification (pytest format) [make SPEC='<spec>' test-spec]
 	@echo "Running custom tests from input specification..."
-	@[ "${TESTS}" ] || ( echo ">> 'TESTS' is not set"; exit 1 )
+	@[ "${SPEC}" ] || ( echo ">> 'SPEC' is not set"; exit 1 )
 	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
-		-m "${TESTS}" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+		-m "${SPEC}" --junitxml "$(REPORTS_DIR)/test-results.xml"'
 
 .PHONY: test-smoke
 test-smoke: docker-test     ## alias to 'docker-test' executing smoke test of built docker images
