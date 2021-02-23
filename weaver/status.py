@@ -35,7 +35,7 @@ JOB_STATUS_VALUES = frozenset([
     STATUS_EXCEPTION,
 ])
 
-# pylint: disable=C0301,line-too-long,C0326,bad-whitespace
+# pylint: disable=C0301,line-too-long
 JOB_STATUS_CATEGORIES = {
     # note:
     #   OGC compliant:  [Accepted, Running, Succeeded, Failed]

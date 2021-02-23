@@ -1162,7 +1162,7 @@ class WpsPackage(Process):
             input_location = input_definition.data
         if not input_location:
             url = getattr(input_definition, "url")
-            if isinstance(url, str) and any([url.startswith("{}://".format(p)) for p in SUPPORTED_FILE_SCHEMES]):
+            if isinstance(url, str) and any(url.startswith("{}://".format(p)) for p in SUPPORTED_FILE_SCHEMES):
                 input_location = url
             else:
                 # last option, could not resolve 'lazily' so will fetch data if needed

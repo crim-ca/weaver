@@ -463,7 +463,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
 
         # test variations of [paths, query, user-id, expected-job-ids]
         path_jobs_user_req_tests = [
-            # pylint: disable=C0301,line-too-long,C0326,bad-whitespace
+            # pylint: disable=C0301,line-too-long
             # URI               ACCESS              USER                    EXPECTED JOBS
             (uri_direct_jobs,   None,               None,                   public_jobs),                               # noqa: E241,E501
             (uri_direct_jobs,   None,               self.user_editor1_id,   editor1_all_jobs),                          # noqa: E241,E501
