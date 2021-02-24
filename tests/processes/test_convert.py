@@ -73,7 +73,6 @@ def test_are_different_and_set_single_null():
 
 
 def test_json2wps_datatype():
-    # pylint: disable=C0326,bad-whitespace
     test_cases = [
         ("float",   {"type": WPS_LITERAL, "data_type": "float"}),                       # noqa: E241
         ("integer", {"type": WPS_LITERAL, "data_type": "integer"}),                     # noqa: E241

@@ -62,13 +62,13 @@ confidence=
 # --disable=W".
 disable=C0111,missing-docstring,
         C0302,too-many-lines,
-        C0330,bad-continuation,
         C0412,ungrouped-imports,
         C0415,import-outside-toplevel,
         C1801,len-as-condition,
         E0401,import-error,
         R0201,no-self-use
         R0205,useless-object-inheritance,
+        R0801,duplicate-code,
         R0901,too-many-ancestors,
         R0904,too-many-public-methods,
         R0912,too-many-branches,
@@ -216,7 +216,7 @@ dummy-variables-rgx=_+$|(_[a-zA-Z0-9_]*[a-zA-Z0-9]+?$)|dummy|^ignored_|^unused_
 ignored-argument-names=_.*|^ignored_|^unused_
 
 # Tells whether we should check for unused import in __init__ files.
-init-import=no
+init-import=yes
 
 # List of qualified module names which can have objects that can redefine
 # builtins.
@@ -425,10 +425,10 @@ ignore-comments=yes
 ignore-docstrings=yes
 
 # Ignore imports when computing similarities.
-ignore-imports=no
+ignore-imports=yes
 
 # Minimum lines number of a similarity.
-min-similarity-lines=4
+min-similarity-lines=10
 
 
 [CLASSES]
