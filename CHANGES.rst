@@ -8,7 +8,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Ensure that configuration file definitions specified in ``processes`` and ``providers`` will override older database
+  definitions respectively matched by ``id`` and ``name`` when starting `Weaver` if other parameters were modified.
 
 Fixes:
 ------
