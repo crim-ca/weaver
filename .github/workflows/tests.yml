@@ -2,7 +2,11 @@
 
 name: Tests
 on:
-  push
+  push:
+    branchhes:
+      - "**"
+    tags:
+      - "**"
   pull_request:
     types: [opened, synchronize, reopened]
   release:
