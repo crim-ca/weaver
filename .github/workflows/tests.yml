@@ -2,15 +2,9 @@
 
 name: Tests
 on:
-  push:
-    branchhes:
-      - "**"
-    tags:
-      - "**"
-  pull_request:
-    types: [opened, synchronize, reopened]
-  release:
-    types: [created]
+  - push
+  - pull_request
+  - release
 
 jobs:
   # see: https://github.com/fkirc/skip-duplicate-actions
