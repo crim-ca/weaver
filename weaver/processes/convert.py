@@ -457,8 +457,10 @@ def any2cwl_io(wps_io, io_select):
         wps_min_occ = get_field(wps_io, "min_occurs", search_variations=True, default=1)
         # field 'default' must correspond to a fallback "value", not a default "format"
         is_min_null = wps_min_occ in [0, "0"]
-        if (wps_default != null and not isinstance(wps_default, dict)) or is_min_null:
-            cwl_io["default"] = wps_default or "null"
+        if wps_default != null and not isinstance(wps_default, dict):
+            cwl_io["default"] = wps_default
+        elif is_min_null:
+            cwl_io["default"] = "null"
 
     wps_max_occ = get_field(wps_io, "max_occurs", search_variations=True)
     if wps_max_occ != null and wps_max_occ > 1:
@@ -475,10 +477,9 @@ def any2cwl_io(wps_io, io_select):
     # apply default null after handling literal/array/enum type variants
     # (easier to apply against their many different structures)
     if is_min_null and isinstance(cwl_io["type"], list):
-        cwl_io["type"].extend("null")  # if min=0,max>1 (null, <type>, <array-type>)
+        cwl_io["type"].insert(0, "null")  # if min=0,max>1 (null, <type>, <array-type>)
     else:
         cwl_io["type"] = ["null", cwl_io["type"]]  # if min=0,max=1 (null, <type>)
-
     return cwl_io, cwl_ns
 
 

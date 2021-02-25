@@ -15,6 +15,7 @@ Changes:
 - Replace ``GET`` HTTP request by ``HEAD`` for MIME-type check against ``IANA`` definitions (speed up).
 - Improve handling of `CWL` input generation in case of ``minOccurs``, ``maxOccurs`` and ``default`` empty of `WPS`
   process from remote provider (relates to `#17 <https://github.com/crim-ca/weaver/issues/17>`_).
+- Add ``hybrid`` mode that allows `Weaver` to simultaneously run local `Application Packages` and remote WPS providers.
 
 Fixes:
 ------

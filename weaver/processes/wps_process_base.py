@@ -11,7 +11,7 @@ from weaver.utils import get_cookie_headers, get_settings, request_extra
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url
 
 if TYPE_CHECKING:
-    from weaver.typedefs import CWL
+    from weaver.typedefs import CWLInputs
     from typing import Dict
     from pywps.app import WPSRequest
 
@@ -23,7 +23,7 @@ class WpsProcessInterface(object):
 
     @abstractmethod
     def execute(self,
-                workflow_inputs,        # type: CWL
+                workflow_inputs,        # type: CWLInputs
                 out_dir,                # type: str
                 expected_outputs,       # type: Dict[str, str]
                 ):
@@ -41,7 +41,10 @@ class WpsProcessInterface(object):
     def __init__(self, request):
         # type: (WPSRequest) -> None
         self.request = request
-        self.cookies = get_cookie_headers(self.request.http_request.headers)
+        if self.request.http_request:
+            self.cookies = get_cookie_headers(self.request.http_request.headers)
+        else:
+            self.cookies = {}
         self.headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
         self.settings = get_settings(app)
         self.verify = asbool(self.settings.get("weaver.ows_proxy_ssl_verify", True))

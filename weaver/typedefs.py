@@ -46,7 +46,9 @@ if TYPE_CHECKING:
     _JsonListItem = List[Union[AnyValue, _JsonObjectItem, "_JsonListItem", "JSON"]]
     _JsonItem = Union[AnyValue, _JsonObjectItem, _JsonListItem]
     JSON = Union[Dict[str, _JsonItem], List[_JsonItem]]
-    CWL = TypedDict("CWL", {"cwlVersion": str, "class": str, "inputs": JSON, "outputs": JSON,
+    CWLInputs = Dict[str, JSON]
+    CWLOutputs = Dict[str, JSON]
+    CWL = TypedDict("CWL", {"cwlVersion": str, "class": str, "inputs": CWLInputs, "outputs": CWLOutputs,
                             "requirements": JSON, "hints": JSON, "label": str, "doc": str, "s:keywords": str,
                             "$namespaces": Dict[str, str], "$schemas": Dict[str, str]}, total=False)
     KVPType = Union[ValueType, Sequence[ValueType]]

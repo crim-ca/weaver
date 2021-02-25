@@ -36,7 +36,7 @@ from pywps.inout.literaltypes import AnyValue
 from pywps.inout.storage.s3 import S3StorageBuilder
 from yaml.scanner import ScannerError
 
-from weaver.config import WEAVER_CONFIGURATION_EMS, get_weaver_configuration
+from weaver.config import WEAVER_CONFIGURATION_HYBRID, get_weaver_configuration
 from weaver.exceptions import (
     PackageException,
     PackageExecutionError,
@@ -639,7 +639,7 @@ class WpsPackage(Process):
     package_log_hook_stderr = None  # type: Optional[str]
     package_log_hook_stdout = None  # type: Optional[str]
     percent = None                  # type: Optional[Number]
-    is_ems = None                   # type: Optional[bool]
+    remote_execution = None         # type: Optional[bool]
     log_file = None                 # type: Optional[str]
     log_level = None                # type: Optional[int]
     logger = None                   # type: Optional[logging.Logger]
@@ -889,7 +889,7 @@ class WpsPackage(Process):
         # NOTE:
         #   When running process in sync (because executed within celery worker already async),
         #   pywps reverts status file output flag. Re-enforce it for our needs.
-        #   (see: 'wevaer.wps.WorkerService.execute_job')
+        #   (see: 'weaver.wps.WorkerService.execute_job')
         self.response.store_status_file = True
 
         # pywps overrides 'status' by 'accepted' in 'update_status', so use the '_update_status' to enforce the status
@@ -962,8 +962,8 @@ class WpsPackage(Process):
 
             self.update_status("Launching package...", PACKAGE_PROGRESS_LAUNCHING, STATUS_RUNNING)
 
-            self.is_ems = get_weaver_configuration(self.settings) == WEAVER_CONFIGURATION_EMS
-            if self.is_ems:
+            self.remote_execution = get_weaver_configuration(self.settings) in WEAVER_CONFIGURATION_HYBRID
+            if self.remote_execution:
                 # EMS dispatch the execution to the ADES
                 loading_context = LoadingContext()
                 loading_context.construct_tool_object = self.make_tool
@@ -1074,7 +1074,7 @@ class WpsPackage(Process):
         .. seealso::
             - :ref:`File Reference Types`
         """
-        if self.is_ems or self.package_type == PROCESS_WORKFLOW:
+        if self.remote_execution or self.package_type == PROCESS_WORKFLOW:
             return False
         app_req = self.get_application_requirement()
         if app_req["class"] not in [CWL_REQUIREMENT_APP_BUILTIN, CWL_REQUIREMENT_APP_DOCKER]:
@@ -1111,13 +1111,11 @@ class WpsPackage(Process):
             if isinstance(input_i, ComplexInput) or elem_type == "File":
                 # extend array data that allow max_occur > 1
                 if is_array:
-                    input_type = elem_type
                     cwl_inputs[input_id] = [
-                        self.make_location_input(input_type, input_def) for input_def in input_occurs
+                        self.make_location_input(elem_type, input_def) for input_def in input_occurs
                     ]
                 else:
-                    input_type = cwl_inputs_info[input_id]["type"]
-                    cwl_inputs[input_id] = self.make_location_input(input_type, input_i)
+                    cwl_inputs[input_id] = self.make_location_input(elem_type, input_i)
             elif isinstance(input_i, (LiteralInput, BoundingBoxInput)):
                 # extend array data that allow max_occur > 1
                 if is_array:

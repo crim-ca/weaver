@@ -6,6 +6,7 @@ from owslib.wps import ComplexDataInput, WebProcessingService
 
 from weaver import status
 from weaver.execute import EXECUTE_MODE_ASYNC
+from weaver.formats import get_format
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes.constants import WPS_COMPLEX_DATA
 from weaver.processes.convert import ows2json_output
@@ -82,8 +83,15 @@ class Wps1Process(WpsProcessInterface):
 
                 input_values = []
                 for val in input_val:
+                    mime_type = None
+                    encoding = None
                     if isinstance(val, dict):
+                        fmt = val.get("format")
                         val = val["location"]
+                        if fmt:
+                            fmt = get_format(workflow_inputs[input_key]["format"])
+                            mime_type = fmt.mime_type or None
+                            encoding = fmt.encoding or None  # avoid empty string
 
                     # owslib only accepts strings, not numbers directly
                     if isinstance(val, (int, float)):
@@ -93,13 +101,13 @@ class Wps1Process(WpsProcessInterface):
                         # we need to host file starting with file:// scheme
                         val = self.host_file(val)
 
-                    input_values.append(val)
+                    input_values.append((val, mime_type, encoding))
 
                 # need to use ComplexDataInput structure for complex input
                 # TODO: BoundingBox not supported
-                for input_value in input_values:
+                for input_value, mime_type, encoding in input_values:
                     if input_key in complex_inputs:
-                        input_value = ComplexDataInput(input_value)
+                        input_value = ComplexDataInput(input_value, mimeType=mime_type, encoding=encoding)
 
                     wps_inputs.append((input_key, input_value))
 
@@ -127,7 +135,7 @@ class Wps1Process(WpsProcessInterface):
                     raise Exception("Could not read status document after {} retries. Giving up.".format(max_retries))
                 try:
                     execution = check_wps_status(location=execution.statusLocation, verify=self.verify,
-                                                 sleep_secs=wait_secs(run_step))
+                                                 sleep_secs=wait_secs(run_step), settings=self.settings)
                     job_id = execution.statusLocation.replace(".xml", "").split("/")[-1]
                     LOGGER.debug(get_log_monitor_msg(job_id, status.map_status(execution.getStatus()),
                                                      execution.percentCompleted, execution.statusMessage,
