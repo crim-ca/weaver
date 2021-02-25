@@ -133,14 +133,17 @@ def _get_deploy_process_info(process_info, reference, package):
         raise HTTPUnprocessableEntity(detail=msg)
 
 
-def deploy_process_from_payload(payload, container):
-    # type: (JSON, AnyContainer) -> HTTPException
+def deploy_process_from_payload(payload, container, overwrite=False):
+    # type: (JSON, AnyContainer, bool) -> HTTPException
     """
     Adds a :class:`weaver.datatype.Process` instance to storage using the provided JSON ``payload`` matching
     :class:`weaver.wps_restapi.swagger_definitions.ProcessDescription`.
 
-    :returns: HTTPOk if the process registration was successful
-    :raises HTTPException: otherwise
+    :param payload: JSON payload that was specified during the process deployment request.
+    :param container: container to retrieve application settings.
+    :param overwrite: whether to allow override of an existing process definition if conflict occurs.
+    :returns: HTTPOk if the process registration was successful.
+    :raises HTTPException: for any invalid process deployment step.
     """
     _check_deploy(payload)
 
@@ -216,7 +219,7 @@ def deploy_process_from_payload(payload, container):
 
     try:
         store = get_db(container).get_store(StoreProcesses)
-        saved_process = store.save_process(Process(process_info), overwrite=False)
+        saved_process = store.save_process(Process(process_info), overwrite=overwrite)
     except ProcessRegistrationError as ex:
         raise HTTPConflict(detail=str(ex))
     except ValueError as ex:
@@ -300,8 +303,8 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
             return
 
         db = get_db(container)
-        process_store = db.get_store(StoreProcesses)
-        service_store = db.get_store(StoreServices)
+        process_store = db.get_store(StoreProcesses)    # type: StoreProcesses
+        service_store = db.get_store(StoreServices)     # type: StoreServices
 
         # either 'service' references to register every underlying 'process' individually
         # or explicit 'process' references to register by themselves
@@ -317,23 +320,30 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
             wps_processes = [wps.describeprocess(p) for p in svc_proc] or wps.processes
             for wps_process in wps_processes:
                 proc_id = "{}_{}".format(svc_name, get_sane_name(wps_process.identifier))
-                try:
-                    process_store.fetch_by_id(proc_id)
-                except ProcessNotFound:
-                    pass
-                else:
-                    LOGGER.warning("Process already registered: [%s]. Skipping...", proc_id)
-                    continue
                 proc_url = "{}?service=WPS&request=DescribeProcess&identifier={}&version={}" \
                            .format(svc_url, wps_process.identifier, wps.version)
                 svc_vis = VISIBILITY_PUBLIC if svc_vis else VISIBILITY_PRIVATE
+                try:
+                    old_process = process_store.fetch_by_id(proc_id)
+                except ProcessNotFound:
+                    pass
+                else:
+                    if (
+                        old_process.id == proc_id
+                        and old_process.processDescriptionURL == proc_url
+                        and old_process.visibility == svc_vis
+                    ):
+                        LOGGER.warning("Process already registered: [%s]. Skipping...", proc_id)
+                        continue
+                    else:
+                        LOGGER.warning("Process matches registered one: [%s]. Updating details...", proc_id)
                 payload = {
                     "processDescription": {"process": {"id": proc_id, "visibility": svc_vis}},
                     "executionUnit": [{"href": proc_url}],
                     "deploymentProfileName": "http://www.opengis.net/profiles/eoc/wpsApplication",
                 }
                 try:
-                    resp = deploy_process_from_payload(payload, container)
+                    resp = deploy_process_from_payload(payload, container, overwrite=True)
                     if resp.status_code == HTTPOk.code:
                         LOGGER.info("Process registered: [%s]", proc_id)
                     else:
@@ -345,17 +355,21 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
         # direct WPS providers to register
         for cfg_service in providers:
             svc_name, svc_url, _, svc_vis = parse_wps_process_config(cfg_service)
-            LOGGER.info("Register WPS-1 provider: [%s]", svc_url)
+            LOGGER.info("Register WPS-1/2 provider: [%s]", svc_url)
             WebProcessingService(url=svc_url)  # only attempt fetch to validate it exists
+            new_service = Service(name=svc_name, url=svc_url, public=svc_vis)
             try:
-                service_store.fetch_by_name(svc_name)
+                old_service = service_store.fetch_by_name(svc_name)
             except ServiceNotFound:
-                pass
+                LOGGER.info("Registering new provider: [%s]...", svc_name)
             else:
-                LOGGER.warning("Provider already registered: [%s]. Skipping...", svc_name)
-                continue
+                if new_service == old_service:
+                    LOGGER.warning("Provider already registered: [%s]. Skipping...", svc_name)
+                    continue
+                else:
+                    LOGGER.warning("Provider matches registered service: [%s]. Updating details...", svc_name)
             try:
-                service_store.save_service(Service(name=svc_name, url=svc_url, public=svc_vis))
+                service_store.save_service(new_service, overwrite=True)
             except Exception as ex:
                 LOGGER.exception("Exception during provider registration: [%r]. Skipping...", ex)
                 continue

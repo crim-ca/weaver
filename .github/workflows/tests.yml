@@ -2,11 +2,14 @@
 
 name: Tests
 on:
-  push
+  push:
+    branchhes: ["**"]
+    tags: ["**"]
   pull_request:
     types: [opened, synchronize, reopened]
   release:
     types: [created]
+  workflow_dispatch: {}
 
 jobs:
   # see: https://github.com/fkirc/skip-duplicate-actions
@@ -14,7 +17,7 @@ jobs:
     continue-on-error: true
     runs-on: ubuntu-latest
     outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip && ! contains(github.ref, "refs/tags") }}
+      should_skip: ${{ steps.skip_check.outputs.should_skip && ! contains(github.ref, 'refs/tags') }}
     steps:
       - id: skip_check
         uses: fkirc/skip-duplicate-actions@master
