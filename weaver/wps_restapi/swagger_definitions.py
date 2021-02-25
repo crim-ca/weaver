@@ -293,7 +293,7 @@ class JsonLink(MappingSchema):
 class MetadataBase(MappingSchema):
     title = SchemaNode(String(), missing=drop)
     role = SchemaNode(String(), format=URL, missing=drop)
-    type = SchemaNode(String(), description="Type of metadata entry.")
+    type = SchemaNode(String(), description="Type of metadata entry.", missing=drop)
 
 
 class MetadataLink(MetadataBase, JsonLink):

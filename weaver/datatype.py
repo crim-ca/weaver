@@ -13,9 +13,15 @@ from owslib.wps import WPSException
 from pywps import Process as ProcessWPS
 
 from weaver.exceptions import ProcessInstanceError
-from weaver.processes.convert import ows2json_io_FIXME  # FIXME: duplicate functions
-from weaver.processes.convert import get_field, ows2json_io, wps2json_io
-from weaver.processes.types import PROCESS_APPLICATION, PROCESS_BUILTIN, PROCESS_TEST, PROCESS_WORKFLOW, PROCESS_WPS
+from weaver.processes.convert import get_field, ows2json_io, ows2json, wps2json_io
+from weaver.processes.types import (
+    PROCESS_APPLICATION,
+    PROCESS_BUILTIN,
+    PROCESS_TEST,
+    PROCESS_WORKFLOW,
+    PROCESS_WPS_LOCAL,
+    PROCESS_WPS_REMOTE
+)
 from weaver.status import (
     JOB_STATUS_CATEGORIES,
     JOB_STATUS_VALUES,
@@ -31,8 +37,9 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from weaver.typedefs import AnySettingsContainer, Number, CWL, JSON
     from typing import Any, Dict, List, Optional, Union
+    from owslib.wps import Process as ProcessOWS
+    from weaver.typedefs import AnySettingsContainer, Number, CWL, JSON
 
 LOGGER = getLogger(__name__)
 
@@ -411,6 +418,18 @@ class Job(Base):
         self["execute_async"] = execute_async
 
     @property
+    def is_local(self):
+        # type: () -> bool
+        return self.get("is_local", not self.service)
+
+    @is_local.setter
+    def is_local(self, is_local):
+        # type: (bool) -> None
+        if not isinstance(is_local, bool):
+            raise TypeError("Type 'bool' is required for '{}.is_local'".format(type(self)))
+        self["is_local"] = is_local
+
+    @property
     def is_workflow(self):
         # type: () -> bool
         return self.get("is_workflow", False)
@@ -738,7 +757,10 @@ class Process(Base):
     @property
     def type(self):
         # type: () -> str
-        return self.get("type", PROCESS_WPS)
+        """
+        Type of process amongst :mod:`weaver.processes.types` definitions.
+        """
+        return self.get("type", PROCESS_APPLICATION)
 
     @property
     def package(self):
@@ -899,7 +921,7 @@ class Process(Base):
 
     @staticmethod
     def from_ows(service, process, container):
-        # type: (Service, ProcessWPS, AnySettingsContainer) -> Process
+        # type: (Service, ProcessOWS, AnySettingsContainer) -> Process
         """
         Converts a :mod:`owslib.wps` Process to local storage :class:`weaver.datatype.Process`.
         """
@@ -910,27 +932,22 @@ class Process(Base):
             provider_url = "{}/providers/{}".format(wps_url, service.get("name"))
         describe_process_url = "{}/processes/{}".format(provider_url, process.identifier)
         execute_process_url = "{describe_url}/jobs".format(describe_url=describe_process_url)
-
-        # FIXME: should use common function
-        inputs = [ows2json_io_FIXME(ows_input) for ows_input in get_field(process, "dataInputs", default=[])]
-        outputs = [ows2json_io(ows_output) for ows_output in get_field(process, "processOutputs", default=[])]
-
+        package, info = ows2json(process, service.name, service.url)
         return Process(
-            id=process.identifier,
-            title=get_field(process, "title", default=process.identifier, search_variations=True),
-            abstract=get_field(process, "abstract", default=None, search_variations=True),
-            inputs=inputs,
-            outputs=outputs,
             url=describe_process_url,
             processEndpointWPS1=service.get("url"),
             processDescriptionURL=describe_process_url,
             executeEndpoint=execute_process_url,
-            package=None,
+            type=PROCESS_WPS_REMOTE,
+            package=package,
+            **info
         )
 
     def wps(self):
         # type: () -> ProcessWPS
-
+        """
+        Converts this :class:`Process` to a corresponding format understood by :mod:`pywps`.
+        """
         # import here to avoid circular import errors
         from weaver.processes.wps_default import HelloWPS
         from weaver.processes.wps_package import WpsPackage
@@ -938,13 +955,14 @@ class Process(Base):
         process_map = {
             HelloWPS.identifier: HelloWPS,
             PROCESS_TEST: WpsTestProcess,
-            PROCESS_APPLICATION: WpsPackage,
-            PROCESS_WORKFLOW: WpsPackage,
-            PROCESS_BUILTIN: WpsPackage,
+            PROCESS_APPLICATION: WpsPackage,    # single CWL package
+            PROCESS_BUILTIN: WpsPackage,        # local scripts
+            PROCESS_WPS_REMOTE: WpsPackage,     # remote WPS
+            PROCESS_WORKFLOW: WpsPackage,       # chaining of CWL packages
         }
 
         process_key = self.type
-        if self.type == PROCESS_WPS:
+        if self.type == PROCESS_WPS_LOCAL:
             process_key = self.identifier
         if process_key not in process_map:
             ProcessInstanceError("Unknown process '{}' in mapping.".format(process_key))

@@ -508,7 +508,7 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
 
     if "s:keywords" in cwl_package_package and isinstance(cwl_package_package["s:keywords"], list):
         wps_package_metadata["keywords"] = list(
-            set(wps_package_metadata.get("keywords", list)) | set(cwl_package_package.get("s:keywords"))
+            set(wps_package_metadata.get("keywords", [])) | set(cwl_package_package.get("s:keywords", []))
         )
 
 

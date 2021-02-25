@@ -103,7 +103,7 @@ def execute_process(self, job_id, url, headers=None):
         except Exception as ex:
             raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
         try:
-            process = wps.describeprocess(job.process)
+            wps_process = wps.describeprocess(job.process)
         except Exception as ex:
             raise OWSNoApplicableCode("Failed to retrieve WPS process description. Error: [{}].".format(str(ex)))
 
@@ -111,7 +111,7 @@ def execute_process(self, job_id, url, headers=None):
         job.progress = JOB_PROGRESS_GET_INPUTS
         job.save_log(logger=task_logger, message="Fetching job input definitions.")
         complex_inputs = []
-        for process_input in process.dataInputs:
+        for process_input in wps_process.dataInputs:
             if WPS_COMPLEX_DATA in process_input.dataType:
                 complex_inputs.append(process_input.identifier)
 
@@ -138,7 +138,14 @@ def execute_process(self, job_id, url, headers=None):
         # prepare outputs
         job.progress = JOB_PROGRESS_GET_OUTPUTS
         job.save_log(logger=task_logger, message="Fetching job output definitions.")
-        wps_outputs = [(o.identifier, o.dataType == WPS_COMPLEX_DATA) for o in process.processOutputs]
+        wps_outputs = [(o.identifier, o.dataType == WPS_COMPLEX_DATA) for o in wps_process.processOutputs]
+
+        # if process refers to a remote WPS provider, pass it down to avoid unnecessary re-fetch request
+        if job.is_local:
+            process = None  # already got all the information needed pre-loaded in PyWPS service
+        else:
+            service = Service(name=job.service, url=url)
+            process = Process.from_ows(service, wps_process, settings)
 
         mode = EXECUTE_MODE_ASYNC if job.execute_async else EXECUTE_MODE_SYNC
         job.progress = JOB_PROGRESS_EXECUTE_REQUEST
@@ -148,7 +155,7 @@ def execute_process(self, job_id, url, headers=None):
 
         wps_worker = get_pywps_service(environ=settings, is_worker=True)
         execution = wps_worker.execute_job(job.process, wps_inputs=wps_inputs, wps_outputs=wps_outputs,
-                                           mode=mode, job_uuid=job.id)
+                                           mode=mode, job_uuid=job.id, remote_process=process)
         if not execution.process and execution.errors:
             raise execution.errors[0]
 

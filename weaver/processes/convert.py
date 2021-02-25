@@ -53,26 +53,22 @@ from weaver.processes.constants import (
     WPS_OUTPUT,
     WPS_REFERENCE
 )
-from weaver.utils import bytes2str, fetch_file, get_any_id, get_url_without_query, null, str2bytes
+from weaver.utils import bytes2str, fetch_file, get_any_id, get_sane_name, get_url_without_query, null, str2bytes
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+    from urllib.parse import ParseResult
 
-    from cwltool.process import Process as ProcessCWL
     from pywps.app import WPSRequest
-    from pywps.response.execute import ExecuteResponse
-    from owslib.wps import Process as ProcessOWS, WPSExecution
+    from owslib.wps import Process as ProcessOWS
     from requests.models import Response
 
-    from weaver.datatype import Job
-    from weaver.status import AnyStatusType
     from weaver.typedefs import (
         AnyKey,
         AnySettingsContainer,
         AnyValueType,
         CWL,
         JSON,
-        Number,
         TypedDict,
         XML
     )
@@ -167,11 +163,19 @@ def metadata2json(meta, force=False):
     """
     if not force and not isinstance(meta, (OWS_Metadata, WPS_Metadata)):
         return meta
-    return {
-        "href": get_field(meta, "href", search_variations=True, default=None),
-        "title": get_field(meta, "title", search_variations=True, default=None),
-        "role": get_field(meta, "role", search_variations=True, default=None),
-    }
+    title = get_field(meta, "title", search_variations=True, default=None)
+    href = get_field(meta, "href", search_variations=True, default=None)
+    role = get_field(meta, "role", search_variations=True, default=None)
+    rel = get_field(meta, "rel", search_variations=True, default=None)
+    if not href:
+        return {}
+    # many remote servers do not provide the 'rel', but instead provide 'title'
+    # build one by default to avoid failing schemas that expect 'rel' to exist
+    if not rel:
+        href_rel = urlparse(href).hostname
+        rel = str(title or role or href_rel).lower()  # fallback to first available, href/url should always be given
+        rel = get_sane_name(rel, replace_character="-", assert_invalid=False)
+    return {"href": href, "title": title, "role": role, "rel": rel}
 
 
 def ows2json_field(ows_field):
@@ -460,6 +464,62 @@ def any2cwl_io(wps_io, io_select):
     return cwl_io, cwl_ns
 
 
+def wps2cwl_requirement(wps_service_url, wps_process_id):
+    # type: (Union[str, ParseResult], str) -> JSON
+    """
+    Obtains the `CWL` requirements definition needed for parsing by a remote `WPS` provider as an `Application Package`.
+    """
+    return OrderedDict([
+        ("cwlVersion", "v1.0"),
+        ("class", "CommandLineTool"),
+        ("hints", {
+            CWL_REQUIREMENT_APP_WPS1: {
+                "provider": get_url_without_query(wps_service_url),
+                "process": wps_process_id,
+            }}),
+    ])
+
+
+def ows2json(wps_process, wps_service_name, wps_service_url):
+    # type: (ProcessOWS, str, Union[str, ParseResult]) -> Tuple[CWL, JSON]
+    """
+    Generates the `CWL` package and process definitions from a :class:`owslib.wps.Process` hosted under `WPS` location.
+    """
+    process_info = OrderedDict([
+        ("identifier", "{}_{}".format(wps_service_name, wps_process.identifier)),
+        ("keywords", [wps_service_name]),
+    ])
+    default_title = wps_process.identifier.capitalize()
+    process_info["title"] = get_field(wps_process, "title", default=default_title, search_variations=True)
+    process_info["abstract"] = get_field(wps_process, "abstract", default=None, search_variations=True)
+    process_info["metadata"] = []
+    if wps_process.metadata:
+        for meta in wps_process.metadata:
+            metadata = metadata2json(meta)
+            if metadata:
+                process_info["metadata"].append(metadata)
+    process_info["inputs"] = []                 # type: List[JSON]
+    process_info["outputs"] = []                # type: List[JSON]
+    for wps_in in wps_process.dataInputs:       # type: OWS_Input_Type
+        process_info["inputs"].append(ows2json_io(wps_in))
+    for wps_out in wps_process.processOutputs:  # type: OWS_Output_Type
+        process_info["outputs"].append(ows2json_io(wps_out))
+
+    # generate CWL for WPS-1 using parsed WPS-3
+    cwl_package = wps2cwl_requirement(wps_service_url, wps_process.identifier)
+    for io_select in [WPS_INPUT, WPS_OUTPUT]:
+        io_section = "{}s".format(io_select)
+        cwl_package[io_section] = list()
+        for wps_io in process_info[io_section]:
+            cwl_io, cwl_ns = any2cwl_io(wps_io, io_select)
+            cwl_package[io_section].append(cwl_io)
+            if cwl_ns:
+                if "$namespaces" not in cwl_package:
+                    cwl_package["$namespaces"] = dict()
+                cwl_package["$namespaces"].update(cwl_ns)
+    return cwl_package, process_info
+
+
 def xml_wps2cwl(wps_process_response):
     # type: (Response) -> Tuple[CWL, JSON]
     """
@@ -496,45 +556,8 @@ def xml_wps2cwl(wps_process_response):
         wps_service_name = wps.provider.name
     else:
         wps_service_name = wps_service_url.hostname
-    process_info = OrderedDict([
-        ("identifier", "{}_{}".format(wps_service_name, process_id)),
-        ("keywords", [wps_service_name]),
-    ])
     wps_process = wps.describeprocess(process_id, xml=wps_process_response.content)
-    for field in ["title", "abstract"]:
-        process_info[field] = get_field(wps_process, field, search_variations=True)
-    if wps_process.metadata:
-        process_info["metadata"] = []
-    for meta in wps_process.metadata:
-        process_info["metadata"].append({"href": meta.url, "title": meta.title, "role": meta.role})
-    process_info["inputs"] = []                 # type: List[JSON]
-    process_info["outputs"] = []                # type: List[JSON]
-    for wps_in in wps_process.dataInputs:       # type: OWS_Input_Type
-        process_info["inputs"].append(ows2json_io(wps_in))
-    for wps_out in wps_process.processOutputs:  # type: OWS_Output_Type
-        process_info["outputs"].append(ows2json_io(wps_out))
-
-    # generate CWL for WPS-1 using parsed WPS-3
-    cwl_package = OrderedDict([
-        ("cwlVersion", "v1.0"),
-        ("class", "CommandLineTool"),
-        ("hints", {
-            CWL_REQUIREMENT_APP_WPS1: {
-                "provider": get_url_without_query(wps_service_url),
-                "process": process_id,
-            }}),
-    ])
-    for io_select in [WPS_INPUT, WPS_OUTPUT]:
-        io_section = "{}s".format(io_select)
-        cwl_package[io_section] = list()
-        for wps_io in process_info[io_section]:
-            cwl_io, cwl_ns = any2cwl_io(wps_io, io_select)
-            cwl_package[io_section].append(cwl_io)
-            if cwl_ns:
-                if "$namespaces" not in cwl_package:
-                    cwl_package["$namespaces"] = dict()
-                cwl_package["$namespaces"].update(cwl_ns)
-
+    cwl_package, process_info = ows2json(wps_process, wps_service_name, wps_service_url)
     return cwl_package, process_info
 
 
@@ -653,7 +676,7 @@ def cwl2wps_io(io_info, io_select):
     """Converts input/output parameters from CWL types to WPS types.
 
     :param io_info: parsed IO of a CWL file
-    :param io_select: ``WPS_INPUT`` or ``WPS_OUTPUT`` to specify desired WPS type conversion.
+    :param io_select: :py:data:`WPS_INPUT` or :py:data:`WPS_OUTPUT` to specify desired WPS type conversion.
     :returns: corresponding IO in WPS format
     """
     is_input = False
@@ -888,11 +911,11 @@ def json2wps_field(field_info, field_category):
 
 
 def json2wps_io(io_info, io_select):
-    # type: (JSON_IO_Type, Union[WPS_INPUT, WPS_OUTPUT]) -> WPS_IO_Type
+    # type: (JSON_IO_Type, str) -> WPS_IO_Type
     """Converts an I/O from a JSON dict to PyWPS types.
 
     :param io_info: I/O in JSON dict format.
-    :param io_select: ``WPS_INPUT`` or ``WPS_OUTPUT`` to specify desired WPS type conversion.
+    :param io_select: :py:data:`WPS_INPUT` or :py:data:`WPS_OUTPUT` to specify desired WPS type conversion.
     :return: corresponding I/O in WPS format.
     """
 
@@ -902,6 +925,9 @@ def json2wps_io(io_info, io_select):
         "formats": "supported_formats",
         "minOccurs": "min_occurs",
         "maxOccurs": "max_occurs",
+        "dataType": "data_type",
+        "defaultValue": "default",
+        "supportedValues": "supported_values",
     }
     remove = [
         "id",
@@ -966,12 +992,13 @@ def json2wps_io(io_info, io_select):
             io_type = WPS_LITERAL
             io_info["data_type"] = io_type_guess
     if io_select == WPS_INPUT:
+        if ("max_occurs", "unbounded") in io_info.items():
+            io_info["max_occurs"] = PACKAGE_ARRAY_MAX_SIZE
         if io_type in WPS_COMPLEX_TYPES:
-            io_info.pop("data_type", None)
             if "supported_formats" not in io_info:
                 io_info["supported_formats"] = [DEFAULT_FORMAT]
-            if ("max_occurs", "unbounded") in io_info.items():
-                io_info["max_occurs"] = PACKAGE_ARRAY_MAX_SIZE
+            io_info.pop("data_type", None)
+            io_info.pop("allowed_values", None)
             io_info.pop("supported_values", None)
             return ComplexInput(**io_info)
         if io_type == WPS_BOUNDINGBOX:
@@ -981,7 +1008,7 @@ def json2wps_io(io_info, io_select):
         if io_type == WPS_LITERAL:
             io_info.pop("data_format", None)
             io_info.pop("supported_formats", None)
-            io_info.pop("literalDataDomains", None)
+            io_info.pop("literalDataDomains", None)  # FIXME: https://github.com/crim-ca/weaver/issues/211
             io_info["data_type"] = json2wps_datatype(io_info)
             return LiteralInput(**io_info)
     elif io_select == WPS_OUTPUT:
@@ -1178,8 +1205,10 @@ def is_equal_formats(format1, format2):
     mime_type2 = get_field(format2, "mime_type", search_variations=True)
     encoding1 = get_field(format1, "encoding", search_variations=True)
     encoding2 = get_field(format2, "encoding", search_variations=True)
-    if mime_type1 == mime_type2 and encoding1 == encoding2 and \
-            all(f != null for f in [mime_type1, mime_type2, encoding1, encoding2]):
+    if (
+        mime_type1 == mime_type2 and encoding1 == encoding2
+        and all(f != null for f in [mime_type1, mime_type2, encoding1, encoding2])
+    ):
         return True
     return False
 
@@ -1220,7 +1249,7 @@ def merge_io_formats(wps_formats, cwl_formats):
 
 
 def merge_package_io(wps_io_list, cwl_io_list, io_select):
-    # type: (List[ANY_IO_Type], List[WPS_IO_Type], Union[WPS_INPUT, WPS_OUTPUT]) -> List[WPS_IO_Type]
+    # type: (List[ANY_IO_Type], List[WPS_IO_Type], str) -> List[WPS_IO_Type]
     """
     Update I/O definitions to use for process creation and returned by GetCapabilities, DescribeProcess.
     If WPS I/O definitions where provided during deployment, update `CWL-to-WPS` converted I/O with the WPS I/O
@@ -1231,7 +1260,7 @@ def merge_package_io(wps_io_list, cwl_io_list, io_select):
 
     :param wps_io_list: list of WPS I/O (as json) passed during process deployment.
     :param cwl_io_list: list of CWL I/O converted to WPS-like I/O for counter-validation.
-    :param io_select: ``WPS_INPUT`` or ``WPS_OUTPUT`` to specify desired WPS type conversion.
+    :param io_select: :py:data:`WPS_INPUT` or :py:data:`WPS_OUTPUT` to specify desired WPS type conversion.
     :returns: list of validated/updated WPS I/O for the process matching CWL I/O requirements.
     """
     if not isinstance(cwl_io_list, list):

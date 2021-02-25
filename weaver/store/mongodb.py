@@ -30,7 +30,7 @@ from weaver.exceptions import (
     ServiceRegistrationError
 )
 from weaver.execute import EXECUTE_MODE_ASYNC, EXECUTE_MODE_SYNC
-from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW, PROCESS_WPS
+from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW, PROCESS_WPS_LOCAL
 from weaver.sort import (
     BILL_SORT_VALUES,
     JOB_SORT_VALUES,
@@ -239,8 +239,10 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
 
     def _get_process_type(self, process):
         # type: (AnyProcess) -> str
-        return self._get_process_field(process, {Process: lambda: process.type,
-                                                 ProcessWPS: lambda: getattr(process, "type", PROCESS_WPS)}).lower()
+        return self._get_process_field(process, {
+            Process: lambda: process.type,
+            ProcessWPS: lambda: getattr(process, "type", PROCESS_WPS_LOCAL)
+        }).lower()
 
     def _get_process_endpoint_wps1(self, process):
         # type: (AnyProcess) -> str

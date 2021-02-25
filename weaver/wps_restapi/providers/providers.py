@@ -10,7 +10,7 @@ from weaver.datatype import Service
 from weaver.exceptions import ServiceNotFound, log_unhandled_exceptions
 from weaver.formats import OUTPUT_FORMAT_JSON
 from weaver.owsexceptions import OWSMissingParameterValue, OWSNotImplemented
-from weaver.processes.types import PROCESS_WPS
+from weaver.processes.types import PROCESS_WPS_REMOTE
 from weaver.store.base import StoreServices
 from weaver.utils import get_any_id, get_settings
 from weaver.warning import NonBreakingExceptionWarning
@@ -67,7 +67,7 @@ def get_capabilities(service, request):
         processes="{base_url}/providers/{provider_id}/processes".format(
             base_url=get_wps_restapi_base_url(settings),
             provider_id=service.name),
-        type=PROCESS_WPS,
+        type=PROCESS_WPS_REMOTE,
         contact=wps.provider.contact.name)
 
 

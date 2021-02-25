@@ -10,10 +10,13 @@ Changes:
 --------
 - Ensure that configuration file definitions specified in ``processes`` and ``providers`` will override older database
   definitions respectively matched by ``id`` and ``name`` when starting `Weaver` if other parameters were modified.
+- Support dynamic instantiation of `WPS-1/2` processes from remote `WPS` providers to accomplish job execution.
+- Remove previously flagged duplicate code to handle ``OWSLib`` processes conversion to ``JSON`` for `OGC-API`.
+- Replace ``GET`` HTTP request by ``HEAD`` for MIME-type check against ``IANA`` definitions (speed up).
 
 Fixes:
 ------
-- No change.
+- Avoid failing `WPS-1/2` processes conversion to corresponding `OGC-API` process if metadata fields are omitted.
 
 `2.0.0 <https://github.com/crim-ca/weaver/tree/2.0.0>`_ (2021-02-22)
 ========================================================================
