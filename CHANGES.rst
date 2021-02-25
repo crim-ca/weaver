@@ -13,10 +13,13 @@ Changes:
 - Support dynamic instantiation of `WPS-1/2` processes from remote `WPS` providers to accomplish job execution.
 - Remove previously flagged duplicate code to handle ``OWSLib`` processes conversion to ``JSON`` for `OGC-API`.
 - Replace ``GET`` HTTP request by ``HEAD`` for MIME-type check against ``IANA`` definitions (speed up).
+- Improve handling of `CWL` input generation in case of ``minOccurs``, ``maxOccurs`` and ``default`` empty of `WPS`
+  process from remote provider (relates to `#17 <https://github.com/crim-ca/weaver/issues/17>`_).
 
 Fixes:
 ------
 - Avoid failing `WPS-1/2` processes conversion to corresponding `OGC-API` process if metadata fields are omitted.
+- Fix invalid function employed for ``GET /providers/{prov}/processes/{proc}`` route (some error handling was bypassed).
 
 `2.0.0 <https://github.com/crim-ca/weaver/tree/2.0.0>`_ (2021-02-22)
 ========================================================================

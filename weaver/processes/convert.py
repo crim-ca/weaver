@@ -80,8 +80,12 @@ if TYPE_CHECKING:
     WPS_IO_Type = Union[WPS_Input_Type, WPS_Output_Type]
     OWS_IO_Type = Union[OWS_Input_Type, OWS_Output_Type]
     JSON_IO_Type = JSON
-    CWL_Input_Type = TypedDict("CWL_Input_Type", {"id": str, "type": str}, total=False)
-    CWL_Output_Type = TypedDict("CWL_Output_Type", {"id": str, "type": str}, total=False)
+    CWL_IO_EnumType = TypedDict("CWL_IO_EnumType", {"type": str, "symbols": List[str]})  # "symbols" => allowed values
+    CWL_IO_ArrayType = TypedDict("CWL_IO_ArrayType", {"type": str, "items": str})  # "items" => type of every item
+    CWL_IO_MultiType = List[str, CWL_IO_ArrayType, CWL_IO_EnumType]  # single string allowed for "null"
+    CWL_IO_DataType = Union[str, CWL_IO_ArrayType, CWL_IO_EnumType, CWL_IO_MultiType]
+    CWL_Input_Type = TypedDict("CWL_Input_Type", {"id": str, "type": CWL_IO_DataType}, total=False)
+    CWL_Output_Type = TypedDict("CWL_Output_Type", {"id": str, "type": CWL_IO_DataType}, total=False)
     CWL_IO_Type = Union[CWL_Input_Type, CWL_Output_Type]
     PKG_IO_Type = Union[JSON_IO_Type, WPS_IO_Type]
     ANY_IO_Type = Union[CWL_IO_Type, JSON_IO_Type, WPS_IO_Type, OWS_IO_Type]
@@ -167,13 +171,11 @@ def metadata2json(meta, force=False):
     href = get_field(meta, "href", search_variations=True, default=None)
     role = get_field(meta, "role", search_variations=True, default=None)
     rel = get_field(meta, "rel", search_variations=True, default=None)
-    if not href:
-        return {}
-    # many remote servers do not provide the 'rel', but instead provide 'title'
+    # many remote servers do not provide the 'rel', but instead provide 'title' or 'role'
     # build one by default to avoid failing schemas that expect 'rel' to exist
     if not rel:
         href_rel = urlparse(href).hostname
-        rel = str(title or role or href_rel).lower()  # fallback to first available, href/url should always be given
+        rel = str(title or role or href_rel).lower()  # fallback to first available
         rel = get_sane_name(rel, replace_character="-", assert_invalid=False)
     return {"href": href, "title": title, "role": role, "rel": rel}
 
@@ -216,6 +218,7 @@ def ows2json_io(ows_io):
                 json_io[field] = metadata2json(value)
             else:
                 json_io[field] = value
+    json_io["id"] = get_field(json_io, "identifier", search_variations=True, pop_found=True)
 
     # add 'format' if missing, derived from other variants
     if "formats" not in json_io:
@@ -447,19 +450,34 @@ def any2cwl_io(wps_io, io_select):
                 "glob": "{}{}".format(wps_io_id, cwl_io_ext)
             }
 
+    wps_min_occ = 1
+    is_min_null = False
     if io_select == WPS_INPUT:
         wps_default = get_field(wps_io, "default", search_variations=True)
-        wps_min_occ = get_field(wps_io, "min_occurs", search_variations=True)
+        wps_min_occ = get_field(wps_io, "min_occurs", search_variations=True, default=1)
         # field 'default' must correspond to a fallback "value", not a default "format"
-        if (wps_default != null and not isinstance(wps_default, dict)) or wps_min_occ in [0, "0"]:
+        is_min_null = wps_min_occ in [0, "0"]
+        if (wps_default != null and not isinstance(wps_default, dict)) or is_min_null:
             cwl_io["default"] = wps_default or "null"
 
     wps_max_occ = get_field(wps_io, "max_occurs", search_variations=True)
     if wps_max_occ != null and wps_max_occ > 1:
-        cwl_io["type"] = {
+        cwl_array = {
             "type": "array",
             "items": cwl_io["type"]
         }
+        # if single value still allowed, or explicitly multi-value array if min is more than one
+        if wps_min_occ > 1:
+            cwl_io["type"] = cwl_array
+        else:
+            cwl_io["type"] = [cwl_io["type"], cwl_array]
+
+    # apply default null after handling literal/array/enum type variants
+    # (easier to apply against their many different structures)
+    if is_min_null and isinstance(cwl_io["type"], list):
+        cwl_io["type"].extend("null")  # if min=0,max>1 (null, <type>, <array-type>)
+    else:
+        cwl_io["type"] = ["null", cwl_io["type"]]  # if min=0,max=1 (null, <type>)
 
     return cwl_io, cwl_ns
 
@@ -486,7 +504,7 @@ def ows2json(wps_process, wps_service_name, wps_service_url):
     Generates the `CWL` package and process definitions from a :class:`owslib.wps.Process` hosted under `WPS` location.
     """
     process_info = OrderedDict([
-        ("identifier", "{}_{}".format(wps_service_name, wps_process.identifier)),
+        ("id", "{}_{}".format(wps_service_name, wps_process.identifier)),
         ("keywords", [wps_service_name]),
     ])
     default_title = wps_process.identifier.capitalize()
@@ -899,7 +917,9 @@ def json2wps_field(field_info, field_category):
         if isinstance(field_info, WPS_Metadata):
             return field_info
         if isinstance(field_info, dict):
-            return WPS_Metadata(**metadata2json(field_info, force=True))
+            meta = metadata2json(field_info, force=True)
+            meta.pop("rel", None)
+            return WPS_Metadata(**meta)
         if isinstance(field_info, str):
             return WPS_Metadata(field_info)
     elif field_category == "keywords" and isinstance(field_info, list):
@@ -1042,11 +1062,11 @@ def wps2json_io(io_wps):
     io_wps_json = io_wps.json   # noqa
 
     rename = {
-        u"identifier": u"id",
-        u"supported_formats": u"formats",
-        u"mime_type": u"mimeType",
-        u"min_occurs": u"minOccurs",
-        u"max_occurs": u"maxOccurs",
+        "identifier": "id",
+        "supported_formats": "formats",
+        "mime_type": "mimeType",
+        "min_occurs": "minOccurs",
+        "max_occurs": "maxOccurs",
     }
     replace_values = {
         PACKAGE_ARRAY_MAX_SIZE: "unbounded",
