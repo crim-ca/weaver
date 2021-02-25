@@ -24,7 +24,7 @@ from weaver.notify import encrypt_email, notify_job_complete
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes import wps_package
 from weaver.processes.constants import WPS_COMPLEX_DATA
-from weaver.processes.convert import ows2json_output
+from weaver.processes.convert import ows2json_output_data
 from weaver.processes.types import PROCESS_WORKFLOW
 from weaver.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_STARTED, STATUS_SUCCEEDED, map_status
 from weaver.store.base import StoreJobs
@@ -208,7 +208,7 @@ def execute_process(self, job_id, url, headers=None):
                         job.status_message = "Job succeeded{}.".format(msg_progress)
                         wps_package.retrieve_package_job_log(execution, job)
                         job.save_log(logger=task_logger)
-                        job_results = [ows2json_output(output, process, settings)
+                        job_results = [ows2json_output_data(output, process, settings)
                                        for output in execution.processOutputs]
                         job.results = make_results_relative(job_results, settings)
                     else:

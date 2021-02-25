@@ -161,7 +161,7 @@ def check_wps_status(location=None,     # type: Optional[str]
     elif location:
         xml_resp = HTTPNotFound()
         try:
-            LOGGER.debug("Attempt to retrieve WPS status-location from URL...")
+            LOGGER.debug("Attempt to retrieve WPS status-location from URL [%s]...", location)
             xml_resp = request_extra("get", location, verify=verify, settings=settings)
             xml = xml_resp.content
         except Exception as ex:

@@ -16,6 +16,10 @@ Changes:
 - Improve handling of `CWL` input generation in case of ``minOccurs``, ``maxOccurs`` and ``default`` empty of `WPS`
   process from remote provider (relates to `#17 <https://github.com/crim-ca/weaver/issues/17>`_).
 - Add ``hybrid`` mode that allows `Weaver` to simultaneously run local `Application Packages` and remote WPS providers.
+- Rename ``ows2json_output`` to ``ows2json_output_data`` to emphasise its usage for parsing job result data rather than
+  simple output definition as accomplished by ``ows2json_io``.
+- Remove function duplicating operations accomplished by ``ows2json_io`` (previously marked with FIXME).
+- Improve typing definitions for `CWL` elements to help identify invalid parsing methods during development.
 
 Fixes:
 ------

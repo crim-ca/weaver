@@ -38,6 +38,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_ESGF_CWT,
     CWL_REQUIREMENT_APP_WPS1
 )
+from weaver.processes.convert import is_cwl_file_type
 from weaver.utils import get_settings, make_dirs, now
 from weaver.wps.utils import get_wps_output_dir
 
@@ -402,10 +403,10 @@ class WpsWorkflowJob(JobBase):  # noqa: N802
         super(WpsWorkflowJob, self).__init__(builder, joborder, None, requirements, hints, name)
         self.wps_process = wps_process
         self.results = None
-        self.expected_outputs = {}  # type: ExpectedOutputType
+        self.expected_outputs = {}  # type: Dict[str, str]  # {id: file-pattern}
         for output in expected_outputs:
             # TODO Should we support something else?
-            if output["type"] == "File":
+            if is_cwl_file_type(output):
                 # Expecting output to look like this
                 # output = {"id": "file:///tmp/random_path/process_name#output_id,
                 #           "type": "File",

@@ -6,10 +6,10 @@ from owslib.wps import ComplexDataInput, WebProcessingService
 
 from weaver import status
 from weaver.execute import EXECUTE_MODE_ASYNC
-from weaver.formats import get_format
+from weaver.formats import CONTENT_TYPE_TEXT_PLAIN, get_extension, get_format
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes.constants import WPS_COMPLEX_DATA
-from weaver.processes.convert import ows2json_output
+from weaver.processes.convert import get_field, ows2json_output_data
 from weaver.processes.utils import map_progress
 from weaver.processes.wps_process_base import WpsProcessInterface
 from weaver.utils import (
@@ -86,10 +86,10 @@ class Wps1Process(WpsProcessInterface):
                     mime_type = None
                     encoding = None
                     if isinstance(val, dict):
-                        fmt = val.get("format")
+                        fmt = val.get("format")  # format as namespace:link
                         val = val["location"]
                         if fmt:
-                            fmt = get_format(workflow_inputs[input_key]["format"])
+                            fmt = get_format(workflow_inputs[input_key]["format"])  # format as content-type
                             mime_type = fmt.mime_type or None
                             encoding = fmt.encoding or None  # avoid empty string
 
@@ -112,14 +112,16 @@ class Wps1Process(WpsProcessInterface):
                     wps_inputs.append((input_key, input_value))
 
             # prepare outputs
-            outputs = [(o.identifier, o.dataType == WPS_COMPLEX_DATA) for o in process.processOutputs
-                       if o.identifier in expected_outputs]
+            outputs_as_ref = [
+                (o.identifier, o.dataType == WPS_COMPLEX_DATA) for o in process.processOutputs
+                if o.identifier in expected_outputs
+            ]
 
             self.update_status("Executing job on remote WPS1 provider.",
                                REMOTE_JOB_PROGRESS_EXECUTION, status.STATUS_RUNNING)
 
             mode = EXECUTE_MODE_ASYNC
-            execution = wps.execute(self.process, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
+            execution = wps.execute(self.process, inputs=wps_inputs, output=outputs_as_ref, mode=mode, lineage=True)
             if not execution.process and execution.errors:
                 raise execution.errors[0]
 
@@ -164,16 +166,25 @@ class Wps1Process(WpsProcessInterface):
             self.update_status("Fetching job outputs from remote WPS1 provider.",
                                REMOTE_JOB_PROGRESS_FETCH_OUT, status.STATUS_RUNNING)
 
-            results = [ows2json_output(output, process) for output in execution.processOutputs]
+            results = [ows2json_output_data(output, process, self.settings) for output in execution.processOutputs]
             for result in results:
                 result_id = get_any_id(result)
                 result_val = get_any_value(result)
+
+                # TODO Should we handle other type than File reference?
                 if result_id in expected_outputs:
                     # This is where cwl expect the output file to be written
                     # TODO We will probably need to handle multiple output value...
                     dst_fn = "/".join([out_dir.rstrip("/"), expected_outputs[result_id]])
-
-                    # TODO Should we handle other type than File reference?
+                    # in case of ".*" glob pattern, replace specified extension with real value
+                    if "." in result_val:
+                        result_ext = "." + result_val.rsplit("/")[-1].rsplit(".", 1)[-1]
+                    else:
+                        result_fmt = get_field(result, "mime_type",
+                                               search_variations=True,
+                                               default=CONTENT_TYPE_TEXT_PLAIN)
+                        result_ext = get_extension(result_fmt)
+                    dst_fn = "{}{}".format(dst_fn.rsplit(".", 1)[0], result_ext)
 
                     resp = request_extra("get", result_val, allow_redirects=True, settings=self.settings)
                     LOGGER.debug("Fetching result output from [%s] to cwl output destination: [%s]", result_val, dst_fn)

@@ -68,8 +68,9 @@ if TYPE_CHECKING:
         AnySettingsContainer,
         AnyValueType,
         CWL,
+        CWL_Input_Type,
+        CWL_Output_Type,
         JSON,
-        TypedDict,
         XML
     )
 
@@ -80,12 +81,6 @@ if TYPE_CHECKING:
     WPS_IO_Type = Union[WPS_Input_Type, WPS_Output_Type]
     OWS_IO_Type = Union[OWS_Input_Type, OWS_Output_Type]
     JSON_IO_Type = JSON
-    CWL_IO_EnumType = TypedDict("CWL_IO_EnumType", {"type": str, "symbols": List[str]})  # "symbols" => allowed values
-    CWL_IO_ArrayType = TypedDict("CWL_IO_ArrayType", {"type": str, "items": str})  # "items" => type of every item
-    CWL_IO_MultiType = List[str, CWL_IO_ArrayType, CWL_IO_EnumType]  # single string allowed for "null"
-    CWL_IO_DataType = Union[str, CWL_IO_ArrayType, CWL_IO_EnumType, CWL_IO_MultiType]
-    CWL_Input_Type = TypedDict("CWL_Input_Type", {"id": str, "type": CWL_IO_DataType}, total=False)
-    CWL_Output_Type = TypedDict("CWL_Output_Type", {"id": str, "type": CWL_IO_DataType}, total=False)
     CWL_IO_Type = Union[CWL_Input_Type, CWL_Output_Type]
     PKG_IO_Type = Union[JSON_IO_Type, WPS_IO_Type]
     ANY_IO_Type = Union[CWL_IO_Type, JSON_IO_Type, WPS_IO_Type, OWS_IO_Type]
@@ -195,7 +190,7 @@ def ows2json_field(ows_field):
 def ows2json_io(ows_io):
     # type: (OWS_IO_Type) -> JSON_IO_Type
     """
-    Converts I/O from :mod:`owslib.wps` to JSON.
+    Converts I/O definition from :mod:`owslib.wps` to JSON.
     """
 
     json_io = dict()
@@ -246,48 +241,28 @@ def ows2json_io(ows_io):
     return json_io
 
 
-# FIXME: duplicate operation of 'ows2json_io', but slightly different result (camel case vs snake case)
-#   resolve and combine into single function
-#   resulting fields should conform to OGC WPS-REST bindings specifications:
-#   https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/inputDescription.yaml
-#   (https://github.com/crim-ca/weaver/issues/211)
-def ows2json_io_FIXME(ows_io):  # pylint: disable=C0103
-    # type: (OWS_IO_Type) -> JSON_IO_Type
-    default_format = {"mimeType": CONTENT_TYPE_TEXT_PLAIN}
-    if isinstance(ows_io, OWS_Input_Type):
-        return dict(
-            id=getattr(ows_io, "identifier", ""),
-            title=getattr(ows_io, "title", ""),
-            abstract=getattr(ows_io, "abstract", ""),
-            minOccurs=str(getattr(ows_io, "minOccurs", 0)),
-            maxOccurs=str(getattr(ows_io, "maxOccurs", 0)),
-            dataType=ows_io.dataType,
-            defaultValue=ows2json_field(getattr(ows_io, "defaultValue", None)),
-            allowedValues=[ows2json_field(dataValue) for dataValue in getattr(ows_io, "allowedValues", [])],
-            supportedValues=[ows2json_field(dataValue) for dataValue in getattr(ows_io, "supportedValues", [])],
-            formats=[ows2json_field(value) for value in getattr(ows_io, "supportedValues", [default_format])],
-        )
-    if isinstance(ows_io, OWS_Output_Type):
-        return dict(
-            id=getattr(ows_io, "identifier", ""),
-            title=getattr(ows_io, "title", ""),
-            abstract=getattr(ows_io, "abstract", ""),
-            dataType=ows_io.dataType,
-            defaultValue=ows2json_field(getattr(ows_io, "defaultValue", None)),
-            formats=[ows2json_field(value) for value in getattr(ows_io, "supportedValues", [default_format])],
-        )
-    raise PackageTypeError("Unsupported OWS-WPS I/O type: {}".format(type(ows_io)))
-
-
-# FIXME: duplicate of 'ows2json_io' specific to output, with some extra util JSON unwrapping
-def ows2json_output(output, process_description, container=None):
+# FIXME: add option to control auto-fetch, disable during workflow by default to avoid double downloads?
+#       (https://github.com/crim-ca/weaver/issues/183)
+def ows2json_output_data(output, process_description, container=None):
     # type: (OWS_Output_Type, ProcessOWS, Optional[AnySettingsContainer]) -> JSON
     """
-    Utility method to jsonify an output element from a WPS1 process description.
+    Utility method to convert an :mod:`owslib.wps` process execution output data (result) to `JSON`.
 
-    In the case that a reference JSON output is specified and that it refers to a file that contains an array list of
-    URL references to simulate a multiple-output, this specific output gets expanded to contain both the original
-    URL ``reference`` field and the loaded URL list under ``data`` field for easier access from the response body.
+    In the case that a ``reference`` output of `JSON` content-type is specified and that it refers to a file that
+    contains an array list of URL references to simulate a multiple-output, this specific output gets expanded to
+    contain both the original URL ``reference`` field and the loaded URL list under ``data`` field for easier access
+    from the response body.
+
+    Referenced file(s) are fetched in order to store them locally if executed on a remote process, such that they can
+    become accessible as local job result for following reporting or use by other processes in an workflow chain.
+
+    If the ``dataType`` details is missing from the data output (depending on servers that might omit it), the
+    :paramref:`process_description` is employed to retrieve the original description with expected result details.
+
+    :param output: output with data value or reference according to expected result for the corresponding process.
+    :param process_description: definition of the process producing the specified output following execution.
+    :param container: container to retrieve application settings (for request options during file retrieval as needed).
+    :return: converted JSON result data and additional metadata as applicable based on data-type and content-type.
     """
 
     if not output.dataType:
@@ -578,6 +553,30 @@ def xml_wps2cwl(wps_process_response):
     wps_process = wps.describeprocess(process_id, xml=wps_process_response.content)
     cwl_package, process_info = ows2json(wps_process, wps_service_name, wps_service_url)
     return cwl_package, process_info
+
+
+def is_cwl_file_type(io_info):
+    # type: (CWL_IO_Type) -> bool
+    """
+    Identifies if the provided `CWL` input/output corresponds to one, many or potentially a ``File`` type(s).
+
+    :returns:
+        - `True`` if
+    If multiple distinct *atomic* types are allowed for a given I/O (e.g.: ``[string, File]``, returns ``True`` if any
+    is a potential ``File``. Also returns ``True``
+    """
+    io_type = io_info.get("type")
+    if not io_type:
+        raise ValueError("Missing CWL 'type' definition: [{!s}]", io_info)
+    if isinstance(io_type, str):
+        return io_type == "File"
+    if isinstance(io_type, dict):
+        if io_type["type"] == "array":
+            return io_type["items"] == "File"
+        return io_type["type"] == "File"
+    if isinstance(io_type, list):
+        return any(typ == "File" or is_cwl_file_type({"type": typ}) for typ in io_type)
+    raise ValueError("Unknown parsing of CWL 'type' format ({!s}) [{!s}] in [{}]", type(io_type), io_type, io_info)
 
 
 def is_cwl_array_type(io_info):
