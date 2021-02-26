@@ -442,7 +442,7 @@ def test_is_cwl_file_type_not_files():
         {"type": "array", "items": "int"},
         ["null", {"type": "array", "items": "string"}],
     ]
-    for i, io_type in test_types:
+    for i, io_type in enumerate(test_types):
         io_info = {"name": "test-{}".format(i), "type": io_type}
         assert not is_cwl_file_type(io_info), "Test [{}]: {}".format(i, io_info)
 
