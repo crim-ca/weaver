@@ -254,7 +254,7 @@ def ows2json_output_data(output, process_description, container=None):
     from the response body.
 
     Referenced file(s) are fetched in order to store them locally if executed on a remote process, such that they can
-    become accessible as local job result for following reporting or use by other processes in an workflow chain.
+    become accessible as local job result for following reporting or use by other processes in a workflow chain.
 
     If the ``dataType`` details is missing from the data output (depending on servers that might omit it), the
     :paramref:`process_description` is employed to retrieve the original description with expected result details.

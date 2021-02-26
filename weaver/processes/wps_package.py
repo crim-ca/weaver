@@ -962,7 +962,7 @@ class WpsPackage(Process):
 
             self.update_status("Launching package...", PACKAGE_PROGRESS_LAUNCHING, STATUS_RUNNING)
 
-            self.remote_execution = get_weaver_configuration(self.settings) in WEAVER_CONFIGURATION_REMOTE
+            self.remote_execution = get_weaver_configuration(self.settings) in WEAVER_CONFIGURATIONS_REMOTE
             if self.remote_execution:
                 # EMS dispatch the execution to the ADES
                 loading_context = LoadingContext()

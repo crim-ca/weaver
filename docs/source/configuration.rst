@@ -40,14 +40,18 @@ they are optional and which default value or operation is applied in each situat
     Some advanced configuration settings are also described in other sections of this page.
 
 
-- | ``weaver.configuration = ADES|EMS``
+- | ``weaver.configuration = ADES|EMS|HYBRID|DEFAULT``
   | (default: ``DEFAULT``)
   |
   | Tells the application in which mode to run.
   |
-  | Enabling `ADES` for instance will disable some `EMS`-specific operations such as dispatching :ref:`Workflow`
-    process steps to known remote `ADES` servers. `ADES` should be used to run processes locally (as the working unit).
-  | Default configuration will provide very minimalistic operations as both other variants will be unavailable.
+  | Enabling ``ADES`` for instance will disable some ``EMS``-specific operations such as dispatching :ref:`Workflow`
+    process steps to known remote ``ADES`` servers. ``ADES`` should be used to *only* run processes locally
+    (as the working unit). ``EMS`` will *always* dispatch execution of jobs to other ``ADES`` except for :ref:`Workflow`
+    processes that chains them.
+  | When ``HYBRID`` is specified, `Weaver` will assume both ``ADES`` and ``EMS`` roles simultaneously, meaning it will
+    be able to execute local processes by itself and monitor dispatched execution of registered remote providers.
+  | Finally, ``DEFAULT`` configuration will provide very minimalistic operations as all other modes will be unavailable.
 
 - | ``weaver.url = <url>``
   | (default: ``https://localhost``)
