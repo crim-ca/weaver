@@ -8,6 +8,17 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+`2.1.0 <https://github.com/crim-ca/weaver/tree/2.1.0>`_ (2021-02-26)
+========================================================================
+
+Changes:
+--------
 - Ensure that configuration file definitions specified in ``processes`` and ``providers`` will override older database
   definitions respectively matched by ``id`` and ``name`` when starting `Weaver` if other parameters were modified.
 - Support dynamic instantiation of `WPS-1/2` processes from remote `WPS` providers to accomplish job execution.
