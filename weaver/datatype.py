@@ -3,17 +3,18 @@ Definitions of types used by tokens.
 """
 import traceback
 import uuid
+import warnings
 from datetime import datetime, timedelta
 from logging import ERROR, INFO, Logger, getLevelName, getLogger
 from typing import TYPE_CHECKING
 
 import lxml.etree
 from dateutil.parser import parse as dt_parse
-from owslib.wps import WPSException
+from owslib.wps import WebProcessingService, WPSException
 from pywps import Process as ProcessWPS
 
 from weaver.exceptions import ProcessInstanceError
-from weaver.processes.convert import get_field, ows2json_io, ows2json, wps2json_io
+from weaver.processes.convert import ows2json, wps2json_io
 from weaver.processes.types import (
     PROCESS_APPLICATION,
     PROCESS_BUILTIN,
@@ -31,14 +32,24 @@ from weaver.status import (
     map_status
 )
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
-from weaver.utils import fully_qualified_name, get_job_log_msg, get_log_date_fmt, get_log_fmt, get_settings, now
+from weaver.utils import (
+    fully_qualified_name,
+    get_cookie_headers,
+    get_job_log_msg,
+    get_log_date_fmt,
+    get_log_fmt,
+    get_settings,
+    now
+)
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_VALUES
+from weaver.warning import NonBreakingExceptionWarning
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Union
     from owslib.wps import Process as ProcessOWS
+    from pyramid.request import Request
     from weaver.typedefs import AnySettingsContainer, Number, CWL, JSON
 
 LOGGER = getLogger(__name__)
@@ -166,6 +177,27 @@ class Service(Base):
             "public": self.public,
             "auth": self.auth
         }
+
+    def summary(self, request):
+        # type: (Request) -> Optional[JSON]
+        try:
+            if self.type.lower() != "wps":
+                return None  # FIXME: not implemented
+
+            cookie_headers = get_cookie_headers(request.headers)
+            wps = WebProcessingService(url=self.url, headers=cookie_headers)
+            url = "{}/providers/{}".format(get_wps_restapi_base_url(request), self.name)
+            return {
+                "id": self.name,
+                "title": getattr(wps.identification, "title", ""),
+                "abstract": getattr(wps.identification, "abstract", ""),
+                "url": url,
+                "public": self.public,
+            }
+        except Exception as exc:
+            msg = "Exception occurred while fetching wps {0} : {1!r}".format(self.url, exc)
+            warnings.warn(msg, NonBreakingExceptionWarning)
+        return None
 
 
 class Job(Base):

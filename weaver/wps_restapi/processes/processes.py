@@ -14,7 +14,7 @@ from pyramid.httpexceptions import (
 from pyramid.request import Request
 from pyramid.settings import asbool
 
-from weaver.config import WEAVER_CONFIGURATION_EMS, get_weaver_configuration
+from weaver.config import WEAVER_CONFIGURATIONS_REMOTE, get_weaver_configuration
 from weaver.database import get_db
 from weaver.datatype import Process, Service
 from weaver.exceptions import ProcessNotFound, log_unhandled_exceptions
@@ -28,6 +28,7 @@ from weaver.utils import get_any_id, get_cookie_headers, get_settings, parse_req
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps.utils import set_wps_language
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.providers.providers import get_provider_services
 
 if TYPE_CHECKING:
     from weaver.typedefs import JSON
@@ -151,20 +152,15 @@ def get_processes(request):
 
         # if 'EMS' and '?providers=True', also fetch each provider's processes
         settings = get_settings(request)
-        if get_weaver_configuration(settings) == WEAVER_CONFIGURATION_EMS:
+        if get_weaver_configuration(settings) in WEAVER_CONFIGURATIONS_REMOTE:
             queries = parse_request_query(request)
             if "providers" in queries and asbool(queries["providers"][0]) is True:
-                prov_url = "{host}/providers".format(host=request.host_url)
-                providers_response = request_extra("GET", prov_url, settings=settings,
-                                                   headers=request.headers, cookies=request.cookies)
-                providers = providers_response.json()
-                response_body.update({"providers": providers})
-                for i, provider in enumerate(providers):
-                    provider_id = get_any_id(provider)
-                    proc_url = "{host}/providers/{prov}/processes".format(host=request.host_url, prov=provider_id)
-                    response = request_extra("GET", proc_url, settings=settings,
-                                             headers=request.headers, cookies=request.cookies)
-                    processes = response.json().get("processes", [])
+                services = get_provider_services(request)
+                response_body.update({
+                    "providers": [svc.summary(request) if detail else {"id": svc.name} for svc in services]
+                })
+                for i, provider in enumerate(services):
+                    processes = list_remote_processes(provider, request)
                     response_body["providers"][i].update({
                         "processes": processes if detail else [get_any_id(p) for p in processes]
                     })

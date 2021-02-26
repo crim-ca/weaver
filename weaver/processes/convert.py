@@ -480,7 +480,7 @@ def ows2json(wps_process, wps_service_name, wps_service_url):
     Generates the `CWL` package and process definitions from a :class:`owslib.wps.Process` hosted under `WPS` location.
     """
     process_info = OrderedDict([
-        ("id", "{}_{}".format(wps_service_name, wps_process.identifier)),
+        ("id", wps_process.identifier),
         ("keywords", [wps_service_name]),
     ])
     default_title = wps_process.identifier.capitalize()
@@ -1145,7 +1145,7 @@ def wps2json_job_payload(wps_request, wps_process):
 
 
 def get_field(io_object, field, search_variations=False, pop_found=False, default=null):
-    # type: (Union[ANY_IO_Type, ANY_Format_Type], str, bool, bool, Any) -> Any
+    # type: (Any, str, bool, bool, Any) -> Any
     """
     Gets a field by name from various I/O object types.
 

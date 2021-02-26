@@ -20,6 +20,7 @@ Changes:
   simple output definition as accomplished by ``ows2json_io``.
 - Remove function duplicating operations accomplished by ``ows2json_io`` (previously marked with FIXME).
 - Improve typing definitions for `CWL` elements to help identify invalid parsing methods during development.
+- Improve listing speed of remote providers that require data fetch when some of them might have become unreachable.
 
 Fixes:
 ------
