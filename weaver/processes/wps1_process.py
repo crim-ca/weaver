@@ -6,9 +6,10 @@ from owslib.wps import ComplexDataInput, WebProcessingService
 
 from weaver import status
 from weaver.execute import EXECUTE_MODE_ASYNC
+from weaver.formats import CONTENT_TYPE_TEXT_PLAIN, get_extension, get_format
 from weaver.owsexceptions import OWSNoApplicableCode
 from weaver.processes.constants import WPS_COMPLEX_DATA
-from weaver.processes.convert import ows2json_output
+from weaver.processes.convert import get_field, ows2json_output_data
 from weaver.processes.utils import map_progress
 from weaver.processes.wps_process_base import WpsProcessInterface
 from weaver.utils import (
@@ -82,8 +83,15 @@ class Wps1Process(WpsProcessInterface):
 
                 input_values = []
                 for val in input_val:
+                    mime_type = None
+                    encoding = None
                     if isinstance(val, dict):
+                        fmt = val.get("format")  # format as namespace:link
                         val = val["location"]
+                        if fmt:
+                            fmt = get_format(workflow_inputs[input_key]["format"])  # format as content-type
+                            mime_type = fmt.mime_type or None
+                            encoding = fmt.encoding or None  # avoid empty string
 
                     # owslib only accepts strings, not numbers directly
                     if isinstance(val, (int, float)):
@@ -93,25 +101,27 @@ class Wps1Process(WpsProcessInterface):
                         # we need to host file starting with file:// scheme
                         val = self.host_file(val)
 
-                    input_values.append(val)
+                    input_values.append((val, mime_type, encoding))
 
                 # need to use ComplexDataInput structure for complex input
                 # TODO: BoundingBox not supported
-                for input_value in input_values:
+                for input_value, mime_type, encoding in input_values:
                     if input_key in complex_inputs:
-                        input_value = ComplexDataInput(input_value)
+                        input_value = ComplexDataInput(input_value, mimeType=mime_type, encoding=encoding)
 
                     wps_inputs.append((input_key, input_value))
 
             # prepare outputs
-            outputs = [(o.identifier, o.dataType == WPS_COMPLEX_DATA) for o in process.processOutputs
-                       if o.identifier in expected_outputs]
+            outputs_as_ref = [
+                (o.identifier, o.dataType == WPS_COMPLEX_DATA) for o in process.processOutputs
+                if o.identifier in expected_outputs
+            ]
 
             self.update_status("Executing job on remote WPS1 provider.",
                                REMOTE_JOB_PROGRESS_EXECUTION, status.STATUS_RUNNING)
 
             mode = EXECUTE_MODE_ASYNC
-            execution = wps.execute(self.process, inputs=wps_inputs, output=outputs, mode=mode, lineage=True)
+            execution = wps.execute(self.process, inputs=wps_inputs, output=outputs_as_ref, mode=mode, lineage=True)
             if not execution.process and execution.errors:
                 raise execution.errors[0]
 
@@ -127,7 +137,7 @@ class Wps1Process(WpsProcessInterface):
                     raise Exception("Could not read status document after {} retries. Giving up.".format(max_retries))
                 try:
                     execution = check_wps_status(location=execution.statusLocation, verify=self.verify,
-                                                 sleep_secs=wait_secs(run_step))
+                                                 sleep_secs=wait_secs(run_step), settings=self.settings)
                     job_id = execution.statusLocation.replace(".xml", "").split("/")[-1]
                     LOGGER.debug(get_log_monitor_msg(job_id, status.map_status(execution.getStatus()),
                                                      execution.percentCompleted, execution.statusMessage,
@@ -156,16 +166,25 @@ class Wps1Process(WpsProcessInterface):
             self.update_status("Fetching job outputs from remote WPS1 provider.",
                                REMOTE_JOB_PROGRESS_FETCH_OUT, status.STATUS_RUNNING)
 
-            results = [ows2json_output(output, process) for output in execution.processOutputs]
+            results = [ows2json_output_data(output, process, self.settings) for output in execution.processOutputs]
             for result in results:
                 result_id = get_any_id(result)
                 result_val = get_any_value(result)
+
+                # TODO Should we handle other type than File reference?
                 if result_id in expected_outputs:
                     # This is where cwl expect the output file to be written
                     # TODO We will probably need to handle multiple output value...
                     dst_fn = "/".join([out_dir.rstrip("/"), expected_outputs[result_id]])
-
-                    # TODO Should we handle other type than File reference?
+                    # in case of ".*" glob pattern, replace specified extension with real value
+                    if "." in result_val:
+                        result_ext = "." + result_val.rsplit("/")[-1].rsplit(".", 1)[-1]
+                    else:
+                        result_fmt = get_field(result, "mime_type",
+                                               search_variations=True,
+                                               default=CONTENT_TYPE_TEXT_PLAIN)
+                        result_ext = get_extension(result_fmt)
+                    dst_fn = "{}{}".format(dst_fn.rsplit(".", 1)[0], result_ext)
 
                     resp = request_extra("get", result_val, allow_redirects=True, settings=self.settings)
                     LOGGER.debug("Fetching result output from [%s] to cwl output destination: [%s]", result_val, dst_fn)

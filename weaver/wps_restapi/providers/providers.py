@@ -1,5 +1,6 @@
 import logging
 import warnings
+from typing import TYPE_CHECKING
 
 from owslib.wps import WebProcessingService
 from pyramid.httpexceptions import HTTPCreated, HTTPNoContent, HTTPNotFound, HTTPOk
@@ -10,14 +11,43 @@ from weaver.datatype import Service
 from weaver.exceptions import ServiceNotFound, log_unhandled_exceptions
 from weaver.formats import OUTPUT_FORMAT_JSON
 from weaver.owsexceptions import OWSMissingParameterValue, OWSNotImplemented
-from weaver.processes.types import PROCESS_WPS
+from weaver.processes.types import PROCESS_WPS_REMOTE
 from weaver.store.base import StoreServices
-from weaver.utils import get_any_id, get_settings
+from weaver.utils import get_any_id, get_settings, request_extra
 from weaver.warning import NonBreakingExceptionWarning
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 LOGGER = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from typing import List
+
+    from pyramid.request import Request
+
+
+def get_provider_services(request):
+    # type: (Request) -> List[Service]
+    """
+    Obtain the list of remote provider services.
+    """
+    settings = get_settings(request)
+    store = get_db(settings).get_store(StoreServices)
+    providers = []
+    for service in store.list_services():
+        # pre-check service location
+        # status can be 500 because of missing query params, but faster skip of invalid references
+        # this avoids long pending connexions that never resolve because of down server
+        try:
+            resp = request_extra("head", service.url, timeout=1, settings=settings)
+            if resp.status_code == 404:
+                LOGGER.warning("Skipping unresponsive service (%s) [%s]", service.name, service.url)
+                continue
+        except Exception as exc:
+            msg = "Exception occurred while fetching wps {0} : {1!r}".format(service.url, exc)
+            warnings.warn(msg, NonBreakingExceptionWarning)
+        else:
+            providers.append(service)
+    return providers
 
 
 @sd.providers_service.get(tags=[sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
@@ -27,27 +57,13 @@ def get_providers(request):
     """
     Lists registered providers.
     """
-    store = get_db(request).get_store(StoreServices)
+
+    reachable_services = get_provider_services(request)
     providers = []
-
-    for service in store.list_services():
-        try:
-            if service.type.lower() != "wps":
-                continue
-
-            wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
-            providers.append(dict(
-                id=service.name,
-                title=getattr(wps.identification, "title", ""),
-                abstract=getattr(wps.identification, "abstract", ""),
-                url="{base_url}/providers/{provider_id}".format(
-                    base_url=get_wps_restapi_base_url(get_settings(request)),
-                    provider_id=service.name),
-                public=service.public))
-        except Exception as exc:
-            warnings.warn("Exception occurred while fetching wps {0} : {1!r}".format(service.url, exc),
-                          NonBreakingExceptionWarning)
-
+    for service in reachable_services:
+        summary = service.summary(request)
+        if summary:
+            providers.append(summary)
     return HTTPOk(json={"providers": providers})
 
 
@@ -67,7 +83,7 @@ def get_capabilities(service, request):
         processes="{base_url}/providers/{provider_id}/processes".format(
             base_url=get_wps_restapi_base_url(settings),
             provider_id=service.name),
-        type=PROCESS_WPS,
+        type=PROCESS_WPS_REMOTE,
         contact=wps.provider.contact.name)
 
 

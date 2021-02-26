@@ -45,7 +45,7 @@ if TYPE_CHECKING:
         AnyValue,
         HeadersType,
         JSON,
-        KVP,
+        KVP_Item,
         Number,
         SettingsType,
         XML
@@ -424,7 +424,7 @@ def parse_request_query(request):
 
 
 def get_path_kvp(path, sep=",", **params):
-    # type: (str, str, KVP) -> str
+    # type: (str, str, KVP_Item) -> str
     """
     Generates the WPS URL with Key-Value-Pairs (KVP) query parameters.
 
@@ -890,8 +890,8 @@ REGEX_ASSERT_INVALID_CHARACTERS = re.compile(r"^[a-zA-Z0-9_\-]+$")
 def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_character="_"):
     # type: (str, Optional[int], Optional[Union[int, None]], Optional[bool], Optional[str]) -> Union[str, None]
     """
-    Returns a cleaned-up version of the input name, replacing invalid characters matched with
-    ``REGEX_SEARCH_INVALID_CHARACTERS`` by ``replace_character``.
+    Returns a cleaned-up version of the input name, replacing invalid characters not matched with
+    :py:data:`REGEX_SEARCH_INVALID_CHARACTERS` by :paramref:`replace_character`.
 
     :param name: value to clean
     :param min_len:
@@ -902,7 +902,7 @@ def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_ch
     :param assert_invalid: If ``True``, fail conditions or invalid characters will raise an error instead of replacing.
     :param replace_character: Single character to use for replacement of invalid ones if ``assert_invalid=False``.
     """
-    if not isinstance(replace_character, str) and not len(replace_character) == 1:
+    if not isinstance(replace_character, str) or not len(replace_character) == 1:
         raise ValueError("Single replace character is expected, got invalid [{!s}]".format(replace_character))
     max_len = max_len or len(name)
     if assert_invalid:

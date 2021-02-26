@@ -5,17 +5,21 @@ from copy import deepcopy
 
 import pytest
 from pywps.inout.formats import Format
-from pywps.inout.literaltypes import AnyValue
+from pywps.inout.inputs import LiteralInput
+from pywps.inout.literaltypes import AnyValue, AllowedValue
 from pywps.validator.mode import MODE
 
 from weaver.exceptions import PackageTypeError
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF, CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_PLAIN
-from weaver.processes.constants import WPS_LITERAL
+from weaver.processes.constants import WPS_INPUT, WPS_LITERAL
 from weaver.processes.convert import _are_different_and_set  # noqa: W0212
 from weaver.processes.convert import (
     DEFAULT_FORMAT,
+    PACKAGE_ARRAY_MAX_SIZE,
+    cwl2wps_io,
     is_cwl_array_type,
     is_cwl_enum_type,
+    is_cwl_file_type,
     json2wps_datatype,
     merge_io_formats
 )
@@ -99,6 +103,50 @@ def test_json2wps_datatype():
     for expect, test_io in test_cases:
         copy_io = deepcopy(test_io)  # can get modified by function
         assert json2wps_datatype(test_io) == expect, "Failed for [{}]".format(copy_io)
+
+
+def test_cwl2wps_io_null_or_array_of_enums():
+    """
+    I/O `CWL` with ``["null", "<enum-type>", "<array-enum-type>]`` must be parsed as `WPS` with
+    parameters ``minOccurs=0``, ``maxOccurs>1`` and ``allowedValues`` as restricted set of values.
+    """
+    allowed_values = ["A", "B", "C"]
+    io_info = {
+        "name": "test",
+        "type": [
+            "null",  # minOccurs=0
+            {"type": "enum", "symbols": allowed_values},  # if maxOccurs=1, only this variant would be provided
+            {"type": "array", "items": {"type": "enum", "symbols": allowed_values}},  # but also this for maxOccurs>1
+        ],
+    }
+    wps_io = cwl2wps_io(io_info, WPS_INPUT)
+    assert isinstance(wps_io, LiteralInput)
+    assert wps_io.min_occurs == 0
+    assert wps_io.max_occurs == PACKAGE_ARRAY_MAX_SIZE
+    assert wps_io.data_type == "string"
+    assert wps_io.allowed_values == [AllowedValue(value=val) for val in allowed_values]
+
+
+def test_cwl2wps_io_raise_mixed_types():
+    io_type1 = ["string", "int"]
+    io_type2 = [
+        "int",
+        {"type": "array", "items": "string"}
+    ]
+    io_type3 = [
+        {"type": "enum", "symbols": ["1", "2"]},  # symbols as literal strings != int literal
+        "null",
+        "int"
+    ]
+    io_type4 = [
+        "null",
+        {"type": "enum", "symbols": ["1", "2"]},  # symbols as literal strings != int items
+        {"type": "array", "items": "int"}
+    ]
+    for i, test_type in enumerate([io_type1, io_type2, io_type3, io_type4]):
+        io_info = {"name": "test-{}".format(i), "type": test_type}
+        with pytest.raises(PackageTypeError):
+            cwl2wps_io(io_info, WPS_INPUT)
 
 
 def testis_cwl_array_type_explicit_invalid_item():
@@ -344,6 +392,59 @@ def testis_cwl_enum_type_int():
     assert res[1] == "int"
     assert res[2] == MODE.SIMPLE
     assert res[3] == [1, 2, 3]
+
+
+def test_is_cwl_file_type_guaranteed_file():
+    io_info = {
+        "name": "test",
+        "type": "File"
+    }
+    assert is_cwl_file_type(io_info)
+
+
+def test_is_cwl_file_type_potential_file():
+    io_info = {
+        "name": "test",
+        "type": ["null", "File"]
+    }
+    assert is_cwl_file_type(io_info)
+
+
+def test_is_cwl_file_type_file_array():
+    io_info = {
+        "name": "test",
+        "type": {"type": "array", "items": "File"}
+    }
+    assert is_cwl_file_type(io_info)
+
+
+def test_is_cwl_file_type_none_one_or_many_files():
+    io_info = {
+        "name": "test",
+        "type": [
+            "null",
+            "File",
+            {"type": "array", "items": "File"}
+        ]
+    }
+    assert is_cwl_file_type(io_info)
+
+
+def test_is_cwl_file_type_not_files():
+    test_types = [
+        "int",
+        "string",
+        "float",
+        ["null", "string"],
+        {"type": "enum", "symbols": [1, 2]},
+        {"type": "enum", "symbols": ["A", "B"]},
+        {"type": "array", "items": "string"},
+        {"type": "array", "items": "int"},
+        ["null", {"type": "array", "items": "string"}],
+    ]
+    for i, io_type in enumerate(test_types):
+        io_info = {"name": "test-{}".format(i), "type": io_type}
+        assert not is_cwl_file_type(io_info), "Test [{}]: {}".format(i, io_info)
 
 
 def assert_formats_equal_any_order(format_result, format_expect):

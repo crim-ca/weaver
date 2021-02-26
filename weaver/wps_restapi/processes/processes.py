@@ -14,7 +14,7 @@ from pyramid.httpexceptions import (
 from pyramid.request import Request
 from pyramid.settings import asbool
 
-from weaver.config import WEAVER_CONFIGURATION_EMS, get_weaver_configuration
+from weaver.config import WEAVER_CONFIGURATIONS_REMOTE, get_weaver_configuration
 from weaver.database import get_db
 from weaver.datatype import Process, Service
 from weaver.exceptions import ProcessNotFound, log_unhandled_exceptions
@@ -24,10 +24,11 @@ from weaver.processes.execution import submit_job
 from weaver.processes.types import PROCESS_BUILTIN
 from weaver.processes.utils import deploy_process_from_payload, get_job_submission_response, get_process
 from weaver.store.base import StoreProcesses, StoreServices
-from weaver.utils import get_any_id, get_cookie_headers, get_settings, parse_request_query, request_extra
+from weaver.utils import get_any_id, get_cookie_headers, get_settings, parse_request_query
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps.utils import set_wps_language
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.providers.providers import get_provider_services
 
 if TYPE_CHECKING:
     from weaver.typedefs import JSON
@@ -58,10 +59,11 @@ def list_remote_processes(service, request):
 
     Note: remote processes won't be stored to the local process storage.
     """
+    # FIXME: support other providers (https://github.com/crim-ca/weaver/issues/130)
     wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
     set_wps_language(wps, request=request)
     settings = get_settings(request)
-    return [Process.from_ows(service, process, settings) for process in wps.processes]
+    return [Process.convert(process, service, settings) for process in wps.processes]
 
 
 @sd.provider_processes_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_PROVIDERS, sd.TAG_GETCAPABILITIES],
@@ -90,10 +92,11 @@ def describe_provider_process(request):
     process_id = request.matchdict.get("process_id")
     store = get_db(request).get_store(StoreServices)
     service = store.fetch_by_name(provider_id)
+    # FIXME: support other providers (https://github.com/crim-ca/weaver/issues/130)
     wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
     set_wps_language(wps, request=request)
     process = wps.describeprocess(process_id)
-    return Process.from_ows(service, process, get_settings(request))
+    return Process.convert(process, service, get_settings(request))
 
 
 @sd.provider_process_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_PROVIDERS, sd.TAG_DESCRIBEPROCESS],
@@ -151,20 +154,15 @@ def get_processes(request):
 
         # if 'EMS' and '?providers=True', also fetch each provider's processes
         settings = get_settings(request)
-        if get_weaver_configuration(settings) == WEAVER_CONFIGURATION_EMS:
+        if get_weaver_configuration(settings) in WEAVER_CONFIGURATIONS_REMOTE:
             queries = parse_request_query(request)
             if "providers" in queries and asbool(queries["providers"][0]) is True:
-                prov_url = "{host}/providers".format(host=request.host_url)
-                providers_response = request_extra("GET", prov_url, settings=settings,
-                                                   headers=request.headers, cookies=request.cookies)
-                providers = providers_response.json()
-                response_body.update({"providers": providers})
-                for i, provider in enumerate(providers):
-                    provider_id = get_any_id(provider)
-                    proc_url = "{host}/providers/{prov}/processes".format(host=request.host_url, prov=provider_id)
-                    response = request_extra("GET", proc_url, settings=settings,
-                                             headers=request.headers, cookies=request.cookies)
-                    processes = response.json().get("processes", [])
+                services = get_provider_services(request)
+                response_body.update({
+                    "providers": [svc.summary(request) if detail else {"id": svc.name} for svc in services]
+                })
+                for i, provider in enumerate(services):
+                    processes = list_remote_processes(provider, request)
                     response_body["providers"][i].update({
                         "processes": processes if detail else [get_any_id(p) for p in processes]
                     })

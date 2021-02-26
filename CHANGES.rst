@@ -10,10 +10,23 @@ Changes:
 --------
 - Ensure that configuration file definitions specified in ``processes`` and ``providers`` will override older database
   definitions respectively matched by ``id`` and ``name`` when starting `Weaver` if other parameters were modified.
+- Support dynamic instantiation of `WPS-1/2` processes from remote `WPS` providers to accomplish job execution.
+- Remove previously flagged duplicate code to handle ``OWSLib`` processes conversion to ``JSON`` for `OGC-API`.
+- Replace ``GET`` HTTP request by ``HEAD`` for MIME-type check against ``IANA`` definitions (speed up).
+- Improve handling of `CWL` input generation in combination with ``minOccurs``, ``maxOccurs``, ``allowedValues``
+  and ``default`` empty (``"null"``) value from `WPS` process from remote provider
+  (fix `#17 <https://github.com/crim-ca/weaver/issues/17>`_).
+- Add ``hybrid`` mode that allows `Weaver` to simultaneously run local `Application Packages` and remote WPS providers.
+- Rename ``ows2json_output`` to ``ows2json_output_data`` to emphasise its usage for parsing job result data rather than
+  simple output definition as accomplished by ``ows2json_io``.
+- Remove function duplicating operations accomplished by ``ows2json_io`` (previously marked with FIXME).
+- Improve typing definitions for `CWL` elements to help identify invalid parsing methods during development.
+- Improve listing speed of remote providers that require data fetch when some of them might have become unreachable.
 
 Fixes:
 ------
-- No change.
+- Avoid failing `WPS-1/2` processes conversion to corresponding `OGC-API` process if metadata fields are omitted.
+- Fix invalid function employed for ``GET /providers/{prov}/processes/{proc}`` route (some error handling was bypassed).
 
 `2.0.0 <https://github.com/crim-ca/weaver/tree/2.0.0>`_ (2021-02-22)
 ========================================================================

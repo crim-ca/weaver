@@ -13,6 +13,7 @@ from pywps.response import WPSResponse
 from pywps.response.execute import ExecuteResponse
 
 from weaver.database import get_db
+from weaver.datatype import Process
 from weaver.exceptions import handle_known_exceptions
 from weaver.formats import CONTENT_TYPE_APP_JSON
 from weaver.owsexceptions import OWSNoApplicableCode
@@ -28,7 +29,8 @@ from weaver.wps_restapi import swagger_definitions as sd
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from typing import Any, Optional, Union
+    from typing import Any, Dict, List, Optional, Union
+    from weaver.processes.convert import WPS_Input_Type, WPS_Output_Type
     from weaver.typedefs import HTTPValid, JSON, SettingsType
 
 
@@ -101,6 +103,7 @@ class WorkerService(ServiceWPS):
         super(WorkerService, self).__init__(*_, **__)
         self.is_worker = is_worker
         self.settings = settings or get_settings(app)
+        self.dispatched_processes = {}  # type: Dict[str, Process]
 
     @handle_known_exceptions
     def _get_capabilities_redirect(self, wps_request, *_, **__):
@@ -182,6 +185,31 @@ class WorkerService(ServiceWPS):
 
         return body
 
+    @handle_known_exceptions
+    def prepare_process_for_execution(self, identifier):
+        # type: (str) -> ProcessWPS
+        """
+        Handles dispatched remote provider process preparation during execution request.
+        """
+        # remote provider processes to instantiate
+        dispatch_process = self.dispatched_processes.get(identifier)
+        if dispatch_process:
+            LOGGER.debug("Preparing dispatched remote provider process definition for execution: [%s]", identifier)
+            try:
+                self.processes[identifier] = dispatch_process.wps()  # prepare operation looks within this mapping
+                process_wps = super(WorkerService, self).prepare_process_for_execution(identifier)
+            except Exception as exc:
+                LOGGER.error("Error occurred during remote provider process creation for execution.", exc_info=exc)
+                raise
+            finally:
+                # cleanup temporary references
+                self.dispatched_processes.pop(identifier, None)
+                self.processes.pop(identifier, None)
+            return process_wps
+
+        # local processes already loaded by the service
+        return super(WorkerService, self).prepare_process_for_execution(identifier)
+
     def execute(self, identifier, wps_request, uuid):
         # type: (str, WPSRequest, str) -> Union[WPSResponse, HTTPValid]
         """
@@ -211,7 +239,8 @@ class WorkerService(ServiceWPS):
             message = "Failed building XML response from WPS Execute result. Error [{!r}]".format(ex)
             raise OWSNoApplicableCode(message, locator=job_id)
 
-    def execute_job(self, process_id, wps_inputs, wps_outputs, mode, job_uuid):
+    def execute_job(self, process_id, wps_inputs, wps_outputs, mode, job_uuid, remote_process):
+        # type: (str, List[WPS_Input_Type], List[WPS_Output_Type], str, str, Optional[Process]) -> WPSExecution
         """
         Real execution of the process by active Celery Worker.
         """
@@ -228,7 +257,17 @@ class WorkerService(ServiceWPS):
         #  (daemon process can't have children processes)
         #  Because if how the code in PyWPS is made, we have to re-enable creation of status file
         wps_request.status = "false"
-        wps_response = super(WorkerService, self).execute(process_id, wps_request, job_uuid)
+
+        # When 'execute' is called, pywps will in turn call 'prepare_process_for_execution',
+        # which then setups and retrieves currently loaded 'local' processes.
+        # Since only local processes were defined by 'get_pywps_service',
+        # a temporary process must be added for remote providers execution.
+        if not remote_process:
+            worker_process_id = process_id
+        else:
+            worker_process_id = "wps_package-{}-{}".format(process_id, job_uuid)
+            self.dispatched_processes[worker_process_id] = remote_process
+        wps_response = super(WorkerService, self).execute(worker_process_id, wps_request, job_uuid)
         wps_response.store_status_file = True
         # update execution status with actual status file and apply required references
         execution = check_wps_status(location=wps_response.process.status_location, settings=self.settings)
@@ -249,7 +288,7 @@ def get_pywps_service(environ=None, is_worker=False):
             load_pywps_config(app, config=pywps_cfg)
 
         # call pywps application with processes filtered according to the adapter's definition
-        process_store = get_db(app).get_store(StoreProcesses)
+        process_store = get_db(app).get_store(StoreProcesses)  # type: StoreProcesses
         processes_wps = [process.wps() for process in
                          process_store.list_processes(visibility=VISIBILITY_PUBLIC)]
         service = WorkerService(processes_wps, is_worker=is_worker, settings=settings)

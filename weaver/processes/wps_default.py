@@ -3,7 +3,7 @@ import os
 
 from pywps import LiteralInput, LiteralOutput, Process
 
-from weaver.processes.types import PROCESS_WPS
+from weaver.processes.types import PROCESS_WPS_LOCAL
 
 LOGGER = logging.getLogger("PYWPS")
 
@@ -11,7 +11,7 @@ LOGGER = logging.getLogger("PYWPS")
 class HelloWPS(Process):
     identifier = "hello"
     title = "Say Hello"
-    type = PROCESS_WPS
+    type = PROCESS_WPS_LOCAL
 
     def __init__(self, *_, **__):
         inputs = [LiteralInput("name", "Your name", data_type="string")]

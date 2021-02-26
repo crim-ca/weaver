@@ -172,7 +172,7 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
         """
         _mime_type_url = "{}{}".format(IANA_NAMESPACE_DEFINITION[IANA_NAMESPACE], _mime_type)
         try:
-            resp = request_extra("get", _mime_type_url, retries=3, allowed_codes=[HTTPOk.code, HTTPNotFound.code])
+            resp = request_extra("head", _mime_type_url, retries=3, allowed_codes=[HTTPOk.code, HTTPNotFound.code])
             if resp.status_code == HTTPOk.code:
                 return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _mime_type)
         except ConnectionError:
