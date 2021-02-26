@@ -425,8 +425,8 @@ def any2cwl_io(wps_io, io_select):
                 "glob": "{}{}".format(wps_io_id, cwl_io_ext)
             }
 
-    wps_min_occ = 1
-    is_min_null = False
+    # FIXME: multi-outputs (https://github.com/crim-ca/weaver/issues/25)
+    # min/max occurs can only be in inputs, outputs are enforced min/max=1 by WPS
     if io_select == WPS_INPUT:
         wps_default = get_field(wps_io, "default", search_variations=True)
         wps_min_occ = get_field(wps_io, "min_occurs", search_variations=True, default=1)
@@ -437,24 +437,26 @@ def any2cwl_io(wps_io, io_select):
         elif is_min_null:
             cwl_io["default"] = "null"
 
-    wps_max_occ = get_field(wps_io, "max_occurs", search_variations=True)
-    if wps_max_occ != null and wps_max_occ > 1:
-        cwl_array = {
-            "type": "array",
-            "items": cwl_io["type"]
-        }
-        # if single value still allowed, or explicitly multi-value array if min is more than one
-        if wps_min_occ > 1:
-            cwl_io["type"] = cwl_array
-        else:
-            cwl_io["type"] = [cwl_io["type"], cwl_array]
+        wps_max_occ = get_field(wps_io, "max_occurs", search_variations=True)
+        if wps_max_occ != null and (wps_max_occ == "unbounded" or wps_max_occ > 1):
+            cwl_array = {
+                "type": "array",
+                "items": cwl_io["type"]
+            }
+            # if single value still allowed, or explicitly multi-value array if min greater than one
+            if wps_min_occ > 1:
+                cwl_io["type"] = cwl_array
+            else:
+                cwl_io["type"] = [cwl_io["type"], cwl_array]
 
-    # apply default null after handling literal/array/enum type variants
-    # (easier to apply against their many different structures)
-    if is_min_null and isinstance(cwl_io["type"], list):
-        cwl_io["type"].insert(0, "null")  # if min=0,max>1 (null, <type>, <array-type>)
-    else:
-        cwl_io["type"] = ["null", cwl_io["type"]]  # if min=0,max=1 (null, <type>)
+        # apply default null after handling literal/array/enum type variants
+        # (easier to apply against their many different structures)
+        if is_min_null:
+            if isinstance(cwl_io["type"], list):
+                cwl_io["type"].insert(0, "null")  # if min=0,max>1 (null, <type>, <array-type>)
+            else:
+                cwl_io["type"] = ["null", cwl_io["type"]]  # if min=0,max=1 (null, <type>)
+
     return cwl_io, cwl_ns
 
 
@@ -560,10 +562,9 @@ def is_cwl_file_type(io_info):
     """
     Identifies if the provided `CWL` input/output corresponds to one, many or potentially a ``File`` type(s).
 
-    :returns:
-        - `True`` if
-    If multiple distinct *atomic* types are allowed for a given I/O (e.g.: ``[string, File]``, returns ``True`` if any
-    is a potential ``File``. Also returns ``True``
+    When multiple distinct *atomic* types are allowed for a given I/O (e.g.: ``[string, File]``) and that one of them
+    is a ``File``, the result will be ``True`` even if other types are not ``Files``.
+    Potential ``File`` when other base type is ``"null"`` will also return ``True``.
     """
     io_type = io_info.get("type")
     if not io_type:

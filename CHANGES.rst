@@ -13,8 +13,9 @@ Changes:
 - Support dynamic instantiation of `WPS-1/2` processes from remote `WPS` providers to accomplish job execution.
 - Remove previously flagged duplicate code to handle ``OWSLib`` processes conversion to ``JSON`` for `OGC-API`.
 - Replace ``GET`` HTTP request by ``HEAD`` for MIME-type check against ``IANA`` definitions (speed up).
-- Improve handling of `CWL` input generation in case of ``minOccurs``, ``maxOccurs`` and ``default`` empty of `WPS`
-  process from remote provider (relates to `#17 <https://github.com/crim-ca/weaver/issues/17>`_).
+- Improve handling of `CWL` input generation in combination with ``minOccurs``, ``maxOccurs``, ``allowedValues``
+  and ``default`` empty (``"null"``) value from `WPS` process from remote provider
+  (fix `#17 <https://github.com/crim-ca/weaver/issues/17>`_).
 - Add ``hybrid`` mode that allows `Weaver` to simultaneously run local `Application Packages` and remote WPS providers.
 - Rename ``ows2json_output`` to ``ows2json_output_data`` to emphasise its usage for parsing job result data rather than
   simple output definition as accomplished by ``ows2json_io``.

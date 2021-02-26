@@ -19,6 +19,7 @@ from weaver.processes.convert import (
     cwl2wps_io,
     is_cwl_array_type,
     is_cwl_enum_type,
+    is_cwl_file_type,
     json2wps_datatype,
     merge_io_formats
 )
@@ -133,13 +134,13 @@ def test_cwl2wps_io_raise_mixed_types():
         {"type": "array", "items": "string"}
     ]
     io_type3 = [
-        {"type": "enum", "symbols": ["1", "2"]},  # symbols enforced as strings != int literal
+        {"type": "enum", "symbols": ["1", "2"]},  # symbols as literal strings != int literal
         "null",
         "int"
     ]
     io_type4 = [
         "null",
-        {"type": "enum", "symbols": ["1", "2"]},  # symbols enforced as strings != int items
+        {"type": "enum", "symbols": ["1", "2"]},  # symbols as literal strings != int items
         {"type": "array", "items": "int"}
     ]
     for i, test_type in enumerate([io_type1, io_type2, io_type3, io_type4]):
@@ -391,6 +392,59 @@ def testis_cwl_enum_type_int():
     assert res[1] == "int"
     assert res[2] == MODE.SIMPLE
     assert res[3] == [1, 2, 3]
+
+
+def test_is_cwl_file_type_guaranteed_file():
+    io_info = {
+        "name": "test",
+        "type": "File"
+    }
+    assert is_cwl_file_type(io_info)
+
+
+def test_is_cwl_file_type_potential_file():
+    io_info = {
+        "name": "test",
+        "type": ["null", "File"]
+    }
+    assert is_cwl_file_type(io_info)
+
+
+def test_is_cwl_file_type_file_array():
+    io_info = {
+        "name": "test",
+        "type": {"type": "array", "items": "File"}
+    }
+    assert is_cwl_file_type(io_info)
+
+
+def test_is_cwl_file_type_none_one_or_many_files():
+    io_info = {
+        "name": "test",
+        "type": [
+            "null",
+            "File",
+            {"type": "array", "items": "File"}
+        ]
+    }
+    assert is_cwl_file_type(io_info)
+
+
+def test_is_cwl_file_type_not_files():
+    test_types = [
+        "int",
+        "string",
+        "float",
+        ["null", "string"],
+        {"type": "enum", "symbols": [1, 2]},
+        {"type": "enum", "symbols": ["A", "B"]},
+        {"type": "array", "items": "string"},
+        {"type": "array", "items": "int"},
+        ["null", {"type": "array", "items": "string"}],
+    ]
+    for i, io_type in test_types:
+        io_info = {"name": "test-{}".format(i), "type": io_type}
+        assert not is_cwl_file_type(io_info), "Test [{}]: {}".format(i, io_info)
 
 
 def assert_formats_equal_any_order(format_result, format_expect):

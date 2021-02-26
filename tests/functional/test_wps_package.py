@@ -1167,12 +1167,18 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert pkg["inputs"][0]["id"] == "tasmax"
         assert "default" not in pkg["inputs"][0]
         assert pkg["inputs"][0]["format"] == EDAM_NETCDF
-        assert pkg["inputs"][0]["type"]["type"] == "array"
-        assert pkg["inputs"][0]["type"]["items"] == "File"
+        assert isinstance(pkg["inputs"][0]["type"], list), "since minOccurs=1, single value non-array must be allowed"
+        assert len(pkg["inputs"][0]["type"]) == 2, "single type and array type of same base"
+        assert pkg["inputs"][0]["type"][0] == "File", "since minOccurs=1, should be type directly"
+        assert pkg["inputs"][0]["type"][1]["type"] == "array"
+        assert pkg["inputs"][0]["type"][1]["items"] == "File", "since maxOccurs>1, same base type must array"
         assert pkg["inputs"][1]["id"] == "freq"
         assert pkg["inputs"][1]["default"] == "YS"
-        assert pkg["inputs"][1]["type"]["type"] == "enum"
-        assert pkg["inputs"][1]["type"]["symbols"] == ["YS", "MS", "QS-DEC", "AS-JUL"]
+        assert isinstance(pkg["inputs"][1]["type"], list), "since minOccurs=0, should be a list with 'null' type"
+        assert len(pkg["inputs"][1]["type"]) == 2
+        assert pkg["inputs"][1]["type"][0] == "null"
+        assert pkg["inputs"][1]["type"][1]["type"] == "enum"
+        assert pkg["inputs"][1]["type"][1]["symbols"] == ["YS", "MS", "QS-DEC", "AS-JUL"]
         assert "outputs" in pkg
         assert len(pkg["outputs"]) == 2
         assert isinstance(pkg["outputs"], list)
@@ -1246,20 +1252,37 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert isinstance(pkg["inputs"], list)
         assert pkg["inputs"][0]["id"] == "region"
         assert pkg["inputs"][0]["default"] == "DEU"
+        # first input
         assert "format" not in pkg["inputs"][0]
-        assert pkg["inputs"][0]["type"]["type"] == "array"
-        assert pkg["inputs"][0]["type"]["items"]["type"] == "enum"
-        assert isinstance(pkg["inputs"][0]["type"]["items"]["symbols"], list)
-        assert len(pkg["inputs"][0]["type"]["items"]["symbols"]) == 220
-        assert all(isinstance(s, str) for s in pkg["inputs"][0]["type"]["items"]["symbols"])
+        assert isinstance(pkg["inputs"][0]["type"], list)
+        # single entry of enum allowed values
+        assert len(pkg["inputs"][0]["type"]) == 2, "single type and array type of same base"
+        assert isinstance(pkg["inputs"][0]["type"][0], dict), "enum base type expected since allowed values"
+        assert pkg["inputs"][0]["type"][0]["type"] == "enum"
+        assert isinstance(pkg["inputs"][0]["type"][0]["symbols"], list)
+        assert len(pkg["inputs"][0]["type"][0]["symbols"]) == 220
+        assert all(isinstance(s, str) for s in pkg["inputs"][0]["type"][0]["symbols"])
+        # array type of same enum allowed values
+        assert pkg["inputs"][0]["type"][1]["type"] == "array"
+        assert pkg["inputs"][0]["type"][1]["items"]["type"] == "enum"
+        assert isinstance(pkg["inputs"][0]["type"][1]["items"]["symbols"], list)
+        assert len(pkg["inputs"][0]["type"][1]["items"]["symbols"]) == 220
+        assert all(isinstance(s, str) for s in pkg["inputs"][0]["type"][1]["items"]["symbols"])
+        # second input
         assert pkg["inputs"][1]["id"] == "mosaic"
         assert pkg["inputs"][1]["default"] == "null"
         assert "format" not in pkg["inputs"][1]
-        assert pkg["inputs"][1]["type"] == "boolean"
+        assert isinstance(pkg["inputs"][1]["type"], list), "default 'null' result type formed with it"
+        assert len(pkg["inputs"][1]["type"]) == 2
+        assert pkg["inputs"][1]["type"][0] == "null"
+        assert pkg["inputs"][1]["type"][1] == "boolean"
         assert pkg["inputs"][2]["id"] == "resource"
         assert "default" not in pkg["inputs"][2]
-        assert pkg["inputs"][2]["type"]["type"] == "array"
-        assert pkg["inputs"][2]["type"]["items"] == "File"
+        assert isinstance(pkg["inputs"][2]["type"], list), "single and array File"
+        assert len(pkg["inputs"][2]["type"]) == 2
+        assert pkg["inputs"][2]["type"][0] == "File", "single File type"
+        assert pkg["inputs"][2]["type"][1]["type"] == "array"
+        assert pkg["inputs"][2]["type"][1]["items"] == "File", "corresponding base type for array type"
         # FIXME: TAR cannot be resolved in the CWL context (not official, disable mapping to GZIP)
         #        this makes all formats to not be resolved (see code: wps_package.any2cwl_io)
         #        (see issue: https://github.com/crim-ca/weaver/issues/50)
