@@ -2,8 +2,14 @@
 
 name: Tests
 on:
-  - pull_request
-  - push
+  push:
+    branchhes: ["**"]
+    tags: ["**"]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  release:
+    types: [created]
+  workflow_dispatch: {}
 
 jobs:
   # see: https://github.com/fkirc/skip-duplicate-actions
@@ -11,19 +17,21 @@ jobs:
     continue-on-error: true
     runs-on: ubuntu-latest
     outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+      should_skip: ${{ steps.skip_check.outputs.should_skip && ! contains(github.ref, 'refs/tags') }}
     steps:
       - id: skip_check
         uses: fkirc/skip-duplicate-actions@master
         with:
           concurrent_skipping: "same_content"
           skip_after_successful_duplicate: "true"
-          do_not_skip: '["pull_request", "workflow_dispatch", "schedule"]'
+          do_not_skip: '["pull_request", "workflow_dispatch", "schedule", "release"]'
 
   # see: https://github.com/actions/setup-python
   tests:
-    needs: skip_duplicate
-    if: ${{ needs.skip_duplicate.outputs.should_skip != 'true' }}
+    # FIXME: https://github.com/fkirc/skip-duplicate-actions/issues/90
+    #   disable for now because the tests never run... somehow similar config works in Magpie...
+    # needs: skip_duplicate
+    # if: ${{ needs.skip_duplicate.outputs.should_skip != 'true' }}
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.allow-failure }}
     env:
