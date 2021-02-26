@@ -45,7 +45,7 @@ if TYPE_CHECKING:
         AnyValue,
         HeadersType,
         JSON,
-        KVP,
+        KVP_Item,
         Number,
         SettingsType,
         XML
@@ -424,7 +424,7 @@ def parse_request_query(request):
 
 
 def get_path_kvp(path, sep=",", **params):
-    # type: (str, str, KVP) -> str
+    # type: (str, str, KVP_Item) -> str
     """
     Generates the WPS URL with Key-Value-Pairs (KVP) query parameters.
 

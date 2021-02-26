@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
     import lxml.etree
     from celery.app import Celery
+    from owslib.wps import Process as ProcessOWS
     from pyramid.httpexceptions import HTTPSuccessful, HTTPRedirection
     from pyramid.registry import Registry
     from pyramid.request import Request as PyramidRequest
@@ -79,8 +80,8 @@ if TYPE_CHECKING:
     CWL_RuntimeInput = Union[CWL_RuntimeLiteral, CWL_RuntimeInputFile]
     CWL_RuntimeOutput = Union[CWL_RuntimeLiteral, CWL_RuntimeOutputFile]
 
-    KVPType = Union[ValueType, Sequence[ValueType]]
-    KVP = Union[Sequence[Tuple[str, KVPType]], Dict[str, KVPType]]
+    KVP_Item = Union[ValueType, Sequence[ValueType]]
+    KVP = Union[Sequence[Tuple[str, KVP_Item]], Dict[str, KVP_Item]]
     XML = lxml.etree._Element  # noqa
 
     AnyContainer = Union[Configurator, Registry, PyramidRequest, Celery]
@@ -104,7 +105,7 @@ if TYPE_CHECKING:
     AnyRequestType = Union[PyramidRequest, WerkzeugRequest, RequestsRequest, DummyRequest]
     HTTPValid = Union[HTTPSuccessful, HTTPRedirection]
 
-    AnyProcess = Union[Process, ProcessWPS]
+    AnyProcess = Union[Process, ProcessOWS, ProcessWPS, JSON]
     AnyProcessType = Union[Type[Process], Type[ProcessWPS]]
 
     # update_status(provider, message, progress, status)

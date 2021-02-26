@@ -59,10 +59,11 @@ def list_remote_processes(service, request):
 
     Note: remote processes won't be stored to the local process storage.
     """
+    # FIXME: support other providers (https://github.com/crim-ca/weaver/issues/130)
     wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
     set_wps_language(wps, request=request)
     settings = get_settings(request)
-    return [Process.from_ows(service, process, settings) for process in wps.processes]
+    return [Process.convert(process, service, settings) for process in wps.processes]
 
 
 @sd.provider_processes_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_PROVIDERS, sd.TAG_GETCAPABILITIES],
@@ -91,10 +92,11 @@ def describe_provider_process(request):
     process_id = request.matchdict.get("process_id")
     store = get_db(request).get_store(StoreServices)
     service = store.fetch_by_name(provider_id)
+    # FIXME: support other providers (https://github.com/crim-ca/weaver/issues/130)
     wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
     set_wps_language(wps, request=request)
     process = wps.describeprocess(process_id)
-    return Process.from_ows(service, process, get_settings(request))
+    return Process.convert(process, service, get_settings(request))
 
 
 @sd.provider_process_service.get(tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_PROVIDERS, sd.TAG_DESCRIBEPROCESS],

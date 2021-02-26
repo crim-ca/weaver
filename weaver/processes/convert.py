@@ -481,7 +481,7 @@ def ows2json(wps_process, wps_service_name, wps_service_url):
     """
     process_info = OrderedDict([
         ("id", wps_process.identifier),
-        ("keywords", [wps_service_name]),
+        ("keywords", [wps_service_name] if wps_service_name else []),
     ])
     default_title = wps_process.identifier.capitalize()
     process_info["title"] = get_field(wps_process, "title", default=default_title, search_variations=True)

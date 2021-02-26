@@ -180,10 +180,10 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
         StoreProcesses.__init__(self)
         MongodbStore.__init__(self, *db_args, **db_kwargs)
         registry = kwargs.get("registry")
-        settings = kwargs.get("settings", {}) if not registry else registry.settings
         default_processes = kwargs.get("default_processes")
-        self.default_host = get_weaver_url(settings)
-        self.default_wps_endpoint = get_wps_url(settings)
+        self.settings = kwargs.get("settings", {}) if not registry else registry.settings
+        self.default_host = get_weaver_url(self.settings)
+        self.default_wps_endpoint = get_wps_url(self.settings)
 
         # enforce default process re-registration to receive any applicable update
         if default_processes:
@@ -196,10 +196,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
 
     def _add_process(self, process):
         # type: (AnyProcess) -> None
-        if isinstance(process, ProcessWPS):
-            new_process = Process.from_wps(process, processEndpointWPS1=self.default_wps_endpoint)
-        else:
-            new_process = process
+        new_process = Process.convert(process, processEndpointWPS1=self.default_wps_endpoint)
         if not isinstance(new_process, Process):
             raise ProcessInstanceError("Unsupported process type '{}'".format(type(process)))
 

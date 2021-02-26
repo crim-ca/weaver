@@ -145,7 +145,7 @@ def execute_process(self, job_id, url, headers=None):
             process = None  # already got all the information needed pre-loaded in PyWPS service
         else:
             service = Service(name=job.service, url=url)
-            process = Process.from_ows(service, wps_process, settings)
+            process = Process.from_ows(wps_process, service, settings)
 
         mode = EXECUTE_MODE_ASYNC if job.execute_async else EXECUTE_MODE_SYNC
         job.progress = JOB_PROGRESS_EXECUTE_REQUEST

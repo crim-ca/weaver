@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 import lxml.etree
 from dateutil.parser import parse as dt_parse
-from owslib.wps import WebProcessingService, WPSException
+from owslib.wps import Process as ProcessOWS, WebProcessingService, WPSException
 from pywps import Process as ProcessWPS
 
 from weaver.exceptions import ProcessInstanceError
@@ -48,9 +48,8 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Union
-    from owslib.wps import Process as ProcessOWS
     from pyramid.request import Request
-    from weaver.typedefs import AnySettingsContainer, Number, CWL, JSON
+    from weaver.typedefs import AnyProcess, AnySettingsContainer, Number, CWL, JSON
 
 LOGGER = getLogger(__name__)
 
@@ -952,28 +951,50 @@ class Process(Base):
         return Process(process)
 
     @staticmethod
-    def from_ows(service, process, container):
-        # type: (Service, ProcessOWS, AnySettingsContainer) -> Process
+    def from_ows(process, service, container, **kwargs):
+        # type: (ProcessOWS, Service, AnySettingsContainer, Any) -> Process
         """
         Converts a :mod:`owslib.wps` Process to local storage :class:`weaver.datatype.Process`.
         """
+        assert isinstance(process, ProcessOWS)
         wps_url = get_wps_restapi_base_url(container)
-        if wps_url == service.url:
-            provider_url = wps_url  # local weaver process, using WPS-XML endpoint
+        svc_name = None
+        if not service or wps_url == service.url:
+            # local weaver process, using WPS-XML endpoint
+            remote_service_url = wps_url
+            local_provider_url = wps_url
         else:
-            provider_url = "{}/providers/{}".format(wps_url, service.get("name"))
-        describe_process_url = "{}/processes/{}".format(provider_url, process.identifier)
-        execute_process_url = "{describe_url}/jobs".format(describe_url=describe_process_url)
-        package, info = ows2json(process, service.name, service.url)
-        return Process(
-            url=describe_process_url,
-            processEndpointWPS1=service.get("url"),
-            processDescriptionURL=describe_process_url,
-            executeEndpoint=execute_process_url,
-            type=PROCESS_WPS_REMOTE,
-            package=package,
-            **info
-        )
+            svc_name = service.get("name")
+            remote_service_url = service.url
+            local_provider_url = "{}/providers/{}".format(wps_url, svc_name)
+        describe_process_url = "{}/processes/{}".format(local_provider_url, process.identifier)
+        execute_process_url = "{}/jobs".format(describe_process_url)
+        package, info = ows2json(process, svc_name, remote_service_url)
+        kwargs.update({  # parameters that must be enforced to find service
+            "url": describe_process_url,
+            "executeEndpoint": execute_process_url,
+            "processEndpointWPS1": remote_service_url,
+            "processDescriptionURL": describe_process_url,
+            "type": PROCESS_WPS_REMOTE,
+            "package": package,
+        })
+        return Process(**info, **kwargs)
+
+    @staticmethod
+    def convert(process, service=None, container=None, **kwargs):
+        # type: (AnyProcess, Optional[Service], Optional[AnySettingsContainer], Any) -> Process
+        """
+        Converts known process equivalents definitions into the formal datatype employed by Weaver.
+        """
+        if isinstance(process, ProcessOWS):
+            return Process.from_ows(process, service, container, **kwargs)
+        if isinstance(process, ProcessWPS):
+            return Process.from_wps(process, **kwargs)
+        if isinstance(process, dict):
+            return Process(process, **kwargs)
+        if isinstance(process, Process):
+            return process
+        raise TypeError("Unknown process type to convert: [{}]", type(process))
 
     def wps(self):
         # type: () -> ProcessWPS
