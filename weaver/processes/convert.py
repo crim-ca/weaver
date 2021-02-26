@@ -567,7 +567,7 @@ def is_cwl_file_type(io_info):
     """
     io_type = io_info.get("type")
     if not io_type:
-        raise ValueError("Missing CWL 'type' definition: [{!s}]", io_info)
+        raise ValueError("Missing CWL 'type' definition: [{!s}]".format(io_info))
     if isinstance(io_type, str):
         return io_type == "File"
     if isinstance(io_type, dict):
@@ -576,7 +576,8 @@ def is_cwl_file_type(io_info):
         return io_type["type"] == "File"
     if isinstance(io_type, list):
         return any(typ == "File" or is_cwl_file_type({"type": typ}) for typ in io_type)
-    raise ValueError("Unknown parsing of CWL 'type' format ({!s}) [{!s}] in [{}]", type(io_type), io_type, io_info)
+    msg = "Unknown parsing of CWL 'type' format ({!s}) [{!s}] in [{}]".format(type(io_type), io_type, io_info)
+    raise ValueError(msg)
 
 
 def is_cwl_array_type(io_info):
@@ -752,8 +753,8 @@ def cwl2wps_io(io_info, io_select):
                 else:
                     io_base_type = io_base_type if io_base_type is not None else typ  # less priority
                     io_type_many.add(typ)  # literal base type by itself (not array/enum)
-            if not len(io_type_many) == 1:
-                raise PackageTypeError("Unsupported I/O with many distinct base types for info: '{}'".format(io_info))
+            if len(io_type_many) != 1:
+                raise PackageTypeError("Unsupported I/O with many distinct base types for info: '{!s}'".format(io_info))
             io_type = io_base_type
 
         LOGGER.debug("I/O parsed for multiple base types")

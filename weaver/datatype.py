@@ -994,7 +994,7 @@ class Process(Base):
             return Process(process, **kwargs)
         if isinstance(process, Process):
             return process
-        raise TypeError("Unknown process type to convert: [{}]", type(process))
+        raise TypeError("Unknown process type to convert: [{}]".format(type(process)))
 
     def wps(self):
         # type: () -> ProcessWPS

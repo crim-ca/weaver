@@ -335,8 +335,7 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
                     ):
                         LOGGER.warning("Process already registered: [%s]. Skipping...", proc_id)
                         continue
-                    else:
-                        LOGGER.warning("Process matches registered one: [%s]. Updating details...", proc_id)
+                    LOGGER.warning("Process matches registered one: [%s]. Updating details...", proc_id)
                 payload = {
                     "processDescription": {"process": {"id": proc_id, "visibility": svc_vis}},
                     "executionUnit": [{"href": proc_url}],
@@ -366,8 +365,7 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
                 if new_service == old_service:
                     LOGGER.warning("Provider already registered: [%s]. Skipping...", svc_name)
                     continue
-                else:
-                    LOGGER.warning("Provider matches registered service: [%s]. Updating details...", svc_name)
+                LOGGER.warning("Provider matches registered service: [%s]. Updating details...", svc_name)
             try:
                 service_store.save_service(new_service, overwrite=True)
             except Exception as ex:
