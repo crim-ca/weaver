@@ -36,7 +36,7 @@ from pywps.inout.literaltypes import AnyValue
 from pywps.inout.storage.s3 import S3StorageBuilder
 from yaml.scanner import ScannerError
 
-from weaver.config import WEAVER_CONFIGURATION_HYBRID, get_weaver_configuration
+from weaver.config import WEAVER_CONFIGURATIONS_REMOTE, get_weaver_configuration
 from weaver.exceptions import (
     PackageException,
     PackageExecutionError,
@@ -962,7 +962,7 @@ class WpsPackage(Process):
 
             self.update_status("Launching package...", PACKAGE_PROGRESS_LAUNCHING, STATUS_RUNNING)
 
-            self.remote_execution = get_weaver_configuration(self.settings) in WEAVER_CONFIGURATION_HYBRID
+            self.remote_execution = get_weaver_configuration(self.settings) in WEAVER_CONFIGURATION_REMOTE
             if self.remote_execution:
                 # EMS dispatch the execution to the ADES
                 loading_context = LoadingContext()
