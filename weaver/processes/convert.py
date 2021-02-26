@@ -719,14 +719,45 @@ def cwl2wps_io(io_info, io_select):
     io_max_occurs = 1
 
     # obtain real type if "default" or shorthand "<type>?" was in CWL, which defines "type" as `["null", <type>]`
-    if isinstance(io_type, list) and "null" in io_type:
-        if not len(io_type) == 2:
-            raise PackageTypeError("Unsupported I/O type parsing for info: '{!r}' with '{}'."
-                                   .format(io_info, io_select))
-        LOGGER.debug("I/O parsed for 'default'")
-        io_type = io_type[1] if io_type[0] == "null" else io_type[0]
-        io_info["type"] = io_type
-        io_min_occurs = 0  # I/O can be omitted since default value exists
+    # CWL allows multiple distinct types (e.g.: `string` and `int` simultaneously), but not WPS inputs
+    # WPS allows only different amount of same type through min/max occurs
+    # considering WPS conversion, we can also have following definition `["null", <type>, <array-type>]` (same type)
+    if isinstance(io_type, list):
+        if not len(io_type) > 1:
+            raise PackageTypeError("Unsupported I/O type as list cannot have only one base type: '{}'".format(io_info))
+        if "null" in io_type:
+            if len(io_type) == 1:
+                raise PackageTypeError("Unsupported I/O cannot be only 'null' type: '{}'".format(io_info))
+            LOGGER.debug("I/O parsed for 'default'")
+            io_min_occurs = 0  # I/O can be omitted since default value exists
+            io_type = [typ for typ in io_type if typ != "null"]
+
+        if len(io_type) == 1:  # valid if other was "null" now removed
+            io_type = io_type[0]
+        else:
+            # check that many sub-type definitions all match same base type (no conflicting literals)
+            io_type_many = set()
+            io_base_type = None
+            for i, typ in enumerate(io_type):
+                sub_type = {"type": typ, "name": "{}[{}]".format(io_name, i)}
+                is_array, array_elem, _, io_allow = is_cwl_array_type(sub_type)
+                is_enum, enum_type, _, _ = is_cwl_enum_type(sub_type)
+                # array base type more important than enum because later array conversion also handles allowed values
+                if is_array:
+                    io_base_type = typ  # highest priority (can have sub-literal or sub-enum)
+                    io_type_many.add(array_elem)
+                elif is_enum:
+                    io_base_type = io_base_type if io_base_type is not None else enum_type  # less priority
+                    io_type_many.add(enum_type)
+                else:
+                    io_base_type = io_base_type if io_base_type is not None else typ  # less priority
+                    io_type_many.add(typ)  # literal base type by itself (not array/enum)
+            if not len(io_type_many) == 1:
+                raise PackageTypeError("Unsupported I/O with many distinct base types for info: '{}'".format(io_info))
+            io_type = io_base_type
+
+        LOGGER.debug("I/O parsed for multiple base types")
+        io_info["type"] = io_type  # override resolved multi-type base for more parsing
 
     # convert array types
     is_array, array_elem, io_mode, io_allow = is_cwl_array_type(io_info)
