@@ -12,7 +12,7 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix `Job` duration not fixed when its execution failed due to raised error.
 
 `2.1.0 <https://github.com/crim-ca/weaver/tree/2.1.0>`_ (2021-02-26)
 ========================================================================
