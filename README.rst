@@ -31,7 +31,7 @@ For more details, see `Configuration`_ section.
     * - dependencies
       - | |py_ver| |requires| |pyup|
     * - build status
-      - | |readthedocs| |coverage| |codacy|
+      - | |readthedocs| |docker_build_mode| |docker_build_status|
     * - tests status
       - | |github_latest| |github_tagged| |coverage| |codacy|
     * - releases
@@ -66,8 +66,16 @@ For more details, see `Configuration`_ section.
     :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A2.1.0
 
 .. |readthedocs| image:: https://img.shields.io/readthedocs/pavics-weaver
-    :alt: Readthedocs Build Status (master branch)
-    :target: `readthedocs`_
+    :alt: ReadTheDocs Build Status (master branch)
+    :target: `ReadTheDocs`_
+
+.. |docker_build_mode| image:: https://img.shields.io/docker/automated/pavics/weaver.svg?label=build
+    :alt: Docker Build Status (latest tag)
+    :target: https://hub.docker.com/r/pavics/weaver/builds
+
+.. |docker_build_status| image:: https://img.shields.io/docker/cloud/build/pavics/weaver.svg?label=status
+    :alt: Docker Build Status (latest tag)
+    :target: https://hub.docker.com/r/pavics/weaver/builds
 
 .. |coverage| image:: https://img.shields.io/codecov/c/gh/crim-ca/weaver.svg?label=coverage
     :alt: Code Coverage
@@ -160,12 +168,12 @@ Documentation
 
 The REST API documentation is auto-generated and served under any running `Weaver` application on route
 ``{WEAVER_URL}/api/``. This documentation will correspond to the version of the executed `Weaver` application.
-For the latest documentation, you can refer to the `OpenAPI Specification`_ served directly on `readthedocs`_.
+For the latest documentation, you can refer to the `OpenAPI Specification`_ served directly on `ReadTheDocs`_.
 
-More ample details about installation, configuration and usage are also provided on `readthedocs`_.
+More ample details about installation, configuration and usage are also provided on `ReadTheDocs`_.
 These are generated from corresponding information provided in `docs`_ source directory.
 
-.. _readthedocs: https://pavics-weaver.readthedocs.io
+.. _ReadTheDocs: https://pavics-weaver.readthedocs.io
 .. _`OpenAPI Specification`: https://pavics-weaver.readthedocs.io/en/latest/api.html
 .. _docs: ./docs
 
