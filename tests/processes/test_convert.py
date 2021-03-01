@@ -6,7 +6,7 @@ from copy import deepcopy
 import pytest
 from pywps.inout.formats import Format
 from pywps.inout.inputs import LiteralInput
-from pywps.inout.literaltypes import AnyValue, AllowedValue
+from pywps.inout.literaltypes import AllowedValue, AnyValue
 from pywps.validator.mode import MODE
 
 from weaver.exceptions import PackageTypeError
