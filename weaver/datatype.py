@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 import lxml.etree
 from dateutil.parser import parse as dt_parse
-from owslib.wps import Process as ProcessOWS, WebProcessingService, WPSException
+from owslib.wps import Process as ProcessOWS, WPSException
 from pywps import Process as ProcessWPS
 
 from weaver.exceptions import ProcessInstanceError
@@ -34,7 +34,6 @@ from weaver.status import (
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
 from weaver.utils import (
     fully_qualified_name,
-    get_cookie_headers,
     get_job_log_msg,
     get_log_date_fmt,
     get_log_fmt,
@@ -43,6 +42,7 @@ from weaver.utils import (
 )
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_VALUES
 from weaver.warning import NonBreakingExceptionWarning
+from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
@@ -183,8 +183,7 @@ class Service(Base):
             if self.type.lower() != "wps":
                 return None  # FIXME: not implemented
 
-            cookie_headers = get_cookie_headers(request.headers)
-            wps = WebProcessingService(url=self.url, headers=cookie_headers)
+            wps = get_wps_client(self.url, request)
             url = "{}/providers/{}".format(get_wps_restapi_base_url(request), self.name)
             return {
                 "id": self.name,

@@ -7,7 +7,6 @@ from urllib.parse import parse_qs, urlparse
 
 import colander
 import yaml
-from owslib.wps import WebProcessingService
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPConflict,
@@ -44,6 +43,7 @@ from weaver.processes.types import PROCESS_APPLICATION, PROCESS_WORKFLOW
 from weaver.store.base import StoreProcesses, StoreServices
 from weaver.utils import get_sane_name, get_settings, get_url_without_query
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_PUBLIC
+from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
@@ -313,7 +313,7 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
 
             # fetch data
             LOGGER.info("Fetching WPS-1: [%s]", svc_url)
-            wps = WebProcessingService(url=svc_url)
+            wps = get_wps_client(svc_url, container)
             if LooseVersion(wps.version) >= LooseVersion("2.0"):
                 LOGGER.warning("Invalid WPS-1 provider, version was [%s]", wps.version)
                 continue
@@ -355,7 +355,11 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
         for cfg_service in providers:
             svc_name, svc_url, _, svc_vis = parse_wps_process_config(cfg_service)
             LOGGER.info("Register WPS-1/2 provider: [%s]", svc_url)
-            WebProcessingService(url=svc_url)  # only attempt fetch to validate it exists
+            try:
+                get_wps_client(svc_url, container)  # only attempt fetch to validate it exists
+            except Exception as ex:
+                LOGGER.exception("Exception during provider validation: [%s] [%r]. Skipping...", svc_name, ex)
+                continue
             new_service = Service(name=svc_name, url=svc_url, public=svc_vis)
             try:
                 old_service = service_store.fetch_by_name(svc_name)
@@ -369,7 +373,7 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
             try:
                 service_store.save_service(new_service, overwrite=True)
             except Exception as ex:
-                LOGGER.exception("Exception during provider registration: [%r]. Skipping...", ex)
+                LOGGER.exception("Exception during provider registration: [%s] [%r]. Skipping...", svc_name, ex)
                 continue
 
         LOGGER.info("Finished processing configuration file [%s].", wps_processes_file_path)

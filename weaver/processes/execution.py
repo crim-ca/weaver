@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import colander
 from celery.utils.log import get_task_logger
 from owslib.util import clean_ows_url
-from owslib.wps import ComplexDataInput, WebProcessingService
+from owslib.wps import ComplexDataInput
 from pyramid.httpexceptions import HTTPBadRequest, HTTPNotImplemented
 from pyramid_celery import celery_app as app
 
@@ -31,20 +31,18 @@ from weaver.store.base import StoreJobs
 from weaver.utils import (
     get_any_id,
     get_any_value,
-    get_cookie_headers,
     get_settings,
-    get_ssl_verify_option,
     raise_on_xml_exception,
     wait_secs
 )
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps.utils import (
     check_wps_status,
+    get_wps_client,
     get_wps_local_status_location,
     get_wps_output_path,
     get_wps_output_url,
     load_pywps_config,
-    set_wps_language
 )
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
@@ -96,9 +94,7 @@ def execute_process(self, job_id, url, headers=None):
         try:
             job.progress = JOB_PROGRESS_DESCRIBE
             job.save_log(logger=task_logger, message="Execute WPS request for process [{!s}]".format(job.process))
-            ssl_verify = get_ssl_verify_option("get", url, settings=settings)
-            wps = WebProcessingService(url=url, headers=get_cookie_headers(headers), verify=ssl_verify)
-            set_wps_language(wps, accept_language=job.accept_language)
+            wps = get_wps_client(url, settings, headers=headers, language=job.accept_language)
             raise_on_xml_exception(wps._capabilities)   # noqa
         except Exception as ex:
             raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))

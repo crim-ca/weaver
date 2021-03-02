@@ -2,10 +2,8 @@ import logging
 import warnings
 from typing import TYPE_CHECKING
 
-from owslib.wps import WebProcessingService
 from pyramid.httpexceptions import HTTPCreated, HTTPNoContent, HTTPNotFound, HTTPOk
 
-from utils import get_cookie_headers
 from weaver.database import get_db
 from weaver.datatype import Service
 from weaver.exceptions import ServiceNotFound, log_unhandled_exceptions
@@ -15,6 +13,7 @@ from weaver.processes.types import PROCESS_WPS_REMOTE
 from weaver.store.base import StoreServices
 from weaver.utils import get_any_id, get_settings, request_extra
 from weaver.warning import NonBreakingExceptionWarning
+from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
@@ -71,20 +70,17 @@ def get_capabilities(service, request):
     """
     GetCapabilities of a wps provider.
     """
-    wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
-    settings = get_settings(request)
-    return dict(
-        id=service.name,
-        title=wps.identification.title,
-        abstract=wps.identification.abstract,
-        url="{base_url}/providers/{provider_id}".format(
-            base_url=get_wps_restapi_base_url(settings),
-            provider_id=service.name),
-        processes="{base_url}/providers/{provider_id}/processes".format(
-            base_url=get_wps_restapi_base_url(settings),
-            provider_id=service.name),
-        type=PROCESS_WPS_REMOTE,
-        contact=wps.provider.contact.name)
+    wps = get_wps_client(service.url, request)
+    url = get_wps_restapi_base_url(request)
+    return {
+        "id": service.name,
+        "title": wps.identification.title,
+        "abstract": wps.identification.abstract,
+        "url": "{base_url}/providers/{provider_id}".format(base_url=url, provider_id=service.name),
+        "processes": "{base_url}/providers/{provider_id}/processes".format(base_url=url, provider_id=service.name),
+        "type": PROCESS_WPS_REMOTE,
+        "contact": wps.provider.contact.name,
+    }
 
 
 def get_service(request):

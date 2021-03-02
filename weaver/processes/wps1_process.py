@@ -2,7 +2,7 @@ import logging
 from time import sleep
 from typing import TYPE_CHECKING
 
-from owslib.wps import ComplexDataInput, WebProcessingService
+from owslib.wps import ComplexDataInput
 
 from weaver import status
 from weaver.execute import EXECUTE_MODE_ASYNC
@@ -21,7 +21,7 @@ from weaver.utils import (
     request_extra,
     wait_secs
 )
-from weaver.wps.utils import check_wps_status
+from weaver.wps.utils import check_wps_status, get_wps_client
 
 if TYPE_CHECKING:
     from pywps.app import WPSRequest
@@ -55,7 +55,7 @@ class Wps1Process(WpsProcessInterface):
         LOGGER.debug("Execute process WPS request for %s", self.process)
         try:
             try:
-                wps = WebProcessingService(url=self.provider, headers=self.cookies, verify=self.verify)
+                wps = get_wps_client(self.provider, headers=self.cookies)
                 raise_on_xml_exception(wps._capabilities)  # noqa: W0212
             except Exception as ex:
                 raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
@@ -136,7 +136,7 @@ class Wps1Process(WpsProcessInterface):
                 if num_retries >= max_retries:
                     raise Exception("Could not read status document after {} retries. Giving up.".format(max_retries))
                 try:
-                    execution = check_wps_status(location=execution.statusLocation, verify=self.verify,
+                    execution = check_wps_status(location=execution.statusLocation,
                                                  sleep_secs=wait_secs(run_step), settings=self.settings)
                     job_id = execution.statusLocation.replace(".xml", "").split("/")[-1]
                     LOGGER.debug(get_log_monitor_msg(job_id, status.map_status(execution.getStatus()),

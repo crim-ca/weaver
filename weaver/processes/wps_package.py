@@ -530,14 +530,15 @@ def _generate_process_with_cwl_from_reference(reference):
 
     # match against WPS-1/2 reference
     else:
-        response = request_extra("GET", reference, retries=3, settings=get_settings(app))
+        settings = get_settings(app)
+        response = request_extra("GET", reference, retries=3, settings=settings)
         if response.status_code != HTTPOk.code:
             raise HTTPServiceUnavailable("Couldn't obtain a valid response from [{}]. Service response: [{} {}]"
                                          .format(reference, response.status_code, response.reason))
         content_type = get_header("Content-Type", response.headers)
         if any(ct in content_type for ct in CONTENT_TYPE_ANY_XML):
             # attempt to retrieve a WPS-1 ProcessDescription definition
-            cwl_package, process_info = xml_wps2cwl(response)
+            cwl_package, process_info = xml_wps2cwl(response, settings)
 
         elif any(ct in content_type for ct in [CONTENT_TYPE_APP_JSON]):
             payload = response.json()
