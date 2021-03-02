@@ -32,14 +32,7 @@ from weaver.status import (
     map_status
 )
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
-from weaver.utils import (
-    fully_qualified_name,
-    get_job_log_msg,
-    get_log_date_fmt,
-    get_log_fmt,
-    get_settings,
-    now
-)
+from weaver.utils import fully_qualified_name, get_job_log_msg, get_log_date_fmt, get_log_fmt, get_settings, now
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_VALUES
 from weaver.warning import NonBreakingExceptionWarning
 from weaver.wps.utils import get_wps_client

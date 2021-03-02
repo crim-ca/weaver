@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 import lxml.etree
-from owslib.wps import WPSExecution, WebProcessingService
+from owslib.wps import WebProcessingService, WPSExecution
 from pyramid.httpexceptions import HTTPNotFound
 from pywps import configuration as pywps_config
 
