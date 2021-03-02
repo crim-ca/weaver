@@ -209,7 +209,7 @@ def execute_process(self, job_id, url, headers=None):
                         wps_package.retrieve_package_job_log(execution, job, progress_min, progress_max)
                         job.status = map_status(STATUS_SUCCEEDED)
                         job.status_message = "Job succeeded{}.".format(msg_progress)
-                        job.progress = JOB_PROGRESS_EXECUTE_MONITOR_DONE
+                        job.progress = progress_max
                         job.save_log(logger=task_logger)
                         job_results = [ows2json_output_data(output, process, settings)
                                        for output in execution.processOutputs]
@@ -218,7 +218,7 @@ def execute_process(self, job_id, url, headers=None):
                         task_logger.debug("Job failed.")
                         wps_package.retrieve_package_job_log(execution, job, progress_min, progress_max)
                         job.status_message = "Job failed{}.".format(msg_progress)
-                        job.progress = JOB_PROGRESS_EXECUTE_MONITOR_DONE
+                        job.progress = progress_max
                         job.save_log(errors=execution.errors, logger=task_logger)
                     task_logger.debug("Mapping Job references with generated WPS locations.")
                     map_locations(job, settings)
