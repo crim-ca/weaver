@@ -70,12 +70,14 @@ For more details, see `Configuration`_ section.
     :target: `ReadTheDocs`_
 
 .. |docker_build_mode| image:: https://img.shields.io/docker/automated/pavics/weaver.svg?label=build
-    :alt: Docker Build Status (latest tag)
-    :target: https://hub.docker.com/r/pavics/weaver/builds
+    :alt: Docker Build Mode (latest version)
+    :target: https://hub.docker.com/r/pavics/weaver/tags
 
-.. |docker_build_status| image:: https://img.shields.io/docker/cloud/build/pavics/weaver.svg?label=status
-    :alt: Docker Build Status (latest tag)
-    :target: https://hub.docker.com/r/pavics/weaver/builds
+.. below shield will either indicate the targeted version or 'tag not found'
+.. since docker tags are pushed following manual builds by CI, they are not automatic and no build artifact exists
+.. |docker_build_status| image:: https://img.shields.io/docker/v/pavics/weaver/2.0.0?label=tag%20status
+    :alt: Docker Build Status (latest version)
+    :target: https://hub.docker.com/r/pavics/weaver/tags
 
 .. |coverage| image:: https://img.shields.io/codecov/c/gh/crim-ca/weaver.svg?label=coverage
     :alt: Code Coverage
