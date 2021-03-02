@@ -12,7 +12,8 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix job percent progress reported in logs to be more consistent with actual execution of the process
+  (fixes `#90 <https://github.com/crim-ca/weaver/issues/90>`_).
 
 `2.1.0 <https://github.com/crim-ca/weaver/tree/2.1.0>`_ (2021-02-26)
 ========================================================================
