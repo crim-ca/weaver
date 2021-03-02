@@ -12,7 +12,7 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Improve race condition handling of ``builtin`` process registration at application startup.
 
 `2.1.0 <https://github.com/crim-ca/weaver/tree/2.1.0>`_ (2021-02-26)
 ========================================================================
