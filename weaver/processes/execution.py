@@ -97,6 +97,7 @@ def execute_process(self, job_id, url, headers=None):
             wps = get_wps_client(url, settings, headers=headers, language=job.accept_language)
             raise_on_xml_exception(wps._capabilities)   # noqa
         except Exception as ex:
+            job.save_log(errors=ex, message="Failed WPS client creation for process [{!s}]".format(job.process))
             raise OWSNoApplicableCode("Failed to retrieve WPS capabilities. Error: [{}].".format(str(ex)))
         try:
             wps_process = wps.describeprocess(job.process)

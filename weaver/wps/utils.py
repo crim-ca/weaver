@@ -8,7 +8,6 @@ from urllib.parse import urlparse
 import lxml.etree
 from owslib.wps import WPSExecution, WebProcessingService
 from pyramid.httpexceptions import HTTPNotFound
-from pyramid.request import Request
 from pywps import configuration as pywps_config
 
 from weaver.config import get_weaver_configuration
@@ -27,7 +26,7 @@ LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing import Dict, Union, Optional
 
-    from weaver.typedefs import AnySettingsContainer, HeadersType, XML
+    from weaver.typedefs import AnySettingsContainer, AnyRequestType, HeadersType, XML
 
 
 def _get_settings_or_wps_config(container,                  # type: AnySettingsContainer
@@ -150,8 +149,11 @@ def get_wps_client(url, container=None, verify=None, headers=None, language=None
     :returns: created WPS client object with configured request options.
     """
     headers = headers or {}
-    if isinstance(container, Request):
+    if headers is None and hasattr(container, "headers"):
         headers = get_cookie_headers(container.headers)
+    # remove invalid values that should be recomputed by the client as needed
+    for hdr in ["Accept", "Content-Length", "Content-Type", "Content-Transfer-Encoding"]:
+        headers.pop(hdr, None)
     if verify is None:
         verify = get_ssl_verify_option("get", url, container)
     wps = WebProcessingService(url=url, headers=headers, verify=verify)
@@ -311,7 +313,7 @@ def load_pywps_config(container, config=None):
 
 
 def set_wps_language(wps, accept_language=None, request=None):
-    # type: (WebProcessingService, Optional[str], Optional[Request]) -> None
+    # type: (WebProcessingService, Optional[str], Optional[AnyRequestType]) -> None
     """Set the :attr:`language` property on the :class:`WebProcessingService` object.
 
     Given the `Accept-Language` header value, match the best language

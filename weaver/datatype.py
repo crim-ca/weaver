@@ -217,7 +217,7 @@ class Job(Base):
         return get_job_log_msg(duration=self.duration_str, progress=self.progress, status=self.status, message=msg)
 
     def save_log(self,
-                 errors=None,       # type: Optional[Union[str, List[WPSException]]]
+                 errors=None,       # type: Optional[Union[str, Exception, WPSException, List[WPSException]]]
                  logger=None,       # type: Optional[Logger]
                  message=None,      # type: Optional[str]
                  level=INFO,        # type: int
@@ -240,6 +240,10 @@ class Job(Base):
         .. note::
             The job object is updated with the log but still requires to be pushed to database to actually persist it.
         """
+        if isinstance(errors, WPSException):
+            errors = [errors]
+        elif isinstance(errors, Exception):
+            errors = str(errors)
         if isinstance(errors, str):
             log_msg = [(ERROR, self._get_log_msg(message))]
             self.exceptions.append(errors)
