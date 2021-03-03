@@ -211,17 +211,26 @@ class Job(Base):
         if not isinstance(self.id, str):
             raise TypeError("Type 'str' is required for '{}.id'".format(type(self)))
 
-    def _get_log_msg(self, msg=None):
-        # type: (Optional[str]) -> str
+    def _get_log_msg(self, msg=None, status=None, progress=None):
+        # type: (Optional[str], Optional[str], Optional[Number]) -> str
         if not msg:
             msg = self.status_message
-        return get_job_log_msg(duration=self.duration_str, progress=self.progress, status=self.status, message=msg)
+        status = map_status(status or self.status)
+        progress = max(0, min(100, progress or self.progress))
+        return get_job_log_msg(duration=self.duration_str, progress=progress, status=status, message=msg)
+
+    @staticmethod
+    def _get_err_msg(error):
+        # type: (WPSException) -> str
+        return "{0.text} - code={0.code} - locator={0.locator}".format(error)
 
     def save_log(self,
                  errors=None,       # type: Optional[Union[str, List[WPSException]]]
                  logger=None,       # type: Optional[Logger]
                  message=None,      # type: Optional[str]
                  level=INFO,        # type: int
+                 status=None,       # type: Optional[str]
+                 progress=None,     # type: Optional[Number]
                  ):                 # type: (...) -> None
         """
         Logs the specified error and/or message, and adds the log entry to the complete job log.
@@ -237,23 +246,31 @@ class Job(Base):
             Explicit string to be logged, otherwise use the current :py:attr:`Job.status_message` is used.
         :param level:
             Logging level to apply to the logged ``message``. This parameter is ignored if ``errors`` are logged.
+        :param status:
+            Override status applied in the logged message entry, but does not set it to the job object.
+            Uses the current :prop:`Job.status` value if not specified. Must be one of :mod:`Weaver.status` values.
+        :param progress:
+            Override progress applied in the logged message entry, but does not set it to the job object.
+            Uses the current :prop:`Job.progress` value if not specified.
 
         .. note::
             The job object is updated with the log but still requires to be pushed to database to actually persist it.
         """
         if isinstance(errors, str):
-            log_msg = [(ERROR, self._get_log_msg(message))]
+            log_msg = [(ERROR, self._get_log_msg(message, status=status, progress=progress))]
             self.exceptions.append(errors)
         elif isinstance(errors, list):
-            log_msg = [(ERROR, self._get_log_msg("{0.text} - code={0.code} - locator={0.locator}".format(error)))
-                       for error in errors]
+            log_msg = [
+                (ERROR, self._get_log_msg(self._get_err_msg(error), status=status, progress=progress))
+                for error in errors
+            ]
             self.exceptions.extend([{
                 "Code": error.code,
                 "Locator": error.locator,
                 "Text": error.text
             } for error in errors])
         else:
-            log_msg = [(level, self._get_log_msg(message))]
+            log_msg = [(level, self._get_log_msg(message, status=status, progress=progress))]
         for lvl, msg in log_msg:
             fmt_msg = get_log_fmt() % dict(asctime=now().strftime(get_log_date_fmt()),
                                            levelname=getLevelName(lvl),

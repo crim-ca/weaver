@@ -59,15 +59,16 @@ if TYPE_CHECKING:
 # job process execution progress
 JOB_PROGRESS_SETUP = 1
 JOB_PROGRESS_DESCRIBE = 2
-JOB_PROGRESS_GET_INPUTS = 4
-JOB_PROGRESS_GET_OUTPUTS = 6
-JOB_PROGRESS_EXECUTE_REQUEST = 8
-JOB_PROGRESS_EXECUTE_STATUS_LOCATION = 10
-JOB_PROGRESS_EXECUTE_MONITOR_START = 15
-JOB_PROGRESS_EXECUTE_MONITOR_LOOP = 20
-JOB_PROGRESS_EXECUTE_MONITOR_ERROR = 85
-JOB_PROGRESS_EXECUTE_MONITOR_END = 90
-JOB_PROGRESS_NOTIFY = 95
+JOB_PROGRESS_GET_INPUTS = 3
+JOB_PROGRESS_GET_OUTPUTS = 4
+JOB_PROGRESS_EXECUTE_REQUEST = 5
+JOB_PROGRESS_EXECUTE_STATUS_LOCATION = 6
+JOB_PROGRESS_EXECUTE_MONITOR_START = 7
+JOB_PROGRESS_EXECUTE_MONITOR_LOOP = 8
+JOB_PROGRESS_EXECUTE_MONITOR_DONE = 96
+JOB_PROGRESS_EXECUTE_MONITOR_ERROR = 97
+JOB_PROGRESS_EXECUTE_MONITOR_END = 98
+JOB_PROGRESS_NOTIFY = 99
 JOB_PROGRESS_DONE = 100
 
 
@@ -188,7 +189,9 @@ def execute_process(self, job_id, url, headers=None):
                 #   Don't actually log anything here until process is completed (success or fail) so that underlying
                 #   WPS execution logs can be inserted within the current job log and appear continuously.
                 #   Only update internal job fields in case they get referenced elsewhere.
-                job.progress = JOB_PROGRESS_EXECUTE_MONITOR_LOOP
+                progress_min = JOB_PROGRESS_EXECUTE_MONITOR_LOOP
+                progress_max = JOB_PROGRESS_EXECUTE_MONITOR_DONE
+                job.progress = progress_min
                 execution = check_wps_status(location=wps_status_path, settings=settings,
                                              sleep_secs=wait_secs(run_step))
                 job_msg = (execution.statusMessage or "").strip()
@@ -200,21 +203,21 @@ def execute_process(self, job_id, url, headers=None):
                 # job = store.update_job(job)
 
                 if execution.isComplete():
-                    job.mark_finished()
-                    job.progress = JOB_PROGRESS_EXECUTE_MONITOR_END
                     msg_progress = " (status: {})".format(job_msg) if job_msg else ""
                     if execution.isSucceded():
+                        wps_package.retrieve_package_job_log(execution, job, progress_min, progress_max)
                         job.status = map_status(STATUS_SUCCEEDED)
                         job.status_message = "Job succeeded{}.".format(msg_progress)
-                        wps_package.retrieve_package_job_log(execution, job)
+                        job.progress = progress_max
                         job.save_log(logger=task_logger)
                         job_results = [ows2json_output_data(output, process, settings)
                                        for output in execution.processOutputs]
                         job.results = make_results_relative(job_results, settings)
                     else:
                         task_logger.debug("Job failed.")
+                        wps_package.retrieve_package_job_log(execution, job, progress_min, progress_max)
                         job.status_message = "Job failed{}.".format(msg_progress)
-                        wps_package.retrieve_package_job_log(execution, job)
+                        job.progress = progress_max
                         job.save_log(errors=execution.errors, logger=task_logger)
                     task_logger.debug("Mapping Job references with generated WPS locations.")
                     map_locations(job, settings)
@@ -259,6 +262,7 @@ def execute_process(self, job_id, url, headers=None):
                 message = "Couldn't send notification email ({})".format(exception)
                 job.save_log(errors=message, logger=task_logger, message=message)
 
+        job.mark_finished()
         job.progress = JOB_PROGRESS_DONE
         job.save_log(logger=task_logger, message="Job task complete.")
         job = store.update_job(job)
