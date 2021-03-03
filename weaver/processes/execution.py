@@ -203,7 +203,6 @@ def execute_process(self, job_id, url, headers=None):
                 # job = store.update_job(job)
 
                 if execution.isComplete():
-                    job.mark_finished()
                     msg_progress = " (status: {})".format(job_msg) if job_msg else ""
                     if execution.isSucceded():
                         wps_package.retrieve_package_job_log(execution, job, progress_min, progress_max)
@@ -263,6 +262,7 @@ def execute_process(self, job_id, url, headers=None):
                 message = "Couldn't send notification email ({})".format(exception)
                 job.save_log(errors=message, logger=task_logger, message=message)
 
+        job.mark_finished()
         job.progress = JOB_PROGRESS_DONE
         job.save_log(logger=task_logger, message="Job task complete.")
         job = store.update_job(job)
