@@ -12,7 +12,8 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix `Job` duration not stopped incrementing when its execution failed due to raised error
+  (fixes `#222 <https://github.com/crim-ca/weaver/issues/222>`_).
 
 `2.1.0 <https://github.com/crim-ca/weaver/tree/2.1.0>`_ (2021-02-26)
 ========================================================================
