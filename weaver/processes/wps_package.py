@@ -153,8 +153,8 @@ def get_status_location_log_path(status_location, out_dir=None):
     return os.path.join(out_dir, os.path.split(log_path)[-1]) if out_dir else log_path
 
 
-def retrieve_package_job_log(execution, job):
-    # type: (WPSExecution, Job) -> None
+def retrieve_package_job_log(execution, job, progress_min=0, progress_max=100):
+    # type: (WPSExecution, Job, Number, Number) -> None
     """
     Obtains the underlying WPS execution log from the status file to add them after existing job log entries.
     """
@@ -164,8 +164,13 @@ def retrieve_package_job_log(execution, job):
         # if the process is a weaver package this status xml should be available in the process output dir
         log_path = get_status_location_log_path(execution.statusLocation, out_dir=out_dir)
         with open(log_path, "r") as log_file:
-            for line in log_file:
-                job.save_log(message=line.rstrip("\n"))
+            log_lines = log_file.readlines()
+        if not log_lines:
+            return
+        total = float(len(log_lines))
+        for i, line in enumerate(log_lines):
+            progress = map_progress(i / total * 100, progress_min, progress_max)
+            job.save_log(message=line.rstrip("\n"), progress=progress, status=STATUS_RUNNING)
     except (KeyError, IOError):
         LOGGER.warning("Failed retrieving package log for %s", job)
 
