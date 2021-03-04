@@ -114,13 +114,13 @@ jobs:
         shell: bash
         run: |
           if [[ "${GITHUB_REF}" == "refs/heads/master" ]]; then
-            echo ::set-output name=TAG_VERSION::latest
+            echo "::set-output name=TAG_VERSION::latest"
           else
-            echo ::set-output name=TAG_VERSION::$(echo ${GITHUB_REF##*/})
+            echo "::set-output name=TAG_VERSION::${GITHUB_REF##*/}"
           fi
       - name: Build Docker
         run: make \
-          DOCKER_REPO=pavics/weaver APP_VERSION=${{ steps.deploy-docker.version.TAG_VERSION }} \
+          DOCKER_REPO=pavics/weaver APP_VERSION=${{ steps.deploy-docker.version.outputs.TAG_VERSION }} \
           docker-info docker-build
       - name: Login to DockerHub
         uses: docker/login-action@v1
@@ -129,5 +129,5 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Push to DockerHub
         run: make \
-          DOCKER_REPO=pavics/weaver APP_VERSION=${{ steps.deploy-docker.version.TAG_VERSION }} \
+          DOCKER_REPO=pavics/weaver APP_VERSION=${{ steps.deploy-docker.version.outputs.TAG_VERSION }} \
           docker-push
