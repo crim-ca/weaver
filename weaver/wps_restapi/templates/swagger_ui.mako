@@ -12,6 +12,8 @@
                 url: "${api_swagger_json_path}",
                 dom_id: "#swagger-ui",
                 deepLinking: true,
+                defaultModelsExpandDepth: 1,
+                defaultModelExpandDepth: 1,
                 docExpansion: "list",
                 validatorUrl: false,
                 presets: [

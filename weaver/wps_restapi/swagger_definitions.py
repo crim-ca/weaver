@@ -289,7 +289,7 @@ class Metadata(MetadataContent):
 
 
 class MetadataList(ExtendedSequenceSchema):
-    item = Metadata()
+    metadata = Metadata()
 
 
 class LinkList(ExtendedSequenceSchema):
@@ -338,7 +338,7 @@ class AdditionalParameter(ExtendedMappingSchema):
 
 
 class AdditionalParameterList(ExtendedSequenceSchema):
-    item = AdditionalParameter()
+    additionalParameter = AdditionalParameter()
 
 
 class AdditionalParameters(ExtendedMappingSchema):
@@ -874,11 +874,11 @@ class ProviderCapabilitiesSchema(ExtendedMappingSchema):
 
 
 class TransmissionModeList(ExtendedSequenceSchema):
-    item = TransmissionModeEnum(missing=drop)
+    transmissionMode = TransmissionModeEnum(missing=drop)
 
 
 class JobControlOptionsList(ExtendedSequenceSchema):
-    item = JobControlOptionsEnum(missing=drop)
+    jobControlOption = JobControlOptionsEnum(missing=drop)
 
 
 class ExceptionReportType(ExtendedMappingSchema):
@@ -896,7 +896,7 @@ class ProcessSummary(ProcessDescriptionType):
 
 
 class ProcessSummaryList(ExtendedSequenceSchema):
-    item = ProcessSummary()
+    processSummary = ProcessSummary()
 
 
 class ProcessCollection(ExtendedMappingSchema):
@@ -1173,7 +1173,7 @@ class Input(InputDataType, AnyType):
 
 
 class InputList(ExtendedSequenceSchema):
-    item = Input(missing=drop, description="Received input definition during job submission.")
+    input = Input(missing=drop, description="Received input definition during job submission.")
 
 
 class Execute(ExtendedMappingSchema):
@@ -1216,7 +1216,7 @@ class QuoteSchema(ExtendedMappingSchema):
 
 
 class QuotationList(ExtendedSequenceSchema):
-    item = ExtendedSchemaNode(String(), description="Bill ID.")
+    quote = ExtendedSchemaNode(String(), description="Bill ID.")
 
 
 class QuotationListSchema(ExtendedMappingSchema):
@@ -1235,7 +1235,7 @@ class BillSchema(ExtendedMappingSchema):
 
 
 class BillList(ExtendedSequenceSchema):
-    item = ExtendedSchemaNode(String(), description="Bill ID.")
+    bill = ExtendedSchemaNode(String(), description="Bill ID.")
 
 
 class BillListSchema(ExtendedMappingSchema):
@@ -1538,7 +1538,7 @@ class FrontpageParameterSchema(ExtendedMappingSchema):
 
 
 class FrontpageParameters(ExtendedSequenceSchema):
-    param = FrontpageParameterSchema()
+    parameter = FrontpageParameterSchema()
 
 
 class FrontpageSchema(ExtendedMappingSchema):
@@ -1562,7 +1562,7 @@ class VersionsSpecSchema(ExtendedMappingSchema):
 
 
 class VersionsList(ExtendedSequenceSchema):
-    item = VersionsSpecSchema()
+    version = VersionsSpecSchema()
 
 
 class VersionsSchema(ExtendedMappingSchema):
@@ -1570,8 +1570,8 @@ class VersionsSchema(ExtendedMappingSchema):
 
 
 class ConformanceList(ExtendedSequenceSchema):
-    item = URL(description="Conformance specification link.",
-               example="http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/core")
+    conformance = URL(description="Conformance specification link.",
+                      example="http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/core")
 
 
 class ConformanceSchema(ExtendedMappingSchema):

@@ -168,8 +168,9 @@ def api_conformance(request):  # noqa: F811
     return HTTPOk(json=conformance)
 
 
-def get_swagger_json(http_scheme="http", http_host="localhost", base_url=None, use_docstring_summary=True):
-    # type: (str, str, Optional[str], bool) -> JSON
+def get_swagger_json(http_scheme="http", http_host="localhost",
+                     base_url=None, use_docstring_summary=True, settings=None):
+    # type: (str, str, Optional[str], bool, Optional[SettingsType]) -> JSON
     """Obtains the JSON schema of weaver API from request and response views schemas.
 
     :param http_scheme: Protocol scheme to use for building the API base if not provided by base URL parameter.
@@ -182,7 +183,7 @@ def get_swagger_json(http_scheme="http", http_host="localhost", base_url=None, u
         - :mod:`weaver.wps_restapi.swagger_definitions`
     """
     CorniceSwagger.type_converter = OAS3TypeConversionDispatcher
-    swagger = CorniceSwagger(get_services())
+    swagger = CorniceSwagger(get_services(), def_ref_depth=-1, param_ref=True)
     # function docstrings are used to create the route's summary in Swagger-UI
     swagger.summary_docstrings = use_docstring_summary
     swagger_base_spec = {"schemes": [http_scheme]}
@@ -195,7 +196,33 @@ def get_swagger_json(http_scheme="http", http_host="localhost", base_url=None, u
         swagger_base_spec["host"] = http_host
         swagger_base_path = sd.api_frontpage_service.path
     swagger.swagger = swagger_base_spec
-    swagger_json = swagger.generate(title=sd.API_TITLE, version=__meta__.__version__,
+    swagger_info = {
+        "description": __meta__.__description__,
+        "licence": {
+            "name": __meta__.__license_type__,
+            "url": "{}/blob/master/LICENSE.txt".format(__meta__.__source_repository__),
+        }
+    }
+    if settings:
+        for key in ["name", "email", "url"]:
+            val = settings.get("weaver.wps_metadata_contact_{}".format(key))
+            if val:
+                swagger_info.setdefault("contact", {})
+                swagger_info["contact"][key] = val
+        abstract = settings.get("weaver.wps_metadata_identification_abstract")
+        if abstract:
+            swagger_info["description"] = "{}\n\n{}".format(abstract, __meta__.__description__)
+        terms = settings.get("weaver.wps_metadata_identification_accessconstraints")
+        if terms and "http" in terms:
+            if "," in terms:
+                terms = [term.strip() for term in terms.split(",")]
+            else:
+                terms = [terms]
+            terms = [term for term in terms if "http" in term]
+            if terms:
+                swagger_info["termsOfService"] = terms[0]
+
+    swagger_json = swagger.generate(title=sd.API_TITLE, version=__meta__.__version__, info=swagger_info,
                                     base_path=swagger_base_path, openapi_spec=3)
     swagger_json["externalDocs"] = sd.API_DOCS
     return swagger_json
@@ -208,17 +235,18 @@ def api_swagger_json(request):  # noqa: F811
     """weaver REST API schema generation in JSON format."""
     # obtain 'server' host and api-base-path, which doesn't correspond necessarily to the app's host and path
     # ex: 'server' adds '/weaver' with proxy redirect before API routes
-    weaver_server_url = get_weaver_url(request)
+    settings = get_settings(request)
+    weaver_server_url = get_weaver_url(settings)
     LOGGER.debug("Request app URL:   [%s]", request.url)
     LOGGER.debug("Weaver config URL: [%s]", weaver_server_url)
-    return get_swagger_json(base_url=weaver_server_url, use_docstring_summary=True)
+    return get_swagger_json(base_url=weaver_server_url, use_docstring_summary=True, settings=settings)
 
 
 @sd.api_swagger_ui_service.get(tags=[sd.TAG_API],
                                schema=sd.SwaggerUIEndpoint(), response_schemas=sd.get_api_swagger_ui_responses)
 def api_swagger_ui(request):
     """Weaver REST API swagger-ui schema documentation (this page)."""
-    json_path = wps_restapi_base_path(request.registry.settings) + sd.api_swagger_json_service.path
+    json_path = wps_restapi_base_path(request) + sd.api_swagger_json_service.path
     json_path = json_path.lstrip("/")   # if path starts by '/', swagger-ui doesn't find it on remote
     data_mako = {"api_title": sd.API_TITLE, "api_swagger_json_path": json_path, "api_version": __meta__.__version__}
     return render_to_response("templates/swagger_ui.mako", data_mako, request=request)
