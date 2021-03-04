@@ -90,12 +90,15 @@ if TYPE_CHECKING:
 # CWL package types and extensions
 PACKAGE_BASE_TYPES = frozenset(["string", "boolean", "float", "int", "integer", "long", "double"])
 PACKAGE_LITERAL_TYPES = frozenset(list(PACKAGE_BASE_TYPES) + ["null", "Any"])
-PACKAGE_COMPLEX_TYPES = frozenset(["File", "Directory"])
+PACKAGE_COMPLEX_TYPES = frozenset(["File"])  # FIXME: type "Directory" not supported
 PACKAGE_ARRAY_BASE = "array"
 PACKAGE_ARRAY_MAX_SIZE = sys.maxsize  # pywps doesn't allow None, so use max size  # FIXME: unbounded (weaver #165)
 PACKAGE_CUSTOM_TYPES = frozenset(["enum"])  # can be anything, but support "enum" which is more common
 PACKAGE_ARRAY_ITEMS = frozenset(list(PACKAGE_BASE_TYPES) + list(PACKAGE_COMPLEX_TYPES) + list(PACKAGE_CUSTOM_TYPES))
 PACKAGE_ARRAY_TYPES = frozenset(["{}[]".format(item) for item in PACKAGE_ARRAY_ITEMS])
+# string values the lowest 'type' field can have
+PACKAGE_TYPE_FIELD_VALUES = frozenset(list(PACKAGE_LITERAL_TYPES) + list(PACKAGE_COMPLEX_TYPES) +
+                                      list(PACKAGE_CUSTOM_TYPES) + [PACKAGE_ARRAY_BASE])
 
 # WPS object attribute -> all possible *other* naming variations
 WPS_FIELD_MAPPING = {

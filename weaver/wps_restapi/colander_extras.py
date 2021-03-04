@@ -127,7 +127,7 @@ class DropableSchemaNode(ExtendedNode, colander.SchemaNode):
 
     In the case of nodes corresponding to literal schema type (i.e.: Integer, String, etc.),
     the *empty* value looked for is ``None``. This is to make sure that ``0`` or ``""`` are
-    preserved unless unless explicitly representing *no-data*. In the case of container
+    preserved unless explicitly representing *no-data*. In the case of container
     schema types (i.e.: list, dict, etc.), it is simply considered *empty* if there are no
     element in it, without any more explicit verification.
 
@@ -138,8 +138,8 @@ class DropableSchemaNode(ExtendedNode, colander.SchemaNode):
     :py:exc:`colander.Invalid` during deserialization. Inheriting this class in a schema definition
     will handle this situation automatically.
 
-    Required schemas (without ``missing=drop``, i.e.: :class:`colander.required`) will still raise
-    for undefined nodes.
+    Required schemas (without ``missing=drop``, defaulting to :class:`colander.required`) will
+    still raise for undefined nodes.
 
     The following snippet shows the result that can be achieved using this schema class:
 
@@ -354,7 +354,7 @@ class VariableSchemaNode(ExtendedNode, colander.SchemaNode):
             available in the mapping (also ignoring constants nodes with explicitly named keys),
             then guess a valid match and finally return it with modified name corresponding to
             the expected ``variable`` value in the parent mapping schema. Returning this modified
-            ``name`` with ``variable`` makes the value/sub-schema correspondance transparent to
+            ``name`` with ``variable`` makes the value/sub-schema correspondence transparent to
             the parent mapping when dictionary get-by-key is called during the mapping validation.
 
         .. warning::
@@ -393,7 +393,7 @@ class VariableSchemaNode(ExtendedNode, colander.SchemaNode):
             return cstruct
         if cstruct in (colander.drop, colander.null):
             return cstruct
-        # skip step in case operation was called as subnode from another schema but doesn't
+        # skip step in case operation was called as sub-node from another schema but doesn't
         # correspond to a valid variable map container (e.g.: SequenceSchema)
         if not isinstance(self, VariableSchemaNode):
             return cstruct
@@ -406,8 +406,15 @@ class VariableSchemaNode(ExtendedNode, colander.SchemaNode):
         for var_child in var_children:
             var = getattr(var_child, self._variable, None)
             var_map[var] = []
+            # value must be a dictionary map object to allow variable key
+            if not isinstance(cstruct, dict):
+                raise colander.Invalid(
+                    node=self, msg="Variable key not allowed for non-mapping data: {}".format(type(cstruct))
+                )
+
             var_invalid = colander.Invalid(
-                node=self, msg="Requirement not met under variable: {}.".format(var))
+                node=self, msg="Requirement not met under variable: {}.".format(var)
+            )
             # attempt to find any sub-node matching the sub-schema under variable
             for child_key, child_cstruct in cstruct.items():
                 # skip explicit nodes as well as other variables already matched
@@ -446,13 +453,11 @@ class VariableSchemaNode(ExtendedNode, colander.SchemaNode):
                 for var_mapped in mapped:
                     result[var_mapped["name"]] = var_mapped["cstruct"]
         except colander.Invalid as invalid:
-            invalid_var.msg = "Tried matching variable '{}' sub-schemas " \
-                              "but no match found.".format(var)  # noqa
+            invalid_var.msg = "Tried matching variable '{}' sub-schemas but no match found.".format(var)  # noqa
             invalid_var.add(invalid)
             raise invalid_var
         except KeyError:
-            invalid_var.msg = "Tried matching variable '{}' sub-schemas " \
-                              "but mapping failed.".format(var)  # noqa
+            invalid_var.msg = "Tried matching variable '{}' sub-schemas but mapping failed.".format(var)  # noqa
             raise invalid_var
         return result
 
@@ -478,20 +483,27 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
 
     def deserialize(self, cstruct):
         schema_type = _get_schema_type(self)
+        result = cstruct
         # process extensions to infer alternative parameter/property values
         # node extensions order is important as they can impact the following ones
-        result = cstruct
         for node_ext in [DropableSchemaNode, DefaultSchemaNode, VariableSchemaNode]:  # type: Type[ExtendedNode]
-            if result in (colander.null, colander.drop):  # skip if we already got a final result
+            # important not to break if result is 'colander.null' since Dropable and Default
+            # schema node implementations can substitute it with their appropriate value
+            if result is colander.drop:
+                # if result is to drop though, we are sure that nothing else must be done
                 break
             result = node_ext._deserialize_impl(self, result)
 
         # process usual base operation with extended result
         if result not in (colander.drop, colander.null):
+            # when processing mapping/sequence, if the result is an empty container, return the default instead
+            # this is to avoid returning many empty containers in case upper level keywords (oneOf, anyOf, etc.)
+            # need to discriminate between them
+            # empty container means that none of the sub-schemas/fields where matched against input structure
             if isinstance(schema_type, colander.Mapping):
-                result = colander.MappingSchema.deserialize(self, result)
+                result = colander.MappingSchema.deserialize(self, result) or self.default
             elif isinstance(schema_type, colander.Sequence):
-                result = colander.SequenceSchema.deserialize(self, result)
+                result = colander.SequenceSchema.deserialize(self, result) or self.default
             else:
                 # special cases for JSON conversion, invert of serialize/deserialize
                 #   deserialize causes Date/DateTime/Time to become Python datetime, and raise if not String
@@ -868,15 +880,18 @@ class OneOfKeywordSchema(KeywordMapper):
                 valid_nodes.append(schema_class)
             except colander.Invalid as invalid:
                 invalid_one_of.update({_get_node_name(invalid.node): invalid.asdict()})
-        message = "Incorrect type, must be one of: {}. Errors for each case: {}" \
-                  .format(list(invalid_one_of.keys()), invalid_one_of)
-
+        message = (
+            "Incorrect type, must be one of: {}. Errors for each case: {}"
+            .format(list(invalid_one_of.keys()), invalid_one_of)
+        )
         if valid_one_of:
             # if found only one, return it, otherwise try to discriminate
             if len(valid_one_of) == 1:
                 return valid_one_of[0]
-            message = "Incorrect type, cannot distinguish between multiple valid schemas. " \
-                      "Must be only one of: {}.".format([_get_node_name(node) for node in valid_nodes])
+            message = (
+                "Incorrect type, cannot distinguish between multiple valid schemas. "
+                "Must be only one of: {}.".format([_get_node_name(node, schema_name=True) for node in valid_nodes])
+            )
 
             discriminator = getattr(self, self._discriminator, None)
             if isinstance(discriminator, dict):
@@ -896,8 +911,10 @@ class OneOfKeywordSchema(KeywordMapper):
                     return valid_discriminated[0]
                 elif len(valid_discriminated) > 1:
                     invalid_one_of = error_discriminated
-                message = "Incorrect type, cannot discriminate between multiple valid schemas. " \
-                          "Must be only one of: {}.".format(list(invalid_one_of.keys()))
+                message = (
+                    "Incorrect type, cannot discriminate between multiple valid schemas. "
+                    "Must be only one of: {}.".format(list(invalid_one_of.keys()))
+                )
                 raise colander.Invalid(node=self, msg=message, value=discriminator)
 
             # because some schema nodes will convert types during deserialize without error,
@@ -907,10 +924,12 @@ class OneOfKeywordSchema(KeywordMapper):
                 valid_values = list(filter(lambda c: c == cstruct and type(c) == type(cstruct), valid_one_of))
                 if len(valid_values) == 1:
                     return valid_values[0]
-                message = "Incorrect type, cannot differentiate between multiple base-type valid schemas. " \
-                          "Must be only one of: {}.".format(valid_values)
+                message = (
+                    "Incorrect type, cannot differentiate between multiple base-type valid schemas. "
+                    "Must be only one of: {}.".format(valid_values)
+                )
 
-        raise colander.Invalid(node=self, msg=message)
+        raise colander.Invalid(node=self, msg=message, value=cstruct)
 
 
 class AllOfKeywordSchema(KeywordMapper):
@@ -956,8 +975,10 @@ class AllOfKeywordSchema(KeywordMapper):
 
         if missing_all_of:
             # if anything failed, the whole definition is invalid in this case
-            message = "Incorrect type, must represent all of: {}. Missing following cases: {}" \
+            message = (
+                "Incorrect type, must represent all of: {}. Missing following cases: {}"
                 .format(list(required_all_of), list(missing_all_of))
+            )
             raise colander.Invalid(node=self, msg=message)
 
         return merged_all_of
@@ -1010,8 +1031,10 @@ class AnyOfKeywordSchema(KeywordMapper):
 
         if not merged_any_of:
             # nothing succeeded, the whole definition is invalid in this case
-            invalid_any_of.msg = "Incorrect type, must represent any of: {}. " \
-                                 "All missing from: {}" .format(list(option_any_of), dict(cstruct))
+            invalid_any_of.msg = (
+                "Incorrect type, must represent any of: {}. "
+                "All missing from: {}".format(list(option_any_of), dict(cstruct))
+            )
             raise invalid_any_of
         return merged_any_of
 
@@ -1298,5 +1321,17 @@ def _get_schema_type(schema_node):
     return schema_type
 
 
-def _get_node_name(schema_node):
+def _get_node_name(schema_node, schema_name=False):
+    # type: (colander.SchemaNode, bool) -> str
+    """
+    Obtains the name of the node with best available value.
+
+    :param schema_node: node for which to retrieve the name.
+    :param schema_name:
+        - If ``True``, prefer the schema definition (class) name over the instance or field name.
+        - Otherwise, return the field name, the title or as last result the class name.
+    :returns: node name
+    """
+    if schema_name:
+        return type(schema_node).__name__
     return getattr(schema_node, "name", None) or getattr(schema_node, "title", None) or type(schema_node).__name__

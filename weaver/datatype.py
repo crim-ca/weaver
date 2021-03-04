@@ -721,7 +721,7 @@ class Job(Base):
             "started": self.started,
             "finished": self.finished,
             "duration": self.duration_str,
-            "runningSeconds": self.duration.total_seconds if self.duration is not None else None,
+            "runningSeconds": self.duration.total_seconds() if self.duration is not None else None,
             # TODO: available fields not yet employed (https://github.com/crim-ca/weaver/issues/129)
             "nextPoll": None,
             "expirationDate": None,

@@ -31,6 +31,7 @@ from weaver.formats import (
     CONTENT_TYPE_TEXT_PLAIN
 )
 from weaver.owsexceptions import OWSMissingParameterValue
+from weaver.processes.convert import PACKAGE_TYPE_FIELD_VALUES
 from weaver.sort import JOB_SORT_VALUES, QUOTE_SORT_VALUES, SORT_CREATED, SORT_ID, SORT_PROCESS
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, STATUS_COMPLIANT_OGC
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
@@ -408,12 +409,12 @@ class ComplexInputType(WithFormats):
 
 
 class SupportedCRS(ExtendedMappingSchema):
-    crs = URL(tile="crs", description="Coordinate Reference System")
+    crs = URL(title="CRS", description="Coordinate Reference System")
     default = ExtendedSchemaNode(Boolean(), missing=drop)
 
 
 class SupportedCRSList(ExtendedSequenceSchema):
-    item = SupportedCRS(title="SupportedCRS")
+    crs = SupportedCRS(title="SupportedCRS")
 
 
 class BoundingBoxInputType(ExtendedMappingSchema):
@@ -514,13 +515,13 @@ class ComplexOutputType(WithFormats):
 class OutputType(OneOfKeywordSchema, OutputDescriptionType):
     _one_of = (
         BoundingBoxOutputType,
-        ComplexOutputType,  # should be 2nd to last because very permission, but requires format at least
-        LiteralOutputType,  # must be last because it"s the most permissive (all can default if omitted)
+        ComplexOutputType,  # should be 2nd to last because very permissive, but requires format at least
+        LiteralOutputType,  # must be last because it's the most permissive (all can default if omitted)
     )
 
 
 class OutputDescriptionList(ExtendedSequenceSchema):
-    item = OutputType()
+    output = OutputType()
 
 
 class JobExecuteModeEnum(ExtendedSchemaNode):
@@ -1312,21 +1313,54 @@ class CWLArguments(ExtendedSequenceSchema):
     argument = ExtendedSchemaNode(String())
 
 
-class CWLSymbols(ExtendedSequenceSchema):
-    symbol = ExtendedSchemaNode(String())
+class CWLTypeString(ExtendedSchemaNode):
+    schema_type = String
+    name = "type"
+    title = "Type"
+    description = "Field type definition."
+    example = "float"
+    validator = OneOf(list(PACKAGE_TYPE_FIELD_VALUES))
 
 
-class CWLTypeMap(PermissiveMappingSchema):
-    type = ExtendedSchemaNode(String(), summary="CWL Type")
-    items = ExtendedSchemaNode(String(), missing=drop, summary="Sub-type when defining an array.")
-    symbols = CWLSymbols(missing=drop, summary="Allowed symbols (enum).")
+class CWLTypeSymbolValues(OneOfKeywordSchema):
+    _one_of = [
+        ExtendedSchemaNode(Float()),
+        ExtendedSchemaNode(Integer()),
+        ExtendedSchemaNode(String()),
+    ]
+
+
+class CWLTypeSymbols(ExtendedSequenceSchema):
+    symbol = CWLTypeSymbolValues()
+
+
+class CWLTypeArray(ExtendedMappingSchema):
+    type = ExtendedSchemaNode(String(), example="array")
+    items = CWLTypeString()
+
+
+class CWLTypeEnum(ExtendedMappingSchema):
+    type = ExtendedSchemaNode(String(), example="enum")
+    symbols = CWLTypeSymbols(missing=drop, summary="Allowed values composing the enum.")
+
+
+class CWLTypeBase(OneOfKeywordSchema):
+    _one_of = [
+        CWLTypeString(summary="CWL type as literal value."),
+        CWLTypeArray(summary="CWL type as list of items."),
+        CWLTypeSymbols(summary="CWL type as enum of values."),
+    ]
+
+
+class CWLTypeList(ExtendedSequenceSchema):
+    type = CWLTypeBase()
 
 
 class CWLType(OneOfKeywordSchema):
     title = "CWL Type"
     _one_of = [
-        ExtendedSchemaNode(String(), title="Type", description="Literal type.", example="float"),
-        CWLTypeMap(summary="CWL type with additional properties.")
+        CWLTypeBase(summary="Specific CWL type."),
+        CWLTypeList(summary="Combination of allowed CWL types."),
     ]
 
 
@@ -1554,7 +1588,7 @@ class PackageBody(ExtendedMappingSchema):
 
 
 class ExecutionUnit(OneOfKeywordSchema):
-    _one_of = (Link, UnitType)
+    _one_of = (Reference, UnitType)
 
 
 class ExecutionUnitList(ExtendedSequenceSchema):
