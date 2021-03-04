@@ -1,3 +1,4 @@
+import json
 import time
 import unittest
 from copy import deepcopy
@@ -85,11 +86,18 @@ class WpsPackageConfigBase(unittest.TestCase):
         :return: result of the successful job
         :raises AssertionError: when job fails or took too long to complete.
         """
+        def _try_get_logs():
+            _resp = self.app.get("{}/logs".format(status_url), headers=self.json_headers)
+            if _resp.status_code == 200:
+                return "Error logs:\n{}".format("\n".join(_resp.json))
+            return ""
+
         def check_job_status(_resp, running=False):
             body = _resp.json
+            pretty = json.dumps(body, indent=2, ensure_ascii=False)
             statuses = [STATUS_RUNNING, STATUS_SUCCEEDED] if running else [STATUS_SUCCEEDED]
-            assert _resp.status_code == 200, "Process execution failed. Response body:\n{}".format(body)
-            assert body["status"] in statuses, "Error job info:\n{}".format(body)
+            assert _resp.status_code == 200, "Execution failed. Response body:\n{}\n{}".format(pretty, _try_get_logs())
+            assert body["status"] in statuses, "Error job info:\n{}\n{}".format(pretty, _try_get_logs())
             return body["status"] == STATUS_SUCCEEDED
 
         time.sleep(1)  # small delay to ensure process execution had a change to start before monitoring

@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 import lxml.etree
 from dateutil.parser import parse as dt_parse
-from owslib.wps import Process as ProcessOWS, WebProcessingService, WPSException
+from owslib.wps import Process as ProcessOWS, WPSException
 from pywps import Process as ProcessWPS
 
 from weaver.exceptions import ProcessInstanceError
@@ -32,17 +32,10 @@ from weaver.status import (
     map_status
 )
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
-from weaver.utils import (
-    fully_qualified_name,
-    get_cookie_headers,
-    get_job_log_msg,
-    get_log_date_fmt,
-    get_log_fmt,
-    get_settings,
-    now
-)
+from weaver.utils import fully_qualified_name, get_job_log_msg, get_log_date_fmt, get_log_fmt, get_settings, now
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_VALUES
 from weaver.warning import NonBreakingExceptionWarning
+from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
@@ -183,8 +176,7 @@ class Service(Base):
             if self.type.lower() != "wps":
                 return None  # FIXME: not implemented
 
-            cookie_headers = get_cookie_headers(request.headers)
-            wps = WebProcessingService(url=self.url, headers=cookie_headers)
+            wps = get_wps_client(self.url, request)
             url = "{}/providers/{}".format(get_wps_restapi_base_url(request), self.name)
             return {
                 "id": self.name,
@@ -225,7 +217,7 @@ class Job(Base):
         return "{0.text} - code={0.code} - locator={0.locator}".format(error)
 
     def save_log(self,
-                 errors=None,       # type: Optional[Union[str, List[WPSException]]]
+                 errors=None,       # type: Optional[Union[str, Exception, WPSException, List[WPSException]]]
                  logger=None,       # type: Optional[Logger]
                  message=None,      # type: Optional[str]
                  level=INFO,        # type: int
@@ -256,6 +248,10 @@ class Job(Base):
         .. note::
             The job object is updated with the log but still requires to be pushed to database to actually persist it.
         """
+        if isinstance(errors, WPSException):
+            errors = [errors]
+        elif isinstance(errors, Exception):
+            errors = str(errors)
         if isinstance(errors, str):
             log_msg = [(ERROR, self._get_log_msg(message, status=status, progress=progress))]
             self.exceptions.append(errors)
