@@ -110,13 +110,14 @@ jobs:
         with:
           fetch-depth: "0"
       - name: Get Tag Version
-        if: ${{ contains(github.ref, 'refs/tags') }}
         id: version
-        run: echo ::set-output name=TAG_VERSION::$(echo ${GITHUB_REF##*/})
-      - name: Set Latest Version
-        if: ${{ github.ref == 'refs/heads/master' }}
-        id: version
-        run: echo ::set-output name=TAG_VERSION::latest
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == "refs/heads/master" ]]; then
+            echo ::set-output name=TAG_VERSION::latest
+          else
+            echo ::set-output name=TAG_VERSION::$(echo ${GITHUB_REF##*/})
+          fi
       - name: Build Docker
         run: make \
           DOCKER_REPO=pavics/weaver APP_VERSION=${{ steps.deploy-docker.version.TAG_VERSION }} \
