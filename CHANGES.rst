@@ -8,6 +8,17 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+`2.2.0 <https://github.com/crim-ca/weaver/tree/2.2.0>`_ (2021-03-03)
+========================================================================
+
+Changes:
+--------
 - Add ``weaver.wps.utils.get_wps_client`` function to handle the creation of ``owslib.wps.WebProcessingService`` client
   with appropriate request options configuration from application settings.
 
