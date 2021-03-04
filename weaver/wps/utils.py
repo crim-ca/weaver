@@ -12,16 +12,22 @@ from pywps import configuration as pywps_config
 
 from weaver.config import get_weaver_configuration
 from weaver.typedefs import XML
-from weaver.utils import get_settings, get_url_without_query, get_weaver_url, is_uuid, make_dirs, request_extra
+from weaver.utils import (
+    get_cookie_headers,
+    get_settings,
+    get_ssl_verify_option,
+    get_url_without_query,
+    get_weaver_url,
+    is_uuid,
+    make_dirs,
+    request_extra
+)
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing import Dict, Union, Optional
 
-    from pyramid.request import Request
-    from owslib.wps import WebProcessingService
-
-    from weaver.typedefs import AnySettingsContainer
+    from weaver.typedefs import AnyRequestType, AnySettingsContainer, HeadersType
 
 
 def _get_settings_or_wps_config(container,                  # type: AnySettingsContainer
