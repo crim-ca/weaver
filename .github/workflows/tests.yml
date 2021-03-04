@@ -120,7 +120,7 @@ jobs:
           fi
       - name: Build Docker
         run: make \
-          DOCKER_REPO=pavics/weaver APP_VERSION=${{ steps.deploy-docker.version.outputs.TAG_VERSION }} \
+          DOCKER_REPO=pavics/weaver APP_VERSION=${{ steps.version.outputs.TAG_VERSION }} \
           docker-info docker-build
       - name: Login to DockerHub
         uses: docker/login-action@v1
@@ -129,5 +129,5 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Push to DockerHub
         run: make \
-          DOCKER_REPO=pavics/weaver APP_VERSION=${{ steps.deploy-docker.version.outputs.TAG_VERSION }} \
+          DOCKER_REPO=pavics/weaver APP_VERSION=${{ steps.version.outputs.TAG_VERSION }} \
           docker-push
