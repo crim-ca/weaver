@@ -93,6 +93,7 @@ TAG_RESULTS = "Results"
 TAG_EXCEPTIONS = "Exceptions"
 TAG_LOGS = "Logs"
 TAG_WPS = "WPS"
+TAG_DEPRECATED = "Deprecated Endpoints"
 
 ###############################################################################
 # API endpoints
@@ -145,6 +146,11 @@ provider_outputs_service = Service(name="provider_outputs", path=provider_servic
 provider_logs_service = Service(name="provider_logs", path=provider_service.path + process_logs_service.path)
 provider_exceptions_service = Service(name="provider_exceptions",
                                       path=provider_service.path + process_exceptions_service.path)
+
+# backward compatibility deprecated routes
+job_result_service = Service(name="job_result", path=job_service.path + "/result")
+process_result_service = Service(name="process_result", path=process_service.path + job_result_service.path)
+provider_result_service = Service(name="provider_result", path=provider_service.path + process_result_service.path)
 
 #########################################################
 # Generic schemas
@@ -245,6 +251,10 @@ class RequestHeaders(AcceptHeader, AcceptLanguageHeader, RequestContentTypeHeade
 
 class ResponseHeaders(ResponseContentTypeHeader):
     """Headers describing resulting response."""
+
+
+class RedirectHeaders(ResponseHeaders):
+    Location = ExtendedSchemaNode(String(), example="https://job/123/result", description="Redirect resource location.")
 
 
 class KeywordList(ExtendedSequenceSchema):
@@ -758,11 +768,11 @@ class ProcessVisibilityPutEndpoint(ProcessPath):
     body = Visibility()
 
 
-class FullJobEndpoint(ProviderPath, ProcessPath, JobPath):
+class ProviderJobEndpoint(ProviderPath, ProcessPath, JobPath):
     header = RequestHeaders()
 
 
-class ShortJobEndpoint(JobPath):
+class JobEndpoint(JobPath):
     header = RequestHeaders()
 
 
@@ -790,23 +800,38 @@ class JobOutputsEndpoint(JobPath):
     header = RequestHeaders()
 
 
+class ProcessResultEndpoint(ProcessOutputsEndpoint):
+    deprecated = True
+    header = RequestHeaders()
+
+
+class ProviderResultEndpoint(ProviderOutputsEndpoint):
+    deprecated = True
+    header = RequestHeaders()
+
+
+class JobResultEndpoint(JobOutputsEndpoint):
+    deprecated = True
+    header = RequestHeaders()
+
+
 class ProcessResultsEndpoint(ProcessPath, JobPath):
     header = RequestHeaders()
 
 
-class FullResultsEndpoint(ProviderPath, ProcessPath, JobPath):
+class ProviderResultsEndpoint(ProviderPath, ProcessPath, JobPath):
     header = RequestHeaders()
 
 
-class ShortResultsEndpoint(ProviderPath, ProcessPath, JobPath):
+class JobResultsEndpoint(ProviderPath, ProcessPath, JobPath):
     header = RequestHeaders()
 
 
-class FullExceptionsEndpoint(ProviderPath, ProcessPath, JobPath):
+class ProviderExceptionsEndpoint(ProviderPath, ProcessPath, JobPath):
     header = RequestHeaders()
 
 
-class ShortExceptionsEndpoint(JobPath):
+class JobExceptionsEndpoint(JobPath):
     header = RequestHeaders()
 
 
@@ -814,11 +839,11 @@ class ProcessExceptionsEndpoint(ProcessPath, JobPath):
     header = RequestHeaders()
 
 
-class FullLogsEndpoint(ProviderPath, ProcessPath, JobPath):
+class ProviderLogsEndpoint(ProviderPath, ProcessPath, JobPath):
     header = RequestHeaders()
 
 
-class ShortLogsEndpoint(JobPath):
+class JobLogsEndpoint(JobPath):
     header = RequestHeaders()
 
 
@@ -2141,6 +2166,10 @@ class OkGetJobOutputsResponse(ExtendedMappingSchema):
     body = Outputs()
 
 
+class RedirectResultResponse(ExtendedMappingSchema):
+    header = RedirectHeaders()
+
+
 class Results(ExtendedSequenceSchema):
     """List of outputs obtained from a successful process job execution."""
     result = JobResultValue()
@@ -2380,6 +2409,9 @@ get_job_outputs_responses = {
     "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetJobOutputResponse(),
 }
+get_result_redirect_responses = {
+    "308": RedirectResultResponse(description="redirect"),
+}
 get_job_results_responses = {
     "200": OkGetJobResultsResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
@@ -2436,6 +2468,10 @@ wps_responses = {
 #################################################################
 # Utility methods
 #################################################################
+
+
+def mark_deprecated(path):
+    pass
 
 
 def service_api_route_info(service_api, settings):

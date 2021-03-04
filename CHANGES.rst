@@ -19,6 +19,9 @@ Changes:
 - Add ``<job-uri>/outputs`` providing the ``data``/``href`` formatted job results as well as ``<job-uri>/inputs`` to
   retrieve the inputs that were provided during job submission
   (`#86 <https://github.com/crim-ca/weaver/issues/86>`_).
+- Deprecate ``<job-uri>/result`` paths (indicated in OpenAPI schemas and UI) in favor of ``<job-uri>/outputs`` which
+  provides the same structure with additional ``links`` references
+  (`#86 <https://github.com/crim-ca/weaver/issues/58>`_). Result path requests are redirected automatically to outputs.
 - Add more reference/documentation links to `WPS-1/2` and update conformance references
   (`#53 <https://github.com/crim-ca/weaver/issues/53>`_).
 - Add some minimal caching support of routes.

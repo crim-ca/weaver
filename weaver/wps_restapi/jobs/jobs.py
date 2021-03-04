@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from celery.utils.log import get_task_logger
-from pyramid.httpexceptions import HTTPBadRequest, HTTPNotFound, HTTPOk, HTTPUnauthorized
+from pyramid.httpexceptions import HTTPBadRequest, HTTPNotFound, HTTPOk, HTTPPermanentRedirect, HTTPUnauthorized
 from pyramid.request import Request
 from pyramid.settings import asbool
 from pyramid_celery import celery_app as app
@@ -197,9 +197,9 @@ def get_queried_jobs(request):
 
 
 @sd.provider_job_service.get(tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
-                             schema=sd.FullJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
+                             schema=sd.ProviderJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
 @sd.job_service.get(tags=[sd.TAG_JOBS, sd.TAG_STATUS], renderer=OUTPUT_FORMAT_JSON,
-                    schema=sd.ShortJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
+                    schema=sd.JobEndpoint(), response_schemas=sd.get_single_job_status_responses)
 @sd.process_job_service.get(tags=[sd.TAG_PROCESSES, sd.TAG_JOBS, sd.TAG_STATUS], renderer=OUTPUT_FORMAT_JSON,
                             schema=sd.GetProcessJobEndpoint(), response_schemas=sd.get_single_job_status_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobStatusResponse.description)
@@ -213,9 +213,9 @@ def get_job_status(request):
 
 
 @sd.provider_job_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
-                                schema=sd.FullJobEndpoint(), response_schemas=sd.delete_job_responses)
+                                schema=sd.ProviderJobEndpoint(), response_schemas=sd.delete_job_responses)
 @sd.job_service.delete(tags=[sd.TAG_JOBS, sd.TAG_DISMISS], renderer=OUTPUT_FORMAT_JSON,
-                       schema=sd.ShortJobEndpoint(), response_schemas=sd.delete_job_responses)
+                       schema=sd.JobEndpoint(), response_schemas=sd.delete_job_responses)
 @sd.process_job_service.delete(tags=[sd.TAG_PROCESSES, sd.TAG_JOBS, sd.TAG_DISMISS], renderer=OUTPUT_FORMAT_JSON,
                                schema=sd.DeleteProcessJobEndpoint(), response_schemas=sd.delete_job_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorDeleteJobResponse.description)
@@ -277,11 +277,11 @@ def get_job_outputs(request):
 
 
 @sd.provider_results_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
-                                 schema=sd.FullResultsEndpoint(), response_schemas=sd.get_job_results_responses)
+                                 schema=sd.ProviderResultsEndpoint(), response_schemas=sd.get_job_results_responses)
 @sd.process_results_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.ProcessResultsEndpoint(), response_schemas=sd.get_job_results_responses)
 @sd.job_results_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS], renderer=OUTPUT_FORMAT_JSON,
-                            schema=sd.ShortResultsEndpoint(), response_schemas=sd.get_job_results_responses)
+                            schema=sd.JobResultsEndpoint(), response_schemas=sd.get_job_results_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobResultsResponse.description)
 def get_job_results(request):
     # type: (Request) -> HTTPException
@@ -301,9 +301,9 @@ def get_job_results(request):
 
 @sd.provider_exceptions_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS, sd.TAG_PROVIDERS],
                                     renderer=OUTPUT_FORMAT_JSON,
-                                    schema=sd.FullExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
+                                    schema=sd.ProviderExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
 @sd.job_exceptions_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS], renderer=OUTPUT_FORMAT_JSON,
-                               schema=sd.ShortExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
+                               schema=sd.JobExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
 @sd.process_exceptions_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                                    schema=sd.ProcessExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobExceptionsResponse.description)
@@ -316,9 +316,9 @@ def get_job_exceptions(request):
 
 
 @sd.provider_logs_service.get(tags=[sd.TAG_JOBS, sd.TAG_LOGS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
-                              schema=sd.FullLogsEndpoint(), response_schemas=sd.get_logs_responses)
+                              schema=sd.ProviderLogsEndpoint(), response_schemas=sd.get_logs_responses)
 @sd.job_logs_service.get(tags=[sd.TAG_JOBS, sd.TAG_LOGS], renderer=OUTPUT_FORMAT_JSON,
-                         schema=sd.ShortLogsEndpoint(), response_schemas=sd.get_logs_responses)
+                         schema=sd.JobLogsEndpoint(), response_schemas=sd.get_logs_responses)
 @sd.process_logs_service.get(tags=[sd.TAG_JOBS, sd.TAG_LOGS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                              schema=sd.ProcessLogsEndpoint(), response_schemas=sd.get_logs_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobLogsResponse.description)
@@ -328,3 +328,22 @@ def get_job_logs(request):
     """
     job = get_job(request)
     return HTTPOk(json=job.logs)
+
+
+@sd.provider_result_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS, sd.TAG_DEPRECATED],
+                                renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderResultEndpoint(),
+                                response_schemas=sd.get_result_redirect_responses)
+@sd.process_result_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES, sd.TAG_DEPRECATED],
+                               renderer=OUTPUT_FORMAT_JSON, schema=sd.ProcessResultEndpoint(),
+                               response_schemas=sd.get_result_redirect_responses)
+@sd.job_result_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_DEPRECATED],
+                           renderer=OUTPUT_FORMAT_JSON, schema=sd.JobResultEndpoint(),
+                           response_schemas=sd.get_result_redirect_responses)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetJobOutputResponse.description)
+def redirect_job_result(request):
+    """
+    Deprecated job result endpoint that is now returned by corresponding outputs path with added links.
+    """
+    location = request.url.rsplit("/", 1)[0] + "/outputs"
+    LOGGER.warning("Deprecated route redirection [%s] -> [%s]", request.url, location)
+    return HTTPPermanentRedirect(comment="deprecated", location=location)

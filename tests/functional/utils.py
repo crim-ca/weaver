@@ -112,6 +112,6 @@ class WpsPackageConfigBase(unittest.TestCase):
             once = False
             left -= delta
         check_job_status(resp)
-        resp = self.app.get("{}/result".format(status_url), headers=self.json_headers)
+        resp = self.app.get("{}/results".format(status_url), headers=self.json_headers)
         assert resp.status_code == 200, "Error job info:\n{}".format(resp.json)
         return resp.json
