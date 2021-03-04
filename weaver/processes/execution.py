@@ -28,7 +28,7 @@ from weaver.processes.convert import ows2json_output_data
 from weaver.processes.types import PROCESS_WORKFLOW
 from weaver.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_STARTED, STATUS_SUCCEEDED, map_status
 from weaver.store.base import StoreJobs
-from weaver.utils import get_any_id, get_any_value, get_settings, raise_on_xml_exception, wait_secs
+from weaver.utils import get_any_id, get_any_value, get_settings, now, raise_on_xml_exception, wait_secs
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps.utils import (
     check_wps_status,

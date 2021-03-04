@@ -1260,31 +1260,66 @@ class CWLClass(ExtendedSchemaNode):
                   "definitions and Workflow that chains multiple packages."
 
 
+class RequirementClass(ExtendedSchemaNode):
+    schema_type = String
+    title = "RequirementClass"
+    name = "class"
+    description = "CWL requirement class specification."
+
+
 class DockerRequirementSpecification(PermissiveMappingSchema):
-    dockerPull = URL(example="docker-registry.host.com/namespace/image:1.2.3",
-                     title="Docker pull reference",
-                     description="Reference package that will be retrieved and executed by CWL.")
+    dockerPull = ExtendedSchemaNode(
+        String(),
+        example="docker-registry.host.com/namespace/image:1.2.3",
+        title="Docker pull reference",
+        description="Reference package that will be retrieved and executed by CWL."
+    )
 
 
-class DockerRequirement(DockerRequirementSpecification):
-    name = "DockerRequirement"
-    title = "DockerRequirement"
+class DockerRequirementMap(ExtendedMappingSchema):
+    DockerRequirement = DockerRequirementSpecification(name="DockerRequirement", title="DockerRequirement")
 
 
-class DockerGpuRequirement(DockerRequirementSpecification):
+class DockerRequirementClass(DockerRequirementSpecification):
+    name = "DockerRequirementClass"
+    title = "DockerRequirementClass"
+    _class = RequirementClass(example="DockerRequirement", validator=OneOf(["DockerRequirement"]))
+
+
+class DockerGpuRequirementSpecification(DockerRequirementSpecification):
     name = "DockerGpuRequirement"
     title = "DockerGpuRequirement"
-    description = "Docker requirement with GPU-enabled support (https://github.com/NVIDIA/nvidia-docker). " \
-                  "The instance must have the NVIDIA toolkit installed to use this feature."
+    description = (
+        "Docker requirement with GPU-enabled support (https://github.com/NVIDIA/nvidia-docker). "
+        "The instance must have the NVIDIA toolkit installed to use this feature."
+    )
 
 
-class InitialWorkDirRequirement(PermissiveMappingSchema):
+class DockerGpuRequirementMap(ExtendedMappingSchema):
+    DockerGpuRequirement = DockerGpuRequirementSpecification()
+
+
+class DockerGpuRequirementClass(DockerGpuRequirementSpecification):
+    name = "DockerGpuRequirementClass"
+    title = "DockerGpuRequirementClass"
+    _class = RequirementClass(example="DockerGpuRequirement", validator=OneOf(["DockerGpuRequirement"]))
+
+
+class InitialWorkDirRequirementSpecification(PermissiveMappingSchema):
     name = "InitialWorkDirRequirement"
     title = "InitialWorkDirRequirement"
     listing = PermissiveMappingSchema()
 
 
-class BuiltinRequirement(PermissiveMappingSchema):
+class InitialWorkDirRequirementMap(ExtendedMappingSchema):
+    InitialWorkDirRequirement = InitialWorkDirRequirementSpecification()
+
+
+class InitialWorkDirRequirementClass(InitialWorkDirRequirementSpecification):
+    _class = RequirementClass(example="InitialWorkDirRequirement", validator=OneOf(["InitialWorkDirRequirement"]))
+
+
+class BuiltinRequirementSpecification(PermissiveMappingSchema):
     name = "BuiltinRequirement"
     title = "BuiltinRequirement"
     description = "Hint indicating that the Application Package corresponds to a builtin process of " \
@@ -1292,20 +1327,74 @@ class BuiltinRequirement(PermissiveMappingSchema):
     process = AnyIdentifier()
 
 
-class CWLRequirements(AnyOfKeywordSchema, PermissiveMappingSchema):
+class BuiltinRequirementMap(ExtendedMappingSchema):
+    BuiltinRequirement = BuiltinRequirementSpecification()
+
+
+class BuiltinRequirementClass(BuiltinRequirementSpecification):
+    _class = RequirementClass(example="BuiltinRequirement", validator=OneOf(["BuiltinRequirement"]))
+
+
+class UnknownRequirementClass(PermissiveMappingSchema):
+    _class = RequirementClass(example="UnknownRequirement")
+
+
+class CWLRequirementsMap(AnyOfKeywordSchema):
     _any_of = [
-        DockerRequirement(missing=drop),
-        DockerGpuRequirement(missing=drop),
-        InitialWorkDirRequirement(missing=drop),
+        DockerRequirementMap(missing=drop),
+        DockerGpuRequirementMap(missing=drop),
+        InitialWorkDirRequirementMap(missing=drop),
+        PermissiveMappingSchema(missing=drop),
     ]
 
 
-class CWLHints(AnyOfKeywordSchema, PermissiveMappingSchema):
+class CWLRequirementsItem(OneOfKeywordSchema):
+    _one_of = [
+        DockerRequirementClass(missing=drop),
+        DockerGpuRequirementClass(missing=drop),
+        InitialWorkDirRequirementClass(missing=drop),
+        UnknownRequirementClass(missing=drop),
+    ]
+
+
+class CWLRequirementsList(ExtendedSequenceSchema):
+    requirement = CWLRequirementsItem()
+
+
+class CWLRequirements(OneOfKeywordSchema):
+    _one_of = [
+        CWLRequirementsMap(),
+        CWLRequirementsList(),
+    ]
+
+
+class CWLHintsMap(AnyOfKeywordSchema, PermissiveMappingSchema):
     _any_of = [
-        BuiltinRequirement(missing=drop),
-        DockerRequirement(missing=drop),
-        DockerGpuRequirement(missing=drop),
-        InitialWorkDirRequirement(missing=drop),
+        BuiltinRequirementMap(missing=drop),
+        DockerRequirementMap(missing=drop),
+        DockerGpuRequirementMap(missing=drop),
+        InitialWorkDirRequirementMap(missing=drop),
+    ]
+
+
+class CWLHintsItem(OneOfKeywordSchema, PermissiveMappingSchema):
+    discriminator = "class"
+    _one_of = [
+        BuiltinRequirementClass(missing=drop),
+        DockerRequirementClass(missing=drop),
+        DockerGpuRequirementClass(missing=drop),
+        InitialWorkDirRequirementClass(missing=drop),
+    ]
+
+
+class CWLHintsList(ExtendedSequenceSchema):
+    hint = CWLHintsItem()
+
+
+class CWLHints(OneOfKeywordSchema):
+    _one_of = [
+        CWLHintsMap(),
+        CWLHintsList(),
     ]
 
 
@@ -1370,14 +1459,14 @@ class CWLInputBase(PermissiveMappingSchema):
                                          description="Defines how to specify the input for the command.")
 
 
-class CWLInputObject(AnyOfKeywordSchema):
+class CWLInputObject(AnyOfKeywordSchema, PermissiveMappingSchema):
     _any_of = [
         CWLInputBase(),
         AnyDefaultTypeFormats(missing=drop),
     ]
 
 
-class CWLInputMap(ExtendedMappingSchema):
+class CWLInputMap(PermissiveMappingSchema):
     input_id = CWLInputObject(variable="<input-id>", title="Input Identifier",
                               description=IO_INFO_IDS.format(first="CWL", second="WPS", what="input") +
                               " (Note: '<input-id>' is a variable corresponding for each identifier)")
@@ -1441,7 +1530,7 @@ class CWLCommand(OneOfKeywordSchema):
 
 
 class CWL(PermissiveMappingSchema):
-    cwlVersion = Version(description="CWL version of the described application package.")
+    cwlVersion = Version(description="CWL version of the described application package.", example="v1.0")
     _class = CWLClass()
     requirements = CWLRequirements(description="Explicit requirement to execute the application package.", missing=drop)
     hints = CWLHints(description="Non-failing additional hints that can help resolve extra requirements.", missing=drop)
@@ -1453,7 +1542,7 @@ class CWL(PermissiveMappingSchema):
     outputs = CWLOutputsDefinition(description="All outputs produced by the Application Package.")
 
 
-class UnitType(ExtendedMappingSchema):
+class Unit(ExtendedMappingSchema):
     unit = CWL(description="Execution unit definition as CWL package specification. " + CWL_DOC_MESSAGE)
 
 
@@ -1588,11 +1677,18 @@ class PackageBody(ExtendedMappingSchema):
 
 
 class ExecutionUnit(OneOfKeywordSchema):
-    _one_of = (Reference, UnitType)
+    _one_of = [
+        Reference(name="Reference", title="Reference", description="Execution Unit reference."),
+        Unit(name="Unit", title="Unit", description="Execution Unit definition."),
+    ]
 
 
 class ExecutionUnitList(ExtendedSequenceSchema):
-    unit = ExecutionUnit(description="Definition of the Application Package to execute.")
+    unit = ExecutionUnit(
+        name="ExecutionUnit",
+        title="ExecutionUnit",
+        description="Definition of the Application Package to execute."
+    )
 
 
 class ProcessOffering(ExtendedMappingSchema):

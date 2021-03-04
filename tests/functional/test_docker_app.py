@@ -37,8 +37,8 @@ class WpsPackageDockerAppTest(WpsPackageConfigBase):
         cls.deploy_docker_process()
 
     @classmethod
-    def deploy_docker_process(cls):
-        cwl = {
+    def get_package(cls):
+        return {
             "cwlVersion": "v1.0",
             "class": "CommandLineTool",
             "baseCommand": "cat",
@@ -54,6 +54,10 @@ class WpsPackageDockerAppTest(WpsPackageConfigBase):
                 {"id": cls.out_key, "type": "File", "outputBinding": {"glob": cls.out_file}},
             ]
         }
+
+    @classmethod
+    def get_deploy_body(cls):
+        cwl = cls.get_package()
         body = {
             "processDescription": {
                 "process": {"id": cls.process_id}
@@ -61,6 +65,11 @@ class WpsPackageDockerAppTest(WpsPackageConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
             "executionUnit": [{"unit": cwl}],
         }
+        return body
+
+    @classmethod
+    def deploy_docker_process(cls):
+        body = cls.get_deploy_body()
         info = cls.deploy_process(body)
         return info
 
@@ -89,6 +98,16 @@ class WpsPackageDockerAppTest(WpsPackageConfigBase):
         # validate content
         with open(wps_out_file) as res_file:
             assert res_file.read() == result_file_content
+
+    def test_deployed_process_schemas(self):
+        """
+        Validate that resulting schemas from deserialization correspond to original package and process definitions.
+        """
+        # process already deployed by setUpClass
+        body = self.get_deploy_body()
+        process = self.process_store.fetch_by_id(self.process_id)
+        assert process.package == body["executionUnit"][0]["unit"]
+        assert process.payload == body
 
     def test_execute_wps_rest_resp_json(self):
         """

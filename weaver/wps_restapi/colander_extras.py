@@ -327,7 +327,7 @@ class VariableSchemaNode(ExtendedNode, colander.SchemaNode):
                 raise SchemaNodeTypeError(
                     "Keyword 'variable' can only be applied to Mapping and literal-type schema nodes. "
                     "Got: {!s} ({!s})".format(type(self), self.schema_type))
-            self.name = var
+            self.name = kwargs.get("name", var)
             if not self.title:
                 self.title = var
                 self.raw_title = var
@@ -739,7 +739,8 @@ class KeywordMapper(colander.MappingSchema):
             - :meth:`_deserialize_keyword`
             - :class:`ExtendedSchemaNode`
         """
-        node.name = _get_node_name(self)  # pass down the parent name
+        if not node.name:
+            node.name = _get_node_name(self)  # pass down the parent name
         if isinstance(node, KeywordMapper):
             return KeywordMapper.deserialize(node, cstruct)
         return ExtendedSchemaNode.deserialize(node, cstruct)
@@ -748,8 +749,11 @@ class KeywordMapper(colander.MappingSchema):
     def deserialize(self, cstruct):
         if cstruct is colander.null:
             return colander.null
+        # first process the keyword subnodes
         result = self._deserialize_keyword(cstruct)
-        if isinstance(result, dict):
+        # if further fields where explicitly added next to the keyword schemas,
+        # validate and apply them as well
+        if isinstance(result, dict) and self.children:
             mapping_data = super(KeywordMapper, self).deserialize(cstruct)
             result.update(mapping_data)
         return result
@@ -879,10 +883,10 @@ class OneOfKeywordSchema(KeywordMapper):
                 valid_one_of.append(self._deserialize_subnode(schema_class, cstruct))
                 valid_nodes.append(schema_class)
             except colander.Invalid as invalid:
-                invalid_one_of.update({_get_node_name(invalid.node): invalid.asdict()})
+                invalid_one_of.update({_get_node_name(invalid.node, schema_name=True): invalid.asdict()})
         message = (
             "Incorrect type, must be one of: {}. Errors for each case: {}"
-            .format(list(invalid_one_of.keys()), invalid_one_of)
+            .format(list(invalid_one_of), invalid_one_of)
         )
         if valid_one_of:
             # if found only one, return it, otherwise try to discriminate
@@ -913,7 +917,7 @@ class OneOfKeywordSchema(KeywordMapper):
                     invalid_one_of = error_discriminated
                 message = (
                     "Incorrect type, cannot discriminate between multiple valid schemas. "
-                    "Must be only one of: {}.".format(list(invalid_one_of.keys()))
+                    "Must be only one of: {}.".format(list(invalid_one_of))
                 )
                 raise colander.Invalid(node=self, msg=message, value=discriminator)
 
@@ -1025,7 +1029,9 @@ class AnyOfKeywordSchema(KeywordMapper):
                 schema_class = _make_node_instance(schema_class)
                 # update items with new ones
                 option_any_of.update({_get_node_name(schema_class): str(schema_class)})
-                merged_any_of.update(self._deserialize_subnode(schema_class, cstruct))
+                result = self._deserialize_subnode(schema_class, cstruct)
+                if result not in (colander.drop, colander.null):
+                    merged_any_of.update(result)
             except colander.Invalid as invalid:
                 invalid_any_of.add(invalid)
 

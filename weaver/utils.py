@@ -954,7 +954,7 @@ def clean_json_text_body(body):
     """
     # cleanup various escape characters and u'' stings
     replaces = [(",\n", ", "), ("\\n", " "), (" \n", " "), ("\"", "\'"), ("\\", ""),
-                ("u\'", "\'"), ("u\"", "\'"), ("\'\'", "\'"), ("  ", " ")]
+                ("u\'", "\'"), ("u\"", "\'"), ("\'\'", "\'"), ("  ", " "), ("'. ", "")]
     replaces_from = [r[0] for r in replaces]
     while any(rf in body for rf in replaces_from):
         for _from, _to in replaces:
