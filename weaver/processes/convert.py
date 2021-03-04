@@ -16,7 +16,6 @@ from owslib.wps import (
     Input as OWS_Input_Type,
     Metadata as OWS_Metadata,
     Output as OWS_Output_Type,
-    WebProcessingService,
     is_reference
 )
 from pywps import Process as ProcessWPS
@@ -54,6 +53,7 @@ from weaver.processes.constants import (
     WPS_REFERENCE
 )
 from weaver.utils import bytes2str, fetch_file, get_any_id, get_sane_name, get_url_without_query, null, str2bytes
+from weaver.wps.utils import get_wps_client
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
@@ -519,13 +519,14 @@ def ows2json(wps_process, wps_service_name, wps_service_url):
     return cwl_package, process_info
 
 
-def xml_wps2cwl(wps_process_response):
-    # type: (Response) -> Tuple[CWL, JSON]
+def xml_wps2cwl(wps_process_response, settings):
+    # type: (Response, AnySettingsContainer) -> Tuple[CWL, JSON]
     """
     Converts a `WPS-1 ProcessDescription XML` tree structure to an equivalent `WPS-3 Process JSON` and builds the
     associated `CWL` package in conformance to :ref:`weaver.processes.wps_package.CWL_REQUIREMENT_APP_WPS1`.
 
     :param wps_process_response: valid response (XML, 200) from a `WPS-1 ProcessDescription`.
+    :param settings: application settings to retrieve additional request options.
     """
     def _tag_name(_xml):
         # type: (Union[XML, str]) -> str
@@ -549,7 +550,7 @@ def xml_wps2cwl(wps_process_response):
         raise ValueError("Could not find a match for 'ProcessDescription.identifier' from WPS-1 response.")
 
     # transform WPS-1 -> WPS-3
-    wps = WebProcessingService(wps_process_response.url)
+    wps = get_wps_client(wps_process_response.url, settings)
     wps_service_url = urlparse(wps_process_response.url)
     if wps.provider:
         wps_service_name = wps.provider.name

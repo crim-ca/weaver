@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 import lxml.etree
-from owslib.wps import WPSExecution
+from owslib.wps import WebProcessingService, WPSExecution
 from pyramid.httpexceptions import HTTPNotFound
 from pywps import configuration as pywps_config
 
@@ -131,6 +131,31 @@ def get_wps_local_status_location(url_status_location, container, must_exist=Tru
     return out_path
 
 
+def get_wps_client(url, container=None, verify=None, headers=None, language=None):
+    # type: (str, Optional[AnySettingsContainer], bool, Optional[HeadersType], Optional[str]) -> WebProcessingService
+    """
+    Obtains a :class:`WebProcessingService` with pre-configured request options for the given URL.
+
+    :param url: WPS URL location.
+    :param container: request or settings container to retrieve headers and other request options.
+    :param verify: flag to enable SSL verification (overrides request options from container).
+    :param headers: specific headers to apply (overrides retrieved ones from container).
+    :param language: preferred response language if supported by the service.
+    :returns: created WPS client object with configured request options.
+    """
+    headers = headers or {}
+    if headers is None and hasattr(container, "headers"):
+        headers = get_cookie_headers(container.headers)
+    # remove invalid values that should be recomputed by the client as needed
+    for hdr in ["Accept", "Content-Length", "Content-Type", "Content-Transfer-Encoding"]:
+        headers.pop(hdr, None)
+    if verify is None:
+        verify = get_ssl_verify_option("get", url, container)
+    wps = WebProcessingService(url=url, headers=headers, verify=verify)
+    set_wps_language(wps, request=container, accept_language=language)
+    return wps
+
+
 def check_wps_status(location=None,     # type: Optional[str]
                      response=None,     # type: Optional[XML]
                      sleep_secs=2,      # type: int
@@ -143,9 +168,9 @@ def check_wps_status(location=None,     # type: Optional[str]
     :param location: job URL or file path where to look for job status.
     :param response: WPS response document of job status.
     :param sleep_secs: number of seconds to sleep before returning control to the caller.
-    :param verify: Flag to enable SSL verification.
-    :param settings: Application settings to retrieve any additional request parameters as applicable.
-    :return: OWSLib.wps.WPSExecution object.
+    :param verify: flag to enable SSL verification.
+    :param settings: application settings to retrieve any additional request parameters as applicable.
+    :returns: OWSLib.wps.WPSExecution object.
     """
     def _retry_file():
         LOGGER.warning("Failed retrieving WPS status-location, attempting with local file.")
@@ -283,7 +308,7 @@ def load_pywps_config(container, config=None):
 
 
 def set_wps_language(wps, accept_language=None, request=None):
-    # type: (WebProcessingService, Optional[str], Optional[Request]) -> None
+    # type: (WebProcessingService, Optional[str], Optional[AnyRequestType]) -> None
     """Set the :attr:`language` property on the :class:`WebProcessingService` object.
 
     Given the `Accept-Language` header value, match the best language
@@ -299,7 +324,7 @@ def set_wps_language(wps, accept_language=None, request=None):
     :param str accept_language: the value of the Accept-Language header
     :param request: request from which to extract Accept-Language header if not provided directly
     """
-    if not accept_language and request:
+    if not accept_language and request and hasattr(request, "accept_language"):
         accept_language = request.accept_language.header_value
 
     if not accept_language:
