@@ -7,12 +7,12 @@
     <script src="https://unpkg.com/swagger-ui-dist@3.25.1/swagger-ui-standalone-preset.js"></script>
     <script src="https://unpkg.com/swagger-ui-dist@3.25.1/swagger-ui-bundle.js"></script>
     <script>
-        addEventListener('DOMContentLoaded', function() {
+        addEventListener("DOMContentLoaded", function() {
             window.ui = SwaggerUIBundle({
                 url: "${api_swagger_json_path}",
-                dom_id: '#swagger-ui',
+                dom_id: "#swagger-ui",
                 deepLinking: true,
-                docExpansion: 'list',
+                docExpansion: "list",
                 validatorUrl: false,
                 presets: [
                     SwaggerUIBundle.presets.apis,
@@ -20,7 +20,7 @@
                 plugins: [
                     SwaggerUIBundle.plugins.DownloadUrl
                 ],
-                tagsSorter: 'alpha',
+                tagsSorter: "alpha",
                 apisSorter : "alpha",
                 operationsSorter: "alpha",
             });
