@@ -202,6 +202,7 @@ def get_test_weaver_config(config=None, settings=None):
 def get_test_weaver_app(config=None, settings=None):
     # type: (Optional[Configurator], Optional[SettingsType]) -> TestApp
     config = get_test_weaver_config(config=config, settings=settings)
+    config.registry.settings.setdefault("weaver.ssl_verify", "false")
     app = weaver_app({}, **config.get_settings())
     return TestApp(app)
 
@@ -343,6 +344,7 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
         if not url.startswith("mock://"):
             _resp = func(url, expect_errors=True, **req_kwargs)
             setattr(_resp, "content", _resp.body)
+            setattr(_resp, "raise_for_status", Response.raise_for_status)
         else:
             path = get_url_without_query(url.replace("mock://", ""))
             _resp = mocked_file_response(path, url)
@@ -355,6 +357,7 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
         req_url, req_func, kwargs = _parse_for_app_req(function, *args, **kwargs)
         kwargs.setdefault("expect_errors", True)
         resp = req_func(req_url, **kwargs)
+        setattr(resp, "raise_for_status", Response.raise_for_status)
         return resp
 
 

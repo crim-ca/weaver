@@ -2,7 +2,6 @@ import logging
 from typing import TYPE_CHECKING
 
 import colander
-from owslib.wps import WebProcessingService
 from pyramid.httpexceptions import (
     HTTPBadRequest,
     HTTPForbidden,
@@ -24,9 +23,9 @@ from weaver.processes.execution import submit_job
 from weaver.processes.types import PROCESS_BUILTIN
 from weaver.processes.utils import deploy_process_from_payload, get_job_submission_response, get_process
 from weaver.store.base import StoreProcesses, StoreServices
-from weaver.utils import get_any_id, get_cookie_headers, get_settings, parse_request_query
+from weaver.utils import get_any_id, get_settings, parse_request_query
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
-from weaver.wps.utils import set_wps_language
+from weaver.wps.utils import get_wps_client
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.providers.providers import get_provider_services
 
@@ -60,8 +59,7 @@ def list_remote_processes(service, request):
     Note: remote processes won't be stored to the local process storage.
     """
     # FIXME: support other providers (https://github.com/crim-ca/weaver/issues/130)
-    wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
-    set_wps_language(wps, request=request)
+    wps = get_wps_client(service.url, request)
     settings = get_settings(request)
     return [Process.convert(process, service, settings) for process in wps.processes]
 
@@ -93,8 +91,7 @@ def describe_provider_process(request):
     store = get_db(request).get_store(StoreServices)
     service = store.fetch_by_name(provider_id)
     # FIXME: support other providers (https://github.com/crim-ca/weaver/issues/130)
-    wps = WebProcessingService(url=service.url, headers=get_cookie_headers(request.headers))
-    set_wps_language(wps, request=request)
+    wps = get_wps_client(service.url, request)
     process = wps.describeprocess(process_id)
     return Process.convert(process, service, get_settings(request))
 

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import pymongo
 from pymongo import ASCENDING, DESCENDING
+from pymongo.errors import DuplicateKeyError
 from pyramid.request import Request
 from pywps import Process as ProcessWPS
 
@@ -187,12 +188,40 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
 
         # enforce default process re-registration to receive any applicable update
         if default_processes:
-            registered_processes = [process.identifier for process in self.list_processes()]
-            for process in default_processes:
-                process_name = self._get_process_id(process)
-                if process_name in registered_processes:
-                    self.delete_process(process_name)
-                self._add_process(process)
+            self._register_defaults(default_processes)
+
+    def _register_defaults(self, processes):
+        # type: (List[Process]) -> None
+        """
+        Default process registration to apply definition updates with duplicate entry handling.
+        """
+        registered_processes = {process.identifier: process for process in self.list_processes()}
+        for process in processes:
+            process_id = self._get_process_id(process)
+            registered = registered_processes.get(process_id)
+            duplicate = False
+            old_params = {}
+            new_params = {}
+            if registered:
+                old_params = registered.params()
+                new_params = process.params()
+                duplicate = registered and old_params == new_params
+            if registered and not duplicate:
+                self.delete_process(process_id)
+            # be more permissive of race-conditions between weaver api/worker booting
+            # if the processes are complete duplicate, there is no reason to rewrite them
+            try:
+                if registered and not duplicate:
+                    LOGGER.debug("Override non-duplicate matching process ID [%s]\n%s", process_id,
+                                 [(param, old_params.get(param), new_params.get(param))
+                                  for param in set(new_params) | set(old_params)])
+                if not registered or not duplicate:
+                    self._add_process(process)
+            except DuplicateKeyError:
+                if duplicate:
+                    LOGGER.debug("Ignore verified duplicate default process definition [%s]", process_id)
+                else:
+                    raise
 
     def _add_process(self, process):
         # type: (AnyProcess) -> None
