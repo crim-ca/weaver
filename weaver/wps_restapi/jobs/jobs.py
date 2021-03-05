@@ -19,7 +19,7 @@ from weaver.exceptions import (
     ServiceNotFound,
     log_unhandled_exceptions
 )
-from weaver.formats import OUTPUT_FORMAT_JSON, CONTENT_TYPE_TEXT_PLAIN
+from weaver.formats import OUTPUT_FORMAT_JSON
 from weaver.owsexceptions import OWSNotFound
 from weaver.processes.convert import any2wps_literal_datatype
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
@@ -99,15 +99,12 @@ def get_results(job, container, value_key=None, ogc_api=False):
         elif value_key:
             out_key = value_key
         output = {out_key: value}
-        if "mimeType" in result:  # required for the rest to be there, other fields optional
+        if "mimeType" in result and rtype == "href":  # required for the rest to be there, other fields optional
             output["format"] = {fmt_key: result["mimeType"]}
             for field in ["encoding", "schema"]:
                 if field in result:
                     output["format"][field] = result[field]
-        elif rtype == "href":
-            # default in case format is incorrectly missing when required
-            output["format"] = {fmt_key: CONTENT_TYPE_TEXT_PLAIN}
-        else:
+        elif rtype != "href":
             # literal data
             # FIXME: BoundingBox not implemented (https://github.com/crim-ca/weaver/issues/51)
             dtype = result.get("dataType", any2wps_literal_datatype(value, is_value=True) or "string")
@@ -289,6 +286,7 @@ def get_job_inputs(request):
     job = get_job(request)
     inputs = dict(inputs=[dict(id=get_any_id(_input), value=get_any_value(_input)) for _input in job.inputs])
     inputs.update(job.links(request, self_link="inputs"))
+    inputs = sd.JobInputsSchema().deserialize(inputs)
     return HTTPOk(json=inputs)
 
 
@@ -307,6 +305,7 @@ def get_job_outputs(request):
     job = get_job(request)
     outputs = {"outputs": get_results(job, request)}
     outputs.update(job.links(request, self_link="outputs"))
+    outputs = sd.JobOutputsSchema().deserialize(outputs)
     return HTTPOk(json=outputs)
 
 
@@ -330,6 +329,7 @@ def get_job_results(request):
             "description": "Job status is '{}'. Results are not yet available.".format(job_status)
         })
     results = get_results(job, request, value_key="value", ogc_api=True)
+    results = sd.Result().deserialize(results)
     return HTTPOk(json=results)
 
 
@@ -346,7 +346,8 @@ def get_job_exceptions(request):
     Retrieve the exceptions of a job.
     """
     job = get_job(request)
-    return HTTPOk(json=job.exceptions)
+    exceptions = sd.JobExceptionsSchema().deserialize(job.exceptions)
+    return HTTPOk(json=exceptions)
 
 
 @sd.provider_logs_service.get(tags=[sd.TAG_JOBS, sd.TAG_LOGS, sd.TAG_PROVIDERS], renderer=OUTPUT_FORMAT_JSON,
@@ -361,7 +362,8 @@ def get_job_logs(request):
     Retrieve the logs of a job.
     """
     job = get_job(request)
-    return HTTPOk(json=job.logs)
+    logs = sd.JobLogsSchema().deserialize(job.logs)
+    return HTTPOk(json=logs)
 
 
 @sd.provider_result_service.get(tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS, sd.TAG_DEPRECATED],

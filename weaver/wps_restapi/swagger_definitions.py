@@ -66,12 +66,16 @@ API_DOCS = {
     "url": __meta__.__documentation_url__
 }
 
-CWL_DOC_MESSAGE = "Note that multiple formats are supported and not all specification variants or parameters " \
-                  "are presented here. Please refer to official CWL documentation for more details " \
-                  "(https://www.commonwl.org/)."
+CWL_DOC_MESSAGE = (
+    "Note that multiple formats are supported and not all specification variants or parameters "
+    "are presented here. Please refer to official CWL documentation for more details "
+    "(https://www.commonwl.org/)."
+)
 
-IO_INFO_IDS = "Identifier of the {first} {what}. To merge details between corresponding {first} and {second} " \
-              "{what} specifications, this is the value that will be used to associate them together."
+IO_INFO_IDS = (
+    "Identifier of the {first} {what}. To merge details between corresponding {first} and {second} "
+    "{what} specifications, this is the value that will be used to associate them together."
+)
 
 #########################################################
 # API tags
@@ -284,6 +288,7 @@ class LinkMeta(ExtendedMappingSchema):
 
 
 class Link(LinkLanguage, LinkMeta):
+    name = "Link"
     pass
 
 
@@ -304,6 +309,7 @@ class MetadataList(ExtendedSequenceSchema):
 
 class LinkList(ExtendedSequenceSchema):
     description = "List of links relative to the applicable object."
+    name = "Links"
     link = Link()
 
 
@@ -312,7 +318,7 @@ class LandingPage(ExtendedMappingSchema):
 
 
 class Format(ExtendedMappingSchema):
-    mimeType = ExtendedSchemaNode(String(), missing=drop)
+    mimeType = ExtendedSchemaNode(String())
     schema = ExtendedSchemaNode(String(), missing=drop)
     encoding = ExtendedSchemaNode(String(), missing=drop)
 
@@ -325,13 +331,24 @@ class FormatDefault(Format):
     mimeType = ExtendedSchemaNode(String(), default=CONTENT_TYPE_TEXT_PLAIN, example=CONTENT_TYPE_APP_JSON)
 
 
-class FormatDescription(FormatDefault):
+class FormatExtra(ExtendedMappingSchema):
     maximumMegabytes = ExtendedSchemaNode(Integer(), missing=drop)
     default = ExtendedSchemaNode(
         Boolean(), missing=drop, default=False,
         description="Indicate if this format should be considered as the default one in case none "
                     "of the other allowed/supported formats is matched against the job input."
     )
+
+
+class FormatDescription(FormatDefault, FormatExtra):
+    pass
+
+
+class FormatMedia(FormatExtra):
+    schema_ref = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/formatDescription.yaml"
+    mediaType = ExtendedSchemaNode(String())
+    schema = ExtendedSchemaNode(String(), missing=drop)
+    encoding = ExtendedSchemaNode(String(), missing=drop)
 
 
 class FormatDescriptionList(ExtendedSequenceSchema):
@@ -435,13 +452,20 @@ class LiteralReference(ExtendedMappingSchema):
     reference = URL()
 
 
-class DataTypeSchema(ExtendedMappingSchema):
-    name = ExtendedSchemaNode(String())
+class NameReferenceType(ExtendedMappingSchema):
+    schema_ref = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/nameReferenceType.yaml"
+    _name = ExtendedSchemaNode(String(), name="name")
     reference = URL(missing=drop)
 
 
-class UomSchema(DataTypeSchema):
-    pass
+class DataTypeSchema(NameReferenceType):
+    description = "Type of the literal data representation."
+    title = "Data Type"
+
+
+class UomSchema(NameReferenceType):
+    name = "uom"
+    title = "Unit of Measure"
 
 
 class AllowedValuesList(ExtendedSequenceSchema):
@@ -476,25 +500,59 @@ class ValuesReference(ExtendedMappingSchema):
     valueReference = URL()
 
 
-class LiteralDataDomainType(OneOfKeywordSchema):
+class AnyLiteralType(OneOfKeywordSchema):
+    """Items with 'data' key, only literal data.
+
+    .. note::
+        :class:`URL` is not here contrary to :class:`ValueTypeFormats`.
+
+    .. seealso::
+        - :class:`DataType`
+        - :class:`AnyType`
+    """
     _one_of = (
-        AllowedValues,
-        AllowedRanges,
-        ValuesReference,
-        AnyValue,  # must be last because it"s the most permissive (always valid)
+        ExtendedSchemaNode(Float()),
+        ExtendedSchemaNode(Integer()),
+        ExtendedSchemaNode(Boolean()),
+        ExtendedSchemaNode(String()),
     )
+
+
+class AnyLiteralDataType(ExtendedMappingSchema):
+    data = AnyLiteralType()
+
+
+class AnyLiteralValueType(ExtendedMappingSchema):
+    value = AnyLiteralType()
+
+
+class AnyLiteralDefaultType(ExtendedMappingSchema):
+    default = AnyLiteralType()
+
+
+class LiteralDataDomainDefinition(ExtendedMappingSchema):
+    default = AnyLiteralDefaultType()
     defaultValue = ExtendedSchemaNode(String(), missing=drop)
     dataType = DataTypeSchema(missing=drop)
     uom = UomSchema(missing=drop)
 
 
-class LiteralDataDomainTypeList(ExtendedSequenceSchema):
-    literalDataDomain = LiteralDataDomainType()
+class LiteralDataDomainConstraints(OneOfKeywordSchema, LiteralDataDomainDefinition):
+    _one_of = (
+        AllowedValues,
+        AllowedRanges,
+        ValuesReference,
+        AnyValue,  # must be last because it"s the most permissive (always valid, default)
+    )
+
+
+class LiteralDataDomainList(ExtendedSequenceSchema):
+    literalDataDomain = LiteralDataDomainConstraints()
 
 
 class LiteralInputType(NotKeywordSchema, ExtendedMappingSchema):
     _not = (WithFormats, )
-    literalDataDomains = LiteralDataDomainTypeList(missing=drop)
+    literalDataDomains = LiteralDataDomainList(missing=drop)
 
 
 class InputType(OneOfKeywordSchema, InputDescriptionType, WithMinMaxOccurs):
@@ -511,7 +569,7 @@ class InputTypeList(ExtendedSequenceSchema):
 
 class LiteralOutputType(NotKeywordSchema, ExtendedMappingSchema):
     _not = (WithFormats, )
-    literalDataDomains = LiteralDataDomainTypeList(missing=drop)
+    literalDataDomains = LiteralDataDomainList(missing=drop)
 
 
 class BoundingBoxOutputType(ExtendedMappingSchema):
@@ -1064,126 +1122,13 @@ class Reference(DataEncodingAttributes):
     bodyReference = URL(missing=drop)
 
 
-class DataInteger(ExtendedMappingSchema):
-    data = ExtendedSchemaNode(Integer())
-
-
-class DataBoolean(ExtendedMappingSchema):
-    data = ExtendedSchemaNode(Boolean())
-
-
-class DataString(ExtendedMappingSchema):
-    data = ExtendedSchemaNode(String())
-
-
-class DataFloat(ExtendedMappingSchema):
-    data = ExtendedSchemaNode(Float())
-
-
-class AnyDataTypeFormats(ExtendedMappingSchema):
-    """Items with 'data' key, only literal data.
-
-    .. note::
-        :class:`URL` is not here contrary to :class:`ValueTypeFormats`.
-
-    .. seealso::
-        - :class:`DataType`
-        - :class:`AnyType`
-    """
-    _any_of = (
-        DataFloat(),
-        DataInteger(),
-        DataBoolean(),
-        DataString(),
-        # ###ExtendedSchemaNode(Float()),  # before Integer because more restrictive Number format
-        # ###ExtendedSchemaNode(Integer()),  # before Boolean because bool can be interpreted using int
-        # ###ExtendedSchemaNode(Boolean()),
-        # ###ExtendedSchemaNode(String())
-    )
-
-
-# ##class DataType(DataEncodingAttributes):
-# ##   data = DataTypeFormats(description="Value provided by one of the accepted types.")
-
-
-class DefaultFloat(ExtendedMappingSchema):
-    default = ExtendedSchemaNode(Float())
-
-
-class DefaultInteger(ExtendedMappingSchema):
-    default = ExtendedSchemaNode(Integer())
-
-
-class DefaultBoolean(ExtendedMappingSchema):
-    default = ExtendedSchemaNode(Boolean())
-
-
-class DefaultString(ExtendedMappingSchema):
-    default = ExtendedSchemaNode(String())
-
-
-# ###class ValueTypeFormats(OneOfKeywordSchema):
-class AnyDefaultTypeFormats(AnyOfKeywordSchema):
-    """Default format, always 'default' key regardless of content."""
-    _any_of = (
-        DefaultString(),
-        DefaultBoolean(),
-        DefaultInteger(),
-        DefaultFloat(),
-    )
-
-
-class ValueFloat(ExtendedMappingSchema):
-    value = ExtendedSchemaNode(Float())
-
-
-class ValueInteger(ExtendedMappingSchema):
-    value = ExtendedSchemaNode(Integer())
-
-
-class ValueBoolean(ExtendedMappingSchema):
-    value = ExtendedSchemaNode(Boolean())
-
-
-class ValueString(ExtendedMappingSchema):
-    value = ExtendedSchemaNode(String())
-
-
-# ###class ValueTypeFormats(OneOfKeywordSchema):
-class AnyValueTypeFormats(AnyOfKeywordSchema):
-    """OGC-specific format, always 'value' key regardless of content.
-
-    .. seealso::
-        - :class:`ValueType`
-        - :class:`AnyType`
-    """
-    _any_of = (
-        ValueString(),
-        ValueBoolean(),
-        ValueInteger(),
-        ValueFloat(),
-        # ###ExtendedSchemaNode(Float()),  # before Integer because more restrictive Number format
-        # ###ExtendedSchemaNode(Integer()),  # before Boolean because bool can be interpreted using int
-        # ###ExtendedSchemaNode(Boolean()),
-        # ###ExtendedSchemaNode(String()),
-        # ###URL(),  # any-of will override previous string if URL validator succeeds because they have the same keys
-    )
-
-
-# ###class ValueType(ExtendedMappingSchema):
-# ###    value = ValueTypeFormats(description="Value provided by one of the accepted types.")
-
-
-# ###class AnyType(OneOfKeywordSchema):
-class AnyType(AnyOfKeywordSchema):
+class AnyType(OneOfKeywordSchema):
     """Permissive variants that we attempt to parse automatically."""
-    _any_of = (
+    _one_of = (
         # literal data with 'data' key
-        AnyDataTypeFormats(),
-        # ### DataType,
+        AnyLiteralDataType(),
         # same with 'value' key (OGC specification)
-        AnyValueTypeFormats(),
-        # ###ValueType,
+        AnyLiteralValueType(),
         # HTTP references with various keywords
         LiteralReference(),
         Reference(),
@@ -1241,7 +1186,7 @@ class QuoteSchema(ExtendedMappingSchema):
 
 
 class QuotationList(ExtendedSequenceSchema):
-    quote = ExtendedSchemaNode(String(), description="Bill ID.")
+    quote = ExtendedSchemaNode(String(), description="Quote ID.")
 
 
 class QuotationListSchema(ExtendedMappingSchema):
@@ -1281,8 +1226,10 @@ class CWLClass(ExtendedSchemaNode):
     name = "class"
     example = "CommandLineTool"
     validator = OneOf(["CommandLineTool", "ExpressionTool", "Workflow"])
-    description = "CWL class specification. This is used to differentiate between single Application Package (AP)" \
-                  "definitions and Workflow that chains multiple packages."
+    description = (
+        "CWL class specification. This is used to differentiate between single Application Package (AP)"
+        "definitions and Workflow that chains multiple packages."
+    )
 
 
 class RequirementClass(ExtendedSchemaNode):
@@ -1347,8 +1294,10 @@ class InitialWorkDirRequirementClass(InitialWorkDirRequirementSpecification):
 class BuiltinRequirementSpecification(PermissiveMappingSchema):
     name = "BuiltinRequirement"
     title = "BuiltinRequirement"
-    description = "Hint indicating that the Application Package corresponds to a builtin process of " \
-                  "this instance. (note: can only be an hint as it is unofficial CWL specification)."
+    description = (
+        "Hint indicating that the Application Package corresponds to a builtin process of "
+        "this instance. (note: can only be an hint as it is unofficial CWL specification)."
+    )
     process = AnyIdentifier()
 
 
@@ -1487,7 +1436,7 @@ class CWLInputBase(PermissiveMappingSchema):
 class CWLInputObject(AnyOfKeywordSchema, PermissiveMappingSchema):
     _any_of = [
         CWLInputBase(),
-        AnyDefaultTypeFormats(missing=drop),
+        AnyLiteralDefaultType(missing=drop),
     ]
 
 
@@ -1614,7 +1563,7 @@ class JobOutput(OneOfKeywordSchema, OutputDataType):
     id = UUID(description="Job output id corresponding to process description outputs.")
     _one_of = (
         Reference(),
-        AnyDataTypeFormats()
+        AnyLiteralDataType()
     )
 
 
@@ -1622,11 +1571,75 @@ class JobOutputList(ExtendedSequenceSchema):
     output = JobOutput(description="Job output result with specific keyword according to represented format.")
 
 
-class JobResultValue(AnyOfKeywordSchema):
-    _any_of = [
-        OutputDataType(),
-        AnyValueTypeFormats(description="Job outputs result conforming to OGC standard.")
+# implement only literal part of:
+#   https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/inlineOrRefData.yaml
+class ResultLiteral(AnyLiteralValueType, LiteralDataDomainDefinition):
+    name = "ResultLiteral"
+    # value = <AnyLiteralValueType>
+
+
+class ResultLiteralList(ExtendedSequenceSchema):
+    result = ResultLiteral()
+
+
+class ValueFormatted(ExtendedMappingSchema):
+    name = "ValueFormatted"
+    value = ExtendedSchemaNode(
+        String(),
+        example="<xml><data>test</data></xml>",
+        description="Formatted content value of the result."
+    )
+    format = FormatMedia()
+
+
+class ValueFormattedList(ExtendedSequenceSchema):
+    result = ValueFormatted()
+
+
+class ResultReference(ExtendedMappingSchema):
+    name = "ResultReference"
+    href = URL(description="Result file reference.")
+    format = FormatMedia()
+
+
+class ResultReferenceList(ExtendedSequenceSchema):
+    result = ResultReference()
+
+
+class ResultData(OneOfKeywordSchema):
+    schema_ref = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/result.yaml"
+    _one_of = [
+        # must place formatted value first since both value/format fields are simultaneously required
+        # other classes require only one of the two, and therefore are more permissive during schema validation
+        ValueFormatted(description="Result formatted content value."),
+        ValueFormattedList(description="Result formatted content of multiple values."),
+        ResultReference(description="Result reference location."),
+        ResultReferenceList(description="Result locations for multiple references."),
+        ResultLiteral(description="Result literal value."),
+        ResultLiteralList(description="Result list of literal values."),
     ]
+
+
+class Result(ExtendedMappingSchema):
+    """Result outputs obtained from a successful process job execution."""
+    example_ref = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/examples/json/Result.json"
+    output_id = ResultData(
+        variable="<output-id>", title="Output Identifier",
+        description=(
+            "Resulting value of the output that conforms to 'OGC-API - Processes' standard. "
+            "(Note: '<output-id>' is a variable corresponding for each output identifier of the process)"
+        )
+    )
+
+
+class JobInputsSchema(ExtendedMappingSchema):
+    inputs = InputList()
+    links = LinkList(missing=drop)
+
+
+class JobOutputsSchema(ExtendedMappingSchema):
+    outputs = JobOutputList()
+    links = LinkList(missing=drop)
 
 
 class JobException(ExtendedMappingSchema):
@@ -1636,11 +1649,11 @@ class JobException(ExtendedMappingSchema):
     Text = ExtendedSchemaNode(String())
 
 
-class JobExceptionList(ExtendedSequenceSchema):
+class JobExceptionsSchema(ExtendedSequenceSchema):
     exceptions = JobException()
 
 
-class JobLogList(ExtendedSequenceSchema):
+class JobLogsSchema(ExtendedSequenceSchema):
     log = ExtendedSchemaNode(String())
 
 
@@ -1692,9 +1705,9 @@ class ConformanceSchema(ExtendedMappingSchema):
     conformsTo = ConformanceList()
 
 
-# #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### ####
+#################################################################
 # Local Processes schemas
-# #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### ####
+#################################################################
 
 
 class PackageBody(ExtendedMappingSchema):
@@ -1833,9 +1846,9 @@ class PostProcessQuoteRequestEndpoint(ProcessPath, QuotePath):
     body = QuoteProcessParametersSchema()
 
 
-# #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### ####
+# ################################################################
 # Provider Processes schemas
-# #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### ####
+# ################################################################
 
 
 class GetProviders(ExtendedMappingSchema):
@@ -1862,9 +1875,9 @@ class PostProviderProcessJobRequest(ExtendedMappingSchema):
     body = Execute()
 
 
-# #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### ####
+# ################################################################
 # Responses schemas
-# #### #### #### #### #### #### #### #### #### #### #### #### #### #### #### ####
+# ################################################################
 
 class ErrorDetail(ExtendedMappingSchema):
     code = ExtendedSchemaNode(Integer(), description="HTTP status code.", example=400)
@@ -2146,38 +2159,23 @@ class InternalServerErrorGetJobStatusResponse(ExtendedMappingSchema):
     description = "Unhandled error occurred during provider process description."
 
 
-class Inputs(ExtendedMappingSchema):
-    inputs = InputList()
-    links = LinkList(missing=drop)
-
-
 class OkGetJobInputsResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
-    body = Inputs()
-
-
-class Outputs(ExtendedMappingSchema):
-    outputs = JobOutputList()
-    links = LinkList(missing=drop)
+    body = JobInputsSchema()
 
 
 class OkGetJobOutputsResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
-    body = Outputs()
+    body = JobOutputsSchema()
 
 
 class RedirectResultResponse(ExtendedMappingSchema):
     header = RedirectHeaders()
 
 
-class Results(ExtendedSequenceSchema):
-    """List of outputs obtained from a successful process job execution."""
-    result = JobResultValue()
-
-
 class OkGetJobResultsResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
-    body = Results()  # list is returned directly without extra metadata, OGC-standard
+    body = Result()
 
 
 class InternalServerErrorGetJobResultsResponse(ExtendedMappingSchema):
@@ -2244,7 +2242,7 @@ class InternalServerErrorGetBillListResponse(ExtendedMappingSchema):
 
 class OkGetJobExceptionsResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
-    body = JobExceptionList()
+    body = JobExceptionsSchema()
 
 
 class InternalServerErrorGetJobExceptionsResponse(ExtendedMappingSchema):
@@ -2253,7 +2251,7 @@ class InternalServerErrorGetJobExceptionsResponse(ExtendedMappingSchema):
 
 class OkGetJobLogsResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
-    body = JobLogList()
+    body = JobLogsSchema()
 
 
 class InternalServerErrorGetJobLogsResponse(ExtendedMappingSchema):
@@ -2468,10 +2466,6 @@ wps_responses = {
 #################################################################
 # Utility methods
 #################################################################
-
-
-def mark_deprecated(path):
-    pass
 
 
 def service_api_route_info(service_api, settings):

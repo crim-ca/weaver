@@ -183,7 +183,8 @@ def get_swagger_json(http_scheme="http", http_host="localhost",
         - :mod:`weaver.wps_restapi.swagger_definitions`
     """
     CorniceSwagger.type_converter = OAS3TypeConversionDispatcher
-    swagger = CorniceSwagger(get_services(), def_ref_depth=-1, param_ref=True)
+    # cannot use response references, swagger-ui doesn't handle them properly (none gets displayed)
+    swagger = CorniceSwagger(get_services(), def_ref_depth=-1, param_ref=True, resp_ref=True)
     # function docstrings are used to create the route's summary in Swagger-UI
     swagger.summary_docstrings = use_docstring_summary
     swagger_base_spec = {"schemes": [http_scheme]}
