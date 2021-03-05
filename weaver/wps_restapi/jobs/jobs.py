@@ -19,8 +19,9 @@ from weaver.exceptions import (
     ServiceNotFound,
     log_unhandled_exceptions
 )
-from weaver.formats import OUTPUT_FORMAT_JSON
+from weaver.formats import OUTPUT_FORMAT_JSON, CONTENT_TYPE_TEXT_PLAIN
 from weaver.owsexceptions import OWSNotFound
+from weaver.processes.convert import any2wps_literal_datatype
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import get_any_id, get_any_value, get_settings
 from weaver.visibility import VISIBILITY_PUBLIC
@@ -28,7 +29,7 @@ from weaver.wps.utils import get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
-    from typing import List, Optional, Tuple
+    from typing import List, Optional, Tuple, Union
     from pyramid.httpexceptions import HTTPException
     from weaver.typedefs import AnySettingsContainer, JSON
 
@@ -66,8 +67,8 @@ def get_job(request):
     return job
 
 
-def get_results(job, container, value_key=None):
-    # type: (Job, AnySettingsContainer, Optional[str]) -> List[JSON]
+def get_results(job, container, value_key=None, ogc_api=False):
+    # type: (Job, AnySettingsContainer, Optional[str], bool) -> Union[List[JSON], JSON]
     """
     Obtains the job results with extended full WPS output URL as applicable and according to configuration settings.
 
@@ -76,25 +77,58 @@ def get_results(job, container, value_key=None):
     :param value_key:
         If not specified, the returned values will have the appropriate ``data``/``href`` key according to the content.
         Otherwise, all values will have the specified key.
+    :param ogc_api:
+        If ``True``, formats the results using the ``OGC-API - Processes`` format.
     :returns: list of all outputs each with minimally an ID and value under the requested key.
     """
+    process = None  # fetch process only if needed
     wps_url = get_wps_output_url(container)
     if not wps_url.endswith("/"):
         wps_url = wps_url + "/"
-    outputs = []
+    outputs = {} if ogc_api else []
+    fmt_key = "mediaType" if ogc_api else "mimeType"
     for result in job.results:
         rtype = "data" if any(k in result for k in ["data", "value"]) else "href"
         value = get_any_value(result)
+        out_id = get_any_id(result)
+        out_key = rtype
         if rtype == "href":
             value = wps_url + str(value).lstrip("/")
-        output_key = value_key if value_key else rtype
-        output = {"id": get_any_id(result), output_key: value}
+        elif ogc_api:
+            out_key = "value"
+        elif value_key:
+            out_key = value_key
+        output = {out_key: value}
         if "mimeType" in result:  # required for the rest to be there, other fields optional
-            output["format"] = {"mimeType": result["mimeType"]}
+            output["format"] = {fmt_key: result["mimeType"]}
             for field in ["encoding", "schema"]:
                 if field in result:
                     output["format"][field] = result[field]
-        outputs.append(output)
+        elif rtype == "href":
+            # default in case format is incorrectly missing when required
+            output["format"] = {fmt_key: CONTENT_TYPE_TEXT_PLAIN}
+        else:
+            # literal data
+            # FIXME: BoundingBox not implemented (https://github.com/crim-ca/weaver/issues/51)
+            dtype = result.get("dataType", any2wps_literal_datatype(value, is_value=True) or "string")
+            if ogc_api:
+                output["dataType"] = {"name": dtype}
+            else:
+                output["dataType"] = dtype
+
+        if ogc_api:
+            if out_id in outputs:
+                output_list = outputs[out_id]
+                if not isinstance(output_list, list):
+                    output_list = [output_list]
+                output_list.append(output)
+                outputs[out_id] = output_list
+            else:
+                outputs[out_id] = output
+        else:
+            # if ordered insert supported by python version, insert ID first
+            output = dict([("id", out_id)] + list(output.items()))  # noqa
+            outputs.append(output)
     return outputs
 
 
@@ -295,7 +329,7 @@ def get_job_results(request):
             "code": "ResultsNotReady",
             "description": "Job status is '{}'. Results are not yet available.".format(job_status)
         })
-    results = get_results(job, request, value_key="value")
+    results = get_results(job, request, value_key="value", ogc_api=True)
     return HTTPOk(json=results)
 
 
