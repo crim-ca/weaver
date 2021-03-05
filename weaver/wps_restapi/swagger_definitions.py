@@ -25,10 +25,12 @@ from weaver.execute import (
 from weaver.formats import (
     ACCEPT_LANGUAGE_EN_CA,
     ACCEPT_LANGUAGES,
+    CONTENT_TYPE_ANY,
     CONTENT_TYPE_APP_JSON,
     CONTENT_TYPE_APP_XML,
     CONTENT_TYPE_TEXT_HTML,
-    CONTENT_TYPE_TEXT_PLAIN
+    CONTENT_TYPE_TEXT_PLAIN,
+    CONTENT_TYPE_TEXT_XML
 )
 from weaver.owsexceptions import OWSMissingParameterValue
 from weaver.processes.convert import PACKAGE_TYPE_FIELD_VALUES
@@ -206,19 +208,50 @@ class Version(ExtendedSchemaNode):
     pattern = r"^\d+(\.\d+(\.\d+(\.[a-zA-Z0-9\-_]+)*)*)*$"
 
 
+class ContentTypeHeader(ExtendedSchemaNode):
+    # ok to use 'name' in this case because target 'key' in the mapping must
+    # be that specific value but cannot have a field named with this format
+    name = "Content-Type"
+    schema_type = String
+
+
+class AcceptHeader(ExtendedSchemaNode):
+    # ok to use 'name' in this case because target 'key' in the mapping must
+    # be that specific value but cannot have a field named with this format
+    name = "Accept"
+    schema_type = String
+    # FIXME: raise HTTPNotAcceptable in not one of those?
+    validator = OneOf([
+        CONTENT_TYPE_APP_JSON,
+        CONTENT_TYPE_APP_XML,
+        CONTENT_TYPE_TEXT_XML,
+        CONTENT_TYPE_TEXT_HTML,
+        CONTENT_TYPE_TEXT_PLAIN,
+        CONTENT_TYPE_ANY,
+    ])
+    missing = drop
+    default = CONTENT_TYPE_APP_JSON  # defaults to JSON for easy use within browsers
+
+
+class AcceptLanguageHeader(ExtendedSchemaNode):
+    # ok to use 'name' in this case because target 'key' in the mapping must
+    # be that specific value but cannot have a field named with this format
+    name = "Accept-Language"
+    schema_type = String
+    default = ACCEPT_LANGUAGE_EN_CA
+    # FIXME: oneOf validator for supported languages (?)
+
+
 class JsonHeader(ExtendedMappingSchema):
-    content_type = ExtendedSchemaNode(String(), example=CONTENT_TYPE_APP_JSON, default=CONTENT_TYPE_APP_JSON)
-    content_type.name = "Content-Type"
+    content_type = ContentTypeHeader(example=CONTENT_TYPE_APP_JSON, default=CONTENT_TYPE_APP_JSON)
 
 
 class HtmlHeader(ExtendedMappingSchema):
-    content_type = ExtendedSchemaNode(String(), example=CONTENT_TYPE_TEXT_HTML, default=CONTENT_TYPE_TEXT_HTML)
-    content_type.name = "Content-Type"
+    content_type = ContentTypeHeader(example=CONTENT_TYPE_TEXT_HTML, default=CONTENT_TYPE_TEXT_HTML)
 
 
 class XmlHeader(ExtendedMappingSchema):
-    content_type = ExtendedSchemaNode(String(), example=CONTENT_TYPE_APP_XML, default=CONTENT_TYPE_APP_XML)
-    content_type.name = "Content-Type"
+    content_type = ContentTypeHeader(example=CONTENT_TYPE_APP_XML, default=CONTENT_TYPE_APP_XML)
 
 
 class RequestContentTypeHeader(OneOfKeywordSchema):
@@ -236,21 +269,10 @@ class ResponseContentTypeHeader(OneOfKeywordSchema):
     )
 
 
-class AcceptHeader(ExtendedMappingSchema):
-    Accept = ExtendedSchemaNode(String(), missing=drop, default=CONTENT_TYPE_APP_JSON, validator=OneOf([
-        CONTENT_TYPE_APP_JSON,
-        CONTENT_TYPE_APP_XML,
-        # CONTENT_TYPE_TEXT_HTML,   # defaults to JSON for easy use within browsers
-    ]))
-
-
-class AcceptLanguageHeader(ExtendedMappingSchema):
-    AcceptLanguage = ExtendedSchemaNode(String(), missing=drop)
-    AcceptLanguage.name = "Accept-Language"
-
-
-class RequestHeaders(AcceptHeader, AcceptLanguageHeader, RequestContentTypeHeader):
+class RequestHeaders(RequestContentTypeHeader):
     """Headers that can indicate how to adjust the behavior and/or result the be provided in the response."""
+    accept = AcceptHeader()
+    accept_language = AcceptLanguageHeader()
 
 
 class ResponseHeaders(ResponseContentTypeHeader):
@@ -288,7 +310,6 @@ class LinkMeta(ExtendedMappingSchema):
 
 
 class Link(LinkLanguage, LinkMeta):
-    name = "Link"
     pass
 
 
@@ -318,6 +339,7 @@ class LandingPage(ExtendedMappingSchema):
 
 
 class Format(ExtendedMappingSchema):
+    title = "Format"
     mimeType = ExtendedSchemaNode(String())
     schema = ExtendedSchemaNode(String(), missing=drop)
     encoding = ExtendedSchemaNode(String(), missing=drop)
@@ -454,18 +476,17 @@ class LiteralReference(ExtendedMappingSchema):
 
 class NameReferenceType(ExtendedMappingSchema):
     schema_ref = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/nameReferenceType.yaml"
-    _name = ExtendedSchemaNode(String(), name="name")
+    name = ExtendedSchemaNode(String())
     reference = URL(missing=drop)
 
 
 class DataTypeSchema(NameReferenceType):
     description = "Type of the literal data representation."
-    title = "Data Type"
+    title = "DataType"
 
 
 class UomSchema(NameReferenceType):
-    name = "uom"
-    title = "Unit of Measure"
+    title = "UnitOfMeasure"
 
 
 class AllowedValuesList(ExtendedSequenceSchema):
@@ -501,14 +522,11 @@ class ValuesReference(ExtendedMappingSchema):
 
 
 class AnyLiteralType(OneOfKeywordSchema):
-    """Items with 'data' key, only literal data.
-
-    .. note::
-        :class:`URL` is not here contrary to :class:`ValueTypeFormats`.
-
+    """
     .. seealso::
-        - :class:`DataType`
-        - :class:`AnyType`
+        - :class:`AnyLiteralDataType`
+        - :class:`AnyLiteralValueType`
+        - :class:`AnyLiteralDefaultType`
     """
     _one_of = (
         ExtendedSchemaNode(Float()),
@@ -771,8 +789,12 @@ class WPSBody(ExtendedMappingSchema):
     content = ExtendedSchemaNode(String(), description="XML data inputs provided for WPS POST request.")
 
 
+class WPSHeaders(ExtendedMappingSchema):
+    accept = AcceptHeader(missing=drop)
+
+
 class WPSEndpoint(ExtendedMappingSchema):
-    header = AcceptHeader()
+    header = WPSHeaders()
     querystring = WPSParameters()
     body = WPSBody()
 
@@ -1116,8 +1138,10 @@ class DataEncodingAttributes(Format):
     pass
 
 
-class Reference(DataEncodingAttributes):
+class Reference(ExtendedMappingSchema):
+    title = "Reference"
     href = URL(description="Endpoint of the reference.")
+    format = DataEncodingAttributes(missing=drop)
     body = ExtendedSchemaNode(String(), missing=drop)
     bodyReference = URL(missing=drop)
 
@@ -1221,9 +1245,11 @@ class DefaultValues(ExtendedMappingSchema):
 
 
 class CWLClass(ExtendedSchemaNode):
-    schema_type = String
-    title = "Class"
+    # in this case it is ok to use 'name' because target fields receiving it will
+    # never be able to be named 'class' because of Python reserved keyword
     name = "class"
+    title = "Class"
+    schema_type = String
     example = "CommandLineTool"
     validator = OneOf(["CommandLineTool", "ExpressionTool", "Workflow"])
     description = (
@@ -1233,9 +1259,11 @@ class CWLClass(ExtendedSchemaNode):
 
 
 class RequirementClass(ExtendedSchemaNode):
-    schema_type = String
-    title = "RequirementClass"
+    # in this case it is ok to use 'name' because target fields receiving it will
+    # never be able to be named 'class' because of Python reserved keyword
     name = "class"
+    title = "RequirementClass"
+    schema_type = String
     description = "CWL requirement class specification."
 
 
@@ -1253,13 +1281,11 @@ class DockerRequirementMap(ExtendedMappingSchema):
 
 
 class DockerRequirementClass(DockerRequirementSpecification):
-    name = "DockerRequirementClass"
     title = "DockerRequirementClass"
     _class = RequirementClass(example="DockerRequirement", validator=OneOf(["DockerRequirement"]))
 
 
 class DockerGpuRequirementSpecification(DockerRequirementSpecification):
-    name = "DockerGpuRequirement"
     title = "DockerGpuRequirement"
     description = (
         "Docker requirement with GPU-enabled support (https://github.com/NVIDIA/nvidia-docker). "
@@ -1272,13 +1298,11 @@ class DockerGpuRequirementMap(ExtendedMappingSchema):
 
 
 class DockerGpuRequirementClass(DockerGpuRequirementSpecification):
-    name = "DockerGpuRequirementClass"
     title = "DockerGpuRequirementClass"
     _class = RequirementClass(example="DockerGpuRequirement", validator=OneOf(["DockerGpuRequirement"]))
 
 
 class InitialWorkDirRequirementSpecification(PermissiveMappingSchema):
-    name = "InitialWorkDirRequirement"
     title = "InitialWorkDirRequirement"
     listing = PermissiveMappingSchema()
 
@@ -1292,7 +1316,6 @@ class InitialWorkDirRequirementClass(InitialWorkDirRequirementSpecification):
 
 
 class BuiltinRequirementSpecification(PermissiveMappingSchema):
-    name = "BuiltinRequirement"
     title = "BuiltinRequirement"
     description = (
         "Hint indicating that the Application Package corresponds to a builtin process of "
@@ -1378,6 +1401,8 @@ class CWLArguments(ExtendedSequenceSchema):
 
 class CWLTypeString(ExtendedSchemaNode):
     schema_type = String
+    # in this case it is ok to use 'name' because target fields receiving it will
+    # cause issues against builtin 'type' of Python reserved keyword
     name = "type"
     title = "Type"
     description = "Field type definition."
@@ -1560,11 +1585,9 @@ class ProcessesSchema(ExtendedSequenceSchema):
 
 
 class JobOutput(OneOfKeywordSchema, OutputDataType):
-    title = "JobOutput"
-    id = UUID(description="Job output id corresponding to process description outputs.")
     _one_of = (
-        Reference(),
-        AnyLiteralDataType()
+        Reference(tilte="JobOutputReference"),
+        AnyLiteralDataType(title="JobOutputLiteral")
     )
 
 
@@ -1576,8 +1599,8 @@ class JobOutputList(ExtendedSequenceSchema):
 # implement only literal part of:
 #   https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/inlineOrRefData.yaml
 class ResultLiteral(AnyLiteralValueType, LiteralDataDomainDefinition):
-    name = "ResultLiteral"
     # value = <AnyLiteralValueType>
+    pass
 
 
 class ResultLiteralList(ExtendedSequenceSchema):
@@ -1585,7 +1608,6 @@ class ResultLiteralList(ExtendedSequenceSchema):
 
 
 class ValueFormatted(ExtendedMappingSchema):
-    name = "ValueFormatted"
     value = ExtendedSchemaNode(
         String(),
         example="<xml><data>test</data></xml>",
@@ -1599,7 +1621,6 @@ class ValueFormattedList(ExtendedSequenceSchema):
 
 
 class ResultReference(ExtendedMappingSchema):
-    name = "ResultReference"
     href = URL(description="Result file reference.")
     format = FormatMedia()
 

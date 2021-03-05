@@ -125,7 +125,24 @@ class ExtendedSchemaMeta(colander._SchemaMeta):
 
 
 class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
-    pass
+    """
+    Utility base node definition that insert itself at creation time of any other schema.
+
+    When no explicit ``title`` is specified by either keyword argument or field definition within container class,
+    default it to the literal name of the class defining the schema node. This title can then be employed by other
+    extended schema implementations to define *cleaner* schema references, notably in the case of
+    :class:`KeywordMapper` derived classes that do not necessarily have any explicit target ``name`` field.
+
+    When the schema node is a simple field within a container schema (mapping, sequence, etc.), operation is skipped
+    to avoid applying the generic ``SchemaNode`` or ``ExtendedSchemaNode`` name of the basic node class. In this case,
+    converters already employ the target ``name`` of the class attribute of the container schema under which that node
+    gets created.
+    """
+    def __init__(self, *args, **kwargs):
+        if _get_schema_type(self, check=True) in [colander.Mapping, colander.Sequence]:
+            if self.title in ["", colander.required] and not kwargs.get("title"):
+                kwargs["title"] = _get_node_name(self, schema_name=True)
+        super(ExtendedSchemaBase, self).__init__(*args, **kwargs)
 
 
 class DropableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
@@ -809,6 +826,10 @@ class OneOfKeywordSchema(KeywordMapper):
     ``oneOf/allOf`` classes expansion manually though, it will result into the same specification.
 
     .. warning::
+        When ``oneOf/allOf`` automatic expansion occurs during schema generation
+
+
+    .. warning::
         When calling :meth:`deserialize`, because the validation process requires **exactly one**
         of the variants to succeed to consider the whole object to evaluate as valid, it is
         important to insert *more permissive* validators later in the ``_one_of`` iterator (or
@@ -1123,20 +1144,30 @@ class OneOfKeywordTypeConverter(KeywordTypeConverter):
             keyword: []
         }
 
-        for item_schema in schema_node.get_keyword_items():
+        for i, item_schema in enumerate(schema_node.get_keyword_items()):
             item_obj = _make_node_instance(item_schema)
-            # shortcut definition of oneOf/allOf mix, see OneOfKeywordSchema docstring)
+            # shortcut definition of oneOf[allOf[],allOf[]] mix, see OneOfKeywordSchema docstring
             # (eg: schema fields always needed regardless of other fields supplied by each oneOf schema)
             if len(getattr(schema_node, "children", [])):
                 if not isinstance(schema_node, colander.MappingSchema):
                     raise ConversionTypeError(
                         "Unknown base type to convert oneOf schema item is no a mapping: {}".format(type(schema_node))
                     )
-                # un-specialize the keyword schema to base schema (otherwise we recurse)
-                # other item can only be an object, otherwise something wrong happened
-                obj_no_one_of = colander.MappingSchema()
-                obj_no_one_of.children = schema_node.children
-                all_of = AllOfKeywordSchema(_all_of=[obj_no_one_of, item_obj])
+                # generate the new nested definition of keywords using schema node bases and children
+                item_title = _get_node_name(item_obj, schema_name=True)
+                # fields that are required and shared across all the oneOf sub-items
+                # pass down the original title of that object to refer to that schema reference
+                obj_req_share = ExtendedMappingSchema(title=item_title)
+                obj_req_share.children = schema_node.children
+                # specific oneOf sub-item, will be processed by itself during dispatch of sub-item of allOf
+                # rewrite the title of that new sub-item schema from the original to avoid conflict
+                schema_title = _get_node_name(schema_node, schema_name=True)
+                obj_one_of = item_obj.clone()
+                # NOTE: to avoid potential conflict of schema reference with other existing ones,
+                #       use an invalid character that cannot exist in schema class name defining titles
+                obj_one_of.title = schema_title + "." + item_title
+                obj_req_title = item_title + "All"
+                all_of = AllOfKeywordSchema(title=obj_req_title, _all_of=[obj_req_share, obj_one_of])
                 obj_converted = self.dispatcher(all_of)
             else:
                 obj_converted = self.dispatcher(item_obj)
@@ -1325,19 +1356,25 @@ def _make_node_instance(schema_node_or_class):
     return schema_node_or_class
 
 
-def _get_schema_type(schema_node):
-    # type: (Union[colander.SchemaNode, Type[colander.SchemaNode], ExtendedSchemaNode]) -> colander.SchemaType
+def _get_schema_type(schema_node, check=False):
+    # type: (Union[colander.SchemaNode, Type[colander.SchemaNode], ExtendedSchemaNode]) -> Optional[colander.SchemaType]
     """Obtains the schema-type from the provided node, supporting various initialization methods.
-
 
     - ``typ`` is set by an instantiated node from specific schema (e.g.: ``colander.SchemaNode(colander.String())``)
     - ``schema_type`` can also be provided, either by type or instance if using class definition with property
+
+    :param schema_node: item to analyse
+    :param check: only attempt to retrieve the schema type, and if failing return ``None``
+    :returns: found schema type
+    :raises ConversionTypeError: if no ``check`` requested and schema type cannot be found (invalid schema node)
     """
     schema_node = _make_node_instance(schema_node)
     schema_type = getattr(schema_node, "typ", getattr(schema_node, "schema_type"))
     if isinstance(schema_type, type):
         schema_type = schema_type()  # only type instead of object, instantiate with default since no parameters anyway
     if not isinstance(schema_type, colander.SchemaType):
+        if check:
+            return None
         raise ConversionTypeError("Invalid schema type could not be detected: {!s}".format(type(schema_type)))
     return schema_type
 
