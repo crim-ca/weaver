@@ -789,9 +789,9 @@ class OneOfKeywordSchema(KeywordMapper):
             _one_of = (Variant1, Variant2)
             [...alternatively, field required by all variants here...]
 
-    In the above example, the validation (ie: ``deserialize``) process will succeed if any of
+    In the above example, the validation (ie: ``deserialize``) process will succeed if only one of
     the ``_one_of`` variants' validator completely succeed, and will fail if every variant fails
-    validation execution.
+    validation execution. The operation will also fail if more than one validation succeeds.
 
     .. note::
         Class ``OneOfWithRequiredFields`` in the example is a shortcut variant to generate a
@@ -805,7 +805,7 @@ class OneOfKeywordSchema(KeywordMapper):
     This is both painful to read and is a lot of extra code to write when you actually expand it
     all into classes (each ``oneOf/allOf`` is another class). Class :class:`OneOfKeywordSchema`
     will actually simplify this by automatically making the ``allOf`` definitions for you if it
-    detects other schema nodes than ``oneOf`` specified in the class. You can still do the full
+    detects other schema nodes than ``oneOf`` specified in the class bases. You can still do the full
     ``oneOf/allOf`` classes expansion manually though, it will result into the same specification.
 
     .. warning::
@@ -830,7 +830,7 @@ class OneOfKeywordSchema(KeywordMapper):
             name = ExtendedSchemaNode(String())
             type = ExtendedSchemaNode(String())  # with explicit definition, this shouldn't be here
 
-            ## With explicit definitions, each below 'Animal' class should define as follows
+            ## With explicit definitions, each below 'Animal' class should be defined as follows
             ## type = ExtendedSchemaNode(String(), validator=colander.OneOf(['<animal>']))
 
         class Cat(Animal):
@@ -854,8 +854,8 @@ class OneOfKeywordSchema(KeywordMapper):
         Class :class:`PermissiveMappingSchema` can also be considered if validation of
         the sub-schemas is not strictly required.
 
-    When multiple valid schemas are matched against, the error will be raised and returned with
-    corresponding elements (fully listed).
+    When multiple valid schemas are matched against the input data, the error will be
+    raised and returned with corresponding erroneous elements for each sub-schema (fully listed).
 
     .. seealso::
         - :class:`AllOfKeywordSchema`
@@ -1126,16 +1126,16 @@ class OneOfKeywordTypeConverter(KeywordTypeConverter):
         for item_schema in schema_node.get_keyword_items():
             item_obj = _make_node_instance(item_schema)
             # shortcut definition of oneOf/allOf mix, see OneOfKeywordSchema docstring)
-            # (eg: other schema fields always needed regardless of additional ones by oneOf)
+            # (eg: schema fields always needed regardless of other fields supplied by each oneOf schema)
             if len(getattr(schema_node, "children", [])):
-                obj_no_one_of = item_obj.clone()  # type: OneOfKeywordSchema
+                if not isinstance(schema_node, colander.MappingSchema):
+                    raise ConversionTypeError(
+                        "Unknown base type to convert oneOf schema item is no a mapping: {}".format(type(schema_node))
+                    )
                 # un-specialize the keyword schema to base schema (otherwise we recurse)
                 # other item can only be an object, otherwise something wrong happened
-                if isinstance(obj_no_one_of, colander.MappingSchema):
-                    obj_no_one_of = colander.MappingSchema(obj_no_one_of)
-                else:
-                    raise ConversionTypeError(
-                        "Unknown base type to convert oneOf schema item: {}".format(type(obj_no_one_of)))
+                obj_no_one_of = colander.MappingSchema()
+                obj_no_one_of.children = schema_node.children
                 all_of = AllOfKeywordSchema(_all_of=[obj_no_one_of, item_obj])
                 obj_converted = self.dispatcher(all_of)
             else:

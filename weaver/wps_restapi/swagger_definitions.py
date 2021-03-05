@@ -309,7 +309,7 @@ class MetadataList(ExtendedSequenceSchema):
 
 class LinkList(ExtendedSequenceSchema):
     description = "List of links relative to the applicable object."
-    name = "Links"
+    title = "Links"
     link = Link()
 
 
@@ -398,7 +398,7 @@ class DescriptionType(ExtendedMappingSchema):
     owsContext = OWSContext(missing=drop, title="owsContext")
     metadata = MetadataList(missing=drop)
     additionalParameters = AdditionalParametersList(missing=drop, title="additionalParameters")
-    links = LinkList(missing=drop, title="links")
+    links = LinkList(missing=drop)
 
 
 class AnyOccursType(OneOfKeywordSchema):
@@ -1560,6 +1560,7 @@ class ProcessesSchema(ExtendedSequenceSchema):
 
 
 class JobOutput(OneOfKeywordSchema, OutputDataType):
+    title = "JobOutput"
     id = UUID(description="Job output id corresponding to process description outputs.")
     _one_of = (
         Reference(),
@@ -1568,6 +1569,7 @@ class JobOutput(OneOfKeywordSchema, OutputDataType):
 
 
 class JobOutputList(ExtendedSequenceSchema):
+    title = "JobOutputList"
     output = JobOutput(description="Job output result with specific keyword according to represented format.")
 
 
