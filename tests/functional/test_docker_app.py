@@ -73,13 +73,24 @@ class WpsPackageDockerAppTest(WpsPackageConfigBase):
         info = cls.deploy_process(body)
         return info
 
-    def validate_outputs(self, job_id, result_payload, result_file_content):
-        # check that output is HTTP reference to file
-        output_values = {out["id"]: get_any_value(out) for out in result_payload["outputs"]}
-        assert len(output_values) == 1
+    def validate_outputs(self, job_id, result_payload, outputs_payload, result_file_content):
+        # get generic details
         wps_uuid = self.job_store.fetch_by_id(job_id).wps_id
         wps_out_path = "{}{}".format(self.settings["weaver.url"], self.settings["weaver.wps_output_path"])
         wps_output = "{}/{}/{}".format(wps_out_path, wps_uuid, self.out_file)
+
+        # --- validate /results path format ---
+        assert len(result_payload) == 1
+        assert isinstance(result_payload, dict)
+        assert isinstance(result_payload[self.out_key], dict)
+        result_values = {out_id: get_any_value(result_payload[out_id]) for out_id in result_payload}
+        assert result_values[self.out_key] == wps_output
+
+        # --- validate /outputs path format ---
+
+        # check that output is HTTP reference to file
+        output_values = {out["id"]: get_any_value(out) for out in outputs_payload["outputs"]}
+        assert len(output_values) == 1
         assert output_values[self.out_key] == wps_output
 
         # check that actual output file was created in expected location along with XML job status
@@ -153,9 +164,10 @@ class WpsPackageDockerAppTest(WpsPackageConfigBase):
             job_id = resp.json["jobID"]
 
             # job monitoring
-            result = self.monitor_job(status_url)
+            results = self.monitor_job(status_url)
+            outputs = self.app.get(status_url + "/outputs").json
 
-        self.validate_outputs(job_id, result, test_content)
+        self.validate_outputs(job_id, results, outputs, test_content)
 
     def wps_execute(self, version, accept):
         wps_url = get_wps_url(self.settings)
@@ -218,9 +230,10 @@ class WpsPackageDockerAppTest(WpsPackageConfigBase):
             assert job_id
 
             # job monitoring
-            result = self.monitor_job(status_url)
+            results = self.monitor_job(status_url)
+            outputs = self.app.get(status_url + "/outputs").json
 
-        self.validate_outputs(job_id, result, test_content)
+        self.validate_outputs(job_id, results, outputs, test_content)
 
     def test_execute_wps_kvp_get_resp_xml(self):
         """
