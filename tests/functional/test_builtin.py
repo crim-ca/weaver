@@ -2,6 +2,7 @@ import contextlib
 import json
 import os
 import tempfile
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -10,6 +11,9 @@ from tests.utils import get_settings_from_testapp, mocked_execute_process, mocke
 from weaver.execute import EXECUTE_TRANSMISSION_MODE_REFERENCE
 from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_NETCDF
 from weaver.processes.builtin import register_builtin_processes
+
+if TYPE_CHECKING:
+    from weaver.typedefs import JSON
 
 
 @pytest.mark.functional
@@ -81,8 +85,18 @@ class BuiltinAppTest(WpsPackageConfigBase):
         assert resp.content_type in CONTENT_TYPE_APP_JSON
         job_url = resp.json["location"]
         results = self.monitor_job(job_url)
-        assert results["outputs"][0]["id"] == "output"
-        nc_path = results["outputs"][0]["href"]
+
+        # first validate format of OGC-API results
+        assert "output" in results, "Expected result ID 'output' in response body"
+        assert isinstance(results["output"], dict), "Container of result ID 'output' should be a dict"
+        assert "href" in results["output"]
+        assert "format" in results["output"]
+        fmt = results["output"]["format"]  # type: JSON
+        assert isinstance(fmt, dict), "Result format should be provided with content details"
+        assert "mediaType" in fmt
+        assert isinstance(fmt["mediaType"], str), "Result format Content-Type should be a single string definition"
+        assert fmt["mediaType"] == CONTENT_TYPE_APP_NETCDF, "Result 'output' format expected to be NetCDF file"
+        nc_path = results["output"]["href"]
         assert isinstance(nc_path, str) and len(nc_path)
         settings = get_settings_from_testapp(self.app)
         wps_out = "{}{}".format(settings.get("weaver.url"), settings.get("weaver.wps_output_path"))
@@ -92,3 +106,14 @@ class BuiltinAppTest(WpsPackageConfigBase):
         assert os.path.isfile(nc_real_path)
         with open(nc_real_path, "r") as f:
             assert f.read() == nc_data
+
+        # if everything was valid for results, validate equivalent but differently formatted outputs response
+        output_url = job_url + "/outputs"
+        resp = self.app.get(output_url, headers=self.json_headers)
+        assert resp.status_code == 200, "Error job outputs:\n{}".format(resp.json)
+        outputs = resp.json
+        assert outputs["outputs"][0]["id"] == "output"
+        nc_path = outputs["outputs"][0]["href"]
+        assert isinstance(nc_path, str) and len(nc_path)
+        assert nc_path.startswith(wps_out)
+        assert os.path.split(nc_real_path)[-1] == os.path.split(nc_path)[-1]

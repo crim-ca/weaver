@@ -190,8 +190,10 @@ def execute_process(self, job_id, url, headers=None):
                 job_msg = (execution.statusMessage or "").strip()
                 job.response = execution.response
                 job.status = map_status(execution.getStatus())
-                job.status_message = "Job execution monitoring (progress: {}%, status: {})."\
-                                     .format(execution.percentCompleted, job_msg or "n/a")
+                job.status_message = (
+                    "Job execution monitoring (progress: {}%, status: {})."
+                    .format(execution.percentCompleted, job_msg or "n/a")
+                )
                 # job.save_log(logger=task_logger)
                 # job = store.update_job(job)
 

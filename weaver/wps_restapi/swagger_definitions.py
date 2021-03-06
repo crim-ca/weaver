@@ -355,18 +355,20 @@ class FormatDefault(Format):
 
 class FormatExtra(ExtendedMappingSchema):
     maximumMegabytes = ExtendedSchemaNode(Integer(), missing=drop)
-    default = ExtendedSchemaNode(
-        Boolean(), missing=drop, default=False,
-        description="Indicate if this format should be considered as the default one in case none "
-                    "of the other allowed/supported formats is matched against the job input."
-    )
 
 
 class FormatDescription(FormatDefault, FormatExtra):
-    pass
+    default = ExtendedSchemaNode(
+        Boolean(), missing=drop, default=False,
+        description=(
+            "Indicates if this format should be considered as the default one in case none of the other "
+            "allowed or supported formats was matched nor provided as input during job submission."
+        )
+    )
 
 
 class FormatMedia(FormatExtra):
+    """Format employed for reference results respecting 'OGC-API - Processes' schemas."""
     schema_ref = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/formatDescription.yaml"
     mediaType = ExtendedSchemaNode(String())
     schema = ExtendedSchemaNode(String(), missing=drop)

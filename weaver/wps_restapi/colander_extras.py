@@ -47,7 +47,10 @@ complementary support of one-another features.
     most mapping will fail validation as they cannot retrieve the same key-name
     from the passed dictionary for ``deserialize`` validation. Let the API
     figure out the name of the field automatically. Instead, use the keyword
-    ``title`` for adjusting the displayed name in the Swagger UI.
+    or field ``title`` for adjusting the displayed name in the Swagger UI.
+    The same value will also be used to generate the ``$ref`` reference names
+    of generated OpenAPI model definitions. If not explicitly provided, the
+    value of ``title`` **WILL** default to the name of the schema node class.
 
 """
 import inspect
@@ -248,8 +251,8 @@ class DefaultSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
     def _deserialize_impl(self, cstruct):
         if not getattr(self, DefaultSchemaNode._extension, False):
             return cstruct
-        # if cstruct is colander.null and self.required and self.default in (colander.null, colander.drop):
-        #    raise colander.Invalid(node=self, msg="Missing value for required field without any default.")
+        if cstruct is colander.null and self.required and self.default in (colander.null, colander.drop):
+            raise colander.Invalid(node=self, msg="Missing value for required field without any default.")
         # if nothing to process in structure, ask to remove (unless picked by default)
         result = colander.drop
         if cstruct is not colander.null:
@@ -336,7 +339,14 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
 
     @classmethod
     def is_variable(cls, node):
+        """If current node is the variable field definition."""
         return getattr(node, cls._variable, None) is not None
+
+    def has_variables(self):
+        """If the current container schema node has sub-node variables."""
+        if isinstance(_get_schema_type(self), colander.Mapping):
+            return any(VariableSchemaNode.is_variable(node) for node in self.children)
+        return False
 
     @staticmethod
     def schema_type():
@@ -438,7 +448,7 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
                 )
 
             var_invalid = colander.Invalid(
-                node=self, msg="Requirement not met under variable: {}.".format(var)
+                node=self, msg="Requirement not met under variable: {}.".format(var), value=cstruct,
             )
             # attempt to find any sub-node matching the sub-schema under variable
             for child_key, child_cstruct in cstruct.items():
@@ -526,6 +536,10 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
             # need to discriminate between them
             # empty container means that none of the sub-schemas/fields where matched against input structure
             if isinstance(schema_type, colander.Mapping):
+                # skip already preprocessed variable mapping from above VariableSchemaNode deserialize
+                # otherwise, following 'normal' schema deserialize could convert valid structure into null
+                if self.has_variables():
+                    return result
                 result = colander.MappingSchema.deserialize(self, result) or self.default
             elif isinstance(schema_type, colander.Sequence):
                 result = colander.SequenceSchema.deserialize(self, result) or self.default
@@ -775,6 +789,8 @@ class KeywordMapper(ExtendedMappingSchema):
     # pylint: disable=W0222,signature-differs
     def deserialize(self, cstruct):
         if cstruct is colander.null:
+            if self.required and not VariableSchemaNode.is_variable(self):
+                raise colander.Invalid(self, "Missing required fields.")
             return colander.null
         # first process the keyword subnodes
         result = self._deserialize_keyword(cstruct)
@@ -911,7 +927,8 @@ class OneOfKeywordSchema(KeywordMapper):
         for schema_class in self._one_of:  # noqa
             try:
                 schema_class = _make_node_instance(schema_class)
-                valid_one_of.append(self._deserialize_subnode(schema_class, cstruct))
+                result = self._deserialize_subnode(schema_class, cstruct)
+                valid_one_of.append(result)
                 valid_nodes.append(schema_class)
             except colander.Invalid as invalid:
                 invalid_one_of.update({_get_node_name(invalid.node, schema_name=True): invalid.asdict()})

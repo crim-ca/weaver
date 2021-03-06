@@ -274,9 +274,11 @@ def ows2json_output_data(output, process_description, container=None):
                 output.dataType = process_output.dataType
                 break
 
-    json_output = dict(identifier=output.identifier,
-                       title=output.title,
-                       dataType=output.dataType)
+    json_output = {
+        "identifier": output.identifier,
+        "title": output.title,
+        "dataType": output.dataType
+    }
 
     # WPS standard v1.0.0 specify that either a reference or a data field has to be provided
     if output.reference:
@@ -287,11 +289,12 @@ def ows2json_output_data(output, process_description, container=None):
         json_array = _get_multi_json_references(output, container)
         if json_array and all(str(ref).startswith("http") for ref in json_array):
             json_output["data"] = json_array
+
     else:
         # WPS standard v1.0.0 specify that Output data field has Zero or one value
         json_output["data"] = output.data[0] if output.data else None
 
-    if json_output["dataType"] == WPS_COMPLEX_DATA:
+    if (json_output["dataType"] == WPS_COMPLEX_DATA or "reference" in json_output) and output.mimeType:
         json_output["mimeType"] = output.mimeType
 
     return json_output
