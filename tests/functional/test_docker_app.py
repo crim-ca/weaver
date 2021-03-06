@@ -165,7 +165,7 @@ class WpsPackageDockerAppTest(WpsPackageConfigBase):
 
             # job monitoring
             results = self.monitor_job(status_url)
-            outputs = self.app.get(status_url + "/outputs").json
+            outputs = self.get_outputs(status_url)
 
         self.validate_outputs(job_id, results, outputs, test_content)
 
@@ -231,7 +231,7 @@ class WpsPackageDockerAppTest(WpsPackageConfigBase):
 
             # job monitoring
             results = self.monitor_job(status_url)
-            outputs = self.app.get(status_url + "/outputs").json
+            outputs = self.get_outputs(status_url)
 
         self.validate_outputs(job_id, results, outputs, test_content)
 

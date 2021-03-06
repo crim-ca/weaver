@@ -3,7 +3,6 @@ Conversion functions between corresponding data structures.
 """
 import json
 import logging
-import sys
 from collections import Hashable, OrderedDict  # pylint: disable=E0611,no-name-in-module   # moved to .abc in Python 3
 from copy import deepcopy
 from tempfile import TemporaryDirectory
@@ -44,6 +43,13 @@ from weaver.formats import (
 )
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_WPS1,
+    PACKAGE_ARRAY_BASE,
+    PACKAGE_ARRAY_ITEMS,
+    PACKAGE_ARRAY_MAX_SIZE,
+    PACKAGE_ARRAY_TYPES,
+    PACKAGE_CUSTOM_TYPES,
+    PACKAGE_ENUM_BASE,
+    PACKAGE_LITERAL_TYPES,
     WPS_BOUNDINGBOX,
     WPS_COMPLEX,
     WPS_COMPLEX_DATA,
@@ -87,18 +93,6 @@ if TYPE_CHECKING:
     ANY_Format_Type = Union[Dict[str, Optional[str]], Format]
     ANY_Metadata_Type = Union[OWS_Metadata, WPS_Metadata, Dict[str, str]]
 
-# CWL package types and extensions
-PACKAGE_BASE_TYPES = frozenset(["string", "boolean", "float", "int", "integer", "long", "double"])
-PACKAGE_LITERAL_TYPES = frozenset(list(PACKAGE_BASE_TYPES) + ["null", "Any"])
-PACKAGE_COMPLEX_TYPES = frozenset(["File"])  # FIXME: type "Directory" not supported
-PACKAGE_ARRAY_BASE = "array"
-PACKAGE_ARRAY_MAX_SIZE = sys.maxsize  # pywps doesn't allow None, so use max size  # FIXME: unbounded (weaver #165)
-PACKAGE_CUSTOM_TYPES = frozenset(["enum"])  # can be anything, but support "enum" which is more common
-PACKAGE_ARRAY_ITEMS = frozenset(list(PACKAGE_BASE_TYPES) + list(PACKAGE_COMPLEX_TYPES) + list(PACKAGE_CUSTOM_TYPES))
-PACKAGE_ARRAY_TYPES = frozenset(["{}[]".format(item) for item in PACKAGE_ARRAY_ITEMS])
-# string values the lowest 'type' field can have
-PACKAGE_TYPE_FIELD_VALUES = frozenset(list(PACKAGE_LITERAL_TYPES) + list(PACKAGE_COMPLEX_TYPES) +
-                                      list(PACKAGE_CUSTOM_TYPES) + [PACKAGE_ARRAY_BASE])
 
 # WPS object attribute -> all possible *other* naming variations
 WPS_FIELD_MAPPING = {
@@ -369,7 +363,7 @@ def any2cwl_io(wps_io, io_select):
         cwl_io_type = any2cwl_literal_datatype(wps_io_type)
         wps_allow = get_field(wps_io, "allowed_values", search_variations=True)
         if isinstance(wps_allow, list) and len(wps_allow) > 0:
-            cwl_io["type"] = {"type": "enum", "symbols": wps_allow}
+            cwl_io["type"] = {"type": PACKAGE_ENUM_BASE, "symbols": wps_allow}
         else:
             cwl_io["type"] = cwl_io_type
     # FIXME: BoundingBox not implemented (https://github.com/crim-ca/weaver/issues/51)
@@ -446,7 +440,7 @@ def any2cwl_io(wps_io, io_select):
         wps_max_occ = get_field(wps_io, "max_occurs", search_variations=True)
         if wps_max_occ != null and (wps_max_occ == "unbounded" or wps_max_occ > 1):
             cwl_array = {
-                "type": "array",
+                "type": PACKAGE_ARRAY_BASE,
                 "items": cwl_io["type"]
             }
             # if single value still allowed, or explicitly multi-value array if min greater than one
@@ -579,7 +573,7 @@ def is_cwl_file_type(io_info):
     if isinstance(io_type, str):
         return io_type == "File"
     if isinstance(io_type, dict):
-        if io_type["type"] == "array":
+        if io_type["type"] == PACKAGE_ARRAY_BASE:
             return io_type["items"] == "File"
         return io_type["type"] == "File"
     if isinstance(io_type, list):

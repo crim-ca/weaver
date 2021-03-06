@@ -33,7 +33,16 @@ from weaver.formats import (
     CONTENT_TYPE_TEXT_XML
 )
 from weaver.owsexceptions import OWSMissingParameterValue
-from weaver.processes.convert import PACKAGE_TYPE_FIELD_VALUES
+from weaver.processes.constants import (
+    CWL_REQUIREMENT_APP_BUILTIN,
+    CWL_REQUIREMENT_APP_DOCKER,
+    CWL_REQUIREMENT_APP_ESGF_CWT,
+    CWL_REQUIREMENT_APP_WPS1,
+    PACKAGE_ARRAY_BASE,
+    PACKAGE_CUSTOM_TYPES,
+    PACKAGE_ENUM_BASE,
+    PACKAGE_TYPE_POSSIBLE_VALUES
+)
 from weaver.sort import JOB_SORT_VALUES, QUOTE_SORT_VALUES, SORT_CREATED, SORT_ID, SORT_PROCESS
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, STATUS_COMPLIANT_OGC
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
@@ -622,7 +631,7 @@ class JobExecuteModeEnum(ExtendedSchemaNode):
             title=kwargs.get("title", "mode"),
             default=kwargs.get("default", EXECUTE_MODE_AUTO),
             example=kwargs.get("example", EXECUTE_MODE_ASYNC),
-            validator=OneOf(list(EXECUTE_MODE_OPTIONS)),
+            validator=OneOf(EXECUTE_MODE_OPTIONS),
             **kwargs)
 
 
@@ -636,7 +645,7 @@ class JobControlOptionsEnum(ExtendedSchemaNode):
             title="jobControlOptions",
             default=kwargs.get("default", EXECUTE_CONTROL_OPTION_ASYNC),
             example=kwargs.get("example", EXECUTE_CONTROL_OPTION_ASYNC),
-            validator=OneOf(list(EXECUTE_CONTROL_OPTIONS)),
+            validator=OneOf(EXECUTE_CONTROL_OPTIONS),
             **kwargs)
 
 
@@ -650,7 +659,7 @@ class JobResponseOptionsEnum(ExtendedSchemaNode):
             title=kwargs.get("title", "response"),
             default=kwargs.get("default", EXECUTE_RESPONSE_RAW),
             example=kwargs.get("example", EXECUTE_RESPONSE_RAW),
-            validator=OneOf(list(EXECUTE_RESPONSE_OPTIONS)),
+            validator=OneOf(EXECUTE_RESPONSE_OPTIONS),
             **kwargs)
 
 
@@ -664,7 +673,7 @@ class TransmissionModeEnum(ExtendedSchemaNode):
             title=kwargs.get("title", "transmissionMode"),
             default=kwargs.get("default", EXECUTE_TRANSMISSION_MODE_REFERENCE),
             example=kwargs.get("example", EXECUTE_TRANSMISSION_MODE_REFERENCE),
-            validator=OneOf(list(EXECUTE_TRANSMISSION_MODE_OPTIONS)),
+            validator=OneOf(EXECUTE_TRANSMISSION_MODE_OPTIONS),
             **kwargs)
 
 
@@ -677,7 +686,7 @@ class JobStatusEnum(ExtendedSchemaNode):
             self.schema_type(),
             default=kwargs.get("default", None),
             example=kwargs.get("example", STATUS_ACCEPTED),
-            validator=OneOf(list(JOB_STATUS_CATEGORIES[STATUS_COMPLIANT_OGC])),
+            validator=OneOf(JOB_STATUS_CATEGORIES[STATUS_COMPLIANT_OGC]),
             **kwargs)
 
 
@@ -690,7 +699,7 @@ class JobSortEnum(ExtendedSchemaNode):
             String(),
             default=kwargs.get("default", SORT_CREATED),
             example=kwargs.get("example", SORT_CREATED),
-            validator=OneOf(list(JOB_SORT_VALUES)),
+            validator=OneOf(JOB_SORT_VALUES),
             **kwargs)
 
 
@@ -703,7 +712,7 @@ class QuoteSortEnum(ExtendedSchemaNode):
             self.schema_type(),
             default=kwargs.get("default", SORT_ID),
             example=kwargs.get("example", SORT_PROCESS),
-            validator=OneOf(list(QUOTE_SORT_VALUES)),
+            validator=OneOf(QUOTE_SORT_VALUES),
             **kwargs)
 
 
@@ -714,7 +723,7 @@ class LaunchJobQuerystring(ExtendedMappingSchema):
 
 class VisibilityValue(ExtendedSchemaNode):
     schema_type = String
-    validator = OneOf(list(VISIBILITY_VALUES))
+    validator = OneOf(VISIBILITY_VALUES)
     example = VISIBILITY_PUBLIC
 
 
@@ -1175,12 +1184,12 @@ class InputList(ExtendedSequenceSchema):
 class Execute(ExtendedMappingSchema):
     inputs = InputList(missing=drop)
     outputs = OutputList()
-    mode = ExtendedSchemaNode(String(), validator=OneOf(list(EXECUTE_MODE_OPTIONS)))
+    mode = ExtendedSchemaNode(String(), validator=OneOf(EXECUTE_MODE_OPTIONS))
     notification_email = ExtendedSchemaNode(
         String(),
         missing=drop,
         description="Optionally send a notification email when the job is done.")
-    response = ExtendedSchemaNode(String(), validator=OneOf(list(EXECUTE_RESPONSE_OPTIONS)))
+    response = ExtendedSchemaNode(String(), validator=OneOf(EXECUTE_RESPONSE_OPTIONS))
 
 
 class Quotation(ExtendedMappingSchema):
@@ -1279,12 +1288,15 @@ class DockerRequirementSpecification(PermissiveMappingSchema):
 
 
 class DockerRequirementMap(ExtendedMappingSchema):
-    DockerRequirement = DockerRequirementSpecification(name="DockerRequirement", title="DockerRequirement")
+    DockerRequirement = DockerRequirementSpecification(
+        name=CWL_REQUIREMENT_APP_DOCKER,
+        title=CWL_REQUIREMENT_APP_DOCKER
+    )
 
 
 class DockerRequirementClass(DockerRequirementSpecification):
     title = "DockerRequirementClass"
-    _class = RequirementClass(example="DockerRequirement", validator=OneOf(["DockerRequirement"]))
+    _class = RequirementClass(example=CWL_REQUIREMENT_APP_DOCKER, validator=OneOf([CWL_REQUIREMENT_APP_DOCKER]))
 
 
 class DockerGpuRequirementSpecification(DockerRequirementSpecification):
@@ -1304,13 +1316,21 @@ class DockerGpuRequirementClass(DockerGpuRequirementSpecification):
     _class = RequirementClass(example="DockerGpuRequirement", validator=OneOf(["DockerGpuRequirement"]))
 
 
+class DirectoryListing(PermissiveMappingSchema):
+    entry = ExtendedSchemaNode(String(), missing=drop)
+
+
+class InitialWorkDirListing(ExtendedSequenceSchema):
+    listing = DirectoryListing()
+
+
 class InitialWorkDirRequirementSpecification(PermissiveMappingSchema):
     title = "InitialWorkDirRequirement"
-    listing = PermissiveMappingSchema()
+    listing = InitialWorkDirListing()
 
 
 class InitialWorkDirRequirementMap(ExtendedMappingSchema):
-    InitialWorkDirRequirement = InitialWorkDirRequirementSpecification()
+    req = InitialWorkDirRequirementSpecification(name="InitialWorkDirRequirement")
 
 
 class InitialWorkDirRequirementClass(InitialWorkDirRequirementSpecification):
@@ -1318,20 +1338,39 @@ class InitialWorkDirRequirementClass(InitialWorkDirRequirementSpecification):
 
 
 class BuiltinRequirementSpecification(PermissiveMappingSchema):
-    title = "BuiltinRequirement"
+    title = CWL_REQUIREMENT_APP_BUILTIN
     description = (
         "Hint indicating that the Application Package corresponds to a builtin process of "
-        "this instance. (note: can only be an hint as it is unofficial CWL specification)."
+        "this instance. (note: can only be an 'hint' as it is unofficial CWL specification)."
     )
-    process = AnyIdentifier()
+    process = AnyIdentifier(description="Builtin process identifier.")
 
 
 class BuiltinRequirementMap(ExtendedMappingSchema):
-    BuiltinRequirement = BuiltinRequirementSpecification()
+    req = BuiltinRequirementSpecification(name=CWL_REQUIREMENT_APP_BUILTIN)
 
 
 class BuiltinRequirementClass(BuiltinRequirementSpecification):
-    _class = RequirementClass(example="BuiltinRequirement", validator=OneOf(["BuiltinRequirement"]))
+    _class = RequirementClass(example=CWL_REQUIREMENT_APP_BUILTIN, validator=OneOf([CWL_REQUIREMENT_APP_BUILTIN]))
+
+
+class WPS1RequirementSpecification(PermissiveMappingSchema):
+    title = CWL_REQUIREMENT_APP_WPS1
+    description = (
+        "Hint indicating that the Application Package corresponds to a WPS-1 provider process"
+        "that should be remotely executed and monitored by this instance. "
+        "(note: can only be an 'hint' as it is unofficial CWL specification)."
+    )
+    process = AnyIdentifier(description="Process identifier of the remote WPS provider.")
+    provider = AnyIdentifier(description="WPS provider endpoint.")
+
+
+class WPS1RequirementMap(ExtendedMappingSchema):
+    req = WPS1RequirementSpecification(name=CWL_REQUIREMENT_APP_WPS1)
+
+
+class WPS1RequirementClass(WPS1RequirementSpecification):
+    _class = RequirementClass(example=CWL_REQUIREMENT_APP_WPS1, validator=OneOf([CWL_REQUIREMENT_APP_WPS1]))
 
 
 class UnknownRequirementClass(PermissiveMappingSchema):
@@ -1352,7 +1391,7 @@ class CWLRequirementsItem(OneOfKeywordSchema):
         DockerRequirementClass(missing=drop),
         DockerGpuRequirementClass(missing=drop),
         InitialWorkDirRequirementClass(missing=drop),
-        UnknownRequirementClass(missing=drop),
+        UnknownRequirementClass(missing=drop),  # allows anything, must be last
     ]
 
 
@@ -1373,6 +1412,7 @@ class CWLHintsMap(AnyOfKeywordSchema, PermissiveMappingSchema):
         DockerRequirementMap(missing=drop),
         DockerGpuRequirementMap(missing=drop),
         InitialWorkDirRequirementMap(missing=drop),
+        WPS1RequirementMap(missing=drop),
     ]
 
 
@@ -1383,6 +1423,8 @@ class CWLHintsItem(OneOfKeywordSchema, PermissiveMappingSchema):
         DockerRequirementClass(missing=drop),
         DockerGpuRequirementClass(missing=drop),
         InitialWorkDirRequirementClass(missing=drop),
+        WPS1RequirementClass(missing=drop),
+        UnknownRequirementClass(missing=drop),  # allows anything, must be last
     ]
 
 
@@ -1409,7 +1451,7 @@ class CWLTypeString(ExtendedSchemaNode):
     title = "Type"
     description = "Field type definition."
     example = "float"
-    validator = OneOf(list(PACKAGE_TYPE_FIELD_VALUES))
+    validator = OneOf(PACKAGE_TYPE_POSSIBLE_VALUES)
 
 
 class CWLTypeSymbolValues(OneOfKeywordSchema):
@@ -1425,13 +1467,13 @@ class CWLTypeSymbols(ExtendedSequenceSchema):
 
 
 class CWLTypeArray(ExtendedMappingSchema):
-    type = ExtendedSchemaNode(String(), example="array")
+    type = ExtendedSchemaNode(String(), example=PACKAGE_ARRAY_BASE, validator=OneOf([PACKAGE_ARRAY_BASE]))
     items = CWLTypeString()
 
 
 class CWLTypeEnum(ExtendedMappingSchema):
-    type = ExtendedSchemaNode(String(), example="enum")
-    symbols = CWLTypeSymbols(missing=drop, summary="Allowed values composing the enum.")
+    type = ExtendedSchemaNode(String(), example=PACKAGE_ENUM_BASE, validator=OneOf(PACKAGE_CUSTOM_TYPES))
+    symbols = CWLTypeSymbols(summary="Allowed values composing the enum.")
 
 
 class CWLTypeBase(OneOfKeywordSchema):

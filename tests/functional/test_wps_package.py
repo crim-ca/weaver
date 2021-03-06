@@ -1381,7 +1381,10 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
                     ]
                 }
             },
-            "hints": {CWL_REQUIREMENT_APP_BUILTIN: {}},  # ensure remote files are downloaded prior to CWL execution
+            "hints": {CWL_REQUIREMENT_APP_BUILTIN: {
+                # ensure remote files are downloaded prior to CWL execution
+                "process": self._testMethodName,
+            }},
             "inputs": [
                 # regardless of reference type, they must be fetched as file before CWL call
                 {"id": "input_with_http", "type": "File"},
@@ -1431,19 +1434,28 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
             assert resp.status_code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(resp.status_code, resp.json)
             status_url = resp.json["location"]
             job_id = resp.json["jobID"]
-        result = self.monitor_job(status_url)
+
+        results = self.monitor_job(status_url)
+        outputs = self.get_outputs(status_url)
+
+        assert "output_from_http" in results
+        assert "output_from_s3" in results
 
         # check that outputs are S3 bucket references
-        output_values = {out["id"]: get_any_value(out) for out in result["outputs"]}
+        output_values = {out["id"]: get_any_value(out) for out in outputs["outputs"]}
         output_bucket = self.settings["weaver.wps_output_s3_bucket"]
         wps_uuid = self.job_store.fetch_by_id(job_id).wps_id
         for out_key, out_file in [("output_from_s3", input_file_s3), ("output_from_http", input_file_http)]:
             output_ref = "{}/{}/{}".format(output_bucket, wps_uuid, out_file)
             output_ref_abbrev = "s3://{}".format(output_ref)
             output_ref_full = "https://s3.{}.amazonaws.com/{}".format(MOCK_AWS_REGION, output_ref)
-            assert output_values[out_key] in [output_ref_abbrev, output_ref_full]  # allow any variant weaver can parse
+            output_ref_any = [output_ref_abbrev, output_ref_full]  # allow any variant weaver can parse
+            # validation on outputs path
+            assert output_values[out_key] in output_ref_any
+            # validation on results path
+            assert results[out_key]["href"] in output_ref_any
 
-        # FIXME:
+            # FIXME:
         #   can validate manually that files exists in output bucket, but cannot seem to retrieve it here
         #   problem due to fixture setup or moto limitation via boto3.resource interface used by pywps?
         # check that outputs are indeed stored in S3 buckets
