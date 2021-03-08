@@ -591,10 +591,10 @@ def setup_cache(settings):
     settings.setdefault("cache.type", "memory")
     settings.setdefault("cache.doc.enable", "false")
     settings.setdefault("cache.doc.expired", "3600")
-    settings.setdefault("cache.request.enable", "false")
-    settings.setdefault("cache.request.expired", "60")
-    settings.setdefault("cache.result.enable", "false")
-    settings.setdefault("cache.result.expired", "3600")
+    settings.setdefault("cache.request.enabled", "false")
+    settings.setdefault("cache.request.expire", "60")
+    settings.setdefault("cache.result.enabled", "false")
+    settings.setdefault("cache.result.expire", "3600")
     set_cache_regions_from_settings(settings)
 
 
@@ -605,7 +605,7 @@ def invalidate_region(caching_args):
 
     :param caching_args: tuple of (function, region, *function-args)
     """
-    func, region, args = caching_args
+    func, region, *args = caching_args
     try:
         region_invalidate(func, region, *args)
     except BeakerException:
@@ -815,12 +815,10 @@ def request_extra(method,                       # type: str
     backoff = backoff or kw_backoff or 0.3
     intervals = intervals or kw_intervals
     if intervals and len(intervals) and all(isinstance(i, (int, float)) for i in intervals):
-        intervals = [0] + intervals
-        retries = list(range(len(intervals)))
-        backoff = 0  # disable first part of delay calculation
+        request_delta = [0] + intervals
     else:
-        retries = [0] + list(range(retries))
-    no_retries = len(retries) == 1
+        request_delta = [0] + [(backoff * (2 ** (retry + 1))) for retry in range(retries)]
+    no_retries = len(request_delta) == 1
     # SSL verification settings
     # ON by default, disable accordingly with any variant if matched
     kw_ssl_verify = get_ssl_verify_option(method, url, settings, request_options=request_options)
@@ -835,15 +833,12 @@ def request_extra(method,                       # type: str
     region = "request"
     request_args = (method, url, request_kwargs)
     caching_args = (request_cached, region, *request_args)
-    for retry in retries:
+    for retry, delay in enumerate(request_delta):
         if retry:
-            delay = 0
             if retry_after and resp and resp.status_code in [HTTPTooManyRequests.code]:
                 after = resp.headers.get("Retry-After", "")
                 delay = int(after) if str(after).isdigit() else 0
                 LOGGER.debug("Received header [Retry-After=%ss] for [%s %s]", after, method, url)
-            if not delay:
-                delay = (backoff * (2 ** (retry + 1))) or intervals[retry]
             LOGGER.debug("Retrying failed request after delay=%s for [%s %s]", delay, method, url)
             time.sleep(delay)
         try:
@@ -854,7 +849,6 @@ def request_extra(method,                       # type: str
             if allowed_codes and len(allowed_codes):
                 if resp.status_code in allowed_codes:
                     return resp
-                invalidate_region(caching_args)
             elif resp.status_code < (500 if only_server_errors else 400):
                 invalidate_region(caching_args)
                 return resp
@@ -866,7 +860,7 @@ def request_extra(method,                       # type: str
             if "Cache region not configured: {}".format(region) in str(exc):
                 LOGGER.warning("Invalid cache region setup detected, retrying request...")
                 setup_cache(settings)
-                resp = request_extra(method, url, retries=len(retries), retry_after=retry_after, backoff=backoff,
+                resp = request_extra(method, url, retries=retries, retry_after=retry_after, backoff=backoff,
                                      intervals=intervals, ssl_verify=ssl_verify, allowed_codes=allowed_codes,
                                      only_server_errors=only_server_errors, settings=settings, **request_kwargs)
                 return resp  # sub-called did the retry loop, so finish early this loop

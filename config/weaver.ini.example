@@ -24,6 +24,8 @@ cache.regions = doc, result
 cache.type = memory
 cache.doc.expire = 86400
 cache.doc.enabled = true
+cache.request.expire = 60
+cache.request.enabled = false
 cache.result.expire = 3600
 cache.result.enabled = false
 

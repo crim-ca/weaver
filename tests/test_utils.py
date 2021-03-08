@@ -459,20 +459,22 @@ def test_request_extra_intervals():
             sleep_counter["called_count"] += 1
             sleep_counter["called_with"].append(delay)
 
-    with mock.patch("requests.Session.request", side_effect=mock_request) as mocked_request:
-        with mock.patch("weaver.utils.time.sleep", side_effect=mock_sleep):
-            intervals = [1e6, 3e6, 5e6]  # random values that shouldn't normally be used with sleep() (too big)
-            # values will not match if backoff/retries are not automatically corrected by internals parameter
-            resp = request_extra("get", "http://whatever", only_server_errors=False,
-                                 intervals=intervals, backoff=1000, retries=10)  # backoff/retries must be ignored here
-            assert resp.status_code == HTTPGatewayTimeout.code
-            assert mocked_request.call_count == 4  # first called directly, then 3 times, one for each interval
-            # WARNING:
-            #   cannot safely use mock counter since everything can increase it
-            #   notably debugger/breakpoints that uses more calls to sleep()
-            #   instead use our custom counter that employs unrealistic values
-            assert sleep_counter["called_count"] == 3  # first direct call doesn't have any sleep interval
-            assert all(called == expect for called, expect in zip(sleep_counter["called_with"], intervals))
+    with mock.patch("weaver.utils.get_settings", return_value={"cache.requests.enable": "false"}):
+        with mock.patch("requests.Session.request", side_effect=mock_request) as mocked_request:
+            with mock.patch("weaver.utils.time.sleep", side_effect=mock_sleep):
+                intervals = [1e6, 3e6, 5e6]  # random values that shouldn't normally be used with sleep() (too big)
+                # values will not match if backoff/retries are not automatically corrected by internals parameter
+                resp = request_extra("get", "http://whatever",
+                                     only_server_errors=False, intervals=intervals,
+                                     backoff=1000, retries=10)  # backoff/retries must be ignored here
+                assert resp.status_code == HTTPGatewayTimeout.code
+                assert mocked_request.call_count == 4  # first called directly, then 3 times, one for each interval
+                # WARNING:
+                #   cannot safely use mock counter since everything can increase it
+                #   notably debugger/breakpoints that uses more calls to sleep()
+                #   instead use our custom counter that employs unrealistic values
+                assert sleep_counter["called_count"] == 3  # first direct call doesn't have any sleep interval
+                assert all(called == expect for called, expect in zip(sleep_counter["called_with"], intervals))
 
 
 def test_fetch_file_local_with_protocol():
