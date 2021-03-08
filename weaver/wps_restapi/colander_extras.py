@@ -540,9 +540,11 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
                 # otherwise, following 'normal' schema deserialize could convert valid structure into null
                 if self.has_variables():
                     return result
-                result = colander.MappingSchema.deserialize(self, result) or self.default
+                result = colander.MappingSchema.deserialize(self, result)
+                result = self.default if result is colander.null else result
             elif isinstance(schema_type, colander.Sequence):
-                result = colander.SequenceSchema.deserialize(self, result) or self.default
+                result = colander.SequenceSchema.deserialize(self, result)
+                result = self.default if result is colander.null else result
             else:
                 # special cases for JSON conversion, invert of serialize/deserialize
                 #   deserialize causes Date/DateTime/Time to become Python datetime, and raise if not String
