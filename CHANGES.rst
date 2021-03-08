@@ -45,6 +45,8 @@ Changes:
 - Disable default auto-generation of ``request-options.yml`` and ``wps_processes.yml`` configuration files from a copy
   of their respective ``.example`` files as these have many demo (and invalid values) that fail real execution of tests
   when no actual file was provided.
+- Add per-request caching support when using ``request_extra`` function, and caching control according to request
+  headers and ``request-options.yml`` configuration.
 
 Fixes:
 ------

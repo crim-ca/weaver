@@ -51,7 +51,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
         assert "info" in resp.json
         assert "host" in resp.json
         assert "paths" in resp.json
-        assert "swagger" in resp.json
+        assert "openapi" in resp.json
         assert "basePath" in resp.json
 
     def test_status_unauthorized_and_forbidden(self):

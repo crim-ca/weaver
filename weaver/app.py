@@ -5,17 +5,15 @@ Weaver Web Application (``weaver-manager``).
 """
 
 import logging
-import os
+
 
 import yaml
 from pyramid.config import Configurator
-from pyramid_beaker import set_cache_regions_from_settings
 
-from weaver import __meta__
 from weaver.config import WEAVER_DEFAULT_REQUEST_OPTIONS_CONFIG, get_weaver_config_file, get_weaver_configuration
 from weaver.processes.builtin import register_builtin_processes
 from weaver.processes.utils import register_wps_processes_from_config
-from weaver.utils import get_settings, parse_extra_options, setup_loggers
+from weaver.utils import get_settings, parse_extra_options, setup_cache, setup_loggers
 
 LOGGER = logging.getLogger(__name__)
 
@@ -49,11 +47,7 @@ def main(global_config, **settings):
 
     # add default caching regions if they were omitted in config file
     LOGGER.info("Adding default caching options...")
-    settings.setdefault("cache.regions", "doc, result")
-    settings.setdefault("cache.type", "memory")
-    settings.setdefault("cache.doc.enable", "false")
-    settings.setdefault("cache.result.enable", "false")
-    set_cache_regions_from_settings(settings)
+    setup_cache(settings)
 
     LOGGER.info("Setup celery configuration...")
     local_config = Configurator(settings=settings)

@@ -16,12 +16,16 @@ import boto3
 import colander
 import pytz
 import requests
+from beaker.cache import cache_region, region_invalidate
+from beaker.exceptions import BeakerException
 from celery.app import Celery
 from pyramid.config import Configurator
 from pyramid.httpexceptions import HTTPError as PyramidHTTPError, HTTPGatewayTimeout, HTTPTooManyRequests
 from pyramid.registry import Registry
 from pyramid.request import Request
 from pyramid.settings import asbool, aslist
+from pyramid.threadlocal import get_current_registry
+from pyramid_beaker import set_cache_regions_from_settings
 from requests import HTTPError as RequestsHTTPError, Response
 from requests.structures import CaseInsensitiveDict
 from requests_file import FileAdapter
@@ -149,8 +153,8 @@ def get_registry(container, nothrow=False):
     raise TypeError("Could not retrieve registry from container object of type [{}].".format(type(container)))
 
 
-def get_settings(container):
-    # type: (AnySettingsContainer) -> SettingsType
+def get_settings(container=None):
+    # type: (Optional[AnySettingsContainer]) -> SettingsType
     """Retrieves the application ``settings`` from various containers referencing to it."""
     if isinstance(container, (Celery, Configurator, Request)):
         container = get_registry(container)
@@ -158,6 +162,8 @@ def get_settings(container):
         return container.settings
     if isinstance(container, dict):
         return container
+    if container is None:
+        return get_current_registry().settings
     raise TypeError("Could not retrieve settings from container object of type [{}]".format(type(container)))
 
 
@@ -435,7 +441,7 @@ def parse_request_query(request):
 
 
 def get_path_kvp(path, sep=",", **params):
-    # type: (str, str, KVP_Item) -> str
+    # type: (str, str, **KVP_Item) -> str
     """
     Generates the WPS URL with Key-Value-Pairs (KVP) query parameters.
 
@@ -576,6 +582,22 @@ def get_caller_name(skip=2, base_class=False):
     return ".".join(name)
 
 
+def setup_cache(settings):
+    # type: (SettingsType) -> None
+    """
+    Prepares the settings with default caching options.
+    """
+    settings.setdefault("cache.regions", "doc, request, result")
+    settings.setdefault("cache.type", "memory")
+    settings.setdefault("cache.doc.enable", "false")
+    settings.setdefault("cache.doc.expired", "3600")
+    settings.setdefault("cache.request.enable", "false")
+    settings.setdefault("cache.request.expired", "60")
+    settings.setdefault("cache.result.enable", "false")
+    settings.setdefault("cache.result.expired", "3600")
+    set_cache_regions_from_settings(settings)
+
+
 def get_ssl_verify_option(method, url, settings, request_options=None):
     # type: (str, str, AnySettingsContainer, Optional[SettingsType]) -> bool
     """
@@ -652,6 +674,28 @@ def get_request_options(method, url, settings):
         req_opts.pop("method", None)
         return req_opts
     return request_options
+
+
+def request_call(method, url, kwargs):
+    # type: (str, str, Dict[str, AnyValue]) -> Response
+    """
+    Request operation employed by :func:`request_extra` without caching.
+    """
+    with requests.Session() as request_session:
+        if urlparse(url).scheme in ["", "file"]:
+            url = "file://{}".format(os.path.abspath(url)) if not url.startswith("file://") else url
+            request_session.mount("file://", FileAdapter())
+        resp = request_session.request(method, url, **kwargs)
+    return resp
+
+
+@cache_region("request")
+def request_cached(method, url, kwargs):
+    # type: (str, str, Dict[str, AnyValue]) -> Response
+    """
+    Cached-enabled request operation employed by :func:`request_extra`.
+    """
+    return request_call(method, url, kwargs)
 
 
 def request_extra(method,                       # type: str
@@ -746,7 +790,7 @@ def request_extra(method,                       # type: str
     :param request_kwargs: All other keyword arguments are passed down to the request call.
     """
     # obtain file request-options arguments, then override any explicitly provided source-code keywords
-    settings = get_settings(settings) if settings else {}
+    settings = get_settings(settings) or {}
     request_options = get_request_options(method, url, settings)
     request_options.update(request_kwargs)
     # catch kw passed to request corresponding to retries parameters
@@ -767,10 +811,16 @@ def request_extra(method,                       # type: str
     # ON by default, disable accordingly with any variant if matched
     kw_ssl_verify = get_ssl_verify_option(method, url, settings, request_options=request_options)
     ssl_verify = False if not kw_ssl_verify or not ssl_verify else True  # pylint: disable=R1719
-    request_options.update({"verify": ssl_verify})
+    request_kwargs.setdefault("timeout", 5)
+    request_kwargs.setdefault("verify", ssl_verify)
     # process request
     resp = None
     failures = []
+    no_cache = CaseInsensitiveDict(request_kwargs.get("headers", {})).get("Cache-Control", "").lower() == "no-cache"
+    no_cache = no_cache is True or request_options.get("cache", True) is False
+    region = "request"
+    request_args = (method, url, request_kwargs)
+    caching_args = (request_cached, region, *request_args)
     for retry in retries:
         if retry:
             delay = 0
@@ -783,23 +833,36 @@ def request_extra(method,                       # type: str
             LOGGER.debug("Retrying failed request after delay=%s for [%s %s]", delay, method, url)
             time.sleep(delay)
         try:
-            with requests.Session() as request_session:
-                if urlparse(url).scheme in ["", "file"]:
-                    url = "file://{}".format(os.path.abspath(url)) if not url.startswith("file://") else url
-                    request_session.mount("file://", FileAdapter())
-                resp = request_session.request(method, url, **request_kwargs)
+            if no_cache:
+                resp = request_call(*request_args)
+            else:
+                resp = request_cached(*request_args)
             if allowed_codes and len(allowed_codes):
                 if resp.status_code in allowed_codes:
+                    region_invalidate(*caching_args)
                     return resp
+                region_invalidate(*caching_args)
             elif resp.status_code < (500 if only_server_errors else 400):
+                region_invalidate(*caching_args)
                 return resp
+            region_invalidate(*caching_args)
             failures.append("{} ({})".format(getattr(resp, "reason", type(resp).__name__),
                                              getattr(resp, "status_code", getattr(resp, "code", 500))))
-        # function called without retries raises original error
-        # as if calling requests module directly
+        # failure caused by invalid cache setup re-run with sub-call to restart the retry procedure from scratch
+        except BeakerException as exc:
+            if "Cache region not configured: {}".format(region) in str(exc):
+                LOGGER.warning("Invalid cache region setup detected, retrying request...")
+                setup_cache(settings)
+                resp = request_extra(method, url, retries=len(retries), retry_after=retry_after, backoff=backoff,
+                                     intervals=intervals, ssl_verify=ssl_verify, allowed_codes=allowed_codes,
+                                     only_server_errors=only_server_errors, settings=settings, **request_kwargs)
+                break  # sub-called did the retry loop, so finish early this loop
+            raise  # if not the expected cache exception, ignore retry attempt
+        # function called without retries raises original error as if calling requests module directly
         except requests.ConnectionError as exc:
             if no_retries:
                 raise
+            region_invalidate(*caching_args)
             failures.append(type(exc).__name__)
     # also pass-through here if no retries
     if no_retries and resp:

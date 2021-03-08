@@ -32,6 +32,7 @@ def includeme(config):
     # otherwise can cause sporadic conflicts
     config.include("cornice")
     config.include("cornice_swagger")
+    config.include("pyramid_beaker")
     config.include("pyramid_mako")
     config.include("pyramid_rewrite")
     # attempt finding a not found route using either an added or removed trailing slash according to situation

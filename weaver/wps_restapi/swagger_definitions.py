@@ -1086,12 +1086,20 @@ class CreatedQuotedJobStatusSchema(CreatedJobStatusSchema):
 
 class GetPagingJobsSchema(ExtendedMappingSchema):
     jobs = JobCollection()
-    limit = ExtendedSchemaNode(Integer())
-    page = ExtendedSchemaNode(Integer())
+    limit = ExtendedSchemaNode(Integer(), default=10)
+    page = ExtendedSchemaNode(Integer(), validator=Range(min=0))
+
+
+class JobCategoryDetail(PermissiveMappingSchema):
+    category = ExtendedSchemaNode(String(), missing=drop, default=None,
+                                  description="Value of the parameter forming that category group.")
 
 
 class GroupedJobsCategorySchema(ExtendedMappingSchema):
-    category = PermissiveMappingSchema(description="Grouping values that compose the corresponding job list category.")
+    category = JobCategoryDetail(
+        default={},
+        description="Grouping values that compose the corresponding job list category."
+    )
     jobs = JobCollection(description="List of jobs that matched the corresponding grouping values.")
     count = ExtendedSchemaNode(Integer(), description="Number of matching jobs for the corresponding group category.")
 
@@ -1831,7 +1839,7 @@ class GetJobsQueries(ExtendedMappingSchema):
     groups = ExtendedSchemaNode(String(),
                                 description="Comma-separated list of grouping fields with which to list jobs.",
                                 default=False, example="process,service", missing=drop)
-    page = ExtendedSchemaNode(Integer(), missing=drop, default=0)
+    page = ExtendedSchemaNode(Integer(), missing=drop, default=0, validator=Range(min=0))
     limit = ExtendedSchemaNode(Integer(), missing=drop, default=10)
     status = JobStatusEnum(missing=drop)
     process = ExtendedSchemaNode(String(), missing=drop, default=None)

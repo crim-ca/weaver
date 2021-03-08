@@ -192,8 +192,10 @@ def get_queried_jobs(request):
     settings = get_settings(request)
     service, process = validate_service_process(request)
     detail = asbool(request.params.get("detail", False))
-    page = int(request.params.get("page", "0"))
-    limit = int(request.params.get("limit", "10"))
+    page = request.params.get("page", "0")
+    page = int(page) if str.isnumeric(page) else 0
+    limit = request.params.get("limit", "10")
+    limit = int(limit) if str.isnumeric(limit) else 10
     email = request.params.get("notification_email", None)
     filters = {
         "page": page,

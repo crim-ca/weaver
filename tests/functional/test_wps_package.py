@@ -1429,7 +1429,7 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
             for mock_exec in mocked_execute_process():
                 stack_exec.enter_context(mock_exec)
             proc_url = "/processes/{}/jobs".format(self._testMethodName)
-            resp = mocked_sub_requests(self.app, "post_json", proc_url,
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=exec_body, headers=self.json_headers, only_local=True)
             assert resp.status_code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(resp.status_code, resp.json)
             status_url = resp.json["location"]
@@ -1455,16 +1455,16 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
             # validation on results path
             assert results[out_key]["href"] in output_ref_any
 
-            # FIXME:
+        # FIXME:
         #   can validate manually that files exists in output bucket, but cannot seem to retrieve it here
         #   problem due to fixture setup or moto limitation via boto3.resource interface used by pywps?
         # check that outputs are indeed stored in S3 buckets
-        #   import boto3
-        #   mocked_s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
-        #   resp_json = mocked_s3.list_objects_v2(Bucket=output_bucket)
-        #   bucket_file_keys = [obj["Key"] for obj in resp_json["Contents"]]
-        #   for out_file in [input_file_s3, input_file_http]:
-        #       assert out_file in bucket_file_keys
+        import boto3
+        mocked_s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
+        resp_json = mocked_s3.list_objects_v2(Bucket=output_bucket)
+        bucket_file_keys = [obj["Key"] for obj in resp_json["Contents"]]
+        for out_file in [input_file_s3, input_file_http]:
+            assert out_file in bucket_file_keys
 
         # check that outputs are NOT copied locally, but that XML status does exist
         # counter validate path with file always present to ensure outputs are not 'missing' just because of wrong dir
