@@ -541,18 +541,18 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
                 if self.has_variables():
                     return result
                 result = colander.MappingSchema.deserialize(self, result)
-                result = self.default if result is colander.null else result
             elif isinstance(schema_type, colander.Sequence):
                 result = colander.SequenceSchema.deserialize(self, result)
-                result = self.default if result is colander.null else result
             else:
-                # special cases for JSON conversion, invert of serialize/deserialize
-                #   deserialize causes Date/DateTime/Time to become Python datetime, and raise if not String
-                #   employ serialize instead which provides the desired conversion from predefined Python datetime
-                if isinstance(_get_schema_type(self), (colander.Date, colander.DateTime, colander.Time)):
-                    result = colander.SchemaNode.serialize(self, result)
+                # special cases for JSON conversion and string dump, serialize parsable string timestamps
+                #   deserialize causes Date/DateTime/Time to become Python datetime, and result raises if not string
+                #   employ serialize instead which provides the desired conversion from predefined datetime to string
+                if isinstance(schema_type, (colander.Date, colander.DateTime, colander.Time)):
+                    if not isinstance(result, str):
+                        result = colander.SchemaNode.serialize(self, result)
                 else:
                     result = colander.SchemaNode.deserialize(self, result)
+            result = self.default if result is colander.null else result
         if result is colander.null and self.missing is colander.required:
             raise colander.Invalid(node=self, msg=self.missing_msg)
         return result

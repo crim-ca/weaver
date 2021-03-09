@@ -91,7 +91,6 @@ def test_get_cwl_file_format_retry_attempts():
         with mock.patch("requests.Session.request", side_effect=mock_request_extra) as mocked_request:
             _, fmt = f.get_cwl_file_format(f.CONTENT_TYPE_APP_JSON)
             assert fmt == "{}:{}".format(f.IANA_NAMESPACE, f.CONTENT_TYPE_APP_JSON)
-            print("CALL?", mocked_request.called)
             assert mocked_request.call_count == 2
 
 

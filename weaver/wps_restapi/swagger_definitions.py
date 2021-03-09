@@ -1504,17 +1504,22 @@ class CWLType(OneOfKeywordSchema):
     ]
 
 
-class CWLInputBase(PermissiveMappingSchema):
+class AnyLiteralList(ExtendedSequenceSchema):
+    default = AnyLiteralType()
+
+
+class CWLDefault(OneOfKeywordSchema):
+    _one_of = [
+        AnyLiteralType(),
+        AnyLiteralList(),
+    ]
+
+
+class CWLInputObject(PermissiveMappingSchema):
     type = CWLType()
+    default = CWLDefault(missing=drop, description="Default value of input if not provided for task execution.")
     inputBinding = ExtendedMappingSchema(missing=drop, title="Input Binding",
                                          description="Defines how to specify the input for the command.")
-
-
-class CWLInputObject(AnyOfKeywordSchema, PermissiveMappingSchema):
-    _any_of = [
-        CWLInputBase(),
-        AnyLiteralDefaultType(missing=drop),
-    ]
 
 
 class CWLInputMap(PermissiveMappingSchema):
