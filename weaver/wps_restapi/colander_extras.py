@@ -62,7 +62,18 @@ from cornice_swagger.converters.exceptions import ConversionError, NoSuchConvert
 from cornice_swagger.converters.schema import ObjectTypeConverter, TypeConversionDispatcher, TypeConverter
 
 if TYPE_CHECKING:
-    from typing import Iterable, Union, Type
+    from typing import Iterable, Optional, Type, Union
+
+
+LITERAL_SCHEMA_TYPES = frozenset([
+    colander.Boolean,
+    colander.Number,  # int, float, etc.
+    colander.String,
+    colander.Time,
+    colander.Date,
+    colander.DateTime,
+    # colander.Enum,  # not supported but could be (literal int/str inferred from Python Enum object)
+])
 
 
 class SchemaNodeTypeError(TypeError):
@@ -358,10 +369,11 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
         super(VariableSchemaNode, self).__init__(*args, **kwargs)
         if var:
             # note: literal type allowed only for shorthand notation, normally not allowed
-            if self.schema_type not in [colander.SchemaNode, colander.Mapping]:
+            schema_type = _get_schema_type(self)
+            if not isinstance(schema_type, tuple(list(LITERAL_SCHEMA_TYPES) + [colander.Mapping])):  # noqa
                 raise SchemaNodeTypeError(
                     "Keyword 'variable' can only be applied to Mapping and literal-type schema nodes. "
-                    "Got: {!s} ({!s})".format(type(self), self.schema_type))
+                    "Got: {!s} ({!s})".format(type(self), schema_type))
             self.name = kwargs.get("name", var)
             if not self.title:
                 self.title = var
@@ -1331,10 +1343,10 @@ def _dict_nested_contained(parent, child):
 
     .. code-block:: python
 
-        >>> parent = {"other": 2, "test": [{"inside": 1, "other_nested": 2}]}
-        >>> child = {"test": [{"inside": 1}]}
-        >>> _dict_nested_contained(parent, child)
-        True
+        parent = {"other": 2, "test": [{"inside": 1, "other_nested": 2}]}
+        child = {"test": [{"inside": 1}]}
+        _dict_nested_contained(parent, child)
+        # returns: True
 
     :param dict parent: The dict that could contain the child
     :param dict child: The dict that could be nested inside the parent
@@ -1376,7 +1388,7 @@ def _make_node_instance(schema_node_or_class):
 
 
 def _get_schema_type(schema_node, check=False):
-    # type: (Union[colander.SchemaNode, Type[colander.SchemaNode], ExtendedSchemaNode]) -> Optional[colander.SchemaType]
+    # type: (Union[colander.SchemaNode, Type[colander.SchemaNode]], bool) -> Optional[colander.SchemaType]
     """Obtains the schema-type from the provided node, supporting various initialization methods.
 
     - ``typ`` is set by an instantiated node from specific schema (e.g.: ``colander.SchemaNode(colander.String())``)

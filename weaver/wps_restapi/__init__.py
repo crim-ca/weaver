@@ -18,6 +18,8 @@ def includeme(config):
         config.include("weaver.wps_restapi.providers")
         config.include("weaver.wps_restapi.processes")
         config.include("weaver.wps_restapi.quotation")
+        config.add_forbidden_view(api.unauthorized_or_forbidden)
+        config.add_notfound_view(api.not_found_or_method_not_allowed, append_slash=True)
         config.add_route(**sd.service_api_route_info(sd.api_frontpage_service, settings))
         config.add_route(**sd.service_api_route_info(sd.api_swagger_json_service, settings))
         config.add_route(**sd.service_api_route_info(sd.api_swagger_ui_service, settings))

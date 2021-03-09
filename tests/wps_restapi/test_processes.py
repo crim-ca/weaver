@@ -27,7 +27,7 @@ from weaver.execute import (
     EXECUTE_TRANSMISSION_MODE_REFERENCE,
     EXECUTE_TRANSMISSION_MODE_VALUE
 )
-from weaver.formats import ACCEPT_LANGUAGE_EN_US, ACCEPT_LANGUAGE_FR_CA, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
+from weaver.formats import ACCEPT_LANGUAGE_FR_CA, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import STATUS_ACCEPTED
 from weaver.utils import fully_qualified_name, ows_context_href
@@ -121,9 +121,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
             "executionUnit": [
                 # full definition not required with mock
-                {"unit": {
-                    "class": "test"
-                }}
+                # use 'href' variant to avoid invalid schema validation via more explicit 'unit'
+                {"href": "{}.cwl".format(process_id)}
             ]
         }
 
@@ -251,13 +250,13 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process_data_tests[1]["processDescription"].pop("process")
         process_data_tests[2]["processDescription"]["process"].pop("id")
         process_data_tests[3]["processDescription"]["jobControlOptions"] = EXECUTE_CONTROL_OPTION_ASYNC
-        process_data_tests[4]["processDescription"]["jobControlOptions"] = [EXECUTE_MODE_ASYNC]
+        process_data_tests[4]["processDescription"]["jobControlOptions"] = [EXECUTE_MODE_ASYNC]  # noqa
         process_data_tests[5].pop("deploymentProfileName")
         process_data_tests[6].pop("executionUnit")
         process_data_tests[7]["executionUnit"] = {}
         process_data_tests[8]["executionUnit"] = list()
         process_data_tests[9]["executionUnit"][0] = {"unit": "something"}  # unit as string instead of package
-        process_data_tests[10]["executionUnit"][0] = {"href": {}}  # href as package instead of url
+        process_data_tests[10]["executionUnit"][0] = {"href": {}}  # noqa  # href as package instead of URL
         process_data_tests[11]["executionUnit"][0] = {"unit": {}, "href": ""}  # can"t have both unit/href together
 
         with contextlib.ExitStack() as stack:

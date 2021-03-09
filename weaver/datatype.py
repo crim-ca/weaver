@@ -696,8 +696,10 @@ class Job(Base):
         if self_link in ["status", "inputs", "outputs", "results", "logs", "exceptions"]:
             self_link_body = list(filter(lambda _link: _link["rel"] == self_link, job_links_body["links"]))[-1]
             self_link_body = copy.deepcopy(self_link_body)
-            self_link_body["rel"] = "self"
-            job_links_body["links"].append(self_link_body)
+        else:
+            self_link_body = {"href": job_url, "title": "Job status."}
+        self_link_body["rel"] = "self"
+        job_links_body["links"].append(self_link_body)
         return job_links_body
 
     def json(self, container=None, self_link=None):     # pylint: disable=W0221,arguments-differ

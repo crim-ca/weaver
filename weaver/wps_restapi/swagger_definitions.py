@@ -1090,16 +1090,13 @@ class GetPagingJobsSchema(ExtendedMappingSchema):
     page = ExtendedSchemaNode(Integer(), validator=Range(min=0))
 
 
-class JobCategoryDetail(PermissiveMappingSchema):
-    category = ExtendedSchemaNode(String(), missing=drop, default=None,
-                                  description="Value of the parameter forming that category group.")
+class JobCategoryFilters(PermissiveMappingSchema):
+    category = ExtendedSchemaNode(String(), title="CategoryFilter", variable="<category>", default=None, missing=None,
+                                  description="Value of the corresponding parameter forming that category group.")
 
 
 class GroupedJobsCategorySchema(ExtendedMappingSchema):
-    category = JobCategoryDetail(
-        default={},
-        description="Grouping values that compose the corresponding job list category."
-    )
+    category = JobCategoryFilters(description="Grouping values that compose the corresponding job list category.")
     jobs = JobCollection(description="List of jobs that matched the corresponding grouping values.")
     count = ExtendedSchemaNode(Integer(), description="Number of matching jobs for the corresponding group category.")
 
@@ -1362,6 +1359,25 @@ class BuiltinRequirementClass(BuiltinRequirementSpecification):
     _class = RequirementClass(example=CWL_REQUIREMENT_APP_BUILTIN, validator=OneOf([CWL_REQUIREMENT_APP_BUILTIN]))
 
 
+class ESGF_CWT_RequirementSpecification(PermissiveMappingSchema):
+    title = CWL_REQUIREMENT_APP_ESGF_CWT
+    description = (
+        "Hint indicating that the Application Package corresponds to an ESGF-CWT provider process"
+        "that should be remotely executed and monitored by this instance. "
+        "(note: can only be an 'hint' as it is unofficial CWL specification)."
+    )
+    process = AnyIdentifier(description="Process identifier of the remote ESGF-CWT provider.")
+    provider = AnyIdentifier(description="ESGF-CWT provider endpoint.")
+
+
+class ESGF_CWT_RequirementMap(ExtendedMappingSchema):
+    req = ESGF_CWT_RequirementSpecification(name=CWL_REQUIREMENT_APP_ESGF_CWT)
+
+
+class ESGF_CWT_RequirementClass(ESGF_CWT_RequirementSpecification):
+    _class = RequirementClass(example=CWL_REQUIREMENT_APP_ESGF_CWT, validator=OneOf([CWL_REQUIREMENT_APP_ESGF_CWT]))
+
+
 class WPS1RequirementSpecification(PermissiveMappingSchema):
     title = CWL_REQUIREMENT_APP_WPS1
     description = (
@@ -1420,17 +1436,19 @@ class CWLHintsMap(AnyOfKeywordSchema, PermissiveMappingSchema):
         DockerRequirementMap(missing=drop),
         DockerGpuRequirementMap(missing=drop),
         InitialWorkDirRequirementMap(missing=drop),
+        ESGF_CWT_RequirementMap(missing=drop),
         WPS1RequirementMap(missing=drop),
     ]
 
 
 class CWLHintsItem(OneOfKeywordSchema, PermissiveMappingSchema):
-    discriminator = "class"
+    discriminator = "class"  # required to distinguish between same structure but different values in 'class' field
     _one_of = [
         BuiltinRequirementClass(missing=drop),
         DockerRequirementClass(missing=drop),
         DockerGpuRequirementClass(missing=drop),
         InitialWorkDirRequirementClass(missing=drop),
+        ESGF_CWT_RequirementClass(missing=drop),
         WPS1RequirementClass(missing=drop),
         UnknownRequirementClass(missing=drop),  # allows anything, must be last
     ]

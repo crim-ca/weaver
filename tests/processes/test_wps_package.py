@@ -280,7 +280,7 @@ def test_stdout_stderr_logging_for_commandline_tool_failure():
     wps_package_instance.set_workdir(workdir)
 
     # ExecuteResponse mock
-    wps_request = MockWpsRequest()
+    wps_request = MockWpsRequest(process_id=process["id"])
     wps_response = type("", (object,), {"_update_status": lambda *_, **__: 1})()
     # FIXME: add more specific asserts... validate CWL command called but as some execution error entry logged
     try:
