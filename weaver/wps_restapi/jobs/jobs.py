@@ -81,7 +81,6 @@ def get_results(job, container, value_key=None, ogc_api=False):
         If ``True``, formats the results using the ``OGC-API - Processes`` format.
     :returns: list of all outputs each with minimally an ID and value under the requested key.
     """
-    process = None  # fetch process only if needed
     wps_url = get_wps_output_url(container)
     if not wps_url.endswith("/"):
         wps_url = wps_url + "/"
@@ -93,7 +92,9 @@ def get_results(job, container, value_key=None, ogc_api=False):
         out_id = get_any_id(result)
         out_key = rtype
         if rtype == "href":
-            value = wps_url + str(value).lstrip("/")
+            # fix paths relative to instance endpoint, but leave explicit links as is (eg: S3 bucket, remote HTTP, etc.)
+            if value.startswith("/"):
+                value = wps_url + str(value).lstrip("/")
         elif ogc_api:
             out_key = "value"
         elif value_key:

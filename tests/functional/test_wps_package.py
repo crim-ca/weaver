@@ -1464,7 +1464,8 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
         resp_json = mocked_s3.list_objects_v2(Bucket=output_bucket)
         bucket_file_keys = [obj["Key"] for obj in resp_json["Contents"]]
         for out_file in [input_file_s3, input_file_http]:
-            assert out_file in bucket_file_keys
+            out_key = "{}/{}".format(job_id, out_file)
+            assert out_key in bucket_file_keys
 
         # check that outputs are NOT copied locally, but that XML status does exist
         # counter validate path with file always present to ensure outputs are not 'missing' just because of wrong dir

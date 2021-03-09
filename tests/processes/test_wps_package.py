@@ -118,7 +118,8 @@ def test_check_package_file_with_url():
     package_url = "https://example.com/package.cwl"
     with mock.patch("requests.Session.request", return_value=MockResponseOk()) as mock_request:
         res_path, is_url = _check_package_file(package_url)
-        mock_request.assert_called_with("head", package_url)
+        assert mock_request.call_count == 1
+        assert mock_request.call_args[0][:2] == ("head", package_url)  # ignore extra args
     assert res_path == package_url
     assert is_url is True
 

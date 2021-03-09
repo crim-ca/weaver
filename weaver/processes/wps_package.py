@@ -1245,8 +1245,8 @@ class WpsPackage(Process):
             # when 'url' is directly enforced, 'ComplexOutput.json' will use it instead of 'file' from temp workdir
             # self.response.outputs[output_id].url = result_wps
 
-            # override builder only here so that only results are uploaded to S3, and not XML status also
-            # settings are retrieved from PyWPS server config
+            # override builder only here so that only results are uploaded to S3, and not XML status
+            # using this storage builder, settings are retrieved from PyWPS server config
             self.response.outputs[output_id]._storage = S3StorageBuilder().build()  # noqa: W0212
             self.response.outputs[output_id].storage.prefix = str(self.response.uuid)
 
