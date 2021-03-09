@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import TYPE_CHECKING
 from urllib.error import HTTPError
@@ -109,6 +110,8 @@ OUTPUT_FORMATS = {
     CONTENT_TYPE_APP_JSON: OUTPUT_FORMAT_JSON,
 }
 
+LOGGER = logging.getLogger(__name__)
+
 
 def get_format(mime_type):
     # type: (str) -> Format
@@ -190,8 +193,8 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
                                  allow_redirects=True, allowed_codes=[HTTPOk.code, HTTPNotFound.code])
             if resp.status_code == HTTPOk.code:
                 return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _mime_type)
-        except ConnectionError:
-            pass
+        except ConnectionError as exc:
+            LOGGER.debug("Format request [%s] connection error: [%s]", _mime_type_url, exc)
         try:
             resp = urlopen(_mime_type_url, timeout=1)  # nosec: B310 # is hardcoded HTTP(S)
             if resp.code == HTTPOk.code:

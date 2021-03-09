@@ -866,7 +866,7 @@ def request_extra(method,                       # type: str
                 return resp  # sub-called did the retry loop, so finish early this loop
             raise  # if not the expected cache exception, ignore retry attempt
         # function called without retries raises original error as if calling requests module directly
-        except requests.ConnectionError as exc:
+        except (requests.ConnectionError, requests.Timeout) as exc:
             if no_retries:
                 raise
             invalidate_region(caching_args)
