@@ -1017,24 +1017,39 @@ def assert_sane_name(name, min_len=3, max_len=None):
         raise InvalidIdentifierValue("Invalid name : {0}".format(name))
 
 
-def clean_json_text_body(body):
-    # type: (str) -> str
+def clean_json_text_body(body, remove_newlines=True, remove_indents=True):
+    # type: (str, bool, bool) -> str
     """
     Cleans a textual body field of superfluous characters to provide a better human-readable text in a JSON response.
     """
     # cleanup various escape characters and u'' stings
-    replaces = [(",\n", ", "), ("\\n", " "), (" \n", " "), ("\"", "\'"), ("\\", ""),
-                ("u\'", "\'"), ("u\"", "\'"), ("\'\'", "\'"), ("  ", " "), ("'. ", "")]
+    replaces = [(",\n", ", "), ("\\n", " "), (" \n", " "), ("\n'", "'"), ("\"", "\'"),
+                ("u\'", "\'"), ("u\"", "\'"), ("\'\'", "\'"), ("'. ", ""), ("'. '", ""),
+                ("}'", "}"), ("'{", "{")]
+    if remove_indents:
+        replaces.extend([("\\", " "), ("  ", " ")])
+    else:
+        replaces.extend([("\\", ""), ])
+    if not remove_newlines:
+        replaces.extend([("'\n  ", "'\n "), ("'\n '", "'\n'"), ("'\n'", "\n")])
+
     replaces_from = [r[0] for r in replaces]
     while any(rf in body for rf in replaces_from):
         for _from, _to in replaces:
             body = body.replace(_from, _to)
 
-    body_parts = [p.strip() for p in body.split("\n") if p != ""]               # remove new line and extra spaces
-    body_parts = [p + "." if not p.endswith(".") else p for p in body_parts]    # add terminating dot per sentence
-    body_parts = [p[0].upper() + p[1:] for p in body_parts if len(p)]           # capitalize first word
-    body_parts = " ".join(p for p in body_parts if p)
-    return body_parts
+    if remove_newlines:
+        body_parts = [p.strip() for p in body.split("\n") if p != ""]               # remove new line and extra spaces
+        body_parts = [p + "." if not p.endswith(".") else p for p in body_parts]    # add terminating dot per sentence
+        body_parts = [p[0].upper() + p[1:] for p in body_parts if len(p)]           # capitalize first word
+        body_clean = " ".join(p for p in body_parts if p)
+    else:
+        body_clean = body
+
+    # re-process without newlines to remove escapes created by concat of lines
+    if any(rf in body_clean for rf in replaces_from):
+        body_clean = clean_json_text_body(body_clean, remove_newlines=remove_newlines, remove_indents=remove_indents)
+    return body_clean
 
 
 def transform_json(json_data,               # type: JSON

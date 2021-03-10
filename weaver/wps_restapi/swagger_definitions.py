@@ -39,6 +39,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_ESGF_CWT,
     CWL_REQUIREMENT_APP_WPS1,
     PACKAGE_ARRAY_BASE,
+    PACKAGE_ARRAY_ITEMS,
     PACKAGE_CUSTOM_TYPES,
     PACKAGE_ENUM_BASE,
     PACKAGE_TYPE_POSSIBLE_VALUES
@@ -1494,7 +1495,7 @@ class CWLTypeSymbols(ExtendedSequenceSchema):
 
 class CWLTypeArray(ExtendedMappingSchema):
     type = ExtendedSchemaNode(String(), example=PACKAGE_ARRAY_BASE, validator=OneOf([PACKAGE_ARRAY_BASE]))
-    items = CWLTypeString()
+    items = CWLTypeString(title="CWLTypeArrayItems", validator=OneOf(PACKAGE_ARRAY_ITEMS))
 
 
 class CWLTypeEnum(ExtendedMappingSchema):
@@ -1517,7 +1518,7 @@ class CWLTypeList(ExtendedSequenceSchema):
 class CWLType(OneOfKeywordSchema):
     title = "CWL Type"
     _one_of = [
-        CWLTypeBase(summary="Specific CWL type."),
+        CWLTypeBase(summary="CWL type definition."),
         CWLTypeList(summary="Combination of allowed CWL types."),
     ]
 
@@ -1540,10 +1541,17 @@ class CWLInputObject(PermissiveMappingSchema):
                                          description="Defines how to specify the input for the command.")
 
 
+class CWLInputType(OneOfKeywordSchema):
+    _one_of = [
+        CWLTypeString(summary="Direct CWL type specification."),
+        CWLInputObject(summary="CWL type definition."),
+    ]
+
+
 class CWLInputMap(PermissiveMappingSchema):
-    input_id = CWLInputObject(variable="<input-id>", title="Input Identifier",
-                              description=IO_INFO_IDS.format(first="CWL", second="WPS", what="input") +
-                              " (Note: '<input-id>' is a variable corresponding for each identifier)")
+    input_id = CWLInputType(variable="<input-id>", title="CWLInputIdentifierType",
+                            description=IO_INFO_IDS.format(first="CWL", second="WPS", what="input") +
+                            " (Note: '<input-id>' is a variable corresponding for each identifier)")
 
 
 class CWLInputItem(CWLInputObject):
@@ -1568,13 +1576,25 @@ class OutputBinding(PermissiveMappingSchema):
 
 class CWLOutputObject(PermissiveMappingSchema):
     type = CWLType()
-    outputBinding = OutputBinding(description="Defines how to retrieve the output result from the command.")
+    # 'outputBinding' should usually be there most of the time (if not always) to retrieve file,
+    # but can technically be omitted in some very specific use-cases such as output literal or output is std logs
+    outputBinding = OutputBinding(
+        missing=drop,
+        description="Defines how to retrieve the output result from the command."
+    )
+
+
+class CWLOutputType(OneOfKeywordSchema):
+    _one_of = [
+        CWLTypeString(summary="Direct CWL type specification."),
+        CWLOutputObject(summary="CWL type definition."),
+    ]
 
 
 class CWLOutputMap(ExtendedMappingSchema):
-    output_id = CWLOutputObject(variable="<output-id>", title="Output Identifier",
-                                description=IO_INFO_IDS.format(first="CWL", second="WPS", what="output") +
-                                " (Note: '<output-id>' is a variable corresponding for each identifier)")
+    output_id = CWLOutputType(variable="<output-id>", title="CWLOutputIdentifierType",
+                              description=IO_INFO_IDS.format(first="CWL", second="WPS", what="output") +
+                              " (Note: '<output-id>' is a variable corresponding for each identifier)")
 
 
 class CWLOutputItem(CWLOutputObject):

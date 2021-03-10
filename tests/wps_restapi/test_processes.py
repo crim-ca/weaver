@@ -122,7 +122,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             "executionUnit": [
                 # full definition not required with mock
                 # use 'href' variant to avoid invalid schema validation via more explicit 'unit'
-                {"href": "{}.cwl".format(process_id)}
+                {"href": "http://{}.cwl".format(process_id)}
             ]
         }
 

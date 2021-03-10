@@ -6,7 +6,7 @@ from pyramid.httpexceptions import HTTPException, HTTPInternalServerError, HTTPR
 from pyramid.tweens import EXCVIEW, INGRESS
 
 from weaver.owsexceptions import OWSException, OWSNotImplemented
-from weaver.utils import fully_qualified_name
+from weaver.utils import clean_json_text_body, fully_qualified_name
 
 if TYPE_CHECKING:
     from typing import Union
@@ -29,8 +29,17 @@ def error_repr(http_err):
     if not isinstance(http_err, (HTTPException, OWSException)):
         return "({}) {!s}".format(err_type, http_err)
     err_code = getattr(http_err, "code", getattr(http_err, "status_code", 500))
-    err_repr = "({}) <{}> {!s}".format(err_type, err_code, http_err)
-    return err_repr
+    err_repr = str(http_err)
+    try:
+        # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
+        #        specific cleanup in case of string representation of colander.Invalid to help debug logged errors
+        err_repr = clean_json_text_body(err_repr, remove_newlines=False, remove_indents=False)
+        if "Invalid schema:" in err_repr:
+            err_repr = err_repr.replace("Invalid schema: [", "Invalid schema: [\n")[:-1] + "\n]"
+            err_repr = err_repr.replace(". Errors for each case:", ".\n Errors for each case:")
+    except Exception:  # noqa
+        pass
+    return "({}) <{}> {!s}".format(err_type, err_code, err_repr)
 
 
 def ows_response_tween(request, handler):
