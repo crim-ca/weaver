@@ -58,7 +58,8 @@ from weaver.wps_restapi.colander_extras import (
     NotKeywordSchema,
     OneOfCaseInsensitive,
     OneOfKeywordSchema,
-    PermissiveMappingSchema
+    PermissiveMappingSchema,
+    StringRange
 )
 from weaver.wps_restapi.utils import wps_restapi_base_path
 
@@ -435,18 +436,30 @@ class DescriptionType(ExtendedMappingSchema):
     links = LinkList(missing=drop)
 
 
-class AnyOccursType(OneOfKeywordSchema):
+class MinOccursDefinition(OneOfKeywordSchema):
+    description = "Minimum amount of values required for this input."
+    title = "Minimum Occurrences"
+    example = 1
     _one_of = [
-        ExtendedSchemaNode(Integer()),
-        ExtendedSchemaNode(String())
+        ExtendedSchemaNode(Integer(), validator=Range(min=0)),
+        ExtendedSchemaNode(String(), validator=StringRange(min=0)),
+    ]
+
+
+class MaxOccursDefinition(OneOfKeywordSchema):
+    description = "Maximum amount of values allowed for this input."
+    title = "Maximum Occurrences"
+    example = 1
+    _one_of = [
+        ExtendedSchemaNode(Integer(), validator=Range(min=0)),
+        ExtendedSchemaNode(String(), validator=StringRange(min=0)),
+        ExtendedSchemaNode(String(), validator=OneOf(["unbounded"])),
     ]
 
 
 class WithMinMaxOccurs(ExtendedMappingSchema):
-    minOccurs = AnyOccursType(title="minOccurs", missing=drop,
-                              description="Minimum allowed number of data occurrences of this item.")
-    maxOccurs = AnyOccursType(title="maxOccurs", missing=drop,
-                              description="Maximum allowed number of data occurrences of this item.")
+    minOccurs = MinOccursDefinition(missing=drop)
+    maxOccurs = MaxOccursDefinition(missing=drop)
 
 
 class ProcessDescriptionType(DescriptionType):
@@ -587,6 +600,10 @@ class LiteralInputType(NotKeywordSchema, ExtendedMappingSchema):
 
 class InputType(OneOfKeywordSchema, InputDescriptionType, WithMinMaxOccurs):
     _one_of = (
+        # NOTE:
+        #   LiteralInputType could be used to represent a complex input if the 'format' is missing in
+        #   process deployment definition but is instead provided in CWL definition.
+        #   This use case is still valid because 'format' can be inferred from the combining Process/CWL contents.
         BoundingBoxInputType,
         ComplexInputType,  # should be 2nd to last because very permissive, but requires format at least
         LiteralInputType,  # must be last because it"s the most permissive (all can default if omitted)
@@ -1020,7 +1037,7 @@ class ProcessCollection(ExtendedMappingSchema):
     processes = ProcessSummaryList()
 
 
-class Process(ProcessDescriptionType):
+class ProcessDeployment(ProcessDescriptionType):
     inputs = InputTypeList(missing=drop)
     outputs = OutputDescriptionList(missing=drop)
     visibility = VisibilityValue(missing=drop)
@@ -1221,7 +1238,7 @@ class QuoteProcessListSchema(ExtendedSequenceSchema):
 
 class QuoteSchema(ExtendedMappingSchema):
     id = UUID(description="Quote ID.")
-    process = ExtendedSchemaNode(String(), description="Corresponding process ID.")
+    process = AnyIdentifier(description="Corresponding process ID.")
     steps = QuoteProcessListSchema(description="Child processes and prices.")
     total = ExtendedSchemaNode(Float(), description="Total of the quote including step processes.")
 
@@ -1474,7 +1491,6 @@ class CWLTypeString(ExtendedSchemaNode):
     schema_type = String
     # in this case it is ok to use 'name' because target fields receiving it will
     # cause issues against builtin 'type' of Python reserved keyword
-    name = "type"
     title = "Type"
     description = "Field type definition."
     example = "float"
@@ -1507,7 +1523,7 @@ class CWLTypeBase(OneOfKeywordSchema):
     _one_of = [
         CWLTypeString(summary="CWL type as literal value."),
         CWLTypeArray(summary="CWL type as list of items."),
-        CWLTypeSymbols(summary="CWL type as enum of values."),
+        CWLTypeEnum(summary="CWL type as enum of values."),
     ]
 
 
@@ -1541,10 +1557,17 @@ class CWLInputObject(PermissiveMappingSchema):
                                          description="Defines how to specify the input for the command.")
 
 
+class CWLTypeStringList(ExtendedSequenceSchema):
+    description = "List of allowed direct CWL type specifications as strings."
+    type = CWLType()
+
+
 class CWLInputType(OneOfKeywordSchema):
+    description = "CWL type definition of the input."
     _one_of = [
-        CWLTypeString(summary="Direct CWL type specification."),
-        CWLInputObject(summary="CWL type definition."),
+        CWLTypeString(summary="Direct CWL type string specification."),
+        CWLTypeStringList(summary="List of allowed CWL type strings."),
+        CWLInputObject(summary="CWL type definition with parameters."),
     ]
 
 
@@ -1586,8 +1609,9 @@ class CWLOutputObject(PermissiveMappingSchema):
 
 class CWLOutputType(OneOfKeywordSchema):
     _one_of = [
-        CWLTypeString(summary="Direct CWL type specification."),
-        CWLOutputObject(summary="CWL type definition."),
+        CWLTypeString(summary="Direct CWL type string specification."),
+        CWLTypeStringList(summary="List of allowed CWL type strings."),
+        CWLOutputObject(summary="CWL type definition with parameters."),
     ]
 
 
@@ -1598,7 +1622,7 @@ class CWLOutputMap(ExtendedMappingSchema):
 
 
 class CWLOutputItem(CWLOutputObject):
-    id = ExtendedSchemaNode(String())
+    id = ExtendedSchemaNode(String(), description=IO_INFO_IDS.format(first="CWL", second="WPS", what="output"))
 
 
 class CWLOutputList(ExtendedSequenceSchema):
@@ -1641,8 +1665,8 @@ class Unit(ExtendedMappingSchema):
 
 
 class ProcessInputDescriptionSchema(ExtendedMappingSchema):
-    minOccurs = ExtendedSchemaNode(Integer())
-    maxOccurs = ExtendedSchemaNode(Integer())
+    minOccurs = MinOccursDefinition()
+    maxOccurs = MaxOccursDefinition()
     title = ExtendedSchemaNode(String())
     dataType = ExtendedSchemaNode(String())
     abstract = ExtendedSchemaNode(String())
@@ -1676,7 +1700,7 @@ class ProvidersSchema(ExtendedSequenceSchema):
 
 
 class ProcessesSchema(ExtendedSequenceSchema):
-    provider_processes_service = Process()
+    provider_processes_service = ProcessInputDescriptionSchema()
 
 
 class JobOutput(OneOfKeywordSchema, OutputDataType):
@@ -1848,7 +1872,7 @@ class ExecutionUnitList(ExtendedSequenceSchema):
 
 
 class ProcessOffering(ExtendedMappingSchema):
-    process = Process()
+    process = ProcessDeployment()
     processVersion = Version(title="processVersion", missing=drop)
     jobControlOptions = JobControlOptionsList(missing=drop)
     outputTransmission = TransmissionModeList(missing=drop)
@@ -1885,7 +1909,7 @@ class GetJobsQueries(ExtendedMappingSchema):
     page = ExtendedSchemaNode(Integer(), missing=drop, default=0, validator=Range(min=0))
     limit = ExtendedSchemaNode(Integer(), missing=drop, default=10)
     status = JobStatusEnum(missing=drop)
-    process = ExtendedSchemaNode(String(), missing=drop, default=None)
+    process = AnyIdentifier(missing=drop, default=None)
     provider = ExtendedSchemaNode(String(), missing=drop, default=None)
     sort = JobSortEnum(missing=drop)
     tags = ExtendedSchemaNode(String(), missing=drop, default=None,
@@ -1936,7 +1960,7 @@ class ProcessQuoteEndpoint(ProcessPath, QuotePath):
 class GetQuotesQueries(ExtendedMappingSchema):
     page = ExtendedSchemaNode(Integer(), missing=drop, default=0)
     limit = ExtendedSchemaNode(Integer(), missing=drop, default=10)
-    process = ExtendedSchemaNode(String(), missing=drop, default=None)
+    process = AnyIdentifier(missing=drop, default=None)
     sort = QuoteSortEnum(missing=drop)
 
 

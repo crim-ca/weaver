@@ -103,11 +103,33 @@ class OneOfCaseInsensitive(colander.OneOf):
             return super(OneOfCaseInsensitive, self).__call__(node, value)
 
 
+class StringRange(colander.Range):
+    """
+    Validator that provides the same functionalities as :class:`colander.Range` for a numerical string value.
+    """
+    def __init__(self, min=None, max=None, **kwargs):
+        try:
+            if isinstance(min, str):
+                min = int(min)
+            if isinstance(max, str):
+                max = int(max)
+        except ValueError:
+            raise SchemaNodeTypeError("StringRange validator created with invalid min/max non-numeric string.")
+        super(StringRange, self).__init__(min=min, max=max, **kwargs)
+
+    def __call__(self, node, value):
+        if not isinstance(value, str):
+            raise colander.Invalid(node=node, value=value, msg="Value is not a string.")
+        if not str.isnumeric(value):
+            raise colander.Invalid(node=node, value=value, msg="Value is not a numeric string.")
+        return super(StringRange, self).__call__(node, int(value))
+
+
 class ExtendedBoolean(colander.Boolean):
     def serialize(self, node, cstruct):
         result = super(ExtendedBoolean, self).serialize(node, cstruct)
         if result is not colander.null:
-            result = result == 'true'
+            result = result == "true"
         return result
 
 
@@ -456,7 +478,7 @@ class VariableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
             # value must be a dictionary map object to allow variable key
             if not isinstance(cstruct, dict):
                 raise colander.Invalid(
-                    node=self, msg="Variable key not allowed for non-mapping data: {}".format(type(cstruct))
+                    node=self, msg="Variable key not allowed for non-mapping data: {}".format(type(cstruct).__name__)
                 )
 
             var_invalid = colander.Invalid(
@@ -805,7 +827,7 @@ class KeywordMapper(ExtendedMappingSchema):
         if cstruct is colander.null:
             if self.required and not VariableSchemaNode.is_variable(self):
                 raise colander.Invalid(self, "Missing required fields.")
-            return colander.null
+            return ExtendedSchemaNode.deserialize(self, colander.null)
         # first process the keyword subnodes
         result = self._deserialize_keyword(cstruct)
         # if further fields where explicitly added next to the keyword schemas,

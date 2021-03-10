@@ -1031,7 +1031,7 @@ def clean_json_text_body(body, remove_newlines=True, remove_indents=True):
     else:
         replaces.extend([("\\", ""), ])
     if not remove_newlines:
-        replaces.extend([("'\n  ", "'\n "), ("'\n '", "'\n'"), ("'\n'", "\n")])
+        replaces.extend([("'\n  ", "'\n "), ("'\n '", "'\n'"), ("'\n'", "\n'")])
 
     replaces_from = [r[0] for r in replaces]
     while any(rf in body for rf in replaces_from):
