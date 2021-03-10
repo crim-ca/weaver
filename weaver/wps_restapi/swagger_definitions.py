@@ -423,17 +423,22 @@ class Offering(ExtendedMappingSchema):
 
 
 class OWSContext(ExtendedMappingSchema):
+    description = "OGC Web Service definition with references to contained application (see also 'executionUnit')."
     offering = Offering(title="offering")
 
 
 class DescriptionType(ExtendedMappingSchema):
-    title = ExtendedSchemaNode(String(), missing=drop)
-    abstract = ExtendedSchemaNode(String(), missing=drop)
-    keywords = KeywordList(missing=drop)
+    title = ExtendedSchemaNode(String(), missing=drop, description="Short name definition of the process.")
+    abstract = ExtendedSchemaNode(String(), missing=drop, description="Detailed explanation of the process operation.")
+    keywords = KeywordList(
+        default=[],
+        description="Keywords applied to the process for search and categorization purposes.")
+    metadata = MetadataList(
+        missing=drop,
+        description="External references to documentation or metadata sources relevant to the process.")
     owsContext = OWSContext(missing=drop, title="owsContext")
-    metadata = MetadataList(missing=drop)
     additionalParameters = AdditionalParametersList(missing=drop, title="additionalParameters")
-    links = LinkList(missing=drop)
+    links = LinkList(missing=drop, description="References to endpoints with information related to the process.")
 
 
 class MinOccursDefinition(OneOfKeywordSchema):

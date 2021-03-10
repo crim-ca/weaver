@@ -328,6 +328,14 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
         req = getattr(app, method)
         return url, req, req_kwargs
 
+    def _patch_response_methods(response, url):
+        if not hasattr(response, "content"):
+            setattr(response, "content", response.body)
+        if not hasattr(response, "raise_for_status"):
+            setattr(response, "raise_for_status", Response.raise_for_status)
+        if getattr(response, "url", None) is None:
+            setattr(response, "url", url)
+
     def mocked_app_request(method, url=None, **req_kwargs):
         """
         Request corresponding to :func:`requests.request` that instead gets executed by :class:`webTest.TestApp`,
@@ -341,13 +349,17 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
                 return real_request(session, method, url, **req_kwargs)
 
         url, func, req_kwargs = _parse_for_app_req(method, url, **req_kwargs)
+        redirects = req_kwargs.pop("allow_redirects", True)
         if not url.startswith("mock://"):
             _resp = func(url, expect_errors=True, **req_kwargs)
-            setattr(_resp, "content", _resp.body)
-            setattr(_resp, "raise_for_status", Response.raise_for_status)
         else:
             path = get_url_without_query(url.replace("mock://", ""))
             _resp = mocked_file_response(path, url)
+        if redirects:
+            # must handle redirects manually with TestApp
+            while 300 <= _resp.status_code < 400:
+                _resp = _resp.follow()
+        _patch_response_methods(_resp, url)
         return _resp
 
     with contextlib.ExitStack() as stack:
@@ -357,7 +369,7 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
         req_url, req_func, kwargs = _parse_for_app_req(function, *args, **kwargs)
         kwargs.setdefault("expect_errors", True)
         resp = req_func(req_url, **kwargs)
-        setattr(resp, "raise_for_status", Response.raise_for_status)
+        _patch_response_methods(resp, req_url)
         return resp
 
 
