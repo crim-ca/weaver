@@ -20,7 +20,7 @@ mongodb.port = 27017
 mongodb.db_name = weaver
 
 # caching
-cache.regions = doc, result
+cache.regions = doc, request, result
 cache.type = memory
 cache.doc.expire = 86400
 cache.doc.enabled = true

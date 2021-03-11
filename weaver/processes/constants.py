@@ -19,14 +19,20 @@ OPENSEARCH_LOCAL_FILE_SCHEME = "opensearchfile"  # must be a valid url scheme pa
 # CWL package (requirements/hints) corresponding to `PROCESS_APPLICATION`
 CWL_REQUIREMENT_APP_BUILTIN = "BuiltinRequirement"
 CWL_REQUIREMENT_APP_DOCKER = "DockerRequirement"
+CWL_REQUIREMENT_APP_DOCKER_GPU = "DockerGpuRequirement"
 CWL_REQUIREMENT_APP_ESGF_CWT = "ESGF-CWTRequirement"
 CWL_REQUIREMENT_APP_WPS1 = "WPS1Requirement"
 CWL_REQUIREMENT_APP_TYPES = frozenset([
     CWL_REQUIREMENT_APP_BUILTIN,
     CWL_REQUIREMENT_APP_DOCKER,
+    # FIXME: properly support GPU execution
+    #   - https://github.com/crim-ca/weaver/issues/104
+    #   - https://github.com/crim-ca/weaver/issues/138
+    # CWL_REQUIREMENT_APP_DOCKER_GPU,
     CWL_REQUIREMENT_APP_ESGF_CWT,
     CWL_REQUIREMENT_APP_WPS1,
 ])
+CWL_REQUIREMENT_INIT_WORKDIR = "InitialWorkDirRequirement"
 
 # CWL package types and extensions
 PACKAGE_SIMPLE_TYPES = frozenset(["string", "boolean", "float", "int", "integer", "long", "double"])

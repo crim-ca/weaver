@@ -37,7 +37,7 @@ from weaver.formats import (
     IANA_NAMESPACE,
     get_cwl_file_format
 )
-from weaver.processes.constants import CWL_REQUIREMENT_APP_BUILTIN
+from weaver.processes.constants import CWL_REQUIREMENT_APP_BUILTIN, CWL_REQUIREMENT_INIT_WORKDIR
 from weaver.utils import get_any_value
 
 EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_TEXT_PLAIN]
@@ -1373,7 +1373,7 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
             "baseCommand": "echo",
             "arguments": ["$(runtime.outdir)"],
             "requirements": {
-                "InitialWorkDirRequirement": {
+                CWL_REQUIREMENT_INIT_WORKDIR: {
                     # directly copy files to output dir in order to retrieve them by glob
                     "listing": [
                         {"entry": "$(inputs.input_with_http)"},

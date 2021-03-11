@@ -86,7 +86,7 @@ class WorkerExecuteResponse(ExecuteResponse):
 
 class WorkerService(ServiceWPS):
     """
-    Dispatches PyWPS requests from *older* WPS-1/2 XML endpoint to WPS-REST as appropriate.
+    Dispatches PyWPS requests from WPS-1/2 XML endpoint to WPS-REST as appropriate.
 
     .. note::
         For every WPS-Request type, the parsing of XML content is already handled by the PyWPS service for GET/POST.
@@ -277,7 +277,7 @@ class WorkerService(ServiceWPS):
 
 def get_pywps_service(environ=None, is_worker=False):
     """
-    Generates the PyWPS Service that provides *older* WPS-1/2 XML endpoint.
+    Generates the PyWPS Service that provides WPS-1/2 XML endpoint.
     """
     environ = environ or {}
     try:

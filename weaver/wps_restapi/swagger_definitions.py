@@ -36,8 +36,10 @@ from weaver.owsexceptions import OWSMissingParameterValue
 from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_BUILTIN,
     CWL_REQUIREMENT_APP_DOCKER,
+    CWL_REQUIREMENT_APP_DOCKER_GPU,
     CWL_REQUIREMENT_APP_ESGF_CWT,
     CWL_REQUIREMENT_APP_WPS1,
+    CWL_REQUIREMENT_INIT_WORKDIR,
     PACKAGE_ARRAY_BASE,
     PACKAGE_ARRAY_ITEMS,
     PACKAGE_CUSTOM_TYPES,
@@ -296,6 +298,11 @@ class RedirectHeaders(ResponseHeaders):
     Location = ExtendedSchemaNode(String(), example="https://job/123/result", description="Redirect resource location.")
 
 
+class NoContent(ExtendedMappingSchema):
+    description = "Empty response body."
+    default = {}
+
+
 class KeywordList(ExtendedSequenceSchema):
     keyword = ExtendedSchemaNode(String())
 
@@ -319,8 +326,11 @@ class MetadataBase(ExtendedMappingSchema):
     title = ExtendedSchemaNode(String(), missing=drop)
 
 
-class Link(LinkLanguage, MetadataBase):
+class LinkRelationship(ExtendedMappingSchema):
     rel = SLUG(description="Relationship of the link to the current content.")
+
+
+class Link(LinkRelationship, LinkLanguage, MetadataBase):
     href = URL(description="Hyperlink reference.")
 
 
@@ -328,17 +338,15 @@ class MetadataValue(NotKeywordSchema, ValueLanguage, MetadataBase):
     _not = [
         # make sure value metadata does not allow 'rel' and 'hreflang' reserved for link reference
         # explicitly refuse them such that when an href/rel link is provided, only link details are possible
-        ExtendedMappingSchema(ExtendedSchemaNode(String(), name="rel"),
-                              description="Field 'rel' must refer to a link reference with 'href'."),
-        ExtendedMappingSchema(ExtendedSchemaNode(String(), name="hreflang"),
-                              description="Field 'hreflang' must refer to a link reference with 'href'."),
+        LinkRelationship(description="Field 'rel' must refer to a link reference with 'href'."),
+        LinkLanguage(description="Field 'hreflang' must refer to a link reference with 'href'."),
     ]
     value = ExtendedSchemaNode(String(), description="Plain text value of the information.")
 
 
 class MetadataContent(OneOfKeywordSchema):
     _one_of = [
-        Link(),
+        Link(title="MetadataLink"),
         MetadataValue()
     ]
 
@@ -1357,12 +1365,10 @@ class DockerRequirementMap(ExtendedMappingSchema):
 
 
 class DockerRequirementClass(DockerRequirementSpecification):
-    title = "DockerRequirementClass"
     _class = RequirementClass(example=CWL_REQUIREMENT_APP_DOCKER, validator=OneOf([CWL_REQUIREMENT_APP_DOCKER]))
 
 
 class DockerGpuRequirementSpecification(DockerRequirementSpecification):
-    title = "DockerGpuRequirement"
     description = (
         "Docker requirement with GPU-enabled support (https://github.com/NVIDIA/nvidia-docker). "
         "The instance must have the NVIDIA toolkit installed to use this feature."
@@ -1370,12 +1376,12 @@ class DockerGpuRequirementSpecification(DockerRequirementSpecification):
 
 
 class DockerGpuRequirementMap(ExtendedMappingSchema):
-    DockerGpuRequirement = DockerGpuRequirementSpecification()
+    req = DockerGpuRequirementSpecification(name=CWL_REQUIREMENT_APP_DOCKER_GPU)
 
 
 class DockerGpuRequirementClass(DockerGpuRequirementSpecification):
-    title = "DockerGpuRequirementClass"
-    _class = RequirementClass(example="DockerGpuRequirement", validator=OneOf(["DockerGpuRequirement"]))
+    title = CWL_REQUIREMENT_APP_DOCKER_GPU
+    _class = RequirementClass(example=CWL_REQUIREMENT_APP_DOCKER_GPU, validator=OneOf([CWL_REQUIREMENT_APP_DOCKER_GPU]))
 
 
 class DirectoryListing(PermissiveMappingSchema):
@@ -1387,16 +1393,16 @@ class InitialWorkDirListing(ExtendedSequenceSchema):
 
 
 class InitialWorkDirRequirementSpecification(PermissiveMappingSchema):
-    title = "InitialWorkDirRequirement"
     listing = InitialWorkDirListing()
 
 
 class InitialWorkDirRequirementMap(ExtendedMappingSchema):
-    req = InitialWorkDirRequirementSpecification(name="InitialWorkDirRequirement")
+    req = InitialWorkDirRequirementSpecification(name=CWL_REQUIREMENT_INIT_WORKDIR)
 
 
 class InitialWorkDirRequirementClass(InitialWorkDirRequirementSpecification):
-    _class = RequirementClass(example="InitialWorkDirRequirement", validator=OneOf(["InitialWorkDirRequirement"]))
+    _class = RequirementClass(example=CWL_REQUIREMENT_INIT_WORKDIR,
+                              validator=OneOf([CWL_REQUIREMENT_INIT_WORKDIR]))
 
 
 class BuiltinRequirementSpecification(PermissiveMappingSchema):
@@ -1499,7 +1505,9 @@ class CWLHintsMap(AnyOfKeywordSchema, PermissiveMappingSchema):
 
 
 class CWLHintsItem(OneOfKeywordSchema, PermissiveMappingSchema):
-    discriminator = "class"  # required to distinguish between same structure but different values in 'class' field
+    # validators of individual requirements define which one applies
+    # in case of ambiguity, 'discriminator' distinguish between them using their 'example' values in 'class' field
+    discriminator = "class"
     _one_of = [
         BuiltinRequirementClass(missing=drop),
         DockerRequirementClass(missing=drop),
@@ -1703,6 +1711,14 @@ class Unit(ExtendedMappingSchema):
     unit = CWL(description="Execution unit definition as CWL package specification. " + CWL_DOC_MESSAGE)
 
 
+class ProcessInputDefaultValues(ExtendedSequenceSchema):
+    value = DefaultValues()
+
+
+class ProcessInputSupportedValues(ExtendedSequenceSchema):
+    value = SupportedValues()
+
+
 class ProcessInputDescriptionSchema(ExtendedMappingSchema):
     id = AnyIdentifier()
     title = ExtendedSchemaNode(String())
@@ -1710,16 +1726,24 @@ class ProcessInputDescriptionSchema(ExtendedMappingSchema):
     abstract = ExtendedSchemaNode(String())
     minOccurs = MinOccursDefinition()
     maxOccurs = MaxOccursDefinition()
-    defaultValue = ExtendedSequenceSchema(DefaultValues())
-    supportedValues = ExtendedSequenceSchema(SupportedValues())
+    defaultValue = ProcessInputDefaultValues()
+    supportedValues = ProcessInputSupportedValues()
+
+
+class ProcessInputDescriptionList(ExtendedSequenceSchema):
+    input = ProcessInputDescriptionSchema()
+
+
+class ProcessOutputDescriptionList(ExtendedSequenceSchema):
+    input = ProcessOutputDescriptionSchema()
 
 
 class ProcessDescriptionSchema(ExtendedMappingSchema):
     id = AnyIdentifier()
     label = ExtendedSchemaNode(String())
     description = ExtendedSchemaNode(String())
-    inputs = ExtendedSequenceSchema(ProcessInputDescriptionSchema())
-    outputs = ExtendedSequenceSchema(ProcessOutputDescriptionSchema())
+    inputs = ProcessInputDescriptionList()
+    outputs = ProcessOutputDescriptionList()
 
 
 class UndeploymentResult(ExtendedMappingSchema):
@@ -2017,12 +2041,12 @@ class QuoteEndpoint(QuotePath):
 
 class PostProcessQuote(ProcessPath, QuotePath):
     header = RequestHeaders()
-    body = ExtendedMappingSchema(default={})
+    body = NoContent()
 
 
 class PostQuote(QuotePath):
     header = RequestHeaders()
-    body = ExtendedMappingSchema(default={})
+    body = NoContent()
 
 
 class PostProcessQuoteRequestEndpoint(ProcessPath, QuotePath):
@@ -2139,7 +2163,7 @@ class InternalServerErrorGetProviderCapabilitiesResponse(ExtendedMappingSchema):
 
 class NoContentDeleteProviderSchema(ExtendedMappingSchema):
     header = ResponseHeaders()
-    body = ExtendedMappingSchema(default={})
+    body = NoContent()
 
 
 class InternalServerErrorDeleteProviderResponse(ExtendedMappingSchema):
@@ -2202,7 +2226,7 @@ class InternalServerErrorPostProcessesResponse(ExtendedMappingSchema):
 
 class BadRequestGetProcessInfoResponse(ExtendedMappingSchema):
     description = "Missing process identifier."
-    body = ExtendedMappingSchema(default={})
+    body = NoContent()
 
 
 class OkGetProcessInfoResponse(ExtendedMappingSchema):
@@ -2216,7 +2240,7 @@ class InternalServerErrorGetProcessResponse(ExtendedMappingSchema):
 
 class OkGetProcessPackageSchema(ExtendedMappingSchema):
     header = ResponseHeaders()
-    body = ExtendedMappingSchema(default={})
+    body = NoContent()
 
 
 class InternalServerErrorGetProcessPackageResponse(ExtendedMappingSchema):
@@ -2225,7 +2249,7 @@ class InternalServerErrorGetProcessPackageResponse(ExtendedMappingSchema):
 
 class OkGetProcessPayloadSchema(ExtendedMappingSchema):
     header = ResponseHeaders()
-    body = ExtendedMappingSchema(default={})
+    body = NoContent()
 
 
 class InternalServerErrorGetProcessPayloadResponse(ExtendedMappingSchema):

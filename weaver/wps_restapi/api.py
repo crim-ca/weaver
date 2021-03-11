@@ -168,22 +168,22 @@ def api_conformance(request):  # noqa: F811
     return HTTPOk(json=conformance)
 
 
+@cache_region("doc", sd.api_swagger_json_service.name)
 def get_swagger_json(http_scheme="http", http_host="localhost",
                      base_url=None, use_docstring_summary=True, settings=None):
     # type: (str, str, Optional[str], bool, Optional[SettingsType]) -> JSON
-    """Obtains the JSON schema of weaver API from request and response views schemas.
+    """Obtains the JSON schema of Weaver OpenAPI from request and response views schemas.
 
     :param http_scheme: Protocol scheme to use for building the API base if not provided by base URL parameter.
     :param http_host: Hostname to use for building the API base if not provided by base URL parameter.
     :param base_url: Explicit base URL to employ of as API base instead of HTTP scheme/host parameters.
-    :param use_docstring_summary:
-        Setting that controls if function docstring should be used to auto-generate the summary field of responses.
+    :param use_docstring_summary: Extra function docstring to auto-generate the summary field of responses.
+    :param settings: Application settings to retrieve further metadata details to be added to the OpenAPI.
 
     .. seealso::
         - :mod:`weaver.wps_restapi.swagger_definitions`
     """
     CorniceSwagger.type_converter = OAS3TypeConversionDispatcher
-    # cannot use response references, swagger-ui doesn't handle them properly (none gets displayed)
     swagger = CorniceSwagger(get_services(), def_ref_depth=-1, param_ref=True, resp_ref=True)
     # function docstrings are used to create the route's summary in Swagger-UI
     swagger.summary_docstrings = use_docstring_summary
@@ -233,7 +233,7 @@ def get_swagger_json(http_scheme="http", http_host="localhost",
                                  schema=sd.SwaggerJSONEndpoint(), response_schemas=sd.get_api_swagger_json_responses)
 def api_swagger_json(request):  # noqa: F811
     # type: (Request) -> dict
-    """weaver REST API schema generation in JSON format."""
+    """weaver OpenAPI schema generation in JSON format."""
     # obtain 'server' host and api-base-path, which doesn't correspond necessarily to the app's host and path
     # ex: 'server' adds '/weaver' with proxy redirect before API routes
     settings = get_settings(request)

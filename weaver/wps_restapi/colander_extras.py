@@ -62,7 +62,7 @@ from cornice_swagger.converters.exceptions import ConversionError, NoSuchConvert
 from cornice_swagger.converters.schema import ObjectTypeConverter, TypeConversionDispatcher, TypeConverter
 
 if TYPE_CHECKING:
-    from typing import Iterable, Optional, Type, Union
+    from typing import Dict, Iterable, Optional, Type, Union
 
 
 LITERAL_SCHEMA_TYPES = frozenset([
@@ -897,9 +897,11 @@ class OneOfKeywordSchema(KeywordMapper):
         are too permissive.
 
     In the event that you have very similar schemas that can sometime match except one identifier
-    (e.g.: field ``type`` defining the type of object), consider adding a validator to that
-    schema node with explicit values to solve the discrimination problem. As a shortcut, the keyword
-    ``discriminator = {"field-name": "value"}`` can be provided to try matching as a last resort.
+    (e.g.: field ``type`` defining the type of object), consider adding a ``validator`` to each sub-node
+    with explicit values to solve the discrimination problem.
+
+    As a shortcut, the OpenAPI keyword ``discriminator`` can be provided to try matching as a last resort.
+
     For example::
 
         class Animal(ExtendedMappingSchema):
@@ -917,18 +919,23 @@ class OneOfKeywordSchema(KeywordMapper):
 
         # With the discriminator keyword, following is possible
         class SomeAnimal(OneOfMappingSchema):
+            discriminator = {
+                "propertyName": "type",     # correspond to 'type' of 'Animal'
+                "mapping": {
+                    "cat": Cat, "dog": Dog  # map expected values to target schemas
+                }
+            }
             _one_of = [
-                Cat(discriminator={"type": "cat"}),
-                Dog(discriminator={"type": "dog"}),
+                Cat(),
+                Dog(),
             ]
 
     .. note::
-        ``discriminator`` keyword only supports a map of key-string to some literal value
-        as in the example, and the key must be located at the top level of the mapping.
-        If this is not the case, you probably need to redesign your schema and/or class
-        hierarchy slightly. Your use case is probably resolvable in some other way.
-        Class :class:`PermissiveMappingSchema` can also be considered if validation of
-        the sub-schemas is not strictly required.
+        Keyword ``discriminator`` supports a map of key-string to schemas-type as presented
+        in the example, and the key must be located at the top level of the mapping.
+        If only ``discriminator = "<field>"`` is provided, the definition will be created
+        automatically using the ``example`` (which should be only the matching value) of the
+        corresponding field of each node within the ``_one_of`` mapping.
 
     When multiple valid schemas are matched against the input data, the error will be
     raised and returned with corresponding erroneous elements for each sub-schema (fully listed).
@@ -952,8 +959,51 @@ class OneOfKeywordSchema(KeywordMapper):
     def __init__(self, *args, **kwargs):
         discriminator = getattr(self, self._discriminator, None)
         discriminator = kwargs.pop(self._discriminator, discriminator)
-        setattr(self, self._discriminator, discriminator)
         super(OneOfKeywordSchema, self).__init__(*args, **kwargs)
+        discriminator_spec = None
+        if discriminator:
+            schema_name = _get_node_name(self, schema_name=True)
+            keyword = self.get_keyword_name()
+            discriminator_spec = discriminator
+            if isinstance(discriminator, str):
+                discriminator_spec = {"propertyName": discriminator}
+            if isinstance(discriminator_spec, dict) and "mapping" not in discriminator_spec:
+                mapping = {}
+                for node in self.get_keyword_items():
+                    node_fields = [getattr(field, "example", colander.null) for field in node.children
+                                   if field.name == discriminator_spec["propertyName"]]
+                    if len(node_fields) != 1:
+                        continue
+                    example = node_fields[0]
+                    if example is not colander.null:
+                        if example in mapping:
+                            raise SchemaNodeTypeError(
+                                "Keyword schema '{}' of type '{}' specification with 'discriminator' attempts "
+                                "to refer to duplicate example values '{}' between '{}' and '{}'".format(
+                                    schema_name, keyword, example,
+                                    _get_node_name(mapping[example], schema_name=True),
+                                    _get_node_name(node, schema_name=True),
+                                )
+                            )
+                        mapping[example] = node
+                discriminator_spec["mapping"] = mapping
+            if not (isinstance(discriminator_spec, dict)
+                    and all(prop in discriminator_spec for prop in ["propertyName", "mapping"])
+                    and isinstance(discriminator_spec["propertyName"], str)
+                    and isinstance(discriminator_spec["mapping"], dict)
+                    and len(discriminator_spec["mapping"])
+                    and all(isinstance(node, colander.SchemaNode) and node.schema_type is colander.Mapping
+                            for name, node in discriminator_spec["mapping"].items())
+            ):
+                raise SchemaNodeTypeError(
+                    "Keyword schema '{}' of type '{}' specification with 'discriminator' must be a string "
+                    "or dictionary with 'propertyName' and 'mapping' of target value to schema nodes, "
+                    "but was specified as '{!s}".format(schema_name, keyword, discriminator))
+        setattr(self, self._discriminator, discriminator_spec)
+
+    @property
+    def discriminator_spec(self):
+        return getattr(self, self._discriminator, None)
 
     def _deserialize_keyword(self, cstruct):
         """
@@ -984,20 +1034,21 @@ class OneOfKeywordSchema(KeywordMapper):
                 "Must be only one of: {}.".format([_get_node_name(node, schema_name=True) for node in valid_nodes])
             )
 
-            discriminator = getattr(self, self._discriminator, None)
-            if isinstance(discriminator, dict):
+            discriminator = self.discriminator_spec
+            if discriminator:
                 # try last resort solve
                 valid_discriminated = []
                 error_discriminated = {}
                 for i, obj in enumerate(valid_one_of):
                     node = valid_nodes[i]
                     node_name = _get_node_name(node)
-                    if all(getattr(obj, d_key, None) == d_val
-                           for d_key, d_val in discriminator.items()):
-                        valid_discriminated.append(obj)
+                    node_field = [child for child in node.children if child.name == discriminator["propertyName"]]
+                    if len(node_field) == 1:
                         error_discriminated.update({node_name: obj})
-                    else:
-                        invalid_one_of = {}  # reset, at least one was matched
+                        node_value = node_field[0].example
+                        node_discriminated = discriminator["mapping"].get(node_value)
+                        if node_discriminated and isinstance(obj, type(node_discriminated)):
+                            valid_discriminated.append(obj)
                 if len(valid_discriminated) == 1:
                     return valid_discriminated[0]
                 elif len(valid_discriminated) > 1:
@@ -1152,7 +1203,8 @@ class NotKeywordSchema(KeywordMapper):
         - :class:`AllOfKeywordSchema`
         - :class:`AnyOfKeywordSchema`
     """
-    _keyword_schemas_only_object = False
+    _keyword_schemas_only_object = True
+    _keyword_schemas_same_struct = True
     _keyword = "_not"
 
     @classmethod
@@ -1205,6 +1257,7 @@ class OneOfKeywordTypeConverter(KeywordTypeConverter):
         - :class:`OneOfKeywordSchema`
     """
     def convert_type(self, schema_node):
+        # type: (OneOfKeywordSchema) -> Dict
         keyword = schema_node.get_keyword_name()
         one_of_obj = {
             keyword: []
@@ -1238,7 +1291,12 @@ class OneOfKeywordTypeConverter(KeywordTypeConverter):
             else:
                 obj_converted = self.dispatcher(item_obj)
             one_of_obj[keyword].append(obj_converted)
-
+        discriminator = schema_node.discriminator_spec
+        if schema_node.discriminator:
+            discriminator_spec = {"propertyName": discriminator["propertyName"], "mapping": {}}
+            for value, node in discriminator["mapping"].items():
+                discriminator_spec["mapping"][value] = node.title
+            one_of_obj["discriminator"] = discriminator_spec
         return one_of_obj
 
 
