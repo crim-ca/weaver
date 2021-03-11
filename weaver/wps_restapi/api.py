@@ -163,7 +163,24 @@ def api_conformance(request):  # noqa: F811
         "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/core",
         # "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/oas30",
         # "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/html"
-        "https://github.com/opengeospatial/wps-rest-binding",
+        "https://github.com/opengeospatial/wps-rest-binding",  # old reference for bw-compat
+        # see ogcapi-processes schemas details:
+        #   https://github.com/opengeospatial/ogcapi-processes
+        # see other references:
+        #   https://github.com/crim-ca/weaver/issues/53
+        #   https://htmlpreview.github.io/?https://github.com/opengeospatial/ogcapi-processes/blob/master/docs/18-062.html
+        "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/core",
+        "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/ogc-process-description",
+        "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/json",
+        # FIXME: https://github.com/crim-ca/weaver/issues/210
+        # "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/html",
+        "http://www.opengis.net/spec/ogcapi-processes-1/1.0/req/oas30",  # OpenAPI 3.0
+        "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/job-list",
+        # FIXME: https://github.com/crim-ca/weaver/issues/230
+        # "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/callback",
+        # FIXME: https://github.com/crim-ca/weaver/issues/228
+        # "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/dismiss",
+
     ]}
     return HTTPOk(json=conformance)
 
