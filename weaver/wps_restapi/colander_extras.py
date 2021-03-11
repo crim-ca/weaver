@@ -175,7 +175,7 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
     gets created.
     """
     def __init__(self, *args, **kwargs):
-        if _get_schema_type(self, check=True) in [colander.Mapping, colander.Sequence]:
+        if isinstance(_get_schema_type(self, check=True), (colander.Mapping, colander.Sequence)):
             if self.title in ["", colander.required] and not kwargs.get("title"):
                 kwargs["title"] = _get_node_name(self, schema_name=True)
         super(ExtendedSchemaBase, self).__init__(*args, **kwargs)

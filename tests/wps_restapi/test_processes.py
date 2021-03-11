@@ -122,7 +122,10 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             "executionUnit": [
                 # full definition not required with mock
                 # use 'href' variant to avoid invalid schema validation via more explicit 'unit'
-                {"href": "http://{}.cwl".format(process_id)}
+                # note:
+                #   hostname cannot have underscores according to [RFC-1123](https://www.ietf.org/rfc/rfc1123.txt)
+                #   schema validator of Reference URL will appropriately raise such invalid string
+                {"href": "http://weaver-test/{}.cwl".format(process_id)}
             ]
         }
 
@@ -549,7 +552,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             resp = self.app.post_json(path, params=data_execute, headers=self.json_headers)
             assert resp.status_code == 201, "Expected job submission without inputs created without error."
             job = self.job_store.fetch_by_id(resp.json["jobID"])
-            assert job.inputs[0]["value"] == "100"  # not cast to float or integer
+            assert job.inputs[0]["data"] == "100", "Input value should remain string and not be cast to float/integer"
 
     def test_execute_process_no_error_not_required_params(self):
         """
@@ -706,4 +709,4 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             except colander.Invalid:
                 pass
             else:
-                self.fail("Metadata is expected to be raised as invalid: (test: {}, metadata: {})".format(i, test_meta))
+                self.fail("Metadata is expected to be raised as invalid: (test: {}, metadata: {})".format(i, meta))

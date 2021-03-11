@@ -195,19 +195,20 @@ class UUID(ExtendedSchemaNode):
     title = "UUID"
 
 
-class AnyId(OneOfKeywordSchema):
-    _one_of = (
+class AnyIdentifier(SLUG):
+    pass
+
+
+# NOTE: future (https://github.com/crim-ca/weaver/issues/107)
+#       support versioning with <id:tag>
+class ProcessIdentifier(OneOfKeywordSchema):
+    description = "Process identifier."
+    _one_of = [
         SLUG(description="Generic identifier. This is a user-friendly slug-name. "
                          "Note that this will represent the latest process matching this name. "
                          "For specific process version, use the UUID instead.", title="ID"),
         UUID(description="Unique identifier.")
-    )
-
-
-# NOTE: future (https://github.com/crim-ca/weaver/issues/107)
-#  replace process/provider 'AnyIdentifier' by above 'AnyId'
-class AnyIdentifier(ExtendedSchemaNode):
-    schema_type = String
+    ]
 
 
 class Version(ExtendedSchemaNode):
@@ -266,18 +267,18 @@ class XmlHeader(ExtendedMappingSchema):
 
 
 class RequestContentTypeHeader(OneOfKeywordSchema):
-    _one_of = (
+    _one_of = [
         JsonHeader(),
         XmlHeader(),
-    )
+    ]
 
 
 class ResponseContentTypeHeader(OneOfKeywordSchema):
-    _one_of = (
+    _one_of = [
         JsonHeader(),
         XmlHeader(),
         HtmlHeader(),
-    )
+    ]
 
 
 class RequestHeaders(RequestContentTypeHeader):
@@ -305,29 +306,39 @@ class Language(ExtendedSchemaNode):
 
 
 class ValueLanguage(ExtendedMappingSchema):
-    value = ExtendedSchemaNode(String())
-    lang = Language(missing=drop)
+    lang = Language(missing=drop, description="Language of the value content.")
 
 
 class LinkLanguage(ExtendedMappingSchema):
-    href = URL()
-    hreflang = Language(missing=drop)
+    hreflang = Language(missing=drop, description="Language of the content located at the link.")
 
 
-class LinkMeta(ExtendedMappingSchema):
-    rel = ExtendedSchemaNode(String())
+class MetadataBase(ExtendedMappingSchema):
     type = ExtendedSchemaNode(String(), missing=drop)
     title = ExtendedSchemaNode(String(), missing=drop)
 
 
-class Link(LinkLanguage, LinkMeta):
-    pass
+class Link(LinkLanguage, MetadataBase):
+    rel = SLUG(description="Relationship of the link to the current content.")
+    href = URL(description="Hyperlink reference.")
 
 
-class MetadataContent(OneOfKeywordSchema, LinkMeta):
+class MetadataValue(NotKeywordSchema, ValueLanguage, MetadataBase):
+    _not = [
+        # make sure value metadata does not allow 'rel' and 'hreflang' reserved for link reference
+        # explicitly refuse them such that when an href/rel link is provided, only link details are possible
+        ExtendedMappingSchema(ExtendedSchemaNode(String(), name="rel"),
+                              description="Field 'rel' must refer to a link reference with 'href'."),
+        ExtendedMappingSchema(ExtendedSchemaNode(String(), name="hreflang"),
+                              description="Field 'hreflang' must refer to a link reference with 'href'."),
+    ]
+    value = ExtendedSchemaNode(String(), description="Plain text value of the information.")
+
+
+class MetadataContent(OneOfKeywordSchema):
     _one_of = [
-        LinkLanguage(),
-        ValueLanguage()
+        Link(),
+        MetadataValue()
     ]
 
 
@@ -430,20 +441,33 @@ class OWSContext(ExtendedMappingSchema):
 class DescriptionType(ExtendedMappingSchema):
     title = ExtendedSchemaNode(String(), missing=drop, description="Short name definition of the process.")
     abstract = ExtendedSchemaNode(String(), missing=drop, description="Detailed explanation of the process operation.")
-    keywords = KeywordList(
-        default=[],
-        description="Keywords applied to the process for search and categorization purposes.")
-    metadata = MetadataList(
-        missing=drop,
-        description="External references to documentation or metadata sources relevant to the process.")
     owsContext = OWSContext(missing=drop, title="owsContext")
     additionalParameters = AdditionalParametersList(missing=drop, title="additionalParameters")
     links = LinkList(missing=drop, description="References to endpoints with information related to the process.")
 
 
+class ProcessDescriptionMeta(ExtendedMappingSchema):
+    # employ empty lists by default if nothing is provided for process description
+    keywords = KeywordList(
+        default=[],
+        description="Keywords applied to the process for search and categorization purposes.")
+    metadata = MetadataList(
+        default=[],
+        description="External references to documentation or metadata sources relevant to the process.")
+
+
+class InputOutputDescriptionMeta(ExtendedMappingSchema):
+    # remove unnecessary empty lists by default if nothing is provided for inputs/outputs
+    def __init__(self, *args, **kwargs):
+        super(InputOutputDescriptionMeta, self).__init__(*args, **kwargs)
+        for child in self.children:
+            if child.name in ["keywords", "metadata"]:
+                child.missing = drop
+
+
 class MinOccursDefinition(OneOfKeywordSchema):
     description = "Minimum amount of values required for this input."
-    title = "Minimum Occurrences"
+    title = "MinOccurs"
     example = 1
     _one_of = [
         ExtendedSchemaNode(Integer(), validator=Range(min=0)),
@@ -453,7 +477,7 @@ class MinOccursDefinition(OneOfKeywordSchema):
 
 class MaxOccursDefinition(OneOfKeywordSchema):
     description = "Maximum amount of values allowed for this input."
-    title = "Maximum Occurrences"
+    title = "MaxOccurs"
     example = 1
     _one_of = [
         ExtendedSchemaNode(Integer(), validator=Range(min=0)),
@@ -467,16 +491,25 @@ class WithMinMaxOccurs(ExtendedMappingSchema):
     maxOccurs = MaxOccursDefinition(missing=drop)
 
 
-class ProcessDescriptionType(DescriptionType):
-    id = AnyIdentifier(description="Process identifier.")
+class ProcessDescriptionType(DescriptionType, ProcessDescriptionMeta):
+    title = "ProcessDescription"
+    id = ProcessIdentifier()
 
 
-class InputDescriptionType(DescriptionType):
-    id = SLUG(description=IO_INFO_IDS.format(first="WPS", second="CWL", what="input"))
+class InputIdentifierType(ExtendedMappingSchema):
+    id = AnyIdentifier(description=IO_INFO_IDS.format(first="WPS", second="CWL", what="input"))
 
 
-class OutputDescriptionType(DescriptionType):
-    id = SLUG(description=IO_INFO_IDS.format(first="WPS", second="CWL", what="output"))
+class OutputIdentifierType(ExtendedMappingSchema):
+    id = AnyIdentifier(description=IO_INFO_IDS.format(first="WPS", second="CWL", what="output"))
+
+
+class InputDescriptionType(InputIdentifierType, DescriptionType, InputOutputDescriptionMeta):
+    pass
+
+
+class OutputDescriptionType(OutputIdentifierType, DescriptionType, InputOutputDescriptionMeta):
+    pass
 
 
 class WithFormats(ExtendedMappingSchema):
@@ -558,12 +591,12 @@ class AnyLiteralType(OneOfKeywordSchema):
         - :class:`AnyLiteralValueType`
         - :class:`AnyLiteralDefaultType`
     """
-    _one_of = (
+    _one_of = [
         ExtendedSchemaNode(Float()),
         ExtendedSchemaNode(Integer()),
         ExtendedSchemaNode(Boolean()),
         ExtendedSchemaNode(String()),
-    )
+    ]
 
 
 class AnyLiteralDataType(ExtendedMappingSchema):
@@ -586,12 +619,12 @@ class LiteralDataDomainDefinition(ExtendedMappingSchema):
 
 
 class LiteralDataDomainConstraints(OneOfKeywordSchema, LiteralDataDomainDefinition):
-    _one_of = (
+    _one_of = [
         AllowedValues,
         AllowedRanges,
         ValuesReference,
         AnyValue,  # must be last because it"s the most permissive (always valid, default)
-    )
+    ]
 
 
 class LiteralDataDomainList(ExtendedSequenceSchema):
@@ -604,7 +637,7 @@ class LiteralInputType(NotKeywordSchema, ExtendedMappingSchema):
 
 
 class InputType(OneOfKeywordSchema, InputDescriptionType, WithMinMaxOccurs):
-    _one_of = (
+    _one_of = [
         # NOTE:
         #   LiteralInputType could be used to represent a complex input if the 'format' is missing in
         #   process deployment definition but is instead provided in CWL definition.
@@ -612,7 +645,7 @@ class InputType(OneOfKeywordSchema, InputDescriptionType, WithMinMaxOccurs):
         BoundingBoxInputType,
         ComplexInputType,  # should be 2nd to last because very permissive, but requires format at least
         LiteralInputType,  # must be last because it"s the most permissive (all can default if omitted)
-    )
+    ]
 
 
 class InputTypeList(ExtendedSequenceSchema):
@@ -633,11 +666,11 @@ class ComplexOutputType(WithFormats):
 
 
 class OutputType(OneOfKeywordSchema, OutputDescriptionType):
-    _one_of = (
+    _one_of = [
         BoundingBoxOutputType,
         ComplexOutputType,  # should be 2nd to last because very permissive, but requires format at least
         LiteralOutputType,  # must be last because it's the most permissive (all can default if omitted)
-    )
+    ]
 
 
 class OutputDescriptionList(ExtendedSequenceSchema):
@@ -971,17 +1004,16 @@ class ProcessLogsEndpoint(ProcessPath, JobPath):
 
 
 class CreateProviderRequestBody(ExtendedMappingSchema):
-    id = ExtendedSchemaNode(String())
+    id = AnyIdentifier()
     url = URL(description="Endpoint where to query the provider.")
     public = ExtendedSchemaNode(Boolean())
 
 
-class InputDataType(ExtendedMappingSchema):
-    id = ExtendedSchemaNode(String())
+class InputDataType(InputIdentifierType):
+    pass
 
 
-class OutputDataType(ExtendedMappingSchema):
-    id = ExtendedSchemaNode(String())
+class OutputDataType(OutputIdentifierType):
     format = Format(missing=drop)
 
 
@@ -1042,7 +1074,8 @@ class ProcessCollection(ExtendedMappingSchema):
     processes = ProcessSummaryList()
 
 
-class ProcessDeployment(ProcessDescriptionType):
+class Process(ProcessDescriptionType):
+    title = "Process"
     inputs = InputTypeList(missing=drop)
     outputs = OutputDescriptionList(missing=drop)
     visibility = VisibilityValue(missing=drop)
@@ -1087,10 +1120,10 @@ class JobEntrySchema(OneOfKeywordSchema):
     # note:
     #   Since JobID is a simple string (not a dict), no additional mapping field can be added here.
     #   They will be discarded by `OneOfKeywordSchema.deserialize()`.
-    _one_of = (
+    _one_of = [
         JobStatusInfo,
         ExtendedSchemaNode(String(), description="Job ID."),
-    )
+    ]
 
 
 class JobCollection(ExtendedSequenceSchema):
@@ -1133,10 +1166,10 @@ class GetGroupedJobsSchema(ExtendedMappingSchema):
 
 
 class GetQueriedJobsSchema(OneOfKeywordSchema):
-    _one_of = (
+    _one_of = [
         GetPagingJobsSchema,
         GetGroupedJobsSchema,
-    )
+    ]
     total = ExtendedSchemaNode(Integer(),
                                description="Total number of matched jobs regardless of grouping or paging result.")
 
@@ -1187,7 +1220,7 @@ class Reference(ExtendedMappingSchema):
 
 class AnyType(OneOfKeywordSchema):
     """Permissive variants that we attempt to parse automatically."""
-    _one_of = (
+    _one_of = [
         # literal data with 'data' key
         AnyLiteralDataType(),
         # same with 'value' key (OGC specification)
@@ -1195,7 +1228,7 @@ class AnyType(OneOfKeywordSchema):
         # HTTP references with various keywords
         LiteralReference(),
         Reference(),
-    )
+    ]
 
 
 class Input(InputDataType, AnyType):
@@ -1583,7 +1616,7 @@ class CWLInputMap(PermissiveMappingSchema):
 
 
 class CWLInputItem(CWLInputObject):
-    id = ExtendedSchemaNode(String(), description=IO_INFO_IDS.format(first="CWL", second="WPS", what="input"))
+    id = AnyIdentifier(description=IO_INFO_IDS.format(first="CWL", second="WPS", what="input"))
 
 
 class CWLInputList(ExtendedSequenceSchema):
@@ -1627,7 +1660,7 @@ class CWLOutputMap(ExtendedMappingSchema):
 
 
 class CWLOutputItem(CWLOutputObject):
-    id = ExtendedSchemaNode(String(), description=IO_INFO_IDS.format(first="CWL", second="WPS", what="output"))
+    id = AnyIdentifier(description=IO_INFO_IDS.format(first="CWL", second="WPS", what="output"))
 
 
 class CWLOutputList(ExtendedSequenceSchema):
@@ -1670,26 +1703,26 @@ class Unit(ExtendedMappingSchema):
 
 
 class ProcessInputDescriptionSchema(ExtendedMappingSchema):
-    minOccurs = MinOccursDefinition()
-    maxOccurs = MaxOccursDefinition()
+    id = AnyIdentifier()
     title = ExtendedSchemaNode(String())
     dataType = ExtendedSchemaNode(String())
     abstract = ExtendedSchemaNode(String())
-    id = ExtendedSchemaNode(String())
+    minOccurs = MinOccursDefinition()
+    maxOccurs = MaxOccursDefinition()
     defaultValue = ExtendedSequenceSchema(DefaultValues())
     supportedValues = ExtendedSequenceSchema(SupportedValues())
 
 
 class ProcessDescriptionSchema(ExtendedMappingSchema):
-    outputs = ExtendedSequenceSchema(ProcessOutputDescriptionSchema())
-    inputs = ExtendedSequenceSchema(ProcessInputDescriptionSchema())
-    description = ExtendedSchemaNode(String())
-    id = ExtendedSchemaNode(String())
+    id = AnyIdentifier()
     label = ExtendedSchemaNode(String())
+    description = ExtendedSchemaNode(String())
+    inputs = ExtendedSequenceSchema(ProcessInputDescriptionSchema())
+    outputs = ExtendedSequenceSchema(ProcessOutputDescriptionSchema())
 
 
 class UndeploymentResult(ExtendedMappingSchema):
-    id = ExtendedSchemaNode(String())
+    id = AnyIdentifier()
 
 
 class DeploymentResult(ExtendedMappingSchema):
@@ -1709,10 +1742,10 @@ class ProcessesSchema(ExtendedSequenceSchema):
 
 
 class JobOutput(OneOfKeywordSchema, OutputDataType):
-    _one_of = (
+    _one_of = [
         Reference(tilte="JobOutputReference"),
         AnyLiteralDataType(title="JobOutputLiteral")
-    )
+    ]
 
 
 class JobOutputList(ExtendedSequenceSchema):
@@ -1877,14 +1910,17 @@ class ExecutionUnitList(ExtendedSequenceSchema):
 
 
 class ProcessOffering(ExtendedMappingSchema):
-    process = ProcessDeployment()
+    process = Process()
     processVersion = Version(title="processVersion", missing=drop)
     jobControlOptions = JobControlOptionsList(missing=drop)
     outputTransmission = TransmissionModeList(missing=drop)
 
 
 class ProcessDescriptionChoiceType(OneOfKeywordSchema):
-    _one_of = (Reference, ProcessOffering)
+    _one_of = [
+        Reference(),
+        ProcessOffering()
+    ]
 
 
 class Deploy(ExtendedMappingSchema):

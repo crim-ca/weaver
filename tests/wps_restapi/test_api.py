@@ -110,7 +110,7 @@ class RebasedApiRoutesTestCase(unittest.TestCase):
             name = service.name + "_proxy"
             config.add_route(name=name, path=self.proxy_path + service.path)
             config.add_view(self.redirect_api_view, route_name=name)
-        testapp = get_test_weaver_app(config)
+        testapp = get_test_weaver_app(config=config)
 
         # setup environment that would define the new weaver location for the proxy pass
         resp = testapp.get(self.app_proxy_json, headers=self.json_headers)

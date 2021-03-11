@@ -36,7 +36,7 @@ def error_repr(http_err):
         err_repr = clean_json_text_body(err_repr, remove_newlines=False, remove_indents=False)
         if "Invalid schema:" in err_repr:
             err_repr = err_repr.replace("Invalid schema: [", "Invalid schema: [\n")[:-1] + "\n]"
-            err_repr = err_repr.replace(". Errors for each case:", ".\n Errors for each case:")
+            err_repr = err_repr.replace(". 'Errors for each case:", ".\n Errors for each case:")
     except Exception:  # noqa
         pass
     return "({}) <{}> {!s}".format(err_type, err_code, err_repr)
