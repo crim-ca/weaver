@@ -971,17 +971,25 @@ REGEX_ASSERT_INVALID_CHARACTERS = re.compile(r"^[a-zA-Z0-9_\-]+$")
 def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_character="_"):
     # type: (str, Optional[int], Optional[Union[int, None]], Optional[bool], str) -> Union[str, None]
     """
-    Returns a cleaned-up version of the input name, replacing invalid characters not matched with
+    Returns a cleaned-up version of the :paramref:`name`, replacing invalid characters not matched with
     :py:data:`REGEX_SEARCH_INVALID_CHARACTERS` by :paramref:`replace_character`.
 
-    :param name: value to clean
+    .. seealso::
+        :class:`weaver.wps_restapi.swagger_definitions.SLUG`
+
+    :param name:
+        Value to clean.
     :param min_len:
-        Minimal length of ``name`` to be respected, raises or returns ``None`` on fail according to ``assert_invalid``.
+        Minimal length of :paramref:`name`` to be respected, raises or returns ``None`` on fail according
+        to :paramref:`assert_invalid`.
     :param max_len:
-        Maximum length of ``name`` to be respected, raises or returns trimmed ``name`` on fail according to
-        ``assert_invalid``. If ``None``, condition is ignored for assertion or full ``name`` is returned respectively.
-    :param assert_invalid: If ``True``, fail conditions or invalid characters will raise an error instead of replacing.
-    :param replace_character: Single character to use for replacement of invalid ones if ``assert_invalid=False``.
+        Maximum length of :paramref:`name` to be respected, raises or returns trimmed :paramref:`name` on fail
+        according to :paramref:`assert_invalid`. If ``None``, condition is ignored for assertion or full
+        :paramref:`name` is returned respectively.
+    :param assert_invalid:
+        If ``True``, fail conditions or invalid characters will raise an error instead of replacing.
+    :param replace_character:
+        Single character to use for replacement of invalid ones if :paramref:`assert_invalid` is ``False``.
     """
     if not isinstance(replace_character, str) or not len(replace_character) == 1:
         raise ValueError("Single replace character is expected, got invalid [{!s}]".format(replace_character))

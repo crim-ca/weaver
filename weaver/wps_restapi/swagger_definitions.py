@@ -180,7 +180,7 @@ class SLUG(ExtendedSchemaNode):
     schema_type = String
     description = "Slug name pattern."
     example = "some-object-slug-name"
-    pattern = "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    pattern = "^[a-z0-9]+(?:(-|_)[a-z0-9]+)*$"
 
 
 class URL(ExtendedSchemaNode):
