@@ -706,7 +706,8 @@ class KeywordMapper(ExtendedMappingSchema):
     Each implementer must provide the corresponding ``keyword`` it defines amongst `OpenAPI` specification keywords.
     """
     schema_type = colander.MappingSchema.schema_type
-    _keyword_objects_only = False   # override validation as needed
+    _keyword_schemas_only_object = False    # override validation as needed
+    _keyword_schemas_same_struct = False    # override validation as needed
     _keywords = frozenset(["_one_of", "_all_of", "_any_of", "_not"])
     _keyword_map = {_kw: _kw.replace("_of", "Of").replace("_", "") for _kw in _keywords}  # kw->name
     _keyword_inv = {_kn: _kw for _kw, _kn in _keyword_map.items()}                        # name->kw
@@ -725,7 +726,6 @@ class KeywordMapper(ExtendedMappingSchema):
             if not self._keyword:
                 raise SchemaNodeTypeError("Type '{}' must define a keyword element.".format(self))
         self._validate_keyword_unique()
-        self._validate_keyword_objects()
         self._validate_keyword_schemas()
 
     @classmethod
@@ -755,35 +755,38 @@ class KeywordMapper(ExtendedMappingSchema):
                 list(self._keywords), self
             ))
 
-    def _validate_keyword_objects(self):
-        """
-        Validation of keyword sub-nodes to be only defined as schema *objects*
-        (i.e.: any node that defines its schema type as :class:`Mapping`).
-
-        This validation is executed only if the class inheriting from :class:`KeywordMapper`
-        defines ``_keyword_objects_only = True``.
-        """
-        if getattr(self, "_keyword_objects_only", False):
-            for child in self.get_keyword_items():
-                if child.schema_type is not colander.Mapping:
-                    key = self.get_keyword_name()
-                    raise SchemaNodeTypeError(
-                        "Keyword schema '{}' of type '{}' can only have object children, "
-                        "but '{}' is '{}'.".format(type(self), key, type(child), child.schema_type))
-
     def _validate_keyword_schemas(self):
         """
-        Additional convenience method that can be overridden by a keyword implementer
-        to validate the integrity of sub-node schemas with specific requirements.
-        If integrity is invalid, this method should raise :exc:`SchemaNodeTypeError`.
+        Validation of children schemas under keyword.
 
-        By default, nothing is executed here, it is meant purely as external extension.
-        This validation will be executed last after other validations.
+        Validation of keyword sub-nodes to be only defined as schema *objects* if property
+        ``_keyword_schemas_only_object = True`` (i.e.: any node that defines its schema type as :class:`Mapping`).
 
-        .. seealso::
-            - :meth:`_validate_keyword_unique`
-            - :meth:`_validate_keyword_objects`
+        Validation of keyword sub-nodes to all have matching structure of container if
+        ``_keyword_schemas_same_struct = True`` (i.e.: all :class:`colander.Mapping`, all literal schema-types, etc.).
         """
+        children = self.get_keyword_items()
+        keyword = self.get_keyword_name()
+        schema_name = _get_node_name(self, schema_name=True)
+        if getattr(self, "_keyword_schemas_only_object", False):
+            for child in children:
+                if child.schema_type is not colander.Mapping:
+                    raise SchemaNodeTypeError(
+                        "Keyword schema '{}' of type '{}' can only have object children, "
+                        "but '{}' is '{}'.".format(schema_name, keyword, type(child), child.schema_type)
+                    )
+        if getattr(self, "_keyword_schemas_same_struct", False):
+            node_types = {child.name: child.schema_type for child in children}
+            if not (
+                all(typ is colander.Mapping for _, typ in node_types.items())
+                or all(typ is colander.Sequence for _, typ in node_types.items())
+                or all(typ in LITERAL_SCHEMA_TYPES for _, typ in node_types.items())
+            ):
+                nodes_name_type = {child.name: child.schema_type for child in children}
+                raise SchemaNodeTypeError(
+                    "Keyword schema '{}' of type '{}' can only have children of same schemas-type structure, "
+                    "but different ones were found '{}'.".format(schema_name, keyword, nodes_name_type)
+                )
 
     @abstractmethod
     def _deserialize_keyword(self, cstruct):
@@ -935,7 +938,7 @@ class OneOfKeywordSchema(KeywordMapper):
         - :class:`AnyOfKeywordSchema`
         - :class:`NotKeywordSchema`
     """
-    _keyword_objects_only = False
+    _keyword_schemas_only_object = False
     _keyword = "_one_of"
     _discriminator = "discriminator"
 
@@ -1034,7 +1037,8 @@ class AllOfKeywordSchema(KeywordMapper):
         - :class:`AnyOfKeywordSchema`
         - :class:`NotKeywordSchema`
     """
-    _keyword_objects_only = True
+    _keyword_schemas_only_object = True
+    _keyword_schemas_same_struct = True
     _keyword = "_all_of"
 
     @classmethod
@@ -1091,7 +1095,8 @@ class AnyOfKeywordSchema(KeywordMapper):
         - :class:`AllOfKeywordSchema`
         - :class:`NotKeywordSchema`
     """
-    _keyword_objects_only = True
+    _keyword_schemas_only_object = False
+    _keyword_schemas_same_struct = True
     _keyword = "_any_of"
 
     @classmethod
@@ -1106,7 +1111,7 @@ class AnyOfKeywordSchema(KeywordMapper):
         Test each possible case, return if no corresponding schema was found.
         """
         option_any_of = dict()
-        merged_any_of = dict()
+        merged_any_of = colander.null
         invalid_any_of = colander.Invalid(node=self)
         for schema_class in self._any_of:  # noqa
             try:
@@ -1115,7 +1120,15 @@ class AnyOfKeywordSchema(KeywordMapper):
                 option_any_of.update({_get_node_name(schema_class, schema_name=True): str(schema_class)})
                 result = self._deserialize_subnode(schema_class, cstruct)
                 if result not in (colander.drop, colander.null):
-                    merged_any_of.update(result)
+                    # technically not supposed to have 'Sequence' type since they can only have one child
+                    # only possibility is all similar objects or all literals because of '_keyword_schemas_same_struct'
+                    if schema_class.schema_type is colander.Mapping:
+                        if merged_any_of is colander.null:
+                            merged_any_of = dict()
+                        merged_any_of.update(result)
+                    else:
+                        # schema nodes override one another if valid for multiple schemas
+                        merged_any_of = result
             except colander.Invalid as invalid:
                 invalid_any_of.add(invalid)
 
@@ -1123,7 +1136,7 @@ class AnyOfKeywordSchema(KeywordMapper):
             # nothing succeeded, the whole definition is invalid in this case
             invalid_any_of.msg = (
                 "Incorrect type, must represent any of: {}. "
-                "All missing from: {}".format(list(option_any_of), dict(cstruct))
+                "All missing from: {}".format(list(option_any_of), cstruct)
             )
             raise invalid_any_of
         return merged_any_of
@@ -1139,7 +1152,7 @@ class NotKeywordSchema(KeywordMapper):
         - :class:`AllOfKeywordSchema`
         - :class:`AnyOfKeywordSchema`
     """
-    _keyword_objects_only = False
+    _keyword_schemas_only_object = False
     _keyword = "_not"
 
     @classmethod

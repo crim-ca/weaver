@@ -201,13 +201,14 @@ class AnyIdentifier(SLUG):
 
 # NOTE: future (https://github.com/crim-ca/weaver/issues/107)
 #       support versioning with <id:tag>
-class ProcessIdentifier(OneOfKeywordSchema):
+class ProcessIdentifier(AnyOfKeywordSchema):
     description = "Process identifier."
-    _one_of = [
+    _any_of = [
+        # UUID first because more strict than SLUG, and SLUG can be similar to UUID, but in the end any is valid
+        UUID(description="Unique identifier."),
         SLUG(description="Generic identifier. This is a user-friendly slug-name. "
                          "Note that this will represent the latest process matching this name. "
                          "For specific process version, use the UUID instead.", title="ID"),
-        UUID(description="Unique identifier.")
     ]
 
 
