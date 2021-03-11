@@ -168,7 +168,6 @@ def api_conformance(request):  # noqa: F811
     return HTTPOk(json=conformance)
 
 
-@cache_region("doc", sd.api_swagger_json_service.name)
 def get_swagger_json(http_scheme="http", http_host="localhost",
                      base_url=None, use_docstring_summary=True, settings=None):
     # type: (str, str, Optional[str], bool, Optional[SettingsType]) -> JSON
@@ -229,6 +228,11 @@ def get_swagger_json(http_scheme="http", http_host="localhost",
     return swagger_json
 
 
+@cache_region("doc", sd.api_swagger_json_service.name)
+def api_swagger_json_cached(*args, **kwargs):
+    return get_swagger_json(*args, **kwargs)
+
+
 @sd.api_swagger_json_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
                                  schema=sd.SwaggerJSONEndpoint(), response_schemas=sd.get_api_swagger_json_responses)
 def api_swagger_json(request):  # noqa: F811
@@ -240,7 +244,7 @@ def api_swagger_json(request):  # noqa: F811
     weaver_server_url = get_weaver_url(settings)
     LOGGER.debug("Request app URL:   [%s]", request.url)
     LOGGER.debug("Weaver config URL: [%s]", weaver_server_url)
-    return get_swagger_json(base_url=weaver_server_url, use_docstring_summary=True, settings=settings)
+    return api_swagger_json_cached(base_url=weaver_server_url, use_docstring_summary=True, settings=settings)
 
 
 @sd.api_swagger_ui_service.get(tags=[sd.TAG_API],

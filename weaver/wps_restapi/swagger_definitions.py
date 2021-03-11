@@ -253,6 +253,7 @@ class AcceptLanguageHeader(ExtendedSchemaNode):
     # be that specific value but cannot have a field named with this format
     name = "Accept-Language"
     schema_type = String
+    missing = drop
     default = ACCEPT_LANGUAGE_EN_CA
     # FIXME: oneOf validator for supported languages (?)
 
