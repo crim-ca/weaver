@@ -59,7 +59,12 @@ from typing import TYPE_CHECKING
 
 import colander
 from cornice_swagger.converters.exceptions import ConversionError, NoSuchConverter
-from cornice_swagger.converters.schema import ObjectTypeConverter, TypeConversionDispatcher, TypeConverter
+from cornice_swagger.converters.schema import (
+    STRING_FORMATTERS,
+    ObjectTypeConverter,
+    TypeConversionDispatcher,
+    TypeConverter
+)
 
 if TYPE_CHECKING:
     from typing import Dict, Iterable, Optional, Type, Union
@@ -125,6 +130,32 @@ class StringRange(colander.Range):
         return super(StringRange, self).__call__(node, int(value))
 
 
+class SemanticVersion(colander.Regex):
+    """
+    String representation that is valid against Semantic Versioning specification.
+
+    .. seealso::
+        https://semver.org/
+    """
+
+    def __init__(self, *args, v_prefix=False, rc_suffix=True, **kwargs):
+        if "regex" in kwargs:
+            self.pattern = kwargs.pop("regex")
+        else:
+            v_prefix = "v" if v_prefix else ""
+            rc_suffix = r"(\.[a-zA-Z0-9\-_]+)*" if rc_suffix else ""
+            self.pattern = (
+                r"^"
+                + v_prefix +
+                r"\d+"      # major
+                r"(\.\d+"   # minor
+                r"(\.\d+"   # patch
+                + rc_suffix +
+                r")*)*$"
+            )
+        super(SemanticVersion, self).__init__(regex=self.pattern, *args, **kwargs)
+
+
 class ExtendedBoolean(colander.Boolean):
     def serialize(self, node, cstruct):
         result = super(ExtendedBoolean, self).serialize(node, cstruct)
@@ -149,6 +180,10 @@ class ExtendedInteger(colander.Integer):
         return result
 
 
+class ExtendedString(colander.String):
+    pass
+
+
 class ExtendedNodeInterface(object):
     _extension = None  # type: str
 
@@ -162,7 +197,7 @@ class ExtendedSchemaMeta(colander._SchemaMeta):
 
 class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
     """
-    Utility base node definition that insert itself at creation time of any other schema.
+    Utility base node definition that initializes additional parameters at creation time of any other extended schema.
 
     When no explicit ``title`` is specified by either keyword argument or field definition within container class,
     default it to the literal name of the class defining the schema node. This title can then be employed by other
@@ -173,11 +208,27 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
     to avoid applying the generic ``SchemaNode`` or ``ExtendedSchemaNode`` name of the basic node class. In this case,
     converters already employ the target ``name`` of the class attribute of the container schema under which that node
     gets created.
+
+    When the schema node is a generic :class:`colander.String` without explicit ``validator``, but that one can be
+    inferred from either ``pattern`` or ``format`` OpenAPI definition, the corresponding ``validator`` gets
+    automatically generated.
     """
     def __init__(self, *args, **kwargs):
-        if isinstance(_get_schema_type(self, check=True), (colander.Mapping, colander.Sequence)):
+        schema_type = _get_schema_type(self, check=True)
+        if isinstance(schema_type, (colander.Mapping, colander.Sequence)):
             if self.title in ["", colander.required] and not kwargs.get("title"):
                 kwargs["title"] = _get_node_name(self, schema_name=True)
+
+        if self.validator is None and isinstance(schema_type, colander.String):
+            format = kwargs.pop("format", getattr(self, "format", None))
+            pattern = kwargs.pop("pattern", getattr(self, "pattern", None))
+            if isinstance(pattern, str):
+                self.validator = colander.Regex(pattern)
+            elif isinstance(pattern, colander.Regex):
+                self.validator = pattern
+            elif format in STRING_FORMATTERS:
+                self.validator = STRING_FORMATTERS[format]["validator"]
+
         super(ExtendedSchemaBase, self).__init__(*args, **kwargs)
 
 
@@ -776,16 +827,15 @@ class KeywordMapper(ExtendedMappingSchema):
                         "but '{}' is '{}'.".format(schema_name, keyword, type(child), child.schema_type)
                     )
         if getattr(self, "_keyword_schemas_same_struct", False):
-            node_types = {child.name: child.schema_type for child in children}
+            node_types = {child.name: _get_schema_type(child) for child in children}
             if not (
-                all(typ is colander.Mapping for _, typ in node_types.items())
-                or all(typ is colander.Sequence for _, typ in node_types.items())
-                or all(typ in LITERAL_SCHEMA_TYPES for _, typ in node_types.items())
+                all(isinstance(typ, colander.Mapping) for _, typ in node_types.items())
+                or all(isinstance(typ, colander.Sequence) for _, typ in node_types.items())
+                or all(isinstance(typ, tuple(LITERAL_SCHEMA_TYPES)) for _, typ in node_types.items())
             ):
-                nodes_name_type = {child.name: child.schema_type for child in children}
                 raise SchemaNodeTypeError(
                     "Keyword schema '{}' of type '{}' can only have children of same schemas-type structure, "
-                    "but different ones were found '{}'.".format(schema_name, keyword, nodes_name_type)
+                    "but different ones were found '{}'.".format(schema_name, keyword, node_types)
                 )
 
     @abstractmethod
@@ -1501,35 +1551,6 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
                     converted["title"] = schema_node.name
 
         return converted
-
-
-def _dict_nested_contained(parent, child):
-    """Tests that a dict is 'contained' within a parent dict
-
-    .. code-block:: python
-
-        parent = {"other": 2, "test": [{"inside": 1, "other_nested": 2}]}
-        child = {"test": [{"inside": 1}]}
-        _dict_nested_contained(parent, child)
-        # returns: True
-
-    :param dict parent: The dict that could contain the child
-    :param dict child: The dict that could be nested inside the parent
-    """
-
-    if not isinstance(parent, dict) or not isinstance(child, dict):
-        return parent == child
-
-    for key, value in child.items():
-        if key not in parent:
-            return False
-        if isinstance(value, list):
-            if len(parent[key]) != len(value):
-                return False
-            return all(_dict_nested_contained(p, c) for p, c in zip(parent[key], value))
-        return _dict_nested_contained(parent[key], value)
-
-    return True
 
 
 def _make_node_instance(schema_node_or_class):

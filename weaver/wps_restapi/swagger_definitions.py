@@ -6,7 +6,7 @@ so that one can update the swagger without touching any other files after the in
 
 from typing import TYPE_CHECKING
 
-from colander import DateTime, OneOf, Range, String, drop
+from colander import DateTime, OneOf, Range, drop
 from cornice import Service
 
 from weaver import __meta__
@@ -57,10 +57,12 @@ from weaver.wps_restapi.colander_extras import (
     ExtendedMappingSchema,
     ExtendedSchemaNode,
     ExtendedSequenceSchema,
+    ExtendedString as String,
     NotKeywordSchema,
     OneOfCaseInsensitive,
     OneOfKeywordSchema,
     PermissiveMappingSchema,
+    SemanticVersion,
     StringRange
 )
 from weaver.wps_restapi.utils import wps_restapi_base_path
@@ -180,18 +182,18 @@ class SLUG(ExtendedSchemaNode):
     schema_type = String
     description = "Slug name pattern."
     example = "some-object-slug-name"
-    pattern = "^[a-z0-9]+(?:(-|_)[a-z0-9]+)*$"
+    pattern = "^[A-Za-z0-9]+(?:(-|_)[A-Za-z0-9]+)*$"
 
 
 class URL(ExtendedSchemaNode):
     schema_type = String
-    description = "URL reference"
+    description = "URL reference."
     format = "url"
 
 
 class UUID(ExtendedSchemaNode):
     schema_type = String
-    description = "UUID"
+    description = "Unique identifier."
     example = "a9d14bf4-84e0-449a-bac8-16e598efe807"
     format = "uuid"
     title = "UUID"
@@ -201,8 +203,6 @@ class AnyIdentifier(SLUG):
     pass
 
 
-# NOTE: future (https://github.com/crim-ca/weaver/issues/107)
-#       support versioning with <id:tag>
 class ProcessIdentifier(AnyOfKeywordSchema):
     description = "Process identifier."
     _any_of = [
@@ -219,8 +219,7 @@ class Version(ExtendedSchemaNode):
     schema_type = String
     description = "Version string."
     example = "1.2.3"
-    format = "version"
-    pattern = r"^\d+(\.\d+(\.\d+(\.[a-zA-Z0-9\-_]+)*)*)*$"
+    validator = SemanticVersion()
 
 
 class ContentTypeHeader(ExtendedSchemaNode):
@@ -807,6 +806,7 @@ class Visibility(ExtendedMappingSchema):
 
 
 class ProcessPath(ExtendedMappingSchema):
+    # FIXME: support versioning with <id:tag> (https://github.com/crim-ca/weaver/issues/107)
     process_id = AnyIdentifier(description="The process identifier.")
 
 
@@ -860,7 +860,7 @@ class WPSParameters(ExtendedMappingSchema):
                                  validator=OneOfCaseInsensitive(["WPS"]))
     request = ExtendedSchemaNode(String(), example="GetCapabilities", description="WPS operation to accomplish",
                                  validator=OneOfCaseInsensitive(["GetCapabilities", "DescribeProcess", "Execute"]))
-    version = ExtendedSchemaNode(String(), exaple="1.0.0", default="1.0.0", validator=OneOf(["1.0.0", "2.0.0"]))
+    version = Version(exaple="1.0.0", default="1.0.0", validator=OneOf(["1.0.0", "2.0.0"]))
     identifier = ExtendedSchemaNode(String(), exaple="hello", description="Process identifier.", missing=drop)
     data_inputs = ExtendedSchemaNode(String(), name="DataInputs", missing=drop, example="message=hi",
                                      description="Process execution inputs provided as Key-Value Pairs (KVP).")
@@ -1073,7 +1073,7 @@ class ExceptionReportType(ExtendedMappingSchema):
 
 class ProcessSummary(ProcessDescriptionType):
     """WPS process definition."""
-    version = ExtendedSchemaNode(String(), missing=drop)
+    version = Version(missing=drop)
     jobControlOptions = JobControlOptionsList(missing=drop)
     outputTransmission = TransmissionModeList(missing=drop)
     processDescriptionURL = URL(description="Process description endpoint.",
@@ -1699,8 +1699,14 @@ class CWLCommand(OneOfKeywordSchema):
     ]
 
 
+class CWLVersion(Version):
+    description = "CWL version of the described application package."
+    example = "v1.0"
+    validator = SemanticVersion(v_prefix=True, rc_suffix=False)
+
+
 class CWL(PermissiveMappingSchema):
-    cwlVersion = Version(description="CWL version of the described application package.", example="v1.0")
+    cwlVersion = CWLVersion()
     _class = CWLClass()
     requirements = CWLRequirements(description="Explicit requirement to execute the application package.", missing=drop)
     hints = CWLHints(description="Non-failing additional hints that can help resolve extra requirements.", missing=drop)
