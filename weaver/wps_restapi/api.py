@@ -79,23 +79,41 @@ def api_frontpage_body(settings):
         {"href": weaver_conform_url, "rel": "conformance", "type": CONTENT_TYPE_APP_JSON,
          "title": "WPS conformance classes implemented by this service."},
     ]
-    if weaver_api_def:
-        weaver_links.append({"href": weaver_api_def, "rel": "service", "type": CONTENT_TYPE_APP_JSON,
-                             "title": "OpenAPI schema specification of this service."})
     if weaver_api:
         weaver_links.extend([
             {"href": weaver_api_url,
              "rel": "service", "type": CONTENT_TYPE_APP_JSON,
              "title": "WPS REST API endpoint of this service."},
             {"href": weaver_api_def,
-             "rel": "swagger", "type": CONTENT_TYPE_TEXT_HTML,
+             "rel": "swagger-ui", "type": CONTENT_TYPE_TEXT_HTML,
              "title": "WPS REST API definition of this service."},
             {"href": weaver_api_spec,
              "rel": "OpenAPI", "type": CONTENT_TYPE_APP_JSON,
              "title": "WPS REST API specification of this service."},
             {"href": weaver_process_url,
              "rel": "processes", "type": CONTENT_TYPE_APP_JSON,
-             "title": "Processes offered by this service."}
+             "title": "Processes offered by this service."},
+            {"href": sd.OGC_API_REPO_URL,
+             "rel": "ogcapi-processes-repository", "type": CONTENT_TYPE_TEXT_HTML,
+             "title": "OGC-API - Processes schema definitions repository."},
+            {"href": sd.CWL_BASE_URL,
+             "rel": "cwl-home", "type": CONTENT_TYPE_TEXT_HTML,
+             "title": "Common Workflow Language (CWL) homepage."},
+            {"href": sd.CWL_REPO_URL,
+             "rel": "cwl-repository", "type": CONTENT_TYPE_TEXT_HTML,
+             "title": "Common Workflow Language (CWL) repositories."},
+            {"href": sd.CWL_SPEC_URL,
+             "rel": "cwl-specification", "type": CONTENT_TYPE_TEXT_HTML,
+             "title": "Common Workflow Language (CWL) specification."},
+            {"href": sd.CWL_USER_GUIDE_URL,
+             "rel": "cwl-user-guide", "type": CONTENT_TYPE_TEXT_HTML,
+             "title": "Common Workflow Language (CWL) user guide."},
+            {"href": sd.CWL_CMD_TOOL_URL,
+             "rel": "cwl-command-line-tool", "type": CONTENT_TYPE_TEXT_HTML,
+             "title": "Common Workflow Language (CWL) CommandLineTool specification."},
+            {"href": sd.CWL_WORKFLOW_URL,
+             "rel": "cwl-workflow", "type": CONTENT_TYPE_TEXT_HTML,
+             "title": "Common Workflow Language (CWL) Workflow specification."},
         ])
         if weaver_api_ref:
             # sample:
@@ -114,19 +132,26 @@ def api_frontpage_body(settings):
                                  "title": "API reference documentation about this service."})
     if weaver_wps:
         weaver_links.extend([
-            {"href": weaver_wps,
+            {"href": weaver_wps_url,
              "rel": "wps", "type": CONTENT_TYPE_TEXT_XML,
              "title": "WPS 1.0.0/2.0 XML endpoint of this service."},
             {"href": "http://docs.opengeospatial.org/is/14-065/14-065.html",
-             "rel": "wps-xml-specification", "type": CONTENT_TYPE_TEXT_HTML,
+             "rel": "wps-specification", "type": CONTENT_TYPE_TEXT_HTML,
              "title": "WPS 1.0.0/2.0 definition of this service."},
             {"href": "http://schemas.opengis.net/wps/",
-             "rel": "wps-xml-schema", "type": CONTENT_TYPE_TEXT_XML,
-             "title": "WPS 1.0.0/2.0 XML validation schemas."}
+             "rel": "wps-schema-repository", "type": CONTENT_TYPE_TEXT_HTML,
+             "title": "WPS 1.0.0/2.0 XML schemas repository."},
+            {"href": "http://schemas.opengis.net/wps/1.0.0/wpsAll.xsd",
+             "rel": "wps-schema-1", "type": CONTENT_TYPE_TEXT_XML,
+             "title": "WPS 1.0.0 XML validation schemas entrypoint."},
+            {"href": "http://schemas.opengis.net/wps/2.0/wps.xsd",
+             "rel": "wps-schema-2", "type": CONTENT_TYPE_TEXT_XML,
+             "title": "WPS 2.0 XML validation schemas entrypoint."},
         ])
     return {
         "message": "Weaver Information",
         "configuration": weaver_config,
+        "description": __meta__.__description__,
         "parameters": [
             {"name": "api", "enabled": weaver_api,
              "url": weaver_api_url,

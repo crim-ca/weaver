@@ -337,8 +337,8 @@ def get_job_results(request):
 
 
 @sd.provider_exceptions_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS, sd.TAG_PROVIDERS],
-                                    renderer=OUTPUT_FORMAT_JSON,
-                                    schema=sd.ProviderExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
+                                    renderer=OUTPUT_FORMAT_JSON, schema=sd.ProviderExceptionsEndpoint(),
+                                    response_schemas=sd.get_exceptions_responses)
 @sd.job_exceptions_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS], renderer=OUTPUT_FORMAT_JSON,
                                schema=sd.JobExceptionsEndpoint(), response_schemas=sd.get_exceptions_responses)
 @sd.process_exceptions_service.get(tags=[sd.TAG_JOBS, sd.TAG_EXCEPTIONS, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,

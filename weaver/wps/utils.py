@@ -57,7 +57,8 @@ def get_wps_path(container):
 
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
     """
-    return _get_settings_or_wps_config(container, "weaver.wps_path", "server", "url", "/ows/wps", "WPS path")
+    path = _get_settings_or_wps_config(container, "weaver.wps_path", "server", "url", "/ows/wps", "WPS path")
+    return urlparse(path).path
 
 
 def get_wps_url(container):

@@ -1,4 +1,6 @@
+import json
 import unittest
+from urllib.parse import urlparse
 
 import colander
 import mock
@@ -7,7 +9,8 @@ from pyramid.httpexceptions import HTTPForbidden, HTTPFound, HTTPUnauthorized
 from webtest import TestApp as WebTestApp
 
 from tests.utils import get_test_weaver_app, get_test_weaver_config
-from weaver.formats import CONTENT_TYPE_APP_JSON
+from weaver.formats import CONTENT_TYPE_ANY_XML, CONTENT_TYPE_APP_JSON
+from weaver.utils import request_extra
 from weaver.wps_restapi import swagger_definitions as sd
 
 
@@ -15,16 +18,37 @@ class GenericApiRoutesTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.testapp = get_test_weaver_app(settings=None)
+        cls.testapp = get_test_weaver_app(settings={"weaver.wps": True, "weaver.wps_restapi": True})
         cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
 
     def test_frontpage_format(self):
         resp = self.testapp.get(sd.api_frontpage_service.path, headers=self.json_headers)
         assert resp.status_code == 200
+        body = resp.json
         try:
-            sd.FrontpageSchema().deserialize(resp.json)
+            sd.FrontpageSchema().deserialize(body)
         except colander.Invalid as ex:
-            self.fail("expected valid response format as defined in schema [{!s}]".format(ex))
+            body = json.dumps(body, indent=2, ensure_ascii=False)
+            self.fail("expected valid response format as defined in schema [{!s}] in\n{}".format(ex, body))
+        refs = [link["rel"] for link in body["links"]]
+        assert len(body["links"]) == len(set(refs)), "Link relationships must all be unique"
+        for link in body["links"]:
+            path = link["href"]
+            rtype = link["type"]
+            if rtype in CONTENT_TYPE_ANY_XML:
+                rtype = CONTENT_TYPE_ANY_XML
+            else:
+                rtype = [rtype]
+            rel = link["rel"]
+            if "localhost" in path:
+                resp = self.testapp.get(urlparse(path).path, expect_errors=True)  # allow error for wps without queries
+            else:
+                resp = request_extra("GET", path, retries=3, retry_after=True, ssl_verify=False, allow_redirects=True)
+            code = resp.status_code
+            test = "({}) [{}]".format(rel, path)
+            assert code in [200, 400], "Reference link expected to be found, got [{}] for {}".format(code, test)
+            ctype = resp.headers.get("Content-Type", "").split(";")[0].strip()
+            assert ctype in rtype, "Reference link content does not match [{}]!=[{}] for {}".format(ctype, rtype, test)
 
     def test_version_format(self):
         resp = self.testapp.get(sd.api_versions_service.path, headers=self.json_headers)

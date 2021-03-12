@@ -1056,13 +1056,14 @@ class OneOfKeywordSchema(KeywordMapper):
                             )
                         mapping[example] = node
                 discriminator_spec["mapping"] = mapping
-            if not (isinstance(discriminator_spec, dict)
-                    and all(prop in discriminator_spec for prop in ["propertyName", "mapping"])
-                    and isinstance(discriminator_spec["propertyName"], str)
-                    and isinstance(discriminator_spec["mapping"], dict)
-                    and len(discriminator_spec["mapping"])
-                    and all(isinstance(node, colander.SchemaNode) and node.schema_type is colander.Mapping
-                            for name, node in discriminator_spec["mapping"].items())
+            if not (
+                isinstance(discriminator_spec, dict)
+                and all(prop in discriminator_spec for prop in ["propertyName", "mapping"])
+                and isinstance(discriminator_spec["propertyName"], str)
+                and isinstance(discriminator_spec["mapping"], dict)
+                and len(discriminator_spec["mapping"])
+                and all(isinstance(node, colander.SchemaNode) and node.schema_type is colander.Mapping
+                        for name, node in discriminator_spec["mapping"].items())
             ):
                 raise SchemaNodeTypeError(
                     "Keyword schema '{}' of type '{}' specification with 'discriminator' must be a string "

@@ -6,7 +6,7 @@ so that one can update the swagger without touching any other files after the in
 
 from typing import TYPE_CHECKING
 
-from colander import DateTime, OneOf, Range, Regex, drop
+from colander import DateTime, Email, OneOf, Range, Regex, drop
 from cornice import Service
 
 from weaver import __meta__
@@ -84,16 +84,26 @@ API_DOCS = {
     "url": __meta__.__documentation_url__
 }
 
+CWL_VERSION = "v1.1"
+CWL_REPO_URL = "https://github.com/common-workflow-language"
+CWL_BASE_URL = "https://www.commonwl.org"
+CWL_SPEC_URL = "{}/#Specification".format(CWL_BASE_URL)
+CWL_USER_GUIDE_URL = "{}/user_guide".format(CWL_BASE_URL)
+CWL_CMD_TOOL_URL = "{}/{}/CommandLineTool.html".format(CWL_BASE_URL, CWL_VERSION)
+CWL_WORKFLOW_URL = "{}/{}/Workflow.html".format(CWL_BASE_URL, CWL_VERSION)
 CWL_DOC_MESSAGE = (
     "Note that multiple formats are supported and not all specification variants or parameters "
     "are presented here. Please refer to official CWL documentation for more details "
-    "(https://www.commonwl.org/)."
+    "({}).".format(CWL_BASE_URL)
 )
 
 IO_INFO_IDS = (
     "Identifier of the {first} {what}. To merge details between corresponding {first} and {second} "
     "{what} specifications, this is the value that will be used to associate them together."
 )
+
+OGC_API_REPO_URL = "https://github.com/opengeospatial/ogcapi-processes"
+OGC_API_SCHEMA_URL = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes"
 
 #########################################################
 # API tags
@@ -437,7 +447,7 @@ class FormatDescription(FormatDefault, FormatExtra):
 
 class FormatMedia(FormatExtra):
     """Format employed for reference results respecting 'OGC-API - Processes' schemas."""
-    schema_ref = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/formatDescription.yaml"
+    schema_ref = "{}/master/core/openapi/schemas/formatDescription.yaml".format(OGC_API_SCHEMA_URL)
     mediaType = ExtendedSchemaNode(String())
     schema = ExtendedSchemaNode(String(), missing=drop)
     encoding = ExtendedSchemaNode(String(), missing=drop)
@@ -609,7 +619,7 @@ class LiteralReference(ExtendedMappingSchema):
 
 
 class NameReferenceType(ExtendedMappingSchema):
-    schema_ref = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/nameReferenceType.yaml"
+    schema_ref = "{}/master/core/openapi/schemas/nameReferenceType.yaml".format(OGC_API_SCHEMA_URL)
     name = ExtendedSchemaNode(String())
     reference = ReferenceURL(missing=drop)
 
@@ -937,7 +947,7 @@ class WPSParameters(ExtendedMappingSchema):
                                  validator=OneOfCaseInsensitive(["WPS"]))
     request = ExtendedSchemaNode(String(), example="GetCapabilities", description="WPS operation to accomplish",
                                  validator=OneOfCaseInsensitive(["GetCapabilities", "DescribeProcess", "Execute"]))
-    version = Version(exaple="1.0.0", default="1.0.0", validator=OneOf(["1.0.0", "2.0.0"]))
+    version = Version(exaple="1.0.0", default="1.0.0", validator=OneOf(["1.0.0", "2.0.0", "2.0"]))
     identifier = ExtendedSchemaNode(String(), exaple="hello", description="Process identifier.", missing=drop)
     data_inputs = ExtendedSchemaNode(String(), name="DataInputs", missing=drop, example="message=hi",
                                      description="Process execution inputs provided as Key-Value Pairs (KVP).")
@@ -1340,6 +1350,7 @@ class Execute(ExtendedMappingSchema):
     notification_email = ExtendedSchemaNode(
         String(),
         missing=drop,
+        validator=Email(),
         description="Optionally send a notification email when the job is done.")
     response = ExtendedSchemaNode(String(), validator=OneOf(EXECUTE_RESPONSE_OPTIONS))
 
@@ -1778,7 +1789,7 @@ class CWLCommand(OneOfKeywordSchema):
 
 class CWLVersion(Version):
     description = "CWL version of the described application package."
-    example = "v1.0"
+    example = CWL_VERSION
     validator = SemanticVersion(v_prefix=True, rc_suffix=False)
 
 
@@ -1900,7 +1911,7 @@ class ResultReferenceList(ExtendedSequenceSchema):
 
 
 class ResultData(OneOfKeywordSchema):
-    schema_ref = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/result.yaml"
+    schema_ref = "{}/master/core/openapi/schemas/result.yaml".format(OGC_API_SCHEMA_URL)
     _one_of = [
         # must place formatted value first since both value/format fields are simultaneously required
         # other classes require only one of the two, and therefore are more permissive during schema validation
@@ -1915,7 +1926,7 @@ class ResultData(OneOfKeywordSchema):
 
 class Result(ExtendedMappingSchema):
     """Result outputs obtained from a successful process job execution."""
-    example_ref = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/examples/json/Result.json"
+    example_ref = "{}/master/core/examples/json/Result.json".format(OGC_API_SCHEMA_URL)
     output_id = ResultData(
         variable="<output-id>", title="Output Identifier",
         description=(

@@ -30,7 +30,6 @@ from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_XML
 from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
 from weaver.utils import get_path_kvp, get_url_without_query, get_weaver_url, null
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
-from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     import botocore.client  # noqa
@@ -303,11 +302,8 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
         When ``True``, only mock requests targeted at :paramref:`app` based on request URL hostname (ignore external).
         Otherwise, mock every underlying request regardless of hostname, including ones not targeting the application.
     """
-    from weaver.wps_restapi.colander_extras import SchemeURL
-    from weaver.wps_restapi.swagger_definitions import ReferenceURL, FileURL, FileLocal
+    from weaver.wps_restapi.swagger_definitions import FileLocal
     from requests.sessions import Session as RealSession
-    real_deserialize = ReferenceURL.deserialize
-    #real_deserialize = AnyOfKeywordSchema.deserialize
     real_request = RealSession.request
 
     def _parse_for_app_req(method, url, **req_kwargs):
@@ -368,36 +364,13 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
         _patch_response_methods(_resp, url)
         return _resp
 
-    class MockURL(FileURL):
-        validator = SchemeURL(schemes=["http", "https", "ftp", "ftps", "mock"])
-
-        #validator = colander.Regex(r"^mock://\S+$")
-
-        #def deserialize(self, url):
-        #    if isinstance(url, str) and url.startswith("mock://"):
-        #        return url
-        #    return super(MockURL, self).deserialize(url)
-        #    #return real_deserialize(self, url)
-
-    def mock_deserialize(self, url=None):
-        if isinstance(url, str) and url.startswith("mock://"):
-            return url
-        return real_deserialize(ReferenceURL(missing=colander.drop), url)
-        #return real_deserialize(AnyOfKeywordSchema())
-
-    #mock_url = ReferenceURL._any_of + [MockURL()]
-
-    import weaver.wps_restapi.swagger_definitions
+    # permit schema validation against 'mock' scheme during test only
     mock_file_regex = mock.PropertyMock(return_value=colander.Regex(r"^(file|mock://)?(?:/|[/?]\S+)$"))
-
     with contextlib.ExitStack() as stack:
         stack.enter_context(mock.patch("requests.request", side_effect=mocked_app_request))
         stack.enter_context(mock.patch("requests.Session.request", side_effect=mocked_app_request))
         stack.enter_context(mock.patch("requests.sessions.Session.request", side_effect=mocked_app_request))
         stack.enter_context(mock.patch.object(FileLocal, "validator", new_callable=mock_file_regex))
-        #stack.enter_context(mock.patch("weaver.wps_restapi.swagger_definitions.Reference", side_effect=MockURL))
-        # stack.enter_context(mock.patch.object(sd.ReferenceURL, "deserialize", side_effect=mock_deserialize))
-        # stack.enter_context(mock.patch("weaver.wps_restapi.swagger_definitions.ReferenceURL", new_callable=lambda *_, **__: MockURL(*_, **__)))
         req_url, req_func, kwargs = _parse_for_app_req(function, *args, **kwargs)
         kwargs.setdefault("expect_errors", True)
         resp = req_func(req_url, **kwargs)
