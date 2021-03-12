@@ -2,7 +2,9 @@ import unittest
 
 import colander
 import mock
+import pyramid.testing
 from pyramid.httpexceptions import HTTPForbidden, HTTPFound, HTTPUnauthorized
+from webtest import TestApp as WebTestApp
 
 from tests.utils import get_test_weaver_app, get_test_weaver_config
 from weaver.formats import CONTENT_TYPE_APP_JSON
@@ -82,9 +84,12 @@ class GenericApiRoutesTestCase(unittest.TestCase):
 
 
 class RebasedApiRoutesTestCase(unittest.TestCase):
+    proxy_calls = []
+
     @classmethod
     def redirect_api_view(cls, request):
         path = request.url.replace(cls.proxy_path, "")  # noqa
+        cls.proxy_calls.append((request.url, path))
         return HTTPFound(location=path)
 
     @classmethod
@@ -97,6 +102,9 @@ class RebasedApiRoutesTestCase(unittest.TestCase):
         cls.app_proxy_ui = cls.proxy_path + sd.api_swagger_ui_service.path
         cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON}
 
+    def setUp(self):
+        self.proxy_calls = []
+
     def test_swagger_api_request_base_path_proxied(self):
         """
         Validates that Swagger JSON properly redefines the host/path to test live requests on Swagger UI
@@ -106,15 +114,17 @@ class RebasedApiRoutesTestCase(unittest.TestCase):
         # fake "proxy" derived path for testing simulated server proxy pass
         # create redirect views to simulate the server proxy pass
         config = get_test_weaver_config(settings={"weaver.url": self.app_proxy_url})  # real access proxy path in config
-        for service in [sd.api_swagger_json_service, sd.api_swagger_ui_service]:
-            name = service.name + "_proxy"
-            config.add_route(name=name, path=self.proxy_path + service.path)
-            config.add_view(self.redirect_api_view, route_name=name)
-        testapp = get_test_weaver_app(config=config)
+        test_app = get_test_weaver_app(config=config)
+
+        config = pyramid.testing.setUp(settings={})
+        config.add_route(name="proxy", path=self.proxy_path, pattern=self.proxy_path + "/{remain:.*}")
+        config.add_view(self.redirect_api_view, route_name="proxy")
+        redirect_app = WebTestApp(config.make_wsgi_app())
 
         # setup environment that would define the new weaver location for the proxy pass
-        resp = testapp.get(self.app_proxy_json, headers=self.json_headers)
+        resp = redirect_app.get(self.app_proxy_json, headers=self.json_headers)
         assert resp.status_code == 302, "Request should be at proxy level at this point."
+        resp.test_app = test_app  # replace object to let follow redirect correctly
         resp = resp.follow()
         assert resp.status_code == 200
         assert resp.json["host"] == self.app_host
@@ -122,8 +132,9 @@ class RebasedApiRoutesTestCase(unittest.TestCase):
             "Proxy path specified by setting 'weaver.url' should be used in API definition to allow live requests."
 
         # validate that swagger UI still renders and has valid URL
-        resp = testapp.get(self.app_proxy_ui)
+        resp = redirect_app.get(self.app_proxy_ui)
         assert resp.status_code == 302, "Request should be at proxy level at this point."
+        resp.test_app = test_app  # replace object to let follow redirect correctly
         resp = resp.follow()
         assert resp.status_code == 200
         assert "<title>{}</title>".format(sd.API_TITLE) in resp.text
