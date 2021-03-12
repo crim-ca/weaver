@@ -1081,7 +1081,18 @@ class AllOfKeywordSchema(KeywordMapper):
 
     Example::
 
-        .. todo:: example
+        class RequiredItem(ExtendedMappingSchema):
+            item = ExtendedSchemaNode(String())
+
+        class RequiredType(ExtendedMappingSchema):
+            type = ExtendedSchemaNode(String())
+
+        class AllRequired(AnyKeywordSchema):
+            _all_of = [RequiredItem(), RequiredType()]
+
+
+    Value parsed with schema this definition will be valid only when every since one of the sub-schemas is valid.
+    Any sub-schema raising an invalid error for any reason with make the whole schema validation fail.
 
     .. seealso::
         - :class:`OneOfKeywordSchema`
@@ -1139,7 +1150,44 @@ class AnyOfKeywordSchema(KeywordMapper):
 
     Example::
 
-        .. todo:: example
+        class RequiredItem(ExtendedMappingSchema):
+            item = ExtendedSchemaNode(String())
+
+        class RequiredType(ExtendedMappingSchema):
+            type = ExtendedSchemaNode(String())
+
+        class RequiredFields(ExtendedMappingSchema):
+            field_str = ExtendedSchemaNode(String())
+            field_int = ExtendedSchemaNode(Integer())
+
+        class AnyRequired(AnyKeywordSchema):
+            _any_of = [RequiredItem(), RequiredType(), RequiredFields()]
+
+        # following is valid because their individual parts have all required sub-fields, result is their composition
+        AnyRequired().deserialize({"type": "test", "item": "valid"})     # result: {"type": "test", "item": "valid"}
+
+        # following is also valid because even though 'item' is missing, the 'type' is present
+        AnyRequired().deserialize({"type": "test"})                      # result: {"type": "test"}
+
+        # following is invalid because every one of the sub-field of individual parts are missing
+        AnyRequired().deserialize({"type": "test"})
+
+        # following is invalid because fields of 'RequiredFields' are only partially fulfilled
+        AnyRequired().deserialize({"field_str": "str"})
+
+        # following is valid because although fields of 'RequiredFields' are not all fulfilled, 'RequiredType' is valid
+        AnyRequired().deserialize({"field_str": "str", "type": "str"})  # result: {"type": "test"}
+
+        # following is invalid because 'RequiredFields' field 'field_int' is incorrect schema type
+        AnyRequired().deserialize({"field_str": "str", "field_int": "str"})
+
+        # following is valid, but result omits 'type' because its schema-type is incorrect, while others are valid
+        AnyRequired().deserialize({"field_str": "str", "field_int": 1, "items": "fields", "type": 1})
+        # result: {"field_str": "str", "field_int": 1, "items": "fields"}
+
+    .. warning::
+        Because valid items are applied on top of each other by merging fields during combinations,
+        conflicting field names of any valid schema will contain only the final valid parsing during deserialization.
 
     .. seealso::
         - :class:`OneOfKeywordSchema`
@@ -1196,7 +1244,23 @@ class AnyOfKeywordSchema(KeywordMapper):
 class NotKeywordSchema(KeywordMapper):
     """
     Allows specifying specific schema conditions that fails underlying schema definition validation if present.
-    Corresponds to the ``not`` specifier of `OpenAPI` specification.
+
+    This is equivalent to OpenAPI object mapping with ``additionalProperties: false``, but is more explicit in
+    the definition of invalid or conflicting field names with explicit definitions during deserialization.
+
+    Example::
+
+        class RequiredItem(ExtendedMappingSchema):
+            item = ExtendedSchemaNode(String())
+
+        class MappingWithType(ExtendedMappingSchema):
+            type = ExtendedSchemaNode(String())
+
+        class MappingWithoutType(NotKeywordSchema, RequiredItem):
+            _not = [MappingWithType()]
+
+        # following will raise invalid error even if 'item' is valid because 'type' is also present
+        MappingWithoutType().deserialize({"type": "invalid", "item": "valid"})
 
     .. seealso::
         - :class:`OneOfKeywordSchema`
@@ -1222,12 +1286,15 @@ class NotKeywordSchema(KeywordMapper):
         for schema_class in self._not:  # noqa
             try:
                 schema_class = _make_node_instance(schema_class)
-                self._deserialize_subnode(schema_class, cstruct)
-                invalid_not.update({_get_node_name(schema_class, schema_name=True): str(schema_class)})
+                result = self._deserialize_subnode(schema_class, cstruct)
+                if isinstance(result, dict) and not len(result):
+                    continue  # allow empty result meaning every item was missing and dropped
+                invalid_names = [node.name for node in schema_class.children]
+                invalid_not.update({_get_node_name(schema_class, schema_name=True): invalid_names})
             except colander.Invalid:
-                pass
+                pass  # error raised as intended when missing field is not present
         if invalid_not:
-            message = "Value contains not allowed schema conditions: {}".format(invalid_not)
+            message = "Value contains not allowed fields from schema conditions: {}".format(invalid_not)
             raise colander.Invalid(node=self, msg=message, value=cstruct)
         return cstruct
 
@@ -1311,6 +1378,11 @@ class AnyOfKeywordTypeConverter(KeywordTypeConverter):
 class NotKeywordTypeConverter(KeywordTypeConverter):
     """Object converter that generates the ``not`` keyword definition."""
 
+    def convert_type(self, schema_node):
+        result = ObjectTypeConverter(self.dispatcher).convert_type(schema_node)
+        result["additionalProperties"] = False
+        return result
+
 
 class VariableObjectTypeConverter(ObjectTypeConverter):
     """
@@ -1385,7 +1457,7 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
         if converter_class is None and self.openapi_spec == 3:
             # dispatch indirect conversions specified by MappingSchema/SequenceSchema
             # using a colander validator as argument matching keyword schemas
-            # (eg: MappingSchema(validator=colander.OneOf[Obj1, Obj2]) )
+            # (eg: MappingSchema(validator=colander.OneOf([Obj1, Obj2])) )
             if isinstance(schema_node, (colander.MappingSchema, colander.SequenceSchema)):
                 if isinstance(schema_node.validator, tuple(self.keyword_validators)):
                     keyword_class = self.keyword_validators[type(schema_node.validator)]

@@ -348,7 +348,7 @@ class MetadataValue(NotKeywordSchema, ValueLanguage, MetadataBase):
 class MetadataContent(OneOfKeywordSchema):
     _one_of = [
         Link(title="MetadataLink"),
-        MetadataValue()
+        MetadataValue(),
     ]
 
 
@@ -642,7 +642,9 @@ class LiteralDataDomainList(ExtendedSequenceSchema):
 
 
 class LiteralInputType(NotKeywordSchema, ExtendedMappingSchema):
-    _not = (WithFormats, )
+    _not = [
+        WithFormats,
+    ]
     literalDataDomains = LiteralDataDomainList(missing=drop)
 
 
@@ -663,7 +665,9 @@ class InputTypeList(ExtendedSequenceSchema):
 
 
 class LiteralOutputType(NotKeywordSchema, ExtendedMappingSchema):
-    _not = (WithFormats, )
+    _not = [
+        WithFormats,
+    ]
     literalDataDomains = LiteralDataDomainList(missing=drop)
 
 
