@@ -63,11 +63,11 @@ def test_url_schemes():
     url = None
     try:
         for url in test_href_valid:
-            href_url.deserialize(url)
+            assert href_url.deserialize(url) == url
         for url in test_file_valid:
-            file_url.deserialize(url)
+            assert file_url.deserialize(url) == url
         for url in test_href_invalid_file_valid:
-            file_url.deserialize(url)
+            assert file_url.deserialize(url) == url
     except colander.Invalid as invalid:
         pytest.fail("Raised invalid URL when expected to be valid for '{}' with [{}]".format(invalid.node, url))
     for url in test_href_invalid_file_valid:

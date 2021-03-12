@@ -209,7 +209,7 @@ class FileURL(ExtendedSchemaNode):
     schema_type = String
     description = "URL file reference."
     format = "url"
-    validator = SchemeURL(schemes=["http", "https", "ftp", "ftps"])
+    validator = SchemeURL(schemes=["http", "https"])
 
 
 class ReferenceURL(AnyOfKeywordSchema):
@@ -355,12 +355,20 @@ class MetadataBase(ExtendedMappingSchema):
     title = ExtendedSchemaNode(String(), missing=drop)
 
 
+class MetadataRole(ExtendedMappingSchema):
+    role = URL(missing=drop)
+
+
 class LinkRelationship(ExtendedMappingSchema):
     rel = SLUG(description="Relationship of the link to the current content.")
 
 
-class Link(LinkRelationship, LinkLanguage, MetadataBase):
+class LinkBase(LinkLanguage, MetadataBase):
     href = URL(description="Hyperlink reference.")
+
+
+class Link(LinkRelationship, LinkBase):
+    pass
 
 
 class MetadataValue(NotKeywordSchema, ValueLanguage, MetadataBase):
@@ -380,8 +388,8 @@ class MetadataContent(OneOfKeywordSchema):
     ]
 
 
-class Metadata(MetadataContent):
-    role = URL(missing=drop)
+class Metadata(MetadataContent, MetadataRole):
+    pass
 
 
 class MetadataList(ExtendedSequenceSchema):
@@ -452,36 +460,61 @@ class AdditionalParameterList(ExtendedSequenceSchema):
     additionalParameter = AdditionalParameter()
 
 
+class AdditionalParametersMeta(LinkBase, MetadataRole):
+    pass
+
+
 class AdditionalParameters(ExtendedMappingSchema):
-    role = ExtendedSchemaNode(String(), missing=drop)
-    parameters = AdditionalParameterList(missing=drop)
+    parameters = AdditionalParameterList()
+
+
+class AdditionalParametersItem(AnyOfKeywordSchema):
+    _any_of = [
+        AdditionalParametersMeta(missind=drop),
+        AdditionalParameters()
+    ]
 
 
 class AdditionalParametersList(ExtendedSequenceSchema):
-    additionalParameter = AdditionalParameters()
+    additionalParameter = AdditionalParametersItem()
 
 
 class Content(ExtendedMappingSchema):
-    href = URL(description="URL to CWL file.", title="href",
-               example="http://some.host/applications/cwl/multisensor_ndvi.cwl")
+    href = ReferenceURL(description="URL to CWL file.", title="href",
+                        example="http://some.host/applications/cwl/multisensor_ndvi.cwl")
 
 
 class Offering(ExtendedMappingSchema):
     code = ExtendedSchemaNode(String(), missing=drop, description="Descriptor of represented information in 'content'.")
-    content = Content(title="content", missing=drop)
+    content = Content()
 
 
 class OWSContext(ExtendedMappingSchema):
     description = "OGC Web Service definition with references to contained application (see also 'executionUnit')."
-    offering = Offering(title="offering")
+    title = "owsContext"
+    offering = Offering()
 
 
-class DescriptionType(ExtendedMappingSchema):
+class DescriptionBase(ExtendedMappingSchema):
     title = ExtendedSchemaNode(String(), missing=drop, description="Short name definition of the process.")
     abstract = ExtendedSchemaNode(String(), missing=drop, description="Detailed explanation of the process operation.")
-    owsContext = OWSContext(missing=drop, title="owsContext")
-    additionalParameters = AdditionalParametersList(missing=drop, title="additionalParameters")
     links = LinkList(missing=drop, description="References to endpoints with information related to the process.")
+
+
+class DescriptionOWS(ExtendedMappingSchema):
+    owsContext = OWSContext()
+
+
+class DescriptionExtra(ExtendedMappingSchema):
+    additionalParameters = AdditionalParametersList(missing=drop)
+
+
+class DescriptionType(AnyOfKeywordSchema):
+    _any_of = [
+        DescriptionBase(default={}),
+        DescriptionOWS(missing=drop),
+        DescriptionExtra(missing=drop),
+    ]
 
 
 class ProcessDescriptionMeta(ExtendedMappingSchema):
@@ -676,7 +709,7 @@ class LiteralInputType(NotKeywordSchema, ExtendedMappingSchema):
     literalDataDomains = LiteralDataDomainList(missing=drop)
 
 
-class InputType(OneOfKeywordSchema, InputDescriptionType, WithMinMaxOccurs):
+class InputTypeDefinition(OneOfKeywordSchema):
     _one_of = [
         # NOTE:
         #   LiteralInputType could be used to represent a complex input if the 'format' is missing in
@@ -685,6 +718,14 @@ class InputType(OneOfKeywordSchema, InputDescriptionType, WithMinMaxOccurs):
         BoundingBoxInputType,
         ComplexInputType,  # should be 2nd to last because very permissive, but requires format at least
         LiteralInputType,  # must be last because it"s the most permissive (all can default if omitted)
+    ]
+
+
+class InputType(AnyOfKeywordSchema):
+    _any_of = [
+        InputDescriptionType(),
+        InputTypeDefinition(),
+        WithMinMaxOccurs(),
     ]
 
 
@@ -707,11 +748,18 @@ class ComplexOutputType(WithFormats):
     pass
 
 
-class OutputType(OneOfKeywordSchema, OutputDescriptionType):
+class OutputTypeDefinition(OneOfKeywordSchema):
     _one_of = [
         BoundingBoxOutputType,
         ComplexOutputType,  # should be 2nd to last because very permissive, but requires format at least
         LiteralOutputType,  # must be last because it's the most permissive (all can default if omitted)
+    ]
+
+
+class OutputType(AnyOfKeywordSchema):
+    _any_of = [
+        OutputTypeDefinition(),
+        OutputDescriptionType(),
     ]
 
 
@@ -1993,7 +2041,7 @@ class Deploy(ExtendedMappingSchema):
     immediateDeployment = ExtendedSchemaNode(Boolean(), missing=drop, default=True)
     executionUnit = ExecutionUnitList()
     deploymentProfileName = URL(missing=drop)
-    owsContext = OWSContext(title="owsContext", missing=drop)
+    owsContext = OWSContext(missing=drop)
 
 
 class PostProcessesEndpoint(ExtendedMappingSchema):

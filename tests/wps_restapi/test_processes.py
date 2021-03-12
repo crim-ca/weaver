@@ -125,7 +125,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 # note:
                 #   hostname cannot have underscores according to [RFC-1123](https://www.ietf.org/rfc/rfc1123.txt)
                 #   schema validator of Reference URL will appropriately raise such invalid string
-                {"href": "http://weaver-test/{}.cwl".format(process_id)}
+                {"href": "http://weaver.test/{}.cwl".format(process_id)}
             ]
         }
 

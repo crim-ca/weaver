@@ -1091,7 +1091,7 @@ class OneOfKeywordSchema(KeywordMapper):
             except colander.Invalid as invalid:
                 invalid_one_of.update({_get_node_name(invalid.node, schema_name=True): invalid.asdict()})
         message = (
-            "Incorrect type, must be one of: {}. Errors for each case: {}"
+            "Incorrect type must be one of: {}. Errors for each case: {}"
             .format(list(invalid_one_of), invalid_one_of)
         )
         if valid_one_of:
@@ -1099,7 +1099,7 @@ class OneOfKeywordSchema(KeywordMapper):
             if len(valid_one_of) == 1:
                 return valid_one_of[0]
             message = (
-                "Incorrect type, cannot distinguish between multiple valid schemas. "
+                "Incorrect type cannot distinguish between multiple valid schemas. "
                 "Must be only one of: {}.".format([_get_node_name(node, schema_name=True) for node in valid_nodes])
             )
 
@@ -1123,7 +1123,7 @@ class OneOfKeywordSchema(KeywordMapper):
                 elif len(valid_discriminated) > 1:
                     invalid_one_of = error_discriminated
                 message = (
-                    "Incorrect type, cannot discriminate between multiple valid schemas. "
+                    "Incorrect type cannot discriminate between multiple valid schemas. "
                     "Must be only one of: {}.".format(list(invalid_one_of))
                 )
                 raise colander.Invalid(node=self, msg=message, value=discriminator)
@@ -1136,7 +1136,7 @@ class OneOfKeywordSchema(KeywordMapper):
                 if len(valid_values) == 1:
                     return valid_values[0]
                 message = (
-                    "Incorrect type, cannot differentiate between multiple base-type valid schemas. "
+                    "Incorrect type cannot differentiate between multiple base-type valid schemas. "
                     "Must be only one of: {}.".format(valid_values)
                 )
 
@@ -1199,7 +1199,7 @@ class AllOfKeywordSchema(KeywordMapper):
         if missing_all_of:
             # if anything failed, the whole definition is invalid in this case
             message = (
-                "Incorrect type, must represent all of: {}. Missing following cases: {}"
+                "Incorrect type must represent all of: {}. Missing following cases: {}"
                 .format(list(required_all_of), list(missing_all_of))
             )
             raise colander.Invalid(node=self, msg=message)
@@ -1300,10 +1300,14 @@ class AnyOfKeywordSchema(KeywordMapper):
             except colander.Invalid as invalid:
                 invalid_any_of.add(invalid)
 
-        if not merged_any_of:
-            # nothing succeeded, the whole definition is invalid in this case
+        # if nothing could be resolved, verify for a default value
+        if merged_any_of is colander.null:
+            merged_any_of = self.default
+
+        # nothing succeeded, the whole definition is invalid in this case
+        if merged_any_of is colander.null:
             invalid_any_of.msg = (
-                "Incorrect type, must represent any of: {}. "
+                "Incorrect type must represent any of: {}. "
                 "All missing from: {}".format(list(option_any_of), cstruct)
             )
             raise invalid_any_of
