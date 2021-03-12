@@ -1198,7 +1198,6 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert desc["process"]["inputs"][0]["id"] == "tasmax"
         assert desc["process"]["inputs"][0]["title"] == "Resource"
         assert desc["process"]["inputs"][0]["abstract"] == "NetCDF Files or archive (tar/zip) containing netCDF files."
-        assert desc["process"]["inputs"][0]["keywords"] == []
         assert desc["process"]["inputs"][0]["minOccurs"] == "1"
         assert desc["process"]["inputs"][0]["maxOccurs"] == "1000"
         assert len(desc["process"]["inputs"][0]["formats"]) == 1
@@ -1208,7 +1207,6 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert desc["process"]["inputs"][1]["id"] == "freq"
         assert desc["process"]["inputs"][1]["title"] == "Frequency"
         assert desc["process"]["inputs"][1]["abstract"] == "Resampling frequency"
-        assert desc["process"]["inputs"][1]["keywords"] == []
         assert desc["process"]["inputs"][1]["minOccurs"] == "0"
         assert desc["process"]["inputs"][1]["maxOccurs"] == "1"
         assert "formats" not in desc["process"]["inputs"][1]
@@ -1216,7 +1214,6 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert desc["process"]["outputs"][0]["id"] == "output_netcdf"
         assert desc["process"]["outputs"][0]["title"] == "Function output in netCDF"
         assert desc["process"]["outputs"][0]["abstract"] == "The indicator values computed on the original input grid."
-        assert desc["process"]["outputs"][0]["keywords"] == []
         assert "minOccurs" not in desc["process"]["outputs"][0]
         assert "maxOccurs" not in desc["process"]["outputs"][0]
         assert len(desc["process"]["outputs"][0]["formats"]) == 1
@@ -1226,7 +1223,6 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert desc["process"]["outputs"][1]["id"] == "output_log"
         assert desc["process"]["outputs"][1]["title"] == "Logging information"
         assert desc["process"]["outputs"][1]["abstract"] == "Collected logs during process run."
-        assert desc["process"]["outputs"][1]["keywords"] == []
         assert "minOccurs" not in desc["process"]["outputs"][1]
         assert "maxOccurs" not in desc["process"]["outputs"][1]
         assert len(desc["process"]["outputs"][1]["formats"]) == 1
@@ -1299,7 +1295,6 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert desc["process"]["inputs"][0]["id"] == "region"
         assert desc["process"]["inputs"][0]["title"] == "Region"
         assert desc["process"]["inputs"][0]["abstract"] == "Country code, see ISO-3166-3"
-        assert desc["process"]["inputs"][0]["keywords"] == []
         assert desc["process"]["inputs"][0]["minOccurs"] == "1"
         assert desc["process"]["inputs"][0]["maxOccurs"] == "220"
         assert "formats" not in desc["process"]["inputs"][0]
@@ -1307,14 +1302,12 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert desc["process"]["inputs"][1]["title"] == "Union of multiple regions"
         assert desc["process"]["inputs"][1]["abstract"] == \
                "If True, selected regions will be merged into a single geometry."   # noqa
-        assert desc["process"]["inputs"][1]["keywords"] == []
         assert desc["process"]["inputs"][1]["minOccurs"] == "0"
         assert desc["process"]["inputs"][1]["maxOccurs"] == "1"
         assert "formats" not in desc["process"]["inputs"][1]
         assert desc["process"]["inputs"][2]["id"] == "resource"
         assert desc["process"]["inputs"][2]["title"] == "Resource"
         assert desc["process"]["inputs"][2]["abstract"] == "NetCDF Files or archive (tar/zip) containing NetCDF files."
-        assert desc["process"]["inputs"][2]["keywords"] == []
         assert desc["process"]["inputs"][2]["minOccurs"] == "1"
         assert desc["process"]["inputs"][2]["maxOccurs"] == "1000"
         # note: TAR should remain as literal format in the WPS context (not mapped/added as GZIP when resolved for CWL)

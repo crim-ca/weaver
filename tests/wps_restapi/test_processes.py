@@ -683,13 +683,15 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     def test_process_description_metadata_href_or_value_valid(self):
         """Validates that metadata is accepted as either hyperlink reference or literal string value."""
-        sd.Process().deserialize({
+        process = {
             "id": self._testMethodName,
             "metadata": [
                 {"type": "value-typed", "value": "some-value", "lang": "en-US"},
                 {"type": "link-typed", "href": "https://example.com", "hreflang": "en-US", "rel": "example"}
             ]
-        })
+        }
+        result = sd.Process().deserialize(process)
+        assert process["metadata"] == result["metadata"]
 
     def test_process_description_metadata_href_or_value_invalid(self):
         """Validates that various invalid metadata definitions are indicated as such."""
