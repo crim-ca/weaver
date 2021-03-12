@@ -6,7 +6,7 @@ so that one can update the swagger without touching any other files after the in
 
 from typing import TYPE_CHECKING
 
-from colander import DateTime, OneOf, Range, drop
+from colander import DateTime, OneOf, Range, Regex, drop
 from cornice import Service
 
 from weaver import __meta__
@@ -62,6 +62,7 @@ from weaver.wps_restapi.colander_extras import (
     OneOfCaseInsensitive,
     OneOfKeywordSchema,
     PermissiveMappingSchema,
+    SchemeURL,
     SemanticVersion,
     StringRange
 )
@@ -189,6 +190,34 @@ class URL(ExtendedSchemaNode):
     schema_type = String
     description = "URL reference."
     format = "url"
+
+
+class S3Bucket(ExtendedSchemaNode):
+    schema_type = String
+    description = "S3 bucket shorthand URL representation [s3://<bucket>/<job-uuid>/<output>.ext]"
+    pattern = r"^s3://\S+$"
+
+
+class FileLocal(ExtendedSchemaNode):
+    schema_type = String
+    description = "Local file reference."
+    format = "file"
+    validator = Regex(r"^(file://)?(?:/|[/?]\S+)$")
+
+
+class FileURL(ExtendedSchemaNode):
+    schema_type = String
+    description = "URL file reference."
+    format = "url"
+    validator = SchemeURL(schemes=["http", "https", "ftp", "ftps"])
+
+
+class ReferenceURL(AnyOfKeywordSchema):
+    _any_of = [
+        FileURL(),
+        FileLocal(),
+        S3Bucket(),
+    ]
 
 
 class UUID(ExtendedSchemaNode):
@@ -543,13 +572,13 @@ class BoundingBoxInputType(ExtendedMappingSchema):
 
 
 class LiteralReference(ExtendedMappingSchema):
-    reference = URL()
+    reference = ReferenceURL()
 
 
 class NameReferenceType(ExtendedMappingSchema):
     schema_ref = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/nameReferenceType.yaml"
     name = ExtendedSchemaNode(String())
-    reference = URL(missing=drop)
+    reference = ReferenceURL(missing=drop)
 
 
 class DataTypeSchema(NameReferenceType):
@@ -590,7 +619,7 @@ class AnyValue(ExtendedMappingSchema):
 
 
 class ValuesReference(ExtendedMappingSchema):
-    valueReference = URL()
+    valueReference = ReferenceURL()
 
 
 class AnyLiteralType(OneOfKeywordSchema):
@@ -1226,10 +1255,10 @@ class DataEncodingAttributes(Format):
 
 class Reference(ExtendedMappingSchema):
     title = "Reference"
-    href = URL(description="Endpoint of the reference.")
+    href = ReferenceURL(description="Endpoint of the reference.")
     format = DataEncodingAttributes(missing=drop)
     body = ExtendedSchemaNode(String(), missing=drop)
-    bodyReference = URL(missing=drop)
+    bodyReference = ReferenceURL(missing=drop)
 
 
 class AnyType(OneOfKeywordSchema):
@@ -1814,7 +1843,7 @@ class ValueFormattedList(ExtendedSequenceSchema):
 
 
 class ResultReference(ExtendedMappingSchema):
-    href = URL(description="Result file reference.")
+    href = ReferenceURL(description="Result file reference.")
     format = FormatMedia()
 
 

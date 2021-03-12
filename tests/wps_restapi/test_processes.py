@@ -148,27 +148,6 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             "response": EXECUTE_RESPONSE_DOCUMENT,
         }
 
-    def test_process_id_schemas(self):
-        test_valid_ids = [
-            "valid-slug-id",
-            "valid_underscores",
-            "valid_lower-and_CAP_MiXeD"
-        ]
-        test_invalid_ids = [
-            "not valid to have spaces",
-            "not-valid-!!!-characters",
-            "not-valid/separators"
-        ]
-        for _id in test_valid_ids:
-            assert sd.ProcessIdentifier().deserialize(_id) == _id
-        for i, _id in enumerate(test_invalid_ids):
-            try:
-                sd.ProcessIdentifier().deserialize(_id)
-            except colander.Invalid:
-                pass
-            else:
-                self.fail("Expected process ID to be raised as invalid: (test: {}, id: {})".format(i, _id))
-
     def test_get_processes(self):
         uri = "/processes"
         resp = self.app.get(uri, headers=self.json_headers)

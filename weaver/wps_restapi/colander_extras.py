@@ -54,6 +54,7 @@ complementary support of one-another features.
 
 """
 import inspect
+import re
 from abc import abstractmethod
 from typing import TYPE_CHECKING
 
@@ -128,6 +129,24 @@ class StringRange(colander.Range):
         if not str.isnumeric(value):
             raise colander.Invalid(node=node, value=value, msg="Value is not a numeric string.")
         return super(StringRange, self).__call__(node, int(value))
+
+
+class SchemeURL(colander.Regex):
+    """
+    String representation of an URL with extended set of allowed URI schemes.
+
+    .. seealso::
+        :class:`colander.url` [remote http(s)/ftp(s)]
+        :class:`colander.file_uri` [local file://]
+    """
+    def __init__(self, schemes=None, msg=None, flags=re.IGNORECASE):  #
+        if not schemes:
+            schemes = [""]
+        if not msg:
+            msg = colander._("Must be a URL matching one of schemes {}".format(schemes))  # noqa
+        regex_schemes = r"(?:" + "|".join(schemes) + r")"
+        regex = colander.URL_REGEX.replace(r"(?:http|ftp)s?", regex_schemes)
+        super(SchemeURL, self).__init__(regex, msg=msg, flags=flags)
 
 
 class SemanticVersion(colander.Regex):
