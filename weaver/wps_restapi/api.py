@@ -282,7 +282,7 @@ def openapi_json_cached(*args, **kwargs):
                              schema=sd.OpenAPIEndpoint(), response_schemas=sd.get_openapi_json_responses)
 def openapi_json(request):  # noqa: F811
     # type: (Request) -> dict
-    """weaver OpenAPI schema generation in JSON format."""
+    """Weaver OpenAPI schema definitions."""
     # obtain 'server' host and api-base-path, which doesn't correspond necessarily to the app's host and path
     # ex: 'server' adds '/weaver' with proxy redirect before API routes
     settings = get_settings(request)
@@ -292,10 +292,8 @@ def openapi_json(request):  # noqa: F811
     return openapi_json_cached(base_url=weaver_server_url, use_docstring_summary=True, settings=settings)
 
 
-@sd.api_swagger_ui_service.get(tags=[sd.TAG_API],
-                               schema=sd.SwaggerUIEndpoint(), response_schemas=sd.get_api_swagger_ui_responses)
-def api_swagger_ui(request):
-    """Weaver REST API swagger-ui schema documentation (this page)."""
+@cache_region("doc", sd.api_swagger_ui_service.name)
+def swagger_ui_cached(request):
     json_path = wps_restapi_base_path(request) + sd.openapi_json_service.path
     json_path = json_path.lstrip("/")   # if path starts by '/', swagger-ui doesn't find it on remote
     data_mako = {"api_title": sd.API_TITLE, "openapi_json_path": json_path, "api_version": __meta__.__version__}
@@ -303,9 +301,17 @@ def api_swagger_ui(request):
     return resp
 
 
-@sd.api_redoc_ui_service.get(tags=[sd.TAG_API],
-                             schema=sd.RedocUIEndpoint(), response_schemas=sd.get_api_redoc_ui_responses)
-def api_redoc_ui(request):
+@sd.api_openapi_ui_service.get(tags=[sd.TAG_API], schema=sd.SwaggerUIEndpoint(),
+                               response_schemas=sd.get_api_swagger_ui_responses)
+@sd.api_swagger_ui_service.get(tags=[sd.TAG_API], schema=sd.SwaggerUIEndpoint(),
+                               response_schemas=sd.get_api_swagger_ui_responses)
+def api_swagger_ui(request):
+    """Weaver OpenAPI schema definitions rendering using Swagger-UI viewer."""
+    return swagger_ui_cached(request)
+
+
+@cache_region("doc", sd.api_redoc_ui_service.name)
+def redoc_ui_cached(request):
     settings = get_settings(request)
     weaver_server_url = get_weaver_url(settings)
     spec = openapi_json_cached(base_url=weaver_server_url, settings=settings,
@@ -313,6 +319,13 @@ def api_redoc_ui(request):
     data_mako = {"openapi_spec": json.dumps(spec, ensure_ascii=False)}
     resp = render_to_response("templates/redoc_ui.mako", data_mako, request=request)
     return resp
+
+
+@sd.api_redoc_ui_service.get(tags=[sd.TAG_API], schema=sd.RedocUIEndpoint(),
+                             response_schemas=sd.get_api_redoc_ui_responses)
+def api_redoc_ui(request):
+    """Weaver OpenAPI schema definitions rendering using Redoc viewer."""
+    return redoc_ui_cached(request)
 
 
 def get_request_info(request, detail=None):

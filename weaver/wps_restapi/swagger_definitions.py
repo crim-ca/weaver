@@ -133,7 +133,8 @@ TAG_DEPRECATED = "Deprecated Endpoints"
 ###############################################################################
 
 api_frontpage_service = Service(name="api_frontpage", path="/")
-api_swagger_ui_service = Service(name="api_swagger_ui", path="/api")
+api_openapi_ui_service = Service(name="api_openapi_ui", path="/api")  # idem to swagger
+api_swagger_ui_service = Service(name="api_swagger_ui", path="/swagger")
 api_redoc_ui_service = Service(name="api_redoc_ui", path="/redoc")
 api_versions_service = Service(name="api_versions", path="/versions")
 api_conformance_service = Service(name="api_conformance", path="/conformance")
