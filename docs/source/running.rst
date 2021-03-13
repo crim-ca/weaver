@@ -23,7 +23,9 @@ specified connection settings in ``weaver/config/weaver.ini``.
 `Gunicorn`_:
 
 .. note::
-    If using ``Windows``, make sure you have read the `Windows Installation <windows_install>`_ section.
+    If using ``Windows``, make sure you have read the |windows_install|_ section.
+
+.. |windows_install| replace:: Windows Installation
 
 .. code-block:: sh
 
@@ -31,7 +33,7 @@ specified connection settings in ``weaver/config/weaver.ini``.
 
 
 Weaver should be running after this operation.
-It will be available under the configured URL endpoint in ``weaver.ini`` (see `example <weaver_config_example>`_).
+It will be available under the configured URL endpoint in ``weaver.ini`` (see `weaver.ini.example`_).
 If everything was configured correctly, calling this URL (default: ``http://localhost:4001``) should
 provide a response containing a JSON body with basic information about Weaver.
 
