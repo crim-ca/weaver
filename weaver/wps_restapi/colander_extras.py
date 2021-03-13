@@ -176,7 +176,7 @@ class SemanticVersion(colander.Regex):
 
 
 class ExtendedBoolean(colander.Boolean):
-    def serialize(self, node, cstruct):
+    def serialize(self, node, cstruct):  # pylint: disable=W0221
         result = super(ExtendedBoolean, self).serialize(node, cstruct)
         if result is not colander.null:
             result = result == "true"
@@ -184,7 +184,7 @@ class ExtendedBoolean(colander.Boolean):
 
 
 class ExtendedFloat(colander.Float):
-    def serialize(self, node, cstruct):
+    def serialize(self, node, cstruct):  # pylint: disable=W0221
         result = super(ExtendedFloat, self).serialize(node, cstruct)
         if result is not colander.null:
             result = float(result)
@@ -192,7 +192,7 @@ class ExtendedFloat(colander.Float):
 
 
 class ExtendedInteger(colander.Integer):
-    def serialize(self, node, cstruct):
+    def serialize(self, node, cstruct):  # pylint: disable=W0221
         result = super(ExtendedInteger, self).serialize(node, cstruct)
         if result is not colander.null:
             result = int(result)
@@ -232,6 +232,10 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
     inferred from either ``pattern`` or ``format`` OpenAPI definition, the corresponding ``validator`` gets
     automatically generated.
     """
+    @staticmethod
+    def schema_type():
+        raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
+
     def __init__(self, *args, **kwargs):
         schema_type = _get_schema_type(self, check=True)
         if isinstance(schema_type, (colander.Mapping, colander.Sequence)):
@@ -1133,6 +1137,7 @@ class OneOfKeywordSchema(KeywordMapper):
             # attempt to discriminate base-type values compared with tested value
             # (e.g.: discriminate between float vs numerical string allowed schema variations)
             if not isinstance(cstruct, (dict, set, list, tuple)):
+                # pylint: disable=C0123
                 valid_values = list(filter(lambda c: c == cstruct and type(c) == type(cstruct), valid_one_of))
                 if len(valid_values) == 1:
                     return valid_values[0]
@@ -1404,7 +1409,7 @@ class OneOfKeywordTypeConverter(KeywordTypeConverter):
             keyword: []
         }
 
-        for i, item_schema in enumerate(schema_node.get_keyword_items()):
+        for item_schema in schema_node.get_keyword_items():
             item_obj = _make_node_instance(item_schema)
             # shortcut definition of oneOf[allOf[],allOf[]] mix, see OneOfKeywordSchema docstring
             # (eg: schema fields always needed regardless of other fields supplied by each oneOf schema)

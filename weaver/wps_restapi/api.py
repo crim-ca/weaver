@@ -193,7 +193,7 @@ def api_conformance(request):  # noqa: F811
         #   https://github.com/opengeospatial/ogcapi-processes
         # see other references:
         #   https://github.com/crim-ca/weaver/issues/53
-        #   https://htmlpreview.github.io/?https://github.com/opengeospatial/ogcapi-processes/blob/master/docs/18-062.html
+        # https://htmlpreview.github.io/?https://github.com/opengeospatial/ogcapi-processes/blob/master/docs/18-062.html
         "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/core",
         "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/ogc-process-description",
         "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/json",

@@ -21,6 +21,8 @@ from weaver.exceptions import PackageExecutionError
 from weaver.processes.wps_package import _check_package_file, _get_package_ordered_io  # noqa: W0212
 from weaver.processes.wps_package import WpsPackage
 
+# pylint: disable=R1729  # ignore non-generator representation employed for displaying test log results
+
 
 def test_get_package_ordered_io_with_builtin_dict_and_hints():
     """

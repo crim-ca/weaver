@@ -116,7 +116,7 @@ api_data_mako = {
 # root level Makefile then override the default 'api.html' with symlink to 'openapi.html'
 api_spec_html = os.path.join(api_html_path, "openapi.html")
 mako_template = os.path.join(WEAVER_MODULE_DIR, "wps_restapi/templates/swagger_ui.mako")
-result = Template(filename=mako_template).render_unicode(**api_data_mako)
+result = Template(filename=mako_template).render_unicode(**api_data_mako)  # nosec: B702
 with open(api_spec_html, "w") as f:
     f.write(result)
 

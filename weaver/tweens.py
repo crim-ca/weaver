@@ -37,7 +37,7 @@ def error_repr(http_err):
         if "Invalid schema:" in err_repr:
             err_repr = err_repr.replace("Invalid schema: [", "Invalid schema: [\n")[:-1] + "\n]"
             err_repr = err_repr.replace(". 'Errors for each case:", ".\n Errors for each case:")
-    except Exception:  # noqa
+    except Exception:  # noqa: W0703 # nosec: B110
         pass
     return "({}) <{}> {!s}".format(err_type, err_code, err_repr)
 

@@ -115,7 +115,7 @@ class WorkerService(ServiceWPS):
         accept_type = get_header("Accept", req.headers)
         if accept_type == CONTENT_TYPE_APP_JSON:
             url = get_weaver_url(self.settings)
-            resp = HTTPSeeOther(location="{}{}".format(url, sd.processes_uri))  # redirect
+            resp = HTTPSeeOther(location="{}{}".format(url, sd.processes_service.path))  # redirect
             setattr(resp, "_update_status", lambda *_, **__: None)  # patch to avoid pywps server raising
             return resp
         return None
@@ -143,7 +143,7 @@ class WorkerService(ServiceWPS):
                 raise HTTPBadRequest(sd.BadRequestGetProcessInfoResponse.description)
             if len(proc) > 1:
                 raise HTTPBadRequest("Unsupported multi-process ID for description. Only provide one.")
-            path = sd.process_uri.format(process_id=proc[0])
+            path = sd.process_service.path.format(process_id=proc[0])
             resp = HTTPSeeOther(location="{}{}".format(url, path))  # redirect
             setattr(resp, "_update_status", lambda *_, **__: None)  # patch to avoid pywps server raising
             return resp

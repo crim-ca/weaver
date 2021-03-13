@@ -198,7 +198,9 @@ class End2EndEMSTestCase(TestCase):
     @classmethod
     def settings(cls):
         # type: (...) -> SettingsType
-        """Provide basic settings that must be defined to use various weaver utility functions."""
+        """
+        Provide basic settings that must be defined to use various weaver utility functions.
+        """
         if not cls.__settings__:
             weaver_url = os.getenv("WEAVER_URL", "{}{}".format(cls.WEAVER_TEST_SERVER_HOSTNAME,
                                                                cls.WEAVER_TEST_SERVER_BASE_PATH))
@@ -426,7 +428,9 @@ class End2EndEMSTestCase(TestCase):
     @classmethod
     def log_json_format(cls, payload, indent_level):
         # type: (str, int) -> str
-        """Logs an indented string representation of a JSON payload according to settings."""
+        """
+        Logs an indented string representation of a JSON payload according to settings.
+        """
         sub_indent = cls.get_indent(indent_level if cls.logger_json_indent else 0)
         log_payload = "\n" if cls.logger_json_indent else "" + json.dumps(payload, indent=cls.logger_json_indent)
         log_payload.replace("\n", "\n{}".format(sub_indent))
@@ -436,7 +440,9 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def log_dict_format(cls, dictionary, indent_level):
-        """Logs dictionary (key, value) pairs in a YAML-like format."""
+        """
+        Logs dictionary (key, value) pairs in a YAML-like format.
+        """
         if dictionary is None:
             return None
 
@@ -546,7 +552,9 @@ class End2EndEMSTestCase(TestCase):
     @classmethod
     def assert_response(cls, response, status=None, message=""):
         # type: (AnyResponseType, Optional[Union[int, Iterable[int]]], str) -> None
-        """Tests a response for expected status and raises an error if not matching."""
+        """
+        Tests a response for expected status and raises an error if not matching.
+        """
         code = response.status_code
         reason = getattr(response, "reason", "")
         content = getattr(response, "content", "")
@@ -566,7 +574,9 @@ class End2EndEMSTestCase(TestCase):
     @classmethod
     def assert_test(cls, assert_test, message=None, title="Test Assertion Failed"):
         # type: (Callable[[], bool], Optional[str], str) -> None
-        """Tests a callable for assertion and logs the message if it fails, then re-raises to terminate execution."""
+        """
+        Tests a callable for assertion and logs the message if it fails, then re-raises to terminate execution.
+        """
         try:
             assert assert_test(), message
         except AssertionError:
@@ -656,7 +666,9 @@ class End2EndEMSTestCase(TestCase):
     @pytest.mark.xfail(reason="Interoperability of remote servers not guaranteed.")
     @pytest.mark.testbed14
     def test_workflow_end2end_with_auth(self):
-        """Full workflow execution procedure with authentication enabled."""
+        """
+        Full workflow execution procedure with authentication enabled.
+        """
         # End to end test will log everything
         self.__class__.log_full_trace = True
 
@@ -767,7 +779,9 @@ class End2EndEMSTestCase(TestCase):
 
     def workflow_runner(self, test_workflow_id, test_application_ids, log_full_trace=False):
         # type: (str, Iterable[str], bool) -> None
-        """Simplify test for demonstration purpose"""
+        """
+        Simplify test for demonstration purpose.
+        """
 
         # test will log basic information
         self.__class__.log_full_trace = log_full_trace
@@ -816,6 +830,7 @@ class End2EndEMSTestCase(TestCase):
         # type: (str, Optional[HeadersType], Optional[CookiesType]) -> None
         """
         Validates that the job is stated, running, and polls it until completed successfully.
+
         Then validates that results are accessible (no data integrity check).
         """
         timeout_accept = self.WEAVER_TEST_JOB_ACCEPTED_MAX_TIMEOUT

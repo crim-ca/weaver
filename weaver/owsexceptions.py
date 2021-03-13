@@ -73,7 +73,7 @@ class OWSException(Response, Exception):
         self.description = str(detail or kw.pop("description", self.description))
         Response.__init__(self, status=status, **kw)
         Exception.__init__(self, detail)
-        self.message = detail or self.description or self.explanation
+        self.message = detail or self.description or getattr(self, "explanation", None)
         self.content_type = CONTENT_TYPE_APP_JSON
         value = kw.get("locator", value)
         if value:
