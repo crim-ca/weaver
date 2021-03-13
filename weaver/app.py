@@ -6,7 +6,6 @@ Weaver Web Application (``weaver-manager``).
 
 import logging
 
-
 import yaml
 from pyramid.config import Configurator
 

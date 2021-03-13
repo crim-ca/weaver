@@ -7,8 +7,7 @@ on :mod:`weaver.wps_restapi.swagger_definitions` objects.
 import colander
 import pytest
 
-from weaver.wps_restapi import colander_extras as ce
-from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi import colander_extras as ce, swagger_definitions as sd
 
 
 def test_oneof_io_formats_deserialize_as_mapping():

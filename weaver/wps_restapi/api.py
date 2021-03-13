@@ -1,5 +1,5 @@
-import logging
 import json
+import logging
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
@@ -37,7 +37,6 @@ from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.colander_extras import OAS3TypeConversionDispatcher
 from weaver.wps_restapi.utils import get_wps_restapi_base_url, wps_restapi_base_path
-
 
 if TYPE_CHECKING:
     from typing import Optional

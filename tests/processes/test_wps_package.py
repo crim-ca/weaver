@@ -18,8 +18,7 @@ from pywps.app import WPSRequest
 
 from weaver.datatype import Process
 from weaver.exceptions import PackageExecutionError
-from weaver.processes.wps_package import _check_package_file, _get_package_ordered_io  # noqa: W0212
-from weaver.processes.wps_package import WpsPackage
+from weaver.processes.wps_package import WpsPackage, _check_package_file, _get_package_ordered_io  # noqa: W0212
 
 # pylint: disable=R1729  # ignore non-generator representation employed for displaying test log results
 
