@@ -103,7 +103,7 @@ setup(name=__meta__.__name__,
       package_data={"": ["*.mako"]},
       zip_safe=False,
       test_suite="tests",
-      python_requires=">=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*, <4",
+      python_requires=">=3.6, <4",
       install_requires=REQUIREMENTS,
       dependency_links=LINKS,
       extras_require={
