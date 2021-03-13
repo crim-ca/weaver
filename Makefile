@@ -250,7 +250,7 @@ clean-cache:	## remove caches such as DOWNLOAD_CACHE
 	@-rm -fr "$(DOWNLOAD_CACHE)"
 
 .PHONY: clean-docs
-clean-docs:	install-dev clean-docs-dirs		## remove documentation artefacts
+clean-docs:	clean-docs-dirs		## remove documentation artefacts
 	@echo "Removing documentation build files..."
 	@$(MAKE) -C "$(APP_ROOT)/docs" clean || true
 
@@ -511,10 +511,14 @@ fixme-list: install-dev fixme-list-only
 
 ## -- Documentation targets ----------------------------------------------------------------------------------------- ##
 
-.PHONY: docs
-docs: install-dev clean-docs 	## generate HTML documentation with Sphinx
+.PHONY: docs-build	## generate HTML documentation with Sphinx
+docs-build: clean-docs
 	@echo "Generating docs with Sphinx..."
-	@bash -c '$(CONDA_CMD) $(MAKE) -C $@ html'
+	@bash -c '$(CONDA_CMD) $(MAKE) -C "$(APP_ROOT)/docs" html'
+	@ln -sf "$(APP_ROOT)/docs/build/html/openapi.html" "$(APP_ROOT)/docs/build/html/api.html"
+
+.PHONY: docs
+docs: install-dev docs-build  ## generate HTML documentation with Sphinx after dependencies installation
 
 ## -- Versioning targets -------------------------------------------------------------------------------------------- ##
 
