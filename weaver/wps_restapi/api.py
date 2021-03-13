@@ -1,4 +1,5 @@
 import logging
+import json
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
@@ -69,7 +70,7 @@ def api_frontpage_body(settings):
     weaver_api_def = weaver_api_url + sd.api_swagger_ui_service.path if weaver_api else None
     weaver_api_doc = settings.get("weaver.wps_restapi_doc", None) if weaver_api else None
     weaver_api_ref = settings.get("weaver.wps_restapi_ref", None) if weaver_api else None
-    weaver_api_spec = weaver_api_url + sd.api_swagger_json_service.path if weaver_api else None
+    weaver_api_spec = weaver_api_url + sd.openapi_json_service.path if weaver_api else None
     weaver_wps = asbool(settings.get("weaver.wps"))
     weaver_wps_url = get_wps_url(settings) if weaver_wps else None
     weaver_conform_url = weaver_url + sd.api_conformance_service.path
@@ -210,7 +211,7 @@ def api_conformance(request):  # noqa: F811
     return HTTPOk(json=conformance)
 
 
-def get_swagger_json(http_scheme="http", http_host="localhost", base_url=None,
+def get_openapi_json(http_scheme="http", http_host="localhost", base_url=None,
                      use_refs=True, use_docstring_summary=True, settings=None):
     # type: (str, str, Optional[str], bool, bool, Optional[SettingsType]) -> JSON
     """Obtains the JSON schema of Weaver OpenAPI from request and response views schemas.
@@ -226,7 +227,8 @@ def get_swagger_json(http_scheme="http", http_host="localhost", base_url=None,
         - :mod:`weaver.wps_restapi.swagger_definitions`
     """
     CorniceSwagger.type_converter = OAS3TypeConversionDispatcher
-    swagger = CorniceSwagger(get_services(), def_ref_depth=-1 if use_refs else 0, param_ref=use_refs, resp_ref=use_refs)
+    depth = -1 if use_refs else 0
+    swagger = CorniceSwagger(get_services(), def_ref_depth=depth, param_ref=use_refs, resp_ref=use_refs)
     # function docstrings are used to create the route's summary in Swagger-UI
     swagger.summary_docstrings = use_docstring_summary
     swagger_base_spec = {"schemes": [http_scheme]}
@@ -271,39 +273,46 @@ def get_swagger_json(http_scheme="http", http_host="localhost", base_url=None,
     return swagger_json
 
 
-@cache_region("doc", sd.api_swagger_json_service.name)
-def api_swagger_json_cached(*args, **kwargs):
-    return get_swagger_json(*args, **kwargs)
+@cache_region("doc", sd.openapi_json_service.name)
+def openapi_json_cached(*args, **kwargs):
+    return get_openapi_json(*args, **kwargs)
 
 
-@sd.api_swagger_json_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
-                                 schema=sd.SwaggerJSONEndpoint(), response_schemas=sd.get_api_swagger_json_responses)
-def api_swagger_json(request):  # noqa: F811
+@sd.openapi_json_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
+                             schema=sd.OpenAPIEndpoint(), response_schemas=sd.get_openapi_json_responses)
+def openapi_json(request):  # noqa: F811
     # type: (Request) -> dict
-    """Weaver OpenAPI schema generation in JSON format."""
+    """weaver OpenAPI schema generation in JSON format."""
     # obtain 'server' host and api-base-path, which doesn't correspond necessarily to the app's host and path
     # ex: 'server' adds '/weaver' with proxy redirect before API routes
     settings = get_settings(request)
     weaver_server_url = get_weaver_url(settings)
     LOGGER.debug("Request app URL:   [%s]", request.url)
     LOGGER.debug("Weaver config URL: [%s]", weaver_server_url)
-    return api_swagger_json_cached(base_url=weaver_server_url, use_docstring_summary=True, settings=settings)
+    return openapi_json_cached(base_url=weaver_server_url, use_docstring_summary=True, settings=settings)
 
 
 @sd.api_swagger_ui_service.get(tags=[sd.TAG_API],
                                schema=sd.SwaggerUIEndpoint(), response_schemas=sd.get_api_swagger_ui_responses)
 def api_swagger_ui(request):
     """Weaver REST API swagger-ui schema documentation (this page)."""
-    json_path = wps_restapi_base_path(request) + sd.api_swagger_json_service.path
+    json_path = wps_restapi_base_path(request) + sd.openapi_json_service.path
     json_path = json_path.lstrip("/")   # if path starts by '/', swagger-ui doesn't find it on remote
-    data_mako = {
-        "api_title": sd.API_TITLE,
-        "api_version": __meta__.__version__,
-        "api_loader": "url: \"{}\",".format(json_path),
-        "api_scripts": "",
-    }
-    response = render_to_response("templates/swagger_ui.mako", data_mako, request=request)
-    return response
+    data_mako = {"api_title": sd.API_TITLE, "openapi_json_path": json_path, "api_version": __meta__.__version__}
+    resp = render_to_response("templates/swagger_ui.mako", data_mako, request=request)
+    return resp
+
+
+@sd.api_redoc_ui_service.get(tags=[sd.TAG_API],
+                             schema=sd.RedocUIEndpoint(), response_schemas=sd.get_api_redoc_ui_responses)
+def api_redoc_ui(request):
+    settings = get_settings(request)
+    weaver_server_url = get_weaver_url(settings)
+    spec = openapi_json_cached(base_url=weaver_server_url, settings=settings,
+                               use_docstring_summary=True, use_refs=False)
+    data_mako = {"openapi_spec": json.dumps(spec, ensure_ascii=False)}
+    resp = render_to_response("templates/redoc_ui.mako", data_mako, request=request)
+    return resp
 
 
 def get_request_info(request, detail=None):

@@ -134,9 +134,10 @@ TAG_DEPRECATED = "Deprecated Endpoints"
 
 api_frontpage_service = Service(name="api_frontpage", path="/")
 api_swagger_ui_service = Service(name="api_swagger_ui", path="/api")
-api_swagger_json_service = Service(name="api_swagger_json", path="/json")
+api_redoc_ui_service = Service(name="api_redoc_ui", path="/redoc")
 api_versions_service = Service(name="api_versions", path="/versions")
 api_conformance_service = Service(name="api_conformance", path="/conformance")
+openapi_json_service = Service(name="openapi_json", path="/json")
 
 quotes_service = Service(name="quotes", path="/quotations")
 quote_service = Service(name="quote", path=quotes_service.path + "/{quote_id}")
@@ -934,11 +935,15 @@ class ConformanceEndpoint(ExtendedMappingSchema):
     header = RequestHeaders()
 
 
-class SwaggerJSONEndpoint(ExtendedMappingSchema):
+class OpenAPIEndpoint(ExtendedMappingSchema):
     header = RequestHeaders()
 
 
 class SwaggerUIEndpoint(ExtendedMappingSchema):
+    pass
+
+
+class RedocUIEndpoint(ExtendedMappingSchema):
     pass
 
 
@@ -2224,12 +2229,17 @@ class OkGetFrontpageResponse(ExtendedMappingSchema):
 
 class OkGetSwaggerJSONResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
-    body = SwaggerJSONSpecSchema(description="Swagger JSON of weaver API.")
+    body = SwaggerJSONSpecSchema(description="OpenAPI JSON schema of Weaver API.")
 
 
 class OkGetSwaggerUIResponse(ExtendedMappingSchema):
     header = HtmlHeader()
-    body = SwaggerUISpecSchema(description="Swagger UI of weaver API.")
+    body = SwaggerUISpecSchema(description="Swagger UI of Weaver API.")
+
+
+class OkGetRedocUIResponse(ExtendedMappingSchema):
+    header = HtmlHeader()
+    body = SwaggerUISpecSchema(description="Redoc UI of Weaver API.")
 
 
 class OkGetVersionsResponse(ExtendedMappingSchema):
@@ -2569,12 +2579,16 @@ get_api_frontpage_responses = {
     "200": OkGetFrontpageResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
-get_api_swagger_json_responses = {
+get_openapi_json_responses = {
     "200": OkGetSwaggerJSONResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_api_swagger_ui_responses = {
     "200": OkGetSwaggerUIResponse(description="success"),
+    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+}
+get_api_redoc_ui_responses = {
+    "200": OkGetRedocUIResponse(description="success"),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
 }
 get_api_versions_responses = {

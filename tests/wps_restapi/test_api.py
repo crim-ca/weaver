@@ -71,7 +71,7 @@ class GenericApiRoutesTestCase(unittest.TestCase):
         assert resp.status_code == 200
         assert "<title>{}</title>".format(sd.API_TITLE) in resp.text
 
-        resp = self.testapp.get(sd.api_swagger_json_service.path, headers=self.json_headers)
+        resp = self.testapp.get(sd.openapi_json_service.path, headers=self.json_headers)
         assert resp.status_code == 200
         assert "tags" in resp.json
         assert "info" in resp.json
@@ -122,7 +122,7 @@ class RebasedApiRoutesTestCase(unittest.TestCase):
         cls.app_host = "localhost"
         cls.app_base_url = "http://" + cls.app_host
         cls.app_proxy_url = cls.app_base_url + cls.proxy_path
-        cls.app_proxy_json = cls.proxy_path + sd.api_swagger_json_service.path
+        cls.app_proxy_json = cls.proxy_path + sd.openapi_json_service.path
         cls.app_proxy_ui = cls.proxy_path + sd.api_swagger_ui_service.path
         cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON}
 
@@ -173,7 +173,7 @@ class RebasedApiRoutesTestCase(unittest.TestCase):
         config = get_test_weaver_config(settings={"weaver.url": None})
         testapp = get_test_weaver_app(config)
 
-        resp = testapp.get(sd.api_swagger_json_service.path, headers=self.json_headers)
+        resp = testapp.get(sd.openapi_json_service.path, headers=self.json_headers)
         assert resp.status_code == 200, "API definition should be accessed directly"
         assert resp.json["host"] in [self.app_host, "{}:80".format(self.app_host)]
         assert resp.json["basePath"] == sd.api_frontpage_service.path

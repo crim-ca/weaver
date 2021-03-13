@@ -9,7 +9,7 @@ from weaver.wps_restapi import swagger_definitions as sd
 TEST_PUBLIC_ROUTES = [
     sd.api_frontpage_service.path,
     sd.api_swagger_ui_service.path,
-    sd.api_swagger_json_service.path,
+    sd.openapi_json_service.path,
     sd.api_versions_service.path,
 ]
 TEST_FORBIDDEN_ROUTES = [

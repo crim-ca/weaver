@@ -515,7 +515,6 @@ fixme-list: install-dev fixme-list-only
 docs-build: clean-docs
 	@echo "Generating docs with Sphinx..."
 	@bash -c '$(CONDA_CMD) $(MAKE) -C "$(APP_ROOT)/docs" html'
-	@ln -sf "$(APP_ROOT)/docs/build/html/openapi.html" "$(APP_ROOT)/docs/build/html/api.html"
 
 .PHONY: docs
 docs: install-dev docs-build  ## generate HTML documentation with Sphinx after dependencies installation
