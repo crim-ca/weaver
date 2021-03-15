@@ -19,7 +19,7 @@ from weaver.exceptions import (
     ServiceNotFound,
     log_unhandled_exceptions
 )
-from weaver.formats import OUTPUT_FORMAT_JSON
+from weaver.formats import CONTENT_TYPE_TEXT_PLAIN, OUTPUT_FORMAT_JSON, get_format
 from weaver.owsexceptions import OWSNotFound
 from weaver.processes.convert import any2wps_literal_datatype
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
@@ -100,7 +100,9 @@ def get_results(job, container, value_key=None, ogc_api=False):
         elif value_key:
             out_key = value_key
         output = {out_key: value}
-        if "mimeType" in result and rtype == "href":  # required for the rest to be there, other fields optional
+        if rtype == "href":  # required for the rest to be there, other fields optional
+            if "mimeType" not in result:
+                result["mimeType"] = get_format(value, default=CONTENT_TYPE_TEXT_PLAIN).mime_type
             output["format"] = {fmt_key: result["mimeType"]}
             for field in ["encoding", "schema"]:
                 if field in result:

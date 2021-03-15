@@ -203,6 +203,36 @@ class ExtendedString(colander.String):
     pass
 
 
+class XMLObject(object):
+    """
+    Object that provides mapping to known XML extensions for OpenAPI schema definition.
+
+    .. seealso::
+        - https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#xmlObject
+        - https://swagger.io/docs/specification/data-models/representing-xml/
+    """
+    attribute = None    # define the corresponding node object as attribute instead of field
+    name = None         # name of the attribute, or default to the class name of the object
+    namespace = None    # location of "xmlns:<prefix> <location>" specification
+    prefix = None       # prefix of the namespace
+    wrapped = False     # used to wrap array elements within a block called "<name>s"
+
+    @property
+    def xml(self):
+        spec = {}
+        if isinstance(self.attribute, bool):
+            spec["attribute"] = self.attribute
+        if isinstance(self.name, str):
+            spec["name"] = self.name
+        if isinstance(self.namespace, str):
+            spec["namespace"] = self.namespace
+        if isinstance(self.prefix, str):
+            spec["prefix"] = self.prefix
+        if isinstance(self.wrapped, bool):
+            spec["wrapped"] = self.wrapped
+        return spec or None
+
+
 class ExtendedNodeInterface(object):
     _extension = None  # type: str
 
@@ -1578,6 +1608,10 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
                     converted["title"] = schema_node.title
                 else:
                     converted["title"] = schema_node.name
+
+        xml = getattr(schema_node, "xml", None)
+        if isinstance(xml, dict):
+            converted["xml"] = xml
 
         return converted
 

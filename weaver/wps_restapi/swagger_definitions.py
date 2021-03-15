@@ -4,8 +4,10 @@ so that one can update the swagger without touching any other files after the in
 """
 # pylint: disable=C0103,invalid-name
 
+import os
 from typing import TYPE_CHECKING
 
+import yaml
 from colander import DateTime, Email, OneOf, Range, Regex, drop
 from cornice import Service
 
@@ -24,6 +26,7 @@ from weaver.execute import (
 )
 from weaver.formats import (
     ACCEPT_LANGUAGE_EN_CA,
+    ACCEPT_LANGUAGE_EN_US,
     ACCEPT_LANGUAGES,
     CONTENT_TYPE_ANY,
     CONTENT_TYPE_APP_JSON,
@@ -64,7 +67,8 @@ from weaver.wps_restapi.colander_extras import (
     PermissiveMappingSchema,
     SchemeURL,
     SemanticVersion,
-    StringRange
+    StringRange,
+    XMLObject
 )
 from weaver.wps_restapi.utils import wps_restapi_base_path
 
@@ -104,6 +108,23 @@ IO_INFO_IDS = (
 
 OGC_API_REPO_URL = "https://github.com/opengeospatial/ogcapi-processes"
 OGC_API_SCHEMA_URL = "https://raw.githubusercontent.com/opengeospatial/ogcapi-processes"
+
+#########################################################
+# Examples
+#########################################################
+
+# load examples by file names as keys
+SCHEMA_EXAMPLE_DIR = os.path.join(os.path.dirname(__file__), "examples")
+EXAMPLES = {}
+for name in os.listdir(SCHEMA_EXAMPLE_DIR):
+    path = os.path.join(SCHEMA_EXAMPLE_DIR, name)
+    ext = os.path.splitext(name)[-1]
+    with open(path, "r") as f:
+        if ext in [".json", ".yaml", ".yml"]:
+            EXAMPLES[name] = yaml.safe_load(f)  # both JSON/YAML
+        else:
+            EXAMPLES[name] = f.read()
+
 
 #########################################################
 # API tags
@@ -948,33 +969,234 @@ class RedocUIEndpoint(ExtendedMappingSchema):
     pass
 
 
+class OWSNamespace(XMLObject):
+    prefix = "ows"
+    namespace = "http://www.opengis.net/ows/1.1"
+
+
+class WPSNamespace(XMLObject):
+    prefix = "ows"
+    namespace = "http://www.opengis.net/wps/1.0.0"
+
+
+class XMLNamespace(XMLObject):
+    prefix = "xml"
+
+
+class OWSVersion(ExtendedSchemaNode, OWSNamespace):
+    schema_type = String
+    name = "Version"
+    default = "1.0.0"
+    example = "1.0.0"
+
+
+class OWSAcceptVersions(ExtendedSequenceSchema, OWSNamespace):
+    description = "Accepted versions to produce the response."
+    name = "AcceptVersions"
+    item = OWSVersion()
+
+
+class OWSLanguage(ExtendedSchemaNode, OWSNamespace):
+    description = "Desired language to produce the response."
+    schema_type = String
+    name = "language"
+    attribute = True
+    default = ACCEPT_LANGUAGE_EN_US
+    example = ACCEPT_LANGUAGE_EN_CA
+
+
+class OWSService(ExtendedSchemaNode, OWSNamespace):
+    description = "Desired service to produce the response (SHOULD be 'WPS')."
+    schema_type = String
+    name = "service"
+    attribute = True
+    default = ACCEPT_LANGUAGE_EN_US
+    example = ACCEPT_LANGUAGE_EN_CA
+
+
+class WPSServiceAttribute(ExtendedSchemaNode, XMLObject):
+    schema_type = String
+    name = "service"
+    attribute = True
+    default = "WPS"
+    example = "WPS"
+
+
+class WPSVersionAttribute(ExtendedSchemaNode, XMLObject):
+    schema_type = String
+    name = "version"
+    attribute = True
+    default = "1.0.0"
+    example = "1.0.0"
+
+
+class WPSLanguageAttribute(ExtendedSchemaNode, XMLNamespace):
+    schema_type = String
+    name = "lang"
+    attribute = True
+    default = ACCEPT_LANGUAGE_EN_US
+    example = ACCEPT_LANGUAGE_EN_CA
+
+
+class WPSMetadata(ExtendedMappingSchema, WPSNamespace):
+    service = WPSServiceAttribute()
+    version = WPSVersionAttribute()
+    lang = WPSLanguageAttribute()
+
+
 class WPSParameters(ExtendedMappingSchema):
     service = ExtendedSchemaNode(String(), example="WPS", description="Service selection.",
                                  validator=OneOfCaseInsensitive(["WPS"]))
     request = ExtendedSchemaNode(String(), example="GetCapabilities", description="WPS operation to accomplish",
                                  validator=OneOfCaseInsensitive(["GetCapabilities", "DescribeProcess", "Execute"]))
     version = Version(exaple="1.0.0", default="1.0.0", validator=OneOf(["1.0.0", "2.0.0", "2.0"]))
-    identifier = ExtendedSchemaNode(String(), exaple="hello", description="Process identifier.", missing=drop)
-    data_inputs = ExtendedSchemaNode(String(), name="DataInputs", missing=drop, example="message=hi",
+    identifier = ExtendedSchemaNode(String(), exaple="hello", missing=drop,
+                                    example="example-process,another-process",
+                                    description="Single or comma-separated list of process identifiers to describe, "
+                                                "and single one for execution.")
+    data_inputs = ExtendedSchemaNode(String(), name="DataInputs", missing=drop,
+                                     example="message=hi&names=user1,user2&value=1",
                                      description="Process execution inputs provided as Key-Value Pairs (KVP).")
 
 
-class WPSBody(ExtendedMappingSchema):
-    content = ExtendedSchemaNode(String(), description="XML data inputs provided for WPS POST request.")
+class WPSOperationGetNoContent(ExtendedMappingSchema):
+    description = "No content body provided (GET requests)."
+    default = {}
+
+
+class WPSOperationPost(ExtendedMappingSchema):
+    accepted_versions = OWSAcceptVersions(missing=drop, default="1.0.0")
+    language = OWSLanguage(missing=drop)
+    service = OWSService()
+
+
+class WPSGetCapabilitiesPost(WPSOperationPost, WPSNamespace):
+    schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsGetCapabilities_request.xsd"
+    name = "GetCapabilities"
+
+
+class WPSIdentifier(ExtendedSchemaNode, OWSNamespace):
+    schema_type = String
+    name = "Identifier"
+
+
+class WPSIdentifierList(ExtendedSequenceSchema, OWSNamespace):
+    name = "Identifiers"
+    item = WPSIdentifier()
+
+
+class WPSDescribeProcessPost(WPSOperationPost, WPSNamespace):
+    schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsDescribeProcess_request.xsd"
+    name = "DescribeProcess"
+    identifier = WPSIdentifierList(
+        description="Single or comma-separated list of process identifier to describe.",
+        example="example"
+    )
+
+
+class WPSExecuteDataInputs(ExtendedMappingSchema, WPSNamespace):
+    description = "XML data inputs provided for WPS POST request (Execute)."
+    name = "Execute"
+    # FIXME: missing details about 'DataInputs'
+
+
+class WPSExecutePost(WPSOperationPost, WPSNamespace):
+    schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsExecute_request.xsd"
+    name = "Execute"
+    identifier = WPSIdentifier(description="Identifier of the process to execute with data inputs.")
+    dataInputs = WPSExecuteDataInputs(description="Data inputs to be provided for process execution.")
+
+
+class WPSBody(OneOfKeywordSchema):
+    _one_of = [
+        WPSExecutePost(),
+        WPSDescribeProcessPost(),
+        WPSGetCapabilitiesPost(),
+    ]
 
 
 class WPSHeaders(ExtendedMappingSchema):
     accept = AcceptHeader(missing=drop)
 
 
-class WPSEndpoint(ExtendedMappingSchema):
+class WPSEndpointGet(ExtendedMappingSchema):
     header = WPSHeaders()
     querystring = WPSParameters()
+    body = WPSOperationGetNoContent()
+
+
+class WPSEndpointPost(ExtendedMappingSchema):
+    header = WPSHeaders()
     body = WPSBody()
 
 
-class WPSXMLSuccessBodySchema(ExtendedMappingSchema):
+class WPSServiceIdentification(ExtendedMappingSchema, WPSNamespace):
+    name = "ServiceIdentification"
+
+
+class WPSGetCapabilities(WPSMetadata):
+    schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsGetCapabilities_response.xsd"
+    name = "Capabilities"
+    svc = WPSServiceIdentification()
+
+
+class WPSDescribeProcess(ExtendedMappingSchema):
     pass
+
+
+class WPSExecute(ExtendedMappingSchema):
+    pass
+
+
+class WPSXMLSuccessBodySchema(OneOfKeywordSchema):
+    _one_of = [
+        WPSGetCapabilities(),
+        WPSDescribeProcess(),
+        WPSExecute(),
+    ]
+
+
+class OWSExceptionCode(ExtendedSchemaNode, XMLObject):
+    schema_type = String
+    name = "exceptionCode"
+    attribute = True
+
+
+class OWSExceptionLocator(ExtendedSchemaNode, XMLObject):
+    schema_type = String
+    name = "locator"
+    attribute = True
+
+
+class OWSExceptionText(ExtendedSchemaNode, OWSNamespace):
+    schema_type = String
+    name = "ExceptionText"
+
+
+class OWSException(ExtendedMappingSchema, OWSNamespace):
+    name = "Exception"
+    code = OWSExceptionCode(example="MissingParameterValue")
+    locator = OWSExceptionLocator(default="None", example="service")
+    text = OWSExceptionText(example="Missing service")
+
+
+class OWSExceptionReport(ExtendedMappingSchema, OWSNamespace):
+    name = "ExceptionReport"
+    exception = OWSException()
+
+
+class WPSException(ExtendedMappingSchema):
+    example = """
+    <ows:ExceptionReport
+            xsi:schemaLocation="http://www.opengis.net/ows/1.1
+            http://schemas.opengis.net/ows/1.1.0/owsExceptionReport.xsd"
+            version="1.0.0">
+        <ows:Exception exceptionCode="MissingParameterValue" locator="service">
+            <ows:ExceptionText>service</ows:ExceptionText>
+        </ows:Exception>
+    </ows:ExceptionReport>
+    """
+    report = OWSExceptionReport()
 
 
 class OkWPSResponse(ExtendedMappingSchema):
@@ -983,14 +1205,10 @@ class OkWPSResponse(ExtendedMappingSchema):
     body = WPSXMLSuccessBodySchema()
 
 
-class WPSXMLErrorBodySchema(ExtendedMappingSchema):
-    pass
-
-
 class ErrorWPSResponse(ExtendedMappingSchema):
     description = "Unhandled error occurred on WPS endpoint."
     header = XmlHeader()
-    body = WPSXMLErrorBodySchema()
+    body = WPSException()
 
 
 class ProviderEndpoint(ProviderPath):
@@ -2700,13 +2918,26 @@ post_process_jobs_responses = {
     "500": InternalServerErrorPostProcessJobResponse(),
 }
 get_all_jobs_responses = {
-    "200": OkGetQueriedJobsResponse(description="success"),
+    "200": OkGetQueriedJobsResponse(description="success", examples={
+        "JobListing": {
+            "summary": "Job ID listing with default queries.",
+            "value": EXAMPLES["jobs_listing.json"]
+        }
+    }),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
     "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetJobsResponse(),
 }
 get_single_job_status_responses = {
-    "200": OkGetJobStatusResponse(description="success"),
+    "200": OkGetJobStatusResponse(description="success", examples={
+        "JobStatusSuccess": {
+            "summary": "Successful job status response.",
+            "value": EXAMPLES["job_status_success.json"]},
+        "JobStatusFailure": {
+            "summary": "Failed job status response.",
+            "value": EXAMPLES["job_status_failed.json"],
+        }
+    }),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
     "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetJobStatusResponse(),
@@ -2718,33 +2949,58 @@ delete_job_responses = {
     "500": InternalServerErrorDeleteJobResponse(),
 }
 get_job_inputs_responses = {
-    "200": OkGetJobInputsResponse(description="success"),
+    "200": OkGetJobInputsResponse(description="success", examples={
+        "JobInputs": {
+            "summary": "Submitted job input values at for process execution.",
+            "value": EXAMPLES["job_inputs.json"],
+        }
+    }),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
     "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetJobResultsResponse(),
 }
 get_job_outputs_responses = {
-    "200": OkGetJobOutputsResponse(description="success"),
+    "200": OkGetJobOutputsResponse(description="success", examples={
+        "JobOutputs": {
+            "summary": "Obtained job outputs values following process execution.",
+            "value": EXAMPLES["job_outputs.json"],
+        }
+    }),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
     "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetJobOutputResponse(),
 }
 get_result_redirect_responses = {
-    "308": RedirectResultResponse(description="redirect"),
+    "308": RedirectResultResponse(description="Redirects '/result' (without 's') to corresponding '/results' path."),
 }
 get_job_results_responses = {
-    "200": OkGetJobResultsResponse(description="success"),
+    "200": OkGetJobResultsResponse(description="success", examples={
+        "JobResults": {
+            "summary": "Obtained job results.",
+            "value": EXAMPLES["job_results.json"],
+        }
+    }),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
     "500": InternalServerErrorGetJobResultsResponse(),
 }
 get_exceptions_responses = {
-    "200": OkGetJobExceptionsResponse(description="success"),
+    "200": OkGetJobExceptionsResponse(description="success", examples={
+        "JobExceptions": {
+            "summary": "Job exceptions that occurred during failing process execution.",
+            "value": EXAMPLES["job_exceptions.json"],
+        }
+    }),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
     "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetJobExceptionsResponse(),
 }
 get_logs_responses = {
-    "200": OkGetJobLogsResponse(description="success"),
+    "200": OkGetJobLogsResponse(description="success", examples={
+        "JobLogs": {
+            "summary": "Job logs registered and captured throughout process execution.",
+            "value": EXAMPLES["job_logs.json"],
+        }
+    }),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
     "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetJobLogsResponse(),
@@ -2780,7 +3036,22 @@ get_bill_responses = {
     "500": InternalServerErrorGetBillInfoResponse(),
 }
 wps_responses = {
-    "200": OkWPSResponse(),
+    "200": OkWPSResponse(examples={
+        "GetCapabilities": {
+            "summary": "GetCapabilities example response.",
+            "value": EXAMPLES["wps_getcapabilities.xml"]
+        },
+        "DescribeProcess": {
+            "summary": "DescribeProcess example response.",
+            "value": EXAMPLES["wps_describeprocess.xml"]
+        }
+    }),
+    "400": ErrorWPSResponse(examples={
+        "MissingParameterError": {
+            "summary": "Error in case of missing parameter ('service' in this case)",
+            "value": EXAMPLES["wps_missing_parameter.xml"],
+        }
+    }),
     "500": ErrorWPSResponse(),
 }
 

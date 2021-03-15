@@ -113,11 +113,16 @@ OUTPUT_FORMATS = {
 LOGGER = logging.getLogger(__name__)
 
 
-def get_format(mime_type):
-    # type: (str) -> Format
+def get_format(mime_type, default=None):
+    # type: (str, Optional[str]) -> Format
     """Obtains a :class:`Format` with predefined extension and encoding details from known MIME-types."""
     ctype = clean_mime_type_format(mime_type, strip_parameters=True)
-    return _CONTENT_TYPE_FORMAT_MAPPING.get(mime_type, Format(ctype, extension=get_extension(ctype)))
+    fmt = _CONTENT_TYPE_FORMAT_MAPPING.get(mime_type)
+    if fmt is not None:
+        return fmt
+    if default is not None:
+        ctype = default
+    return Format(ctype, extension=get_extension(ctype))
 
 
 def get_extension(mime_type):
