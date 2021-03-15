@@ -1,0 +1,9 @@
+{
+  "id": "hummingbird",
+  "title": "Hummingbird 0.5_dev",
+  "abstract": "WPS processes for general tools used in the climate science community like cdo and compliance checker.",
+  "url": "http://schema-example.com/providers/hummingbird",
+  "processes": "http://schema-example.com/providers/hummingbird/processes",
+  "type": "wps-remote",
+  "contact": "Lastname, Firstname"
+}

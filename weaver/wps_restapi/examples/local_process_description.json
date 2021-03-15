@@ -1,0 +1,38 @@
+{
+  "process": {
+    "processVersion": "1.1",
+    "title": "JSON array to NetCDF",
+    "abstract": "Extracts and fetches NetCDF files from a JSON file containing an URL string array, and provides them on the output directory.",
+    "keywords": [],
+    "metadata": [],
+    "id": "jsonarray2netcdf",
+    "inputs": [
+      {
+        "title": "input",
+        "id": "input",
+        "formats": [
+          {
+            "mimeType": "application/json",
+            "default": true
+          }
+        ],
+        "minOccurs": "1",
+        "maxOccurs": "1"
+      }
+    ],
+    "outputs": [
+      {
+        "formats": [
+          {
+            "mimeType": "application/x-netcdf",
+            "default": true
+          }
+        ],
+        "title": "output",
+        "id": "output"
+      }
+    ],
+    "visibility": "public",
+    "executeEndpoint": "http://localhost:4002/processes/jsonarray2netcdf/jobs"
+  }
+}

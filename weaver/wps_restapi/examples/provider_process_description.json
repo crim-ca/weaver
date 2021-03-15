@@ -1,0 +1,65 @@
+{
+  "process": {
+    "title": "NCDump",
+    "abstract": "Run ncdump to retrieve NetCDF header metadata.",
+    "keywords": [
+      "hummingbird"
+    ],
+    "metadata": [
+      {
+        "title": "Birdhouse",
+        "href": "http://bird-house.github.io/",
+        "rel": "birdhouse"
+      },
+      {
+        "title": "User Guide",
+        "href": "http://birdhouse-hummingbird.readthedocs.io/en/latest/",
+        "rel": "user-guide"
+      }
+    ],
+    "id": "ncdump",
+    "inputs": [
+      {
+        "title": "Dataset",
+        "abstract": "Enter a URL pointing to a NetCDF file (optional)",
+        "id": "dataset",
+        "formats": [
+          {
+            "mimeType": "application/x-netcdf",
+            "default": false
+          }
+        ]
+      },
+      {
+        "title": "Remote OpenDAP Data URL",
+        "abstract": "Or provide a remote OpenDAP data URL, for example: http://my.opendap/thredds/dodsC/path/to/file.nc",
+        "id": "dataset_opendap",
+        "metadata": [
+          {
+            "href": "https://www.iana.org/assignments/media-types/media-types.xhtml",
+            "title": "application/x-ogc-dods",
+            "role": null,
+            "rel": "application-x-ogc-dods"
+          }
+        ],
+        "type": "string",
+        "min_occurs": 0,
+        "max_occurs": 100
+      }
+    ],
+    "outputs": [
+      {
+        "formats": [
+          {
+            "mimeType": "text/plain",
+            "default": false
+          }
+        ],
+        "title": "NetCDF Metadata",
+        "abstract": "NetCDF Metadata",
+        "id": "output"
+      }
+    ],
+    "executeEndpoint": "http://schema-example.com/providers/hummingbird/processes/ncdump/jobs"
+  }
+}

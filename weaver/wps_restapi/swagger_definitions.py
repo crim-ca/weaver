@@ -2819,7 +2819,12 @@ get_api_conformance_responses = {
     "401": UnauthorizedJsonResponseSchema(description="unauthorized")
 }
 get_processes_responses = {
-    "200": OkGetProcessesListResponse(description="success"),
+    "200": OkGetProcessesListResponse(description="success", examples={
+        "ProcessesList": {
+            "summary": "Listing of local processes registered in Weaver.",
+            "value": EXAMPLES["local_process_listing.json"],
+        }
+    }),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
     "500": InternalServerErrorGetProcessesListResponse(),
 }
@@ -2830,20 +2835,35 @@ post_processes_responses = {
     "500": InternalServerErrorPostProcessesResponse(),
 }
 get_process_responses = {
-    "200": OkGetProcessInfoResponse(description="success"),
+    "200": OkGetProcessInfoResponse(description="success", examples={
+        "ProcessDescription": {
+            "summary": "Description of a local process registered in Weaver.",
+            "value": EXAMPLES["local_process_description.json"],
+        }
+    }),
     "400": BadRequestGetProcessInfoResponse(),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
     "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetProcessResponse(),
 }
 get_process_package_responses = {
-    "200": OkGetProcessPackageSchema(description="success"),
+    "200": OkGetProcessPackageSchema(description="success", examples={
+        "PackageCWL": {
+            "summary": "CWL Application Package definition of the local process.",
+            "value": EXAMPLES["local_process_package.json"],
+        }
+    }),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
     "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetProcessPackageResponse(),
 }
 get_process_payload_responses = {
-    "200": OkGetProcessPayloadSchema(description="success"),
+    "200": OkGetProcessPayloadSchema(description="success", examples={
+        "Payload": {
+            "summary": "Payload employed during process deployment and registration.",
+            "value": EXAMPLES["local_process_payload.json"],
+        }
+    }),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
     "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetProcessPayloadResponse(),
@@ -2867,13 +2887,23 @@ delete_process_responses = {
     "500": InternalServerErrorDeleteProcessResponse(),
 }
 get_providers_list_responses = {
-    "200": OkGetProvidersListResponse(description="success"),
+    "200": OkGetProvidersListResponse(description="success", examples={
+        "ProviderList": {
+            "summary": "Listing of registered remote providers.",
+            "value": EXAMPLES["provider_listing.json"],
+        }
+    }),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
     "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetProvidersListResponse(),
 }
 get_provider_responses = {
-    "200": OkGetProviderCapabilitiesSchema(description="success"),
+    "200": OkGetProviderCapabilitiesSchema(description="success", examples={
+        "ProviderDescription": {
+            "summary": "Description of a registered remote WPS provider.",
+            "value": EXAMPLES["provider_description.json"],
+        }
+    }),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
     "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetProviderCapabilitiesResponse(),
@@ -2892,7 +2922,12 @@ get_provider_processes_responses = {
     "500": InternalServerErrorGetProviderProcessesListResponse(),
 }
 get_provider_process_responses = {
-    "200": OkGetProviderProcessDescriptionResponse(description="success"),
+    "200": OkGetProviderProcessDescriptionResponse(description="success", examples={
+        "ProviderProcessWPS": {
+            "summary": "Description of a remote WPS provider process converted to OGC-API Processes format.",
+            "value": EXAMPLES["provider_process_description.json"]
+        }
+    }),
     "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
     "403": UnauthorizedJsonResponseSchema(description="forbidden"),
     "500": InternalServerErrorGetProviderProcessResponse(),
