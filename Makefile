@@ -23,9 +23,16 @@ CONDA_ENV      ?= $(APP_NAME)
 CONDA_HOME     ?= $(HOME)/.conda
 CONDA_ENVS_DIR ?= $(CONDA_HOME)/envs
 CONDA_ENV_PATH := $(CONDA_ENVS_DIR)/$(CONDA_ENV)
-CONDA_BIN      := $(CONDA_HOME)/bin/conda
+# allow pre-installed conda in Windows bash-like shell
+ifeq ($(findstring MINGW,$(OS_NAME)),MINGW)
+  CONDA_BIN_DIR ?= $(CONDA_HOME)/Scripts
+else
+  CONDA_BIN_DIR ?= $(CONDA_HOME)/bin
+endif
+CONDA_BIN := $(CONDA_BIN_DIR)/conda
 CONDA_ENV_REAL_TARGET_PATH := $(realpath $(CONDA_ENV_PATH))
 CONDA_ENV_REAL_ACTIVE_PATH := $(realpath ${CONDA_PREFIX})
+
 # environment already active - use it directly
 ifneq ("$(CONDA_ENV_REAL_ACTIVE_PATH)", "")
   CONDA_ENV_MODE := [using active environment]
@@ -43,7 +50,7 @@ endif
 # update paths for environment activation
 ifeq ("$(CONDA_ENV_REAL_ACTIVE_PATH)", "")
   CONDA_ENV_MODE := [will activate environment]
-  CONDA_CMD := source "$(CONDA_HOME)/bin/activate" "$(CONDA_ENV)";
+  CONDA_CMD := source "$(CONDA_BIN_DIR)/activate" "$(CONDA_ENV)";
 endif
 DOWNLOAD_CACHE ?= $(APP_ROOT)/downloads
 PYTHON_VERSION ?= `python -c 'import platform; print(platform.python_version())'`
@@ -138,24 +145,24 @@ info:		## display make information
 .PHONY: conda-base
 conda-base:		## obtain and install a missing conda distribution
 	@echo "Validating conda installation..."
-	@test -f "$(CONDA_HOME)/bin/conda" || test -d "$(DOWNLOAD_CACHE)" || \
+	@test -f "$(CONDA_BIN)" || test -d "$(DOWNLOAD_CACHE)" || \
 		(echo "Creating download directory: $(DOWNLOAD_CACHE)" && mkdir -p "$(DOWNLOAD_CACHE)")
-	@test -f "$(CONDA_HOME)/bin/conda" || test -f "$(DOWNLOAD_CACHE)/$(FN)" || \
+	@test -f "$(CONDA_BIN)" || test -f "$(DOWNLOAD_CACHE)/$(FN)" || \
 		(echo "Fetching conda distribution from: $(CONDA_URL)/$(FN)" && \
 		 curl "$(CONDA_URL)/$(FN)" --insecure --location --output "$(DOWNLOAD_CACHE)/$(FN)")
-	@test -f "$(CONDA_HOME)/bin/conda" || \
+	@test -f "$(CONDA_BIN)" || \
 		(bash "$(DOWNLOAD_CACHE)/$(FN)" -b -u -p "$(CONDA_HOME)" && \
-		 echo "Make sure to add '$(CONDA_HOME)/bin' to your PATH variable in '~/.bashrc'.")
+		 echo "Make sure to add '$(CONDA_BIN_DIR)' to your PATH variable in '~/.bashrc'.")
 
 .PHONY: conda-clean
 clean-clean: 	## remove the conda environment
 	@echo "Removing conda env '$(CONDA_ENV)'"
-	@-test -d "$(CONDA_ENV_PATH)" && "$(CONDA_BIN)" remove -n $(CONDA_ENV) --yes --all
+	@-test -d "$(CONDA_ENV_PATH)" && "$(CONDA_BIN)" remove -n "$(CONDA_ENV)" --yes --all
 
 .PHONY: conda-config
 conda-config: conda-base	## setup configuration of the conda environment
 	@echo "Updating conda configuration..."
-	@ "$(CONDA_BIN)" config --add envs_dirs $(CONDA_ENVS_DIR)
+	@ "$(CONDA_BIN)" config --add envs_dirs "$(CONDA_ENVS_DIR)"
 	@ "$(CONDA_BIN)" config --set ssl_verify true
 	@ "$(CONDA_BIN)" config --set channel_priority true
 	@ "$(CONDA_BIN)" config --set auto_update_conda false
@@ -193,13 +200,13 @@ install-all: install-sys install-pkg install-pip install-dev  ## install applica
 .PHONY: install-dev
 install-dev: install-pip	## install development and test dependencies
 	@echo "Installing development packages with pip..."
-	@-bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements-dev.txt"'
+	@bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements-dev.txt"'
 	@echo "Install with pip complete. Test service with 'make test*' variations."
 
 .PHONY: install-pkg
 install-pkg: install-pip	## install application package dependencies
 	@echo "Installing base packages with pip..."
-	@-bash -c "$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements.txt" --no-cache-dir"
+	@bash -c "$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements.txt" --no-cache-dir"
 	@echo "Install with pip complete."
 
 # don't use 'PIP_XARGS' in this case since extra features could not yet be supported by pip being installed/updated
@@ -217,7 +224,7 @@ install-pip:	## install application as a package to allow import from another py
 .PHONY: install-raw
 install-raw:	## install without any requirements or dependencies (suppose everything is setup)
 	@echo "Installing package without dependencies..."
-	@-bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -e "$(APP_ROOT)" --no-deps'
+	@bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -e "$(APP_ROOT)" --no-deps'
 	@echo "Install package complete."
 
 ## -- Cleanup targets ----------------------------------------------------------------------------------------------- ##
@@ -243,7 +250,7 @@ clean-cache:	## remove caches such as DOWNLOAD_CACHE
 	@-rm -fr "$(DOWNLOAD_CACHE)"
 
 .PHONY: clean-docs
-clean-docs:	install-dev clean-docs-dirs		## remove documentation artefacts
+clean-docs:	clean-docs-dirs		## remove documentation artefacts
 	@echo "Removing documentation build files..."
 	@$(MAKE) -C "$(APP_ROOT)/docs" clean || true
 
@@ -325,7 +332,7 @@ test-func-only: mkdir-reports   	## run functional tests (online and usage speci
 test-workflow-only:	mkdir-reports	## run EMS workflow End-2-End tests
 	@echo "Running workflow tests..."
 	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
- 		-m "workflow" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+		-m "workflow" --junitxml "$(REPORTS_DIR)/test-results.xml"'
 
 .PHONY: test-online-only
 test-online-only: mkdir-reports  	## run online tests (running instance required)
@@ -337,7 +344,7 @@ test-online-only: mkdir-reports  	## run online tests (running instance required
 test-offline-only: mkdir-reports  	## run offline tests (not marked as online)
 	@echo "Running offline tests (not marked as online)..."
 	@bash -c '$(CONDA_CMD) pytest tests $(TEST_VERBOSITY) \
- 		-m "not online" --junitxml "$(REPORTS_DIR)/test-results.xml"'
+		-m "not online" --junitxml "$(REPORTS_DIR)/test-results.xml"'
 
 .PHONY: test-no-tb14-only
 test-no-tb14-only: mkdir-reports  	## run all tests except ones marked for 'Testbed-14'
@@ -504,10 +511,13 @@ fixme-list: install-dev fixme-list-only
 
 ## -- Documentation targets ----------------------------------------------------------------------------------------- ##
 
-.PHONY: docs
-docs: install-dev clean-docs 	## generate HTML documentation with Sphinx
+.PHONY: docs-build	## generate HTML documentation with Sphinx
+docs-build: clean-docs
 	@echo "Generating docs with Sphinx..."
-	@bash -c '$(CONDA_CMD) $(MAKE) -C $@ html'
+	@bash -c '$(CONDA_CMD) $(MAKE) -C "$(APP_ROOT)/docs" html'
+
+.PHONY: docs
+docs: install-dev docs-build  ## generate HTML documentation with Sphinx after dependencies installation
 
 ## -- Versioning targets -------------------------------------------------------------------------------------------- ##
 

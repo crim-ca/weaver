@@ -37,8 +37,8 @@ class WpsPackageDockerAppTest(WpsPackageConfigBase):
         cls.deploy_docker_process()
 
     @classmethod
-    def deploy_docker_process(cls):
-        cwl = {
+    def get_package(cls):
+        return {
             "cwlVersion": "v1.0",
             "class": "CommandLineTool",
             "baseCommand": "cat",
@@ -54,6 +54,10 @@ class WpsPackageDockerAppTest(WpsPackageConfigBase):
                 {"id": cls.out_key, "type": "File", "outputBinding": {"glob": cls.out_file}},
             ]
         }
+
+    @classmethod
+    def get_deploy_body(cls):
+        cwl = cls.get_package()
         body = {
             "processDescription": {
                 "process": {"id": cls.process_id}
@@ -61,16 +65,32 @@ class WpsPackageDockerAppTest(WpsPackageConfigBase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
             "executionUnit": [{"unit": cwl}],
         }
+        return body
+
+    @classmethod
+    def deploy_docker_process(cls):
+        body = cls.get_deploy_body()
         info = cls.deploy_process(body)
         return info
 
-    def validate_outputs(self, job_id, result_payload, result_file_content):
-        # check that output is HTTP reference to file
-        output_values = {out["id"]: get_any_value(out) for out in result_payload["outputs"]}
-        assert len(output_values) == 1
+    def validate_outputs(self, job_id, result_payload, outputs_payload, result_file_content):
+        # get generic details
         wps_uuid = self.job_store.fetch_by_id(job_id).wps_id
         wps_out_path = "{}{}".format(self.settings["weaver.url"], self.settings["weaver.wps_output_path"])
         wps_output = "{}/{}/{}".format(wps_out_path, wps_uuid, self.out_file)
+
+        # --- validate /results path format ---
+        assert len(result_payload) == 1
+        assert isinstance(result_payload, dict)
+        assert isinstance(result_payload[self.out_key], dict)
+        result_values = {out_id: get_any_value(result_payload[out_id]) for out_id in result_payload}
+        assert result_values[self.out_key] == wps_output
+
+        # --- validate /outputs path format ---
+
+        # check that output is HTTP reference to file
+        output_values = {out["id"]: get_any_value(out) for out in outputs_payload["outputs"]}
+        assert len(output_values) == 1
         assert output_values[self.out_key] == wps_output
 
         # check that actual output file was created in expected location along with XML job status
@@ -89,6 +109,16 @@ class WpsPackageDockerAppTest(WpsPackageConfigBase):
         # validate content
         with open(wps_out_file) as res_file:
             assert res_file.read() == result_file_content
+
+    def test_deployed_process_schemas(self):
+        """
+        Validate that resulting schemas from deserialization correspond to original package and process definitions.
+        """
+        # process already deployed by setUpClass
+        body = self.get_deploy_body()
+        process = self.process_store.fetch_by_id(self.process_id)
+        assert process.package == body["executionUnit"][0]["unit"]
+        assert process.payload == body
 
     def test_execute_wps_rest_resp_json(self):
         """
@@ -134,9 +164,10 @@ class WpsPackageDockerAppTest(WpsPackageConfigBase):
             job_id = resp.json["jobID"]
 
             # job monitoring
-            result = self.monitor_job(status_url)
+            results = self.monitor_job(status_url)
+            outputs = self.get_outputs(status_url)
 
-        self.validate_outputs(job_id, result, test_content)
+        self.validate_outputs(job_id, results, outputs, test_content)
 
     def wps_execute(self, version, accept):
         wps_url = get_wps_url(self.settings)
@@ -199,9 +230,10 @@ class WpsPackageDockerAppTest(WpsPackageConfigBase):
             assert job_id
 
             # job monitoring
-            result = self.monitor_job(status_url)
+            results = self.monitor_job(status_url)
+            outputs = self.get_outputs(status_url)
 
-        self.validate_outputs(job_id, result, test_content)
+        self.validate_outputs(job_id, results, outputs, test_content)
 
     def test_execute_wps_kvp_get_resp_xml(self):
         """

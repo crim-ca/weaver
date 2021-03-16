@@ -264,11 +264,11 @@ under a common WPS server to iteratively register, using a :ref:`GetCapabilities
 To specify a custom YAML file, you can define the setting named ``weaver.wps_processes_file`` with the appropriate path
 within the employed ``weaver.ini`` file that starts your application. By default, this setting will look for the
 provided path as absolute location, then will attempt to resolve relative path (corresponding to where the application
-is started from), and will also look within the |weaver-config|_ directory. If none of the files can be found, it will
-try to use a copy of `wps_processes.yml.example`_.
+is started from), and will also look within the |weaver-config|_ directory. If none of the files can be found, the
+operation is skipped.
 
-To disable this feature and avoid any auto-deployment provided by this functionality, simply set setting
-``weaver.wps_processes_file`` as *undefined* (i.e.: nothing after ``=`` in ``weaver.ini``).
+To ensure that this feature is disabled and to avoid any unexpected auto-deployment provided by this functionality,
+simply set setting ``weaver.wps_processes_file`` as *undefined* (i.e.: nothing after ``=`` in ``weaver.ini``).
 
 .. seealso::
     - `weaver.ini.example`_

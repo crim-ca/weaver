@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import TYPE_CHECKING
 from urllib.error import HTTPError
@@ -12,6 +13,17 @@ from weaver.utils import request_extra
 if TYPE_CHECKING:
     from weaver.typedefs import JSON
     from typing import Dict, Optional, Tuple, Union
+
+# Languages
+ACCEPT_LANGUAGE_EN_CA = "en-CA"
+ACCEPT_LANGUAGE_FR_CA = "fr-CA"
+ACCEPT_LANGUAGE_EN_US = "en-US"
+
+ACCEPT_LANGUAGES = frozenset([
+    ACCEPT_LANGUAGE_EN_CA,
+    ACCEPT_LANGUAGE_FR_CA,
+    ACCEPT_LANGUAGE_EN_US,
+])
 
 # Content-Types
 #   MIME-type nomenclature:
@@ -33,6 +45,9 @@ CONTENT_TYPE_APP_GEOJSON = "application/geo+json"
 CONTENT_TYPE_APP_VDN_GEOJSON = "application/vnd.geo+json"
 CONTENT_TYPE_APP_XML = "application/xml"
 CONTENT_TYPE_IMAGE_GEOTIFF = "image/tiff; subtype=geotiff"
+CONTENT_TYPE_IMAGE_JPEG = "image/jpeg"
+CONTENT_TYPE_IMAGE_PNG = "image/png"
+CONTENT_TYPE_IMAGE_TIFF = "image/tiff"
 CONTENT_TYPE_TEXT_XML = "text/xml"
 CONTENT_TYPE_ANY_XML = {CONTENT_TYPE_APP_XML, CONTENT_TYPE_TEXT_XML}
 CONTENT_TYPE_ANY = "*/*"
@@ -94,6 +109,8 @@ OUTPUT_FORMATS = {
     CONTENT_TYPE_APP_XML: OUTPUT_FORMAT_XML,
     CONTENT_TYPE_APP_JSON: OUTPUT_FORMAT_JSON,
 }
+
+LOGGER = logging.getLogger(__name__)
 
 
 def get_format(mime_type):
@@ -172,13 +189,14 @@ def get_cwl_file_format(mime_type, make_reference=False, must_exist=True, allow_
         """
         _mime_type_url = "{}{}".format(IANA_NAMESPACE_DEFINITION[IANA_NAMESPACE], _mime_type)
         try:
-            resp = request_extra("head", _mime_type_url, retries=3, allowed_codes=[HTTPOk.code, HTTPNotFound.code])
+            resp = request_extra("head", _mime_type_url, retries=3, timeout=0.5,
+                                 allow_redirects=True, allowed_codes=[HTTPOk.code, HTTPNotFound.code])
             if resp.status_code == HTTPOk.code:
                 return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _mime_type)
-        except ConnectionError:
-            pass
+        except ConnectionError as exc:
+            LOGGER.debug("Format request [%s] connection error: [%s]", _mime_type_url, exc)
         try:
-            resp = urlopen(_mime_type_url)  # nosec: B310 # is hardcoded HTTP(S)
+            resp = urlopen(_mime_type_url, timeout=1)  # nosec: B310 # is hardcoded HTTP(S)
             if resp.code == HTTPOk.code:
                 return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, _mime_type)
         except HTTPError:

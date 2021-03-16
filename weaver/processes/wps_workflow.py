@@ -106,6 +106,10 @@ class CallbackJob(object):
 
 
 class WpsWorkflow(ProcessCWL):
+    """
+    Definition of a ``CWL`` ``workflow`` that can execute ``WPS`` application packages as defined by
+    :class:`weaver.processes.wps_package.WpsPackage` as job steps.
+    """
     def __init__(self, toolpath_object, loading_context, get_job_process_definition):
         # type: (Dict[Text, Any], LoadingContext, GetJobProcessDefinitionFunction) -> None
         super(WpsWorkflow, self).__init__(toolpath_object, loading_context)

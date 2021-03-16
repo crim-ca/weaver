@@ -11,6 +11,7 @@ from pyramid.httpexceptions import HTTPNotFound
 from pywps import configuration as pywps_config
 
 from weaver.config import get_weaver_configuration
+from weaver.typedefs import XML
 from weaver.utils import (
     get_cookie_headers,
     get_settings,
@@ -26,7 +27,7 @@ LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing import Dict, Union, Optional
 
-    from weaver.typedefs import AnySettingsContainer, AnyRequestType, HeadersType, XML
+    from weaver.typedefs import AnyRequestType, AnySettingsContainer, HeadersType
 
 
 def _get_settings_or_wps_config(container,                  # type: AnySettingsContainer
@@ -56,7 +57,8 @@ def get_wps_path(container):
 
     Searches directly in settings, then `weaver.wps_cfg` file, or finally, uses the default values if not found.
     """
-    return _get_settings_or_wps_config(container, "weaver.wps_path", "server", "url", "/ows/wps", "WPS path")
+    path = _get_settings_or_wps_config(container, "weaver.wps_path", "server", "url", "/ows/wps", "WPS path")
+    return urlparse(path).path
 
 
 def get_wps_url(container):
@@ -208,7 +210,7 @@ def check_wps_status(location=None,     # type: Optional[str]
     execution.checkStatus(response=xml, sleepSecs=sleep_secs)
     if execution.response is None:
         raise Exception("Missing response, cannot check status.")
-    if not isinstance(execution.response, lxml.etree._Element):  # noqa
+    if not isinstance(execution.response, XML):
         execution.response = lxml.etree.fromstring(execution.response)
     return execution
 

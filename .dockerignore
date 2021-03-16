@@ -25,11 +25,13 @@ env
 *.egg[s]
 *.egg-info
 *egg[s]__pycache__
+.python_history
 
 # Unit test / Coverage reports
 .cache
 .coverage
 coverage
+.pylint.d/
 .pytest_cache
 .tox
 nosetests.xml

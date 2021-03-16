@@ -65,8 +65,7 @@ class WpsPackageConfigBase(unittest.TestCase):
         :returns: resulting tuple of ``(process-description, package)`` JSON responses.
         """
         resp = mocked_sub_requests(cls.app, "post_json", "/processes", data=payload, headers=cls.json_headers)
-        # TODO: status should be 201 when properly modified to match API conformance
-        assert resp.status_code == 200, "Expected successful deployment.\nError:\n{}".format(resp.text)
+        assert resp.status_code == 201, "Expected successful deployment.\nError:\n{}".format(resp.text)
         path = resp.json["processSummary"]["processDescriptionURL"]
         body = {"value": VISIBILITY_PUBLIC}
         resp = cls.app.put_json("{}/visibility".format(path), params=body, headers=cls.json_headers)
@@ -78,6 +77,12 @@ class WpsPackageConfigBase(unittest.TestCase):
             info.append(deepcopy(resp.json))
         return info
 
+    def _try_get_logs(self, status_url):
+        _resp = self.app.get("{}/logs".format(status_url), headers=self.json_headers)
+        if _resp.status_code == 200:
+            return "Error logs:\n{}".format("\n".join(_resp.json))
+        return ""
+
     def monitor_job(self, status_url, timeout=None, delta=None):
         # type: (str, Optional[int], Optional[int]) -> JSON
         """
@@ -86,18 +91,13 @@ class WpsPackageConfigBase(unittest.TestCase):
         :return: result of the successful job
         :raises AssertionError: when job fails or took too long to complete.
         """
-        def _try_get_logs():
-            _resp = self.app.get("{}/logs".format(status_url), headers=self.json_headers)
-            if _resp.status_code == 200:
-                return "Error logs:\n{}".format("\n".join(_resp.json))
-            return ""
 
         def check_job_status(_resp, running=False):
             body = _resp.json
             pretty = json.dumps(body, indent=2, ensure_ascii=False)
             statuses = [STATUS_RUNNING, STATUS_SUCCEEDED] if running else [STATUS_SUCCEEDED]
-            assert _resp.status_code == 200, "Execution failed. Response body:\n{}\n{}".format(pretty, _try_get_logs())
-            assert body["status"] in statuses, "Error job info:\n{}\n{}".format(pretty, _try_get_logs())
+            assert _resp.status_code == 200, "Execution failed:\n{}\n{}".format(pretty, self._try_get_logs(status_url))
+            assert body["status"] in statuses, "Error job info:\n{}\n{}".format(pretty, self._try_get_logs(status_url))
             return body["status"] == STATUS_SUCCEEDED
 
         time.sleep(1)  # small delay to ensure process execution had a change to start before monitoring
@@ -113,6 +113,13 @@ class WpsPackageConfigBase(unittest.TestCase):
             once = False
             left -= delta
         check_job_status(resp)
-        resp = self.app.get("{}/result".format(status_url), headers=self.json_headers)
+        resp = self.app.get("{}/results".format(status_url), headers=self.json_headers)
         assert resp.status_code == 200, "Error job info:\n{}".format(resp.json)
         return resp.json
+
+    def get_outputs(self, status_url):
+        resp = self.app.get(status_url + "/outputs", headers=self.json_headers)
+        body = resp.json
+        pretty = json.dumps(body, indent=2, ensure_ascii=False)
+        assert resp.status_code == 200, "Get outputs failed:\n{}\n{}".format(pretty, self._try_get_logs(status_url))
+        return body

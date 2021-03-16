@@ -1,17 +1,30 @@
 alembic
+beaker
 # AWS support (S3 buckets)
 boto3
+# windows fixes until
+# https://github.com/celery/billiard/issues/260
+# https://github.com/celery/billiard/issues/313
+billiard; sys_platform != "win32"
+billiard>3.2,<3.4; sys_platform == "win32"
 # celery 5 to be released in near future
 # celery >=4.4.3 breaks on 'future.utils' import
-celery==4.4.2
+celery[mongodb]==4.4.2; sys_platform != "win32"
+celery[mongodb]<4; sys_platform == "win32"
 cffi
 colander
 cornice
-cornice_swagger>=0.7.0
-# cwltool Python 2 support dropped on 2.x
-# enforce Python 3 with version >=2 to update existing 1.x installations
-# FIXME: avoid error invalid get_listing import location,
-#        remove properly as per https://github.com/crim-ca/weaver/issues/154
+#cornice_swagger>=0.7.0
+git+https://github.com/fmigneault/cornice.ext.swagger.git@openapi-3#egg=cornice-swagger
+# FIXME: properly support GPU execution
+#   - https://github.com/crim-ca/weaver/issues/104
+#   - https://github.com/crim-ca/weaver/issues/138
+# use cwltool gpu-enabled support until integrated within the original tool
+# (https://github.com/common-workflow-language/common-workflow-language/issues/587)
+### git+https://github.com/crim-ca/cwltool@docker-gpu#egg=cwltool; python_version >= "3"
+# FIXME: remove extra CWL code and let it handle it for use
+#   - changes since cause error with invalid get_listing import location
+#   - https://github.com/crim-ca/weaver/issues/154
 cwltool>=2,<=3.0.20200324120055
 duration
 git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7#egg=esgf-compute-api
@@ -27,9 +40,11 @@ oauthlib
 owslib>=0.19.2
 pymongo
 pyramid>=1.7.3
+pyramid_beaker>=0.8
 pyramid_celery
 pyramid_mako
 python-dateutil
+pyramid_rewrite
 pytz
 # no viable pywps version with Python>3.5 dependencies
 # use '4.2.4' plus a few commits that provide fix, but not yet released

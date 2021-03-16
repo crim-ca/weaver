@@ -37,7 +37,7 @@ from weaver.formats import (
     IANA_NAMESPACE,
     get_cwl_file_format
 )
-from weaver.processes.constants import CWL_REQUIREMENT_APP_BUILTIN
+from weaver.processes.constants import CWL_REQUIREMENT_APP_BUILTIN, CWL_REQUIREMENT_INIT_WORKDIR
 from weaver.utils import get_any_value
 
 EDAM_PLAIN = EDAM_NAMESPACE + ":" + EDAM_MAPPING[CONTENT_TYPE_TEXT_PLAIN]
@@ -923,7 +923,7 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         raised as invalid schemas.
 
         .. seealso::
-            :meth:`test_valid_io_min_max_occurs_as_str_or_int`
+            - :meth:`test_valid_io_min_max_occurs_as_str_or_int`
         """
         cwl = {
             "cwlVersion": "v1.0",
@@ -1198,7 +1198,6 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert desc["process"]["inputs"][0]["id"] == "tasmax"
         assert desc["process"]["inputs"][0]["title"] == "Resource"
         assert desc["process"]["inputs"][0]["abstract"] == "NetCDF Files or archive (tar/zip) containing netCDF files."
-        assert desc["process"]["inputs"][0]["keywords"] == []
         assert desc["process"]["inputs"][0]["minOccurs"] == "1"
         assert desc["process"]["inputs"][0]["maxOccurs"] == "1000"
         assert len(desc["process"]["inputs"][0]["formats"]) == 1
@@ -1208,7 +1207,6 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert desc["process"]["inputs"][1]["id"] == "freq"
         assert desc["process"]["inputs"][1]["title"] == "Frequency"
         assert desc["process"]["inputs"][1]["abstract"] == "Resampling frequency"
-        assert desc["process"]["inputs"][1]["keywords"] == []
         assert desc["process"]["inputs"][1]["minOccurs"] == "0"
         assert desc["process"]["inputs"][1]["maxOccurs"] == "1"
         assert "formats" not in desc["process"]["inputs"][1]
@@ -1216,7 +1214,6 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert desc["process"]["outputs"][0]["id"] == "output_netcdf"
         assert desc["process"]["outputs"][0]["title"] == "Function output in netCDF"
         assert desc["process"]["outputs"][0]["abstract"] == "The indicator values computed on the original input grid."
-        assert desc["process"]["outputs"][0]["keywords"] == []
         assert "minOccurs" not in desc["process"]["outputs"][0]
         assert "maxOccurs" not in desc["process"]["outputs"][0]
         assert len(desc["process"]["outputs"][0]["formats"]) == 1
@@ -1226,7 +1223,6 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert desc["process"]["outputs"][1]["id"] == "output_log"
         assert desc["process"]["outputs"][1]["title"] == "Logging information"
         assert desc["process"]["outputs"][1]["abstract"] == "Collected logs during process run."
-        assert desc["process"]["outputs"][1]["keywords"] == []
         assert "minOccurs" not in desc["process"]["outputs"][1]
         assert "maxOccurs" not in desc["process"]["outputs"][1]
         assert len(desc["process"]["outputs"][1]["formats"]) == 1
@@ -1299,7 +1295,6 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert desc["process"]["inputs"][0]["id"] == "region"
         assert desc["process"]["inputs"][0]["title"] == "Region"
         assert desc["process"]["inputs"][0]["abstract"] == "Country code, see ISO-3166-3"
-        assert desc["process"]["inputs"][0]["keywords"] == []
         assert desc["process"]["inputs"][0]["minOccurs"] == "1"
         assert desc["process"]["inputs"][0]["maxOccurs"] == "220"
         assert "formats" not in desc["process"]["inputs"][0]
@@ -1307,14 +1302,12 @@ class WpsPackageAppTest(WpsPackageConfigBase):
         assert desc["process"]["inputs"][1]["title"] == "Union of multiple regions"
         assert desc["process"]["inputs"][1]["abstract"] == \
                "If True, selected regions will be merged into a single geometry."   # noqa
-        assert desc["process"]["inputs"][1]["keywords"] == []
         assert desc["process"]["inputs"][1]["minOccurs"] == "0"
         assert desc["process"]["inputs"][1]["maxOccurs"] == "1"
         assert "formats" not in desc["process"]["inputs"][1]
         assert desc["process"]["inputs"][2]["id"] == "resource"
         assert desc["process"]["inputs"][2]["title"] == "Resource"
         assert desc["process"]["inputs"][2]["abstract"] == "NetCDF Files or archive (tar/zip) containing NetCDF files."
-        assert desc["process"]["inputs"][2]["keywords"] == []
         assert desc["process"]["inputs"][2]["minOccurs"] == "1"
         assert desc["process"]["inputs"][2]["maxOccurs"] == "1000"
         # note: TAR should remain as literal format in the WPS context (not mapped/added as GZIP when resolved for CWL)
@@ -1373,7 +1366,7 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
             "baseCommand": "echo",
             "arguments": ["$(runtime.outdir)"],
             "requirements": {
-                "InitialWorkDirRequirement": {
+                CWL_REQUIREMENT_INIT_WORKDIR: {
                     # directly copy files to output dir in order to retrieve them by glob
                     "listing": [
                         {"entry": "$(inputs.input_with_http)"},
@@ -1381,7 +1374,10 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
                     ]
                 }
             },
-            "hints": {CWL_REQUIREMENT_APP_BUILTIN: {}},  # ensure remote files are downloaded prior to CWL execution
+            "hints": {CWL_REQUIREMENT_APP_BUILTIN: {
+                # ensure remote files are downloaded prior to CWL execution
+                "process": self._testMethodName,
+            }},
             "inputs": [
                 # regardless of reference type, they must be fetched as file before CWL call
                 {"id": "input_with_http", "type": "File"},
@@ -1426,33 +1422,43 @@ class WpsPackageAppWithS3BucketTest(WpsPackageConfigBase):
             for mock_exec in mocked_execute_process():
                 stack_exec.enter_context(mock_exec)
             proc_url = "/processes/{}/jobs".format(self._testMethodName)
-            resp = mocked_sub_requests(self.app, "post_json", proc_url,
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=exec_body, headers=self.json_headers, only_local=True)
             assert resp.status_code in [200, 201], "Failed with: [{}]\nReason:\n{}".format(resp.status_code, resp.json)
             status_url = resp.json["location"]
             job_id = resp.json["jobID"]
-        result = self.monitor_job(status_url)
+
+        results = self.monitor_job(status_url)
+        outputs = self.get_outputs(status_url)
+
+        assert "output_from_http" in results
+        assert "output_from_s3" in results
 
         # check that outputs are S3 bucket references
-        output_values = {out["id"]: get_any_value(out) for out in result["outputs"]}
+        output_values = {out["id"]: get_any_value(out) for out in outputs["outputs"]}
         output_bucket = self.settings["weaver.wps_output_s3_bucket"]
         wps_uuid = self.job_store.fetch_by_id(job_id).wps_id
         for out_key, out_file in [("output_from_s3", input_file_s3), ("output_from_http", input_file_http)]:
             output_ref = "{}/{}/{}".format(output_bucket, wps_uuid, out_file)
             output_ref_abbrev = "s3://{}".format(output_ref)
             output_ref_full = "https://s3.{}.amazonaws.com/{}".format(MOCK_AWS_REGION, output_ref)
-            assert output_values[out_key] in [output_ref_abbrev, output_ref_full]  # allow any variant weaver can parse
+            output_ref_any = [output_ref_abbrev, output_ref_full]  # allow any variant weaver can parse
+            # validation on outputs path
+            assert output_values[out_key] in output_ref_any
+            # validation on results path
+            assert results[out_key]["href"] in output_ref_any
 
         # FIXME:
         #   can validate manually that files exists in output bucket, but cannot seem to retrieve it here
         #   problem due to fixture setup or moto limitation via boto3.resource interface used by pywps?
         # check that outputs are indeed stored in S3 buckets
-        #   import boto3
-        #   mocked_s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
-        #   resp_json = mocked_s3.list_objects_v2(Bucket=output_bucket)
-        #   bucket_file_keys = [obj["Key"] for obj in resp_json["Contents"]]
-        #   for out_file in [input_file_s3, input_file_http]:
-        #       assert out_file in bucket_file_keys
+        import boto3
+        mocked_s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
+        resp_json = mocked_s3.list_objects_v2(Bucket=output_bucket)
+        bucket_file_keys = [obj["Key"] for obj in resp_json["Contents"]]
+        for out_file in [input_file_s3, input_file_http]:
+            out_key = "{}/{}".format(job_id, out_file)
+            assert out_key in bucket_file_keys
 
         # check that outputs are NOT copied locally, but that XML status does exist
         # counter validate path with file always present to ensure outputs are not 'missing' just because of wrong dir

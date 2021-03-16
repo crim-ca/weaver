@@ -108,6 +108,7 @@ def map_progress(progress, range_min, range_max):
                           is_request=False)
 def _check_deploy(payload):
     """Validate minimum deploy payload field requirements with exception handling."""
+    # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     try:
         sd.Deploy().deserialize(payload)
     except colander.Invalid as ex:
@@ -117,7 +118,12 @@ def _check_deploy(payload):
 @log_unhandled_exceptions(logger=LOGGER, message="Unhandled error occurred during parsing of process definition.",
                           is_request=False)
 def _get_deploy_process_info(process_info, reference, package):
-    """Obtain the process definition from deploy payload with exception handling."""
+    """
+    Obtain the process definition from deploy payload with exception handling.
+
+    .. seealso::
+        - :func:`weaver.processes.wps_package.get_process_definition`
+    """
     from weaver.processes.wps_package import get_process_definition
     try:
         # data_source `None` forces workflow process to search locally for deployed step applications
@@ -217,17 +223,21 @@ def deploy_process_from_payload(payload, container, overwrite=False):
     elif isinstance(ows_context, dict):
         process_info["owsContext"] = ows_context
 
+    # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
     try:
         store = get_db(container).get_store(StoreProcesses)
-        saved_process = store.save_process(Process(process_info), overwrite=overwrite)
+        process = Process(process_info)
+        sd.ProcessSummary().deserialize(process)  # make if fail before save if invalid
+        store.save_process(process, overwrite=False)
+        process_summary = process.summary()
     except ProcessRegistrationError as ex:
         raise HTTPConflict(detail=str(ex))
-    except ValueError as ex:
+    except (ValueError, colander.Invalid) as ex:
         # raised on invalid process name
         raise HTTPBadRequest(detail=str(ex))
 
-    json_response = {"processSummary": saved_process.process_summary(), "deploymentDone": True}
-    return HTTPOk(json=json_response)   # FIXME: should be 201 (created), update swagger accordingly
+    json_response = {"processSummary": process_summary, "deploymentDone": True}
+    return HTTPCreated(json=json_response)
 
 
 def parse_wps_process_config(config_entry):
@@ -281,7 +291,8 @@ def register_wps_processes_from_config(wps_processes_file_path, container):
     """
     if wps_processes_file_path is None:
         warnings.warn("No file specified for WPS-1 providers registration.", RuntimeWarning)
-        wps_processes_file_path = get_weaver_config_file("", WEAVER_DEFAULT_WPS_PROCESSES_CONFIG)
+        wps_processes_file_path = get_weaver_config_file("", WEAVER_DEFAULT_WPS_PROCESSES_CONFIG,
+                                                         generate_default_from_example=False)
     elif wps_processes_file_path == "":
         warnings.warn("Configuration file for WPS-1 providers registration explicitly defined as empty in settings. "
                       "Not loading anything.", RuntimeWarning)

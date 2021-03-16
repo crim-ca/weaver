@@ -36,7 +36,7 @@ sys.path.insert(0, os.path.abspath(DOC_PRJ_ROOT))
 from weaver import __meta__  # isort:skip # noqa: E402 # pylint: disable=C0413
 
 # for api generation
-from weaver.wps_restapi.api import get_swagger_json  # isort:skip # noqa: E402
+from weaver.wps_restapi.api import get_openapi_json  # isort:skip # noqa: E402
 from pyramid.config import Configurator  # isort:skip # noqa: E402
 
 # -- General configuration ---------------------------------------------
@@ -94,7 +94,8 @@ for _dir in [DOC_SRC_ROOT, DOC_PRJ_ROOT]:
 config = Configurator(settings={"weaver.wps": False, "weaver.wps_restapi": True, "weaver.build_docs": True})
 config.include("weaver")  # need to include package to apply decorators and parse routes
 api_spec_file = os.path.join(DOC_BLD_ROOT, "api.json")
-api_spec_json = get_swagger_json(http_host="example", http_scheme="https")
+# must disable references when using redoc (alpha version note rendering them correctly)
+api_spec_json = get_openapi_json(http_host="example", http_scheme="https", use_docstring_summary=True, use_refs=False)
 if not os.path.isdir(DOC_BLD_ROOT):
     os.makedirs(DOC_BLD_ROOT)
 with open(api_spec_file, "w") as f:
@@ -110,6 +111,8 @@ redoc = [{
         "hide-hostname": True
     }
 }]
+# must use next version (2.x-alpha) because default 1.x does not support OpenAPIv3
+redoc_uri = "https://cdn.jsdelivr.net/npm/redoc@next/bundles/redoc.standalone.js"
 
 autoapi_type = "python"
 autoapi_dirs = [DOC_PKG_ROOT]
@@ -392,7 +395,7 @@ texinfo_documents = [
 # intersphinx_mapping = {'https://docs.python.org/': None}
 intersphinx_mapping = {
     "python": ("http://docs.python.org/", None),
-    "weaver": ("http://pavics-weaver.readthedocs.io/en/latest/", None),
+    "weaver": (__meta__.__documentation_url__, None),
 }
 
 # linkcheck options

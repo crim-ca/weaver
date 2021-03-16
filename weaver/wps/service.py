@@ -86,7 +86,7 @@ class WorkerExecuteResponse(ExecuteResponse):
 
 class WorkerService(ServiceWPS):
     """
-    Dispatches PyWPS requests from *older* WPS-1/2 XML endpoint to WPS-REST as appropriate.
+    Dispatches PyWPS requests from WPS-1/2 XML endpoint to WPS-REST as appropriate.
 
     .. note::
         For every WPS-Request type, the parsing of XML content is already handled by the PyWPS service for GET/POST.
@@ -115,7 +115,7 @@ class WorkerService(ServiceWPS):
         accept_type = get_header("Accept", req.headers)
         if accept_type == CONTENT_TYPE_APP_JSON:
             url = get_weaver_url(self.settings)
-            resp = HTTPSeeOther(location="{}{}".format(url, sd.processes_uri))  # redirect
+            resp = HTTPSeeOther(location="{}{}".format(url, sd.processes_service.path))  # redirect
             setattr(resp, "_update_status", lambda *_, **__: None)  # patch to avoid pywps server raising
             return resp
         return None
@@ -143,7 +143,7 @@ class WorkerService(ServiceWPS):
                 raise HTTPBadRequest(sd.BadRequestGetProcessInfoResponse.description)
             if len(proc) > 1:
                 raise HTTPBadRequest("Unsupported multi-process ID for description. Only provide one.")
-            path = sd.process_uri.format(process_id=proc[0])
+            path = sd.process_service.path.format(process_id=proc[0])
             resp = HTTPSeeOther(location="{}{}".format(url, path))  # redirect
             setattr(resp, "_update_status", lambda *_, **__: None)  # patch to avoid pywps server raising
             return resp
@@ -277,7 +277,7 @@ class WorkerService(ServiceWPS):
 
 def get_pywps_service(environ=None, is_worker=False):
     """
-    Generates the PyWPS Service that provides *older* WPS-1/2 XML endpoint.
+    Generates the PyWPS Service that provides WPS-1/2 XML endpoint.
     """
     environ = environ or {}
     try:

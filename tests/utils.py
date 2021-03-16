@@ -10,6 +10,7 @@ from configparser import ConfigParser
 from inspect import isclass
 from typing import TYPE_CHECKING
 
+import colander
 # Note: do NOT import 'boto3' here otherwise 'moto' will not be able to mock it effectively
 import mock
 import moto
@@ -19,8 +20,9 @@ from pyramid.config import Configurator
 from pyramid.httpexceptions import HTTPException, HTTPNotFound, HTTPUnprocessableEntity
 from pyramid.registry import Registry
 from requests import Response
-from webtest import TestApp
+from webtest import TestApp, TestResponse
 
+from weaver.app import main as weaver_app
 from weaver.config import WEAVER_CONFIGURATION_DEFAULT, WEAVER_DEFAULT_INI_CONFIG, get_weaver_config_file
 from weaver.database import get_db
 from weaver.datatype import Service
@@ -202,8 +204,8 @@ def get_test_weaver_app(config=None, settings=None):
     # type: (Optional[Configurator], Optional[SettingsType]) -> TestApp
     config = get_test_weaver_config(config=config, settings=settings)
     config.registry.settings.setdefault("weaver.ssl_verify", "false")
-    config.scan()
-    return TestApp(config.make_wsgi_app())
+    app = weaver_app({}, **config.get_settings())
+    return TestApp(app)
 
 
 def get_settings_from_testapp(testapp):
@@ -274,8 +276,12 @@ def mocked_file_response(path, url):
         def read(self, chuck_size=None):  # noqa: E811
             return self._data.pop(-1)
 
+    # add extra methods that 'real' response would have and that are employed by underlying code
     setattr(resp, "raw", StreamReader())
-    resp.url = url
+    if isinstance(resp, TestResponse):
+        setattr(resp, "url", url)
+        setattr(resp, "reason", getattr(resp, "explanation", ""))
+        setattr(resp, "raise_for_status", lambda: Response.raise_for_status(resp))
     return resp
 
 
@@ -296,6 +302,7 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
         When ``True``, only mock requests targeted at :paramref:`app` based on request URL hostname (ignore external).
         Otherwise, mock every underlying request regardless of hostname, including ones not targeting the application.
     """
+    from weaver.wps_restapi.swagger_definitions import FileLocal
     from requests.sessions import Session as RealSession
     real_request = RealSession.request
 
@@ -323,6 +330,14 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
         req = getattr(app, method)
         return url, req, req_kwargs
 
+    def _patch_response_methods(response, url):
+        if not hasattr(response, "content"):
+            setattr(response, "content", response.body)
+        if not hasattr(response, "raise_for_status"):
+            setattr(response, "raise_for_status", Response.raise_for_status)
+        if getattr(response, "url", None) is None:
+            setattr(response, "url", url)
+
     def mocked_app_request(method, url=None, **req_kwargs):
         """
         Request corresponding to :func:`requests.request` that instead gets executed by :class:`webTest.TestApp`,
@@ -336,24 +351,31 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
                 return real_request(session, method, url, **req_kwargs)
 
         url, func, req_kwargs = _parse_for_app_req(method, url, **req_kwargs)
+        redirects = req_kwargs.pop("allow_redirects", True)
         if not url.startswith("mock://"):
-            resp = func(url, expect_errors=True, **req_kwargs)
-            setattr(resp, "content", resp.body)
-            setattr(resp, "raise_for_status", Response.raise_for_status)
+            _resp = func(url, expect_errors=True, **req_kwargs)
         else:
             path = get_url_without_query(url.replace("mock://", ""))
-            resp = mocked_file_response(path, url)
-        return resp
+            _resp = mocked_file_response(path, url)
+        if redirects:
+            # must handle redirects manually with TestApp
+            while 300 <= _resp.status_code < 400:
+                _resp = _resp.follow()
+        _patch_response_methods(_resp, url)
+        return _resp
 
+    # permit schema validation against 'mock' scheme during test only
+    mock_file_regex = mock.PropertyMock(return_value=colander.Regex(r"^(file|mock://)?(?:/|[/?]\S+)$"))
     with contextlib.ExitStack() as stack:
         stack.enter_context(mock.patch("requests.request", side_effect=mocked_app_request))
         stack.enter_context(mock.patch("requests.Session.request", side_effect=mocked_app_request))
         stack.enter_context(mock.patch("requests.sessions.Session.request", side_effect=mocked_app_request))
+        stack.enter_context(mock.patch.object(FileLocal, "validator", new_callable=mock_file_regex))
         req_url, req_func, kwargs = _parse_for_app_req(function, *args, **kwargs)
         kwargs.setdefault("expect_errors", True)
-        app_resp = req_func(req_url, **kwargs)
-        setattr(app_resp, "raise_for_status", Response.raise_for_status)
-        return app_resp
+        resp = req_func(req_url, **kwargs)
+        _patch_response_methods(resp, req_url)
+        return resp
 
 
 def mocked_execute_process():

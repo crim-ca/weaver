@@ -12,11 +12,11 @@ from pyramid.settings import asbool
 from weaver.formats import OUTPUT_FORMAT_XML
 from weaver.utils import get_settings
 from weaver.wps.utils import get_wps_path
-from weaver.wps_restapi import swagger_definitions as sd
 
 
 def includeme(config):
     from weaver.wps.app import pywps_view
+    from weaver.wps_restapi import swagger_definitions as sd
 
     settings = get_settings(config)
     logger = logging.getLogger(__name__)

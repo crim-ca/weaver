@@ -1,7 +1,9 @@
+import json
 import logging
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
+from beaker.cache import cache_region
 from cornice.service import get_services
 from cornice_swagger import CorniceSwagger
 from pyramid.authentication import Authenticated, IAuthenticationPolicy
@@ -21,18 +23,24 @@ from pyramid.response import Response
 from pyramid.settings import asbool
 from simplejson import JSONDecodeError
 
-from weaver.__meta__ import __version__ as weaver_version
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_TEXT_PLAIN, OUTPUT_FORMAT_JSON
+from weaver import __meta__
+from weaver.formats import (
+    CONTENT_TYPE_APP_JSON,
+    CONTENT_TYPE_TEXT_HTML,
+    CONTENT_TYPE_TEXT_PLAIN,
+    CONTENT_TYPE_TEXT_XML,
+    OUTPUT_FORMAT_JSON
+)
 from weaver.owsexceptions import OWSException
 from weaver.utils import get_header, get_settings, get_weaver_url
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.colander_extras import CustomTypeConversionDispatcher
+from weaver.wps_restapi.colander_extras import OAS3TypeConversionDispatcher
 from weaver.wps_restapi.utils import get_wps_restapi_base_url, wps_restapi_base_path
 
 if TYPE_CHECKING:
     from typing import Optional
-    from weaver.typedefs import JSON
+    from weaver.typedefs import JSON, SettingsType
 
 LOGGER = logging.getLogger(__name__)
 
@@ -40,55 +48,114 @@ LOGGER = logging.getLogger(__name__)
 @sd.api_frontpage_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
                               schema=sd.FrontpageEndpoint(), response_schemas=sd.get_api_frontpage_responses)
 def api_frontpage(request):
-    """Frontpage of weaver."""
+    """Frontpage of Weaver."""
+    settings = get_settings(request)
+    return api_frontpage_body(settings)
+
+
+@cache_region("doc", sd.api_frontpage_service.name)
+def api_frontpage_body(settings):
+    # type: (SettingsType) -> JSON
+    """Generates the JSON body describing the Weaver API and documentation references."""
 
     # import here to avoid circular import errors
     from weaver.config import get_weaver_configuration
 
-    settings = get_settings(request)
     weaver_url = get_weaver_url(settings)
     weaver_config = get_weaver_configuration(settings)
 
     weaver_api = asbool(settings.get("weaver.wps_restapi"))
     weaver_api_url = get_wps_restapi_base_url(settings) if weaver_api else None
-    weaver_api_def = weaver_api_url + sd.api_swagger_ui_uri if weaver_api else None
+    weaver_api_def = weaver_api_url + sd.api_swagger_ui_service.path if weaver_api else None
     weaver_api_doc = settings.get("weaver.wps_restapi_doc", None) if weaver_api else None
     weaver_api_ref = settings.get("weaver.wps_restapi_ref", None) if weaver_api else None
+    weaver_api_spec = weaver_api_url + sd.openapi_json_service.path if weaver_api else None
     weaver_wps = asbool(settings.get("weaver.wps"))
     weaver_wps_url = get_wps_url(settings) if weaver_wps else None
-    weaver_conform_url = weaver_url + sd.api_conformance_uri
-    weaver_process_url = weaver_url + sd.processes_uri
+    weaver_conform_url = weaver_url + sd.api_conformance_service.path
+    weaver_process_url = weaver_url + sd.processes_service.path
     weaver_links = [
         {"href": weaver_url, "rel": "self", "type": CONTENT_TYPE_APP_JSON, "title": "This document"},
         {"href": weaver_conform_url, "rel": "conformance", "type": CONTENT_TYPE_APP_JSON,
-         "title": "WPS 2.0/3.0 REST-JSON Binding Extension conformance classes implemented by this service."},
+         "title": "WPS conformance classes implemented by this service."},
     ]
-    if weaver_api_def:
-        weaver_links.append({"href": weaver_api_def, "rel": "service", "type": CONTENT_TYPE_APP_JSON,
-                             "title": "API definition of this service."})
-    if isinstance(weaver_api_doc, str):
-        if "." in weaver_api_doc:   # pylint: disable=E1135,unsupported-membership-test
-            ext_type = weaver_api_doc.split(".")[-1]
-            doc_type = "application/{}".format(ext_type)
-        else:
-            doc_type = CONTENT_TYPE_TEXT_PLAIN  # default most basic type
-        weaver_links.append({"href": weaver_api_doc, "rel": "documentation", "type": doc_type,
-                             "title": "API documentation about this service."})
-    if weaver_api_ref:
-        weaver_links.append({"href": weaver_api_ref, "rel": "reference", "type": CONTENT_TYPE_APP_JSON,
-                             "title": "API reference specification of this service."})
-    weaver_links.append({"href": weaver_process_url, "rel": "processes", "type": CONTENT_TYPE_APP_JSON,
-                         "title": "Processes offered by this service."})
-
+    if weaver_api:
+        weaver_links.extend([
+            {"href": weaver_api_url,
+             "rel": "service", "type": CONTENT_TYPE_APP_JSON,
+             "title": "WPS REST API endpoint of this service."},
+            {"href": weaver_api_def,
+             "rel": "swagger-ui", "type": CONTENT_TYPE_TEXT_HTML,
+             "title": "WPS REST API definition of this service."},
+            {"href": weaver_api_spec,
+             "rel": "OpenAPI", "type": CONTENT_TYPE_APP_JSON,
+             "title": "WPS REST API specification of this service."},
+            {"href": weaver_process_url,
+             "rel": "processes", "type": CONTENT_TYPE_APP_JSON,
+             "title": "Processes offered by this service."},
+            {"href": sd.OGC_API_REPO_URL,
+             "rel": "ogcapi-processes-repository", "type": CONTENT_TYPE_TEXT_HTML,
+             "title": "OGC-API - Processes schema definitions repository."},
+            {"href": sd.CWL_BASE_URL,
+             "rel": "cwl-home", "type": CONTENT_TYPE_TEXT_HTML,
+             "title": "Common Workflow Language (CWL) homepage."},
+            {"href": sd.CWL_REPO_URL,
+             "rel": "cwl-repository", "type": CONTENT_TYPE_TEXT_HTML,
+             "title": "Common Workflow Language (CWL) repositories."},
+            {"href": sd.CWL_SPEC_URL,
+             "rel": "cwl-specification", "type": CONTENT_TYPE_TEXT_HTML,
+             "title": "Common Workflow Language (CWL) specification."},
+            {"href": sd.CWL_USER_GUIDE_URL,
+             "rel": "cwl-user-guide", "type": CONTENT_TYPE_TEXT_HTML,
+             "title": "Common Workflow Language (CWL) user guide."},
+            {"href": sd.CWL_CMD_TOOL_URL,
+             "rel": "cwl-command-line-tool", "type": CONTENT_TYPE_TEXT_HTML,
+             "title": "Common Workflow Language (CWL) CommandLineTool specification."},
+            {"href": sd.CWL_WORKFLOW_URL,
+             "rel": "cwl-workflow", "type": CONTENT_TYPE_TEXT_HTML,
+             "title": "Common Workflow Language (CWL) Workflow specification."},
+        ])
+        if weaver_api_ref:
+            # sample:
+            #   https://app.swaggerhub.com/apis/geoprocessing/WPS/
+            weaver_links.append({"href": weaver_api_ref, "rel": "reference", "type": CONTENT_TYPE_APP_JSON,
+                                 "title": "API reference specification of this service."})
+        if isinstance(weaver_api_doc, str):
+            # sample:
+            #   https://raw.githubusercontent.com/opengeospatial/wps-rest-binding/develop/docs/18-062.pdf
+            if "." in weaver_api_doc:  # pylint: disable=E1135,unsupported-membership-test
+                ext_type = weaver_api_doc.split(".")[-1]
+                doc_type = "application/{}".format(ext_type)
+            else:
+                doc_type = CONTENT_TYPE_TEXT_PLAIN  # default most basic type
+            weaver_links.append({"href": weaver_api_doc, "rel": "documentation", "type": doc_type,
+                                 "title": "API reference documentation about this service."})
+    if weaver_wps:
+        weaver_links.extend([
+            {"href": weaver_wps_url,
+             "rel": "wps", "type": CONTENT_TYPE_TEXT_XML,
+             "title": "WPS 1.0.0/2.0 XML endpoint of this service."},
+            {"href": "http://docs.opengeospatial.org/is/14-065/14-065.html",
+             "rel": "wps-specification", "type": CONTENT_TYPE_TEXT_HTML,
+             "title": "WPS 1.0.0/2.0 definition of this service."},
+            {"href": "http://schemas.opengis.net/wps/",
+             "rel": "wps-schema-repository", "type": CONTENT_TYPE_TEXT_HTML,
+             "title": "WPS 1.0.0/2.0 XML schemas repository."},
+            {"href": "http://schemas.opengis.net/wps/1.0.0/wpsAll.xsd",
+             "rel": "wps-schema-1", "type": CONTENT_TYPE_TEXT_XML,
+             "title": "WPS 1.0.0 XML validation schemas entrypoint."},
+            {"href": "http://schemas.opengis.net/wps/2.0/wps.xsd",
+             "rel": "wps-schema-2", "type": CONTENT_TYPE_TEXT_XML,
+             "title": "WPS 2.0 XML validation schemas entrypoint."},
+        ])
     return {
         "message": "Weaver Information",
         "configuration": weaver_config,
+        "description": __meta__.__description__,
         "parameters": [
             {"name": "api", "enabled": weaver_api,
              "url": weaver_api_url,
-             "doc": weaver_api_doc,
-             "api": weaver_api_def,
-             "ref": weaver_api_ref},
+             "api": weaver_api_def},
             {"name": "wps", "enabled": weaver_wps,
              "url": weaver_wps_url},
         ],
@@ -101,7 +168,7 @@ def api_frontpage(request):
 def api_versions(request):  # noqa: F811
     # type: (Request) -> HTTPException
     """Weaver versions information."""
-    weaver_info = {"name": "weaver", "version": weaver_version, "type": "api"}
+    weaver_info = {"name": "weaver", "version": __meta__.__version__, "type": "api"}
     return HTTPOk(json={"versions": [weaver_info]})
 
 
@@ -112,32 +179,55 @@ def api_conformance(request):  # noqa: F811
     """Weaver specification conformance information."""
     # TODO: follow updates with https://github.com/geopython/pygeoapi/issues/198
     conformance = {"conformsTo": [
-        "http://www.opengis.net/spec/wfs-1/3.0/req/core",
-        "http://www.opengis.net/spec/wfs-1/3.0/req/oas30",
+        # "http://www.opengis.net/spec/wfs-1/3.0/req/core",
+        # "http://www.opengis.net/spec/wfs-1/3.0/req/oas30",
         # "http://www.opengis.net/spec/wfs-1/3.0/req/html",
-        "http://www.opengis.net/spec/wfs-1/3.0/req/geojson",
+        # "http://www.opengis.net/spec/wfs-1/3.0/req/geojson",
+        "http://schemas.opengis.net/wps/1.0.0/",
+        "http://schemas.opengis.net/wps/2.0/",
         "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/core",
-        "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/oas30",
+        # "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/oas30",
         # "http://www.opengis.net/spec/WPS/2.0/req/service/binding/rest-json/html"
+        "https://github.com/opengeospatial/wps-rest-binding",  # old reference for bw-compat
+        # see ogcapi-processes schemas details:
+        #   https://github.com/opengeospatial/ogcapi-processes
+        # see other references:
+        #   https://github.com/crim-ca/weaver/issues/53
+        # https://htmlpreview.github.io/?https://github.com/opengeospatial/ogcapi-processes/blob/master/docs/18-062.html
+        "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/core",
+        "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/ogc-process-description",
+        "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/json",
+        # FIXME: https://github.com/crim-ca/weaver/issues/210
+        # "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/html",
+        "http://www.opengis.net/spec/ogcapi-processes-1/1.0/req/oas30",  # OpenAPI 3.0
+        "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/job-list",
+        # FIXME: https://github.com/crim-ca/weaver/issues/230
+        # "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/callback",
+        # FIXME: https://github.com/crim-ca/weaver/issues/228
+        # "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/dismiss",
+
     ]}
     return HTTPOk(json=conformance)
 
 
-def get_swagger_json(http_scheme="http", http_host="localhost", base_url=None, use_docstring_summary=True):
-    # type: (str, str, Optional[str], bool) -> JSON
-    """Obtains the JSON schema of weaver API from request and response views schemas.
+def get_openapi_json(http_scheme="http", http_host="localhost", base_url=None,
+                     use_refs=True, use_docstring_summary=True, settings=None):
+    # type: (str, str, Optional[str], bool, bool, Optional[SettingsType]) -> JSON
+    """Obtains the JSON schema of Weaver OpenAPI from request and response views schemas.
 
     :param http_scheme: Protocol scheme to use for building the API base if not provided by base URL parameter.
     :param http_host: Hostname to use for building the API base if not provided by base URL parameter.
     :param base_url: Explicit base URL to employ of as API base instead of HTTP scheme/host parameters.
-    :param use_docstring_summary:
-        Setting that controls if function docstring should be used to auto-generate the summary field of responses.
+    :param use_refs: Generate schemas with ``$ref`` definitions or expand every schema content.
+    :param use_docstring_summary: Extra function docstring to auto-generate the summary field of responses.
+    :param settings: Application settings to retrieve further metadata details to be added to the OpenAPI.
 
     .. seealso::
         - :mod:`weaver.wps_restapi.swagger_definitions`
     """
-    CorniceSwagger.type_converter = CustomTypeConversionDispatcher
-    swagger = CorniceSwagger(get_services())
+    CorniceSwagger.type_converter = OAS3TypeConversionDispatcher
+    depth = -1 if use_refs else 0
+    swagger = CorniceSwagger(get_services(), def_ref_depth=depth, param_ref=use_refs, resp_ref=use_refs)
     # function docstrings are used to create the route's summary in Swagger-UI
     swagger.summary_docstrings = use_docstring_summary
     swagger_base_spec = {"schemes": [http_scheme]}
@@ -148,33 +238,93 @@ def get_swagger_json(http_scheme="http", http_host="localhost", base_url=None, u
         swagger_base_path = weaver_parsed_url.path
     else:
         swagger_base_spec["host"] = http_host
-        swagger_base_path = sd.api_frontpage_uri
+        swagger_base_path = sd.api_frontpage_service.path
     swagger.swagger = swagger_base_spec
-    return swagger.generate(title=sd.API_TITLE, version=weaver_version, base_path=swagger_base_path)
+    swagger_info = {
+        "description": __meta__.__description__,
+        "licence": {
+            "name": __meta__.__license_type__,
+            "url": "{}/blob/master/LICENSE.txt".format(__meta__.__source_repository__),
+        }
+    }
+    if settings:
+        for key in ["name", "email", "url"]:
+            val = settings.get("weaver.wps_metadata_contact_{}".format(key))
+            if val:
+                swagger_info.setdefault("contact", {})
+                swagger_info["contact"][key] = val
+        abstract = settings.get("weaver.wps_metadata_identification_abstract")
+        if abstract:
+            swagger_info["description"] = "{}\n\n{}".format(abstract, __meta__.__description__)
+        terms = settings.get("weaver.wps_metadata_identification_accessconstraints")
+        if terms and "http" in terms:
+            if "," in terms:
+                terms = [term.strip() for term in terms.split(",")]
+            else:
+                terms = [terms]
+            terms = [term for term in terms if "http" in term]
+            if terms:
+                swagger_info["termsOfService"] = terms[0]
+
+    swagger_json = swagger.generate(title=sd.API_TITLE, version=__meta__.__version__, info=swagger_info,
+                                    base_path=swagger_base_path, openapi_spec=3)
+    swagger_json["externalDocs"] = sd.API_DOCS
+    return swagger_json
 
 
-@sd.api_swagger_json_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
-                                 schema=sd.SwaggerJSONEndpoint(), response_schemas=sd.get_api_swagger_json_responses)
-def api_swagger_json(request):  # noqa: F811
+@cache_region("doc", sd.openapi_json_service.name)
+def openapi_json_cached(*args, **kwargs):
+    return get_openapi_json(*args, **kwargs)
+
+
+@sd.openapi_json_service.get(tags=[sd.TAG_API], renderer=OUTPUT_FORMAT_JSON,
+                             schema=sd.OpenAPIEndpoint(), response_schemas=sd.get_openapi_json_responses)
+def openapi_json(request):  # noqa: F811
     # type: (Request) -> dict
-    """weaver REST API schema generation in JSON format."""
+    """Weaver OpenAPI schema definitions."""
     # obtain 'server' host and api-base-path, which doesn't correspond necessarily to the app's host and path
     # ex: 'server' adds '/weaver' with proxy redirect before API routes
-    weaver_server_url = get_weaver_url(request)
+    settings = get_settings(request)
+    weaver_server_url = get_weaver_url(settings)
     LOGGER.debug("Request app URL:   [%s]", request.url)
     LOGGER.debug("Weaver config URL: [%s]", weaver_server_url)
-    # http_scheme=request.scheme, http_host=request.host
-    return get_swagger_json(base_url=weaver_server_url, use_docstring_summary=True)
+    return openapi_json_cached(base_url=weaver_server_url, use_docstring_summary=True, settings=settings)
 
 
-@sd.api_swagger_ui_service.get(tags=[sd.TAG_API],
-                               schema=sd.SwaggerUIEndpoint(), response_schemas=sd.get_api_swagger_ui_responses)
-def api_swagger_ui(request):
-    """weaver REST API swagger-ui schema documentation (this page)."""
-    json_path = wps_restapi_base_path(request.registry.settings) + sd.api_swagger_json_uri
+@cache_region("doc", sd.api_swagger_ui_service.name)
+def swagger_ui_cached(request):
+    json_path = wps_restapi_base_path(request) + sd.openapi_json_service.path
     json_path = json_path.lstrip("/")   # if path starts by '/', swagger-ui doesn't find it on remote
-    data_mako = {"api_title": sd.API_TITLE, "api_swagger_json_path": json_path}
-    return render_to_response("templates/swagger_ui.mako", data_mako, request=request)
+    data_mako = {"api_title": sd.API_TITLE, "openapi_json_path": json_path, "api_version": __meta__.__version__}
+    resp = render_to_response("templates/swagger_ui.mako", data_mako, request=request)
+    return resp
+
+
+@sd.api_openapi_ui_service.get(tags=[sd.TAG_API], schema=sd.SwaggerUIEndpoint(),
+                               response_schemas=sd.get_api_swagger_ui_responses)
+@sd.api_swagger_ui_service.get(tags=[sd.TAG_API], schema=sd.SwaggerUIEndpoint(),
+                               response_schemas=sd.get_api_swagger_ui_responses)
+def api_swagger_ui(request):
+    """Weaver OpenAPI schema definitions rendering using Swagger-UI viewer."""
+    return swagger_ui_cached(request)
+
+
+@cache_region("doc", sd.api_redoc_ui_service.name)
+def redoc_ui_cached(request):
+    settings = get_settings(request)
+    weaver_server_url = get_weaver_url(settings)
+    spec = openapi_json_cached(base_url=weaver_server_url, settings=settings,
+                               use_docstring_summary=True, use_refs=False)
+    data_mako = {"openapi_spec": json.dumps(spec, ensure_ascii=False)}
+    resp = render_to_response("templates/redoc_ui.mako", data_mako, request=request)
+    return resp
+
+
+@sd.api_redoc_ui_service.get(tags=[sd.TAG_API], schema=sd.RedocUIEndpoint(),
+                             response_schemas=sd.get_api_redoc_ui_responses)
+def api_redoc_ui(request):
+    """Weaver OpenAPI schema definitions rendering using Redoc viewer."""
+    return redoc_ui_cached(request)
 
 
 def get_request_info(request, detail=None):
@@ -230,8 +380,8 @@ def not_found_or_method_not_allowed(request):
 
     Without this fix, both situations return [404] regardless.
     """
-    if isinstance(request.exception, PredicateMismatch) and \
-            request.method not in request.exception._safe_methods:  # noqa: W0212
+    path_methods = request.exception._safe_methods  # noqa: W0212
+    if isinstance(request.exception, PredicateMismatch) and request.method not in path_methods:
         http_err = HTTPMethodNotAllowed
         http_msg = ""  # auto-generated by HTTPMethodNotAllowed
     else:
@@ -251,7 +401,7 @@ def unauthorized_or_forbidden(request):
     Without this fix, both situations return [403] regardless.
 
     .. seealso::
-        http://www.restapitutorial.com/httpstatuscodes.html
+        - http://www.restapitutorial.com/httpstatuscodes.html
     """
     authn_policy = request.registry.queryUtility(IAuthenticationPolicy)
     if authn_policy:

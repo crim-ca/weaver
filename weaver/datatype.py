@@ -1,6 +1,7 @@
 """
 Definitions of types used by tokens.
 """
+import copy
 import traceback
 import uuid
 import warnings
@@ -14,6 +15,7 @@ from owslib.wps import Process as ProcessOWS, WPSException
 from pywps import Process as ProcessWPS
 
 from weaver.exceptions import ProcessInstanceError
+from weaver.formats import ACCEPT_LANGUAGE_EN_US, CONTENT_TYPE_APP_JSON
 from weaver.processes.convert import ows2json, wps2json_io
 from weaver.processes.types import (
     PROCESS_APPLICATION,
@@ -31,6 +33,7 @@ from weaver.status import (
     STATUS_UNKNOWN,
     map_status
 )
+from weaver.typedefs import XML
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
 from weaver.utils import fully_qualified_name, get_job_log_msg, get_log_date_fmt, get_log_fmt, get_settings, now
 from weaver.visibility import VISIBILITY_PRIVATE, VISIBILITY_VALUES
@@ -494,6 +497,21 @@ class Job(Base):
         return localize_datetime(self.get("created"))
 
     @property
+    def started(self):
+        # type: () -> Optional[datetime]
+        started = self.get("started", None)
+        if not started:
+            return None
+        return localize_datetime(started)
+
+    @started.setter
+    def started(self, started):
+        # type: (datetime) -> None
+        if not isinstance(started, datetime):
+            raise TypeError("Type 'datetime' is required for '{}.started'".format(type(self)))
+        self["started"] = started
+
+    @property
     def finished(self):
         # type: () -> Optional[datetime]
         return self.get("finished", None)
@@ -508,14 +526,19 @@ class Job(Base):
 
     @property
     def duration(self):
-        # type: () -> timedelta
+        # type: () -> Optional[timedelta]
+        if not self.started:
+            return None
         final_time = self.finished or now()
-        return localize_datetime(final_time) - localize_datetime(self.created)
+        return localize_datetime(final_time) - localize_datetime(self.started)
 
     @property
     def duration_str(self):
         # type: () -> str
-        return str(self.duration).split(".")[0]
+        duration = self.duration
+        if duration is None:
+            return "00:00:00"
+        return str(duration).split(".")[0].zfill(8)  # "HH:MM:SS"
 
     @property
     def progress(self):
@@ -617,7 +640,7 @@ class Job(Base):
     def request(self, request):
         # type: (Optional[str]) -> None
         """XML request for WPS execution submission as string (binary)."""
-        if isinstance(request, lxml.etree._Element):  # noqa
+        if isinstance(request, XML):
             request = lxml.etree.tostring(request)
         self["request"] = request
 
@@ -631,20 +654,57 @@ class Job(Base):
     def response(self, response):
         # type: (Optional[str]) -> None
         """XML status response from WPS execution submission as string (binary)."""
-        if isinstance(response, lxml.etree._Element):  # noqa
+        if isinstance(response, XML):
             response = lxml.etree.tostring(response)
         self["response"] = response
 
     def _job_url(self, settings):
         base_job_url = get_wps_restapi_base_url(settings)
         if self.service is not None:
-            base_job_url += sd.provider_uri.format(provider_id=self.service)
-        job_path = sd.process_job_uri.format(process_id=self.process, job_id=self.id)
+            base_job_url += sd.provider_service.path.format(provider_id=self.service)
+        job_path = sd.process_job_service.path.format(process_id=self.process, job_id=self.id)
         return "{base_job_url}{job_path}".format(base_job_url=base_job_url, job_path=job_path)
 
-    def json(self, container=None):     # pylint: disable=W0221,arguments-differ
-        # type: (Optional[AnySettingsContainer]) -> JSON
-        """Obtain the JSON data representation for response body.
+    def links(self, container=None, self_link=None):
+        # type: (Optional[AnySettingsContainer], Optional[str]) -> JSON
+        """Obtains the JSON links section of many response body for jobs.
+
+        If :paramref:`self_link` is provided (e.g.: `"outputs"`) the link for that corresponding item will also
+        be added as `self` entry to the links. It must be a recognized job link field.
+
+        :param container: object that helps retrieve instance details, namely the host URL.
+        :param self_link: name of a section that represents the current link that will be returned.
+        """
+        settings = get_settings(container) if container else {}
+        job_url = self._job_url(settings)
+        job_links_body = {"links": [
+            {"href": job_url, "rel": "status", "title": "Job status."},
+        ]}
+        job_links = ["logs", "inputs"]
+        if self.status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_FINISHED]:
+            job_status = map_status(self.status)
+            if job_status == STATUS_SUCCEEDED:
+                job_links.extend(["outputs", "results"])
+            else:
+                job_links.extend(["exceptions"])
+        for link_type in job_links:
+            link_href = "{job_url}/{res}".format(job_url=job_url, res=link_type)
+            job_links_body["links"].append({"href": link_href, "rel": link_type, "title": "Job {}.".format(link_type)})
+        link_meta = {"type": CONTENT_TYPE_APP_JSON, "hreflang": ACCEPT_LANGUAGE_EN_US}
+        for link in job_links_body["links"]:
+            link.update(link_meta)
+        if self_link in ["status", "inputs", "outputs", "results", "logs", "exceptions"]:
+            self_link_body = list(filter(lambda _link: _link["rel"] == self_link, job_links_body["links"]))[-1]
+            self_link_body = copy.deepcopy(self_link_body)
+        else:
+            self_link_body = {"href": job_url, "title": "Job status."}
+        self_link_body["rel"] = "self"
+        job_links_body["links"].append(self_link_body)
+        return job_links_body
+
+    def json(self, container=None, self_link=None):     # pylint: disable=W0221,arguments-differ
+        # type: (Optional[AnySettingsContainer], Optional[str]) -> JSON
+        """Obtains the JSON data representation for response body.
 
         .. note::
             Settings are required to update API shortcut URLs to job additional information.
@@ -655,19 +715,18 @@ class Job(Base):
             "jobID": self.id,
             "status": self.status,
             "message": self.status_message,
+            "created": self.created,
+            "started": self.started,
+            "finished": self.finished,
             "duration": self.duration_str,
+            "runningSeconds": self.duration.total_seconds() if self.duration is not None else None,
+            # TODO: available fields not yet employed (https://github.com/crim-ca/weaver/issues/129)
+            "nextPoll": None,
+            "expirationDate": None,
+            "estimatedCompletion": None,
             "percentCompleted": self.progress,
         }
-        job_url = self._job_url(settings)
-        # TODO: use links (https://github.com/crim-ca/weaver/issues/58)
-        if self.status in JOB_STATUS_CATEGORIES[STATUS_CATEGORY_FINISHED]:
-            job_status = map_status(self.status)
-            if job_status == STATUS_SUCCEEDED:
-                resource_type = "result"
-            else:
-                resource_type = "exceptions"
-            job_json[resource_type] = "{job_url}/{res}".format(job_url=job_url, res=resource_type.lower())
-        job_json["logs"] = "{job_url}/logs".format(job_url=job_url)
+        job_json.update(self.links(settings, self_link=self_link))
         return sd.JobStatusInfo().deserialize(job_json)
 
     def params(self):
@@ -686,6 +745,7 @@ class Job(Base):
             "execute_async": self.execute_async,
             "is_workflow": self.is_workflow,
             "created": self.created,
+            "started": self.started,
             "finished": self.finished,
             "progress": self.progress,
             "results": self.results,
@@ -931,10 +991,16 @@ class Process(Base):
 
     def json(self):
         # type: () -> JSON
+        """
+        Obtains the JSON serializable complete representation of the process.
+        """
         return sd.Process().deserialize(self)
 
-    def process_offering(self):
+    def offering(self):
         # type: () -> JSON
+        """
+        Obtains the JSON serializable offering representation of the process.
+        """
         process_offering = {"process": self}
         if self.version:
             process_offering.update({"processVersion": self.version})
@@ -944,8 +1010,11 @@ class Process(Base):
             process_offering.update({"outputTransmission": self.outputTransmission})
         return sd.ProcessOffering().deserialize(process_offering)
 
-    def process_summary(self):
+    def summary(self):
         # type: () -> JSON
+        """
+        Obtains the JSON serializable summary representation of the process.
+        """
         return sd.ProcessSummary().deserialize(self)
 
     @staticmethod

@@ -1,3 +1,5 @@
+.. :changelog:
+
 Changes
 *******
 
@@ -8,11 +10,54 @@ Changes
 
 Changes:
 --------
-- No change.
+- Provide HTTP links to corresponding items of job in JSON body of status, inputs and outputs routes
+  (`#58 <https://github.com/crim-ca/weaver/issues/58>`_, `#86 <https://github.com/crim-ca/weaver/issues/86>`_).
+- Provide ``Job.started`` datetime and calculate ``Job.duration`` from it to indicate the duration of the process
+  execution instead of counting from the time the job was submitted (i.e.: ``Job.created``).
+- Provide OGC compliant ``<job-uri>/results`` response schema as well as some expected ``code``/``description``
+  fields in case where the request fails.
+- Add ``<job-uri>/outputs`` providing the ``data``/``href`` formatted job results as well as ``<job-uri>/inputs`` to
+  retrieve the inputs that were provided during job submission
+  (`#86 <https://github.com/crim-ca/weaver/issues/86>`_).
+- Deprecate ``<job-uri>/result`` paths (indicated in OpenAPI schemas and UI) in favor of ``<job-uri>/outputs`` which
+  provides the same structure with additional ``links`` references
+  (`#58 <https://github.com/crim-ca/weaver/issues/58>`_). Result path requests are redirected automatically to outputs.
+- Add more reference/documentation links to `WPS-1/2` and update conformance references
+  (`#53 <https://github.com/crim-ca/weaver/issues/53>`_).
+- Add some minimal caching support of routes.
+- Adjust job creation route to return ``201`` (created) as it is now correctly defined by the OGC API specification
+  (`#14 <https://github.com/crim-ca/weaver/issues/14>`_).
+- Add ``Job.link`` method that auto-generates all applicable links (inputs, outputs, logs, etc.).
+- Add ``image/jpeg``, ``image/png``, ``image/tiff`` formats to supported ``weaver.formats``
+  (relates to `#100 <https://github.com/crim-ca/weaver/issues/100>`_).
+- Handle additional trailing slash resulting in ``HTTPNotFound [404]`` to automatically resolve to corresponding
+  valid route without the slash when applicable.
+- Provide basic conda environment setup through ``Makefile`` for Windows bash-like shell (ie: ``MINGW``/``MINGW64``).
+- Update documentation for minimal adjustments needed to run under Windows.
+- Update OpenAPI template to not render the useless version selector since we only provide the current version.
+- Update Swagger definitions to reflect changes and better reuse existing schemas.
+- Update Swagger UI to provide the `readthedocs` URL.
+- Add `crim-ca/cwltool@docker-gpu <https://github.com/crim-ca/cwltool/tree/docker-gpu>`_ as ``cwltool`` requirement
+  to allow processing of GPU-enabled dockers with `nvidia-docker <https://github.com/NVIDIA/nvidia-docker>`_.
+- Add `fmigneault/cornice.ext.swagger@openapi-3 <https://github.com/fmigneault/cornice.ext.swagger/tree/openapi-3>`_
+  as ``cornice_swagger`` requirement to allow OpenAPI-3 definitions support of schema generation and deserialization
+  validation of JSON payloads.
+- Disable default auto-generation of ``request-options.yml`` and ``wps_processes.yml`` configuration files from a copy
+  of their respective ``.example`` files as these have many demo (and invalid values) that fail real execution of tests
+  when no actual file was provided.
+- Add per-request caching support when using ``request_extra`` function, and caching control according to request
+  headers and ``request-options.yml`` configuration.
 
 Fixes:
 ------
-- No change.
+- Fix ``weaver.config.get_weaver_config_file`` called with empty path to be resolved just as requesting the default
+  file path explicitly instead of returning an invalid directory.
+- Fix `CWL` package path resolution under Windows incorrectly parsed partition as URL protocol.
+- Fix ``AttributeError`` of ``pywps.inout.formats.Format`` equality check compared to ``null`` object (using getter
+  patch on ``null`` since fix `#507 <https://github.com/geopython/pywps/pull/507>`_ not released at this point).
+- Fix potential invalid database state that could have saved an invalid process although the following
+  ``ProcessSummary`` schema validation would fail and return ``HTTPBadRequest [400]``. The process is now saved only
+  after complete and successful schema validation.
 
 `2.2.0 <https://github.com/crim-ca/weaver/tree/2.2.0>`_ (2021-03-03)
 ========================================================================
@@ -309,9 +354,9 @@ Fixes:
   (relates to `#25 <https://github.com/crim-ca/weaver/issues/25>`_).
 - Fix `CWL` job logs to be timezone aware, just like most other logs that will report UTC time.
 - Fix JSON response parsing of remote provider processes.
-- Fix parsing of `CWL` ordered parsing when I/O is specified as shorthand ``"<id>":"<type>" directly under the
-  ``inputs`` or ``outputs`` dictionary instead of extended sub-dictionary variant
-  (fixes `#137 <https://github.com/crim-ca/weaver/issues/137>`_).
+- Fix parsing of `CWL` ordered parsing when I/O is specified as shorthand ``"<id>":"<type>"`` directly under the
+  ``inputs`` or ``outputs`` dictionary instead of extended JSON object variant such as
+  ``{"input": {"type:" "<type>", "format": [...]}}`` (fixes `#137 <https://github.com/crim-ca/weaver/issues/137>`_).
 
 `1.6.0 <https://github.com/crim-ca/weaver/tree/1.6.0>`_ (2020-05-07)
 ========================================================================
@@ -406,14 +451,12 @@ Changes:
 Changes:
 --------
 
-- Add wps languages for other wps requests types: ``DescribeProcess`` and ``GetCapabilities``.
+- Add `WPS` languages for other wps requests types: ``DescribeProcess`` and ``GetCapabilities``.
 
 Fixes:
 ------
 
 - Fix a bug where the validation of ``OneOf`` items was casting the value to the first valid possibility.
-  Now, it doesn't change the value if it's valid without casting it (and still casts it if it's
-  necessary to make it valid).
 
 `1.1.0 <https://github.com/crim-ca/weaver/tree/1.1.0>`_ (2020-02-17)
 ========================================================================

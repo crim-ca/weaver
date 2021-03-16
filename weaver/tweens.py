@@ -1,11 +1,15 @@
 import logging
 import sys
+from typing import TYPE_CHECKING
 
 from pyramid.httpexceptions import HTTPException, HTTPInternalServerError, HTTPRedirection, HTTPSuccessful
 from pyramid.tweens import EXCVIEW, INGRESS
 
 from weaver.owsexceptions import OWSException, OWSNotImplemented
-from weaver.utils import fully_qualified_name
+from weaver.utils import clean_json_text_body, fully_qualified_name
+
+if TYPE_CHECKING:
+    from typing import Union
 
 LOGGER = logging.getLogger(__name__)
 
@@ -15,8 +19,32 @@ OWS_TWEEN_HANDLED = "OWS_TWEEN_HANDLED"
 # FIXME:
 #   https://github.com/crim-ca/weaver/issues/215
 #   define common Exception classes that won't require this type of conversion
+def error_repr(http_err):
+    # type: (Union[HTTPException, OWSException, Exception]) -> str
+    """
+    Returns a cleaned up representation string of the HTTP error, but with similar and even extended details to
+    facilitate later debugging.
+    """
+    err_type = type(http_err).__name__
+    if not isinstance(http_err, (HTTPException, OWSException)):
+        return "({}) {!s}".format(err_type, http_err)
+    err_code = getattr(http_err, "code", getattr(http_err, "status_code", 500))
+    err_repr = str(http_err)
+    try:
+        # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
+        #        specific cleanup in case of string representation of colander.Invalid to help debug logged errors
+        err_repr = clean_json_text_body(err_repr, remove_newlines=False, remove_indents=False)
+        if "Invalid schema:" in err_repr:
+            err_repr = err_repr.replace("Invalid schema: [", "Invalid schema: [\n")[:-1] + "\n]"
+            err_repr = err_repr.replace(". 'Errors for each case:", ".\n Errors for each case:")
+    except Exception:  # noqa: W0703 # nosec: B110
+        pass
+    return "({}) <{}> {!s}".format(err_type, err_code, err_repr)
+
+
 def ows_response_tween(request, handler):
     """Tween that wraps any API request with appropriate dispatch of error conversion to handle formatting."""
+    exc_log_lvl = logging.WARNING
     try:
         result = handler(request)
         if hasattr(handler, OWS_TWEEN_HANDLED):
@@ -40,13 +68,11 @@ def ows_response_tween(request, handler):
         raised_error = err
         return_error = err
         exc_info_err = False
-        exc_log_lvl = logging.WARNING
     except NotImplementedError as err:
         LOGGER.debug("not implemented error -> ows exception response")
         raised_error = err
         return_error = OWSNotImplemented(str(err))
         exc_info_err = sys.exc_info()
-        exc_log_lvl = logging.ERROR
     except Exception as err:
         LOGGER.debug("unhandled %s exception -> ows exception response", type(err).__name__)
         raised_error = err
@@ -56,14 +82,14 @@ def ows_response_tween(request, handler):
     # FIXME:
     #   https://github.com/crim-ca/weaver/issues/215
     #   convivial generation of this repr format should be directly in common exception class
-    raised_err_code = getattr(raised_error, "code", getattr(raised_error, "status_code", 500))
-    raised_err_repr = "({}) <{}> {!s}".format(type(raised_error).__name__, raised_err_code, raised_error)
+    err_msg = "\n  Cause:  [{} {}]".format(request.method, request.url)
+    raised_error_repr = error_repr(raised_error)
     if raised_error != return_error:
-        err_msg = "\n  Raised: [{}]\n  Return: [{!r}]".format(raised_err_repr, return_error)
+        err_msg += "\n  Raised: [{}]\n  Return: [{}]".format(raised_error_repr, error_repr(return_error))
     else:
-        err_msg = " [{}]".format(raised_err_repr)
+        err_msg += "\n  Raised: [{}]".format(raised_error_repr)
     LOGGER.log(exc_log_lvl, "Handled request exception:%s", err_msg, exc_info=exc_info_err)
-    LOGGER.debug("Handled request details:\n%s\n%s", raised_err_repr, getattr(raised_error, "text", ""))
+    LOGGER.debug("Handled request details:\n%s\n%s", raised_error_repr, getattr(raised_error, "text", ""))
     return return_error
 
 

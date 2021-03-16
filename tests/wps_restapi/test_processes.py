@@ -27,7 +27,7 @@ from weaver.execute import (
     EXECUTE_TRANSMISSION_MODE_REFERENCE,
     EXECUTE_TRANSMISSION_MODE_VALUE
 )
-from weaver.formats import CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
+from weaver.formats import ACCEPT_LANGUAGE_FR_CA, CONTENT_TYPE_APP_JSON, CONTENT_TYPE_APP_XML
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import STATUS_ACCEPTED
 from weaver.utils import fully_qualified_name, ows_context_href
@@ -121,9 +121,11 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             "deploymentProfileName": "http://www.opengis.net/profiles/eoc/dockerizedApplication",
             "executionUnit": [
                 # full definition not required with mock
-                {"unit": {
-                    "class": "test"
-                }}
+                # use 'href' variant to avoid invalid schema validation via more explicit 'unit'
+                # note:
+                #   hostname cannot have underscores according to [RFC-1123](https://www.ietf.org/rfc/rfc1123.txt)
+                #   schema validator of Reference URL will appropriately raise such invalid string
+                {"href": "http://weaver.test/{}.cwl".format(process_id)}
             ]
         }
 
@@ -173,8 +175,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             for pkg in package_mock:
                 stack.enter_context(pkg)
             resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=True)
-            # TODO: status should be 201 when properly modified to match API conformance
-            assert resp.status_code == 200
+            assert resp.status_code == 201
             assert resp.json["processSummary"]["id"] == process_name
 
         # change value that will trigger schema error on check
@@ -210,8 +211,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 stack.enter_context(pkg)
             uri = "/processes"
             resp = self.app.post_json(uri, params=process_data, headers=self.json_headers, expect_errors=True)
-            # TODO: status should be 201 when properly modified to match API conformance
-            assert resp.status_code == 200
+            assert resp.status_code == 201
             assert resp.content_type == CONTENT_TYPE_APP_JSON
             assert resp.json["processSummary"]["id"] == process_name
             assert isinstance(resp.json["deploymentDone"], bool) and resp.json["deploymentDone"]
@@ -253,13 +253,13 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         process_data_tests[1]["processDescription"].pop("process")
         process_data_tests[2]["processDescription"]["process"].pop("id")
         process_data_tests[3]["processDescription"]["jobControlOptions"] = EXECUTE_CONTROL_OPTION_ASYNC
-        process_data_tests[4]["processDescription"]["jobControlOptions"] = [EXECUTE_MODE_ASYNC]
+        process_data_tests[4]["processDescription"]["jobControlOptions"] = [EXECUTE_MODE_ASYNC]  # noqa
         process_data_tests[5].pop("deploymentProfileName")
         process_data_tests[6].pop("executionUnit")
         process_data_tests[7]["executionUnit"] = {}
         process_data_tests[8]["executionUnit"] = list()
         process_data_tests[9]["executionUnit"][0] = {"unit": "something"}  # unit as string instead of package
-        process_data_tests[10]["executionUnit"][0] = {"href": {}}  # href as package instead of url
+        process_data_tests[10]["executionUnit"][0] = {"href": {}}  # noqa  # href as package instead of URL
         process_data_tests[11]["executionUnit"][0] = {"unit": {}, "href": ""}  # can"t have both unit/href together
 
         with contextlib.ExitStack() as stack:
@@ -283,8 +283,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
                 stack.enter_context(pkg)
             uri = "/processes"
             resp = self.app.post_json(uri, params=process_data, headers=self.json_headers, expect_errors=True)
-            # TODO: status should be 201 when properly modified to match API conformance
-            assert resp.status_code == 200
+            assert resp.status_code == 201
 
         weaver_wps_path = get_wps_url(self.config.registry.settings)
         process_wps_endpoint = self.process_store.fetch_by_id(process_name).processEndpointWPS1
@@ -321,7 +320,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             This is a shortcut method for all ``test_deploy_process_<>`` cases.
         """
         resp = self.app.post_json("/processes", params=deploy_payload, headers=self.json_headers)
-        assert resp.status_code == 200  # TODO: status should be 201 when properly modified to match API conformance
+        assert resp.status_code == 201
         assert resp.content_type == CONTENT_TYPE_APP_JSON
 
         # apply visibility to allow retrieval
@@ -498,7 +497,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             for exe in mock_execute:
                 stack.enter_context(exe)
             headers = self.json_headers.copy()
-            headers["Accept-Language"] = "fr-CA"
+            headers["Accept-Language"] = ACCEPT_LANGUAGE_FR_CA
             resp = self.app.post_json(uri, params=data, headers=headers)
             assert resp.status_code == 201, "Error: {}".format(resp.text)
             try:
@@ -506,7 +505,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             except JobNotFound:
                 self.fail("Job should have been created and be retrievable.")
             assert job.id == resp.json["jobID"]
-            assert job.accept_language == "fr-CA"
+            assert job.accept_language == ACCEPT_LANGUAGE_FR_CA
 
     def test_execute_process_no_json_body(self):
         uri = "/processes/{}/jobs".format(self.process_public.identifier)
@@ -553,7 +552,7 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             resp = self.app.post_json(path, params=data_execute, headers=self.json_headers)
             assert resp.status_code == 201, "Expected job submission without inputs created without error."
             job = self.job_store.fetch_by_id(resp.json["jobID"])
-            assert job.inputs[0]["data"] == "100"  # not cast to float or integer
+            assert job.inputs[0]["data"] == "100", "Input value should remain string and not be cast to float/integer"
 
     def test_execute_process_no_error_not_required_params(self):
         """
@@ -684,13 +683,15 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
     def test_process_description_metadata_href_or_value_valid(self):
         """Validates that metadata is accepted as either hyperlink reference or literal string value."""
-        sd.Process().deserialize({
+        process = {
             "id": self._testMethodName,
             "metadata": [
                 {"type": "value-typed", "value": "some-value", "lang": "en-US"},
                 {"type": "link-typed", "href": "https://example.com", "hreflang": "en-US", "rel": "example"}
             ]
-        })
+        }
+        result = sd.Process().deserialize(process)
+        assert process["metadata"] == result["metadata"]
 
     def test_process_description_metadata_href_or_value_invalid(self):
         """Validates that various invalid metadata definitions are indicated as such."""
@@ -710,4 +711,4 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             except colander.Invalid:
                 pass
             else:
-                self.fail("Metadata is expected to be raised as invalid: (test: {}, metadata: {})".format(i, test_meta))
+                self.fail("Metadata is expected to be raised as invalid: (test: {}, metadata: {})".format(i, meta))

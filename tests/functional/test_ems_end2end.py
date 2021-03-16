@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 
 import mock
 import pytest
+import six
 from pyramid import testing
 from pyramid.httpexceptions import HTTPCreated, HTTPNotFound, HTTPOk, HTTPUnauthorized
 from pyramid.settings import asbool
@@ -117,7 +118,9 @@ class End2EndEMSTestCase(TestCase):
             pass
 
         # logging parameter overrides
-        cls.logger_level = os.getenv("WEAVER_TEST_LOGGER_LEVEL", cls.logger_level)
+        cls.logger_level = os.getenv("WEAVER_TEST_LOGGER_LEVEL", cls.logger_level) or cls.logger_level
+        if isinstance(cls.logger_level, six.string_types):
+            cls.logger_level = logging.getLevelName(cls.logger_level)
         cls.logger_enabled = asbool(os.getenv("WEAVER_TEST_LOGGER_ENABLED", cls.logger_enabled))
         cls.logger_result_dir = os.getenv("WEAVER_TEST_LOGGER_RESULT_DIR", os.path.join(WEAVER_ROOT_DIR))
         cls.logger_json_indent = os.getenv("WEAVER_TEST_LOGGER_JSON_INDENT", cls.logger_json_indent)
@@ -195,7 +198,9 @@ class End2EndEMSTestCase(TestCase):
     @classmethod
     def settings(cls):
         # type: (...) -> SettingsType
-        """Provide basic settings that must be defined to use various weaver utility functions."""
+        """
+        Provide basic settings that must be defined to use various weaver utility functions.
+        """
         if not cls.__settings__:
             weaver_url = os.getenv("WEAVER_URL", "{}{}".format(cls.WEAVER_TEST_SERVER_HOSTNAME,
                                                                cls.WEAVER_TEST_SERVER_BASE_PATH))
@@ -423,7 +428,9 @@ class End2EndEMSTestCase(TestCase):
     @classmethod
     def log_json_format(cls, payload, indent_level):
         # type: (str, int) -> str
-        """Logs an indented string representation of a JSON payload according to settings."""
+        """
+        Logs an indented string representation of a JSON payload according to settings.
+        """
         sub_indent = cls.get_indent(indent_level if cls.logger_json_indent else 0)
         log_payload = "\n" if cls.logger_json_indent else "" + json.dumps(payload, indent=cls.logger_json_indent)
         log_payload.replace("\n", "\n{}".format(sub_indent))
@@ -433,12 +440,14 @@ class End2EndEMSTestCase(TestCase):
 
     @classmethod
     def log_dict_format(cls, dictionary, indent_level):
-        """Logs dictionary (key, value) pairs in a YAML-like format."""
+        """
+        Logs dictionary (key, value) pairs in a YAML-like format.
+        """
         if dictionary is None:
             return None
 
-        tab = cls.get_indent(indent_level)
-        return tab + "\n{tab}".format(tab=tab).join(["{}: {}".format(k, dictionary[k]) for k in sorted(dictionary)])
+        tab = "\n" + cls.get_indent(indent_level)
+        return tab + "{tab}".format(tab=tab).join(["{}: {}".format(k, dictionary[k]) for k in sorted(dictionary)])
 
     @classmethod
     def request(cls, method, url, ignore_errors=False, force_requests=False, log_enabled=True, **kw):
@@ -543,7 +552,9 @@ class End2EndEMSTestCase(TestCase):
     @classmethod
     def assert_response(cls, response, status=None, message=""):
         # type: (AnyResponseType, Optional[Union[int, Iterable[int]]], str) -> None
-        """Tests a response for expected status and raises an error if not matching."""
+        """
+        Tests a response for expected status and raises an error if not matching.
+        """
         code = response.status_code
         reason = getattr(response, "reason", "")
         content = getattr(response, "content", "")
@@ -563,7 +574,9 @@ class End2EndEMSTestCase(TestCase):
     @classmethod
     def assert_test(cls, assert_test, message=None, title="Test Assertion Failed"):
         # type: (Callable[[], bool], Optional[str], str) -> None
-        """Tests a callable for assertion and logs the message if it fails, then re-raises to terminate execution."""
+        """
+        Tests a callable for assertion and logs the message if it fails, then re-raises to terminate execution.
+        """
         try:
             assert assert_test(), message
         except AssertionError:
@@ -653,7 +666,9 @@ class End2EndEMSTestCase(TestCase):
     @pytest.mark.xfail(reason="Interoperability of remote servers not guaranteed.")
     @pytest.mark.testbed14
     def test_workflow_end2end_with_auth(self):
-        """Full workflow execution procedure with authentication enabled."""
+        """
+        Full workflow execution procedure with authentication enabled.
+        """
         # End to end test will log everything
         self.__class__.log_full_trace = True
 
@@ -764,7 +779,9 @@ class End2EndEMSTestCase(TestCase):
 
     def workflow_runner(self, test_workflow_id, test_application_ids, log_full_trace=False):
         # type: (str, Iterable[str], bool) -> None
-        """Simplify test for demonstration purpose"""
+        """
+        Simplify test for demonstration purpose.
+        """
 
         # test will log basic information
         self.__class__.log_full_trace = log_full_trace
@@ -813,6 +830,7 @@ class End2EndEMSTestCase(TestCase):
         # type: (str, Optional[HeadersType], Optional[CookiesType]) -> None
         """
         Validates that the job is stated, running, and polls it until completed successfully.
+
         Then validates that results are accessible (no data integrity check).
         """
         timeout_accept = self.WEAVER_TEST_JOB_ACCEPTED_MAX_TIMEOUT

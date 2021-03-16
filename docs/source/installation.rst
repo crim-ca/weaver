@@ -41,4 +41,31 @@ that environment. You can also enforce a specific environment using:
 
    make CONDA_ENV=<my-env> install
 
+
+.. _windows_install:
+
+Windows Installation
+=====================
+
+*Minimal* support is provided to run the code on Windows. To do so, the ``Makefile`` assumes you are running in a
+``MINGW`` environment, that ``conda`` is already installed, and that it is available from ``CONDA_HOME`` variable or
+similar. If this is not the case, you will have to adjust the reference variables accordingly.
+
+.. note::
+    Windows support is not official and any dependency could stop supporting it at any given time. Particularly,
+    libraries for `Celery`_ task execution have a tendency to break between versions for Windows. The application
+    is regularly evaluated on a Linux virtual machine. It is recommended to run it as so or using the existing
+    Docker images.
+
+Known issues
+------------
+
+* Package ``shapely.geos`` has C++ dependency to ``geos`` library. If the package was installed in a ``conda``
+  environment, but through ``pip install`` call, the source path will not be found. You have to make sure to install
+  it using ``conda install -c conda-forge shapely``.
+* The example `weaver.ini.example`_ file uses ``gunicorn`` by default to take advantage of its performance features,
+  but this package does not support Windows. Alternatively, you might need to use ``waitress`` by replacing it in the
+  ``[server:main]`` section.
+
+
 Please refer to :ref:`Configuration` and :ref:`Running` sections for following steps.

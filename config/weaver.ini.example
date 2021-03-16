@@ -19,6 +19,16 @@ mongodb.host = mongodb
 mongodb.port = 27017
 mongodb.db_name = weaver
 
+# caching
+cache.regions = doc, request, result
+cache.type = memory
+cache.doc.expire = 86400
+cache.doc.enabled = true
+cache.request.expire = 60
+cache.request.enabled = false
+cache.result.expire = 3600
+cache.result.enabled = false
+
 # NOTE:
 #   For all below parameters, settings suffixed by `_url` are automatically generated from their corresponding `_path`
 #   settings using `weaver.url` if they are not provided. Otherwise, the explicit definition provided by `_url` suffixed
@@ -96,8 +106,6 @@ weaver.wps_metadata_contact_role=Information
 weaver.wps_restapi = true
 weaver.wps_restapi_url =
 weaver.wps_restapi_path = /
-weaver.wps_restapi_ref = https://app.swaggerhub.com/apis/geoprocessing/WPS/
-weaver.wps_restapi_doc = https://raw.githubusercontent.com/opengeospatial/wps-rest-binding/develop/docs/18-062.pdf
 
 # --- Weaver job email notification ---
 weaver.wps_email_encrypt_salt = salty-email
@@ -132,10 +140,19 @@ BROKER_URL = mongodb://mongodb:27017/celery
 ###
 
 [server:main]
+# NOTE: Gunicorn not supported on Windows, use waitress instead
+
+# --- gunicorn ---
 use = egg:gunicorn#main
 bind = 0.0.0.0:4001
-workers = 5
+workers = 10
 timeout = 10
+
+# --- waitress ---
+# use = egg:waitress#main
+# listen = localhost:4002
+# threads = 10
+# channel_timeout = 10
 
 ###
 # logging configuration

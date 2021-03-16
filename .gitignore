@@ -17,12 +17,14 @@ downloads
 *.egg-info
 *egg[s]
 __pycache__
+.python_history
 
 # Unit test / Coverage reports
 *.log
 *.lock
 .cache
 .coverage
+.pylint.d/
 .pytest_cache
 .tox
 coverage.xml

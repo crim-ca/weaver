@@ -13,7 +13,7 @@ LOGGER = logging.getLogger(__name__)
 @wsgiapp2
 def pywps_view(environ, start_response):
     """
-    Served location for PyWPS Service that provides *older* WPS-1/2 XML endpoint.
+    Served location for PyWPS Service that provides WPS-1/2 XML endpoint.
     """
     LOGGER.debug("pywps env: %s", environ)
     service = get_pywps_service(environ)

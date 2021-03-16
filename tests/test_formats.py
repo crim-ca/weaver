@@ -87,10 +87,11 @@ def test_get_cwl_file_format_retry_attempts():
         m_resp.status_code = codes["codes"].pop()
         return m_resp
 
-    with mock.patch("requests.Session.request", side_effect=mock_request_extra) as mocked_request:
-        _, fmt = f.get_cwl_file_format(f.CONTENT_TYPE_APP_JSON)
-        assert fmt == "{}:{}".format(f.IANA_NAMESPACE, f.CONTENT_TYPE_APP_JSON)
-        assert mocked_request.call_count == 2
+    with mock.patch("weaver.utils.get_settings", return_value={"cache.request.enabled": "false"}):
+        with mock.patch("requests.Session.request", side_effect=mock_request_extra) as mocked_request:
+            _, fmt = f.get_cwl_file_format(f.CONTENT_TYPE_APP_JSON)
+            assert fmt == "{}:{}".format(f.IANA_NAMESPACE, f.CONTENT_TYPE_APP_JSON)
+            assert mocked_request.call_count == 2
 
 
 def test_get_cwl_file_format_retry_fallback_urlopen():
@@ -101,12 +102,13 @@ def test_get_cwl_file_format_retry_fallback_urlopen():
     def mock_urlopen(*_, **__):
         return HTTPOk()
 
-    with mock.patch("requests.Session.request", side_effect=mock_connect_error) as mocked_request:
-        with mock.patch("weaver.formats.urlopen", side_effect=mock_urlopen) as mocked_urlopen:
-            _, fmt = f.get_cwl_file_format(f.CONTENT_TYPE_APP_JSON)
-            assert fmt == "{}:{}".format(f.IANA_NAMESPACE, f.CONTENT_TYPE_APP_JSON)
-            assert mocked_request.call_count == 4   # internally attempted 4 times (1 attempt + 3 retries)
-            assert mocked_urlopen.call_count == 1
+    with mock.patch("weaver.utils.get_settings", return_value={"cache.request.enabled": "false"}):
+        with mock.patch("requests.Session.request", side_effect=mock_connect_error) as mocked_request:
+            with mock.patch("weaver.formats.urlopen", side_effect=mock_urlopen) as mocked_urlopen:
+                _, fmt = f.get_cwl_file_format(f.CONTENT_TYPE_APP_JSON)
+                assert fmt == "{}:{}".format(f.IANA_NAMESPACE, f.CONTENT_TYPE_APP_JSON)
+                assert mocked_request.call_count == 4, "Expected internally attempted 4 times (1 attempt + 3 retries)"
+                assert mocked_urlopen.call_count == 1, "Expected internal fallback request calls"
 
 
 def test_get_cwl_file_format_synonym():

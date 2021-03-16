@@ -28,7 +28,7 @@ from weaver.processes.convert import ows2json_output_data
 from weaver.processes.types import PROCESS_WORKFLOW
 from weaver.status import STATUS_ACCEPTED, STATUS_FAILED, STATUS_STARTED, STATUS_SUCCEEDED, map_status
 from weaver.store.base import StoreJobs
-from weaver.utils import get_any_id, get_any_value, get_settings, raise_on_xml_exception, wait_secs
+from weaver.utils import get_any_id, get_any_value, get_settings, now, raise_on_xml_exception, wait_secs
 from weaver.visibility import VISIBILITY_PUBLIC
 from weaver.wps.utils import (
     check_wps_status,
@@ -80,6 +80,7 @@ def execute_process(self, job_id, url, headers=None):
     store = db.get_store(StoreJobs)
 
     job = store.fetch_by_id(job_id)
+    job.started = now()
     job.task_id = self.request.id
     job.progress = JOB_PROGRESS_SETUP
     job.save_log(logger=task_logger, message="Job task setup completed.")
@@ -88,6 +89,7 @@ def execute_process(self, job_id, url, headers=None):
     try:
         try:
             job.progress = JOB_PROGRESS_DESCRIBE
+            job.save_log(logger=task_logger, message="Employed WPS URL: [{!s}]".format(url), level=logging.DEBUG)
             job.save_log(logger=task_logger, message="Execute WPS request for process [{!s}]".format(job.process))
             wps = get_wps_client(url, settings, headers=headers, language=job.accept_language)
             raise_on_xml_exception(wps._capabilities)   # noqa
@@ -188,8 +190,10 @@ def execute_process(self, job_id, url, headers=None):
                 job_msg = (execution.statusMessage or "").strip()
                 job.response = execution.response
                 job.status = map_status(execution.getStatus())
-                job.status_message = "Job execution monitoring (progress: {}%, status: {})."\
-                                     .format(execution.percentCompleted, job_msg or "n/a")
+                job.status_message = (
+                    "Job execution monitoring (progress: {}%, status: {})."
+                    .format(execution.percentCompleted, job_msg or "n/a")
+                )
                 # job.save_log(logger=task_logger)
                 # job = store.update_job(job)
 

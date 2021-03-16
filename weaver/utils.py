@@ -6,7 +6,6 @@ import re
 import shutil
 import sys
 import time
-import types
 import warnings
 from copy import deepcopy
 from datetime import datetime
@@ -17,13 +16,16 @@ import boto3
 import colander
 import pytz
 import requests
+from beaker.cache import cache_region, region_invalidate
+from beaker.exceptions import BeakerException
 from celery.app import Celery
-from lxml import etree
 from pyramid.config import Configurator
 from pyramid.httpexceptions import HTTPError as PyramidHTTPError, HTTPGatewayTimeout, HTTPTooManyRequests
 from pyramid.registry import Registry
 from pyramid.request import Request
 from pyramid.settings import asbool, aslist
+from pyramid.threadlocal import get_current_registry
+from pyramid_beaker import set_cache_regions_from_settings
 from requests import HTTPError as RequestsHTTPError, Response
 from requests.structures import CaseInsensitiveDict
 from requests_file import FileAdapter
@@ -31,10 +33,11 @@ from urlmatch import urlmatch
 from webob.headers import EnvironHeaders, ResponseHeaders
 
 from weaver.status import map_status
+from weaver.typedefs import XML
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Iterable, Optional, Type, Union
+    from typing import Any, Callable, Dict, List, Iterable, NoReturn, Optional, Type, Tuple, Union
 
     from weaver.typedefs import (
         AnyKey,
@@ -47,8 +50,7 @@ if TYPE_CHECKING:
         JSON,
         KVP_Item,
         Number,
-        SettingsType,
-        XML
+        SettingsType
     )
 
 LOGGER = logging.getLogger(__name__)
@@ -70,15 +72,26 @@ class _Singleton(type):
         return cls.__instance__
 
 
-class _NullType(metaclass=_Singleton):
+class NullType(metaclass=_Singleton):
     """Represents a ``null`` value to differentiate from ``None``."""
 
     # pylint: disable=E1101,no-member
     def __eq__(self, other):
-        return (isinstance(other, _NullType)                                    # noqa: W503
+        """Makes any instance of :class:`NullType` compare as the same (ie: Singleton)"""
+        return (isinstance(other, NullType)                                     # noqa: W503
                 or other is null                                                # noqa: W503
                 or other is self.__instance__                                   # noqa: W503
-                or (inspect.isclass(other) and issubclass(other, _NullType)))   # noqa: W503
+                or (inspect.isclass(other) and issubclass(other, NullType)))    # noqa: W503
+
+    def __getattr__(self, item):
+        # type: (Any) -> NullType
+        """Makes any property getter return ``null`` to make any sub-item also look like ``null``.
+
+        Useful for example in the case of type comparators that do not validate their
+        own type before accessing a property that they expect to be there. Without this
+        the get operation on ``null`` would raise an unknown key or attribute error.
+        """
+        return null
 
     def __repr__(self):
         return "<null>"
@@ -92,7 +105,7 @@ class _NullType(metaclass=_Singleton):
 
 
 # pylint: disable=C0103,invalid-name
-null = _NullType()
+null = NullType()
 
 
 def get_weaver_url(container):
@@ -140,8 +153,8 @@ def get_registry(container, nothrow=False):
     raise TypeError("Could not retrieve registry from container object of type [{}].".format(type(container)))
 
 
-def get_settings(container):
-    # type: (AnySettingsContainer) -> SettingsType
+def get_settings(container=None):
+    # type: (Optional[AnySettingsContainer]) -> SettingsType
     """Retrieves the application ``settings`` from various containers referencing to it."""
     if isinstance(container, (Celery, Configurator, Request)):
         container = get_registry(container)
@@ -149,6 +162,8 @@ def get_settings(container):
         return container.settings
     if isinstance(container, dict):
         return container
+    if container is None:
+        return get_current_registry().settings
     raise TypeError("Could not retrieve settings from container object of type [{}]".format(type(container)))
 
 
@@ -218,6 +233,7 @@ def is_uuid(maybe_uuid):
 
 
 def parse_extra_options(option_str):
+    # type: (str) -> Dict[str, str]
     """
     Parses the extra options parameter.
 
@@ -233,7 +249,7 @@ def parse_extra_options(option_str):
         try:
             # pylint: disable=R1717,consider-using-dict-comprehension
             extra_options = option_str.split(",")
-            extra_options = dict([("=" in opt) and opt.split("=", 1) for opt in extra_options])
+            extra_options = dict([("=" in opt) and opt.split("=", 1) for opt in extra_options])  # noqa
         except Exception:
             msg = "Can not parse extra-options: {}".format(option_str)
             from pyramid.exceptions import ConfigurationError
@@ -278,7 +294,7 @@ def expires_at(hours=1):
 def localize_datetime(dt, tz_name="UTC"):
     # type: (datetime, Optional[str]) -> datetime
     """
-    Provide a timezone-aware object for a given datetime and timezone name
+    Provide a timezone-aware object for a given datetime and timezone name.
     """
     tz_aware_dt = dt
     if dt.tzinfo is None:
@@ -355,12 +371,13 @@ def pass_http_error(exception, expected_http_error):
 
 
 def raise_on_xml_exception(xml_node):
+    # type: (XML) -> Optional[NoReturn]
     """
     Raises an exception with the description if the XML response document defines an ExceptionReport.
-    :param xml_node: instance of :class:`etree.Element`
+    :param xml_node: instance of :class:`XML`
     :raise Exception: on found ExceptionReport document.
     """
-    if not isinstance(xml_node, etree._Element):  # noqa: W0212
+    if not isinstance(xml_node, XML):
         raise TypeError("Invalid input, expecting XML element node.")
     if "ExceptionReport" in xml_node.tag:
         node = xml_node
@@ -391,7 +408,7 @@ def bytes2str(string):
 
 def islambda(func):
     # type: (Any) -> bool
-    return isinstance(func, types.LambdaType) and func.__name__ == (lambda: None).__name__
+    return isinstance(func, type(lambda: None)) and func.__name__ == (lambda: None).__name__
 
 
 first_cap_re = re.compile(r"(.)([A-Z][a-z]+)")
@@ -424,7 +441,7 @@ def parse_request_query(request):
 
 
 def get_path_kvp(path, sep=",", **params):
-    # type: (str, str, KVP_Item) -> str
+    # type: (str, str, **KVP_Item) -> str
     """
     Generates the WPS URL with Key-Value-Pairs (KVP) query parameters.
 
@@ -565,6 +582,36 @@ def get_caller_name(skip=2, base_class=False):
     return ".".join(name)
 
 
+def setup_cache(settings):
+    # type: (SettingsType) -> None
+    """
+    Prepares the settings with default caching options.
+    """
+    settings.setdefault("cache.regions", "doc, request, result")
+    settings.setdefault("cache.type", "memory")
+    settings.setdefault("cache.doc.enable", "false")
+    settings.setdefault("cache.doc.expired", "3600")
+    settings.setdefault("cache.request.enabled", "false")
+    settings.setdefault("cache.request.expire", "60")
+    settings.setdefault("cache.result.enabled", "false")
+    settings.setdefault("cache.result.expire", "3600")
+    set_cache_regions_from_settings(settings)
+
+
+def invalidate_region(caching_args):
+    # type: (Tuple[Callable, str, Tuple[Any]]) -> None
+    """
+    Caching region invalidation with handling to ignore errors generated by of unknown regions.
+
+    :param caching_args: tuple of (function, region, *function-args)
+    """
+    func, region, *args = caching_args
+    try:
+        region_invalidate(func, region, *args)
+    except BeakerException:
+        pass
+
+
 def get_ssl_verify_option(method, url, settings, request_options=None):
     # type: (str, str, AnySettingsContainer, Optional[SettingsType]) -> bool
     """
@@ -641,6 +688,28 @@ def get_request_options(method, url, settings):
         req_opts.pop("method", None)
         return req_opts
     return request_options
+
+
+def request_call(method, url, kwargs):
+    # type: (str, str, Dict[str, AnyValue]) -> Response
+    """
+    Request operation employed by :func:`request_extra` without caching.
+    """
+    with requests.Session() as request_session:
+        if urlparse(url).scheme in ["", "file"]:
+            url = "file://{}".format(os.path.abspath(url)) if not url.startswith("file://") else url
+            request_session.mount("file://", FileAdapter())
+        resp = request_session.request(method, url, **kwargs)
+    return resp
+
+
+@cache_region("request")
+def request_cached(method, url, kwargs):
+    # type: (str, str, Dict[str, AnyValue]) -> Response
+    """
+    Cached-enabled request operation employed by :func:`request_extra`.
+    """
+    return request_call(method, url, kwargs)
 
 
 def request_extra(method,                       # type: str
@@ -735,7 +804,7 @@ def request_extra(method,                       # type: str
     :param request_kwargs: All other keyword arguments are passed down to the request call.
     """
     # obtain file request-options arguments, then override any explicitly provided source-code keywords
-    settings = get_settings(settings) if settings else {}
+    settings = get_settings(settings) or {}
     request_options = get_request_options(method, url, settings)
     request_options.update(request_kwargs)
     # catch kw passed to request corresponding to retries parameters
@@ -746,49 +815,61 @@ def request_extra(method,                       # type: str
     backoff = backoff or kw_backoff or 0.3
     intervals = intervals or kw_intervals
     if intervals and len(intervals) and all(isinstance(i, (int, float)) for i in intervals):
-        intervals = [0] + intervals
-        retries = list(range(len(intervals)))
-        backoff = 0  # disable first part of delay calculation
+        request_delta = [0] + intervals
     else:
-        retries = [0] + list(range(retries))
-    no_retries = len(retries) == 1
+        request_delta = [0] + [(backoff * (2 ** (retry + 1))) for retry in range(retries)]
+    no_retries = len(request_delta) == 1
     # SSL verification settings
     # ON by default, disable accordingly with any variant if matched
     kw_ssl_verify = get_ssl_verify_option(method, url, settings, request_options=request_options)
     ssl_verify = False if not kw_ssl_verify or not ssl_verify else True  # pylint: disable=R1719
-    request_options.update({"verify": ssl_verify})
+    request_kwargs.setdefault("timeout", 5)
+    request_kwargs.setdefault("verify", ssl_verify)
     # process request
     resp = None
     failures = []
-    for retry in retries:
+    no_cache = CaseInsensitiveDict(request_kwargs.get("headers", {})).get("Cache-Control", "").lower() == "no-cache"
+    no_cache = no_cache is True or request_options.get("cache", True) is False
+    region = "request"
+    request_args = (method, url, request_kwargs)
+    caching_args = (request_cached, region, *request_args)
+    for retry, delay in enumerate(request_delta):
         if retry:
-            delay = 0
             if retry_after and resp and resp.status_code in [HTTPTooManyRequests.code]:
                 after = resp.headers.get("Retry-After", "")
                 delay = int(after) if str(after).isdigit() else 0
                 LOGGER.debug("Received header [Retry-After=%ss] for [%s %s]", after, method, url)
-            if not delay:
-                delay = (backoff * (2 ** (retry + 1))) or intervals[retry]
             LOGGER.debug("Retrying failed request after delay=%s for [%s %s]", delay, method, url)
             time.sleep(delay)
         try:
-            with requests.Session() as request_session:
-                if urlparse(url).scheme in ["", "file"]:
-                    url = "file://{}".format(os.path.abspath(url)) if not url.startswith("file://") else url
-                    request_session.mount("file://", FileAdapter())
-                resp = request_session.request(method, url, **request_kwargs)
+            if no_cache:
+                resp = request_call(*request_args)
+            else:
+                resp = request_cached(*request_args)
             if allowed_codes and len(allowed_codes):
                 if resp.status_code in allowed_codes:
                     return resp
             elif resp.status_code < (500 if only_server_errors else 400):
+                invalidate_region(caching_args)
                 return resp
+            invalidate_region(caching_args)
             failures.append("{} ({})".format(getattr(resp, "reason", type(resp).__name__),
                                              getattr(resp, "status_code", getattr(resp, "code", 500))))
-        # function called without retries raises original error
-        # as if calling requests module directly
-        except requests.ConnectionError as exc:
+        # failure caused by invalid cache setup re-run with sub-call to restart the retry procedure from scratch
+        except BeakerException as exc:
+            if "Cache region not configured: {}".format(region) in str(exc):
+                LOGGER.warning("Invalid cache region setup detected, retrying request...")
+                setup_cache(settings)
+                resp = request_extra(method, url, retries=retries, retry_after=retry_after, backoff=backoff,
+                                     intervals=intervals, ssl_verify=ssl_verify, allowed_codes=allowed_codes,
+                                     only_server_errors=only_server_errors, settings=settings, **request_kwargs)
+                return resp  # sub-called did the retry loop, so finish early this loop
+            raise  # if not the expected cache exception, ignore retry attempt
+        # function called without retries raises original error as if calling requests module directly
+        except (requests.ConnectionError, requests.Timeout) as exc:
             if no_retries:
                 raise
+            invalidate_region(caching_args)
             failures.append(type(exc).__name__)
     # also pass-through here if no retries
     if no_retries and resp:
@@ -888,19 +969,27 @@ REGEX_ASSERT_INVALID_CHARACTERS = re.compile(r"^[a-zA-Z0-9_\-]+$")
 
 
 def get_sane_name(name, min_len=3, max_len=None, assert_invalid=True, replace_character="_"):
-    # type: (str, Optional[int], Optional[Union[int, None]], Optional[bool], Optional[str]) -> Union[str, None]
+    # type: (str, Optional[int], Optional[Union[int, None]], Optional[bool], str) -> Union[str, None]
     """
-    Returns a cleaned-up version of the input name, replacing invalid characters not matched with
+    Returns a cleaned-up version of the :paramref:`name`, replacing invalid characters not matched with
     :py:data:`REGEX_SEARCH_INVALID_CHARACTERS` by :paramref:`replace_character`.
 
-    :param name: value to clean
+    .. seealso::
+        :class:`weaver.wps_restapi.swagger_definitions.SLUG`
+
+    :param name:
+        Value to clean.
     :param min_len:
-        Minimal length of ``name`` to be respected, raises or returns ``None`` on fail according to ``assert_invalid``.
+        Minimal length of :paramref:`name`` to be respected, raises or returns ``None`` on fail according
+        to :paramref:`assert_invalid`.
     :param max_len:
-        Maximum length of ``name`` to be respected, raises or returns trimmed ``name`` on fail according to
-        ``assert_invalid``. If ``None``, condition is ignored for assertion or full ``name`` is returned respectively.
-    :param assert_invalid: If ``True``, fail conditions or invalid characters will raise an error instead of replacing.
-    :param replace_character: Single character to use for replacement of invalid ones if ``assert_invalid=False``.
+        Maximum length of :paramref:`name` to be respected, raises or returns trimmed :paramref:`name` on fail
+        according to :paramref:`assert_invalid`. If ``None``, condition is ignored for assertion or full
+        :paramref:`name` is returned respectively.
+    :param assert_invalid:
+        If ``True``, fail conditions or invalid characters will raise an error instead of replacing.
+    :param replace_character:
+        Single character to use for replacement of invalid ones if :paramref:`assert_invalid` is ``False``.
     """
     if not isinstance(replace_character, str) or not len(replace_character) == 1:
         raise ValueError("Single replace character is expected, got invalid [{!s}]".format(replace_character))
@@ -936,21 +1025,91 @@ def assert_sane_name(name, min_len=3, max_len=None):
         raise InvalidIdentifierValue("Invalid name : {0}".format(name))
 
 
-def clean_json_text_body(body):
-    # type: (str) -> str
+def clean_json_text_body(body, remove_newlines=True, remove_indents=True):
+    # type: (str, bool, bool) -> str
     """
     Cleans a textual body field of superfluous characters to provide a better human-readable text in a JSON response.
     """
     # cleanup various escape characters and u'' stings
-    replaces = [(",\n", ", "), ("\\n", " "), (" \n", " "), ("\"", "\'"), ("\\", ""),
-                ("u\'", "\'"), ("u\"", "\'"), ("\'\'", "\'"), ("  ", " ")]
+    replaces = [(",\n", ", "), ("\\n", " "), (" \n", " "), ("\n'", "'"), ("\"", "\'"),
+                ("u\'", "\'"), ("u\"", "\'"), ("\'\'", "\'"), ("'. ", ""), ("'. '", ""),
+                ("}'", "}"), ("'{", "{")]
+    if remove_indents:
+        replaces.extend([("\\", " "), ("  ", " ")])
+    else:
+        replaces.extend([("\\", ""), ])
+    if not remove_newlines:
+        replaces.extend([("'\n  ", "'\n "), ("'\n '", "'\n'"), ("'\n'", "\n'")])
+
     replaces_from = [r[0] for r in replaces]
     while any(rf in body for rf in replaces_from):
         for _from, _to in replaces:
             body = body.replace(_from, _to)
 
-    body_parts = [p.strip() for p in body.split("\n") if p != ""]               # remove new line and extra spaces
-    body_parts = [p + "." if not p.endswith(".") else p for p in body_parts]    # add terminating dot per sentence
-    body_parts = [p[0].upper() + p[1:] for p in body_parts if len(p)]           # capitalize first word
-    body_parts = " ".join(p for p in body_parts if p)
-    return body_parts
+    if remove_newlines:
+        body_parts = [p.strip() for p in body.split("\n") if p != ""]               # remove new line and extra spaces
+        body_parts = [p + "." if not p.endswith(".") else p for p in body_parts]    # add terminating dot per sentence
+        body_parts = [p[0].upper() + p[1:] for p in body_parts if len(p)]           # capitalize first word
+        body_clean = " ".join(p for p in body_parts if p)
+    else:
+        body_clean = body
+
+    # re-process without newlines to remove escapes created by concat of lines
+    if any(rf in body_clean for rf in replaces_from):
+        body_clean = clean_json_text_body(body_clean, remove_newlines=remove_newlines, remove_indents=remove_indents)
+    return body_clean
+
+
+def transform_json(json_data,               # type: JSON
+                   rename=None,             # type: Optional[Dict[AnyKey, Any]]
+                   remove=None,             # type: Optional[List[AnyKey]]
+                   add=None,                # type: Optional[Dict[AnyKey, Any]]
+                   replace_values=None,     # type: Optional[Dict[AnyKey, Any]]
+                   replace_func=None,       # type: Optional[Dict[AnyKey, Callable[[Any], Any]]]
+                   ):                       # type: (...) -> JSON
+    """
+    Transforms the input ``json_data`` with different methods.
+    The transformations are applied in the same order as the arguments.
+    """
+    rename = rename or {}
+    remove = remove or []
+    add = add or {}
+    replace_values = replace_values or {}
+    replace_func = replace_func or {}
+
+    # rename
+    for k, v in rename.items():
+        if k in json_data:
+            json_data[v] = json_data.pop(k)
+
+    # remove
+    for r_k in remove:
+        json_data.pop(r_k, None)
+
+    # add
+    for k, v in add.items():
+        json_data[k] = v
+
+    # replace values
+    for key, value in json_data.items():
+        for old_value, new_value in replace_values.items():
+            if value == old_value:
+                json_data[key] = new_value
+
+    # replace with function call
+    for k, func in replace_func.items():
+        if k in json_data:
+            json_data[k] = func(json_data[k])
+
+    # also rename if the type of the value is a list of dicts
+    for key, value in json_data.items():
+        if isinstance(value, list):
+            for nested_item in value:
+                if isinstance(nested_item, dict):
+                    for k, v in rename.items():
+                        if k in nested_item:
+                            nested_item[v] = nested_item.pop(k)
+                    for k, func in replace_func.items():
+                        if k in nested_item:
+                            nested_item[k] = func(nested_item[k])
+    return json_data

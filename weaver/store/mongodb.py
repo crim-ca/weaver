@@ -334,11 +334,11 @@ class MongodbProcessStore(StoreProcesses, MongodbStore):
     def fetch_by_id(self, process_id, visibility=None):
         # type: (str, Optional[str]) -> Process
         """
-        Get process for given `process_id` from storage, optionally filtered by `visibility`.
+        Get process for given :paramref:`process_id` from storage, optionally filtered by :paramref:`visibility`.
         If ``visibility=None``, the process is retrieved (if existing) regardless of its visibility value.
 
         :param process_id: process identifier
-        :param visibility: one value amongst `weaver.visibility`.
+        :param visibility: one value amongst :py:mod:`weaver.visibility`.
         :return: An instance of :class:`weaver.datatype.Process`.
         """
         sane_name = get_sane_name(process_id, **self.sane_name_config)
@@ -407,7 +407,7 @@ class MongodbJobStore(StoreJobs, MongodbStore):
                  accept_language=None,      # type: Optional[str]
                  ):                         # type: (...) -> Job
         """
-        Stores a job in mongodb.
+        Creates a new :class:`Job` and stores it in mongodb.
         """
         try:
             tags = ["dev"]

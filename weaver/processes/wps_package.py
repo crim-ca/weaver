@@ -12,6 +12,7 @@ Functions and classes that offer interoperability and conversion between corresp
 import json
 import logging
 import os
+import posixpath  # pylint: disable=C0411,wrong-import-order
 import shutil
 import sys
 import tempfile
@@ -92,7 +93,7 @@ from weaver.utils import (
     setup_loggers
 )
 from weaver.wps.utils import get_wps_output_dir
-from weaver.wps_restapi.swagger_definitions import process_uri
+from weaver.wps_restapi.swagger_definitions import process_service
 
 if TYPE_CHECKING:
     from typing import Any, Deque, Dict, List, Optional, Tuple, Type, Union
@@ -121,8 +122,13 @@ if TYPE_CHECKING:
     ListCWLRequirements = List[CWLRequirement]       # [{'class': <req>, <param>: <val>}]
     AnyCWLRequirements = Union[DictCWLRequirements, ListCWLRequirements]
     # results from CWL execution
-    CWLResultEntry = Dict[str, Union[AnyValueType, List[AnyValueType]]]
+    CWLResultFile = TypedDict("CWLResultFile", {"location": str}, total=False)
+    CWLResultValue = Union[AnyValueType, List[AnyValueType]]
+    CWLResultEntry = Union[Dict[str, CWLResultValue], CWLResultFile, List[CWLResultFile]]
     CWLResults = Dict[str, CWLResultEntry]
+
+    # cwl_result[output_id]["location"]
+    # cwl_result[output_id][i]["location"]
 
 # NOTE:
 #   Only use this logger for 'utility' methods (not residing under WpsPackage).
@@ -189,7 +195,7 @@ def get_process_location(process_id_or_url, data_source=None):
         return process_id_or_url
     data_source_url = retrieve_data_source_url(data_source)
     process_id = get_sane_name(process_id_or_url)
-    process_url = process_uri.format(process_id=process_id)
+    process_url = process_service.path.format(process_id=process_id)
     return "{host}{path}".format(host=data_source_url, path=process_url)
 
 
@@ -286,7 +292,7 @@ def _get_package_requirements_as_class_list(requirements):
 
 
 def _get_package_ordered_io(io_section, order_hints=None):
-    # type: (Union[List[JSON], OrderedDict[str, JSON]], Optional[List[JSON]]) -> List[JSON]
+    # type: (Union[List[JSON], Dict[str, Union[JSON, str]]], Optional[List[JSON]]) -> List[JSON]
     """
     Converts `CWL` package I/O definitions defined as dictionary to an equivalent :class:`list` representation.
     The list representation ensures that I/O order is preserved when written to file and reloaded afterwards
@@ -346,7 +352,11 @@ def _check_package_file(cwl_file_path_or_url):
     :raises PackageRegistrationError: in case of missing file, invalid format or invalid HTTP status code.
     """
     is_url = False
-    if urlparse(cwl_file_path_or_url).scheme != "":
+    cwl_file_path_or_url = cwl_file_path_or_url.replace("file://", "")
+    scheme = urlparse(cwl_file_path_or_url).scheme
+    if scheme != "" and not posixpath.ismount("{}:".format(scheme)):    # windows partition
+        is_url = True
+    if is_url:
         cwl_path = cwl_file_path_or_url
         cwl_resp = request_extra("head", cwl_path, settings=get_settings(app))
         is_url = True
@@ -357,7 +367,7 @@ def _check_package_file(cwl_file_path_or_url):
         if not os.path.isfile(cwl_path):
             raise PackageRegistrationError("Cannot find CWL file at: '{}'.".format(cwl_path))
 
-    file_ext = os.path.splitext(cwl_path)[1].replace(".", "")
+    file_ext = os.path.splitext(cwl_path)[-1].replace(".", "")
     if file_ext not in PACKAGE_EXTENSIONS:
         raise PackageRegistrationError("Not a valid CWL file type: '{}'.".format(file_ext))
     return cwl_path, is_url
@@ -389,7 +399,7 @@ def _load_package_content(package_dict,                             # type: Dict
                           loading_context=None,                     # type: Optional[LoadingContext]
                           runtime_context=None,                     # type: Optional[RuntimeContext]
                           process_offering=None,                    # type: Optional[JSON]
-                          ):  # type: (...) -> Optional[Tuple[CWLFactoryCallable, str, Dict]]
+                          ):  # type: (...) -> Optional[Tuple[CWLFactoryCallable, str, Dict[str, str]]]
     """
     Loads the package content to file in a temporary directory.
     Recursively processes sub-packages steps if the parent is a `Workflow` (CWL class).
@@ -407,7 +417,7 @@ def _load_package_content(package_dict,                             # type: Dict
         otherwise, tuple of:
             - instance of ``CWLFactoryCallable``
             - package type (``PROCESS_WORKFLOW`` or ``PROCESS_APPLICATION``)
-            - dict of each step with their package name that must be run
+            - mapping of each step ID with their package name that must be run
 
     .. warning::
         Specified :paramref:`tmp_dir` will be deleted on exit.
@@ -503,7 +513,7 @@ def _update_package_metadata(wps_package_metadata, cwl_package_package):
         and "$namespaces" in cwl_package_package
         and isinstance(cwl_package_package["$namespaces"], dict)
     ):
-        metadata = wps_package_metadata.get("metadata", list())
+        metadata = wps_package_metadata.get("metadata", [])
         namespaces_inv = {v: k for k, v in cwl_package_package["$namespaces"]}
         for schema in cwl_package_package["$schemas"]:
             for namespace_url in namespaces_inv:
@@ -656,7 +666,7 @@ class WpsPackage(Process):
 
     def __init__(self, **kw):
         """
-        Creates a `WPS-3 Process` instance to execute a `CWL` package definition.
+        Creates a `WPS-3 Process` instance to execute a `CWL` application package definition.
 
         Process parameters should be loaded from an existing :class:`weaver.datatype.Process`
         instance generated using :func:`weaver.wps_package.get_process_definition`.
@@ -766,8 +776,8 @@ class WpsPackage(Process):
         :returns:  captured execution log lines retrieved from files
         """
         captured_log = []
+        status = STATUS_RUNNING
         try:
-            status = STATUS_RUNNING
             if isinstance(result, CWLException):
                 result = getattr(result, "out")
                 status = STATUS_FAILED
@@ -873,9 +883,12 @@ class WpsPackage(Process):
 
         Overrides :mod:`cwltool`'s function to retrieve user/group id for ones we enforce.
         """
+        if sys.platform == "win32":
+            return
+
         cfg_euid = str(self.settings.get("weaver.cwl_euid", ""))
         cfg_egid = str(self.settings.get("weaver.cwl_egid", ""))
-        app_euid, app_egid = str(os.geteuid()), str(os.getgid())
+        app_euid, app_egid = str(os.geteuid()), str(os.getgid())  # pylint: disable=E1101
         if cfg_euid not in ["", "0", app_euid] and cfg_egid not in ["", "0", app_egid]:
             self.logger.info("Enforcing CWL euid:egid [%s,%s]", cfg_euid, cfg_egid)
             cwltool.docker.docker_vm_id = lambda *_, **__: (int(cfg_euid), int(cfg_egid))
@@ -1232,8 +1245,8 @@ class WpsPackage(Process):
             # when 'url' is directly enforced, 'ComplexOutput.json' will use it instead of 'file' from temp workdir
             # self.response.outputs[output_id].url = result_wps
 
-            # override builder only here so that only results are uploaded to S3, and not XML status also
-            # settings are retrieved from PyWPS server config
+            # override builder only here so that only results are uploaded to S3, and not XML status
+            # using this storage builder, settings are retrieved from PyWPS server config
             self.response.outputs[output_id]._storage = S3StorageBuilder().build()  # noqa: W0212
             self.response.outputs[output_id].storage.prefix = str(self.response.uuid)
 
@@ -1277,14 +1290,16 @@ class WpsPackage(Process):
         # type: (str, JSON, CWL) -> WpsPackage
         """
         This function is called before running an ADES job (either from a workflow step or a simple EMS dispatch).
-        It must return a WpsProcess instance configured with the proper package, ADES target and cookies.
+        It must return a :class:`weaver.processes.wps_process.WpsProcess` instance configured with the proper ``CWL``
+        package definition, ADES target and cookies to access it (if protected).
 
-        :param jobname: The workflow step or the package id that must be launch on an ADES :class:`string`
+        :param jobname: The workflow step or the package id that must be launched on an ADES :class:`string`
         :param joborder: The params for the job :class:`dict {input_name: input_value}`
                          input_value is one of `input_object` or `array [input_object]`
                          input_object is one of `string` or `dict {class: File, location: string}`
                          in our case input are expected to be File object
         :param tool: Whole `CWL` config including hints requirement
+                     (see: :py:data:`weaver.processes.constants.CWL_REQUIREMENT_APP_TYPES`)
         """
 
         if jobname == self.package_id:
