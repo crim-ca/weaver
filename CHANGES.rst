@@ -10,6 +10,17 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+`3.0.0 <https://github.com/crim-ca/weaver/tree/3.0.0>`_ (2021-03-16)
+========================================================================
+
+Changes:
+--------
 - Provide HTTP links to corresponding items of job in JSON body of status, inputs and outputs routes
   (`#58 <https://github.com/crim-ca/weaver/issues/58>`_, `#86 <https://github.com/crim-ca/weaver/issues/86>`_).
 - Provide ``Job.started`` datetime and calculate ``Job.duration`` from it to indicate the duration of the process
