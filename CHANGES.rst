@@ -10,7 +10,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add caching of remote WPS requests according to ``request-options.yml`` and request header ``Cache-Control`` to allow
+  reduced query of pre-fetched WPS client definition.
 
 Fixes:
 ------

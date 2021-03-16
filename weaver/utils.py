@@ -587,6 +587,14 @@ def setup_cache(settings):
     """
     Prepares the settings with default caching options.
     """
+    # handle other naming variant supported by 'pyramid_beaker',
+    # unify only with 'cache.' prefix but ignore if duplicate
+    for key in list(settings):
+        if key.startswith("beaker.cache."):
+            cache_key = key.replace("beaker.cache.", "cache.")
+            cache_val = settings.get(key)
+            settings.setdefault(cache_key, cache_val)
+    # apply defaults to avoid missing items during runtime
     settings.setdefault("cache.regions", "doc, request, result")
     settings.setdefault("cache.type", "memory")
     settings.setdefault("cache.doc.enable", "false")
@@ -633,6 +641,25 @@ def get_ssl_verify_option(method, url, settings, request_options=None):
     if not req_opts.get("ssl_verify", req_opts.get("verify", True)):
         return False
     return True
+
+
+def get_no_cache_option(request_headers, request_options):
+    # type: (HeadersType, SettingsType) -> bool
+    """
+    Obtains the No-Cache result from request headers and configured request options.
+
+    .. seealso::
+        - :meth:`Request.headers`
+        - :func:`get_request_options`
+
+    :param request_headers: specific request headers that could indicate ``Cache-Control: no-cache``
+    :param request_options: specific request options that could define ``cache: True|False``
+    :return: whether to disable cache or not
+    """
+    no_cache_header = str(get_header("Cache-Control", request_headers)).lower().replace(" ", "")
+    no_cache = no_cache_header in ["no-cache", "max-age=0", "max-age=0,must-revalidate"]
+    no_cache = no_cache is True or request_options.get("cache", True) is False
+    return no_cache
 
 
 def get_request_options(method, url, settings):
@@ -690,7 +717,7 @@ def get_request_options(method, url, settings):
     return request_options
 
 
-def request_call(method, url, kwargs):
+def _request_call(method, url, kwargs):
     # type: (str, str, Dict[str, AnyValue]) -> Response
     """
     Request operation employed by :func:`request_extra` without caching.
@@ -704,12 +731,12 @@ def request_call(method, url, kwargs):
 
 
 @cache_region("request")
-def request_cached(method, url, kwargs):
+def _request_cached(method, url, kwargs):
     # type: (str, str, Dict[str, AnyValue]) -> Response
     """
     Cached-enabled request operation employed by :func:`request_extra`.
     """
-    return request_call(method, url, kwargs)
+    return _request_call(method, url, kwargs)
 
 
 def request_extra(method,                       # type: str
@@ -828,11 +855,10 @@ def request_extra(method,                       # type: str
     # process request
     resp = None
     failures = []
-    no_cache = CaseInsensitiveDict(request_kwargs.get("headers", {})).get("Cache-Control", "").lower() == "no-cache"
-    no_cache = no_cache is True or request_options.get("cache", True) is False
+    no_cache = get_no_cache_option(request_kwargs.get("headers", {}), request_options)
     region = "request"
     request_args = (method, url, request_kwargs)
-    caching_args = (request_cached, region, *request_args)
+    caching_args = (_request_cached, region, *request_args)
     for retry, delay in enumerate(request_delta):
         if retry:
             if retry_after and resp and resp.status_code in [HTTPTooManyRequests.code]:
@@ -843,9 +869,9 @@ def request_extra(method,                       # type: str
             time.sleep(delay)
         try:
             if no_cache:
-                resp = request_call(*request_args)
+                resp = _request_call(*request_args)
             else:
-                resp = request_cached(*request_args)
+                resp = _request_cached(*request_args)
             if allowed_codes and len(allowed_codes):
                 if resp.status_code in allowed_codes:
                     return resp

@@ -106,7 +106,6 @@ def get_provider_process(request):
     """
     try:
         process = describe_provider_process(request)
-        sd.ProcessOffering().deserialize(process)
         process_offering = process.offering()
         return HTTPOk(json=process_offering)
     # FIXME: handle colander invalid directly in tween (https://github.com/crim-ca/weaver/issues/112)
