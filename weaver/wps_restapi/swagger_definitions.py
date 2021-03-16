@@ -917,27 +917,27 @@ class Visibility(ExtendedMappingSchema):
 
 class ProcessPath(ExtendedMappingSchema):
     # FIXME: support versioning with <id:tag> (https://github.com/crim-ca/weaver/issues/107)
-    process_id = AnyIdentifier(description="The process identifier.")
+    process_id = AnyIdentifier(description="Process identifier.", example="jsonarray2netcdf")
 
 
 class ProviderPath(ExtendedMappingSchema):
-    provider_id = AnyIdentifier(description="The provider identifier")
+    provider_id = AnyIdentifier(description="Remote provider identifier.", example="hummingbird")
 
 
 class JobPath(ExtendedMappingSchema):
-    job_id = UUID(description="The job id")
+    job_id = UUID(description="Job ID", example="14c68477-c3ed-4784-9c0f-a4c9e1344db5")
 
 
 class BillPath(ExtendedMappingSchema):
-    bill_id = UUID(description="The bill id")
+    bill_id = UUID(description="Bill ID")
 
 
 class QuotePath(ExtendedMappingSchema):
-    quote_id = UUID(description="The quote id")
+    quote_id = UUID(description="Quote ID")
 
 
 class ResultPath(ExtendedMappingSchema):
-    result_id = UUID(description="The result id")
+    result_id = UUID(description="Result ID")
 
 
 #########################################################
@@ -999,10 +999,14 @@ class OWSAcceptVersions(ExtendedSequenceSchema, OWSNamespace):
 class OWSLanguage(ExtendedSchemaNode, OWSNamespace):
     description = "Desired language to produce the response."
     schema_type = String
-    name = "language"
-    attribute = True
+    name = "Language"
     default = ACCEPT_LANGUAGE_EN_US
     example = ACCEPT_LANGUAGE_EN_CA
+
+
+class OWSLanguageAttribute(OWSLanguage):
+    name = "language"
+    attribute = True
 
 
 class OWSService(ExtendedSchemaNode, OWSNamespace):
@@ -1066,7 +1070,7 @@ class WPSOperationGetNoContent(ExtendedMappingSchema):
 
 class WPSOperationPost(ExtendedMappingSchema):
     accepted_versions = OWSAcceptVersions(missing=drop, default="1.0.0")
-    language = OWSLanguage(missing=drop)
+    language = OWSLanguageAttribute(missing=drop)
     service = OWSService()
 
 
@@ -1075,20 +1079,30 @@ class WPSGetCapabilitiesPost(WPSOperationPost, WPSNamespace):
     name = "GetCapabilities"
 
 
-class WPSIdentifier(ExtendedSchemaNode, OWSNamespace):
+class OWSIdentifier(ExtendedSchemaNode, OWSNamespace):
     schema_type = String
     name = "Identifier"
 
 
-class WPSIdentifierList(ExtendedSequenceSchema, OWSNamespace):
+class OWSIdentifierList(ExtendedSequenceSchema, OWSNamespace):
     name = "Identifiers"
-    item = WPSIdentifier()
+    item = OWSIdentifier()
+
+
+class OWSTitle(ExtendedSchemaNode, OWSNamespace):
+    schema_type = String
+    name = "Title"
+
+
+class OWSAbstract(ExtendedSchemaNode, OWSNamespace):
+    schema_type = String
+    name = "Abstract"
 
 
 class WPSDescribeProcessPost(WPSOperationPost, WPSNamespace):
     schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsDescribeProcess_request.xsd"
     name = "DescribeProcess"
-    identifier = WPSIdentifierList(
+    identifier = OWSIdentifierList(
         description="Single or comma-separated list of process identifier to describe.",
         example="example"
     )
@@ -1096,14 +1110,14 @@ class WPSDescribeProcessPost(WPSOperationPost, WPSNamespace):
 
 class WPSExecuteDataInputs(ExtendedMappingSchema, WPSNamespace):
     description = "XML data inputs provided for WPS POST request (Execute)."
-    name = "Execute"
+    name = "DataInputs"
     # FIXME: missing details about 'DataInputs'
 
 
 class WPSExecutePost(WPSOperationPost, WPSNamespace):
     schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsExecute_request.xsd"
     name = "Execute"
-    identifier = WPSIdentifier(description="Identifier of the process to execute with data inputs.")
+    identifier = OWSIdentifier(description="Identifier of the process to execute with data inputs.")
     dataInputs = WPSExecuteDataInputs(description="Data inputs to be provided for process execution.")
 
 
@@ -1122,7 +1136,7 @@ class WPSHeaders(ExtendedMappingSchema):
 class WPSEndpointGet(ExtendedMappingSchema):
     header = WPSHeaders()
     querystring = WPSParameters()
-    body = WPSOperationGetNoContent()
+    body = WPSOperationGetNoContent(missing=drop)
 
 
 class WPSEndpointPost(ExtendedMappingSchema):
@@ -1130,14 +1144,156 @@ class WPSEndpointPost(ExtendedMappingSchema):
     body = WPSBody()
 
 
-class WPSServiceIdentification(ExtendedMappingSchema, WPSNamespace):
+class OWSString(ExtendedSchemaNode, OWSNamespace):
+    schema_type = String
+
+
+class OWSKeywordList(ExtendedSequenceSchema, OWSNamespace):
+    title = "OWSKeywords"
+    keyword = OWSString(name="Keyword", title="OWSKeyword", example="Weaver")
+
+
+class OWSType(ExtendedMappingSchema, OWSNamespace):
+    schema_type = String
+    name = "Type"
+    example = "theme"
+    additionalProperties = {
+        "codeSpace": {
+            "type": "string",
+            "example": "ISOTC211/19115",
+            "xml": {"attribute": True}
+        }
+    }
+
+
+class OWSPhone(ExtendedMappingSchema, OWSNamespace):
+    name = "Phone"
+    voice = OWSString(name="Voice", title="OWSVoice", example="1-234-567-8910", missing=drop)
+    facsimile = OWSString(name="Facsimile", title="OWSFacsimile", missing=drop)
+
+
+class OWSAddress(ExtendedMappingSchema, OWSNamespace):
+    name = "Address"
+    delivery_point = OWSString(name="DeliveryPoint", title="OWSDeliveryPoint",
+                               example="123 Place Street", missing=drop)
+    city = OWSString(name="City", title="OWSCity", example="Nowhere", missing=drop)
+    country = OWSString(name="Country", title="OWSCountry", missing=drop)
+    admin_area = OWSString(name="AdministrativeArea", title="AdministrativeArea", missing=drop)
+    postal_code = OWSString(name="PostalCode", title="OWSPostalCode", example="A1B 2C3", missing=drop)
+    email = OWSString(name="ElectronicMailAddress", title="OWSElectronicMailAddress",
+                      example="mail@me.com", validator=Email, missing=drop)
+
+
+class OWSContactInfo(ExtendedMappingSchema, OWSNamespace):
+    name = "ContactInfo"
+    phone = OWSPhone(missing=drop)
+    address = OWSAddress(missing=drop)
+
+
+class OWSServiceContact(ExtendedMappingSchema, OWSNamespace):
+    name = "ServiceContact"
+    individual = OWSString(name="IndividualName", title="OWSIndividualName", example="John Smith", missing=drop)
+    position = OWSString(name="PositionName", title="OWSPositionName", example="One Man Team", missing=drop)
+    contact = OWSContactInfo(missing=drop, default={})
+
+
+class OWSServiceProvider(ExtendedMappingSchema, OWSNamespace):
+    name = "ServiceProvider"
+    provider_name = OWSString(name="ProviderName", title="OWSProviderName", example="EXAMPLE")
+    provider_site = OWSString(name="ProviderName", title="OWSProviderName", example="http://schema-example.com")
+    contact = OWSServiceContact(required=False, defalult={})
+
+
+class OWSServiceIdentification(ExtendedMappingSchema, OWSNamespace):
     name = "ServiceIdentification"
+    title = OWSTitle(description="Title of the service.", example="Weaver")
+    abstract = OWSAbstract(description="Detail about the service.", example="Weaver WPS example schema.")
+    keywords = OWSKeywordList(name="Keywords")
+    type = OWSType()
+    svc_type = OWSString(name="ServiceType", title="OWSServiceType", example="WPS")
+    svc_type_ver1 = OWSString(name="ServiceTypeVersion", title="OWSServiceTypeVersion", example="1.0.0")
+    svc_type_ver2 = OWSString(name="ServiceTypeVersion", title="OWSServiceTypeVersion", example="2.0.0")
+    fees = OWSString(name="Fees", title="Fees", example="NONE", missing=drop, default="NONE")
+    access = OWSString(name="AccessConstraints", title="OWSAccessConstraints",
+                       example="NONE", missing=drop, default="NONE")
+    provider = OWSServiceProvider()
+
+
+class OWSOperationName(ExtendedSchemaNode, OWSNamespace):
+    schema_type = String
+    attribute = True
+    name = "name"
+    example = "GetCapabilities"
+    validator = OneOf(["GetCapabilities", "DescribeProcess", "Execute"])
+
+
+class OperationLink(ExtendedSchemaNode, XMLObject):
+    schema_type = String
+    attribute = True
+    name = "href"
+    prefix = "xlink"
+    example = "http://schema-example.com/wps"
+
+
+class OperationRequest(ExtendedMappingSchema, OWSNamespace):
+    href = OperationLink()
+
+
+class OWS_HTTP(ExtendedMappingSchema, OWSNamespace):
+    get = OperationRequest(name="Get", title="OWSGet")
+    post = OperationRequest(name="Post", title="OWSPost")
+
+
+class OWS_DCP(ExtendedMappingSchema, OWSNamespace):
+    http = OWS_HTTP(name="HTTP", missing=drop)
+    https = OWS_HTTP(name="HTTPS", missing=drop)
+
+
+class Operation(ExtendedMappingSchema, OWSNamespace):
+    name = OWSOperationName()
+    dcp = OWS_DCP()
+
+
+class OperationsMetadata(ExtendedSequenceSchema, OWSNamespace):
+    name = "OperationsMetadata"
+    op = Operation()
+
+
+class ProcessVersion(ExtendedSchemaNode, WPSNamespace):
+    schema_type = String
+    attribute = True
+
+
+class OWSProcessSummary(ExtendedMappingSchema, WPSNamespace):
+    version = ProcessVersion(name="processVersion", default="None", example="1.2",
+                             description="Version of the corresponding process summary.")
+    identifier = OWSIdentifier(example="example", description="Identifier to refer to the process.")
+    title = OWSTitle(example="Example Process", description="Title of the process.")
+    abstract = OWSAbstract(example="Process for example schema.", description="Detail about the process.")
+
+
+class WPSProcessOfferings(ExtendedSequenceSchema, WPSNamespace):
+    name = "ProcessOfferings"
+    process = OWSProcessSummary(name="Process")
+
+
+class WPSLanguageItems(ExtendedSequenceSchema, WPSNamespace):
+    lang = OWSLanguage(name="Language")
+
+
+class WPSLanguageSpecification(ExtendedMappingSchema, WPSNamespace):
+    name = "Languages"
+    defaults = WPSLanguageItems(name="Default")
+    supported = WPSLanguageItems(name="Supported")
 
 
 class WPSGetCapabilities(WPSMetadata):
     schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsGetCapabilities_response.xsd"
     name = "Capabilities"
-    svc = WPSServiceIdentification()
+    svc = OWSServiceIdentification()
+    ops = OperationsMetadata()
+    offering = WPSProcessOfferings()
+    languages = WPSLanguageSpecification()
 
 
 class WPSDescribeProcess(ExtendedMappingSchema):

@@ -215,7 +215,7 @@ class XMLObject(object):
     name = None         # name of the attribute, or default to the class name of the object
     namespace = None    # location of "xmlns:<prefix> <location>" specification
     prefix = None       # prefix of the namespace
-    wrapped = False     # used to wrap array elements within a block called "<name>s"
+    wrapped = None      # used to wrap array elements called "<name>" within a block called "<name>s"
 
     @property
     def xml(self):
@@ -228,7 +228,7 @@ class XMLObject(object):
             spec["namespace"] = self.namespace
         if isinstance(self.prefix, str):
             spec["prefix"] = self.prefix
-        if isinstance(self.wrapped, bool):
+        if self.wrapped:  # only add if True to avoid over-populate spec, default is False
             spec["wrapped"] = self.wrapped
         return spec or None
 
