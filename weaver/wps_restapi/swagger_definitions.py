@@ -88,6 +88,7 @@ API_DOCS = {
     "description": "{} documentation".format(__meta__.__title__),
     "url": __meta__.__documentation_url__
 }
+DOC_URL = "{}/en/latest".format(__meta__.__documentation_url__)
 
 CWL_VERSION = "v1.1"
 CWL_REPO_URL = "https://github.com/common-workflow-language"
@@ -812,101 +813,62 @@ class OutputDescriptionList(ExtendedSequenceSchema):
 
 class JobExecuteModeEnum(ExtendedSchemaNode):
     schema_type = String
-
-    def __init__(self, *_, **kwargs):
-        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
-        super(JobExecuteModeEnum, self).__init__(
-            self.schema_type(),
-            title=kwargs.get("title", "mode"),
-            default=kwargs.get("default", EXECUTE_MODE_AUTO),
-            example=kwargs.get("example", EXECUTE_MODE_ASYNC),
-            validator=OneOf(EXECUTE_MODE_OPTIONS),
-            **kwargs)
+    title = "JobExecuteMode"
+    default = EXECUTE_MODE_AUTO
+    example = EXECUTE_MODE_ASYNC
+    validator = OneOf(EXECUTE_MODE_OPTIONS)
 
 
 class JobControlOptionsEnum(ExtendedSchemaNode):
     schema_type = String
-
-    def __init__(self, *_, **kwargs):
-        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
-        super(JobControlOptionsEnum, self).__init__(
-            self.schema_type(),
-            title="jobControlOptions",
-            default=kwargs.get("default", EXECUTE_CONTROL_OPTION_ASYNC),
-            example=kwargs.get("example", EXECUTE_CONTROL_OPTION_ASYNC),
-            validator=OneOf(EXECUTE_CONTROL_OPTIONS),
-            **kwargs)
+    title = "JobControlOptions"
+    default = EXECUTE_CONTROL_OPTION_ASYNC
+    example = EXECUTE_CONTROL_OPTION_ASYNC
+    validator = OneOf(EXECUTE_CONTROL_OPTIONS)
 
 
 class JobResponseOptionsEnum(ExtendedSchemaNode):
     schema_type = String
-
-    def __init__(self, *_, **kwargs):
-        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
-        super(JobResponseOptionsEnum, self).__init__(
-            self.schema_type(),
-            title=kwargs.get("title", "response"),
-            default=kwargs.get("default", EXECUTE_RESPONSE_RAW),
-            example=kwargs.get("example", EXECUTE_RESPONSE_RAW),
-            validator=OneOf(EXECUTE_RESPONSE_OPTIONS),
-            **kwargs)
+    title = "JobResponseOptions"
+    default = EXECUTE_RESPONSE_RAW
+    example = EXECUTE_RESPONSE_RAW
+    validator = OneOf(EXECUTE_RESPONSE_OPTIONS)
 
 
 class TransmissionModeEnum(ExtendedSchemaNode):
     schema_type = String
-
-    def __init__(self, *_, **kwargs):
-        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
-        super(TransmissionModeEnum, self).__init__(
-            self.schema_type(),
-            title=kwargs.get("title", "transmissionMode"),
-            default=kwargs.get("default", EXECUTE_TRANSMISSION_MODE_REFERENCE),
-            example=kwargs.get("example", EXECUTE_TRANSMISSION_MODE_REFERENCE),
-            validator=OneOf(EXECUTE_TRANSMISSION_MODE_OPTIONS),
-            **kwargs)
+    title = "TransmissionMode"
+    default = EXECUTE_TRANSMISSION_MODE_REFERENCE
+    example = EXECUTE_TRANSMISSION_MODE_REFERENCE
+    validator = OneOf(EXECUTE_TRANSMISSION_MODE_OPTIONS)
 
 
 class JobStatusEnum(ExtendedSchemaNode):
     schema_type = String
-
-    def __init__(self, *_, **kwargs):
-        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
-        super(JobStatusEnum, self).__init__(
-            self.schema_type(),
-            default=kwargs.get("default", None),
-            example=kwargs.get("example", STATUS_ACCEPTED),
-            validator=OneOf(JOB_STATUS_CATEGORIES[STATUS_COMPLIANT_OGC]),
-            **kwargs)
+    title = "JobStatus"
+    default = STATUS_ACCEPTED
+    example = STATUS_ACCEPTED
+    validator = OneOf(JOB_STATUS_CATEGORIES[STATUS_COMPLIANT_OGC])
 
 
 class JobSortEnum(ExtendedSchemaNode):
     schema_type = String
-
-    def __init__(self, *_, **kwargs):
-        kwargs.pop("validator", None)   # ignore passed argument and enforce the validator
-        super(JobSortEnum, self).__init__(
-            String(),
-            default=kwargs.get("default", SORT_CREATED),
-            example=kwargs.get("example", SORT_CREATED),
-            validator=OneOf(JOB_SORT_VALUES),
-            **kwargs)
+    title = "JobSortingMethod"
+    default = SORT_CREATED
+    example = SORT_CREATED
+    validator = OneOf(JOB_SORT_VALUES)
 
 
 class QuoteSortEnum(ExtendedSchemaNode):
     schema_type = String
-
-    def __init__(self, *_, **kwargs):
-        kwargs.pop("validator", None)  # ignore passed argument and enforce the validator
-        super(QuoteSortEnum, self).__init__(
-            self.schema_type(),
-            default=kwargs.get("default", SORT_ID),
-            example=kwargs.get("example", SORT_PROCESS),
-            validator=OneOf(QUOTE_SORT_VALUES),
-            **kwargs)
+    title = "QuoteSortingMethod"
+    default = SORT_ID
+    example = SORT_PROCESS
+    validator = OneOf(QUOTE_SORT_VALUES)
 
 
 class LaunchJobQuerystring(ExtendedMappingSchema):
-    tags = ExtendedSchemaNode(String(), default=None, missing=drop,
+    tags = ExtendedSchemaNode(String(), title="JobTags", default=None, missing=drop,
                               description="Comma separated tags that can be used to filter jobs later")
 
 
@@ -1570,15 +1532,23 @@ class ProcessInfo(ExtendedMappingSchema):
 
 
 class Process(ProcessInfo, ProcessDescriptionType, ProcessDescriptionMeta):
-    inputs = InputTypeList()
-    outputs = OutputDescriptionList()
+    inputs = InputTypeList(description="Inputs definition of the process.")
+    outputs = OutputDescriptionList(description="Outputs definition of the process.")
     visibility = VisibilityValue(missing=drop)
 
 
 class ProcessDeployment(ProcessDescriptionType, ProcessDeployMeta):
-    # allowed undefined I/O during deploy because of reference from OWSContext
-    inputs = InputTypeList(missing=drop)
-    outputs = OutputDescriptionList(missing=drop)
+    # allowed undefined I/O during deploy because of reference from owsContext or executionUnit
+    inputs = InputTypeList(
+        missing=drop, title="DeploymentInputs",
+        description="Additional definitions for process inputs to extend generated details by the referred package. "
+                    "These are optional as they can mostly be inferred from the 'executionUnit', but allow specific "
+                    "overrides (see '{}/package.html#correspondence-between-cwl-and-wps-fields')".format(DOC_URL))
+    outputs = OutputDescriptionList(
+        missing=drop, title="DeploymentInputs",
+        description="Additional definitions for process outputs to extend generated details by the referred package. "
+                    "These are optional as they can mostly be inferred from the 'executionUnit', but allow specific "
+                    "overrides (see '{}/package.html#correspondence-between-cwl-and-wps-fields')".format(DOC_URL))
     visibility = VisibilityValue(missing=drop)
 
 
@@ -1743,6 +1713,8 @@ class InputList(ExtendedSequenceSchema):
 
 
 class Execute(ExtendedMappingSchema):
+    # permit unspecified inputs for processes that could technically allow no-inputs definition (CWL),
+    # but very unlikely/unusual in real world scenarios (possible case: constant endpoint fetcher?)
     inputs = InputList(missing=drop)
     outputs = OutputList()
     mode = ExtendedSchemaNode(String(), validator=OneOf(EXECUTE_MODE_OPTIONS))
@@ -2488,7 +2460,7 @@ class GetJobsQueries(ExtendedMappingSchema):
     page = ExtendedSchemaNode(Integer(), missing=drop, default=0, validator=Range(min=0))
     limit = ExtendedSchemaNode(Integer(), missing=drop, default=10)
     status = JobStatusEnum(missing=drop)
-    process = AnyIdentifier(missing=drop, default=None)
+    process = AnyIdentifier(missing=None)
     provider = ExtendedSchemaNode(String(), missing=drop, default=None)
     sort = JobSortEnum(missing=drop)
     tags = ExtendedSchemaNode(String(), missing=drop, default=None,
@@ -2539,7 +2511,7 @@ class ProcessQuoteEndpoint(ProcessPath, QuotePath):
 class GetQuotesQueries(ExtendedMappingSchema):
     page = ExtendedSchemaNode(Integer(), missing=drop, default=0)
     limit = ExtendedSchemaNode(Integer(), missing=drop, default=10)
-    process = AnyIdentifier(missing=drop, default=None)
+    process = AnyIdentifier(missing=None)
     sort = QuoteSortEnum(missing=drop)
 
 

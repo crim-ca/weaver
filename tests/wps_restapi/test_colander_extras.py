@@ -103,3 +103,79 @@ def test_oneof_nested_dict_list():
         else:
             raise AssertionError("Should have raised invalid schema from deserialize of '{!s}' with {!s}, but got {!s}"
                                  .format(ce._get_node_name(test_schema), test_value, result))
+
+
+def test_invalid_schema_mismatch_default_validator():
+    try:
+        class TestBad(ce.ExtendedSchemaNode):
+            schema_type = colander.String
+            default = "bad-value-not-in-one-of"
+            validator = colander.OneOf(["test"])
+
+        TestBad()
+    except ce.SchemaNodeTypeError:
+        pass
+    else:
+        pytest.fail("Erroneous schema must raise immediately if default doesn't conform to its own validator.")
+    try:
+        class TestString(ce.ExtendedSchemaNode):
+            schema_type = colander.String
+
+        class DefaultValidatorBad(ce.ExtendedMappingSchema):
+            test = TestString(default="bad-value-not-in-one-of", validator=colander.OneOf(["test"]))
+
+        DefaultValidatorBad()
+    except ce.SchemaNodeTypeError:
+        pass
+    else:
+        pytest.fail("Erroneous schema must raise immediately if default doesn't conform to its own validator.")
+
+
+def test_schema_default_missing_validator_combinations():
+    class TestString(ce.ExtendedSchemaNode):
+        schema_type = colander.String
+
+    class Default(ce.ExtendedMappingSchema):
+        test = TestString(default="test")
+
+    class Missing(ce.ExtendedMappingSchema):
+        test = TestString(missing=colander.drop)
+
+    class DefaultMissing(ce.ExtendedMappingSchema):
+        test = TestString(default="test", missing=colander.drop)
+
+    class DefaultMissingValidator(ce.ExtendedMappingSchema):
+        test = TestString(default="test", missing=colander.drop, validator=colander.OneOf(["test"]))
+
+    class DefaultValidator(ce.ExtendedMappingSchema):
+        test = TestString(default="test", validator=colander.OneOf(["test"]))
+
+    class MissingValidator(ce.ExtendedMappingSchema):
+        test = TestString(missing=colander.drop, validator=colander.OneOf(["test"]))
+
+    test_invalid = [
+        (DefaultMissingValidator, {"test": "bad"}),
+        (DefaultValidator, {"test": "bad"}),
+        (MissingValidator, {"test": "bad"}),
+    ]
+    test_valid = [
+        (Default, {}, {"test": "test"}),                    # default+required adds the value if omitted
+        (Default, {"test": None}, {"test": "test"}),        # default+required sets the value if null
+        (DefaultMissing, {}, {"test": "test"}),             # default+missing ignores drops and sets omitted value
+        (Missing, {}, {}),                                  # missing only drops the value if omitted
+        (DefaultMissingValidator, {}, {"test": "test"})     # default+missing ignores drop and sets default
+    ]
+
+    for test_schema, test_value in test_invalid:
+        try:
+            test_schema().deserialize(test_value)
+        except colander.Invalid:
+            pass
+        else:
+            pytest.fail("Expected invalid format from [{}] with [{}]".format(test_schema.__name__, test_value))
+    for test_schema, test_value, test_expect in test_valid:
+        try:
+            result = test_schema().deserialize(test_value)
+            assert result == test_expect, "Bad result from [{}] with [{}]".format(test_schema.__name__, test_value)
+        except colander.Invalid:
+            pytest.fail("Expected valid format from [{}] with [{}]".format(test_schema.__name__, test_value))

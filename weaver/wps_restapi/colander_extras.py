@@ -139,7 +139,7 @@ class SchemeURL(colander.Regex):
         :class:`colander.url` [remote http(s)/ftp(s)]
         :class:`colander.file_uri` [local file://]
     """
-    def __init__(self, schemes=None, msg=None, flags=re.IGNORECASE):  #
+    def __init__(self, schemes=None, msg=None, flags=re.IGNORECASE):
         if not schemes:
             schemes = [""]
         if not msg:
@@ -273,16 +273,34 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
                 kwargs["title"] = _get_node_name(self, schema_name=True)
 
         if self.validator is None and isinstance(schema_type, colander.String):
-            format = kwargs.pop("format", getattr(self, "format", None))
+            _format = kwargs.pop("format", getattr(self, "format", None))
             pattern = kwargs.pop("pattern", getattr(self, "pattern", None))
             if isinstance(pattern, str):
                 self.validator = colander.Regex(pattern)
             elif isinstance(pattern, colander.Regex):
                 self.validator = pattern
-            elif format in STRING_FORMATTERS:
-                self.validator = STRING_FORMATTERS[format]["validator"]
+            elif _format in STRING_FORMATTERS:
+                self.validator = STRING_FORMATTERS[_format]["validator"]
+
+        default = kwargs.get("default", colander.null)
+        if self.default is colander.null and default is not colander.null:
+            self.default = default
+        if self.default is not colander.null and self.missing is not colander.drop:
+            self.missing = self.default  # setting value makes 'self.required' return False, but doesn't drop it
 
         super(ExtendedSchemaBase, self).__init__(*args, **kwargs)
+        ExtendedSchemaBase._validate(self)
+
+    @staticmethod
+    def _validate(node):
+        if node.default and node.validator not in [colander.null, None]:
+            try:
+                node.validator(node, node.default)
+            except (colander.Invalid, TypeError):
+                raise SchemaNodeTypeError(
+                    "Default value [{!s}] of [{!s}] is not valid against its own validator.".format(
+                        node.default, _get_node_name(node, schema_name=True))
+                )
 
 
 class DropableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
@@ -671,45 +689,34 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
         schema_type = _get_schema_type(self)
         result = ExtendedSchemaNode._deserialize_extensions(self, cstruct)
 
-        try:
-            # process usual base operation with extended result
-            if result not in (colander.drop, colander.null):
-                # when processing mapping/sequence, if the result is an empty container, return the default instead
-                # this is to avoid returning many empty containers in case upper level keywords (oneOf, anyOf, etc.)
-                # need to discriminate between them
-                # empty container means that none of the sub-schemas/fields where matched against input structure
-                if isinstance(schema_type, colander.Mapping):
-                    # skip already preprocessed variable mapping from above VariableSchemaNode deserialize
-                    # otherwise, following 'normal' schema deserialize could convert valid structure into null
-                    if self.has_variables():
-                        return result
-                    result = colander.MappingSchema.deserialize(self, result)
-                elif isinstance(schema_type, colander.Sequence):
-                    result = colander.SequenceSchema.deserialize(self, result)
-                else:
-                    # special cases for JSON conversion and string dump, serialize parsable string timestamps
-                    #   deserialize causes Date/DateTime/Time to become Python datetime, and result raises if not string
-                    #   employ serialize instead which provides the desired conversion from datetime objects to string
-                    if isinstance(schema_type, (colander.Date, colander.DateTime, colander.Time)):
-                        if not isinstance(result, str):
-                            result = colander.SchemaNode.serialize(self, result)
-                    else:
-                        result = colander.SchemaNode.deserialize(self, result)
-                result = self.default if result is colander.null else result
-
-        # if object is not required but children was required and failed with raised validation error
-        # catch the exception and employ the default instead
-        except colander.Invalid:
-            if not self.required:  # missing=drop
-                result = self.default
+        # process usual base operation with extended result
+        if result not in (colander.drop, colander.null):
+            # when processing mapping/sequence, if the result is an empty container, return the default instead
+            # this is to avoid returning many empty containers in case upper level keywords (oneOf, anyOf, etc.)
+            # need to discriminate between them
+            # empty container means that none of the sub-schemas/fields where matched against input structure
+            if isinstance(schema_type, colander.Mapping):
+                # skip already preprocessed variable mapping from above VariableSchemaNode deserialize
+                # otherwise, following 'normal' schema deserialize could convert valid structure into null
+                if self.has_variables():
+                    return result
+                result = colander.MappingSchema.deserialize(self, result)
+            elif isinstance(schema_type, colander.Sequence):
+                result = colander.SequenceSchema.deserialize(self, result)
             else:
-                raise  # otherwise re-raise as-is
+                # special cases for JSON conversion and string dump, serialize parsable string timestamps
+                #   deserialize causes Date/DateTime/Time to become Python datetime, and result raises if not string
+                #   employ serialize instead which provides the desired conversion from datetime objects to string
+                if isinstance(schema_type, (colander.Date, colander.DateTime, colander.Time)):
+                    if not isinstance(result, str):
+                        result = colander.SchemaNode.serialize(self, result)
+                else:
+                    result = colander.SchemaNode.deserialize(self, result)
+            result = self.default if result is colander.null else result
 
         if result is colander.null and self.missing is colander.required:
             raise colander.Invalid(node=self, msg=self.missing_msg)
 
-        # re-process extensions in case deserialization of the node converted the value for drop/default
-        result = ExtendedSchemaNode._deserialize_extensions(self, result)
         return result
 
 
@@ -740,6 +747,13 @@ class ExtendedSequenceSchema(DefaultSchemaNode, DropableSchemaNode, colander.Seq
         - :class:`ExtendedMappingSchema`
     """
     schema_type = colander.SequenceSchema.schema_type
+
+    def __init__(self, *args, **kwargs):
+        super(ExtendedSequenceSchema, self).__init__(*args, **kwargs)
+        self._validate()
+
+    def _validate(self):
+        ExtendedSchemaBase._validate(self.children[0])
 
 
 class DropableMappingSchema(DropableSchemaNode, colander.MappingSchema):
@@ -787,6 +801,14 @@ class ExtendedMappingSchema(
         - :class:`PermissiveMappingSchema`
     """
     schema_type = colander.MappingSchema.schema_type
+
+    def __init__(self, *args, **kwargs):
+        super(ExtendedMappingSchema, self).__init__(*args, **kwargs)
+        self._validate_nodes()
+
+    def _validate_nodes(self):
+        for node in self.children:
+            ExtendedSchemaBase._validate(node)
 
 
 class PermissiveMappingSchema(ExtendedMappingSchema):
@@ -907,6 +929,10 @@ class KeywordMapper(ExtendedMappingSchema):
                     "Keyword schema '{}' of type '{}' can only have children of same schemas-type structure, "
                     "but different ones were found '{}'.".format(schema_name, keyword, node_types)
                 )
+
+        ExtendedMappingSchema._validate_nodes(self)
+        for node in children:
+            ExtendedSchemaBase._validate(node)
 
     @abstractmethod
     def _deserialize_keyword(self, cstruct):

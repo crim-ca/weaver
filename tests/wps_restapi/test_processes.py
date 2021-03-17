@@ -1,4 +1,5 @@
 import contextlib
+import json
 import os
 import unittest
 from copy import deepcopy
@@ -7,6 +8,8 @@ import colander
 import pyramid.testing
 import pytest
 import responses
+import stopit
+import webtest
 
 from tests.utils import (
     get_test_weaver_app,
@@ -266,8 +269,8 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             uri = "/processes"
             for i, data in enumerate(process_data_tests):
                 resp = self.app.post_json(uri, params=data, headers=self.json_headers, expect_errors=True)
-                msg = "Failed with test variation '{}' with value '{}'."
-                assert resp.status_code in [400, 422], msg.format(i, resp.status_code)
+                msg = "Failed with test variation '{}' with value '{}' using data:\n{}"
+                assert resp.status_code in [400, 422], msg.format(i, resp.status_code, json.dumps(data, indent=2))
                 assert resp.content_type == CONTENT_TYPE_APP_JSON, msg.format(i, resp.content_type)
 
     def test_deploy_process_default_endpoint_wps1(self):
@@ -526,10 +529,14 @@ class WpsRestApiProcessesTest(unittest.TestCase):
 
         uri = "/processes/{}/jobs".format(self.process_public.identifier)
         for i, exec_data in enumerate(execute_data_tests):
-            resp = self.app.post_json(uri, params=exec_data, headers=self.json_headers, expect_errors=True)
-            msg = "Failed with test variation '{}' with value '{}'."
-            assert resp.status_code in [400, 422], msg.format(i, resp.status_code)
-            assert resp.content_type == CONTENT_TYPE_APP_JSON, msg.format(i, resp.content_type)
+            data_json = json.dumps(exec_data, indent=2)
+            with stopit.ThreadingTimeout(600) as timeout:
+                resp = self.app.post_json(uri, params=exec_data, headers=self.json_headers, expect_errors=True)
+                msg = "Failed with test variation '{}' with status '{}' using {}."
+                assert resp.status_code in [400, 422], msg.format(i, resp.status_code, data_json)
+                assert resp.content_type == CONTENT_TYPE_APP_JSON, msg.format(i, resp.content_type)
+            msg = "Killed test '{}' request taking too long using:\n{}".format(i, data_json)
+            assert timeout.state == timeout.EXECUTED, msg
 
     def test_execute_process_dont_cast_one_of(self):
         """
@@ -686,7 +693,9 @@ class WpsRestApiProcessesTest(unittest.TestCase):
             "metadata": [
                 {"type": "value-typed", "value": "some-value", "lang": "en-US"},
                 {"type": "link-typed", "href": "https://example.com", "hreflang": "en-US", "rel": "example"}
-            ]
+            ],
+            "inputs": [],
+            "outputs": [],
         }
         result = sd.Process().deserialize(process)
         assert process["metadata"] == result["metadata"]
