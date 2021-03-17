@@ -53,6 +53,7 @@ from weaver.sort import JOB_SORT_VALUES, QUOTE_SORT_VALUES, SORT_CREATED, SORT_I
 from weaver.status import JOB_STATUS_CATEGORIES, STATUS_ACCEPTED, STATUS_COMPLIANT_OGC
 from weaver.visibility import VISIBILITY_PUBLIC, VISIBILITY_VALUES
 from weaver.wps_restapi.colander_extras import (
+    AllOfKeywordSchema,
     AnyOfKeywordSchema,
     ExtendedBoolean as Boolean,
     ExtendedFloat as Float,
@@ -523,7 +524,7 @@ class Offering(ExtendedMappingSchema):
 
 
 class OWSContext(ExtendedMappingSchema):
-    description = "OGC Web Service definition with references to contained application (see also 'executionUnit')."
+    description = "OGC Web Service definition from an URL reference."
     title = "owsContext"
     offering = Offering()
 
@@ -535,19 +536,15 @@ class DescriptionBase(ExtendedMappingSchema):
 
 
 class DescriptionOWS(ExtendedMappingSchema):
-    owsContext = OWSContext()
+    owsContext = OWSContext(missing=drop)
 
 
 class DescriptionExtra(ExtendedMappingSchema):
     additionalParameters = AdditionalParametersList(missing=drop)
 
 
-class DescriptionType(AnyOfKeywordSchema):
-    _any_of = [
-        DescriptionBase(default={}),
-        DescriptionOWS(missing=drop),
-        DescriptionExtra(missing=drop),
-    ]
+class DescriptionType(DescriptionBase, DescriptionExtra):
+    pass
 
 
 class ProcessDescriptionMeta(ExtendedMappingSchema):
@@ -557,6 +554,16 @@ class ProcessDescriptionMeta(ExtendedMappingSchema):
         description="Keywords applied to the process for search and categorization purposes.")
     metadata = MetadataList(
         default=[],
+        description="External references to documentation or metadata sources relevant to the process.")
+
+
+class ProcessDeployMeta(ExtendedMappingSchema):
+    # don't require fields at all for process deployment, default to empty if omitted
+    keywords = KeywordList(
+        missing=drop, default=[],
+        description="Keywords applied to the process for search and categorization purposes.")
+    metadata = MetadataList(
+        missing=drop, default=[],
         description="External references to documentation or metadata sources relevant to the process.")
 
 
@@ -574,8 +581,10 @@ class MinOccursDefinition(OneOfKeywordSchema):
     title = "MinOccurs"
     example = 1
     _one_of = [
-        ExtendedSchemaNode(Integer(), validator=Range(min=0)),
-        ExtendedSchemaNode(String(), validator=StringRange(min=0)),
+        ExtendedSchemaNode(Integer(), validator=Range(min=0),
+                           description="Positive integer."),
+        ExtendedSchemaNode(String(), validator=StringRange(min=0), pattern="^[0-9]+$",
+                           description="Numerical string representing a positive integer."),
     ]
 
 
@@ -584,8 +593,10 @@ class MaxOccursDefinition(OneOfKeywordSchema):
     title = "MaxOccurs"
     example = 1
     _one_of = [
-        ExtendedSchemaNode(Integer(), validator=Range(min=0)),
-        ExtendedSchemaNode(String(), validator=StringRange(min=0)),
+        ExtendedSchemaNode(Integer(), validator=Range(min=0),
+                           description="Positive integer."),
+        ExtendedSchemaNode(String(), validator=StringRange(min=0), pattern="^[0-9]+$",
+                           description="Numerical string representing a positive integer."),
         ExtendedSchemaNode(String(), validator=OneOf(["unbounded"])),
     ]
 
@@ -595,8 +606,7 @@ class WithMinMaxOccurs(ExtendedMappingSchema):
     maxOccurs = MaxOccursDefinition(missing=drop)
 
 
-class ProcessDescriptionType(DescriptionType, ProcessDescriptionMeta):
-    title = "ProcessDescription"
+class ProcessDescriptionType(DescriptionType, DescriptionOWS):
     id = ProcessIdentifier()
 
 
@@ -1538,7 +1548,7 @@ class ExceptionReportType(ExtendedMappingSchema):
     description = ExtendedSchemaNode(String(), missing=drop)
 
 
-class ProcessSummary(ProcessDescriptionType):
+class ProcessSummary(ProcessDescriptionType, ProcessDescriptionMeta):
     """WPS process definition."""
     version = Version(missing=drop)
     jobControlOptions = JobControlOptionsList(missing=drop)
@@ -1555,12 +1565,21 @@ class ProcessCollection(ExtendedMappingSchema):
     processes = ProcessSummaryList()
 
 
-class Process(ProcessDescriptionType):
-    title = "Process"
+class ProcessInfo(ExtendedMappingSchema):
+    executeEndpoint = URL(description="Endpoint where the process can be executed from.", missing=drop)
+
+
+class Process(ProcessInfo, ProcessDescriptionType, ProcessDescriptionMeta):
+    inputs = InputTypeList()
+    outputs = OutputDescriptionList()
+    visibility = VisibilityValue(missing=drop)
+
+
+class ProcessDeployment(ProcessDescriptionType, ProcessDeployMeta):
+    # allowed undefined I/O during deploy because of reference from OWSContext
     inputs = InputTypeList(missing=drop)
     outputs = OutputDescriptionList(missing=drop)
     visibility = VisibilityValue(missing=drop)
-    executeEndpoint = URL(description="Endpoint where the process can be executed from.", missing=drop)
 
 
 class ProcessOutputDescriptionSchema(ExtendedMappingSchema):
@@ -2245,10 +2264,17 @@ class ProcessesSchema(ExtendedSequenceSchema):
     provider_processes_service = ProcessInputDescriptionSchema()
 
 
-class JobOutput(OneOfKeywordSchema, OutputDataType):
+class JobOutputValue(OneOfKeywordSchema):
     _one_of = [
         Reference(tilte="JobOutputReference"),
         AnyLiteralDataType(title="JobOutputLiteral")
+    ]
+
+
+class JobOutput(AllOfKeywordSchema):
+    _all_of = [
+        OutputDataType(),
+        JobOutputValue(),
     ]
 
 
@@ -2413,17 +2439,25 @@ class ExecutionUnitList(ExtendedSequenceSchema):
     )
 
 
-class ProcessOffering(ExtendedMappingSchema):
+class ProcessOfferingBase(ExtendedMappingSchema):
     process = Process()
     processVersion = Version(title="processVersion", missing=drop)
     jobControlOptions = JobControlOptionsList(missing=drop)
     outputTransmission = TransmissionModeList(missing=drop)
 
 
+class ProcessOffering(ProcessOfferingBase):
+    process = Process()
+
+
+class ProcessDeploymentOffering(ProcessOfferingBase):
+    process = ProcessDeployment()
+
+
 class ProcessDescriptionChoiceType(OneOfKeywordSchema):
     _one_of = [
         Reference(),
-        ProcessOffering()
+        ProcessDeploymentOffering()
     ]
 
 

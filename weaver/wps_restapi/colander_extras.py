@@ -654,8 +654,7 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
     def schema_type():
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
-    def deserialize(self, cstruct):
-        schema_type = _get_schema_type(self)
+    def _deserialize_extensions(self, cstruct):
         result = cstruct
         # process extensions to infer alternative parameter/property values
         # node extensions order is important as they can impact the following ones
@@ -666,33 +665,51 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
                 # if result is to drop though, we are sure that nothing else must be done
                 break
             result = node._deserialize_impl(self, result)
+        return result
 
-        # process usual base operation with extended result
-        if result not in (colander.drop, colander.null):
-            # when processing mapping/sequence, if the result is an empty container, return the default instead
-            # this is to avoid returning many empty containers in case upper level keywords (oneOf, anyOf, etc.)
-            # need to discriminate between them
-            # empty container means that none of the sub-schemas/fields where matched against input structure
-            if isinstance(schema_type, colander.Mapping):
-                # skip already preprocessed variable mapping from above VariableSchemaNode deserialize
-                # otherwise, following 'normal' schema deserialize could convert valid structure into null
-                if self.has_variables():
-                    return result
-                result = colander.MappingSchema.deserialize(self, result)
-            elif isinstance(schema_type, colander.Sequence):
-                result = colander.SequenceSchema.deserialize(self, result)
-            else:
-                # special cases for JSON conversion and string dump, serialize parsable string timestamps
-                #   deserialize causes Date/DateTime/Time to become Python datetime, and result raises if not string
-                #   employ serialize instead which provides the desired conversion from predefined datetime to string
-                if isinstance(schema_type, (colander.Date, colander.DateTime, colander.Time)):
-                    if not isinstance(result, str):
-                        result = colander.SchemaNode.serialize(self, result)
+    def deserialize(self, cstruct):
+        schema_type = _get_schema_type(self)
+        result = ExtendedSchemaNode._deserialize_extensions(self, cstruct)
+
+        try:
+            # process usual base operation with extended result
+            if result not in (colander.drop, colander.null):
+                # when processing mapping/sequence, if the result is an empty container, return the default instead
+                # this is to avoid returning many empty containers in case upper level keywords (oneOf, anyOf, etc.)
+                # need to discriminate between them
+                # empty container means that none of the sub-schemas/fields where matched against input structure
+                if isinstance(schema_type, colander.Mapping):
+                    # skip already preprocessed variable mapping from above VariableSchemaNode deserialize
+                    # otherwise, following 'normal' schema deserialize could convert valid structure into null
+                    if self.has_variables():
+                        return result
+                    result = colander.MappingSchema.deserialize(self, result)
+                elif isinstance(schema_type, colander.Sequence):
+                    result = colander.SequenceSchema.deserialize(self, result)
                 else:
-                    result = colander.SchemaNode.deserialize(self, result)
-            result = self.default if result is colander.null else result
+                    # special cases for JSON conversion and string dump, serialize parsable string timestamps
+                    #   deserialize causes Date/DateTime/Time to become Python datetime, and result raises if not string
+                    #   employ serialize instead which provides the desired conversion from datetime objects to string
+                    if isinstance(schema_type, (colander.Date, colander.DateTime, colander.Time)):
+                        if not isinstance(result, str):
+                            result = colander.SchemaNode.serialize(self, result)
+                    else:
+                        result = colander.SchemaNode.deserialize(self, result)
+                result = self.default if result is colander.null else result
+
+        # if object is not required but children was required and failed with raised validation error
+        # catch the exception and employ the default instead
+        except colander.Invalid:
+            if not self.required:  # missing=drop
+                result = self.default
+            else:
+                raise  # otherwise re-raise as-is
+
         if result is colander.null and self.missing is colander.required:
             raise colander.Invalid(node=self, msg=self.missing_msg)
+
+        # re-process extensions in case deserialization of the node converted the value for drop/default
+        result = ExtendedSchemaNode._deserialize_extensions(self, result)
         return result
 
 
@@ -932,7 +949,7 @@ class KeywordMapper(ExtendedMappingSchema):
     def deserialize(self, cstruct):
         if cstruct is colander.null:
             if self.required and not VariableSchemaNode.is_variable(self):
-                raise colander.Invalid(self, "Missing required fields.")
+                raise colander.Invalid(self, "Missing required field.")
             return ExtendedSchemaNode.deserialize(self, colander.null)
         # first process the keyword subnodes
         result = self._deserialize_keyword(cstruct)
@@ -1448,21 +1465,23 @@ class OneOfKeywordTypeConverter(KeywordTypeConverter):
                     raise ConversionTypeError(
                         "Unknown base type to convert oneOf schema item is no a mapping: {}".format(type(schema_node))
                     )
+                # specific oneOf sub-item, will be processed by itself during dispatch of sub-item of allOf
+                # rewrite the title of that new sub-item schema from the original title to avoid conflict
+                schema_title = _get_node_name(schema_node, schema_name=True)
                 # generate the new nested definition of keywords using schema node bases and children
                 item_title = _get_node_name(item_obj, schema_name=True)
-                # fields that are required and shared across all the oneOf sub-items
+                # NOTE: to avoid potential conflict of schema reference definitions with other existing ones,
+                #       use an invalid character that cannot exist in Python class name defining the schema titles
+                one_of_title = schema_title + "." + item_title
+                shared_title = schema_title + ".Shared"
+                obj_req_title = item_title + ".AllOf"
+                # fields that are shared across all the oneOf sub-items
                 # pass down the original title of that object to refer to that schema reference
-                obj_req_share = ExtendedMappingSchema(title=item_title)
-                obj_req_share.children = schema_node.children
-                # specific oneOf sub-item, will be processed by itself during dispatch of sub-item of allOf
-                # rewrite the title of that new sub-item schema from the original to avoid conflict
-                schema_title = _get_node_name(schema_node, schema_name=True)
+                obj_shared = ExtendedMappingSchema(title=shared_title)
+                obj_shared.children = schema_node.children
                 obj_one_of = item_obj.clone()
-                # NOTE: to avoid potential conflict of schema reference with other existing ones,
-                #       use an invalid character that cannot exist in schema class name defining titles
-                obj_one_of.title = schema_title + "." + item_title
-                obj_req_title = item_title + "All"
-                all_of = AllOfKeywordSchema(title=obj_req_title, _all_of=[obj_req_share, obj_one_of])
+                obj_one_of.title = one_of_title
+                all_of = AllOfKeywordSchema(title=obj_req_title, _all_of=[obj_shared, obj_one_of])
                 obj_converted = self.dispatcher(all_of)
             else:
                 obj_converted = self.dispatcher(item_obj)
