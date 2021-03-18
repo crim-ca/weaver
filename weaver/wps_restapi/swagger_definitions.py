@@ -515,7 +515,7 @@ class AdditionalParametersList(ExtendedSequenceSchema):
 
 
 class Content(ExtendedMappingSchema):
-    href = ReferenceURL(description="URL to CWL file.", title="href",
+    href = ReferenceURL(description="URL to CWL file.", title="OWSContentURL",
                         example="http://some.host/applications/cwl/multisensor_ndvi.cwl")
 
 

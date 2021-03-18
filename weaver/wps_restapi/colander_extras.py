@@ -297,10 +297,11 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
             try:
                 node.validator(node, node.default)
             except (colander.Invalid, TypeError):
-                raise SchemaNodeTypeError(
-                    "Default value [{!s}] of [{!s}] is not valid against its own validator.".format(
-                        node.default, _get_node_name(node, schema_name=True))
-                )
+                if node.default is not colander.drop:
+                    raise SchemaNodeTypeError(
+                        "Default value [{!s}] of [{!s}] is not valid against its own validator.".format(
+                            node.default, _get_node_name(node, schema_name=True))
+                    )
 
 
 class DropableSchemaNode(ExtendedNodeInterface, ExtendedSchemaBase):
@@ -689,30 +690,36 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
         schema_type = _get_schema_type(self)
         result = ExtendedSchemaNode._deserialize_extensions(self, cstruct)
 
-        # process usual base operation with extended result
-        if result not in (colander.drop, colander.null):
-            # when processing mapping/sequence, if the result is an empty container, return the default instead
-            # this is to avoid returning many empty containers in case upper level keywords (oneOf, anyOf, etc.)
-            # need to discriminate between them
-            # empty container means that none of the sub-schemas/fields where matched against input structure
-            if isinstance(schema_type, colander.Mapping):
-                # skip already preprocessed variable mapping from above VariableSchemaNode deserialize
-                # otherwise, following 'normal' schema deserialize could convert valid structure into null
-                if self.has_variables():
-                    return result
-                result = colander.MappingSchema.deserialize(self, result)
-            elif isinstance(schema_type, colander.Sequence):
-                result = colander.SequenceSchema.deserialize(self, result)
-            else:
-                # special cases for JSON conversion and string dump, serialize parsable string timestamps
-                #   deserialize causes Date/DateTime/Time to become Python datetime, and result raises if not string
-                #   employ serialize instead which provides the desired conversion from datetime objects to string
-                if isinstance(schema_type, (colander.Date, colander.DateTime, colander.Time)):
-                    if not isinstance(result, str):
-                        result = colander.SchemaNode.serialize(self, result)
+        try:
+            # process usual base operation with extended result
+            if result not in (colander.drop, colander.null):
+                # when processing mapping/sequence, if the result is an empty container, return the default instead
+                # this is to avoid returning many empty containers in case upper level keywords (oneOf, anyOf, etc.)
+                # need to discriminate between them
+                # empty container means that none of the sub-schemas/fields where matched against input structure
+                if isinstance(schema_type, colander.Mapping):
+                    # skip already preprocessed variable mapping from above VariableSchemaNode deserialize
+                    # otherwise, following 'normal' schema deserialize could convert valid structure into null
+                    if self.has_variables():
+                        return result
+                    result = colander.MappingSchema.deserialize(self, result)
+                elif isinstance(schema_type, colander.Sequence):
+                    result = colander.SequenceSchema.deserialize(self, result)
                 else:
-                    result = colander.SchemaNode.deserialize(self, result)
-            result = self.default if result is colander.null else result
+                    # special cases for JSON conversion and string dump, serialize parsable string timestamps
+                    #   deserialize causes Date/DateTime/Time to become Python datetime, and result raises if not string
+                    #   employ serialize instead which provides the desired conversion from datetime objects to string
+                    if isinstance(schema_type, (colander.Date, colander.DateTime, colander.Time)):
+                        if not isinstance(result, str):
+                            result = colander.SchemaNode.serialize(self, result)
+                    else:
+                        result = colander.SchemaNode.deserialize(self, result)
+                result = self.default if result is colander.null else result
+        except colander.Invalid:
+            # if children schema raised invalid but parent is not required, silently discard the whole structure
+            if self.missing is colander.drop:
+                return colander.drop
+            raise
 
         if result is colander.null and self.missing is colander.required:
             raise colander.Invalid(node=self, msg=self.missing_msg)
@@ -1653,6 +1660,9 @@ class OAS3TypeConversionDispatcher(TypeConversionDispatcher):
                     converted["title"] = schema_node.title
                 else:
                     converted["title"] = schema_node.name
+
+        if converted.get("default") is colander.drop:
+            converted.pop("default")
 
         xml = getattr(schema_node, "xml", None)
         if isinstance(xml, dict):

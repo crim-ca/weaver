@@ -19,6 +19,7 @@ Changes:
 Fixes:
 ------
 - Fix erroneous tags in job inputs schemas.
+- Fix handling of deeply nested schema validator raising for invalid format within optional parent schema.
 
 `3.0.0 <https://github.com/crim-ca/weaver/tree/3.0.0>`_ (2021-03-16)
 ========================================================================
