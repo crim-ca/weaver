@@ -208,7 +208,7 @@ class XMLObject(object):
     Object that provides mapping to known XML extensions for OpenAPI schema definition.
 
     .. seealso::
-        - https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#xmlObject
+        - https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#user-content-xml-object
         - https://swagger.io/docs/specification/data-models/representing-xml/
     """
     attribute = None    # define the corresponding node object as attribute instead of field
