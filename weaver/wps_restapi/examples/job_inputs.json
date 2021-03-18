@@ -1,7 +1,7 @@
 {
   "inputs": [
     {
-      "value": "https://host-140-4.rdext.crim.ca/twitcher/ows/proxy/thredds/dodsC/birdhouse/nrcan/nrcan_canada_daily/tasmin/nrcan_canada_daily_tasmin_2013.nc",
+      "value": "https://schema-example.com/data/test.nc",
       "id": "dataset"
     }
   ],
