@@ -15,6 +15,8 @@ Changes:
 - Add OpenAPI schema examples for some of the most common responses.
 - Add missing schema definitions for WPS XML requests and responses.
 - Improve schema self-validation with their specified default values.
+- Add explicit options usage and expected parsing results for all test variations of OpenAPI schemas generation and
+  ``colander`` object arguments for future reference in ``tests.wps_restapi.test_colander_extras``.
 
 Fixes:
 ------
