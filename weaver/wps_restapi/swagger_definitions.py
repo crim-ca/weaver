@@ -8,7 +8,7 @@ import os
 from typing import TYPE_CHECKING
 
 import yaml
-from colander import DateTime, Email, OneOf, Range, Regex, drop
+from colander import DateTime, Email, OneOf, Range, Regex, drop, required
 from cornice import Service
 
 from weaver import __meta__
@@ -19,8 +19,8 @@ from weaver.execute import (
     EXECUTE_MODE_ASYNC,
     EXECUTE_MODE_AUTO,
     EXECUTE_MODE_OPTIONS,
+    EXECUTE_RESPONSE_DOCUMENT,
     EXECUTE_RESPONSE_OPTIONS,
-    EXECUTE_RESPONSE_RAW,
     EXECUTE_TRANSMISSION_MODE_OPTIONS,
     EXECUTE_TRANSMISSION_MODE_REFERENCE
 )
@@ -516,6 +516,8 @@ class AdditionalParametersList(ExtendedSequenceSchema):
 
 class Content(ExtendedMappingSchema):
     href = ReferenceURL(description="URL to CWL file.", title="OWSContentURL",
+                        default=drop,       # if invalid, drop it completely,
+                        missing=required,   # but still mark as 'required' for parent objects
                         example="http://some.host/applications/cwl/multisensor_ndvi.cwl")
 
 
@@ -814,7 +816,9 @@ class OutputDescriptionList(ExtendedSequenceSchema):
 class JobExecuteModeEnum(ExtendedSchemaNode):
     schema_type = String
     title = "JobExecuteMode"
-    default = EXECUTE_MODE_AUTO
+    # no default to enforce required input as per OGC-API schemas
+    # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/execute.yaml
+    # default = EXECUTE_MODE_AUTO
     example = EXECUTE_MODE_ASYNC
     validator = OneOf(EXECUTE_MODE_OPTIONS)
 
@@ -830,8 +834,10 @@ class JobControlOptionsEnum(ExtendedSchemaNode):
 class JobResponseOptionsEnum(ExtendedSchemaNode):
     schema_type = String
     title = "JobResponseOptions"
-    default = EXECUTE_RESPONSE_RAW
-    example = EXECUTE_RESPONSE_RAW
+    # no default to enforce required input as per OGC-API schemas
+    # https://github.com/opengeospatial/ogcapi-processes/blob/master/core/openapi/schemas/execute.yaml
+    # default = EXECUTE_RESPONSE_DOCUMENT
+    example = EXECUTE_RESPONSE_DOCUMENT
     validator = OneOf(EXECUTE_RESPONSE_OPTIONS)
 
 
@@ -1498,11 +1504,11 @@ class ProviderCapabilitiesSchema(ExtendedMappingSchema):
 
 
 class TransmissionModeList(ExtendedSequenceSchema):
-    transmissionMode = TransmissionModeEnum(missing=drop)
+    transmissionMode = TransmissionModeEnum()
 
 
 class JobControlOptionsList(ExtendedSequenceSchema):
-    jobControlOption = JobControlOptionsEnum(missing=drop)
+    jobControlOption = JobControlOptionsEnum()
 
 
 class ExceptionReportType(ExtendedMappingSchema):
@@ -1513,8 +1519,8 @@ class ExceptionReportType(ExtendedMappingSchema):
 class ProcessSummary(ProcessDescriptionType, ProcessDescriptionMeta):
     """WPS process definition."""
     version = Version(missing=drop)
-    jobControlOptions = JobControlOptionsList(missing=drop)
-    outputTransmission = TransmissionModeList(missing=drop)
+    jobControlOptions = JobControlOptionsList(missing=[])
+    outputTransmission = TransmissionModeList(missing=[])
     processDescriptionURL = URL(description="Process description endpoint.",
                                 missing=drop, title="processDescriptionURL")
 
@@ -1654,8 +1660,8 @@ class DismissedJobSchema(ExtendedMappingSchema):
 class QuoteProcessParametersSchema(ExtendedMappingSchema):
     inputs = InputTypeList(missing=drop)
     outputs = OutputDescriptionList(missing=drop)
-    mode = JobExecuteModeEnum(missing=drop)
-    response = JobResponseOptionsEnum(missing=drop)
+    mode = JobExecuteModeEnum()
+    response = JobResponseOptionsEnum()
 
 
 class AlternateQuotation(ExtendedMappingSchema):
@@ -1717,13 +1723,13 @@ class Execute(ExtendedMappingSchema):
     # but very unlikely/unusual in real world scenarios (possible case: constant endpoint fetcher?)
     inputs = InputList(missing=drop)
     outputs = OutputList()
-    mode = ExtendedSchemaNode(String(), validator=OneOf(EXECUTE_MODE_OPTIONS))
+    mode = JobExecuteModeEnum()
     notification_email = ExtendedSchemaNode(
         String(),
         missing=drop,
         validator=Email(),
         description="Optionally send a notification email when the job is done.")
-    response = ExtendedSchemaNode(String(), validator=OneOf(EXECUTE_RESPONSE_OPTIONS))
+    response = JobResponseOptionsEnum()
 
 
 class Quotation(ExtendedMappingSchema):

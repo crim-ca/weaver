@@ -716,8 +716,9 @@ class ExtendedSchemaNode(DefaultSchemaNode, DropableSchemaNode, VariableSchemaNo
                         result = colander.SchemaNode.deserialize(self, result)
                 result = self.default if result is colander.null else result
         except colander.Invalid:
-            # if children schema raised invalid but parent is not required, silently discard the whole structure
-            if self.missing is colander.drop:
+            # if children schema raised invalid but parent specifically requested
+            # to be dropped by default and is not required, silently discard the whole structure
+            if self.default is colander.drop:
                 return colander.drop
             raise
 

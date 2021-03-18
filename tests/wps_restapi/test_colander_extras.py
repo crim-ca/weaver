@@ -201,7 +201,7 @@ class Validator(ce.ExtendedMappingSchema):
 
 
 class DefaultDropValidator(ce.ExtendedMappingSchema):
-    """definition that will allow only the specific validator values, or drops the content silently"""
+    """Definition that will allow only the specific validator values, or drops the content silently."""
     test = FieldTestString(default=colander.drop, validator=colander.OneOf(["test"]))
     schema_expected = {
         "type": "object",
@@ -216,7 +216,38 @@ class DefaultDropValidator(ce.ExtendedMappingSchema):
     }
 
 
+class DefaultDropRequired(ce.ExtendedMappingSchema):
+    """
+    Definition that will allow only the specific validator values, or drops the full content silently.
+    One top of that, ensures that the resulting OpenAPI schema defines it as required instead of optional
+    when default is usually specified.
+
+    This allows dropping invalid values that failed validation and not employ any default, while letting know
+    in the OpenAPI specification that for a nested definition of required elements, they will be used only if
+    correctly provided, or completely ignored as optional.
+    """
+    test = FieldTestString(default=colander.drop, missing=colander.required, validator=colander.OneOf(["test"]))
+    schema_expected = {
+        "type": "object",
+        "title": "DefaultDropRequired",
+        "required": ["test"],
+        "properties": {
+            "test": {
+                "title": "test",
+                "type": "string",
+                "enum": ["test"],
+            }
+        }
+    }
+
+
 class DefaultValidator(ce.ExtendedMappingSchema):
+    """
+    Functionality that we want most of the time to make an 'optional' but validated value.
+
+    When value is explicitly provided, raise if invalid according to condition.
+    Otherwise, use default if omitted.
+    """
     test = FieldTestString(default="test", validator=colander.OneOf(["test"]))
     schema_expected = {
         "type": "object",
@@ -298,13 +329,20 @@ def test_schema_default_missing_validator_combinations():
         (DefaultValidator, {"test": None}, {"test": "test"}),
         (DefaultValidator, {"test": "bad"}, colander.Invalid),
         (DefaultValidator, {"test": "test"}, {"test": "test"}),
-        (DefaultMissingValidator, {"test": "bad"}, {}),
-        (DefaultMissingValidator, {"test": None}, {}),
         (DefaultMissingValidator, {}, {"test": "test"}),    # default+missing ignores drop and sets default if omitted
+        (DefaultMissingValidator, {"test": None}, {}),
+        # (DefaultMissingValidator, {"test": "bad"}, {}),
+        (DefaultMissingValidator, {"test": "bad"}, colander.Invalid),
         (DefaultMissingValidator, {"test": "test"}, {"test": "test"}),
+        (MissingValidator, {}, {}),
         (MissingValidator, {"test": None}, {}),
-        (MissingValidator, {"test": "bad"}, {}),
+        # (MissingValidator, {"test": "bad"}, {}),
+        (MissingValidator, {"test": "bad"}, colander.Invalid),
         (MissingValidator, {"test": "test"}, {"test": "test"}),
+        (DefaultDropRequired, {}, {}),
+        (DefaultDropRequired, {"test": None}, {}),
+        (DefaultDropRequired, {"test": "bad"}, {}),
+        (DefaultDropRequired, {"test": "test"}, {"test": "test"}),
         (DefaultDropValidator, {}, {}),
         (DefaultDropValidator, {"test": None}, {}),
         (DefaultDropValidator, {"test": "bad"}, {}),
@@ -342,9 +380,10 @@ def test_schema_default_missing_validator_openapi():
         Validator,
         DefaultMissing,
         DefaultValidator,
+        MissingValidator,
         DefaultMissingValidator,
         DefaultDropValidator,
-        MissingValidator,
+        DefaultDropRequired,
     ]
     for schema in test_schemas:
         converted = converter.convert_type(schema())
