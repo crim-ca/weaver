@@ -1,5 +1,6 @@
 import contextlib
 import copy
+
 import mock
 
 from tests.utils import mocked_remote_wps
