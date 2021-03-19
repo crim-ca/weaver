@@ -17,7 +17,6 @@ from weaver.execute import (
     EXECUTE_CONTROL_OPTION_ASYNC,
     EXECUTE_CONTROL_OPTIONS,
     EXECUTE_MODE_ASYNC,
-    EXECUTE_MODE_AUTO,
     EXECUTE_MODE_OPTIONS,
     EXECUTE_RESPONSE_DOCUMENT,
     EXECUTE_RESPONSE_OPTIONS,
@@ -983,6 +982,7 @@ class OWSLanguage(ExtendedSchemaNode, OWSNamespace):
 
 
 class OWSLanguageAttribute(OWSLanguage):
+    description = "RFC-4646 language code of the human-readable text."
     name = "language"
     attribute = True
 
@@ -1020,12 +1020,6 @@ class WPSLanguageAttribute(ExtendedSchemaNode, XMLNamespace):
     example = ACCEPT_LANGUAGE_EN_CA
 
 
-class WPSMetadata(ExtendedMappingSchema, WPSNamespace):
-    service = WPSServiceAttribute()
-    version = WPSVersionAttribute()
-    lang = WPSLanguageAttribute()
-
-
 class WPSParameters(ExtendedMappingSchema):
     service = ExtendedSchemaNode(String(), example="WPS", description="Service selection.",
                                  validator=OneOfCaseInsensitive(["WPS"]))
@@ -1047,6 +1041,7 @@ class WPSOperationGetNoContent(ExtendedMappingSchema):
 
 
 class WPSOperationPost(ExtendedMappingSchema):
+    schema_ref = "http://schemas.opengis.net/wps/1.0.0/common/RequestBaseType.xsd"
     accepted_versions = OWSAcceptVersions(missing=drop, default="1.0.0")
     language = OWSLanguageAttribute(missing=drop)
     service = OWSService()
@@ -1077,9 +1072,26 @@ class OWSAbstract(ExtendedSchemaNode, OWSNamespace):
     name = "Abstract"
 
 
+class OWSMetadataLink(ExtendedSchemaNode, XMLObject):
+    schema_name = "Metadata"
+    schema_type = String
+    attribute = True
+    name = "Metadata"
+    prefix = "xlink"
+    example = "WPS"
+    wrapped = False  # metadata xlink at same level as other items
+
+
+class OWSMetadata(ExtendedSequenceSchema, OWSNamespace):
+    schema_type = String
+    name = "Metadata"
+    title = OWSMetadataLink(missing=drop)
+
+
 class WPSDescribeProcessPost(WPSOperationPost, WPSNamespace):
     schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsDescribeProcess_request.xsd"
     name = "DescribeProcess"
+    title = "DescribeProcess"
     identifier = OWSIdentifierList(
         description="Single or comma-separated list of process identifier to describe.",
         example="example"
@@ -1089,12 +1101,14 @@ class WPSDescribeProcessPost(WPSOperationPost, WPSNamespace):
 class WPSExecuteDataInputs(ExtendedMappingSchema, WPSNamespace):
     description = "XML data inputs provided for WPS POST request (Execute)."
     name = "DataInputs"
+    title = "DataInputs"
     # FIXME: missing details about 'DataInputs'
 
 
 class WPSExecutePost(WPSOperationPost, WPSNamespace):
     schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsExecute_request.xsd"
     name = "Execute"
+    title = "Execute"
     identifier = OWSIdentifier(description="Identifier of the process to execute with data inputs.")
     dataInputs = WPSExecuteDataInputs(description="Data inputs to be provided for process execution.")
 
@@ -1120,6 +1134,15 @@ class WPSEndpointGet(ExtendedMappingSchema):
 class WPSEndpointPost(ExtendedMappingSchema):
     header = WPSHeaders()
     body = WPSBody()
+
+
+class XMLBooleanAttribute(ExtendedSchemaNode, XMLObject):
+    schema_type = Boolean
+    attribute = True
+
+
+class XMLString(ExtendedSchemaNode, XMLObject):
+    schema_type = String
 
 
 class OWSString(ExtendedSchemaNode, OWSNamespace):
@@ -1176,23 +1199,32 @@ class OWSServiceContact(ExtendedMappingSchema, OWSNamespace):
 
 
 class OWSServiceProvider(ExtendedMappingSchema, OWSNamespace):
+    description = "Details about the institution providing the service."
     name = "ServiceProvider"
+    title = "ServiceProvider"
     provider_name = OWSString(name="ProviderName", title="OWSProviderName", example="EXAMPLE")
     provider_site = OWSString(name="ProviderName", title="OWSProviderName", example="http://schema-example.com")
     contact = OWSServiceContact(required=False, defalult={})
 
 
-class OWSServiceIdentification(ExtendedMappingSchema, OWSNamespace):
+class WPSDescriptionType(ExtendedMappingSchema, OWSNamespace):
+    schema_ref = "http://schemas.opengis.net/wps/1.0.0/common/DescriptionType.xsd"
+    name = "DescriptionType"
+    _title = OWSTitle(description="Title of the service.", example="Weaver")
+    abstract = OWSAbstract(description="Detail about the service.", example="Weaver WPS example schema.", missing=drop)
+    metadata = OWSMetadata(description="Metadata of the service.", example="Weaver WPS example schema.", missing=drop)
+
+
+class OWSServiceIdentification(WPSDescriptionType, OWSNamespace):
     name = "ServiceIdentification"
-    title = OWSTitle(description="Title of the service.", example="Weaver")
-    abstract = OWSAbstract(description="Detail about the service.", example="Weaver WPS example schema.")
+    title = "ServiceIdentification"
     keywords = OWSKeywordList(name="Keywords")
     type = OWSType()
-    svc_type = OWSString(name="ServiceType", title="OWSServiceType", example="WPS")
-    svc_type_ver1 = OWSString(name="ServiceTypeVersion", title="OWSServiceTypeVersion", example="1.0.0")
-    svc_type_ver2 = OWSString(name="ServiceTypeVersion", title="OWSServiceTypeVersion", example="2.0.0")
+    svc_type = OWSString(name="ServiceType", title="ServiceType", example="WPS")
+    svc_type_ver1 = OWSString(name="ServiceTypeVersion", title="ServiceTypeVersion", example="1.0.0")
+    svc_type_ver2 = OWSString(name="ServiceTypeVersion", title="ServiceTypeVersion", example="2.0.0")
     fees = OWSString(name="Fees", title="Fees", example="NONE", missing=drop, default="NONE")
-    access = OWSString(name="AccessConstraints", title="OWSAccessConstraints",
+    access = OWSString(name="AccessConstraints", title="AccessConstraints",
                        example="NONE", missing=drop, default="NONE")
     provider = OWSServiceProvider()
 
@@ -1246,40 +1278,196 @@ class OWSProcessSummary(ExtendedMappingSchema, WPSNamespace):
     version = ProcessVersion(name="processVersion", default="None", example="1.2",
                              description="Version of the corresponding process summary.")
     identifier = OWSIdentifier(example="example", description="Identifier to refer to the process.")
-    title = OWSTitle(example="Example Process", description="Title of the process.")
+    _title = OWSTitle(example="Example Process", description="Title of the process.")
     abstract = OWSAbstract(example="Process for example schema.", description="Detail about the process.")
 
 
 class WPSProcessOfferings(ExtendedSequenceSchema, WPSNamespace):
     name = "ProcessOfferings"
+    title = "ProcessOfferings"
     process = OWSProcessSummary(name="Process")
 
 
-class WPSLanguageItems(ExtendedSequenceSchema, WPSNamespace):
+class WPSLanguagesType(ExtendedSequenceSchema, WPSNamespace):
+    title = "LanguagesType"
+    wrapped = False
     lang = OWSLanguage(name="Language")
 
 
 class WPSLanguageSpecification(ExtendedMappingSchema, WPSNamespace):
     name = "Languages"
-    defaults = WPSLanguageItems(name="Default")
-    supported = WPSLanguageItems(name="Supported")
+    title = "Languages"
+    default = OWSLanguage(name="Default")
+    supported = WPSLanguagesType(name="Supported")
 
 
-class WPSGetCapabilities(WPSMetadata):
+class WPSResponseBaseType(PermissiveMappingSchema, WPSNamespace):
+    schema_ref = "http://schemas.opengis.net/wps/1.0.0/common/ResponseBaseType.xsd"
+    service = WPSServiceAttribute()
+    version = WPSVersionAttribute()
+    lang = WPSLanguageAttribute()
+
+
+class WPSProcessVersion(ExtendedSchemaNode, WPSNamespace):
+    schema_ref = "http://schemas.opengis.net/wps/1.0.0/common/ProcessVersion.xsd"
+    schema_type = String
+    description = "Release version of this Process."
+    name = "processVersion"
+    attribute = True
+
+
+class WPSInputDescriptionType(WPSDescriptionType):
+    identifier = OWSIdentifier(description="Unique identifier of the input.")
+    # override below to have different examples/descriptions
+    _title = OWSTitle(description="Human readable representation of the process input.")
+    abstract = OWSAbstract(missing=drop)
+    metadata = OWSMetadata(missing=drop)
+
+
+class WPSLiteralInputType(ExtendedMappingSchema, XMLObject):
+    pass
+
+
+class WPSLiteralData(WPSLiteralInputType):
+    name = "LiteralData"
+
+
+class WPSCRSsType(ExtendedMappingSchema, WPSNamespace):
+    crs = XMLString(name="CRS", description="Coordinate Reference System")
+
+
+class WPSSupportedCRS(ExtendedSequenceSchema):
+    crs = WPSCRSsType(name="CRS")
+
+
+class WPSSupportedCRSType(ExtendedMappingSchema, WPSNamespace):
+    name = "SupportedCRSsType"
+    default = WPSCRSsType(name="Default")
+    supported = WPSSupportedCRS(name="Supported")
+
+
+class WPSBoundingBoxData(ExtendedMappingSchema, XMLObject):
+    data = WPSSupportedCRSType(name="BoundingBoxData")
+
+
+class WPSFormatDefinition(ExtendedMappingSchema, XMLObject):
+    mime_type = XMLString(name="MimeType", default=CONTENT_TYPE_TEXT_PLAIN, example=CONTENT_TYPE_TEXT_PLAIN)
+    encoding = XMLString(name="Encoding", missing=drop, example="base64")
+    schema = XMLString(name="Schema", missing=drop)
+
+
+class WPSFileFormat(ExtendedMappingSchema, XMLObject):
+    name = "Format"
+    format = WPSFormatDefinition()
+
+
+class WPSFormatList(ExtendedSequenceSchema):
+    format = WPSFileFormat()
+
+
+class WPSComplexInputType(ExtendedMappingSchema, WPSNamespace):
+    max_mb = XMLString(name="maximumMegabytes", attribute=True)
+    defaults = WPSFileFormat(name="Default")
+    supported = WPSFormatList(name="Supported")
+
+
+class WPSComplexData(ExtendedMappingSchema, XMLObject):
+    data = WPSComplexInputType(name="ComplexData")
+
+
+class WPSInputFormChoice(OneOfKeywordSchema):
+    title = "InputFormChoice"
+    _one_of = [
+        WPSComplexData(),
+        WPSLiteralData(),
+        WPSBoundingBoxData(),
+    ]
+
+
+class WPSMinOccursAttribute(MinOccursDefinition, XMLObject):
+    name = "minOccurs"
+    attribute = True
+
+
+class WPSMaxOccursAttribute(MinOccursDefinition, XMLObject):
+    name = "maxOccurs"
+    prefix = drop
+    attribute = True
+
+
+class WPSDataInputDescription(ExtendedMappingSchema):
+    min_occurs = WPSMinOccursAttribute()
+    max_occurs = WPSMaxOccursAttribute()
+
+
+class WPSDataInputItem(AllOfKeywordSchema, XMLObject):  # no XML prefix for these
+    _all_of = [
+        WPSInputDescriptionType(),
+        WPSInputFormChoice(),
+        WPSDataInputDescription(),
+    ]
+
+
+class WPSDataInputs(ExtendedSequenceSchema, XMLObject):  # no XML prefix for these
+    name = "DataInputs"
+    title = "DataInputs"
+    input = WPSDataInputItem()
+
+
+class WPSOutputDescriptionType(WPSDescriptionType):
+    name = "OutputDescriptionType"
+    title = "OutputDescriptionType"
+    identifier = OWSIdentifier(description="Unique identifier of the output.")
+    # override below to have different examples/descriptions
+    _title = OWSTitle(description="Human readable representation of the process output.")
+    abstract = OWSAbstract(missing=drop)
+    metadata = OWSMetadata(missing=drop)
+
+
+class ProcessOutputs(ExtendedSequenceSchema, XMLObject):  # no XML prefix for these
+    name = "ProcessOutputs"
+    title = "ProcessOutputs"
+    output = WPSOutputDescriptionType()
+
+
+class WPSGetCapabilities(WPSResponseBaseType):
     schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsGetCapabilities_response.xsd"
     name = "Capabilities"
+    title = "GetCapabilities"
     svc = OWSServiceIdentification()
     ops = OperationsMetadata()
     offering = WPSProcessOfferings()
     languages = WPSLanguageSpecification()
 
 
-class WPSDescribeProcess(ExtendedMappingSchema):
-    pass
+class WPSProcessDescriptionType(WPSResponseBaseType, WPSProcessVersion):
+    name = "ProcessDescriptionType"
+    description = "Description of the requested process by identifier."
+    store = XMLBooleanAttribute(name="storeSupported", example=True, default=True)
+    status = XMLBooleanAttribute(name="statusSupported", example=True, default=True)
+    inputs = WPSDataInputs()
+    outputs = ProcessOutputs()
 
 
-class WPSExecute(ExtendedMappingSchema):
-    pass
+class WPSProcessDescriptionList(ExtendedSequenceSchema, WPSNamespace):
+    name = "ProcessDescriptions"
+    title = "ProcessDescriptions"
+    description = "Listing of process description for every requested identifier."
+    wrapped = False
+    process = WPSProcessDescriptionType()
+
+
+class WPSDescribeProcess(WPSResponseBaseType):
+    schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsDescribeProcess_response.xsd"
+    name = "DescribeProcess"
+    title = "DescribeProcess"
+    process = WPSProcessDescriptionList()
+
+
+class WPSExecute(WPSResponseBaseType, WPSProcessVersion):
+    schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsExecute_response.xsd"
+    name = "Execute"
+    title = "Execute"
 
 
 class WPSXMLSuccessBodySchema(OneOfKeywordSchema):
@@ -1290,13 +1478,14 @@ class WPSXMLSuccessBodySchema(OneOfKeywordSchema):
     ]
 
 
-class OWSExceptionCode(ExtendedSchemaNode, XMLObject):
+class OWSExceptionCodeAttribute(ExtendedSchemaNode, XMLObject):
     schema_type = String
     name = "exceptionCode"
+    title = "Exception"
     attribute = True
 
 
-class OWSExceptionLocator(ExtendedSchemaNode, XMLObject):
+class OWSExceptionLocatorAttribute(ExtendedSchemaNode, XMLObject):
     schema_type = String
     name = "locator"
     attribute = True
@@ -1309,13 +1498,14 @@ class OWSExceptionText(ExtendedSchemaNode, OWSNamespace):
 
 class OWSException(ExtendedMappingSchema, OWSNamespace):
     name = "Exception"
-    code = OWSExceptionCode(example="MissingParameterValue")
-    locator = OWSExceptionLocator(default="None", example="service")
+    code = OWSExceptionCodeAttribute(example="MissingParameterValue")
+    locator = OWSExceptionLocatorAttribute(default="None", example="service")
     text = OWSExceptionText(example="Missing service")
 
 
 class OWSExceptionReport(ExtendedMappingSchema, OWSNamespace):
     name = "ExceptionReport"
+    title = "ExceptionReport"
     exception = OWSException()
 
 

@@ -207,6 +207,10 @@ class XMLObject(object):
     """
     Object that provides mapping to known XML extensions for OpenAPI schema definition.
 
+    Name of the schema definition in the OpenAPI will use :prop:`prefix` and the schema class name.
+    Prefix can be omitted from the schema definition name by setting it to :class:`colander.drop`.
+    The value of ``title`` provided as option or
+
     .. seealso::
         - https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#user-content-xml-object
         - https://swagger.io/docs/specification/data-models/representing-xml/
@@ -267,10 +271,19 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
         raise NotImplementedError("Using SchemaNode for a field requires 'schema_type' definition.")
 
     def __init__(self, *args, **kwargs):
+        schema_name = _get_node_name(self, schema_name=True)
         schema_type = _get_schema_type(self, check=True)
-        if isinstance(schema_type, (colander.Mapping, colander.Sequence)):
+        if isinstance(self, XMLObject):
+            if isinstance(self.title, str):
+                title = self.title
+            else:
+                title = kwargs.get("title", schema_name)
+            if self.prefix is not colander.drop:
+                title = "{}:{}".format(self.prefix or "xml", title)
+            kwargs["title"] = title
+        elif isinstance(schema_type, (colander.Mapping, colander.Sequence)):
             if self.title in ["", colander.required] and not kwargs.get("title"):
-                kwargs["title"] = _get_node_name(self, schema_name=True)
+                kwargs["title"] = schema_name
 
         if self.validator is None and isinstance(schema_type, colander.String):
             _format = kwargs.pop("format", getattr(self, "format", None))
@@ -288,8 +301,11 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
         if self.default is not colander.null and self.missing is not colander.drop:
             self.missing = self.default  # setting value makes 'self.required' return False, but doesn't drop it
 
-        super(ExtendedSchemaBase, self).__init__(*args, **kwargs)
-        ExtendedSchemaBase._validate(self)
+        try:
+            super(ExtendedSchemaBase, self).__init__(*args, **kwargs)
+            ExtendedSchemaBase._validate(self)
+        except Exception as exc:
+            raise SchemaNodeTypeError("Invalid schema definition for [{}]".format(schema_name)) from exc
 
     @staticmethod
     def _validate(node):
