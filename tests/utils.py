@@ -394,12 +394,15 @@ def mocked_remote_wps(processes, languages=None):
     class MockProcesses(mock.PropertyMock):
         pass
 
-    class MockLanguages(mock.PropertyMock, Languages):
+    class MockLanguages(mock.PropertyMock):
         pass
 
+    lang = Languages([])
+    lang.supported = languages or []
     mock_processes = MockProcesses
     mock_processes.return_value = processes
-    mock_languages = MockLanguages(languages or [])
+    mock_languages = MockLanguages
+    mock_languages.return_value = lang
     return (
         mock.patch.object(WebProcessingService, "getcapabilities", side_effect=lambda *args, **kwargs: None),
         mock.patch.object(WebProcessingService, "processes", new_callable=mock_processes, create=True),
