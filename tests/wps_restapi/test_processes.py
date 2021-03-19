@@ -7,7 +7,6 @@ import colander
 import pyramid.testing
 import pytest
 import responses
-import webtest
 
 from tests.utils import (
     get_test_weaver_app,
@@ -81,7 +80,6 @@ class WpsRestApiProcessesTest(unittest.TestCase):
         cls.config = setup_config_with_mongodb(settings=settings)
         cls.app = get_test_weaver_app(config=cls.config)
         cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
-        cls.app = webtest.TestApp(cls.config.make_wsgi_app())
 
     @classmethod
     def tearDownClass(cls):

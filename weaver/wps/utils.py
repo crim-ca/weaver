@@ -2,10 +2,12 @@ import logging
 import os
 import tempfile
 from configparser import ConfigParser
+from copy import deepcopy
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 import lxml.etree
+from beaker.cache import cache_region
 from owslib.wps import WebProcessingService, WPSExecution
 from pyramid.httpexceptions import HTTPNotFound
 from pywps import configuration as pywps_config
@@ -13,21 +15,25 @@ from pywps import configuration as pywps_config
 from weaver.config import get_weaver_configuration
 from weaver.typedefs import XML
 from weaver.utils import (
-    get_cookie_headers,
+    get_header,
+    get_no_cache_option,
+    get_request_options,
     get_settings,
     get_ssl_verify_option,
     get_url_without_query,
     get_weaver_url,
+    invalidate_region,
     is_uuid,
     make_dirs,
-    request_extra
+    request_extra,
+    retry_on_cache_error
 )
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing import Dict, Union, Optional
 
-    from weaver.typedefs import AnyRequestType, AnySettingsContainer, HeadersType
+    from weaver.typedefs import AnyRequestType, AnySettingsContainer, HeadersType, ProcessOWS
 
 
 def _get_settings_or_wps_config(container,                  # type: AnySettingsContainer
@@ -99,7 +105,8 @@ def get_wps_output_url(container):
     """
     wps_output_default = get_weaver_url(container) + "/wpsoutputs"
     wps_output_config = _get_settings_or_wps_config(
-        container, "weaver.wps_output_url", "server", "outputurl", wps_output_default, "WPS output url")
+        container, "weaver.wps_output_url", "server", "outputurl", wps_output_default, "WPS output url"
+    )
     return wps_output_config or wps_output_default
 
 
@@ -138,6 +145,25 @@ def get_wps_local_status_location(url_status_location, container, must_exist=Tru
     return out_path
 
 
+@cache_region("request")
+def _describe_process_cached(self, identifier, xml=None):
+    # type: (WebProcessingService, str, Optional[XML]) -> ProcessOWS
+    LOGGER.debug("Request WPS DescribeProcess to [%s] with [id: %s]", self.url, identifier)
+    return self.describeprocess_method(identifier, xml=xml)  # noqa  # method created by '_get_wps_client_cached'
+
+
+@cache_region("request")
+def _get_wps_client_cached(url, headers, verify, language):
+    # type: (str, HeadersType, bool, Optional[str]) -> WebProcessingService
+    LOGGER.debug("Request WPS GetCapabilities to [%s]", url)
+    wps = WebProcessingService(url=url, headers=headers, verify=verify)
+    set_wps_language(wps, accept_language=language)
+    setattr(wps, "describeprocess_method", wps.describeprocess)  # backup real method, them override with cached
+    setattr(wps, "describeprocess", lambda *_, **__: _describe_process_cached(wps, *_, **__))
+    return wps
+
+
+@retry_on_cache_error
 def get_wps_client(url, container=None, verify=None, headers=None, language=None):
     # type: (str, Optional[AnySettingsContainer], bool, Optional[HeadersType], Optional[str]) -> WebProcessingService
     """
@@ -150,16 +176,32 @@ def get_wps_client(url, container=None, verify=None, headers=None, language=None
     :param language: preferred response language if supported by the service.
     :returns: created WPS client object with configured request options.
     """
-    headers = headers or {}
     if headers is None and hasattr(container, "headers"):
-        headers = get_cookie_headers(container.headers)
+        headers = container.headers
+    else:
+        headers = headers or {}
     # remove invalid values that should be recomputed by the client as needed
-    for hdr in ["Accept", "Content-Length", "Content-Type", "Content-Transfer-Encoding"]:
-        headers.pop(hdr, None)
+    # employ the provided headers instead of making new ones in order to forward any language/authorization definition
+    headers = deepcopy(headers)  # don't modify original headers for sub-requests for next steps that could use them
+    for header in ["Accept", "Content-Length", "Content-Type", "Content-Transfer-Encoding"]:
+        hdr_low = header.lower()
+        for hdr in [header, hdr_low, header.replace("-", "_"), hdr_low.replace("-", "_")]:
+            headers.pop(hdr, None)
+    opts = get_request_options("get", url, container)
     if verify is None:
-        verify = get_ssl_verify_option("get", url, container)
-    wps = WebProcessingService(url=url, headers=headers, verify=verify)
-    set_wps_language(wps, request=container, accept_language=language)
+        verify = get_ssl_verify_option("get", url, container, request_options=opts)
+    # convert objects to allow caching keys against values (object instances always different)
+    language = language or getattr(container, "accept_language", None) or get_header("Accept-Language", headers)
+    if language is not None and not isinstance(language, str):
+        language = str(language)
+    if headers is not None and not isinstance(headers, dict):
+        headers = dict(headers)
+    request_args = (url, headers, verify, language)
+    if get_no_cache_option(headers, request_options=opts):
+        for func in (_get_wps_client_cached, _describe_process_cached):
+            caching_args = (func, "request", *request_args)
+            invalidate_region(caching_args)
+    wps = _get_wps_client_cached(*request_args)
     return wps
 
 
@@ -185,7 +227,8 @@ def check_wps_status(location=None,     # type: Optional[str]
         if not out_path:
             raise HTTPNotFound("Could not find file resource from [{}].".format(location))
         LOGGER.info("Resolved WPS status-location using local file reference.")
-        return open(out_path, "r").read()
+        with open(out_path, "r") as f:
+            return f.read()
 
     execution = WPSExecution()
     if response:
@@ -341,6 +384,7 @@ def set_wps_language(wps, accept_language=None, request=None):
         # owslib version doesn't support setting a language
         return
 
+    accept_language = str(accept_language)  # in case it is one of pyramid AcceptLanguage objects
     accepted_languages = [lang.strip().split(";")[0] for lang in accept_language.lower().split(",")]
 
     for accept in accepted_languages:

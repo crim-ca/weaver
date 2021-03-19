@@ -1,4 +1,5 @@
 import errno
+import functools
 import inspect
 import logging
 import os
@@ -587,6 +588,14 @@ def setup_cache(settings):
     """
     Prepares the settings with default caching options.
     """
+    # handle other naming variant supported by 'pyramid_beaker',
+    # unify only with 'cache.' prefix but ignore if duplicate
+    for key in list(settings):
+        if key.startswith("beaker.cache."):
+            cache_key = key.replace("beaker.cache.", "cache.")
+            cache_val = settings.get(key)
+            settings.setdefault(cache_key, cache_val)
+    # apply defaults to avoid missing items during runtime
     settings.setdefault("cache.regions", "doc, request, result")
     settings.setdefault("cache.type", "memory")
     settings.setdefault("cache.doc.enable", "false")
@@ -633,6 +642,25 @@ def get_ssl_verify_option(method, url, settings, request_options=None):
     if not req_opts.get("ssl_verify", req_opts.get("verify", True)):
         return False
     return True
+
+
+def get_no_cache_option(request_headers, request_options):
+    # type: (HeadersType, SettingsType) -> bool
+    """
+    Obtains the No-Cache result from request headers and configured request options.
+
+    .. seealso::
+        - :meth:`Request.headers`
+        - :func:`get_request_options`
+
+    :param request_headers: specific request headers that could indicate ``Cache-Control: no-cache``
+    :param request_options: specific request options that could define ``cache: True|False``
+    :return: whether to disable cache or not
+    """
+    no_cache_header = str(get_header("Cache-Control", request_headers)).lower().replace(" ", "")
+    no_cache = no_cache_header in ["no-cache", "max-age=0", "max-age=0,must-revalidate"]
+    no_cache = no_cache is True or request_options.get("cache", True) is False
+    return no_cache
 
 
 def get_request_options(method, url, settings):
@@ -690,7 +718,32 @@ def get_request_options(method, url, settings):
     return request_options
 
 
-def request_call(method, url, kwargs):
+def retry_on_cache_error(func):
+    # type: (Callable[[...], Any]) -> Callable
+    """
+    Decorator to handle invalid cache setup.
+
+    Any function wrapped with this decorator will retry execution once if missing cache setup was the cause of error.
+    """
+    @functools.wraps(func)
+    def wrapped(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except BeakerException as exc:
+            if "Cache region not configured" in str(exc):
+                LOGGER.debug("Invalid cache region setup detected, retrying operation after setup...")
+                setup_cache(get_settings() or {})
+            else:
+                raise  # if not the expected cache exception, ignore retry attempt
+        try:
+            return func(*args, **kwargs)
+        except BeakerException as exc:
+            LOGGER.error("Invalid cache region setup could not be resolved: [%s]", exc)
+            raise
+    return wrapped
+
+
+def _request_call(method, url, kwargs):
     # type: (str, str, Dict[str, AnyValue]) -> Response
     """
     Request operation employed by :func:`request_extra` without caching.
@@ -704,14 +757,15 @@ def request_call(method, url, kwargs):
 
 
 @cache_region("request")
-def request_cached(method, url, kwargs):
+def _request_cached(method, url, kwargs):
     # type: (str, str, Dict[str, AnyValue]) -> Response
     """
     Cached-enabled request operation employed by :func:`request_extra`.
     """
-    return request_call(method, url, kwargs)
+    return _request_call(method, url, kwargs)
 
 
+@retry_on_cache_error
 def request_extra(method,                       # type: str
                   url,                          # type: str
                   retries=None,                 # type: Optional[int]
@@ -828,11 +882,10 @@ def request_extra(method,                       # type: str
     # process request
     resp = None
     failures = []
-    no_cache = CaseInsensitiveDict(request_kwargs.get("headers", {})).get("Cache-Control", "").lower() == "no-cache"
-    no_cache = no_cache is True or request_options.get("cache", True) is False
+    no_cache = get_no_cache_option(request_kwargs.get("headers", {}), request_options)
     region = "request"
     request_args = (method, url, request_kwargs)
-    caching_args = (request_cached, region, *request_args)
+    caching_args = (_request_cached, region, *request_args)
     for retry, delay in enumerate(request_delta):
         if retry:
             if retry_after and resp and resp.status_code in [HTTPTooManyRequests.code]:
@@ -843,9 +896,9 @@ def request_extra(method,                       # type: str
             time.sleep(delay)
         try:
             if no_cache:
-                resp = request_call(*request_args)
+                resp = _request_call(*request_args)
             else:
-                resp = request_cached(*request_args)
+                resp = _request_cached(*request_args)
             if allowed_codes and len(allowed_codes):
                 if resp.status_code in allowed_codes:
                     return resp
@@ -855,16 +908,6 @@ def request_extra(method,                       # type: str
             invalidate_region(caching_args)
             failures.append("{} ({})".format(getattr(resp, "reason", type(resp).__name__),
                                              getattr(resp, "status_code", getattr(resp, "code", 500))))
-        # failure caused by invalid cache setup re-run with sub-call to restart the retry procedure from scratch
-        except BeakerException as exc:
-            if "Cache region not configured: {}".format(region) in str(exc):
-                LOGGER.warning("Invalid cache region setup detected, retrying request...")
-                setup_cache(settings)
-                resp = request_extra(method, url, retries=retries, retry_after=retry_after, backoff=backoff,
-                                     intervals=intervals, ssl_verify=ssl_verify, allowed_codes=allowed_codes,
-                                     only_server_errors=only_server_errors, settings=settings, **request_kwargs)
-                return resp  # sub-called did the retry loop, so finish early this loop
-            raise  # if not the expected cache exception, ignore retry attempt
         # function called without retries raises original error as if calling requests module directly
         except (requests.ConnectionError, requests.Timeout) as exc:
             if no_retries:

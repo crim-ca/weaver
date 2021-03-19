@@ -15,6 +15,7 @@ import colander
 import mock
 import moto
 import pyramid_celery
+from owslib.wps import Languages, WebProcessingService
 from pyramid import testing
 from pyramid.config import Configurator
 from pyramid.httpexceptions import HTTPException, HTTPNotFound, HTTPUnprocessableEntity
@@ -32,9 +33,16 @@ from weaver.utils import get_path_kvp, get_url_without_query, get_weaver_url, nu
 from weaver.warning import MissingParameterWarning, UnsupportedOperationWarning
 
 if TYPE_CHECKING:
-    import botocore.client  # noqa
+    from typing import Any, Callable, Iterable, List, Optional, Type, Union
 
-    from weaver.typedefs import Any, AnyResponseType, Callable, List, Optional, SettingsType, Type, Union
+    import botocore.client  # noqa
+    from owslib.wps import Process as ProcessOWSWPS
+    from pywps.app import Process as ProcessPyWPS
+
+    from weaver.typedefs import AnyResponseType, SettingsType
+
+    # pylint: disable=C0103,invalid-name,E1101,no-member
+    MockPatch = mock._patch  # noqa
 
 MOCK_AWS_REGION = "us-central-1"
 
@@ -378,7 +386,32 @@ def mocked_sub_requests(app, function, *args, only_local=False, **kwargs):
         return resp
 
 
+def mocked_remote_wps(processes, languages=None):
+    # type: (List[Union[ProcessPyWPS, ProcessOWSWPS]], Optional[List[str]]) -> Iterable[MockPatch]
+    """
+    Mocks creation of a :class:`WebProcessingService` with provided :paramref:`processes` and returns them directly.
+    """
+    class MockProcesses(mock.PropertyMock):
+        pass
+
+    class MockLanguages(mock.PropertyMock):
+        pass
+
+    lang = Languages([])
+    lang.supported = languages or []
+    mock_processes = MockProcesses
+    mock_processes.return_value = processes
+    mock_languages = MockLanguages
+    mock_languages.return_value = lang
+    return (
+        mock.patch.object(WebProcessingService, "getcapabilities", side_effect=lambda *args, **kwargs: None),
+        mock.patch.object(WebProcessingService, "processes", new_callable=mock_processes, create=True),
+        mock.patch.object(WebProcessingService, "languages", new_callable=mock_languages, create=True),
+    )
+
+
 def mocked_execute_process():
+    # type: () -> Iterable[MockPatch]
     """
     Provides a mock to call :func:`weaver.processes.execution.execute_process` safely within a test employing
     :class:`webTest.TestApp` without a running ``Celery`` app.
@@ -420,6 +453,7 @@ def mocked_execute_process():
 
 
 def mocked_process_job_runner(job_task_id="mocked-job-id"):
+    # type: (str) -> Iterable[MockPatch]
     """
     Provides a mock that will bypass execution of the process when called during job submission.
 
@@ -434,6 +468,7 @@ def mocked_process_job_runner(job_task_id="mocked-job-id"):
 
 
 def mocked_process_package():
+    # type: () -> Iterable[MockPatch]
     """
     Provides mocks that bypasses execution when calling :module:`weaver.processes.wps_package` functions.
     """
@@ -446,6 +481,7 @@ def mocked_process_package():
 
 
 def mocked_aws_credentials(test_func):
+    # type: (Callable[[...], Any]) -> Callable
     """Mocked AWS Credentials for :py:mod:`moto`.
 
     When using this fixture, ensures that if other mocks fail, at least credentials should be invalid to avoid
@@ -463,6 +499,7 @@ def mocked_aws_credentials(test_func):
 
 
 def mocked_aws_s3(test_func):
+    # type: (Callable[[...], Any]) -> Callable
     """
     Mocked AWS S3 bucket for :py:mod:`boto3` over mocked AWS credentials using :py:mod:`moto`.
 
