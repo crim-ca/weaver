@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING
 import mock
 import pyramid.testing
 import pytest
-import webtest
-from owslib.wps import WebProcessingService
 
 from tests.utils import (
+    get_test_weaver_app,
     mocked_process_job_runner,
+    mocked_remote_wps,
     setup_config_with_mongodb,
     setup_mongodb_jobstore,
     setup_mongodb_processstore,
@@ -37,28 +37,18 @@ from weaver.wps_restapi import swagger_definitions as sd
 if TYPE_CHECKING:
     from typing import Iterable, List, Tuple, Union
 
-    from owslib.wps import Process as ProcessOWSWPS
-    from pywps.app import Process as ProcessPyWPS
-
-    # pylint: disable=C0103,invalid-name,E1101,no-member
-    MockPatch = mock._patch  # noqa: W0212
-
 
 class WpsRestApiJobsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         warnings.simplefilter("ignore", TimeZoneInfoAlreadySetWarning)
-        cls.config = setup_config_with_mongodb()
-        cls.config.include("weaver.wps")
-        cls.config.include("weaver.wps_restapi")
-        cls.config.include("weaver.tweens")
-        cls.config.registry.settings.update({
+        settings = {
             "weaver.url": "localhost",
             "weaver.wps_email_encrypt_salt": "weaver-test",
-        })
-        cls.config.scan()
+        }
+        cls.config = setup_config_with_mongodb(settings=settings)
+        cls.app = get_test_weaver_app(config=cls.config)
         cls.json_headers = {"Accept": CONTENT_TYPE_APP_JSON, "Content-Type": CONTENT_TYPE_APP_JSON}
-        cls.app = webtest.TestApp(cls.config.make_wsgi_app())
 
     @classmethod
     def tearDownClass(cls):
@@ -144,16 +134,6 @@ class WpsRestApiJobsTest(unittest.TestCase):
         return tuple([
             mock.patch("pyramid.security.AuthenticationAPIMixin.authenticated_userid", new_callable=lambda: user_id),
             mock.patch("pyramid.request.AuthorizationAPIMixin.has_permission", return_value=is_admin),
-        ])
-
-    @staticmethod
-    def get_job_remote_service_mock(processes):
-        # type: (List[Union[ProcessPyWPS, ProcessOWSWPS]]) -> Iterable[MockPatch]
-        mock_processes = mock.PropertyMock
-        mock_processes.return_value = processes
-        return tuple([
-            mock.patch.object(WebProcessingService, "getcapabilities", new=lambda *args, **kwargs: None),
-            mock.patch.object(WebProcessingService, "processes", new_callable=mock_processes, create=True),
         ])
 
     @staticmethod
@@ -424,7 +404,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
                             service=self.service_public.name,
                             process=self.process_private.identifier)
         with contextlib.ExitStack() as stack:
-            for runner in self.get_job_remote_service_mock([self.process_private]):  # process visible on remote
+            for runner in mocked_remote_wps([self.process_private]):  # process visible on remote
                 stack.enter_context(runner)
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 200
@@ -440,8 +420,8 @@ class WpsRestApiJobsTest(unittest.TestCase):
                             service=self.service_public.name,
                             process=self.process_private.identifier)
         with contextlib.ExitStack() as stack:
-            for job in self.get_job_remote_service_mock([]):    # process invisible (not returned by remote)
-                stack.enter_context(job)
+            for patch in mocked_remote_wps([]):    # process invisible (not returned by remote)
+                stack.enter_context(patch)
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 404
             assert resp.content_type == CONTENT_TYPE_APP_JSON
@@ -506,7 +486,7 @@ class WpsRestApiJobsTest(unittest.TestCase):
             with contextlib.ExitStack() as stack:
                 for patch in self.get_job_request_auth_mock(user_id):
                     stack.enter_context(patch)
-                for patch in self.get_job_remote_service_mock([self.process_public]):
+                for patch in mocked_remote_wps([self.process_public]):
                     stack.enter_context(patch)
                 test = get_path_kvp(path, access=access) if access else path
                 resp = self.app.get(test, headers=self.json_headers)

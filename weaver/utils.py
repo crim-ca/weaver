@@ -1,4 +1,5 @@
 import errno
+import functools
 import inspect
 import logging
 import os
@@ -717,6 +718,31 @@ def get_request_options(method, url, settings):
     return request_options
 
 
+def retry_on_cache_error(func):
+    # type: (Callable[[...], Any]) -> Callable
+    """
+    Decorator to handle invalid cache setup.
+
+    Any function wrapped with this decorator will retry execution once if missing cache setup was the cause of error.
+    """
+    @functools.wraps(func)
+    def wrapped(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except BeakerException as exc:
+            if "Cache region not configured" in str(exc):
+                LOGGER.debug("Invalid cache region setup detected, retrying operation after setup...")
+                setup_cache(get_settings() or {})
+            else:
+                raise  # if not the expected cache exception, ignore retry attempt
+        try:
+            return func(*args, **kwargs)
+        except BeakerException as exc:
+            LOGGER.error("Invalid cache region setup could not be resolved: [%s]", exc)
+            raise
+    return wrapped
+
+
 def _request_call(method, url, kwargs):
     # type: (str, str, Dict[str, AnyValue]) -> Response
     """
@@ -739,6 +765,7 @@ def _request_cached(method, url, kwargs):
     return _request_call(method, url, kwargs)
 
 
+@retry_on_cache_error
 def request_extra(method,                       # type: str
                   url,                          # type: str
                   retries=None,                 # type: Optional[int]
@@ -881,16 +908,6 @@ def request_extra(method,                       # type: str
             invalidate_region(caching_args)
             failures.append("{} ({})".format(getattr(resp, "reason", type(resp).__name__),
                                              getattr(resp, "status_code", getattr(resp, "code", 500))))
-        # failure caused by invalid cache setup re-run with sub-call to restart the retry procedure from scratch
-        except BeakerException as exc:
-            if "Cache region not configured: {}".format(region) in str(exc):
-                LOGGER.warning("Invalid cache region setup detected, retrying request...")
-                setup_cache(settings)
-                resp = request_extra(method, url, retries=retries, retry_after=retry_after, backoff=backoff,
-                                     intervals=intervals, ssl_verify=ssl_verify, allowed_codes=allowed_codes,
-                                     only_server_errors=only_server_errors, settings=settings, **request_kwargs)
-                return resp  # sub-called did the retry loop, so finish early this loop
-            raise  # if not the expected cache exception, ignore retry attempt
         # function called without retries raises original error as if calling requests module directly
         except (requests.ConnectionError, requests.Timeout) as exc:
             if no_retries:
