@@ -2986,26 +2986,14 @@ class OkGetProvidersListResponse(ExtendedMappingSchema):
     body = ProvidersSchema()
 
 
-class InternalServerErrorGetProvidersListResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during providers listing."
-
-
 class OkGetProviderCapabilitiesSchema(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = ProviderCapabilitiesSchema()
 
 
-class InternalServerErrorGetProviderCapabilitiesResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during provider capabilities request."
-
-
 class NoContentDeleteProviderSchema(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = NoContent()
-
-
-class InternalServerErrorDeleteProviderResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during provider removal."
 
 
 class NotImplementedDeleteProviderResponse(ExtendedMappingSchema):
@@ -3015,10 +3003,6 @@ class NotImplementedDeleteProviderResponse(ExtendedMappingSchema):
 class OkGetProviderProcessesSchema(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = ProcessesSchema()
-
-
-class InternalServerErrorGetProviderProcessesListResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during provider processes listing."
 
 
 class GetProcessesQuery(ExtendedMappingSchema):
@@ -3041,12 +3025,6 @@ class OkGetProcessesListResponse(ExtendedMappingSchema):
     body = ProcessCollection()
 
 
-class InternalServerErrorGetProcessesListResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during processes listing."
-    headers = ResponseHeaders()
-    body = ErrorJsonResponseBodySchema()
-
-
 class OkPostProcessDeployBodySchema(ExtendedMappingSchema):
     deploymentDone = ExtendedSchemaNode(Boolean(), default=False, example=True,
                                         description="Indicates if the process was successfully deployed.")
@@ -3060,10 +3038,6 @@ class OkPostProcessesResponse(ExtendedMappingSchema):
     body = OkPostProcessDeployBodySchema()
 
 
-class InternalServerErrorPostProcessesResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during process deployment."
-
-
 class BadRequestGetProcessInfoResponse(ExtendedMappingSchema):
     description = "Missing process identifier."
     body = NoContent()
@@ -3074,26 +3048,14 @@ class OkGetProcessInfoResponse(ExtendedMappingSchema):
     body = ProcessOffering()
 
 
-class InternalServerErrorGetProcessResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during process description."
-
-
 class OkGetProcessPackageSchema(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = NoContent()
 
 
-class InternalServerErrorGetProcessPackageResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during process package description."
-
-
 class OkGetProcessPayloadSchema(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = NoContent()
-
-
-class InternalServerErrorGetProcessPayloadResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during process payload description."
 
 
 class ProcessVisibilityResponseBodySchema(ExtendedMappingSchema):
@@ -3105,10 +3067,6 @@ class OkGetProcessVisibilitySchema(ExtendedMappingSchema):
     body = ProcessVisibilityResponseBodySchema()
 
 
-class InternalServerErrorGetProcessVisibilityResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during process visibility retrieval."
-
-
 class OkPutProcessVisibilitySchema(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = ProcessVisibilityResponseBodySchema()
@@ -3118,10 +3076,6 @@ class ForbiddenVisibilityUpdateResponseSchema(ExtendedMappingSchema):
     description = "Visibility value modification not allowed."
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
-
-
-class InternalServerErrorPutProcessVisibilityResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during process visibility update."
 
 
 class OkDeleteProcessUndeployBodySchema(ExtendedMappingSchema):
@@ -3137,26 +3091,14 @@ class OkDeleteProcessResponse(ExtendedMappingSchema):
     body = OkDeleteProcessUndeployBodySchema()
 
 
-class InternalServerErrorDeleteProcessResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during process deletion."
-
-
 class OkGetProviderProcessDescriptionResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = ProcessDescriptionBodySchema()
 
 
-class InternalServerErrorGetProviderProcessResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during provider process description."
-
-
 class CreatedPostProvider(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = ProviderSummarySchema()
-
-
-class InternalServerErrorPostProviderResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during provider process registration."
 
 
 class NotImplementedPostProviderResponse(ExtendedMappingSchema):
@@ -3166,14 +3108,6 @@ class NotImplementedPostProviderResponse(ExtendedMappingSchema):
 class CreatedLaunchJobResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = CreatedJobStatusSchema()
-
-
-class InternalServerErrorPostProcessJobResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during process job submission."
-
-
-class InternalServerErrorPostProviderProcessJobResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during process job submission."
 
 
 class OkGetProcessJobResponse(ExtendedMappingSchema):
@@ -3191,17 +3125,9 @@ class OkGetQueriedJobsResponse(ExtendedMappingSchema):
     body = GetQueriedJobsSchema()
 
 
-class InternalServerErrorGetJobsResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during jobs listing."
-
-
 class OkDismissJobResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = DismissedJobSchema()
-
-
-class InternalServerErrorDeleteJobResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during job dismiss request."
 
 
 class OkGetJobStatusResponse(ExtendedMappingSchema):
@@ -3219,10 +3145,6 @@ class NotFoundJobResponseSchema(ExtendedMappingSchema):
     }
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
-
-
-class InternalServerErrorGetJobStatusResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during provider process description."
 
 
 class OkGetJobInputsResponse(ExtendedMappingSchema):
@@ -3384,7 +3306,7 @@ get_provider_responses = {
         }
     }),
     "403": ForbiddenProviderAccessResponseSchema(),
-    "500": InternalServerErrorGetProviderCapabilitiesResponse(),
+    "500": InternalServerErrorResponseSchema(),
 }
 delete_provider_responses = {
     "204": NoContentDeleteProviderSchema(description="success"),
@@ -3411,8 +3333,8 @@ post_provider_responses = {
     "201": CreatedPostProvider(description="success"),
     "400": ExtendedMappingSchema(description=OWSMissingParameterValue.description),
     "403": ForbiddenProviderAccessResponseSchema(),
-    "500": InternalServerErrorPostProviderResponse(),
-    "501": InternalServerErrorResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
+    "501": NotImplementedPostProviderResponse(),
 }
 post_provider_process_job_responses = {
     "201": CreatedLaunchJobResponse(description="success"),

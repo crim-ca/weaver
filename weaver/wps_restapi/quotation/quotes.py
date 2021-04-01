@@ -35,7 +35,7 @@ def process_quote_estimator(process):   # noqa: E811
 
 @sd.process_quotes_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_PROCESSES], renderer=OUTPUT_FORMAT_JSON,
                                 schema=sd.PostProcessQuoteRequestEndpoint(), response_schemas=sd.post_quotes_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostQuoteRequestResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def request_quote(request):
     """
     Request a quotation for a process.
@@ -103,7 +103,7 @@ def request_quote(request):
                                schema=sd.ProcessQuotesEndpoint(), response_schemas=sd.get_quote_list_responses)
 @sd.quotes_service.get(tags=[sd.TAG_BILL_QUOTE], renderer=OUTPUT_FORMAT_JSON,
                        schema=sd.QuotesEndpoint(), response_schemas=sd.get_quote_list_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetQuoteListResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_quote_list(request):
     """
     Get list of quotes IDs.
@@ -131,7 +131,7 @@ def get_quote_list(request):
                               schema=sd.ProcessQuoteEndpoint(), response_schemas=sd.get_quote_responses)
 @sd.quote_service.get(tags=[sd.TAG_BILL_QUOTE], renderer=OUTPUT_FORMAT_JSON,
                       schema=sd.QuoteEndpoint(), response_schemas=sd.get_quote_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorGetQuoteInfoResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_quote_info(request):
     """
     Get quote information.
@@ -149,7 +149,7 @@ def get_quote_info(request):
                                schema=sd.PostProcessQuote(), response_schemas=sd.post_quote_responses)
 @sd.quote_service.post(tags=[sd.TAG_BILL_QUOTE, sd.TAG_EXECUTE], renderer=OUTPUT_FORMAT_JSON,
                        schema=sd.PostQuote(), response_schemas=sd.post_quote_responses)
-@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostQuoteExecuteResponse.description)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def execute_quote(request):
     """
     Execute a quoted process.
