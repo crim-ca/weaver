@@ -1455,7 +1455,7 @@ class WPSOutputDescriptionType(WPSDescriptionType):
     metadata = OWSMetadata(missing=drop)
 
 
-class ProcessOutputs(ExtendedSequenceSchema, XMLObject):  # no XML prefix for these
+class ProcessOutputs(ExtendedSequenceSchema, WPSNamespace):
     name = "ProcessOutputs"
     title = "ProcessOutputs"
     output = WPSOutputDescriptionType()
