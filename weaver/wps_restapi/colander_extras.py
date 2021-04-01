@@ -278,6 +278,7 @@ class ExtendedSchemaBase(colander.SchemaNode, metaclass=ExtendedSchemaMeta):
                 title = self.title
             else:
                 title = kwargs.get("title", schema_name)
+            # pylint: disable=no-member
             if self.prefix is not colander.drop:
                 title = "{}:{}".format(self.prefix or "xml", title)
             kwargs["title"] = title
@@ -776,7 +777,7 @@ class ExtendedSequenceSchema(DefaultSchemaNode, DropableSchemaNode, colander.Seq
         super(ExtendedSequenceSchema, self).__init__(*args, **kwargs)
         self._validate()
 
-    def _validate(self):
+    def _validate(self):  # pylint: disable=arguments-differ
         ExtendedSchemaBase._validate(self.children[0])
 
 

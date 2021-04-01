@@ -9,7 +9,6 @@ import pyramid.testing
 import pytest
 import responses
 import stopit
-import webtest
 
 from tests.utils import (
     get_test_weaver_app,
