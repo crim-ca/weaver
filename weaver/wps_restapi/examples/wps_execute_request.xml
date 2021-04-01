@@ -1,0 +1,34 @@
+<wps:Execute
+		xmlns:wps="http://www.opengis.net/wps/1.0.0"
+		xmlns:ows="http://www.opengis.net/ows/1.1"
+		xmlns:xlink="http://www.w3.org/1999/xlink"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 ../wpsExecute_request.xsd"
+		service="WPS"
+		version="1.0.0"
+>
+	<ows:Identifier>ProcessIdentifier</ows:Identifier>
+	<wps:DataInputs>
+		<wps:Input>
+			<ows:Identifier>LiteralInputIdentifier</ows:Identifier>
+			<ows:Title>Demo process</ows:Title>
+			<wps:Data>
+				<wps:LiteralData>400</wps:LiteralData>
+			</wps:Data>
+		</wps:Input>
+		<wps:Input>
+			<ows:Identifier>ComplexInputIdentifier</ows:Identifier>
+			<ows:Title>Another description</ows:Title>
+			<wps:Reference xlink:href="http://schema-example.com/data/image.tif" method="GET"/>
+		</wps:Input>
+	</wps:DataInputs>
+	<wps:ResponseForm>
+		<wps:ResponseDocument storeExecuteResponse="true" lineage="true" status="true">
+			<wps:Output asReference="true">
+				<ows:Identifier>OutputIdentifier</ows:Identifier>
+				<ows:Title>Description of output</ows:Title>
+				<ows:Abstract>Additional details.</ows:Abstract>
+			</wps:Output>
+		</wps:ResponseDocument>
+	</wps:ResponseForm>
+</wps:Execute>

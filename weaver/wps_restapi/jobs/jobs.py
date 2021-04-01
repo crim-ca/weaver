@@ -49,7 +49,7 @@ def get_job(request):
     try:
         job = store.fetch_by_id(job_id)
     except JobNotFound:
-        raise OWSNotFound(code="NoSuchJob", description="Could not find job with specified 'job_id'.")
+        raise OWSNotFound(code="NoSuchJob", locator="JobID", description="Could not find job with specified 'job_id'.")
 
     provider_id = request.matchdict.get("provider_id", job.service)
     process_id = request.matchdict.get("process_id", job.process)
@@ -57,11 +57,13 @@ def get_job(request):
     if job.service != provider_id:
         raise OWSNotFound(
             code="NoSuchProvider",
+            locator="provider",
             description="Could not find job corresponding to specified 'provider_id'."
         )
     if job.process != process_id:
         raise OWSNotFound(
             code="NoSuchProcess",
+            locator="process",
             description="Could not find job corresponding to specified 'process_id'."
         )
     return job

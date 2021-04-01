@@ -5,7 +5,9 @@
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 ../wpsDescribeProcess_response.xsd"
         xml:lang="en-US"
-        service="WPS" version="1.0.0">
+        service="WPS"
+        version="1.0.0"
+>
     <ProcessDescription wps:processVersion="1.1" storeSupported="true" statusSupported="true">
         <ows:Identifier>jsonarray2netcdf</ows:Identifier>
         <ows:Title>JSON array to NetCDF</ows:Title>

@@ -952,12 +952,36 @@ class OWSNamespace(XMLObject):
 
 
 class WPSNamespace(XMLObject):
-    prefix = "ows"
+    prefix = "wps"
     namespace = "http://www.opengis.net/wps/1.0.0"
 
 
 class XMLNamespace(XMLObject):
     prefix = "xml"
+
+
+class XMLReferenceAttribute(ExtendedSchemaNode, XMLObject):
+    schema_type = String
+    attribute = True
+    name = "href"
+    prefix = "xlink"
+    format = "url"
+
+
+class MimeTypeAttribute(ExtendedSchemaNode, XMLObject):
+    schema_type = String
+    attribute = True
+    name = "mimeType"
+    prefix = drop
+    example = CONTENT_TYPE_APP_JSON
+
+
+class EncodingAttribute(ExtendedSchemaNode, XMLObject):
+    schema_type = String
+    attribute = True
+    name = "encoding"
+    prefix = drop
+    example = "UTF-8"
 
 
 class OWSVersion(ExtendedSchemaNode, OWSNamespace):
@@ -1050,6 +1074,7 @@ class WPSOperationPost(ExtendedMappingSchema):
 class WPSGetCapabilitiesPost(WPSOperationPost, WPSNamespace):
     schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsGetCapabilities_request.xsd"
     name = "GetCapabilities"
+    title = "GetCapabilities"
 
 
 class OWSIdentifier(ExtendedSchemaNode, OWSNamespace):
@@ -1113,12 +1138,18 @@ class WPSExecutePost(WPSOperationPost, WPSNamespace):
     dataInputs = WPSExecuteDataInputs(description="Data inputs to be provided for process execution.")
 
 
-class WPSBody(OneOfKeywordSchema):
+class WPSRequestBody(OneOfKeywordSchema):
     _one_of = [
         WPSExecutePost(),
         WPSDescribeProcessPost(),
         WPSGetCapabilitiesPost(),
     ]
+    examples = {
+        "Execute": {
+            "summary": "Execute request example.",
+            "value": EXAMPLES["wps_execute_request.xml"]
+        }
+    }
 
 
 class WPSHeaders(ExtendedMappingSchema):
@@ -1133,7 +1164,7 @@ class WPSEndpointGet(ExtendedMappingSchema):
 
 class WPSEndpointPost(ExtendedMappingSchema):
     header = WPSHeaders()
-    body = WPSBody()
+    body = WPSRequestBody()
 
 
 class XMLBooleanAttribute(ExtendedSchemaNode, XMLObject):
@@ -1400,7 +1431,7 @@ class WPSDataInputDescription(ExtendedMappingSchema):
     max_occurs = WPSMaxOccursAttribute()
 
 
-class WPSDataInputItem(AllOfKeywordSchema, XMLObject):  # no XML prefix for these
+class WPSDataInputItem(AllOfKeywordSchema, WPSNamespace):
     _all_of = [
         WPSInputDescriptionType(),
         WPSInputFormChoice(),
@@ -1408,7 +1439,7 @@ class WPSDataInputItem(AllOfKeywordSchema, XMLObject):  # no XML prefix for thes
     ]
 
 
-class WPSDataInputs(ExtendedSequenceSchema, XMLObject):  # no XML prefix for these
+class WPSDataInputs(ExtendedSequenceSchema, WPSNamespace):
     name = "DataInputs"
     title = "DataInputs"
     input = WPSDataInputItem()
@@ -1433,7 +1464,7 @@ class ProcessOutputs(ExtendedSequenceSchema, XMLObject):  # no XML prefix for th
 class WPSGetCapabilities(WPSResponseBaseType):
     schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsGetCapabilities_response.xsd"
     name = "Capabilities"
-    title = "GetCapabilities"
+    title = "Capabilities"  # not to be confused by 'GetCapabilities' used for request
     svc = OWSServiceIdentification()
     ops = OperationsMetadata()
     offering = WPSProcessOfferings()
@@ -1464,17 +1495,132 @@ class WPSDescribeProcess(WPSResponseBaseType):
     process = WPSProcessDescriptionList()
 
 
-class WPSExecute(WPSResponseBaseType, WPSProcessVersion):
+class WPSStatusLocationAttribute(ExtendedSchemaNode, XMLObject):
+    schema_type = String
+    name = "statusLocation"
+    prefix = drop
+    attribute = True
+    format = "file"
+
+
+class WPSServiceInstanceAttribute(ExtendedSchemaNode, XMLObject):
+    schema_type = String
+    name = "serviceInstance"
+    prefix = drop
+    attribute = True
+    format = "url"
+
+
+class CreationTimeAttribute(ExtendedSchemaNode, XMLObject):
+    schema_type = DateTime
+    name = "creationTime"
+    title = "CreationTime"
+    prefix = drop
+    attribute = True
+
+
+class WPSStatusSuccess(ExtendedSchemaNode, WPSNamespace):
+    schema_type = String
+    name = "ProcessSucceeded"
+    title = "ProcessSucceeded"
+
+
+class WPSStatusFailed(ExtendedSchemaNode, WPSNamespace):
+    schema_type = String
+    name = "ProcessFailed"
+    title = "ProcessFailed"
+
+
+class WPSStatus(ExtendedMappingSchema, WPSNamespace):
+    name = "Status"
+    title = "Status"
+    creationTime = CreationTimeAttribute()
+    status_success = WPSStatusSuccess(missing=drop)
+    status_failed = WPSStatusFailed(missing=drop)
+
+
+class WPSProcessSummary(ExtendedMappingSchema, WPSNamespace):
+    name = "Process"
+    title = "Process"
+    identifier = OWSIdentifier()
+    _title = OWSTitle()
+    abstract = OWSAbstract(missing=drop)
+
+
+class WPSOutputBase(ExtendedMappingSchema):
+    identifier = OWSIdentifier()
+    _title = OWSTitle()
+    abstract = OWSAbstract(missing=drop)
+
+
+class WPSOutputDefinitionItem(WPSOutputBase, WPSNamespace):
+    name = "Output"
+    # use different title to avoid OpenAPI schema definition clash with 'Output' of 'WPSProcessOutputs'
+    title = "OutputDefinition"
+
+
+class WPSOutputDefinitions(ExtendedSequenceSchema, WPSNamespace):
+    name = "OutputDefinitions"
+    title = "OutputDefinitions"
+    out_def = WPSOutputDefinitionItem()
+
+
+class WPSOutputLiteral(ExtendedMappingSchema):
+    data = ()
+
+
+class WPSReference(ExtendedMappingSchema, WPSNamespace):
+    href = XMLReferenceAttribute()
+    mimeType = MimeTypeAttribute()
+    encoding = EncodingAttribute()
+
+
+class WPSOutputReference(ExtendedMappingSchema):
+    title = "OutputReference"
+    reference = WPSReference(name="Reference")
+
+
+class WPSOutputData(OneOfKeywordSchema):
+    _one_of = [
+        WPSOutputLiteral(),
+        WPSOutputReference(),
+    ]
+
+
+class WPSDataOutputItem(AllOfKeywordSchema, WPSNamespace):
+    name = "Output"
+    # use different title to avoid OpenAPI schema definition clash with 'Output' of 'WPSOutputDefinitions'
+    title = "DataOutput"
+    _all_of = [
+        WPSOutputBase(),
+        WPSOutputData(),
+    ]
+
+
+class WPSProcessOutputs(ExtendedSequenceSchema, WPSNamespace):
+    name = "ProcessOutputs"
+    title = "ProcessOutputs"
+    output = WPSDataOutputItem()
+
+
+class WPSExecuteResponse(WPSResponseBaseType, WPSProcessVersion):
     schema_ref = "http://schemas.opengis.net/wps/1.0.0/wpsExecute_response.xsd"
-    name = "Execute"
-    title = "Execute"
+    name = "ExecuteResponse"
+    title = "ExecuteResponse"  # not to be confused by 'Execute' used for request
+    location = WPSStatusLocationAttribute()
+    svc_loc = WPSServiceInstanceAttribute()
+    process = WPSProcessSummary()
+    status = WPSStatus()
+    inputs = WPSDataInputs(missing=drop)          # when lineage is requested only
+    out_def = WPSOutputDefinitions(missing=drop)  # when lineage is requested only
+    outputs = WPSProcessOutputs()
 
 
 class WPSXMLSuccessBodySchema(OneOfKeywordSchema):
     _one_of = [
         WPSGetCapabilities(),
         WPSDescribeProcess(),
-        WPSExecute(),
+        WPSExecuteResponse(),
     ]
 
 
@@ -1498,6 +1644,7 @@ class OWSExceptionText(ExtendedSchemaNode, OWSNamespace):
 
 class OWSException(ExtendedMappingSchema, OWSNamespace):
     name = "Exception"
+    title = "Exception"
     code = OWSExceptionCodeAttribute(example="MissingParameterValue")
     locator = OWSExceptionLocatorAttribute(default="None", example="service")
     text = OWSExceptionText(example="Missing service")
@@ -1510,16 +1657,6 @@ class OWSExceptionReport(ExtendedMappingSchema, OWSNamespace):
 
 
 class WPSException(ExtendedMappingSchema):
-    example = """
-    <ows:ExceptionReport
-            xsi:schemaLocation="http://www.opengis.net/ows/1.1
-            http://schemas.opengis.net/ows/1.1.0/owsExceptionReport.xsd"
-            version="1.0.0">
-        <ows:Exception exceptionCode="MissingParameterValue" locator="service">
-            <ows:ExceptionText>service</ows:ExceptionText>
-        </ows:Exception>
-    </ows:ExceptionReport>
-    """
     report = OWSExceptionReport()
 
 
@@ -2781,7 +2918,8 @@ class OWSErrorCode(ExtendedSchemaNode):
 
 class OWSExceptionResponse(ExtendedMappingSchema):
     """Error content in XML format"""
-    code = OWSErrorCode()
+    description = "OWS formatted exception."
+    code = OWSErrorCode(example="NoSuchProcess")
     locator = ExtendedSchemaNode(String(), example="identifier",
                                  description="Indication of the element that caused the error.")
     message = ExtendedSchemaNode(String(), example="Invalid process ID.",
@@ -2790,11 +2928,25 @@ class OWSExceptionResponse(ExtendedMappingSchema):
 
 class ErrorJsonResponseBodySchema(ExtendedMappingSchema):
     code = OWSErrorCode()
-    description = ExtendedSchemaNode(String(), description="", example="Process identifier is invalid.")
+    description = ExtendedSchemaNode(String(), description="Detail about the cause of error.")
     error = ErrorDetail(missing=drop)
+    exception = OWSExceptionResponse(missing=drop)
 
 
-class UnauthorizedJsonResponseSchema(ExtendedMappingSchema):
+class ForbiddenProcessAccessResponseSchema(ExtendedMappingSchema):
+    description = "Referenced process is not accessible."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
+class ForbiddenProviderAccessResponseSchema(ExtendedMappingSchema):
+    description = "Referenced provider is not accessible."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
+class InternalServerErrorResponseSchema(ExtendedMappingSchema):
+    description = "Unhandled internal server error."
     header = ResponseHeaders()
     body = ErrorJsonResponseBodySchema()
 
@@ -2891,6 +3043,8 @@ class OkGetProcessesListResponse(ExtendedMappingSchema):
 
 class InternalServerErrorGetProcessesListResponse(ExtendedMappingSchema):
     description = "Unhandled error occurred during processes listing."
+    headers = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
 
 
 class OkPostProcessDeployBodySchema(ExtendedMappingSchema):
@@ -2958,6 +3112,12 @@ class InternalServerErrorGetProcessVisibilityResponse(ExtendedMappingSchema):
 class OkPutProcessVisibilitySchema(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = ProcessVisibilityResponseBodySchema()
+
+
+class ForbiddenVisibilityUpdateResponseSchema(ExtendedMappingSchema):
+    description = "Visibility value modification not allowed."
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
 
 
 class InternalServerErrorPutProcessVisibilityResponse(ExtendedMappingSchema):
@@ -3049,6 +3209,18 @@ class OkGetJobStatusResponse(ExtendedMappingSchema):
     body = JobStatusInfo()
 
 
+class NotFoundJobResponseSchema(ExtendedMappingSchema):
+    description = "Job reference UUID cannot be found."
+    examples = {
+        "JobNotFound": {
+            "summary": "Example response when specified job reference cannot be found.",
+            "value": EXAMPLES["job_not_found.json"]
+        }
+    }
+    header = ResponseHeaders()
+    body = ErrorJsonResponseBodySchema()
+
+
 class InternalServerErrorGetJobStatusResponse(ExtendedMappingSchema):
     description = "Unhandled error occurred during provider process description."
 
@@ -3072,21 +3244,9 @@ class OkGetJobResultsResponse(ExtendedMappingSchema):
     body = Result()
 
 
-class InternalServerErrorGetJobResultsResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during job results listing."
-
-
-class InternalServerErrorGetJobOutputResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during job results listing."
-
-
 class CreatedQuoteExecuteResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = CreatedQuotedJobStatusSchema()
-
-
-class InternalServerErrorPostQuoteExecuteResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during quote job execution."
 
 
 class CreatedQuoteRequestResponse(ExtendedMappingSchema):
@@ -3094,17 +3254,9 @@ class CreatedQuoteRequestResponse(ExtendedMappingSchema):
     body = QuoteSchema()
 
 
-class InternalServerErrorPostQuoteRequestResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during quote submission."
-
-
 class OkGetQuoteInfoResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = QuoteSchema()
-
-
-class InternalServerErrorGetQuoteInfoResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during quote retrieval."
 
 
 class OkGetQuoteListResponse(ExtendedMappingSchema):
@@ -3112,17 +3264,9 @@ class OkGetQuoteListResponse(ExtendedMappingSchema):
     body = QuotationListSchema()
 
 
-class InternalServerErrorGetQuoteListResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during quote listing."
-
-
 class OkGetBillDetailResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = BillSchema()
-
-
-class InternalServerErrorGetBillInfoResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during bill retrieval."
 
 
 class OkGetBillListResponse(ExtendedMappingSchema):
@@ -3130,17 +3274,9 @@ class OkGetBillListResponse(ExtendedMappingSchema):
     body = BillListSchema()
 
 
-class InternalServerErrorGetBillListResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during bill listing."
-
-
 class OkGetJobExceptionsResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = JobExceptionsSchema()
-
-
-class InternalServerErrorGetJobExceptionsResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during job exceptions listing."
 
 
 class OkGetJobLogsResponse(ExtendedMappingSchema):
@@ -3148,33 +3284,29 @@ class OkGetJobLogsResponse(ExtendedMappingSchema):
     body = JobLogsSchema()
 
 
-class InternalServerErrorGetJobLogsResponse(ExtendedMappingSchema):
-    description = "Unhandled error occurred during job logs listing."
-
-
 get_api_frontpage_responses = {
     "200": OkGetFrontpageResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_openapi_json_responses = {
     "200": OkGetSwaggerJSONResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_api_swagger_ui_responses = {
     "200": OkGetSwaggerUIResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_api_redoc_ui_responses = {
     "200": OkGetRedocUIResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_api_versions_responses = {
     "200": OkGetVersionsResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_api_conformance_responses = {
     "200": OkGetConformanceResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized")
+    "500": InternalServerErrorResponseSchema(),
 }
 get_processes_responses = {
     "200": OkGetProcessesListResponse(description="success", examples={
@@ -3183,14 +3315,11 @@ get_processes_responses = {
             "value": EXAMPLES["local_process_listing.json"],
         }
     }),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "500": InternalServerErrorGetProcessesListResponse(),
+    "500": InternalServerErrorResponseSchema(),
 }
 post_processes_responses = {
     "201": OkPostProcessesResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorPostProcessesResponse(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_process_responses = {
     "200": OkGetProcessInfoResponse(description="success", examples={
@@ -3200,9 +3329,7 @@ get_process_responses = {
         }
     }),
     "400": BadRequestGetProcessInfoResponse(),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetProcessResponse(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_process_package_responses = {
     "200": OkGetProcessPackageSchema(description="success", examples={
@@ -3211,9 +3338,8 @@ get_process_package_responses = {
             "value": EXAMPLES["local_process_package.json"],
         }
     }),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetProcessPackageResponse(),
+    "403": ForbiddenProcessAccessResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_process_payload_responses = {
     "200": OkGetProcessPayloadSchema(description="success", examples={
@@ -3222,27 +3348,23 @@ get_process_payload_responses = {
             "value": EXAMPLES["local_process_payload.json"],
         }
     }),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetProcessPayloadResponse(),
+    "403": ForbiddenProcessAccessResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_process_visibility_responses = {
     "200": OkGetProcessVisibilitySchema(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetProcessVisibilityResponse(),
+    "403": ForbiddenProcessAccessResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 put_process_visibility_responses = {
     "200": OkPutProcessVisibilitySchema(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorPutProcessVisibilityResponse(),
+    "403": ForbiddenVisibilityUpdateResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 delete_process_responses = {
     "200": OkDeleteProcessResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorDeleteProcessResponse(),
+    "403": ForbiddenProcessAccessResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_providers_list_responses = {
     "200": OkGetProvidersListResponse(description="success", examples={
@@ -3251,9 +3373,8 @@ get_providers_list_responses = {
             "value": EXAMPLES["provider_listing.json"],
         }
     }),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetProvidersListResponse(),
+    "403": ForbiddenProviderAccessResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_provider_responses = {
     "200": OkGetProviderCapabilitiesSchema(description="success", examples={
@@ -3262,22 +3383,19 @@ get_provider_responses = {
             "value": EXAMPLES["provider_description.json"],
         }
     }),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
+    "403": ForbiddenProviderAccessResponseSchema(),
     "500": InternalServerErrorGetProviderCapabilitiesResponse(),
 }
 delete_provider_responses = {
     "204": NoContentDeleteProviderSchema(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorDeleteProviderResponse(),
+    "403": ForbiddenProviderAccessResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
     "501": NotImplementedDeleteProviderResponse(),
 }
 get_provider_processes_responses = {
     "200": OkGetProviderProcessesSchema(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetProviderProcessesListResponse(),
+    "403": ForbiddenProviderAccessResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_provider_process_responses = {
     "200": OkGetProviderProcessDescriptionResponse(description="success", examples={
@@ -3286,29 +3404,25 @@ get_provider_process_responses = {
             "value": EXAMPLES["provider_process_description.json"]
         }
     }),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetProviderProcessResponse(),
+    "403": ForbiddenProviderAccessResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 post_provider_responses = {
     "201": CreatedPostProvider(description="success"),
     "400": ExtendedMappingSchema(description=OWSMissingParameterValue.description),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
+    "403": ForbiddenProviderAccessResponseSchema(),
     "500": InternalServerErrorPostProviderResponse(),
-    "501": NotImplementedPostProviderResponse(),
+    "501": InternalServerErrorResponseSchema(),
 }
 post_provider_process_job_responses = {
     "201": CreatedLaunchJobResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorPostProviderProcessJobResponse(),
+    "403": ForbiddenProviderAccessResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 post_process_jobs_responses = {
     "201": CreatedLaunchJobResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorPostProcessJobResponse(),
+    "403": ForbiddenProviderAccessResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_all_jobs_responses = {
     "200": OkGetQueriedJobsResponse(description="success", examples={
@@ -3317,9 +3431,7 @@ get_all_jobs_responses = {
             "value": EXAMPLES["jobs_listing.json"]
         }
     }),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetJobsResponse(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_single_job_status_responses = {
     "200": OkGetJobStatusResponse(description="success", examples={
@@ -3331,15 +3443,13 @@ get_single_job_status_responses = {
             "value": EXAMPLES["job_status_failed.json"],
         }
     }),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetJobStatusResponse(),
+    "404": NotFoundJobResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 delete_job_responses = {
     "200": OkDismissJobResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorDeleteJobResponse(),
+    "404": NotFoundJobResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_job_inputs_responses = {
     "200": OkGetJobInputsResponse(description="success", examples={
@@ -3348,9 +3458,8 @@ get_job_inputs_responses = {
             "value": EXAMPLES["job_inputs.json"],
         }
     }),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetJobResultsResponse(),
+    "404": NotFoundJobResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_job_outputs_responses = {
     "200": OkGetJobOutputsResponse(description="success", examples={
@@ -3359,9 +3468,8 @@ get_job_outputs_responses = {
             "value": EXAMPLES["job_outputs.json"],
         }
     }),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetJobOutputResponse(),
+    "404": NotFoundJobResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_result_redirect_responses = {
     "308": RedirectResultResponse(description="Redirects '/result' (without 's') to corresponding '/results' path."),
@@ -3373,8 +3481,8 @@ get_job_results_responses = {
             "value": EXAMPLES["job_results.json"],
         }
     }),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "500": InternalServerErrorGetJobResultsResponse(),
+    "404": NotFoundJobResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_exceptions_responses = {
     "200": OkGetJobExceptionsResponse(description="success", examples={
@@ -3383,9 +3491,8 @@ get_exceptions_responses = {
             "value": EXAMPLES["job_exceptions.json"],
         }
     }),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetJobExceptionsResponse(),
+    "404": NotFoundJobResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_logs_responses = {
     "200": OkGetJobLogsResponse(description="success", examples={
@@ -3394,39 +3501,32 @@ get_logs_responses = {
             "value": EXAMPLES["job_logs.json"],
         }
     }),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "403": UnauthorizedJsonResponseSchema(description="forbidden"),
-    "500": InternalServerErrorGetJobLogsResponse(),
+    "404": NotFoundJobResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_quote_list_responses = {
     "200": OkGetQuoteListResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "500": InternalServerErrorGetQuoteListResponse(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_quote_responses = {
     "200": OkGetQuoteInfoResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "500": InternalServerErrorGetQuoteInfoResponse(),
+    "500": InternalServerErrorResponseSchema(),
 }
 post_quotes_responses = {
     "201": CreatedQuoteRequestResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "500": InternalServerErrorPostQuoteRequestResponse(),
+    "500": InternalServerErrorResponseSchema(),
 }
 post_quote_responses = {
     "201": CreatedQuoteExecuteResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "500": InternalServerErrorPostQuoteExecuteResponse(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_bill_list_responses = {
     "200": OkGetBillListResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "500": InternalServerErrorGetBillListResponse(),
+    "500": InternalServerErrorResponseSchema(),
 }
 get_bill_responses = {
     "200": OkGetBillDetailResponse(description="success"),
-    "401": UnauthorizedJsonResponseSchema(description="unauthorized"),
-    "500": InternalServerErrorGetBillInfoResponse(),
+    "500": InternalServerErrorResponseSchema(),
 }
 wps_responses = {
     "200": OkWPSResponse(examples={
@@ -3437,11 +3537,15 @@ wps_responses = {
         "DescribeProcess": {
             "summary": "DescribeProcess example response.",
             "value": EXAMPLES["wps_describeprocess.xml"]
+        },
+        "Execute": {
+            "summary": "Execute example response.",
+            "value": EXAMPLES["wps_execute_response.xml"]
         }
     }),
     "400": ErrorWPSResponse(examples={
         "MissingParameterError": {
-            "summary": "Error in case of missing parameter ('service' in this case)",
+            "summary": "Error report in case of missing request parameter.",
             "value": EXAMPLES["wps_missing_parameter.xml"],
         }
     }),
