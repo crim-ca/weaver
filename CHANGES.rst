@@ -12,6 +12,10 @@ Changes:
 --------
 - Add caching of remote WPS requests according to ``request-options.yml`` and request header ``Cache-Control`` to allow
   reduced query of pre-fetched WPS client definition.
+- Add ``POST /processes/{}/execution`` endpoint that mimics its jobs counterpart to respect `OGC-API Processes` updates
+  (see issue `opengeospatial/ogcapi-processes#124 <https://github.com/opengeospatial/ogcapi-processes/issues/124>`_ and
+  PR `opengeospatial/ogcapi-processes#159 <https://github.com/opengeospatial/ogcapi-processes/pull/159>`_, resolves
+  `#235 <https://github.com/crim-ca/weaver/issues/235>`_).
 
 Fixes:
 ------
@@ -48,7 +52,7 @@ Changes:
 - Update documentation for minimal adjustments needed to run under Windows.
 - Update OpenAPI template to not render the useless version selector since we only provide the current version.
 - Update Swagger definitions to reflect changes and better reuse existing schemas.
-- Update Swagger UI to provide the `readthedocs` URL.
+- Update Swagger UI to provide the `ReadTheDocs` URL.
 - Add `crim-ca/cwltool@docker-gpu <https://github.com/crim-ca/cwltool/tree/docker-gpu>`_ as ``cwltool`` requirement
   to allow processing of GPU-enabled dockers with `nvidia-docker <https://github.com/NVIDIA/nvidia-docker>`_.
 - Add `fmigneault/cornice.ext.swagger@openapi-3 <https://github.com/fmigneault/cornice.ext.swagger/tree/openapi-3>`_

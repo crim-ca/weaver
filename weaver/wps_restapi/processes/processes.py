@@ -281,12 +281,14 @@ def delete_local_process(request):
     raise HTTPForbidden("Deletion of process has been refused by the database or could not have been validated.")
 
 
+@sd.process_execution_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS], renderer=OUTPUT_FORMAT_JSON,
+                                   schema=sd.PostProcessJobsEndpoint(), response_schemas=sd.post_process_jobs_responses)
 @sd.process_jobs_service.post(tags=[sd.TAG_PROCESSES, sd.TAG_EXECUTE, sd.TAG_JOBS], renderer=OUTPUT_FORMAT_JSON,
                               schema=sd.PostProcessJobsEndpoint(), response_schemas=sd.post_process_jobs_responses)
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorPostProcessJobResponse.description)
 def submit_local_job(request):
     """
-    Execute a process registered locally. The execution occurs where the WPS location was defined during deployment.
+    Execute a process registered locally. Execution location and method is according to deployed Application Package.
     """
     process = get_process(request=request)
     body = submit_job(request, process, tags=["wps-rest"])
